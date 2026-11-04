@@ -274,7 +274,7 @@ check not run stays recorded in ADR-0003 as an open risk.
 Each task is one PR that leaves `pnpm check` green and the playground working.
 
 - [x] Claim phase, branch `phase-4/editor-view`
-- [ ] 4.1 (in review, #8) Smallest editable slice: `EditorView` renders an `EditorState` into one
+- [x] 4.1 (#8) Smallest editable slice: `EditorView` renders an `EditorState` into one
   `contenteditable` host with block/leaf descriptors (DOM ↔ model positions; unchanged blocks
   reused by node identity); `beforeinput` → core commands (insertText, deletes, splitBlock,
   hard break, history, format); keydown through the plugin keymaps; selection synced both ways,

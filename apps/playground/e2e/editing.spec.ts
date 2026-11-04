@@ -77,6 +77,18 @@ test("Enter splits the paragraph and Backspace joins it again", async ({ page })
   await expect.poll(() => savedTexts(page)).toEqual(["on!two"]);
 });
 
+test("triple-click selects one paragraph; typing replaces only it", async ({ page }) => {
+  await openEmpty(page);
+  await page.keyboard.type("one");
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("two");
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("three");
+  await editor(page).locator("p").nth(1).click({ clickCount: 3 });
+  await page.keyboard.type("X");
+  await expect.poll(() => savedTexts(page)).toEqual(["one", "X", "three"]);
+});
+
 test("Mod-b toggles bold for the next typed text and on a selection", async ({ page }) => {
   await openEmpty(page);
   await page.keyboard.type("a");

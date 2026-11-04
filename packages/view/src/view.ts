@@ -19,12 +19,14 @@ import {
 } from "@foli/core";
 
 // Every schema v1 mark must have a tag; marks of other schemas fall back to <span>.
-const MARK_TAGS: Readonly<Record<string, string>> = {
-  bold: "strong",
-  italic: "em",
-  underline: "u",
-  strike: "s",
-} satisfies Record<MarkName, string>;
+const MARK_TAGS: ReadonlyMap<string, string> = new Map(
+  Object.entries({
+    bold: "strong",
+    italic: "em",
+    underline: "u",
+    strike: "s",
+  } satisfies Record<MarkName, string>),
+);
 
 /** A rendered inline leaf (text node or hard break) and where it sits in its block's content. */
 interface LeafDesc {
@@ -81,6 +83,7 @@ export class EditorView {
     host.addEventListener("compositionstart", this.onCompositionStart);
     host.addEventListener("compositionend", this.onCompositionEnd);
     host.addEventListener("blur", this.onBlur);
+    host.addEventListener("mousedown", this.onMouseDown);
     host.ownerDocument.addEventListener("selectionchange", this.onSelectionChange);
     this.unsubscribe = editor.subscribe((state) => this.update(state));
   }
@@ -94,6 +97,7 @@ export class EditorView {
     host.removeEventListener("compositionstart", this.onCompositionStart);
     host.removeEventListener("compositionend", this.onCompositionEnd);
     host.removeEventListener("blur", this.onBlur);
+    host.removeEventListener("mousedown", this.onMouseDown);
     host.ownerDocument.removeEventListener("selectionchange", this.onSelectionChange);
     for (const name of ["contenteditable", "role", "aria-multiline"]) host.removeAttribute(name);
     host.style.removeProperty("white-space");
@@ -276,8 +280,9 @@ export class EditorView {
   }
 
   private onBeforeInput = (event: InputEvent): void => {
-    // During composition the browser owns the DOM; it is reconciled at compositionend.
-    if (event.isComposing || this.composing) return;
+    // During composition the browser owns the DOM; it is reconciled at compositionend. A
+    // composition event that arrives after it must not fall through to a delete or insert.
+    if (event.isComposing || this.composing || COMPOSITION_INPUT.has(event.inputType)) return;
     event.preventDefault();
     this.syncSelection();
     const type = event.inputType;
@@ -319,6 +324,29 @@ export class EditorView {
     }
     const unit = type.startsWith("deleteWord") ? "word" : "char";
     this.run(type.endsWith("Forward") ? deleteForward(unit) : deleteBackward(unit));
+  };
+
+  /**
+   * Triple-click selects the clicked block's content. Chromium and WebKit natively extend the
+   * selection to the start of the next block, so typing over it would merge the two blocks.
+   */
+  private onMouseDown = (event: MouseEvent): void => {
+    if (event.detail !== 3 || event.button !== 0) return;
+    let element = event.target as Node | null;
+    while (element && element.parentNode !== this.host) element = element.parentNode;
+    const index = this.blocks.findIndex((desc) => desc.dom === element);
+    const desc = this.blocks[index];
+    if (!desc) return;
+    event.preventDefault();
+    const from = (this.starts[index] as number) + 1;
+    const { doc } = this.state;
+    this.host.focus();
+    this.editor.dispatch(
+      this.state.tr
+        .setSelection(TextSelection.create(doc, from, from + desc.node.content.size))
+        .setStoredMarks(null),
+    );
+    this.writeSelection(true);
   };
 
   private onKeyDown = (event: KeyboardEvent): void => {
@@ -377,7 +405,7 @@ function renderBlock(node: ModelNode, doc: Document): BlockDesc {
     // Text only: a mark wrapper around <br> would add nothing visible.
     if (child.isText) {
       for (const mark of [...child.marks].reverse()) {
-        const wrapper = doc.createElement(MARK_TAGS[mark.type.name] ?? "span");
+        const wrapper = doc.createElement(MARK_TAGS.get(mark.type.name) ?? "span");
         wrapper.append(outer);
         outer = wrapper;
       }
@@ -388,6 +416,12 @@ function renderBlock(node: ModelNode, doc: Document): BlockDesc {
   if (!node.lastChild?.isText) dom.append(doc.createElement("br"));
   return { node, dom, leaves };
 }
+
+const COMPOSITION_INPUT = new Set([
+  "insertCompositionText",
+  "deleteCompositionText",
+  "insertFromComposition",
+]);
 
 const IS_MAC = typeof navigator !== "undefined" && /Mac|iP(hone|[oa]d)/.test(navigator.platform);
 
