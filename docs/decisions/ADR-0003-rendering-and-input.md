@@ -1,8 +1,9 @@
 # ADR-0003: Rendering and input approach
 
 - **Status:** Accepted provisionally (2026-11-04). Automated evidence is complete; manual checks
-  are partial (see "Manual results"). The untested items are accepted risks that Phase 4 must
-  re-verify on the real view before gate G3.
+  are partial (see "Manual results"). The untested items are accepted risks: the checks that do not
+  need pages must pass on the Phase 4 view (gate G3), the page-break versions on the Phase 5 view
+  (gate G4).
 - **Date:** 2026-11-04
 - **Evidence:** `spikes/two-page` (spike) and `spikes/two-page/e2e/experiments.spec.ts`
 
@@ -93,10 +94,10 @@ keystroke cost is mostly the full re-render.
 Manual checklist: [`spikes/two-page/README.md`](../../spikes/two-page/README.md). Run by the
 project owner on Windows 11, 2026-11-04:
 
-| Check                                                                                     | Result |
-| ----------------------------------------------------------------------------------------- | ------ |
-| Typing at the page break, selection across pages + replace + undo, ArrowDown across pages | Pass   |
-| E5 spellcheck: replacing a misspelling on page 2 via the context menu                     | Pass   |
+| Check                                                                                        | Result |
+| -------------------------------------------------------------------------------------------- | ------ |
+| Typing at the page break, selection across pages + replace + undo, ArrowDown across pages    | Pass   |
+| E5 spellcheck: replacing a misspelling on page 2 via the context menu (browser not recorded) | Pass   |
 
 **Not tested (accepted risks, carried into Phase 4):**
 
@@ -108,8 +109,15 @@ project owner on Windows 11, 2026-11-04:
 - macOS and mobile autocorrect.
 - Also untested: justified text, inline formatting and mixed fonts, RTL, very long words, images.
 
-Phase 4 must run the IME and screen-reader checks on the real view (test T4, gate G3). A failure
-there that cannot be fixed at the fragment edge triggers the fallback below.
+Where they are re-run:
+
+- **Gate G3 (Phase 4, unpaginated view):** real IME and dead keys (T4), and NVDA/VoiceOver
+  reading the editor.
+- **Gate G4 (Phase 5, pages):** the same checks across a page break: IME at a fragment edge, a
+  screen reader reading a split paragraph.
+
+Any check not run at its gate stays recorded here as an open risk. A failure at G4 that cannot be
+fixed at the fragment edge triggers the fallback below.
 
 ## Decision
 
@@ -128,4 +136,5 @@ Consequences for Phases 4–5:
 - Incremental rendering and reflow are mandatory, not optional.
 
 **Fallback triggers:** move to option B if manual IME on Safari or Android, or the screen-reader
-checks, show failures that cannot be fixed at the fragment edge.
+checks, show failures that cannot be fixed at the fragment edge. If those checks are never run,
+the risk stays open and is listed in the release notes.
