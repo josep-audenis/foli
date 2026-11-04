@@ -68,7 +68,10 @@ export function history({ newGroupDelay = 500, depth = 100 }: HistoryOptions = {
                 { steps: prepend(inverted, top.steps), selection: top.selection },
               ]
             : [...stack, { steps: inverted, selection: oldState.selection.toJSON() }];
-          return rootOp === "undo" ? { ...hist, undone: merged } : { ...hist, done: merged };
+          // The other stack still applies to the document before the reaction: move it past it.
+          return rootOp === "undo"
+            ? { ...hist, undone: merged, done: rebase(hist.done, tr.mapping, tr.doc) }
+            : { ...hist, done: merged, undone: rebase(hist.undone, tr.mapping, tr.doc) };
         }
 
         if (!tr.addToHistory || (root && !root.addToHistory)) {
@@ -275,9 +278,11 @@ function historyCommand(redo: boolean): Command {
         selection: state.selection.toJSON(),
       };
       const rest = source.slice(0, -1);
+      // If nothing could be applied, the event is discarded rather than turned into an empty reverse.
+      const pushed = reverse.steps.length ? [reverse] : [];
       tr.setMeta(historyKey, {
-        done: redo ? [...hist.done, reverse] : rest,
-        undone: redo ? rest : [...hist.undone, reverse],
+        done: redo ? [...hist.done, ...pushed] : rest,
+        undone: redo ? rest : [...hist.undone, ...pushed],
         prevTime: 0,
         prevRanges: null,
       } satisfies HistoryState);

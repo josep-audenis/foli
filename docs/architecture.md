@@ -82,8 +82,12 @@ Foli's own (see `THIRD_PARTY_NOTICES.md`).
   - Changes with `addToHistory: false` are rebased into the stored events. Each rebased step is
     applied to a running copy of the document and dropped if it no longer applies, so the
     remaining steps stay correctly positioned. A step whose target node was deleted is dropped.
-  - Changes a plugin appends join the event of the transaction they react to; a reaction to an
-    undo or redo joins the reverse event, so it cannot trap the history.
+  - Changes a plugin appends join the event of the transaction they react to.
+  - A plugin's reaction to an undo or redo joins the reverse event, so it cannot trap the history,
+    and the opposite stack is rebased past it. A reaction is recorded this way even when the plugin
+    marks it `addToHistory: false`.
+  - An undo or redo whose steps no longer apply (their effect was already reverted outside
+    history) is discarded instead of leaving an empty reverse event.
   - Undo/redo replays mark steps through addMark/removeMark, so redo is exact even when marks
     were changed outside history.
 - **Commands** have the shape `(state, dispatch?) => boolean`:
@@ -98,9 +102,17 @@ Foli's own (see `THIRD_PARTY_NOTICES.md`).
 Known limits:
 - No general slice fitting (comes with paste in Phase 4).
 - Splits one level only (lists, Phase 7).
-- Rebasing costs O(n²) in the number of stored steps (not events) per unrecorded change. Typing
-  runs collapse to one step and depth is capped at 100 events, so n stays small in normal use;
-  formatting-heavy histories are the worst case.
+- Each unrecorded change (and each plugin reaction to undo/redo) rebases the stored history.
+  This costs O(n²) in the number of stored steps (not events), and every step is re-applied to the
+  document, which also scales with document size.
+  - Typing runs collapse to one step, and depth is capped at 100 events.
+  - Formatting across many paragraphs is the worst case: `addMark` makes one step per paragraph.
+    One reviewer measurement, select-all bold on 4,000 paragraphs:
+    - the bold itself took about 0.6 s;
+    - a later unrecorded insert took about 0.7 s;
+    - the undo took about 0.5 s.
+
+  Batch per-paragraph mark steps before documents get that large.
 - Selections snap out of surrogate pairs but not to full grapheme clusters; the view must place
   carets at cluster boundaries (Phase 4).
 - Plugins, `Transaction` metadata and mapping internals are exported but not yet a stable API.

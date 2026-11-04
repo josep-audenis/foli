@@ -450,3 +450,44 @@ describe("review regressions (PR #4)", () => {
     expect(() => editor.commands.insertText("a")).toThrow(RangeError);
   });
 });
+
+describe("plugin reactions to undo/redo (PR #4 re-review)", () => {
+  /** Inserts ">" at the document start whenever a transaction is the given history operation. */
+  const reactTo = (op: "undo" | "redo") =>
+    new Plugin({
+      appendTransaction: (trs, _old, state) =>
+        trs.some((tr) => tr.getMeta("historyOp") === op) ? state.tr.insertText(">", 1) : null,
+    });
+  const setup = (op: "undo" | "redo", secondAt: number) => {
+    const editor = createEditor({
+      document: createDocument(docJSON(para("abc") as BlockJSON)),
+      plugins: [reactTo(op)],
+    });
+    editor.select(4);
+    type(editor, "Z");
+    vi.advanceTimersByTime(1000);
+    editor.select(secondAt);
+    type(editor, "Y");
+    vi.advanceTimersByTime(1000);
+    return editor;
+  };
+
+  it("an undo reaction does not shift the next undo onto other text", () => {
+    const editor = setup("undo", 1); // "YabcZ"
+    editor.commands.undo();
+    expect(content(editor)).toEqual(docJSON(para(">abcZ")));
+    editor.commands.undo();
+    expect(content(editor)).toEqual(docJSON(para(">>abc")));
+  });
+
+  it("a redo reaction does not shift the next redo onto other text", () => {
+    const editor = setup("redo", 3); // "abYcZ"
+    editor.commands.undo();
+    editor.commands.undo();
+    expect(content(editor)).toEqual(docJSON(para("abc")));
+    editor.commands.redo();
+    expect(content(editor)).toEqual(docJSON(para(">abcZ")));
+    editor.commands.redo();
+    expect(content(editor)).toEqual(docJSON(para(">>abYcZ")));
+  });
+});

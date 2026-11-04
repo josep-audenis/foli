@@ -5,7 +5,7 @@ import { Mapping, Selection, Transform, TransformError } from "../index.js";
 import type { Node } from "../model/index.js";
 import type { DocJSON } from "../schema.js";
 import { docJSON, testSchema } from "../testing/index.js";
-import { createEditor, type Editor } from "./index.js";
+import { createEditor, type Editor, Plugin } from "./index.js";
 
 const RUNS = { numRuns: 10_000 };
 const TIMEOUT = 300_000;
@@ -343,15 +343,52 @@ describe("history with changes kept out of it (10k runs)", () => {
           (json, steps) => {
             const editor = editorFor(json);
             const before = runMixed(editor, steps);
-            let undos = 0;
-            while (editor.commands.undo()) {
-              editor.state.doc.check();
-              undos++;
-            }
-            for (let i = 0; i < undos; i++)
-              ok(editor.commands.redo(), "redo stack shorter than undo count");
-            editor.state.doc.check();
+            while (editor.commands.undo()) editor.state.doc.check();
+            // An undo that changed nothing (its effect was already undone outside history) leaves
+            // nothing to redo, so redo until the stack is empty rather than count undos.
+            while (editor.commands.redo()) editor.state.doc.check();
             ok(editor.state.doc.eq(before), "redo did not return to the state before undoing");
+          },
+        ),
+        RUNS,
+      );
+    },
+    TIMEOUT,
+  );
+
+  it(
+    "plugin reactions to undo/redo never make later undos or redos edit other text",
+    () => {
+      // Drops a marker at the caret after every undo and redo (inside text the history touches).
+      const react = new Plugin({
+        appendTransaction: (trs, _old, state) =>
+          trs.some((tr) => tr.getMeta("historyOp")) && state.selection.$from.parent.inlineContent
+            ? state.tr.insertText(MARKER, state.selection.from)
+            : null,
+      });
+      fc.assert(
+        fc.property(
+          docJSON({ rich: false }),
+          fc.array(step, { minLength: 1, maxLength: 10 }),
+          (json, steps) => {
+            const editor = createEditor({
+              document: { ...createDocument(), content: json as DocJSON },
+              plugins: [react],
+            });
+            const initial = blockText(editor.state.doc);
+            const edited = blockText(runMixed(editor, steps, "mark"))
+              .split(MARKER)
+              .join("");
+            while (editor.commands.undo()) editor.state.doc.check();
+            ok(
+              blockText(editor.state.doc).split(MARKER).join("") === initial,
+              "undo changed text it did not record",
+            );
+            while (editor.commands.redo()) editor.state.doc.check();
+            ok(
+              blockText(editor.state.doc).split(MARKER).join("") === edited,
+              "redo did not restore the edited text",
+            );
           },
         ),
         RUNS,
