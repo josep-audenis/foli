@@ -15,7 +15,7 @@ place that says what is in progress; check it before starting work.
 | 1 Architecture spike     | ✅ Done (G1 provisional) | —      | ADR-0003 accepted provisionally; IME/screen-reader checks carried to Phase 4 |
 | 2 Document model         | ✅ Done                  | —      | Merged in #2                                                                 |
 | 3 Transactions & history | ✅ Done                  | —      | Merged in #4; gate G2 passed                                                 |
-| 4 Editor view            | Ready                    |        | Must run the manual IME and screen-reader checks ADR-0003 left open          |
+| 4 Editor view            | In progress              | `phase-4/editor-view` | Must run the manual IME and screen-reader checks ADR-0003 left open |
 | 5 Native pagination      | Blocked by G3            |        |                                                                              |
 | 6 React API & 0.1.0      | Blocked by G4            |        |                                                                              |
 | 7–12                     | Not started              |        |                                                                              |
@@ -267,6 +267,33 @@ The gate includes the manual checks ADR-0003 left open:
 - NVDA/VoiceOver reading across a page break.
 
 A failure that cannot be fixed at the fragment edge triggers ADR-0003's fallback (option B).
+
+### Tasks
+
+Each task is one PR that leaves `pnpm check` green and the playground working.
+
+- [x] Claim phase, branch `phase-4/editor-view`
+- [ ] 4.1 Smallest editable slice: `EditorView` renders an `EditorState` into one
+  `contenteditable` host with block/leaf descriptors (DOM ↔ model positions; unchanged blocks
+  reused by node identity); `beforeinput` → core commands (insertText, deletes, splitBlock,
+  hard break, history, format); keydown through the plugin keymaps; selection synced both ways,
+  read from the live DOM on demand; React `DocumentEditor` editable with `onChange`; playground
+  persists to `localStorage`. Playwright in all three engines: typing, Enter, Backspace, Mod-b,
+  undo/redo, reload without loss.
+- [ ] 4.2 Composition: let the browser mutate during composition, read the changed blocks back
+  into steps at `compositionend`; `MutationObserver` safety net for unprevented changes
+  (Android, extensions, spellcheck in Firefox); automated Chromium CDP IME tests;
+  `docs/testing/ime.md` checklist (T4 automated part).
+- [ ] 4.3 Clipboard: copy/cut from the model (`text/plain`, `text/html`, Foli slice JSON); paste
+  with general slice fitting (closed blocks into a textblock); own HTML parser to the schema
+  (everything else dropped); fixture corpus from Word, Google Docs, LibreOffice, web pages (T3).
+- [ ] 4.4 Keyboard and caret edges: Home/End, word and line movement where the browser is
+  unsafe, carets at grapheme-cluster boundaries, Delete/Backspace edge cases, scroll caret into
+  view, stored marks across native caret moves; browser T1/T2.
+- [ ] 4.5 Read-only mode, focus management, placeholder; accessibility baseline (label,
+  `aria-readonly`, semantic blocks); axe check on the playground.
+- [ ] 4.6 Manual G3 checks recorded: real IME (Windows Japanese/Chinese/Korean in Chrome and
+  Firefox; macOS Safari and Android where available), dead keys, NVDA/VoiceOver. Gate G3 review.
 
 ## Phase 5 — Native pagination · XL
 
