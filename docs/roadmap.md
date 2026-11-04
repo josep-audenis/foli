@@ -14,7 +14,7 @@ place that says what is in progress; check it before starting work.
 | 0 Foundation             | ✅ Done                             | —                        |                                        |
 | 1 Architecture spike     | In progress — manual checks pending | `phase-1/two-page-spike` | Owns root tooling changes (Playwright) |
 | 2 Document model         | ✅ Done                             | —                        | Merged in #2                           |
-| 3 Transactions & history | In progress                         | `phase-3/transactions`   |                                        |
+| 3 Transactions & history | In review                           | `phase-3/transactions`   |                                        |
 | 4 Editor view            | Blocked by G1, G2                   |                          | Needs ADR-0003 (Phase 1) and Phase 3   |
 | 5 Native pagination      | Blocked by G3                       |                          |                                        |
 | 6 React API & 0.1.0      | Blocked by G4                       |                          |                                        |
