@@ -41,11 +41,12 @@ test("an IME composition is committed into the model and undone in one step", as
   await compose(cdp, ["に", "にほ", "にほん"], "日本");
   await expect.poll(() => texts(page)).toEqual(["Hello 日本"]);
 
-  await page.keyboard.type("!");
-  await expect.poll(() => texts(page)).toEqual(["Hello 日本!"]);
-  await page.waitForTimeout(600);
   await page.keyboard.press(`${MOD}+z`);
   await expect.poll(() => texts(page)).toEqual(["Hello "]);
+  await page.keyboard.press(`${MOD}+y`);
+  await expect.poll(() => texts(page)).toEqual(["Hello 日本"]);
+  await page.keyboard.type("!");
+  await expect.poll(() => texts(page)).toEqual(["Hello 日本!"]);
   expect(warnings).toEqual([]);
 });
 

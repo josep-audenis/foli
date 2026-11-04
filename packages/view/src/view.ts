@@ -160,8 +160,10 @@ export class EditorView {
     }
     this.blocks = blocks;
     this.starts = starts;
-    // The view's own DOM changes are not input.
-    this.observer.takeRecords();
+    // The view's own DOM changes are not input. During a composition, keep what the browser
+    // changed before this render: the touched blocks are read back at compositionend.
+    const records = this.observer.takeRecords();
+    if (this.composing) this.pending.push(...records);
   }
 
   // ---------- position mapping ----------
@@ -405,18 +407,19 @@ export class EditorView {
 
   /**
    * Turns DOM changes into a transaction: diffs the DOM text with the model text (blocks joined
-   * by a separator, hard breaks as one character) and replaces the changed range. The diff is
-   * anchored at the DOM caret, so typing "a" after "a" lands where the browser put it. Blocks
+   * by a separator, hard breaks as one character) and replaces the minimal changed range. The
+   * DOM caret only breaks ties, so typing "a" after "a" lands where the browser put it. Blocks
    * whose DOM was touched are re-rendered even if their text is unchanged.
    *
    * shortcut: diffs the whole document text (O(document) per composition); limit it to the
    * touched blocks if it shows in profiles.
    */
   private readBack(records: readonly MutationRecord[]): void {
+    const byDom = new Map<Node, BlockDesc>(this.blocks.map((desc) => [desc.dom, desc]));
     for (const record of records) {
       let node: Node | null = record.target;
       while (node && node.parentNode !== this.host) node = node.parentNode;
-      const desc = this.blocks.find((d) => d.dom === node);
+      const desc = node && byDom.get(node);
       if (desc) this.dirty.add(desc);
     }
     const hardBreaks = new Set<Node>();
@@ -434,10 +437,14 @@ export class EditorView {
       } else if (hardBreaks.has(node)) domText += HARD_BREAK;
       else node.childNodes.forEach(walk);
     };
-    this.host.childNodes.forEach((child, i) => {
-      if (i > 0) domText += BLOCK_SEPARATOR;
+    let first = true;
+    for (const child of this.host.childNodes) {
+      // An empty stray node (an extension's marker) holds no text; the re-render removes it.
+      if (!byDom.has(child) && !child.textContent) continue;
+      if (!first) domText += BLOCK_SEPARATOR;
+      first = false;
       walk(child);
-    });
+    }
 
     const { doc } = this.state;
     const lineStarts: number[] = [];
@@ -458,14 +465,30 @@ export class EditorView {
       this.rerender();
       return;
     }
+    // The minimal change: common prefix, then common suffix (never overlapping the prefix).
+    let start = 0;
+    const shorter = Math.min(modelText.length, domText.length);
+    while (start < shorter && modelText[start] === domText[start]) start++;
     let end = modelText.length;
     let domEnd = domText.length;
-    while (end > 0 && domEnd > Math.max(caret, 0) && modelText[end - 1] === domText[domEnd - 1]) {
+    while (end > start && domEnd > start && modelText[end - 1] === domText[domEnd - 1]) {
       end--;
       domEnd--;
     }
-    let start = 0;
-    while (start < end && start < domEnd && modelText[start] === domText[start]) start++;
+    // A pure insertion or deletion inside repeated text ("aa" → "aaa") could sit at several
+    // offsets; slide it back to where the DOM caret says it happened.
+    const insertion = end === start;
+    if (caret >= 0 && insertion !== (domEnd === start)) {
+      while (
+        start > 0 &&
+        (insertion ? domEnd > caret : start > caret) &&
+        modelText[start - 1] === (insertion ? domText[domEnd - 1] : modelText[end - 1])
+      ) {
+        start--;
+        end--;
+        domEnd--;
+      }
+    }
     // Never split a surrogate pair.
     if (start > 0 && isHighSurrogate(modelText.charCodeAt(start - 1))) start--;
     if (end < modelText.length && isHighSurrogate(modelText.charCodeAt(end - 1))) {

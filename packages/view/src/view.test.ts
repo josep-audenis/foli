@@ -286,6 +286,75 @@ describe("EditorView DOM read-back", () => {
     warn.mockRestore();
   });
 
+  it("replaces only the changed text, not the text up to the caret", async () => {
+    const { host, editor, view } = mount({
+      type: "doc",
+      content: [
+        {
+          type: "paragraph",
+          content: [
+            { type: "text", text: "teh " },
+            { type: "text", text: "bold", marks: [{ type: "bold" }] },
+          ],
+        },
+        { type: "paragraph", content: [{ type: "text", text: "ab" }, { type: "hardBreak" }] },
+      ],
+    });
+    view.focus();
+    editor.select(9); // caret at the end of "bold"
+    (host.querySelector("p")?.firstChild as Text).data = "the "; // autocorrect, extension…
+    await settle();
+    expect(editor.getDocument().content.content[0]?.content).toEqual([
+      { type: "text", text: "the " },
+      { type: "text", text: "bold", marks: [{ type: "bold" }] },
+    ]);
+  });
+
+  it("reads back a change before the caret across a block or a hard break", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const { host, editor, view } = mount({
+      type: "doc",
+      content: [
+        {
+          type: "paragraph",
+          content: [
+            { type: "text", text: "a" },
+            { type: "hardBreak" },
+            { type: "text", text: "b" },
+          ],
+        },
+        { type: "paragraph", content: [{ type: "text", text: "cd" }] },
+      ],
+    });
+    view.focus();
+    editor.select(8); // end of "cd"
+    (host.querySelector("p")?.firstChild as Text).data = "aX";
+    await settle();
+    expect(texts(editor)).toEqual(["aXb", "cd"]);
+    expect(warn).not.toHaveBeenCalled();
+    warn.mockRestore();
+  });
+
+  it("keeps a composition that a render of another block interrupted", () => {
+    const { host, editor } = composing(paragraphs("ab", "cd"), 3);
+    const text = host.querySelector("p")?.firstChild as Text;
+    text.data = "abX";
+    editor.dispatch(editor.state.tr.insertText("!", 7)); // e.g. a remote change to "cd"
+    document.getSelection()?.collapse(text, 3);
+    host.dispatchEvent(new CompositionEvent("compositionend"));
+    expect(texts(editor)).toEqual(["abX", "cd!"]);
+  });
+
+  it("removes an empty stray node without a warning", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const { host } = mount(paragraphs("ab"));
+    host.append(document.createElement("span"));
+    await settle();
+    expect(host.innerHTML).toBe("<p>ab</p>");
+    expect(warn).not.toHaveBeenCalled();
+    warn.mockRestore();
+  });
+
   it("does not read back its own rendering", async () => {
     const { editor } = mount(paragraphs("ab"));
     editor.select(3);

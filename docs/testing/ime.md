@@ -20,7 +20,9 @@ Press **Reset** in the playground bar before each row. "Pass" means:
 
 - the text is right, with nothing duplicated or lost;
 - the caret ends after the committed text;
-- one Ctrl/Cmd+Z removes the whole composition and nothing else;
+- one Ctrl/Cmd+Z removes the whole composition, never only part of it (typing within half a
+  second before or after it, or back-to-back compositions such as Korean syllables, may be
+  undone together: history groups adjacent edits);
 - reloading the page shows the same document;
 - the DevTools console shows no `Foli:` warning.
 

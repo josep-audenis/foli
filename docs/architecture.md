@@ -157,19 +157,23 @@ host); pages and fragments arrive in Phase 5, so today the whole document is one
   keyboards, extensions, any unprevented change) the view diffs the DOM text with the model
   text and turns the difference into one transaction, using the same `insertText` /
   `deleteSelection` commands as typing.
-  - Text is compared as one string: blocks joined by a line feed, hard breaks as U+FFFC. The diff is
-    anchored at the DOM caret, so an ambiguous insertion ("a" next to "a") lands where the
-    browser put it. It never splits a surrogate pair.
+  - Text is compared as one string: blocks joined by a line feed, hard breaks as U+FFFC. The
+    diff never splits a surrogate pair.
   - The marks of the inserted text follow `insertText` (stored marks, else the marks before).
     A composition is one undo step and groups with adjacent typing.
   - Blocks whose DOM changed are always re-rendered, even if their text did not change.
-  - A blur ends a composition the browser never closed; composition input types that arrive
-    outside a composition are ignored.
+  - The diff is minimal (common prefix, then common suffix); the caret only decides where a pure
+    insertion or deletion inside repeated text happened.
+  - A render during a composition keeps the browser's pending changes for the read-back.
+  - A blur ends a composition the browser never closed. Composition input types that arrive
+    outside a composition are not prevented; their DOM effect is read back. Empty stray nodes
+    are removed silently.
 
 Known limits (each is a later Phase 4 task in the roadmap):
 - A read-back that would add blocks or line breaks is discarded with a `Foli:` console warning
-  (some Android keyboards insert paragraphs without `beforeinput`). The read-back diffs the
-  whole document text, O(document) per composition.
+  (some Android keyboards insert paragraphs without `beforeinput`). A `<br>` the browser adds in
+  place of a hard break is not recognized, so that hard break would be read as deleted
+  (untested). The read-back diffs the whole document text, O(document) per composition.
 - Real IME and dead keys are verified only through Chromium's emulation so far; the manual
   checklist is [testing/ime.md](testing/ime.md) (4.6).
 - Delete input types for whole lines rely on the browser's target range; without one they
