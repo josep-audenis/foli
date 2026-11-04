@@ -279,7 +279,10 @@ function applyUnrecorded(editor: Editor, o: UnrecordedOp): void {
   const caret = Selection.near(tr.doc.resolve(from)).from;
   try {
     const markers = markerPositions(tr.doc);
-    const marker = markers[Math.min(markers.length - 1, Math.floor(o.b * markers.length))];
+    // The marker nearest the chosen position, so deletions land next to recent edits too.
+    const marker = markers.length
+      ? markers.reduce((x, y) => (Math.abs(y - from) < Math.abs(x - from) ? y : x))
+      : undefined;
     if (o.kind === "mark") tr.insertText(MARKER, caret);
     else if (o.kind === "unmark") {
       if (marker !== undefined) tr.delete(marker, marker + 1);
@@ -312,8 +315,14 @@ function runMixed(
       selectFor(editor, s.c);
       execute(editor, s.c);
     } else if (s.o) {
+      // Markers-only: half the time act at the caret, where recorded edits just happened; that is
+      // where a deletion collapses positions around re-inserted content.
       const kind = s.o.b < 0.5 ? "mark" : "unmark";
-      applyUnrecorded(editor, markersOnly ? { ...s.o, kind } : s.o);
+      const atCaret = s.o.a < 0.5;
+      const a = atCaret
+        ? editor.state.selection.head / Math.max(1, editor.state.doc.content.size)
+        : s.o.a;
+      applyUnrecorded(editor, markersOnly ? { ...s.o, kind, a, b: a } : s.o);
     }
     editor.state.doc.check();
   }

@@ -93,6 +93,8 @@ export class StepMap implements Mappable {
   /**
    * Which side of the changed ranges `pos` (in input coordinates) lies on: -1 at or before the
    * nearest range ahead of it, 1 at or after the last range behind it, 0 for an empty map.
+   * shortcut: one side for the whole map, exact only for single-range maps (every step today);
+   * record a side per range when multi-range steps (ReplaceAroundStep, Phase 7) arrive.
    */
   side(pos: number): -1 | 0 | 1 {
     let side: -1 | 0 | 1 = 0;
