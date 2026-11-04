@@ -9,16 +9,16 @@ leaves `main` green with a working playground.
 **Update this table in the same PR that starts, advances or finishes a phase.** It is the only
 place that says what is in progress; check it before starting work.
 
-| Phase                    | Status            | Branch                   | Notes                                  |
-| ------------------------ | ----------------- | ------------------------ | -------------------------------------- |
-| 0 Foundation             | ✅ Done           | —                        |                                        |
-| 1 Architecture spike     | In progress       | `phase-1/two-page-spike` | Owns root tooling changes (Playwright) |
-| 2 Document model         | Ready             | `phase-2/document-model` | Can run in parallel with Phase 1       |
-| 3 Transactions & history | Blocked by 2      |                          |                                        |
-| 4 Editor view            | Blocked by G1, G2 |                          | Needs ADR-0003 (Phase 1) and Phase 3   |
-| 5 Native pagination      | Blocked by G3     |                          |                                        |
-| 6 React API & 0.1.0      | Blocked by G4     |                          |                                        |
-| 7–12                     | Not started       |                          |                                        |
+| Phase                    | Status                              | Branch                   | Notes                                  |
+| ------------------------ | ----------------------------------- | ------------------------ | -------------------------------------- |
+| 0 Foundation             | ✅ Done                             | —                        |                                        |
+| 1 Architecture spike     | In progress — manual checks pending | `phase-1/two-page-spike` | Owns root tooling changes (Playwright) |
+| 2 Document model         | Ready                               | `phase-2/document-model` | Can run in parallel with Phase 1       |
+| 3 Transactions & history | Blocked by 2                        |                          |                                        |
+| 4 Editor view            | Blocked by G1, G2                   |                          | Needs ADR-0003 (Phase 1) and Phase 3   |
+| 5 Native pagination      | Blocked by G3                       |                          |                                        |
+| 6 React API & 0.1.0      | Blocked by G4                       |                          |                                        |
+| 7–12                     | Not started                         |                          |                                        |
 
 Status values: `Ready` (dependencies met, nobody on it) · `In progress` · `In review` (PR open) ·
 `✅ Done` (merged, acceptance criteria met) · `Blocked by …`.
@@ -150,13 +150,15 @@ C) `contenteditable` with block-level pages only. Evidence attached. Phase 4/5 d
 
 ### Tasks
 
-- [ ] Claim phase, branch `phase-1/two-page-spike`
-- [ ] Playwright at the root: Chromium, Firefox, WebKit; `pnpm test:e2e`
-- [ ] Spike app `spikes/two-page`: toy model, line measurement, page-flow layout (unit-tested), page rendering
-- [ ] Input: `beforeinput` editing, DOM ↔ model selection mapping, composition read-back, snapshot undo
-- [ ] Automated experiments E1–E4, E7 (E3 Chromium only) in all three engines
-- [ ] Manual checklist for E3 (other platforms), E5, E6
-- [ ] ADR-0003 draft with automated evidence; accepted once manual results are in (gate G1)
+- [x] Claim phase, branch `phase-1/two-page-spike`
+- [x] Playwright at the root: Chromium, Firefox, WebKit; `pnpm test:e2e`
+- [x] Spike app `spikes/two-page`: toy model, line measurement, page-flow layout (unit-tested), page rendering
+- [x] Input: `beforeinput` editing, DOM ↔ model selection mapping, composition read-back, snapshot undo
+- [x] Automated experiments E1–E4, E7 (E3 Chromium only) in all three engines
+- [x] Manual checklist for E3 (other platforms), E5, E6 (`spikes/two-page/README.md`)
+- [ ] Manual checks executed and recorded (needs real devices: Windows IMEs, macOS Safari, Android, screen readers)
+- [x] ADR-0003 draft with automated evidence (status: Proposed, recommends option A)
+- [ ] ADR-0003 accepted once manual results are in (gate G1)
 
 ## Phase 2 — Document model (`@foli/core`) · L
 
