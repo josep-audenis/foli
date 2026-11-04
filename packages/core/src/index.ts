@@ -6,22 +6,23 @@ export {
   PAGE_SIZES,
   type PageMargins,
   type PageSize,
+  parseContent,
   parseDocument,
   SCHEMA_VERSION,
 } from "./document.js";
+export * from "./model/index.js";
 export {
   type BlockJSON,
   type DocJSON,
-  FoliDocumentError,
   type HardBreakJSON,
   HEADING_LEVELS,
   type HeadingJSON,
   type HeadingLevel,
   type InlineJSON,
   MARK_TYPES,
-  type MarkJSON,
-  type MarkType,
+  type MarkName,
+  type MarkNameJSON,
   type ParagraphJSON,
+  schema,
   type TextJSON,
-  validateContent,
 } from "./schema.js";
