@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createDocument, FoliDocumentError, parseDocument } from "./index.js";
+import { createDocument, FoliDocumentError, parseContent, parseDocument } from "./index.js";
 
 const roundTrip = (value: unknown) => JSON.parse(JSON.stringify(value));
 const withContent = (content: unknown) => ({ ...createDocument(), content });
@@ -31,6 +31,42 @@ describe("parseDocument", () => {
     expect(parseDocument(roundTrip(doc))).toEqual(doc);
   });
 
+  it("normalizes content: merged text, canonical mark order, no empty arrays", () => {
+    const loaded = parseDocument(
+      withBlock({
+        type: "paragraph",
+        content: [
+          { type: "text", text: "a", marks: [{ type: "italic" }, { type: "bold" }] },
+          { type: "text", text: "b", marks: [{ type: "bold" }, { type: "italic" }] },
+          { type: "hardBreak", marks: [{ type: "bold" }] },
+          { type: "text", text: "c", marks: [] },
+        ],
+      }),
+    );
+    expect(loaded.content.content).toEqual([
+      {
+        type: "paragraph",
+        content: [
+          { type: "text", text: "ab", marks: [{ type: "bold" }, { type: "italic" }] },
+          { type: "hardBreak", marks: [{ type: "bold" }] },
+          { type: "text", text: "c" },
+        ],
+      },
+    ]);
+    expect(parseDocument(withBlock({ type: "paragraph", content: [] })).content.content).toEqual([
+      { type: "paragraph" },
+    ]);
+  });
+
+  it("parses content into an immutable node tree", () => {
+    const doc = parseContent({ type: "doc", content: [{ type: "paragraph" }] });
+    expect(doc.type.name).toBe("doc");
+    expect(doc.content.size).toBe(2);
+    expect(() => parseContent({ type: "paragraph" })).toThrow(
+      'content: root node must be of type "doc"',
+    );
+  });
+
   it("reports the path of invalid content", () => {
     expect(() =>
       parseDocument(withInline({ type: "text", text: "x", marks: [{ type: "code" }] })),
@@ -41,6 +77,10 @@ describe("parseDocument", () => {
     ["non-object", 42],
     ["unknown version", { ...createDocument(), schemaVersion: 99 }],
     ["non-doc root", withContent({ type: "paragraph" })],
+    [
+      "marks on doc",
+      withContent({ type: "doc", marks: [{ type: "bold" }], content: [{ type: "paragraph" }] }),
+    ],
     ["empty doc", withContent({ type: "doc", content: [] })],
     ["unknown block type", withBlock({ type: "bulletList" })],
     ["text directly in doc", withBlock({ type: "text", text: "x" })],

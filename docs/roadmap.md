@@ -13,8 +13,8 @@ place that says what is in progress; check it before starting work.
 | ------------------------ | ----------------------------------- | ------------------------ | -------------------------------------- |
 | 0 Foundation             | ✅ Done                             | —                        |                                        |
 | 1 Architecture spike     | In progress — manual checks pending | `phase-1/two-page-spike` | Owns root tooling changes (Playwright) |
-| 2 Document model         | Ready                               | `phase-2/document-model` | Can run in parallel with Phase 1       |
-| 3 Transactions & history | Blocked by 2                        |                          |                                        |
+| 2 Document model         | ✅ Done                             | —                        | Merged in #2                           |
+| 3 Transactions & history | Ready                               |                          |                                        |
 | 4 Editor view            | Blocked by G1, G2                   |                          | Needs ADR-0003 (Phase 1) and Phase 3   |
 | 5 Native pagination      | Blocked by G3                       |                          |                                        |
 | 6 React API & 0.1.0      | Blocked by G4                       |                          |                                        |
@@ -160,7 +160,7 @@ C) `contenteditable` with block-level pages only. Evidence attached. Phase 4/5 d
 - [x] ADR-0003 draft with automated evidence (status: Proposed, recommends option A)
 - [ ] ADR-0003 accepted once manual results are in (gate G1)
 
-## Phase 2 — Document model (`@foli/core`) · L
+## Phase 2 — Document model (`@foli/core`) · L ✅
 
 **Goal:** the permanent document model. Pure TypeScript, no DOM.
 
@@ -179,6 +179,23 @@ C) `contenteditable` with block-level pages only. Evidence attached. Phase 4/5 d
 **Acceptance:** property tests (≥10k runs) for `fromJSON(toJSON(x)) = x` and position/resolve
 invariants; ≥95% line coverage of the model; existing v1 documents load unchanged; build and
 serialize timings for 1/10/50/100-page fixtures recorded in `docs/benchmarks.md`.
+
+### Tasks
+
+- [x] 2.1 Claim the phase; `fast-check` and `@vitest/coverage-v8` as `@foli/core` devDependencies.
+- [x] 2.2 `Schema` from node/mark specs (content expressions, attrs, allowed marks, exclusion);
+  immutable `Mark`, `Node`, `Fragment`; schema v1 defined through the spec API; strict JSON in
+  with normalization, canonical JSON out; `parseDocument` on the schema.
+- [x] 2.3 Integer positions: `ResolvedPos`, `nodeAt`, `nodesBetween`, `textBetween`.
+- [x] 2.4 `Slice` (open start/end), `Node.slice`, `Node.replace` (`canReplace` moves to Phase 3).
+- [x] 2.5 Property tests (≥10k runs), ≥95% line coverage of the model, benchmarks in
+  `docs/benchmarks.md`.
+- [x] 2.6 Docs match the code; status `In review`.
+
+Acceptance evidence: `model.property.test.ts` (5 properties × 10,000 runs);
+`pnpm --filter @foli/core coverage` (100% lines of the model sources in `src/model/`, threshold 95%); v1 fixtures in
+`document.test.ts` load unchanged; timings in [benchmarks.md](benchmarks.md). Not in CI yet:
+coverage and benchmarks run from `@foli/core` scripts (root config belongs to Phase 1).
 
 ## Phase 3 — Transactions, history, commands · L
 
