@@ -151,14 +151,27 @@ host); pages and fragments arrive in Phase 5, so today the whole document is one
   does not already show it, so native caret affinity survives. An `AllSelection` is shown as the
   text range between its ends. Triple-click selects the clicked block's content (natively,
   Chromium and WebKit extend it into the next block, and typing would merge the two).
+- **Composition and DOM read-back:** during composition (IME, dead keys) the browser edits the
+  DOM and the view leaves it alone. A `MutationObserver` records every DOM change the view did
+  not make itself. At `compositionend` (or right away when no composition is running: Android
+  keyboards, extensions, any unprevented change) the view diffs the DOM text with the model
+  text and turns the difference into one transaction, using the same `insertText` /
+  `deleteSelection` commands as typing.
+  - Text is compared as one string: blocks joined by a line feed, hard breaks as U+FFFC. The diff is
+    anchored at the DOM caret, so an ambiguous insertion ("a" next to "a") lands where the
+    browser put it. It never splits a surrogate pair.
+  - The marks of the inserted text follow `insertText` (stored marks, else the marks before).
+    A composition is one undo step and groups with adjacent typing.
+  - Blocks whose DOM changed are always re-rendered, even if their text did not change.
+  - A blur ends a composition the browser never closed; composition input types that arrive
+    outside a composition are ignored.
 
 Known limits (each is a later Phase 4 task in the roadmap):
-- Composition (IME, and dead-key accents in all three engines) and any other unprevented DOM
-  change are discarded by re-rendering (no read-back yet, 4.2). Late composition input types
-  are ignored. A blur ends a composition the browser never closed.
-- DOM changes that fire no `input` event (browser extensions, translation) are not detected:
-  a reused block keeps the stale DOM its descriptors point into, and stray nodes before the
-  first block shift host-level positions. The `MutationObserver` safety net is 4.2.
+- A read-back that would add blocks or line breaks is discarded with a `Foli:` console warning
+  (some Android keyboards insert paragraphs without `beforeinput`). The read-back diffs the
+  whole document text, O(document) per composition.
+- Real IME and dead keys are verified only through Chromium's emulation so far; the manual
+  checklist is [testing/ime.md](testing/ime.md) (4.6).
 - Delete input types for whole lines rely on the browser's target range; without one they
   delete a character. `Mod-Backspace` is bound to word deletion, so macOS Cmd+Backspace deletes
   a word, not to the line start (4.4).

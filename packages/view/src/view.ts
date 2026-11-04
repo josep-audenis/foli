@@ -52,8 +52,11 @@ interface DomPoint {
  * `contenteditable` host and turns DOM input into core commands. The model is the source of
  * truth; the DOM is rebuilt from it (unchanged blocks are reused by node identity).
  *
+ * The browser edits the DOM itself only during composition (IME, dead keys) and for changes the
+ * view cannot prevent (Android keyboards, extensions). A MutationObserver records those; the view
+ * then reads the changed text back into a transaction (`readBack`) and re-renders.
+ *
  * shortcut: assumes schema v1 (doc > textblocks > inline); nested blocks arrive with lists in Phase 7.
- * shortcut: composition and other unprevented DOM changes are discarded by re-rendering; IME read-back is task 4.2.
  */
 export class EditorView {
   private state: EditorState;
@@ -61,6 +64,11 @@ export class EditorView {
   /** Position before each block, parallel to `blocks`. */
   private starts: number[] = [];
   private composing = false;
+  /** Blocks whose DOM the browser changed: the next render rebuilds them. */
+  private readonly dirty = new Set<BlockDesc>();
+  /** DOM mutations not yet read back (kept while a composition is running). */
+  private pending: MutationRecord[] = [];
+  private readonly observer: MutationObserver;
   private readonly unsubscribe: () => void;
 
   constructor(
@@ -75,6 +83,8 @@ export class EditorView {
     host.style.whiteSpace = "pre-wrap";
     host.style.overflowWrap = "break-word";
     host.replaceChildren();
+    this.observer = new MutationObserver(this.onMutations);
+    this.observer.observe(host, { childList: true, characterData: true, subtree: true });
     this.render();
 
     host.addEventListener("beforeinput", this.onBeforeInput);
@@ -90,6 +100,7 @@ export class EditorView {
 
   destroy(): void {
     this.unsubscribe();
+    this.observer.disconnect();
     const { host } = this;
     host.removeEventListener("beforeinput", this.onBeforeInput);
     host.removeEventListener("keydown", this.onKeyDown);
@@ -123,7 +134,10 @@ export class EditorView {
   /** Renders the document, reusing the DOM of blocks whose model node is unchanged. */
   private render(): void {
     const { doc } = this.state;
-    const previous = new Map(this.blocks.map((desc) => [desc.node, desc]));
+    const previous = new Map(
+      this.blocks.filter((desc) => !this.dirty.has(desc)).map((desc) => [desc.node, desc]),
+    );
+    this.dirty.clear();
     const blocks: BlockDesc[] = [];
     const starts: number[] = [];
     doc.forEach((node, offset) => {
@@ -146,6 +160,8 @@ export class EditorView {
     }
     this.blocks = blocks;
     this.starts = starts;
+    // The view's own DOM changes are not input.
+    this.observer.takeRecords();
   }
 
   // ---------- position mapping ----------
@@ -355,9 +371,9 @@ export class EditorView {
     if (this.editor.handleKey(keyName(event))) event.preventDefault();
   };
 
-  /** Safety net: a DOM change that was not prevented is discarded by re-rendering from the model. */
+  /** Safety net: a DOM change that was not prevented is read back into the model. */
   private onInput = (): void => {
-    if (!this.composing) this.rerender();
+    if (!this.composing) this.flush();
   };
 
   private onCompositionStart = (): void => {
@@ -367,7 +383,7 @@ export class EditorView {
 
   private onCompositionEnd = (): void => {
     this.composing = false;
-    this.rerender();
+    this.flush();
   };
 
   /** Some browsers drop compositionend when focus leaves mid-composition; never stay stuck in it. */
@@ -375,9 +391,104 @@ export class EditorView {
     if (this.composing) this.onCompositionEnd();
   };
 
+  private onMutations = (records: MutationRecord[]): void => {
+    this.pending.push(...records);
+    if (!this.composing) this.flush();
+  };
+
+  /** Reads back every DOM change recorded so far. */
+  private flush(): void {
+    const records = [...this.pending, ...this.observer.takeRecords()];
+    this.pending = [];
+    if (records.length) this.readBack(records);
+  }
+
+  /**
+   * Turns DOM changes into a transaction: diffs the DOM text with the model text (blocks joined
+   * by a separator, hard breaks as one character) and replaces the changed range. The diff is
+   * anchored at the DOM caret, so typing "a" after "a" lands where the browser put it. Blocks
+   * whose DOM was touched are re-rendered even if their text is unchanged.
+   *
+   * shortcut: diffs the whole document text (O(document) per composition); limit it to the
+   * touched blocks if it shows in profiles.
+   */
+  private readBack(records: readonly MutationRecord[]): void {
+    for (const record of records) {
+      let node: Node | null = record.target;
+      while (node && node.parentNode !== this.host) node = node.parentNode;
+      const desc = this.blocks.find((d) => d.dom === node);
+      if (desc) this.dirty.add(desc);
+    }
+    const hardBreaks = new Set<Node>();
+    for (const desc of this.blocks)
+      for (const leaf of desc.leaves)
+        if (leaf.dom.nodeType !== Node.TEXT_NODE) hardBreaks.add(leaf.dom);
+
+    const sel = this.host.ownerDocument.getSelection();
+    let caret = -1;
+    let domText = "";
+    const walk = (node: Node): void => {
+      if (node.nodeType === Node.TEXT_NODE) {
+        if (node === sel?.focusNode) caret = domText.length + sel.focusOffset;
+        domText += (node as Text).data;
+      } else if (hardBreaks.has(node)) domText += HARD_BREAK;
+      else node.childNodes.forEach(walk);
+    };
+    this.host.childNodes.forEach((child, i) => {
+      if (i > 0) domText += BLOCK_SEPARATOR;
+      walk(child);
+    });
+
+    const { doc } = this.state;
+    const lineStarts: number[] = [];
+    let modelText = "";
+    doc.forEach((block, _offset, i) => {
+      if (i > 0) modelText += BLOCK_SEPARATOR;
+      lineStarts.push(modelText.length);
+      modelText += block.textBetween(0, block.content.size, "", HARD_BREAK);
+    });
+    /** Model position of an offset in `modelText`. */
+    const posAt = (offset: number): number => {
+      let i = lineStarts.length - 1;
+      while (i > 0 && (lineStarts[i] as number) > offset) i--;
+      return (this.starts[i] as number) + 1 + offset - (lineStarts[i] as number);
+    };
+
+    if (domText === modelText) {
+      this.rerender();
+      return;
+    }
+    let end = modelText.length;
+    let domEnd = domText.length;
+    while (end > 0 && domEnd > Math.max(caret, 0) && modelText[end - 1] === domText[domEnd - 1]) {
+      end--;
+      domEnd--;
+    }
+    let start = 0;
+    while (start < end && start < domEnd && modelText[start] === domText[start]) start++;
+    // Never split a surrogate pair.
+    if (start > 0 && isHighSurrogate(modelText.charCodeAt(start - 1))) start--;
+    if (end < modelText.length && isHighSurrogate(modelText.charCodeAt(end - 1))) {
+      end++;
+      domEnd++;
+    }
+    const inserted = domText.slice(start, domEnd);
+    if (inserted.includes(BLOCK_SEPARATOR) || inserted.includes(HARD_BREAK)) {
+      // shortcut: a change that adds blocks or line breaks cannot be read back yet; it is dropped.
+      console.warn("Foli: discarded a DOM change that adds blocks or line breaks");
+      this.rerender();
+      return;
+    }
+    // One transaction: the command runs on a state with the changed range selected.
+    const range = TextSelection.create(doc, posAt(start), posAt(end));
+    const selected = this.state.apply(this.state.tr.setSelection(range));
+    const command = inserted ? insertText(inserted) : deleteSelection;
+    // A filtered transaction renders nothing: still drop the browser's DOM.
+    if (!command(selected, (tr) => this.editor.dispatch(tr)) || this.dirty.size) this.rerender();
+  }
+
+  /** Rebuilds every block that is not reused and puts the selection back. */
   private rerender(): void {
-    for (const desc of this.blocks) desc.dom.remove();
-    this.blocks = [];
     this.render();
     this.writeSelection(true);
   }
@@ -415,6 +526,14 @@ function renderBlock(node: ModelNode, doc: Document): BlockDesc {
   // An empty block, or one ending in a hard break, needs an extra <br> to show its last line.
   if (!node.lastChild?.isText) dom.append(doc.createElement("br"));
   return { node, dom, leaves };
+}
+
+/** Stand-ins used when diffing DOM text with model text. */
+const BLOCK_SEPARATOR = "\n";
+const HARD_BREAK = "\uFFFC";
+
+function isHighSurrogate(code: number): boolean {
+  return code >= 0xd800 && code <= 0xdbff;
 }
 
 const COMPOSITION_INPUT = new Set([

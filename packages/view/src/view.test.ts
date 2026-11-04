@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { createDocument, createEditor, type DocJSON } from "@foli/core";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { EditorView, keyName } from "./index.js";
 
 const sample: DocJSON = {
@@ -195,6 +195,105 @@ describe("EditorView input", () => {
     expect(host.innerHTML).toBe("<p><strong>ab</strong></p>");
     host.dispatchEvent(new KeyboardEvent("keydown", { key: "Backspace", cancelable: true }));
     expect(editor.state.doc.textContent).toBe("");
+  });
+});
+
+describe("EditorView DOM read-back", () => {
+  const paragraphs = (...texts: string[]): DocJSON => ({
+    type: "doc",
+    content: texts.map((text) => ({ type: "paragraph", content: [{ type: "text", text }] })),
+  });
+  const texts = (editor: ReturnType<typeof mount>["editor"]) =>
+    editor
+      .getDocument()
+      .content.content.map((b) =>
+        (b.content ?? []).map((i) => ("text" in i ? i.text : "")).join(""),
+      );
+  const settle = () => new Promise((resolve) => setTimeout(resolve));
+
+  function composing(content: DocJSON, caret: number) {
+    const setup = mount(content);
+    setup.view.focus();
+    setup.editor.select(caret);
+    setup.host.dispatchEvent(new CompositionEvent("compositionstart"));
+    return setup;
+  }
+
+  it("reads a committed composition back as one undoable insertion", () => {
+    const { host, editor } = composing(paragraphs("ab"), 3);
+    const text = host.querySelector("p")?.firstChild as Text;
+    text.data = "abé"; // what a dead key or IME leaves in the DOM
+    document.getSelection()?.collapse(text, 3);
+    host.dispatchEvent(new CompositionEvent("compositionend"));
+    expect(texts(editor)).toEqual(["abé"]);
+    expect(editor.state.selection.head).toBe(4);
+    expect(host.querySelector("p")?.firstChild).not.toBe(text); // re-rendered from the model
+    editor.commands.undo();
+    expect(texts(editor)).toEqual(["ab"]);
+  });
+
+  it("places an ambiguous insertion at the DOM caret", () => {
+    const { host, editor } = composing(paragraphs("aa"), 2);
+    const text = host.querySelector("p")?.firstChild as Text;
+    text.data = "aaa";
+    document.getSelection()?.collapse(text, 2);
+    host.dispatchEvent(new CompositionEvent("compositionend"));
+    expect(texts(editor)).toEqual(["aaa"]);
+    expect(editor.state.selection.head).toBe(3);
+  });
+
+  it("reads back a composition that replaced a selection across blocks", () => {
+    const { host, editor } = composing(paragraphs("ab", "cd"), 2);
+    const [first, second] = [...host.querySelectorAll("p")] as HTMLElement[];
+    // The browser deleted "b|c" (merging the blocks) and inserted the composed "X".
+    (first?.firstChild as Text).data = "aXd";
+    second?.remove();
+    document.getSelection()?.collapse(first?.firstChild as Text, 2);
+    host.dispatchEvent(new CompositionEvent("compositionend"));
+    expect(texts(editor)).toEqual(["aXd"]);
+    editor.commands.undo();
+    expect(texts(editor)).toEqual(["ab", "cd"]);
+  });
+
+  it("reads back an unprevented change outside composition", async () => {
+    const { host, editor } = mount(paragraphs("ab"));
+    (host.querySelector("p")?.firstChild as Text).data = "abc";
+    await settle();
+    expect(texts(editor)).toEqual(["abc"]);
+  });
+
+  it("restores DOM that changed without changing the text", async () => {
+    const { host, editor } = mount(paragraphs("ab"));
+    const p = host.querySelector("p") as HTMLElement;
+    const span = document.createElement("span");
+    span.append(p.firstChild as Node);
+    p.append(span);
+    await settle();
+    expect(host.innerHTML).toBe("<p>ab</p>");
+    expect(texts(editor)).toEqual(["ab"]);
+  });
+
+  it("discards a change that adds blocks, with a warning", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const { host, editor } = mount(paragraphs("ab"));
+    const extra = document.createElement("p");
+    extra.textContent = "x";
+    host.append(extra);
+    await settle();
+    expect(host.innerHTML).toBe("<p>ab</p>");
+    expect(texts(editor)).toEqual(["ab"]);
+    expect(warn).toHaveBeenCalledOnce();
+    warn.mockRestore();
+  });
+
+  it("does not read back its own rendering", async () => {
+    const { editor } = mount(paragraphs("ab"));
+    editor.select(3);
+    editor.commands.insertText("c");
+    await settle();
+    expect(texts(editor)).toEqual(["abc"]);
+    editor.commands.undo();
+    expect(texts(editor)).toEqual(["ab"]);
   });
 });
 
