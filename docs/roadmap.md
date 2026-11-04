@@ -9,16 +9,16 @@ leaves `main` green with a working playground.
 **Update this table in the same PR that starts, advances or finishes a phase.** It is the only
 place that says what is in progress; check it before starting work.
 
-| Phase                    | Status            | Branch                   | Notes                                  |
-| ------------------------ | ----------------- | ------------------------ | -------------------------------------- |
-| 0 Foundation             | ✅ Done           | —                        |                                        |
-| 1 Architecture spike     | Ready             | `phase-1/two-page-spike` | Owns root tooling changes (Playwright) |
-| 2 Document model         | ✅ Done           | —                        | Merged in #2                           |
-| 3 Transactions & history | Ready             |                          |                                        |
-| 4 Editor view            | Blocked by G1, G2 |                          | Needs ADR-0003 (Phase 1) and Phase 3   |
-| 5 Native pagination      | Blocked by G3     |                          |                                        |
-| 6 React API & 0.1.0      | Blocked by G4     |                          |                                        |
-| 7–12                     | Not started       |                          |                                        |
+| Phase                    | Status                              | Branch                   | Notes                                  |
+| ------------------------ | ----------------------------------- | ------------------------ | -------------------------------------- |
+| 0 Foundation             | ✅ Done                             | —                        |                                        |
+| 1 Architecture spike     | In progress — manual checks pending | `phase-1/two-page-spike` | Owns root tooling changes (Playwright) |
+| 2 Document model         | ✅ Done                             | —                        | Merged in #2                           |
+| 3 Transactions & history | Ready                               |                          |                                        |
+| 4 Editor view            | Blocked by G1, G2                   |                          | Needs ADR-0003 (Phase 1) and Phase 3   |
+| 5 Native pagination      | Blocked by G3                       |                          |                                        |
+| 6 React API & 0.1.0      | Blocked by G4                       |                          |                                        |
+| 7–12                     | Not started                         |                          |                                        |
 
 Status values: `Ready` (dependencies met, nobody on it) · `In progress` · `In review` (PR open) ·
 `✅ Done` (merged, acceptance criteria met) · `Blocked by …`.
@@ -147,6 +147,18 @@ host, pages as visual containers inside it, one paragraph rendered as fragments 
 **Exit (G1):** `docs/decisions/ADR-0003-rendering-and-input.md` chooses one of:
 A) `contenteditable` with page fragments · B) hidden input + Foli-rendered DOM ·
 C) `contenteditable` with block-level pages only. Evidence attached. Phase 4/5 design follows it.
+
+### Tasks
+
+- [x] Claim phase, branch `phase-1/two-page-spike`
+- [x] Playwright at the root: Chromium, Firefox, WebKit; `pnpm test:e2e`
+- [x] Spike app `spikes/two-page`: toy model, line measurement, page-flow layout (unit-tested), page rendering
+- [x] Input: `beforeinput` editing, DOM ↔ model selection mapping, composition read-back, snapshot undo
+- [x] Automated experiments E1–E4, E7 (E3 Chromium only) in all three engines
+- [x] Manual checklist for E3 (other platforms), E5, E6 (`spikes/two-page/README.md`)
+- [ ] Manual checks executed and recorded (needs real devices: Windows IMEs, macOS Safari, Android, screen readers)
+- [x] ADR-0003 draft with automated evidence (status: Proposed, recommends option A)
+- [ ] ADR-0003 accepted once manual results are in (gate G1)
 
 ## Phase 2 — Document model (`@foli/core`) · L ✅
 

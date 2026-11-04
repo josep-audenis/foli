@@ -14,10 +14,12 @@
     "test:watch": "vitest",
     "lint": "biome check .",
     "format": "biome check --write .",
-    "check": "pnpm lint && pnpm typecheck && pnpm test && pnpm build"
+    "check": "pnpm lint && pnpm typecheck && pnpm test && pnpm build",
+    "test:e2e": "playwright test"
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.4",
+    "@playwright/test": "^1.64.1",
     "@testing-library/react": "^16.3.3",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",

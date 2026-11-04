@@ -6,6 +6,12 @@
       "runtimeExecutable": "pnpm",
       "runtimeArgs": ["dev"],
       "port": 5173
+    },
+    {
+      "name": "spike-two-page",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "@foli/spike-two-page", "dev", "--port", "5174", "--strictPort"],
+      "port": 5174
     }
   ]
 }

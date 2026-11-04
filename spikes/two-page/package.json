@@ -1,0 +1,10 @@
+{
+  "name": "@foli/spike-two-page",
+  "private": true,
+  "description": "Phase 1 throwaway spike: one contenteditable host, paragraphs split across pages. Never published.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  }
+}

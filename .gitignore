@@ -10,3 +10,7 @@ graphify-out/
 
 # Machine-specific Claude Code settings (graphify hooks use absolute paths)
 .claude/settings.local.json
+
+# Playwright
+test-results/
+playwright-report/
