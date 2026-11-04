@@ -28,13 +28,13 @@
   line-height: var(--foli-line-height);
 }
 
-.foli-content .ProseMirror {
+.foli-content {
   outline: none;
   min-height: 100%;
   white-space: pre-wrap;
 }
 
-.foli-content .ProseMirror ::selection {
+.foli-content ::selection {
   background: var(--foli-selection-color);
 }
 

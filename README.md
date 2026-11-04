@@ -1,46 +1,47 @@
 # Foli
 
-An open-source, embeddable, Word-like document editor for React: structured documents,
-real pages, extensible core.
+An open-source document-editing engine for the web, built from the ground up: its own document
+model, transactions, view and layout, designed around native pagination, with first-class React
+integration.
 
-> **Status: pre-alpha (Phase 0 done).** The current editor is a walking skeleton: StarterKit
-> formatting via keyboard shortcuts, one A4-sized page, JSON load/save. No toolbar or
-> pagination yet. See [docs/roadmap.md](docs/roadmap.md). Not published to npm yet.
+> **Status: pre-alpha — engine under construction.** Foli currently renders documents
+> **read-only** from its own model onto a page-sized sheet. Editing and pagination are being
+> built as Foli's own engine (no ProseMirror/Tiptap/Lexical). See [docs/roadmap.md](docs/roadmap.md).
+> Not published to npm yet.
 
-## Usage (current API)
+## Usage (current, read-only API)
 
 ```tsx
 import { createDocument, parseDocument } from "@foli/core";
 import { DocumentEditor } from "@foli/react";
 import "@foli/react/styles.css";
 
+const doc = parseDocument(JSON.parse(saved)); // throws FoliDocumentError on invalid input
+// or: createDocument({ type: "doc", content: [{ type: "paragraph" }] })
+
 export function App() {
-  return (
-    <DocumentEditor
-      initialContent={createDocument()} // or parseDocument(JSON.parse(saved))
-      onChange={(doc) => save(JSON.stringify(doc))}
-    />
-  );
+  return <DocumentEditor initialContent={doc} />;
 }
 ```
 
-Peer dependencies: `react`, `react-dom`, `@tiptap/core`, `@tiptap/pm`.
+Peer dependencies: `react`, `react-dom`.
 
 ## Packages
 
-| Package                              | Purpose                                                       |
-| ------------------------------------ | ------------------------------------------------------------- |
-| [`@foli/core`](packages/core)        | Document envelope, schema, validation, page geometry. No DOM. |
-| [`@foli/react`](packages/react)      | React components and default stylesheet.                      |
-| [`apps/playground`](apps/playground) | Demo app; consumes the packages like a third party would.     |
+| Package                              | Purpose                                                                      |
+| ------------------------------------ | ---------------------------------------------------------------------------- |
+| [`@foli/core`](packages/core)        | Document envelope, schema, validation (model and transactions next). No DOM. |
+| [`@foli/view`](packages/view)        | Framework-agnostic DOM view (read-only rendering so far).                    |
+| [`@foli/react`](packages/react)      | React components and default stylesheet.                                     |
+| [`apps/playground`](apps/playground) | Demo app; consumes the packages like a third party would.                    |
 
 ## Documentation
 
-- [Architecture](docs/architecture.md) — packages, boundaries, React and Rust strategy, risks
-- [ADR-0001: editor foundation](docs/decisions/ADR-0001-editor-foundation.md) — Tiptap vs ProseMirror vs Lexical
-- [Document model](docs/document-model.md) — persisted format, units, migrations
-- [Pagination](docs/pagination.md) — design for multi-page editing (not implemented yet)
-- [Roadmap](docs/roadmap.md) — phases and acceptance criteria
+- [Roadmap](docs/roadmap.md) — phases, gates, acceptance criteria
+- [Architecture](docs/architecture.md) — subsystems, packages, dependency policy, risks
+- [ADR-0002: Foli owns its editing engine](docs/decisions/ADR-0002-own-editing-engine.md)
+- [Document model](docs/document-model.md) — persisted format, schema v1, units, migrations
+- [Pagination](docs/pagination.md) — design for native multi-page editing (not implemented yet)
 - [Contributing](docs/contributing.md)
 
 ## Development

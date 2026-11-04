@@ -2,6 +2,9 @@ import { describe, expect, it } from "vitest";
 import { createDocument, FoliDocumentError, parseDocument } from "./index.js";
 
 const roundTrip = (value: unknown) => JSON.parse(JSON.stringify(value));
+const withContent = (content: unknown) => ({ ...createDocument(), content });
+const withBlock = (block: unknown) => withContent({ type: "doc", content: [block] });
+const withInline = (inline: unknown) => withBlock({ type: "paragraph", content: [inline] });
 
 describe("parseDocument", () => {
   it("accepts a freshly created document", () => {
@@ -16,30 +19,41 @@ describe("parseDocument", () => {
         { type: "heading", attrs: { level: 1 }, content: [{ type: "text", text: "Title" }] },
         {
           type: "paragraph",
-          content: [{ type: "text", text: "bold", marks: [{ type: "bold" }] }],
-        },
-        {
-          type: "bulletList",
           content: [
-            {
-              type: "listItem",
-              content: [{ type: "paragraph", content: [{ type: "text", text: "item" }] }],
-            },
+            { type: "text", text: "bold italic", marks: [{ type: "bold" }, { type: "italic" }] },
+            { type: "hardBreak" },
+            { type: "text", text: "plain" },
           ],
         },
+        { type: "paragraph" },
       ],
     });
     expect(parseDocument(roundTrip(doc))).toEqual(doc);
   });
 
+  it("reports the path of invalid content", () => {
+    expect(() =>
+      parseDocument(withInline({ type: "text", text: "x", marks: [{ type: "code" }] })),
+    ).toThrow("content.content[0].content[0].marks[0].type: unknown mark type");
+  });
+
   it.each([
     ["non-object", 42],
     ["unknown version", { ...createDocument(), schemaVersion: 99 }],
-    ["unknown node type", createDocument({ type: "doc", content: [{ type: "nope" }] })],
+    ["non-doc root", withContent({ type: "paragraph" })],
+    ["empty doc", withContent({ type: "doc", content: [] })],
+    ["unknown block type", withBlock({ type: "bulletList" })],
+    ["text directly in doc", withBlock({ type: "text", text: "x" })],
+    ["unknown key", withBlock({ type: "paragraph", style: "x" })],
+    ["paragraph attrs", withBlock({ type: "paragraph", attrs: {} })],
+    ["heading level 7", withBlock({ type: "heading", attrs: { level: 7 } })],
+    ["heading without attrs", withBlock({ type: "heading" })],
+    ["empty text", withInline({ type: "text", text: "" })],
     [
-      "invalid content model",
-      createDocument({ type: "doc", content: [{ type: "text", text: "x" }] }),
+      "duplicate mark",
+      withInline({ type: "text", text: "x", marks: [{ type: "bold" }, { type: "bold" }] }),
     ],
+    ["block inside paragraph", withInline({ type: "paragraph" })],
     [
       "negative margin",
       createDocument(undefined, { margins: { top: -1, right: 0, bottom: 0, left: 0 } }),

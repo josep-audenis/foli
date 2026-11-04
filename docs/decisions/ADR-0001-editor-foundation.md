@@ -1,6 +1,6 @@
 # ADR-0001: Editor foundation
 
-- **Status:** Accepted
+- **Status:** Superseded by [ADR-0002](ADR-0002-own-editing-engine.md) (2026-11-04)
 - **Date:** 2026-11-04
 
 ## Context

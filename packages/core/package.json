@@ -1,7 +1,7 @@
 {
   "name": "@foli/core",
   "version": "0.0.0",
-  "description": "Framework-agnostic document model, schema and extensions for the Foli document editor.",
+  "description": "Document model, schema and validation for the Foli document engine. No DOM.",
   "license": "MIT",
   "type": "module",
   "sideEffects": false,
@@ -20,16 +20,5 @@
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc -p tsconfig.json --noEmit"
-  },
-  "dependencies": {
-    "@tiptap/starter-kit": "^3.32.2"
-  },
-  "peerDependencies": {
-    "@tiptap/core": "^3.32.2",
-    "@tiptap/pm": "^3.32.2"
-  },
-  "devDependencies": {
-    "@tiptap/core": "^3.32.2",
-    "@tiptap/pm": "^3.32.2"
   }
 }

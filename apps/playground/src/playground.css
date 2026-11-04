@@ -22,8 +22,3 @@ body {
   color: #6b6b66;
   flex: 1;
 }
-
-.playground [role="alert"] {
-  margin: 16px;
-  color: #a1260d;
-}

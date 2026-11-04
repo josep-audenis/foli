@@ -1,10 +1,12 @@
 # Document model
 
-> Status: implemented in `@foli/core` (`packages/core/src/document.ts`), schema version 1.
+> Status: envelope and schema v1 validation implemented in `@foli/core`
+> (`packages/core/src/document.ts`, `packages/core/src/schema.ts`). The full model (immutable
+> nodes, positions, steps) is Phase 2–3 of the [roadmap](roadmap.md).
 
 ## Canonical form
 
-A persisted Foli document is a small versioned **envelope** around ProseMirror-compatible JSON:
+A persisted Foli document is a versioned **envelope** around a JSON content tree:
 
 ```ts
 interface FoliDocument {
@@ -13,7 +15,7 @@ interface FoliDocument {
     pageSize: { width: number; height: number }; // mm
     margins: { top: number; right: number; bottom: number; left: number }; // mm
   };
-  content: JSONContent; // ProseMirror JSON, root node type "doc"
+  content: DocJSON; // root node of type "doc"
 }
 ```
 
@@ -22,15 +24,48 @@ Rules:
 1. `content` is the **only** source of truth for document content. The rendered DOM is never
    parsed back as truth; pages are never stored.
 2. The content is one continuous `doc` regardless of how many pages it occupies.
-3. `content` must validate against the schema produced by `createExtensions()`. Editor,
-   validation and serialization all use that same extension set.
-4. `parseDocument(input)` is the trust boundary for loading. It throws `FoliDocumentError`
-   instead of dropping or "repairing" content silently.
+3. `parseDocument(input)` is the trust boundary for loading. Unknown node types, marks,
+   attributes or keys throw `FoliDocumentError` with a JSON path
+   (e.g. `content.content[2].content[0].marks[0].type: unknown mark type "code"`). Content is
+   never silently dropped or "repaired".
+
+## Content JSON shape
+
+Every node is `{ type, attrs?, content?, text?, marks? }`. This shape is permanent: it is
+familiar to developers who know ProseMirror-style JSON and simple for Rust and other consumers.
+
+## Schema v1
+
+| Node        | Group  | Content            | Attrs                             |
+| ----------- | ------ | ------------------ | --------------------------------- |
+| `doc`       | root   | one or more blocks | —                                 |
+| `paragraph` | block  | inline\*           | —                                 |
+| `heading`   | block  | inline\*           | `level`: 1–6 (required)           |
+| `text`      | inline | —                  | `text`: non-empty string, `marks` |
+| `hardBreak` | inline | —                  | —                                 |
+
+Marks: `bold`, `italic`, `underline`, `strike` (no attributes; each at most once per text node).
+
+v1 may still change until the first published release (nothing has been published, so no
+migration is owed yet). Planned before 0.1: `pageBreak` block node.
+
+## Model concepts (Phase 2–3, not implemented)
+
+- **Immutable tree** with structural sharing: an edit creates new nodes along the changed path;
+  unchanged nodes are reused, which makes identity a free cache key for rendering and layout.
+- **Integer positions**: every position in the document is a number. Entering or leaving a
+  non-leaf node counts 1; each character counts 1; a leaf node counts 1. `ResolvedPos` gives the
+  tree context (depth, parent, index, offset) for a position.
+- **Steps**: every change is a step (replace, add/remove mark, set attribute) that can be
+  applied, inverted, and produces a **position map**. Mapping keeps selections, undo history,
+  cursor positions across reflow, and future collaboration consistent.
+- **Normalization**: adjacent text nodes with equal marks merge; marks are kept in canonical
+  order. The serialized form is therefore canonical.
 
 ## Why page size is width/height, not a preset name
 
 `pageSize` stores resolved dimensions. `PAGE_SIZES.A4` / `PAGE_SIZES.Letter` are helpers.
-This avoids invalid states such as `"custom"` without dimensions or `orientation` that
+This avoids invalid states such as `"custom"` without dimensions or an `orientation` that
 contradicts the numbers. Orientation is derived (`width > height` = landscape).
 
 ## Units
@@ -49,24 +84,24 @@ Font sizes inside content use points (pt), matching word processors.
 
 ## Versioning and migrations
 
-`schemaVersion` is bumped whenever the envelope or the content schema changes incompatibly
-(renamed node, changed attribute meaning). `parseDocument` then gains a migration step
-`vN → vN+1` before validation. Old documents must keep loading.
+After the first release, `schemaVersion` is bumped whenever the envelope or content schema
+changes incompatibly (renamed node, changed attribute meaning). `parseDocument` then runs
+migrations `vN → vN+1` before validation. Old documents must keep loading. The first planned
+migration is v1 → v2 for lists and links (Phase 7).
 
-## Planned additions (not implemented)
+## Planned envelope additions (not implemented)
 
-Added only when a feature needs them, each with a migration:
+Each added only when a feature needs it, with a migration:
 
 - `metadata` (title, author, timestamps, app-defined fields).
-- `styles` (named paragraph/character styles) — Phase 5.
-- `headers` / `footers` as separate ProseMirror docs (they are genuinely separate content) — Phase 3.
-- `resources` (image references by id, so binary data is not inlined) — Phase 5.
+- `styles` (named paragraph/character styles) — Phase 9.
+- `headers` / `footers` as separate content trees — Phase 9.
+- `resources` (image references by id, no inline binary) — Phase 8.
 - Extension-owned data under a namespaced key.
 
 ## Open questions
 
-- Deterministic serialization (stable key order) for diff-friendly storage: `JSON.stringify`
-  of ProseMirror's `toJSON()` is already stable in practice; confirm and add a test before
-  promising it.
-- Whether to validate with a JSON schema (for non-JS consumers / Rust) in addition to the
-  ProseMirror schema check.
+- Generate a JSON Schema from the TypeScript schema so Rust and other consumers validate the
+  same format (Phase 10).
+- Key order in serialized JSON for diff-friendly storage: make `toJSON` emit a fixed order and
+  test it (Phase 2).

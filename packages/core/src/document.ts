@@ -1,8 +1,9 @@
-import { type AnyExtension, getSchema, type JSONContent } from "@tiptap/core";
-import { Node } from "@tiptap/pm/model";
-import { createExtensions } from "./extensions.js";
+import { type DocJSON, FoliDocumentError, validateContent } from "./schema.js";
 
-/** Bump when the persisted envelope or content schema changes incompatibly; add a migration. */
+/**
+ * Bump when the persisted envelope or content schema changes incompatibly; add a migration.
+ * Nothing is published yet, so v1 may still change until the first release.
+ */
 export const SCHEMA_VERSION = 1;
 
 /** All page geometry is in millimetres. See docs/document-model.md for unit conversions. */
@@ -23,11 +24,11 @@ export interface DocumentSettings {
   margins: PageMargins;
 }
 
-/** The persisted document: a versioned envelope around ProseMirror-compatible JSON. */
+/** The persisted document: a versioned envelope around the content tree. */
 export interface FoliDocument {
   schemaVersion: typeof SCHEMA_VERSION;
   settings: DocumentSettings;
-  content: JSONContent;
+  content: DocJSON;
 }
 
 export const PAGE_SIZES = {
@@ -40,12 +41,8 @@ export const DEFAULT_SETTINGS: DocumentSettings = {
   margins: { top: 25.4, right: 25.4, bottom: 25.4, left: 25.4 },
 };
 
-export class FoliDocumentError extends Error {
-  override name = "FoliDocumentError";
-}
-
 export function createDocument(
-  content: JSONContent = { type: "doc", content: [{ type: "paragraph" }] },
+  content: DocJSON = { type: "doc", content: [{ type: "paragraph" }] },
   settings: Partial<DocumentSettings> = {},
 ): FoliDocument {
   return { schemaVersion: SCHEMA_VERSION, settings: { ...DEFAULT_SETTINGS, ...settings }, content };
@@ -55,24 +52,14 @@ export function createDocument(
  * Validates untrusted input (e.g. JSON loaded from storage) and returns a FoliDocument.
  * Throws FoliDocumentError instead of silently dropping invalid content.
  */
-export function parseDocument(
-  input: unknown,
-  extensions: AnyExtension[] = createExtensions(),
-): FoliDocument {
+export function parseDocument(input: unknown): FoliDocument {
   if (!isRecord(input)) throw new FoliDocumentError("Document must be an object");
   if (input.schemaVersion !== SCHEMA_VERSION) {
     throw new FoliDocumentError(`Unsupported schemaVersion: ${String(input.schemaVersion)}`);
   }
   const settings = parseSettings(input.settings);
-  if (!isRecord(input.content) || input.content.type !== "doc") {
-    throw new FoliDocumentError('content must be a ProseMirror JSON node of type "doc"');
-  }
-  try {
-    Node.fromJSON(getSchema(extensions), input.content).check();
-  } catch (cause) {
-    throw new FoliDocumentError("content does not match the editor schema", { cause });
-  }
-  return { schemaVersion: SCHEMA_VERSION, settings, content: input.content as JSONContent };
+  const content = validateContent(input.content);
+  return { schemaVersion: SCHEMA_VERSION, settings, content };
 }
 
 function parseSettings(input: unknown): DocumentSettings {

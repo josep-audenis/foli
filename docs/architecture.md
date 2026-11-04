@@ -1,99 +1,127 @@
 # Architecture
 
-Foli is an embeddable, Word-like document editor for React: structured documents, real pages,
-an extensible core, and (later, where measured to help) Rust/WASM processing.
+Foli is an open-source document-editing engine for the web: its own document model,
+transactions, view and layout, designed around native pagination, with first-class React
+integration. Decision record: [ADR-0002](decisions/ADR-0002-own-editing-engine.md).
 
-This document describes **what exists** and **what is decided**. Planned work is marked as such.
+This document describes **what exists** and **what is decided**. Planned parts are marked.
 
-## Foundation
+## Subsystems
 
-Tiptap 3 (MIT packages only) on ProseMirror. Rationale and comparison with direct
-ProseMirror and Lexical: [ADR-0001](decisions/ADR-0001-editor-foundation.md).
+```
+┌──────────────────────────────────────────────────────────────┐
+│ @foli/react   components · hooks · toolbar                   │
+└──────────────────────────────┬───────────────────────────────┘
+                               │ mounts, subscribes
+┌──────────────────────────────▼───────────────────────────────┐
+│ @foli/view    DOM rendering · input · selection · clipboard  │
+│               layout & pagination                            │
+└──────────────────────────────┬───────────────────────────────┘
+                               │ dispatches transactions, renders state
+┌──────────────────────────────▼───────────────────────────────┐
+│ @foli/core    schema · nodes · positions · steps · mapping   │
+│               state · history · commands        (no DOM)     │
+└──────────────────────────────▲───────────────────────────────┘
+                               │ same JSON format
+┌──────────────────────────────┴───────────────────────────────┐
+│ Rust (later)  DOCX import/export · batch processing · WASM   │
+│               never on the keystroke path                    │
+└──────────────────────────────────────────────────────────────┘
+```
 
-ProseMirror owns: selection, IME, transactions, undo/redo, clipboard parsing, DOM rendering of
-content. Foli owns: the document envelope, the extension set, pagination, React integration, UI.
+| Subsystem           | Responsibility                                                                 | Status                                                 |
+| ------------------- | ------------------------------------------------------------------------------ | ------------------------------------------------------ |
+| Document model      | Schema, immutable tree, marks, positions, JSON, validation                     | Envelope + schema v1 validator ✅; model: Phase 2      |
+| Editing engine      | Steps, position mapping, selection, state, history, commands                   | Phase 3                                                |
+| View                | Render state to DOM, DOM ↔ model mapping, `beforeinput`, IME, clipboard, focus | Read-only renderer ✅; editing: Phase 4                |
+| Layout              | Measurement, line breaking, page flow, fragments, incremental reflow, print    | Phase 5 (inside `@foli/view` until the seam is proven) |
+| React integration   | Components, hooks, toolbar                                                     | Read-only `DocumentEditor` ✅; API: Phase 6            |
+| Document processing | DOCX/HTML interop, Rust/WASM                                                   | Phase 10                                               |
+
+## Editing data flow (target design)
+
+```
+DOM event (beforeinput / keydown / composition / paste)
+  → view translates to a command
+  → command builds a Transaction (steps + selection + metadata)
+  → core applies it → new immutable EditorState
+  → history records inverted steps (unless addToHistory: false)
+  → view.update(state): re-render changed nodes only
+  → layout reflows from the first changed block → page fragments
+  → selection written back to the DOM
+  → subscribers (React, onChange) notified
+```
+
+The DOM is never parsed as the source of truth. The one exception is IME composition and
+Android input, where the browser must mutate the DOM; the view reads those changes back and
+converts them into steps immediately.
 
 ## Packages
 
 ```
 foli/
-├── apps/
-│   └── playground/        Vite demo. Consumes packages by name only; no editing logic lives here.
+├── apps/playground/     Vite demo; consumes packages by name; no engine logic.
 ├── packages/
-│   ├── core/    @foli/core    Framework-agnostic: document envelope, schema (extension set),
-│   │                          validation/parsing, page geometry. No DOM required.
-│   └── react/   @foli/react   React components + default stylesheet (@foli/react/styles.css).
+│   ├── core/  @foli/core   Document envelope, schema, validation. Pure TS, no DOM.
+│   ├── view/  @foli/view   DOM rendering (read-only so far). Framework-agnostic.
+│   └── react/ @foli/react  React components + default stylesheet.
 └── docs/
 ```
 
-Dependency direction: `playground → react → core → @tiptap/*`. Never the reverse.
+Dependency direction: `playground → react → view → core`. Never the reverse.
 
-### Deliberately not created yet
+Planned, created only when needed:
 
-| Proposed                            | Decision                                                                                                                                                                   |
-| ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `packages/pagination`               | Created in Phase 2 with the first pagination code. It is a ProseMirror plugin (DOM-bound but framework-agnostic), so it belongs neither in `core` (no DOM) nor in `react`. |
-| `packages/ui`                       | Folded into `@foli/react`. The toolbar/menus are React components; a separate package has no consumer until a non-React UI exists.                                         |
-| `packages/wasm`, `crates/*`         | Deferred until a feature with benchmarks justifies Rust (see below).                                                                                                       |
-| `apps/docs`, `examples/nextjs`      | Phase 6. A Next.js example is useful earlier as an SSR smoke test; may move up.                                                                                            |
-| `tests/`, `benchmarks/` (top level) | Unit tests live next to code. Playwright e2e and benchmarks get folders when introduced.                                                                                   |
+| Package / folder         | When                                                                          |
+| ------------------------ | ----------------------------------------------------------------------------- |
+| `spikes/two-page/`       | Phase 1, throwaway, never published                                           |
+| `@foli/layout`           | Split out of `@foli/view` once the layout/view boundary is stable             |
+| `@foli/ui`               | Only if a non-React UI appears; until then the toolbar lives in `@foli/react` |
+| `crates/*`, `@foli/wasm` | Phase 10                                                                      |
+| `examples/`              | Phase 6 (Vite and Next.js install tests)                                      |
+
+## Dependency policy
+
+- **Forbidden in published packages:** any editor engine (ProseMirror, Tiptap, Lexical, Slate,
+  Quill, CKEditor, Draft.js, Editor.js …).
+- **Allowed:** general-purpose libraries under permissive licenses (MIT, Apache-2.0, BSD, ISC),
+  after checking size and whether existing code already covers the need.
+- **Copied code:** only with provenance in `THIRD_PARTY_NOTICES.md` and preserved notices.
+- Runtime dependencies today: none besides React (peer) and our own packages.
 
 ## Build and dev wiring
 
-- Each package exports an `@foli/source` condition pointing at `src/index.ts`. The playground
-  (Vite), Vitest and `tsc --noEmit` resolve that condition, so dev and tests run on source with
-  no build step, while still importing through package names.
-- `pnpm build` runs `tsc` per package (topological order) to `dist/` with `.d.ts`. Build configs
-  drop the custom condition so published types point at `dist`.
-- Packages are ESM-only, `sideEffects` declared, React/Tiptap as peers.
+- Each package exports an `@foli/source` condition pointing at `src/index.ts`. Vite, Vitest and
+  `tsc --noEmit` resolve it, so dev and tests run on source while importing by package name.
+- `pnpm build` runs `tsc` per package (topological) to `dist/` with `.d.ts`; build configs drop
+  the condition so published types point at `dist`.
+- ESM-only, `sideEffects` declared, React as a peer dependency.
 
-## React integration
+## React integration (target)
 
-Current: `<DocumentEditor initialContent onChange />`, **uncontrolled**. The editor owns
-document state; the parent observes changes. `initialContent` is read once; load another
-document by remounting with a new `key`.
-
-Planned (Phase 1):
-
-- `useDocumentEditor(options)` → editor handle; `DocumentEditorProvider`, `DocumentCanvas`,
-  `DocumentToolbar` for composition; `<DocumentEditor>` stays as the batteries-included wrapper.
-- External replacement via an imperative `setDocument()` (no history entry) rather than
-  controlled props.
-- **Not supported:** a fully controlled `value` prop. Re-feeding the document on each keystroke
-  forces whole-document diffing and parent re-renders; it is the main performance trap of
-  React editors.
-- `onChange` receives transaction metadata later (origin, whether doc changed) for autosave.
-- SSR: Tiptap needs `immediatelyRender: false` under Next.js; add with the Next.js example.
+Uncontrolled: the engine owns document state; React observes. `initialContent` is read once;
+external replacement goes through an imperative `setDocument()`. No fully controlled `value`
+prop: feeding the whole document back on every keystroke defeats incremental rendering.
+The view owns its DOM subtree; React never renders children into it.
 
 ## Styling
 
-Plain CSS with custom properties (`--foli-*`) scoped to `.foli-canvas`. No CSS framework.
-Page geometry is applied in `mm` units straight from document settings.
-
-## Rust / WebAssembly strategy
-
-No Rust today. Rules for introducing it:
-
-1. A concrete feature needs it, and a TypeScript baseline has been benchmarked (including
-   serialization across the JS/WASM boundary, WASM init time, memory).
-2. Coarse-grained API (whole operations, batches), run in a Web Worker where it can block.
-3. Never for selection, DOM events, rendering, or text measurement.
-
-Realistic first candidates, in order: DOCX import/export (zip + XML processing, also usable
-server-side), batch transformations/validation for server pipelines. Pagination math is not a
-candidate (DOM measurement dominates). Note: `docx` (MIT) already covers JS-side DOCX generation
-and must be the baseline to beat.
+Plain CSS with custom properties (`--foli-*`) on `.foli-canvas`. Page geometry is applied in
+`mm` straight from document settings. No CSS framework.
 
 ## Risk register
 
-| Area                   | Risk                                                                                  | Mitigation                                                                                                                 |
-| ---------------------- | ------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| Pagination feasibility | Decoration-based layout may hit edge cases (caret over spacers, justified lines, IME) | Staged: block-level first, line-level after; Playwright tests in 3 engines; see [pagination.md](pagination.md)             |
-| Cross-page selection   | Must work by construction (one doc); risk is spacer widgets interfering               | Widgets with `ignoreSelection`, `aria-hidden`, e2e tests dragging selection across pages                                   |
-| Undo history           | Layout transactions must never enter history                                          | All layout dispatches set `addToHistory: false`; unit test that undo after repagination restores the edit, not the layout  |
-| DOM measurement        | Layout thrash; measuring before fonts/images load                                     | rAF-batched read phase, then one write; repaginate on font/image load                                                      |
-| Font metrics           | Different fonts per OS → different pagination                                         | Bundle default fonts; visual tests in pinned containers; document that pagination is per-environment                       |
-| Large documents        | O(n) measurement and decoration sets                                                  | Node-identity height cache, incremental recompute; benchmarks at 1/10/50/100+ pages before any optimization                |
-| DOCX compatibility     | Word layout is not reproducible in browsers; DOCX features are vast                   | Target content fidelity, not pagination fidelity; test against real Word/LibreOffice files; never claim full compatibility |
-| Dependencies           | Tiptap features moving to paid tiers; Lexical alternative is pre-1.0                  | Use only MIT packages; we can always drop to raw ProseMirror                                                               |
-| Tooling                | TypeScript 7 (native) and Vite 8 (Rolldown) are new majors                            | Both pass today; if a tool breaks, pin TypeScript 5.9 / Vite 7 rather than work around                                     |
+| Area                | Risk                                                                                                     | Mitigation                                                                                      |
+| ------------------- | -------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| Rendering approach  | Paragraph fragments across pages inside one `contenteditable` may break IME, selection or screen readers | Phase 1 spike before any view code; fallback approaches defined in ADR-0002                     |
+| IME / mobile input  | Android and Safari composition behave differently; `beforeinput` unreliable on Android                   | Composition read-back + MutationObserver; automated Chromium IME tests; manual device checklist |
+| Model correctness   | Data corruption from step or mapping bugs                                                                | Property-based tests on steps, mapping, undo; strict validation at load                         |
+| Undo history        | Layout or programmatic changes leaking into history                                                      | Transaction metadata (`addToHistory`); tests per command                                        |
+| Clipboard           | Office HTML is messy; unsafe HTML                                                                        | Own sanitizing parser to schema; fixture corpus; never insert raw HTML                          |
+| DOM measurement     | Layout thrash; fonts/images not loaded                                                                   | Read-then-write per frame; reflow on font/image load                                            |
+| Font metrics        | Different fonts per OS change pagination                                                                 | Bundled default font; pinned test environments; documented as environment-dependent             |
+| Large documents     | O(n) measurement and DOM size                                                                            | Node-identity caches, incremental reflow; benchmarks before optimizing                          |
+| Accessibility       | Custom input handling can break assistive tech                                                           | Keep native `contenteditable` semantics; screen-reader checks per release                       |
+| DOCX                | Word layout not reproducible; spec is vast                                                               | Target content fidelity; real-world corpus; never claim full compatibility                      |
+| Scope / maintenance | We own every editing bug                                                                                 | Gates, small feature set, tests first                                                           |
+| Tooling             | TypeScript 7 (native) and Vite 8 are new majors                                                          | If a tool breaks, pin TypeScript 5.9 / Vite 7 rather than work around                           |

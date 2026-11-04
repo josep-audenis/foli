@@ -1,7 +1,8 @@
 # Foli — agent notes
 
-Embeddable Word-like document editor for React. Tiptap 3 (MIT only) on ProseMirror.
-Read `docs/architecture.md` before structural changes; `docs/roadmap.md` for current phase.
+Independent document-editing engine for the web (own model, transactions, view, layout) with
+React integration. Read `docs/architecture.md` before structural changes, `docs/roadmap.md` for
+the current phase and its gates, ADR-0002 for why there is no editor-engine dependency.
 
 ## Commands
 
@@ -10,12 +11,17 @@ Read `docs/architecture.md` before structural changes; `docs/roadmap.md` for cur
 
 ## Conventions
 
-- Packages: `packages/core` (no DOM), `packages/react`. Playground holds no editing logic.
+- Packages: `packages/core` (no DOM), `packages/view` (DOM, framework-agnostic), `packages/react`.
+  Playground holds no engine logic.
 - Imports between packages go through package names; the `@foli/source` export condition maps
   them to `src/` in dev/test/typecheck. Relative imports inside a package use `.js` extensions (NodeNext).
-- Document content = ProseMirror JSON inside the `FoliDocument` envelope. Never parse the DOM as truth.
-- Format changes bump `SCHEMA_VERSION` + migration. Never silently drop content.
-- No Tiptap Pro / paid packages. Check licenses for any new dependency.
+- Document content = `{type, attrs, content, text, marks}` JSON inside the `FoliDocument`
+  envelope. Never parse the DOM as truth. Never use `innerHTML` with document or pasted data.
+- Format changes bump `SCHEMA_VERSION` + migration (after first release). Never silently drop content.
+- No editor-engine dependencies (ProseMirror, Tiptap, Lexical, Slate, Quill, CKEditor…). Reading
+  their source is fine; copied code needs an entry in `THIRD_PARTY_NOTICES.md`. Check licenses
+  for any new dependency.
+- Do not start a roadmap phase whose gate predecessor has not passed.
 - No Rust/WASM until a benchmarked feature needs it.
 - Keep docs truthful: planned ≠ implemented.
 

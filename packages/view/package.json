@@ -1,0 +1,27 @@
+{
+  "name": "@foli/view",
+  "version": "0.0.0",
+  "description": "Framework-agnostic DOM view for the Foli document engine: rendering, input, selection, layout.",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "@foli/source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "src",
+    "!src/**/*.test.*"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@foli/core": "workspace:*"
+  }
+}

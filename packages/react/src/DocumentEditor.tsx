@@ -1,30 +1,25 @@
-import { createDocument, createExtensions, type FoliDocument } from "@foli/core";
-import { EditorContent, useEditor } from "@tiptap/react";
-import { type CSSProperties, useEffect, useRef, useState } from "react";
+import { createDocument, type FoliDocument } from "@foli/core";
+import { renderContent } from "@foli/view";
+import { type CSSProperties, useLayoutEffect, useRef, useState } from "react";
 
 export interface DocumentEditorProps {
   /** Read once on mount. To load a different document later, remount with a new `key`. */
   initialContent?: FoliDocument;
-  onChange?: (document: FoliDocument) => void;
   className?: string;
 }
 
 /**
- * Uncontrolled editor: the editor owns document state, the parent observes it via onChange.
- * Walking skeleton only — single visual page, no pagination or toolbar yet (see docs/roadmap.md).
+ * Currently READ-ONLY: renders the document on one page-sized sheet.
+ * Editing arrives with Foli's own engine (Phases 2–4), pagination in Phase 5 — see docs/roadmap.md.
  */
-export function DocumentEditor({ initialContent, onChange, className }: DocumentEditorProps) {
+export function DocumentEditor({ initialContent, className }: DocumentEditorProps) {
   const [initial] = useState(() => initialContent ?? createDocument());
-  const onChangeRef = useRef(onChange);
-  useEffect(() => {
-    onChangeRef.current = onChange;
-  });
+  const contentRef = useRef<HTMLDivElement>(null);
 
-  const editor = useEditor({
-    extensions: createExtensions(),
-    content: initial.content,
-    onUpdate: ({ editor }) => onChangeRef.current?.({ ...initial, content: editor.getJSON() }),
-  });
+  // The view owns this DOM subtree; React never renders children into it.
+  useLayoutEffect(() => {
+    contentRef.current?.replaceChildren(renderContent(initial.content));
+  }, [initial]);
 
   const { pageSize, margins } = initial.settings;
   const pageStyle: CSSProperties = {
@@ -36,7 +31,7 @@ export function DocumentEditor({ initialContent, onChange, className }: Document
   return (
     <div className={className ? `foli-canvas ${className}` : "foli-canvas"}>
       <div className="foli-page" style={pageStyle}>
-        <EditorContent editor={editor} className="foli-content" />
+        <div ref={contentRef} className="foli-content" />
       </div>
     </div>
   );
