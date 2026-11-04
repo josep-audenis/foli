@@ -28,12 +28,12 @@ Peer dependencies: `react`, `react-dom`.
 
 ## Packages
 
-| Package                              | Purpose                                                                      |
-| ------------------------------------ | ---------------------------------------------------------------------------- |
-| [`@foli/core`](packages/core)        | Document envelope, schema, validation (model and transactions next). No DOM. |
-| [`@foli/view`](packages/view)        | Framework-agnostic DOM view (read-only rendering so far).                    |
-| [`@foli/react`](packages/react)      | React components and default stylesheet.                                     |
-| [`apps/playground`](apps/playground) | Demo app; consumes the packages like a third party would.                    |
+| Package                              | Purpose                                                                                 |
+| ------------------------------------ | --------------------------------------------------------------------------------------- |
+| [`@foli/core`](packages/core)        | Document model: schema, immutable nodes, positions, slices (transactions next). No DOM. |
+| [`@foli/view`](packages/view)        | Framework-agnostic DOM view (read-only rendering so far).                               |
+| [`@foli/react`](packages/react)      | React components and default stylesheet.                                                |
+| [`apps/playground`](apps/playground) | Demo app; consumes the packages like a third party would.                               |
 
 ## Documentation
 
@@ -41,6 +41,7 @@ Peer dependencies: `react`, `react-dom`.
 - [Architecture](docs/architecture.md) — subsystems, packages, dependency policy, risks
 - [ADR-0002: Foli owns its editing engine](docs/decisions/ADR-0002-own-editing-engine.md)
 - [Document model](docs/document-model.md) — persisted format, schema v1, units, migrations
+- [Benchmarks](docs/benchmarks.md) — model build/serialize timings with method
 - [Pagination](docs/pagination.md) — design for native multi-page editing (not implemented yet)
 - [Contributing](docs/contributing.md)
 

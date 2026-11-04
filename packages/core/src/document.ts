@@ -1,4 +1,5 @@
-import { type DocJSON, FoliDocumentError, validateContent } from "./schema.js";
+import { FoliDocumentError, type Node } from "./model/index.js";
+import { type DocJSON, schema } from "./schema.js";
 
 /**
  * Bump when the persisted envelope or content schema changes incompatibly; add a migration.
@@ -49,7 +50,8 @@ export function createDocument(
 }
 
 /**
- * Validates untrusted input (e.g. JSON loaded from storage) and returns a FoliDocument.
+ * Validates untrusted input (e.g. JSON loaded from storage) against the schema and returns a
+ * FoliDocument with content in canonical form (see docs/document-model.md, "Normalization").
  * Throws FoliDocumentError instead of silently dropping invalid content.
  */
 export function parseDocument(input: unknown): FoliDocument {
@@ -58,8 +60,19 @@ export function parseDocument(input: unknown): FoliDocument {
     throw new FoliDocumentError(`Unsupported schemaVersion: ${String(input.schemaVersion)}`);
   }
   const settings = parseSettings(input.settings);
-  const content = validateContent(input.content);
+  const content = parseContent(input.content).toJSON() as DocJSON;
   return { schemaVersion: SCHEMA_VERSION, settings, content };
+}
+
+/** Parses untrusted content JSON into a `doc` node of the v1 schema. */
+export function parseContent(value: unknown, path = "content"): Node {
+  const doc = schema.nodeFromJSON(value, path);
+  if (doc.type !== schema.topNodeType) {
+    throw new FoliDocumentError(`${path}: root node must be of type "doc"`);
+  }
+  // The root has no parent to check its marks against.
+  if (doc.marks.length) throw new FoliDocumentError(`${path}.marks: doc cannot have marks`);
+  return doc;
 }
 
 function parseSettings(input: unknown): DocumentSettings {

@@ -1,6 +1,6 @@
-import type { BlockJSON, DocJSON, InlineJSON, MarkType } from "@foli/core";
+import type { BlockJSON, DocJSON, InlineJSON, MarkName } from "@foli/core";
 
-const MARK_TAGS: Record<MarkType, string> = {
+const MARK_TAGS: Record<MarkName, string> = {
   bold: "strong",
   italic: "em",
   underline: "u",

@@ -62,7 +62,7 @@ converts them into steps immediately.
 foli/
 ├── apps/playground/     Vite demo; consumes packages by name; no engine logic.
 ├── packages/
-│   ├── core/  @foli/core   Document envelope, schema, validation. Pure TS, no DOM.
+│   ├── core/  @foli/core   Envelope, schema, immutable model, positions, slices. Pure TS, no DOM.
 │   ├── view/  @foli/view   DOM rendering (read-only so far). Framework-agnostic.
 │   └── react/ @foli/react  React components + default stylesheet.
 └── docs/
