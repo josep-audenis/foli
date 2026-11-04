@@ -12,7 +12,7 @@ place that says what is in progress; check it before starting work.
 | Phase                    | Status            | Branch                   | Notes                                  |
 | ------------------------ | ----------------- | ------------------------ | -------------------------------------- |
 | 0 Foundation             | ✅ Done           | —                        |                                        |
-| 1 Architecture spike     | Ready             | `phase-1/two-page-spike` | Owns root tooling changes (Playwright) |
+| 1 Architecture spike     | In progress       | `phase-1/two-page-spike` | Owns root tooling changes (Playwright) |
 | 2 Document model         | Ready             | `phase-2/document-model` | Can run in parallel with Phase 1       |
 | 3 Transactions & history | Blocked by 2      |                          |                                        |
 | 4 Editor view            | Blocked by G1, G2 |                          | Needs ADR-0003 (Phase 1) and Phase 3   |
@@ -147,6 +147,16 @@ host, pages as visual containers inside it, one paragraph rendered as fragments 
 **Exit (G1):** `docs/decisions/ADR-0003-rendering-and-input.md` chooses one of:
 A) `contenteditable` with page fragments · B) hidden input + Foli-rendered DOM ·
 C) `contenteditable` with block-level pages only. Evidence attached. Phase 4/5 design follows it.
+
+### Tasks
+
+- [ ] Claim phase, branch `phase-1/two-page-spike`
+- [ ] Playwright at the root: Chromium, Firefox, WebKit; `pnpm test:e2e`
+- [ ] Spike app `spikes/two-page`: toy model, line measurement, page-flow layout (unit-tested), page rendering
+- [ ] Input: `beforeinput` editing, DOM ↔ model selection mapping, composition read-back, snapshot undo
+- [ ] Automated experiments E1–E4, E7 (E3 Chromium only) in all three engines
+- [ ] Manual checklist for E3 (other platforms), E5, E6
+- [ ] ADR-0003 draft with automated evidence; accepted once manual results are in (gate G1)
 
 ## Phase 2 — Document model (`@foli/core`) · L
 
