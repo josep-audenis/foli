@@ -83,8 +83,8 @@ export function App() {
       <header className="playground-bar">
         <strong>Foli</strong>
         <span className="playground-hint">
-          Editor view in progress (Phase 4): typing, Enter, Backspace, marks, undo. No paste, IME or
-          dead-key accents yet.
+          Editor view in progress (Phase 4): typing, Enter, Backspace, marks, undo. IME and dead
+          keys are being verified. No paste yet.
         </span>
         <button type="button" onClick={reset}>
           Reset

@@ -6,8 +6,9 @@ integration.
 
 > **Status: pre-alpha — engine under construction.** Foli edits documents with its own model,
 > engine and view (no ProseMirror/Tiptap/Lexical) on one page-sized sheet: typing, Enter,
-> Backspace, bold/italic/underline shortcuts, undo/redo. Not yet: paste, IME composition and dead-key accents,
-> pagination. See [docs/roadmap.md](docs/roadmap.md). Not published to npm yet.
+> Backspace, bold/italic/underline shortcuts, undo/redo, IME and dead keys (automated tests
+> only; manual checks pending). Not yet: paste, pagination. See [docs/roadmap.md](docs/roadmap.md).
+> Not published to npm yet.
 
 ## Usage (current, provisional API)
 
