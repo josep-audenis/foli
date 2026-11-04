@@ -14,7 +14,7 @@ during IME composition, where the browser edits the DOM and the spike reads it b
 pnpm exec playwright install                           # once: download test browsers
 pnpm --filter @foli/spike-two-page dev --port 5174     # http://localhost:5174
 pnpm --filter @foli/spike-two-page dev --port 5174 --host          # also reachable from phones/other machines on the LAN
-pnpm test:e2e                                          # automated experiments, all three engines
+pnpm test:e2e --project="spike-*"                      # automated experiments, all three engines
 ```
 
 `?pages=50` loads a ~50-page document. Paragraph 3 (approximately) is split across pages 1 and 2.

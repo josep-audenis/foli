@@ -4,12 +4,12 @@ An open-source document-editing engine for the web, built from the ground up: it
 model, transactions, view and layout, designed around native pagination, with first-class React
 integration.
 
-> **Status: pre-alpha — engine under construction.** Foli currently renders documents
-> **read-only** from its own model onto a page-sized sheet. Editing and pagination are being
-> built as Foli's own engine (no ProseMirror/Tiptap/Lexical). See [docs/roadmap.md](docs/roadmap.md).
-> Not published to npm yet.
+> **Status: pre-alpha — engine under construction.** Foli edits documents with its own model,
+> engine and view (no ProseMirror/Tiptap/Lexical) on one page-sized sheet: typing, Enter,
+> Backspace, bold/italic/underline shortcuts, undo/redo. Not yet: paste, IME composition,
+> pagination. See [docs/roadmap.md](docs/roadmap.md). Not published to npm yet.
 
-## Usage (current, read-only API)
+## Usage (current, provisional API)
 
 ```tsx
 import { createDocument, parseDocument } from "@foli/core";
@@ -20,7 +20,7 @@ const doc = parseDocument(JSON.parse(saved)); // throws FoliDocumentError on inv
 // or: createDocument({ type: "doc", content: [{ type: "paragraph" }] })
 
 export function App() {
-  return <DocumentEditor initialContent={doc} />;
+  return <DocumentEditor initialContent={doc} onChange={(next) => save(JSON.stringify(next))} />;
 }
 ```
 
@@ -31,7 +31,7 @@ Peer dependencies: `react`, `react-dom`.
 | Package                              | Purpose                                                                                      |
 | ------------------------------------ | -------------------------------------------------------------------------------------------- |
 | [`@foli/core`](packages/core)        | Document model and headless editing engine: schema, nodes, steps, history, commands. No DOM. |
-| [`@foli/view`](packages/view)        | Framework-agnostic DOM view (read-only rendering so far).                                    |
+| [`@foli/view`](packages/view)        | Framework-agnostic editable DOM view (`EditorView`): rendering, input, selection.            |
 | [`@foli/react`](packages/react)      | React components and default stylesheet.                                                     |
 | [`apps/playground`](apps/playground) | Demo app; consumes the packages like a third party would.                                    |
 

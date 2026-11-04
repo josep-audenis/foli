@@ -9,16 +9,16 @@ leaves `main` green with a working playground.
 **Update this table in the same PR that starts, advances or finishes a phase.** It is the only
 place that says what is in progress; check it before starting work.
 
-| Phase                    | Status                   | Branch | Notes                                                                        |
-| ------------------------ | ------------------------ | ------ | ---------------------------------------------------------------------------- |
-| 0 Foundation             | ✅ Done                  | —      |                                                                              |
-| 1 Architecture spike     | ✅ Done (G1 provisional) | —      | ADR-0003 accepted provisionally; IME/screen-reader checks carried to Phase 4 |
-| 2 Document model         | ✅ Done                  | —      | Merged in #2                                                                 |
-| 3 Transactions & history | ✅ Done                  | —      | Merged in #4; gate G2 passed                                                 |
-| 4 Editor view            | In progress              | `phase-4/editor-view` | Must run the manual IME and screen-reader checks ADR-0003 left open |
-| 5 Native pagination      | Blocked by G3            |        |                                                                              |
-| 6 React API & 0.1.0      | Blocked by G4            |        |                                                                              |
-| 7–12                     | Not started              |        |                                                                              |
+| Phase                    | Status                   | Branch                | Notes                                                                        |
+| ------------------------ | ------------------------ | --------------------- | ---------------------------------------------------------------------------- |
+| 0 Foundation             | ✅ Done                  | —                     |                                                                              |
+| 1 Architecture spike     | ✅ Done (G1 provisional) | —                     | ADR-0003 accepted provisionally; IME/screen-reader checks carried to Phase 4 |
+| 2 Document model         | ✅ Done                  | —                     | Merged in #2                                                                 |
+| 3 Transactions & history | ✅ Done                  | —                     | Merged in #4; gate G2 passed                                                 |
+| 4 Editor view            | In progress              | `phase-4/editor-view` | Must run the manual IME and screen-reader checks ADR-0003 left open          |
+| 5 Native pagination      | Blocked by G3            |                       |                                                                              |
+| 6 React API & 0.1.0      | Blocked by G4            |                       |                                                                              |
+| 7–12                     | Not started              |                       |                                                                              |
 
 Status values: `Ready` (dependencies met, nobody on it) · `In progress` · `In review` (PR open) ·
 `✅ Done` (merged, acceptance criteria met) · `Blocked by …`.
@@ -273,7 +273,7 @@ A failure that cannot be fixed at the fragment edge triggers ADR-0003's fallback
 Each task is one PR that leaves `pnpm check` green and the playground working.
 
 - [x] Claim phase, branch `phase-4/editor-view`
-- [ ] 4.1 Smallest editable slice: `EditorView` renders an `EditorState` into one
+- [ ] 4.1 (in review) Smallest editable slice: `EditorView` renders an `EditorState` into one
   `contenteditable` host with block/leaf descriptors (DOM ↔ model positions; unchanged blocks
   reused by node identity); `beforeinput` → core commands (insertText, deletes, splitBlock,
   hard break, history, format); keydown through the plugin keymaps; selection synced both ways,
