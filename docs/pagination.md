@@ -17,11 +17,12 @@ An editor built on a third-party engine can only paginate _around_ a continuous 
 document **directly into pages**: a paragraph that crosses a page boundary is emitted as two
 DOM fragments, one per page, both mapped to the same model node.
 
-## Chosen design (supported by Phase 1 automated spike results; ADR-0003 Proposed)
+## Chosen design (Phase 1 spike; ADR-0003 accepted provisionally)
 
 Spike result so far: works in Chromium, Firefox and WebKit for selection, caret movement,
 deletion and (Chromium) IME. Requires caret affinity at fragment edges and incremental rendering.
-Manual IME/screen-reader checks pending — see [ADR-0003](decisions/ADR-0003-rendering-and-input.md).
+Manual IME, dead-key and screen-reader checks not yet run (accepted risks) — see
+[ADR-0003](decisions/ADR-0003-rendering-and-input.md).
 
 ```
 EditorState ──► layout
