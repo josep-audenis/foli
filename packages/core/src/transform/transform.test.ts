@@ -234,3 +234,31 @@ describe("review regressions (PR #4)", () => {
     expect(mirrored.map(1, 1)).toBe(4); // before the re-inserted content, not after it
   });
 });
+
+describe("post-merge review of PR #4", () => {
+  it("join refuses positions that are not between two textblocks", () => {
+    const start = doc(para("abcd"), para("ef"));
+    expect(() => new Transform(start).join(3)).toThrow(TransformError); // inside text
+    expect(() => new Transform(start).join(0)).toThrow(TransformError); // document edge
+    expect(new Transform(start).join(6).doc.toJSON()).toEqual(doc(para("abcdef")).toJSON());
+    const withRule = testSchema.nodeFromJSON({
+      type: "doc",
+      content: [para("a"), { type: "rule" }],
+    });
+    expect(() => new Transform(withRule).join(3)).toThrow(TransformError); // next to a leaf block
+  });
+
+  it("addMark records nothing when an existing mark excludes the new one", () => {
+    const start = testSchema.nodeFromJSON({ type: "doc", content: [para(text("ab", "code"))] });
+    const tr = new Transform(start).addMark(1, 3, testSchema.mark("bold"));
+    expect(tr.steps).toHaveLength(0);
+  });
+
+  it("StepMap.side tells which side of the changed range a position is on", () => {
+    const map = new StepMap([3, 2, 0]); // deletes 3..5
+    expect([map.side(1), map.side(3), map.side(4), map.side(5), map.side(9)]).toEqual([
+      -1, -1, 0, 1, 1,
+    ]);
+    expect(StepMap.empty.side(4)).toBe(0);
+  });
+});

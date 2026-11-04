@@ -69,7 +69,7 @@ Foli's own (see `THIRD_PARTY_NOTICES.md`).
 - **Mapping**: each step has a `StepMap`. `Mapping` chains them, with association bias, deletion
   detection, and mirrored maps that recover positions inside re-inserted content.
 - **Transform helpers**: replace/delete/insert/insertText, addMark/removeMark (exactly
-  invertible), split, join, setBlockType, setNodeMarkup.
+  invertible), split, join (only between two textblocks), setBlockType, setNodeMarkup.
 - **State**: an immutable `EditorState` holds the doc, selection, stored marks and plugin fields.
   A `Transaction` adds selection tracking, stored marks and metadata (`addToHistory`, time).
   Selections are `TextSelection` and `AllSelection`; `NodeSelection` waits for a block leaf node.
@@ -79,9 +79,14 @@ Foli's own (see `THIRD_PARTY_NOTICES.md`).
   - Changes are grouped by time (500 ms) and adjacency; consecutive typing collapses into one step.
   - Formatting and block-type changes get their own undo steps.
   - The selection is restored on undo.
-  - Changes with `addToHistory: false` are rebased into the stored events. Each rebased step is
-    applied to a running copy of the document and dropped if it no longer applies, so the
-    remaining steps stay correctly positioned. A step whose target node was deleted is dropped.
+  - Changes with `addToHistory: false` are rebased into the stored events.
+    - Each rebased step is applied to a running copy of the document and dropped if it no longer
+      applies. A step whose target node was deleted is dropped.
+    - Positions keep the side of each original step's changed range they were on, so a deletion
+      right next to re-inserted content cannot move them across it.
+    - Property tests cover recorded edits interleaved with unrecorded marker insertions and
+      deletions and with plugin reactions. Arbitrary unrecorded edits that overlap recorded
+      content have no exact oracle; there, undo is best-effort but always valid and reversible.
   - Changes a plugin appends join the event of the transaction they react to.
   - A plugin's reaction to an undo or redo joins the reverse event, so it cannot trap the history,
     and the opposite stack is rebased past it. A reaction is recorded this way even when the plugin

@@ -99,10 +99,12 @@ export class Transform {
     const added: { from: number; to: number }[] = [];
     this.doc.nodesBetween(from, to, (node, pos, parent) => {
       if (!node.isInline || !parent) return;
-      if (mark.isInSet(node.marks) || !parent.type.allowsMarkType(mark.type)) return;
+      if (!parent.type.allowsMarkType(mark.type)) return;
+      // Unchanged when the mark is already there or an existing mark excludes it: no step.
+      const next = mark.addToSet(node.marks);
+      if (next === node.marks) return;
       const start = Math.max(pos, from);
       const end = Math.min(pos + node.nodeSize, to);
-      const next = mark.addToSet(node.marks);
       for (const old of node.marks) {
         if (old.isInSet(next)) continue;
         const last = removed[removed.length - 1];
@@ -156,8 +158,16 @@ export class Transform {
     return this.replace(pos, pos, new Slice(Fragment.from([parent.copy(), second]), 1, 1));
   }
 
-  /** Joins the blocks on either side of `pos` (a position between two sibling blocks). */
+  /**
+   * Joins the two textblocks on either side of `pos`. Throws TransformError for any other position.
+   * shortcut: textblocks only; joining other compatible blocks (lists, Phase 7) needs a content check.
+   */
   join(pos: number): this {
+    // Without this check a position inside text would silently delete the two characters around it.
+    const $pos = pos > 0 && pos < this.doc.content.size ? this.doc.resolve(pos) : null;
+    if (!$pos?.nodeBefore?.isTextblock || !$pos.nodeAfter?.isTextblock) {
+      throw new TransformError(`Position ${pos} is not between two textblocks`);
+    }
     return this.delete(pos - 1, pos + 1);
   }
 
