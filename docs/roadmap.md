@@ -194,7 +194,7 @@ serialize timings for 1/10/50/100-page fixtures recorded in `docs/benchmarks.md`
 
 Acceptance evidence: `model.property.test.ts` (5 properties × 10,000 runs);
 `pnpm --filter @foli/core coverage` (100% lines of the model sources in `src/model/`, threshold 95%); v1 fixtures in
-`document.test.ts` load unchanged; timings in [benchmarks.md](benchmarks.md). Not in CI yet:
+`document.test.ts` load unchanged; timings in [benchmarks.md](benchmarks.md). Not in `pnpm check` yet:
 coverage and benchmarks run from `@foli/core` scripts (root config belongs to Phase 1).
 
 ## Phase 3 — Transactions, history, commands · L
