@@ -14,7 +14,7 @@ place that says what is in progress; check it before starting work.
 | 0 Foundation             | ✅ Done                             | —                        |                                        |
 | 1 Architecture spike     | In progress — manual checks pending | `phase-1/two-page-spike` | Owns root tooling changes (Playwright) |
 | 2 Document model         | ✅ Done                             | —                        | Merged in #2                           |
-| 3 Transactions & history | Ready                               |                          |                                        |
+| 3 Transactions & history | In progress                         | `phase-3/transactions`   |                                        |
 | 4 Editor view            | Blocked by G1, G2                   |                          | Needs ADR-0003 (Phase 1) and Phase 3   |
 | 5 Native pagination      | Blocked by G3                       |                          |                                        |
 | 6 React API & 0.1.0      | Blocked by G4                       |                          |                                        |
@@ -221,6 +221,20 @@ coverage and benchmarks run from `@foli/core` scripts (root config belongs to Ph
 **Acceptance (G2):** T1, T2 headless; property tests: random step sequences — `apply` then
 `invert` restores the doc; mapping round-trips; undo after N random edits restores exact
 doc and selection.
+
+### Tasks
+
+- [ ] Claim phase, branch `phase-3/transactions`
+- [ ] `StepMap` / `Mapping`: association bias, deletion detection, mirroring with recovery
+- [ ] Steps: `ReplaceStep`, `AddMarkStep`, `RemoveMarkStep`, `NodeMarkupStep` (covers `AttrStep`:
+  type/attribute changes that keep inner positions)
+- [ ] Transform helpers: replace/delete/insertText, split, join, setBlockType, add/remove mark
+  (exactly invertible). General slice fitting (closed blocks into a textblock) moves to Phase 4 paste.
+- [ ] `TextSelection`, `AllSelection`, `EditorState`, `Transaction`, plugins (state fields,
+  filter/append, keymaps). `NodeSelection` waits for the first block leaf node (Phase 7).
+- [ ] History: grouping by time and adjacency, selection restore, rebase over unrecorded changes
+- [ ] Commands, base keymap, headless `createEditor`
+- [ ] Property tests and headless T1/T2 (gate G2); docs updated
 
 ## Phase 4 — Editor view (`@foli/view`) · XL
 
