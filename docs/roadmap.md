@@ -13,8 +13,8 @@ place that says what is in progress; check it before starting work.
 | ------------------------ | ----------------- | ------------------------ | -------------------------------------- |
 | 0 Foundation             | ✅ Done           | —                        |                                        |
 | 1 Architecture spike     | Ready             | `phase-1/two-page-spike` | Owns root tooling changes (Playwright) |
-| 2 Document model         | In review         | `phase-2/document-model` | Can run in parallel with Phase 1       |
-| 3 Transactions & history | Blocked by 2      |                          |                                        |
+| 2 Document model         | ✅ Done           | —                        | Merged in #2                           |
+| 3 Transactions & history | Ready             |                          |                                        |
 | 4 Editor view            | Blocked by G1, G2 |                          | Needs ADR-0003 (Phase 1) and Phase 3   |
 | 5 Native pagination      | Blocked by G3     |                          |                                        |
 | 6 React API & 0.1.0      | Blocked by G4     |                          |                                        |
@@ -148,7 +148,7 @@ host, pages as visual containers inside it, one paragraph rendered as fragments 
 A) `contenteditable` with page fragments · B) hidden input + Foli-rendered DOM ·
 C) `contenteditable` with block-level pages only. Evidence attached. Phase 4/5 design follows it.
 
-## Phase 2 — Document model (`@foli/core`) · L
+## Phase 2 — Document model (`@foli/core`) · L ✅
 
 **Goal:** the permanent document model. Pure TypeScript, no DOM.
 
