@@ -4,12 +4,53 @@ Foli is built as an independent document-editing engine ([ADR-0002](decisions/AD
 This roadmap orders the work so the riskiest assumptions are tested first and every phase
 leaves `main` green with a working playground.
 
+## Status
+
+**Update this table in the same PR that starts, advances or finishes a phase.** It is the only
+place that says what is in progress; check it before starting work.
+
+| Phase                    | Status            | Branch                   | Notes                                  |
+| ------------------------ | ----------------- | ------------------------ | -------------------------------------- |
+| 0 Foundation             | ✅ Done           | —                        |                                        |
+| 1 Architecture spike     | Ready             | `phase-1/two-page-spike` | Owns root tooling changes (Playwright) |
+| 2 Document model         | Ready             | `phase-2/document-model` | Can run in parallel with Phase 1       |
+| 3 Transactions & history | Blocked by 2      |                          |                                        |
+| 4 Editor view            | Blocked by G1, G2 |                          | Needs ADR-0003 (Phase 1) and Phase 3   |
+| 5 Native pagination      | Blocked by G3     |                          |                                        |
+| 6 React API & 0.1.0      | Blocked by G4     |                          |                                        |
+| 7–12                     | Not started       |                          |                                        |
+
+Status values: `Ready` (dependencies met, nobody on it) · `In progress` · `In review` (PR open) ·
+`✅ Done` (merged, acceptance criteria met) · `Blocked by …`.
+
+## Working on a phase
+
+1. **Claim it:** set the phase to `In progress` in the table above with its branch name, as the
+   first commit on the branch `phase-<n>/<slug>`.
+2. **Plan it:** add a `### Tasks` checklist (PR-sized, ordered, each leaving the build green)
+   under the phase's section below. Large phases may use several PRs; tick tasks as they merge.
+3. **Build it:** tests with each task; `pnpm check` green before every push.
+4. **Close it:** verify every acceptance criterion, update architecture/model/pagination docs to
+   match what was built, set status to `In review`, open a PR to `main`. After merge: `✅ Done`
+   and unblock dependents.
+
+**Shared root files** (`package.json`, `pnpm-lock.yaml`, `vitest.config.ts`, `biome.json`,
+`tsconfig.base.json`, CI) collide between parallel branches:
+
+- Put dependencies in the package that uses them (`packages/core` devDependencies), not the root,
+  unless the tool is repo-wide.
+- Only the phase marked "owns root tooling changes" edits root tooling config while parallel
+  phases are open; others ask for it in their PR description.
+- Lockfile conflicts: take `main`'s `pnpm-lock.yaml`, run `pnpm install`, commit the result.
+  Never hand-merge the lockfile.
+
 ## Principles
 
 1. **Gates before features.** Four architecture gates (below). A failed gate means fixing the
    architecture, not building more on top of it.
 2. **Correctness first, then speed.** Measure before optimizing; publish numbers with method.
-3. **Small, reviewable increments.** Each phase is split into PR-sized tasks when it starts.
+3. **Small, reviewable increments.** Each phase is split into PR-sized tasks when it starts
+   (see "Working on a phase").
 4. **Docs follow reality.** A feature is listed as done only when it is implemented and tested.
 5. **No dates.** Sizes are relative effort for part-time, AI-assisted development:
    **S** days · **M** weeks · **L** 1–2 months · **XL** several months. Estimates, not commitments.

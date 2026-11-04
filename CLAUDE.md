@@ -4,6 +4,17 @@ Independent document-editing engine for the web (own model, transactions, view, 
 React integration. Read `docs/architecture.md` before structural changes, `docs/roadmap.md` for
 the current phase and its gates, ADR-0002 for why there is no editor-engine dependency.
 
+## Starting a session
+
+1. Fresh checkout or worktree: run `pnpm install` (node_modules is not shared). `graphify-out/`
+   and `.claude/settings.local.json` are local and may be missing; if so, skip graphify or run
+   `graphify update .` to build the graph.
+2. Read the **Status** table in `docs/roadmap.md`. Work only on a phase marked `Ready` or one
+   you were explicitly assigned; follow "Working on a phase" there (claim → plan → build → close).
+3. Work on the phase branch `phase-<n>/<slug>`, never directly on `main`. Merge via PR.
+4. Before finishing: `pnpm check` green, docs updated to match reality, roadmap status and task
+   checklist updated, commit pushed.
+
 ## Commands
 
 - `pnpm check` — lint + typecheck + test + build (what CI runs). Run before declaring done.
