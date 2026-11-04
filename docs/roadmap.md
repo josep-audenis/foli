@@ -273,7 +273,7 @@ A failure that cannot be fixed at the fragment edge triggers ADR-0003's fallback
 Each task is one PR that leaves `pnpm check` green and the playground working.
 
 - [x] Claim phase, branch `phase-4/editor-view`
-- [ ] 4.1 (in review) Smallest editable slice: `EditorView` renders an `EditorState` into one
+- [ ] 4.1 (in review, #8) Smallest editable slice: `EditorView` renders an `EditorState` into one
   `contenteditable` host with block/leaf descriptors (DOM ↔ model positions; unchanged blocks
   reused by node identity); `beforeinput` → core commands (insertText, deletes, splitBlock,
   hard break, history, format); keydown through the plugin keymaps; selection synced both ways,
