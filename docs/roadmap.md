@@ -35,7 +35,7 @@ Status values: `Ready` (dependencies met, nobody on it) · `In progress` · `In 
    and unblock dependents.
 
 **Shared root files** (`package.json`, `pnpm-lock.yaml`, `vitest.config.ts`, `biome.json`,
-`tsconfig.base.json`, CI) collide between parallel branches:
+`tsconfig.base.json`, `scripts/`) collide between parallel branches:
 
 - Put dependencies in the package that uses them (`packages/core` devDependencies), not the root,
   unless the tool is repo-wide.
@@ -109,7 +109,7 @@ Phases 1 and 2 can run in parallel: the model does not depend on how text is ren
 
 ## Phase 0 — Foundation ✅
 
-- [x] pnpm monorepo, TypeScript strict, Biome, Vitest, CI, graphify.
+- [x] pnpm monorepo, TypeScript strict, Biome, Vitest, CI (since replaced by a local pre-push hook), graphify.
 - [x] ADR-0001 (superseded), ADR-0002 (own engine), architecture, document model, pagination design.
 - [x] `@foli/core`: `FoliDocument` envelope, schema v1 (paragraph, heading, text, hardBreak;
   bold/italic/underline/strike) with strict validation and error paths.
