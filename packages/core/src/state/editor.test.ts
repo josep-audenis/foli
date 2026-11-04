@@ -491,3 +491,36 @@ describe("plugin reactions to undo/redo (PR #4 re-review)", () => {
     expect(content(editor)).toEqual(docJSON(para(">>abYcZ")));
   });
 });
+
+describe("rebasing next to deleted content (post-merge review of PR #4)", () => {
+  it("undo removes typed text after an unrecorded deletion right before it", () => {
+    const editor = editorWith(para("aaaa"));
+    editor.select(1);
+    type(editor, "Sab");
+    vi.advanceTimersByTime(1000);
+    editor.select(3);
+    editor.commands.deleteBackward(); // "Sbaaaa"
+    vi.advanceTimersByTime(1000);
+    unrecorded(editor, (tr) => tr.delete(1, 2)); // "baaaa"
+    editor.commands.undo();
+    expect(content(editor)).toEqual(docJSON(para("abaaaa")));
+    editor.commands.undo();
+    expect(content(editor)).toEqual(docJSON(para("aaaa")));
+  });
+
+  it("redo does not bring back deleted text after an unrecorded deletion", () => {
+    const editor = editorWith(para("Sbxx"));
+    editor.select(2);
+    type(editor, "a"); // "Sabxx"
+    vi.advanceTimersByTime(1000);
+    editor.select(1, 4);
+    editor.commands.deleteSelection(); // "xx"
+    editor.commands.undo();
+    editor.commands.undo(); // "Sbxx"
+    unrecorded(editor, (tr) => tr.delete(1, 2)); // "bxx"
+    editor.commands.redo();
+    expect(content(editor)).toEqual(docJSON(para("abxx")));
+    editor.commands.redo();
+    expect(content(editor)).toEqual(docJSON(para("xx")));
+  });
+});

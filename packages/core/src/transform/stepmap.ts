@@ -90,6 +90,20 @@ export class StepMap implements Mappable {
     }
   }
 
+  /**
+   * Which side of the changed ranges `pos` (in input coordinates) lies on: -1 at or before the
+   * nearest range ahead of it, 1 at or after the last range behind it, 0 for an empty map.
+   */
+  side(pos: number): -1 | 0 | 1 {
+    let side: -1 | 0 | 1 = 0;
+    this.forEach((oldStart, oldEnd) => {
+      if (side === -1) return;
+      if (pos <= oldStart) side = -1;
+      else if (pos >= oldEnd) side = 1;
+    });
+    return side;
+  }
+
   invert(): StepMap {
     return new StepMap(this.ranges, !this.inverted);
   }

@@ -241,7 +241,7 @@ describe("editor history properties (10k runs)", () => {
 });
 
 const unrecordedOp = fc.record({
-  kind: fc.constantFrom("mark", "delete", "split", "bold", "heading"),
+  kind: fc.constantFrom("mark", "unmark", "delete", "split", "bold", "heading"),
   a: fraction,
   b: fraction,
 });
@@ -249,7 +249,27 @@ type UnrecordedOp = typeof unrecordedOp extends fc.Arbitrary<infer T> ? T : neve
 
 const MARKER = "§";
 
-/** Applies a random change outside history. "mark" inserts MARKER, the rest edit freely. */
+/** Positions of every MARKER character in the document. */
+function markerPositions(doc: Node): number[] {
+  const out: number[] = [];
+  doc.descendants((node, pos) => {
+    if (!node.isText) return true;
+    for (
+      let i = (node.text ?? "").indexOf(MARKER);
+      i >= 0;
+      i = (node.text ?? "").indexOf(MARKER, i + 1)
+    ) {
+      out.push(pos + i);
+    }
+    return false;
+  });
+  return out;
+}
+
+/**
+ * Applies a random change outside history. "mark" inserts MARKER, "unmark" deletes one (removing
+ * content next to text the history inserted is what stresses rebasing); the rest edit freely.
+ */
 function applyUnrecorded(editor: Editor, o: UnrecordedOp): void {
   const tr = editor.state.tr.setMeta("addToHistory", false);
   const size = tr.doc.content.size;
@@ -258,8 +278,12 @@ function applyUnrecorded(editor: Editor, o: UnrecordedOp): void {
   const [from, to] = a <= b ? [a, b] : [b, a];
   const caret = Selection.near(tr.doc.resolve(from)).from;
   try {
+    const markers = markerPositions(tr.doc);
+    const marker = markers[Math.min(markers.length - 1, Math.floor(o.b * markers.length))];
     if (o.kind === "mark") tr.insertText(MARKER, caret);
-    else if (o.kind === "delete") tr.delete(from, to);
+    else if (o.kind === "unmark") {
+      if (marker !== undefined) tr.delete(marker, marker + 1);
+    } else if (o.kind === "delete") tr.delete(from, to);
     else if (o.kind === "split") tr.split(caret);
     else if (o.kind === "bold" && from < to) tr.addMark(from, to, tr.doc.type.schema.mark("bold"));
     else if (o.kind === "heading")
@@ -279,7 +303,8 @@ const step = fc.oneof(
 function runMixed(
   editor: Editor,
   steps: { recorded: boolean; c?: Cmd; o?: UnrecordedOp }[],
-  only?: "mark",
+  /** Restrict unrecorded changes to inserting and deleting markers (never user text). */
+  markersOnly = false,
 ): Node {
   for (const s of steps) {
     vi.advanceTimersByTime(s.c?.pause ?? 1000);
@@ -287,7 +312,8 @@ function runMixed(
       selectFor(editor, s.c);
       execute(editor, s.c);
     } else if (s.o) {
-      applyUnrecorded(editor, only ? { ...s.o, kind: only } : s.o);
+      const kind = s.o.b < 0.5 ? "mark" : "unmark";
+      applyUnrecorded(editor, markersOnly ? { ...s.o, kind } : s.o);
     }
     editor.state.doc.check();
   }
@@ -307,7 +333,7 @@ describe("history with changes kept out of it (10k runs)", () => {
   const blockText = (doc: Node) => doc.textBetween(0, doc.content.size, "\n", "␤");
 
   it(
-    "undoing everything removes exactly the recorded edits around unrecorded insertions",
+    "undoing everything removes exactly the recorded edits around unrecorded marker edits",
     () => {
       fc.assert(
         fc.property(
@@ -316,7 +342,7 @@ describe("history with changes kept out of it (10k runs)", () => {
           (json, steps) => {
             const editor = editorFor(json);
             const initial = blockText(editor.state.doc);
-            const before = runMixed(editor, steps, "mark");
+            const before = runMixed(editor, steps, true);
             while (editor.commands.undo()) editor.state.doc.check();
             // Undo may drop a marker that sat inside text it removes, but never touches original text.
             ok(
@@ -359,12 +385,23 @@ describe("history with changes kept out of it (10k runs)", () => {
   it(
     "plugin reactions to undo/redo never make later undos or redos edit other text",
     () => {
-      // Drops a marker at the caret after every undo and redo (inside text the history touches).
+      // After every undo and redo, inserts a marker at the caret or deletes the marker nearest to
+      // it (on alternate document sizes), so reactions both add and remove content near history edits.
       const react = new Plugin({
-        appendTransaction: (trs, _old, state) =>
-          trs.some((tr) => tr.getMeta("historyOp")) && state.selection.$from.parent.inlineContent
-            ? state.tr.insertText(MARKER, state.selection.from)
-            : null,
+        appendTransaction: (trs, _old, state) => {
+          if (!trs.some((tr) => tr.getMeta("historyOp"))) return null;
+          const markers = markerPositions(state.doc);
+          const caret = state.selection.from;
+          if (markers.length && state.doc.content.size % 2 === 0) {
+            const nearest = markers.reduce((a, b) =>
+              Math.abs(b - caret) < Math.abs(a - caret) ? b : a,
+            );
+            return state.tr.delete(nearest, nearest + 1);
+          }
+          return state.selection.$from.parent.inlineContent
+            ? state.tr.insertText(MARKER, caret)
+            : null;
+        },
       });
       fc.assert(
         fc.property(
@@ -376,7 +413,7 @@ describe("history with changes kept out of it (10k runs)", () => {
               plugins: [react],
             });
             const initial = blockText(editor.state.doc);
-            const edited = blockText(runMixed(editor, steps, "mark"))
+            const edited = blockText(runMixed(editor, steps, true))
               .split(MARKER)
               .join("");
             while (editor.commands.undo()) editor.state.doc.check();
