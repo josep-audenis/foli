@@ -9,16 +9,16 @@ leaves `main` green with a working playground.
 **Update this table in the same PR that starts, advances or finishes a phase.** It is the only
 place that says what is in progress; check it before starting work.
 
-| Phase                    | Status                              | Branch                   | Notes                                           |
-| ------------------------ | ----------------------------------- | ------------------------ | ----------------------------------------------- |
-| 0 Foundation             | ✅ Done                             | —                        |                                                 |
-| 1 Architecture spike     | In progress — manual checks pending | `phase-1/two-page-spike` | Owns root tooling changes (Playwright)          |
-| 2 Document model         | ✅ Done                             | —                        | Merged in #2                                    |
-| 3 Transactions & history | ✅ Done                             | —                        | Merged in #4; gate G2 passed                    |
-| 4 Editor view            | Blocked by G1                       |                          | Needs ADR-0003 accepted (Phase 1 manual checks) |
-| 5 Native pagination      | Blocked by G3                       |                          |                                                 |
-| 6 React API & 0.1.0      | Blocked by G4                       |                          |                                                 |
-| 7–12                     | Not started                         |                          |                                                 |
+| Phase                    | Status                   | Branch | Notes                                                                        |
+| ------------------------ | ------------------------ | ------ | ---------------------------------------------------------------------------- |
+| 0 Foundation             | ✅ Done                  | —      |                                                                              |
+| 1 Architecture spike     | ✅ Done (G1 provisional) | —      | ADR-0003 accepted provisionally; IME/screen-reader checks carried to Phase 4 |
+| 2 Document model         | ✅ Done                  | —      | Merged in #2                                                                 |
+| 3 Transactions & history | ✅ Done                  | —      | Merged in #4; gate G2 passed                                                 |
+| 4 Editor view            | Ready                    |        | Must run the manual IME and screen-reader checks ADR-0003 left open          |
+| 5 Native pagination      | Blocked by G3            |        |                                                                              |
+| 6 React API & 0.1.0      | Blocked by G4            |        |                                                                              |
+| 7–12                     | Not started              |        |                                                                              |
 
 Status values: `Ready` (dependencies met, nobody on it) · `In progress` · `In review` (PR open) ·
 `✅ Done` (merged, acceptance criteria met) · `Blocked by …`.
@@ -156,9 +156,10 @@ C) `contenteditable` with block-level pages only. Evidence attached. Phase 4/5 d
 - [x] Input: `beforeinput` editing, DOM ↔ model selection mapping, composition read-back, snapshot undo
 - [x] Automated experiments E1–E4, E7 (E3 Chromium only) in all three engines
 - [x] Manual checklist for E3 (other platforms), E5, E6 (`spikes/two-page/README.md`)
-- [ ] Manual checks executed and recorded (needs real devices: Windows IMEs, macOS Safari, Android, screen readers)
+- [x] Manual checks partially executed and recorded (warm-up and spellcheck pass on Windows); IME,
+  screen readers, dead keys, macOS and mobile not tested and carried to Phase 4
 - [x] ADR-0003 draft with automated evidence (status: Proposed, recommends option A)
-- [ ] ADR-0003 accepted once manual results are in (gate G1)
+- [x] ADR-0003 accepted provisionally (gate G1 passed with recorded risks)
 
 ## Phase 2 — Document model (`@foli/core`) · L ✅
 
@@ -208,7 +209,7 @@ coverage and benchmarks run from `@foli/core` scripts (root config belongs to Ph
   add/remove mark.
 - Selections: `TextSelection` (anchor/head), `AllSelection`; `NodeSelection` with first leaf node.
 - `EditorState` (doc, selection, stored marks) and `Transaction` (steps + selection + metadata:
-  origin, `addToHistory`, timestamp).
+  `addToHistory`, timestamp; an `origin` field was not built).
 - History: undo/redo of inverted steps, grouping by time and adjacency, selection restore,
   remote/unrecorded changes mapped through.
 - Commands as `(state, dispatch?) => boolean` (dry run = enabled state for toolbars):
@@ -258,6 +259,14 @@ doc and selection.
 
 **Acceptance (G3):** T1–T4 green; the original success criterion works in the playground
 (type, format via shortcuts, undo, serialize, reload without loss). Optional `0.0.x` canary.
+
+The gate includes the manual checks ADR-0003 left open:
+- real IME: Windows Japanese/Chinese/Korean in Chrome and Firefox, plus macOS Safari and Android
+  where available;
+- dead keys;
+- NVDA/VoiceOver reading across a page break.
+
+A failure that cannot be fixed at the fragment edge triggers ADR-0003's fallback (option B).
 
 ## Phase 5 — Native pagination · XL
 
