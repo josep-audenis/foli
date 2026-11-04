@@ -146,13 +146,19 @@ host); pages and fragments arrive in Phase 5, so today the whole document is one
   insertParagraph, insertLineBreak, the delete types (target range, else by character or word),
   historyUndo/Redo, and format*.
 - **Selection:** read from the live DOM before every key and input event (`selectionchange` is
-  asynchronous) and on `selectionchange`. A user caret move clears stored marks. The model
-  selection is written back only when the DOM does not already show it, so native caret affinity
-  survives. An `AllSelection` is shown as the text range between its ends.
+  asynchronous) and on `selectionchange`, and compared with the model selection by position.
+  A user caret move clears stored marks. The model selection is written back only when the DOM
+  does not already show it, so native caret affinity survives. An `AllSelection` is shown as the
+  text range between its ends.
 
 Known limits (each is a later Phase 4 task in the roadmap):
 - Composition and any other unprevented DOM change are discarded by re-rendering (no IME
-  read-back yet, 4.2).
+  read-back yet, 4.2). A blur ends a composition the browser never closed.
+- DOM changes that fire no `input` event (browser extensions, translation) are not detected:
+  a reused block keeps the stale DOM its descriptors point into, and stray nodes before the
+  first block shift host-level positions. The `MutationObserver` safety net is 4.2.
+- Delete input types for whole lines rely on the browser's target range; without one they
+  delete a character (4.4).
 - Paste and drop do nothing; copy and cut use the browser's DOM serialization (4.3).
 - No scroll-into-view after programmatic selection changes; no grapheme-cluster caret snapping (4.4).
 - No read-only mode or placeholder (4.5).

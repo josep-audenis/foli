@@ -30,6 +30,7 @@ export function DocumentEditor({ initialContent, onChange, className }: Document
     const host = contentRef.current;
     if (!host) return;
     const view = new EditorView(host, editor);
+    // shortcut: serializes the whole document per change (O(document) per keystroke); Phase 6 API decides on a lazy getter.
     const unsubscribe = editor.subscribe((_state, transactions) => {
       if (transactions.some((tr) => tr.docChanged)) onChangeRef.current?.(editor.getDocument());
     });

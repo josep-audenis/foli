@@ -75,6 +75,13 @@ describe("EditorView rendering", () => {
     expect(after[3]?.textContent).toBe("yx");
   });
 
+  it("restores the host on destroy", () => {
+    const { host, view } = mount();
+    view.destroy();
+    expect(host.getAttributeNames()).toEqual([]);
+    expect(host.childNodes).toHaveLength(0);
+  });
+
   it("re-renders on setDocument", () => {
     const { host, editor } = mount();
     editor.setDocument(createDocument());
@@ -137,6 +144,34 @@ describe("EditorView input", () => {
     host.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", cancelable: true }));
     expect(editor.getDocument().content.content).toHaveLength(2);
     expect(editor.state.selection.head).toBe(3);
+  });
+
+  it("follows the caret back to a point the view wrote earlier", () => {
+    const { host, editor } = focused();
+    const text = host.firstChild?.firstChild as Node;
+    editor.select(3); // the view writes the caret at the end of "ab"
+    document.getSelection()?.collapse(text, 1);
+    host.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowLeft", cancelable: true }));
+    expect(editor.state.selection.head).toBe(2);
+    document.getSelection()?.collapse(text, 2); // back to the written point
+    host.dispatchEvent(
+      new InputEvent("beforeinput", { inputType: "insertText", data: "x", cancelable: true }),
+    );
+    expect(host.textContent).toBe("abx");
+  });
+
+  it("does not stay in composition when focus leaves without compositionend", () => {
+    const { host } = focused();
+    host.dispatchEvent(new CompositionEvent("compositionstart"));
+    host.dispatchEvent(new FocusEvent("blur"));
+    const event = new InputEvent("beforeinput", {
+      inputType: "insertText",
+      data: "c",
+      cancelable: true,
+    });
+    host.dispatchEvent(event);
+    expect(event.defaultPrevented).toBe(true);
+    expect(host.textContent).toBe("acb");
   });
 
   it("dispatches beforeinput insertText and prevents the native edit", () => {

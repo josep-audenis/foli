@@ -46,15 +46,29 @@ function load(): FoliDocument {
   return sample;
 }
 
-function save(document: FoliDocument): void {
+let pending: FoliDocument | null = null;
+let timer: ReturnType<typeof setTimeout> | undefined;
+
+function flush(): void {
+  if (!pending) return;
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(document));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(pending));
   } catch (error) {
     console.warn("Could not save the playground document:", error);
   }
+  pending = null;
 }
 
+/** Saves once changes pause for 300 ms; leaving the page saves anything still pending. */
+function save(document: FoliDocument): void {
+  pending = document;
+  clearTimeout(timer);
+  timer = setTimeout(flush, 300);
+}
+addEventListener("pagehide", flush);
+
 function reset(): void {
+  pending = null;
   try {
     localStorage.removeItem(STORAGE_KEY);
   } catch {

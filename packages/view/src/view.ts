@@ -8,6 +8,7 @@ import {
   type EditorState,
   insertHardBreak,
   insertText,
+  type MarkName,
   type Node as ModelNode,
   redo,
   type Selection,
@@ -17,12 +18,13 @@ import {
   undo,
 } from "@foli/core";
 
-const MARK_TAGS: Record<string, string> = {
+// Every schema v1 mark must have a tag; marks of other schemas fall back to <span>.
+const MARK_TAGS: Readonly<Record<string, string>> = {
   bold: "strong",
   italic: "em",
   underline: "u",
   strike: "s",
-};
+} satisfies Record<MarkName, string>;
 
 /** A rendered inline leaf (text node or hard break) and where it sits in its block's content. */
 interface LeafDesc {
@@ -57,8 +59,6 @@ export class EditorView {
   /** Position before each block, parallel to `blocks`. */
   private starts: number[] = [];
   private composing = false;
-  /** The DOM selection last written by the view, to tell it apart from user changes. */
-  private written: [Node | null, number, Node | null, number] = [null, 0, null, 0];
   private readonly unsubscribe: () => void;
 
   constructor(
@@ -80,6 +80,7 @@ export class EditorView {
     host.addEventListener("input", this.onInput);
     host.addEventListener("compositionstart", this.onCompositionStart);
     host.addEventListener("compositionend", this.onCompositionEnd);
+    host.addEventListener("blur", this.onBlur);
     host.ownerDocument.addEventListener("selectionchange", this.onSelectionChange);
     this.unsubscribe = editor.subscribe((state) => this.update(state));
   }
@@ -92,8 +93,12 @@ export class EditorView {
     host.removeEventListener("input", this.onInput);
     host.removeEventListener("compositionstart", this.onCompositionStart);
     host.removeEventListener("compositionend", this.onCompositionEnd);
+    host.removeEventListener("blur", this.onBlur);
     host.ownerDocument.removeEventListener("selectionchange", this.onSelectionChange);
-    host.removeAttribute("contenteditable");
+    for (const name of ["contenteditable", "role", "aria-multiline"]) host.removeAttribute(name);
+    host.style.removeProperty("white-space");
+    host.style.removeProperty("overflow-wrap");
+    if (!host.getAttribute("style")) host.removeAttribute("style");
     host.replaceChildren();
   }
 
@@ -212,20 +217,23 @@ export class EditorView {
    * every input handler calls this first instead of trusting the last event.
    */
   private syncSelection(): void {
-    const sel = this.host.ownerDocument.getSelection();
-    if (!sel) return;
-    const [an, ao, fn, fo] = this.written;
-    if (
-      sel.anchorNode === an &&
-      sel.anchorOffset === ao &&
-      sel.focusNode === fn &&
-      sel.focusOffset === fo
-    )
-      return;
     const selection = this.readSelection();
-    if (!selection || selection.eq(this.state.selection)) return;
+    if (!selection || this.shows(selection)) return;
     // A caret moved by the user drops marks toggled at the old position.
     this.editor.dispatch(this.state.tr.setSelection(selection).setStoredMarks(null));
+  }
+
+  /**
+   * Whether a selection read from the DOM already shows the model selection. An AllSelection is
+   * shown as the text range between its snapped ends, so reading it back must not replace it.
+   */
+  private shows(dom: Selection): boolean {
+    const { selection } = this.state;
+    const shown =
+      selection instanceof AllSelection
+        ? TextSelection.between(selection.$anchor, selection.$head)
+        : selection;
+    return dom.anchor === shown.anchor && dom.head === shown.head;
   }
 
   private hasFocus(): boolean {
@@ -241,17 +249,11 @@ export class EditorView {
     const { selection } = this.state;
     if (!force) {
       const current = this.readSelection();
-      // An AllSelection is shown as the text selection between its snapped ends.
-      const shown =
-        selection instanceof AllSelection
-          ? TextSelection.between(selection.$anchor, selection.$head)
-          : selection;
-      if (current && current.anchor === shown.anchor && current.head === shown.head) return;
+      if (current && this.shows(current)) return;
     }
     const anchor = this.domFromPos(selection.anchor);
     const head = this.domFromPos(selection.head);
     sel.setBaseAndExtent(anchor.node, anchor.offset, head.node, head.offset);
-    this.written = [sel.anchorNode, sel.anchorOffset, sel.focusNode, sel.focusOffset];
   }
 
   // ---------- input ----------
@@ -338,6 +340,11 @@ export class EditorView {
   private onCompositionEnd = (): void => {
     this.composing = false;
     this.rerender();
+  };
+
+  /** Some browsers drop compositionend when focus leaves mid-composition; never stay stuck in it. */
+  private onBlur = (): void => {
+    if (this.composing) this.onCompositionEnd();
   };
 
   private rerender(): void {
