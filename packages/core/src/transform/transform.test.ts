@@ -204,3 +204,33 @@ describe("Transform helpers", () => {
     expectInvertible(tr);
   });
 });
+
+describe("review regressions (PR #4)", () => {
+  it("merges consecutive typing and deletion steps", () => {
+    const typedB = new ReplaceStep(2, 3, Slice.empty); // inverse of typing "b" at 2
+    const typedA = new ReplaceStep(1, 2, Slice.empty); // inverse of typing "a" at 1
+    expect(typedB.merge(typedA)).toMatchObject({ from: 1, to: 3 });
+    const a = new Slice(Fragment.from(schema.text("a")), 0, 0);
+    const b = new Slice(Fragment.from(schema.text("b")), 0, 0);
+    const merged = new ReplaceStep(1, 1, a).merge(new ReplaceStep(2, 2, b));
+    expect(merged?.apply(doc(para("xy"))).doc?.toJSON()).toEqual(doc(para("abxy")).toJSON());
+    expect(new ReplaceStep(1, 1, a).merge(new ReplaceStep(5, 5, b))).toBeNull();
+  });
+
+  it("drops a node markup step whose node was deleted from its start, including leaf nodes", () => {
+    const blocks = new NodeMarkupStep(3, nodeType("paragraph"), null);
+    expect(blocks.map(new StepMap([3, 3, 0]))).toBeNull(); // the block at 3 deleted
+    expect(blocks.map(new StepMap([4, 1, 0]))).toMatchObject({ pos: 3 }); // only its text changed
+    const rule = new NodeMarkupStep(3, testSchema.nodes.rule as NodeType, null);
+    expect(rule.map(new StepMap([3, 1, 0]))).toBeNull();
+    expect(rule.map(new StepMap([0, 0, 2]))).toMatchObject({ pos: 5 });
+  });
+
+  it("recovers a range start edge through mirrored maps", () => {
+    const mirrored = new Mapping();
+    mirrored.appendMap(new StepMap([1, 1, 0])); // removes [1,2]
+    mirrored.appendMap(new StepMap([0, 0, 3])); // unrelated insertion
+    mirrored.appendMap(new StepMap([4, 0, 1]), 0); // re-inserts it, shifted by 3
+    expect(mirrored.map(1, 1)).toBe(4); // before the re-inserted content, not after it
+  });
+});

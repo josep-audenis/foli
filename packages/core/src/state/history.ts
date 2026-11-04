@@ -1,7 +1,9 @@
-import { Mapping } from "../transform/stepmap.js";
-import type { Step } from "../transform/steps.js";
+import type { Node } from "../model/index.js";
+import { type Mappable, Mapping, type MapResult, type StepMap } from "../transform/stepmap.js";
+import { AddMarkStep, RemoveMarkStep, ReplaceStep, type Step } from "../transform/steps.js";
+import { TransformError } from "../transform/transform.js";
 import { Selection, type SelectionJSON } from "./selection.js";
-import { type Command, Plugin, PluginKey, type Transaction } from "./state.js";
+import { type Command, type EditorState, Plugin, PluginKey, type Transaction } from "./state.js";
 
 /** One undoable unit: inverted steps in the order they apply, and the selection to restore. */
 interface HistoryEvent {
@@ -9,7 +11,8 @@ interface HistoryEvent {
   readonly selection: SelectionJSON;
 }
 
-export interface HistoryState {
+/** @internal The history plugin's state; its shape will change (collaboration, Phase 12). */
+interface HistoryState {
   /** Undo stack, oldest first. The last event applies to the current document. */
   readonly done: readonly HistoryEvent[];
   /** Redo stack, oldest first. */
@@ -26,7 +29,9 @@ export interface HistoryOptions {
   depth?: number;
 }
 
-export const historyKey = new PluginKey<HistoryState>("history");
+const historyKey = new PluginKey<HistoryState>("history");
+/** Meta set on undo/redo transactions: which operation produced them. */
+const historyOp = "historyOp";
 
 /** Set this meta on a transaction to stop it merging into the previous undo event. */
 export const closeHistory = "closeHistory";
@@ -34,14 +39,12 @@ export const closeHistory = "closeHistory";
 const EMPTY: HistoryState = { done: [], undone: [], prevTime: 0, prevRanges: null };
 
 /**
- * Undo/redo history. Recorded changes become inverted steps; unrecorded changes
- * (`addToHistory: false`) are rebased into every stored event, so undo still targets the right
- * content after them. Rebasing uses mirrored mappings so positions inside re-inserted content stay exact.
+ * Undo/redo history. Recorded changes become inverted steps (consecutive typing collapses into
+ * one step). Unrecorded changes (`addToHistory: false`) are rebased into every stored event, so
+ * undo still targets the right content after them. Changes appended by plugins join the event
+ * of the transaction they react to.
  */
-export function history({
-  newGroupDelay = 500,
-  depth = 100,
-}: HistoryOptions = {}): Plugin<HistoryState> {
+export function history({ newGroupDelay = 500, depth = 100 }: HistoryOptions = {}): Plugin {
   return new Plugin<HistoryState>({
     key: historyKey,
     state: {
@@ -50,38 +53,63 @@ export function history({
         const own = tr.getMeta(historyKey) as HistoryState | undefined;
         if (own) return own;
         if (!tr.docChanged) return hist;
-        if (!tr.addToHistory) {
+
+        const root = tr.getMeta("appendedTransaction") as Transaction | undefined;
+        const rootOp = root?.getMeta(historyOp) as "undo" | "redo" | undefined;
+        const inverted = tr.steps.map((step, i) => step.invert(tr.docs[i] as Node)).reverse();
+
+        if (rootOp) {
+          // A plugin reacted to undo/redo: undoing that undo/redo must also revert the reaction.
+          const stack = rootOp === "undo" ? hist.undone : hist.done;
+          const top = stack[stack.length - 1];
+          const merged = top
+            ? [
+                ...stack.slice(0, -1),
+                { steps: prepend(inverted, top.steps), selection: top.selection },
+              ]
+            : [...stack, { steps: inverted, selection: oldState.selection.toJSON() }];
+          return rootOp === "undo" ? { ...hist, undone: merged } : { ...hist, done: merged };
+        }
+
+        if (!tr.addToHistory || (root && !root.addToHistory)) {
           return {
-            done: rebase(hist.done, tr.mapping),
-            undone: rebase(hist.undone, tr.mapping),
+            done: rebase(hist.done, tr.mapping, tr.doc),
+            undone: rebase(hist.undone, tr.mapping, tr.doc),
             prevTime: 0,
             prevRanges: null,
           };
         }
-        const inverted = tr.steps
-          .map((step, i) => step.invert(tr.docs[i] as typeof tr.doc))
-          .reverse();
+
         const last = hist.done[hist.done.length - 1];
         const merge =
           last !== undefined &&
-          !tr.getMeta(closeHistory) &&
-          tr.time - hist.prevTime < newGroupDelay &&
-          isAdjacent(hist.prevRanges, tr);
+          (root !== undefined ||
+            (!tr.getMeta(closeHistory) &&
+              tr.time - hist.prevTime < newGroupDelay &&
+              isAdjacent(hist.prevRanges, tr)));
         const done = merge
           ? [
               ...hist.done.slice(0, -1),
-              { steps: [...inverted, ...last.steps], selection: last.selection },
+              { steps: prepend(inverted, last.steps), selection: last.selection },
             ]
           : [...hist.done, { steps: inverted, selection: oldState.selection.toJSON() }];
         return {
           done: done.slice(-depth),
           undone: [],
-          prevTime: tr.time,
-          prevRanges: changedRanges(tr),
+          prevTime: root ? hist.prevTime : tr.time,
+          prevRanges: root ? mapRanges(hist.prevRanges, tr.mapping) : changedRanges(tr),
         };
       },
     },
   });
+}
+
+/** Puts `inverted` (applied first) before `steps`, merging adjacent replace steps (typing runs). */
+function prepend(inverted: readonly Step[], steps: readonly Step[]): Step[] {
+  const last = inverted[inverted.length - 1];
+  const first = steps[0];
+  const merged = last instanceof ReplaceStep && first ? last.merge(first) : null;
+  return merged ? [...inverted.slice(0, -1), merged, ...steps.slice(1)] : [...inverted, ...steps];
 }
 
 /** Whether `tr`'s first change touches a range changed by the previous recorded transaction. */
@@ -109,41 +137,118 @@ function changedRanges(tr: Transaction): number[] {
   return ranges;
 }
 
+function mapRanges(ranges: readonly number[] | null, mapping: Mappable): number[] | null {
+  return ranges && ranges.map((pos, i) => mapping.map(pos, i % 2 ? 1 : -1));
+}
+
 /**
- * Moves stored events (newest applies first) through an unrecorded change `mapping`.
- * For each inverted step S in space A (output space A'), the mapping into the rebased space is
- * carried forward as: invert(map(S)) · mapping · map(S'), with the first and last mirrored.
+ * Maps positions from the space of an original inverted step into the rebased space:
+ * invert(m_k) · … · invert(m_1) · base · m'_1 · … · m'_k, where m_i is an original step's map and
+ * m'_i its rebased copy's (null if dropped). Each pair is mirrored: a position inside content the
+ * inverse removes is recovered at its copy. Linear in the number of steps per lookup.
  */
-function rebase(events: readonly HistoryEvent[], mapping: Mapping): HistoryEvent[] {
-  // shortcut: rebuilds mappings per step (quadratic in history size); bounded by `depth`, revisit with collaboration (Phase 12).
-  let current = mapping;
+class RebaseMapping implements Mappable {
+  private readonly inverted: StepMap[] = [];
+  private readonly rebased: (StepMap | null)[] = [];
+
+  constructor(private readonly base: Mappable) {}
+
+  push(original: Step, rebased: Step | null): void {
+    this.inverted.push(original.getMap().invert());
+    this.rebased.push(rebased ? rebased.getMap() : null);
+  }
+
+  map(pos: number, assoc = 1): number {
+    return this.mapResult(pos, assoc).pos;
+  }
+
+  mapResult(pos: number, assoc = 1): MapResult {
+    let deleted = false;
+    let from = 0;
+    let recovered = false;
+    for (let i = this.inverted.length - 1; i >= 0; i--) {
+      const result = (this.inverted[i] as StepMap).mapResult(pos, assoc);
+      const mirror = this.rebased[i];
+      if (result.recover !== null && mirror) {
+        pos = mirror.recover(result.recover);
+        from = i + 1;
+        recovered = true;
+        break;
+      }
+      deleted ||= result.deleted;
+      pos = result.pos;
+    }
+    if (!recovered) {
+      const result = this.base.mapResult(pos, assoc);
+      deleted ||= result.deleted;
+      pos = result.pos;
+    }
+    for (let i = from; i < this.rebased.length; i++) {
+      const result = this.rebased[i]?.mapResult(pos, assoc);
+      if (!result) continue;
+      deleted ||= result.deleted;
+      pos = result.pos;
+    }
+    return { pos, deleted, recover: null };
+  }
+}
+
+/** Range ends stick to the content they bound (start leftwards, end rightwards); a caret sticks left. */
+function mapSelection(sel: SelectionJSON, mapping: Mappable): SelectionJSON {
+  const anchorAssoc = sel.anchor <= sel.head ? -1 : 1;
+  const headAssoc = sel.anchor === sel.head ? -1 : -anchorAssoc;
+  return {
+    ...sel,
+    anchor: mapping.map(sel.anchor, anchorAssoc),
+    head: mapping.map(sel.head, headAssoc),
+  };
+}
+
+/**
+ * Moves stored events (the last applies to `doc` first) through an unrecorded change. Every
+ * rebased step is applied to a running copy of the document; a step that no longer applies is
+ * dropped and its map left out, so the remaining steps stay positioned for what undo will really do.
+ */
+function rebase(events: readonly HistoryEvent[], mapping: Mappable, doc: Node): HistoryEvent[] {
+  const remap = new RebaseMapping(mapping);
+  let current = doc;
   const out: HistoryEvent[] = [];
   for (let e = events.length - 1; e >= 0; e--) {
     const event = events[e] as HistoryEvent;
     const steps: Step[] = [];
     for (const step of event.steps) {
-      const mapped = step.map(current);
-      const next = new Mapping();
-      next.appendMap(step.getMap().invert());
-      next.appendMapping(current);
-      if (mapped) {
-        next.appendMap(mapped.getMap(), 0);
-        steps.push(mapped);
+      const mapped = step.map(remap);
+      const result = mapped?.apply(current);
+      const applied = result?.doc ? mapped : null;
+      if (applied && result?.doc) {
+        current = result.doc;
+        steps.push(applied);
       }
-      current = next;
+      remap.push(step, applied);
     }
-    // Range ends stick to the content they bound (start leftwards, end rightwards); a caret sticks left.
-    const sel = event.selection;
-    const anchorAssoc = sel.anchor <= sel.head ? -1 : 1;
-    const headAssoc = sel.anchor === sel.head ? -1 : -anchorAssoc;
-    const moved: SelectionJSON = {
-      ...sel,
-      anchor: current.map(sel.anchor, anchorAssoc),
-      head: current.map(sel.head, headAssoc),
-    };
-    if (steps.length) out.unshift({ steps, selection: moved });
+    if (steps.length) out.unshift({ steps, selection: mapSelection(event.selection, remap) });
   }
   return out;
+}
+
+/**
+ * Applies a stored step during undo/redo. Mark steps go through addMark/removeMark so only ranges
+ * that actually change get steps; otherwise a mark already present (e.g. added outside history)
+ * would make the recorded reverse remove it, and redo would not be exact.
+ */
+function applyStored(tr: Transaction, step: Step): boolean {
+  if (step instanceof AddMarkStep || step instanceof RemoveMarkStep) {
+    if (step.from < 0 || step.to > tr.doc.content.size || step.from >= step.to) return false;
+    try {
+      if (step instanceof AddMarkStep) tr.addMark(step.from, step.to, step.mark);
+      else tr.removeMark(step.from, step.to, step.mark);
+      return true;
+    } catch (error) {
+      if (error instanceof TransformError) return false;
+      throw error;
+    }
+  }
+  return tr.maybeStep(step).failed === null;
 }
 
 function historyCommand(redo: boolean): Command {
@@ -154,11 +259,19 @@ function historyCommand(redo: boolean): Command {
     if (!hist || !source || !event) return false;
     if (dispatch) {
       const tr = state.tr;
-      // Rebased steps can conflict with later content; skip those rather than fail the whole undo.
-      for (const step of event.steps) tr.maybeStep(step);
-      tr.setSelection(Selection.fromJSON(tr.doc, event.selection));
+      // Rebasing keeps stored steps applicable; should one still fail, later steps are remapped
+      // as if it never existed rather than applied at positions that assumed it.
+      let remap: RebaseMapping | null = null;
+      for (const step of event.steps) {
+        const mapped = remap ? step.map(remap) : step;
+        const applied = mapped !== null && applyStored(tr, mapped);
+        if (!applied && !remap) remap = new RebaseMapping(new Mapping());
+        remap?.push(step, applied ? mapped : null);
+      }
+      const selection = remap ? mapSelection(event.selection, remap) : event.selection;
+      tr.setSelection(Selection.fromJSON(tr.doc, selection));
       const reverse: HistoryEvent = {
-        steps: tr.steps.map((step, i) => step.invert(tr.docs[i] as typeof tr.doc)).reverse(),
+        steps: tr.steps.map((step, i) => step.invert(tr.docs[i] as Node)).reverse(),
         selection: state.selection.toJSON(),
       };
       const rest = source.slice(0, -1);
@@ -168,6 +281,7 @@ function historyCommand(redo: boolean): Command {
         prevTime: 0,
         prevRanges: null,
       } satisfies HistoryState);
+      tr.setMeta(historyOp, redo ? "redo" : "undo");
       dispatch(tr);
     }
     return true;
@@ -177,6 +291,10 @@ function historyCommand(redo: boolean): Command {
 export const undo: Command = historyCommand(false);
 export const redo: Command = historyCommand(true);
 
-export function undoDepth(state: Parameters<Command>[0]): number {
+export function undoDepth(state: EditorState): number {
   return historyKey.getState(state)?.done.length ?? 0;
+}
+
+export function redoDepth(state: EditorState): number {
+  return historyKey.getState(state)?.undone.length ?? 0;
 }

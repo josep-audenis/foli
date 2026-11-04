@@ -1,8 +1,20 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createDocument, parseDocument } from "../document.js";
 import type { NodeJSON } from "../model/index.js";
+import { Slice } from "../model/index.js";
 import type { BlockJSON, DocJSON } from "../schema.js";
-import { createEditor, type Editor, Plugin, PluginKey } from "./index.js";
+import { testSchema } from "../testing/index.js";
+import {
+  createEditor,
+  deleteSelection,
+  type Editor,
+  EditorState,
+  Plugin,
+  PluginKey,
+  redoDepth,
+  TextSelection,
+  undoDepth,
+} from "./index.js";
 
 const text = (t: string, ...marks: string[]): NodeJSON =>
   marks.length
@@ -288,5 +300,153 @@ describe("plugins", () => {
     editor.commands.insertText("?");
     expect(content(editor)).toEqual(docJSON(para("a?!")));
     expect(count.getState(editor.state)).toBe(3);
+  });
+});
+
+/** Applies a change that is kept out of undo history (like a programmatic edit). */
+function unrecorded(
+  editor: Editor,
+  build: (tr: ReturnType<Editor["state"]["tr"]["setMeta"]>) => void,
+): void {
+  const tr = editor.state.tr.setMeta("addToHistory", false);
+  build(tr);
+  editor.dispatch(tr);
+}
+
+describe("review regressions (PR #4)", () => {
+  it("undo after an unrecorded change never edits the wrong text", () => {
+    const editor = editorWith(
+      para("hello world"),
+      heading(1, "head"),
+      para("tail text"),
+      para("more"),
+    );
+    editor.select(35);
+    type(editor, "Z");
+    vi.advanceTimersByTime(1000);
+    editor.select(28, 2);
+    editor.commands.splitBlock(); // p"h", p"t", p"moreZ"
+    unrecorded(editor, (tr) => tr.delete(3, 6)); // removes p"t" outside history
+    const before = editor.state.doc;
+    while (editor.commands.undo()) editor.state.doc.check();
+    const last = editor.state.doc.lastChild?.textContent;
+    expect(last).toBe("more"); // the typed "Z" is undone, not the "e" of "more"
+    while (editor.commands.redo()) editor.state.doc.check();
+    expect(editor.state.doc.eq(before)).toBe(true);
+  });
+
+  it("undo of a block type change does not land on another block after its block was deleted", () => {
+    const editor = editorWith(para("a"), para("b"), heading(2, "c"));
+    editor.select(4);
+    editor.commands.setBlockType("heading", { level: 1 });
+    unrecorded(editor, (tr) => tr.delete(3, 6)); // deletes the changed block
+    expect(editor.commands.undo()).toBe(false);
+    expect(content(editor)).toEqual(docJSON(para("a"), heading(2, "c")));
+  });
+
+  it("a plugin reacting to undo cannot trap the history", () => {
+    // Keeps an empty paragraph at the end of the document.
+    const trailing = new Plugin({
+      appendTransaction: (_trs, _old, state) =>
+        state.doc.lastChild?.content.size
+          ? state.tr.insert(state.doc.content.size, state.schema.node("paragraph"))
+          : null,
+    });
+    const editor = createEditor({
+      document: createDocument(docJSON(para("a") as BlockJSON)),
+      plugins: [trailing],
+    });
+    // No select(): a selection-only transaction would trigger the plugin as its own undo event.
+    type(editor, "b");
+    const typed = editor.getDocument().content;
+    expect(typed).toEqual(docJSON(para("ba"), para()));
+    expect(undoDepth(editor.state)).toBe(1);
+    expect(editor.commands.undo()).toBe(true);
+    expect(content(editor)).toEqual(docJSON(para("a"), para()));
+    expect(editor.commands.undo()).toBe(false);
+    expect(redoDepth(editor.state)).toBe(1);
+    expect(editor.commands.redo()).toBe(true);
+    expect(content(editor)).toEqual(typed);
+  });
+
+  it("a long typing run is one cheap undo step, even through unrecorded changes", () => {
+    const editor = createEditor();
+    for (let i = 0; i < 3000; i++) {
+      editor.commands.insertText("x");
+      vi.advanceTimersByTime(10);
+    }
+    expect(undoDepth(editor.state)).toBe(1);
+    const start = performance.now();
+    unrecorded(editor, (tr) => tr.insertText("!", 1));
+    expect(performance.now() - start).toBeLessThan(200);
+    editor.commands.undo();
+    expect(content(editor)).toEqual(docJSON(para("!")));
+  });
+
+  it("deleteSelection returns false instead of throwing on an impossible deletion", () => {
+    const doc = testSchema.nodeFromJSON({
+      type: "doc",
+      content: [{ type: "blockquote", content: [para("quoted")] }, para("after")],
+    });
+    const state = EditorState.create({ doc, selection: TextSelection.create(doc, 4, 13) });
+    expect(() => deleteSelection(state, () => {})).not.toThrow();
+    expect(deleteSelection(state)).toBe(false);
+  });
+
+  it("selection helpers map only through their own steps", () => {
+    const editor = editorWith(para("abc"));
+    editor.select(2, 3);
+    const tr = editor.state.tr.insertText("XXXX", 1);
+    tr.setSelection(TextSelection.create(tr.doc, 6, 7));
+    tr.replaceSelection(new Slice(editor.state.doc.slice(1, 2).content, 0, 0));
+    editor.dispatch(tr);
+    expect(content(editor)).toEqual(docJSON(para("XXXXaac")));
+    expect(editor.state.selection.head).toBe(7);
+  });
+
+  it("carets never split a surrogate pair", () => {
+    const editor = editorWith(para("a😀b"));
+    editor.select(3); // between the halves of 😀
+    expect(editor.state.selection.head).toBe(2);
+    editor.select(4);
+    editor.handleKey("Backspace");
+    expect(content(editor)).toEqual(docJSON(para("ab")));
+  });
+
+  it("Backspace after a combining mark that follows a hard break keeps the break", () => {
+    const editor = editorWith(para("a", { type: "hardBreak" }, "́b"));
+    editor.select(4);
+    editor.handleKey("Backspace");
+    expect(content(editor)).toEqual(docJSON(para("a", { type: "hardBreak" }, "b")));
+  });
+
+  it("toggleMark on only empty paragraphs does not apply", () => {
+    const editor = editorWith(para(), para());
+    editor.select(1, 3);
+    expect(editor.commands.toggleMark("bold")).toBe(false);
+  });
+
+  it("select all on an already empty document deletes nothing and records nothing", () => {
+    const editor = createEditor();
+    const doc = editor.state.doc;
+    editor.handleKey("Mod-a");
+    editor.commands.deleteSelection(); // only collapses the selection
+    expect(editor.state.doc).toBe(doc);
+    expect(undoDepth(editor.state)).toBe(0);
+  });
+
+  it("hard break replaces a select-all selection", () => {
+    const editor = editorWith(para("x"), para("y"));
+    editor.handleKey("Mod-a");
+    expect(editor.commands.insertHardBreak()).toBe(true);
+    expect(content(editor)).toEqual(docJSON(para({ type: "hardBreak" })));
+  });
+
+  it("an appendTransaction loop fails loudly instead of hanging", () => {
+    // A plugin never sees its own appended transactions, so a loop takes two that trigger each other.
+    const ping = new Plugin({ appendTransaction: (_t, _o, state) => state.tr.insertText("x", 1) });
+    const pong = new Plugin({ appendTransaction: (_t, _o, state) => state.tr.insertText("y", 1) });
+    const editor = createEditor({ plugins: [ping, pong] });
+    expect(() => editor.commands.insertText("a")).toThrow(RangeError);
   });
 });

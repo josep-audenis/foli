@@ -45,11 +45,13 @@ export class StepMap implements Mappable {
       const end = start + oldSize;
       if (pos <= end) {
         const side = !oldSize ? assoc : pos === start ? -1 : pos === end ? 1 : assoc;
-        const inside = pos > start && pos < end;
+        // Recoverable unless the position sits on the range edge it associates with; a start edge
+        // with right association must be recoverable, or it drifts past re-inserted content.
+        const recoverable = pos !== (assoc < 0 ? start : end);
         return {
           pos: start + diff + (side < 0 ? 0 : newSize),
-          deleted: inside,
-          recover: inside ? makeRecover(i / 3, pos - start) : null,
+          deleted: pos > start && pos < end,
+          recover: recoverable ? makeRecover(i / 3, pos - start) : null,
         };
       }
       diff += newSize - oldSize;
@@ -100,20 +102,25 @@ export class StepMap implements Mappable {
  */
 export class Mapping implements Mappable {
   constructor(
+    /** Shared with slices; append through `appendMap`, never mutate directly. */
     readonly maps: StepMap[] = [],
-    private readonly mirror: number[] = [],
+    /** Mirror pairs, stored in both directions for O(1) lookup. */
+    private readonly mirror = new Map<number, number>(),
     private readonly from = 0,
     private to = maps.length,
   ) {}
 
-  /** A view of maps `from..to` (shares storage). */
+  /** A view of maps `from..to` (shares storage; do not append to a slice). */
   slice(from = 0, to = this.maps.length): Mapping {
     return new Mapping(this.maps, this.mirror, from, to);
   }
 
   appendMap(map: StepMap, mirrors?: number): void {
     this.to = this.maps.push(map);
-    if (mirrors !== undefined) this.mirror.push(this.maps.length - 1, mirrors);
+    if (mirrors !== undefined) {
+      this.mirror.set(this.maps.length - 1, mirrors);
+      this.mirror.set(mirrors, this.maps.length - 1);
+    }
   }
 
   appendMapping(mapping: Mapping): void {
@@ -130,11 +137,7 @@ export class Mapping implements Mappable {
   }
 
   getMirror(n: number): number | undefined {
-    for (let i = 0; i < this.mirror.length; i += 2) {
-      if (this.mirror[i] === n) return this.mirror[i + 1];
-      if (this.mirror[i + 1] === n) return this.mirror[i];
-    }
-    return undefined;
+    return this.mirror.get(n);
   }
 
   map(pos: number, assoc = 1): number {

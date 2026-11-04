@@ -87,6 +87,29 @@ export class ReplaceStep extends Step {
     if (from.deleted && to.deleted) return null;
     return new ReplaceStep(from.pos, Math.max(from.pos, to.pos), this.slice);
   }
+
+  /**
+   * One step equivalent to applying this step and then `next`, when they touch adjacent ranges
+   * (e.g. consecutive keystrokes); null otherwise. Keeps typing history to one step per run.
+   */
+  merge(next: Step): ReplaceStep | null {
+    if (!(next instanceof ReplaceStep)) return null;
+    const join = (a: Slice, b: Slice) =>
+      a.size + b.size === 0
+        ? Slice.empty
+        : new Slice(a.content.append(b.content), a.openStart, b.openEnd);
+    if (this.from + this.slice.size === next.from && !this.slice.openEnd && !next.slice.openStart) {
+      return new ReplaceStep(
+        this.from,
+        this.to + (next.to - next.from),
+        join(this.slice, next.slice),
+      );
+    }
+    if (next.to === this.from && !this.slice.openStart && !next.slice.openEnd) {
+      return new ReplaceStep(next.from, this.to, join(next.slice, this.slice));
+    }
+    return null;
+  }
 }
 
 /** Rebuilds inline nodes of a fragment with `f`, descending into block content. */
@@ -217,6 +240,11 @@ export class NodeMarkupStep extends Step {
 
   map(mapping: Mappable): Step | null {
     const pos = mapping.mapResult(this.pos, 1);
-    return pos.deleted ? null : new NodeMarkupStep(pos.pos, this.type, this.attrs, this.marks);
+    // A node deleted from exactly its start leaves `pos` on the range edge (not "deleted"); the
+    // position just after its first token is deleted or collapses onto `pos` (leaf nodes). Without
+    // this check the step would land on whatever node follows.
+    const inside = mapping.mapResult(this.pos + 1, -1);
+    if (pos.deleted || inside.deleted || inside.pos <= pos.pos) return null;
+    return new NodeMarkupStep(pos.pos, this.type, this.attrs, this.marks);
   }
 }

@@ -13,8 +13,11 @@ import {
 
 export type DeleteUnit = "char" | "word";
 
-/** Leaf nodes count as one position; this stands in for them in text measurements. */
-const LEAF = "￼";
+/**
+ * Stands in for leaf nodes (one position each) in text measurements. A line feed, because
+ * grapheme rules never join it with a following combining mark (U+FFFC would be).
+ */
+const LEAF = "\n";
 const graphemes = new Intl.Segmenter(undefined, { granularity: "grapheme" });
 const words = new Intl.Segmenter(undefined, { granularity: "word" });
 
@@ -45,8 +48,7 @@ function caret(state: EditorState): ResolvedPos | null {
 
 export const deleteSelection: Command = (state, dispatch) => {
   if (state.selection.empty) return false;
-  dispatch?.(state.tr.deleteSelection());
-  return true;
+  return attempt(state, dispatch, (tr) => tr.deleteSelection());
 };
 
 /** Replaces the selection with text, using stored marks or the marks at the selection start. */
@@ -168,9 +170,12 @@ export const splitBlock: Command = (state, dispatch) => {
 
 export const insertHardBreak: Command = (state, dispatch) => {
   const type = state.schema.nodes.hardBreak;
-  if (!type || !state.selection.$from.parent.inlineContent) return false;
+  const { selection } = state;
+  if (!type || (!(selection instanceof AllSelection) && !selection.$from.parent.inlineContent)) {
+    return false;
+  }
   return attempt(state, dispatch, (tr) => {
-    const marks = marksAt(state.selection.$from);
+    const marks = state.storedMarks ?? marksAt(selection.$from);
     tr.deleteSelection();
     const pos = tr.selection.from;
     tr.insert(
@@ -234,14 +239,13 @@ export function toggleMark(type: string | MarkType, attrs?: Attrs | null): Comma
       return !applicable;
     });
     if (!applicable) return false;
-    if (dispatch) {
-      const tr = state.tr;
-      if (rangeHasMark(state, selection.from, selection.to, mark))
+    return attempt(state, dispatch, (tr) => {
+      if (rangeHasMark(state, selection.from, selection.to, mark)) {
         tr.removeMark(selection.from, selection.to, mark);
-      else tr.addMark(selection.from, selection.to, mark.create(attrs));
-      dispatch(tr);
-    }
-    return true;
+      } else {
+        tr.addMark(selection.from, selection.to, mark.create(attrs));
+      }
+    });
   };
 }
 

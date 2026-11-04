@@ -35,7 +35,12 @@ export class Transform {
   readonly docs: Node[] = [];
   readonly mapping = new Mapping();
 
-  constructor(public doc: Node) {}
+  constructor(private current: Node) {}
+
+  /** The document after all steps so far. Changes only through steps. */
+  get doc(): Node {
+    return this.current;
+  }
 
   /** The document before any step. */
   get before(): Node {
@@ -62,7 +67,7 @@ export class Transform {
     this.docs.push(this.doc);
     this.steps.push(step);
     this.mapping.appendMap(step.getMap());
-    this.doc = doc;
+    this.current = doc;
   }
 
   replace(from: number, to = from, slice: Slice = Slice.empty): this {

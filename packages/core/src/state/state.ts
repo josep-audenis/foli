@@ -120,19 +120,27 @@ export class Transaction extends Transform {
     if (selection.empty) return this;
     if (selection instanceof AllSelection) {
       const type = defaultTextblockType(this.doc.type.schema);
-      this.replace(0, this.doc.content.size, new Slice(Fragment.from(type.create()), 0, 0));
+      const only = this.doc.childCount === 1 ? this.doc.firstChild : null;
+      // Already a single empty default block: nothing to delete (and nothing to record).
+      if (!(only?.type === type && only.content.size === 0)) {
+        this.replace(0, this.doc.content.size, new Slice(Fragment.from(type.create()), 0, 0));
+      }
       return this.setSelection(Selection.atStart(this.doc));
     }
+    const start = this.steps.length;
     this.delete(selection.from, selection.to);
-    return this.setSelection(TextSelection.create(this.doc, this.mapping.map(selection.from, -1)));
+    const caret = this.mapping.slice(start).map(selection.from, -1);
+    return this.setSelection(TextSelection.create(this.doc, caret));
   }
 
   /** Replaces the selection with a slice and puts the caret after it. */
   replaceSelection(slice: Slice): this {
     this.deleteSelection();
     const from = this.selection.from;
+    const start = this.steps.length;
     this.replace(from, from, slice);
-    return this.setSelection(Selection.near(this.doc.resolve(this.mapping.map(from, 1)), -1));
+    const end = this.mapping.slice(start).map(from, 1);
+    return this.setSelection(Selection.near(this.doc.resolve(end), -1));
   }
 }
 
@@ -198,7 +206,9 @@ export class EditorState {
     const transactions = [root];
     let state = this.applyInner(root);
     const seen: { state: EditorState; count: number }[] = [];
-    for (;;) {
+    for (let round = 0; ; round++) {
+      // A plugin that appends on every round would otherwise hang the editor.
+      if (round > 100) throw new RangeError("appendTransaction did not settle after 100 rounds");
       let appended = false;
       this.plugins.forEach((plugin, i) => {
         const append = plugin.spec.appendTransaction;

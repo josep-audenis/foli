@@ -18,10 +18,9 @@ export { createEditor, type Editor, type EditorListener, type EditorOptions } fr
 export {
   closeHistory,
   type HistoryOptions,
-  type HistoryState,
   history,
-  historyKey,
   redo,
+  redoDepth,
   undo,
   undoDepth,
 } from "./history.js";

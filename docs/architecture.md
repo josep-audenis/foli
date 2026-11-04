@@ -76,10 +76,16 @@ Foli's own (see `THIRD_PARTY_NOTICES.md`).
 - **Plugins** (internal API, used by history and keymaps): state fields, `filterTransaction`,
   `appendTransaction`, `keymap`.
 - **History**: undo/redo of inverted steps.
-  - Changes are grouped by time (500 ms) and adjacency.
+  - Changes are grouped by time (500 ms) and adjacency; consecutive typing collapses into one step.
   - Formatting and block-type changes get their own undo steps.
   - The selection is restored on undo.
-  - Changes with `addToHistory: false` are rebased into the stored events.
+  - Changes with `addToHistory: false` are rebased into the stored events. Each rebased step is
+    applied to a running copy of the document and dropped if it no longer applies, so the
+    remaining steps stay correctly positioned. A step whose target node was deleted is dropped.
+  - Changes a plugin appends join the event of the transaction they react to; a reaction to an
+    undo or redo joins the reverse event, so it cannot trap the history.
+  - Undo/redo replays mark steps through addMark/removeMark, so redo is exact even when marks
+    were changed outside history.
 - **Commands** have the shape `(state, dispatch?) => boolean`:
   - Editing: insertText, deleteBackward/Forward (by grapheme or word), deleteSelection,
     joinBackward/Forward, insertHardBreak.
@@ -92,7 +98,12 @@ Foli's own (see `THIRD_PARTY_NOTICES.md`).
 Known limits:
 - No general slice fitting (comes with paste in Phase 4).
 - Splits one level only (lists, Phase 7).
-- History rebasing is quadratic in history depth, which is capped at 100 events.
+- Rebasing costs O(n²) in the number of stored steps (not events) per unrecorded change. Typing
+  runs collapse to one step and depth is capped at 100 events, so n stays small in normal use;
+  formatting-heavy histories are the worst case.
+- Selections snap out of surrogate pairs but not to full grapheme clusters; the view must place
+  carets at cluster boundaries (Phase 4).
+- Plugins, `Transaction` metadata and mapping internals are exported but not yet a stable API.
 
 ## Packages
 

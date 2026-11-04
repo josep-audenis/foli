@@ -154,6 +154,8 @@ const command = fc.record({
   a: fraction,
   b: fraction,
   collapse: fc.boolean(),
+  // Short pauses let adjacent edits merge into one undo event, exercising grouping.
+  pause: fc.constantFrom(100, 1000),
 });
 type Cmd = typeof command extends fc.Arbitrary<infer T> ? T : never;
 
@@ -207,7 +209,7 @@ describe("editor history properties (10k runs)", () => {
             const initial = editor.state.doc;
             let firstSelection: Selection | null = null;
             for (const c of cmds) {
-              vi.advanceTimersByTime(1000); // one undo event per command
+              vi.advanceTimersByTime(c.pause);
               selectFor(editor, c);
               const selection = editor.state.selection;
               const doc = editor.state.doc;
@@ -232,6 +234,127 @@ describe("editor history properties (10k runs)", () => {
       ok(
         changes / commands > 0.5,
         `only ${changes} of ${commands} random commands changed the document`,
+      );
+    },
+    TIMEOUT,
+  );
+});
+
+const unrecordedOp = fc.record({
+  kind: fc.constantFrom("mark", "delete", "split", "bold", "heading"),
+  a: fraction,
+  b: fraction,
+});
+type UnrecordedOp = typeof unrecordedOp extends fc.Arbitrary<infer T> ? T : never;
+
+const MARKER = "§";
+
+/** Applies a random change outside history. "mark" inserts MARKER, the rest edit freely. */
+function applyUnrecorded(editor: Editor, o: UnrecordedOp): void {
+  const tr = editor.state.tr.setMeta("addToHistory", false);
+  const size = tr.doc.content.size;
+  const a = Math.round(o.a * size);
+  const b = Math.round(o.b * size);
+  const [from, to] = a <= b ? [a, b] : [b, a];
+  const caret = Selection.near(tr.doc.resolve(from)).from;
+  try {
+    if (o.kind === "mark") tr.insertText(MARKER, caret);
+    else if (o.kind === "delete") tr.delete(from, to);
+    else if (o.kind === "split") tr.split(caret);
+    else if (o.kind === "bold" && from < to) tr.addMark(from, to, tr.doc.type.schema.mark("bold"));
+    else if (o.kind === "heading")
+      tr.setBlockType(from, to, tr.doc.type.schema.nodes.heading as never, { level: 2 });
+  } catch (error) {
+    if (!(error instanceof TransformError)) throw error;
+  }
+  if (tr.docChanged) editor.dispatch(tr);
+}
+
+const step = fc.oneof(
+  { weight: 3, arbitrary: command.map((c) => ({ recorded: true as const, c })) },
+  { weight: 1, arbitrary: unrecordedOp.map((o) => ({ recorded: false as const, o })) },
+);
+
+/** Runs a mixed sequence; returns the doc right before undoing. */
+function runMixed(
+  editor: Editor,
+  steps: { recorded: boolean; c?: Cmd; o?: UnrecordedOp }[],
+  only?: "mark",
+): Node {
+  for (const s of steps) {
+    vi.advanceTimersByTime(s.c?.pause ?? 1000);
+    if (s.recorded && s.c) {
+      selectFor(editor, s.c);
+      execute(editor, s.c);
+    } else if (s.o) {
+      applyUnrecorded(editor, only ? { ...s.o, kind: only } : s.o);
+    }
+    editor.state.doc.check();
+  }
+  return editor.state.doc;
+}
+
+describe("history with changes kept out of it (10k runs)", () => {
+  beforeAll(() => {
+    vi.useFakeTimers();
+  });
+  afterAll(() => {
+    vi.useRealTimers();
+  });
+
+  const editorFor = (json: unknown) =>
+    createEditor({ document: { ...createDocument(), content: json as DocJSON } });
+  const blockText = (doc: Node) => doc.textBetween(0, doc.content.size, "\n", "␤");
+
+  it(
+    "undoing everything removes exactly the recorded edits around unrecorded insertions",
+    () => {
+      fc.assert(
+        fc.property(
+          docJSON({ rich: false }),
+          fc.array(step, { minLength: 1, maxLength: 10 }),
+          (json, steps) => {
+            const editor = editorFor(json);
+            const initial = blockText(editor.state.doc);
+            const before = runMixed(editor, steps, "mark");
+            while (editor.commands.undo()) editor.state.doc.check();
+            // Undo may drop a marker that sat inside text it removes, but never touches original text.
+            ok(
+              blockText(editor.state.doc).split(MARKER).join("") === initial,
+              "undo changed text it did not record",
+            );
+            while (editor.commands.redo()) editor.state.doc.check();
+            ok(editor.state.doc.eq(before), "redo did not return to the state before undoing");
+          },
+        ),
+        RUNS,
+      );
+    },
+    TIMEOUT,
+  );
+
+  it(
+    "arbitrary unrecorded changes keep undo/redo valid and reversible",
+    () => {
+      fc.assert(
+        fc.property(
+          docJSON({ rich: false }),
+          fc.array(step, { minLength: 1, maxLength: 10 }),
+          (json, steps) => {
+            const editor = editorFor(json);
+            const before = runMixed(editor, steps);
+            let undos = 0;
+            while (editor.commands.undo()) {
+              editor.state.doc.check();
+              undos++;
+            }
+            for (let i = 0; i < undos; i++)
+              ok(editor.commands.redo(), "redo stack shorter than undo count");
+            editor.state.doc.check();
+            ok(editor.state.doc.eq(before), "redo did not return to the state before undoing");
+          },
+        ),
+        RUNS,
       );
     },
     TIMEOUT,

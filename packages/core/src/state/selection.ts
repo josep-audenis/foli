@@ -99,6 +99,20 @@ function findTextPos(doc: Node, pos: number, dir: number): number | null {
   return found;
 }
 
+/**
+ * Moves a position that falls between the two halves of a surrogate pair to before the pair.
+ * shortcut: does not snap to full grapheme clusters (combining marks, ZWJ sequences); the view
+ * places carets at cluster boundaries (Phase 4).
+ */
+function outOfSurrogatePair($pos: ResolvedPos): ResolvedPos {
+  if (!$pos.textOffset) return $pos;
+  const text = $pos.parent.child($pos.index()).text ?? "";
+  const before = text.charCodeAt($pos.textOffset - 1);
+  const after = text.charCodeAt($pos.textOffset);
+  const split = before >= 0xd800 && before <= 0xdbff && after >= 0xdc00 && after <= 0xdfff;
+  return split ? $pos.doc.resolve($pos.pos - 1) : $pos;
+}
+
 /** A caret or range whose ends both sit in inline content. */
 export class TextSelection extends Selection {
   static create(doc: Node, anchor: number, head = anchor): Selection {
@@ -112,7 +126,7 @@ export class TextSelection extends Selection {
     const anchor = $anchor.parent.inlineContent ? $anchor : Selection.near($anchor, -dir).$head;
     if (!head.parent.inlineContent || !anchor.parent.inlineContent)
       return Selection.near($head, dir);
-    return new TextSelection(anchor, head);
+    return new TextSelection(outOfSurrogatePair(anchor), outOfSurrogatePair(head));
   }
 
   map(doc: Node, mapping: Mappable): Selection {
