@@ -33,9 +33,9 @@ This document describes **what exists** and **what is decided**. Planned parts a
 | ------------------- | ------------------------------------------------------------------------------ | ------------------------------------------------------ |
 | Document model      | Schema, immutable tree, marks, positions, JSON, validation                     | ✅ (Phase 2)                                           |
 | Editing engine      | Steps, position mapping, selection, state, history, commands                   | ✅ headless (Phase 3)                                  |
-| View                | Render state to DOM, DOM ↔ model mapping, `beforeinput`, IME, clipboard, focus | Read-only renderer ✅; editing: Phase 4                |
+| View                | Render state to DOM, DOM ↔ model mapping, `beforeinput`, IME, clipboard, focus | Editing slice ✅ (Phase 4.1); IME, clipboard: Phase 4  |
 | Layout              | Measurement, line breaking, page flow, fragments, incremental reflow, print    | Phase 5 (inside `@foli/view` until the seam is proven) |
-| React integration   | Components, hooks, toolbar                                                     | Read-only `DocumentEditor` ✅; API: Phase 6            |
+| React integration   | Components, hooks, toolbar                                                     | Editable `DocumentEditor` ✅; API: Phase 6             |
 | Document processing | DOCX/HTML interop, Rust/WASM                                                   | Phase 10                                               |
 
 ## Editing data flow (target design)
@@ -122,6 +122,51 @@ Known limits:
   carets at cluster boundaries (Phase 4).
 - Plugins, `Transaction` metadata and mapping internals are exported but not yet a stable API.
 
+## Editor view (`@foli/view`)
+
+Phase 4 in progress (`packages/view/src/view.ts`). Design per ADR-0003 (one `contenteditable`
+host); pages and fragments arrive in Phase 5, so today the whole document is one continuous host.
+
+- `new EditorView(host, editor)` renders the state of a core `Editor` into `host` and
+  subscribes to it. Edits go through `editor.dispatch`, so history, plugins and subscribers see
+  every change. `destroy()` detaches it.
+- **Descriptors:** one per block (model node, element, leaves) and one per inline leaf (text
+  node or hard break with its offset in the block). `posFromDOM` / `domFromPos` map through
+  them; the DOM is never parsed for content.
+  - An element point maps to the start of the first leaf at or after it, else the block end.
+  - At a mark boundary the caret is placed in the text before it, matching the marks typed text
+    gets.
+  - Empty blocks and blocks ending in a hard break get an extra `<br>` without a descriptor.
+- **Rendering:** blocks whose model node is unchanged (same identity) keep their DOM; changed
+  blocks are rebuilt; stray DOM is removed. Built with `createElement`/`textContent` only.
+- **Input:** `keydown` → the plugin keymaps (`editor.handleKey`). Names are normalized as
+  `Mod-Ctrl-Meta-Alt-Shift-key` (`Mod` = Cmd on Apple platforms, Ctrl elsewhere; non-Latin
+  layouts fall back to the physical key). Everything else arrives as `beforeinput` and is always
+  prevented. It maps to commands: insertText, insertReplacementText (target range),
+  insertParagraph, insertLineBreak, the delete types (target range, else by character or word),
+  historyUndo/Redo, and format*.
+- **Selection:** read from the live DOM before every key and input event (`selectionchange` is
+  asynchronous) and on `selectionchange`, and compared with the model selection by position.
+  A user caret move clears stored marks. The model selection is written back only when the DOM
+  does not already show it, so native caret affinity survives. An `AllSelection` is shown as the
+  text range between its ends. Triple-click selects the clicked block's content (natively,
+  Chromium and WebKit extend it into the next block, and typing would merge the two).
+
+Known limits (each is a later Phase 4 task in the roadmap):
+- Composition (IME, and dead-key accents in all three engines) and any other unprevented DOM
+  change are discarded by re-rendering (no read-back yet, 4.2). Late composition input types
+  are ignored. A blur ends a composition the browser never closed.
+- DOM changes that fire no `input` event (browser extensions, translation) are not detected:
+  a reused block keeps the stale DOM its descriptors point into, and stray nodes before the
+  first block shift host-level positions. The `MutationObserver` safety net is 4.2.
+- Delete input types for whole lines rely on the browser's target range; without one they
+  delete a character. `Mod-Backspace` is bound to word deletion, so macOS Cmd+Backspace deletes
+  a word, not to the line start (4.4).
+- Paste and drop do nothing; copy and cut use the browser's DOM serialization (4.3).
+- No scroll-into-view after programmatic selection changes; no grapheme-cluster caret snapping (4.4).
+- No read-only mode or placeholder (4.5).
+- Assumes schema v1 depth (doc > textblock > inline).
+
 ## Packages
 
 ```
@@ -129,7 +174,7 @@ foli/
 ├── apps/playground/     Vite demo; consumes packages by name; no engine logic.
 ├── packages/
 │   ├── core/  @foli/core   Envelope, schema, immutable model, positions, slices. Pure TS, no DOM.
-│   ├── view/  @foli/view   DOM rendering (read-only so far). Framework-agnostic.
+│   ├── view/  @foli/view   Editable DOM view (EditorView). Framework-agnostic.
 │   └── react/ @foli/react  React components + default stylesheet.
 └── docs/
 ```

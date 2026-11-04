@@ -1,25 +1,44 @@
-import { createDocument, type FoliDocument } from "@foli/core";
-import { renderContent } from "@foli/view";
+import { createDocument, createEditor, type FoliDocument } from "@foli/core";
+import { EditorView } from "@foli/view";
 import { type CSSProperties, useLayoutEffect, useRef, useState } from "react";
 
 export interface DocumentEditorProps {
   /** Read once on mount. To load a different document later, remount with a new `key`. */
   initialContent?: FoliDocument;
+  /** Called with the whole document after every change to its content. */
+  onChange?: (document: FoliDocument) => void;
   className?: string;
 }
 
 /**
- * Currently READ-ONLY: renders the document on one page-sized sheet.
- * Editing arrives with Foli's own engine (Phases 2–4), pagination in Phase 5 — see docs/roadmap.md.
+ * An editable document on one page-sized sheet (pagination arrives in Phase 5). Uncontrolled:
+ * the engine owns the document; React only observes it through `onChange`.
+ * Provisional API: final names are decided in Phase 6 (see docs/roadmap.md).
  */
-export function DocumentEditor({ initialContent, className }: DocumentEditorProps) {
+export function DocumentEditor({ initialContent, onChange, className }: DocumentEditorProps) {
   const [initial] = useState(() => initialContent ?? createDocument());
+  const [editor] = useState(() => createEditor({ document: initial }));
   const contentRef = useRef<HTMLDivElement>(null);
+  const onChangeRef = useRef(onChange);
+
+  useLayoutEffect(() => {
+    onChangeRef.current = onChange;
+  });
 
   // The view owns this DOM subtree; React never renders children into it.
   useLayoutEffect(() => {
-    contentRef.current?.replaceChildren(renderContent(initial.content));
-  }, [initial]);
+    const host = contentRef.current;
+    if (!host) return;
+    const view = new EditorView(host, editor);
+    // shortcut: serializes the whole document per change (O(document) per keystroke); Phase 6 API decides on a lazy getter.
+    const unsubscribe = editor.subscribe((_state, transactions) => {
+      if (transactions.some((tr) => tr.docChanged)) onChangeRef.current?.(editor.getDocument());
+    });
+    return () => {
+      unsubscribe();
+      view.destroy();
+    };
+  }, [editor]);
 
   const { pageSize, margins } = initial.settings;
   const pageStyle: CSSProperties = {
@@ -31,7 +50,15 @@ export function DocumentEditor({ initialContent, className }: DocumentEditorProp
   return (
     <div className={className ? `foli-canvas ${className}` : "foli-canvas"}>
       <div className="foli-page" style={pageStyle}>
-        <div ref={contentRef} className="foli-content" />
+        {/* biome-ignore lint/a11y/useSemanticElements: EditorView makes this div a contenteditable rich-text box. */}
+        <div
+          ref={contentRef}
+          className="foli-content"
+          role="textbox"
+          aria-multiline="true"
+          aria-label="Document"
+          tabIndex={0}
+        />
       </div>
     </div>
   );

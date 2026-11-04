@@ -31,7 +31,6 @@
 .foli-content {
   outline: none;
   min-height: 100%;
-  white-space: pre-wrap;
 }
 
 .foli-content ::selection {

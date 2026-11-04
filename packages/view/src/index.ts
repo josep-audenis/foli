@@ -1,1 +1,1 @@
-export { renderContent } from "./render.js";
+export { EditorView, keyName } from "./view.js";
