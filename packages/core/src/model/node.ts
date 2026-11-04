@@ -71,6 +71,11 @@ export class Node {
     return this.type.isLeaf;
   }
 
+  /** True if this node holds inline content (a caret can sit directly inside it). */
+  get inlineContent(): boolean {
+    return this.type.inlineContent;
+  }
+
   /** All text in this node, concatenated without separators. */
   get textContent(): string {
     return this.content.textBetween(0, this.content.size);

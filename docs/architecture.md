@@ -31,8 +31,8 @@ This document describes **what exists** and **what is decided**. Planned parts a
 
 | Subsystem           | Responsibility                                                                 | Status                                                 |
 | ------------------- | ------------------------------------------------------------------------------ | ------------------------------------------------------ |
-| Document model      | Schema, immutable tree, marks, positions, JSON, validation                     | Envelope + schema v1 validator ✅; model: Phase 2      |
-| Editing engine      | Steps, position mapping, selection, state, history, commands                   | Phase 3                                                |
+| Document model      | Schema, immutable tree, marks, positions, JSON, validation                     | ✅ (Phase 2)                                           |
+| Editing engine      | Steps, position mapping, selection, state, history, commands                   | ✅ headless (Phase 3)                                  |
 | View                | Render state to DOM, DOM ↔ model mapping, `beforeinput`, IME, clipboard, focus | Read-only renderer ✅; editing: Phase 4                |
 | Layout              | Measurement, line breaking, page flow, fragments, incremental reflow, print    | Phase 5 (inside `@foli/view` until the seam is proven) |
 | React integration   | Components, hooks, toolbar                                                     | Read-only `DocumentEditor` ✅; API: Phase 6            |
@@ -55,6 +55,67 @@ DOM event (beforeinput / keydown / composition / paste)
 The DOM is never parsed as the source of truth. The one exception is IME composition and
 Android input, where the browser must mutate the DOM; the view reads those changes back and
 converts them into steps immediately.
+
+## Editing engine (`@foli/core`)
+
+Implemented headless in Phase 3 (`packages/core/src/transform/`, `packages/core/src/state/`).
+The design follows prosemirror-transform, -state, -history and -commands (MIT); the code is
+Foli's own (see `THIRD_PARTY_NOTICES.md`).
+
+- **Steps** change the document atomically and are invertible: `ReplaceStep`, `AddMarkStep`,
+  `RemoveMarkStep` and `NodeMarkupStep`. `NodeMarkupStep` handles type and attribute changes that
+  keep inner positions; it replaces the planned `AttrStep`. A failing step returns a failed
+  `StepResult`; `Transform.step` throws `TransformError` and leaves the transform unchanged.
+- **Mapping**: each step has a `StepMap`. `Mapping` chains them, with association bias, deletion
+  detection, and mirrored maps that recover positions inside re-inserted content.
+- **Transform helpers**: replace/delete/insert/insertText, addMark/removeMark (exactly
+  invertible), split, join, setBlockType, setNodeMarkup.
+- **State**: an immutable `EditorState` holds the doc, selection, stored marks and plugin fields.
+  A `Transaction` adds selection tracking, stored marks and metadata (`addToHistory`, time).
+  Selections are `TextSelection` and `AllSelection`; `NodeSelection` waits for a block leaf node.
+- **Plugins** (internal API, used by history and keymaps): state fields, `filterTransaction`,
+  `appendTransaction`, `keymap`.
+- **History**: undo/redo of inverted steps.
+  - Changes are grouped by time (500 ms) and adjacency; consecutive typing collapses into one step.
+  - Formatting and block-type changes get their own undo steps.
+  - The selection is restored on undo.
+  - Changes with `addToHistory: false` are rebased into the stored events. Each rebased step is
+    applied to a running copy of the document and dropped if it no longer applies, so the
+    remaining steps stay correctly positioned. A step whose target node was deleted is dropped.
+  - Changes a plugin appends join the event of the transaction they react to.
+  - A plugin's reaction to an undo or redo joins the reverse event, so it cannot trap the history,
+    and the opposite stack is rebased past it. A reaction is recorded this way even when the plugin
+    marks it `addToHistory: false`.
+  - An undo or redo whose steps no longer apply (their effect was already reverted outside
+    history) is discarded instead of leaving an empty reverse event.
+  - Undo/redo replays mark steps through addMark/removeMark, so redo is exact even when marks
+    were changed outside history.
+- **Commands** have the shape `(state, dispatch?) => boolean`:
+  - Editing: insertText, deleteBackward/Forward (by grapheme or word), deleteSelection,
+    joinBackward/Forward, insertHardBreak.
+  - splitBlock: Enter at the end of a heading starts a paragraph, and formatting carries over.
+  - Formatting and selection: toggleMark, setBlockType, selectAll, undo, redo, plus `isMarkActive`.
+  - `baseKeymap()` binds them to key names (`Mod-b`, `Enter`…).
+- **Headless editor**: `createEditor({ document })` returns `commands.*`, `run`, `can`,
+  `handleKey`, `select`, `getDocument`, `setDocument` and `subscribe`.
+
+Known limits:
+- No general slice fitting (comes with paste in Phase 4).
+- Splits one level only (lists, Phase 7).
+- Each unrecorded change (and each plugin reaction to undo/redo) rebases the stored history.
+  This costs O(n²) in the number of stored steps (not events), and every step is re-applied to the
+  document, which also scales with document size.
+  - Typing runs collapse to one step, and depth is capped at 100 events.
+  - Formatting across many paragraphs is the worst case: `addMark` makes one step per paragraph.
+    One reviewer measurement, select-all bold on 4,000 paragraphs:
+    - the bold itself took about 0.6 s;
+    - a later unrecorded insert took about 0.7 s;
+    - the undo took about 0.5 s.
+
+  Batch per-paragraph mark steps before documents get that large.
+- Selections snap out of surrogate pairs but not to full grapheme clusters; the view must place
+  carets at cluster boundaries (Phase 4).
+- Plugins, `Transaction` metadata and mapping internals are exported but not yet a stable API.
 
 ## Packages
 
