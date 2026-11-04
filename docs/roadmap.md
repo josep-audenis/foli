@@ -281,7 +281,7 @@ Each task is one PR that leaves `pnpm check` green and the playground working.
   read from the live DOM on demand; React `DocumentEditor` editable with `onChange`; playground
   persists to `localStorage`. Playwright in all three engines: typing, Enter, Backspace, Mod-b,
   undo/redo, reload without loss.
-- [ ] 4.2 (in review) Composition: let the browser mutate during composition, read the changed blocks back
+- [ ] 4.2 (in review, #9) Composition: let the browser mutate during composition, read the changed blocks back
   into steps at `compositionend`; `MutationObserver` safety net for unprevented changes
   (Android, extensions, spellcheck in Firefox); automated Chromium CDP IME tests;
   `docs/testing/ime.md` checklist (T4 automated part).
