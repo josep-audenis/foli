@@ -17,7 +17,7 @@ the current phase and its gates, ADR-0002 for why there is no editor-engine depe
 
 ## Commands
 
-- `pnpm check` — lint + typecheck + test + build (what CI runs). Run before declaring done.
+- `pnpm check` — lint + typecheck + test + build. Runs as a local pre-push hook (installed by `pnpm install`; no GitHub CI). Run before declaring done.
 - `pnpm test`, `pnpm typecheck`, `pnpm lint`, `pnpm format`, `pnpm dev`.
 
 ## Conventions

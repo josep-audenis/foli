@@ -9,6 +9,10 @@ pnpm install
 pnpm dev        # playground at http://localhost:5173
 ```
 
+`pnpm install` also installs a git pre-push hook that runs `pnpm check` on the working tree
+(uncommitted edits count). There is no GitHub CI. Skip once with `git push --no-verify`. The hook
+is not installed when `core.hooksPath` is set or a foreign `pre-push` hook exists.
+
 ## Commands
 
 | Command                         | What it does                                       |
@@ -18,7 +22,7 @@ pnpm dev        # playground at http://localhost:5173
 | `pnpm typecheck`                | `tsc --noEmit` in every workspace project          |
 | `pnpm lint` / `pnpm format`     | Biome check / auto-fix                             |
 | `pnpm build`                    | Build packages to `dist/` and the playground       |
-| `pnpm check`                    | Everything CI runs                                 |
+| `pnpm check`                    | lint + typecheck + test + build; the pre-push hook |
 
 ## Rules
 

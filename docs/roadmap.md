@@ -35,7 +35,7 @@ Status values: `Ready` (dependencies met, nobody on it) · `In progress` · `In 
    and unblock dependents.
 
 **Shared root files** (`package.json`, `pnpm-lock.yaml`, `vitest.config.ts`, `biome.json`,
-`tsconfig.base.json`, CI) collide between parallel branches:
+`tsconfig.base.json`, `scripts/`) collide between parallel branches:
 
 - Put dependencies in the package that uses them (`packages/core` devDependencies), not the root,
   unless the tool is repo-wide.
@@ -109,7 +109,7 @@ Phases 1 and 2 can run in parallel: the model does not depend on how text is ren
 
 ## Phase 0 — Foundation ✅
 
-- [x] pnpm monorepo, TypeScript strict, Biome, Vitest, CI, graphify.
+- [x] pnpm monorepo, TypeScript strict, Biome, Vitest, CI (since replaced by a local pre-push hook), graphify.
 - [x] ADR-0001 (superseded), ADR-0002 (own engine), architecture, document model, pagination design.
 - [x] `@foli/core`: `FoliDocument` envelope, schema v1 (paragraph, heading, text, hardBreak;
   bold/italic/underline/strike) with strict validation and error paths.
@@ -194,7 +194,7 @@ serialize timings for 1/10/50/100-page fixtures recorded in `docs/benchmarks.md`
 
 Acceptance evidence: `model.property.test.ts` (5 properties × 10,000 runs);
 `pnpm --filter @foli/core coverage` (100% lines of the model sources in `src/model/`, threshold 95%); v1 fixtures in
-`document.test.ts` load unchanged; timings in [benchmarks.md](benchmarks.md). Not in CI yet:
+`document.test.ts` load unchanged; timings in [benchmarks.md](benchmarks.md). Not in `pnpm check` yet:
 coverage and benchmarks run from `@foli/core` scripts (root config belongs to Phase 1).
 
 ## Phase 3 — Transactions, history, commands · L
