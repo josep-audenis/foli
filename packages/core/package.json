@@ -20,5 +20,9 @@
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "devDependencies": {
+    "@vitest/coverage-v8": "^5.1.0",
+    "fast-check": "^4.10.2"
   }
 }
