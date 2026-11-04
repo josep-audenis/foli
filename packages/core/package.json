@@ -22,7 +22,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "coverage": "vitest run --root ../.. --coverage.enabled --coverage.provider=v8 --coverage.include=packages/core/src/model/** --coverage.exclude=**/*.test.ts --coverage.thresholds.lines=95 packages/core",
+    "coverage": "vitest run --root ../.. --coverage.enabled --coverage.provider=v8 --coverage.include=packages/core/src/model/** --coverage.exclude=**/*.test.ts --coverage.exclude=**/*.bench.ts --coverage.thresholds.lines=95 packages/core",
     "bench": "vitest bench --run --root ../.. --reporter=verbose packages/core"
   },
   "devDependencies": {

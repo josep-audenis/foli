@@ -293,6 +293,11 @@ describe("Slice and replace", () => {
     expect(sample.replace(0, 0, new Slice(Fragment.from(p(t("new"))), 0, 0)).childCount).toBe(3);
   });
 
+  it("rejects reversed ranges", () => {
+    expect(() => sample.slice(6, 2)).toThrow(RangeError);
+    expect(() => sample.replace(6, 2, Slice.empty)).toThrow(RangeError);
+  });
+
   it("throws ReplaceError for replaces the schema forbids", () => {
     const deep = new Slice(Fragment.from(p(t("x"))), 1, 1);
     expect(() => sample.replace(0, 0, deep)).toThrow(ReplaceError); // deeper than position

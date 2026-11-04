@@ -61,7 +61,7 @@ Input may be loose; output is canonical, so equal documents serialize to identic
 Marks: `bold`, `italic`, `underline`, `strike` (no attributes; each at most once per node).
 Marks are allowed on the inline children of `paragraph` and `heading`, and nowhere else.
 Phase 2 relaxed one v1 rule: `hardBreak` may carry marks (as in other ProseMirror-style models),
-so formatting continues across a line break. Every document valid before still loads unchanged.
+so formatting continues across a line break. Every document valid before still loads (normalized, see above).
 
 v1 is defined in `packages/core/src/schema.ts` through the same spec API extensions will use:
 

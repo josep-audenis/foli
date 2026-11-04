@@ -70,6 +70,8 @@ export function parseContent(value: unknown, path = "content"): Node {
   if (doc.type !== schema.topNodeType) {
     throw new FoliDocumentError(`${path}: root node must be of type "doc"`);
   }
+  // The root has no parent to check its marks against.
+  if (doc.marks.length) throw new FoliDocumentError(`${path}.marks: doc cannot have marks`);
   return doc;
 }
 

@@ -141,6 +141,7 @@ export class Node {
 
   /** The content between two positions as a slice, open as deep as the positions are. */
   slice(from: number, to = this.content.size): Slice {
+    if (from > to) throw new RangeError(`Invalid range ${from}..${to}`);
     if (from === to) return Slice.empty;
     const $from = this.resolve(from);
     const $to = this.resolve(to);
@@ -155,6 +156,7 @@ export class Node {
    * the result would break the schema (the original node is untouched either way).
    */
   replace(from: number, to: number, slice: Slice): Node {
+    if (from > to) throw new RangeError(`Invalid range ${from}..${to}`);
     return replace(this.resolve(from), this.resolve(to), slice);
   }
 

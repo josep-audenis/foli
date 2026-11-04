@@ -175,13 +175,13 @@ serialize timings for 1/10/50/100-page fixtures recorded in `docs/benchmarks.md`
   immutable `Mark`, `Node`, `Fragment`; schema v1 defined through the spec API; strict JSON in
   with normalization, canonical JSON out; `parseDocument` on the schema.
 - [x] 2.3 Integer positions: `ResolvedPos`, `nodeAt`, `nodesBetween`, `textBetween`.
-- [x] 2.4 `Slice` (open start/end), `Node.slice`, `Node.replace`, `canReplace`.
+- [x] 2.4 `Slice` (open start/end), `Node.slice`, `Node.replace` (`canReplace` moves to Phase 3).
 - [x] 2.5 Property tests (≥10k runs), ≥95% line coverage of the model, benchmarks in
   `docs/benchmarks.md`.
 - [x] 2.6 Docs match the code; status `In review`.
 
 Acceptance evidence: `model.property.test.ts` (5 properties × 10,000 runs);
-`pnpm --filter @foli/core coverage` (100% lines of `src/model/`, threshold 95%); v1 fixtures in
+`pnpm --filter @foli/core coverage` (100% lines of the model sources in `src/model/`, threshold 95%); v1 fixtures in
 `document.test.ts` load unchanged; timings in [benchmarks.md](benchmarks.md). Not in CI yet:
 coverage and benchmarks run from `@foli/core` scripts (root config belongs to Phase 1).
 

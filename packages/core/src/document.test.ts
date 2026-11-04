@@ -77,6 +77,10 @@ describe("parseDocument", () => {
     ["non-object", 42],
     ["unknown version", { ...createDocument(), schemaVersion: 99 }],
     ["non-doc root", withContent({ type: "paragraph" })],
+    [
+      "marks on doc",
+      withContent({ type: "doc", marks: [{ type: "bold" }], content: [{ type: "paragraph" }] }),
+    ],
     ["empty doc", withContent({ type: "doc", content: [] })],
     ["unknown block type", withBlock({ type: "bulletList" })],
     ["text directly in doc", withBlock({ type: "text", text: "x" })],
