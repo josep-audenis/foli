@@ -251,6 +251,7 @@ test.describe("E3 IME composition (Chromium, CDP)", () => {
     await cdp.send("Input.insertText", { text: "亜" });
     const s = await state(page);
     expect(s.paras[para]).toBe(`${text.slice(0, split - 3)}亜${text.slice(split + 3)}`);
+    expect(s.sel.head).toEqual({ p: para, o: split - 2 });
     await expectLayoutConsistent(page);
     await page.keyboard.press("ControlOrMeta+z");
     expect((await state(page)).paras[para]).toBe(text);

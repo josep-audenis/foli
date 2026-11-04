@@ -42,14 +42,15 @@ Stability: 3 consecutive runs × 3 repetitions, 69/69 tests passed each run with
 
 \* Only after a fix. See finding 2.
 
-Every test also checks layout consistency:
+Every test that edits also checks layout consistency:
 
 - No page overflows its body.
 - Every fragment renders exactly the number of lines measured for it.
 
 **E7: performance, 50-page document (55 pages).** Each number is synchronous main-thread time for
-layout, a full DOM re-render and the selection write-back. Paint is excluded. Runs are serial, 20
-keystrokes on page 1.
+layout, a full DOM re-render and the selection write-back. Paint is excluded. Recorded with `--workers=1`, 20
+keystrokes on page 1. Numbers vary between runs (a later run measured WebKit at 486 ms initial and
+43 ms max), so treat them as indicative.
 
 | Browser  | Initial layout | Keystroke median | Keystroke max |
 | -------- | -------------- | ---------------- | ------------- |
@@ -78,12 +79,12 @@ keystroke cost is mostly the full re-render.
    composition, then rebuilding the model from fragments in DOM order, produced correct text,
    caret and undo. That includes composition replacing a selection across pages. Paragraph ids in
    the DOM are pre-edit indices and must be remapped after merges.
-5. **Native copy would split paragraphs.** The browser serializes two fragments as two
+5. **Native copy is expected to split paragraphs (not verified).** The browser serializes two fragments as two
    paragraphs, so copy and cut must come from the model. The spike does this, but it is not yet
    covered by a test.
 6. **Measurement is fast enough, but WebKit's is slow.** Initial layout of 55 pages takes 382 ms
-   in WebKit, against 46–71 ms in the other engines. Full re-render per keystroke goes beyond one
-   frame in Chromium and WebKit at 50 pages. **Incremental rendering is required** (already
+   in WebKit, against 46–71 ms in the other engines. Full re-render per keystroke exceeds one frame
+   (16.7 ms) at 50 pages: the median in WebKit, the worst case in Chromium. **Incremental rendering is required** (already
    planned for Phase 5). Measurement may need a cheaper first pass in WebKit.
 
 ## Not yet covered (manual)
