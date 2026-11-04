@@ -1,7 +1,9 @@
 # ADR-0003: Rendering and input approach
 
-- **Status:** Proposed. Automated evidence is complete. It becomes Accepted (gate G1) once the
-  manual checks below are recorded.
+- **Status:** Accepted provisionally (2026-11-04). Automated evidence is complete; manual checks
+  are partial (see "Manual results"). The untested items are accepted risks: the checks that do not
+  need pages must pass on the Phase 4 view (gate G3), the page-break versions on the Phase 5 view
+  (gate G4).
 - **Date:** 2026-11-04
 - **Evidence:** `spikes/two-page` (spike) and `spikes/two-page/e2e/experiments.spec.ts`
 
@@ -87,20 +89,41 @@ keystroke cost is mostly the full re-render.
    (16.7 ms) at 50 pages: the median in WebKit, the worst case in Chromium. **Incremental rendering is required** (already
    planned for Phase 5). Measurement may need a cheaper first pass in WebKit.
 
-## Not yet covered (manual)
+## Manual results (partial)
 
-Manual checklist: [`spikes/two-page/README.md`](../../spikes/two-page/README.md).
+Manual checklist: [`spikes/two-page/README.md`](../../spikes/two-page/README.md). Run by the
+project owner on Windows 11, 2026-11-04:
 
-- **E3 IME on real platforms:** Windows (Japanese, Chinese, Korean IME), macOS Safari, Android
-  Gboard, iOS. Also dead keys.
-- **E5 spellcheck and autocorrect:** `insertReplacementText` cannot be triggered by automation.
-- **E6 screen readers:** NVDA, VoiceOver. Is a split paragraph announced as one or two?
+| Check                                                                                        | Result |
+| -------------------------------------------------------------------------------------------- | ------ |
+| Typing at the page break, selection across pages + replace + undo, ArrowDown across pages    | Pass   |
+| E5 spellcheck: replacing a misspelling on page 2 via the context menu (browser not recorded) | Pass   |
+
+**Not tested (accepted risks, carried into Phase 4):**
+
+- **E3 IME on real platforms:** no manual IME check yet (only the automated Chromium CDP
+  emulation passed). Windows Japanese/Chinese/Korean IME, Firefox, macOS Safari, Android Gboard,
+  iOS. Also dead keys.
+- **E6 screen readers:** NVDA, VoiceOver. Whether a split paragraph is announced as one or two
+  is still unknown.
+- macOS and mobile autocorrect.
 - Also untested: justified text, inline formatting and mixed fonts, RTL, very long words, images.
 
-## Proposed decision
+Where they are re-run:
 
-**Option A: `contenteditable` with page fragments.** Every automated experiment passes in all
-three engines once the caret-affinity fix is in. No result so far points to option B or C.
+- **Gate G3 (Phase 4, unpaginated view):** real IME and dead keys (T4), and NVDA/VoiceOver
+  reading the editor.
+- **Gate G4 (Phase 5, pages):** the same checks across a page break: IME at a fragment edge, a
+  screen reader reading a split paragraph.
+
+Any check not run at its gate stays recorded here as an open risk. A failure at G4 that cannot be
+fixed at the fragment edge triggers the fallback below.
+
+## Decision
+
+**Option A: `contenteditable` with page fragments** (provisional). Every automated experiment
+passes in all three engines once the caret-affinity fix is in, and the manual checks run so far
+pass. No result so far points to option B or C.
 
 Consequences for Phases 4–5:
 
@@ -113,4 +136,5 @@ Consequences for Phases 4–5:
 - Incremental rendering and reflow are mandatory, not optional.
 
 **Fallback triggers:** move to option B if manual IME on Safari or Android, or the screen-reader
-checks, show failures that cannot be fixed at the fragment edge.
+checks, show failures that cannot be fixed at the fragment edge. If those checks are never run,
+the risk stays open and is listed in the release notes.
