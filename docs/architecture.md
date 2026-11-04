@@ -31,8 +31,8 @@ This document describes **what exists** and **what is decided**. Planned parts a
 
 | Subsystem           | Responsibility                                                                 | Status                                                 |
 | ------------------- | ------------------------------------------------------------------------------ | ------------------------------------------------------ |
-| Document model      | Schema, immutable tree, marks, positions, JSON, validation                     | Envelope + schema v1 validator ✅; model: Phase 2      |
-| Editing engine      | Steps, position mapping, selection, state, history, commands                   | Phase 3                                                |
+| Document model      | Schema, immutable tree, marks, positions, JSON, validation                     | ✅ (Phase 2)                                           |
+| Editing engine      | Steps, position mapping, selection, state, history, commands                   | ✅ headless (Phase 3)                                  |
 | View                | Render state to DOM, DOM ↔ model mapping, `beforeinput`, IME, clipboard, focus | Read-only renderer ✅; editing: Phase 4                |
 | Layout              | Measurement, line breaking, page flow, fragments, incremental reflow, print    | Phase 5 (inside `@foli/view` until the seam is proven) |
 | React integration   | Components, hooks, toolbar                                                     | Read-only `DocumentEditor` ✅; API: Phase 6            |
@@ -55,6 +55,44 @@ DOM event (beforeinput / keydown / composition / paste)
 The DOM is never parsed as the source of truth. The one exception is IME composition and
 Android input, where the browser must mutate the DOM; the view reads those changes back and
 converts them into steps immediately.
+
+## Editing engine (`@foli/core`)
+
+Implemented headless in Phase 3 (`packages/core/src/transform/`, `packages/core/src/state/`).
+The design follows prosemirror-transform, -state, -history and -commands (MIT); the code is
+Foli's own (see `THIRD_PARTY_NOTICES.md`).
+
+- **Steps** change the document atomically and are invertible: `ReplaceStep`, `AddMarkStep`,
+  `RemoveMarkStep` and `NodeMarkupStep`. `NodeMarkupStep` handles type and attribute changes that
+  keep inner positions; it replaces the planned `AttrStep`. A failing step returns a failed
+  `StepResult`; `Transform.step` throws `TransformError` and leaves the transform unchanged.
+- **Mapping**: each step has a `StepMap`. `Mapping` chains them, with association bias, deletion
+  detection, and mirrored maps that recover positions inside re-inserted content.
+- **Transform helpers**: replace/delete/insert/insertText, addMark/removeMark (exactly
+  invertible), split, join, setBlockType, setNodeMarkup.
+- **State**: an immutable `EditorState` holds the doc, selection, stored marks and plugin fields.
+  A `Transaction` adds selection tracking, stored marks and metadata (`addToHistory`, time).
+  Selections are `TextSelection` and `AllSelection`; `NodeSelection` waits for a block leaf node.
+- **Plugins** (internal API, used by history and keymaps): state fields, `filterTransaction`,
+  `appendTransaction`, `keymap`.
+- **History**: undo/redo of inverted steps.
+  - Changes are grouped by time (500 ms) and adjacency.
+  - Formatting and block-type changes get their own undo steps.
+  - The selection is restored on undo.
+  - Changes with `addToHistory: false` are rebased into the stored events.
+- **Commands** have the shape `(state, dispatch?) => boolean`:
+  - Editing: insertText, deleteBackward/Forward (by grapheme or word), deleteSelection,
+    joinBackward/Forward, insertHardBreak.
+  - splitBlock: Enter at the end of a heading starts a paragraph, and formatting carries over.
+  - Formatting and selection: toggleMark, setBlockType, selectAll, undo, redo, plus `isMarkActive`.
+  - `baseKeymap()` binds them to key names (`Mod-b`, `Enter`…).
+- **Headless editor**: `createEditor({ document })` returns `commands.*`, `run`, `can`,
+  `handleKey`, `select`, `getDocument`, `setDocument` and `subscribe`.
+
+Known limits:
+- No general slice fitting (comes with paste in Phase 4).
+- Splits one level only (lists, Phase 7).
+- History rebasing is quadratic in history depth, which is capped at 100 events.
 
 ## Packages
 

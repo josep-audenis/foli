@@ -224,17 +224,18 @@ doc and selection.
 
 ### Tasks
 
-- [ ] Claim phase, branch `phase-3/transactions`
-- [ ] `StepMap` / `Mapping`: association bias, deletion detection, mirroring with recovery
-- [ ] Steps: `ReplaceStep`, `AddMarkStep`, `RemoveMarkStep`, `NodeMarkupStep` (covers `AttrStep`:
+- [x] Claim phase, branch `phase-3/transactions`
+- [x] `StepMap` / `Mapping`: association bias, deletion detection, mirroring with recovery
+- [x] Steps: `ReplaceStep`, `AddMarkStep`, `RemoveMarkStep`, `NodeMarkupStep` (covers `AttrStep`:
   type/attribute changes that keep inner positions)
-- [ ] Transform helpers: replace/delete/insertText, split, join, setBlockType, add/remove mark
+- [x] Transform helpers: replace/delete/insertText, split, join, setBlockType, add/remove mark
   (exactly invertible). General slice fitting (closed blocks into a textblock) moves to Phase 4 paste.
-- [ ] `TextSelection`, `AllSelection`, `EditorState`, `Transaction`, plugins (state fields,
+- [x] `TextSelection`, `AllSelection`, `EditorState`, `Transaction`, plugins (state fields,
   filter/append, keymaps). `NodeSelection` waits for the first block leaf node (Phase 7).
-- [ ] History: grouping by time and adjacency, selection restore, rebase over unrecorded changes
-- [ ] Commands, base keymap, headless `createEditor`
-- [ ] Property tests and headless T1/T2 (gate G2); docs updated
+- [x] History: grouping by time and adjacency, selection restore, rebase over unrecorded changes
+- [x] Commands, base keymap, headless `createEditor`
+- [x] Property tests (10k runs each: step inversion, map round-trips, schema rejection, undo/redo of
+  random command sequences with a no-op guard) and headless T1/T2 (gate G2); docs updated
 
 ## Phase 4 — Editor view (`@foli/view`) · XL
 

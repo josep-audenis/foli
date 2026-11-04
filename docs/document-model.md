@@ -2,8 +2,8 @@
 
 > Status: envelope, schema v1 and the document model (schema from specs, immutable nodes,
 > positions, slices, JSON in/out) are implemented in `@foli/core` (`packages/core/src/document.ts`,
-> `packages/core/src/schema.ts`, `packages/core/src/model/`). Steps, transactions and history are
-> Phase 3 of the [roadmap](roadmap.md).
+> `packages/core/src/schema.ts`, `packages/core/src/model/`). Steps, transactions, history and
+> commands (Phase 3) are described in [architecture.md](architecture.md#editing-engine-folicore).
 
 ## Canonical form
 
@@ -127,7 +127,7 @@ a non-leaf node counts 1, each UTF-16 code unit of text counts 1, a leaf node co
 `indexAfter(d)`, `start(d)`, `end(d)`, `before(d)`, `after(d)`, `parentOffset`, `textOffset`,
 `nodeBefore`, `nodeAfter`, `posAtIndex`, `sharedDepth`, `sameParent` (negative depths count up
 from the parent). `doc.nodeAt(pos)`, `nodesBetween`, `descendants` and `textBetween` walk by
-position. Resolution is not cached yet; Phase 3 adds a cache if profiling shows a need.
+position. Resolution is not cached; add a cache if profiling shows a need.
 
 ### Slices and replace
 
@@ -136,8 +136,9 @@ chain are cut open. `doc.slice(from, to)` returns one (`slice.size === to - from
 `doc.replace(from, to, slice)` inserts it, joining open nodes with the nodes cut at `from` and
 `to`, and validates every rebuilt node (throws `ReplaceError` otherwise). Both ends must sit at
 consistent depths (`$from.depth - openStart === $to.depth - openEnd`); fitting arbitrary slices
-(closing and opening nodes as needed) is Phase 3 transform work. `ReplaceStep` builds on
-`replace`.
+(closing and opening nodes as needed) is not implemented: Phase 3 transforms only use
+structurally compatible slices, and general fitting arrives with paste in Phase 4.
+`ReplaceStep` builds on `replace`.
 
 ### JSON in/out
 
@@ -201,4 +202,5 @@ Each added only when a feature needs it, with a migration:
 - Generate a JSON Schema from the TypeScript schema so Rust and other consumers validate the
   same format (Phase 10).
 - Positions count UTF-16 code units, so a position can fall between the two halves of a
-  surrogate pair. Phase 3/4 commands must move by grapheme; the model does not prevent it.
+  surrogate pair. Deletion commands move by grapheme (`Intl.Segmenter`); the view (Phase 4)
+  must do the same for caret movement. The model does not prevent it.

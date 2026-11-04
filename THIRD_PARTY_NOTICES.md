@@ -37,3 +37,23 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 ```
+
+## prosemirror-transform, prosemirror-state, prosemirror-history, prosemirror-commands
+
+- **Source:** https://github.com/ProseMirror (the `prosemirror-transform`, `prosemirror-state`,
+  `prosemirror-history` and `prosemirror-commands` repositories), studied as published in their
+  1.x lines; no specific commit was copied from.
+- **License:** MIT, same notice and copyright holders as prosemirror-model above.
+- **Used in:** `packages/core/src/transform/` (`stepmap.ts`, `steps.ts`, `transform.ts`) and
+  `packages/core/src/state/` (`selection.ts`, `state.ts`, `history.ts`, `commands.ts`).
+- **What:** the designs, written independently in Foli's own data structures:
+  - Step maps with mirroring and position recovery, and replace/mark steps with exact inversion.
+  - The addMark/removeMark range-collection algorithm.
+  - Transaction selection mapping, plugin state fields with filter/append hooks.
+  - Undo history built from inverted steps.
+  - The `(state, dispatch?) => boolean` command signature.
+
+  No file was copied verbatim. Foli differs in several ways:
+  - `NodeMarkupStep` instead of `AttrStep`/`ReplaceAroundStep`.
+  - History rebasing is per-event and eager, not ProseMirror's branch/item structure.
+  - Deletion is grapheme- and word-aware via `Intl.Segmenter`.

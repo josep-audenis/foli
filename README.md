@@ -28,12 +28,12 @@ Peer dependencies: `react`, `react-dom`.
 
 ## Packages
 
-| Package                              | Purpose                                                                                 |
-| ------------------------------------ | --------------------------------------------------------------------------------------- |
-| [`@foli/core`](packages/core)        | Document model: schema, immutable nodes, positions, slices (transactions next). No DOM. |
-| [`@foli/view`](packages/view)        | Framework-agnostic DOM view (read-only rendering so far).                               |
-| [`@foli/react`](packages/react)      | React components and default stylesheet.                                                |
-| [`apps/playground`](apps/playground) | Demo app; consumes the packages like a third party would.                               |
+| Package                              | Purpose                                                                                      |
+| ------------------------------------ | -------------------------------------------------------------------------------------------- |
+| [`@foli/core`](packages/core)        | Document model and headless editing engine: schema, nodes, steps, history, commands. No DOM. |
+| [`@foli/view`](packages/view)        | Framework-agnostic DOM view (read-only rendering so far).                                    |
+| [`@foli/react`](packages/react)      | React components and default stylesheet.                                                     |
+| [`apps/playground`](apps/playground) | Demo app; consumes the packages like a third party would.                                    |
 
 ## Documentation
 
