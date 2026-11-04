@@ -1,0 +1,49 @@
+/* Foli default theme. Override any token on .foli-canvas or an ancestor. */
+.foli-canvas {
+  --foli-canvas-background: #f3f3f1;
+  --foli-page-background: #ffffff;
+  --foli-page-shadow: 0 1px 2px rgb(0 0 0 / 0.08), 0 2px 8px rgb(0 0 0 / 0.06);
+  --foli-border-color: #e2e2df;
+  --foli-text-color: #1d1d1b;
+  --foli-selection-color: rgb(35 103 220 / 0.22);
+  --foli-font-family: Georgia, "Times New Roman", serif;
+  --foli-font-size: 11pt;
+  --foli-line-height: 1.5;
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+  padding: 32px 16px;
+  background: var(--foli-canvas-background);
+}
+
+.foli-page {
+  box-sizing: border-box;
+  background: var(--foli-page-background);
+  box-shadow: var(--foli-page-shadow);
+  color: var(--foli-text-color);
+  font-family: var(--foli-font-family);
+  font-size: var(--foli-font-size);
+  line-height: var(--foli-line-height);
+}
+
+.foli-content .ProseMirror {
+  outline: none;
+  min-height: 100%;
+  white-space: pre-wrap;
+}
+
+.foli-content .ProseMirror ::selection {
+  background: var(--foli-selection-color);
+}
+
+@media print {
+  .foli-canvas {
+    padding: 0;
+    background: none;
+  }
+  .foli-page {
+    box-shadow: none;
+  }
+}

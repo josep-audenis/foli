@@ -1,0 +1,29 @@
+body {
+  margin: 0;
+  font-family: system-ui, sans-serif;
+  background: #f3f3f1;
+  color: #1d1d1b;
+}
+
+.playground-bar {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 10px 16px;
+  background: #fff;
+  border-bottom: 1px solid #e2e2df;
+  font-size: 14px;
+}
+
+.playground-hint {
+  color: #6b6b66;
+  flex: 1;
+}
+
+.playground [role="alert"] {
+  margin: 16px;
+  color: #a1260d;
+}
