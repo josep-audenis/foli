@@ -93,6 +93,28 @@ describe("htmlToDoc rules", () => {
     ]);
   });
 
+  it("keeps trailing non-breaking spaces and spaces in pre", () => {
+    expect(parsed("<p>a&nbsp;</p><pre>b  </pre>")).toEqual([p(t("a ")), p(t("b  "))]);
+  });
+
+  it("drops hidden text", () => {
+    expect(
+      parsed(
+        '<p>a<span style="display:none">X</span><span hidden>Y</span><span style="mso-hide:all">Z</span></p>',
+      ),
+    ).toEqual([p(t("a"))]);
+  });
+
+  it("keeps an inherited underline that a child cannot remove in CSS", () => {
+    expect(parsed('<u><span style="text-decoration:none">x</span></u>')).toEqual([
+      p(t("x", "underline")),
+    ]);
+  });
+
+  it("reads a <br> between blocks as an empty line, whatever the source formatting", () => {
+    expect(parsed("<p>a</p>\n<br>\n<p>b</p>")).toEqual([p(t("a")), p(), p(t("b"))]);
+  });
+
   it("returns null when nothing readable is left", () => {
     expect(htmlToDoc("<script>x</script><img src=x>")).toBeNull();
   });
@@ -149,25 +171,64 @@ describe("EditorView clipboard", () => {
     host.dispatchEvent(event);
     expect(event.defaultPrevented).toBe(true);
     expect(store.get("text/plain")).toBe("bcd\ne");
-    expect(store.get("text/html")).toBe("<p>b<strong>cd</strong></p><h2>e</h2>");
-    expect(JSON.parse(store.get(FOLI_MIME) ?? "")).toEqual(
-      doc(p(t("b"), t("cd", "bold")), h(2, t("e"))),
+    expect(store.get("text/html")).toBe(
+      '<p style="white-space: pre-wrap;">b<strong>cd</strong></p><h2 style="white-space: pre-wrap;">e</h2>',
     );
+    expect(JSON.parse(store.get(FOLI_MIME) ?? "")).toEqual({
+      open: false,
+      content: doc(p(t("b"), t("cd", "bold")), h(2, t("e"))),
+    });
   });
 
-  it("cut copies and deletes as one step", () => {
-    const { host, editor } = mount(doc(p(t("abc"))));
-    editor.select(2, 3);
+  /** Copies `from..to` of `content` and returns the clipboard types. */
+  function copy(content: DocJSON, from: number, to: number) {
+    const { host, editor } = mount(content);
+    editor.select(from, to);
+    const { event, store } = clipboardEvent("copy");
+    host.dispatchEvent(event);
+    view?.destroy();
+    view?.host.remove();
+    view = undefined;
+    return Object.fromEntries(store);
+  }
+
+  it("keeps the target block type when pasting text copied from inside a heading", () => {
+    const copied = copy(doc(h(1, t("Big title"))), 1, 4); // "Big"
+    expect(JSON.parse(copied[FOLI_MIME] ?? "").open).toBe(true);
+    const { editor, view: target } = mount(doc(p(t("a")), p()));
+    editor.select(4);
+    target.paste(data(copied));
+    expect(blocks(editor)).toEqual([p(t("a")), p(t("Big"))]);
+  });
+
+  it("keeps repeated and leading spaces through the HTML copy", () => {
+    const copied = copy(doc(h(3, t("  two  spaces"))), 1, 14);
+    const { editor, view: target } = mount(doc(p(t("x"))));
+    editor.select(2);
+    target.paste(data({ "text/html": copied["text/html"] ?? "" }));
+    expect(blocks(editor)).toEqual([p(t("x  two  spaces"))]);
+  });
+
+  it("cut copies and deletes as its own undo step", () => {
+    const { host, editor } = mount(doc(p(t("ab"))));
+    editor.select(2);
+    editor.commands.insertText("xyz"); // typing just before the cut
+    editor.select(3, 5);
     const { event, store } = clipboardEvent("cut");
     host.dispatchEvent(event);
-    expect(store.get("text/plain")).toBe("b");
-    expect(blocks(editor)).toEqual([p(t("ac"))]);
+    expect(store.get("text/plain")).toBe("yz");
+    expect(blocks(editor)).toEqual([p(t("axb"))]);
+    editor.commands.undo();
+    expect(blocks(editor)).toEqual([p(t("axyzb"))]);
   });
 
   it("pastes Foli JSON first and joins its open ends with the text around the caret", () => {
     const { editor, view } = mount(doc(p(t("xy"))));
     editor.select(2);
-    const json = JSON.stringify(doc(p(t("b"), t("cd", "bold")), h(2, t("e"))));
+    const json = JSON.stringify({
+      open: false,
+      content: doc(p(t("b"), t("cd", "bold")), h(2, t("e"))),
+    });
     expect(
       view.paste(data({ [FOLI_MIME]: json, "text/html": "<p>no</p>", "text/plain": "no" })),
     ).toBe(true);
@@ -200,6 +261,37 @@ describe("EditorView clipboard", () => {
     view.paste(data({ "text/html": "<h2>Title</h2><p>text</p>" }));
     expect(blocks(editor)).toEqual([p(t("a")), h(2, t("Title")), p(t("text")), p(t("b"))]);
     expect(editor.state.selection.head).toBe(15); // end of "text"
+  });
+
+  it("keeps an empty heading a heading when pasting plain text or inline HTML", () => {
+    const { editor, view } = mount(doc(h(1), p(t("b"))));
+    editor.select(1);
+    view.paste(data({ "text/plain": "Title" }));
+    expect(blocks(editor)).toEqual([h(1, t("Title")), p(t("b"))]);
+    view.paste(data({ "text/html": "<meta charset='utf-8'><span>&nbsp;and more</span>" }));
+    expect(blocks(editor)).toEqual([h(1, t("Title and more")), p(t("b"))]);
+  });
+
+  it("pastes plain text on Ctrl/Cmd+Shift+V", () => {
+    const { host, editor } = mount(doc(p()));
+    const mod = { ctrlKey: true, cancelable: true }; // Mod in jsdom
+    host.dispatchEvent(new KeyboardEvent("keydown", { key: "V", shiftKey: true, ...mod }));
+    const event = new Event("paste", { cancelable: true }) as ClipboardEvent;
+    Object.defineProperty(event, "clipboardData", {
+      value: data({ "text/html": "<b>bold</b>", "text/plain": "bold" }),
+    });
+    host.dispatchEvent(event);
+    expect(blocks(editor)).toEqual([p(t("bold"))]);
+  });
+
+  it("ignores a paste during a composition", () => {
+    const { host, editor } = mount(doc(p()));
+    host.dispatchEvent(new CompositionEvent("compositionstart"));
+    const event = new Event("paste", { cancelable: true }) as ClipboardEvent;
+    Object.defineProperty(event, "clipboardData", { value: data({ "text/plain": "x" }) });
+    host.dispatchEvent(event);
+    expect(event.defaultPrevented).toBe(true);
+    expect(blocks(editor)).toEqual([p()]);
   });
 
   it("pastes over a select-all", () => {

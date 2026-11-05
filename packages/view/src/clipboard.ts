@@ -10,8 +10,22 @@ import {
 } from "@foli/core";
 import { renderBlock } from "./render.js";
 
-/** Clipboard type for Foli content: the copied blocks as `DocJSON`, read back first on paste. */
+/**
+ * Clipboard type for Foli content, read back first on paste: `{ open, content }`, the copied
+ * blocks as `DocJSON` and whether they were cut out of one block (see `Pasted.open`).
+ */
 export const FOLI_MIME = "application/x-foli+json";
+
+/** Validated clipboard content. */
+export interface Pasted {
+  doc: ModelNode;
+  /**
+   * True when no block boundary was copied (text from inside one block, plain text, inline
+   * HTML): the content always joins the block it is pasted into, which keeps its type. Closed
+   * content (whole blocks) replaces an empty block instead.
+   */
+  open: boolean;
+}
 
 export interface ClipboardContent {
   text: string;
@@ -35,38 +49,46 @@ export function serializeRange(
   const container = ownerDocument.createElement("div");
   // Built with createElement/textContent (render.ts); reading innerHTML only serializes it.
   blocks.forEach((block) => {
-    container.append(renderBlock(block, ownerDocument).dom);
+    const { dom } = renderBlock(block, ownerDocument);
+    dom.style.whiteSpace = "pre-wrap"; // keep repeated and leading spaces in other apps
+    container.append(dom);
   });
   return {
     text: doc.textBetween(from, to, "\n", "\n"),
     html: container.innerHTML,
-    json: JSON.stringify(blocks.toJSON()),
+    json: JSON.stringify({ open: $from.sharedDepth(to) > 0, content: blocks.toJSON() }),
   };
 }
 
 /**
- * The content of clipboard data as a validated document, or null. Priority: Foli JSON, then
- * HTML, then plain text. Every format is validated by the schema (`parseContent`); a format
- * that fails falls through to the next. `marks` are given to plain text (the marks typing would
- * get at the insertion point).
+ * The content of clipboard data, validated, or null. Priority: Foli JSON, then HTML, then plain
+ * text. Every format is validated by the schema (`parseContent`); a format that fails falls
+ * through to the next. `marks` are given to plain text (the marks typing would get at the
+ * insertion point).
  */
 export function docFromClipboard(
   data: Pick<DataTransfer, "getData">,
   marks: readonly MarkJSON[] = [],
-): ModelNode | null {
+): Pasted | null {
   const json = data.getData(FOLI_MIME);
   const html = data.getData("text/html");
   const text = data.getData("text/plain");
-  const candidates: (() => DocJSON | null)[] = [
-    () => (json ? (JSON.parse(json) as DocJSON) : null),
-    () => (html ? htmlToDoc(html) : null),
-    () => (text ? textToDoc(text, marks) : null),
+  const candidates: (() => { content: unknown; open: boolean } | null)[] = [
+    () => {
+      if (!json) return null;
+      const value: unknown = JSON.parse(json);
+      if (typeof value !== "object" || value === null) return null;
+      const { open, content } = value as { open?: unknown; content?: unknown };
+      return { content, open: open === true };
+    },
+    () => (html ? readHTML(html) : null),
+    () => (text ? { content: textToDoc(text, marks), open: true } : null),
   ];
   for (const candidate of candidates) {
     try {
-      const content = candidate();
-      if (!content) continue;
-      return parseContent(content);
+      const found = candidate();
+      if (!found) continue;
+      return { doc: parseContent(found.content), open: found.open };
     } catch {
       // Invalid or unreadable in this format: try the next one.
     }
@@ -179,17 +201,17 @@ function marksOf(element: Element, inherited: ReadonlySet<MarkName>): Set<MarkNa
   const decoration = `${style.textDecorationLine} ${style.textDecoration}`;
   if (decoration.includes("underline")) marks.add("underline");
   if (decoration.includes("line-through")) marks.add("strike");
-  if (/^\s*none\b/.test(style.textDecorationLine || style.textDecoration)) {
-    marks.delete("underline");
-    marks.delete("strike");
-  }
+  // `text-decoration: none` on a child does not remove a parent's line in CSS: keep it.
   return marks;
 }
 
-/** Word's list bullets and empty-paragraph fillers. */
-function isOfficeNoise(element: Element): boolean {
+/** Hidden text, Word's list bullets and empty-paragraph fillers. */
+function isNoise(element: Element): boolean {
   const style = element.getAttribute("style") ?? "";
-  if (/mso-list:\s*ignore/i.test(style)) return true;
+  if (/mso-list:\s*ignore|mso-hide:\s*all/i.test(style)) return true;
+  if ((element as HTMLElement).style?.display === "none" || element.hasAttribute("hidden")) {
+    return true;
+  }
   return element.localName === "o:p" && !element.textContent?.replace(/[\s ]/g, "");
 }
 
@@ -198,17 +220,25 @@ function isOfficeNoise(element: Element): boolean {
  * (links keep their text). The HTML is parsed into an inert document and never inserted.
  */
 export function htmlToDoc(html: string): DocJSON | null {
+  return readHTML(html)?.content ?? null;
+}
+
+/** `htmlToDoc`, plus whether the HTML had no block elements (`Pasted.open`). */
+function readHTML(html: string): { content: DocJSON; open: boolean } | null {
   const parsed = new DOMParser().parseFromString(html, "text/html");
   const blocks: BlockJSON[] = [];
   let inline: InlineJSON[] | null = null;
   let blockType: BlockJSON["type"] = "paragraph";
   let level = 1;
+  let blockPre = false;
+  let sawBlock = false;
   let afterSpace = true; // collapse leading and repeated whitespace like HTML layout does
 
-  const open = (type: BlockJSON["type"], headingLevel = 1) => {
+  const open = (type: BlockJSON["type"], headingLevel = 1, pre = false) => {
     inline = [];
     blockType = type;
     level = headingLevel;
+    blockPre = pre;
     afterSpace = true;
   };
   const close = (keepEmpty: boolean) => {
@@ -216,7 +246,11 @@ export function htmlToDoc(html: string): DocJSON | null {
     const last = inline[inline.length - 1];
     if (last?.type === "hardBreak") inline.pop(); // a trailing <br> adds no line in HTML
     const tail = inline[inline.length - 1];
-    if (tail?.type === "text") tail.text = tail.text.replace(/ +$/, "");
+    if (tail?.type === "text" && !blockPre) tail.text = tail.text.replace(/ +$/, "");
+    // Non-breaking spaces survive the trimming above, then become ordinary spaces.
+    for (const node of inline) {
+      if (node.type === "text") node.text = node.text.replace(/\u00a0/g, " ");
+    }
     const content = inline.filter((node) => node.type !== "text" || node.text);
     if (content.length || keepEmpty) {
       blocks.push(
@@ -228,13 +262,14 @@ export function htmlToDoc(html: string): DocJSON | null {
     inline = null;
   };
   const addText = (raw: string, marks: ReadonlySet<MarkName>, pre: boolean) => {
-    if (!inline) open("paragraph");
+    // Source formatting between blocks ("</p>\n<br>\n<p>") is not content.
+    if (!inline && !pre && !/[^ \t\n\r\f]/.test(raw)) return;
+    if (!inline) open("paragraph", 1, pre);
     const lines = pre ? raw.replace(/\r\n?/g, "\n").split("\n") : [raw];
     lines.forEach((line, i) => {
       if (i > 0) addBreak();
       let text = pre ? line : line.replace(/[ \t\n\r\f]+/g, " ");
       if (!pre && afterSpace) text = text.replace(/^ /, "");
-      text = text.replace(/ /g, " ");
       if (!text) return;
       afterSpace = !pre && text.endsWith(" ");
       const markJSON = [...marks].map((type) => ({ type }));
@@ -267,7 +302,7 @@ export function htmlToDoc(html: string): DocJSON | null {
     if (node.nodeType !== 1) return false; // comments (Word's conditional comments), etc.
     const element = node as Element;
     const tag = element.localName;
-    if (SKIPPED_TAGS.has(tag) || isOfficeNoise(element)) return false;
+    if (SKIPPED_TAGS.has(tag) || isNoise(element)) return false;
     if (tag === "br") {
       // Chrome marks "the copied range ended with a line break" this way; it is not content.
       if (!element.classList.contains("Apple-interchange-newline")) addBreak();
@@ -282,9 +317,10 @@ export function htmlToDoc(html: string): DocJSON | null {
         hasBlock = walk(child, childMarks, childPre) || hasBlock;
       return hasBlock;
     }
+    sawBlock = true;
     close(false);
     const heading = /^h([1-6])$/.exec(tag);
-    open(heading ? "heading" : "paragraph", heading ? Number(heading[1]) : 1);
+    open(heading ? "heading" : "paragraph", heading ? Number(heading[1]) : 1, childPre);
     let hasBlock = false;
     for (const child of element.childNodes)
       hasBlock = walk(child, childMarks, childPre) || hasBlock;
@@ -295,5 +331,5 @@ export function htmlToDoc(html: string): DocJSON | null {
 
   walk(parsed.body, new Set(), false);
   close(false);
-  return blocks.length ? { type: "doc", content: blocks } : null;
+  return blocks.length ? { content: { type: "doc", content: blocks }, open: !sawBlock } : null;
 }

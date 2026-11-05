@@ -44,6 +44,8 @@ export class EditorView {
   /** Position before each block, parallel to `blocks`. */
   private starts: number[] = [];
   private composing = false;
+  /** Set by Ctrl/Cmd+Shift+V for the paste event it triggers. */
+  private plainPaste = false;
   /** Blocks whose DOM the browser changed: the next render rebuilds them. */
   private readonly dirty = new Set<BlockDesc>();
   /** DOM mutations not yet read back (kept while a composition is running). */
@@ -356,7 +358,10 @@ export class EditorView {
   private onKeyDown = (event: KeyboardEvent): void => {
     if (event.isComposing || this.composing) return;
     this.syncSelection();
-    if (this.editor.handleKey(keyName(event))) event.preventDefault();
+    const name = keyName(event);
+    // Ctrl/Cmd+Shift+V: the paste event that follows uses only the plain text.
+    this.plainPaste = name === "Mod-Shift-v";
+    if (this.editor.handleKey(name)) event.preventDefault();
   };
 
   /** Safety net: a DOM change that was not prevented is read back into the model. */
@@ -523,37 +528,48 @@ export class EditorView {
 
   private onCut = (event: ClipboardEvent): void => {
     this.onCopy(event);
-    if (event.defaultPrevented) this.run(deleteSelection);
+    if (!event.defaultPrevented) return;
+    // Its own undo step, not merged with the typing before it.
+    deleteSelection(this.state, (tr) => this.editor.dispatch(tr.setMeta(closeHistory, true)));
   };
 
   private onPaste = (event: ClipboardEvent): void => {
     if (!event.clipboardData) return;
     event.preventDefault();
+    const plain = this.plainPaste;
+    this.plainPaste = false;
+    // The browser owns the DOM during a composition; a model change now would be overwritten.
+    if (this.composing) return;
     this.syncSelection();
-    this.paste(event.clipboardData);
+    const data = event.clipboardData;
+    this.paste(
+      plain ? { getData: (type) => (type === "text/plain" ? data.getData(type) : "") } : data,
+    );
   };
 
   /**
-   * Replaces the selection with clipboard content (Foli JSON, else HTML, else plain text) as
-   * its own undo step. Into an empty textblock the pasted blocks go in whole (a pasted heading
-   * stays a heading); elsewhere the first and last pasted blocks join the text around the
-   * selection. Returns whether anything was inserted.
+   * Replaces the selection with clipboard content (Foli JSON, else HTML, else plain text). The
+   * paste starts a new undo step (typing right after it joins that step). Closed content (whole
+   * blocks) goes into an empty textblock whole, so a pasted heading stays a heading; open
+   * content, and anything pasted into a non-empty block, joins the text around the selection,
+   * so the target block keeps its type. Returns whether anything was inserted.
    */
   paste(data: Pick<DataTransfer, "getData">): boolean {
     const { state } = this;
     const marks = (state.storedMarks ?? marksAt(state.selection.$from)).map((m) => m.toJSON());
     const pasted = docFromClipboard(data, marks);
     // One empty block: nothing to paste.
-    if (!pasted || pasted.content.size <= 2) return false;
+    if (!pasted || pasted.doc.content.size <= 2) return false;
+    const { doc, open } = pasted;
     try {
       const tr = state.tr.deleteSelection();
       const $pos = tr.selection.$from;
-      if ($pos.depth === 1 && $pos.parent.isTextblock && !$pos.parent.content.size) {
+      if (!open && $pos.depth === 1 && $pos.parent.isTextblock && !$pos.parent.content.size) {
         const from = $pos.before();
-        tr.replace(from, $pos.after(), new Slice(pasted.content, 0, 0));
-        tr.setSelection(Selection.near(tr.doc.resolve(from + pasted.content.size), -1));
+        tr.replace(from, $pos.after(), new Slice(doc.content, 0, 0));
+        tr.setSelection(Selection.near(tr.doc.resolve(from + doc.content.size), -1));
       } else {
-        tr.replaceSelection(pasted.slice(1, pasted.content.size - 1));
+        tr.replaceSelection(doc.slice(1, doc.content.size - 1));
       }
       this.editor.dispatch(tr.setMeta(closeHistory, true));
       return true;

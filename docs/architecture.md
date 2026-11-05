@@ -105,7 +105,8 @@ Foli's own (see `THIRD_PARTY_NOTICES.md`).
   `handleKey`, `select`, `getDocument`, `setDocument` and `subscribe`.
 
 Known limits:
-- No general slice fitting (comes with paste in Phase 4).
+- No general slice fitting: paste (Phase 4.3) joins open content or replaces an empty textblock
+  with whole blocks; fitting blocks into nested structures comes with lists (Phase 7).
 - Splits one level only (lists, Phase 7).
 - Each unrecorded change (and each plugin reaction to undo/redo) rebases the stored history.
   This costs O(n²) in the number of stored steps (not events), and every step is re-applied to the
@@ -193,22 +194,32 @@ Known limits (each is a later Phase 4 task in the roadmap):
 
 - **Copy and cut** come from the model, never from the DOM (ADR-0003 finding 5). The selected
   range is written as `text/plain` (blocks and hard breaks as line feeds), `text/html` (rendered
-  by the view's own renderer) and `application/x-foli+json` (the copied blocks as `DocJSON`).
-  Cut is copy plus `deleteSelection`.
-- **Paste** reads, in order: Foli JSON, then HTML, then plain text. Each candidate goes through
-  `parseContent`, the same validation as loading a document; one that fails falls through to
-  the next. Plain text becomes one paragraph per line, with the marks typing would get.
-  - Into an empty textblock the pasted blocks go in whole, so a pasted heading stays a heading.
-    Elsewhere the first and last pasted blocks join the text around the selection; text after
-    the selection then ends up in the last pasted block (ProseMirror's open-slice behaviour).
-  - A paste is its own undo step.
+  by the view's own renderer, with `white-space: pre-wrap` so spaces survive in other apps) and
+  `application/x-foli+json`: `{ open, content }`, the copied blocks as `DocJSON` and whether the
+  copy was inside one block. Cut is copy plus `deleteSelection`, as its own undo step.
+- **Paste** reads, in order: Foli JSON, then HTML, then plain text (Ctrl/Cmd+Shift+V: plain
+  text only). Each candidate goes through `parseContent`, the same validation as loading a
+  document; one that fails falls through to the next. Plain text becomes one paragraph per
+  line, with the marks typing would get. A paste during a composition is ignored.
+  - Content is **open** when no block boundary was copied: plain text, HTML without block
+    elements, Foli JSON copied from inside one block. It always joins the text around the
+    selection, so the target block keeps its type (text pasted into an empty heading stays a
+    heading).
+  - **Closed** content (whole blocks) pasted into an empty textblock replaces it, so a pasted
+    heading stays a heading. Elsewhere its first and last blocks join the text around the
+    selection; text after the selection then ends up in the last pasted block (ProseMirror's
+    open-slice behaviour).
+  - A paste starts a new undo step; typing right after it (within the 500 ms grouping window)
+    joins that step.
 - **HTML reader** (`htmlToDoc`): the HTML is parsed with `DOMParser` into an inert document and
   never inserted. Known block tags become paragraphs or headings; `b/strong`, `i/em`, `u/ins`,
   `s/strike/del` and inline `font-weight`, `font-style` and `text-decoration` become marks
-  (Google Docs' `<b style="font-weight:normal">` wrapper is honoured). Whitespace collapses as
-  in HTML layout, except in `pre` and `white-space: pre*`. Scripts, styles, images, media,
-  form controls, Word's list bullets and empty `<o:p>` are dropped; everything else keeps only
-  its text. Fixtures: `packages/view/fixtures/clipboard/`.
+  (Google Docs' `<b style="font-weight:normal">` wrapper is honoured; a child's
+  `text-decoration: none` keeps the parent's line, as in CSS). Whitespace collapses as in HTML
+  layout, except in `pre` and `white-space: pre*`; non-breaking spaces become spaces. Hidden
+  text (`display: none`, `hidden`, Word's `mso-hide: all`), scripts, styles, images, media, form
+  controls, Word's list bullets and empty `<o:p>` are dropped; everything else keeps only its
+  text. Fixtures: `packages/view/fixtures/clipboard/`.
 
 ## Packages
 
