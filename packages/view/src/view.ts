@@ -42,13 +42,17 @@ const PLACEHOLDER_ATTR = "data-foli-placeholder";
 const STYLES = `[${PLACEHOLDER_ATTR}]::before{content:attr(${PLACEHOLDER_ATTR});content:attr(${PLACEHOLDER_ATTR}) / "";float:inline-start;height:0;pointer-events:none;color:GrayText}`;
 
 /**
- * Adds the view's stylesheet once per document or shadow root.
+ * Adds the view's stylesheet once per document or shadow root, when a placeholder is first shown
+ * (by then the host is usually mounted where it will stay).
  * shortcut: a CSP without 'unsafe-inline' for styles blocks it (placeholder not shown); ship a CSS file with the Phase 6 package if users need that.
  */
 function injectStyles(host: HTMLElement): void {
+  const doc = host.ownerDocument;
   const root = host.getRootNode();
   const parent =
-    root.nodeType === Node.DOCUMENT_FRAGMENT_NODE ? (root as ShadowRoot) : host.ownerDocument.head;
+    root.nodeType === Node.DOCUMENT_FRAGMENT_NODE
+      ? (root as ShadowRoot)
+      : (doc.head ?? doc.documentElement);
   if (parent.querySelector("style[data-foli]")) return;
   const style = host.ownerDocument.createElement("style");
   style.setAttribute("data-foli", "");
@@ -100,7 +104,6 @@ export class EditorView {
     host.setAttribute("aria-multiline", "true");
     this.addedTabIndex = !host.hasAttribute("tabindex");
     if (this.addedTabIndex) host.tabIndex = 0;
-    injectStyles(host);
     // Spaces typed into the model must stay visible and caret-addressable.
     host.style.whiteSpace = "pre-wrap";
     host.style.overflowWrap = "break-word";
@@ -191,7 +194,10 @@ export class EditorView {
     const target =
       this.placeholder && empty && !this.composing ? (this.blocks[0]?.dom ?? null) : null;
     if (this.placeholderDom !== target) this.placeholderDom?.removeAttribute(PLACEHOLDER_ATTR);
-    target?.setAttribute(PLACEHOLDER_ATTR, this.placeholder);
+    if (target) {
+      injectStyles(this.host);
+      target.setAttribute(PLACEHOLDER_ATTR, this.placeholder);
+    }
     this.placeholderDom = target;
   }
 
@@ -392,11 +398,13 @@ export class EditorView {
   }
 
   /**
-   * Every change from user input goes through here. Read-only mode drops document changes;
-   * selection changes still apply, and code can change the document through the editor.
+   * Every change from user input goes through here. Read-only mode drops document changes and
+   * newly stored marks (Mod+B on a caret); selection changes, and clearing stored marks, still
+   * apply. Code can always change the document through the editor.
    */
   private dispatch(tr: Transaction): boolean {
-    if (!this.editable && tr.docChanged) return false;
+    const marksAdded = tr.storedMarks !== null && tr.storedMarks !== this.state.storedMarks;
+    if (!this.editable && (tr.docChanged || marksAdded)) return false;
     this.editor.dispatch(tr);
     return true;
   }
@@ -480,6 +488,9 @@ export class EditorView {
    */
   private onMouseDown = (event: MouseEvent): void => {
     this.pointerFocus = !this.hasFocus();
+    // Focus from a mousedown happens in its default action, before this timer. A mousedown that
+    // focuses nothing (prevented, middle button) must not skip the next keyboard focus.
+    if (this.pointerFocus) setTimeout(() => (this.pointerFocus = false));
     if (event.detail !== 3 || event.button !== 0) return;
     let element = event.target as Node | null;
     while (element && element.parentNode !== this.host) element = element.parentNode;
@@ -530,13 +541,17 @@ export class EditorView {
   };
 
   /**
-   * Focus from the keyboard or from code shows the model selection. Once the page selection has
-   * moved elsewhere, browsers put the caret at the start of the host instead.
+   * Focus from the keyboard or from code shows the model selection: once the page selection has
+   * moved elsewhere, browsers put the caret at the start of the host instead. A DOM selection
+   * that already shows the model selection (the window or tab regaining focus) is left alone,
+   * and so is the scroll position.
    */
   private onFocus = (): void => {
     const pointer = this.pointerFocus;
     this.pointerFocus = false;
     if (pointer) return;
+    const current = this.readSelection();
+    if (current && this.shows(current)) return;
     this.writeSelection(true);
     this.scrollToSelection();
   };

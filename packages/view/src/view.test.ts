@@ -483,6 +483,10 @@ describe("EditorView options", () => {
     await settle();
     expect(host.innerHTML).toBe("<p>ab</p>");
     expect(editor.state.doc.textContent).toBe("ab");
+    // Mod+B on a caret would only store a mark: dropped too.
+    editor.select(2);
+    host.dispatchEvent(new KeyboardEvent("keydown", { key: "b", ...ctrl }));
+    expect(editor.state.storedMarks).toBeNull();
     // Selection still works, and code can still change the document.
     host.dispatchEvent(new KeyboardEvent("keydown", { key: "a", ...ctrl }));
     expect(editor.state.selection.from).toBe(0);
@@ -532,7 +536,28 @@ describe("EditorView options", () => {
     expect(sel?.focusNode).toBe(host.querySelector("p")?.firstChild);
     expect(sel?.focusOffset).toBe(2);
 
+    // Focus again (window or tab switch) with the selection already shown: nothing is
+    // rewritten and nothing scrolls.
+    const write = vi.spyOn(Selection.prototype, "setBaseAndExtent");
+    host.dispatchEvent(new FocusEvent("focus"));
+    expect(write).not.toHaveBeenCalled();
+    write.mockRestore();
+
     // The click half (no restore after a mousedown) needs real focus: e2e view-options.
+    outside.remove();
+  });
+
+  it("a mousedown that focuses nothing does not skip the next keyboard focus", async () => {
+    const { host, editor } = mount(one("abc"));
+    editor.select(3);
+    host.dispatchEvent(new MouseEvent("mousedown", { bubbles: true })); // no focus follows
+    await new Promise((resolve) => setTimeout(resolve));
+    const outside = document.createElement("span");
+    outside.textContent = "elsewhere";
+    document.body.append(outside);
+    document.getSelection()?.selectAllChildren(outside);
+    host.focus();
+    expect(document.getSelection()?.focusOffset).toBe(2);
     outside.remove();
   });
 

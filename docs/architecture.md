@@ -171,12 +171,14 @@ host); pages and fragments arrive in Phase 5, so today the whole document is one
     and sets the selection itself. Vertical only, since text wraps.
 - **Focus:** focus from the keyboard or from code (`view.focus()`) shows the model selection and
   scrolls to it. Once the page selection has moved elsewhere (text selected outside the
-  editor), all three engines otherwise put the caret at the start of the host. A click that
+  editor), browsers otherwise put the caret at the start of the host (measured with Tab in
+  Chromium, Firefox and WebKit). A DOM selection that already shows the model selection (the
+  window or tab regaining focus) is left alone, with the scroll position. A click that
   focuses the host keeps the caret where it lands.
 - **Read-only** (`editable: false`): the host gets `contenteditable="false"` and
   `aria-readonly="true"` and stays focusable (the view adds `tabindex="0"` if the host has
   none). Every change from user input goes through one dispatch gate that drops document
-  changes, so keymaps, `beforeinput`, paste, cut and DOM read-back cannot edit; read-back
+  changes and newly stored marks (Mod+B on a caret), so keymaps, `beforeinput`, paste, cut and DOM read-back cannot edit; read-back
   restores the DOM instead. Selection, Mod+A and copy (the model's content) still work; code
   can change the document through the editor. Switching to read-only first ends a running
   composition so its text is kept.
@@ -222,6 +224,8 @@ Known limits (each is a later Phase 4 task in the roadmap):
   Google Docs and LibreOffice captures are part of the manual checks (4.6).
 - Content the schema cannot fit at the selection is not pasted (only possible once nested
   blocks exist).
+- The placeholder stylesheet is added when a placeholder is first shown, to the host's shadow
+  root or the document head; a host moved into a shadow root after that keeps no styles there.
 - The placeholder stylesheet is an inline `<style>`: a Content Security Policy without
   `'unsafe-inline'` for styles blocks it, and the placeholder is not shown (`aria-placeholder`
   still is announced).
