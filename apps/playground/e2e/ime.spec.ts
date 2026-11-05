@@ -6,7 +6,7 @@ test.skip(({ browserName }) => browserName !== "chromium", "CDP IME emulation is
 
 const MOD = "ControlOrMeta";
 const editor = (page: Page) => page.getByRole("textbox", { name: "Document" });
-const texts = (page: Page) => editor(page).locator(":scope > *").allTextContents();
+const texts = (page: Page) => editor(page).locator(":scope > .foli-page > *").allTextContents();
 
 /** Opens an empty document; returns a CDP session and the console warnings seen so far. */
 async function openEmpty(page: Page): Promise<{ cdp: CDPSession; warnings: string[] }> {

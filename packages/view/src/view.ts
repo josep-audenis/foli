@@ -22,6 +22,7 @@ import {
   undo,
 } from "@foli/core";
 import { docFromClipboard, FOLI_MIME, serializeRange } from "./clipboard.js";
+import { type BlockBox, contentHeight, flowBlocks } from "./layout/flow.js";
 import { type BlockDesc, renderBlock } from "./render.js";
 
 interface DomPoint {
@@ -76,6 +77,12 @@ export class EditorView {
   private blocks: BlockDesc[] = [];
   /** Position before each block, parallel to `blocks`. */
   private starts: number[] = [];
+  /** Page index of each block, parallel to `blocks`. */
+  private pageOf: number[] = [];
+  /** The page elements, in order; the host's only children. */
+  private pages: HTMLElement[] = [];
+  private pageStyle = "";
+  private destroyed = false;
   private composing = false;
   /** Set by Ctrl/Cmd+Shift+V for the paste event it triggers. */
   private plainPaste = false;
@@ -125,11 +132,14 @@ export class EditorView {
     host.addEventListener("cut", this.onCut);
     host.addEventListener("paste", this.onPaste);
     host.ownerDocument.addEventListener("selectionchange", this.onSelectionChange);
+    host.ownerDocument.fonts?.addEventListener("loadingdone", this.onFontsLoaded);
     this.unsubscribe = editor.subscribe((state) => this.update(state));
   }
 
   destroy(): void {
+    this.destroyed = true;
     this.unsubscribe();
+    this.host.ownerDocument.fonts?.removeEventListener("loadingdone", this.onFontsLoaded);
     this.observer.disconnect();
     const { host } = this;
     host.removeEventListener("beforeinput", this.onBeforeInput);
@@ -238,12 +248,20 @@ export class EditorView {
     if (rect) scrollRectIntoView(this.host, rect);
   }
 
-  /** Renders the document, reusing the DOM of blocks whose model node is unchanged. */
+  /**
+   * Renders the document into pages, reusing the DOM of blocks whose model node is unchanged.
+   * Blocks are first placed where they were (a new block joins the page of the block before
+   * it), then measured and flowed; during a composition they stay put, since moving the DOM
+   * the browser is composing in would break the IME.
+   *
+   * shortcut: measures every block on every render (O(document) per keystroke); the measurement cache and reflow from the first changed page come in 5.4.
+   */
   private render(): void {
     const { doc } = this.state;
     const previous = new Map(
       this.blocks.filter((desc) => !this.dirty.has(desc)).map((desc) => [desc.node, desc]),
     );
+    const previousPage = new Map(this.blocks.map((desc, i) => [desc, this.pageOf[i] ?? 0]));
     this.dirty.clear();
     const blocks: BlockDesc[] = [];
     const starts: number[] = [];
@@ -254,19 +272,18 @@ export class EditorView {
       starts.push(offset);
     });
     for (const stale of previous.values()) stale.dom.remove();
-    // Insert or move blocks into order; anything else (stray DOM) drifts to the end and is removed.
-    let cursor = this.host.firstChild;
-    for (const desc of blocks) {
-      if (desc.dom === cursor) cursor = cursor.nextSibling;
-      else this.host.insertBefore(desc.dom, cursor);
-    }
-    while (cursor) {
-      const next: ChildNode | null = cursor.nextSibling;
-      cursor.remove();
-      cursor = next;
+    this.applyGeometry();
+    let last = 0;
+    let pageOf = blocks.map((desc) => (last = Math.max(last, previousPage.get(desc) ?? last)));
+    this.place(blocks, pageOf);
+    if (!this.composing) {
+      const flowed = flowBlocks(blocks.map(measureBox), contentHeight(this.editor.settings));
+      if (flowed.some((page, i) => page !== pageOf[i])) this.place(blocks, flowed);
+      pageOf = flowed;
     }
     this.blocks = blocks;
     this.starts = starts;
+    this.pageOf = pageOf;
     this.showPlaceholder();
     // The view's own DOM changes are not input. During a composition, keep what the browser
     // changed before this render: the touched blocks are read back at compositionend.
@@ -274,19 +291,93 @@ export class EditorView {
     if (this.composing) this.pending.push(...records);
   }
 
+  /**
+   * Puts each block into its page (`pageOf` is non-decreasing), creating and removing pages as
+   * needed. Anything else in the host or a page (stray DOM) is removed.
+   */
+  private place(blocks: readonly BlockDesc[], pageOf: readonly number[]): void {
+    const { host } = this;
+    const count = (pageOf[pageOf.length - 1] ?? 0) + 1;
+    while (this.pages.length < count) this.pages.push(this.createPage());
+    let cursor = host.firstChild;
+    for (const page of this.pages.slice(0, count)) {
+      if (page === cursor) cursor = cursor.nextSibling;
+      else host.insertBefore(page, cursor);
+    }
+    const blockDoms = new Set<Node>(blocks.map((desc) => desc.dom));
+    let i = 0;
+    for (let p = 0; p < count; p++) {
+      const page = this.pages[p] as HTMLElement;
+      let at = page.firstChild;
+      for (; i < blocks.length && pageOf[i] === p; i++) {
+        const { dom } = blocks[i] as BlockDesc;
+        if (dom === at) at = at.nextSibling;
+        else page.insertBefore(dom, at);
+      }
+      // What is left: strays go; blocks of a later page are moved there next.
+      while (at) {
+        const next: ChildNode | null = at.nextSibling;
+        if (!blockDoms.has(at)) at.remove();
+        at = next;
+      }
+    }
+    // Pages no longer needed (their blocks have moved) and stray DOM in the host.
+    while (cursor) {
+      const next: ChildNode | null = cursor.nextSibling;
+      cursor.remove();
+      cursor = next;
+    }
+    this.pages.length = count;
+  }
+
+  private createPage(): HTMLElement {
+    const page = this.host.ownerDocument.createElement("section");
+    page.className = "foli-page";
+    page.style.cssText = this.pageStyle;
+    return page;
+  }
+
+  /** Page size and margins from the document settings, applied to every page when they change. */
+  private applyGeometry(): void {
+    const { pageSize, margins } = this.editor.settings;
+    const style =
+      `box-sizing: border-box; width: ${pageSize.width}mm; min-height: ${pageSize.height}mm; ` +
+      `padding: ${margins.top}mm ${margins.right}mm ${margins.bottom}mm ${margins.left}mm;`;
+    if (style === this.pageStyle) return;
+    this.pageStyle = style;
+    for (const page of this.pages) page.style.cssText = style;
+  }
+
+  /** Re-flows the pages once web fonts have loaded: line heights and wrapping change. */
+  private onFontsLoaded = (): void => {
+    if (this.destroyed) return;
+    this.render();
+    this.writeSelection(false);
+  };
+
   // ---------- position mapping ----------
+
+  /** The block element that contains `node` (the child of a page it sits in), or null. */
+  private blockElement(node: Node | null): Node | null {
+    let element = node;
+    while (element?.parentNode && !this.pages.includes(element.parentNode as HTMLElement)) {
+      if (element.parentNode === this.host) return null;
+      element = element.parentNode;
+    }
+    return element?.parentNode ? element : null;
+  }
 
   /** Model position of a DOM point inside the host, or null if it is outside. */
   posFromDOM(node: Node, offset: number): number | null {
     const { host } = this;
-    if (node === host) {
-      const index = Math.min(offset, this.blocks.length);
-      return index < this.blocks.length
-        ? (this.starts[index] as number)
-        : this.state.doc.content.size;
+    if (node === host || this.pages.includes(node as HTMLElement)) {
+      // Between blocks: the start of the first block after the point, else the document end.
+      const range = host.ownerDocument.createRange();
+      range.setStart(node, offset);
+      const index = this.blocks.findIndex((desc) => range.comparePoint(desc.dom, 0) >= 0);
+      return index < 0 ? this.state.doc.content.size : (this.starts[index] as number);
     }
-    let element: Node | null = node;
-    while (element && element.parentNode !== host) element = element.parentNode;
+    const element = this.blockElement(node);
     const index = this.blocks.findIndex((desc) => desc.dom === element);
     const desc = this.blocks[index];
     if (!desc) return null;
@@ -492,8 +583,7 @@ export class EditorView {
     // focuses nothing (prevented, middle button) must not skip the next keyboard focus.
     if (this.pointerFocus) setTimeout(() => (this.pointerFocus = false));
     if (event.detail !== 3 || event.button !== 0) return;
-    let element = event.target as Node | null;
-    while (element && element.parentNode !== this.host) element = element.parentNode;
+    const element = this.blockElement(event.target as Node | null);
     const index = this.blocks.findIndex((desc) => desc.dom === element);
     const desc = this.blocks[index];
     if (!desc) return;
@@ -586,8 +676,7 @@ export class EditorView {
   private readBack(records: readonly MutationRecord[]): void {
     const byDom = new Map<Node, BlockDesc>(this.blocks.map((desc) => [desc.dom, desc]));
     for (const record of records) {
-      let node: Node | null = record.target;
-      while (node && node.parentNode !== this.host) node = node.parentNode;
+      const node = this.blockElement(record.target);
       const desc = node && byDom.get(node);
       if (desc) this.dirty.add(desc);
     }
@@ -607,7 +696,11 @@ export class EditorView {
       else node.childNodes.forEach(walk);
     };
     let first = true;
-    for (const child of this.host.childNodes) {
+    // Block-level nodes in order: the children of each page, and anything else in the host.
+    const blockLevel = [...this.host.childNodes].flatMap((child) =>
+      this.pages.includes(child as HTMLElement) ? [...child.childNodes] : [child],
+    );
+    for (const child of blockLevel) {
       // An empty stray node (an extension's marker) holds no text; the re-render removes it.
       if (!byDom.has(child) && !child.textContent) continue;
       if (!first) domText += BLOCK_SEPARATOR;
@@ -763,6 +856,17 @@ export class EditorView {
 
   private onSelectionChange = (): void => {
     if (!this.composing && this.hasFocus()) this.syncSelection();
+  };
+}
+
+/** A block's border-box height and vertical margins, as laid out now. */
+function measureBox(desc: BlockDesc): BlockBox {
+  const style = getComputedStyle(desc.dom);
+  return {
+    height: desc.dom.getBoundingClientRect().height,
+    // jsdom and detached nodes report no margins.
+    marginTop: Number.parseFloat(style.marginTop) || 0,
+    marginBottom: Number.parseFloat(style.marginBottom) || 0,
   };
 }
 

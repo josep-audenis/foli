@@ -16,7 +16,7 @@ interface Block {
 const editor = (page: Page) => page.getByRole("textbox", { name: "Document" });
 
 /** Each rendered block as its text (the view renders synchronously after every change). */
-const texts = (page: Page) => editor(page).locator(":scope > *").allTextContents();
+const texts = (page: Page) => editor(page).locator(":scope > .foli-page > *").allTextContents();
 
 /** The model as the playground saved it, or null. Saving is debounced (300 ms): poll it. */
 async function saved(page: Page): Promise<Block[] | null> {

@@ -9,17 +9,15 @@
   --foli-font-family: Georgia, "Times New Roman", serif;
   --foli-font-size: 11pt;
   --foli-line-height: 1.5;
+  --foli-page-gap: 24px;
 
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 24px;
   padding: 32px 16px;
   background: var(--foli-canvas-background);
 }
 
+/* Pages are rendered by the view (size and margins inline, from the document settings). */
 .foli-page {
-  box-sizing: border-box;
+  margin: 0 auto;
   background: var(--foli-page-background);
   box-shadow: var(--foli-page-shadow);
   color: var(--foli-text-color);
@@ -28,9 +26,12 @@
   line-height: var(--foli-line-height);
 }
 
+.foli-page + .foli-page {
+  margin-top: var(--foli-page-gap);
+}
+
 .foli-content {
   outline: none;
-  min-height: 100%;
 }
 
 .foli-content ::selection {

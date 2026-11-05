@@ -87,11 +87,10 @@ export function App() {
         <strong>Foli</strong>
         <span
           className="playground-hint"
-          title="Phase 4 editor view: typing, marks, undo, IME, paste, read-only mode, placeholder"
+          title="Foli playground: typing, marks, undo, IME, paste, read-only mode, placeholder, pages"
         >
-          Editor view in progress (Phase 4): typing, Enter, Backspace, marks, undo. IME and dead
-          keys are being verified. Paste maps HTML to the schema. Try read-only mode, or clear the
-          page to see the placeholder.
+          Pagination in progress (Phase 5): whole blocks flow onto A4 pages; paragraphs split across
+          pages next. Typing, marks, undo, paste, read-only mode, placeholder.
         </span>
         <label>
           <input

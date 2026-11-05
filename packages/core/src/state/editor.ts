@@ -1,4 +1,10 @@
-import { createDocument, type FoliDocument, parseContent, SCHEMA_VERSION } from "../document.js";
+import {
+  createDocument,
+  type DocumentSettings,
+  type FoliDocument,
+  parseContent,
+  SCHEMA_VERSION,
+} from "../document.js";
 import type { Attrs } from "../model/index.js";
 import type { DocJSON } from "../schema.js";
 import {
@@ -33,6 +39,8 @@ export type EditorListener = (state: EditorState, transactions: readonly Transac
 /** A headless editor: state, commands, history and change notifications, no DOM. */
 export interface Editor {
   readonly state: EditorState;
+  /** Page size and margins of the current document. */
+  readonly settings: DocumentSettings;
   dispatch(tr: Transaction): void;
   /** Runs a command; returns whether it applied. */
   run(command: Command): boolean;
@@ -85,6 +93,9 @@ export function createEditor({
   const run = (command: Command) => command(state, dispatch);
 
   return {
+    get settings() {
+      return settings;
+    },
     get state() {
       return state;
     },

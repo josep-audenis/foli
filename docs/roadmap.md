@@ -338,15 +338,17 @@ Each task is one PR that leaves `pnpm check` green and the playground working. L
 `packages/view` (`src/layout/`) until the seam is proven; page flow stays a pure function.
 
 - [x] Claim phase, branch `phase-5/pagination`
-- [ ] 5.1 Pages in the view, block level: `EditorView` renders `section.foli-page` containers
-  (size and margins from `DocumentSettings`, mm → px) inside the one editable host and flows
-  whole blocks into them by measured height (no splitting yet). Descriptors, position
-  mapping, read-back, triple-click, placeholder and scroll work with blocks under page
-  sections; page chrome is `contenteditable="false"` and `aria-hidden`. React's
-  `DocumentEditor` drops its single sheet; the playground shows real pages. A bundled test font
-  (permissive license, test-only, recorded) makes heights deterministic. Playwright: existing
-  suites green on pages; a long document renders N pages; typing that pushes a block onto the
-  next page.
+- [x] 5.1 Pages in the view, block level: `EditorView` renders `section.foli-page` containers
+  (size and margins from `editor.settings`, in mm) inside the one editable host and flows
+  whole blocks into them by measured height with the pure `flowBlocks` (no splitting yet; no
+  reflow during composition; re-flow when web fonts load). Position mapping, read-back and
+  triple-click work with blocks under pages. React's `DocumentEditor` drops its single sheet;
+  the playground shows real pages. Playwright in all three engines: existing suites on pages;
+  a long document flows into A4 pages that respect the content box and are never under-filled;
+  Enter pushes blocks onto the next page and undo pulls them back; selection and deletion
+  across pages with undo; ArrowDown across the page gap; clicks on a later page. The bundled
+  test font moved to 5.5, where exact page breaks are asserted; page chrome (headers, numbers)
+  arrives with Phase 9.
 - [ ] 5.2 Paragraphs split across pages: line starts measured from the rendered block
   (`Range` rects over the leaves, binary search per line, marks and mixed sizes included);
   pure `paginate` assigns lines to pages; one block descriptor owns several DOM fragments
@@ -363,7 +365,8 @@ Each task is one PR that leaves `pnpm check` green and the playground working. L
   block and line as before; reuse unchanged pages and fragments; one pass per animation frame;
   deferred during composition. Full invalidation on font load (`document.fonts`), width and
   zoom (`ResizeObserver`), and settings change.
-- [ ] 5.5 Deterministic fixtures and visual regression: short, multi-page, long paragraph,
+- [ ] 5.5 Deterministic fixtures and visual regression with a bundled test font (permissive
+  license, test-only, recorded): short, multi-page, long paragraph,
   heading at a boundary, explicit breaks, mixed font sizes, different margins; identical page
   breaks across runs; Playwright screenshot snapshots per engine.
 - [ ] 5.6 Print: `@page` size and margins from settings, one printed page per screen page

@@ -6,12 +6,13 @@ const MOD = "ControlOrMeta";
 
 const editor = (page: Page) => page.getByRole("textbox", { name: "Document" });
 const readOnly = (page: Page) => page.getByRole("checkbox", { name: "Read-only" });
-const texts = (page: Page) => editor(page).locator(":scope > *").allTextContents();
+const texts = (page: Page) => editor(page).locator(":scope > .foli-page > *").allTextContents();
 
 /** The placeholder text CSS shows on the first block, or "" when there is none. */
 const placeholderShown = (page: Page) =>
   editor(page)
-    .locator(":scope > :first-child")
+    .locator(":scope > .foli-page > :first-child")
+    .first()
     .evaluate((block) => {
       const content = getComputedStyle(block, "::before").content;
       // Drop the alternative text ("…" / "") where the engine reports it.
@@ -138,7 +139,7 @@ test("the placeholder shows only while the document is empty", async ({ page }) 
   // Not part of the text: the caret sits at the start of the line, and typing replaces it.
   const caretLeft = await page.evaluate(() => {
     const range = getSelection()?.getRangeAt(0);
-    const block = document.querySelector(".foli-content > *");
+    const block = document.querySelector(".foli-content > .foli-page > *");
     const rect =
       range?.getClientRects()[0] ??
       range?.startContainer.childNodes[0]?.parentElement?.getBoundingClientRect();
@@ -171,7 +172,7 @@ test("Tab back into the editor keeps the caret where it was", async ({ page }) =
 
   // A click still puts the caret where it lands.
   await page.locator(".playground-hint").dblclick();
-  const box = await editor(page).locator(":scope > *").first().boundingBox();
+  const box = await editor(page).locator(":scope > .foli-page > *").first().boundingBox();
   if (!box) throw new Error("no block box");
   await page.mouse.click(box.x + 1, box.y + box.height / 2);
   await page.keyboard.type("Y");

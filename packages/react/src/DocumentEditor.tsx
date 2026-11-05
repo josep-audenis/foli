@@ -1,6 +1,6 @@
 import { createDocument, createEditor, type FoliDocument } from "@foli/core";
 import { EditorView } from "@foli/view";
-import { type CSSProperties, useLayoutEffect, useRef, useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 
 export interface DocumentEditorProps {
   /** Read once on mount. To load a different document later, remount with a new `key`. */
@@ -17,7 +17,8 @@ export interface DocumentEditorProps {
 }
 
 /**
- * An editable document on one page-sized sheet (pagination arrives in Phase 5). Uncontrolled:
+ * An editable document on real pages (size and margins from the document settings; whole blocks
+ * flow from page to page, paragraphs split across pages in Phase 5.2). Uncontrolled:
  * the engine owns the document; React only observes it through `onChange`.
  * Provisional API: final names are decided in Phase 6 (see docs/roadmap.md).
  */
@@ -61,26 +62,17 @@ export function DocumentEditor({
     viewRef.current?.setOptions({ editable: !readOnly, placeholder });
   }, [readOnly, placeholder]);
 
-  const { pageSize, margins } = initial.settings;
-  const pageStyle: CSSProperties = {
-    width: `${pageSize.width}mm`,
-    minHeight: `${pageSize.height}mm`,
-    padding: `${margins.top}mm ${margins.right}mm ${margins.bottom}mm ${margins.left}mm`,
-  };
-
   return (
     <div className={className ? `foli-canvas ${className}` : "foli-canvas"}>
-      <div className="foli-page" style={pageStyle}>
-        {/* biome-ignore lint/a11y/useSemanticElements: EditorView makes this div a contenteditable rich-text box. */}
-        <div
-          ref={contentRef}
-          className="foli-content"
-          role="textbox"
-          aria-multiline="true"
-          aria-label={label}
-          tabIndex={0}
-        />
-      </div>
+      {/* biome-ignore lint/a11y/useSemanticElements: EditorView makes this div a contenteditable rich-text box. */}
+      <div
+        ref={contentRef}
+        className="foli-content"
+        role="textbox"
+        aria-multiline="true"
+        aria-label={label}
+        tabIndex={0}
+      />
     </div>
   );
 }

@@ -17,7 +17,7 @@ interface Block {
 }
 
 const editor = (page: Page) => page.getByRole("textbox", { name: "Document" });
-const texts = (page: Page) => editor(page).locator(":scope > *").allTextContents();
+const texts = (page: Page) => editor(page).locator(":scope > .foli-page > *").allTextContents();
 
 /** The model as the playground saved it, or null. Saving is debounced (300 ms): poll it. */
 async function saved(page: Page): Promise<Block[] | null> {
@@ -266,15 +266,26 @@ test("T1: typing and formatting keep a valid document after every keystroke", as
     if (message.type() === "warning" || message.type() === "error") warnings.push(message.text());
   });
   await openEmpty(page);
-  /** The host holds only blocks the renderer makes, with only mark elements and <br> inside. */
+  /**
+   * The host holds only pages, the pages only blocks the renderer makes, and the blocks only
+   * mark elements and <br>.
+   */
   const valid = () =>
     editor(page).evaluate((host) => {
       if (!host.childNodes.length) return false;
       return [...host.childNodes].every(
-        (block) =>
-          block instanceof Element &&
-          /^(P|H[1-6])$/.test(block.tagName) &&
-          [...block.querySelectorAll("*")].every((el) => /^(STRONG|EM|U|S|BR)$/.test(el.tagName)),
+        (page) =>
+          page instanceof Element &&
+          page.matches("section.foli-page") &&
+          page.childNodes.length > 0 &&
+          [...page.childNodes].every(
+            (block) =>
+              block instanceof Element &&
+              /^(P|H[1-6])$/.test(block.tagName) &&
+              [...block.querySelectorAll("*")].every((el) =>
+                /^(STRONG|EM|U|S|BR)$/.test(el.tagName),
+              ),
+          ),
       );
     });
   const steps = [
