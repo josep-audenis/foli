@@ -179,10 +179,36 @@ Known limits (each is a later Phase 4 task in the roadmap):
 - Delete input types for whole lines rely on the browser's target range; without one they
   delete a character. `Mod-Backspace` is bound to word deletion, so macOS Cmd+Backspace deletes
   a word, not to the line start (4.4).
-- Paste and drop do nothing; copy and cut use the browser's DOM serialization (4.3).
+- Drag and drop does nothing (both the drop and the drag source are prevented).
+- Paste keeps only schema v1: links keep their text, lists and table cells become paragraphs,
+  images and colors are dropped. The fixture corpus is hand-written approximations; real Word,
+  Google Docs and LibreOffice captures are part of the manual checks (4.6).
+- Content the schema cannot fit at the selection is not pasted (only possible once nested
+  blocks exist).
 - No scroll-into-view after programmatic selection changes; no grapheme-cluster caret snapping (4.4).
 - No read-only mode or placeholder (4.5).
 - Assumes schema v1 depth (doc > textblock > inline).
+
+### Clipboard (`packages/view/src/clipboard.ts`)
+
+- **Copy and cut** come from the model, never from the DOM (ADR-0003 finding 5). The selected
+  range is written as `text/plain` (blocks and hard breaks as line feeds), `text/html` (rendered
+  by the view's own renderer) and `application/x-foli+json` (the copied blocks as `DocJSON`).
+  Cut is copy plus `deleteSelection`.
+- **Paste** reads, in order: Foli JSON, then HTML, then plain text. Each candidate goes through
+  `parseContent`, the same validation as loading a document; one that fails falls through to
+  the next. Plain text becomes one paragraph per line, with the marks typing would get.
+  - Into an empty textblock the pasted blocks go in whole, so a pasted heading stays a heading.
+    Elsewhere the first and last pasted blocks join the text around the selection; text after
+    the selection then ends up in the last pasted block (ProseMirror's open-slice behaviour).
+  - A paste is its own undo step.
+- **HTML reader** (`htmlToDoc`): the HTML is parsed with `DOMParser` into an inert document and
+  never inserted. Known block tags become paragraphs or headings; `b/strong`, `i/em`, `u/ins`,
+  `s/strike/del` and inline `font-weight`, `font-style` and `text-decoration` become marks
+  (Google Docs' `<b style="font-weight:normal">` wrapper is honoured). Whitespace collapses as
+  in HTML layout, except in `pre` and `white-space: pre*`. Scripts, styles, images, media,
+  form controls, Word's list bullets and empty `<o:p>` are dropped; everything else keeps only
+  its text. Fixtures: `packages/view/fixtures/clipboard/`.
 
 ## Packages
 

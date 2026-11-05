@@ -1,6 +1,7 @@
 import {
   AllSelection,
   type Command,
+  closeHistory,
   deleteBackward,
   deleteForward,
   deleteSelection,
@@ -8,39 +9,18 @@ import {
   type EditorState,
   insertHardBreak,
   insertText,
-  type MarkName,
-  type Node as ModelNode,
+  marksAt,
   redo,
-  type Selection,
+  Selection,
+  Slice,
   splitBlock,
   TextSelection,
+  TransformError,
   toggleMark,
   undo,
 } from "@foli/core";
-
-// Every schema v1 mark must have a tag; marks of other schemas fall back to <span>.
-const MARK_TAGS: ReadonlyMap<string, string> = new Map(
-  Object.entries({
-    bold: "strong",
-    italic: "em",
-    underline: "u",
-    strike: "s",
-  } satisfies Record<MarkName, string>),
-);
-
-/** A rendered inline leaf (text node or hard break) and where it sits in its block's content. */
-interface LeafDesc {
-  readonly dom: Node;
-  readonly offset: number;
-  readonly size: number;
-}
-
-/** View descriptor of one block: the model node, its element and its leaves. */
-interface BlockDesc {
-  readonly node: ModelNode;
-  readonly dom: HTMLElement;
-  readonly leaves: readonly LeafDesc[];
-}
+import { docFromClipboard, FOLI_MIME, serializeRange } from "./clipboard.js";
+import { type BlockDesc, renderBlock } from "./render.js";
 
 interface DomPoint {
   node: Node;
@@ -94,6 +74,9 @@ export class EditorView {
     host.addEventListener("compositionend", this.onCompositionEnd);
     host.addEventListener("blur", this.onBlur);
     host.addEventListener("mousedown", this.onMouseDown);
+    host.addEventListener("copy", this.onCopy);
+    host.addEventListener("cut", this.onCut);
+    host.addEventListener("paste", this.onPaste);
     host.ownerDocument.addEventListener("selectionchange", this.onSelectionChange);
     this.unsubscribe = editor.subscribe((state) => this.update(state));
   }
@@ -109,6 +92,9 @@ export class EditorView {
     host.removeEventListener("compositionend", this.onCompositionEnd);
     host.removeEventListener("blur", this.onBlur);
     host.removeEventListener("mousedown", this.onMouseDown);
+    host.removeEventListener("copy", this.onCopy);
+    host.removeEventListener("cut", this.onCut);
+    host.removeEventListener("paste", this.onPaste);
     host.ownerDocument.removeEventListener("selectionchange", this.onSelectionChange);
     for (const name of ["contenteditable", "role", "aria-multiline"]) host.removeAttribute(name);
     host.style.removeProperty("white-space");
@@ -516,6 +502,68 @@ export class EditorView {
     this.writeSelection(true);
   }
 
+  // ---------- clipboard ----------
+
+  /** Copy writes the model's content (plain text, HTML, Foli JSON), never the browser's DOM. */
+  private onCopy = (event: ClipboardEvent): void => {
+    this.syncSelection();
+    const { selection, doc } = this.state;
+    if (selection.empty || !event.clipboardData) return;
+    event.preventDefault();
+    const { text, html, json } = serializeRange(
+      doc,
+      selection.from,
+      selection.to,
+      this.host.ownerDocument,
+    );
+    event.clipboardData.setData("text/plain", text);
+    event.clipboardData.setData("text/html", html);
+    event.clipboardData.setData(FOLI_MIME, json);
+  };
+
+  private onCut = (event: ClipboardEvent): void => {
+    this.onCopy(event);
+    if (event.defaultPrevented) this.run(deleteSelection);
+  };
+
+  private onPaste = (event: ClipboardEvent): void => {
+    if (!event.clipboardData) return;
+    event.preventDefault();
+    this.syncSelection();
+    this.paste(event.clipboardData);
+  };
+
+  /**
+   * Replaces the selection with clipboard content (Foli JSON, else HTML, else plain text) as
+   * its own undo step. Into an empty textblock the pasted blocks go in whole (a pasted heading
+   * stays a heading); elsewhere the first and last pasted blocks join the text around the
+   * selection. Returns whether anything was inserted.
+   */
+  paste(data: Pick<DataTransfer, "getData">): boolean {
+    const { state } = this;
+    const marks = (state.storedMarks ?? marksAt(state.selection.$from)).map((m) => m.toJSON());
+    const pasted = docFromClipboard(data, marks);
+    // One empty block: nothing to paste.
+    if (!pasted || pasted.content.size <= 2) return false;
+    try {
+      const tr = state.tr.deleteSelection();
+      const $pos = tr.selection.$from;
+      if ($pos.depth === 1 && $pos.parent.isTextblock && !$pos.parent.content.size) {
+        const from = $pos.before();
+        tr.replace(from, $pos.after(), new Slice(pasted.content, 0, 0));
+        tr.setSelection(Selection.near(tr.doc.resolve(from + pasted.content.size), -1));
+      } else {
+        tr.replaceSelection(pasted.slice(1, pasted.content.size - 1));
+      }
+      this.editor.dispatch(tr.setMeta(closeHistory, true));
+      return true;
+    } catch (error) {
+      // shortcut: content the schema cannot fit at the selection is not pasted; general fitting comes with nested blocks (Phase 7).
+      if (error instanceof TransformError) return false;
+      throw error;
+    }
+  }
+
   private onSelectionChange = (): void => {
     if (!this.composing && this.hasFocus()) this.syncSelection();
   };
@@ -524,31 +572,6 @@ export class EditorView {
 function before(node: Node): DomPoint {
   const parent = node.parentNode as Node;
   return { node: parent, offset: Array.prototype.indexOf.call(parent.childNodes, node) };
-}
-
-function renderBlock(node: ModelNode, doc: Document): BlockDesc {
-  const level = node.attrs.level;
-  const dom = doc.createElement(node.type.name === "heading" ? `h${String(level)}` : "p");
-  const leaves: LeafDesc[] = [];
-  node.forEach((child, offset) => {
-    let leaf: Node;
-    if (child.isText) leaf = doc.createTextNode(child.text ?? "");
-    else leaf = doc.createElement("br");
-    leaves.push({ dom: leaf, offset, size: child.nodeSize });
-    let outer = leaf;
-    // Text only: a mark wrapper around <br> would add nothing visible.
-    if (child.isText) {
-      for (const mark of [...child.marks].reverse()) {
-        const wrapper = doc.createElement(MARK_TAGS.get(mark.type.name) ?? "span");
-        wrapper.append(outer);
-        outer = wrapper;
-      }
-    }
-    dom.append(outer);
-  });
-  // An empty block, or one ending in a hard break, needs an extra <br> to show its last line.
-  if (!node.lastChild?.isText) dom.append(doc.createElement("br"));
-  return { node, dom, leaves };
 }
 
 /** Stand-ins used when diffing DOM text with model text. */

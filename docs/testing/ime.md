@@ -1,4 +1,4 @@
-# IME, dead keys and screen readers: manual checklist
+# IME, dead keys, clipboard and screen readers: manual checklist
 
 Gate G3 needs these checks run by hand on real platforms: automation can only emulate IME in
 Chromium (`apps/playground/e2e/ime.spec.ts`). Copy the results into
@@ -50,6 +50,22 @@ Press **Reset** in the playground bar before each row. "Pass" means:
 
 Known gap: a composition that inserts a line break or a new paragraph (some Android keyboards)
 is discarded with a `Foli:` console warning. Record it if you see one.
+
+## Clipboard
+
+Automation covers copy/cut/paste inside the editor (Chromium, Firefox) and pastes of
+hand-written fixture HTML. Playwright's WebKit on Windows gives paste events empty clipboard
+data, so Safari needs these rows by hand. When pasting from another app, also save the HTML it
+put on the clipboard as a fixture (see `packages/view/fixtures/clipboard/README.md`).
+
+| Platform / browser | Case                                                                 | Result | Notes |
+| ------------------ | -------------------------------------------------------------------- | ------ | ----- |
+| macOS / Safari     | copy and paste inside the editor (blocks and bold kept), cut + undo  |        |       |
+| Any / Chrome       | paste from Word: heading, bold/italic/underline, empty line, list    |        |       |
+| Any / Chrome       | paste from Google Docs: same                                         |        |       |
+| Any / Chrome       | paste from LibreOffice Writer: same                                  |        |       |
+| Any / Firefox      | paste from a web page with links and images (text only, no images)   |        |       |
+| Any                | copy from the editor, paste into Word / Google Docs: formatting kept |        |       |
 
 ## Screen readers
 
