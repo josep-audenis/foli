@@ -297,7 +297,7 @@ Each task is one PR that leaves `pnpm check` green and the playground working.
   pending in 4.6), line deletes without a target
   range via `Selection.modify`; Delete/Backspace at block and document edges; scroll caret into
   view; stored marks dropped across native caret moves; browser T1/T2.
-- [x] 4.5 Read-only mode (one dispatch gate drops user edits; select and copy still work),
+- [x] 4.5 (#13) Read-only mode (one dispatch gate drops user edits; select and copy still work),
   focus management (keyboard and code focus show the model selection), placeholder (CSS on
   the empty block, `aria-placeholder`); accessibility baseline (label, `aria-readonly`,
   semantic blocks); axe check on the playground in all three engines.
