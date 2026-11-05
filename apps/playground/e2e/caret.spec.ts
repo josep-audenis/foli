@@ -230,6 +230,7 @@ test("the caret scrolls into view after typing, Enter and undo", async ({ page }
 });
 
 test("the caret scrolls into view on hard-break lines of a tall paragraph", async ({ page }) => {
+  test.slow(); // ~280 keys: about 20 s in WebKit on Windows, past the timeout under parallel load
   await openEmpty(page);
   for (let i = 0; i < 40; i++) {
     await page.keyboard.type(`line ${i}`);

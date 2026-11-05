@@ -21,6 +21,11 @@ body {
 .playground-hint {
   color: #6b6b66;
   flex: 1;
+  /* One line, so the bar stays shorter than the scroll padding below. */
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 html {

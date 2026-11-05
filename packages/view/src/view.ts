@@ -16,6 +16,7 @@ import {
   Slice,
   splitBlock,
   TextSelection,
+  type Transaction,
   TransformError,
   toggleMark,
   undo,
@@ -26,6 +27,37 @@ import { type BlockDesc, renderBlock } from "./render.js";
 interface DomPoint {
   node: Node;
   offset: number;
+}
+
+export interface EditorViewOptions {
+  /** Whether the user can change the document (default true). Code can always change it. */
+  editable?: boolean;
+  /** Shown while the document is one empty block (default: none). */
+  placeholder?: string;
+}
+
+const PLACEHOLDER_ATTR = "data-foli-placeholder";
+// Generated content is not document text: no caret stops inside it, a zero-height float keeps
+// the caret at the line start, and the empty alt text keeps screen readers on aria-placeholder.
+const STYLES = `[${PLACEHOLDER_ATTR}]::before{content:attr(${PLACEHOLDER_ATTR});content:attr(${PLACEHOLDER_ATTR}) / "";float:inline-start;height:0;pointer-events:none;color:GrayText}`;
+
+/**
+ * Adds the view's stylesheet once per document or shadow root, when a placeholder is first shown
+ * (by then the host is usually mounted where it will stay).
+ * shortcut: a CSP without 'unsafe-inline' for styles blocks it (placeholder not shown); ship a CSS file with the Phase 6 package if users need that.
+ */
+function injectStyles(host: HTMLElement): void {
+  const doc = host.ownerDocument;
+  const root = host.getRootNode();
+  const parent =
+    root.nodeType === Node.DOCUMENT_FRAGMENT_NODE
+      ? (root as ShadowRoot)
+      : (doc.head ?? doc.documentElement);
+  if (parent.querySelector("style[data-foli]")) return;
+  const style = host.ownerDocument.createElement("style");
+  style.setAttribute("data-foli", "");
+  style.textContent = STYLES;
+  parent.append(style);
 }
 
 /**
@@ -53,15 +85,25 @@ export class EditorView {
   private pending: MutationRecord[] = [];
   private readonly observer: MutationObserver;
   private readonly unsubscribe: () => void;
+  private editable = true;
+  private placeholder = "";
+  /** The block that shows the placeholder, if any. */
+  private placeholderDom: HTMLElement | null = null;
+  /** Set by a mousedown that focuses the host: the click places the caret, not the view. */
+  private pointerFocus = false;
+  /** Whether the view added the host's tabindex (a read-only host must stay focusable). */
+  private readonly addedTabIndex: boolean;
 
   constructor(
     readonly host: HTMLElement,
     readonly editor: Editor,
+    options: EditorViewOptions = {},
   ) {
     this.state = editor.state;
-    host.setAttribute("contenteditable", "true");
     host.setAttribute("role", "textbox");
     host.setAttribute("aria-multiline", "true");
+    this.addedTabIndex = !host.hasAttribute("tabindex");
+    if (this.addedTabIndex) host.tabIndex = 0;
     // Spaces typed into the model must stay visible and caret-addressable.
     host.style.whiteSpace = "pre-wrap";
     host.style.overflowWrap = "break-word";
@@ -69,8 +111,10 @@ export class EditorView {
     this.observer = new MutationObserver(this.onMutations);
     this.observer.observe(host, { childList: true, characterData: true, subtree: true });
     this.render();
+    this.setOptions(options);
 
     host.addEventListener("beforeinput", this.onBeforeInput);
+    host.addEventListener("focus", this.onFocus);
     host.addEventListener("keydown", this.onKeyDown);
     host.addEventListener("input", this.onInput);
     host.addEventListener("compositionstart", this.onCompositionStart);
@@ -89,6 +133,7 @@ export class EditorView {
     this.observer.disconnect();
     const { host } = this;
     host.removeEventListener("beforeinput", this.onBeforeInput);
+    host.removeEventListener("focus", this.onFocus);
     host.removeEventListener("keydown", this.onKeyDown);
     host.removeEventListener("input", this.onInput);
     host.removeEventListener("compositionstart", this.onCompositionStart);
@@ -99,16 +144,61 @@ export class EditorView {
     host.removeEventListener("cut", this.onCut);
     host.removeEventListener("paste", this.onPaste);
     host.ownerDocument.removeEventListener("selectionchange", this.onSelectionChange);
-    for (const name of ["contenteditable", "role", "aria-multiline"]) host.removeAttribute(name);
+    const owned = [
+      "contenteditable",
+      "role",
+      "aria-multiline",
+      "aria-readonly",
+      "aria-placeholder",
+    ];
+    if (this.addedTabIndex) owned.push("tabindex");
+    for (const name of owned) host.removeAttribute(name);
     host.style.removeProperty("white-space");
     host.style.removeProperty("overflow-wrap");
     if (!host.getAttribute("style")) host.removeAttribute("style");
     host.replaceChildren();
   }
 
+  /** Focuses the host and shows the model selection in it. */
   focus(): void {
     this.host.focus();
     this.writeSelection(true);
+  }
+
+  /** Changes the given options; the others keep their value. */
+  setOptions(options: EditorViewOptions): void {
+    const { host } = this;
+    if (options.editable !== undefined) {
+      // Finish a running composition while its text can still go into the model.
+      if (!options.editable && this.composing) this.onCompositionEnd();
+      this.editable = options.editable;
+    }
+    if (options.placeholder !== undefined) this.placeholder = options.placeholder;
+    // Read-only: no caret and no browser editing; the text stays selectable and copyable.
+    host.setAttribute("contenteditable", String(this.editable));
+    if (this.editable) host.removeAttribute("aria-readonly");
+    else host.setAttribute("aria-readonly", "true");
+    if (this.placeholder) host.setAttribute("aria-placeholder", this.placeholder);
+    else host.removeAttribute("aria-placeholder");
+    this.showPlaceholder();
+  }
+
+  /**
+   * Marks the only block while the document is one empty textblock; CSS shows the text. Hidden
+   * during a composition, whose text the model does not have yet.
+   */
+  private showPlaceholder(): void {
+    const { doc } = this.state;
+    const empty =
+      doc.childCount === 1 && doc.firstChild?.isTextblock && !doc.firstChild.content.size;
+    const target =
+      this.placeholder && empty && !this.composing ? (this.blocks[0]?.dom ?? null) : null;
+    if (this.placeholderDom !== target) this.placeholderDom?.removeAttribute(PLACEHOLDER_ATTR);
+    if (target) {
+      injectStyles(this.host);
+      target.setAttribute(PLACEHOLDER_ATTR, this.placeholder);
+    }
+    this.placeholderDom = target;
   }
 
   // ---------- rendering ----------
@@ -177,6 +267,7 @@ export class EditorView {
     }
     this.blocks = blocks;
     this.starts = starts;
+    this.showPlaceholder();
     // The view's own DOM changes are not input. During a composition, keep what the browser
     // changed before this render: the touched blocks are read back at compositionend.
     const records = this.observer.takeRecords();
@@ -259,7 +350,7 @@ export class EditorView {
     const selection = this.readSelection();
     if (!selection || this.shows(selection)) return;
     // A caret moved by the user drops marks toggled at the old position.
-    this.editor.dispatch(this.state.tr.setSelection(selection).setStoredMarks(null));
+    this.dispatch(this.state.tr.setSelection(selection).setStoredMarks(null));
   }
 
   /**
@@ -303,7 +394,19 @@ export class EditorView {
   // ---------- input ----------
 
   private run(command: Command): boolean {
-    return command(this.state, (tr) => this.editor.dispatch(tr));
+    return command(this.state, (tr) => this.dispatch(tr));
+  }
+
+  /**
+   * Every change from user input goes through here. Read-only mode drops document changes and
+   * newly stored marks (Mod+B on a caret); selection changes, and clearing stored marks, still
+   * apply. Code can always change the document through the editor.
+   */
+  private dispatch(tr: Transaction): boolean {
+    const marksAdded = tr.storedMarks !== null && tr.storedMarks !== this.state.storedMarks;
+    if (!this.editable && (tr.docChanged || marksAdded)) return false;
+    this.editor.dispatch(tr);
+    return true;
   }
 
   /** Selects the event's target range when the browser gives a non-empty one (spellcheck, deletes). */
@@ -315,8 +418,7 @@ export class EditorView {
     if (from === null || to === null) return;
     const { doc } = this.state;
     const selection = TextSelection.between(doc.resolve(from), doc.resolve(to));
-    if (!selection.eq(this.state.selection))
-      this.editor.dispatch(this.state.tr.setSelection(selection));
+    if (!selection.eq(this.state.selection)) this.dispatch(this.state.tr.setSelection(selection));
   }
 
   private onBeforeInput = (event: InputEvent): void => {
@@ -385,6 +487,10 @@ export class EditorView {
    * selection to the start of the next block, so typing over it would merge the two blocks.
    */
   private onMouseDown = (event: MouseEvent): void => {
+    this.pointerFocus = !this.hasFocus();
+    // Focus from a mousedown happens in its default action, before this timer. A mousedown that
+    // focuses nothing (prevented, middle button) must not skip the next keyboard focus.
+    if (this.pointerFocus) setTimeout(() => (this.pointerFocus = false));
     if (event.detail !== 3 || event.button !== 0) return;
     let element = event.target as Node | null;
     while (element && element.parentNode !== this.host) element = element.parentNode;
@@ -395,7 +501,7 @@ export class EditorView {
     const from = (this.starts[index] as number) + 1;
     const { doc } = this.state;
     this.host.focus();
-    this.editor.dispatch(
+    this.dispatch(
       this.state.tr
         .setSelection(TextSelection.create(doc, from, from + desc.node.content.size))
         .setStoredMarks(null),
@@ -409,7 +515,12 @@ export class EditorView {
     const name = keyName(event);
     // Ctrl/Cmd+Shift+V: the paste event that follows uses only the plain text.
     this.plainPaste = name === "Mod-Shift-v";
-    if (this.editor.handleKey(name)) event.preventDefault();
+    // Like `editor.handleKey`, but through the view's dispatch, so read-only mode drops edits.
+    const handled = this.state.plugins.some((plugin) => {
+      const command = plugin.spec.keymap?.[name];
+      return command ? this.run(command) : false;
+    });
+    if (handled) event.preventDefault();
   };
 
   /** Safety net: a DOM change that was not prevented is read back into the model. */
@@ -420,15 +531,34 @@ export class EditorView {
   private onCompositionStart = (): void => {
     this.syncSelection();
     this.composing = true;
+    this.showPlaceholder();
   };
 
   private onCompositionEnd = (): void => {
     this.composing = false;
     this.flush();
+    this.showPlaceholder();
+  };
+
+  /**
+   * Focus from the keyboard or from code shows the model selection: once the page selection has
+   * moved elsewhere, browsers put the caret at the start of the host instead. A DOM selection
+   * that already shows the model selection (the window or tab regaining focus) is left alone,
+   * and so is the scroll position.
+   */
+  private onFocus = (): void => {
+    const pointer = this.pointerFocus;
+    this.pointerFocus = false;
+    if (pointer) return;
+    const current = this.readSelection();
+    if (current && this.shows(current)) return;
+    this.writeSelection(true);
+    this.scrollToSelection();
   };
 
   /** Some browsers drop compositionend when focus leaves mid-composition; never stay stuck in it. */
   private onBlur = (): void => {
+    this.pointerFocus = false;
     if (this.composing) this.onCompositionEnd();
   };
 
@@ -545,8 +675,12 @@ export class EditorView {
     const range = TextSelection.create(doc, posAt(start), posAt(end));
     const selected = this.state.apply(this.state.tr.setSelection(range));
     const command = inserted ? insertText(inserted) : deleteSelection;
-    // A filtered transaction renders nothing: still drop the browser's DOM.
-    if (!command(selected, (tr) => this.editor.dispatch(tr)) || this.dirty.size) this.rerender();
+    // A filtered or read-only transaction renders nothing: still drop the browser's DOM.
+    let applied = false;
+    command(selected, (tr) => {
+      applied = this.dispatch(tr);
+    });
+    if (!applied || this.dirty.size) this.rerender();
   }
 
   /** Rebuilds every block that is not reused and puts the selection back. */
@@ -578,7 +712,7 @@ export class EditorView {
     this.onCopy(event);
     if (!event.defaultPrevented) return;
     // Its own undo step, not merged with the typing before it.
-    deleteSelection(this.state, (tr) => this.editor.dispatch(tr.setMeta(closeHistory, true)));
+    deleteSelection(this.state, (tr) => this.dispatch(tr.setMeta(closeHistory, true)));
   };
 
   private onPaste = (event: ClipboardEvent): void => {
@@ -619,8 +753,7 @@ export class EditorView {
       } else {
         tr.replaceSelection(doc.slice(1, doc.content.size - 1));
       }
-      this.editor.dispatch(tr.setMeta(closeHistory, true));
-      return true;
+      return this.dispatch(tr.setMeta(closeHistory, true));
     } catch (error) {
       // shortcut: content the schema cannot fit at the selection is not pasted; general fitting comes with nested blocks (Phase 7).
       if (error instanceof TransformError) return false;

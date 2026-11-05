@@ -7,6 +7,12 @@ export interface DocumentEditorProps {
   initialContent?: FoliDocument;
   /** Called with the whole document after every change to its content. */
   onChange?: (document: FoliDocument) => void;
+  /** The user can read, select and copy, but not change the document. */
+  readOnly?: boolean;
+  /** Shown while the document is empty. */
+  placeholder?: string;
+  /** Accessible name of the editor (default "Document"). */
+  label?: string;
   className?: string;
 }
 
@@ -15,10 +21,18 @@ export interface DocumentEditorProps {
  * the engine owns the document; React only observes it through `onChange`.
  * Provisional API: final names are decided in Phase 6 (see docs/roadmap.md).
  */
-export function DocumentEditor({ initialContent, onChange, className }: DocumentEditorProps) {
+export function DocumentEditor({
+  initialContent,
+  onChange,
+  readOnly = false,
+  placeholder = "",
+  label = "Document",
+  className,
+}: DocumentEditorProps) {
   const [initial] = useState(() => initialContent ?? createDocument());
   const [editor] = useState(() => createEditor({ document: initial }));
   const contentRef = useRef<HTMLDivElement>(null);
+  const viewRef = useRef<EditorView | null>(null);
   const onChangeRef = useRef(onChange);
 
   useLayoutEffect(() => {
@@ -30,6 +44,7 @@ export function DocumentEditor({ initialContent, onChange, className }: Document
     const host = contentRef.current;
     if (!host) return;
     const view = new EditorView(host, editor);
+    viewRef.current = view;
     // shortcut: serializes the whole document per change (O(document) per keystroke); Phase 6 API decides on a lazy getter.
     const unsubscribe = editor.subscribe((_state, transactions) => {
       if (transactions.some((tr) => tr.docChanged)) onChangeRef.current?.(editor.getDocument());
@@ -37,8 +52,14 @@ export function DocumentEditor({ initialContent, onChange, className }: Document
     return () => {
       unsubscribe();
       view.destroy();
+      viewRef.current = null;
     };
   }, [editor]);
+
+  // Runs after the view is created (effects run in order), and again when the props change.
+  useLayoutEffect(() => {
+    viewRef.current?.setOptions({ editable: !readOnly, placeholder });
+  }, [readOnly, placeholder]);
 
   const { pageSize, margins } = initial.settings;
   const pageStyle: CSSProperties = {
@@ -56,7 +77,7 @@ export function DocumentEditor({ initialContent, onChange, className }: Document
           className="foli-content"
           role="textbox"
           aria-multiline="true"
-          aria-label="Document"
+          aria-label={label}
           tabIndex={0}
         />
       </div>

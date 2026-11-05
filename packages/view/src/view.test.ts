@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { createDocument, createEditor, type DocJSON } from "@foli/core";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { EditorView, keyName } from "./index.js";
+import { EditorView, type EditorViewOptions, keyName } from "./index.js";
 
 const sample: DocJSON = {
   type: "doc",
@@ -30,11 +30,11 @@ afterEach(() => {
   views = [];
 });
 
-function mount(content: DocJSON = sample) {
+function mount(content: DocJSON = sample, options?: EditorViewOptions) {
   const host = document.createElement("div");
   document.body.append(host);
   const editor = createEditor({ document: createDocument(content) });
-  const view = new EditorView(host, editor);
+  const view = new EditorView(host, editor, options);
   views.push(view);
   return { host, editor, view };
 }
@@ -439,5 +439,136 @@ describe("keyName", () => {
   it("falls back to the physical key on non-Latin layouts", () => {
     expect(key({ key: "и", code: "KeyB", ctrlKey: true })).toMatch(/^(Mod|Ctrl)-/);
     expect(key({ key: "и", code: "KeyB", ctrlKey: true })).not.toContain("и");
+  });
+});
+
+describe("EditorView options", () => {
+  const empty: DocJSON = { type: "doc", content: [{ type: "paragraph" }] };
+  const one = (text: string): DocJSON => ({
+    type: "doc",
+    content: [{ type: "paragraph", content: [{ type: "text", text }] }],
+  });
+  const settle = () => new Promise((resolve) => setTimeout(resolve));
+
+  it("read-only: not editable, marked aria-readonly, still focusable", () => {
+    const { host, view } = mount(one("ab"), { editable: false });
+    expect(host.getAttribute("contenteditable")).toBe("false");
+    expect(host.getAttribute("aria-readonly")).toBe("true");
+    expect(host.tabIndex).toBe(0);
+    view.setOptions({ editable: true });
+    expect(host.getAttribute("contenteditable")).toBe("true");
+    expect(host.hasAttribute("aria-readonly")).toBe(false);
+  });
+
+  it("read-only: drops edits from input, keys, paste, cut and read-back", async () => {
+    const { host, editor, view } = mount(one("ab"), { editable: false });
+    host.focus();
+    editor.select(1, 3);
+    const ctrl = { ctrlKey: true, cancelable: true };
+    host.dispatchEvent(
+      new InputEvent("beforeinput", { inputType: "insertText", data: "x", cancelable: true }),
+    );
+    host.dispatchEvent(new KeyboardEvent("keydown", { key: "b", ...ctrl }));
+    host.dispatchEvent(new KeyboardEvent("keydown", { key: "Backspace", cancelable: true }));
+    host.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", cancelable: true }));
+    expect(view.paste({ getData: (type) => (type === "text/plain" ? "pasted" : "") })).toBe(false);
+    // jsdom has no ClipboardEvent: a plain event carrying clipboard data.
+    const cut = Object.assign(new Event("cut", { cancelable: true }), {
+      clipboardData: { setData: () => {} },
+    });
+    host.dispatchEvent(cut);
+    expect(cut.defaultPrevented).toBe(true); // copied, not deleted
+    // A DOM change the browser was not supposed to make is undone, not read back.
+    (host.querySelector("p")?.firstChild as Text).data = "abc";
+    await settle();
+    expect(host.innerHTML).toBe("<p>ab</p>");
+    expect(editor.state.doc.textContent).toBe("ab");
+    // Mod+B on a caret would only store a mark: dropped too.
+    editor.select(2);
+    host.dispatchEvent(new KeyboardEvent("keydown", { key: "b", ...ctrl }));
+    expect(editor.state.storedMarks).toBeNull();
+    // Selection still works, and code can still change the document.
+    host.dispatchEvent(new KeyboardEvent("keydown", { key: "a", ...ctrl }));
+    expect(editor.state.selection.from).toBe(0);
+    editor.commands.insertText("z");
+    expect(host.textContent).toBe("z");
+  });
+
+  it("shows the placeholder only on an empty document, never during composition", () => {
+    const { host, editor, view } = mount(empty, { placeholder: "Write…" });
+    const marked = () =>
+      host.querySelector("[data-foli-placeholder]")?.getAttribute("data-foli-placeholder");
+    expect(host.getAttribute("aria-placeholder")).toBe("Write…");
+    expect(marked()).toBe("Write…");
+    expect(document.head.querySelectorAll("style[data-foli]")).toHaveLength(1);
+    host.focus();
+    editor.commands.insertText("a");
+    expect(marked()).toBeUndefined();
+    editor.commands.deleteBackward();
+    expect(marked()).toBe("Write…");
+    host.dispatchEvent(new CompositionEvent("compositionstart"));
+    expect(marked()).toBeUndefined();
+    host.dispatchEvent(new CompositionEvent("compositionend"));
+    expect(marked()).toBe("Write…");
+    editor.commands.splitBlock();
+    expect(marked()).toBeUndefined();
+    view.setOptions({ placeholder: "" });
+    editor.setDocument(createDocument());
+    expect(marked()).toBeUndefined();
+    expect(host.hasAttribute("aria-placeholder")).toBe(false);
+  });
+
+  it("adds its stylesheet once per document", () => {
+    mount(empty, { placeholder: "a" });
+    mount(empty, { placeholder: "b" });
+    expect(document.head.querySelectorAll("style[data-foli]")).toHaveLength(1);
+  });
+
+  it("focus from the keyboard or code shows the model selection", () => {
+    const { host, editor } = mount(one("abc"));
+    editor.select(3);
+    const outside = document.createElement("span");
+    outside.textContent = "elsewhere";
+    document.body.append(outside);
+    document.getSelection()?.selectAllChildren(outside);
+    host.focus();
+    const sel = document.getSelection();
+    expect(sel?.focusNode).toBe(host.querySelector("p")?.firstChild);
+    expect(sel?.focusOffset).toBe(2);
+
+    // Focus again (window or tab switch) with the selection already shown: nothing is
+    // rewritten and nothing scrolls.
+    const write = vi.spyOn(Selection.prototype, "setBaseAndExtent");
+    host.dispatchEvent(new FocusEvent("focus"));
+    expect(write).not.toHaveBeenCalled();
+    write.mockRestore();
+
+    // The click half (no restore after a mousedown) needs real focus: e2e view-options.
+    outside.remove();
+  });
+
+  it("a mousedown that focuses nothing does not skip the next keyboard focus", async () => {
+    const { host, editor } = mount(one("abc"));
+    editor.select(3);
+    host.dispatchEvent(new MouseEvent("mousedown", { bubbles: true })); // no focus follows
+    await new Promise((resolve) => setTimeout(resolve));
+    const outside = document.createElement("span");
+    outside.textContent = "elsewhere";
+    document.body.append(outside);
+    document.getSelection()?.selectAllChildren(outside);
+    host.focus();
+    expect(document.getSelection()?.focusOffset).toBe(2);
+    outside.remove();
+  });
+
+  it("restores the host's own tabindex and the attributes it added on destroy", () => {
+    const host = document.createElement("div");
+    host.tabIndex = -1;
+    document.body.append(host);
+    const view = new EditorView(host, createEditor(), { editable: false, placeholder: "x" });
+    view.destroy();
+    expect(host.getAttributeNames()).toEqual(["tabindex"]);
+    expect(host.tabIndex).toBe(-1);
+    host.remove();
   });
 });
