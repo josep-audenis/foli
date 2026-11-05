@@ -1,5 +1,6 @@
 import { createDocument, type FoliDocument, parseDocument } from "@foli/core";
 import { DocumentEditor } from "@foli/react";
+import { useState } from "react";
 
 const STORAGE_KEY = "foli-playground-document";
 
@@ -78,19 +79,38 @@ function reset(): void {
 }
 
 export function App() {
+  const [initial] = useState(load);
+  const [readOnly, setReadOnly] = useState(false);
   return (
     <main>
       <header className="playground-bar">
         <strong>Foli</strong>
-        <span className="playground-hint">
+        <span
+          className="playground-hint"
+          title="Phase 4 editor view: typing, marks, undo, IME, paste, read-only mode, placeholder"
+        >
           Editor view in progress (Phase 4): typing, Enter, Backspace, marks, undo. IME and dead
-          keys are being verified. Paste maps HTML to the schema.
+          keys are being verified. Paste maps HTML to the schema. Try read-only mode, or clear the
+          page to see the placeholder.
         </span>
+        <label>
+          <input
+            type="checkbox"
+            checked={readOnly}
+            onChange={(event) => setReadOnly(event.target.checked)}
+          />{" "}
+          Read-only
+        </label>
         <button type="button" onClick={reset}>
           Reset
         </button>
       </header>
-      <DocumentEditor initialContent={load()} onChange={save} />
+      <DocumentEditor
+        initialContent={initial}
+        onChange={save}
+        readOnly={readOnly}
+        placeholder="Start writing…"
+      />
     </main>
   );
 }

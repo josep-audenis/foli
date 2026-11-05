@@ -29,14 +29,14 @@ This document describes **what exists** and **what is decided**. Planned parts a
 └──────────────────────────────────────────────────────────────┘
 ```
 
-| Subsystem           | Responsibility                                                                 | Status                                                 |
-| ------------------- | ------------------------------------------------------------------------------ | ------------------------------------------------------ |
-| Document model      | Schema, immutable tree, marks, positions, JSON, validation                     | ✅ (Phase 2)                                           |
-| Editing engine      | Steps, position mapping, selection, state, history, commands                   | ✅ headless (Phase 3)                                  |
-| View                | Render state to DOM, DOM ↔ model mapping, `beforeinput`, IME, clipboard, focus | Editing slice ✅ (Phase 4.1); IME, clipboard: Phase 4  |
-| Layout              | Measurement, line breaking, page flow, fragments, incremental reflow, print    | Phase 5 (inside `@foli/view` until the seam is proven) |
-| React integration   | Components, hooks, toolbar                                                     | Editable `DocumentEditor` ✅; API: Phase 6             |
-| Document processing | DOCX/HTML interop, Rust/WASM                                                   | Phase 10                                               |
+| Subsystem           | Responsibility                                                                 | Status                                                   |
+| ------------------- | ------------------------------------------------------------------------------ | -------------------------------------------------------- |
+| Document model      | Schema, immutable tree, marks, positions, JSON, validation                     | ✅ (Phase 2)                                             |
+| Editing engine      | Steps, position mapping, selection, state, history, commands                   | ✅ headless (Phase 3)                                    |
+| View                | Render state to DOM, DOM ↔ model mapping, `beforeinput`, IME, clipboard, focus | Editing, clipboard, focus, read-only ✅; IME manual: 4.6 |
+| Layout              | Measurement, line breaking, page flow, fragments, incremental reflow, print    | Phase 5 (inside `@foli/view` until the seam is proven)   |
+| React integration   | Components, hooks, toolbar                                                     | Editable `DocumentEditor` ✅; API: Phase 6               |
+| Document processing | DOCX/HTML interop, Rust/WASM                                                   | Phase 10                                                 |
 
 ## Editing data flow (target design)
 
@@ -128,9 +128,10 @@ Known limits:
 Phase 4 in progress (`packages/view/src/view.ts`). Design per ADR-0003 (one `contenteditable`
 host); pages and fragments arrive in Phase 5, so today the whole document is one continuous host.
 
-- `new EditorView(host, editor)` renders the state of a core `Editor` into `host` and
-  subscribes to it. Edits go through `editor.dispatch`, so history, plugins and subscribers see
-  every change. `destroy()` detaches it.
+- `new EditorView(host, editor, { editable, placeholder })` renders the state of a core
+  `Editor` into `host` and subscribes to it. Edits go through `editor.dispatch`, so history,
+  plugins and subscribers see every change. `setOptions()` changes the options; `destroy()`
+  detaches the view and removes every attribute it added.
 - **Descriptors:** one per block (model node, element, leaves) and one per inline leaf (text
   node or hard break with its offset in the block). `posFromDOM` / `domFromPos` map through
   them; the DOM is never parsed for content.
@@ -140,7 +141,8 @@ host); pages and fragments arrive in Phase 5, so today the whole document is one
   - Empty blocks and blocks ending in a hard break get an extra `<br>` without a descriptor.
 - **Rendering:** blocks whose model node is unchanged (same identity) keep their DOM; changed
   blocks are rebuilt; stray DOM is removed. Built with `createElement`/`textContent` only.
-- **Input:** `keydown` → the plugin keymaps (`editor.handleKey`). Names are normalized as
+- **Input:** `keydown` → the plugin keymaps (as `editor.handleKey`, through the view's
+  dispatch). Names are normalized as
   `Mod-Ctrl-Meta-Alt-Shift-key` (`Mod` = Cmd on Apple platforms, Ctrl elsewhere; non-Latin
   layouts fall back to the physical key). Everything else arrives as `beforeinput` and is always
   prevented. It maps to commands: insertText, insertReplacementText (target range),
@@ -167,6 +169,25 @@ host); pages and fragments arrive in Phase 5, so today the whole document is one
   - After every change the view scrolls the selection head into view (scrollable ancestors,
     then the window, honouring `scroll-padding`): browsers do not when the view edits the DOM
     and sets the selection itself. Vertical only, since text wraps.
+- **Focus:** focus from the keyboard or from code (`view.focus()`) shows the model selection and
+  scrolls to it. Once the page selection has moved elsewhere (text selected outside the
+  editor), all three engines otherwise put the caret at the start of the host. A click that
+  focuses the host keeps the caret where it lands.
+- **Read-only** (`editable: false`): the host gets `contenteditable="false"` and
+  `aria-readonly="true"` and stays focusable (the view adds `tabindex="0"` if the host has
+  none). Every change from user input goes through one dispatch gate that drops document
+  changes, so keymaps, `beforeinput`, paste, cut and DOM read-back cannot edit; read-back
+  restores the DOM instead. Selection, Mod+A and copy (the model's content) still work; code
+  can change the document through the editor. Switching to read-only first ends a running
+  composition so its text is kept.
+- **Placeholder:** while the document is one empty textblock (and no composition runs) that
+  block gets `data-foli-placeholder`; a stylesheet the view adds once per document or shadow
+  root shows it as `::before` content: a zero-height float, so the caret stays at the line
+  start, with empty alternative text, so screen readers rely on the host's `aria-placeholder`.
+- **Accessibility baseline:** the host is `role="textbox"` with `aria-multiline`; React gives it
+  an `aria-label` (`label` prop). Blocks are semantic `<p>` and `<h1>`–`<h6>`. Playwright runs
+  axe on the playground (editable, read-only, empty) in all three engines; screen-reader checks
+  are manual (4.6).
 - **Composition and DOM read-back:** during composition (IME, dead keys) the browser edits the
   DOM and the view leaves it alone. A `MutationObserver` records every DOM change the view did
   not make itself. At `compositionend` (or right away when no composition is running: Android
@@ -201,7 +222,9 @@ Known limits (each is a later Phase 4 task in the roadmap):
   Google Docs and LibreOffice captures are part of the manual checks (4.6).
 - Content the schema cannot fit at the selection is not pasted (only possible once nested
   blocks exist).
-- No read-only mode or placeholder (4.5).
+- The placeholder stylesheet is an inline `<style>`: a Content Security Policy without
+  `'unsafe-inline'` for styles blocks it, and the placeholder is not shown (`aria-placeholder`
+  still is announced).
 - Assumes schema v1 depth (doc > textblock > inline).
 
 ### Clipboard (`packages/view/src/clipboard.ts`)
@@ -267,6 +290,8 @@ Planned, created only when needed:
   after checking size and whether existing code already covers the need.
 - **Copied code:** only with provenance in `THIRD_PARTY_NOTICES.md` and preserved notices.
 - Runtime dependencies today: none besides React (peer) and our own packages.
+- Dev-only exception: `@axe-core/playwright` / `axe-core` (MPL-2.0) for the accessibility check
+  in Playwright. Test tooling, never bundled or published.
 
 ## Build and dev wiring
 

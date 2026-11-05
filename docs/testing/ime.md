@@ -87,4 +87,6 @@ behave as in TextEdit, and typing afterwards must land at the new caret.
 | NVDA / Firefox          | read paragraph by paragraph and line by line; arrow through a word  |        |       |
 | NVDA / Chrome           | same two rows                                                       |        |       |
 | NVDA / Firefox          | type, Backspace, Ctrl+B: typed and deleted characters are announced |        |       |
+| NVDA / Firefox          | read-only (playground checkbox): announced as read-only; reads text |        |       |
+| NVDA / Firefox          | empty document: placeholder announced once, not read as content     |        |       |
 | VoiceOver / Safari      | the rows above                                                      |        |       |

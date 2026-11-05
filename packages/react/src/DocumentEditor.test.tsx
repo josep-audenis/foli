@@ -34,4 +34,18 @@ describe("DocumentEditor", () => {
       content: [{ type: "paragraph", content: [{ type: "text", text: "Hi" }] }],
     });
   });
+
+  it("passes readOnly, placeholder and label to the view, also when they change", () => {
+    const { rerender } = render(<DocumentEditor readOnly placeholder="Write…" label="Notes" />);
+    const host = screen.getByRole("textbox", { name: "Notes" });
+    expect(host.getAttribute("contenteditable")).toBe("false");
+    expect(host.getAttribute("aria-readonly")).toBe("true");
+    expect(host.getAttribute("aria-placeholder")).toBe("Write…");
+    expect(host.querySelector("[data-foli-placeholder]")).toBeTruthy();
+
+    rerender(<DocumentEditor placeholder="" label="Notes" />);
+    expect(host.getAttribute("contenteditable")).toBe("true");
+    expect(host.hasAttribute("aria-readonly")).toBe(false);
+    expect(host.querySelector("[data-foli-placeholder]")).toBeNull();
+  });
 });
