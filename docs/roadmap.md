@@ -293,7 +293,8 @@ Each task is one PR that leaves `pnpm check` green and the playground working.
 - [x] 4.4 Keyboard and caret edges: native Home/End, word and line movement measured safe in
   all three engines (Playwright, Windows bindings; macOS bindings in the manual checklist);
   carets shown at grapheme-cluster boundaries; word and line deletes from the browser's
-  `beforeinput` (macOS Cmd+Backspace deletes to the line start), line deletes without a target
+  `beforeinput` (so macOS Cmd+Backspace is expected to delete to the line start; manual check
+  pending in 4.6), line deletes without a target
   range via `Selection.modify`; Delete/Backspace at block and document edges; scroll caret into
   view; stored marks dropped across native caret moves; browser T1/T2.
 - [ ] 4.5 Read-only mode, focus management, placeholder; accessibility baseline (label,

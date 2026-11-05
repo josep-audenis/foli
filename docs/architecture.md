@@ -149,7 +149,9 @@ host); pages and fragments arrive in Phase 5, so today the whole document is one
     grapheme and word boundaries; line deletes extend the DOM selection to the visual line edge
     (`Selection.modify`) and never fall back to deleting a character.
   - Word and line deletion keys are not in the keymap (they differ per platform: Ctrl+Backspace,
-    Option+Backspace, Cmd+Backspace), so they reach the view as `beforeinput` types.
+    Option+Backspace, Cmd+Backspace), so they reach the view as `beforeinput` types. Measured on
+    Windows in all three engines (Ctrl+Backspace/Delete arrive as `deleteWord*` with a target
+    range); the macOS keys are expected to work the same way, manual check pending (4.6).
 - **Caret movement** (arrows, Home/End, word and line moves, Shift-extension) is native: the
   browser moves the DOM caret and the view reads it back. Playwright checks it in all three
   engines across marks, hard breaks, empty blocks and grapheme clusters; macOS key bindings
@@ -190,8 +192,9 @@ Known limits (each is a later Phase 4 task in the roadmap):
   (untested). The read-back diffs the whole document text, O(document) per composition.
 - Real IME and dead keys are verified only through Chromium's emulation so far; the manual
   checklist is [testing/ime.md](testing/ime.md) (4.6).
-- A hard-line delete without a target range stops at the visual line edge (all three engines
-  give a range, so this fallback is untested outside synthetic events).
+- A line delete without a target range stops at the visual line edge, also for hard-line
+  deletes. The fallback is tested only with synthetic events; whether every engine gives a
+  target range for line deletes (macOS Cmd+Backspace, Ctrl+K) is part of the manual checks.
 - Drag and drop does nothing (both the drop and the drag source are prevented).
 - Paste keeps only schema v1: links keep their text, lists and table cells become paragraphs,
   images and colors are dropped. The fixture corpus is hand-written approximations; real Word,

@@ -49,9 +49,12 @@ function caretVisible(page: Page): Promise<boolean> {
     if (!sel?.focusNode) return false;
     const range = document.createRange();
     range.setStart(sel.focusNode, sel.focusOffset);
-    const element =
-      sel.focusNode instanceof Element ? sel.focusNode : (sel.focusNode.parentElement as Element);
-    const rect = range.getClientRects()[0] ?? element.getBoundingClientRect();
+    // An element point (next to a <br>) has no rects: measure the <br> after it, else before.
+    const { focusNode: node, focusOffset: offset } = sel;
+    const near = node.childNodes[offset] ?? node.childNodes[offset - 1];
+    const rect =
+      range.getClientRects()[0] ??
+      (near instanceof Element ? near : (node as Element)).getBoundingClientRect();
     const bar = document.querySelector(".playground-bar")?.getBoundingClientRect().bottom ?? 0;
     return rect.top >= bar - 1 && rect.bottom <= innerHeight + 1;
   });
@@ -112,7 +115,18 @@ test("word movement and word deletion follow the browser", async ({ page }) => {
   await page.keyboard.type("X");
   await expectSaved(page, ["hello Xbig world"]);
   await page.keyboard.press("End");
+  // Not a keymap binding any more: the browser sends its own word-delete input type.
+  await editor(page).evaluate((host) => {
+    const types: string[] = [];
+    (window as unknown as { inputTypes: string[] }).inputTypes = types;
+    host.addEventListener("beforeinput", (event) => {
+      if (event.isTrusted) types.push((event as InputEvent).inputType);
+    });
+  });
   await page.keyboard.press(`${WORD}+Backspace`);
+  expect(
+    await page.evaluate(() => (window as unknown as { inputTypes: string[] }).inputTypes),
+  ).toEqual(["deleteWordBackward"]);
   await expectSaved(page, ["hello Xbig "]);
   await page.keyboard.press("Home");
   await page.keyboard.press(`${WORD}+Delete`);
@@ -212,6 +226,18 @@ test("the caret scrolls into view after typing, Enter and undo", async ({ page }
 
   await page.evaluate(() => scrollTo(0, 0));
   await page.keyboard.type("x");
+  expect(await caretVisible(page)).toBe(true);
+});
+
+test("the caret scrolls into view on hard-break lines of a tall paragraph", async ({ page }) => {
+  await openEmpty(page);
+  for (let i = 0; i < 40; i++) {
+    await page.keyboard.type(`line ${i}`);
+    await page.keyboard.press("Shift+Enter");
+  }
+  // The caret sits after the last hard break, an element point with no box of its own.
+  expect(await caretVisible(page)).toBe(true);
+  await page.keyboard.press("Shift+Enter");
   expect(await caretVisible(page)).toBe(true);
 });
 

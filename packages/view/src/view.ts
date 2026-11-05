@@ -119,6 +119,7 @@ export class EditorView {
     this.state = state;
     if (docChanged) this.render();
     this.writeSelection(docChanged);
+    // shortcut: scrolls for every change while focused; once remote or plugin changes exist, scroll only for local input (a transaction flag).
     if (docChanged || selectionChanged) this.scrollToSelection();
   }
 
@@ -134,8 +135,15 @@ export class EditorView {
     if (!sel || !node || !this.host.contains(node)) return;
     const range = doc.createRange();
     range.setStart(node, sel.focusOffset);
-    // A caret in an empty block or before a <br> can have no box of its own: use its element's.
-    const element = node.nodeType === Node.ELEMENT_NODE ? (node as Element) : node.parentElement;
+    // An element point (next to a <br>, in an empty block) has no box of its own: measure the
+    // <br> after it, else the one before, else the element (never a whole tall block).
+    const near = node.childNodes[sel.focusOffset] ?? node.childNodes[sel.focusOffset - 1];
+    const element =
+      near instanceof Element
+        ? near
+        : node.nodeType === Node.ELEMENT_NODE
+          ? (node as Element)
+          : node.parentElement;
     const rect = range.getClientRects?.()[0] ?? element?.getBoundingClientRect();
     if (rect) scrollRectIntoView(this.host, rect);
   }
