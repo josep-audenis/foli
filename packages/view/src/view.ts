@@ -9,6 +9,7 @@ import {
   type EditorState,
   insertHardBreak,
   insertText,
+  type Node as ModelNode,
   marksAt,
   redo,
   Selection,
@@ -114,9 +115,29 @@ export class EditorView {
 
   private update(state: EditorState): void {
     const docChanged = state.doc !== this.state.doc;
+    const selectionChanged = !state.selection.eq(this.state.selection);
     this.state = state;
     if (docChanged) this.render();
     this.writeSelection(docChanged);
+    if (docChanged || selectionChanged) this.scrollToSelection();
+  }
+
+  /**
+   * Scrolls the selection head into view. Browsers do it for their own edits and caret moves,
+   * not when the view changes the DOM and sets the selection (typing, Enter, undo, paste).
+   */
+  private scrollToSelection(): void {
+    if (this.composing || !this.hasFocus()) return;
+    const doc = this.host.ownerDocument;
+    const sel = doc.getSelection();
+    const node = sel?.focusNode;
+    if (!sel || !node || !this.host.contains(node)) return;
+    const range = doc.createRange();
+    range.setStart(node, sel.focusOffset);
+    // A caret in an empty block or before a <br> can have no box of its own: use its element's.
+    const element = node.nodeType === Node.ELEMENT_NODE ? (node as Element) : node.parentElement;
+    const rect = range.getClientRects?.()[0] ?? element?.getBoundingClientRect();
+    if (rect) scrollRectIntoView(this.host, rect);
   }
 
   /** Renders the document, reusing the DOM of blocks whose model node is unchanged. */
@@ -256,13 +277,18 @@ export class EditorView {
     if (this.composing || !this.hasFocus()) return;
     const sel = this.host.ownerDocument.getSelection();
     if (!sel) return;
-    const { selection } = this.state;
+    const { selection, doc } = this.state;
     if (!force) {
       const current = this.readSelection();
       if (current && this.shows(current)) return;
     }
-    const anchor = this.domFromPos(selection.anchor);
-    const head = this.domFromPos(selection.head);
+    // Never show a caret inside a grapheme cluster (the core snaps only out of surrogate pairs).
+    // The model takes the snapped selection back on its next read of the DOM.
+    const from = clusterBoundary(doc, selection.from, false);
+    const to = selection.empty ? from : clusterBoundary(doc, selection.to, true);
+    const forward = selection.anchor <= selection.head;
+    const anchor = this.domFromPos(forward ? from : to);
+    const head = this.domFromPos(forward ? to : from);
     sel.setBaseAndExtent(anchor.node, anchor.offset, head.node, head.offset);
   }
 
@@ -324,6 +350,20 @@ export class EditorView {
     }
     if (!type.startsWith("delete") || type === "deleteByDrag") return;
     this.selectTargetRange(event);
+    if (this.state.selection.empty && type.includes("Line")) {
+      // No target range: let the browser find the line edge, never delete a character instead.
+      // shortcut: hard-line deletes also stop at the visual line edge here; Chromium, Firefox and WebKit all give a range.
+      const sel = this.host.ownerDocument.getSelection();
+      if (type === "deleteEntireSoftLine") {
+        sel?.modify?.("move", "backward", "lineboundary");
+        sel?.modify?.("extend", "forward", "lineboundary");
+      } else {
+        sel?.modify?.("extend", type.endsWith("Forward") ? "forward" : "backward", "lineboundary");
+      }
+      this.syncSelection();
+      this.run(deleteSelection);
+      return;
+    }
     if (!this.state.selection.empty || type === "deleteByCut" || type === "deleteContent") {
       this.run(deleteSelection);
       return;
@@ -583,6 +623,52 @@ export class EditorView {
   private onSelectionChange = (): void => {
     if (!this.composing && this.hasFocus()) this.syncSelection();
   };
+}
+
+const graphemes = new Intl.Segmenter(undefined, { granularity: "grapheme" });
+
+/** `pos`, or the start (`forward`: the end) of the grapheme cluster it falls inside. */
+function clusterBoundary(doc: ModelNode, pos: number, forward: boolean): number {
+  const { parent, parentOffset } = doc.resolve(pos);
+  if (!parent.inlineContent || parentOffset === 0 || parentOffset === parent.content.size)
+    return pos;
+  // Leaves count as one character, a line feed (it never joins a cluster), as in the core.
+  const text = parent.textBetween(0, parent.content.size, "", "\n");
+  const cluster = graphemes.segment(text).containing(parentOffset);
+  if (!cluster || cluster.index === parentOffset) return pos;
+  return pos - parentOffset + cluster.index + (forward ? cluster.segment.length : 0);
+}
+
+/**
+ * Scrolls every scrollable ancestor of `from`, then the window, so that `rect` is inside its
+ * visible area (minus `scroll-padding`, e.g. for a sticky toolbar). Vertical only: text wraps.
+ */
+function scrollRectIntoView(from: HTMLElement, rect: DOMRect): void {
+  const doc = from.ownerDocument;
+  const win = doc.defaultView;
+  if (!win) return;
+  let { top, bottom } = rect;
+  const delta = (low: number, high: number) =>
+    top < low ? top - low : bottom > high ? Math.min(bottom - high, top - low) : 0;
+  const last = new Set<Element>([doc.body, doc.documentElement]); // they scroll as the window
+  for (let el: HTMLElement | null = from; el && !last.has(el); el = el.parentElement) {
+    const style = win.getComputedStyle(el);
+    if (!/auto|scroll|overlay/.test(style.overflowY) || el.scrollHeight <= el.clientHeight)
+      continue;
+    const edge = el.getBoundingClientRect().top + el.clientTop;
+    const low = edge + (Number.parseFloat(style.scrollPaddingTop) || 0);
+    const high = edge + el.clientHeight - (Number.parseFloat(style.scrollPaddingBottom) || 0);
+    const before = el.scrollTop;
+    el.scrollTop += delta(low, high);
+    top -= el.scrollTop - before;
+    bottom -= el.scrollTop - before;
+  }
+  const root = win.getComputedStyle(doc.documentElement);
+  const move = delta(
+    Number.parseFloat(root.scrollPaddingTop) || 0,
+    win.innerHeight - (Number.parseFloat(root.scrollPaddingBottom) || 0),
+  );
+  if (move) win.scrollBy(0, move);
 }
 
 function before(node: Node): DomPoint {

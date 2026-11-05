@@ -119,8 +119,8 @@ Known limits:
     - the undo took about 0.5 s.
 
   Batch per-paragraph mark steps before documents get that large.
-- Selections snap out of surrogate pairs but not to full grapheme clusters; the view must place
-  carets at cluster boundaries (Phase 4).
+- Selections snap out of surrogate pairs but not to full grapheme clusters; the view shows them
+  at cluster boundaries (Phase 4.4).
 - Plugins, `Transaction` metadata and mapping internals are exported but not yet a stable API.
 
 ## Editor view (`@foli/view`)
@@ -144,14 +144,27 @@ host); pages and fragments arrive in Phase 5, so today the whole document is one
   `Mod-Ctrl-Meta-Alt-Shift-key` (`Mod` = Cmd on Apple platforms, Ctrl elsewhere; non-Latin
   layouts fall back to the physical key). Everything else arrives as `beforeinput` and is always
   prevented. It maps to commands: insertText, insertReplacementText (target range),
-  insertParagraph, insertLineBreak, the delete types (target range, else by character or word),
-  historyUndo/Redo, and format*.
+  insertParagraph, insertLineBreak, the delete types, historyUndo/Redo, and format*.
+  - Deletes use the browser's target range. Without one, characters and words use the core's
+    grapheme and word boundaries; line deletes extend the DOM selection to the visual line edge
+    (`Selection.modify`) and never fall back to deleting a character.
+  - Word and line deletion keys are not in the keymap (they differ per platform: Ctrl+Backspace,
+    Option+Backspace, Cmd+Backspace), so they reach the view as `beforeinput` types.
+- **Caret movement** (arrows, Home/End, word and line moves, Shift-extension) is native: the
+  browser moves the DOM caret and the view reads it back. Playwright checks it in all three
+  engines across marks, hard breaks, empty blocks and grapheme clusters; macOS key bindings
+  (Cmd/Option+arrows) are in the manual checklist.
 - **Selection:** read from the live DOM before every key and input event (`selectionchange` is
   asynchronous) and on `selectionchange`, and compared with the model selection by position.
   A user caret move clears stored marks. The model selection is written back only when the DOM
   does not already show it, so native caret affinity survives. An `AllSelection` is shown as the
   text range between its ends. Triple-click selects the clicked block's content (natively,
   Chromium and WebKit extend it into the next block, and typing would merge the two).
+  - A model selection inside a grapheme cluster (only possible programmatically) is shown
+    snapped to the cluster's edges; the model takes the snapped selection back on its next read.
+  - After every change the view scrolls the selection head into view (scrollable ancestors,
+    then the window, honouring `scroll-padding`): browsers do not when the view edits the DOM
+    and sets the selection itself. Vertical only, since text wraps.
 - **Composition and DOM read-back:** during composition (IME, dead keys) the browser edits the
   DOM and the view leaves it alone. A `MutationObserver` records every DOM change the view did
   not make itself. At `compositionend` (or right away when no composition is running: Android
@@ -177,16 +190,14 @@ Known limits (each is a later Phase 4 task in the roadmap):
   (untested). The read-back diffs the whole document text, O(document) per composition.
 - Real IME and dead keys are verified only through Chromium's emulation so far; the manual
   checklist is [testing/ime.md](testing/ime.md) (4.6).
-- Delete input types for whole lines rely on the browser's target range; without one they
-  delete a character. `Mod-Backspace` is bound to word deletion, so macOS Cmd+Backspace deletes
-  a word, not to the line start (4.4).
+- A hard-line delete without a target range stops at the visual line edge (all three engines
+  give a range, so this fallback is untested outside synthetic events).
 - Drag and drop does nothing (both the drop and the drag source are prevented).
 - Paste keeps only schema v1: links keep their text, lists and table cells become paragraphs,
   images and colors are dropped. The fixture corpus is hand-written approximations; real Word,
   Google Docs and LibreOffice captures are part of the manual checks (4.6).
 - Content the schema cannot fit at the selection is not pasted (only possible once nested
   blocks exist).
-- No scroll-into-view after programmatic selection changes; no grapheme-cluster caret snapping (4.4).
 - No read-only mode or placeholder (4.5).
 - Assumes schema v1 depth (doc > textblock > inline).
 

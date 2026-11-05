@@ -196,6 +196,67 @@ describe("EditorView input", () => {
     host.dispatchEvent(new KeyboardEvent("keydown", { key: "Backspace", cancelable: true }));
     expect(editor.state.doc.textContent).toBe("");
   });
+
+  it("shows carets and selections at grapheme-cluster boundaries", () => {
+    const { host, editor, view } = mount({
+      type: "doc",
+      content: [{ type: "paragraph", content: [{ type: "text", text: "a👍🏽b" }] }],
+    });
+    view.focus();
+    const text = host.firstChild?.firstChild as Node;
+    const sel = document.getSelection();
+    editor.select(4); // between 👍 and its skin tone: inside the cluster
+    expect([sel?.focusNode, sel?.focusOffset]).toEqual([text, 1]);
+    editor.select(7, 4); // backwards from after "b" into the cluster: covers all of it
+    expect([sel?.anchorOffset, sel?.focusOffset]).toEqual([6, 1]);
+    editor.select(4);
+    host.dispatchEvent(
+      new InputEvent("beforeinput", { inputType: "insertText", data: "x", cancelable: true }),
+    );
+    expect(editor.state.doc.textContent).toBe("ax👍🏽b");
+  });
+
+  it("leaves word and line deletion keys to the browser's beforeinput", () => {
+    const { host, editor } = mount({
+      type: "doc",
+      content: [{ type: "paragraph", content: [{ type: "text", text: "one two" }] }],
+    });
+    host.focus();
+    editor.select(8);
+    const key = new KeyboardEvent("keydown", { key: "Backspace", ctrlKey: true, cancelable: true });
+    host.dispatchEvent(key);
+    expect(key.defaultPrevented).toBe(false);
+    const input = (inputType: string) =>
+      host.dispatchEvent(new InputEvent("beforeinput", { inputType, cancelable: true }));
+    input("deleteWordBackward"); // no target range: the core's word boundaries
+    expect(editor.state.doc.textContent).toBe("one ");
+  });
+
+  it("deletes to the line edge the browser finds when a line delete has no target range", () => {
+    const { host, editor } = mount({
+      type: "doc",
+      content: [{ type: "paragraph", content: [{ type: "text", text: "one two" }] }],
+    });
+    host.focus();
+    editor.select(5);
+    const input = () =>
+      host.dispatchEvent(
+        new InputEvent("beforeinput", { inputType: "deleteSoftLineBackward", cancelable: true }),
+      );
+    input(); // jsdom has no Selection.modify: nothing, rather than one character
+    expect(editor.state.doc.textContent).toBe("one two");
+    const proto = Selection.prototype as { modify?: unknown };
+    proto.modify = function (this: Selection, _alter: string, direction: string) {
+      const node = this.focusNode as Node;
+      this.extend(node, direction === "backward" ? 0 : (node.textContent?.length ?? 0));
+    };
+    try {
+      input();
+    } finally {
+      delete proto.modify;
+    }
+    expect(editor.state.doc.textContent).toBe("two");
+  });
 });
 
 describe("EditorView DOM read-back", () => {
