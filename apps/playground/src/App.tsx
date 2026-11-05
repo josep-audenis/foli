@@ -84,7 +84,7 @@ export function App() {
         <strong>Foli</strong>
         <span className="playground-hint">
           Editor view in progress (Phase 4): typing, Enter, Backspace, marks, undo. IME and dead
-          keys are being verified. No paste yet.
+          keys are being verified. Paste maps HTML to the schema.
         </span>
         <button type="button" onClick={reset}>
           Reset

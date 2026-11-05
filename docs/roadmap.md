@@ -285,9 +285,11 @@ Each task is one PR that leaves `pnpm check` green and the playground working.
   into steps at `compositionend`; `MutationObserver` safety net for unprevented changes
   (Android, extensions, spellcheck in Firefox); automated Chromium CDP IME tests;
   `docs/testing/ime.md` checklist (T4 automated part).
-- [ ] 4.3 Clipboard: copy/cut from the model (`text/plain`, `text/html`, Foli slice JSON); paste
-  with general slice fitting (closed blocks into a textblock); own HTML parser to the schema
-  (everything else dropped); fixture corpus from Word, Google Docs, LibreOffice, web pages (T3).
+- [x] 4.3 (#10) Clipboard: copy/cut from the model (`text/plain`, `text/html`, Foli
+  JSON with an open/closed flag); paste joins open content into the target block and puts
+  closed blocks into an empty textblock whole (general fitting into nested blocks moves to
+  Phase 7); own HTML parser to the schema (everything else dropped); fixture corpus for Word,
+  Google Docs, LibreOffice, web pages, hand-written for now (T3; real captures in 4.6).
 - [ ] 4.4 Keyboard and caret edges: Home/End, word and line movement where the browser is
   unsafe, carets at grapheme-cluster boundaries, Delete/Backspace edge cases, scroll caret into
   view, stored marks across native caret moves; browser T1/T2.
