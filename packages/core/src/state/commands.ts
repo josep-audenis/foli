@@ -275,7 +275,11 @@ export function setBlockType(type: string | NodeType, attrs: Attrs | null = null
   };
 }
 
-/** Default key bindings. Key names follow the view's normalization ("Mod" = Ctrl or Cmd). */
+/**
+ * Default key bindings. Key names follow the view's normalization ("Mod" = Ctrl or Cmd). Word and
+ * line deletion are not bound: their keys differ per platform (Ctrl+Backspace, Option+Backspace,
+ * Cmd+Backspace), so the view takes them from the browser's `beforeinput` types.
+ */
 export function baseKeymap(): Plugin {
   return new Plugin({
     keymap: {
@@ -283,8 +287,6 @@ export function baseKeymap(): Plugin {
       "Shift-Enter": insertHardBreak,
       Backspace: deleteBackward(),
       Delete: deleteForward(),
-      "Mod-Backspace": deleteBackward("word"),
-      "Mod-Delete": deleteForward("word"),
       "Mod-b": toggleMark("bold"),
       "Mod-i": toggleMark("italic"),
       "Mod-u": toggleMark("underline"),

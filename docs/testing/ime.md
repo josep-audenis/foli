@@ -67,6 +67,18 @@ put on the clipboard as a fixture (see `packages/view/fixtures/clipboard/README.
 | Any / Firefox      | paste from a web page with links and images (text only, no images)   |        |       |
 | Any                | copy from the editor, paste into Word / Google Docs: formatting kept |        |       |
 
+## Keyboard (macOS)
+
+Automation runs on Windows key bindings. Check these on a Mac in Safari and Chrome; each should
+behave as in TextEdit, and typing afterwards must land at the new caret.
+
+| Platform / browser | Case                                                                | Result | Notes |
+| ------------------ | ------------------------------------------------------------------- | ------ | ----- |
+| macOS / Safari     | Cmd+Left/Right (line edges), Option+Left/Right (words), Cmd+Up/Down |        |       |
+| macOS / Safari     | Cmd+Backspace deletes to the line start; Option+Backspace a word    |        |       |
+| macOS / Safari     | Ctrl+K deletes to the line end; Ctrl+H, Ctrl+D delete a character   |        |       |
+| macOS / Chrome     | the rows above                                                      |        |       |
+
 ## Screen readers
 
 | Screen reader / browser | Case                                                                | Result | Notes |

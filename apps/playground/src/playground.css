@@ -22,3 +22,8 @@ body {
   color: #6b6b66;
   flex: 1;
 }
+
+html {
+  /* Scrolling the caret into view (native and the view's) keeps it clear of the sticky bar. */
+  scroll-padding-top: 56px;
+}

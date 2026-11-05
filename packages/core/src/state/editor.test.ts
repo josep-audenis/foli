@@ -6,6 +6,8 @@ import type { BlockJSON, DocJSON } from "../schema.js";
 import { testSchema } from "../testing/index.js";
 import {
   createEditor,
+  deleteBackward,
+  deleteForward,
   deleteSelection,
   type Editor,
   EditorState,
@@ -188,10 +190,10 @@ describe("commands", () => {
   it("word deletion removes the previous word and the spaces after it", () => {
     const editor = editorWith(para("hello big  world"));
     editor.select(12);
-    editor.handleKey("Mod-Backspace");
+    editor.run(deleteBackward("word"));
     expect(content(editor)).toEqual(docJSON(para("hello world")));
     editor.select(1);
-    editor.handleKey("Mod-Delete");
+    editor.run(deleteForward("word"));
     expect(content(editor)).toEqual(docJSON(para(" world")));
   });
 

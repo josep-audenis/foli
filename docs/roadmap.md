@@ -290,9 +290,13 @@ Each task is one PR that leaves `pnpm check` green and the playground working.
   closed blocks into an empty textblock whole (general fitting into nested blocks moves to
   Phase 7); own HTML parser to the schema (everything else dropped); fixture corpus for Word,
   Google Docs, LibreOffice, web pages, hand-written for now (T3; real captures in 4.6).
-- [ ] 4.4 Keyboard and caret edges: Home/End, word and line movement where the browser is
-  unsafe, carets at grapheme-cluster boundaries, Delete/Backspace edge cases, scroll caret into
-  view, stored marks across native caret moves; browser T1/T2.
+- [x] 4.4 Keyboard and caret edges: native Home/End, word and line movement measured safe in
+  all three engines (Playwright, Windows bindings; macOS bindings in the manual checklist);
+  carets shown at grapheme-cluster boundaries; word and line deletes from the browser's
+  `beforeinput` (so macOS Cmd+Backspace is expected to delete to the line start; manual check
+  pending in 4.6), line deletes without a target
+  range via `Selection.modify`; Delete/Backspace at block and document edges; scroll caret into
+  view; stored marks dropped across native caret moves; browser T1/T2.
 - [ ] 4.5 Read-only mode, focus management, placeholder; accessibility baseline (label,
   `aria-readonly`, semantic blocks); axe check on the playground.
 - [ ] 4.6 Manual G3 checks recorded: real IME (Windows Japanese/Chinese/Korean in Chrome and
