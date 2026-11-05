@@ -290,7 +290,7 @@ Each task is one PR that leaves `pnpm check` green and the playground working.
   closed blocks into an empty textblock whole (general fitting into nested blocks moves to
   Phase 7); own HTML parser to the schema (everything else dropped); fixture corpus for Word,
   Google Docs, LibreOffice, web pages, hand-written for now (T3; real captures in 4.6).
-- [x] 4.4 Keyboard and caret edges: native Home/End, word and line movement measured safe in
+- [x] 4.4 (#11) Keyboard and caret edges: native Home/End, word and line movement measured safe in
   all three engines (Playwright, Windows bindings; macOS bindings in the manual checklist);
   carets shown at grapheme-cluster boundaries; word and line deletes from the browser's
   `beforeinput` (so macOS Cmd+Backspace is expected to delete to the line start; manual check
