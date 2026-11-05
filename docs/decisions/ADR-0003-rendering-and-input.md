@@ -3,7 +3,8 @@
 - **Status:** Accepted provisionally (2026-11-04). Automated evidence is complete; manual checks
   are partial (see "Manual results"). The untested items are accepted risks: the checks that do not
   need pages must pass on the Phase 4 view (gate G3), the page-break versions on the Phase 5 view
-  (gate G4).
+  (gate G4). G3 passed provisionally on automated evidence (2026-11-05); its manual checks are
+  still open (see "Gate G3").
 - **Date:** 2026-11-04
 - **Evidence:** `spikes/two-page` (spike) and `spikes/two-page/e2e/experiments.spec.ts`
 
@@ -118,6 +119,37 @@ Where they are re-run:
 
 Any check not run at its gate stays recorded here as an open risk. A failure at G4 that cannot be
 fixed at the fragment edge triggers the fallback below.
+
+### Gate G3: passed provisionally (2026-11-05)
+
+The project owner chose to continue to Phase 5 without the manual checks (roadmap task 4.6),
+in the same way G1 passed. Automated evidence on the Phase 4 view (Playwright, Chromium,
+Firefox and WebKit, Windows 11):
+
+- **T1, T2:** typing and formatting keep the tree valid after every keystroke; replacing a
+  cross-paragraph selection with mixed marks and undoing restores the exact document and
+  selection (`apps/playground/e2e/caret.spec.ts`).
+- **T3:** paste through the model: Foli JSON, sanitized HTML (hand-written Word, Google Docs,
+  LibreOffice and web-page fixtures), plain text; scripts and images never load. Copy/paste
+  inside the editor is not automated in WebKit (Playwright gives WebKit paste events no
+  clipboard contents).
+- **T4, automated part only:** IME composition (commit, undo as one step, inside bold text,
+  over a cross-paragraph selection) through Chromium's CDP emulation. Firefox and WebKit have
+  no IME emulation.
+
+**Still open (accepted risks, not run):**
+
+- Real IME: Windows Japanese, Chinese and Korean in Chrome and Firefox; macOS Safari; Android
+  Gboard; iOS. Dead keys on Windows and macOS.
+- NVDA and VoiceOver reading the editor, including read-only mode and the placeholder.
+- macOS key bindings (Cmd/Option+arrows, Cmd/Option+Backspace, Ctrl+K/H/D) and whether every
+  engine gives a target range for line deletes.
+- Pastes captured from real Word, Google Docs and LibreOffice (the corpus is hand-written).
+
+The checklist is [`docs/testing/ime.md`](../testing/ime.md). These checks run before the 0.1.0
+release at the latest, or together with their page-break versions at G4; until then they are
+listed in the release notes of any canary. A failure that cannot be fixed in the view triggers
+the fallback below.
 
 ## Decision
 

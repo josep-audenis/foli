@@ -29,14 +29,14 @@ This document describes **what exists** and **what is decided**. Planned parts a
 └──────────────────────────────────────────────────────────────┘
 ```
 
-| Subsystem           | Responsibility                                                                 | Status                                                   |
-| ------------------- | ------------------------------------------------------------------------------ | -------------------------------------------------------- |
-| Document model      | Schema, immutable tree, marks, positions, JSON, validation                     | ✅ (Phase 2)                                             |
-| Editing engine      | Steps, position mapping, selection, state, history, commands                   | ✅ headless (Phase 3)                                    |
-| View                | Render state to DOM, DOM ↔ model mapping, `beforeinput`, IME, clipboard, focus | Editing, clipboard, focus, read-only ✅; IME manual: 4.6 |
-| Layout              | Measurement, line breaking, page flow, fragments, incremental reflow, print    | Phase 5 (inside `@foli/view` until the seam is proven)   |
-| React integration   | Components, hooks, toolbar                                                     | Editable `DocumentEditor` ✅; API: Phase 6               |
-| Document processing | DOCX/HTML interop, Rust/WASM                                                   | Phase 10                                                 |
+| Subsystem           | Responsibility                                                                 | Status                                                 |
+| ------------------- | ------------------------------------------------------------------------------ | ------------------------------------------------------ |
+| Document model      | Schema, immutable tree, marks, positions, JSON, validation                     | ✅ (Phase 2)                                           |
+| Editing engine      | Steps, position mapping, selection, state, history, commands                   | ✅ headless (Phase 3)                                  |
+| View                | Render state to DOM, DOM ↔ model mapping, `beforeinput`, IME, clipboard, focus | ✅ (G3 provisional; manual IME/SR checks open)         |
+| Layout              | Measurement, line breaking, page flow, fragments, incremental reflow, print    | Phase 5 (inside `@foli/view` until the seam is proven) |
+| React integration   | Components, hooks, toolbar                                                     | Editable `DocumentEditor` ✅; API: Phase 6             |
+| Document processing | DOCX/HTML interop, Rust/WASM                                                   | Phase 10                                               |
 
 ## Editing data flow (target design)
 
@@ -153,7 +153,7 @@ host); pages and fragments arrive in Phase 5, so today the whole document is one
   - Word and line deletion keys are not in the keymap (they differ per platform: Ctrl+Backspace,
     Option+Backspace, Cmd+Backspace), so they reach the view as `beforeinput` types. Measured on
     Windows in all three engines (Ctrl+Backspace/Delete arrive as `deleteWord*` with a target
-    range); the macOS keys are expected to work the same way, manual check pending (4.6).
+    range); the macOS keys are expected to work the same way, manual check open (ADR-0003).
 - **Caret movement** (arrows, Home/End, word and line moves, Shift-extension) is native: the
   browser moves the DOM caret and the view reads it back. Playwright checks it in all three
   engines across marks, hard breaks, empty blocks and grapheme clusters; macOS key bindings
@@ -189,7 +189,7 @@ host); pages and fragments arrive in Phase 5, so today the whole document is one
 - **Accessibility baseline:** the host is `role="textbox"` with `aria-multiline`; React gives it
   an `aria-label` (`label` prop). Blocks are semantic `<p>` and `<h1>`–`<h6>`. Playwright runs
   axe on the playground (editable, read-only, empty) in all three engines; screen-reader checks
-  are manual (4.6).
+  are manual and still open (ADR-0003).
 - **Composition and DOM read-back:** during composition (IME, dead keys) the browser edits the
   DOM and the view leaves it alone. A `MutationObserver` records every DOM change the view did
   not make itself. At `compositionend` (or right away when no composition is running: Android
@@ -208,20 +208,20 @@ host); pages and fragments arrive in Phase 5, so today the whole document is one
     outside a composition are not prevented; their DOM effect is read back. Empty stray nodes
     are removed silently.
 
-Known limits (each is a later Phase 4 task in the roadmap):
+Known limits:
 - A read-back that would add blocks or line breaks is discarded with a `Foli:` console warning
   (some Android keyboards insert paragraphs without `beforeinput`). A `<br>` the browser adds in
   place of a hard break is not recognized, so that hard break would be read as deleted
   (untested). The read-back diffs the whole document text, O(document) per composition.
 - Real IME and dead keys are verified only through Chromium's emulation so far; the manual
-  checklist is [testing/ime.md](testing/ime.md) (4.6).
+  checklist is [testing/ime.md](testing/ime.md); not run yet, open risk in ADR-0003.
 - A line delete without a target range stops at the visual line edge, also for hard-line
   deletes. The fallback is tested only with synthetic events; whether every engine gives a
   target range for line deletes (macOS Cmd+Backspace, Ctrl+K) is part of the manual checks.
 - Drag and drop does nothing (both the drop and the drag source are prevented).
 - Paste keeps only schema v1: links keep their text, lists and table cells become paragraphs,
   images and colors are dropped. The fixture corpus is hand-written approximations; real Word,
-  Google Docs and LibreOffice captures are part of the manual checks (4.6).
+  Google Docs and LibreOffice captures are part of the open manual checks (ADR-0003).
 - Content the schema cannot fit at the selection is not pasted (only possible once nested
   blocks exist).
 - The placeholder stylesheet is added when a placeholder is first shown, to the host's shadow
