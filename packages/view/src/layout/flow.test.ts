@@ -1,6 +1,6 @@
 import { DEFAULT_SETTINGS } from "@foli/core";
 import { describe, expect, it } from "vitest";
-import { type BlockBox, contentHeight, type Fragment, flow, PX_PER_MM } from "./flow.js";
+import { type BlockBox, contentHeight, type Fragment, flow, flowFrom, PX_PER_MM } from "./flow.js";
 
 /** No widow/orphan rules: pure geometry. */
 const ANY = { orphans: 1, widows: 1 };
@@ -249,5 +249,74 @@ describe("contentHeight", () => {
   it("is the page height minus the vertical margins, in CSS px", () => {
     expect(contentHeight(DEFAULT_SETTINGS)).toBeCloseTo((297 - 2 * 25.4) * PX_PER_MM);
     expect(PX_PER_MM * 25.4).toBeCloseTo(96);
+  });
+});
+
+describe("flowFrom: incremental flow equals a full flow", () => {
+  /** A small deterministic random generator (mulberry32), so failures reproduce. */
+  function random(seed: number) {
+    let a = seed >>> 0;
+    return () => {
+      a = (a + 0x6d2b79f5) >>> 0;
+      let t = a;
+      t = Math.imul(t ^ (t >>> 15), t | 1);
+      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  function randomBox(next: () => number): BlockBox {
+    const lineHeight = [10, 12, 20][Math.floor(next() * 3)] as number;
+    const lines = 1 + Math.floor(next() * (next() < 0.5 ? 3 : 12));
+    const marginTop = Math.floor(next() * 3) * 4;
+    const marginBottom = Math.floor(next() * 3) * 4;
+    const breaks = next() < 0.1 ? [Math.floor(next() * lines)] : [];
+    return {
+      ...box(lines * lineHeight, marginTop, marginBottom, lineHeight),
+      keepWithNext: next() < 0.35,
+      breaksAfter: () => breaks,
+    };
+  }
+
+  it("for random documents and random edits (insert, delete, replace)", () => {
+    for (let seed = 1; seed <= 3000; seed++) {
+      const next = random(seed);
+      const before = Array.from({ length: 5 + Math.floor(next() * 40) }, () => randomBox(next));
+      const previous = flowFrom(before, 100);
+      // Replace `removed` boxes at `at` with `added` new ones.
+      const at = Math.floor(next() * before.length);
+      const removed = Math.min(Math.floor(next() * 3), before.length - at);
+      const added = Array.from({ length: Math.floor(next() * 3) }, () => randomBox(next));
+      const after = [...before.slice(0, at), ...added, ...before.slice(at + removed)];
+      const tail = before.length - at - removed;
+      const delta = after.length - before.length;
+      const incremental = flowFrom(after, 100, undefined, {
+        previous,
+        from: at,
+        previousIndex: (i) => (i >= after.length - tail ? i - delta : -1),
+      });
+      const full = flowFrom(after, 100);
+      expect(incremental.fragments, `seed ${seed}`).toEqual(full.fragments);
+      expect(incremental.states, `seed ${seed}`).toEqual(full.states);
+    }
+  });
+
+  it("stops early once realigned: unchanged boxes after the edit are not measured", () => {
+    let measured = 0;
+    const tall = (): BlockBox => ({
+      ...box(60, 0, 0, 10),
+      lines: () => {
+        measured++;
+        return [10, 20, 30, 40, 50, 60];
+      },
+    });
+    // Every block fills more than half a page: each one after the first splits, so a full
+    // flow measures the lines of almost all of them.
+    const blocks = Array.from({ length: 50 }, tall);
+    const previous = flowFrom(blocks, 100);
+    measured = 0;
+    // Replace block 0 by an identical one: the state before block 1 is the same as before.
+    const after = [tall(), ...blocks.slice(1)];
+    flowFrom(after, 100, undefined, { previous, from: 0, previousIndex: (i) => (i >= 1 ? i : -1) });
+    expect(measured).toBeLessThanOrEqual(1);
   });
 });

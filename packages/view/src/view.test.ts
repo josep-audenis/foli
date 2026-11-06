@@ -604,6 +604,37 @@ describe("EditorView pages", () => {
     );
   afterEach(() => vi.restoreAllMocks());
 
+  it("measures only the blocks an edit changed", () => {
+    const spy = tall();
+    const texts = Array.from({ length: 30 }, (_, i) => `p${i}`);
+    const { host, editor } = mount(paragraphs(...texts));
+    expect(host.querySelectorAll(".foli-page")).toHaveLength(15);
+    spy.mockClear();
+    editor.select(2); // in "p0"
+    editor.commands.insertText("x");
+    // The changed block, once: the 29 others keep their measurement.
+    expect(spy.mock.calls.length).toBeLessThanOrEqual(2);
+    expect(pageTexts(host)[0]).toEqual(["px0", "p1"]);
+    spy.mockClear();
+    // A new block in the middle shifts every later block to another page: heights come from
+    // the cache; only blocks that now cross a page end have their lines measured, once each.
+    /** The position at the end of block `index`'s content. */
+    const endOf = (index: number) => {
+      let pos = 0;
+      for (let i = 0; i <= index; i++) pos += editor.state.doc.child(i).nodeSize;
+      return pos - 1;
+    };
+    editor.select(endOf(15)); // end of "p15"
+    editor.commands.splitBlock();
+    expect(spy.mock.calls.length).toBeLessThan(texts.length);
+    expect(pageTexts(host).flat()).toEqual(["px0", ...texts.slice(1, 16), "", ...texts.slice(16)]);
+    expect(pageTexts(host).every((page) => page.length <= 2)).toBe(true);
+    spy.mockClear();
+    editor.select(endOf(20)); // end of "p19", after the new block
+    editor.commands.insertText("y");
+    expect(spy.mock.calls.length).toBeLessThanOrEqual(2);
+  });
+
   it("renders page elements with the document's size and margins", () => {
     const host = document.createElement("div");
     document.body.append(host);

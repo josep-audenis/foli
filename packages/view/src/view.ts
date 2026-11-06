@@ -22,7 +22,14 @@ import {
   undo,
 } from "@foli/core";
 import { docFromClipboard, FOLI_MIME, serializeRange } from "./clipboard.js";
-import { type BlockBox, contentHeight, flow } from "./layout/flow.js";
+import {
+  type BlockBox,
+  contentHeight,
+  DEFAULT_RULES,
+  type FlowResult,
+  flowFrom,
+  type Reuse,
+} from "./layout/flow.js";
 import { type BlockDesc, PAGE_BREAK_ATTR, renderBlock } from "./render.js";
 
 interface DomPoint {
@@ -87,6 +94,19 @@ export class EditorView {
   private destroyed = false;
   /** Set by a render during a composition, which places blocks but does not flow them. */
   private unflowed = false;
+  /**
+   * Measurements by model node: a node's rendered height, margins and lines only depend on
+   * its content (unchanged node, same identity), the page width and the CSS. Cleared when the
+   * page settings or the fonts change; single entries go stale when a block's size changes
+   * without an edit (`ResizeObserver`: CSS, fonts, a container).
+   */
+  private measures = new WeakMap<ModelNode, Measure>();
+  private readonly stale = new Set<ModelNode>();
+  /** The last flow and the nodes it was made for, for the next incremental one. */
+  private flowed: { nodes: readonly ModelNode[]; result: FlowResult } | null = null;
+  private readonly resizeObserver: ResizeObserver | null;
+  private readonly observed = new Set<Element>();
+  private relayoutPending = false;
   private composing = false;
   /** Set by Ctrl/Cmd+Shift+V for the paste event it triggers. */
   private plainPaste = false;
@@ -119,6 +139,8 @@ export class EditorView {
     host.style.whiteSpace = "pre-wrap";
     host.style.overflowWrap = "break-word";
     host.replaceChildren();
+    this.resizeObserver =
+      typeof ResizeObserver === "undefined" ? null : new ResizeObserver(this.onResize);
     this.observer = new MutationObserver(this.onMutations);
     this.observer.observe(host, { childList: true, characterData: true, subtree: true });
     this.render();
@@ -145,6 +167,7 @@ export class EditorView {
     this.unsubscribe();
     this.host.ownerDocument.fonts?.removeEventListener("loadingdone", this.onFontsLoaded);
     this.observer.disconnect();
+    this.resizeObserver?.disconnect();
     const { host } = this;
     host.removeEventListener("beforeinput", this.onBeforeInput);
     host.removeEventListener("focus", this.onFocus);
@@ -287,18 +310,32 @@ export class EditorView {
     });
     this.place(blocks, pages);
     if (!this.composing) {
-      const scale = layoutScale(this.pages[0] as HTMLElement);
-      const measured = new Map<BlockDesc, Lines>();
-      const lines = (desc: BlockDesc) => {
-        let found = measured.get(desc);
-        if (!found) {
-          found = measureLines(desc, scale);
-          measured.set(desc, found);
+      // DOM reads only for blocks without a valid measurement (new, changed or stale ones).
+      let scale: number | undefined;
+      const layoutPx = () => {
+        scale ??= layoutScale(this.pages[0] as HTMLElement);
+        return scale;
+      };
+      const measureOf = (desc: BlockDesc) => {
+        let found = this.measures.get(desc.node);
+        if (!found || this.stale.has(desc.node)) {
+          found = measureBox(desc, layoutPx());
+          this.measures.set(desc.node, found);
         }
         return found;
       };
-      const boxes = blocks.map((desc) => measureBox(desc, scale, () => lines(desc)));
-      const flowed = flow(boxes, contentHeight(this.editor.settings));
+      const lines = (desc: BlockDesc) => {
+        const found = measureOf(desc);
+        found.lines ??= measureLines(desc, layoutPx());
+        return found.lines;
+      };
+      const boxes = blocks.map((desc) => blockBox(desc, measureOf(desc), () => lines(desc)));
+      const nodes = blocks.map((desc) => desc.node);
+      const reuse = this.flowed ? reuseOf(this.flowed, nodes, this.stale) : undefined;
+      const result = flowFrom(boxes, contentHeight(this.editor.settings), DEFAULT_RULES, reuse);
+      this.flowed = { nodes, result };
+      this.stale.clear();
+      const flowed = result.fragments;
       blocks = blocks.map((desc, i) => {
         const fragments = flowed[i] ?? [];
         const contentStart = (starts[i] as number) + 1;
@@ -321,6 +358,7 @@ export class EditorView {
       blocks.flatMap((desc) => desc.fragments.map((fragment) => [fragment, desc] as const)),
     );
     this.unflowed = this.composing;
+    this.observeSizes();
     this.showPlaceholder();
     // The view's own DOM changes are not input. During a composition, keep what the browser
     // changed before this render: the touched blocks are read back at compositionend.
@@ -390,14 +428,73 @@ export class EditorView {
     if (style === this.pageStyle) return;
     this.pageStyle = style;
     for (const page of this.pages) page.style.cssText = style;
+    this.invalidateLayout();
+  }
+
+  /** Forgets every measurement: the next flow measures the whole document again. */
+  private invalidateLayout(): void {
+    this.measures = new WeakMap();
+    this.flowed = null;
   }
 
   /** Re-flows the pages once web fonts have loaded: line heights and wrapping change. */
   private onFontsLoaded = (): void => {
-    if (this.destroyed) return;
-    this.render();
-    this.writeSelection(false);
+    this.invalidateLayout();
+    this.scheduleRelayout();
   };
+
+  /** Observes the size of every rendered block element (and only those). */
+  private observeSizes(): void {
+    if (!this.resizeObserver) return;
+    for (const element of this.observed) {
+      if (this.owner.has(element)) continue;
+      this.resizeObserver.unobserve(element);
+      this.observed.delete(element);
+    }
+    for (const element of this.owner.keys()) {
+      if (!(element instanceof Element) || this.observed.has(element)) continue;
+      this.resizeObserver.observe(element);
+      this.observed.add(element);
+    }
+  }
+
+  /**
+   * A block whose height no longer matches its measurement changed without an edit (CSS, a web
+   * font, the content width): measure it again and re-flow, once per frame.
+   */
+  private onResize = (entries: ResizeObserverEntry[]): void => {
+    let scale: number | undefined;
+    for (const entry of entries) {
+      const desc = this.owner.get(entry.target);
+      const measured = desc && this.measures.get(desc.node);
+      if (!desc || !measured || this.stale.has(desc.node)) continue;
+      scale ??= layoutScale(this.pages[0] as HTMLElement);
+      let height = 0;
+      for (const fragment of desc.fragments) height += fragment.getBoundingClientRect().height;
+      if (Math.abs(height / scale - measured.height) > 0.5) this.stale.add(desc.node);
+    }
+    if (this.stale.size) this.scheduleRelayout();
+  };
+
+  /** Re-flows in the next animation frame (several requests in one frame make one pass). */
+  private scheduleRelayout(): void {
+    if (this.relayoutPending) return;
+    this.relayoutPending = true;
+    const run = () => {
+      this.relayoutPending = false;
+      if (this.destroyed) return;
+      // compositionend flows what a composition kept from moving.
+      if (this.composing) {
+        this.unflowed = true;
+        return;
+      }
+      this.render();
+      this.writeSelection(false);
+    };
+    const win = this.host.ownerDocument.defaultView;
+    if (win?.requestAnimationFrame) win.requestAnimationFrame(run);
+    else setTimeout(run);
+  }
 
   // ---------- position mapping ----------
 
@@ -989,11 +1086,16 @@ function layoutScale(page: HTMLElement): number {
   return layout ? page.getBoundingClientRect().height / layout || 1 : 1;
 }
 
-/**
- * A block's border-box height across its fragments (in layout px), vertical margins, and what
- * the flow rules need: headings keep with the next block; page breaks end their line's page.
- */
-function measureBox(desc: BlockDesc, scale: number, lines: () => Lines): BlockBox {
+/** A block's measurement: border-box height across its fragments (layout px), margins, lines. */
+interface Measure {
+  height: number;
+  marginTop: number;
+  marginBottom: number;
+  lines?: Lines;
+}
+
+/** Reads a block's height (in layout px) and vertical margins from the DOM. */
+function measureBox(desc: BlockDesc, scale: number): Measure {
   let height = 0;
   for (const fragment of desc.fragments) height += fragment.getBoundingClientRect().height;
   // A split block's first fragment has no bottom margin and its last no top margin (inline).
@@ -1004,6 +1106,18 @@ function measureBox(desc: BlockDesc, scale: number, lines: () => Lines): BlockBo
     // jsdom and detached nodes report no margins.
     marginTop: Number.parseFloat(first.marginTop) || 0,
     marginBottom: Number.parseFloat(last.marginBottom) || 0,
+  };
+}
+
+/**
+ * What the flow needs of a block: its measurement, its lines (on demand), and what the rules
+ * need: headings keep with the next block; page breaks end their line's page.
+ */
+function blockBox(desc: BlockDesc, measure: Measure, lines: () => Lines): BlockBox {
+  return {
+    height: measure.height,
+    marginTop: measure.marginTop,
+    marginBottom: measure.marginBottom,
     lines: () => lines().bottoms,
     keepWithNext: desc.node.type.name === "heading",
     breaksAfter: () => {
@@ -1021,6 +1135,35 @@ function measureBox(desc: BlockDesc, scale: number, lines: () => Lines): BlockBo
         return line;
       });
     },
+  };
+}
+
+/**
+ * What the next flow can reuse of the last one: the unchanged blocks before the first changed
+ * (or stale) one, and the unchanged tail after the last.
+ */
+function reuseOf(
+  last: { nodes: readonly ModelNode[]; result: FlowResult },
+  nodes: readonly ModelNode[],
+  stale: ReadonlySet<ModelNode>,
+): Reuse {
+  const before = last.nodes;
+  const same = (a: ModelNode | undefined, b: ModelNode | undefined) =>
+    a !== undefined && a === b && !stale.has(a);
+  let from = 0;
+  while (from < nodes.length && from < before.length && same(nodes[from], before[from])) from++;
+  let tail = 0;
+  while (
+    tail < nodes.length - from &&
+    tail < before.length - from &&
+    same(nodes[nodes.length - 1 - tail], before[before.length - 1 - tail])
+  )
+    tail++;
+  const delta = nodes.length - before.length;
+  return {
+    previous: last.result,
+    from,
+    previousIndex: (i) => (i >= nodes.length - tail ? i - delta : -1),
   };
 }
 

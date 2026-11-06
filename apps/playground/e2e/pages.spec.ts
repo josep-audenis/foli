@@ -650,3 +650,29 @@ test("a split paragraph leaves at least two lines on each page", async ({ page }
   }
   expect(split).toBeGreaterThan(0);
 });
+
+// ---------- incremental reflow (5.4) ----------
+
+test("a CSS change that resizes blocks re-flows the pages without an edit", async ({ page }) => {
+  await openLong(page, 60);
+  const before = await pages(page).count();
+  // Measurements are cached by node; the ResizeObserver notices the blocks grew.
+  await page.addStyleTag({ content: ".foli-page p { font-size: 20px; }" });
+  await expect.poll(() => pages(page).count()).toBeGreaterThan(before);
+  expectValidFlow(await layout(page));
+  expect(await texts(page)).toEqual(["Pages", ...Array.from({ length: 60 }, (_, i) => line(i))]);
+});
+
+test("typing on page 1 of a long document keeps every page valid", async ({ page }) => {
+  await openLong(page, 200);
+  await editor(page).getByText("Pages", { exact: true }).click();
+  await page.keyboard.press("End");
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("A new first paragraph that pushes every later block down.");
+  expectValidFlow(await layout(page));
+  for (let i = 0; i < 3; i++) await page.keyboard.press("Enter");
+  expectValidFlow(await layout(page));
+  await page.keyboard.press(`${MOD}+z`);
+  await expect.poll(async () => (await texts(page)).length).toBeLessThan(205);
+  expectValidFlow(await layout(page));
+});

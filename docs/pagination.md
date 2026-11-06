@@ -2,8 +2,9 @@
 
 > Status: **in progress (Phase 5).** Built: real page containers (5.1), paragraphs split
 > across pages at a line with caret affinity at the split (5.2), and the rules: explicit page
-> breaks, widows and orphans, keep-with-next for headings (5.3); see "Editor view" in
-> [architecture.md](architecture.md). Not built yet: incremental reflow, print. The rendering approach is
+> breaks, widows and orphans, keep-with-next for headings (5.3), and incremental reflow with
+> cached measurements (5.4); see "Editor view" in [architecture.md](architecture.md). Not built
+> yet: print, fixtures with a bundled font, benchmarks. The rendering approach is
 > validated by the Phase 1 spike (ADR-0003).
 
 ## Invariant
