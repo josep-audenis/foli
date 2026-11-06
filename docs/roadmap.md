@@ -338,7 +338,7 @@ Each task is one PR that leaves `pnpm check` green and the playground working. L
 `packages/view` (`src/layout/`) until the seam is proven; page flow stays a pure function.
 
 - [x] Claim phase, branch `phase-5/pagination`
-- [x] 5.1 Pages in the view, block level: `EditorView` renders `section.foli-page` containers
+- [x] 5.1 (#15) Pages in the view, block level: `EditorView` renders `section.foli-page` containers
   (size and margins from `editor.settings`, in mm) inside the one editable host and flows
   whole blocks into them by measured height with the pure `flowBlocks` (no splitting yet; no
   reflow during composition; re-flow when web fonts load). Position mapping, read-back and
