@@ -23,6 +23,15 @@ the font (intercepted requests to `/__foli-test-font/`), applies it with `--foli
 waits for the faces to load, and waits until the layout stops changing between frames.
 `pageBreaks(page)` lists each page's elements as `<block>[.<fragment>] (<characters>) <start>`.
 
+## Print
+
+`apps/playground/e2e/print.spec.ts`, for each fixture:
+
+- in print media (all engines; re-flow frozen, since a real print does not re-flow), every
+  page's content fits its sheet;
+- printed to PDF (Chromium only: Playwright's `page.pdf`), one sheet per screen page, each of
+  the fixture's page size.
+
 ## Snapshots
 
 `apps/playground/e2e/visual.spec.ts` checks, for each fixture and engine:

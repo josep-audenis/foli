@@ -4,8 +4,8 @@
 > across pages at a line with caret affinity at the split (5.2), and the rules: explicit page
 > breaks, widows and orphans, keep-with-next for headings (5.3), and incremental reflow with
 > cached measurements (5.4), deterministic fixtures with a bundled test font and visual
-> regression (5.5); see "Editor view" in [architecture.md](architecture.md). Not built yet:
-> print, benchmarks. The rendering approach is
+> regression (5.5), print with one sheet per page (5.6); see "Editor view" in
+> [architecture.md](architecture.md). Not built yet: benchmarks. The rendering approach is
 > validated by the Phase 1 spike (ADR-0003).
 
 ## Invariant

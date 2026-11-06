@@ -382,7 +382,7 @@ Each task is one PR that leaves `pnpm check` green and the playground working. L
   frame and wait for a composition to end. Edits themselves flow synchronously (the DOM must
   match the model for the next mapping). Playwright: a CSS change re-flows without an edit;
   typing on page 1 of a 200-paragraph document keeps every page valid.
-- [x] 5.5 Deterministic fixtures and visual regression with a bundled test font: Tinos (SIL
+- [x] 5.5 (#19) Deterministic fixtures and visual regression with a bundled test font: Tinos (SIL
   OFL 1.1, `@fontsource/tinos` dev dependency, served to the page by the tests only; recorded
   in THIRD_PARTY_NOTICES.md). Fixtures in `apps/playground/e2e/fixtures.ts`: short,
   multi-page, long paragraph, heading at a boundary, explicit breaks, mixed font sizes
@@ -393,9 +393,14 @@ Each task is one PR that leaves `pnpm check` green and the playground working. L
   the way: a re-flow without an edit (font, CSS) measured a split block's lines across its
   old split, and kept line starts of blocks rewrapped without a height change (WebKit sends
   no `loadingdone` for CSS fonts), so page breaks depended on when the font loaded.
-- [ ] 5.6 Print: `@page` size and margins from settings, one printed page per screen page
-  (`break-after: page`); Playwright PDF (Chromium) page count equals screen page count on the
-  fixtures.
+- [x] 5.6 Print: the view writes a print stylesheet from the settings (`@page` of the page
+  size with no margins, since each page's padding holds them; for its own pages, also inside a
+  shadow root: each exactly one sheet tall, no gap, `break-after: page` but after the last);
+  the React theme and the playground drop their chrome in print. Playwright on every fixture:
+  in print media every page's content fits its sheet (all three engines); a PDF (Chromium) has
+  as many sheets as screen pages, each of the page size (US Letter included). `@page` is per
+  document: several editors with different page sizes on one web page print with the last
+  one's sheet size.
 - [ ] 5.7 Benchmarks: 1/10/50/100+ pages: initial layout, keystroke-to-paint p50/p95, reflow
   time; hardware, browser and method in `docs/benchmarks.md`; targets set from the baseline.
 - [ ] 5.8 Gate G4 review: T5 in all three engines; the page-break manual checks (IME at a

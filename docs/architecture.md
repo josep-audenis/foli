@@ -127,7 +127,8 @@ Known limits:
 
 `packages/view/src/view.ts`, design per ADR-0003: one `contenteditable` host holding real pages.
 Phase 5 in progress: blocks flow from page to page (5.1) and split across pages at a line
-(5.2); rules, incremental reflow and print follow.
+(5.2), with pagination rules (5.3), incremental reflow (5.4) and print (5.6); benchmarks
+follow.
 
 - `new EditorView(host, editor, { editable, placeholder })` renders the state of a core
   `Editor` into `host` and subscribes to it. Edits go through `editor.dispatch`, so history,
@@ -174,6 +175,20 @@ Phase 5 in progress: blocks flow from page to page (5.1) and split across pages 
     there, unless it already starts its page; the flow restarts from a snapshot before it).
   - No reflow or re-split during a composition (moving the DOM the browser composes in would
     break the IME); the next render after it flows.
+  - **Print (5.6):** the view keeps a `<style data-foli-print>` in the document's head (and
+    in the shadow root holding the host, if any) with the page settings: `@page` of the page
+    size without margins (the page's padding holds them); for this view's pages only (the
+    host's `data-foli-view`), each page exactly one sheet tall, no gap between pages,
+    `break-after: page` but after the last. Content taller than a page is not cut (it prints
+    over the next sheet). A print lays out the screen's pagination: print-only CSS that
+    changes text metrics (font size, line height) makes pages overflow their sheets.
+    Checked by Playwright: in print media every page's content fits its sheet (all three
+    engines, re-flow frozen as in a real print); a PDF has one sheet of the page size per
+    page (Chromium only: `page.pdf`; Firefox and Safari printing is not checked). The React
+    theme drops the canvas and shadows in print; everything else on the web page prints too
+    and must be hidden by the app (the playground hides its bar), or it adds sheets. `@page`
+    is per document: with several editors of different page sizes, the last one's sheet
+    size wins.
   - **Incremental reflow (5.4):** measurements (height, margins, and lines once needed) are
     cached by model node: an unchanged node (same identity) renders the same at the same page
     width, so an edit reads the DOM only for the blocks it changed. The flow (`flowFrom`)
