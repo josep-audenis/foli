@@ -22,6 +22,7 @@ export {
   MARK_TYPES,
   type MarkName,
   type MarkNameJSON,
+  type PageBreakJSON,
   type ParagraphJSON,
   schema,
   type TextJSON,

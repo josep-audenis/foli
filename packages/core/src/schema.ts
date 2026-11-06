@@ -30,6 +30,9 @@ export const schema = new Schema({
     },
     text: { group: "inline" },
     hardBreak: { group: "inline", inline: true },
+    // An explicit page break: inline like a hard break (as in DOCX, `<w:br w:type="page"/>`);
+    // the line it ends is the last on its page.
+    pageBreak: { group: "inline", inline: true },
   },
   marks: Object.fromEntries(MARK_TYPES.map((name) => [name, {}])),
 });
@@ -49,7 +52,12 @@ export interface HardBreakJSON {
   marks?: MarkNameJSON[];
 }
 
-export type InlineJSON = TextJSON | HardBreakJSON;
+export interface PageBreakJSON {
+  type: "pageBreak";
+  marks?: MarkNameJSON[];
+}
+
+export type InlineJSON = TextJSON | HardBreakJSON | PageBreakJSON;
 
 export interface ParagraphJSON {
   type: "paragraph";

@@ -10,6 +10,9 @@ const MARK_TAGS: ReadonlyMap<string, string> = new Map(
   } satisfies Record<MarkName, string>),
 );
 
+/** Marks the <br> of an explicit page break. */
+export const PAGE_BREAK_ATTR = "data-page-break";
+
 /**
  * A rendered inline leaf (a text node or hard break) and where it sits in its block's content.
  * A text node split across fragments is two leaves, one per fragment.
@@ -63,7 +66,9 @@ export function renderBlock(
   };
   node.forEach((child, offset) => {
     if (!child.isText) {
+      // A hard break or a page break: both end their line (the flow ends the page at a page break).
       const br = doc.createElement("br");
+      if (child.type.name === "pageBreak") br.setAttribute(PAGE_BREAK_ATTR, "");
       leaves.push({ dom: br, offset, size: child.nodeSize });
       // Text only: a mark wrapper around <br> would add nothing visible.
       fragmentAt(offset).append(br);

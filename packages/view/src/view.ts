@@ -23,7 +23,7 @@ import {
 } from "@foli/core";
 import { docFromClipboard, FOLI_MIME, serializeRange } from "./clipboard.js";
 import { type BlockBox, contentHeight, flow } from "./layout/flow.js";
-import { type BlockDesc, renderBlock } from "./render.js";
+import { type BlockDesc, PAGE_BREAK_ATTR, renderBlock } from "./render.js";
 
 interface DomPoint {
   node: Node;
@@ -297,7 +297,7 @@ export class EditorView {
         }
         return found;
       };
-      const boxes = blocks.map((desc) => measureBox(desc, scale, () => lines(desc).bottoms));
+      const boxes = blocks.map((desc) => measureBox(desc, scale, () => lines(desc)));
       const flowed = flow(boxes, contentHeight(this.editor.settings));
       blocks = blocks.map((desc, i) => {
         const fragments = flowed[i] ?? [];
@@ -989,8 +989,11 @@ function layoutScale(page: HTMLElement): number {
   return layout ? page.getBoundingClientRect().height / layout || 1 : 1;
 }
 
-/** A block's border-box height across its fragments (in layout px) and vertical margins. */
-function measureBox(desc: BlockDesc, scale: number, lines: () => readonly number[]): BlockBox {
+/**
+ * A block's border-box height across its fragments (in layout px), vertical margins, and what
+ * the flow rules need: headings keep with the next block; page breaks end their line's page.
+ */
+function measureBox(desc: BlockDesc, scale: number, lines: () => Lines): BlockBox {
   let height = 0;
   for (const fragment of desc.fragments) height += fragment.getBoundingClientRect().height;
   // A split block's first fragment has no bottom margin and its last no top margin (inline).
@@ -1001,7 +1004,23 @@ function measureBox(desc: BlockDesc, scale: number, lines: () => readonly number
     // jsdom and detached nodes report no margins.
     marginTop: Number.parseFloat(first.marginTop) || 0,
     marginBottom: Number.parseFloat(last.marginBottom) || 0,
-    lines,
+    lines: () => lines().bottoms,
+    keepWithNext: desc.node.type.name === "heading",
+    breaksAfter: () => {
+      const breaks = desc.leaves.filter(
+        (leaf) =>
+          leaf.dom.nodeType !== Node.TEXT_NODE &&
+          (leaf.dom as Element).hasAttribute(PAGE_BREAK_ATTR),
+      );
+      if (!breaks.length) return [];
+      const { starts } = lines();
+      // The line holding the break: the last one starting at or before it.
+      return breaks.map((leaf) => {
+        let line = starts.length - 1;
+        while (line > 0 && (starts[line] as number) > leaf.offset) line--;
+        return line;
+      });
+    },
   };
 }
 

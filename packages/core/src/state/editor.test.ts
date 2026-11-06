@@ -446,6 +446,19 @@ describe("review regressions (PR #4)", () => {
     expect(undoDepth(editor.state)).toBe(0);
   });
 
+  it("Mod-Enter inserts a page break at the caret, keeping the marks typing gets", () => {
+    const editor = editorWith(para("ab"));
+    editor.select(2);
+    editor.commands.toggleMark("bold");
+    expect(editor.handleKey("Mod-Enter")).toBe(true);
+    expect(content(editor)).toEqual(
+      docJSON(para("a", { type: "pageBreak", marks: [{ type: "bold" }] }, "b")),
+    );
+    expect(editor.state.selection.head).toBe(3);
+    editor.commands.deleteBackward();
+    expect(content(editor)).toEqual(docJSON(para("ab")));
+  });
+
   it("hard break replaces a select-all selection", () => {
     const editor = editorWith(para("x"), para("y"));
     editor.handleKey("Mod-a");

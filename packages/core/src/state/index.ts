@@ -5,6 +5,7 @@ export {
   deleteForward,
   deleteSelection,
   insertHardBreak,
+  insertPageBreak,
   insertText,
   isMarkActive,
   joinBackward,

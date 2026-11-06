@@ -168,8 +168,17 @@ export const splitBlock: Command = (state, dispatch) => {
   });
 };
 
-export const insertHardBreak: Command = (state, dispatch) => {
-  const type = state.schema.nodes.hardBreak;
+/** Inserts a hard break (a line break inside the block) in place of the selection. */
+export const insertHardBreak: Command = (state, dispatch) =>
+  insertLeaf("hardBreak", state, dispatch);
+
+/** Inserts an explicit page break in place of the selection (Mod-Enter). */
+export const insertPageBreak: Command = (state, dispatch) =>
+  insertLeaf("pageBreak", state, dispatch);
+
+/** Replaces the selection with an inline leaf node of `name`, keeping the marks typing gets. */
+function insertLeaf(name: string, ...[state, dispatch]: Parameters<Command>): boolean {
+  const type = state.schema.nodes[name];
   const { selection } = state;
   if (!type || (!(selection instanceof AllSelection) && !selection.$from.parent.inlineContent)) {
     return false;
@@ -188,7 +197,7 @@ export const insertHardBreak: Command = (state, dispatch) => {
     );
     tr.setSelection(TextSelection.create(tr.doc, pos + 1));
   });
-};
+}
 
 export const selectAll: Command = (state, dispatch) => {
   dispatch?.(state.tr.setSelection(new AllSelection(state.doc)));
@@ -285,6 +294,7 @@ export function baseKeymap(): Plugin {
     keymap: {
       Enter: splitBlock,
       "Shift-Enter": insertHardBreak,
+      "Mod-Enter": insertPageBreak,
       Backspace: deleteBackward(),
       Delete: deleteForward(),
       "Mod-b": toggleMark("bold"),

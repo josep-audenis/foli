@@ -81,6 +81,9 @@ interface PageLayout {
   blocks: {
     text: string;
     fragment: number;
+    heading: boolean;
+    /** Holds an explicit page break. */
+    pageBreak: boolean;
     top: number;
     bottom: number;
     marginTop: number;
@@ -108,6 +111,8 @@ function layout(page: Page): Promise<PageLayout[]> {
             return {
               text: block.textContent ?? "",
               fragment: Number(block.getAttribute("data-fragment") ?? -1),
+              heading: /^H[1-6]$/.test(block.tagName),
+              pageBreak: block.querySelector("br[data-page-break]") !== null,
               lineHeight: Number.parseFloat(blockStyle.lineHeight),
               top: box.top,
               bottom: box.bottom,
@@ -123,9 +128,11 @@ function layout(page: Page): Promise<PageLayout[]> {
 
 /**
  * The page-flow invariants: every page holds at least one element and keeps its A4 height;
- * nothing ends below the content box; and no page could have taken another line: the first
- * line of the next page's first element (with the gap above it when it starts a block, and its
- * bottom margin when that line is all of it).
+ * nothing ends below the content box; and no page could have taken more of the next page,
+ * given the rules: a page that ends with a page break or before a heading (kept with its next
+ * block) may end early; otherwise the next element's first lines would have had to fit (one
+ * line of a continuation that keeps two, two lines of a block that can leave two, else the
+ * whole block with its bottom margin).
  */
 function expectValidFlow(pagesLayout: PageLayout[]): void {
   pagesLayout.forEach((p, i) => {
@@ -138,16 +145,22 @@ function expectValidFlow(pagesLayout: PageLayout[]): void {
     expect(p.height, `page ${i} grew`).toBeCloseTo(PAGE_HEIGHT, 0);
     const next = pagesLayout[i + 1]?.blocks[0];
     const last = p.blocks[p.blocks.length - 1];
-    if (next && last) {
-      const oneLine = next.bottom - next.top < next.lineHeight * 1.5;
-      const gap = next.fragment > 0 ? 0 : Math.max(last.marginBottom, next.marginTop);
-      const needed = gap + next.lineHeight + (oneLine ? next.marginBottom : 0);
-      const free = p.contentBottom - last.bottom;
-      // Same rule as the flow: a line fits if it ends at most half a pixel below the box.
-      expect(free + 0.5, `page ${i} could take a line of "${next.text.slice(0, 30)}"`).toBeLessThan(
-        needed + 0.05,
-      );
+    if (!next || !last || last.pageBreak || next.heading) return;
+    const lines = Math.round((next.bottom - next.top) / next.lineHeight);
+    let needed: number;
+    if (next.fragment > 0) {
+      if (lines <= 2) return; // moving a line back would leave a widow
+      needed = next.lineHeight;
+    } else {
+      const gap = Math.max(last.marginBottom, next.marginTop);
+      needed =
+        lines >= 4 ? gap + 2 * next.lineHeight : gap + lines * next.lineHeight + next.marginBottom;
     }
+    const free = p.contentBottom - last.bottom;
+    // Same rule as the flow: a line fits if it ends at most half a pixel below the box.
+    expect(free + 0.5, `page ${i} could take more of "${next.text.slice(0, 30)}"`).toBeLessThan(
+      needed + 0.05,
+    );
   });
 }
 
@@ -507,4 +520,119 @@ test("an IME composition just before the break, then typing: exact text", async 
   await expect
     .poll(() => savedLong(page))
     .toBe(`${LONG.slice(0, split - 3)}${composed}Q${LONG.slice(split - 3)}`);
+});
+
+// ---------- rules (5.3) ----------
+
+/** Each page's elements, as `tag:text` (fragments marked with their index). */
+const pageContents = (page: Page) =>
+  page.evaluate(() =>
+    [...document.querySelectorAll(".foli-page")].map((section) =>
+      [...section.children].map(
+        (el) =>
+          `${el.tagName.toLowerCase()}${el.getAttribute("data-fragment") ? `#${el.getAttribute("data-fragment")}` : ""}:${el.textContent}`,
+      ),
+    ),
+  );
+
+test("Mod+Enter inserts a page break: the rest starts the next page; undo, redo, Backspace", async ({
+  page,
+}) => {
+  await openDoc(page, [
+    { type: "paragraph", content: [{ type: "text", text: "before break after" }] },
+    { type: "paragraph", content: [{ type: "text", text: "next" }] },
+  ]);
+  const broken = [["p#0:before break"], ["p#1: after", "p:next"]];
+  const whole = [["p:before break after", "p:next"]];
+  await editor(page).getByText("before break after").click();
+  await page.keyboard.press("Home");
+  for (let i = 0; i < "before break".length; i++) await page.keyboard.press("ArrowRight");
+  await page.keyboard.press(`${MOD}+Enter`);
+  await expect.poll(() => pageContents(page)).toEqual(broken);
+  const savedBreak = async () =>
+    JSON.parse((await page.evaluate((key) => localStorage.getItem(key), STORAGE_KEY)) ?? "{}")
+      .content?.content?.[0]?.content?.[1];
+  await expect.poll(savedBreak).toEqual({ type: "pageBreak" });
+  expectValidFlow(await layout(page));
+  await page.keyboard.press(`${MOD}+z`);
+  await expect.poll(() => pageContents(page)).toEqual(whole);
+  await page.keyboard.press(`${MOD}+Shift+z`);
+  await expect.poll(() => pageContents(page)).toEqual(broken);
+
+  // The caret is after the break, on page 2: typing goes there; Backspace removes the break.
+  await page.keyboard.type("X");
+  await expect
+    .poll(() => pageContents(page))
+    .toEqual([["p#0:before break"], ["p#1:X after", "p:next"]]);
+  await page.keyboard.press("Backspace");
+  await page.keyboard.press("Backspace");
+  await expect.poll(() => pageContents(page)).toEqual(whole);
+});
+
+test("a page break at the end of a paragraph starts the next block on a new page", async ({
+  page,
+}) => {
+  await openDoc(page, [
+    { type: "paragraph", content: [{ type: "text", text: "one" }] },
+    { type: "paragraph", content: [{ type: "text", text: "two" }] },
+  ]);
+  await caretAtEnd(page, "one");
+  await page.keyboard.press(`${MOD}+Enter`);
+  // The break's line ends page 1; the paragraph's empty last line and "two" are on page 2.
+  await expect.poll(() => pageContents(page)).toEqual([["p#0:one"], ["p#1:", "p:two"]]);
+  expectValidFlow(await layout(page));
+});
+
+test("a heading never ends a page: it moves to the next page with its paragraph", async ({
+  page,
+}) => {
+  let moved = 0;
+  // Slide a heading over the end of page 1 by adding short paragraphs before it.
+  for (let count = 14; count <= 30; count++) {
+    await openDoc(page, [
+      ...Array.from({ length: count }, (_, i) => ({
+        type: "paragraph",
+        content: [{ type: "text", text: short(i) }],
+      })),
+      { type: "heading", attrs: { level: 2 }, content: [{ type: "text", text: "Heading" }] },
+      { type: "paragraph", content: [{ type: "text", text: "Body" }] },
+    ]);
+    const flow = await layout(page);
+    const where = (text: string) => flow.findIndex((p) => p.blocks.some((b) => b.text === text));
+    expect(where("Heading"), `count ${count}`).toBe(where("Body"));
+    expectValidFlow(flow);
+    // The rule did something when the heading starts a page that is not the first.
+    if (where("Heading") > 0 && flow[where("Heading")]?.blocks[0]?.text === "Heading") moved++;
+  }
+  expect(moved).toBeGreaterThan(0);
+});
+
+test("a split paragraph leaves at least two lines on each page", async ({ page }) => {
+  test.slow(); // many reloads
+  let split = 0;
+  // A three-to-four-line paragraph slid over the end of page 1 line by line: without the
+  // rules some positions leave one line on a page.
+  const middle = `Middle ${words(45)}.`;
+  for (let count = 0; count <= 30; count++) {
+    await openDoc(page, [
+      ...Array.from({ length: count }, (_, i) => ({
+        type: "paragraph",
+        content: [{ type: "text", text: short(i) }],
+      })),
+      { type: "paragraph", content: [{ type: "text", text: middle }] },
+      { type: "paragraph", content: [{ type: "text", text: LONG }] },
+    ]);
+    const flow = await layout(page);
+    expectValidFlow(flow);
+    for (const p of flow)
+      for (const block of p.blocks)
+        if (block.fragment >= 0) {
+          split++;
+          expect(
+            Math.round((block.bottom - block.top) / block.lineHeight),
+            `count ${count}: "${block.text.slice(0, 20)}"`,
+          ).toBeGreaterThanOrEqual(2);
+        }
+  }
+  expect(split).toBeGreaterThan(0);
 });

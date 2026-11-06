@@ -57,11 +57,18 @@ Input may be loose; output is canonical, so equal documents serialize to identic
 | `heading`   | block  | inline\*           | `level`: 1–6 (required)           |
 | `text`      | inline | —                  | `text`: non-empty string, `marks` |
 | `hardBreak` | inline | —                  | `marks`                           |
+| `pageBreak` | inline | —                  | `marks`                           |
 
 Marks: `bold`, `italic`, `underline`, `strike` (no attributes; each at most once per node).
 Marks are allowed on the inline children of `paragraph` and `heading`, and nowhere else.
 Phase 2 relaxed one v1 rule: `hardBreak` may carry marks (as in other ProseMirror-style models),
 so formatting continues across a line break. Every document valid before still loads (normalized, see above).
+
+`pageBreak` (added in Phase 5.3, before any release) is an explicit page break. It is inline,
+like `hardBreak`, rather than a block between paragraphs: DOCX stores a page break the same way
+(`<w:br w:type="page"/>` inside a run), and the caret, deletion, read-back and clipboard
+handle it as they handle a hard break. The line it ends is the last one on its page; the rest
+of the paragraph continues at the top of the next page. In plain text it is a line feed.
 
 v1 is defined in `packages/core/src/schema.ts` through the same spec API extensions will use:
 
@@ -73,13 +80,14 @@ const schema = new Schema({
     heading: { group: "block", content: "inline*", attrs: { level: { validate } } },
     text: { group: "inline" },
     hardBreak: { group: "inline", inline: true },
+    pageBreak: { group: "inline", inline: true },
   },
   marks: { bold: {}, italic: {}, underline: {}, strike: {} },
 });
 ```
 
 v1 may still change until the first published release (nothing has been published, so no
-migration is owed yet). Planned before 0.1: `pageBreak` block node.
+migration is owed yet).
 
 ## The model (`packages/core/src/model/`)
 
