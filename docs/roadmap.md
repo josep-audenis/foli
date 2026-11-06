@@ -349,7 +349,7 @@ Each task is one PR that leaves `pnpm check` green and the playground working. L
   across pages with undo; ArrowDown across the page gap; clicks on a later page. The bundled
   test font moved to 5.5, where exact page breaks are asserted; page chrome (headers, numbers)
   arrives with Phase 9.
-- [x] 5.2 Paragraphs split across pages: line starts and line-box bottoms measured from the
+- [x] 5.2 (#16) Paragraphs split across pages: line starts and line-box bottoms measured from the
   rendered block (per-character `Range` rects, binary search per line, only for blocks that
   do not fit; splits snapped to grapheme clusters); the pure `flow` assigns lines to pages;
   one block descriptor owns several DOM fragments (`data-fragment`), each rendering its slice
@@ -364,10 +364,15 @@ Each task is one PR that leaves `pnpm check` green and the playground working. L
   smaller than the glyph boxes, Shift-select + replace + undo (text and
   selection back), mouse drag across + delete + undo. Mixed font sizes on one line are not in
   schema v1 yet (measured with equal-line-height assumptions; see architecture.md).
-- [ ] 5.3 Pagination rules: explicit `pageBreak` node (schema v1 addition before release, JSON,
-  HTML paste/copy, Mod-Enter); headings keep-with-next; widow/orphan control (default 2
-  lines). Unit tests on `flow` for each rule. (Blocks taller than a page already split by
-  lines since 5.2.)
+- [x] 5.3 Pagination rules: explicit `pageBreak` node (schema v1 addition before release;
+  inline like `hardBreak`, as DOCX stores it; JSON, Mod-Enter, copy as a page-breaking `<br>`,
+  paste from Word's `<br style='page-break-before:always'>`, Google Docs' hidden `<hr>` and
+  Foli's own markup); the line holding a break ends its page; headings keep with the next
+  block (chains too); widow/orphan control (2 lines by default, `FlowRules`). Unit tests on
+  `flow` for each rule; Playwright in all three engines: Mod+Enter (undo, redo, Backspace),
+  a break at a paragraph end, a heading slid over the end of page 1 never ends a page, a
+  paragraph slid over it never leaves one line. (Blocks taller than a page split by lines
+  since 5.2.)
 - [ ] 5.4 Incremental reflow: measurement cache keyed by node identity and content width;
   reflow from the page holding the first changed block; stop when a page starts at the same
   block and line as before; reuse unchanged pages and fragments; one pass per animation frame;

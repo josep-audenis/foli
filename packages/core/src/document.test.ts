@@ -23,6 +23,7 @@ describe("parseDocument", () => {
             { type: "text", text: "bold italic", marks: [{ type: "bold" }, { type: "italic" }] },
             { type: "hardBreak" },
             { type: "text", text: "plain" },
+            { type: "pageBreak" },
           ],
         },
         { type: "paragraph" },

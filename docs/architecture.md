@@ -97,7 +97,7 @@ Foli's own (see `THIRD_PARTY_NOTICES.md`).
     were changed outside history.
 - **Commands** have the shape `(state, dispatch?) => boolean`:
   - Editing: insertText, deleteBackward/Forward (by grapheme or word), deleteSelection,
-    joinBackward/Forward, insertHardBreak.
+    joinBackward/Forward, insertHardBreak, insertPageBreak (Mod-Enter).
   - splitBlock: Enter at the end of a heading starts a paragraph, and formatting carries over.
   - Formatting and selection: toggleMark, setBlockType, selectAll, undo, redo, plus `isMarkActive`.
   - `baseKeymap()` binds them to key names (`Mod-b`, `Enter`…).
@@ -166,6 +166,12 @@ Phase 5 in progress: blocks flow from page to page (5.1) and split across pages 
     that changed page are moved; empty pages are removed; blocks found loose in the host (an
     extension unwrapping a page) are put back.
   - Only a single line taller than a page makes its page grow (`min-height`).
+  - Rules (`flow`): a line holding a `pageBreak` (rendered as `<br data-page-break>`) is the
+    last on its page; a split leaves at least 2 lines on each page (widows and orphans,
+    `DEFAULT_RULES`; a block too short for both moves whole; not applied across a page break,
+    nor where only an empty page could hold the lines); headings keep with the next block (a
+    heading, or a chain of them, moves to the next page when the block after it would start
+    there, unless it already starts its page; the flow restarts from a snapshot before it).
   - No reflow or re-split during a composition (moving the DOM the browser composes in would
     break the IME); the next render after it flows. Web fonts finishing loading (`document.fonts`
     `loadingdone`) trigger a re-flow.
@@ -281,8 +287,9 @@ Known limits:
 ### Clipboard (`packages/view/src/clipboard.ts`)
 
 - **Copy and cut** come from the model, never from the DOM (ADR-0003 finding 5). The selected
-  range is written as `text/plain` (blocks and hard breaks as line feeds), `text/html` (rendered
-  by the view's own renderer, with `white-space: pre-wrap` so spaces survive in other apps) and
+  range is written as `text/plain` (blocks, hard and page breaks as line feeds), `text/html`
+  (rendered by the view's own renderer, with `white-space: pre-wrap` so spaces survive in other
+  apps, and page breaks as `<br data-page-break style="page-break-before: always; …">`) and
   `application/x-foli+json`: `{ open, content }`, the copied blocks as `DocJSON` and whether the
   copy was inside one block. Cut is copy plus `deleteSelection`, as its own undo step.
 - **Paste** reads, in order: Foli JSON, then HTML, then plain text (Ctrl/Cmd+Shift+V: plain

@@ -14,6 +14,7 @@ import {
   deleteForward,
   deleteSelection,
   insertHardBreak,
+  insertPageBreak,
   insertText,
   isMarkActive,
   joinBackward,
@@ -59,6 +60,7 @@ export interface Editor {
     joinForward(): boolean;
     splitBlock(): boolean;
     insertHardBreak(): boolean;
+    insertPageBreak(): boolean;
     toggleMark(type: string, attrs?: Attrs | null): boolean;
     setBlockType(type: string, attrs?: Attrs | null): boolean;
     selectAll(): boolean;
@@ -122,6 +124,7 @@ export function createEditor({
       joinForward: () => run(joinForward),
       splitBlock: () => run(splitBlock),
       insertHardBreak: () => run(insertHardBreak),
+      insertPageBreak: () => run(insertPageBreak),
       toggleMark: (type, attrs) => run(toggleMark(type, attrs)),
       setBlockType: (type, attrs) => run(setBlockType(type, attrs)),
       selectAll: () => run(selectAll),

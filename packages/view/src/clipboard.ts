@@ -8,7 +8,7 @@ import {
   type Node as ModelNode,
   parseContent,
 } from "@foli/core";
-import { renderBlock } from "./render.js";
+import { PAGE_BREAK_ATTR, renderBlock } from "./render.js";
 
 /**
  * Clipboard type for Foli content, read back first on paste: `{ open, content }`, the copied
@@ -51,6 +51,9 @@ export function serializeRange(
   blocks.forEach((block) => {
     const { dom } = renderBlock(block, ownerDocument);
     dom.style.whiteSpace = "pre-wrap"; // keep repeated and leading spaces in other apps
+    // How other apps (and print) recognize a page break; the editor itself does not need it.
+    for (const br of dom.querySelectorAll(`br[${PAGE_BREAK_ATTR}]`))
+      (br as HTMLElement).style.cssText = "page-break-before: always; break-before: page";
     container.append(dom);
   });
   return {
@@ -205,6 +208,21 @@ function marksOf(element: Element, inherited: ReadonlySet<MarkName>): Set<MarkNa
   return marks;
 }
 
+/**
+ * A page break in pasted HTML: Foli's own `<br data-page-break>`, or a `<br>` or `<hr>` styled
+ * to break the page (Word writes `<br clear=all style='page-break-before:always'>`, Google Docs
+ * `<hr style="page-break-before:always;display:none">`).
+ *
+ * shortcut: a block styled to break before or after it (`<p style="page-break-before:always">`) loses the break; map it when a real capture needs it.
+ */
+function isPageBreak(element: Element): boolean {
+  if (element.localName !== "br" && element.localName !== "hr") return false;
+  if (element.hasAttribute(PAGE_BREAK_ATTR)) return true;
+  const style = element.getAttribute("style") ?? "";
+  // Anchored on a property start, so Word's `mso-column-break-before` (a column break) is not one.
+  return /(?:^|[;\s])(?:page-)?break-(?:before|after)\s*:\s*(?:always|page)/i.test(style);
+}
+
 /** Hidden text, Word's list bullets and empty-paragraph fillers. */
 function isNoise(element: Element): boolean {
   const style = element.getAttribute("style") ?? "";
@@ -280,6 +298,17 @@ function readHTML(html: string): { content: DocJSON; open: boolean } | null {
       } as InlineJSON);
     });
   };
+  /** An explicit page break: in the open block, else at the end of the previous one. */
+  const addPageBreak = () => {
+    const previous = blocks[blocks.length - 1];
+    if (inline) inline.push({ type: "pageBreak" });
+    else if (previous) previous.content = [...(previous.content ?? []), { type: "pageBreak" }];
+    else {
+      open("paragraph");
+      (inline as InlineJSON[] | null)?.push({ type: "pageBreak" });
+    }
+    afterSpace = true;
+  };
   const addBreak = () => {
     // A <br> between blocks is an empty line (Google Docs writes empty paragraphs this way).
     if (!inline) {
@@ -302,6 +331,11 @@ function readHTML(html: string): { content: DocJSON; open: boolean } | null {
     if (node.nodeType !== 1) return false; // comments (Word's conditional comments), etc.
     const element = node as Element;
     const tag = element.localName;
+    // Before the noise check: Google Docs hides its page-break <hr> (display: none).
+    if (isPageBreak(element)) {
+      addPageBreak();
+      return false;
+    }
     if (SKIPPED_TAGS.has(tag) || isNoise(element)) return false;
     if (tag === "br") {
       // Chrome marks "the copied range ended with a line break" this way; it is not content.

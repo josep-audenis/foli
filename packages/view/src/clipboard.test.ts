@@ -120,6 +120,37 @@ describe("htmlToDoc rules", () => {
   });
 });
 
+describe("htmlToDoc page breaks", () => {
+  const pb = { type: "pageBreak" };
+  it("reads Word's and Foli's page-break <br>", () => {
+    expect(
+      parsed(
+        "<p>a<br clear=all style='mso-special-character:line-break;page-break-before:always'>b</p>",
+      ),
+    ).toEqual([p(t("a"), pb, t("b"))]);
+    expect(parsed('<p>a<br data-page-break="">b</p>')).toEqual([p(t("a"), pb, t("b"))]);
+    expect(parsed('<p>a<br style="break-before: page">b</p>')).toEqual([p(t("a"), pb, t("b"))]);
+  });
+
+  it("reads Google Docs' hidden <hr> between blocks into the end of the previous one", () => {
+    expect(parsed('<p>a</p><hr style="page-break-before:always;display:none;"><p>b</p>')).toEqual([
+      p(t("a"), pb),
+      p(t("b")),
+    ]);
+    expect(parsed('<hr style="page-break-after: always"><p>b</p>')).toEqual([p(pb), p(t("b"))]);
+  });
+
+  it("does not read Word's column break as a page break", () => {
+    expect(parsed("<p>a<br clear=all style='mso-column-break-before:always'>b</p>")).toEqual([
+      p(t("a"), br, t("b")),
+    ]);
+  });
+
+  it("keeps an ordinary <br> and <hr> what they were", () => {
+    expect(parsed("<p>a<br>b</p><hr><p>c</p>")).toEqual([p(t("a"), br, t("b")), p(t("c"))]);
+  });
+});
+
 describe("textToDoc", () => {
   it("makes one paragraph per line, with the given marks", () => {
     expect(textToDoc("a\r\n\nb", [{ type: "bold" }]).content).toEqual([
@@ -163,6 +194,20 @@ describe("EditorView clipboard", () => {
     });
     return { event, store };
   }
+
+  it("copies a page break as a line break in text and a page-breaking <br> in HTML", () => {
+    const { host, editor } = mount(doc(p(t("a"), { type: "pageBreak" }, t("b"))));
+    editor.select(1, 4);
+    const { event, store } = clipboardEvent("copy");
+    host.dispatchEvent(event);
+    expect(store.get("text/plain")).toBe("a\nb");
+    expect(store.get("text/html")).toBe(
+      '<p style="white-space: pre-wrap;">a<br data-page-break="" style="page-break-before: always; break-before: page;">b</p>',
+    );
+    expect(JSON.parse(store.get(FOLI_MIME) ?? "").content.content[0].content[1]).toEqual({
+      type: "pageBreak",
+    });
+  });
 
   it("copies the model selection as text, HTML and Foli JSON", () => {
     const { host, editor } = mount(doc(p(t("ab"), t("cd", "bold")), h(2, t("ef"))));
