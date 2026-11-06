@@ -189,10 +189,11 @@ Phase 5 in progress: blocks flow from page to page (5.1) and split across pages 
     (a fragment's end breaks its line, so lines measured across the old split would depend
     on it). Web fonts finishing loading (`document.fonts` `loadingdone`) and a change of page
     settings drop every measurement. These re-flows are batched into one per animation
-    frame; a re-flow due during a composition waits for its end. Sizes reported in the frame
-    of the relayout that re-measured a block are not compared (fragments of a split block may
-    add up to another height than the whole block: no re-flow every frame), nor are those of
-    a hidden host (0 wide). Edits flow synchronously:
+    frame; a re-flow due during a composition waits for its end. A block is measured
+    whole, so its fragments are compared with that height plus the vertical padding and
+    border every further fragment repeats, within a pixel per split for rounding (compared
+    with the height alone, a split block would re-flow every frame); the zoom scale comes
+    from the page's width in mm (`offsetWidth`/`offsetHeight` are rounded). Sizes of a hidden host (0 wide) are not compared. Edits flow synchronously:
     the DOM must match the model for the next mapping.
   - DOM ↔ model mapping walks up to the page child (a block or a fragment); a point between
     them (on a page or the host) maps to the start of the next one. The read-back joins a
@@ -278,7 +279,10 @@ Known limits:
   measurement of blocks that now cross a page end); the reconciliation walks every block's
   DOM position (no layout reads). A CSS change that alters only margins, or rewraps blocks
   without changing any block's height, is not noticed (the `ResizeObserver` watches sizes;
-  the old line starts stay until some block's height changes). Line measurement assumes
+  the old line starts stay until some block's height changes). One block resized without an
+  edit makes a full flow that renders every split block whole and measures again the lines of
+  every block crossing a page end (about one per page): fine for a font swap, costly for a
+  CSS animation of one block's height. Line measurement assumes
   left-to-right text without vertical-align offsets; block padding and borders are not split
   (a fragment keeps both). Justified text would need `text-align-last` on continued fragments
   (alignment arrives in Phase 7). Page breaks depend on the fonts available: the tests use

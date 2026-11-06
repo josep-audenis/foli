@@ -82,12 +82,13 @@ export const FIXTURES: Fixture[] = [
     blocks: [heading(1, "One long paragraph"), paragraph(text(words(1400, 1)))],
   },
   {
-    // The heading would be the last line of page 1: it moves to page 2 with its paragraph.
+    // The heading fits as the last block of page 1 (it does with keep-with-next off): it moves
+    // to page 2 with its paragraph.
     name: "heading-at-boundary",
     settings: A4,
     blocks: [
       heading(1, "Heading at a page boundary"),
-      ...Array.from({ length: 22 }, (_, i) => paragraph(text(`Line ${i + 1}: ${words(6, i)}`))),
+      ...Array.from({ length: 21 }, (_, i) => paragraph(text(`Line ${i + 1}: ${words(6, i)}`))),
       heading(2, "This heading keeps with the next paragraph"),
       paragraph(text(words(60, 2))),
       ...mixed(6, 3),
@@ -133,7 +134,11 @@ export const FIXTURES: Fixture[] = [
   },
 ];
 
-/** Opens the playground on a fixture, laid out with the bundled test font. */
+/**
+ * Opens the playground on a fixture, laid out with the bundled test font. The playground first
+ * lays it out with its own font, then re-flows once the test font has loaded (the path of a
+ * web font on a real page); a benchmark of the first layout needs the font loaded before.
+ */
 export async function openFixture(page: Page, fixture: Fixture): Promise<void> {
   await page.route(`**${FONT_PATH}*`, (route) => {
     const file = new URL(route.request().url()).pathname.slice(FONT_PATH.length);
@@ -174,6 +179,20 @@ export async function openFixture(page: Page, fixture: Fixture): Promise<void> {
     },
     [FONT_FAMILY, FACES] as const,
   );
+  // WebKit applies a loaded font to the layout a while after `load()` resolves: wait until text
+  // is laid out with it, or `settled` could see the fallback font's layout as final.
+  await page.waitForFunction((family) => {
+    const width = (font: string) => {
+      const probe = document.createElement("span");
+      probe.style.cssText = `position: absolute; visibility: hidden; white-space: nowrap; font: 16px ${font}`;
+      probe.textContent = "The quick brown fox jumps 0123";
+      document.body.append(probe);
+      const result = probe.getBoundingClientRect().width;
+      probe.remove();
+      return result;
+    };
+    return width(`"${family}", monospace`) !== width("monospace");
+  }, FONT_FAMILY);
   await settled(page);
 }
 
@@ -197,7 +216,7 @@ export function pageBreaks(page: Page): Promise<string[][]> {
 }
 
 /** Waits until the layout no longer changes between animation frames (font load re-flows). */
-async function settled(page: Page): Promise<void> {
+export async function settled(page: Page): Promise<void> {
   const frames = () =>
     page.evaluate(
       () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),

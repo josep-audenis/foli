@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { createDocument, createEditor, type DocJSON } from "@foli/core";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, onTestFinished, vi } from "vitest";
 import { EditorView, type EditorViewOptions, keyName } from "./index.js";
 
 const sample: DocJSON = {
@@ -41,10 +41,14 @@ const html = (host: HTMLElement) =>
     .map((block) => block.outerHTML)
     .join("");
 
-/** jsdom has no ResizeObserver, and its frames are not driven by the test: fakes for both. */
+/**
+ * jsdom has no ResizeObserver, and its frames are not driven by the test: fakes for both. Like
+ * the real one, `fire` reports each observed element once when first observed, then only when
+ * its size changed.
+ */
 function fakeResizeObserver() {
   const fake = {
-    /** Reports every observed element (`contentRect.width` 0: a hidden host). */
+    /** Reports the elements whose size changed (`contentRect.width` 0: a hidden host). */
     fire: (_width?: number) => {},
     queue: [] as (() => void)[],
     /** Runs the animation-frame callbacks queued before it. */
@@ -57,18 +61,22 @@ function fakeResizeObserver() {
   vi.stubGlobal(
     "ResizeObserver",
     class {
-      readonly targets = new Set<Element>();
+      /** Each observed element and its last reported size. */
+      readonly targets = new Map<Element, string | undefined>();
       constructor(callback: ResizeObserverCallback) {
-        fake.fire = (width = 600) =>
-          callback(
-            [...this.targets].map(
-              (target) => ({ target, contentRect: { width } }) as ResizeObserverEntry,
-            ),
-            this as unknown as ResizeObserver,
-          );
+        fake.fire = (width = 600) => {
+          const entries: ResizeObserverEntry[] = [];
+          for (const [target, last] of this.targets) {
+            const size = `${width}x${target.getBoundingClientRect().height}`;
+            if (size === last) continue;
+            this.targets.set(target, size);
+            entries.push({ target, contentRect: { width } } as ResizeObserverEntry);
+          }
+          if (entries.length) callback(entries, this as unknown as ResizeObserver);
+        };
       }
       observe(target: Element) {
-        this.targets.add(target);
+        this.targets.set(target, undefined);
       }
       unobserve(target: Element) {
         this.targets.delete(target);
@@ -81,6 +89,10 @@ function fakeResizeObserver() {
   vi.stubGlobal("requestAnimationFrame", (callback: () => void) => fake.queue.push(callback));
   return fake;
 }
+
+/** Layout reads of block elements (not of pages: the zoom scale comes from a page) by a spy. */
+const blockReads = (spy: { mock: { contexts: unknown[] } }) =>
+  spy.mock.contexts.filter((el) => !(el as Element).classList.contains("foli-page")).length;
 
 function mount(content: DocJSON = sample, options?: EditorViewOptions) {
   const host = document.createElement("div");
@@ -655,7 +667,7 @@ describe("EditorView pages", () => {
     editor.select(2); // in "p0"
     editor.commands.insertText("x");
     // The changed block, once: the 29 others keep their measurement.
-    expect(spy.mock.calls.length).toBeLessThanOrEqual(2);
+    expect(blockReads(spy)).toBeLessThanOrEqual(2);
     expect(pageTexts(host)[0]).toEqual(["px0", "p1"]);
     spy.mockClear();
     // A new block in the middle shifts every later block to another page: heights come from
@@ -668,13 +680,13 @@ describe("EditorView pages", () => {
     };
     editor.select(endOf(15)); // end of "p15"
     editor.commands.splitBlock();
-    expect(spy.mock.calls.length).toBeLessThan(texts.length);
+    expect(blockReads(spy)).toBeLessThan(texts.length);
     expect(pageTexts(host).flat()).toEqual(["px0", ...texts.slice(1, 16), "", ...texts.slice(16)]);
     expect(pageTexts(host).every((page) => page.length <= 2)).toBe(true);
     spy.mockClear();
     editor.select(endOf(20)); // end of "p19", after the new block
     editor.commands.insertText("y");
-    expect(spy.mock.calls.length).toBeLessThanOrEqual(2);
+    expect(blockReads(spy)).toBeLessThanOrEqual(2);
   });
 
   describe("blocks resized without an edit", () => {
@@ -689,7 +701,9 @@ describe("EditorView pages", () => {
         const h = this.parentElement?.classList.contains("foli-page") ? height : 0;
         return { height: h, width: 0, top: 0, left: 0, bottom: h, right: 0 } as DOMRect;
       });
-      return { spy, ...mount(paragraphs("a", "b", "c", "d")) };
+      const mounted = mount(paragraphs("a", "b", "c", "d"));
+      ro.fire(); // the first reports, as rendered
+      return { spy, ...mounted };
     }
 
     it("re-measures each resized block once and re-flows", () => {
@@ -704,7 +718,7 @@ describe("EditorView pages", () => {
       ro.frame();
       expect(pageTexts(host)).toEqual([["a"], ["b"], ["c"], ["d"]]);
       // Four blocks, one measurement each (no repeat while the flow asks for lines).
-      expect(spy.mock.calls.length).toBeLessThanOrEqual(4 * 2);
+      expect(blockReads(spy)).toBeLessThanOrEqual(4 * 2);
     });
 
     it("does not re-flow for a hidden host", () => {
@@ -716,27 +730,6 @@ describe("EditorView pages", () => {
         ["a", "b"],
         ["c", "d"],
       ]);
-    });
-
-    it("does not re-flow again in the frame of its own relayout", () => {
-      const { spy, host } = setup();
-      height = 500;
-      ro.fire();
-      ro.frame(); // the relayout
-      // Fragments that add up to another height than the measurement (CSS on split
-      // fragments) are not compared in the frame of the relayout that measured them.
-      height = 1000;
-      ro.fire();
-      spy.mockClear();
-      ro.frame();
-      expect(spy).not.toHaveBeenCalled();
-      expect(pageTexts(host)).toEqual([["a"], ["b"], ["c"], ["d"]]);
-      expect(ro.queue).toHaveLength(0);
-      // A later change is noticed again.
-      ro.fire();
-      ro.frame();
-      expect(pageTexts(host)[0]).toEqual(["a"]);
-      expect(ro.queue.length).toBeGreaterThan(0);
     });
   });
 
@@ -846,6 +839,8 @@ describe("EditorView split blocks", () => {
   let perLine = 10;
   /** The height in lines of a block whose text is "x" (as if CSS resized it). */
   let xLines = 1;
+  /** Vertical padding of every block element, repeated by each fragment of a split block. */
+  let padding = 0;
   function lines() {
     const linesOf = (el: Element) =>
       el.textContent === "x"
@@ -854,7 +849,9 @@ describe("EditorView split blocks", () => {
     vi.spyOn(Element.prototype, "getBoundingClientRect").mockImplementation(function (
       this: Element,
     ) {
-      const height = this.parentElement?.classList.contains("foli-page") ? linesOf(this) * 100 : 0;
+      const height = this.parentElement?.classList.contains("foli-page")
+        ? linesOf(this) * 100 + padding
+        : 0;
       return { height, width: 0, top: 0, left: 0, bottom: height, right: 0 } as DOMRect;
     });
     Object.defineProperty(Range.prototype, "getBoundingClientRect", {
@@ -879,6 +876,7 @@ describe("EditorView split blocks", () => {
     vi.restoreAllMocks();
     perLine = 10;
     xLines = 1;
+    padding = 0;
     // biome-ignore lint/suspicious/noExplicitAny: removes the fake added above.
     delete (Range.prototype as any).getBoundingClientRect;
   });
@@ -934,6 +932,7 @@ describe("EditorView split blocks", () => {
     lines();
     const ro = fakeResizeObserver();
     const { host } = mount(paragraphs("x", long));
+    ro.fire(); // the first reports, as rendered
     expect(fragments(host)).toEqual([["-:x", `0:${long.slice(0, 80)}`], [`1:${long.slice(80)}`]]);
     // A CSS change: "x" grows to two lines, and the long block rewraps at 10.5 characters per
     // line with the same 15 lines (same height, so its own size does not change). Lines
@@ -943,6 +942,36 @@ describe("EditorView split blocks", () => {
     ro.fire();
     ro.frame();
     expect(fragments(host)).toEqual([["-:x", `0:${long.slice(0, 74)}`], [`1:${long.slice(74)}`]]);
+  });
+
+  it("does not re-flow every frame when fragments add up to another height", () => {
+    lines();
+    padding = 20; // as the CSS below: each fragment keeps it
+    const style = document.head.appendChild(document.createElement("style"));
+    style.textContent = "p { padding: 10px 0 }";
+    onTestFinished(() => style.remove());
+    const ro = fakeResizeObserver();
+    const { host, editor } = mount(paragraphs("x", long, long));
+    const settle = () => {
+      for (let i = 0; i < 4; i++) {
+        ro.fire();
+        ro.frame();
+      }
+      ro.fire();
+      expect(ro.queue).toHaveLength(0);
+    };
+    settle();
+    // An edit re-renders the first long block (same lines: the second keeps its DOM). Its new
+    // fragments add up to more than its height: compared with the height alone, they would
+    // mark it stale; its relayout would render the second again, whose new fragments would
+    // mark it stale, and so on every frame.
+    editor.select(4, 5); // the first character of the first long block
+    editor.commands.insertText("z");
+    settle();
+    // A CSS change on "x" re-flows once, rendering both split blocks again.
+    xLines = 2;
+    settle();
+    expect(fragments(host)[0]).toEqual(["-:x", `0:z${long.slice(1, 70)}`]);
   });
 
   it("maps positions across fragments; the caret at a split shows on the next page", () => {
