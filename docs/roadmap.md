@@ -356,14 +356,18 @@ Each task is one PR that leaves `pnpm check` green and the playground working. L
   with its marks, the split edges without margins. Caret affinity at fragment edges:
   Left/Right and word moves (with Shift) step over the edge; Backspace/Delete delete one
   character there (the browser's target range collapses); Home/End and up/down are native.
-  Read-back joins fragments; copy is from the model. Same split after a reload. Playwright T5
+  Read-back joins fragments; copy is from the model; an IME composition just before the
+  break gives exact text (Chromium CDP; no re-split while composing). Same split after a
+  reload. Playwright T5
   basics in all three engines: split onto both pages, type at the end of page 1, arrows
-  across the break, Backspace/Delete at it, Shift-select + replace + undo (text and
+  across the break (also right after a hard break), Backspace/Delete at it, a line-height
+  smaller than the glyph boxes, Shift-select + replace + undo (text and
   selection back), mouse drag across + delete + undo. Mixed font sizes on one line are not in
   schema v1 yet (measured with equal-line-height assumptions; see architecture.md).
 - [ ] 5.3 Pagination rules: explicit `pageBreak` node (schema v1 addition before release, JSON,
   HTML paste/copy, Mod-Enter); headings keep-with-next; widow/orphan control (default 2
-  lines); blocks taller than a page split by lines. Unit tests on `paginate` for each rule.
+  lines). Unit tests on `flow` for each rule. (Blocks taller than a page already split by
+  lines since 5.2.)
 - [ ] 5.4 Incremental reflow: measurement cache keyed by node identity and content width;
   reflow from the page holding the first changed block; stop when a page starts at the same
   block and line as before; reuse unchanged pages and fragments; one pass per animation frame;

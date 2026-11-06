@@ -433,3 +433,78 @@ test("a mouse drag across the page break selects into page 2; delete and undo", 
   await page.keyboard.press(`${MOD}+z`);
   await expect.poll(() => texts(page)).toEqual(original);
 });
+
+test("at a break after a hard break, ArrowLeft and Shift+ArrowLeft move one character", async ({
+  page,
+}) => {
+  // Short lines joined by hard breaks: every line start, so every split, follows a <br>.
+  const lines = Array.from({ length: 80 }, (_, i) => `line${i}`);
+  await openDoc(page, [
+    {
+      type: "paragraph",
+      content: lines.flatMap((text, i) => [
+        ...(i ? [{ type: "hardBreak" }] : []),
+        { type: "text", text },
+      ]),
+    },
+  ]);
+  const first = (await fragmentsOf(page))[0]?.text ?? "";
+  const onFirst = first.match(/line\d+/g)?.length ?? 0;
+  expect(onFirst).toBeGreaterThan(1);
+  const before = lines.slice(0, onFirst).join("\n");
+  const after = lines.slice(onFirst).join("\n");
+  const saved = async () => (await savedTexts(page))?.[0];
+
+  await caretInFragment(page, 1, 0);
+  await page.keyboard.press("ArrowLeft");
+  await page.keyboard.type("#");
+  await expect.poll(saved).toBe(`${before}#\n${after}`);
+  await page.keyboard.press(`${MOD}+z`);
+  await expect.poll(saved).toBe(`${before}\n${after}`);
+
+  await caretInFragment(page, 1, 0);
+  await page.keyboard.press("Shift+ArrowLeft");
+  await page.keyboard.type("Q");
+  await expect.poll(saved).toBe(`${before}Q${after}`);
+});
+
+test("a line height smaller than the font's glyph boxes still splits inside the page", async ({
+  page,
+}) => {
+  await openSplit(page);
+  await page.addStyleTag({ content: ".foli-page p { line-height: 1; }" });
+  await editor(page).getByText("Split", { exact: true }).click();
+  await page.keyboard.press("End");
+  await page.keyboard.type("!"); // a render measures again
+  await expect.poll(async () => (await texts(page))[0]).toBe("Split!");
+  expectValidFlow(await layout(page));
+});
+
+test("an IME composition just before the break, then typing: exact text", async ({
+  page,
+  browserName,
+}) => {
+  test.skip(browserName !== "chromium", "CDP IME emulation is Chromium-only");
+  await openSplit(page);
+  const split = ((await fragmentsOf(page))[0]?.text ?? "").length;
+  await caretInFragment(page, 0, split - 3);
+  const cdp = await page.context().newCDPSession(page);
+  // Long enough to push text over the break while composing (no reflow until it ends).
+  let composed = "";
+  for (let i = 0; i < 40; i++) {
+    composed += "か";
+    await cdp.send("Input.imeSetComposition", {
+      text: composed,
+      selectionStart: composed.length,
+      selectionEnd: composed.length,
+    });
+  }
+  await cdp.send("Input.insertText", { text: composed });
+  const expected = `${LONG.slice(0, split - 3)}${composed}${LONG.slice(split - 3)}`;
+  await expect.poll(() => savedLong(page)).toBe(expected);
+  expectValidFlow(await layout(page));
+  await page.keyboard.type("Q");
+  await expect
+    .poll(() => savedLong(page))
+    .toBe(`${LONG.slice(0, split - 3)}${composed}Q${LONG.slice(split - 3)}`);
+});

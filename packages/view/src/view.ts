@@ -676,6 +676,8 @@ export class EditorView {
    * Caret affinity at a page break. The end of one fragment and the start of the next are two
    * DOM caret stops for one model position, so a native Left/Right (or word move) there would
    * seem to do nothing. Step over the edge first, then let the browser make the move.
+   *
+   * shortcut: left-to-right only (ArrowRight is forward); bidi text needs visual order here and in the line measurement.
    */
   private crossFragmentEdge(event: KeyboardEvent): boolean {
     const forward = event.key === "ArrowRight";
@@ -695,18 +697,31 @@ export class EditorView {
     if (head === null) return false;
     const offset = head - (this.starts[this.blocks.indexOf(desc)] as number) - 1;
     let target: DomPoint | null = null;
+    // Stepping back over an edge after a hard break lands before the <br>: the point after it
+    // is still the split, and browsers would show it before the <br> anyway. That step is
+    // already the one-character move.
+    let moved = false;
     if (forward && f < desc.fragments.length - 1 && offset === desc.splits[f])
       target = fragmentStart(desc, f + 1);
-    else if (!forward && f > 0 && offset === desc.splits[f - 1]) target = fragmentEnd(desc, f - 1);
+    else if (!forward && f > 0 && offset === desc.splits[f - 1]) {
+      const fragment = desc.fragments[f - 1] as HTMLElement;
+      const inside = desc.leaves.filter((l) => fragment.contains(l.dom));
+      const last = inside[inside.length - 1];
+      if (last && last.dom.nodeType !== Node.TEXT_NODE && last.offset + last.size === offset) {
+        target = before(last.dom);
+        moved = !word;
+      } else target = fragmentEnd(desc, f - 1);
+    }
     if (!target) return false;
     if (event.shiftKey)
       sel.setBaseAndExtent(sel.anchorNode, sel.anchorOffset, target.node, target.offset);
     else sel.collapse(target.node, target.offset);
-    sel.modify(
-      event.shiftKey ? "extend" : "move",
-      forward ? "forward" : "backward",
-      word ? "word" : "character",
-    );
+    if (!moved)
+      sel.modify(
+        event.shiftKey ? "extend" : "move",
+        forward ? "forward" : "backward",
+        word ? "word" : "character",
+      );
     this.syncSelection();
     return true;
   }
@@ -1006,7 +1021,7 @@ interface LineItem {
 
 /**
  * The lines of a rendered block, across its fragments. A line ends where the next character
- * (or <br>) sits below the bottom of the line's first one; a binary search finds each line's
+ * (or <br>) starts below the vertical middle of the line's first one; a binary search finds each line's
  * first item. Between two lines the boundary is halfway between the first line's first item
  * bottom and the next line's first item top, which is exact for equal line heights (equal
  * half-leading above and below).
@@ -1064,10 +1079,13 @@ function measureLines(desc: BlockDesc, scale: number): Lines {
         reference = (items[k] as LineItem).rect();
       starts.push((items[i] as LineItem).offset);
       firsts.push(reference);
-      const bottom = reference.bottom;
+      const middle = (reference.top + reference.bottom) / 2;
       const below = (j: number) => {
         const rect = (items[j] as LineItem).rect();
-        return rect.height > 0 && rect.top >= bottom - 0.5;
+        // Below the middle of the line's first item: holds when glyph boxes of consecutive
+        // lines overlap (line-height smaller than the font's content area) and for items of
+        // different heights on one line.
+        return rect.height > 0 && rect.top >= middle;
       };
       let lo = i + 1;
       let hi = items.length;

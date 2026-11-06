@@ -155,7 +155,8 @@ Phase 5 in progress: blocks flow from page to page (5.1) and split across pages 
   - A block that does not fit is split at a line boundary: the lines that fit stay, the rest
     continues at the top of the next page (over as many pages as it takes). Lines are measured
     only for such blocks: per-character `Range` rects, a binary search per line (a line ends
-    where an item sits below the bottom of the line's first one), line boundaries halfway
+    where an item starts below the middle of the line's first one, which also holds for a
+    line-height smaller than the glyph boxes), line boundaries halfway
     between lines; splits are snapped to grapheme-cluster edges. Each fragment is the same
     element type, rendered with its slice of the content and marks; a continued fragment has
     no bottom margin and a continuation no top margin (inline), so the fragments take the
@@ -175,7 +176,8 @@ Phase 5 in progress: blocks flow from page to page (5.1) and split across pages 
   - **Caret affinity at a split:** the end of one fragment and the start of the next are two DOM
     caret stops for one model position. ArrowLeft/Right (with Shift, and word moves:
     Ctrl, Alt on Apple platforms) at such an edge first step over it, then let the browser
-    move (`Selection.modify`), so each press moves once. Backspace/Delete there need nothing:
+    move (`Selection.modify`), so each press moves once. Stepping back over an edge that
+    follows a hard break lands before the `<br>`, which already is the one-character move. Backspace/Delete there need nothing:
     the browser's target range collapses to one model position and the character delete runs.
     Arrow up/down, Home/End and clicks are native.
 - **Input:** `keydown` → the plugin keymaps (as `editor.handleKey`, through the view's
