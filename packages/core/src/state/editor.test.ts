@@ -171,6 +171,15 @@ describe("history", () => {
     expect(content(editor)).toEqual(docJSON(para(">hello world")));
   });
 
+  it("exposes the document settings, also after setDocument", () => {
+    const editor = createEditor();
+    expect(editor.settings.pageSize.width).toBe(210);
+    editor.setDocument(
+      createDocument(undefined, { margins: { top: 1, right: 2, bottom: 3, left: 4 } }),
+    );
+    expect(editor.settings.margins).toEqual({ top: 1, right: 2, bottom: 3, left: 4 });
+  });
+
   it("setDocument resets history", () => {
     const editor = createEditor();
     type(editor, "a");

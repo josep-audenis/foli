@@ -9,16 +9,16 @@ leaves `main` green with a working playground.
 **Update this table in the same PR that starts, advances or finishes a phase.** It is the only
 place that says what is in progress; check it before starting work.
 
-| Phase                    | Status                   | Branch | Notes                                                                                      |
-| ------------------------ | ------------------------ | ------ | ------------------------------------------------------------------------------------------ |
-| 0 Foundation             | ✅ Done                  | —      |                                                                                            |
-| 1 Architecture spike     | ✅ Done (G1 provisional) | —      | Merged in #1; ADR-0003 accepted provisionally; IME, dead-key and screen-reader checks open |
-| 2 Document model         | ✅ Done                  | —      | Merged in #2                                                                               |
-| 3 Transactions & history | ✅ Done                  | —      | Merged in #4; gate G2 passed                                                               |
-| 4 Editor view            | ✅ Done (G3 provisional) | —      | Merged in #8–#13; manual checks (4.6) deferred, open risks in ADR-0003                     |
-| 5 Native pagination      | Ready                    |        |                                                                                            |
-| 6 React API & 0.1.0      | Blocked by G4            |        |                                                                                            |
-| 7–12                     | Not started              |        |                                                                                            |
+| Phase                    | Status                   | Branch               | Notes                                                                                      |
+| ------------------------ | ------------------------ | -------------------- | ------------------------------------------------------------------------------------------ |
+| 0 Foundation             | ✅ Done                  | —                    |                                                                                            |
+| 1 Architecture spike     | ✅ Done (G1 provisional) | —                    | Merged in #1; ADR-0003 accepted provisionally; IME, dead-key and screen-reader checks open |
+| 2 Document model         | ✅ Done                  | —                    | Merged in #2                                                                               |
+| 3 Transactions & history | ✅ Done                  | —                    | Merged in #4; gate G2 passed                                                               |
+| 4 Editor view            | ✅ Done (G3 provisional) | —                    | Merged in #8–#13; manual checks (4.6) deferred, open risks in ADR-0003                     |
+| 5 Native pagination      | In progress              | `phase-5/pagination` | Plan below; G3 passed provisionally (manual checks open in ADR-0003)                       |
+| 6 React API & 0.1.0      | Blocked by G4            |                      |                                                                                            |
+| 7–12                     | Not started              |                      |                                                                                            |
 
 Status values: `Ready` (dependencies met, nobody on it) · `In progress` · `In review` (PR open) ·
 `✅ Done` (merged, acceptance criteria met) · `Blocked by …`.
@@ -331,6 +331,52 @@ visual regression snapshots stable; benchmark baseline published (targets set fr
 Includes ADR-0003's page-break checks: IME at a fragment edge and a screen reader reading a split
 paragraph. A failure that cannot be fixed at the fragment edge triggers ADR-0003's fallback
 (option B).
+
+### Tasks
+
+Each task is one PR that leaves `pnpm check` green and the playground working. Layout lives in
+`packages/view` (`src/layout/`) until the seam is proven; page flow stays a pure function.
+
+- [x] Claim phase, branch `phase-5/pagination`
+- [x] 5.1 Pages in the view, block level: `EditorView` renders `section.foli-page` containers
+  (size and margins from `editor.settings`, in mm) inside the one editable host and flows
+  whole blocks into them by measured height with the pure `flowBlocks` (no splitting yet; no
+  reflow during composition; re-flow when web fonts load). Position mapping, read-back and
+  triple-click work with blocks under pages. React's `DocumentEditor` drops its single sheet;
+  the playground shows real pages. Playwright in all three engines: existing suites on pages;
+  a long document flows into A4 pages that respect the content box and are never under-filled;
+  Enter pushes blocks onto the next page and undo pulls them back; selection and deletion
+  across pages with undo; ArrowDown across the page gap; clicks on a later page. The bundled
+  test font moved to 5.5, where exact page breaks are asserted; page chrome (headers, numbers)
+  arrives with Phase 9.
+- [ ] 5.2 Paragraphs split across pages: line starts measured from the rendered block
+  (`Range` rects over the leaves, binary search per line, marks and mixed sizes included);
+  pure `paginate` assigns lines to pages; one block descriptor owns several DOM fragments
+  (`data-fragment`), each rendering its slice with its marks. Caret affinity at fragment edges
+  (one model offset, two DOM stops: Left/Right, word moves, Home/End, Backspace/Delete step
+  through the edge). Copy, read-back and composition work across fragments. Convergence check
+  (re-render at the same width gives the same lines). Playwright T5 basics in all three
+  engines: type across the break, select across pages, replace, undo.
+- [ ] 5.3 Pagination rules: explicit `pageBreak` node (schema v1 addition before release, JSON,
+  HTML paste/copy, Mod-Enter); headings keep-with-next; widow/orphan control (default 2
+  lines); blocks taller than a page split by lines. Unit tests on `paginate` for each rule.
+- [ ] 5.4 Incremental reflow: measurement cache keyed by node identity and content width;
+  reflow from the page holding the first changed block; stop when a page starts at the same
+  block and line as before; reuse unchanged pages and fragments; one pass per animation frame;
+  deferred during composition. Full invalidation on font load (`document.fonts`), width and
+  zoom (`ResizeObserver`), and settings change.
+- [ ] 5.5 Deterministic fixtures and visual regression with a bundled test font (permissive
+  license, test-only, recorded): short, multi-page, long paragraph,
+  heading at a boundary, explicit breaks, mixed font sizes, different margins; identical page
+  breaks across runs; Playwright screenshot snapshots per engine.
+- [ ] 5.6 Print: `@page` size and margins from settings, one printed page per screen page
+  (`break-after: page`); Playwright PDF (Chromium) page count equals screen page count on the
+  fixtures.
+- [ ] 5.7 Benchmarks: 1/10/50/100+ pages: initial layout, keystroke-to-paint p50/p95, reflow
+  time; hardware, browser and method in `docs/benchmarks.md`; targets set from the baseline.
+- [ ] 5.8 Gate G4 review: T5 in all three engines; the page-break manual checks (IME at a
+  fragment edge, a screen reader reading a split paragraph) run or recorded as open risks in
+  ADR-0003; `docs/pagination.md` rewritten to match what was built.
 
 ## Phase 6 — React API & first release · M → 0.1.0
 

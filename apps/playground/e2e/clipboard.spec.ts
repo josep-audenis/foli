@@ -4,7 +4,7 @@ import { expect, type Page, test } from "@playwright/test";
 const STORAGE_KEY = "foli-playground-document";
 const MOD = "ControlOrMeta";
 const editor = (page: Page) => page.getByRole("textbox", { name: "Document" });
-const texts = (page: Page) => editor(page).locator(":scope > *").allTextContents();
+const texts = (page: Page) => editor(page).locator(":scope > .foli-page > *").allTextContents();
 
 async function saved(page: Page): Promise<unknown[] | null> {
   const raw = await page.evaluate((key) => localStorage.getItem(key), STORAGE_KEY);

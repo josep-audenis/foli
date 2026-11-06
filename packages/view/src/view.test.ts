@@ -30,6 +30,16 @@ afterEach(() => {
   views = [];
 });
 
+/** The rendered blocks, in order, across pages. */
+const blocks = (host: HTMLElement) => [
+  ...host.querySelectorAll<HTMLElement>(":scope > .foli-page > *"),
+];
+/** The blocks' markup, without the page elements around them. */
+const html = (host: HTMLElement) =>
+  blocks(host)
+    .map((block) => block.outerHTML)
+    .join("");
+
 function mount(content: DocJSON = sample, options?: EditorViewOptions) {
   const host = document.createElement("div");
   document.body.append(host);
@@ -44,7 +54,7 @@ describe("EditorView rendering", () => {
     const { host } = mount();
     expect(host.getAttribute("contenteditable")).toBe("true");
     expect(host.getAttribute("role")).toBe("textbox");
-    expect(host.innerHTML).toBe(
+    expect(html(host)).toBe(
       "<h2>Title</h2><p><strong><em>a</em></strong><br>bc<strong>d</strong></p>" +
         "<p><br></p><p>x<br><br></p>",
     );
@@ -57,16 +67,16 @@ describe("EditorView rendering", () => {
         { type: "paragraph", content: [{ type: "text", text: "<img src=x onerror=alert(1)>" }] },
       ],
     });
-    expect(host.innerHTML).toBe("<p>&lt;img src=x onerror=alert(1)&gt;</p>");
+    expect(html(host)).toBe("<p>&lt;img src=x onerror=alert(1)&gt;</p>");
   });
 
   it("reuses the DOM of unchanged blocks and drops stray nodes", () => {
     const { host, editor } = mount();
-    const before = [...host.children];
+    const before = blocks(host);
     host.append(document.createElement("div"));
     editor.select(17);
     editor.commands.insertText("y");
-    const after = [...host.children];
+    const after = blocks(host);
     expect(after).toHaveLength(4);
     expect(after[0]).toBe(before[0]);
     expect(after[1]).toBe(before[1]);
@@ -85,7 +95,7 @@ describe("EditorView rendering", () => {
   it("re-renders on setDocument", () => {
     const { host, editor } = mount();
     editor.setDocument(createDocument());
-    expect(host.innerHTML).toBe("<p><br></p>");
+    expect(html(host)).toBe("<p><br></p>");
   });
 });
 
@@ -105,13 +115,14 @@ describe("EditorView position mapping", () => {
 
   it("maps element points to the next leaf, else the block end", () => {
     const { host, view } = mount();
-    const p = host.children[1] as HTMLElement;
+    const p = blocks(host)[1] as HTMLElement;
     expect(view.posFromDOM(p, 0)).toBe(8); // before <strong>a</strong>
     expect(view.posFromDOM(p, 1)).toBe(9); // before the hard break
     expect(view.posFromDOM(p, 4)).toBe(13); // end of the paragraph
-    expect(view.posFromDOM(host.children[2] as HTMLElement, 0)).toBe(15); // empty block
-    expect(view.posFromDOM(host.children[3] as HTMLElement, 2)).toBe(19); // after a trailing break
-    expect(view.posFromDOM(host, 1)).toBe(7); // between blocks
+    expect(view.posFromDOM(blocks(host)[2] as HTMLElement, 0)).toBe(15); // empty block
+    expect(view.posFromDOM(blocks(host)[3] as HTMLElement, 2)).toBe(19); // after a trailing break
+    expect(view.posFromDOM(host.firstChild as Node, 1)).toBe(7); // between blocks (in a page)
+    expect(view.posFromDOM(host, 1)).toBe(20); // after the last page: the document end
     expect(view.posFromDOM(document.body, 0)).toBeNull();
   });
 
@@ -137,9 +148,9 @@ describe("EditorView input", () => {
   it("writes the model selection to the DOM and reads it back on demand", () => {
     const { host, editor } = focused();
     const sel = document.getSelection();
-    expect(sel?.focusNode).toBe(host.firstChild?.firstChild);
+    expect(sel?.focusNode).toBe(blocks(host)[0]?.firstChild);
     expect(sel?.focusOffset).toBe(1);
-    sel?.collapse(host.firstChild?.firstChild as Node, 0);
+    sel?.collapse(blocks(host)[0]?.firstChild as Node, 0);
     // No selectionchange has run yet: the keydown handler reads the live DOM selection itself.
     host.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", cancelable: true }));
     expect(editor.getDocument().content.content).toHaveLength(2);
@@ -148,7 +159,7 @@ describe("EditorView input", () => {
 
   it("follows the caret back to a point the view wrote earlier", () => {
     const { host, editor } = focused();
-    const text = host.firstChild?.firstChild as Node;
+    const text = blocks(host)[0]?.firstChild as Node;
     editor.select(3); // the view writes the caret at the end of "ab"
     document.getSelection()?.collapse(text, 1);
     host.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowLeft", cancelable: true }));
@@ -192,7 +203,7 @@ describe("EditorView input", () => {
     const ctrl = { ctrlKey: true, cancelable: true }; // Mod outside Apple platforms (jsdom)
     host.dispatchEvent(new KeyboardEvent("keydown", { key: "a", ...ctrl }));
     host.dispatchEvent(new KeyboardEvent("keydown", { key: "b", ...ctrl }));
-    expect(host.innerHTML).toBe("<p><strong>ab</strong></p>");
+    expect(html(host)).toBe("<p><strong>ab</strong></p>");
     host.dispatchEvent(new KeyboardEvent("keydown", { key: "Backspace", cancelable: true }));
     expect(editor.state.doc.textContent).toBe("");
   });
@@ -203,7 +214,7 @@ describe("EditorView input", () => {
       content: [{ type: "paragraph", content: [{ type: "text", text: "a👍🏽b" }] }],
     });
     view.focus();
-    const text = host.firstChild?.firstChild as Node;
+    const text = blocks(host)[0]?.firstChild as Node;
     const sel = document.getSelection();
     editor.select(4); // between 👍 and its skin tone: inside the cluster
     expect([sel?.focusNode, sel?.focusOffset]).toEqual([text, 1]);
@@ -330,7 +341,7 @@ describe("EditorView DOM read-back", () => {
     span.append(p.firstChild as Node);
     p.append(span);
     await settle();
-    expect(host.innerHTML).toBe("<p>ab</p>");
+    expect(html(host)).toBe("<p>ab</p>");
     expect(texts(editor)).toEqual(["ab"]);
   });
 
@@ -341,7 +352,7 @@ describe("EditorView DOM read-back", () => {
     extra.textContent = "x";
     host.append(extra);
     await settle();
-    expect(host.innerHTML).toBe("<p>ab</p>");
+    expect(html(host)).toBe("<p>ab</p>");
     expect(texts(editor)).toEqual(["ab"]);
     expect(warn).toHaveBeenCalledOnce();
     warn.mockRestore();
@@ -411,7 +422,7 @@ describe("EditorView DOM read-back", () => {
     const { host } = mount(paragraphs("ab"));
     host.append(document.createElement("span"));
     await settle();
-    expect(host.innerHTML).toBe("<p>ab</p>");
+    expect(html(host)).toBe("<p>ab</p>");
     expect(warn).not.toHaveBeenCalled();
     warn.mockRestore();
   });
@@ -481,7 +492,7 @@ describe("EditorView options", () => {
     // A DOM change the browser was not supposed to make is undone, not read back.
     (host.querySelector("p")?.firstChild as Text).data = "abc";
     await settle();
-    expect(host.innerHTML).toBe("<p>ab</p>");
+    expect(html(host)).toBe("<p>ab</p>");
     expect(editor.state.doc.textContent).toBe("ab");
     // Mod+B on a caret would only store a mark: dropped too.
     editor.select(2);
@@ -570,5 +581,119 @@ describe("EditorView options", () => {
     expect(host.getAttributeNames()).toEqual(["tabindex"]);
     expect(host.tabIndex).toBe(-1);
     host.remove();
+  });
+});
+
+describe("EditorView pages", () => {
+  const paragraphs = (...texts: string[]): DocJSON => ({
+    type: "doc",
+    content: texts.map((text) => ({ type: "paragraph", content: [{ type: "text", text }] })),
+  });
+  /** jsdom lays nothing out: every block is 400px tall (A4 content box: about 930px). */
+  function tall() {
+    return vi.spyOn(Element.prototype, "getBoundingClientRect").mockImplementation(function (
+      this: Element,
+    ) {
+      const height = this.parentElement?.classList.contains("foli-page") ? 400 : 0;
+      return { height, width: 0, top: 0, left: 0, bottom: height, right: 0 } as DOMRect;
+    });
+  }
+  const pageTexts = (host: HTMLElement) =>
+    [...host.querySelectorAll(".foli-page")].map((page) =>
+      [...page.children].map((block) => block.textContent),
+    );
+  afterEach(() => vi.restoreAllMocks());
+
+  it("renders page elements with the document's size and margins", () => {
+    const host = document.createElement("div");
+    document.body.append(host);
+    const doc = createDocument(paragraphs("a"), {
+      pageSize: { width: 216, height: 279 },
+      margins: { top: 10, right: 20, bottom: 30, left: 40 },
+    });
+    const view = new EditorView(host, createEditor({ document: doc }));
+    views.push(view);
+    const page = host.firstElementChild as HTMLElement;
+    expect(page.tagName).toBe("SECTION");
+    expect(page.className).toBe("foli-page");
+    expect(page.style.width).toBe("216mm");
+    expect(page.style.minHeight).toBe("279mm");
+    expect(page.style.padding).toBe("10mm 20mm 30mm 40mm");
+    expect(host.children).toHaveLength(1);
+  });
+
+  it("flows whole blocks into pages by measured height and back", () => {
+    tall();
+    const { host, editor } = mount(paragraphs("a", "b", "c", "d", "e"));
+    expect(pageTexts(host)).toEqual([["a", "b"], ["c", "d"], ["e"]]);
+    // Enter at the end of "b" pushes everything after it one block down.
+    editor.select(5);
+    expect(editor.commands.splitBlock()).toBe(true);
+    expect(pageTexts(host)).toEqual([
+      ["a", "b"],
+      ["", "c"],
+      ["d", "e"],
+    ]);
+    editor.commands.undo();
+    expect(pageTexts(host)).toEqual([["a", "b"], ["c", "d"], ["e"]]);
+    editor.commands.selectAll();
+    editor.commands.deleteSelection();
+    expect(pageTexts(host)).toEqual([[""]]);
+  });
+
+  it("maps positions and reads DOM changes back across pages", async () => {
+    tall();
+    const { host, editor, view } = mount(paragraphs("a", "b", "c"));
+    const third = host.querySelectorAll(".foli-page")[1]?.firstElementChild as HTMLElement;
+    expect(view.posFromDOM(third.firstChild as Node, 1)).toBe(8);
+    expect(view.posFromDOM(host.lastChild as Node, 0)).toBe(6); // page 2, before "c"
+    expect(view.domFromPos(8).node).toBe(third.firstChild);
+    (third.firstChild as Text).data = "cx";
+    await new Promise((resolve) => setTimeout(resolve));
+    expect(editor.state.doc.textContent).toBe("abcx");
+    expect(pageTexts(host)).toEqual([["a", "b"], ["cx"]]);
+  });
+
+  it("keeps blocks on their pages during a composition and flows them after", () => {
+    tall();
+    const { host, editor, view } = mount(paragraphs("a", "b"));
+    view.focus();
+    editor.select(2);
+    host.dispatchEvent(new CompositionEvent("compositionstart"));
+    editor.commands.splitBlock(); // a change while composing (e.g. from code)
+    expect(pageTexts(host)).toEqual([["a", "", "b"]]);
+    // compositionend flows what the composition skipped (here through the read-back of the
+    // render's own records; with no records, onCompositionEnd renders itself).
+    host.dispatchEvent(new CompositionEvent("compositionend"));
+    expect(pageTexts(host)).toEqual([["a", ""], ["b"]]);
+  });
+
+  it("puts back blocks unwrapped from their page, or a whole unwrapped page", async () => {
+    tall();
+    const { host, editor } = mount(paragraphs("a", "b", "c"));
+    const [first, second] = [...host.querySelectorAll(".foli-page")] as HTMLElement[];
+    host.append(second?.firstElementChild as Node); // "c" now loose in the host
+    (first?.children[1]?.firstChild as Text).data = "bz"; // and a native edit elsewhere
+    await new Promise((resolve) => setTimeout(resolve));
+    expect(editor.state.doc.textContent).toBe("abzc");
+    expect(pageTexts(host)).toEqual([["a", "bz"], ["c"]]);
+
+    // An extension unwraps page 1: its blocks are loose in the host, before page 2.
+    const page = host.firstElementChild as HTMLElement;
+    page.replaceWith(...page.childNodes);
+    ((host.lastElementChild as HTMLElement).firstElementChild?.firstChild as Text).data = "cy";
+    await new Promise((resolve) => setTimeout(resolve));
+    expect(editor.state.doc.textContent).toBe("abzcy");
+    expect(pageTexts(host)).toEqual([["a", "bz"], ["cy"]]);
+    expect(host.children).toHaveLength(2);
+  });
+
+  it("removes stray DOM in the host and in pages", () => {
+    const { host, editor } = mount(paragraphs("a"));
+    host.append(document.createElement("div"));
+    host.firstElementChild?.append(document.createElement("span"));
+    editor.commands.insertText("b");
+    expect(host.children).toHaveLength(1);
+    expect(html(host)).toBe("<p>ba</p>");
   });
 });

@@ -1,8 +1,9 @@
 # Pagination
 
-> Status: **design only.** The current view renders one page-sized sheet (`min-height` = page
-> height). The rendering approach is validated by the Phase 1 spike; this document is revised
-> by ADR-0003 with its results.
+> Status: **in progress (Phase 5).** Built: real page containers with whole blocks flowing
+> between them (5.1, see "Editor view" in [architecture.md](architecture.md)). Not built yet:
+> paragraphs split across pages, rules, incremental reflow, print. The rendering approach is
+> validated by the Phase 1 spike (ADR-0003).
 
 ## Invariant
 

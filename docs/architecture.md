@@ -125,8 +125,9 @@ Known limits:
 
 ## Editor view (`@foli/view`)
 
-Phase 4 in progress (`packages/view/src/view.ts`). Design per ADR-0003 (one `contenteditable`
-host); pages and fragments arrive in Phase 5, so today the whole document is one continuous host.
+`packages/view/src/view.ts`, design per ADR-0003: one `contenteditable` host holding real pages.
+Phase 5 in progress: whole blocks flow from page to page (5.1); paragraphs split across pages
+in 5.2.
 
 - `new EditorView(host, editor, { editable, placeholder })` renders the state of a core
   `Editor` into `host` and subscribes to it. Edits go through `editor.dispatch`, so history,
@@ -141,6 +142,23 @@ host); pages and fragments arrive in Phase 5, so today the whole document is one
   - Empty blocks and blocks ending in a hard break get an extra `<br>` without a descriptor.
 - **Rendering:** blocks whose model node is unchanged (same identity) keep their DOM; changed
   blocks are rebuilt; stray DOM is removed. Built with `createElement`/`textContent` only.
+- **Pages:** the host's only children are `section.foli-page` elements. Each gets the
+  document's page size (`width`, `min-height`) and margins (`padding`) inline in mm, from
+  `editor.settings`; the theme adds the background, shadow and gap. Blocks are page children.
+  - Every render places blocks where they were (a new block joins the page of the block
+    before it), measures each block's border-box height and vertical margins in place, and
+    flows them with the pure `flowBlocks` (`src/layout/flow.ts`): CSS margin collapsing between
+    blocks, the first block keeps its top margin, the last block's bottom margin must fit too
+    (it stays inside the padded page, which would otherwise grow), half a pixel of slack.
+    Heights are in layout px: a scaled ancestor (`transform`, `zoom`) is divided out. Blocks
+    that changed page are moved; empty pages are removed; blocks found loose in the host (an
+    extension unwrapping a page) are put back.
+  - A block taller than a page gets a page of its own, which grows (`min-height`).
+  - No reflow during a composition (moving the DOM the browser composes in would break the
+    IME); the next render after it flows. Web fonts finishing loading (`document.fonts`
+    `loadingdone`) trigger a re-flow.
+  - DOM ↔ model mapping walks up to the page child; a point between blocks (on a page or the
+    host) maps to the start of the next block.
 - **Input:** `keydown` → the plugin keymaps (as `editor.handleKey`, through the view's
   dispatch). Names are normalized as
   `Mod-Ctrl-Meta-Alt-Shift-key` (`Mod` = Cmd on Apple platforms, Ctrl elsewhere; non-Latin
@@ -209,6 +227,11 @@ host); pages and fragments arrive in Phase 5, so today the whole document is one
     are removed silently.
 
 Known limits:
+- Pages (5.1): paragraphs do not split across pages yet, so a page ends at a block boundary and
+  a block taller than a page makes that page grow (5.2). Every render measures every block
+  (O(document) per keystroke; cache and partial reflow in 5.4). Page breaks depend on the
+  fonts installed (a bundled test font arrives with the fixtures, 5.5). Negative block margins
+  are not modelled.
 - A read-back that would add blocks or line breaks is discarded with a `Foli:` console warning
   (some Android keyboards insert paragraphs without `beforeinput`). A `<br>` the browser adds in
   place of a hard break is not recognized, so that hard break would be read as deleted
