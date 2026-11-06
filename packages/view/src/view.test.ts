@@ -23,6 +23,7 @@ const sample: DocJSON = {
 
 let views: EditorView[] = [];
 afterEach(() => {
+  vi.unstubAllGlobals();
   for (const view of views) {
     view.destroy();
     view.host.remove();
@@ -39,6 +40,47 @@ const html = (host: HTMLElement) =>
   blocks(host)
     .map((block) => block.outerHTML)
     .join("");
+
+/** jsdom has no ResizeObserver, and its frames are not driven by the test: fakes for both. */
+function fakeResizeObserver() {
+  const fake = {
+    /** Reports every observed element (`contentRect.width` 0: a hidden host). */
+    fire: (_width?: number) => {},
+    queue: [] as (() => void)[],
+    /** Runs the animation-frame callbacks queued before it. */
+    frame() {
+      const due = fake.queue;
+      fake.queue = [];
+      for (const callback of due) callback();
+    },
+  };
+  vi.stubGlobal(
+    "ResizeObserver",
+    class {
+      readonly targets = new Set<Element>();
+      constructor(callback: ResizeObserverCallback) {
+        fake.fire = (width = 600) =>
+          callback(
+            [...this.targets].map(
+              (target) => ({ target, contentRect: { width } }) as ResizeObserverEntry,
+            ),
+            this as unknown as ResizeObserver,
+          );
+      }
+      observe(target: Element) {
+        this.targets.add(target);
+      }
+      unobserve(target: Element) {
+        this.targets.delete(target);
+      }
+      disconnect() {
+        this.targets.clear();
+      }
+    },
+  );
+  vi.stubGlobal("requestAnimationFrame", (callback: () => void) => fake.queue.push(callback));
+  return fake;
+}
 
 function mount(content: DocJSON = sample, options?: EditorViewOptions) {
   const host = document.createElement("div");
@@ -636,36 +678,10 @@ describe("EditorView pages", () => {
   });
 
   describe("blocks resized without an edit", () => {
-    /** jsdom has no ResizeObserver: a fake whose callback the test fires. */
-    let fire: (contentWidth?: number) => void;
+    let ro: ReturnType<typeof fakeResizeObserver>;
     let height = 400;
     function setup() {
-      vi.stubGlobal(
-        "ResizeObserver",
-        class {
-          readonly targets = new Set<Element>();
-          constructor(callback: ResizeObserverCallback) {
-            fire = (width = 600) =>
-              callback(
-                [...this.targets].map(
-                  (target) => ({ target, contentRect: { width } }) as ResizeObserverEntry,
-                ),
-                this as unknown as ResizeObserver,
-              );
-          }
-          observe(target: Element) {
-            this.targets.add(target);
-          }
-          unobserve(target: Element) {
-            this.targets.delete(target);
-          }
-          disconnect() {
-            this.targets.clear();
-          }
-        },
-      );
-      queue = [];
-      vi.stubGlobal("requestAnimationFrame", (callback: () => void) => queue.push(callback));
+      ro = fakeResizeObserver();
       height = 400;
       const spy = vi.spyOn(Element.prototype, "getBoundingClientRect").mockImplementation(function (
         this: Element,
@@ -675,14 +691,6 @@ describe("EditorView pages", () => {
       });
       return { spy, ...mount(paragraphs("a", "b", "c", "d")) };
     }
-    /** Animation frames run by the test: `frame()` runs the callbacks queued before it. */
-    let queue: (() => void)[] = [];
-    const frame = () => {
-      const due = queue;
-      queue = [];
-      for (const callback of due) callback();
-    };
-    afterEach(() => vi.unstubAllGlobals());
 
     it("re-measures each resized block once and re-flows", () => {
       const { spy, host } = setup();
@@ -691,9 +699,9 @@ describe("EditorView pages", () => {
         ["c", "d"],
       ]);
       height = 500;
-      fire();
+      ro.fire();
       spy.mockClear();
-      frame();
+      ro.frame();
       expect(pageTexts(host)).toEqual([["a"], ["b"], ["c"], ["d"]]);
       // Four blocks, one measurement each (no repeat while the flow asks for lines).
       expect(spy.mock.calls.length).toBeLessThanOrEqual(4 * 2);
@@ -702,8 +710,8 @@ describe("EditorView pages", () => {
     it("does not re-flow for a hidden host", () => {
       const { host } = setup();
       height = 0; // display: none
-      fire(0);
-      expect(queue).toHaveLength(0);
+      ro.fire(0);
+      expect(ro.queue).toHaveLength(0);
       expect(pageTexts(host)).toEqual([
         ["a", "b"],
         ["c", "d"],
@@ -713,22 +721,22 @@ describe("EditorView pages", () => {
     it("does not re-flow again in the frame of its own relayout", () => {
       const { spy, host } = setup();
       height = 500;
-      fire();
-      frame(); // the relayout
+      ro.fire();
+      ro.frame(); // the relayout
       // Fragments that add up to another height than the measurement (CSS on split
       // fragments) are not compared in the frame of the relayout that measured them.
       height = 1000;
-      fire();
+      ro.fire();
       spy.mockClear();
-      frame();
+      ro.frame();
       expect(spy).not.toHaveBeenCalled();
       expect(pageTexts(host)).toEqual([["a"], ["b"], ["c"], ["d"]]);
-      expect(queue).toHaveLength(0);
+      expect(ro.queue).toHaveLength(0);
       // A later change is noticed again.
-      fire();
-      frame();
+      ro.fire();
+      ro.frame();
       expect(pageTexts(host)[0]).toEqual(["a"]);
-      expect(queue.length).toBeGreaterThan(0);
+      expect(ro.queue.length).toBeGreaterThan(0);
     });
   });
 
@@ -835,8 +843,14 @@ describe("EditorView split blocks", () => {
    * Fake layout: 10 characters per line, lines 100px apart (glyph boxes 10..90 within each);
    * a block is as tall as its lines. The A4 content box (about 930px) holds 9 lines.
    */
+  let perLine = 10;
+  /** The height in lines of a block whose text is "x" (as if CSS resized it). */
+  let xLines = 1;
   function lines() {
-    const linesOf = (el: Element) => Math.max(1, Math.ceil((el.textContent ?? "").length / 10));
+    const linesOf = (el: Element) =>
+      el.textContent === "x"
+        ? xLines
+        : Math.max(1, Math.ceil((el.textContent ?? "").length / perLine));
     vi.spyOn(Element.prototype, "getBoundingClientRect").mockImplementation(function (
       this: Element,
     ) {
@@ -856,13 +870,15 @@ describe("EditorView split blocks", () => {
           node = walker.nextNode()
         )
           offset += (node as Text).length;
-        const top = Math.floor(offset / 10) * 100 + 10;
+        const top = Math.floor(offset / perLine) * 100 + 10;
         return { top, bottom: top + 80, height: 80, left: 0, right: 0, width: 0 } as DOMRect;
       },
     });
   }
   afterEach(() => {
     vi.restoreAllMocks();
+    perLine = 10;
+    xLines = 1;
     // biome-ignore lint/suspicious/noExplicitAny: removes the fake added above.
     delete (Range.prototype as any).getBoundingClientRect;
   });
@@ -892,6 +908,41 @@ describe("EditorView split blocks", () => {
     editor.select(3, 3 + 100);
     editor.commands.deleteSelection();
     expect(fragments(host)).toEqual([[`-:${long.slice(0, 2)}${long.slice(102)}`]]);
+  });
+
+  it("measures a split block whole again when the fonts change its wrapping", async () => {
+    lines();
+    const fonts = new EventTarget();
+    Object.defineProperty(document, "fonts", { configurable: true, value: fonts });
+    try {
+      const { host } = mount(paragraphs(long));
+      expect(fragments(host)).toEqual([[`0:${long.slice(0, 90)}`], [`1:${long.slice(90)}`]]);
+      // A narrower font: 12 characters per line, so 9 lines hold 108. Measured across the
+      // old split, fragment 0 would end a line at 90 and the split would land at 102.
+      perLine = 12;
+      fonts.dispatchEvent(new Event("loadingdone"));
+      await vi.waitFor(() =>
+        expect(fragments(host)).toEqual([[`0:${long.slice(0, 108)}`], [`1:${long.slice(108)}`]]),
+      );
+    } finally {
+      // biome-ignore lint/suspicious/noExplicitAny: removes the fake added above.
+      delete (document as any).fonts;
+    }
+  });
+
+  it("measures lines again when CSS resizes a block and rewraps another", () => {
+    lines();
+    const ro = fakeResizeObserver();
+    const { host } = mount(paragraphs("x", long));
+    expect(fragments(host)).toEqual([["-:x", `0:${long.slice(0, 80)}`], [`1:${long.slice(80)}`]]);
+    // A CSS change: "x" grows to two lines, and the long block rewraps at 10.5 characters per
+    // line with the same 15 lines (same height, so its own size does not change). Lines
+    // start at 0, 11, 21, 32, 42, 53, 63, 74…: 7 lines fit after "x", the split is at 74.
+    xLines = 2;
+    perLine = 10.5;
+    ro.fire();
+    ro.frame();
+    expect(fragments(host)).toEqual([["-:x", `0:${long.slice(0, 74)}`], [`1:${long.slice(74)}`]]);
   });
 
   it("maps positions across fragments; the caret at a split shows on the next page", () => {

@@ -104,6 +104,12 @@ export class EditorView {
   private readonly stale = new Set<ModelNode>();
   /** The stale blocks the last relayout re-measured (see `onResize`). */
   private remeasured = new Set<ModelNode>();
+  /**
+   * Set when a block resized without an edit: the CSS or a font changed, and may have rewrapped
+   * other blocks without changing their height. The next render drops every cached line list
+   * (heights stay; lines are measured again only for blocks that cross a page end).
+   */
+  private linesStale = false;
   /** The last flow and the nodes it was made for, for the next incremental one. */
   private flowed: { nodes: readonly ModelNode[]; result: FlowResult } | null = null;
   private readonly resizeObserver: ResizeObserver | null;
@@ -294,10 +300,19 @@ export class EditorView {
     );
     const previousPages = this.fragmentPages;
     this.dirty.clear();
+    const dropLines = this.linesStale && !this.composing;
+    if (dropLines) {
+      this.linesStale = false;
+      this.flowed = null;
+    }
     let blocks: BlockDesc[] = [];
     const starts: number[] = [];
     doc.forEach((node, offset) => {
-      const reused = previous.get(node);
+      let reused = previous.get(node);
+      // A split block about to be measured again (fonts, CSS) is rendered whole first: each
+      // fragment's end breaks its line, so its lines would depend on where it was split before.
+      const remeasure = dropLines || !this.measures.has(node) || this.stale.has(node);
+      if (reused && reused.fragments.length > 1 && remeasure && !this.composing) reused = undefined;
       if (reused) previous.delete(node);
       blocks.push(reused ?? renderBlock(node, ownerDocument));
       starts.push(offset);
@@ -318,6 +333,11 @@ export class EditorView {
         scale ??= layoutScale(this.pages[0] as HTMLElement);
         return scale;
       };
+      if (dropLines)
+        for (const desc of blocks) {
+          const measure = this.measures.get(desc.node);
+          if (measure) delete measure.lines;
+        }
       const nodes = blocks.map((desc) => desc.node);
       const reuse = this.flowed ? reuseOf(this.flowed, nodes, this.stale) : undefined;
       const measureOf = (desc: BlockDesc) => {
@@ -480,7 +500,10 @@ export class EditorView {
       scale ??= layoutScale(this.pages[0] as HTMLElement);
       let height = 0;
       for (const fragment of desc.fragments) height += fragment.getBoundingClientRect().height;
-      if (Math.abs(height / scale - measured.height) > 0.5) this.stale.add(desc.node);
+      if (Math.abs(height / scale - measured.height) > 0.5) {
+        this.stale.add(desc.node);
+        this.linesStale = true;
+      }
     }
     if (this.stale.size) this.scheduleRelayout();
   };
