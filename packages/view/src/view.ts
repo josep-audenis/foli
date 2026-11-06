@@ -102,6 +102,8 @@ export class EditorView {
    */
   private measures = new WeakMap<ModelNode, Measure>();
   private readonly stale = new Set<ModelNode>();
+  /** The stale blocks the last relayout re-measured (see `onResize`). */
+  private remeasured = new Set<ModelNode>();
   /** The last flow and the nodes it was made for, for the next incremental one. */
   private flowed: { nodes: readonly ModelNode[]; result: FlowResult } | null = null;
   private readonly resizeObserver: ResizeObserver | null;
@@ -282,7 +284,7 @@ export class EditorView {
    * fragments on consecutive pages. During a composition nothing moves, since moving or
    * re-splitting the DOM the browser is composing in would break the IME.
    *
-   * shortcut: measures every block on every render (O(document) per keystroke), and the lines of every block that crosses a page; the measurement cache and reflow from the first changed page come in 5.4.
+   * Measurements are cached by node and the flow restarts at the first changed block (5.4).
    */
   private render(): void {
     const { doc } = this.state;
@@ -316,9 +318,12 @@ export class EditorView {
         scale ??= layoutScale(this.pages[0] as HTMLElement);
         return scale;
       };
+      const nodes = blocks.map((desc) => desc.node);
+      const reuse = this.flowed ? reuseOf(this.flowed, nodes, this.stale) : undefined;
       const measureOf = (desc: BlockDesc) => {
         let found = this.measures.get(desc.node);
-        if (!found || this.stale.has(desc.node)) {
+        // A stale block is measured again once per render.
+        if (!found || this.stale.delete(desc.node)) {
           found = measureBox(desc, layoutPx());
           this.measures.set(desc.node, found);
         }
@@ -330,8 +335,6 @@ export class EditorView {
         return found.lines;
       };
       const boxes = blocks.map((desc) => blockBox(desc, measureOf(desc), () => lines(desc)));
-      const nodes = blocks.map((desc) => desc.node);
-      const reuse = this.flowed ? reuseOf(this.flowed, nodes, this.stale) : undefined;
       const result = flowFrom(boxes, contentHeight(this.editor.settings), DEFAULT_RULES, reuse);
       this.flowed = { nodes, result };
       this.stale.clear();
@@ -463,11 +466,17 @@ export class EditorView {
    * font, the content width): measure it again and re-flow, once per frame.
    */
   private onResize = (entries: ResizeObserverEntry[]): void => {
+    // The blocks a relayout re-measured are not compared in its own frame: if CSS makes a
+    // block's fragments add up to another height than the whole block (a continuation
+    // indent), comparing them would re-flow it every frame.
+    const settled = this.remeasured;
     let scale: number | undefined;
     for (const entry of entries) {
       const desc = this.owner.get(entry.target);
       const measured = desc && this.measures.get(desc.node);
-      if (!desc || !measured || this.stale.has(desc.node)) continue;
+      if (!desc || !measured || this.stale.has(desc.node) || settled.has(desc.node)) continue;
+      // A hidden host (display: none) reports every block as 0x0: nothing to re-flow.
+      if (!entry.contentRect.width) continue;
       scale ??= layoutScale(this.pages[0] as HTMLElement);
       let height = 0;
       for (const fragment of desc.fragments) height += fragment.getBoundingClientRect().height;
@@ -480,6 +489,9 @@ export class EditorView {
   private scheduleRelayout(): void {
     if (this.relayoutPending) return;
     this.relayoutPending = true;
+    const win = this.host.ownerDocument.defaultView;
+    const nextFrame = (callback: () => void) =>
+      win?.requestAnimationFrame ? win.requestAnimationFrame(callback) : setTimeout(callback);
     const run = () => {
       this.relayoutPending = false;
       if (this.destroyed) return;
@@ -488,12 +500,13 @@ export class EditorView {
         this.unflowed = true;
         return;
       }
+      this.remeasured = new Set(this.stale);
+      // Resize callbacks run after this frame's layout, before the next frame's callbacks.
+      nextFrame(() => this.remeasured.clear());
       this.render();
       this.writeSelection(false);
     };
-    const win = this.host.ownerDocument.defaultView;
-    if (win?.requestAnimationFrame) win.requestAnimationFrame(run);
-    else setTimeout(run);
+    nextFrame(run);
   }
 
   // ---------- position mapping ----------

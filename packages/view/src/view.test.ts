@@ -635,6 +635,103 @@ describe("EditorView pages", () => {
     expect(spy.mock.calls.length).toBeLessThanOrEqual(2);
   });
 
+  describe("blocks resized without an edit", () => {
+    /** jsdom has no ResizeObserver: a fake whose callback the test fires. */
+    let fire: (contentWidth?: number) => void;
+    let height = 400;
+    function setup() {
+      vi.stubGlobal(
+        "ResizeObserver",
+        class {
+          readonly targets = new Set<Element>();
+          constructor(callback: ResizeObserverCallback) {
+            fire = (width = 600) =>
+              callback(
+                [...this.targets].map(
+                  (target) => ({ target, contentRect: { width } }) as ResizeObserverEntry,
+                ),
+                this as unknown as ResizeObserver,
+              );
+          }
+          observe(target: Element) {
+            this.targets.add(target);
+          }
+          unobserve(target: Element) {
+            this.targets.delete(target);
+          }
+          disconnect() {
+            this.targets.clear();
+          }
+        },
+      );
+      queue = [];
+      vi.stubGlobal("requestAnimationFrame", (callback: () => void) => queue.push(callback));
+      height = 400;
+      const spy = vi.spyOn(Element.prototype, "getBoundingClientRect").mockImplementation(function (
+        this: Element,
+      ) {
+        const h = this.parentElement?.classList.contains("foli-page") ? height : 0;
+        return { height: h, width: 0, top: 0, left: 0, bottom: h, right: 0 } as DOMRect;
+      });
+      return { spy, ...mount(paragraphs("a", "b", "c", "d")) };
+    }
+    /** Animation frames run by the test: `frame()` runs the callbacks queued before it. */
+    let queue: (() => void)[] = [];
+    const frame = () => {
+      const due = queue;
+      queue = [];
+      for (const callback of due) callback();
+    };
+    afterEach(() => vi.unstubAllGlobals());
+
+    it("re-measures each resized block once and re-flows", () => {
+      const { spy, host } = setup();
+      expect(pageTexts(host)).toEqual([
+        ["a", "b"],
+        ["c", "d"],
+      ]);
+      height = 500;
+      fire();
+      spy.mockClear();
+      frame();
+      expect(pageTexts(host)).toEqual([["a"], ["b"], ["c"], ["d"]]);
+      // Four blocks, one measurement each (no repeat while the flow asks for lines).
+      expect(spy.mock.calls.length).toBeLessThanOrEqual(4 * 2);
+    });
+
+    it("does not re-flow for a hidden host", () => {
+      const { host } = setup();
+      height = 0; // display: none
+      fire(0);
+      expect(queue).toHaveLength(0);
+      expect(pageTexts(host)).toEqual([
+        ["a", "b"],
+        ["c", "d"],
+      ]);
+    });
+
+    it("does not re-flow again in the frame of its own relayout", () => {
+      const { spy, host } = setup();
+      height = 500;
+      fire();
+      frame(); // the relayout
+      // Fragments that add up to another height than the measurement (CSS on split
+      // fragments) are not compared in the frame of the relayout that measured them.
+      height = 1000;
+      fire();
+      spy.mockClear();
+      frame();
+      expect(spy).not.toHaveBeenCalled();
+      expect(pageTexts(host)).toEqual([["a"], ["b"], ["c"], ["d"]]);
+      expect(queue).toHaveLength(0);
+      // A later change is noticed again.
+      fire();
+      frame();
+      expect(pageTexts(host)[0]).toEqual(["a"]);
+      expect(queue.length).toBeGreaterThan(0);
+    });
+  });
+
   it("renders page elements with the document's size and margins", () => {
     const host = document.createElement("div");
     document.body.append(host);

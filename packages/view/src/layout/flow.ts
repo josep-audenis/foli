@@ -201,8 +201,13 @@ export function flowFrom(
   let index = start;
   while (index < boxes.length) {
     // Realigned with the previous flow: the rest is unchanged (no keep-with-next decision
-    // about this block, made with the block before it, is pending).
-    const was = reuse && index > start && !attempts.size ? reuse.previousIndex(index) : -1;
+    // about this block, made with the block before it, is pending). The block before it must
+    // be unchanged too: had it been keep-with-next before the edit, the previous flow from
+    // here holds a decision about a chain that no longer exists.
+    const was =
+      reuse && index > start && !attempts.size && reuse.previousIndex(index - 1) >= 0
+        ? reuse.previousIndex(index)
+        : -1;
     const before = was >= 0 ? reuse?.previous.states[was] : undefined;
     if (before && !boxes[index - 1]?.keepWithNext && sameState(before, state)) {
       const previous = reuse as Reuse;

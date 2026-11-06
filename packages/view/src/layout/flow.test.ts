@@ -278,14 +278,23 @@ describe("flowFrom: incremental flow equals a full flow", () => {
   }
 
   it("for random documents and random edits (insert, delete, replace)", () => {
-    for (let seed = 1; seed <= 3000; seed++) {
+    for (let seed = 1; seed <= 5000; seed++) {
       const next = random(seed);
-      const before = Array.from({ length: 5 + Math.floor(next() * 40) }, () => randomBox(next));
+      const before = Array.from({ length: Math.floor(next() * 40) }, () => randomBox(next));
       const previous = flowFrom(before, 100);
-      // Replace `removed` boxes at `at` with `added` new ones.
-      const at = Math.floor(next() * before.length);
-      const removed = Math.min(Math.floor(next() * 3), before.length - at);
-      const added = Array.from({ length: Math.floor(next() * 3) }, () => randomBox(next));
+      // Replace `removed` boxes at `at` (up to the end: an append) with `added` new ones.
+      const at = Math.floor(next() * (before.length + 1));
+      const mode = next();
+      // Some edits delete everything after `at`.
+      const removed =
+        mode < 0.1 ? before.length - at : Math.min(Math.floor(next() * 3), before.length - at);
+      // Some edits keep the same box with keep-with-next toggled (a heading turned into a
+      // paragraph): the state after it stays equal to the previous one.
+      const old = before[at];
+      const added =
+        mode > 0.8 && old && removed === 1
+          ? [{ ...old, keepWithNext: !old.keepWithNext }]
+          : Array.from({ length: Math.floor(next() * 3) }, () => randomBox(next));
       const after = [...before.slice(0, at), ...added, ...before.slice(at + removed)];
       const tail = before.length - at - removed;
       const delta = after.length - before.length;
@@ -298,6 +307,22 @@ describe("flowFrom: incremental flow equals a full flow", () => {
       expect(incremental.fragments, `seed ${seed}`).toEqual(full.fragments);
       expect(incremental.states, `seed ${seed}`).toEqual(full.states);
     }
+  });
+
+  it("does not reuse a keep-with-next decision about a block the edit changed", () => {
+    // Before: H+P (keep-with-next) cannot join Q on a page, so the move is reverted and P
+    // stays on page 0. After H becomes a paragraph, only P moves: P+Q fit on page 1.
+    const kwn = (height: number): BlockBox => ({ ...box(height), keepWithNext: true });
+    const before = [box(50), kwn(20), kwn(20), box(70)];
+    const previous = flowFrom(before, 100);
+    const after = [before[0] as BlockBox, box(20), ...before.slice(2)];
+    const incremental = flowFrom(after, 100, undefined, {
+      previous,
+      from: 1,
+      previousIndex: (i) => (i === 1 ? -1 : i),
+    });
+    expect(incremental).toEqual(flowFrom(after, 100));
+    expect(incremental.fragments[2]?.[0]?.page).toBe(1);
   });
 
   it("stops early once realigned: unchanged boxes after the edit are not measured", () => {
