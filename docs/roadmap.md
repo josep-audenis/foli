@@ -373,7 +373,7 @@ Each task is one PR that leaves `pnpm check` green and the playground working. L
   a break at a paragraph end, a heading slid over the end of page 1 never ends a page, a
   paragraph slid over it never leaves one line. (Blocks taller than a page split by lines
   since 5.2.)
-- [x] 5.4 Incremental reflow: measurements cached by node identity (an edit reads the DOM only
+- [x] 5.4 (#18) Incremental reflow: measurements cached by node identity (an edit reads the DOM only
   for the blocks it changed; settings changes and font loads drop the cache); `flowFrom`
   starts at the first changed block with the previous state and stops once the state before an
   unchanged block equals the previous one (property test against a full flow); unchanged
