@@ -71,6 +71,21 @@ function injectStyles(host: HTMLElement): void {
 }
 
 /**
+ * Print rules for the page settings: one sheet of the document's size per page, without
+ * margins (the page's padding holds them). A page is exactly as tall as a sheet (the flow keeps
+ * content inside it; `overflow: hidden` only cuts the half-pixel slack), with no gap after it.
+ * shortcut: `@page` is per document: with several editors of different page sizes on one web page, the last one's size wins; print one editor per document until that is needed.
+ */
+function printStyles({ pageSize }: DocumentSettings): string {
+  const { width, height } = pageSize;
+  return (
+    `@media print{@page{size:${width}mm ${height}mm;margin:0}` +
+    `.foli-page{height:${height}mm!important;overflow:hidden;margin-block:0!important;` +
+    "break-after:page;break-inside:avoid}.foli-page:last-child{break-after:auto}}"
+  );
+}
+
+/**
  * The editable view of an `Editor` from `@foli/core`: renders its state into one
  * `contenteditable` host and turns DOM input into core commands. The model is the source of
  * truth; the DOM is rebuilt from it (unchanged blocks are reused by node identity).
@@ -93,6 +108,8 @@ export class EditorView {
   /** The page elements, in order; the host's only children. */
   private pages: HTMLElement[] = [];
   private pageStyle = "";
+  /** This view's print rules (`printStyles`), in the document's head: `@page` is per document. */
+  private printStyle: HTMLStyleElement | null = null;
   private destroyed = false;
   /** Set by a render during a composition, which places blocks but does not flow them. */
   private unflowed = false;
@@ -176,6 +193,7 @@ export class EditorView {
     this.host.ownerDocument.fonts?.removeEventListener("loadingdone", this.onFontsLoaded);
     this.observer.disconnect();
     this.resizeObserver?.disconnect();
+    this.printStyle?.remove();
     const { host } = this;
     host.removeEventListener("beforeinput", this.onBeforeInput);
     host.removeEventListener("focus", this.onFocus);
@@ -451,6 +469,13 @@ export class EditorView {
     if (style === this.pageStyle) return;
     this.pageStyle = style;
     for (const page of this.pages) page.style.cssText = style;
+    const doc = this.host.ownerDocument;
+    if (!this.printStyle) {
+      this.printStyle = doc.createElement("style");
+      this.printStyle.setAttribute("data-foli-print", "");
+      (doc.head ?? doc.documentElement).append(this.printStyle);
+    }
+    this.printStyle.textContent = printStyles(this.editor.settings);
     this.invalidateLayout();
   }
 

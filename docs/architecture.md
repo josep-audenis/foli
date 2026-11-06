@@ -127,7 +127,8 @@ Known limits:
 
 `packages/view/src/view.ts`, design per ADR-0003: one `contenteditable` host holding real pages.
 Phase 5 in progress: blocks flow from page to page (5.1) and split across pages at a line
-(5.2); rules, incremental reflow and print follow.
+(5.2), with pagination rules (5.3), incremental reflow (5.4) and print (5.6); benchmarks
+follow.
 
 - `new EditorView(host, editor, { editable, placeholder })` renders the state of a core
   `Editor` into `host` and subscribes to it. Edits go through `editor.dispatch`, so history,
@@ -174,6 +175,14 @@ Phase 5 in progress: blocks flow from page to page (5.1) and split across pages 
     there, unless it already starts its page; the flow restarts from a snapshot before it).
   - No reflow or re-split during a composition (moving the DOM the browser composes in would
     break the IME); the next render after it flows.
+  - **Print (5.6):** the view keeps a `<style data-foli-print>` in the document's head with
+    the page settings: `@page` of the page size without margins (the page's padding holds
+    them), each page exactly one sheet tall (`overflow: hidden` cuts only the flow's
+    half-pixel slack), no gap between pages, `break-after: page` but after the last. One
+    printed sheet per page (Playwright PDF in Chromium, on every fixture: sheet count and
+    size). The React theme drops the canvas and shadows in print; everything else on the web
+    page prints too (the playground hides its bar). `@page` is per document: with several
+    editors of different page sizes, the last one's wins.
   - **Incremental reflow (5.4):** measurements (height, margins, and lines once needed) are
     cached by model node: an unchanged node (same identity) renders the same at the same page
     width, so an edit reads the DOM only for the blocks it changed. The flow (`flowFrom`)

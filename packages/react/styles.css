@@ -38,6 +38,7 @@
   background: var(--foli-selection-color);
 }
 
+/* The view prints one sheet per page (size from the document settings); this drops the chrome. */
 @media print {
   .foli-canvas {
     padding: 0;

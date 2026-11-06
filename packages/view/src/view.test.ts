@@ -733,6 +733,25 @@ describe("EditorView pages", () => {
     });
   });
 
+  it("prints one sheet of the document's page size per page, and cleans up", () => {
+    const host = document.createElement("div");
+    document.body.append(host);
+    const doc = createDocument(paragraphs("a"), {
+      pageSize: { width: 216, height: 279 },
+      margins: { top: 10, right: 20, bottom: 30, left: 40 },
+    });
+    const view = new EditorView(host, createEditor({ document: doc }));
+    const styles = () => document.head.querySelectorAll("style[data-foli-print]");
+    expect(styles()).toHaveLength(1);
+    const css = styles()[0]?.textContent ?? "";
+    expect(css).toContain("@page{size:216mm 279mm;margin:0}");
+    expect(css).toContain(".foli-page{height:279mm!important");
+    expect(css).toContain("break-after:page");
+    view.destroy();
+    host.remove();
+    expect(styles()).toHaveLength(0);
+  });
+
   it("renders page elements with the document's size and margins", () => {
     const host = document.createElement("div");
     document.body.append(host);

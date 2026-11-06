@@ -393,9 +393,13 @@ Each task is one PR that leaves `pnpm check` green and the playground working. L
   the way: a re-flow without an edit (font, CSS) measured a split block's lines across its
   old split, and kept line starts of blocks rewrapped without a height change (WebKit sends
   no `loadingdone` for CSS fonts), so page breaks depended on when the font loaded.
-- [ ] 5.6 Print: `@page` size and margins from settings, one printed page per screen page
-  (`break-after: page`); Playwright PDF (Chromium) page count equals screen page count on the
-  fixtures.
+- [x] 5.6 Print: the view writes a print stylesheet from the settings (`@page` of the page
+  size with no margins, since each page's padding holds them; each page exactly one sheet tall;
+  no gap; `break-after: page` but after the last); the React theme and the playground drop
+  their chrome in print. Playwright PDF (Chromium): on every fixture the sheet count equals the
+  screen page count and each sheet has the page size (US Letter included). `@page` is per
+  document: several editors with different page sizes on one web page print with the last
+  one's size.
 - [ ] 5.7 Benchmarks: 1/10/50/100+ pages: initial layout, keystroke-to-paint p50/p95, reflow
   time; hardware, browser and method in `docs/benchmarks.md`; targets set from the baseline.
 - [ ] 5.8 Gate G4 review: T5 in all three engines; the page-break manual checks (IME at a
