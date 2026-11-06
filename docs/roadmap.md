@@ -393,7 +393,7 @@ Each task is one PR that leaves `pnpm check` green and the playground working. L
   the way: a re-flow without an edit (font, CSS) measured a split block's lines across its
   old split, and kept line starts of blocks rewrapped without a height change (WebKit sends
   no `loadingdone` for CSS fonts), so page breaks depended on when the font loaded.
-- [x] 5.6 Print: the view writes a print stylesheet from the settings (`@page` of the page
+- [x] 5.6 (#20) Print: the view writes a print stylesheet from the settings (`@page` of the page
   size with no margins, since each page's padding holds them; for its own pages, also inside a
   shadow root: each exactly one sheet tall, no gap, `break-after: page` but after the last);
   the React theme and the playground drop their chrome in print. Playwright on every fixture:
