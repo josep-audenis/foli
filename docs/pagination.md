@@ -1,8 +1,9 @@
 # Pagination
 
-> Status: **in progress (Phase 5).** Built: real page containers with whole blocks flowing
-> between them (5.1, see "Editor view" in [architecture.md](architecture.md)). Not built yet:
-> paragraphs split across pages, rules, incremental reflow, print. The rendering approach is
+> Status: **in progress (Phase 5).** Built: real page containers (5.1) and paragraphs split
+> across pages at a line, with caret affinity at the split (5.2); see "Editor view" in
+> [architecture.md](architecture.md). Not built yet: rules (widows, orphans, keep-with-next,
+> explicit breaks), incremental reflow, print. The rendering approach is
 > validated by the Phase 1 spike (ADR-0003).
 
 ## Invariant

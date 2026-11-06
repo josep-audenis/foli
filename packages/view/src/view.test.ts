@@ -697,3 +697,111 @@ describe("EditorView pages", () => {
     expect(html(host)).toBe("<p>ba</p>");
   });
 });
+
+describe("EditorView split blocks", () => {
+  const paragraphs = (...texts: string[]): DocJSON => ({
+    type: "doc",
+    content: texts.map((text) => ({ type: "paragraph", content: [{ type: "text", text }] })),
+  });
+  /**
+   * Fake layout: 10 characters per line, lines 100px apart (glyph boxes 10..90 within each);
+   * a block is as tall as its lines. The A4 content box (about 930px) holds 9 lines.
+   */
+  function lines() {
+    const linesOf = (el: Element) => Math.max(1, Math.ceil((el.textContent ?? "").length / 10));
+    vi.spyOn(Element.prototype, "getBoundingClientRect").mockImplementation(function (
+      this: Element,
+    ) {
+      const height = this.parentElement?.classList.contains("foli-page") ? linesOf(this) * 100 : 0;
+      return { height, width: 0, top: 0, left: 0, bottom: height, right: 0 } as DOMRect;
+    });
+    Object.defineProperty(Range.prototype, "getBoundingClientRect", {
+      configurable: true,
+      value(this: Range) {
+        // Offset within the fragment: the text before this node in its fragment, plus the offset.
+        let offset = this.startOffset;
+        const fragment = this.startContainer.parentElement?.closest(".foli-page > *");
+        const walker = document.createTreeWalker(fragment as Node, NodeFilter.SHOW_TEXT);
+        for (
+          let node = walker.nextNode();
+          node && node !== this.startContainer;
+          node = walker.nextNode()
+        )
+          offset += (node as Text).length;
+        const top = Math.floor(offset / 10) * 100 + 10;
+        return { top, bottom: top + 80, height: 80, left: 0, right: 0, width: 0 } as DOMRect;
+      },
+    });
+  }
+  afterEach(() => {
+    vi.restoreAllMocks();
+    // biome-ignore lint/suspicious/noExplicitAny: removes the fake added above.
+    delete (Range.prototype as any).getBoundingClientRect;
+  });
+  const fragments = (host: HTMLElement) =>
+    [...host.querySelectorAll(".foli-page")].map((page) =>
+      [...page.children].map(
+        (el) => `${el.getAttribute("data-fragment") ?? "-"}:${el.textContent}`,
+      ),
+    );
+  const long = "abcdefghij".repeat(15); // 15 lines
+
+  it("splits a block that crosses the page end at a line, and joins it again", () => {
+    lines();
+    const { host, editor } = mount(paragraphs("x", long));
+    // "x" takes 1 line, so 8 lines (80 characters) of the long block fit on page 1.
+    expect(fragments(host)).toEqual([["-:x", `0:${long.slice(0, 80)}`], [`1:${long.slice(80)}`]]);
+    const [first, second] = host.querySelectorAll<HTMLElement>("[data-fragment]");
+    expect(first?.style.marginBottom).toBe("0px");
+    expect(second?.style.marginTop).toBe("0px");
+    // Deleting "x" frees a line: the split moves by 10 characters.
+    editor.select(1, 2);
+    editor.commands.deleteSelection();
+    expect(fragments(host)).toEqual([["-:", `0:${long.slice(0, 80)}`], [`1:${long.slice(80)}`]]);
+    editor.commands.joinForward();
+    expect(fragments(host)).toEqual([[`0:${long.slice(0, 90)}`], [`1:${long.slice(90)}`]]);
+    // Short enough to fit: one element again.
+    editor.select(3, 3 + 100);
+    editor.commands.deleteSelection();
+    expect(fragments(host)).toEqual([[`-:${long.slice(0, 2)}${long.slice(102)}`]]);
+  });
+
+  it("maps positions across fragments; the caret at a split shows on the next page", () => {
+    lines();
+    const { host, view } = mount(paragraphs(long));
+    const [first, second] = host.querySelectorAll<HTMLElement>("[data-fragment]");
+    const secondText = second?.firstChild as Text;
+    expect(view.posFromDOM(secondText, 0)).toBe(1 + 90);
+    expect(view.posFromDOM(first?.firstChild as Text, 90)).toBe(1 + 90);
+    expect(view.posFromDOM(host.lastChild as Node, 0)).toBe(1 + 90); // page 2, before its fragment
+    expect(view.domFromPos(1 + 90)).toEqual({ node: secondText, offset: 0 });
+    expect(view.domFromPos(1 + 95)).toEqual({ node: secondText, offset: 5 });
+    expect(view.domFromPos(1 + 89).node).toBe(first?.firstChild);
+  });
+
+  it("reads back a DOM change in a continuation as one block", async () => {
+    lines();
+    const { host, editor } = mount(paragraphs(long, "y"));
+    const text = host.querySelectorAll<HTMLElement>("[data-fragment]")[1]?.firstChild as Text;
+    text.data = `Z${text.data}`;
+    await new Promise((resolve) => setTimeout(resolve));
+    expect(editor.state.doc.childCount).toBe(2);
+    expect(editor.state.doc.firstChild?.textContent).toBe(`${long.slice(0, 90)}Z${long.slice(90)}`);
+  });
+
+  it("keeps marks on both sides of a split inside a marked text", () => {
+    lines();
+    const { host } = mount({
+      type: "doc",
+      content: [
+        {
+          type: "paragraph",
+          content: [{ type: "text", text: long, marks: [{ type: "bold" }] }],
+        },
+      ],
+    });
+    expect(
+      [...host.querySelectorAll("[data-fragment]")].map((el) => el.firstElementChild?.tagName),
+    ).toEqual(["STRONG", "STRONG"]);
+  });
+});

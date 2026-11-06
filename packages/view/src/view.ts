@@ -22,7 +22,7 @@ import {
   undo,
 } from "@foli/core";
 import { docFromClipboard, FOLI_MIME, serializeRange } from "./clipboard.js";
-import { type BlockBox, contentHeight, flowBlocks } from "./layout/flow.js";
+import { type BlockBox, contentHeight, flow } from "./layout/flow.js";
 import { type BlockDesc, renderBlock } from "./render.js";
 
 interface DomPoint {
@@ -77,8 +77,10 @@ export class EditorView {
   private blocks: BlockDesc[] = [];
   /** Position before each block, parallel to `blocks`. */
   private starts: number[] = [];
-  /** Page index of each block, parallel to `blocks`. */
-  private pageOf: number[] = [];
+  /** The page of each fragment of each block. */
+  private fragmentPages = new Map<BlockDesc, readonly number[]>();
+  /** The block each fragment element belongs to. */
+  private owner = new Map<Node, BlockDesc>();
   /** The page elements, in order; the host's only children. */
   private pages: HTMLElement[] = [];
   private pageStyle = "";
@@ -253,41 +255,71 @@ export class EditorView {
   /**
    * Renders the document into pages, reusing the DOM of blocks whose model node is unchanged.
    * Blocks are first placed where they were (a new block joins the page of the block before
-   * it), then measured and flowed; during a composition they stay put, since moving the DOM
-   * the browser is composing in would break the IME.
+   * it), then measured and flowed: a block that does not fit is split at a line boundary into
+   * fragments on consecutive pages. During a composition nothing moves, since moving or
+   * re-splitting the DOM the browser is composing in would break the IME.
    *
-   * shortcut: measures every block on every render (O(document) per keystroke); the measurement cache and reflow from the first changed page come in 5.4.
+   * shortcut: measures every block on every render (O(document) per keystroke), and the lines of every block that crosses a page; the measurement cache and reflow from the first changed page come in 5.4.
    */
   private render(): void {
     const { doc } = this.state;
+    const ownerDocument = this.host.ownerDocument;
     const previous = new Map(
       this.blocks.filter((desc) => !this.dirty.has(desc)).map((desc) => [desc.node, desc]),
     );
-    const previousPage = new Map(this.blocks.map((desc, i) => [desc, this.pageOf[i] ?? 0]));
+    const previousPages = this.fragmentPages;
     this.dirty.clear();
-    const blocks: BlockDesc[] = [];
+    let blocks: BlockDesc[] = [];
     const starts: number[] = [];
     doc.forEach((node, offset) => {
       const reused = previous.get(node);
       if (reused) previous.delete(node);
-      blocks.push(reused ?? renderBlock(node, this.host.ownerDocument));
+      blocks.push(reused ?? renderBlock(node, ownerDocument));
       starts.push(offset);
     });
-    for (const stale of previous.values()) stale.dom.remove();
+    for (const stale of previous.values())
+      for (const fragment of stale.fragments) fragment.remove();
     this.applyGeometry();
     let last = 0;
-    let pageOf = blocks.map((desc) => (last = Math.max(last, previousPage.get(desc) ?? last)));
-    this.place(blocks, pageOf);
+    let pages = blocks.map((desc) => {
+      const before = previousPages.get(desc);
+      return desc.fragments.map((_, f) => (last = Math.max(last, before?.[f] ?? last)));
+    });
+    this.place(blocks, pages);
     if (!this.composing) {
       const scale = layoutScale(this.pages[0] as HTMLElement);
-      const boxes = blocks.map((desc) => measureBox(desc, scale));
-      const flowed = flowBlocks(boxes, contentHeight(this.editor.settings));
-      if (flowed.some((page, i) => page !== pageOf[i])) this.place(blocks, flowed);
-      pageOf = flowed;
+      const measured = new Map<BlockDesc, Lines>();
+      const lines = (desc: BlockDesc) => {
+        let found = measured.get(desc);
+        if (!found) {
+          found = measureLines(desc, scale);
+          measured.set(desc, found);
+        }
+        return found;
+      };
+      const boxes = blocks.map((desc) => measureBox(desc, scale, () => lines(desc).bottoms));
+      const flowed = flow(boxes, contentHeight(this.editor.settings));
+      blocks = blocks.map((desc, i) => {
+        const fragments = flowed[i] ?? [];
+        const contentStart = (starts[i] as number) + 1;
+        const splits = fragments.slice(1).map((fragment) => {
+          const offset = lines(desc).starts[fragment.fromLine] as number;
+          // Never split a grapheme cluster across pages.
+          return clusterBoundary(doc, contentStart + offset, false) - contentStart;
+        });
+        const same =
+          splits.length === desc.splits.length && splits.every((at, k) => at === desc.splits[k]);
+        return same ? desc : renderBlock(desc.node, ownerDocument, splits);
+      });
+      pages = flowed.map((fragments) => fragments.map((fragment) => fragment.page));
+      this.place(blocks, pages);
     }
     this.blocks = blocks;
     this.starts = starts;
-    this.pageOf = pageOf;
+    this.fragmentPages = new Map(blocks.map((desc, i) => [desc, pages[i] ?? []]));
+    this.owner = new Map(
+      blocks.flatMap((desc) => desc.fragments.map((fragment) => [fragment, desc] as const)),
+    );
     this.unflowed = this.composing;
     this.showPlaceholder();
     // The view's own DOM changes are not input. During a composition, keep what the browser
@@ -297,12 +329,16 @@ export class EditorView {
   }
 
   /**
-   * Puts each block into its page (`pageOf` is non-decreasing), creating and removing pages as
-   * needed. Anything else in the host or a page (stray DOM) is removed.
+   * Puts each fragment of each block into its page (pages are non-decreasing in document
+   * order), creating and removing pages as needed. Anything else in the host or a page (stray
+   * DOM) is removed.
    */
-  private place(blocks: readonly BlockDesc[], pageOf: readonly number[]): void {
+  private place(blocks: readonly BlockDesc[], pages: readonly (readonly number[])[]): void {
     const { host } = this;
-    const count = (pageOf[pageOf.length - 1] ?? 0) + 1;
+    const items = blocks.flatMap((desc, i) =>
+      desc.fragments.map((dom, f) => ({ dom, page: pages[i]?.[f] ?? 0 })),
+    );
+    const count = (items[items.length - 1]?.page ?? 0) + 1;
     while (this.pages.length < count) this.pages.push(this.createPage());
     // Pages first, in order; anything else in the host ends up after them.
     let cursor = host.firstChild;
@@ -310,17 +346,17 @@ export class EditorView {
       if (page === cursor) cursor = cursor.nextSibling;
       else host.insertBefore(page, cursor);
     }
-    const blockDoms = new Set<Node>(blocks.map((desc) => desc.dom));
+    const blockDoms = new Set<Node>(items.map((item) => item.dom));
     let i = 0;
     for (let p = 0; p < count; p++) {
       const page = this.pages[p] as HTMLElement;
       let at = page.firstChild;
-      for (; i < blocks.length && pageOf[i] === p; i++) {
-        const { dom } = blocks[i] as BlockDesc;
+      for (; i < items.length && items[i]?.page === p; i++) {
+        const dom = (items[i] as { dom: HTMLElement }).dom;
         if (dom === at) at = at.nextSibling;
         else page.insertBefore(dom, at);
       }
-      // What is left: strays go; blocks of a later page are moved there next.
+      // What is left: strays go; fragments of a later page are moved there next.
       while (at) {
         const next: ChildNode | null = at.nextSibling;
         if (!blockDoms.has(at)) at.remove();
@@ -379,14 +415,20 @@ export class EditorView {
   posFromDOM(node: Node, offset: number): number | null {
     const { host } = this;
     if (node === host || this.pages.includes(node as HTMLElement)) {
-      // Between blocks: the start of the first block after the point, else the document end.
+      // Between fragments: the start of the first one after the point (a block start, or
+      // where a continuation starts), else the document end.
       const range = host.ownerDocument.createRange();
       range.setStart(node, offset);
-      const index = this.blocks.findIndex((desc) => range.comparePoint(desc.dom, 0) >= 0);
-      return index < 0 ? this.state.doc.content.size : (this.starts[index] as number);
+      for (const [i, desc] of this.blocks.entries()) {
+        const f = desc.fragments.findIndex((fragment) => range.comparePoint(fragment, 0) >= 0);
+        if (f === 0) return this.starts[i] as number;
+        if (f > 0) return (this.starts[i] as number) + 1 + (desc.splits[f - 1] as number);
+      }
+      return this.state.doc.content.size;
     }
     const element = this.blockElement(node);
-    const index = this.blocks.findIndex((desc) => desc.dom === element);
+    const owner = element ? this.owner.get(element) : undefined;
+    const index = owner ? this.blocks.indexOf(owner) : -1;
     const desc = this.blocks[index];
     if (!desc) return null;
     const contentStart = (this.starts[index] as number) + 1;
@@ -410,6 +452,10 @@ export class EditorView {
     if ($pos.depth === 0) $pos = doc.resolve($pos.nodeAfter ? pos + 1 : pos - 1);
     const desc = this.blocks[$pos.index(0)] as BlockDesc;
     const offset = $pos.parentOffset;
+    // Where a fragment starts, show the caret at the start of the next page's fragment, as a
+    // browser shows it at the start of the next line at a soft wrap.
+    const split = desc.splits.indexOf(offset);
+    if (split >= 0) return fragmentStart(desc, split + 1);
     for (const leaf of desc.leaves) {
       if (
         leaf.dom.nodeType === Node.TEXT_NODE &&
@@ -592,7 +638,8 @@ export class EditorView {
     if (this.pointerFocus) setTimeout(() => (this.pointerFocus = false));
     if (event.detail !== 3 || event.button !== 0) return;
     const element = this.blockElement(event.target as Node | null);
-    const index = this.blocks.findIndex((desc) => desc.dom === element);
+    const owner = element ? this.owner.get(element) : undefined;
+    const index = owner ? this.blocks.indexOf(owner) : -1;
     const desc = this.blocks[index];
     if (!desc) return;
     event.preventDefault();
@@ -610,6 +657,10 @@ export class EditorView {
   private onKeyDown = (event: KeyboardEvent): void => {
     if (event.isComposing || this.composing) return;
     this.syncSelection();
+    if (this.crossFragmentEdge(event)) {
+      event.preventDefault();
+      return;
+    }
     const name = keyName(event);
     // Ctrl/Cmd+Shift+V: the paste event that follows uses only the plain text.
     this.plainPaste = name === "Mod-Shift-v";
@@ -620,6 +671,60 @@ export class EditorView {
     });
     if (handled) event.preventDefault();
   };
+
+  /**
+   * Caret affinity at a page break. The end of one fragment and the start of the next are two
+   * DOM caret stops for one model position, so a native Left/Right (or word move) there would
+   * seem to do nothing. Step over the edge first, then let the browser make the move.
+   *
+   * shortcut: left-to-right only (ArrowRight is forward); bidi text needs visual order here and in the line measurement.
+   */
+  private crossFragmentEdge(event: KeyboardEvent): boolean {
+    const forward = event.key === "ArrowRight";
+    if (!forward && event.key !== "ArrowLeft") return false;
+    // Word moves are Alt on Apple platforms and Ctrl elsewhere; other modifiers are not moves
+    // this view knows (Cmd+arrows go to the line edge, Alt+arrows navigate history on Windows).
+    const word = IS_MAC ? event.altKey : event.ctrlKey;
+    if (event.metaKey || (IS_MAC ? event.ctrlKey : event.altKey)) return false;
+    const sel = this.host.ownerDocument.getSelection();
+    if (!sel?.focusNode || !sel.anchorNode || !sel.modify) return false;
+    if (!event.shiftKey && !sel.isCollapsed) return false;
+    const element = this.blockElement(sel.focusNode);
+    const desc = element ? this.owner.get(element) : undefined;
+    if (!desc || desc.fragments.length < 2) return false;
+    const f = desc.fragments.indexOf(element as HTMLElement);
+    const head = this.posFromDOM(sel.focusNode, sel.focusOffset);
+    if (head === null) return false;
+    const offset = head - (this.starts[this.blocks.indexOf(desc)] as number) - 1;
+    let target: DomPoint | null = null;
+    // Stepping back over an edge after a hard break lands before the <br>: the point after it
+    // is still the split, and browsers would show it before the <br> anyway. That step is
+    // already the one-character move.
+    let moved = false;
+    if (forward && f < desc.fragments.length - 1 && offset === desc.splits[f])
+      target = fragmentStart(desc, f + 1);
+    else if (!forward && f > 0 && offset === desc.splits[f - 1]) {
+      const fragment = desc.fragments[f - 1] as HTMLElement;
+      const inside = desc.leaves.filter((l) => fragment.contains(l.dom));
+      const last = inside[inside.length - 1];
+      if (last && last.dom.nodeType !== Node.TEXT_NODE && last.offset + last.size === offset) {
+        target = before(last.dom);
+        moved = !word;
+      } else target = fragmentEnd(desc, f - 1);
+    }
+    if (!target) return false;
+    if (event.shiftKey)
+      sel.setBaseAndExtent(sel.anchorNode, sel.anchorOffset, target.node, target.offset);
+    else sel.collapse(target.node, target.offset);
+    if (!moved)
+      sel.modify(
+        event.shiftKey ? "extend" : "move",
+        forward ? "forward" : "backward",
+        word ? "word" : "character",
+      );
+    this.syncSelection();
+    return true;
+  }
 
   /** Safety net: a DOM change that was not prevented is read back into the model. */
   private onInput = (): void => {
@@ -687,10 +792,9 @@ export class EditorView {
    * touched blocks if it shows in profiles.
    */
   private readBack(records: readonly MutationRecord[]): void {
-    const byDom = new Map<Node, BlockDesc>(this.blocks.map((desc) => [desc.dom, desc]));
     for (const record of records) {
       const node = this.blockElement(record.target);
-      const desc = node && byDom.get(node);
+      const desc = node && this.owner.get(node);
       if (desc) this.dirty.add(desc);
     }
     const hardBreaks = new Set<Node>();
@@ -713,11 +817,15 @@ export class EditorView {
     const blockLevel = [...this.host.childNodes].flatMap((child) =>
       this.pages.includes(child as HTMLElement) ? [...child.childNodes] : [child],
     );
+    let previousOwner: BlockDesc | undefined;
     for (const child of blockLevel) {
+      const owner = this.owner.get(child);
       // An empty stray node (an extension's marker) holds no text; the re-render removes it.
-      if (!byDom.has(child) && !child.textContent) continue;
-      if (!first) domText += BLOCK_SEPARATOR;
+      if (!owner && !child.textContent) continue;
+      // The fragments of one block are one text; anything else starts a new block.
+      if (!first && !(owner && owner === previousOwner)) domText += BLOCK_SEPARATOR;
       first = false;
+      previousOwner = owner;
       walk(child);
     }
 
@@ -881,15 +989,141 @@ function layoutScale(page: HTMLElement): number {
   return layout ? page.getBoundingClientRect().height / layout || 1 : 1;
 }
 
-/** A block's border-box height (in layout px) and vertical margins, as laid out now. */
-function measureBox(desc: BlockDesc, scale: number): BlockBox {
-  const style = getComputedStyle(desc.dom);
+/** A block's border-box height across its fragments (in layout px) and vertical margins. */
+function measureBox(desc: BlockDesc, scale: number, lines: () => readonly number[]): BlockBox {
+  let height = 0;
+  for (const fragment of desc.fragments) height += fragment.getBoundingClientRect().height;
+  // A split block's first fragment has no bottom margin and its last no top margin (inline).
+  const first = getComputedStyle(desc.dom);
+  const last = getComputedStyle(desc.fragments[desc.fragments.length - 1] as HTMLElement);
   return {
-    height: desc.dom.getBoundingClientRect().height / scale,
+    height: height / scale,
     // jsdom and detached nodes report no margins.
-    marginTop: Number.parseFloat(style.marginTop) || 0,
-    marginBottom: Number.parseFloat(style.marginBottom) || 0,
+    marginTop: Number.parseFloat(first.marginTop) || 0,
+    marginBottom: Number.parseFloat(last.marginBottom) || 0,
+    lines,
   };
+}
+
+interface Lines {
+  /** Content offset where each line starts. */
+  starts: number[];
+  /** Bottom of each line box, in layout px from the block's top, as if it were not split. */
+  bottoms: number[];
+}
+
+const NO_RECT = { top: 0, bottom: 0, height: 0 } as DOMRect;
+
+interface LineItem {
+  offset: number;
+  rect: () => DOMRect;
+}
+
+/**
+ * The lines of a rendered block, across its fragments. A line ends where the next character
+ * (or <br>) starts below the vertical middle of the line's first one; a binary search finds each line's
+ * first item. Between two lines the boundary is halfway between the first line's first item
+ * bottom and the next line's first item top, which is exact for equal line heights (equal
+ * half-leading above and below).
+ *
+ * shortcut: assumes left-to-right lines without vertical-align offsets (schema v1 has neither); bidi and superscripts need line boxes from the layout instead.
+ */
+function measureLines(desc: BlockDesc, scale: number): Lines {
+  const starts: number[] = [];
+  const bottoms: number[] = [];
+  const range = desc.dom.ownerDocument.createRange();
+  let base = 0;
+  for (const [f, fragment] of desc.fragments.entries()) {
+    const box = fragment.getBoundingClientRect();
+    const items: LineItem[] = [];
+    for (const leaf of desc.leaves) {
+      if (!fragment.contains(leaf.dom)) continue;
+      if (leaf.dom.nodeType !== Node.TEXT_NODE) {
+        const br = leaf.dom as Element;
+        items.push({ offset: leaf.offset, rect: () => br.getBoundingClientRect() });
+        continue;
+      }
+      for (let k = 0; k < leaf.size; k++) {
+        items.push({
+          offset: leaf.offset + k,
+          rect: () => {
+            range.setStart(leaf.dom, k);
+            range.setEnd(leaf.dom, k + 1);
+            // jsdom has no range rects: every block is then one line.
+            return range.getBoundingClientRect?.() ?? NO_RECT;
+          },
+        });
+      }
+    }
+    // The extra <br> that shows an empty last line (no leaf of its own).
+    const tail = fragment.lastChild;
+    if (
+      tail instanceof Element &&
+      tail.tagName === "BR" &&
+      !desc.leaves.some((l) => l.dom === tail)
+    )
+      items.push({ offset: desc.node.content.size, rect: () => tail.getBoundingClientRect() });
+    const from = f ? (desc.splits[f - 1] as number) : 0;
+    if (!items.length) {
+      starts.push(from);
+      bottoms.push((base + box.height) / scale);
+      base += box.height;
+      continue;
+    }
+    const firsts: DOMRect[] = [];
+    let i = 0;
+    while (i < items.length) {
+      // The line's reference: its first item with a box (zero-width characters have none).
+      let reference = (items[i] as LineItem).rect();
+      for (let k = i + 1; !reference.height && k < items.length; k++)
+        reference = (items[k] as LineItem).rect();
+      starts.push((items[i] as LineItem).offset);
+      firsts.push(reference);
+      const middle = (reference.top + reference.bottom) / 2;
+      const below = (j: number) => {
+        const rect = (items[j] as LineItem).rect();
+        // Below the middle of the line's first item: holds when glyph boxes of consecutive
+        // lines overlap (line-height smaller than the font's content area) and for items of
+        // different heights on one line.
+        return rect.height > 0 && rect.top >= middle;
+      };
+      let lo = i + 1;
+      let hi = items.length;
+      while (lo < hi) {
+        const mid = (lo + hi) >> 1;
+        if (below(mid)) hi = mid;
+        else lo = mid + 1;
+      }
+      i = lo;
+    }
+    for (let line = 0; line < firsts.length; line++) {
+      const next = firsts[line + 1];
+      const y = next ? ((firsts[line] as DOMRect).bottom + next.top) / 2 : box.bottom;
+      bottoms.push((base + y - box.top) / scale);
+    }
+    base += box.height;
+  }
+  return { starts, bottoms };
+}
+
+/** The DOM point at the start of a block's fragment `f`. */
+function fragmentStart(desc: BlockDesc, f: number): DomPoint {
+  const fragment = desc.fragments[f] as HTMLElement;
+  const offset = f ? (desc.splits[f - 1] as number) : 0;
+  const leaf = desc.leaves.find((l) => l.offset === offset && fragment.contains(l.dom));
+  if (!leaf) return { node: fragment, offset: 0 };
+  return leaf.dom.nodeType === Node.TEXT_NODE ? { node: leaf.dom, offset: 0 } : before(leaf.dom);
+}
+
+/** The DOM point at the end of a block's fragment `f`. */
+function fragmentEnd(desc: BlockDesc, f: number): DomPoint {
+  const fragment = desc.fragments[f] as HTMLElement;
+  const inside = desc.leaves.filter((l) => fragment.contains(l.dom));
+  const last = inside[inside.length - 1];
+  if (!last) return { node: fragment, offset: fragment.childNodes.length };
+  if (last.dom.nodeType === Node.TEXT_NODE) return { node: last.dom, offset: last.size };
+  const point = before(last.dom);
+  return { node: point.node, offset: point.offset + 1 };
 }
 
 const graphemes = new Intl.Segmenter(undefined, { granularity: "grapheme" });

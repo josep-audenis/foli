@@ -126,15 +126,17 @@ Known limits:
 ## Editor view (`@foli/view`)
 
 `packages/view/src/view.ts`, design per ADR-0003: one `contenteditable` host holding real pages.
-Phase 5 in progress: whole blocks flow from page to page (5.1); paragraphs split across pages
-in 5.2.
+Phase 5 in progress: blocks flow from page to page (5.1) and split across pages at a line
+(5.2); rules, incremental reflow and print follow.
 
 - `new EditorView(host, editor, { editable, placeholder })` renders the state of a core
   `Editor` into `host` and subscribes to it. Edits go through `editor.dispatch`, so history,
   plugins and subscribers see every change. `setOptions()` changes the options; `destroy()`
   detaches the view and removes every attribute it added.
-- **Descriptors:** one per block (model node, element, leaves) and one per inline leaf (text
-  node or hard break with its offset in the block). `posFromDOM` / `domFromPos` map through
+- **Descriptors:** one per block (model node, its elements, leaves) and one per inline leaf
+  (text node or hard break with its offset in the block). A block split across pages has one
+  element per page (`fragments`, with `splits` = the content offsets where each later one
+  starts); a text node crossing a split is two leaves. `posFromDOM` / `domFromPos` map through
   them; the DOM is never parsed for content.
   - An element point maps to the start of the first leaf at or after it, else the block end.
   - At a mark boundary the caret is placed in the text before it, matching the marks typed text
@@ -147,18 +149,37 @@ in 5.2.
   `editor.settings`; the theme adds the background, shadow and gap. Blocks are page children.
   - Every render places blocks where they were (a new block joins the page of the block
     before it), measures each block's border-box height and vertical margins in place, and
-    flows them with the pure `flowBlocks` (`src/layout/flow.ts`): CSS margin collapsing between
+    flows them with the pure `flow` (`src/layout/flow.ts`): CSS margin collapsing between
     blocks, the first block keeps its top margin, the last block's bottom margin must fit too
     (it stays inside the padded page, which would otherwise grow), half a pixel of slack.
+  - A block that does not fit is split at a line boundary: the lines that fit stay, the rest
+    continues at the top of the next page (over as many pages as it takes). Lines are measured
+    only for such blocks: per-character `Range` rects, a binary search per line (a line ends
+    where an item starts below the middle of the line's first one, which also holds for a
+    line-height smaller than the glyph boxes), line boundaries halfway
+    between lines; splits are snapped to grapheme-cluster edges. Each fragment is the same
+    element type, rendered with its slice of the content and marks; a continued fragment has
+    no bottom margin and a continuation no top margin (inline), so the fragments take the
+    block's height. Fragments carry `data-fragment` (their index). Measuring the fragments of a
+    split block gives the lines of the whole block, so a reload gives the same split.
     Heights are in layout px: a scaled ancestor (`transform`, `zoom`) is divided out. Blocks
     that changed page are moved; empty pages are removed; blocks found loose in the host (an
     extension unwrapping a page) are put back.
-  - A block taller than a page gets a page of its own, which grows (`min-height`).
-  - No reflow during a composition (moving the DOM the browser composes in would break the
-    IME); the next render after it flows. Web fonts finishing loading (`document.fonts`
+  - Only a single line taller than a page makes its page grow (`min-height`).
+  - No reflow or re-split during a composition (moving the DOM the browser composes in would
+    break the IME); the next render after it flows. Web fonts finishing loading (`document.fonts`
     `loadingdone`) trigger a re-flow.
-  - DOM ↔ model mapping walks up to the page child; a point between blocks (on a page or the
-    host) maps to the start of the next block.
+  - DOM ↔ model mapping walks up to the page child (a block or a fragment); a point between
+    them (on a page or the host) maps to the start of the next one. The read-back joins a
+    block's fragments into one text. At a split the caret is shown at the start of the next
+    page's fragment, as at a soft wrap.
+  - **Caret affinity at a split:** the end of one fragment and the start of the next are two DOM
+    caret stops for one model position. ArrowLeft/Right (with Shift, and word moves:
+    Ctrl, Alt on Apple platforms) at such an edge first step over it, then let the browser
+    move (`Selection.modify`), so each press moves once. Stepping back over an edge that
+    follows a hard break lands before the `<br>`, which already is the one-character move. Backspace/Delete there need nothing:
+    the browser's target range collapses to one model position and the character delete runs.
+    Arrow up/down, Home/End and clicks are native.
 - **Input:** `keydown` → the plugin keymaps (as `editor.handleKey`, through the view's
   dispatch). Names are normalized as
   `Mod-Ctrl-Meta-Alt-Shift-key` (`Mod` = Cmd on Apple platforms, Ctrl elsewhere; non-Latin
@@ -227,9 +248,12 @@ in 5.2.
     are removed silently.
 
 Known limits:
-- Pages (5.1): paragraphs do not split across pages yet, so a page ends at a block boundary and
-  a block taller than a page makes that page grow (5.2). Every render measures every block
-  (O(document) per keystroke; cache and partial reflow in 5.4). Page breaks depend on the
+- Pages: no widow/orphan or keep-with-next rules yet, so a split can leave one line alone on a
+  page (5.3). Every render measures every block, and the lines of each block that crosses a
+  page (O(document) per keystroke; cache and partial reflow in 5.4). Line measurement assumes
+  left-to-right text without vertical-align offsets; block padding and borders are not split
+  (a fragment keeps both). Justified text would need `text-align-last` on continued fragments
+  (alignment arrives in Phase 7). Page breaks depend on the
   fonts installed (a bundled test font arrives with the fixtures, 5.5). Negative block margins
   are not modelled.
 - A read-back that would add blocks or line breaks is discarded with a `Foli:` console warning
