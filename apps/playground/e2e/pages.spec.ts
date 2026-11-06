@@ -5,7 +5,16 @@ const MOD = "ControlOrMeta";
 
 const editor = (page: Page) => page.getByRole("textbox", { name: "Document" });
 const pages = (page: Page) => editor(page).locator(":scope > .foli-page");
-const texts = (page: Page) => editor(page).locator(":scope > .foli-page > *").allTextContents();
+/** Each block's text, its fragments on several pages joined. */
+const texts = (page: Page) =>
+  editor(page).evaluate((host) => {
+    const result: string[] = [];
+    for (const el of host.querySelectorAll(":scope > .foli-page > *")) {
+      if (Number(el.getAttribute("data-fragment")) > 0) result[result.length - 1] += el.textContent;
+      else result.push(el.textContent ?? "");
+    }
+    return result;
+  });
 
 /** Each saved block as its plain text. Saving is debounced (300 ms): poll it. */
 async function savedTexts(page: Page): Promise<string[] | null> {
@@ -15,21 +24,26 @@ async function savedTexts(page: Page): Promise<string[] | null> {
   return blocks.map((b) => (b.content ?? []).map((i) => i.text ?? "\n").join(""));
 }
 
+/** Paragraphs of one to four lines. */
 const line = (i: number) => `Paragraph ${i}: ${"lorem ipsum dolor sit amet ".repeat(i % 4)}`;
+/** One-line paragraphs: never split, so each is one element. */
+const short = (i: number) => `Paragraph ${i}`;
 
-/** Opens the playground on a document of `count` paragraphs (mixed lengths) and a heading. */
-async function openLong(page: Page, count: number): Promise<void> {
+/** Opens the playground on a heading and `count` paragraphs (mixed lengths by default). */
+async function openLong(page: Page, count: number, text = line): Promise<void> {
+  await openDoc(page, [
+    { type: "heading", attrs: { level: 1 }, content: [{ type: "text", text: "Pages" }] },
+    ...Array.from({ length: count }, (_, i) => ({
+      type: "paragraph",
+      content: [{ type: "text", text: text(i) }],
+    })),
+  ]);
+}
+
+/** Opens the playground on the given blocks (A4, 25.4 mm margins). */
+async function openDoc(page: Page, blocks: unknown[]): Promise<void> {
   await page.goto("/");
-  const content = {
-    type: "doc",
-    content: [
-      { type: "heading", attrs: { level: 1 }, content: [{ type: "text", text: "Pages" }] },
-      ...Array.from({ length: count }, (_, i) => ({
-        type: "paragraph",
-        content: [{ type: "text", text: line(i) }],
-      })),
-    ],
-  };
+  const content = { type: "doc", content: blocks };
   await page.evaluate(([key, doc]) => localStorage.setItem(key, doc), [
     STORAGE_KEY,
     JSON.stringify({
@@ -42,7 +56,7 @@ async function openLong(page: Page, count: number): Promise<void> {
     }),
   ] as const);
   await page.reload();
-  await expect(editor(page)).toContainText("Pages");
+  await expect(editor(page).locator(".foli-page").first()).toBeVisible();
 }
 
 /** Focuses the editor with the caret at the end of the block whose text is `text`. */
@@ -63,7 +77,16 @@ const PAGE_HEIGHT = 297 * PX_PER_MM;
 const CONTENT_HEIGHT = (297 - 2 * 25.4) * PX_PER_MM;
 
 interface PageLayout {
-  blocks: { text: string; top: number; bottom: number; marginTop: number; marginBottom: number }[];
+  /** The page's elements: whole blocks, or fragments of a split one (`fragment` >= 0). */
+  blocks: {
+    text: string;
+    fragment: number;
+    top: number;
+    bottom: number;
+    marginTop: number;
+    marginBottom: number;
+    lineHeight: number;
+  }[];
   height: number;
   /** Where the content box ends by the page settings, not by the (growable) element. */
   contentBottom: number;
@@ -84,6 +107,8 @@ function layout(page: Page): Promise<PageLayout[]> {
             const blockStyle = getComputedStyle(block);
             return {
               text: block.textContent ?? "",
+              fragment: Number(block.getAttribute("data-fragment") ?? -1),
+              lineHeight: Number.parseFloat(blockStyle.lineHeight),
               top: box.top,
               bottom: box.bottom,
               marginTop: Number.parseFloat(blockStyle.marginTop),
@@ -97,31 +122,31 @@ function layout(page: Page): Promise<PageLayout[]> {
 }
 
 /**
- * The page-flow invariants: every page holds at least one block; no block ends below its
- * page's content box (unless it is alone there); and no page could have taken the first block
- * of the next one.
+ * The page-flow invariants: every page holds at least one element and keeps its A4 height;
+ * nothing ends below the content box; and no page could have taken another line: the first
+ * line of the next page's first element (with the gap above it when it starts a block, and its
+ * bottom margin when that line is all of it).
  */
 function expectValidFlow(pagesLayout: PageLayout[]): void {
   pagesLayout.forEach((p, i) => {
     expect(p.blocks.length, `page ${i} is empty`).toBeGreaterThan(0);
-    if (p.blocks.length > 1) {
-      // Blocks, bottom margins included, stay inside the content box; the page keeps its size.
-      for (const block of p.blocks)
-        expect(
-          block.bottom + block.marginBottom,
-          `"${block.text}" overflows page ${i}`,
-        ).toBeLessThanOrEqual(p.contentBottom + 0.5);
-      expect(p.height, `page ${i} grew`).toBeCloseTo(PAGE_HEIGHT, 0);
-    }
+    for (const block of p.blocks)
+      expect(
+        block.bottom + block.marginBottom,
+        `"${block.text.slice(0, 30)}" overflows page ${i}`,
+      ).toBeLessThanOrEqual(p.contentBottom + 0.5);
+    expect(p.height, `page ${i} grew`).toBeCloseTo(PAGE_HEIGHT, 0);
     const next = pagesLayout[i + 1]?.blocks[0];
     const last = p.blocks[p.blocks.length - 1];
     if (next && last) {
-      // Same rule as the flow: a block fits if it ends at most half a pixel below the box.
-      // The next block would need the gap, its height and its own bottom margin.
-      const needed =
-        Math.max(last.marginBottom, next.marginTop) + (next.bottom - next.top) + next.marginBottom;
+      const oneLine = next.bottom - next.top < next.lineHeight * 1.5;
+      const gap = next.fragment > 0 ? 0 : Math.max(last.marginBottom, next.marginTop);
+      const needed = gap + next.lineHeight + (oneLine ? next.marginBottom : 0);
       const free = p.contentBottom - last.bottom;
-      expect(free + 0.5, `page ${i} could take "${next.text}"`).toBeLessThan(needed + 0.05);
+      // Same rule as the flow: a line fits if it ends at most half a pixel below the box.
+      expect(free + 0.5, `page ${i} could take a line of "${next.text.slice(0, 30)}"`).toBeLessThan(
+        needed + 0.05,
+      );
     }
   });
 }
@@ -140,7 +165,7 @@ test("a long document flows into A4 pages that respect the content box", async (
 test("typing that grows page 1 pushes blocks onto page 2, and undo pulls them back", async ({
   page,
 }) => {
-  await openLong(page, 60);
+  await openLong(page, 120, short);
   const original = await texts(page);
   const before = await layout(page);
   const lastOnFirst = before[0]?.blocks.at(-1)?.text as string;
@@ -162,7 +187,7 @@ test("typing that grows page 1 pushes blocks onto page 2, and undo pulls them ba
 });
 
 test("selection across pages: drag, delete, undo restores the document", async ({ page }) => {
-  await openLong(page, 40);
+  await openLong(page, 80, short);
   const original = await texts(page);
   const flow = await layout(page);
   const from = flow[0]?.blocks.at(-2)?.text as string;
@@ -183,7 +208,7 @@ test("selection across pages: drag, delete, undo restores the document", async (
 test("ArrowDown from the last line of page 1 lands on page 2; clicks place the caret", async ({
   page,
 }) => {
-  await openLong(page, 60);
+  await openLong(page, 120, short);
   const flow = await layout(page);
   const last = flow[0]?.blocks.at(-1)?.text as string;
   const next = flow[1]?.blocks[0]?.text as string;
@@ -227,4 +252,184 @@ test("a scaled ancestor (transform) does not change where pages break", async ({
   await page.keyboard.press("End");
   await page.keyboard.type("!"); // a render measures again
   await expect.poll(perPage).toEqual(before);
+});
+
+// ---------- a paragraph split across pages (T5) ----------
+
+const words = (n: number) =>
+  Array.from({ length: n }, (_, i) => ["alpha", "beta", "gamma", "delta"][i % 4]).join(" ");
+const LONG = `Long ${words(500)}.`;
+
+/** A heading, short paragraphs, then one long paragraph that crosses the end of page 1. */
+async function openSplit(page: Page): Promise<void> {
+  await openDoc(page, [
+    { type: "heading", attrs: { level: 1 }, content: [{ type: "text", text: "Split" }] },
+    ...Array.from({ length: 12 }, (_, i) => ({
+      type: "paragraph",
+      content: [{ type: "text", text: short(i) }],
+    })),
+    { type: "paragraph", content: [{ type: "text", text: LONG }] },
+    { type: "paragraph", content: [{ type: "text", text: "After" }] },
+  ]);
+}
+
+/** The long paragraph's fragments: page index and text of each. */
+const fragmentsOf = (page: Page) =>
+  page.evaluate(() =>
+    [...document.querySelectorAll(".foli-page > [data-fragment]")].map((el) => ({
+      page: [...document.querySelectorAll(".foli-page")].indexOf(el.parentElement as Element),
+      index: Number(el.getAttribute("data-fragment")),
+      text: el.textContent ?? "",
+    })),
+  );
+
+/** The saved text of the long paragraph (the one that starts with "Long"). */
+async function savedLong(page: Page): Promise<string | undefined> {
+  return (await savedTexts(page))?.find((t) => t.startsWith("Long"));
+}
+
+/** Focuses the editor with the caret `offset` characters into fragment `index`. */
+async function caretInFragment(page: Page, index: number, offset: number): Promise<void> {
+  await editor(page).locator(`[data-fragment="${index}"]`).click();
+  await page.evaluate(
+    ([i, at]) => {
+      const fragment = document.querySelector(`[data-fragment="${i}"]`) as Element;
+      const walker = document.createTreeWalker(fragment, NodeFilter.SHOW_TEXT);
+      let left = at;
+      for (
+        let node = walker.nextNode() as Text | null;
+        node;
+        node = walker.nextNode() as Text | null
+      ) {
+        if (left <= node.length) {
+          getSelection()?.collapse(node, left);
+          return;
+        }
+        left -= node.length;
+      }
+    },
+    [index, offset] as const,
+  );
+}
+
+test("a paragraph that crosses the page end is split at a line onto both pages", async ({
+  page,
+}) => {
+  await openSplit(page);
+  const parts = await fragmentsOf(page);
+  expect(parts.length).toBeGreaterThanOrEqual(2);
+  expect(parts.map((p) => p.index)).toEqual(parts.map((_, i) => i));
+  expect(parts.map((p) => p.page)).toEqual(parts.map((_, i) => (parts[0]?.page ?? 0) + i));
+  expect(parts.map((p) => p.text).join("")).toBe(LONG);
+  // Split at a line start: the first fragment ends at a word boundary (pre-wrap keeps the space).
+  expect(parts[0]?.text.endsWith(" ")).toBe(true);
+  expectValidFlow(await layout(page));
+  expect(await texts(page)).toContain(LONG);
+
+  // The same split after a reload: measuring the fragments gives the lines of the whole block.
+  await page.reload();
+  await expect.poll(() => fragmentsOf(page)).toEqual(parts);
+});
+
+test("typing at the end of page 1 inside a split paragraph keeps text and caret", async ({
+  page,
+}) => {
+  await openSplit(page);
+  const split = ((await fragmentsOf(page))[0]?.text ?? "").length;
+  await caretInFragment(page, 0, split);
+  await page.keyboard.type("XYZ");
+  await page.keyboard.type("W");
+  await expect.poll(() => savedLong(page)).toBe(`${LONG.slice(0, split)}XYZW${LONG.slice(split)}`);
+  expectValidFlow(await layout(page));
+  expect((await fragmentsOf(page)).map((p) => p.text).join("")).toBe(
+    `${LONG.slice(0, split)}XYZW${LONG.slice(split)}`,
+  );
+});
+
+test("ArrowRight and ArrowLeft cross the page break one character per press", async ({ page }) => {
+  await openSplit(page);
+  const split = ((await fragmentsOf(page))[0]?.text ?? "").length;
+  await caretInFragment(page, 0, split - 1);
+  await page.keyboard.press("ArrowRight");
+  await page.keyboard.press("ArrowRight");
+  await page.keyboard.type("#");
+  await expect
+    .poll(() => savedLong(page))
+    .toBe(`${LONG.slice(0, split + 1)}#${LONG.slice(split + 1)}`);
+  await page.keyboard.press(`${MOD}+z`);
+  await expect.poll(() => savedLong(page)).toBe(LONG);
+
+  await caretInFragment(page, 1, 1);
+  await page.keyboard.press("ArrowLeft");
+  await page.keyboard.press("ArrowLeft");
+  await page.keyboard.type("%");
+  await expect
+    .poll(() => savedLong(page))
+    .toBe(`${LONG.slice(0, split - 1)}%${LONG.slice(split - 1)}`);
+});
+
+test("Backspace and Delete at the page break remove one character", async ({ page }) => {
+  await openSplit(page);
+  const split = ((await fragmentsOf(page))[0]?.text ?? "").length;
+  await caretInFragment(page, 1, 0);
+  await page.keyboard.press("Backspace");
+  await expect.poll(() => savedLong(page)).toBe(`${LONG.slice(0, split - 1)}${LONG.slice(split)}`);
+  await page.keyboard.press(`${MOD}+z`);
+  await expect.poll(() => savedLong(page)).toBe(LONG);
+
+  const again = ((await fragmentsOf(page))[0]?.text ?? "").length;
+  await caretInFragment(page, 0, again);
+  await page.keyboard.press("Delete");
+  await expect.poll(() => savedLong(page)).toBe(`${LONG.slice(0, again)}${LONG.slice(again + 1)}`);
+});
+
+test("select across the page break, replace, undo: exact text and selection back", async ({
+  page,
+}) => {
+  await openSplit(page);
+  const split = ((await fragmentsOf(page))[0]?.text ?? "").length;
+  await caretInFragment(page, 0, split - 3);
+  for (let i = 0; i < 6; i++) await page.keyboard.press("Shift+ArrowRight");
+  // Browsers serialize the break between fragments as a newline (Firefox adds spaces too).
+  const selected = () => page.evaluate(() => String(getSelection()).replace(/\s+/g, " "));
+  expect(await selected()).toBe(LONG.slice(split - 3, split + 3));
+  await page.keyboard.type("Q");
+  await expect
+    .poll(() => savedLong(page))
+    .toBe(`${LONG.slice(0, split - 3)}Q${LONG.slice(split + 3)}`);
+  expectValidFlow(await layout(page));
+  await page.keyboard.press(`${MOD}+z`);
+  await expect.poll(() => savedLong(page)).toBe(LONG);
+  await expect.poll(selected).toBe(LONG.slice(split - 3, split + 3));
+  // The model selection is back too: typing replaces exactly those characters again.
+  await page.keyboard.type("Q");
+  await expect
+    .poll(() => savedLong(page))
+    .toBe(`${LONG.slice(0, split - 3)}Q${LONG.slice(split + 3)}`);
+});
+
+test("a mouse drag across the page break selects into page 2; delete and undo", async ({
+  page,
+}) => {
+  await openSplit(page);
+  const original = await texts(page);
+  const first = editor(page).locator('[data-fragment="0"]');
+  const second = editor(page).locator('[data-fragment="1"]');
+  await first.scrollIntoViewIfNeeded();
+  const from = await first.boundingBox();
+  if (!from) throw new Error("no fragment box");
+  await page.mouse.move(from.x + 40, from.y + from.height - 8);
+  await page.mouse.down();
+  await second.scrollIntoViewIfNeeded();
+  const to = await second.boundingBox();
+  if (!to) throw new Error("no fragment box");
+  await page.mouse.move(to.x + 60, to.y + 8, { steps: 10 });
+  await page.mouse.up();
+  await page.keyboard.press("Backspace");
+  await expect
+    .poll(async () => (await texts(page)).join("").length)
+    .toBeLessThan(original.join("").length);
+  expectValidFlow(await layout(page));
+  await page.keyboard.press(`${MOD}+z`);
+  await expect.poll(() => texts(page)).toEqual(original);
 });

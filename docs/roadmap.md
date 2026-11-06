@@ -349,14 +349,18 @@ Each task is one PR that leaves `pnpm check` green and the playground working. L
   across pages with undo; ArrowDown across the page gap; clicks on a later page. The bundled
   test font moved to 5.5, where exact page breaks are asserted; page chrome (headers, numbers)
   arrives with Phase 9.
-- [ ] 5.2 Paragraphs split across pages: line starts measured from the rendered block
-  (`Range` rects over the leaves, binary search per line, marks and mixed sizes included);
-  pure `paginate` assigns lines to pages; one block descriptor owns several DOM fragments
-  (`data-fragment`), each rendering its slice with its marks. Caret affinity at fragment edges
-  (one model offset, two DOM stops: Left/Right, word moves, Home/End, Backspace/Delete step
-  through the edge). Copy, read-back and composition work across fragments. Convergence check
-  (re-render at the same width gives the same lines). Playwright T5 basics in all three
-  engines: type across the break, select across pages, replace, undo.
+- [x] 5.2 Paragraphs split across pages: line starts and line-box bottoms measured from the
+  rendered block (per-character `Range` rects, binary search per line, only for blocks that
+  do not fit; splits snapped to grapheme clusters); the pure `flow` assigns lines to pages;
+  one block descriptor owns several DOM fragments (`data-fragment`), each rendering its slice
+  with its marks, the split edges without margins. Caret affinity at fragment edges:
+  Left/Right and word moves (with Shift) step over the edge; Backspace/Delete delete one
+  character there (the browser's target range collapses); Home/End and up/down are native.
+  Read-back joins fragments; copy is from the model. Same split after a reload. Playwright T5
+  basics in all three engines: split onto both pages, type at the end of page 1, arrows
+  across the break, Backspace/Delete at it, Shift-select + replace + undo (text and
+  selection back), mouse drag across + delete + undo. Mixed font sizes on one line are not in
+  schema v1 yet (measured with equal-line-height assumptions; see architecture.md).
 - [ ] 5.3 Pagination rules: explicit `pageBreak` node (schema v1 addition before release, JSON,
   HTML paste/copy, Mod-Enter); headings keep-with-next; widow/orphan control (default 2
   lines); blocks taller than a page split by lines. Unit tests on `paginate` for each rule.

@@ -89,8 +89,8 @@ export function App() {
           className="playground-hint"
           title="Foli playground: typing, marks, undo, IME, paste, read-only mode, placeholder, pages"
         >
-          Pagination in progress (Phase 5): whole blocks flow onto A4 pages; paragraphs split across
-          pages next. Typing, marks, undo, paste, read-only mode, placeholder.
+          Pagination in progress (Phase 5): blocks flow onto A4 pages and paragraphs split across
+          them. Typing, marks, undo, paste, read-only mode, placeholder.
         </span>
         <label>
           <input
