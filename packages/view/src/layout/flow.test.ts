@@ -230,6 +230,15 @@ describe("flow: keep with next", () => {
     expect(result[2]?.[0]).toEqual({ page: 0, fromLine: 0, toLine: 3 });
   });
 
+  it("does not move a heading when the next block would not fit after it anyway", () => {
+    // One unsplittable line of 90 after a heading of 20 does not fit any page of 100.
+    expect(pagesOf(flow([box(50), heading(20), box(90)], 100))).toEqual([0, 0, 1]);
+    // And the flow after that is the original one.
+    expect(pagesOf(flow([box(50), heading(20), box(90), heading(20), box(20)], 100))).toEqual([
+      0, 0, 1, 2, 2,
+    ]);
+  });
+
   it("leaves a heading that starts its page alone", () => {
     // Heading at the top of page 1 and a block taller than the rest: nothing to gain.
     expect(pagesOf(flow([box(100), heading(20), box(90)], 100))).toEqual([0, 1, 2]);

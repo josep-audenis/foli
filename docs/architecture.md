@@ -97,7 +97,7 @@ Foli's own (see `THIRD_PARTY_NOTICES.md`).
     were changed outside history.
 - **Commands** have the shape `(state, dispatch?) => boolean`:
   - Editing: insertText, deleteBackward/Forward (by grapheme or word), deleteSelection,
-    joinBackward/Forward, insertHardBreak.
+    joinBackward/Forward, insertHardBreak, insertPageBreak (Mod-Enter).
   - splitBlock: Enter at the end of a heading starts a paragraph, and formatting carries over.
   - Formatting and selection: toggleMark, setBlockType, selectAll, undo, redo, plus `isMarkActive`.
   - `baseKeymap()` binds them to key names (`Mod-b`, `Enter`…).

@@ -145,16 +145,30 @@ function expectValidFlow(pagesLayout: PageLayout[]): void {
     expect(p.height, `page ${i} grew`).toBeCloseTo(PAGE_HEIGHT, 0);
     const next = pagesLayout[i + 1]?.blocks[0];
     const last = p.blocks[p.blocks.length - 1];
-    if (!next || !last || last.pageBreak || next.heading) return;
+    if (!next || !last || last.pageBreak) return;
     const lines = Math.round((next.bottom - next.top) / next.lineHeight);
+    /** What a page needs to take the start of `block` after `above` (with the rules). */
+    const start = (above: PageLayout["blocks"][number], block: PageLayout["blocks"][number]) => {
+      const count = Math.round((block.bottom - block.top) / block.lineHeight);
+      const gap = Math.max(above.marginBottom, block.marginTop);
+      // A split first fragment could have given up to its last two lines; else whole, or two.
+      if (block.fragment === 0) return gap + Math.min(count, 2) * block.lineHeight;
+      return count >= 4
+        ? gap + 2 * block.lineHeight
+        : gap + count * block.lineHeight + block.marginBottom;
+    };
     let needed: number;
-    if (next.fragment > 0) {
+    if (next.heading) {
+      // Kept with its next block: the heading and the start of that block would have to fit.
+      const after = pagesLayout[i + 1]?.blocks[1];
+      if (!after) return;
+      needed =
+        Math.max(last.marginBottom, next.marginTop) + (next.bottom - next.top) + start(next, after);
+    } else if (next.fragment > 0) {
       if (lines <= 2) return; // moving a line back would leave a widow
       needed = next.lineHeight;
     } else {
-      const gap = Math.max(last.marginBottom, next.marginTop);
-      needed =
-        lines >= 4 ? gap + 2 * next.lineHeight : gap + lines * next.lineHeight + next.marginBottom;
+      needed = start(last, next);
     }
     const free = p.contentBottom - last.bottom;
     // Same rule as the flow: a line fits if it ends at most half a pixel below the box.

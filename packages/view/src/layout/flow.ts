@@ -65,7 +65,8 @@ interface State {
  *   carries at least `widows` lines to the next; a block too short for both moves whole. Not
  *   applied where only an empty page could hold the lines, nor across an explicit break.
  * - Keep with next: a `keepWithNext` block (and a chain of them) moves to the next page when
- *   the block after it would start there, unless it already starts its page.
+ *   the block after it would start there, unless it already starts its page or the move would
+ *   not bring them together (then the flow stays as it was).
  *
  * Spacing follows CSS inside a padded page: the first block keeps its top margin, adjacent
  * margins collapse to the larger, and the last block's bottom margin stays inside the page
@@ -152,6 +153,11 @@ export function flow(
     return fragments;
   };
 
+  /** The flow as it was before a keep-with-next move, by the block that triggered it. */
+  const attempts = new Map<
+    number,
+    { first: number; result: Fragment[][]; snapshots: State[]; state: State }
+  >();
   let index = 0;
   while (index < boxes.length) {
     snapshots[index] = { ...state };
@@ -161,6 +167,19 @@ export function flow(
     const startsLater =
       previous !== undefined &&
       (fragments[0]?.page ?? 0) > (previous[previous.length - 1]?.page ?? 0);
+    const attempt = attempts.get(index);
+    if (attempt) {
+      attempts.delete(index);
+      // The move did not bring them together (the block does not fit after the heading on a
+      // page of its own either): keep the flow as it was.
+      if (startsLater) {
+        result.splice(attempt.first, result.length - attempt.first, ...attempt.result);
+        snapshots.splice(attempt.first, snapshots.length - attempt.first, ...attempt.snapshots);
+        state = attempt.state;
+        index++;
+        continue;
+      }
+    }
     if (startsLater && boxes[index - 1]?.keepWithNext) {
       // The chain of keep-with-next blocks before this one, each whole on one page.
       let first = index - 1;
@@ -173,6 +192,12 @@ export function flow(
         first--;
       const before = snapshots[first] as State;
       if (!breakBefore.has(first) && before.onPage > 0 && result[first]?.length === 1) {
+        attempts.set(index, {
+          first,
+          result: result.slice(first),
+          snapshots: snapshots.slice(first),
+          state: { ...state },
+        });
         breakBefore.add(first);
         state = { ...before };
         result.length = first;

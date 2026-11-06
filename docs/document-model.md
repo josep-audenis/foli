@@ -69,6 +69,9 @@ like `hardBreak`, rather than a block between paragraphs: DOCX stores a page bre
 (`<w:br w:type="page"/>` inside a run), and the caret, deletion, read-back and clipboard
 handle it as they handle a hard break. The line it ends is the last one on its page; the rest
 of the paragraph continues at the top of the next page. In plain text it is a line feed.
+A break at the end of a paragraph (Mod-Enter there, or a pasted break between blocks, which
+goes to the end of the previous block) leaves that paragraph's empty last line at the top of
+the next page, as a trailing hard break does; the next block follows it.
 
 v1 is defined in `packages/core/src/schema.ts` through the same spec API extensions will use:
 

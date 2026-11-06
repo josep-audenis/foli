@@ -140,6 +140,12 @@ describe("htmlToDoc page breaks", () => {
     expect(parsed('<hr style="page-break-after: always"><p>b</p>')).toEqual([p(pb), p(t("b"))]);
   });
 
+  it("does not read Word's column break as a page break", () => {
+    expect(parsed("<p>a<br clear=all style='mso-column-break-before:always'>b</p>")).toEqual([
+      p(t("a"), br, t("b")),
+    ]);
+  });
+
   it("keeps an ordinary <br> and <hr> what they were", () => {
     expect(parsed("<p>a<br>b</p><hr><p>c</p>")).toEqual([p(t("a"), br, t("b")), p(t("c"))]);
   });

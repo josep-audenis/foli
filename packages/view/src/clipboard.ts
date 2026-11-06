@@ -208,7 +208,6 @@ function marksOf(element: Element, inherited: ReadonlySet<MarkName>): Set<MarkNa
   return marks;
 }
 
-/** Hidden text, Word's list bullets and empty-paragraph fillers. */
 /**
  * A page break in pasted HTML: Foli's own `<br data-page-break>`, or a `<br>` or `<hr>` styled
  * to break the page (Word writes `<br clear=all style='page-break-before:always'>`, Google Docs
@@ -220,9 +219,11 @@ function isPageBreak(element: Element): boolean {
   if (element.localName !== "br" && element.localName !== "hr") return false;
   if (element.hasAttribute(PAGE_BREAK_ATTR)) return true;
   const style = element.getAttribute("style") ?? "";
-  return /(page-break|break)-(before|after)\s*:\s*(always|page)/i.test(style);
+  // Anchored on a property start, so Word's `mso-column-break-before` (a column break) is not one.
+  return /(?:^|[;\s])(?:page-)?break-(?:before|after)\s*:\s*(?:always|page)/i.test(style);
 }
 
+/** Hidden text, Word's list bullets and empty-paragraph fillers. */
 function isNoise(element: Element): boolean {
   const style = element.getAttribute("style") ?? "";
   if (/mso-list:\s*ignore|mso-hide:\s*all/i.test(style)) return true;
