@@ -349,7 +349,7 @@ Each task is one PR that leaves `pnpm check` green and the playground working. L
   across pages with undo; ArrowDown across the page gap; clicks on a later page. The bundled
   test font moved to 5.5, where exact page breaks are asserted; page chrome (headers, numbers)
   arrives with Phase 9.
-- [x] 5.2 Paragraphs split across pages: line starts and line-box bottoms measured from the
+- [x] 5.2 (#16) Paragraphs split across pages: line starts and line-box bottoms measured from the
   rendered block (per-character `Range` rects, binary search per line, only for blocks that
   do not fit; splits snapped to grapheme clusters); the pure `flow` assigns lines to pages;
   one block descriptor owns several DOM fragments (`data-fragment`), each rendering its slice
