@@ -364,7 +364,7 @@ Each task is one PR that leaves `pnpm check` green and the playground working. L
   smaller than the glyph boxes, Shift-select + replace + undo (text and
   selection back), mouse drag across + delete + undo. Mixed font sizes on one line are not in
   schema v1 yet (measured with equal-line-height assumptions; see architecture.md).
-- [x] 5.3 Pagination rules: explicit `pageBreak` node (schema v1 addition before release;
+- [x] 5.3 (#17) Pagination rules: explicit `pageBreak` node (schema v1 addition before release;
   inline like `hardBreak`, as DOCX stores it; JSON, Mod-Enter, copy as a page-breaking `<br>`,
   paste from Word's `<br style='page-break-before:always'>`, Google Docs' hidden `<hr>` and
   Foli's own markup); the line holding a break ends its page; headings keep with the next
