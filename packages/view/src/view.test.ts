@@ -662,9 +662,30 @@ describe("EditorView pages", () => {
     host.dispatchEvent(new CompositionEvent("compositionstart"));
     editor.commands.splitBlock(); // a change while composing (e.g. from code)
     expect(pageTexts(host)).toEqual([["a", "", "b"]]);
+    // compositionend flows what the composition skipped (here through the read-back of the
+    // render's own records; with no records, onCompositionEnd renders itself).
     host.dispatchEvent(new CompositionEvent("compositionend"));
-    editor.commands.insertText("z");
-    expect(pageTexts(host)).toEqual([["a", "z"], ["b"]]);
+    expect(pageTexts(host)).toEqual([["a", ""], ["b"]]);
+  });
+
+  it("puts back blocks unwrapped from their page, or a whole unwrapped page", async () => {
+    tall();
+    const { host, editor } = mount(paragraphs("a", "b", "c"));
+    const [first, second] = [...host.querySelectorAll(".foli-page")] as HTMLElement[];
+    host.append(second?.firstElementChild as Node); // "c" now loose in the host
+    (first?.children[1]?.firstChild as Text).data = "bz"; // and a native edit elsewhere
+    await new Promise((resolve) => setTimeout(resolve));
+    expect(editor.state.doc.textContent).toBe("abzc");
+    expect(pageTexts(host)).toEqual([["a", "bz"], ["c"]]);
+
+    // An extension unwraps page 1: its blocks are loose in the host, before page 2.
+    const page = host.firstElementChild as HTMLElement;
+    page.replaceWith(...page.childNodes);
+    ((host.lastElementChild as HTMLElement).firstElementChild?.firstChild as Text).data = "cy";
+    await new Promise((resolve) => setTimeout(resolve));
+    expect(editor.state.doc.textContent).toBe("abzcy");
+    expect(pageTexts(host)).toEqual([["a", "bz"], ["cy"]]);
+    expect(host.children).toHaveLength(2);
   });
 
   it("removes stray DOM in the host and in pages", () => {

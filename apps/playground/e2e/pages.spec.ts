@@ -57,34 +57,42 @@ async function caretAtEnd(page: Page, text: string): Promise<void> {
   }, text);
 }
 
+/** The playground's settings (A4, 25.4 mm margins) in CSS px. */
+const PX_PER_MM = 96 / 25.4;
+const PAGE_HEIGHT = 297 * PX_PER_MM;
+const CONTENT_HEIGHT = (297 - 2 * 25.4) * PX_PER_MM;
+
 interface PageLayout {
   blocks: { text: string; top: number; bottom: number; marginTop: number; marginBottom: number }[];
-  contentTop: number;
+  height: number;
+  /** Where the content box ends by the page settings, not by the (growable) element. */
   contentBottom: number;
 }
 
 /** Where every page's content box is and where its blocks sit, in viewport px. */
 function layout(page: Page): Promise<PageLayout[]> {
-  return page.evaluate(() =>
-    [...document.querySelectorAll(".foli-content > .foli-page")].map((section) => {
-      const rect = section.getBoundingClientRect();
-      const style = getComputedStyle(section);
-      return {
-        contentTop: rect.top + Number.parseFloat(style.paddingTop),
-        contentBottom: rect.top + rect.height - Number.parseFloat(style.paddingBottom),
-        blocks: [...section.children].map((block) => {
-          const box = block.getBoundingClientRect();
-          const blockStyle = getComputedStyle(block);
-          return {
-            text: block.textContent ?? "",
-            top: box.top,
-            bottom: box.bottom,
-            marginTop: Number.parseFloat(blockStyle.marginTop),
-            marginBottom: Number.parseFloat(blockStyle.marginBottom),
-          };
-        }),
-      };
-    }),
+  return page.evaluate(
+    (contentHeight) =>
+      [...document.querySelectorAll(".foli-content > .foli-page")].map((section) => {
+        const rect = section.getBoundingClientRect();
+        const style = getComputedStyle(section);
+        return {
+          height: rect.height,
+          contentBottom: rect.top + Number.parseFloat(style.paddingTop) + contentHeight,
+          blocks: [...section.children].map((block) => {
+            const box = block.getBoundingClientRect();
+            const blockStyle = getComputedStyle(block);
+            return {
+              text: block.textContent ?? "",
+              top: box.top,
+              bottom: box.bottom,
+              marginTop: Number.parseFloat(blockStyle.marginTop),
+              marginBottom: Number.parseFloat(blockStyle.marginBottom),
+            };
+          }),
+        };
+      }),
+    CONTENT_HEIGHT,
   );
 }
 
@@ -96,16 +104,22 @@ function layout(page: Page): Promise<PageLayout[]> {
 function expectValidFlow(pagesLayout: PageLayout[]): void {
   pagesLayout.forEach((p, i) => {
     expect(p.blocks.length, `page ${i} is empty`).toBeGreaterThan(0);
-    if (p.blocks.length > 1)
+    if (p.blocks.length > 1) {
+      // Blocks, bottom margins included, stay inside the content box; the page keeps its size.
       for (const block of p.blocks)
-        expect(block.bottom, `"${block.text}" overflows page ${i}`).toBeLessThanOrEqual(
-          p.contentBottom + 1,
-        );
+        expect(
+          block.bottom + block.marginBottom,
+          `"${block.text}" overflows page ${i}`,
+        ).toBeLessThanOrEqual(p.contentBottom + 0.5);
+      expect(p.height, `page ${i} grew`).toBeCloseTo(PAGE_HEIGHT, 0);
+    }
     const next = pagesLayout[i + 1]?.blocks[0];
     const last = p.blocks[p.blocks.length - 1];
     if (next && last) {
       // Same rule as the flow: a block fits if it ends at most half a pixel below the box.
-      const needed = Math.max(last.marginBottom, next.marginTop) + (next.bottom - next.top);
+      // The next block would need the gap, its height and its own bottom margin.
+      const needed =
+        Math.max(last.marginBottom, next.marginTop) + (next.bottom - next.top) + next.marginBottom;
       const free = p.contentBottom - last.bottom;
       expect(free + 0.5, `page ${i} could take "${next.text}"`).toBeLessThan(needed + 0.05);
     }
@@ -198,4 +212,19 @@ test("deleting everything leaves one page", async ({ page }) => {
   await page.keyboard.press("Backspace");
   await expect(pages(page)).toHaveCount(1);
   await expect.poll(() => texts(page)).toEqual([""]);
+});
+
+test("a scaled ancestor (transform) does not change where pages break", async ({ page }) => {
+  await openLong(page, 60);
+  const perPage = () =>
+    page.evaluate(() =>
+      [...document.querySelectorAll(".foli-content > .foli-page")].map((p) => p.children.length),
+    );
+  const before = await perPage();
+  // Client rects shrink by 0.8; layout (and so wrapping) is unchanged.
+  await page.addStyleTag({ content: ".foli-canvas { transform: scale(0.8); }" });
+  await editor(page).getByText("Pages", { exact: true }).click();
+  await page.keyboard.press("End");
+  await page.keyboard.type("!"); // a render measures again
+  await expect.poll(perPage).toEqual(before);
 });

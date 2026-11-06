@@ -18,10 +18,18 @@ describe("flowBlocks", () => {
   });
 
   it("collapses adjacent margins to the larger one and keeps the first top margin", () => {
-    // 10 + 30 = 40 | + max(20, 5) + 30 = 90 | + max(20, 10) + 20 = 130
+    // 10 + 30 = 40 | + max(20, 5) + 30 = 90 | + max(20, 10) + 20 = 130 (+ its bottom margin 0)
     const boxes = [box(30, 10, 20), box(30, 5, 20), box(20, 10, 0)];
-    expect(flowBlocks(boxes, 100)).toEqual([0, 0, 1]);
     expect(flowBlocks(boxes, 130)).toEqual([0, 0, 0]);
+    // The second block needs 90 + its own bottom margin 20 = 110.
+    expect(flowBlocks(boxes, 110)).toEqual([0, 0, 1]);
+    expect(flowBlocks(boxes, 100)).toEqual([0, 1, 1]);
+  });
+
+  it("keeps the last block's bottom margin inside the page", () => {
+    // 40 | + max(10, 0) + 45 = 95, + its bottom margin 10 = 105 > 100: the page would grow.
+    expect(flowBlocks([box(40, 0, 10), box(45, 0, 10)], 100)).toEqual([0, 1]);
+    expect(flowBlocks([box(40, 0, 10), box(45, 0, 5)], 100)).toEqual([0, 0]);
   });
 
   it("gives a block taller than a page its own page", () => {

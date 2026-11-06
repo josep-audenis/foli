@@ -18,7 +18,9 @@ export function contentHeight({ pageSize, margins }: DocumentSettings): number {
 /**
  * Page flow for whole blocks: the page index of each block. Blocks fill a page in order; one
  * that would end below the content box starts the next page. Spacing follows CSS inside a
- * padded page: the first block keeps its top margin, adjacent margins collapse to the larger.
+ * padded page: the first block keeps its top margin, adjacent margins collapse to the larger,
+ * and the last block's bottom margin stays inside the page (it does not collapse into the
+ * padding), so it must fit too or the page would grow past its size.
  * A block taller than a page gets a page of its own (the page grows; splitting comes in 5.2).
  *
  * shortcut: positive margins only (negative margins collapse differently); add them when a
@@ -33,7 +35,7 @@ export function flowBlocks(boxes: readonly BlockBox[], pageHeight: number): numb
   for (const box of boxes) {
     const gap = onPage ? Math.max(previousMargin, box.marginTop) : box.marginTop;
     // Half a pixel of slack: measured heights are fractional and rounding must not add a page.
-    if (onPage && used + gap + box.height > pageHeight + 0.5) {
+    if (onPage && used + gap + box.height + box.marginBottom > pageHeight + 0.5) {
       page++;
       used = box.marginTop + box.height;
       onPage = 1;

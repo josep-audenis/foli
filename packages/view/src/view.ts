@@ -83,6 +83,8 @@ export class EditorView {
   private pages: HTMLElement[] = [];
   private pageStyle = "";
   private destroyed = false;
+  /** Set by a render during a composition, which places blocks but does not flow them. */
+  private unflowed = false;
   private composing = false;
   /** Set by Ctrl/Cmd+Shift+V for the paste event it triggers. */
   private plainPaste = false;
@@ -277,13 +279,16 @@ export class EditorView {
     let pageOf = blocks.map((desc) => (last = Math.max(last, previousPage.get(desc) ?? last)));
     this.place(blocks, pageOf);
     if (!this.composing) {
-      const flowed = flowBlocks(blocks.map(measureBox), contentHeight(this.editor.settings));
+      const scale = layoutScale(this.pages[0] as HTMLElement);
+      const boxes = blocks.map((desc) => measureBox(desc, scale));
+      const flowed = flowBlocks(boxes, contentHeight(this.editor.settings));
       if (flowed.some((page, i) => page !== pageOf[i])) this.place(blocks, flowed);
       pageOf = flowed;
     }
     this.blocks = blocks;
     this.starts = starts;
     this.pageOf = pageOf;
+    this.unflowed = this.composing;
     this.showPlaceholder();
     // The view's own DOM changes are not input. During a composition, keep what the browser
     // changed before this render: the touched blocks are read back at compositionend.
@@ -299,6 +304,7 @@ export class EditorView {
     const { host } = this;
     const count = (pageOf[pageOf.length - 1] ?? 0) + 1;
     while (this.pages.length < count) this.pages.push(this.createPage());
+    // Pages first, in order; anything else in the host ends up after them.
     let cursor = host.firstChild;
     for (const page of this.pages.slice(0, count)) {
       if (page === cursor) cursor = cursor.nextSibling;
@@ -321,11 +327,13 @@ export class EditorView {
         at = next;
       }
     }
-    // Pages no longer needed (their blocks have moved) and stray DOM in the host.
-    while (cursor) {
-      const next: ChildNode | null = cursor.nextSibling;
-      cursor.remove();
-      cursor = next;
+    // Pages no longer needed and stray DOM in the host: all after the last page by now. Taken
+    // after the block loop, since a block found loose in the host has just moved into a page.
+    let rest = (this.pages[count - 1] as HTMLElement).nextSibling;
+    while (rest) {
+      const next: ChildNode | null = rest.nextSibling;
+      rest.remove();
+      rest = next;
     }
     this.pages.length = count;
   }
@@ -627,6 +635,11 @@ export class EditorView {
   private onCompositionEnd = (): void => {
     this.composing = false;
     this.flush();
+    // A render during the composition did not flow; if the read-back rendered nothing, flow now.
+    if (this.unflowed) {
+      this.render();
+      this.writeSelection(false);
+    }
     this.showPlaceholder();
   };
 
@@ -859,11 +872,20 @@ export class EditorView {
   };
 }
 
-/** A block's border-box height and vertical margins, as laid out now. */
-function measureBox(desc: BlockDesc): BlockBox {
+/**
+ * Client rects are scaled by CSS `zoom` or a `transform` on an ancestor, while margins and the
+ * page geometry are in layout px: the ratio between the two for a page.
+ */
+function layoutScale(page: HTMLElement): number {
+  const layout = page.offsetHeight;
+  return layout ? page.getBoundingClientRect().height / layout || 1 : 1;
+}
+
+/** A block's border-box height (in layout px) and vertical margins, as laid out now. */
+function measureBox(desc: BlockDesc, scale: number): BlockBox {
   const style = getComputedStyle(desc.dom);
   return {
-    height: desc.dom.getBoundingClientRect().height,
+    height: desc.dom.getBoundingClientRect().height / scale,
     // jsdom and detached nodes report no margins.
     marginTop: Number.parseFloat(style.marginTop) || 0,
     marginBottom: Number.parseFloat(style.marginBottom) || 0,

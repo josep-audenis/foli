@@ -148,8 +148,11 @@ in 5.2.
   - Every render places blocks where they were (a new block joins the page of the block
     before it), measures each block's border-box height and vertical margins in place, and
     flows them with the pure `flowBlocks` (`src/layout/flow.ts`): CSS margin collapsing between
-    blocks, the first block keeps its top margin, half a pixel of slack. Blocks that changed
-    page are moved; empty pages are removed.
+    blocks, the first block keeps its top margin, the last block's bottom margin must fit too
+    (it stays inside the padded page, which would otherwise grow), half a pixel of slack.
+    Heights are in layout px: a scaled ancestor (`transform`, `zoom`) is divided out. Blocks
+    that changed page are moved; empty pages are removed; blocks found loose in the host (an
+    extension unwrapping a page) are put back.
   - A block taller than a page gets a page of its own, which grows (`min-height`).
   - No reflow during a composition (moving the DOM the browser composes in would break the
     IME); the next render after it flows. Web fonts finishing loading (`document.fonts`
