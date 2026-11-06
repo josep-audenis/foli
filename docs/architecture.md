@@ -148,8 +148,8 @@ Phase 5 in progress: blocks flow from page to page (5.1) and split across pages 
   document's page size (`width`, `min-height`) and margins (`padding`) inline in mm, from
   `editor.settings`; the theme adds the background, shadow and gap. Blocks are page children.
   - Every render places blocks where they were (a new block joins the page of the block
-    before it), measures each block's border-box height and vertical margins in place, and
-    flows them with the pure `flow` (`src/layout/flow.ts`): CSS margin collapsing between
+    before it), measures the blocks it has no measurement for (border-box height and vertical
+    margins, in place), and flows them with the pure `flow` (`src/layout/flow.ts`): CSS margin collapsing between
     blocks, the first block keeps its top margin, the last block's bottom margin must fit too
     (it stays inside the padded page, which would otherwise grow), half a pixel of slack.
   - A block that does not fit is split at a line boundary: the lines that fit stay, the rest
@@ -173,8 +173,23 @@ Phase 5 in progress: blocks flow from page to page (5.1) and split across pages 
     heading, or a chain of them, moves to the next page when the block after it would start
     there, unless it already starts its page; the flow restarts from a snapshot before it).
   - No reflow or re-split during a composition (moving the DOM the browser composes in would
-    break the IME); the next render after it flows. Web fonts finishing loading (`document.fonts`
-    `loadingdone`) trigger a re-flow.
+    break the IME); the next render after it flows.
+  - **Incremental reflow (5.4):** measurements (height, margins, and lines once needed) are
+    cached by model node: an unchanged node (same identity) renders the same at the same page
+    width, so an edit reads the DOM only for the blocks it changed. The flow (`flowFrom`)
+    starts at the first changed block (backed up over a chain of keep-with-next blocks) from
+    the previous flow's state there, and stops once the state before an unchanged block of the
+    edit's tail equals the previous state before it: the rest is the previous flow (property
+    test: equal to a full flow for random documents and edits). Unchanged fragments keep
+    their DOM. A `ResizeObserver` on every block element notices a block whose height no
+    longer matches its measurement without an edit (CSS, a web font, a container) and marks
+    it stale; web fonts finishing loading (`document.fonts` `loadingdone`) and a change of
+    page settings drop every measurement. These re-flows are batched into one per animation
+    frame; a re-flow due during a composition waits for its end. Sizes reported in the frame
+    of the relayout that re-measured a block are not compared (fragments of a split block may
+    add up to another height than the whole block: no re-flow every frame), nor are those of
+    a hidden host (0 wide). Edits flow synchronously:
+    the DOM must match the model for the next mapping.
   - DOM ↔ model mapping walks up to the page child (a block or a fragment); a point between
     them (on a page or the host) maps to the start of the next one. The read-back joins a
     block's fragments into one text. At a split the caret is shown at the start of the next
@@ -254,9 +269,12 @@ Phase 5 in progress: blocks flow from page to page (5.1) and split across pages 
     are removed silently.
 
 Known limits:
-- Pages: no widow/orphan or keep-with-next rules yet, so a split can leave one line alone on a
-  page (5.3). Every render measures every block, and the lines of each block that crosses a
-  page (O(document) per keystroke; cache and partial reflow in 5.4). Line measurement assumes
+- Pages: an edit that shifts every later block (a new block in the middle) re-runs the flow
+  over the rest of the document (arithmetic over cached measurements, plus the first line
+  measurement of blocks that now cross a page end); the reconciliation walks every block's
+  DOM position (no layout reads). A CSS change that alters only margins, or rewraps a block
+  without changing its height, is not noticed (the `ResizeObserver` watches sizes; the old
+  line starts stay until the block's height changes). Line measurement assumes
   left-to-right text without vertical-align offsets; block padding and borders are not split
   (a fragment keeps both). Justified text would need `text-align-last` on continued fragments
   (alignment arrives in Phase 7). Page breaks depend on the

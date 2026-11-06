@@ -364,7 +364,7 @@ Each task is one PR that leaves `pnpm check` green and the playground working. L
   smaller than the glyph boxes, Shift-select + replace + undo (text and
   selection back), mouse drag across + delete + undo. Mixed font sizes on one line are not in
   schema v1 yet (measured with equal-line-height assumptions; see architecture.md).
-- [x] 5.3 Pagination rules: explicit `pageBreak` node (schema v1 addition before release;
+- [x] 5.3 (#17) Pagination rules: explicit `pageBreak` node (schema v1 addition before release;
   inline like `hardBreak`, as DOCX stores it; JSON, Mod-Enter, copy as a page-breaking `<br>`,
   paste from Word's `<br style='page-break-before:always'>`, Google Docs' hidden `<hr>` and
   Foli's own markup); the line holding a break ends its page; headings keep with the next
@@ -373,11 +373,15 @@ Each task is one PR that leaves `pnpm check` green and the playground working. L
   a break at a paragraph end, a heading slid over the end of page 1 never ends a page, a
   paragraph slid over it never leaves one line. (Blocks taller than a page split by lines
   since 5.2.)
-- [ ] 5.4 Incremental reflow: measurement cache keyed by node identity and content width;
-  reflow from the page holding the first changed block; stop when a page starts at the same
-  block and line as before; reuse unchanged pages and fragments; one pass per animation frame;
-  deferred during composition. Full invalidation on font load (`document.fonts`), width and
-  zoom (`ResizeObserver`), and settings change.
+- [x] 5.4 Incremental reflow: measurements cached by node identity (an edit reads the DOM only
+  for the blocks it changed; settings changes and font loads drop the cache); `flowFrom`
+  starts at the first changed block with the previous state and stops once the state before an
+  unchanged block equals the previous one (property test against a full flow); unchanged
+  fragments keep their DOM; a `ResizeObserver` on blocks re-measures one whose size changed
+  without an edit (CSS, fonts, width, zoom); those re-flows are batched to one per animation
+  frame and wait for a composition to end. Edits themselves flow synchronously (the DOM must
+  match the model for the next mapping). Playwright: a CSS change re-flows without an edit;
+  typing on page 1 of a 200-paragraph document keeps every page valid.
 - [ ] 5.5 Deterministic fixtures and visual regression with a bundled test font (permissive
   license, test-only, recorded): short, multi-page, long paragraph,
   heading at a boundary, explicit breaks, mixed font sizes, different margins; identical page

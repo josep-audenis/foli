@@ -44,7 +44,8 @@ export function contentHeight({ pageSize, margins }: DocumentSettings): number {
 // Half a pixel of slack: measured heights are fractional and rounding must not add a page.
 const SLACK = 0.5;
 
-interface State {
+/** Where the flow stands before a block: shared by a full and an incremental flow. */
+export interface FlowState {
   page: number;
   used: number;
   previousMargin: number;
@@ -81,9 +82,48 @@ export function flow(
   pageHeight: number,
   rules: FlowRules = DEFAULT_RULES,
 ): Fragment[][] {
-  const result: Fragment[][] = [];
-  let state: State = { page: 0, used: 0, previousMargin: 0, onPage: 0, breakPending: false };
-  const snapshots: State[] = [];
+  return flowFrom(boxes, pageHeight, rules).fragments;
+}
+
+/** A flow with the state before each block (and after the last), for the next incremental one. */
+export interface FlowResult {
+  fragments: Fragment[][];
+  states: FlowState[];
+}
+
+/** What an incremental flow may reuse from the previous one. */
+export interface Reuse {
+  previous: FlowResult;
+  /** Blocks before this index are the previous flow's first blocks, with the same boxes. */
+  from: number;
+  /**
+   * The previous index of block `i` when it and every block after it are unchanged from the
+   * previous flow (the common tail of an edit), else -1.
+   */
+  previousIndex(i: number): number;
+}
+
+/**
+ * `flow`, reusing a previous one: it starts at `reuse.from` (backed up over a chain of
+ * keep-with-next blocks, whose placement depends on what follows) with the previous state
+ * there, and once the state before an unchanged block equals the previous state before it, the
+ * rest is the previous flow's. The result is the same as a full flow.
+ */
+export function flowFrom(
+  boxes: readonly BlockBox[],
+  pageHeight: number,
+  rules: FlowRules = DEFAULT_RULES,
+  reuse?: Reuse,
+): FlowResult {
+  let start = reuse ? Math.min(reuse.from, boxes.length, reuse.previous.fragments.length) : 0;
+  while (start > 0 && boxes[start - 1]?.keepWithNext) start--;
+  const result: Fragment[][] = reuse ? reuse.previous.fragments.slice(0, start) : [];
+  const snapshots: FlowState[] = reuse ? reuse.previous.states.slice(0, start) : [];
+  let state: FlowState = (
+    reuse && reuse.previous.states[start]
+      ? { ...reuse.previous.states[start] }
+      : { page: 0, used: 0, previousMargin: 0, onPage: 0, breakPending: false }
+  ) as FlowState;
   /** Blocks that start a page because the keep-with-next rule moved them. */
   const breakBefore = new Set<number>();
   const newPage = () => {
@@ -156,10 +196,30 @@ export function flow(
   /** The flow as it was before a keep-with-next move, by the block that triggered it. */
   const attempts = new Map<
     number,
-    { first: number; result: Fragment[][]; snapshots: State[]; state: State }
+    { first: number; result: Fragment[][]; snapshots: FlowState[]; state: FlowState }
   >();
-  let index = 0;
+  let index = start;
   while (index < boxes.length) {
+    // Realigned with the previous flow: the rest is unchanged (no keep-with-next decision
+    // about this block, made with the block before it, is pending). The block before it must
+    // be unchanged too: had it been keep-with-next before the edit, the previous flow from
+    // here holds a decision about a chain that no longer exists.
+    const was =
+      reuse && index > start && !attempts.size && reuse.previousIndex(index - 1) >= 0
+        ? reuse.previousIndex(index)
+        : -1;
+    const before = was >= 0 ? reuse?.previous.states[was] : undefined;
+    if (before && !boxes[index - 1]?.keepWithNext && sameState(before, state)) {
+      const previous = reuse as Reuse;
+      result.length = index;
+      snapshots.length = index;
+      result.push(...previous.previous.fragments.slice(was));
+      snapshots.push(...previous.previous.states.slice(was, -1));
+      return {
+        fragments: result,
+        states: [...snapshots, { ...(previous.previous.states.at(-1) as FlowState) }],
+      };
+    }
     snapshots[index] = { ...state };
     const fragments = place(boxes[index] as BlockBox, index);
     result[index] = fragments;
@@ -190,8 +250,8 @@ export function flow(
         result[first - 1]?.[0]?.page === result[first]?.[0]?.page
       )
         first--;
-      const before = snapshots[first] as State;
-      if (!breakBefore.has(first) && before.onPage > 0 && result[first]?.length === 1) {
+      const beforeFirst = snapshots[first] as FlowState;
+      if (!breakBefore.has(first) && beforeFirst.onPage > 0 && result[first]?.length === 1) {
         attempts.set(index, {
           first,
           result: result.slice(first),
@@ -199,7 +259,7 @@ export function flow(
           state: { ...state },
         });
         breakBefore.add(first);
-        state = { ...before };
+        state = { ...beforeFirst };
         result.length = first;
         index = first;
         continue;
@@ -207,5 +267,15 @@ export function flow(
     }
     index++;
   }
-  return result;
+  return { fragments: result, states: [...snapshots.slice(0, boxes.length), { ...state }] };
+}
+
+function sameState(a: FlowState, b: FlowState): boolean {
+  return (
+    a.page === b.page &&
+    a.used === b.used &&
+    a.previousMargin === b.previousMargin &&
+    a.onPage === b.onPage &&
+    a.breakPending === b.breakPending
+  );
 }
