@@ -382,7 +382,7 @@ Each task is one PR that leaves `pnpm check` green and the playground working. L
   frame and wait for a composition to end. Edits themselves flow synchronously (the DOM must
   match the model for the next mapping). Playwright: a CSS change re-flows without an edit;
   typing on page 1 of a 200-paragraph document keeps every page valid.
-- [x] 5.5 Deterministic fixtures and visual regression with a bundled test font: Tinos (SIL
+- [x] 5.5 (#19) Deterministic fixtures and visual regression with a bundled test font: Tinos (SIL
   OFL 1.1, `@fontsource/tinos` dev dependency, served to the page by the tests only; recorded
   in THIRD_PARTY_NOTICES.md). Fixtures in `apps/playground/e2e/fixtures.ts`: short,
   multi-page, long paragraph, heading at a boundary, explicit breaks, mixed font sizes
