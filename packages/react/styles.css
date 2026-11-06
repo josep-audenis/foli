@@ -38,7 +38,10 @@
   background: var(--foli-selection-color);
 }
 
-/* The view prints one sheet per page (size from the document settings); this drops the chrome. */
+/*
+ * The view prints one sheet per page (size from the document settings); this drops the chrome.
+ * Hide the rest of your page in print: anything printed before the pages adds sheets.
+ */
 @media print {
   .foli-canvas {
     padding: 0;

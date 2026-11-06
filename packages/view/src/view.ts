@@ -70,18 +70,24 @@ function injectStyles(host: HTMLElement): void {
   parent.append(style);
 }
 
+const VIEW_ATTR = "data-foli-view";
+let viewCount = 0;
+
 /**
- * Print rules for the page settings: one sheet of the document's size per page, without
- * margins (the page's padding holds them). A page is exactly as tall as a sheet (the flow keeps
- * content inside it; `overflow: hidden` only cuts the half-pixel slack), with no gap after it.
- * shortcut: `@page` is per document: with several editors of different page sizes on one web page, the last one's size wins; print one editor per document until that is needed.
+ * Print rules for the page settings of the view whose host has `VIEW_ATTR` = `id`: one sheet of
+ * the document's size per page, without margins (the page's padding holds them). A page is
+ * exactly as tall as a sheet (the flow keeps content inside it; the exact height absorbs its
+ * half-pixel slack), with no gap after it. Content taller than a page (a line taller than a
+ * page) is not cut: it prints over the next sheet.
+ * shortcut: `@page` is per document: with several editors of different page sizes on one web page, the last one's sheet size wins (each keeps its own page rules); print one editor per document until that is needed.
  */
-function printStyles({ pageSize }: DocumentSettings): string {
+function printStyles({ pageSize }: DocumentSettings, id: string): string {
   const { width, height } = pageSize;
+  const pages = `[${VIEW_ATTR}="${id}"]>.foli-page`;
   return (
     `@media print{@page{size:${width}mm ${height}mm;margin:0}` +
-    `.foli-page{height:${height}mm!important;overflow:hidden;margin-block:0!important;` +
-    "break-after:page;break-inside:avoid}.foli-page:last-child{break-after:auto}}"
+    `${pages}{height:${height}mm!important;margin-block:0!important;` +
+    `break-after:page;break-inside:avoid}${pages}:last-child{break-after:auto}}`
   );
 }
 
@@ -108,8 +114,13 @@ export class EditorView {
   /** The page elements, in order; the host's only children. */
   private pages: HTMLElement[] = [];
   private pageStyle = "";
-  /** This view's print rules (`printStyles`), in the document's head: `@page` is per document. */
-  private printStyle: HTMLStyleElement | null = null;
+  /** Marks the host for this view's print rules (`printStyles`). */
+  private readonly id = String(++viewCount);
+  /**
+   * This view's print rules: in the document's head (`@page` only applies there) and, for a host
+   * in a shadow root, there too (page rules do not cross into it).
+   */
+  private printStyles: HTMLStyleElement[] = [];
   private destroyed = false;
   /** Set by a render during a composition, which places blocks but does not flow them. */
   private unflowed = false;
@@ -158,6 +169,7 @@ export class EditorView {
     this.state = editor.state;
     host.setAttribute("role", "textbox");
     host.setAttribute("aria-multiline", "true");
+    host.setAttribute(VIEW_ATTR, this.id);
     this.addedTabIndex = !host.hasAttribute("tabindex");
     if (this.addedTabIndex) host.tabIndex = 0;
     // Spaces typed into the model must stay visible and caret-addressable.
@@ -193,7 +205,7 @@ export class EditorView {
     this.host.ownerDocument.fonts?.removeEventListener("loadingdone", this.onFontsLoaded);
     this.observer.disconnect();
     this.resizeObserver?.disconnect();
-    this.printStyle?.remove();
+    for (const style of this.printStyles) style.remove();
     const { host } = this;
     host.removeEventListener("beforeinput", this.onBeforeInput);
     host.removeEventListener("focus", this.onFocus);
@@ -213,6 +225,7 @@ export class EditorView {
       "aria-multiline",
       "aria-readonly",
       "aria-placeholder",
+      VIEW_ATTR,
     ];
     if (this.addedTabIndex) owned.push("tabindex");
     for (const name of owned) host.removeAttribute(name);
@@ -469,13 +482,19 @@ export class EditorView {
     if (style === this.pageStyle) return;
     this.pageStyle = style;
     for (const page of this.pages) page.style.cssText = style;
+    // shortcut: written when the page settings change; a host moved to another document or shadow root keeps them where they were until then.
+    for (const style of this.printStyles) style.remove();
     const doc = this.host.ownerDocument;
-    if (!this.printStyle) {
-      this.printStyle = doc.createElement("style");
-      this.printStyle.setAttribute("data-foli-print", "");
-      (doc.head ?? doc.documentElement).append(this.printStyle);
-    }
-    this.printStyle.textContent = printStyles(this.editor.settings);
+    const root = this.host.getRootNode();
+    const parents: ParentNode[] = [doc.head ?? doc.documentElement];
+    if (root.nodeType === Node.DOCUMENT_FRAGMENT_NODE) parents.push(root as ShadowRoot);
+    this.printStyles = parents.map((parent) => {
+      const style = doc.createElement("style");
+      style.setAttribute("data-foli-print", "");
+      style.textContent = printStyles(this.editor.settings, this.id);
+      parent.append(style);
+      return style;
+    });
     this.invalidateLayout();
   }
 

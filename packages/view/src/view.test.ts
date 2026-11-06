@@ -745,11 +745,28 @@ describe("EditorView pages", () => {
     expect(styles()).toHaveLength(1);
     const css = styles()[0]?.textContent ?? "";
     expect(css).toContain("@page{size:216mm 279mm;margin:0}");
-    expect(css).toContain(".foli-page{height:279mm!important");
+    // Page rules for this view's pages only: another editor keeps its own page height.
+    const id = host.getAttribute("data-foli-view");
+    expect(css).toContain(`[data-foli-view="${id}"]>.foli-page{height:279mm!important`);
     expect(css).toContain("break-after:page");
     view.destroy();
     host.remove();
     expect(styles()).toHaveLength(0);
+    expect(host.hasAttribute("data-foli-view")).toBe(false);
+  });
+
+  it("adds the print page rules to a shadow root holding the host", () => {
+    const outer = document.createElement("div");
+    document.body.append(outer);
+    const shadow = outer.attachShadow({ mode: "open" });
+    const host = document.createElement("div");
+    shadow.append(host);
+    const view = new EditorView(host, createEditor({ document: createDocument(paragraphs("a")) }));
+    expect(shadow.querySelectorAll("style[data-foli-print]")).toHaveLength(1);
+    expect(document.head.querySelectorAll("style[data-foli-print]")).toHaveLength(1);
+    view.destroy();
+    outer.remove();
+    expect(shadow.querySelectorAll("style[data-foli-print]")).toHaveLength(0);
   });
 
   it("renders page elements with the document's size and margins", () => {
