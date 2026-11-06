@@ -2,6 +2,7 @@ import {
   AllSelection,
   type Command,
   closeHistory,
+  type DocumentSettings,
   deleteBackward,
   deleteForward,
   deleteSelection,
@@ -28,6 +29,7 @@ import {
   DEFAULT_RULES,
   type FlowResult,
   flowFrom,
+  PX_PER_MM,
   type Reuse,
 } from "./layout/flow.js";
 import { type BlockDesc, PAGE_BREAK_ATTR, renderBlock } from "./render.js";
@@ -102,8 +104,12 @@ export class EditorView {
    */
   private measures = new WeakMap<ModelNode, Measure>();
   private readonly stale = new Set<ModelNode>();
-  /** The stale blocks the last relayout re-measured (see `onResize`). */
-  private remeasured = new Set<ModelNode>();
+  /**
+   * Set when a block resized without an edit: the CSS or a font changed, and may have rewrapped
+   * other blocks without changing their height. The next render drops every cached line list
+   * (heights stay; lines are measured again only for blocks that cross a page end).
+   */
+  private linesStale = false;
   /** The last flow and the nodes it was made for, for the next incremental one. */
   private flowed: { nodes: readonly ModelNode[]; result: FlowResult } | null = null;
   private readonly resizeObserver: ResizeObserver | null;
@@ -294,10 +300,19 @@ export class EditorView {
     );
     const previousPages = this.fragmentPages;
     this.dirty.clear();
+    const dropLines = this.linesStale && !this.composing;
+    if (dropLines) {
+      this.linesStale = false;
+      this.flowed = null;
+    }
     let blocks: BlockDesc[] = [];
     const starts: number[] = [];
     doc.forEach((node, offset) => {
-      const reused = previous.get(node);
+      let reused = previous.get(node);
+      // A split block about to be measured again (fonts, CSS) is rendered whole first: each
+      // fragment's end breaks its line, so its lines would depend on where it was split before.
+      const remeasure = dropLines || !this.measures.has(node) || this.stale.has(node);
+      if (reused && reused.fragments.length > 1 && remeasure && !this.composing) reused = undefined;
       if (reused) previous.delete(node);
       blocks.push(reused ?? renderBlock(node, ownerDocument));
       starts.push(offset);
@@ -315,9 +330,14 @@ export class EditorView {
       // DOM reads only for blocks without a valid measurement (new, changed or stale ones).
       let scale: number | undefined;
       const layoutPx = () => {
-        scale ??= layoutScale(this.pages[0] as HTMLElement);
+        scale ??= layoutScale(this.pages[0] as HTMLElement, this.editor.settings);
         return scale;
       };
+      if (dropLines)
+        for (const desc of blocks) {
+          const measure = this.measures.get(desc.node);
+          if (measure) delete measure.lines;
+        }
       const nodes = blocks.map((desc) => desc.node);
       const reuse = this.flowed ? reuseOf(this.flowed, nodes, this.stale) : undefined;
       const measureOf = (desc: BlockDesc) => {
@@ -466,21 +486,25 @@ export class EditorView {
    * font, the content width): measure it again and re-flow, once per frame.
    */
   private onResize = (entries: ResizeObserverEntry[]): void => {
-    // The blocks a relayout re-measured are not compared in its own frame: if CSS makes a
-    // block's fragments add up to another height than the whole block (a continuation
-    // indent), comparing them would re-flow it every frame.
-    const settled = this.remeasured;
     let scale: number | undefined;
     for (const entry of entries) {
       const desc = this.owner.get(entry.target);
       const measured = desc && this.measures.get(desc.node);
-      if (!desc || !measured || this.stale.has(desc.node) || settled.has(desc.node)) continue;
+      if (!desc || !measured || this.stale.has(desc.node)) continue;
       // A hidden host (display: none) reports every block as 0x0: nothing to re-flow.
       if (!entry.contentRect.width) continue;
-      scale ??= layoutScale(this.pages[0] as HTMLElement);
+      scale ??= layoutScale(this.pages[0] as HTMLElement, this.editor.settings);
       let height = 0;
       for (const fragment of desc.fragments) height += fragment.getBoundingClientRect().height;
-      if (Math.abs(height / scale - measured.height) > 0.5) this.stale.add(desc.node);
+      // A block is measured whole; each fragment of a split one keeps its padding and border,
+      // and each split may round by up to a pixel. Compared with the whole height alone, its
+      // fragments would re-flow it every frame.
+      const splits = desc.fragments.length - 1;
+      const expected = measured.height + splits * measured.box;
+      if (Math.abs(height / scale - expected) > 0.5 + splits) {
+        this.stale.add(desc.node);
+        this.linesStale = true;
+      }
     }
     if (this.stale.size) this.scheduleRelayout();
   };
@@ -500,9 +524,6 @@ export class EditorView {
         this.unflowed = true;
         return;
       }
-      this.remeasured = new Set(this.stale);
-      // Resize callbacks run after this frame's layout, before the next frame's callbacks.
-      nextFrame(() => this.remeasured.clear());
       this.render();
       this.writeSelection(false);
     };
@@ -1092,11 +1113,11 @@ export class EditorView {
 
 /**
  * Client rects are scaled by CSS `zoom` or a `transform` on an ancestor, while margins and the
- * page geometry are in layout px: the ratio between the two for a page.
+ * page geometry are in layout px: the ratio between the two for a page. From the page's width
+ * as set in mm (`offsetWidth` is rounded to a pixel: off by up to 0.1%, a pixel per page).
  */
-function layoutScale(page: HTMLElement): number {
-  const layout = page.offsetHeight;
-  return layout ? page.getBoundingClientRect().height / layout || 1 : 1;
+function layoutScale(page: HTMLElement, settings: DocumentSettings): number {
+  return page.getBoundingClientRect().width / (settings.pageSize.width * PX_PER_MM) || 1;
 }
 
 /** A block's measurement: border-box height across its fragments (layout px), margins, lines. */
@@ -1104,6 +1125,8 @@ interface Measure {
   height: number;
   marginTop: number;
   marginBottom: number;
+  /** Vertical padding and border, which every fragment of a split block repeats. */
+  box: number;
   lines?: Lines;
 }
 
@@ -1114,11 +1137,17 @@ function measureBox(desc: BlockDesc, scale: number): Measure {
   // A split block's first fragment has no bottom margin and its last no top margin (inline).
   const first = getComputedStyle(desc.dom);
   const last = getComputedStyle(desc.fragments[desc.fragments.length - 1] as HTMLElement);
+  // jsdom and detached nodes report no margins.
+  const px = (value: string) => Number.parseFloat(value) || 0;
   return {
     height: height / scale,
-    // jsdom and detached nodes report no margins.
-    marginTop: Number.parseFloat(first.marginTop) || 0,
-    marginBottom: Number.parseFloat(last.marginBottom) || 0,
+    marginTop: px(first.marginTop),
+    marginBottom: px(last.marginBottom),
+    box:
+      px(first.paddingTop) +
+      px(first.paddingBottom) +
+      px(first.borderTopWidth) +
+      px(first.borderBottomWidth),
   };
 }
 

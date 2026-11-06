@@ -653,6 +653,40 @@ test("a split paragraph leaves at least two lines on each page", async ({ page }
 
 // ---------- incremental reflow (5.4) ----------
 
+test("split blocks are left alone while nothing changes (no re-flow every frame)", async ({
+  page,
+}) => {
+  // One paragraph of 80 hard-broken lines over two pages: its fragments add up to its height
+  // only within a pixel per split, and the zoom scale must be exact (a rounded one is 0.05% off,
+  // about a pixel here) or each frame would find it resized and render it again.
+  await openDoc(page, [
+    {
+      type: "paragraph",
+      content: Array.from({ length: 80 }, (_, i) => [
+        ...(i ? [{ type: "hardBreak" }] : []),
+        { type: "text", text: `line${i}` },
+      ]).flat(),
+    },
+  ]);
+  await expect.poll(async () => (await fragmentsOf(page)).length).toBe(2);
+  await page.waitForTimeout(300);
+  const mutations = await editor(page).evaluate(
+    (host) =>
+      new Promise<number>((resolve) => {
+        let count = 0;
+        const observer = new MutationObserver((records) => {
+          count += records.length;
+        });
+        observer.observe(host, { childList: true, subtree: true, characterData: true });
+        setTimeout(() => {
+          observer.disconnect();
+          resolve(count);
+        }, 500);
+      }),
+  );
+  expect(mutations).toBe(0);
+});
+
 test("a CSS change that resizes blocks re-flows the pages without an edit", async ({ page }) => {
   await openLong(page, 60);
   const before = await pages(page).count();

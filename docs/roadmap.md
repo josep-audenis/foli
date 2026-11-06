@@ -373,7 +373,7 @@ Each task is one PR that leaves `pnpm check` green and the playground working. L
   a break at a paragraph end, a heading slid over the end of page 1 never ends a page, a
   paragraph slid over it never leaves one line. (Blocks taller than a page split by lines
   since 5.2.)
-- [x] 5.4 Incremental reflow: measurements cached by node identity (an edit reads the DOM only
+- [x] 5.4 (#18) Incremental reflow: measurements cached by node identity (an edit reads the DOM only
   for the blocks it changed; settings changes and font loads drop the cache); `flowFrom`
   starts at the first changed block with the previous state and stops once the state before an
   unchanged block equals the previous one (property test against a full flow); unchanged
@@ -382,10 +382,17 @@ Each task is one PR that leaves `pnpm check` green and the playground working. L
   frame and wait for a composition to end. Edits themselves flow synchronously (the DOM must
   match the model for the next mapping). Playwright: a CSS change re-flows without an edit;
   typing on page 1 of a 200-paragraph document keeps every page valid.
-- [ ] 5.5 Deterministic fixtures and visual regression with a bundled test font (permissive
-  license, test-only, recorded): short, multi-page, long paragraph,
-  heading at a boundary, explicit breaks, mixed font sizes, different margins; identical page
-  breaks across runs; Playwright screenshot snapshots per engine.
+- [x] 5.5 Deterministic fixtures and visual regression with a bundled test font: Tinos (SIL
+  OFL 1.1, `@fontsource/tinos` dev dependency, served to the page by the tests only; recorded
+  in THIRD_PARTY_NOTICES.md). Fixtures in `apps/playground/e2e/fixtures.ts`: short,
+  multi-page, long paragraph, heading at a boundary, explicit breaks, mixed font sizes
+  (heading levels and bold/italic: schema v1 has no font-size mark), different margins (US
+  Letter). Each fixture: a second load gives the same page breaks, which also match a
+  recorded snapshot (block, fragment, characters per page), and a screenshot snapshot per
+  engine (`visual.spec.ts`; see `docs/testing/visual-regression.md`). Found and fixed on
+  the way: a re-flow without an edit (font, CSS) measured a split block's lines across its
+  old split, and kept line starts of blocks rewrapped without a height change (WebKit sends
+  no `loadingdone` for CSS fonts), so page breaks depended on when the font loaded.
 - [ ] 5.6 Print: `@page` size and margins from settings, one printed page per screen page
   (`break-after: page`); Playwright PDF (Chromium) page count equals screen page count on the
   fixtures.
