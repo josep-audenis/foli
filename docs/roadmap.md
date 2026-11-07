@@ -9,16 +9,17 @@ leaves `main` green with a working playground.
 **Update this table in the same PR that starts, advances or finishes a phase.** It is the only
 place that says what is in progress; check it before starting work.
 
-| Phase                    | Status                   | Branch              | Notes                                                                                           |
-| ------------------------ | ------------------------ | ------------------- | ----------------------------------------------------------------------------------------------- |
-| 0 Foundation             | ✅ Done                  | —                   |                                                                                                 |
-| 1 Architecture spike     | ✅ Done (G1 provisional) | —                   | Merged in #1; ADR-0003 accepted provisionally; IME, dead-key and screen-reader checks open      |
-| 2 Document model         | ✅ Done                  | —                   | Merged in #2                                                                                    |
-| 3 Transactions & history | ✅ Done                  | —                   | Merged in #4; gate G2 passed                                                                    |
-| 4 Editor view            | ✅ Done (G3 provisional) | —                   | Merged in #8–#13; manual checks (4.6) deferred, open risks in ADR-0003                          |
-| 5 Native pagination      | ✅ Done (G4 provisional) | —                   | Merged in #15–#22; page-break manual checks open, risks in ADR-0003                             |
-| 6 React API & 0.1.0      | In review                | `phase-6/react-api` | 6.1–6.6 merged; 6.7 release PR open, publish after merge (manual checks shipped as known risks) |
-| 7–12                     | Not started              |                     |                                                                                                 |
+| Phase                    | Status                   | Branch | Notes                                                                                      |
+| ------------------------ | ------------------------ | ------ | ------------------------------------------------------------------------------------------ |
+| 0 Foundation             | ✅ Done                  | —      |                                                                                            |
+| 1 Architecture spike     | ✅ Done (G1 provisional) | —      | Merged in #1; ADR-0003 accepted provisionally; IME, dead-key and screen-reader checks open |
+| 2 Document model         | ✅ Done                  | —      | Merged in #2                                                                               |
+| 3 Transactions & history | ✅ Done                  | —      | Merged in #4; gate G2 passed                                                               |
+| 4 Editor view            | ✅ Done (G3 provisional) | —      | Merged in #8–#13; manual checks (4.6) deferred, open risks in ADR-0003                     |
+| 5 Native pagination      | ✅ Done (G4 provisional) | —      | Merged in #15–#22; page-break manual checks open, risks in ADR-0003                        |
+| 6 React API & 0.1.0      | ✅ Done                  | —      | Merged in #23–#31; 0.1.0 on npm; manual checks shipped as known risks (ADR-0003)           |
+| 7 Rich content           | Ready                    |        |                                                                                            |
+| 8–12                     | Not started              |        |                                                                                            |
 
 Status values: `Ready` (dependencies met, nobody on it) · `In progress` · `In review` (PR open) ·
 `✅ Done` (merged, acceptance criteria met) · `Blocked by …`.
@@ -484,11 +485,12 @@ criterion is the one from G3: type, format with shortcuts, undo, serialize, relo
 - [x] 6.6 (#28) Docs: a README per package (the npm pages), getting started, API reference, styling
   (CSS variables, theme, print), known limitations (from architecture.md, pagination.md and
   ADR-0003's open risks).
-- [ ] 6.7 Release 0.1.0: ADR-0003's manual checks (G3 and G4 lists) run, or the owner accepts
+- [x] 6.7 (#31) Release 0.1.0: ADR-0003's manual checks (G3 and G4 lists) run, or the owner accepts
   them as known risks listed in the release notes; tarball success criterion and toolbar axe
   green; the "not on npm yet" notes (README.md, docs/getting-started.md) removed; the owner
-  approves the publish. Versioned in #31; ticked, with Phase 6 done and the README's "on npm
-  once its release run finishes" removed, in a follow-up PR after the publish run.
+  approves the publish. Published 2026-11-07 by the Release workflow (the first run failed
+  before publishing anything: the token lacked "bypass 2FA"), with provenance and tags
+  `@folijs/{core,view,react}@0.1.0`; the manual checks shipped as known risks.
 
 ## Phase 7 — Rich content · L → 0.2.0
 
