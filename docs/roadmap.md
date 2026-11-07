@@ -463,7 +463,7 @@ criterion is the one from G3: type, format with shortcuts, undo, serialize, relo
   (React 18 warns about `useLayoutEffect` on the server). React 18 at runtime moved to 6.4:
   aliasing React 18 inside `@foli/react` resolves react-dom's `react` peer to React 19, and
   the example apps install the packed packages with their own React.
-- [x] 6.4 Packaging: exports maps checked (ESM, types, `@foli/react/styles.css`; React and React
+- [x] 6.4 (#27) Packaging: exports maps checked (ESM, types, `@foli/react/styles.css`; React and React
   DOM the only peer dependencies; `sideEffects`; `repository` per package, which npm
   provenance checks; `publishConfig.exports` without the workspace's `@foli/source` condition;
   `build` empties `dist` first); `publint --strict` (MIT) on every package and bundle size budgets
@@ -479,12 +479,13 @@ criterion is the one from G3: type, format with shortcuts, undo, serialize, relo
   workflow that publishes with npm provenance. Needs the owner: control of the `@foli` npm
   scope (an npm org named `foli` already exists: confirm it is yours, or choose another
   scope) and an npm token as a repository secret.
-- [ ] 6.6 Docs: a README per package (the npm pages), getting started, API reference, styling
+- [x] 6.6 Docs: a README per package (the npm pages), getting started, API reference, styling
   (CSS variables, theme, print), known limitations (from architecture.md, pagination.md and
   ADR-0003's open risks).
 - [ ] 6.7 Release 0.1.0: ADR-0003's manual checks (G3 and G4 lists) run, or the owner accepts
   them as known risks listed in the release notes; tarball success criterion and toolbar axe
-  green; the owner approves the publish.
+  green; the "not on npm yet" notes (README.md, docs/getting-started.md) removed; the owner
+  approves the publish.
 
 ## Phase 7 — Rich content · L → 0.2.0
 

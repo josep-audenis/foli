@@ -10,44 +10,40 @@ integration.
 > print with one sheet per page. Typing, Enter, Backspace, bold/italic/underline shortcuts,
 > undo/redo, IME and dead keys (automated tests only; manual checks pending, also at page
 > breaks), copy/cut/paste (HTML mapped to the schema; pastes from real Word and Google Docs not
-> yet verified). Next: the React API and the first release (Phase 6). See
-> [docs/roadmap.md](docs/roadmap.md).
+> yet verified). React components with a toolbar, server rendering, and per-package docs. Next:
+> the first release, 0.1.0 (Phase 6). See [docs/roadmap.md](docs/roadmap.md).
 > Not published to npm yet.
 
 ## Usage
+
+```bash
+npm install @foli/react @foli/core react react-dom
+```
 
 ```tsx
 import { createDocument, parseDocument } from "@foli/core";
 import { type FoliChange, FoliEditor } from "@foli/react";
 import "@foli/react/styles.css";
 
-const doc = parseDocument(JSON.parse(saved)); // throws FoliDocumentError on invalid input
-// or: createDocument({ type: "doc", content: [{ type: "paragraph" }] })
+// Load: parseDocument validates the saved JSON (throws FoliDocumentError when invalid).
+const saved = localStorage.getItem("doc");
+const initial = saved ? parseDocument(JSON.parse(saved)) : createDocument();
 
-// `change.document` is serialized when read: read it when saving, not on every keystroke.
-let latest: FoliChange | undefined;
+// Save once typing pauses: reading `change.document` serializes the whole document.
 let timer: ReturnType<typeof setTimeout> | undefined;
 function onChange(change: FoliChange) {
-  latest = change;
   clearTimeout(timer);
-  timer = setTimeout(() => save(JSON.stringify(latest?.document)), 500);
+  timer = setTimeout(() => localStorage.setItem("doc", JSON.stringify(change.document)), 300);
 }
 
 export function App() {
-  return <FoliEditor initialContent={doc} onChange={onChange} />;
+  return <FoliEditor initialContent={initial} placeholder="Start writing…" onChange={onChange} />;
 }
 ```
 
-`FoliEditor` shows a formatting toolbar (`toolbar={false}` hides it); a `ref` gives its
-`editor` (e.g. `ref.current.editor.setDocument(doc)`) and `focus()`. Build your own layout from
-the parts: `useFoliEditor()` creates an editor, `<FoliEditorProvider editor>` shares it,
-`<FoliToolbar />` and `<FoliCanvas />` show it (with `<FoliCanvas readOnly />`, pass
-`<FoliToolbar disabled />` too), `useCurrentEditor()` reads it and
-`useEditorState(selector)` re-renders a component only when its slice of the state changes.
-Server rendering works (the editor appears on hydration; its content is not in the server
-HTML). The API is not stable before 0.1.0.
-
-Peer dependencies: `react`, `react-dom`.
+[Getting started](docs/getting-started.md) covers loading and saving, read-only mode, your own
+toolbar, Next.js and using the view without React. Before using Foli, read the
+[known limitations](docs/limitations.md).
 
 ## Packages
 
@@ -59,6 +55,15 @@ Peer dependencies: `react`, `react-dom`.
 | [`apps/playground`](apps/playground) | Demo app; consumes the packages like a third party would.                                    |
 
 ## Documentation
+
+Using Foli:
+
+- [Getting started](docs/getting-started.md)
+- [API reference](docs/api.md)
+- [Styling](docs/styling.md) — CSS variables, dark theme, print
+- [Known limitations](docs/limitations.md)
+
+Design and development:
 
 - [Roadmap](docs/roadmap.md) — phases, gates, acceptance criteria
 - [Architecture](docs/architecture.md) — subsystems, packages, dependency policy, risks
