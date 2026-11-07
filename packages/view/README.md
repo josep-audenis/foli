@@ -4,7 +4,7 @@ The editable view of [Foli](https://github.com/josep-audenis/foli), without a fr
 a `@folijs/core` editor into an element as real pages and turns keyboard, IME, clipboard and
 mouse input into editor commands. For React, use [`@folijs/react`](https://www.npmjs.com/package/@folijs/react).
 
-> Pre-release: the API may change in any 0.x version.
+> Early release: the API may change in any 0.x minor version (changes in `CHANGELOG.md`).
 
 ```bash
 npm install @folijs/view @folijs/core

@@ -433,7 +433,7 @@ Uncontrolled: the engine owns document state; React observes. `initialContent` i
 external replacement goes through an imperative `setDocument()`. No fully controlled `value`
 prop: feeding the whole document back on every keystroke defeats incremental rendering.
 The view owns its DOM subtree; React never renders children into it. Built in 6.1 (API not
-stable before 0.1.0):
+stable before 1.0):
 
 - `useFoliEditor({ initialContent, plugins })`: a headless `Editor` created on the first render
   and kept for the component's lifetime (later options are ignored; StrictMode's extra

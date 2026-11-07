@@ -193,7 +193,7 @@ Font sizes inside content use points (pt), matching word processors.
 
 ## Versioning and migrations
 
-After the first release, `schemaVersion` is bumped whenever the envelope or content schema
+Since the first release (0.1.0), `schemaVersion` is bumped whenever the envelope or content schema
 changes incompatibly (renamed node, changed attribute meaning). `parseDocument` then runs
 migrations `vN → vN+1` before validation. Old documents must keep loading. The first planned
 migration is v1 → v2 for lists and links (Phase 7).
