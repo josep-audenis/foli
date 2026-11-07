@@ -3,6 +3,13 @@
   "version": "0.0.0",
   "description": "Framework-agnostic DOM view for the Foli document engine: rendering, input, selection, layout.",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/josep-audenis/foli.git",
+    "directory": "packages/view"
+  },
+  "homepage": "https://github.com/josep-audenis/foli#readme",
+  "bugs": "https://github.com/josep-audenis/foli/issues",
   "type": "module",
   "sideEffects": false,
   "exports": {
@@ -18,10 +25,18 @@
     "!src/**/*.test.*"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
+    "build": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\" && tsc -p tsconfig.build.json",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
     "@foli/core": "workspace:*"
+  },
+  "publishConfig": {
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      }
+    }
   }
 }

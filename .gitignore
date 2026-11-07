@@ -11,3 +11,7 @@ graphify-out/
 # Playwright
 test-results/
 playwright-report/
+
+# Example apps (`pnpm examples`): packed tarballs and Next.js output
+.packs/
+.next/

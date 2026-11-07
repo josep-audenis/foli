@@ -15,14 +15,16 @@ is not installed when `core.hooksPath` is set or a foreign `pre-push` hook exist
 
 ## Commands
 
-| Command                         | What it does                                       |
-| ------------------------------- | -------------------------------------------------- |
-| `pnpm dev`                      | Playground with HMR, packages consumed from source |
-| `pnpm test` / `pnpm test:watch` | Vitest (all packages)                              |
-| `pnpm typecheck`                | `tsc --noEmit` in every workspace project          |
-| `pnpm lint` / `pnpm format`     | Biome check / auto-fix                             |
-| `pnpm build`                    | Build packages to `dist/` and the playground       |
-| `pnpm check`                    | lint + typecheck + test + build; the pre-push hook |
+| Command                         | What it does                                                                                                         |
+| ------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `pnpm dev`                      | Playground with HMR, packages consumed from source                                                                   |
+| `pnpm test` / `pnpm test:watch` | Vitest (all packages)                                                                                                |
+| `pnpm typecheck`                | `tsc --noEmit` in every workspace project                                                                            |
+| `pnpm lint` / `pnpm format`     | Biome check / auto-fix                                                                                               |
+| `pnpm build`                    | Build packages to `dist/` and the playground                                                                         |
+| `pnpm check`                    | lint + typecheck + test + build + package checks (`publint`) + bundle size budgets; the pre-push hook                |
+| `pnpm size`                     | Bundle size per package against its budget (after `pnpm build`)                                                      |
+| `pnpm examples`                 | Pack the packages, install them into `examples/` (Vite + React 18, Next.js + React 19), build, Playwright smoke test |
 
 ## Rules
 
