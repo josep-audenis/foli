@@ -117,14 +117,7 @@ export function App() {
         <button type="button" onClick={() => fileRef.current?.click()}>
           Open…
         </button>
-        <input
-          ref={fileRef}
-          type="file"
-          accept=".json,application/json"
-          hidden
-          aria-label="Open a Foli document (JSON)"
-          onChange={open}
-        />
+        <input ref={fileRef} type="file" accept=".json,application/json" hidden onChange={open} />
         <label>
           <input
             type="checkbox"

@@ -1,10 +1,11 @@
 // @vitest-environment jsdom
 import { createDocument, type FoliDocument, PAGE_SIZES } from "@foli/core";
 import { act, cleanup, render, screen } from "@testing-library/react";
-import { createRef } from "react";
+import { createRef, useLayoutEffect } from "react";
 import { hydrateRoot, type Root } from "react-dom/client";
 import { renderToString } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { useIsomorphicLayoutEffect } from "./editor.js";
 import { type FoliChange, FoliEditor, type FoliEditorHandle } from "./index.js";
 
 const text = (value: string, settings?: Partial<FoliDocument["settings"]>) =>
@@ -57,7 +58,14 @@ describe("replacing the document (setDocument)", () => {
 });
 
 describe("server rendering and hydration", () => {
-  afterEach(cleanup);
+  afterEach(() => {
+    cleanup();
+    vi.restoreAllMocks();
+  });
+
+  it("runs layout effects as layout effects in the browser (the view exists before paint)", () => {
+    expect(useIsomorphicLayoutEffect).toBe(useLayoutEffect);
+  });
 
   it("hydrates the server markup without warnings and attaches the view", () => {
     const doc = text("Served");
@@ -80,7 +88,6 @@ describe("server rendering and hydration", () => {
     type("!");
     expect(host.textContent).toBe("!Served");
 
-    errors.mockRestore();
     act(() => root?.unmount());
     container.remove();
   });

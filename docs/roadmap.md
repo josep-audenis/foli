@@ -461,7 +461,7 @@ criterion is the one from G3: type, format with shortcuts, undo, serialize, relo
   `renderToString(<FoliEditor />)` gives the toolbar and an empty editable area, and
   `hydrateRoot` attaches the view without warnings (React 19); layout effects are isomorphic
   (React 18 warns about `useLayoutEffect` on the server). React 18 at runtime moved to 6.4:
-  aliasing a second React into this workspace does not work with pnpm's peer resolution, and
+  aliasing React 18 inside `@foli/react` resolves react-dom's `react` peer to React 19, and
   the example apps install the packed packages with their own React.
 - [ ] 6.4 Packaging: exports maps (ESM, types, `@foli/react/styles.css`), React and React DOM
   as the only peer dependencies, `sideEffects`; a package check (e.g. publint, if its license
