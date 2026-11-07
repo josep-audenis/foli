@@ -1,6 +1,6 @@
-import { createDocument, type FoliDocument, parseDocument } from "@foli/core";
-import { type FoliChange, FoliEditor } from "@foli/react";
-import "@foli/react/styles.css";
+import { createDocument, type FoliDocument, parseDocument } from "@folijs/core";
+import { type FoliChange, FoliEditor } from "@folijs/react";
+import "@folijs/react/styles.css";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 

@@ -1,5 +1,5 @@
-import { createDocument, type Editor, type FoliDocument, parseDocument } from "@foli/core";
-import { FoliEditor, type FoliEditorHandle } from "@foli/react";
+import { createDocument, type Editor, type FoliDocument, parseDocument } from "@folijs/core";
+import { FoliEditor, type FoliEditorHandle } from "@folijs/react";
 import { type ChangeEvent, useRef, useState } from "react";
 
 const STORAGE_KEY = "foli-playground-document";

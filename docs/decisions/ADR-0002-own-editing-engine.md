@@ -40,8 +40,8 @@ everything, so we stop now, while the codebase is a skeleton.
 5. **TypeScript is the single source of truth** for the model and transactions. Rust/WASM is
    for off-the-keystroke-path processing (DOCX, batch transforms, server pipelines) and must
    consume the same JSON format. No duplicate transaction logic in two languages.
-6. **Package boundaries** start small: `@foli/core` (model, transactions; no DOM),
-   `@foli/view` (DOM rendering, input, selection, layout), `@foli/react`. More packages only
+6. **Package boundaries** start small: `@folijs/core` (model, transactions; no DOM),
+   `@folijs/view` (DOM rendering, input, selection, layout), `@folijs/react`. More packages only
    when a boundary has proven itself in code.
 
 ## Consequences

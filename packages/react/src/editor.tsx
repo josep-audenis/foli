@@ -4,7 +4,7 @@ import {
   type EditorState,
   type FoliDocument,
   type Plugin,
-} from "@foli/core";
+} from "@folijs/core";
 import {
   createContext,
   type ReactNode,

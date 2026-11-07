@@ -17,13 +17,13 @@ integration.
 ## Usage
 
 ```bash
-npm install @foli/react @foli/core react react-dom
+npm install @folijs/react @folijs/core react react-dom
 ```
 
 ```tsx
-import { createDocument, parseDocument } from "@foli/core";
-import { type FoliChange, FoliEditor } from "@foli/react";
-import "@foli/react/styles.css";
+import { createDocument, parseDocument } from "@folijs/core";
+import { type FoliChange, FoliEditor } from "@folijs/react";
+import "@folijs/react/styles.css";
 
 // Load: parseDocument validates the saved JSON (throws FoliDocumentError when invalid).
 const saved = localStorage.getItem("doc");
@@ -49,9 +49,9 @@ toolbar, Next.js and using the view without React. Before using Foli, read the
 
 | Package                              | Purpose                                                                                      |
 | ------------------------------------ | -------------------------------------------------------------------------------------------- |
-| [`@foli/core`](packages/core)        | Document model and headless editing engine: schema, nodes, steps, history, commands. No DOM. |
-| [`@foli/view`](packages/view)        | Framework-agnostic editable DOM view (`EditorView`): rendering, input, selection.            |
-| [`@foli/react`](packages/react)      | React components and default stylesheet.                                                     |
+| [`@folijs/core`](packages/core)      | Document model and headless editing engine: schema, nodes, steps, history, commands. No DOM. |
+| [`@folijs/view`](packages/view)      | Framework-agnostic editable DOM view (`EditorView`): rendering, input, selection.            |
+| [`@folijs/react`](packages/react)    | React components and default stylesheet.                                                     |
 | [`apps/playground`](apps/playground) | Demo app; consumes the packages like a third party would.                                    |
 
 ## Documentation

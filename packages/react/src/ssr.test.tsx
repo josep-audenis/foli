@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { createDocument } from "@foli/core";
+import { createDocument } from "@folijs/core";
 import { useEffect } from "react";
 import { renderToString } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";

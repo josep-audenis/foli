@@ -111,10 +111,10 @@ Phases 1 and 2 can run in parallel: the model does not depend on how text is ren
 
 - [x] pnpm monorepo, TypeScript strict, Biome, Vitest, CI (since replaced by a local pre-push hook), graphify.
 - [x] ADR-0001 (superseded), ADR-0002 (own engine), architecture, document model, pagination design.
-- [x] `@foli/core`: `FoliDocument` envelope, schema v1 (paragraph, heading, text, hardBreak;
+- [x] `@folijs/core`: `FoliDocument` envelope, schema v1 (paragraph, heading, text, hardBreak;
   bold/italic/underline/strike) with strict validation and error paths.
-- [x] `@foli/view`: read-only DOM renderer (no `innerHTML`).
-- [x] `@foli/react`: read-only `DocumentEditor` on an A4 sheet; playground uses it.
+- [x] `@folijs/view`: read-only DOM renderer (no `innerHTML`).
+- [x] `@folijs/react`: read-only `DocumentEditor` on an A4 sheet; playground uses it.
 - [x] No editor-engine dependencies.
 
 ## Phase 1 — Architecture spike: one editable surface, two pages · M
@@ -161,7 +161,7 @@ C) `contenteditable` with block-level pages only. Evidence attached. Phase 4/5 d
 - [x] ADR-0003 draft with automated evidence (status: Proposed, recommends option A)
 - [x] ADR-0003 accepted provisionally (gate G1 passed provisionally; risks recorded in ADR-0003)
 
-## Phase 2 — Document model (`@foli/core`) · L ✅
+## Phase 2 — Document model (`@folijs/core`) · L ✅
 
 **Goal:** the permanent document model. Pure TypeScript, no DOM.
 
@@ -183,7 +183,7 @@ serialize timings for 1/10/50/100-page fixtures recorded in `docs/benchmarks.md`
 
 ### Tasks
 
-- [x] 2.1 Claim the phase; `fast-check` and `@vitest/coverage-v8` as `@foli/core` devDependencies.
+- [x] 2.1 Claim the phase; `fast-check` and `@vitest/coverage-v8` as `@folijs/core` devDependencies.
 - [x] 2.2 `Schema` from node/mark specs (content expressions, attrs, allowed marks, exclusion);
   immutable `Mark`, `Node`, `Fragment`; schema v1 defined through the spec API; strict JSON in
   with normalization, canonical JSON out; `parseDocument` on the schema.
@@ -194,9 +194,9 @@ serialize timings for 1/10/50/100-page fixtures recorded in `docs/benchmarks.md`
 - [x] 2.6 Docs match the code; status `In review`.
 
 Acceptance evidence: `model.property.test.ts` (5 properties × 10,000 runs);
-`pnpm --filter @foli/core coverage` (100% lines of the model sources in `src/model/`, threshold 95%); v1 fixtures in
+`pnpm --filter @folijs/core coverage` (100% lines of the model sources in `src/model/`, threshold 95%); v1 fixtures in
 `document.test.ts` load unchanged; timings in [benchmarks.md](benchmarks.md). Not in `pnpm check` yet:
-coverage and benchmarks run from `@foli/core` scripts (root config belongs to Phase 1).
+coverage and benchmarks run from `@folijs/core` scripts (root config belongs to Phase 1).
 
 ## Phase 3 — Transactions, history, commands · L
 
@@ -238,7 +238,7 @@ doc and selection.
 - [x] Property tests (10k runs each: step inversion, map round-trips, schema rejection, undo/redo of
   random command sequences with a no-op guard) and headless T1/T2 (gate G2); docs updated
 
-## Phase 4 — Editor view (`@foli/view`) · XL
+## Phase 4 — Editor view (`@folijs/view`) · XL
 
 **Goal:** an editable, continuous (unpaginated) page that passes T1–T4. Design per ADR-0003.
 
@@ -419,7 +419,7 @@ Each task is one PR that leaves `pnpm check` green and the playground working. L
 
 ## Phase 6 — React API & first release · M → 0.1.0
 
-- `@foli/react`: `FoliEditor` (batteries included), `useFoliEditor`, `FoliEditorProvider`,
+- `@folijs/react`: `FoliEditor` (batteries included), `useFoliEditor`, `FoliEditorProvider`,
   `FoliCanvas`, `FoliToolbar`, `useEditorState(selector)` to avoid re-render storms.
   Final names decided here (current `DocumentEditor` is provisional).
 - Toolbar: accessible (roving tabindex, `aria-pressed`, labels, visible focus); buttons driven by
@@ -428,7 +428,7 @@ Each task is one PR that leaves `pnpm check` green and the playground working. L
   external replacement; no per-keystroke controlled `value`. SSR-safe imports.
 - Packaging: ESM, exports map, types, CSS entry, peer deps only for React; bundle size tracked;
   tarball install test into fresh Vite and Next.js apps (`examples/`); Changesets; npm publish
-  with provenance from CI; `@foli` scope registered.
+  with provenance from CI; npm scope registered (`@folijs`: `@foli` belongs to another npm user).
 - Docs: getting started, API, styling, known limitations.
 
 **Acceptance:** success criterion via npm-installed tarballs; axe checks on toolbar; 0.1.0 published.
@@ -461,11 +461,11 @@ criterion is the one from G3: type, format with shortcuts, undo, serialize, relo
   `renderToString(<FoliEditor />)` gives the toolbar and an empty editable area, and
   `hydrateRoot` attaches the view without warnings (React 19); layout effects are isomorphic
   (React 18 warns about `useLayoutEffect` on the server). React 18 at runtime moved to 6.4:
-  aliasing React 18 inside `@foli/react` resolves react-dom's `react` peer to React 19, and
+  aliasing React 18 inside `@folijs/react` resolves react-dom's `react` peer to React 19, and
   the example apps install the packed packages with their own React.
-- [x] 6.4 (#27) Packaging: exports maps checked (ESM, types, `@foli/react/styles.css`; React and React
+- [x] 6.4 (#27) Packaging: exports maps checked (ESM, types, `@folijs/react/styles.css`; React and React
   DOM the only peer dependencies; `sideEffects`; `repository` per package, which npm
-  provenance checks; `publishConfig.exports` without the workspace's `@foli/source` condition;
+  provenance checks; `publishConfig.exports` without the workspace's `@folijs/source` condition;
   `build` empties `dist` first); `publint --strict` (MIT) on every package and bundle size budgets
   (`scripts/size.mjs`: gzip per package with its Foli dependencies, fully minified, plus an
   app importing only `FoliEditor`; 14.1 / 19.9 / 25.3 / 25.2 kB)
@@ -475,10 +475,10 @@ criterion is the one from G3: type, format with shortcuts, undo, serialize, relo
   16, React 19, server rendering and hydration), builds both, and runs the success criterion
   in Playwright in all three engines (no console errors; the editor's shell in the server
   HTML).
-- [ ] 6.5 Release tooling: Changesets (versions, changelogs); a release-only GitHub Actions
-  workflow that publishes with npm provenance. Needs the owner: control of the `@foli` npm
-  scope (an npm org named `foli` already exists: confirm it is yours, or choose another
-  scope) and an npm token as a repository secret.
+- [ ] 6.5 Release tooling: packages renamed to `@folijs/*` (the `@foli` npm scope belongs to
+  another user); Changesets (versions, changelogs); a release-only GitHub Actions workflow
+  that publishes with npm provenance. Needs the owner: the `folijs` npm org (free plan) and an
+  npm token as a repository secret.
 - [x] 6.6 (#28) Docs: a README per package (the npm pages), getting started, API reference, styling
   (CSS variables, theme, print), known limitations (from architecture.md, pagination.md and
   ADR-0003's open risks).

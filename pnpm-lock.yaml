@@ -47,10 +47,10 @@ importers:
 
   apps/playground:
     dependencies:
-      '@foli/core':
+      '@folijs/core':
         specifier: workspace:*
         version: link:../../packages/core
-      '@foli/react':
+      '@folijs/react':
         specifier: workspace:*
         version: link:../../packages/react
       react:
@@ -75,10 +75,10 @@ importers:
 
   packages/react:
     dependencies:
-      '@foli/core':
+      '@folijs/core':
         specifier: workspace:^
         version: link:../core
-      '@foli/view':
+      '@folijs/view':
         specifier: workspace:^
         version: link:../view
     devDependencies:
@@ -91,7 +91,7 @@ importers:
 
   packages/view:
     dependencies:
-      '@foli/core':
+      '@folijs/core':
         specifier: workspace:^
         version: link:../core
 

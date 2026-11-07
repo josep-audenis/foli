@@ -21,7 +21,7 @@ import {
   TransformError,
   toggleMark,
   undo,
-} from "@foli/core";
+} from "@folijs/core";
 import { docFromClipboard, FOLI_MIME, serializeRange } from "./clipboard.js";
 import {
   type BlockBox,
@@ -92,7 +92,7 @@ function printStyles({ pageSize }: DocumentSettings, id: string): string {
 }
 
 /**
- * The editable view of an `Editor` from `@foli/core`: renders its state into one
+ * The editable view of an `Editor` from `@folijs/core`: renders its state into one
  * `contenteditable` host and turns DOM input into core commands. The model is the source of
  * truth; the DOM is rebuilt from it (unchanged blocks are reused by node identity).
  *

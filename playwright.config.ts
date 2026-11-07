@@ -2,8 +2,8 @@ import { defineConfig, devices } from "@playwright/test";
 
 /** Each app's e2e/ folder runs against its own dev server, in every engine. */
 const APPS = [
-  { name: "spike", dir: "spikes/two-page", filter: "@foli/spike-two-page", port: 5174 },
-  { name: "playground", dir: "apps/playground", filter: "@foli/playground", port: 5175 },
+  { name: "spike", dir: "spikes/two-page", filter: "@folijs/spike-two-page", port: 5174 },
+  { name: "playground", dir: "apps/playground", filter: "@folijs/playground", port: 5175 },
 ];
 const BROWSERS = [
   { name: "chromium", device: devices["Desktop Chrome"] },

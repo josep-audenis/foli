@@ -1,18 +1,18 @@
-# @foli/view
+# @folijs/view
 
 The editable view of [Foli](https://github.com/josep-audenis/foli), without a framework: renders
-a `@foli/core` editor into an element as real pages and turns keyboard, IME, clipboard and
-mouse input into editor commands. For React, use [`@foli/react`](https://www.npmjs.com/package/@foli/react).
+a `@folijs/core` editor into an element as real pages and turns keyboard, IME, clipboard and
+mouse input into editor commands. For React, use [`@folijs/react`](https://www.npmjs.com/package/@folijs/react).
 
 > Pre-release: the API may change in any 0.x version.
 
 ```bash
-npm install @foli/view @foli/core
+npm install @folijs/view @folijs/core
 ```
 
 ```ts
-import { createDocument, createEditor } from "@foli/core";
-import { EditorView } from "@foli/view";
+import { createDocument, createEditor } from "@folijs/core";
+import { EditorView } from "@folijs/view";
 
 const editor = createEditor({ document: createDocument() });
 const host = document.getElementById("editor")!;
@@ -24,7 +24,7 @@ const view = new EditorView(host, editor, { placeholder: "Start writing…" });
 
 The view sets page size and margins from the document settings; the page look (background,
 shadow, gap, fonts) comes from your CSS or a copy of
-[`@foli/react`'s `styles.css`](https://github.com/josep-audenis/foli/blob/main/packages/react/styles.css).
+[`@folijs/react`'s `styles.css`](https://github.com/josep-audenis/foli/blob/main/packages/react/styles.css).
 
 - [Getting started](https://github.com/josep-audenis/foli/blob/main/docs/getting-started.md#using-the-view-without-react)
 - [API reference](https://github.com/josep-audenis/foli/blob/main/docs/api.md#foliview)

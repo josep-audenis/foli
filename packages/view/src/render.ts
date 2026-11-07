@@ -1,4 +1,4 @@
-import type { MarkName, Node as ModelNode } from "@foli/core";
+import type { MarkName, Node as ModelNode } from "@folijs/core";
 
 // Every schema v1 mark must have a tag; marks of other schemas fall back to <span>.
 const MARK_TAGS: ReadonlyMap<string, string> = new Map(

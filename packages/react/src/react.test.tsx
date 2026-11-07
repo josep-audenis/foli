@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { createDocument, createEditor, type Editor } from "@foli/core";
+import { createDocument, createEditor, type Editor } from "@folijs/core";
 import { act, cleanup, render, screen } from "@testing-library/react";
 import { StrictMode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";

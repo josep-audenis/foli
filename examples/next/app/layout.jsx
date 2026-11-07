@@ -1,4 +1,4 @@
-import "@foli/react/styles.css";
+import "@folijs/react/styles.css";
 
 export const metadata = { title: "Foli with Next.js" };
 

@@ -1,6 +1,6 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import "@foli/react/styles.css";
+import "@folijs/react/styles.css";
 import "./playground.css";
 import { App } from "./App.js";
 

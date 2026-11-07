@@ -1,7 +1,7 @@
 "use client";
 
-import { createDocument, parseDocument } from "@foli/core";
-import { FoliEditor } from "@foli/react";
+import { createDocument, parseDocument } from "@folijs/core";
+import { FoliEditor } from "@folijs/react";
 import { useState } from "react";
 
 const KEY = "foli-example";

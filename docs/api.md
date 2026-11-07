@@ -5,13 +5,13 @@ in a minor version until then (changes are listed in each package's changelog). 
 listed here (model classes, steps, `Transform`, `Plugin`, `Transaction` metadata, mapping) are
 public for advanced use but are not a stable API yet.
 
-- [`@foli/react`](#folireact): components and hooks
-- [`@foli/core`](#folicore): documents, the headless editor, commands
-- [`@foli/view`](#foliview): the editable DOM view without React
+- [`@folijs/react`](#folireact): components and hooks
+- [`@folijs/core`](#folicore): documents, the headless editor, commands
+- [`@folijs/view`](#foliview): the editable DOM view without React
 
-## `@foli/react`
+## `@folijs/react`
 
-Peer dependencies: `react` and `react-dom` 18.2+ or 19. Stylesheet: `@foli/react/styles.css`
+Peer dependencies: `react` and `react-dom` 18.2+ or 19. Stylesheet: `@folijs/react/styles.css`
 ([styling.md](styling.md)).
 
 ### `<FoliEditor>`
@@ -77,7 +77,7 @@ Clicking a button keeps the document's selection.
   re-renders only when it changes (`isEqual`, default `Object.is`). The selector
   `(state, editor) => T` runs after every transaction: keep it cheap.
 
-## `@foli/core`
+## `@folijs/core`
 
 No DOM: runs in Node, workers and the browser.
 
@@ -129,7 +129,7 @@ Commands are `(state, dispatch?) => boolean` and run with `editor.run(command)`:
 `marksAt`. `baseKeymap()` is the default key binding plugin (keys in
 [getting-started.md](getting-started.md#keyboard)).
 
-## `@foli/view`
+## `@folijs/view`
 
 The editable view without a framework. Needs a browser DOM.
 

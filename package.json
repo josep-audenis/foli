@@ -7,7 +7,7 @@
     "node": ">=20.19"
   },
   "scripts": {
-    "dev": "pnpm --filter @foli/playground dev",
+    "dev": "pnpm --filter @folijs/playground dev",
     "build": "pnpm -r build",
     "typecheck": "pnpm -r typecheck",
     "test": "vitest run",

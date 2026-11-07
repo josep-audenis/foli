@@ -5,7 +5,7 @@ import { type BlockJSON, schema } from "../schema.js";
 import { createEditor } from "../state/index.js";
 import { Transform } from "./transform.js";
 
-// Run with `pnpm --filter @foli/core bench`; results and method go in docs/benchmarks.md.
+// Run with `pnpm --filter @folijs/core bench`; results and method go in docs/benchmarks.md.
 const blocks: BlockJSON[] = Array.from({ length: 4000 }, (_, i) => ({
   type: "paragraph",
   content: [{ type: "text", text: `paragraph ${i} lorem ipsum dolor sit amet` }],

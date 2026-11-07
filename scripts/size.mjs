@@ -22,9 +22,9 @@ writeFileSync(appEntry, `export { FoliEditor } from "${dist("react")}";\n`);
  * 25.2 kB). Raise one only with a reason in the PR.
  */
 const BUNDLES = [
-  { name: "@foli/core", entry: dist("core"), budget: 16_500 },
-  { name: "@foli/view", entry: dist("view"), budget: 23_500 },
-  { name: "@foli/react", entry: dist("react"), budget: 29_800 },
+  { name: "@folijs/core", entry: dist("core"), budget: 16_500 },
+  { name: "@folijs/view", entry: dist("view"), budget: 23_500 },
+  { name: "@folijs/react", entry: dist("react"), budget: 29_800 },
   { name: "FoliEditor only", entry: appEntry, budget: 29_800 },
 ];
 

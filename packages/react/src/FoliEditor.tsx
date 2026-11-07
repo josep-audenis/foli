@@ -5,7 +5,7 @@ import {
   type FoliDocument,
   type Plugin,
   type Transaction,
-} from "@foli/core";
+} from "@folijs/core";
 import { forwardRef, type ReactNode, useImperativeHandle, useRef } from "react";
 import { FoliEditorProvider, useFoliEditor, useIsomorphicLayoutEffect } from "./editor.js";
 import { FoliCanvas, type FoliCanvasHandle, type FoliCanvasProps } from "./FoliCanvas.js";

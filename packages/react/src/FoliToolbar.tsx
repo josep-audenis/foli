@@ -9,7 +9,7 @@ import {
   toggleMark,
   undo,
   undoDepth,
-} from "@foli/core";
+} from "@folijs/core";
 import { Fragment, type KeyboardEvent, type MouseEvent, useRef, useState } from "react";
 import { useEditorOrContext, useEditorState } from "./editor.js";
 

@@ -3,7 +3,7 @@ import { createDocument, parseDocument } from "../document.js";
 import { type DocJSON, schema } from "../schema.js";
 import { pagesFixture } from "../testing/index.js";
 
-// Run with `pnpm --filter @foli/core bench`; results and method go in docs/benchmarks.md.
+// Run with `pnpm --filter @folijs/core bench`; results and method go in docs/benchmarks.md.
 for (const pages of [1, 10, 50, 100]) {
   const json = pagesFixture(pages);
   const doc = schema.nodeFromJSON(json);

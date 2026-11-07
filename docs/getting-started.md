@@ -11,19 +11,19 @@ edited in the browser, stored as JSON. This guide uses the React package. Withou
 ## Install
 
 ```bash
-npm install @foli/react @foli/core react react-dom
+npm install @folijs/react @folijs/core react react-dom
 ```
 
-`@foli/react` works with React 18.2+ and 19. `@foli/core` holds the document functions
+`@folijs/react` works with React 18.2+ and 19. `@folijs/core` holds the document functions
 (`createDocument`, `parseDocument`); import it directly rather than relying on it being a
-dependency of `@foli/react`. Keep all `@foli/*` packages on the same version (upgrade them
+dependency of `@folijs/react`. Keep all `@folijs/*` packages on the same version (upgrade them
 together), so the app has one copy of the engine.
 
 ## Show an editor
 
 ```tsx
-import { FoliEditor } from "@foli/react";
-import "@foli/react/styles.css";
+import { FoliEditor } from "@folijs/react";
+import "@folijs/react/styles.css";
 
 export function App() {
   return <FoliEditor placeholder="Start writing…" />;
@@ -40,9 +40,9 @@ A saved document is a `FoliDocument`: a versioned envelope with the page setting
 content tree ([document-model.md](document-model.md)). Store it as JSON.
 
 ```tsx
-import { createDocument, type FoliDocument, parseDocument } from "@foli/core";
-import { type FoliChange, FoliEditor } from "@foli/react";
-import "@foli/react/styles.css";
+import { createDocument, type FoliDocument, parseDocument } from "@folijs/core";
+import { type FoliChange, FoliEditor } from "@folijs/react";
+import "@folijs/react/styles.css";
 
 const KEY = "my-document";
 
@@ -97,8 +97,8 @@ rendering, see [Next.js](#server-rendering-nextjs-and-others).
 A `ref` on `FoliEditor` gives its `editor` and `focus()`:
 
 ```tsx
-import { parseDocument } from "@foli/core";
-import { FoliEditor, type FoliEditorHandle } from "@foli/react";
+import { parseDocument } from "@folijs/core";
+import { FoliEditor, type FoliEditorHandle } from "@folijs/react";
 import { useRef } from "react";
 
 export function App() {
@@ -140,7 +140,7 @@ document through `editor`.
 `FoliEditor` is a shortcut for the parts below. Use them for your own toolbar or layout:
 
 ```tsx
-import type { Editor } from "@foli/core";
+import type { Editor } from "@folijs/core";
 import {
   FoliCanvas,
   FoliEditorProvider,
@@ -148,7 +148,7 @@ import {
   useCurrentEditor,
   useEditorState,
   useFoliEditor,
-} from "@foli/react";
+} from "@folijs/react";
 import { useEffect } from "react";
 
 function BoldButton() {
@@ -228,8 +228,8 @@ layout:
 ```jsx
 // app/Editor.jsx
 "use client";
-import { createDocument, parseDocument } from "@foli/core";
-import { FoliEditor } from "@foli/react";
+import { createDocument, parseDocument } from "@folijs/core";
+import { FoliEditor } from "@folijs/react";
 import { useState } from "react";
 
 const KEY = "my-document";
@@ -272,7 +272,7 @@ export function Editor() {
 
 ```jsx
 // app/layout.jsx
-import "@foli/react/styles.css";
+import "@folijs/react/styles.css";
 ```
 
 Complete apps: [examples/vite](../examples/vite) (React 18, TypeScript) and
@@ -286,12 +286,12 @@ the toolbar and page shadows in print. Hide the rest of your page in print yours
 
 ## Using the view without React
 
-`@foli/view` renders an editor into any element:
+`@folijs/view` renders an editor into any element:
 
 ```ts
-import { createDocument, createEditor } from "@foli/core";
-import { EditorView } from "@foli/view";
-import "@foli/react/styles.css"; // optional, see below
+import { createDocument, createEditor } from "@folijs/core";
+import { EditorView } from "@folijs/view";
+import "@folijs/react/styles.css"; // optional, see below
 
 const editor = createEditor({ document: createDocument() });
 const host = document.querySelector<HTMLElement>("#editor")!;
@@ -309,7 +309,7 @@ editor.subscribe((_state, transactions) => {
 
 The view makes `host` a `contenteditable` textbox and renders `.foli-page` sections into it.
 It does not name the textbox: set `aria-label` (or `aria-labelledby`) yourself. The default
-theme ships in `@foli/react` (which lists `react` as a peer dependency); without React, copy its
+theme ships in `@folijs/react` (which lists `react` as a peer dependency); without React, copy its
 `styles.css` into your project instead. See [api.md](api.md#foliview).
 
 ## Next

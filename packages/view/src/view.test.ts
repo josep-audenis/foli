@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { createDocument, createEditor, type DocJSON } from "@foli/core";
+import { createDocument, createEditor, type DocJSON } from "@folijs/core";
 import { afterEach, describe, expect, it, onTestFinished, vi } from "vitest";
 import { EditorView, type EditorViewOptions, keyName } from "./index.js";
 

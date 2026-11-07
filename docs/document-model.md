@@ -1,7 +1,7 @@
 # Document model
 
 > Status: envelope, schema v1 and the document model (schema from specs, immutable nodes,
-> positions, slices, JSON in/out) are implemented in `@foli/core` (`packages/core/src/document.ts`,
+> positions, slices, JSON in/out) are implemented in `@folijs/core` (`packages/core/src/document.ts`,
 > `packages/core/src/schema.ts`, `packages/core/src/model/`). Steps, transactions, history and
 > commands (Phase 3) are described in [architecture.md](architecture.md#editing-engine-folicore).
 
@@ -168,7 +168,7 @@ that excludes all others): `fromJSON(toJSON(x)) = x` with canonical key order; v
 is idempotent; resolve invariants at every position; slice size and JSON round trip;
 `replace(from, to, slice(from, to))` is the identity; random replaces either throw
 `ReplaceError` or yield a valid, normalized document of the expected size. Unit tests cover the
-rest; `pnpm --filter @foli/core coverage` fails below 95% line coverage of `src/model/` (100% at
+rest; `pnpm --filter @folijs/core coverage` fails below 95% line coverage of `src/model/` (100% at
 the end of Phase 2). Timings: [benchmarks.md](benchmarks.md).
 
 ## Why page size is width/height, not a preset name
