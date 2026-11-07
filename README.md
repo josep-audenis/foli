@@ -14,20 +14,34 @@ integration.
 > [docs/roadmap.md](docs/roadmap.md).
 > Not published to npm yet.
 
-## Usage (current, provisional API)
+## Usage
 
 ```tsx
 import { createDocument, parseDocument } from "@foli/core";
-import { DocumentEditor } from "@foli/react";
+import { type FoliChange, FoliEditor } from "@foli/react";
 import "@foli/react/styles.css";
 
 const doc = parseDocument(JSON.parse(saved)); // throws FoliDocumentError on invalid input
 // or: createDocument({ type: "doc", content: [{ type: "paragraph" }] })
 
+// `change.document` is serialized when read: read it when saving, not on every keystroke.
+let latest: FoliChange | undefined;
+let timer: ReturnType<typeof setTimeout> | undefined;
+function onChange(change: FoliChange) {
+  latest = change;
+  clearTimeout(timer);
+  timer = setTimeout(() => save(JSON.stringify(latest?.document)), 500);
+}
+
 export function App() {
-  return <DocumentEditor initialContent={doc} onChange={(next) => save(JSON.stringify(next))} />;
+  return <FoliEditor initialContent={doc} onChange={onChange} />;
 }
 ```
+
+Build your own layout from the parts: `useFoliEditor()` creates an editor,
+`<FoliEditorProvider editor>` shares it, `<FoliCanvas />` shows its pages, `useCurrentEditor()`
+reads it and `useEditorState(selector)` re-renders a component only when its slice of the state
+changes. The API is not stable before 0.1.0.
 
 Peer dependencies: `react`, `react-dom`.
 
