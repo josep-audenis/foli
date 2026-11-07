@@ -9,7 +9,7 @@ import {
   parseContent,
   type SimpleMarkName,
 } from "@folijs/core";
-import { PAGE_BREAK_ATTR, renderBlock } from "./render.js";
+import { PAGE_BREAK_ATTR, renderTree } from "./render.js";
 
 /**
  * Clipboard type for Foli content, read back first on paste: `{ open, content }`, the copied
@@ -46,17 +46,18 @@ export function serializeRange(
   let content = doc.slice(from, to).content;
   for (let depth = $from.sharedDepth(to); depth > 0; depth--)
     content = Fragment.from($from.node(depth).copy(content));
-  const blocks = doc.type.create(null, content);
+  // Not validated: a cut-open list item may lack its first paragraph. The JSON is validated
+  // when pasted; the HTML is only markup.
+  const blocks = doc.type.createOpen(null, content);
   const container = ownerDocument.createElement("div");
   // Built with createElement/textContent (render.ts); reading innerHTML only serializes it.
-  blocks.forEach((block) => {
-    const { dom } = renderBlock(block, ownerDocument);
-    dom.style.whiteSpace = "pre-wrap"; // keep repeated and leading spaces in other apps
-    // How other apps (and print) recognize a page break; the editor itself does not need it.
-    for (const br of dom.querySelectorAll(`br[${PAGE_BREAK_ATTR}]`))
-      (br as HTMLElement).style.cssText = "page-break-before: always; break-before: page";
-    container.append(dom);
-  });
+  renderTree(blocks.content.content, container, ownerDocument);
+  // Keep repeated and leading spaces in other apps.
+  for (const block of container.querySelectorAll("p, h1, h2, h3, h4, h5, h6"))
+    (block as HTMLElement).style.whiteSpace = "pre-wrap";
+  // How other apps (and print) recognize a page break; the editor itself does not need it.
+  for (const br of container.querySelectorAll(`br[${PAGE_BREAK_ATTR}]`))
+    (br as HTMLElement).style.cssText = "page-break-before: always; break-before: page";
   return {
     text: doc.textBetween(from, to, "\n", "\n"),
     html: container.innerHTML,

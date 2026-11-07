@@ -12,6 +12,7 @@ import {
   insertText,
   type Node as ModelNode,
   marksAt,
+  NodeSelection,
   redo,
   Selection,
   Slice,
@@ -32,7 +33,28 @@ import {
   PX_PER_MM,
   type Reuse,
 } from "./layout/flow.js";
-import { type BlockDesc, PAGE_BREAK_ATTR, renderBlock } from "./render.js";
+import {
+  type BlockDesc,
+  createWrapper,
+  isWrapperFor,
+  PAGE_BREAK_ATTR,
+  renderBlock,
+  WRAPPER_ATTR,
+} from "./render.js";
+
+/**
+ * A container around blocks (a list, a list item) as rendered: its node, the position before it
+ * (which identifies it within one render), its index in its parent and its first block's index.
+ */
+interface Container {
+  readonly node: ModelNode;
+  readonly pos: number;
+  readonly index: number;
+  readonly firstBlock: number;
+}
+
+/** Class of the element of a node-selected block (a rule). */
+const SELECTED_CLASS = "foli-selected-node";
 
 interface DomPoint {
   node: Node;
@@ -100,13 +122,21 @@ function printStyles({ pageSize }: DocumentSettings, id: string): string {
  * view cannot prevent (Android keyboards, extensions). A MutationObserver records those; the view
  * then reads the changed text back into a transaction (`readBack`) and re-renders.
  *
- * shortcut: assumes schema v1 (doc > textblocks > inline); nested blocks arrive with lists in Phase 7.
+ * Blocks are the leaf blocks of the document at any depth (paragraphs, headings, rules); the
+ * containers around them (lists, list items) are rebuilt on each page around the blocks it holds
+ * (ADR-0004).
  */
 export class EditorView {
   private state: EditorState;
   private blocks: BlockDesc[] = [];
   /** Position before each block, parallel to `blocks`. */
   private starts: number[] = [];
+  /** The containers around each block, outermost first, parallel to `blocks`. */
+  private chains: (readonly Container[])[] = [];
+  /** The index of each block in `blocks`. */
+  private indexOf = new Map<BlockDesc, number>();
+  /** The element that shows a node selection, if any. */
+  private selectedDom: HTMLElement | null = null;
   /** The page of each fragment of each block. */
   private fragmentPages = new Map<BlockDesc, readonly number[]>();
   /** The block each fragment element belongs to. */
@@ -194,6 +224,8 @@ export class EditorView {
     host.addEventListener("copy", this.onCopy);
     host.addEventListener("cut", this.onCut);
     host.addEventListener("paste", this.onPaste);
+    host.addEventListener("click", this.onClick);
+    host.addEventListener("auxclick", this.onClick);
     host.ownerDocument.addEventListener("selectionchange", this.onSelectionChange);
     host.ownerDocument.fonts?.addEventListener("loadingdone", this.onFontsLoaded);
     this.unsubscribe = editor.subscribe((state) => this.update(state));
@@ -218,6 +250,8 @@ export class EditorView {
     host.removeEventListener("copy", this.onCopy);
     host.removeEventListener("cut", this.onCut);
     host.removeEventListener("paste", this.onPaste);
+    host.removeEventListener("click", this.onClick);
+    host.removeEventListener("auxclick", this.onClick);
     host.ownerDocument.removeEventListener("selectionchange", this.onSelectionChange);
     const owned = [
       "contenteditable",
@@ -287,6 +321,7 @@ export class EditorView {
     const selectionChanged = !state.selection.eq(this.state.selection);
     this.state = state;
     if (docChanged) this.render();
+    this.showSelectedNode();
     this.writeSelection(docChanged);
     // shortcut: scrolls for every change while focused; once remote or plugin changes exist, scroll only for local input (a transaction flag).
     if (docChanged || selectionChanged) this.scrollToSelection();
@@ -341,7 +376,19 @@ export class EditorView {
     }
     let blocks: BlockDesc[] = [];
     const starts: number[] = [];
-    doc.forEach((node, offset) => {
+    const chains: (readonly Container[])[] = [];
+    // Leaf blocks at any depth, in document order, with the containers around each.
+    const open: Container[] = [];
+    doc.descendants((node, pos, _parent, index) => {
+      while (open.length) {
+        const last = open[open.length - 1] as Container;
+        if (pos < last.pos + last.node.nodeSize) break;
+        open.pop();
+      }
+      if (!node.isTextblock && !node.isLeaf) {
+        open.push({ node, pos, index, firstBlock: blocks.length });
+        return true;
+      }
       let reused = previous.get(node);
       // A split block about to be measured again (fonts, CSS) is rendered whole first: each
       // fragment's end breaks its line, so its lines would depend on where it was split before.
@@ -349,7 +396,9 @@ export class EditorView {
       if (reused && reused.fragments.length > 1 && remeasure && !this.composing) reused = undefined;
       if (reused) previous.delete(node);
       blocks.push(reused ?? renderBlock(node, ownerDocument));
-      starts.push(offset);
+      starts.push(pos);
+      chains.push(open.slice());
+      return false;
     });
     for (const stale of previous.values())
       for (const fragment of stale.fragments) fragment.remove();
@@ -359,7 +408,7 @@ export class EditorView {
       const before = previousPages.get(desc);
       return desc.fragments.map((_, f) => (last = Math.max(last, before?.[f] ?? last)));
     });
-    this.place(blocks, pages);
+    this.place(blocks, pages, chains);
     if (!this.composing) {
       // DOM reads only for blocks without a valid measurement (new, changed or stale ones).
       let scale: number | undefined;
@@ -406,10 +455,12 @@ export class EditorView {
         return same ? desc : renderBlock(desc.node, ownerDocument, splits);
       });
       pages = flowed.map((fragments) => fragments.map((fragment) => fragment.page));
-      this.place(blocks, pages);
+      this.place(blocks, pages, chains);
     }
     this.blocks = blocks;
     this.starts = starts;
+    this.chains = chains;
+    this.indexOf = new Map(blocks.map((desc, i) => [desc, i]));
     this.fragmentPages = new Map(blocks.map((desc, i) => [desc, pages[i] ?? []]));
     this.owner = new Map(
       blocks.flatMap((desc) => desc.fragments.map((fragment) => [fragment, desc] as const)),
@@ -417,6 +468,7 @@ export class EditorView {
     this.unflowed = this.composing;
     this.observeSizes();
     this.showPlaceholder();
+    this.showSelectedNode();
     // The view's own DOM changes are not input. During a composition, keep what the browser
     // changed before this render: the touched blocks are read back at compositionend.
     const records = this.observer.takeRecords();
@@ -425,13 +477,19 @@ export class EditorView {
 
   /**
    * Puts each fragment of each block into its page (pages are non-decreasing in document
-   * order), creating and removing pages as needed. Anything else in the host or a page (stray
-   * DOM) is removed.
+   * order), inside the elements of the block's containers (lists, list items), creating and
+   * removing pages as needed. A page reuses the container elements already at the same place
+   * (same tag, in order), so an edit inside a list moves no DOM. Anything else in the host, a
+   * page or a container (stray DOM) is removed.
    */
-  private place(blocks: readonly BlockDesc[], pages: readonly (readonly number[])[]): void {
+  private place(
+    blocks: readonly BlockDesc[],
+    pages: readonly (readonly number[])[],
+    chains: readonly (readonly Container[])[],
+  ): void {
     const { host } = this;
     const items = blocks.flatMap((desc, i) =>
-      desc.fragments.map((dom, f) => ({ dom, page: pages[i]?.[f] ?? 0 })),
+      desc.fragments.map((dom, f) => ({ dom, page: pages[i]?.[f] ?? 0, block: i, fragment: f })),
     );
     const count = (items[items.length - 1]?.page ?? 0) + 1;
     while (this.pages.length < count) this.pages.push(this.createPage());
@@ -441,25 +499,55 @@ export class EditorView {
       if (page === cursor) cursor = cursor.nextSibling;
       else host.insertBefore(page, cursor);
     }
-    const blockDoms = new Set<Node>(items.map((item) => item.dom));
+    const ownerDocument = host.ownerDocument;
+    /** Removes what is left after the last placed child (strays, and blocks of later pages). */
+    const closeLevel = (level: { at: ChildNode | null }) => {
+      let at = level.at;
+      while (at) {
+        const next: ChildNode | null = at.nextSibling;
+        at.remove();
+        at = next;
+      }
+    };
     let i = 0;
     for (let p = 0; p < count; p++) {
       const page = this.pages[p] as HTMLElement;
-      let at = page.firstChild;
+      const stack: { el: HTMLElement; at: ChildNode | null; pos: number }[] = [
+        { el: page, at: page.firstChild, pos: -1 },
+      ];
       for (; i < items.length && items[i]?.page === p; i++) {
-        const dom = (items[i] as { dom: HTMLElement }).dom;
-        if (dom === at) at = at.nextSibling;
-        else page.insertBefore(dom, at);
+        const item = items[i] as (typeof items)[number];
+        const chain = chains[item.block] ?? [];
+        // Keep the open containers this block shares with the previous one on this page.
+        let common = 0;
+        while (
+          common < chain.length &&
+          common + 1 < stack.length &&
+          stack[common + 1]?.pos === (chain[common] as Container).pos
+        )
+          common++;
+        while (stack.length > common + 1) closeLevel(stack.pop() as (typeof stack)[number]);
+        for (let k = common; k < chain.length; k++) {
+          const container = chain[k] as Container;
+          const parent = stack[stack.length - 1] as (typeof stack)[number];
+          let element: HTMLElement;
+          if (isWrapperFor(parent.at, container.node)) {
+            element = parent.at;
+            parent.at = element.nextSibling;
+          } else {
+            element = createWrapper(container.node, ownerDocument);
+            parent.el.insertBefore(element, parent.at);
+          }
+          styleContainer(element, container, chain[k - 1], item);
+          stack.push({ el: element, at: element.firstChild, pos: container.pos });
+        }
+        const top = stack[stack.length - 1] as (typeof stack)[number];
+        if (item.dom === top.at) top.at = top.at.nextSibling;
+        else top.el.insertBefore(item.dom, top.at);
       }
-      // What is left: strays go; fragments of a later page are moved there next.
-      while (at) {
-        const next: ChildNode | null = at.nextSibling;
-        if (!blockDoms.has(at)) at.remove();
-        at = next;
-      }
+      while (stack.length) closeLevel(stack.pop() as (typeof stack)[number]);
     }
-    // Pages no longer needed and stray DOM in the host: all after the last page by now. Taken
-    // after the block loop, since a block found loose in the host has just moved into a page.
+    // Pages no longer needed and stray DOM in the host: all after the last page by now.
     let rest = (this.pages[count - 1] as HTMLElement).nextSibling;
     while (rest) {
       const next: ChildNode | null = rest.nextSibling;
@@ -579,20 +667,39 @@ export class EditorView {
 
   // ---------- position mapping ----------
 
-  /** The block element that contains `node` (the child of a page it sits in), or null. */
+  /** The block element (a fragment of a rendered block) that contains `node`, or null. */
   private blockElement(node: Node | null): Node | null {
-    let element = node;
-    while (element?.parentNode && !this.pages.includes(element.parentNode as HTMLElement)) {
-      if (element.parentNode === this.host) return null;
-      element = element.parentNode;
+    for (let element = node; element && element !== this.host; element = element.parentNode) {
+      if (this.owner.has(element)) return element;
     }
-    return element?.parentNode ? element : null;
+    return null;
+  }
+
+  /** Whether `node` holds blocks rather than content: the host, a page or a container. */
+  private holdsBlocks(node: Node): boolean {
+    return (
+      node === this.host ||
+      this.pages.includes(node as HTMLElement) ||
+      (node instanceof Element && node.hasAttribute(WRAPPER_ATTR))
+    );
+  }
+
+  /** Index of the first block that starts at or after `pos` (the block count if none). */
+  private blockFrom(pos: number): number {
+    let lo = 0;
+    let hi = this.starts.length;
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1;
+      if ((this.starts[mid] as number) < pos) lo = mid + 1;
+      else hi = mid;
+    }
+    return lo;
   }
 
   /** Model position of a DOM point inside the host, or null if it is outside. */
   posFromDOM(node: Node, offset: number): number | null {
     const { host } = this;
-    if (node === host || this.pages.includes(node as HTMLElement)) {
+    if (this.holdsBlocks(node)) {
       // Between fragments: the start of the first one after the point (a block start, or
       // where a continuation starts), else the document end.
       const range = host.ownerDocument.createRange();
@@ -606,9 +713,14 @@ export class EditorView {
     }
     const element = this.blockElement(node);
     const owner = element ? this.owner.get(element) : undefined;
-    const index = owner ? this.blocks.indexOf(owner) : -1;
+    const index = owner ? (this.indexOf.get(owner) ?? -1) : -1;
     const desc = this.blocks[index];
     if (!desc) return null;
+    // A point in or at a block leaf (a rule): before it, or after it at its end.
+    if (!desc.node.isTextblock) {
+      const after = node === desc.dom && offset > 0;
+      return (this.starts[index] as number) + (after ? desc.node.nodeSize : 0);
+    }
     const contentStart = (this.starts[index] as number) + 1;
     const leaf = desc.leaves.find((l) => l.dom === node);
     if (leaf && node.nodeType === Node.TEXT_NODE)
@@ -625,10 +737,19 @@ export class EditorView {
   /** DOM point for a model position. At a mark boundary the caret stays in the text before it. */
   domFromPos(pos: number): DomPoint {
     const { doc } = this.state;
-    let $pos = doc.resolve(pos);
-    // Between blocks: use the nearest block edge (schema v1 has only textblocks at depth 1).
-    if ($pos.depth === 0) $pos = doc.resolve($pos.nodeAfter ? pos + 1 : pos - 1);
-    const desc = this.blocks[$pos.index(0)] as BlockDesc;
+    const $pos = doc.resolve(pos);
+    if (!$pos.parent.isTextblock) {
+      // Between blocks: the start of the next block (before a rule), else the document end.
+      const next = this.blocks[this.blockFrom(pos)];
+      if (next) return next.node.isTextblock ? fragmentStart(next, 0) : before(next.dom);
+      const last = this.blocks[this.blocks.length - 1] as BlockDesc;
+      if (!last.node.isTextblock) {
+        const point = before(last.dom);
+        return { node: point.node, offset: point.offset + 1 };
+      }
+      return fragmentEnd(last, last.fragments.length - 1);
+    }
+    const desc = this.blocks[this.blockFrom($pos.before())] as BlockDesc;
     const offset = $pos.parentOffset;
     // Where a fragment starts, show the caret at the start of the next page's fragment, as a
     // browser shows it at the start of the next line at a soft wrap.
@@ -658,11 +779,48 @@ export class EditorView {
   private readSelection(): Selection | null {
     const sel = this.host.ownerDocument.getSelection();
     if (!sel?.anchorNode || !sel.focusNode) return null;
+    // A range around exactly one block leaf element (a rule): the node selection that wrote it.
+    // (Its end, mapped alone, would be the start of the next block, not the end of the rule.)
+    if (sel.anchorNode === sel.focusNode && Math.abs(sel.anchorOffset - sel.focusOffset) === 1) {
+      const child = sel.anchorNode.childNodes[Math.min(sel.anchorOffset, sel.focusOffset)];
+      const owner = child && this.owner.get(child);
+      const index = owner ? (this.indexOf.get(owner) ?? -1) : -1;
+      if (owner && !owner.node.isTextblock && NodeSelection.isSelectable(owner.node))
+        return NodeSelection.create(this.state.doc, this.starts[index] as number);
+    }
     const anchor = this.posFromDOM(sel.anchorNode, sel.anchorOffset);
     const head = this.posFromDOM(sel.focusNode, sel.focusOffset);
     if (anchor === null || head === null) return null;
     const { doc } = this.state;
+    // Exactly around a selectable block leaf (a rule): the node selection that wrote it.
+    const from = Math.min(anchor, head);
+    const node = doc.nodeAt(from);
+    if (
+      node &&
+      node.isBlock &&
+      node.isAtom &&
+      Math.max(anchor, head) === from + node.nodeSize &&
+      NodeSelection.isSelectable(node)
+    )
+      return NodeSelection.create(doc, from);
     return TextSelection.between(doc.resolve(anchor), doc.resolve(head));
+  }
+
+  /** The rendered block a node selection selects, if it selects one. */
+  private selectedBlock(): BlockDesc | null {
+    const { selection } = this.state;
+    if (!(selection instanceof NodeSelection)) return null;
+    const desc = this.blocks[this.blockFrom(selection.from)];
+    return desc && this.starts[this.indexOf.get(desc) ?? -1] === selection.from ? desc : null;
+  }
+
+  /** Marks the element of a node-selected block, for styling (the DOM selection is around it). */
+  private showSelectedNode(): void {
+    const dom = this.selectedBlock()?.dom ?? null;
+    if (dom === this.selectedDom) return;
+    this.selectedDom?.classList.remove(SELECTED_CLASS);
+    dom?.classList.add(SELECTED_CLASS);
+    this.selectedDom = dom;
   }
 
   /**
@@ -703,6 +861,12 @@ export class EditorView {
     if (!force) {
       const current = this.readSelection();
       if (current && this.shows(current)) return;
+    }
+    const selected = this.selectedBlock();
+    if (selected) {
+      const point = before(selected.dom);
+      sel.setBaseAndExtent(point.node, point.offset, point.node, point.offset + 1);
+      return;
     }
     // Never show a caret inside a grapheme cluster (the core snaps only out of surrogate pairs).
     // The model takes the snapped selection back on its next read of the DOM.
@@ -814,22 +978,33 @@ export class EditorView {
     // Focus from a mousedown happens in its default action, before this timer. A mousedown that
     // focuses nothing (prevented, middle button) must not skip the next keyboard focus.
     if (this.pointerFocus) setTimeout(() => (this.pointerFocus = false));
-    if (event.detail !== 3 || event.button !== 0) return;
+    if (event.button !== 0) return;
     const element = this.blockElement(event.target as Node | null);
     const owner = element ? this.owner.get(element) : undefined;
-    const index = owner ? this.blocks.indexOf(owner) : -1;
+    const index = owner ? (this.indexOf.get(owner) ?? -1) : -1;
     const desc = this.blocks[index];
     if (!desc) return;
-    event.preventDefault();
-    const from = (this.starts[index] as number) + 1;
     const { doc } = this.state;
+    const start = this.starts[index] as number;
+    let selection: Selection;
+    if (!desc.node.isTextblock) {
+      // A click on a rule selects it (the browser would put the caret beside it).
+      if (!NodeSelection.isSelectable(desc.node)) return;
+      selection = NodeSelection.create(doc, start);
+    } else if (event.detail === 3) {
+      selection = TextSelection.create(doc, start + 1, start + 1 + desc.node.content.size);
+    } else return;
+    event.preventDefault();
     this.host.focus();
-    this.dispatch(
-      this.state.tr
-        .setSelection(TextSelection.create(doc, from, from + desc.node.content.size))
-        .setStoredMarks(null),
-    );
+    this.dispatch(this.state.tr.setSelection(selection).setStoredMarks(null));
     this.writeSelection(true);
+  };
+
+  /** A link in the document does not navigate when clicked (editing places the caret in it). */
+  private onClick = (event: MouseEvent): void => {
+    const target = event.target;
+    if (target instanceof Element && target.closest("a") && this.host.contains(target))
+      event.preventDefault();
   };
 
   private onKeyDown = (event: KeyboardEvent): void => {
@@ -873,7 +1048,7 @@ export class EditorView {
     const f = desc.fragments.indexOf(element as HTMLElement);
     const head = this.posFromDOM(sel.focusNode, sel.focusOffset);
     if (head === null) return false;
-    const offset = head - (this.starts[this.blocks.indexOf(desc)] as number) - 1;
+    const offset = head - (this.starts[this.indexOf.get(desc) ?? -1] as number) - 1;
     let target: DomPoint | null = null;
     // Stepping back over an edge after a hard break lands before the <br>: the point after it
     // is still the split, and browsers would show it before the <br> anyway. That step is
@@ -991,10 +1166,15 @@ export class EditorView {
       else node.childNodes.forEach(walk);
     };
     let first = true;
-    // Block-level nodes in order: the children of each page, and anything else in the host.
-    const blockLevel = [...this.host.childNodes].flatMap((child) =>
-      this.pages.includes(child as HTMLElement) ? [...child.childNodes] : [child],
-    );
+    // Block-level nodes in order: inside pages and containers, and anything else in the host.
+    const blockLevel: Node[] = [];
+    const collect = (parent: Node) => {
+      for (const child of parent.childNodes) {
+        if (this.holdsBlocks(child)) collect(child);
+        else blockLevel.push(child);
+      }
+    };
+    collect(this.host);
     let previousOwner: BlockDesc | undefined;
     for (const child of blockLevel) {
       const owner = this.owner.get(child);
@@ -1010,7 +1190,7 @@ export class EditorView {
     const { doc } = this.state;
     const lineStarts: number[] = [];
     let modelText = "";
-    doc.forEach((block, _offset, i) => {
+    this.blocks.forEach(({ node: block }, i) => {
       if (i > 0) modelText += BLOCK_SEPARATOR;
       lineStarts.push(modelText.length);
       modelText += block.textBetween(0, block.content.size, "", HARD_BREAK);
@@ -1156,6 +1336,25 @@ export class EditorView {
   private onSelectionChange = (): void => {
     if (!this.composing && this.hasFocus()) this.syncSelection();
   };
+}
+
+/**
+ * Sets what a container element shows on a page: an ordered list item's number (so numbering
+ * continues across pages), and no marker on an item continued from the previous page (its
+ * first block is on an earlier page, or this is a continued fragment of it).
+ */
+function styleContainer(
+  element: HTMLElement,
+  container: Container,
+  parent: Container | undefined,
+  item: { block: number; fragment: number },
+): void {
+  if (element.tagName !== "LI") return;
+  const continued = item.block !== container.firstBlock || item.fragment > 0;
+  element.style.listStyleType = continued ? "none" : "";
+  const start = parent?.node.type.name === "orderedList" ? parent.node.attrs.start : undefined;
+  if (typeof start === "number") element.setAttribute("value", String(start + container.index));
+  else element.removeAttribute("value");
 }
 
 /**
