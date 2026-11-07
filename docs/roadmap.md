@@ -9,17 +9,17 @@ leaves `main` green with a working playground.
 **Update this table in the same PR that starts, advances or finishes a phase.** It is the only
 place that says what is in progress; check it before starting work.
 
-| Phase                    | Status                   | Branch | Notes                                                                                      |
-| ------------------------ | ------------------------ | ------ | ------------------------------------------------------------------------------------------ |
-| 0 Foundation             | ✅ Done                  | —      |                                                                                            |
-| 1 Architecture spike     | ✅ Done (G1 provisional) | —      | Merged in #1; ADR-0003 accepted provisionally; IME, dead-key and screen-reader checks open |
-| 2 Document model         | ✅ Done                  | —      | Merged in #2                                                                               |
-| 3 Transactions & history | ✅ Done                  | —      | Merged in #4; gate G2 passed                                                               |
-| 4 Editor view            | ✅ Done (G3 provisional) | —      | Merged in #8–#13; manual checks (4.6) deferred, open risks in ADR-0003                     |
-| 5 Native pagination      | ✅ Done (G4 provisional) | —      | Merged in #15–#22; page-break manual checks open, risks in ADR-0003                        |
-| 6 React API & 0.1.0      | ✅ Done                  | —      | Merged in #23–#31; 0.1.0 on npm; manual checks shipped as known risks (ADR-0003)           |
-| 7 Rich content           | Ready                    |        |                                                                                            |
-| 8–12                     | Not started              |        |                                                                                            |
+| Phase                    | Status                   | Branch                 | Notes                                                                                      |
+| ------------------------ | ------------------------ | ---------------------- | ------------------------------------------------------------------------------------------ |
+| 0 Foundation             | ✅ Done                  | —                      |                                                                                            |
+| 1 Architecture spike     | ✅ Done (G1 provisional) | —                      | Merged in #1; ADR-0003 accepted provisionally; IME, dead-key and screen-reader checks open |
+| 2 Document model         | ✅ Done                  | —                      | Merged in #2                                                                               |
+| 3 Transactions & history | ✅ Done                  | —                      | Merged in #4; gate G2 passed                                                               |
+| 4 Editor view            | ✅ Done (G3 provisional) | —                      | Merged in #8–#13; manual checks (4.6) deferred, open risks in ADR-0003                     |
+| 5 Native pagination      | ✅ Done (G4 provisional) | —                      | Merged in #15–#22; page-break manual checks open, risks in ADR-0003                        |
+| 6 React API & 0.1.0      | ✅ Done                  | —                      | Merged in #23–#31; 0.1.0 on npm; manual checks shipped as known risks (ADR-0003)           |
+| 7 Rich content           | In progress              | `phase-7/rich-content` | Plan below (tasks 7.1–7.9); nested blocks in the paged view need ADR-0004 (7.3)            |
+| 8–12                     | Not started              |                        |                                                                                            |
 
 Status values: `Ready` (dependencies met, nobody on it) · `In progress` · `In review` (PR open) ·
 `✅ Done` (merged, acceptance criteria met) · `Blocked by …`.
@@ -499,6 +499,71 @@ criterion is the one from G3: type, format with shortcuts, undo, serialize, relo
 - Links: mark with validated `href` (safe protocols only), autolink on paste, editing UI.
 - Paragraph alignment, text color, highlight (mark attrs), horizontal rule, `NodeSelection`.
 - **Schema v2** with the first real migration (v1 → v2) and migration tests.
+
+**Acceptance:** T1–T5 pass with lists, links and a horizontal rule in all three engines; a list
+item split across pages and a nested list across pages paginate deterministically (snapshots)
+and print one sheet per page; documents saved by 0.1.0 load through the v1 → v2 migration
+unchanged in content; HTML with lists, links, rules, colors and alignment pastes into the
+schema (fixtures) and copies back out; no `href` outside the safe protocols reaches the
+document by any path; axe passes on the new toolbar controls; the 100-page benchmark stays
+within its targets; 0.2.0 published.
+
+### Tasks
+
+Starting point (survey 2026-11-07): the core model is generic (nested content, mark attrs,
+`excludes`), but there is no `ReplaceAroundStep`, wrap/lift transform, `NodeSelection` or
+non-inclusive mark. The view, layout and clipboard assume blocks are textblocks directly under
+`doc` (one `BlockDesc` per top-level child, positions from top-level offsets, one layout box per
+top-level block, marks rendered without attrs).
+
+- [ ] 7.1 Structure engine (`@folijs/core`, no schema change): `ReplaceAroundStep` (apply,
+  invert, map, merge rules); `Transform.wrap`, `lift`, `split` at depth > 1 with types after,
+  `join` across nesting; helpers `findWrapping`, `liftTarget`, `canSplit`, `canJoin`;
+  `NodeSelection` (JSON, mapping, `selectable`/`atom` node specs); mark spec `inclusive`
+  (typing at a link's edge does not extend it). Tests on `testSchema` (blockquote, rule, link),
+  property tests: step invert/map round-trips including `ReplaceAroundStep`, undo of wrap/lift
+  exact.
+- [ ] 7.2 Schema v2 and migrations: `SCHEMA_VERSION` 2; `parseDocument` runs `vN → vN+1`
+  migrations before validation (registry, tests with v1 documents written by 0.1.0, unknown
+  future versions rejected); v1 → v2 keeps content as is. Schema v2 adds `bulletList`,
+  `orderedList` (`start`), `listItem` (`paragraph block*`), `horizontalRule` (atom, selectable),
+  `align` on paragraph and heading (`left`, `center`, `right`, `justify`), marks `link`
+  (`href` limited to http, https, mailto, tel and relative URLs; not inclusive), `textColor`
+  and `highlight` (`#rrggbb`). JSON types, docs/document-model.md. Headless only: the view
+  supports the new types from 7.3, so nothing user-facing changes until then.
+- [ ] 7.3 Nested blocks in the view (ADR-0004): decide how nested blocks render on pages
+  (proposed: layout over the flattened leaf blocks, each page rebuilding the open `ul`/`ol`/`li`
+  ancestors of its blocks, so list semantics survive). Render lists, list items and rules;
+  positions, selection read/write and composition read-back at any depth; `NodeSelection`
+  (rule) shown and read back; triple-click, placeholder and paste target in nested
+  paragraphs; marks with attrs (link as `<a>` that does not navigate on a plain click, colors
+  as styles); alignment. Pagination unchanged for flat documents (all existing suites green).
+- [ ] 7.4 Lists across pages: the flow works on the flattened blocks with nesting-aware margins;
+  a list item splits at a line, a nested list continues on the next page (continued item
+  without a second marker, `ol` numbering continues); widow/orphan and keep-with-next inside
+  lists; justified text keeps its alignment across a break (`text-align-last` on continued
+  fragments). Deterministic fixtures and visual snapshots in three engines, print, the
+  benchmark with lists.
+- [ ] 7.5 List editing: commands `wrapInList`, `liftListItem`, `sinkListItem`, `splitListItem`
+  (Enter on an empty item leaves the list), Backspace at an item's start, list type toggle;
+  keys Tab/Shift-Tab inside lists only (Tab elsewhere still leaves the editor), Mod-Shift-7/8;
+  the `beforeinput` fallback runs the same commands; toolbar buttons (bulleted, numbered,
+  indent, outdent). Undo restores document and selection exactly; e2e in three engines.
+- [ ] 7.6 Links: `setLink(href)`/`removeLink` commands validating `href`; React link editing
+  (toolbar button and Mod-K open a small accessible dialog: URL field, apply, remove);
+  Ctrl/Cmd+click opens the link in a new tab (`noopener`); autolink of a pasted plain-text URL.
+  Every entry point (parse, paste, command, dialog) rejects unsafe protocols, with tests.
+- [ ] 7.7 Alignment, colors, rule: commands `setAlign`, `setTextColor`, `setHighlight` (and
+  removal), `insertHorizontalRule`; arrows and Backspace around a rule (`NodeSelection`);
+  toolbar controls: alignment group, color and highlight menus (accessible menu buttons with a
+  fixed palette), rule button; CSS variables for link, marker and rule styling.
+- [ ] 7.8 Clipboard and interop: HTML ↔ schema v2 for `ul`/`ol`/`li` (nesting, `start`), Word
+  and Google Docs list markup (fixtures, best effort), `a[href]` (sanitized), `hr`, `color`,
+  `background-color`, `text-align`; copy writes the same structures; fixture corpus extended;
+  T3 rerun.
+- [ ] 7.9 Close: docs (architecture, document model, pagination, limitations, API, styling,
+  getting started), playground sample document with every v2 feature, example apps updated,
+  benchmark rerun; 0.2.0 changeset, version PR, publish after the owner's approval.
 
 ## Phase 8 — Tables & images · XL → 0.3.0
 
