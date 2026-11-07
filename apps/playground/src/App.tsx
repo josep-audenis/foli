@@ -1,5 +1,5 @@
-import { createDocument, type FoliDocument, parseDocument } from "@foli/core";
-import { DocumentEditor } from "@foli/react";
+import { createDocument, type Editor, type FoliDocument, parseDocument } from "@foli/core";
+import { type FoliChange, FoliEditor } from "@foli/react";
 import { useState } from "react";
 
 const STORAGE_KEY = "foli-playground-document";
@@ -47,13 +47,14 @@ function load(): FoliDocument {
   return sample;
 }
 
-let pending: FoliDocument | null = null;
+// The editor with unsaved changes: its document is serialized when saving, not per keystroke.
+let pending: Editor | null = null;
 let timer: ReturnType<typeof setTimeout> | undefined;
 
 function flush(): void {
   if (!pending) return;
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(pending));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(pending.getDocument()));
   } catch (error) {
     console.warn("Could not save the playground document:", error);
   }
@@ -61,8 +62,8 @@ function flush(): void {
 }
 
 /** Saves once changes pause for 300 ms; leaving the page saves anything still pending. */
-function save(document: FoliDocument): void {
-  pending = document;
+function save({ editor }: FoliChange): void {
+  pending = editor;
   clearTimeout(timer);
   timer = setTimeout(flush, 300);
 }
@@ -104,7 +105,7 @@ export function App() {
           Reset
         </button>
       </header>
-      <DocumentEditor
+      <FoliEditor
         initialContent={initial}
         onChange={save}
         readOnly={readOnly}

@@ -3,7 +3,7 @@
  * from inside the page. Driven by `apps/playground/bench/`; see docs/benchmarks.md.
  */
 import { parseDocument } from "@foli/core";
-import { DocumentEditor } from "@foli/react";
+import { type FoliChange, FoliEditor } from "@foli/react";
 import { flushSync } from "react-dom";
 import { createRoot, type Root } from "react-dom/client";
 import "@foli/react/styles.css";
@@ -53,9 +53,9 @@ addEventListener(
   { capture: true },
 );
 
-// Every change reads the document back, as an app that saves it does (the playground's
-// `onChange`); with the current `DocumentEditor` that serializes the whole document.
-const ignore = () => {};
+// Every change reads the document back, as an app that saves on each change does (the
+// playground saves after a pause instead): the whole document is serialized per keystroke.
+const readBack = (change: FoliChange) => change.document;
 let swapped = false;
 
 const bench = {
@@ -65,7 +65,7 @@ const bench = {
     root?.unmount();
     root = createRoot(container);
     const start = performance.now();
-    flushSync(() => root?.render(<DocumentEditor initialContent={document} onChange={ignore} />));
+    flushSync(() => root?.render(<FoliEditor initialContent={document} onChange={readBack} />));
     const layoutMs = performance.now() - start;
     await painted();
     return { layoutMs, paintMs: performance.now() - start, pages: pages() };

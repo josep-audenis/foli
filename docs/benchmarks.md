@@ -50,7 +50,7 @@ well under one frame. Nothing here is on the keystroke path; edits will reuse un
 **Run:** `pnpm bench:layout` (Playwright, `playwright.bench.config.ts`, one worker; about 3
 minutes for all three engines). Each test prints a `BENCH {…}` line. Not part of `pnpm check` or
 `pnpm test:e2e`. Source: `apps/playground/bench/pagination.bench.ts`, driving the dev-only page
-`apps/playground/bench.html` (`src/bench.tsx`), which mounts `DocumentEditor` and times it from
+`apps/playground/bench.html` (`src/bench.tsx`), which mounts `FoliEditor` and times it from
 inside the page.
 
 **Fixtures:** `benchDocument(sections)` in `apps/playground/e2e/fixtures.ts`: per section a level-2
@@ -61,7 +61,7 @@ apply. 1, 10, 50, 100 and 200 sections give 1, 10, 50, 100 and 199 pages.
 
 **Operations:**
 
-- **layout:** mounting the editor (`flushSync` render of `DocumentEditor`: view creation, measuring
+- **layout:** mounting the editor (`flushSync` render of `FoliEditor`: view creation, measuring
   every block, the page flow, the DOM of every page), synchronous. **To paint:** until the next
   frame has been painted. Median of 5 mounts.
 - **type / Enter:** 88 characters typed, then 40 Enter presses, at the start of the first
@@ -76,9 +76,10 @@ apply. 1, 10, 50, 100 and 200 sections give 1, 10, 50, 100 and 199 pages.
     layout and paint; rasterizing and compositing are not included).
   - Keys are 40-56 ms apart plus a round trip, so they arrive at any point of a frame; each
     sample is checked to belong to the key just pressed.
-  - The editor has an `onChange` that ignores the document, as an app that saves it has one.
-    With the current `DocumentEditor` (its API is decided in Phase 6) that serializes the whole
-    document on every change.
+  - The editor has an `onChange` that reads `change.document`, as an app that saves on every
+    change does: the whole document is serialized per keystroke. (Measured with Phase 5's
+    `DocumentEditor`, which always serialized; `FoliEditor` only does when `document` is read,
+    so the numbers carry over.)
 - **re-flow:** a full re-flow as when a web font with other metrics finishes loading: the editor's
   font family switches (to the default sans-serif, then back to the test font; the page count
   changes, e.g. 101 → 105 pages) and a `loadingdone` event fires on `document.fonts`. The browser

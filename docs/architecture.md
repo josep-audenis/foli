@@ -29,14 +29,14 @@ This document describes **what exists** and **what is decided**. Planned parts a
 └──────────────────────────────────────────────────────────────┘
 ```
 
-| Subsystem           | Responsibility                                                                 | Status                                                 |
-| ------------------- | ------------------------------------------------------------------------------ | ------------------------------------------------------ |
-| Document model      | Schema, immutable tree, marks, positions, JSON, validation                     | ✅ (Phase 2)                                           |
-| Editing engine      | Steps, position mapping, selection, state, history, commands                   | ✅ headless (Phase 3)                                  |
-| View                | Render state to DOM, DOM ↔ model mapping, `beforeinput`, IME, clipboard, focus | ✅ (G3 provisional; manual IME/SR checks open)         |
-| Layout              | Measurement, line breaking, page flow, fragments, incremental reflow, print    | Phase 5 (inside `@foli/view` until the seam is proven) |
-| React integration   | Components, hooks, toolbar                                                     | Editable `DocumentEditor` ✅; API: Phase 6             |
-| Document processing | DOCX/HTML interop, Rust/WASM                                                   | Phase 10                                               |
+| Subsystem           | Responsibility                                                                 | Status                                                       |
+| ------------------- | ------------------------------------------------------------------------------ | ------------------------------------------------------------ |
+| Document model      | Schema, immutable tree, marks, positions, JSON, validation                     | ✅ (Phase 2)                                                 |
+| Editing engine      | Steps, position mapping, selection, state, history, commands                   | ✅ headless (Phase 3)                                        |
+| View                | Render state to DOM, DOM ↔ model mapping, `beforeinput`, IME, clipboard, focus | ✅ (G3 provisional; manual IME/SR checks open)               |
+| Layout              | Measurement, line breaking, page flow, fragments, incremental reflow, print    | Phase 5 (inside `@foli/view` until the seam is proven)       |
+| React integration   | Components, hooks, toolbar                                                     | Hooks, provider, canvas, `FoliEditor` ✅ (6.1); toolbar next |
+| Document processing | DOCX/HTML interop, Rust/WASM                                                   | Phase 10                                                     |
 
 ## Editing data flow (target design)
 
@@ -401,12 +401,30 @@ Planned, created only when needed:
   the condition so published types point at `dist`.
 - ESM-only, `sideEffects` declared, React as a peer dependency.
 
-## React integration (target)
+## React integration (`@foli/react`)
 
 Uncontrolled: the engine owns document state; React observes. `initialContent` is read once;
 external replacement goes through an imperative `setDocument()`. No fully controlled `value`
 prop: feeding the whole document back on every keystroke defeats incremental rendering.
-The view owns its DOM subtree; React never renders children into it.
+The view owns its DOM subtree; React never renders children into it. Built in 6.1 (API not
+stable before 0.1.0):
+
+- `useFoliEditor({ initialContent, plugins })`: a headless `Editor` created on the first render
+  and kept for the component's lifetime (later options are ignored; StrictMode's extra
+  initializer call only creates a discarded editor, which has no side effects).
+- `FoliEditorProvider` / `useCurrentEditor()`: the editor for a subtree (throws outside one).
+- `FoliCanvas`: the editable pages for an editor (prop or context): creates the `EditorView` in
+  a layout effect, destroys it on unmount or when the editor changes, passes `readOnly` and
+  `placeholder` to every view it creates; `label` names the textbox.
+- `useEditorState(selector, { editor, isEqual })`: `useSyncExternalStore` over
+  `editor.subscribe`; the selection is cached per state and selector, and an equal one
+  (`isEqual`, default `Object.is`) keeps its identity, so the component re-renders only when
+  its slice changes. The selector runs after every transaction.
+- `FoliEditor`: `useFoliEditor` + provider + canvas, `children` rendered above the pages inside
+  the provider. `onChange(change)` fires after transactions that change the content (not
+  selection-only ones) with `{ editor, transactions, document }`; `document` is serialized on
+  first read, so an app that saves later (the playground: after a 300 ms pause) pays nothing
+  per keystroke.
 
 ## Styling
 

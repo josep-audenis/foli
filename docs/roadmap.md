@@ -439,7 +439,7 @@ Each task is one PR that leaves `pnpm check` green and the playground working. T
 criterion is the one from G3: type, format with shortcuts, undo, serialize, reload without loss.
 
 - [x] Claim phase, branch `phase-6/react-api`
-- [ ] 6.1 React API: `useFoliEditor(options)` (one `Editor` per component, created once),
+- [x] 6.1 React API: `useFoliEditor(options)` (one `Editor` per component, created once),
   `FoliCanvas` (mounts the `EditorView` for an editor: `editable`, `placeholder`, `label`),
   `FoliEditorProvider` and a context hook, `useEditorState(selector, isEqual?)` on
   `useSyncExternalStore` (a component re-renders only when its slice changes), `FoliEditor`
