@@ -29,14 +29,14 @@ This document describes **what exists** and **what is decided**. Planned parts a
 └──────────────────────────────────────────────────────────────┘
 ```
 
-| Subsystem           | Responsibility                                                                 | Status                                                       |
-| ------------------- | ------------------------------------------------------------------------------ | ------------------------------------------------------------ |
-| Document model      | Schema, immutable tree, marks, positions, JSON, validation                     | ✅ (Phase 2)                                                 |
-| Editing engine      | Steps, position mapping, selection, state, history, commands                   | ✅ headless (Phase 3)                                        |
-| View                | Render state to DOM, DOM ↔ model mapping, `beforeinput`, IME, clipboard, focus | ✅ (G3 provisional; manual IME/SR checks open)               |
-| Layout              | Measurement, line breaking, page flow, fragments, incremental reflow, print    | Phase 5 (inside `@foli/view` until the seam is proven)       |
-| React integration   | Components, hooks, toolbar                                                     | Hooks, provider, canvas, `FoliEditor` ✅ (6.1); toolbar next |
-| Document processing | DOCX/HTML interop, Rust/WASM                                                   | Phase 10                                                     |
+| Subsystem           | Responsibility                                                                 | Status                                                           |
+| ------------------- | ------------------------------------------------------------------------------ | ---------------------------------------------------------------- |
+| Document model      | Schema, immutable tree, marks, positions, JSON, validation                     | ✅ (Phase 2)                                                     |
+| Editing engine      | Steps, position mapping, selection, state, history, commands                   | ✅ headless (Phase 3)                                            |
+| View                | Render state to DOM, DOM ↔ model mapping, `beforeinput`, IME, clipboard, focus | ✅ (G3 provisional; manual IME/SR checks open)                   |
+| Layout              | Measurement, line breaking, page flow, fragments, incremental reflow, print    | Phase 5 (inside `@foli/view` until the seam is proven)           |
+| React integration   | Components, hooks, toolbar                                                     | Hooks, provider, canvas, `FoliEditor` ✅ (6.1); toolbar ✅ (6.2) |
+| Document processing | DOCX/HTML interop, Rust/WASM                                                   | Phase 10                                                         |
 
 ## Editing data flow (target design)
 
@@ -420,17 +420,33 @@ stable before 0.1.0):
   `editor.subscribe`; the selected value is cached per state and selector, and an equal one
   (`isEqual`, default `Object.is`) keeps its identity, so the component re-renders only when
   its slice changes. The selector runs after every transaction and after `setDocument`.
-- `FoliEditor`: `useFoliEditor` + provider + canvas, `children` rendered above the pages inside
-  the provider. `onChange(change)` fires after transactions that change the content (not
+- `FoliEditor`: `useFoliEditor` + provider + `FoliToolbar` (unless `toolbar={false}`, disabled
+  when `readOnly`) + canvas, `children` rendered between the toolbar and the pages inside the
+  provider. A `ref` gives `{ editor, focus() }` (`FoliCanvas`'s ref: `{ focus() }`), so a parent
+  can load a document (`setDocument`) or run commands. `onChange(change)` fires after
+  transactions that change the content (not
   selection-only ones, nor `setDocument`) with `{ editor, transactions, document }`.
   `document` is the document right after that change (the change keeps the immutable state),
   serialized on first read, so an app that saves later (the playground: after a 300 ms pause)
   pays nothing per keystroke.
+- `FoliToolbar` (6.2): bold, italic, underline, strikethrough; paragraph and heading levels
+  1-3 (a pressed heading turns back into a paragraph); undo, redo; page break. Its state is one
+  `useEditorState` selector: `aria-pressed` from the marks and block types of the selection,
+  `aria-disabled` from command dry runs (`editor.can`), compared item by item so typing does not
+  re-render it. One tab stop (`role="toolbar"`, roving `tabindex`: arrows, Home, End, wrapping;
+  the last used button keeps the stop); disabled buttons stay focusable (`aria-disabled`, not
+  `disabled`). `mousedown` is prevented, so a click leaves the focus and the selection in the
+  document; keyboard activation keeps the focus on the button, and Tab returns to the document
+  at its selection. Buttons with a symbol (B, I, U, S, ¶) are named by `aria-label`; the others
+  by their visible text (H1, Undo), so speech input matches what is on screen; every button has
+  a `title`. Axe (scoped to the toolbar, editable and read-only) and keyboard-only flows run in
+  Playwright in all three engines.
 
 ## Styling
 
-Plain CSS with custom properties (`--foli-*`) on `.foli-canvas`. Page geometry is applied in
-`mm` straight from document settings. No CSS framework.
+Plain CSS with custom properties (`--foli-*`) on `.foli-canvas` and `.foli-toolbar` (toolbar
+colors and `--foli-focus-ring`). Page geometry is applied in `mm` straight from document
+settings. In print the canvas chrome and the toolbar are hidden. No CSS framework.
 
 ## Risk register
 

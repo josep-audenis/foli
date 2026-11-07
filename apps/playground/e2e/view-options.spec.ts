@@ -123,7 +123,8 @@ test("read-only mode reached by keyboard: focusable, Mod+A selects only the docu
   await page.goto("/");
   await readOnly(page).check();
   await page.keyboard.press("Tab"); // checkbox → Reset
-  await page.keyboard.press("Tab"); // Reset → editor
+  await page.keyboard.press("Tab"); // Reset → toolbar (one tab stop)
+  await page.keyboard.press("Tab"); // toolbar → editor
   await expect(editor(page)).toBeFocused();
   await page.keyboard.press(`${MOD}+a`);
   const selected = await page.evaluate(() => String(getSelection()));
@@ -165,6 +166,7 @@ test("Tab back into the editor keeps the caret where it was", async ({ page }) =
   // Selecting text elsewhere moves the page selection out of the editor.
   await page.locator(".playground-hint").dblclick();
   await page.locator(".playground-bar button").focus();
+  await page.keyboard.press("Tab"); // the toolbar: one tab stop
   await page.keyboard.press("Tab");
   await expect(editor(page)).toBeFocused();
   await page.keyboard.type("X");

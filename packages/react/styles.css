@@ -38,6 +38,79 @@
   background: var(--foli-selection-color);
 }
 
+/* Toolbar (FoliToolbar). Tokens can be set on .foli-toolbar or an ancestor. */
+.foli-toolbar {
+  --foli-toolbar-background: #ffffff;
+  --foli-toolbar-color: #1d1d1b;
+  --foli-toolbar-pressed: #dfe8f8;
+  --foli-toolbar-hover: #f0f0ee;
+  --foli-focus-ring: #2367dc;
+
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--foli-border-color, #e2e2df);
+  background: var(--foli-toolbar-background);
+  color: var(--foli-toolbar-color);
+  font:
+    14px / 1 system-ui,
+    sans-serif;
+}
+
+.foli-toolbar-button {
+  min-width: 32px;
+  height: 32px;
+  padding: 0 8px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.foli-toolbar-button:hover {
+  background: var(--foli-toolbar-hover);
+}
+
+.foli-toolbar-button[aria-pressed="true"] {
+  border-color: var(--foli-focus-ring);
+  background: var(--foli-toolbar-pressed);
+}
+
+.foli-toolbar-button[aria-disabled="true"] {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.foli-toolbar-button:focus-visible {
+  outline: 2px solid var(--foli-focus-ring);
+  outline-offset: 1px;
+}
+
+.foli-toolbar-bold {
+  font-weight: 700;
+}
+.foli-toolbar-italic {
+  font-style: italic;
+}
+.foli-toolbar-underline {
+  text-decoration: underline;
+}
+.foli-toolbar-strike {
+  text-decoration: line-through;
+}
+
+.foli-toolbar-separator {
+  align-self: stretch;
+  width: 1px;
+  margin: 4px 4px;
+  border: none;
+  background: var(--foli-border-color, #e2e2df);
+}
+
 /*
  * The view prints one sheet per page (size from the document settings); this drops the chrome.
  * Hide the rest of your page in print: anything printed before the pages adds sheets.
@@ -49,5 +122,8 @@
   }
   .foli-page {
     box-shadow: none;
+  }
+  .foli-toolbar {
+    display: none;
   }
 }

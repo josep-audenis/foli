@@ -1,6 +1,6 @@
 import type { Editor } from "@foli/core";
 import { EditorView } from "@foli/view";
-import { useLayoutEffect, useRef } from "react";
+import { forwardRef, useImperativeHandle, useLayoutEffect, useRef } from "react";
 import { useEditorOrContext } from "./editor.js";
 
 export interface FoliCanvasProps {
@@ -15,20 +15,25 @@ export interface FoliCanvasProps {
   className?: string | undefined;
 }
 
+/** What a `ref` on `FoliCanvas` gives. */
+export interface FoliCanvasHandle {
+  /** Focuses the document and shows the editor's selection in it. */
+  focus(): void;
+}
+
 /**
  * The editable document on real pages (size and margins from the document settings). The view
  * owns the DOM inside it; React never renders children there.
  */
-export function FoliCanvas({
-  editor: given,
-  readOnly = false,
-  placeholder = "",
-  label = "Document",
-  className,
-}: FoliCanvasProps) {
+export const FoliCanvas = forwardRef<FoliCanvasHandle, FoliCanvasProps>(function FoliCanvas(
+  { editor: given, readOnly = false, placeholder = "", label = "Document", className },
+  ref,
+) {
   const editor = useEditorOrContext(given, "FoliCanvas");
   const contentRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
+
+  useImperativeHandle(ref, () => ({ focus: () => viewRef.current?.focus() }), []);
 
   useLayoutEffect(() => {
     const host = contentRef.current;
@@ -60,4 +65,4 @@ export function FoliCanvas({
       />
     </div>
   );
-}
+});

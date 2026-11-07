@@ -447,12 +447,12 @@ criterion is the one from G3: type, format with shortcuts, undo, serialize, relo
   document lazily (no whole-document serialization per keystroke unless asked). Final names;
   `DocumentEditor` removed (nothing is published yet), playground migrated. Tests: StrictMode
   double mount, unmount cleanup, re-render counts with selectors.
-- [ ] 6.2 Toolbar: `FoliToolbar` (bold, italic, underline, strike, paragraph/heading levels,
+- [x] 6.2 Toolbar: `FoliToolbar` (bold, italic, underline, strike, paragraph/heading levels,
   undo, redo, page break), state from `useEditorState` and command dry runs (`editor.can`);
   roving tabindex, `aria-pressed`, labels, visible focus; clicks keep the editor's selection
-  and focus (so `FoliCanvas` exposes focusing its view). A parent of `FoliEditor` gets its
-  editor (a `ref` or an `onReady` callback). Axe on the toolbar in all three engines;
-  keyboard-only Playwright test.
+  and focus. `FoliEditor` shows it by default (`toolbar={false}`); a `ref` on `FoliEditor`
+  gives `{ editor, focus() }`, on `FoliCanvas` `{ focus() }`. Axe on the toolbar (editable and
+  read-only) in all three engines; keyboard-only and mouse Playwright tests.
 - [ ] 6.3 Lifecycle and SSR: replacing the document from React (`editor.setDocument`: view,
   selection, history and `onChange` behave as documented); importing every package and
   `renderToString(<FoliEditor />)` in Node without a DOM works; hydration attaches the view;
