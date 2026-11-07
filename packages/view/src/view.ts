@@ -235,10 +235,13 @@ export class EditorView {
     host.replaceChildren();
   }
 
-  /** Focuses the host and shows the model selection in it. */
+  /** Focuses the host, shows the model selection in it and scrolls it into view. */
   focus(): void {
     this.host.focus();
     this.writeSelection(true);
+    // The focus handler scrolls only when it writes the selection itself, and a DOM selection
+    // that already shows the model's (Firefox keeps one in an unfocused host) skips that.
+    this.scrollToSelection();
   }
 
   /** Changes the given options; the others keep their value. */

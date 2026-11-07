@@ -1,7 +1,7 @@
 import type { Editor } from "@foli/core";
 import { EditorView } from "@foli/view";
-import { forwardRef, useImperativeHandle, useLayoutEffect, useRef } from "react";
-import { useEditorOrContext } from "./editor.js";
+import { forwardRef, useImperativeHandle, useRef } from "react";
+import { useEditorOrContext, useIsomorphicLayoutEffect } from "./editor.js";
 
 export interface FoliCanvasProps {
   /** Default: the editor of the nearest `FoliEditorProvider`. */
@@ -35,7 +35,7 @@ export const FoliCanvas = forwardRef<FoliCanvasHandle, FoliCanvasProps>(function
 
   useImperativeHandle(ref, () => ({ focus: () => viewRef.current?.focus() }), []);
 
-  useLayoutEffect(() => {
+  useIsomorphicLayoutEffect(() => {
     const host = contentRef.current;
     if (!host) return;
     const view = new EditorView(host, editor);
@@ -48,7 +48,7 @@ export const FoliCanvas = forwardRef<FoliCanvasHandle, FoliCanvasProps>(function
 
   // Runs after the view is created (effects run in order): for a new view, and when the props change.
   // biome-ignore lint/correctness/useExhaustiveDependencies: a new editor means a new view, which needs the options too.
-  useLayoutEffect(() => {
+  useIsomorphicLayoutEffect(() => {
     viewRef.current?.setOptions({ editable: !readOnly, placeholder });
   }, [editor, readOnly, placeholder]);
 

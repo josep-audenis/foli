@@ -6,8 +6,8 @@ import {
   type Plugin,
   type Transaction,
 } from "@foli/core";
-import { forwardRef, type ReactNode, useImperativeHandle, useLayoutEffect, useRef } from "react";
-import { FoliEditorProvider, useFoliEditor } from "./editor.js";
+import { forwardRef, type ReactNode, useImperativeHandle, useRef } from "react";
+import { FoliEditorProvider, useFoliEditor, useIsomorphicLayoutEffect } from "./editor.js";
 import { FoliCanvas, type FoliCanvasHandle, type FoliCanvasProps } from "./FoliCanvas.js";
 import { FoliToolbar } from "./FoliToolbar.js";
 
@@ -63,11 +63,11 @@ export const FoliEditor = forwardRef<FoliEditorHandle, FoliEditorProps>(function
 
   useImperativeHandle(ref, () => ({ editor, focus: () => canvasRef.current?.focus() }), [editor]);
 
-  useLayoutEffect(() => {
+  useIsomorphicLayoutEffect(() => {
     onChangeRef.current = onChange;
   });
 
-  useLayoutEffect(
+  useIsomorphicLayoutEffect(
     () =>
       editor.subscribe((state, transactions) => {
         const listener = onChangeRef.current;
