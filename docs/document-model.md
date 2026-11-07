@@ -1,8 +1,10 @@
 # Document model
 
-> Status: envelope, schema v1 and the document model (schema from specs, immutable nodes,
-> positions, slices, JSON in/out) are implemented in `@folijs/core` (`packages/core/src/document.ts`,
-> `packages/core/src/schema.ts`, `packages/core/src/model/`). Steps, transactions, history and
+> Status: envelope, schema v2 (with the v1 → v2 migration) and the document model (schema from
+> specs, immutable nodes, positions, slices, JSON in/out) are implemented in `@folijs/core`
+> (`packages/core/src/document.ts`, `packages/core/src/schema.ts`, `packages/core/src/model/`).
+> The view shows v2's lists, rules, links, colors and alignment from task 7.3 on; until then
+> they exist only in the engine. Steps, transactions, history and
 > commands (Phase 3) are described in [architecture.md](architecture.md#editing-engine-folicore).
 
 ## Canonical form
@@ -11,7 +13,7 @@ A persisted Foli document is a versioned **envelope** around a JSON content tree
 
 ```ts
 interface FoliDocument {
-  schemaVersion: 1;
+  schemaVersion: 2; // 1: documents saved by 0.1.0, migrated on load
   settings: {
     pageSize: { width: number; height: number }; // mm
     margins: { top: number; right: number; bottom: number; left: number }; // mm
@@ -41,28 +43,55 @@ familiar to developers who know ProseMirror-style JSON and simple for Rust and o
 Input may be loose; output is canonical, so equal documents serialize to identical JSON:
 
 - Adjacent text nodes with equal marks are merged.
-- Mark sets are sorted in schema order (v1: `bold`, `italic`, `underline`, `strike`).
-- Empty `content` and `marks` arrays are omitted; `attrs` is emitted (with all attributes,
-  defaults filled in) exactly for types that declare attributes.
+- Mark sets are sorted in schema order (v2: `link`, `bold`, `italic`, `underline`, `strike`,
+  `textColor`, `highlight`).
+- Empty `content` and `marks` arrays are omitted. `attrs` holds only attributes that differ from
+  their default (required ones always) and is omitted when none do: a left-aligned paragraph has
+  no `attrs`, a heading has `{ "level": n }`. Parsing fills the defaults back in. (Until v2,
+  `attrs` held every attribute; v1 content has no default-valued attribute, so it serializes
+  the same.)
 - `toJSON` emits keys in the fixed order `type, attrs, content, text, marks`.
 
 `parseDocument` returns the normalized form; normalizing twice changes nothing (property-tested).
 
-## Schema v1
+## Schema v2
 
-| Node        | Group  | Content            | Attrs                             |
-| ----------- | ------ | ------------------ | --------------------------------- |
-| `doc`       | root   | one or more blocks | —                                 |
-| `paragraph` | block  | inline\*           | —                                 |
-| `heading`   | block  | inline\*           | `level`: 1–6 (required)           |
-| `text`      | inline | —                  | `text`: non-empty string, `marks` |
-| `hardBreak` | inline | —                  | `marks`                           |
-| `pageBreak` | inline | —                  | `marks`                           |
+| Node             | Group  | Content                                       | Attrs                                                   |
+| ---------------- | ------ | --------------------------------------------- | ------------------------------------------------------- |
+| `doc`            | root   | one or more blocks                            | —                                                       |
+| `paragraph`      | block  | inline\*                                      | `align`: `left` (default), `center`, `right`, `justify` |
+| `heading`        | block  | inline\*                                      | `level`: 1–6 (required); `align` as paragraph           |
+| `bulletList`     | block  | one or more `listItem`                        | —                                                       |
+| `orderedList`    | block  | one or more `listItem`                        | `start`: integer 0–99999 (default 1)                    |
+| `listItem`       | —      | a `paragraph`, then any blocks (nested lists) | —                                                       |
+| `horizontalRule` | block  | — (leaf)                                      | —                                                       |
+| `text`           | inline | —                                             | `text`: non-empty string, `marks`                       |
+| `hardBreak`      | inline | —                                             | `marks`                                                 |
+| `pageBreak`      | inline | —                                             | `marks`                                                 |
 
-Marks: `bold`, `italic`, `underline`, `strike` (no attributes; each at most once per node).
-Marks are allowed on the inline children of `paragraph` and `heading`, and nowhere else.
-Phase 2 relaxed one v1 rule: `hardBreak` may carry marks (as in other ProseMirror-style models),
-so formatting continues across a line break. Every document valid before still loads (normalized, see above).
+| Mark                                    | Attrs                                                                          |
+| --------------------------------------- | ------------------------------------------------------------------------------ |
+| `link`                                  | `href` (required): a relative URL or an `http`, `https`, `mailto` or `tel` URL |
+| `bold`, `italic`, `underline`, `strike` | —                                                                              |
+| `textColor`                             | `color` (required): lowercase `#rrggbb`                                        |
+| `highlight`                             | `color` (required): lowercase `#rrggbb`                                        |
+
+Each mark at most once per node. Marks are allowed on the inline children of `paragraph` and
+`heading`, and nowhere else. `link` is not inclusive: text typed right after (or before) a link
+is not part of it. `hardBreak` and `pageBreak` cannot be node-selected; a `horizontalRule` can.
+
+**Link safety.** `href` is the one value in a document a browser may act on, so it is checked
+wherever a document is built (parse, paste, commands; `isSafeHref` exports the rule): absolute
+URLs only with the protocols above (case-insensitive), relative URLs (`/path`, `path`,
+`#fragment`, `?query`, `//host`) allowed; control characters, spaces and backslashes anywhere
+are rejected (browsers drop tabs and newlines inside a scheme, so `java\tscript:` would run).
+`javascript:`, `data:`, `vbscript:`, `file:` and every other scheme are rejected, not repaired.
+
+**Colors** are stored as lowercase `#rrggbb` only (`isColor`); paste and the UI convert other
+CSS colors before they reach the document, so equal colors serialize equally.
+
+`hardBreak` may carry marks (as in other ProseMirror-style models), so formatting continues
+across a line break.
 
 `pageBreak` (added in Phase 5.3, before any release) is an explicit page break. It is inline,
 like `hardBreak`, rather than a block between paragraphs: DOCX stores a page break the same way
@@ -73,24 +102,13 @@ A break at the end of a paragraph (Mod-Enter there, or a pasted break between bl
 goes to the end of the previous block) leaves that paragraph's empty last line at the top of
 the next page, as a trailing hard break does; the next block follows it.
 
-v1 is defined in `packages/core/src/schema.ts` through the same spec API extensions will use:
+The schema is defined in `packages/core/src/schema.ts` through the same spec API extensions
+will use.
 
-```ts
-const schema = new Schema({
-  nodes: {
-    doc: { content: "block+" },
-    paragraph: { group: "block", content: "inline*" },
-    heading: { group: "block", content: "inline*", attrs: { level: { validate } } },
-    text: { group: "inline" },
-    hardBreak: { group: "inline", inline: true },
-    pageBreak: { group: "inline", inline: true },
-  },
-  marks: { bold: {}, italic: {}, underline: {}, strike: {} },
-});
-```
+### Schema v1 (0.1.0)
 
-v1 may still change until the first published release (nothing has been published, so no
-migration is owed yet).
+v1 had `doc`, `paragraph` and `heading` (without `align`), `text`, `hardBreak`, `pageBreak` and
+the marks `bold`, `italic`, `underline`, `strike`. Every v1 document is a valid v2 document.
 
 ## The model (`packages/core/src/model/`)
 
@@ -158,7 +176,8 @@ structurally compatible slices, and general fitting arrives with paste in Phase 
   incomplete content only in their open nodes.
 - `node.toJSON()`, `mark.toJSON()` and `slice.toJSON()` emit canonical JSON
   (`SliceJSON = { content, openStart, openEnd }`).
-- `parseContent(json)` parses v1 content into a `doc` node; `parseDocument` uses it.
+- `parseContent(json)` parses current (v2) content into a `doc` node; `parseDocument`
+  migrates the envelope first, then uses it.
 
 ### Testing
 
@@ -193,25 +212,18 @@ Font sizes inside content use points (pt), matching word processors.
 
 ## Versioning and migrations
 
-Since the first release (0.1.0), `schemaVersion` is bumped whenever the envelope or content schema
-changes incompatibly (renamed node, changed attribute meaning). `parseDocument` then runs
-migrations `vN → vN+1` before validation. Old documents must keep loading. The first planned
-migration is v1 → v2 for lists and links (Phase 7).
+`schemaVersion` is bumped whenever the envelope or the content schema changes (new types
+included: an older Foli cannot read them). `parseDocument` accepts every version from 1 to the
+current one: it runs the migrations `vN → vN+1` in order (`MIGRATIONS` in
+`packages/core/src/document.ts`), then validates against the current schema. A document from a
+newer Foli is rejected with a message saying so; versions below 1 or not integers are invalid.
+Migrations never drop content. A published version never changes in place.
 
-## Planned envelope additions (not implemented)
+| Version | Released in | Migration to the next                                                           |
+| ------- | ----------- | ------------------------------------------------------------------------------- |
+| 1       | 0.1.0       | v1 → v2: only the version changes (v2 only adds types and defaulted attributes) |
+| 2       | 0.2.0       | —                                                                               |
 
-Each added only when a feature needs it, with a migration:
-
-- `metadata` (title, author, timestamps, app-defined fields).
-- `styles` (named paragraph/character styles) — Phase 9.
-- `headers` / `footers` as separate content trees — Phase 9.
-- `resources` (image references by id, no inline binary) — Phase 8.
-- Extension-owned data under a namespaced key.
-
-## Open questions
-
-- Generate a JSON Schema from the TypeScript schema so Rust and other consumers validate the
-  same format (Phase 10).
-- Positions count UTF-16 code units, so a position can fall between the two halves of a
-  surrogate pair. Deletion commands move by grapheme (`Intl.Segmenter`); the view (Phase 4)
-  must do the same for caret movement. The model does not prevent it.
+0.1.0 reads only version 1: it rejects documents saved by 0.2.0 ("Unsupported schemaVersion: 2").
+Tests load a document exactly as 0.1.0 saved it (`document.test.ts`), and the playground's e2e
+fixtures are still v1 documents, loaded through the migration.

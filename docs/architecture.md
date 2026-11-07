@@ -127,8 +127,9 @@ Foli's own (see `THIRD_PARTY_NOTICES.md`).
 Known limits:
 - No general slice fitting: paste (Phase 4.3) joins open content or replaces an empty textblock
   with whole blocks; fitting blocks into nested structures comes with lists (Phase 7).
-- Nested blocks (lists) exist only in custom schemas until schema v2 (task 7.2); the view
-  renders top-level textblocks only until task 7.3.
+- Schema v2 (7.2) has lists, rules, links, colors and alignment, but the view renders
+  top-level paragraphs and headings only until task 7.3 (and ignores alignment, links and
+  colors); paste produces v1 content until 7.8.
 - Each unrecorded change (and each plugin reaction to undo/redo) rebases the stored history.
   This costs O(n²) in the number of stored steps (not events), and every step is re-applied to the
   document, which also scales with document size.

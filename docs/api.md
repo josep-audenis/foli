@@ -92,8 +92,11 @@ No DOM: runs in Node, workers and the browser.
   (`content.content[2].marks[0].type: …`); never drops content silently.
 - `FoliDocument`: `{ schemaVersion, settings: { pageSize, margins }, content }`; sizes in
   millimetres. Format: [document-model.md](document-model.md).
-- `SCHEMA_VERSION`, `PAGE_SIZES` (`A4`, `Letter`), `DEFAULT_SETTINGS`, `schema`, `MARK_TYPES`
-  (`bold`, `italic`, `underline`, `strike`), `HEADING_LEVELS` (1–6), and the JSON types
+- `SCHEMA_VERSION` (2), `PAGE_SIZES` (`A4`, `Letter`), `DEFAULT_SETTINGS`, `schema`,
+  `MARK_TYPES` (`link`, `bold`, `italic`, `underline`, `strike`, `textColor`, `highlight`),
+  `SIMPLE_MARK_TYPES` (those without attributes), `HEADING_LEVELS` (1–6), `ALIGNMENTS`,
+  `isSafeHref(href)` and `isColor(color)` (the rules links and colors must follow), and the
+  JSON types
   (`DocJSON`, `ParagraphJSON`, `HeadingJSON`, `TextJSON`…).
 
 ### Editor

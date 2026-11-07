@@ -1,4 +1,4 @@
-import { type Attrs, deepEqual } from "./attrs.js";
+import { type Attrs, attrsToJSON, deepEqual } from "./attrs.js";
 import type { MarkType } from "./schema.js";
 
 export interface MarkJSON {
@@ -60,7 +60,8 @@ export class Mark {
 
   toJSON(): MarkJSON {
     const json: MarkJSON = { type: this.type.name };
-    if (this.type.spec.attrs) json.attrs = { ...this.attrs };
+    const attrs = attrsToJSON(this.type.spec.attrs, this.attrs);
+    if (attrs) json.attrs = attrs;
     return json;
   }
 

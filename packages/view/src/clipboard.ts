@@ -1,12 +1,13 @@
 import {
-  type BlockJSON,
   type DocJSON,
   Fragment,
+  type HeadingJSON,
   type InlineJSON,
   type MarkJSON,
-  type MarkName,
   type Node as ModelNode,
+  type ParagraphJSON,
   parseContent,
+  type SimpleMarkName,
 } from "@folijs/core";
 import { PAGE_BREAK_ATTR, renderBlock } from "./render.js";
 
@@ -111,7 +112,7 @@ export function textToDoc(text: string, marks: readonly MarkJSON[] = []): DocJSO
             content: [{ type: "text", text: line, ...(marks.length ? { marks: [...marks] } : {}) }],
           }
         : {}),
-    })) as BlockJSON[],
+    })) as ParagraphJSON[],
   };
 }
 
@@ -176,7 +177,7 @@ const SKIPPED_TAGS = new Set([
   "video",
 ]);
 
-const TAG_MARKS: ReadonlyMap<string, MarkName> = new Map([
+const TAG_MARKS: ReadonlyMap<string, SimpleMarkName> = new Map([
   ["b", "bold"],
   ["strong", "bold"],
   ["i", "italic"],
@@ -189,7 +190,7 @@ const TAG_MARKS: ReadonlyMap<string, MarkName> = new Map([
 ]);
 
 /** Marks of an element on top of the inherited ones: tags first, then inline styles. */
-function marksOf(element: Element, inherited: ReadonlySet<MarkName>): Set<MarkName> {
+function marksOf(element: Element, inherited: ReadonlySet<SimpleMarkName>): Set<SimpleMarkName> {
   const marks = new Set(inherited);
   const tagMark = TAG_MARKS.get(element.localName);
   if (tagMark) marks.add(tagMark);
@@ -244,15 +245,16 @@ export function htmlToDoc(html: string): DocJSON | null {
 /** `htmlToDoc`, plus whether the HTML had no block elements (`Pasted.open`). */
 function readHTML(html: string): { content: DocJSON; open: boolean } | null {
   const parsed = new DOMParser().parseFromString(html, "text/html");
-  const blocks: BlockJSON[] = [];
+  // Paste maps HTML to paragraphs and headings (lists, links, rules: task 7.8).
+  const blocks: (ParagraphJSON | HeadingJSON)[] = [];
   let inline: InlineJSON[] | null = null;
-  let blockType: BlockJSON["type"] = "paragraph";
+  let blockType: (ParagraphJSON | HeadingJSON)["type"] = "paragraph";
   let level = 1;
   let blockPre = false;
   let sawBlock = false;
   let afterSpace = true; // collapse leading and repeated whitespace like HTML layout does
 
-  const open = (type: BlockJSON["type"], headingLevel = 1, pre = false) => {
+  const open = (type: (ParagraphJSON | HeadingJSON)["type"], headingLevel = 1, pre = false) => {
     inline = [];
     blockType = type;
     level = headingLevel;
@@ -273,13 +275,13 @@ function readHTML(html: string): { content: DocJSON; open: boolean } | null {
     if (content.length || keepEmpty) {
       blocks.push(
         blockType === "heading"
-          ? ({ type: "heading", attrs: { level }, content } as BlockJSON)
-          : ({ type: "paragraph", content } as BlockJSON),
+          ? ({ type: "heading", attrs: { level }, content } as HeadingJSON)
+          : ({ type: "paragraph", content } as ParagraphJSON),
       );
     }
     inline = null;
   };
-  const addText = (raw: string, marks: ReadonlySet<MarkName>, pre: boolean) => {
+  const addText = (raw: string, marks: ReadonlySet<SimpleMarkName>, pre: boolean) => {
     // Source formatting between blocks ("</p>\n<br>\n<p>") is not content.
     if (!inline && !pre && !/[^ \t\n\r\f]/.test(raw)) return;
     if (!inline) open("paragraph", 1, pre);
@@ -312,7 +314,7 @@ function readHTML(html: string): { content: DocJSON; open: boolean } | null {
   const addBreak = () => {
     // A <br> between blocks is an empty line (Google Docs writes empty paragraphs this way).
     if (!inline) {
-      blocks.push({ type: "paragraph" } as BlockJSON);
+      blocks.push({ type: "paragraph" });
       return;
     }
     const list = inline as InlineJSON[];
@@ -323,7 +325,7 @@ function readHTML(html: string): { content: DocJSON; open: boolean } | null {
   };
 
   /** Walks `node`; returns whether it contained a block element. */
-  const walk = (node: Node, marks: ReadonlySet<MarkName>, pre: boolean): boolean => {
+  const walk = (node: Node, marks: ReadonlySet<SimpleMarkName>, pre: boolean): boolean => {
     if (node.nodeType === 3) {
       addText((node as Text).data, marks, pre);
       return false;

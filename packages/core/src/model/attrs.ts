@@ -37,6 +37,25 @@ export function computeAttrs(
   return attrs;
 }
 
+/**
+ * The persisted form of `attrs`: only attributes that differ from their default (required ones
+ * always). Undefined when none remain, so a paragraph with default alignment has no `attrs`.
+ */
+export function attrsToJSON(
+  specs: AttributeSpecs | undefined,
+  attrs: Attrs,
+): Record<string, unknown> | undefined {
+  if (!specs) return undefined;
+  let json: Record<string, unknown> | undefined;
+  for (const [name, spec] of Object.entries(specs)) {
+    const value = attrs[name];
+    if ("default" in spec && deepEqual(value, spec.default)) continue;
+    json ??= {};
+    json[name] = value;
+  }
+  return json;
+}
+
 /** Structural equality for JSON-like attribute values. */
 export function deepEqual(a: unknown, b: unknown): boolean {
   if (a === b) return true;

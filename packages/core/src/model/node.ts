@@ -1,4 +1,4 @@
-import { type Attrs, deepEqual, NO_ATTRS } from "./attrs.js";
+import { type Attrs, attrsToJSON, deepEqual, NO_ATTRS } from "./attrs.js";
 import type { ContentMatch } from "./content.js";
 import { FoliDocumentError } from "./errors.js";
 import { Fragment } from "./fragment.js";
@@ -234,7 +234,8 @@ export class Node {
 
   toJSON(): NodeJSON {
     const json: NodeJSON = { type: this.type.name };
-    if (this.type.spec.attrs) json.attrs = { ...this.attrs };
+    const attrs = attrsToJSON(this.type.spec.attrs, this.attrs);
+    if (attrs) json.attrs = attrs;
     if (this.content.size) json.content = this.content.toJSON();
     if (this.marks.length) json.marks = this.marks.map((mark) => mark.toJSON());
     return json;

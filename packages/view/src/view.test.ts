@@ -333,7 +333,7 @@ describe("EditorView DOM read-back", () => {
     editor
       .getDocument()
       .content.content.map((b) =>
-        (b.content ?? []).map((i) => ("text" in i ? i.text : "")).join(""),
+        ("content" in b ? (b.content ?? []) : []).map((i) => ("text" in i ? i.text : "")).join(""),
       );
   const settle = () => new Promise((resolve) => setTimeout(resolve));
 
@@ -430,7 +430,7 @@ describe("EditorView DOM read-back", () => {
     editor.select(9); // caret at the end of "bold"
     (host.querySelector("p")?.firstChild as Text).data = "the "; // autocorrect, extension…
     await settle();
-    expect(editor.getDocument().content.content[0]?.content).toEqual([
+    expect((editor.getDocument().content.content[0] as { content?: unknown })?.content).toEqual([
       { type: "text", text: "the " },
       { type: "text", text: "bold", marks: [{ type: "bold" }] },
     ]);
