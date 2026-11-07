@@ -479,7 +479,7 @@ criterion is the one from G3: type, format with shortcuts, undo, serialize, relo
   workflow that publishes with npm provenance. Needs the owner: control of the `@foli` npm
   scope (an npm org named `foli` already exists: confirm it is yours, or choose another
   scope) and an npm token as a repository secret.
-- [ ] 6.6 Docs: a README per package (the npm pages), getting started, API reference, styling
+- [x] 6.6 Docs: a README per package (the npm pages), getting started, API reference, styling
   (CSS variables, theme, print), known limitations (from architecture.md, pagination.md and
   ADR-0003's open risks).
 - [ ] 6.7 Release 0.1.0: ADR-0003's manual checks (G3 and G4 lists) run, or the owner accepts
