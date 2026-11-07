@@ -475,10 +475,12 @@ criterion is the one from G3: type, format with shortcuts, undo, serialize, relo
   16, React 19, server rendering and hydration), builds both, and runs the success criterion
   in Playwright in all three engines (no console errors; the editor's shell in the server
   HTML).
-- [ ] 6.5 Release tooling: packages renamed to `@folijs/*` (the `@foli` npm scope belongs to
-  another user); Changesets (versions, changelogs); a release-only GitHub Actions workflow
-  that publishes with npm provenance. Needs the owner: the `folijs` npm org (free plan) and an
-  npm token as a repository secret.
+- [x] 6.5 Release tooling: packages renamed to `@folijs/*` (#29; the `@foli` npm scope belongs to
+  another user); Changesets (one fixed version for the three packages, changelogs); a
+  release-only GitHub Actions workflow (`.github/workflows/release.yml`, started by hand on
+  `main`) that runs `pnpm check` and publishes with npm provenance. Owner setup before 6.7
+  (docs/contributing.md, "Releasing"): the `folijs` npm org and the `NPM_TOKEN` secret of the
+  `npm` environment. The workflow has not run yet: its first run is the 0.1.0 publish.
 - [x] 6.6 (#28) Docs: a README per package (the npm pages), getting started, API reference, styling
   (CSS variables, theme, print), known limitations (from architecture.md, pagination.md and
   ADR-0003's open risks).
