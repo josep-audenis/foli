@@ -106,7 +106,9 @@ All in Playwright on Chromium, Firefox and WebKit (Windows 11), plus unit and pr
 
 ## Known limits
 
-- Blocks are textblocks only (schema v1): tables and images (Phase 8) are not laid out yet.
+- Layout works on leaf blocks (paragraphs, headings, rules) at any depth; lists are rebuilt
+  around them on each page (ADR-0004). A list split across pages is two lists in the DOM.
+  Tables and images (Phase 8) are not laid out yet.
 - No page chrome: headers, footers and page numbers arrive in Phase 9.
 - Line measurement assumes left-to-right text without vertical-align offsets. Justified text
   would need `text-align-last` on continued fragments (alignment is Phase 7). A split block's

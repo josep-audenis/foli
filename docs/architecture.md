@@ -127,9 +127,9 @@ Foli's own (see `THIRD_PARTY_NOTICES.md`).
 Known limits:
 - No general slice fitting: paste (Phase 4.3) joins open content or replaces an empty textblock
   with whole blocks; fitting blocks into nested structures comes with lists (Phase 7).
-- Schema v2 (7.2) has lists, rules, links, colors and alignment, but the view renders
-  top-level paragraphs and headings only until task 7.3 (and ignores alignment, links and
-  colors); paste produces v1 content until 7.8.
+- Lists render and paginate at block level (7.3); list editing commands and keys are 7.5,
+  pagination rules inside lists and justified text across a break 7.4, paste of lists, links
+  and colors 7.8. Typing over a node-selected rule does nothing yet (7.7).
 - Each unrecorded change (and each plugin reaction to undo/redo) rebases the stored history.
   This costs O(n²) in the number of stored steps (not events), and every step is re-applied to the
   document, which also scales with document size.
@@ -154,7 +154,8 @@ Known limits:
 
 ## Editor view (`@folijs/view`)
 
-`packages/view/src/view.ts`, design per ADR-0003: one `contenteditable` host holding real pages.
+`packages/view/src/view.ts`, design per ADR-0003: one `contenteditable` host holding real pages;
+nested blocks per ADR-0004 (7.3).
 Built in Phase 5 (gate G4 passed provisionally): blocks flow from page to page (5.1) and split
 across pages at a line (5.2), with pagination rules (5.3), incremental reflow (5.4), print (5.6)
 and benchmarks (5.7, [benchmarks.md](benchmarks.md)); overview in [pagination.md](pagination.md).
@@ -163,12 +164,32 @@ and benchmarks (5.7, [benchmarks.md](benchmarks.md)); overview in [pagination.md
   `Editor` into `host` and subscribes to it. Edits go through `editor.dispatch`, so history,
   plugins and subscribers see every change. `setOptions()` changes the options; `destroy()`
   detaches the view and removes every attribute it added.
+- **Blocks are the leaf blocks at any depth** (paragraphs, headings, rules), in document order,
+  each with its position and the chain of containers around it (lists, list items). The flow,
+  the measurement cache and the line measurement see only these blocks (ADR-0004).
+  - **Containers per page:** `place` puts each block fragment into its page inside `ul`/`ol`/`li`
+    elements for its containers (`data-foli-wrapper`), reusing the container elements already
+    at the same place on the page (same tag, in order), so typing in a list moves no DOM. A list
+    continued on the next page gets new containers there; an item continued from the previous
+    page shows no marker (`list-style-type: none` inline); ordered list items carry their number
+    (`value`), so numbering continues. Containers get block margins and paddings of 0 inline:
+    the blocks' margins then collapse through them as between siblings, which the flow assumes.
+  - **Block leaves** (`<hr>`) have no leaves or lines: never split, moved whole. A click on one
+    selects it as a `NodeSelection`, shown as a DOM range around the element plus the class
+    `foli-selected-node`, and read back as a node selection.
+  - **Marks with attributes:** a link is an `<a href>` (validated by the schema) that does not
+    navigate on click; text color and highlight are spans with `color` / `background-color`.
+    Alignment is `text-align` on the block (`start` is the default and is not written).
+  - Copy renders the same structures (`renderTree`: real nested lists, `start` on ordered
+    lists, without the view's attributes).
 - **Descriptors:** one per block (model node, its elements, leaves) and one per inline leaf
   (text node or hard break with its offset in the block). A block split across pages has one
   element per page (`fragments`, with `splits` = the content offsets where each later one
   starts); a text node crossing a split is two leaves. `posFromDOM` / `domFromPos` map through
   them; the DOM is never parsed for content.
   - An element point maps to the start of the first leaf at or after it, else the block end.
+    A point in a page or container (between blocks) maps to the start of the next block
+    fragment; a position between blocks maps to the start of the next block (before a rule).
   - At a mark boundary the caret is placed in the text before it, matching the marks typed text
     gets.
   - Empty blocks and blocks ending in a hard break get an extra `<br>` without a descriptor.

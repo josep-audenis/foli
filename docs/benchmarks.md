@@ -205,12 +205,13 @@ fails when a bundle passes its budget.
 
 | Bundle            | Includes          | Minified | Gzipped |  Budget |
 | ----------------- | ----------------- | -------: | ------: | ------: |
-| `@folijs/core`    | core              |  53.4 kB | 16.6 kB | 19.0 kB |
-| `@folijs/view`    | view, core        |  65.0 kB | 21.1 kB | 22.9 kB |
-| `@folijs/react`   | react, view, core |  84.5 kB | 27.2 kB | 29.1 kB |
-| `FoliEditor` only | what it reaches   |  84.3 kB | 27.1 kB | 29.1 kB |
+| `@folijs/core`    | core              |  55.6 kB | 17.4 kB | 19.0 kB |
+| `@folijs/view`    | view, core        |  70.3 kB | 22.7 kB | 26.1 kB |
+| `@folijs/react`   | react, view, core |  90.1 kB | 29.0 kB | 33.4 kB |
+| `FoliEditor` only | what it reaches   |  89.9 kB | 29.0 kB | 33.4 kB |
 
-(kB = 1,024 bytes; measured 2026-11-07 after task 7.1. At 0.1.0 (6.4) they were 14.1, 19.9,
-25.3 and 25.2 kB gzipped; 7.1 added the structure engine for lists to core and raised its
-budget from 16.1 kB.) For comparison, the whole Vite example app (React 18,
+(kB = 1,024 bytes; measured 2026-11-07 after task 7.3. At 0.1.0 (6.4) they were 14.1, 19.9,
+25.3 and 25.2 kB gzipped. Phase 7 added the structure engine (7.1, core budget raised from
+16.1 kB), schema v2 (7.2) and nested blocks on pages (7.3, view and React budgets raised from
+22.9 and 29.1 kB).) For comparison, the whole Vite example app (React 18,
 React DOM and Foli) is about 70 kB gzipped.

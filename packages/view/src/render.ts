@@ -1,7 +1,7 @@
-import type { Node as ModelNode, SimpleMarkName } from "@folijs/core";
+import type { Mark, Node as ModelNode, SimpleMarkName } from "@folijs/core";
 
-// Every mark without attributes has a tag. Others (link, colors: task 7.3) and marks of other
-// schemas fall back to <span>.
+// Every mark without attributes has a tag. Marks with attributes are rendered by `markElement`;
+// marks of other schemas fall back to <span>.
 const MARK_TAGS: ReadonlyMap<string, string> = new Map(
   Object.entries({
     bold: "strong",
@@ -13,6 +13,16 @@ const MARK_TAGS: ReadonlyMap<string, string> = new Map(
 
 /** Marks the <br> of an explicit page break. */
 export const PAGE_BREAK_ATTR = "data-page-break";
+
+/** Marks a container element (list, list item) the view created around blocks. */
+export const WRAPPER_ATTR = "data-foli-wrapper";
+
+/** The element for a container node: lists and list items; anything else is a <div>. */
+const WRAPPER_TAGS: ReadonlyMap<string, string> = new Map([
+  ["bulletList", "ul"],
+  ["orderedList", "ol"],
+  ["listItem", "li"],
+]);
 
 /**
  * A rendered inline leaf (a text node or hard break) and where it sits in its block's content.
@@ -37,20 +47,45 @@ export interface BlockDesc {
   readonly leaves: readonly LeafDesc[];
 }
 
+/** The element for a mark: a tag, a link, or a span with a color. Values come validated. */
+function markElement(mark: Mark, doc: Document): HTMLElement {
+  const { name } = mark.type;
+  if (name === "link") {
+    const a = doc.createElement("a");
+    // The schema only lets safe hrefs into a document (isSafeHref); clicks do not navigate.
+    a.setAttribute("href", String(mark.attrs.href));
+    return a;
+  }
+  const element = doc.createElement(MARK_TAGS.get(name) ?? "span");
+  if (name === "textColor") element.style.color = String(mark.attrs.color);
+  if (name === "highlight") element.style.backgroundColor = String(mark.attrs.color);
+  return element;
+}
+
+/** The element for a block: a heading or paragraph tag, or a rule. */
+function blockTag(node: ModelNode): string {
+  if (node.type.name === "heading") return `h${String(node.attrs.level)}`;
+  if (node.type.name === "horizontalRule") return "hr";
+  return "p";
+}
+
 /**
- * Renders one textblock with createElement/textContent only (never innerHTML), and records its
- * leaves for position mapping. With `splits`, the content is rendered as several fragments of
- * the same element type: each continued fragment has no bottom margin and each continuation no
- * top margin, so together they take the same height as the whole block.
+ * Renders one leaf block (a textblock, or a block leaf such as a rule) with
+ * createElement/textContent only (never innerHTML), and records its leaves for position
+ * mapping. With `splits`, a textblock's content is rendered as several fragments of the same
+ * element type: each continued fragment has no bottom margin and each continuation no top
+ * margin, so together they take the same height as the whole block.
  */
 export function renderBlock(
   node: ModelNode,
   doc: Document,
   splits: readonly number[] = [],
 ): BlockDesc {
-  const tag = node.type.name === "heading" ? `h${String(node.attrs.level)}` : "p";
+  const tag = blockTag(node);
+  const align = node.attrs.align;
   const fragments = [0, ...splits].map((_, i, all) => {
     const fragment = doc.createElement(tag);
+    if (typeof align === "string" && align !== "start") fragment.style.textAlign = align;
     if (all.length > 1) {
       fragment.dataset.fragment = String(i);
       if (i > 0) fragment.style.marginTop = "0";
@@ -59,6 +94,9 @@ export function renderBlock(
     return fragment;
   });
   const leaves: LeafDesc[] = [];
+  const dom = fragments[0] as HTMLElement;
+  // A block leaf (a rule) has no content: nothing to map, nothing to split.
+  if (!node.isTextblock) return { node, dom, fragments, splits, leaves };
   /** The fragment that holds content offset `at` (a split offset starts the next fragment). */
   const fragmentAt = (at: number) => {
     let i = 0;
@@ -82,8 +120,9 @@ export function renderBlock(
       const leaf = doc.createTextNode(text.slice(from - offset, to - offset));
       leaves.push({ dom: leaf, offset: from, size: to - from });
       let outer: Node = leaf;
+      // Marks are in canonical order, outermost first (a link wraps the formatting inside it).
       for (const mark of [...child.marks].reverse()) {
-        const wrapper = doc.createElement(MARK_TAGS.get(mark.type.name) ?? "span");
+        const wrapper = markElement(mark, doc);
         wrapper.append(outer);
         outer = wrapper;
       }
@@ -94,6 +133,47 @@ export function renderBlock(
   // An empty block, or one ending in a hard break, needs an extra <br> to show its last line.
   if (!node.lastChild?.isText)
     (fragments[fragments.length - 1] as HTMLElement).append(doc.createElement("br"));
-  const dom = fragments[0] as HTMLElement;
   return { node, dom, fragments, splits, leaves };
+}
+
+/**
+ * Creates the element for a container (list, list item). It takes no vertical space of its own
+ * (block margins and paddings 0): the page flow treats the blocks inside as siblings, whose
+ * margins collapse through it (ADR-0004).
+ */
+export function createWrapper(node: ModelNode, doc: Document): HTMLElement {
+  const element = doc.createElement(WRAPPER_TAGS.get(node.type.name) ?? "div");
+  element.setAttribute(WRAPPER_ATTR, "");
+  const { style } = element;
+  style.marginTop = style.marginBottom = style.paddingTop = style.paddingBottom = "0";
+  return element;
+}
+
+/** Whether `element` is the container element `createWrapper` makes for `node`. */
+export function isWrapperFor(element: Node | null, node: ModelNode): element is HTMLElement {
+  return (
+    element instanceof HTMLElement &&
+    element.hasAttribute(WRAPPER_ATTR) &&
+    element.tagName.toLowerCase() === (WRAPPER_TAGS.get(node.type.name) ?? "div")
+  );
+}
+
+/**
+ * Renders a fragment of blocks as one DOM tree, for the clipboard: containers become their
+ * elements (with the list's start number), leaf blocks as in the editor, unsplit.
+ */
+export function renderTree(content: Iterable<ModelNode>, parent: Node, doc: Document): void {
+  for (const node of content) {
+    if (node.isTextblock || node.isLeaf) {
+      parent.appendChild(renderBlock(node, doc).dom);
+      continue;
+    }
+    const element = createWrapper(node, doc);
+    element.removeAttribute(WRAPPER_ATTR);
+    element.removeAttribute("style");
+    const start = node.attrs.start;
+    if (typeof start === "number" && start !== 1) element.setAttribute("start", String(start));
+    renderTree(node.content.content, element, doc);
+    parent.appendChild(element);
+  }
 }

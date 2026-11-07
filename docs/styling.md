@@ -68,19 +68,28 @@ pages should print white.
 
 ## Elements and classes
 
-| Selector                           | What                                                                                                 |
-| ---------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| `.foli-canvas`                     | `FoliCanvas`'s outer element (`className` is added here)                                             |
-| `.foli-content`                    | the editable host (`role="textbox"`); `FoliCanvas` adds the class, with `EditorView` add it yourself |
-| `.foli-page`                       | one page (`<section>`), size and padding inline                                                      |
-| `p`, `h1`–`h6` inside `.foli-page` | paragraphs and headings                                                                              |
-| `strong`, `em`, `u`, `s`           | bold, italic, underline, strikethrough                                                               |
-| `.foli-toolbar`                    | `FoliToolbar` (`className` is added here)                                                            |
-| `.foli-toolbar-button`             | each button, plus `.foli-toolbar-<key>` (`bold`, `h1`, `undo`, `pageBreak`…)                         |
-| `.foli-toolbar-separator`          | between button groups                                                                                |
+| Selector                             | What                                                                                                 |
+| ------------------------------------ | ---------------------------------------------------------------------------------------------------- |
+| `.foli-canvas`                       | `FoliCanvas`'s outer element (`className` is added here)                                             |
+| `.foli-content`                      | the editable host (`role="textbox"`); `FoliCanvas` adds the class, with `EditorView` add it yourself |
+| `.foli-page`                         | one page (`<section>`), size and padding inline                                                      |
+| `p`, `h1`–`h6` inside `.foli-page`   | paragraphs and headings (alignment as inline `text-align`)                                           |
+| `ul`, `ol`, `li` inside `.foli-page` | lists and list items (`data-foli-wrapper`); one set per page a list is on                            |
+| `hr` inside `.foli-page`             | a horizontal rule; `.foli-selected-node` while it is selected                                        |
+| `a`                                  | a link (does not navigate when clicked)                                                              |
+| `strong`, `em`, `u`, `s`             | bold, italic, underline, strikethrough; text color and highlight are spans with inline colors        |
+| `.foli-toolbar`                      | `FoliToolbar` (`className` is added here)                                                            |
+| `.foli-toolbar-button`               | each button, plus `.foli-toolbar-<key>` (`bold`, `h1`, `undo`, `pageBreak`…)                         |
+| `.foli-toolbar-separator`            | between button groups                                                                                |
 
 You can style headings and paragraphs (`.foli-page h1 { font-size: 20pt }`). Margins and
-padding on blocks are measured, so pagination follows them. A paragraph split across two pages
+padding on blocks are measured, so pagination follows them. List elements must take no
+vertical space of their own (the view sets their block margins and paddings to 0 inline; do not
+add vertical borders, or margins with `!important`): pagination treats the blocks inside lists
+as siblings. Also avoid `list-style-position: inside` (it adds a line box of its own) and
+anything that makes a list a block formatting context (`display: flow-root`, `overflow`
+other than `visible`, `float`): margins would stop collapsing through it. Indent lists
+horizontally (`padding-inline-start`) as you like. A paragraph split across two pages
 is two elements: its padding and border repeat on each part. Avoid negative margins on blocks
 and `vertical-align` on inline text; pagination does not model them.
 

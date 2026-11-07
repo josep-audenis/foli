@@ -49,6 +49,12 @@
   background: var(--foli-selection-color);
 }
 
+/* A node-selected block (a horizontal rule): the view adds the class. */
+.foli-content .foli-selected-node {
+  outline: 2px solid var(--foli-focus-ring);
+  outline-offset: 2px;
+}
+
 /* Toolbar (FoliToolbar). */
 .foli-toolbar {
   display: flex;
