@@ -401,7 +401,7 @@ Each task is one PR that leaves `pnpm check` green and the playground working. L
   as many sheets as screen pages, each of the page size (US Letter included). `@page` is per
   document: several editors with different page sizes on one web page print with the last
   one's sheet size.
-- [x] 5.7 Benchmarks: 1/10/50/100/199 pages in all three engines (`pnpm bench:layout`,
+- [x] 5.7 (#21) Benchmarks: 1/10/50/100/199 pages in all three engines (`pnpm bench:layout`,
   Playwright, a dev-only bench page that mounts the editor and times it from inside): initial
   layout and paint, keystroke handler and keystroke-to-paint p50/p95 (typing and Enter at the
   start of page 1, with an `onChange`), full re-flow after a font change; hardware, browsers
