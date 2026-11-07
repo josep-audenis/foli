@@ -3,6 +3,7 @@ import {
   AddMarkStep,
   Fragment,
   Mapping,
+  NodeMarkupBatchStep,
   NodeMarkupStep,
   ReplaceStep,
   Slice,
@@ -260,5 +261,61 @@ describe("post-merge review of PR #4", () => {
       -1, -1, 0, 1, 1,
     ]);
     expect(StepMap.empty.side(4)).toBe(0);
+  });
+});
+
+describe("NodeMarkupBatchStep", () => {
+  const quote = (...content: NodeJSON[]): NodeJSON => ({ type: "blockquote", content });
+  const tdoc = (...blocks: NodeJSON[]) => testSchema.nodeFromJSON({ type: "doc", content: blocks });
+  const heading = testSchema.nodes.heading as NodeType;
+
+  it("setBlockType emits one step that keeps positions and changes nested textblocks", () => {
+    const start = tdoc(para("a"), quote(para("b"), para("c")), para("d"));
+    const tr = new Transform(start).setBlockType(0, start.content.size, heading, { level: 2 });
+    expect(tr.steps).toHaveLength(1);
+    expect(tr.steps[0]).toBeInstanceOf(NodeMarkupBatchStep);
+    const types: string[] = [];
+    tr.doc.descendants((node) => {
+      if (node.isTextblock) types.push(node.type.name);
+    });
+    expect(types).toEqual(["heading", "heading", "heading", "heading"]);
+    expect(tr.mapping.map(5)).toBe(5);
+    expectInvertible(tr);
+  });
+
+  it("fails on positions that are not node starts, unsorted, or break the schema", () => {
+    const start = doc(para("ab"), para("c"));
+    const p = nodeType("paragraph");
+    const batch = (...pos: number[]) =>
+      new NodeMarkupBatchStep(pos.map((at) => new NodeMarkupStep(at, p, null)));
+    expect(batch(0, 4).apply(start).doc).not.toBeNull();
+    expect(batch(2).apply(start).failed).toMatch(/No node/); // inside text
+    expect(batch(7).apply(start).failed).toMatch(/No node/); // end of document
+    expect(batch(4, 0).apply(start).failed).toMatch(/Unsorted/);
+    const level9 = new NodeMarkupBatchStep([
+      new NodeMarkupStep(0, nodeType("heading"), { level: 9 }),
+    ]);
+    expect(level9.apply(start).failed).not.toBeNull();
+    const text = new NodeMarkupBatchStep([new NodeMarkupStep(1, p, null)]);
+    expect(text.apply(start).failed).not.toBeNull(); // a text node
+    const rules = testSchema.nodeFromJSON({
+      type: "doc",
+      content: [{ type: "rule" }, { type: "rule" }],
+    });
+    const grow = new NodeMarkupBatchStep([
+      new NodeMarkupStep(0, testSchema.nodes.paragraph as NodeType, null),
+    ]);
+    expect(grow.apply(rules).failed).toMatch(/keep the node size/); // leaf to textblock
+  });
+
+  it("maps like its single steps, dropping blocks that were deleted", () => {
+    const p = nodeType("paragraph");
+    const batch = new NodeMarkupBatchStep([
+      new NodeMarkupStep(0, p, null),
+      new NodeMarkupStep(4, p, null),
+    ]);
+    expect(batch.map(new StepMap([0, 4, 0]))).toMatchObject({ steps: [{ pos: 0 }] });
+    expect(batch.map(new StepMap([0, 0, 2]))).toMatchObject({ steps: [{ pos: 2 }, { pos: 6 }] });
+    expect(batch.map(new StepMap([0, 7, 0]))).toBeNull();
   });
 });
