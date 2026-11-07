@@ -1,6 +1,6 @@
 import { createDocument, type Editor, type FoliDocument, parseDocument } from "@foli/core";
-import { type FoliChange, FoliEditor } from "@foli/react";
-import { useState } from "react";
+import { FoliEditor, type FoliEditorHandle } from "@foli/react";
+import { type ChangeEvent, useRef, useState } from "react";
 
 const STORAGE_KEY = "foli-playground-document";
 
@@ -62,7 +62,7 @@ function flush(): void {
 }
 
 /** Saves once changes pause for 300 ms; leaving the page saves anything still pending. */
-function save({ editor }: FoliChange): void {
+function save({ editor }: { editor: Editor }): void {
   pending = editor;
   clearTimeout(timer);
   timer = setTimeout(flush, 300);
@@ -83,6 +83,26 @@ function reset(): void {
 export function App() {
   const [initial] = useState(load);
   const [readOnly, setReadOnly] = useState(false);
+  const editorRef = useRef<FoliEditorHandle>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  /** Loads a saved FoliDocument (JSON) into the editor, replacing the document and its history. */
+  async function open(event: ChangeEvent<HTMLInputElement>): Promise<void> {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    const editor = editorRef.current?.editor;
+    if (!file || !editor) return;
+    try {
+      editor.setDocument(parseDocument(JSON.parse(await file.text())));
+    } catch (error) {
+      alert(`Could not open ${file.name}: ${error instanceof Error ? error.message : error}`);
+      return;
+    }
+    // setDocument is not a change onChange reports: save the opened document explicitly.
+    save({ editor });
+    editorRef.current?.focus();
+  }
+
   return (
     <main>
       <header className="playground-bar">
@@ -94,6 +114,17 @@ export function App() {
           Real pages: blocks flow onto A4 pages and paragraphs split across them; Ctrl/Cmd+Enter
           inserts a page break; prints one sheet per page. Typing, marks, undo, paste, read-only.
         </span>
+        <button type="button" onClick={() => fileRef.current?.click()}>
+          Open…
+        </button>
+        <input
+          ref={fileRef}
+          type="file"
+          accept=".json,application/json"
+          hidden
+          aria-label="Open a Foli document (JSON)"
+          onChange={open}
+        />
         <label>
           <input
             type="checkbox"
@@ -107,6 +138,7 @@ export function App() {
         </button>
       </header>
       <FoliEditor
+        ref={editorRef}
         initialContent={initial}
         onChange={save}
         readOnly={readOnly}

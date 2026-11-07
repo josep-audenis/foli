@@ -10,10 +10,19 @@ import {
   type ReactNode,
   useCallback,
   useContext,
+  useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   useSyncExternalStore,
 } from "react";
+
+/**
+ * `useLayoutEffect` in the browser, `useEffect` on the server, where neither runs: React 18
+ * warns about a layout effect in server rendering.
+ */
+export const useIsomorphicLayoutEffect =
+  typeof document === "undefined" ? useEffect : useLayoutEffect;
 
 export interface UseFoliEditorOptions {
   /** Read once, when the editor is created. To load another document, `editor.setDocument()`. */

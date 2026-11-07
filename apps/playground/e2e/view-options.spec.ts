@@ -165,7 +165,7 @@ test("Tab back into the editor keeps the caret where it was", async ({ page }) =
   await page.keyboard.press("ArrowLeft");
   // Selecting text elsewhere moves the page selection out of the editor.
   await page.locator(".playground-hint").dblclick();
-  await page.locator(".playground-bar button").focus();
+  await page.getByRole("button", { name: "Reset" }).focus();
   await page.keyboard.press("Tab"); // the toolbar: one tab stop
   await page.keyboard.press("Tab");
   await expect(editor(page)).toBeFocused();

@@ -330,6 +330,12 @@ Known limits:
   `'unsafe-inline'` for styles blocks it, and the placeholder is not shown (`aria-placeholder`
   still is announced).
 - Assumes schema v1 depth (doc > textblock > inline).
+- `setDocument` during an IME composition is not handled: the composition's read-back would
+  compare the browser's DOM with the new document. Load documents when the user is not
+  composing (a file picker or a button click already ends it).
+- Server rendering gives no document content (an empty editable area until the JavaScript
+  runs): no preview without JavaScript, nothing for crawlers. A static server render of the
+  pages could come later.
 
 ### Clipboard (`packages/view/src/clipboard.ts`)
 
@@ -434,6 +440,18 @@ stable before 0.1.0):
   `document` is the document right after that change (the change keeps the immutable state),
   serialized on first read, so an app that saves later (the playground: after a 300 ms pause)
   pays nothing per keystroke.
+- **Replacing the document (6.3):** `editor.setDocument(doc)` (e.g. through `FoliEditor`'s
+  `ref`) validates the content, applies the new page settings, starts a new history (nothing to
+  undo; the old document cannot come back) and puts the selection at the start; the view
+  renders every block again and flows the pages synchronously. It notifies subscribers, so
+  `useEditorState` re-renders, but `onChange` is not called: the caller has the document. The
+  playground's "Open…" button loads a JSON file this way and then saves it itself.
+- **Server rendering (6.3):** every package imports in Node without a DOM (nothing touches
+  `document` or `window` at import time). `renderToString(<FoliEditor />)` gives the shell: the
+  toolbar and an empty labelled `role="textbox"`; the view fills it in a layout effect after
+  hydration, with no hydration mismatch (tested with `hydrateRoot`). Layout effects go through
+  `useIsomorphicLayoutEffect` (`useEffect` where there is no `document`), so React 18 does not
+  warn during server rendering; React 18 itself is exercised by the 6.4 example apps.
 - `FoliToolbar` (6.2): bold, italic, underline, strikethrough; paragraph and heading levels
   1-3 (a pressed heading turns back into a paragraph); undo, redo; page break. Its state is one
   module-level `useEditorState` selector, compared item by item so typing does not re-render it:

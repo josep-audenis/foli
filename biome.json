@@ -3,5 +3,19 @@
   "vcs": { "enabled": true, "clientKind": "git", "useIgnoreFile": true },
   "files": { "includes": ["**", "!packages/view/fixtures/clipboard/*.html", "!**/*-snapshots"] },
   "formatter": { "indentStyle": "space", "lineWidth": 100 },
-  "linter": { "rules": { "preset": "recommended" } }
+  "linter": {
+    "rules": {
+      "preset": "recommended",
+      "correctness": {
+        "useExhaustiveDependencies": {
+          "level": "error",
+          "options": {
+            "hooks": [
+              { "name": "useIsomorphicLayoutEffect", "closureIndex": 0, "dependenciesIndex": 1 }
+            ]
+          }
+        }
+      }
+    }
+  }
 }

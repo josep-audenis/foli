@@ -43,8 +43,9 @@ export function App() {
 the parts: `useFoliEditor()` creates an editor, `<FoliEditorProvider editor>` shares it,
 `<FoliToolbar />` and `<FoliCanvas />` show it (with `<FoliCanvas readOnly />`, pass
 `<FoliToolbar disabled />` too), `useCurrentEditor()` reads it and
-`useEditorState(selector)` re-renders a component only when its slice of the state changes. The
-API is not stable before 0.1.0.
+`useEditorState(selector)` re-renders a component only when its slice of the state changes.
+Server rendering works (the editor appears on hydration; its content is not in the server
+HTML). The API is not stable before 0.1.0.
 
 Peer dependencies: `react`, `react-dom`.
 
