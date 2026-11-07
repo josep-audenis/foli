@@ -15,3 +15,7 @@ playwright-report/
 # Example apps (`pnpm examples`): packed tarballs and Next.js output
 .packs/
 .next/
+
+# Local secrets (e.g. an npm token): never committed
+.env
+.env.*

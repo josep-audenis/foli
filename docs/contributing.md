@@ -60,21 +60,30 @@ examples are never published.
    Review, commit ("Version packages"), PR, merge to `main`.
 3. **Publish**: GitHub → Actions → **Release** → Run workflow (on `main`). It installs from the
    lockfile, refuses to run while unapplied changesets exist or a package is still at the
-   `0.0.0` placeholder, runs `pnpm check`, publishes every
-   version not yet on npm with [provenance](https://docs.npmjs.com/generating-provenance-statements),
-   and pushes the tags (`@folijs/core@0.1.0`…). Publishing an existing version is skipped, so a
-   failed run can be re-run.
+   `0.0.0` placeholder, runs `pnpm check`, publishes every version not yet on npm with
+   [provenance](https://docs.npmjs.com/generating-provenance-statements), then tags every
+   current version that is on npm and has no tag yet (`@folijs/core@0.1.0`…) and pushes the
+   tags. A failed run can be re-run: published versions are skipped, and their missing tags
+   are added.
 
 Before the first release, the owner sets up (once):
 
 - The npm org `folijs` (npmjs.com → Add Organization, free plan for public packages), owning
   the `@folijs` scope.
-- An npm **granular access token** with read and write access to the `@folijs` scope (npmjs.com
-  → Access Tokens → Generate New Token → Granular), saved as the secret `NPM_TOKEN` of the
-  GitHub environment `npm` (repository Settings → Environments → `npm` → Add secret). Add
-  required reviewers to that environment to approve each publish. Write tokens expire: renew
-  it before a release if needed.
+- An npm **granular access token** (npmjs.com → Access Tokens → Generate New Token →
+  Granular): packages and scopes **Read and write**, limited to the `@folijs` scope; tick
+  **Bypass two-factor authentication**, since CI cannot answer a 2FA prompt (the publish
+  would fail with `EOTP`). Write tokens expire: renew it before a release if needed. Keep it
+  out of the repository (a local `.env` is ignored by git).
+- The GitHub environment `npm` (repository Settings → Environments → New environment `npm`):
+  - **Deployment branches and tags: Selected branches → `main`**. The workflow's own `main`
+    check can be removed on another branch by anyone who can push, so this setting is what
+    keeps the token on `main`. Without the environment, the first run creates it unprotected.
+  - Secret `NPM_TOKEN`: the token above.
+  - Optional: required reviewers, to approve each publish.
 - After the first publish, optionally switch to npm
   [trusted publishing](https://docs.npmjs.com/trusted-publishers) (each package's settings on
   npmjs.com → Trusted publisher: GitHub Actions, this repository, workflow `release.yml`,
   environment `npm`) and delete the token: the workflow then authenticates through OIDC.
+  Then consider splitting the workflow into a check job and a publish job, so the OIDC
+  permission (`id-token: write`) is not available to the install and check steps.

@@ -62,7 +62,22 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           NPM_CONFIG_PROVENANCE: "true"
 
-      - name: Push release tags
-        run: git push "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" --tags
+      # Also after a failed publish: tags the versions that are on npm (Changesets tags only what
+      # it published in this run, so a re-run would never tag a version published by a failed one).
+      - name: Tag and push released versions
+        if: ${{ !cancelled() }}
+        run: |
+          for manifest in packages/*/package.json; do
+            name=$(node -p "require('./$manifest').name")
+            version=$(node -p "require('./$manifest').version")
+            tag="$name@$version"
+            git rev-parse -q --verify "refs/tags/$tag" >/dev/null && continue
+            git ls-remote --exit-code --tags origin "refs/tags/$tag" >/dev/null && continue
+            curl -fsS -o /dev/null "https://registry.npmjs.org/${name/\//%2f}/$version" || continue
+            git tag -a "$tag" -m "$tag"
+          done
+          git tag
+          # --no-verify: `pnpm install` installed the repo's pre-push hook (it runs pnpm check).
+          git push --no-verify "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" --tags
         env:
           GH_TOKEN: ${{ github.token }}
