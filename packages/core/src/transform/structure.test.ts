@@ -281,3 +281,53 @@ describe("inclusive marks", () => {
     expect(marksAt(both.resolve(2)).map((m) => m.type.name)).toEqual(["link"]);
   });
 });
+
+describe("review regressions (PR #33)", () => {
+  it("a node selection does not move onto a child when its node's content is lifted out", () => {
+    const start = doc(quote(p("ab"), p("cd")), p("z"));
+    const sel = NodeSelection.create(start, 0);
+    const tr = new Transform(start);
+    const r = range(start, 3, 7);
+    tr.lift(r, liftTarget(r) as number);
+    expect(sel.map(tr.doc, tr.mapping)).toBeInstanceOf(TextSelection);
+    // Content inserted inside a selected container keeps the selection on the container.
+    const typed = new Transform(start).insertText("x", 3);
+    const kept = sel.map(typed.doc, typed.mapping);
+    expect(kept).toBeInstanceOf(NodeSelection);
+    expect((kept as NodeSelection).node.type.name).toBe("blockquote");
+  });
+
+  it("canSplit refuses invalid attributes, and split throws a TransformError for them", () => {
+    const start = doc(p("ab"));
+    const bad = [{ type: type("heading"), attrs: { level: 5 } }];
+    expect(canSplit(start, 2, 1, bad)).toBe(false);
+    expect(() => new Transform(start).split(2, 1, bad)).toThrow(TransformError);
+  });
+
+  it("canSplit and split read typesAfter the same way (entry 0 is the outermost)", () => {
+    const start = doc(list(item(p("ab"))));
+    const asItem = [{ type: type("listItem") }];
+    expect(canSplit(start, 4, 2, asItem)).toBe(true);
+    expect(
+      new Transform(start).split(4, 2, asItem).doc.eq(doc(list(item(p("a")), item(p("b"))))),
+    ).toBe(true);
+    const innerHeading = [null, { type: type("heading"), attrs: { level: 1 } }];
+    expect(canSplit(start, 4, 2, innerHeading)).toBe(false);
+    expect(() => new Transform(start).split(4, 2, innerHeading)).toThrow(TransformError);
+  });
+
+  it("drops a lift whose moved content was deleted, instead of splitting around nothing", () => {
+    const start = doc(quote(p("ab"), p("cd"), p("ef")));
+    const r = range(start, 6); // inside "cd"
+    const lift = new Transform(start).lift(r, 0).steps[0] as ReplaceAroundStep;
+    const deleted = new Transform(start).delete(5, 9); // the "cd" paragraph
+    expect(lift.map(deleted.mapping)).toBeNull();
+  });
+
+  it("deleting the only item of a list does not apply (a list item is not a paragraph)", () => {
+    const start = doc(list(item(p("a"))), p("z"));
+    const state = EditorState.create({ doc: start });
+    const tr = state.tr.setSelection(NodeSelection.create(start, 1));
+    expect(() => tr.deleteSelection()).toThrow(TransformError);
+  });
+});

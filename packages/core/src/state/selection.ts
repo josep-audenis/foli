@@ -178,8 +178,15 @@ export class NodeSelection extends Selection {
     const to = mapping.mapResult(this.head, -1);
     const $pos = doc.resolve(from.pos);
     const node = $pos.nodeAfter;
-    // Both ends collapsing together means the node itself was deleted.
-    if (from.deleted || to.deleted || to.pos <= from.pos || !node || $pos.textOffset) {
+    // The node now at the start must still end at the mapped end: otherwise it was deleted
+    // (both ends collapse) or its content moved out (a lift maps its edges onto a child's).
+    if (
+      from.deleted ||
+      to.deleted ||
+      !node ||
+      $pos.textOffset ||
+      from.pos + node.nodeSize !== to.pos
+    ) {
       return Selection.near($pos);
     }
     return NodeSelection.isSelectable(node) ? new NodeSelection($pos) : Selection.near($pos);

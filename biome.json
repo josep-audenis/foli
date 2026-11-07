@@ -6,7 +6,12 @@
     "useIgnoreFile": true
   },
   "files": {
-    "includes": ["**", "!packages/view/fixtures/clipboard/*.html", "!**/*-snapshots"]
+    "includes": [
+      "**",
+      "!packages/view/fixtures/clipboard/*.html",
+      "!**/*-snapshots",
+      "!.changeset/*.md"
+    ]
   },
   "formatter": {
     "indentStyle": "space",

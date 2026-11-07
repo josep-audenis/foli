@@ -3,6 +3,7 @@
 import { deepEqual } from "../model/attrs.js";
 import {
   type Attrs,
+  FoliDocumentError,
   Fragment,
   type Mark,
   MarkType,
@@ -155,8 +156,9 @@ export class Transform {
   /**
    * Splits the node around `pos` and `depth - 1` of its ancestors in two (depth 2 in a list
    * item's paragraph splits the item). The new nodes after the split get the types in
-   * `typesAfter` (outermost first); missing entries keep the original type and attributes.
-   * Check with `canSplit` first: an invalid split throws TransformError.
+   * `typesAfter`: entry 0 for the outermost split node, entry `depth - 1` for the innermost;
+   * missing or null entries keep the original type and attributes. Check with `canSplit`
+   * first: an invalid split (content or attributes) throws TransformError.
    */
   split(
     pos: number,
@@ -171,9 +173,16 @@ export class Transform {
     for (let d = $pos.depth, i = depth - 1; d > $pos.depth - depth; d--, i--) {
       before = Fragment.from($pos.node(d).copy(before));
       const typeAfter = typesAfter?.[i];
-      after = Fragment.from(
-        typeAfter ? typeAfter.type.createOpen(typeAfter.attrs, after) : $pos.node(d).copy(after),
-      );
+      let next: Node;
+      try {
+        next = typeAfter
+          ? typeAfter.type.createOpen(typeAfter.attrs, after)
+          : $pos.node(d).copy(after);
+      } catch (error) {
+        if (error instanceof FoliDocumentError) throw new TransformError(error.message);
+        throw error;
+      }
+      after = Fragment.from(next);
     }
     return this.step(
       new ReplaceStep(pos, pos, new Slice(before.append(after), depth, depth), true),

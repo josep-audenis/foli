@@ -117,9 +117,11 @@ export class NodeType {
   }
 
   /**
-   * Creates a node without checking its content, for a transform that completes it before the
-   * document is rebuilt (a wrapper filled with the wrapped blocks, the open half of a split).
-   * Attributes are still validated. The step that uses it validates the result.
+   * Creates a node without checking its content. Attributes are still validated.
+   * @internal For transforms whose node ends up complete: a wrapper the wrapped blocks fill
+   * (validated when they are inserted) or the open half of a split (validated when the replace
+   * joins it). Steps do not validate closed nodes inside a slice: a node left incomplete here
+   * would make an invalid document.
    */
   createOpen(attrs?: Attrs | null, content?: Fragment | Node | readonly Node[] | null): Node {
     if (this.isText) throw new RangeError("Use Schema.text to create text nodes");

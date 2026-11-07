@@ -82,13 +82,15 @@ Foli's own (see `THIRD_PARTY_NOTICES.md`).
     wrappers or out of their ancestors, splitting the ancestors left around them.
   - Checks before acting: `findWrapping` (the wrappers a node type needs, e.g. list then list
     item), `liftTarget`, `canSplit`, `canJoin`; `ResolvedPos.blockRange` gives the range.
-- **Schema specs** for structure: node `atom` and `selectable`, mark `inclusive` (a link is
-  not: typing at its end continues as plain text). `ContentMatch.findWrapping` and
+- **Schema specs** for structure: node `selectable`, mark `inclusive` (a link is not: typing
+  at its end continues as plain text); node `atom` is declared for the view (7.3), unused yet. `ContentMatch.findWrapping` and
   `defaultType` answer which nodes fit where.
 - **State**: an immutable `EditorState` holds the doc, selection, stored marks and plugin fields.
   A `Transaction` adds selection tracking, stored marks and metadata (`addToHistory`, time).
-  Selections are `TextSelection`, `NodeSelection` (one selectable node, e.g. a rule; deleting
-  the only child of a node leaves an empty paragraph) and `AllSelection`.
+  Selections are `TextSelection`, `NodeSelection` (one selectable node, e.g. a rule) and
+  `AllSelection`. Deleting a node-selected block that its parent cannot lose (its only child)
+  leaves an empty paragraph where the parent takes one; otherwise the delete does not apply
+  (e.g. the only item of a list). Typing over a node-selected block does nothing yet (7.7).
 - **Plugins** (internal API, used by history and keymaps): state fields, `filterTransaction`,
   `appendTransaction`, `keymap`.
 - **History**: undo/redo of inverted steps.

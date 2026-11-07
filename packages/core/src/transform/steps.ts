@@ -198,6 +198,8 @@ export class ReplaceAroundStep extends Step {
     const gapFrom = this.from === this.gapFrom ? from.pos : mapping.map(this.gapFrom, -1);
     const gapTo = this.to === this.gapTo ? to.pos : mapping.map(this.gapTo, 1);
     if ((from.deleted && to.deleted) || gapFrom < from.pos || gapTo > to.pos) return null;
+    // The content it moves is gone: a lift would only split its ancestors around nothing.
+    if (this.gapTo > this.gapFrom && gapTo <= gapFrom) return null;
     return new ReplaceAroundStep(
       from.pos,
       to.pos,

@@ -74,7 +74,8 @@ function wrappingInside(range: NodeRange, type: NodeType): readonly NodeType[] |
 
 /**
  * Whether splitting at `pos` through `depth` ancestors is valid, giving the new nodes after the
- * split the types in `typesAfter` (outermost first; missing entries keep the original type).
+ * split the types in `typesAfter`: entry 0 for the outermost split node, entry `depth - 1` for
+ * the innermost (the one holding `pos`); missing or null entries keep the original type.
  */
 export function canSplit(
   doc: Node,
@@ -85,7 +86,8 @@ export function canSplit(
   const $pos = doc.resolve(pos);
   const base = $pos.depth - depth;
   if (base < 0) return false;
-  const innerType = typesAfter?.[typesAfter.length - 1]?.type ?? $pos.parent.type;
+  if (typesAfter?.some((entry) => entry && !attrsValid(entry))) return false;
+  const innerType = typesAfter?.[depth - 1]?.type ?? $pos.parent.type;
   if (
     !$pos.parent.canReplace($pos.index(), $pos.parent.childCount) ||
     !innerType.validContent($pos.parent.content.cutByIndex($pos.index(), $pos.parent.childCount))
@@ -106,6 +108,15 @@ export function canSplit(
   const index = $pos.indexAfter(base);
   const baseType = typesAfter?.[0]?.type ?? $pos.node(base + 1).type;
   return $pos.node(base).canReplaceWith(index, index, baseType);
+}
+
+function attrsValid({ type, attrs }: NodeTypeWithAttrs): boolean {
+  try {
+    type.createOpen(attrs);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /** Whether the nodes on either side of `pos` can be joined into one. */
