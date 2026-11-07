@@ -39,7 +39,9 @@ An editable document on pages, with a toolbar. Creates its own editor and provid
 - `transactions: readonly Transaction[]`: this change's transactions (several when plugins
   append their own).
 - `document: FoliDocument`: the document right after this change, serialized on first read.
-  Read it when you save, not on every change. `JSON.stringify(change)` serializes it too.
+  Read it when you save, not on every change. Save `change.document`, never `change`:
+  `JSON.stringify(change)` gives `{ editor, transactions, document }`, which `parseDocument`
+  rejects.
 
 ### `<FoliCanvas>`
 
@@ -82,10 +84,12 @@ No DOM: runs in Node, workers and the browser.
 ### Documents
 
 - `createDocument(content?, settings?): FoliDocument`: a new document (default: one empty
-  paragraph, A4 with 25.4 mm margins).
+  paragraph, A4 with 25.4 mm margins). Neither argument is validated, and `settings` is merged
+  shallowly: pass a whole `margins` object, not part of one.
 - `parseDocument(input: unknown): FoliDocument`: validates untrusted input (e.g. parsed JSON)
-  and returns it in canonical form. Throws `FoliDocumentError` with a JSON path; never drops
-  content silently.
+  and returns it in canonical form: content against the schema, settings (positive page size,
+  margins that leave a content area). Throws `FoliDocumentError`, whose message names the place
+  (`content.content[2].marks[0].type: …`); never drops content silently.
 - `FoliDocument`: `{ schemaVersion, settings: { pageSize, margins }, content }`; sizes in
   millimetres. Format: [document-model.md](document-model.md).
 - `SCHEMA_VERSION`, `PAGE_SIZES` (`A4`, `Letter`), `DEFAULT_SETTINGS`, `schema`, `MARK_TYPES`
@@ -95,7 +99,9 @@ No DOM: runs in Node, workers and the browser.
 ### Editor
 
 `createEditor({ document?, plugins? }): Editor`: a headless editor (state, commands, undo
-history, change notifications). `document` is validated before use.
+history, change notifications). Its content is validated (as by `parseDocument`); its
+settings are not, so pass a document from `parseDocument` or `createDocument`.
+`setDocument` behaves the same way.
 
 | Member                         | Notes                                                                                                                                                                                                                                                                                                                         |
 | ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

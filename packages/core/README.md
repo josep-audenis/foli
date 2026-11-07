@@ -11,17 +11,18 @@ npm install @foli/core
 ```
 
 ```ts
-import { createEditor, parseDocument } from "@foli/core";
+import { createDocument, createEditor, parseDocument } from "@foli/core";
 
-const doc = parseDocument(JSON.parse(saved)); // throws FoliDocumentError on invalid input
+const text = JSON.stringify(createDocument()); // stand-in for a saved document
+const doc = parseDocument(JSON.parse(text)); // throws FoliDocumentError on invalid input
 const editor = createEditor({ document: doc });
-editor.select(1);
-editor.commands.insertText("Hello ");
-editor.commands.toggleMark("bold");
-editor.subscribe((state, transactions) => {
-  if (transactions.some((tr) => tr.docChanged)) console.log("changed");
+editor.subscribe((_state, transactions) => {
+  if (transactions.some((tr) => tr.docChanged)) console.log("content changed");
 });
-const json = JSON.stringify(editor.getDocument());
+editor.select(1); // inside the first paragraph
+editor.commands.toggleMark("bold"); // the next typed text is bold
+editor.commands.insertText("Hello");
+const saved = JSON.stringify(editor.getDocument());
 ```
 
 To show and edit a document in the browser, use [`@foli/react`](https://www.npmjs.com/package/@foli/react)

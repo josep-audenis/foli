@@ -76,10 +76,10 @@ importers:
   packages/react:
     dependencies:
       '@foli/core':
-        specifier: workspace:*
+        specifier: workspace:^
         version: link:../core
       '@foli/view':
-        specifier: workspace:*
+        specifier: workspace:^
         version: link:../view
     devDependencies:
       react:
@@ -92,7 +92,7 @@ importers:
   packages/view:
     dependencies:
       '@foli/core':
-        specifier: workspace:*
+        specifier: workspace:^
         version: link:../core
 
   spikes/two-page: {}

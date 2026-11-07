@@ -44,7 +44,10 @@ Pages are paper: the default keeps them white. To darken everything:
 
 ```css
 @media (prefers-color-scheme: dark) {
-  :root {
+  /* On the editor's elements, not :root: the stylesheet's own :root defaults would win
+     whenever it loads after this rule. */
+  .foli-canvas,
+  .foli-toolbar {
     --foli-canvas-background: #1b1b1a;
     --foli-page-background: #2a2a28;
     --foli-page-shadow: 0 0 0 1px #3a3a37;
@@ -65,16 +68,16 @@ pages should print white.
 
 ## Elements and classes
 
-| Selector                           | What                                                                         |
-| ---------------------------------- | ---------------------------------------------------------------------------- |
-| `.foli-canvas`                     | `FoliCanvas`'s outer element (`className` is added here)                     |
-| `.foli-content`                    | the editable host (`role="textbox"`)                                         |
-| `.foli-page`                       | one page (`<section>`), size and padding inline                              |
-| `p`, `h1`–`h6` inside `.foli-page` | paragraphs and headings                                                      |
-| `strong`, `em`, `u`, `s`           | bold, italic, underline, strikethrough                                       |
-| `.foli-toolbar`                    | `FoliToolbar` (`className` is added here)                                    |
-| `.foli-toolbar-button`             | each button, plus `.foli-toolbar-<key>` (`bold`, `h1`, `undo`, `pageBreak`…) |
-| `.foli-toolbar-separator`          | between button groups                                                        |
+| Selector                           | What                                                                                                 |
+| ---------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `.foli-canvas`                     | `FoliCanvas`'s outer element (`className` is added here)                                             |
+| `.foli-content`                    | the editable host (`role="textbox"`); `FoliCanvas` adds the class, with `EditorView` add it yourself |
+| `.foli-page`                       | one page (`<section>`), size and padding inline                                                      |
+| `p`, `h1`–`h6` inside `.foli-page` | paragraphs and headings                                                                              |
+| `strong`, `em`, `u`, `s`           | bold, italic, underline, strikethrough                                                               |
+| `.foli-toolbar`                    | `FoliToolbar` (`className` is added here)                                                            |
+| `.foli-toolbar-button`             | each button, plus `.foli-toolbar-<key>` (`bold`, `h1`, `undo`, `pageBreak`…)                         |
+| `.foli-toolbar-separator`          | between button groups                                                                                |
 
 You can style headings and paragraphs (`.foli-page h1 { font-size: 20pt }`). Margins and
 padding on blocks are measured, so pagination follows them. A paragraph split across two pages

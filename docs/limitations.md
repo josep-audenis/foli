@@ -7,8 +7,9 @@ and the reasons are in [architecture.md](architecture.md), [pagination.md](pagin
 
 ## Not verified by hand
 
-Every check below is automated in Chromium, Firefox and WebKit (Playwright on Windows), but the
-manual checks have not been run yet. The project owner accepted them as open risks
+The editor is tested in Chromium, Firefox and WebKit (Playwright on Windows), but the manual
+checks below have not been run yet, and some automated parts cover one engine only (IME
+emulation exists only in Chromium; paste is not automated in WebKit). The project owner accepted them as open risks
 ([ADR-0003](decisions/ADR-0003-rendering-and-input.md#gate-g4-passed-provisionally-2026-11-07);
 checklist in [testing/ime.md](testing/ime.md)):
 
@@ -50,7 +51,8 @@ checklist in [testing/ime.md](testing/ime.md)):
   pages ([benchmarks.md](benchmarks.md): 100 pages lay out in about 40–85 ms, a keystroke
   paints within 8–19 ms at p95 in Chromium and Firefox).
 - Formatting thousands of paragraphs at once is slow: bold over 4,000 paragraphs takes about
-  half a second, and so does its undo.
+  0.6 s, the next edit about 0.7 s, its undo about 0.5 s.
+- Undo history keeps the last 100 undo steps (a run of typing is one step).
 
 ## Print
 

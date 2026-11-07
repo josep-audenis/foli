@@ -16,13 +16,15 @@ import { EditorView } from "@foli/view";
 
 const editor = createEditor({ document: createDocument() });
 const host = document.getElementById("editor")!;
+host.classList.add("foli-content"); // the default theme's selection color
 host.setAttribute("aria-label", "Document");
 const view = new EditorView(host, editor, { placeholder: "Start writing…" });
 // later: view.destroy();
 ```
 
 The view sets page size and margins from the document settings; the page look (background,
-shadow, gap, fonts) comes from your CSS or `@foli/react/styles.css`.
+shadow, gap, fonts) comes from your CSS or a copy of
+[`@foli/react`'s `styles.css`](https://github.com/josep-audenis/foli/blob/main/packages/react/styles.css).
 
 - [Getting started](https://github.com/josep-audenis/foli/blob/main/docs/getting-started.md#using-the-view-without-react)
 - [API reference](https://github.com/josep-audenis/foli/blob/main/docs/api.md#foliview)

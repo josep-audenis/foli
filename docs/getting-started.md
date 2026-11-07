@@ -16,7 +16,8 @@ npm install @foli/react @foli/core react react-dom
 
 `@foli/react` works with React 18.2+ and 19. `@foli/core` holds the document functions
 (`createDocument`, `parseDocument`); import it directly rather than relying on it being a
-dependency of `@foli/react`.
+dependency of `@foli/react`. Keep all `@foli/*` packages on the same version (upgrade them
+together), so the app has one copy of the engine.
 
 ## Show an editor
 
@@ -77,8 +78,14 @@ export function App() {
 }
 ```
 
-- `parseDocument` is the trust boundary: it validates input against the schema and throws
-  `FoliDocumentError` (with a JSON path) instead of dropping content it does not understand.
+This runs in the browser only (module-level `localStorage` and `addEventListener`). With server
+rendering, see [Next.js](#server-rendering-nextjs-and-others).
+
+- `parseDocument` is the trust boundary: it validates input (content and page settings) and
+  throws `FoliDocumentError`, whose message names where the problem is
+  (`content.content[2]...`), instead of dropping content it does not understand.
+- Save `change.document`, never `change` itself: `JSON.stringify(change)` gives
+  `{ editor, transactions, document }`, which `parseDocument` rejects.
 - `onChange` runs after every change to the content (typing, commands, undo), not for selection
   changes. Read `change.document` when you save, not on every keystroke: it serializes the
   whole document.
@@ -133,6 +140,7 @@ document through `editor`.
 `FoliEditor` is a shortcut for the parts below. Use them for your own toolbar or layout:
 
 ```tsx
+import type { Editor } from "@foli/core";
 import {
   FoliCanvas,
   FoliEditorProvider,
@@ -141,6 +149,7 @@ import {
   useEditorState,
   useFoliEditor,
 } from "@foli/react";
+import { useEffect } from "react";
 
 function BoldButton() {
   const editor = useCurrentEditor();
@@ -158,8 +167,27 @@ function BoldButton() {
   );
 }
 
+// What FoliEditor's onChange does, for an editor you created yourself.
+function useSave(editor: Editor, save: (json: string) => void) {
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const unsubscribe = editor.subscribe((_state, transactions) => {
+      if (!transactions.some((tr) => tr.docChanged)) return; // a selection change
+      clearTimeout(timer);
+      timer = setTimeout(() => save(JSON.stringify(editor.getDocument())), 300);
+    });
+    return () => {
+      clearTimeout(timer);
+      unsubscribe();
+    };
+  }, [editor, save]);
+}
+
+const saveToStorage = (json: string) => localStorage.setItem("my-document", json);
+
 export function App() {
   const editor = useFoliEditor(); // or useFoliEditor({ initialContent: doc })
+  useSave(editor, saveToStorage);
   return (
     <FoliEditorProvider editor={editor}>
       <BoldButton />
@@ -184,6 +212,7 @@ its context.
 | Enter; Shift+Enter                         | new paragraph; line break |
 | Ctrl+Enter                                 | page break                |
 | Ctrl+A                                     | select all                |
+| Ctrl+Shift+V                               | paste as plain text       |
 
 Word and line deletion use the platform's own keys (Ctrl+Backspace, Option+Backspace,
 Cmd+Backspace…). In the toolbar, arrow keys move between buttons and Tab leaves it.
@@ -203,18 +232,41 @@ import { createDocument, parseDocument } from "@foli/core";
 import { FoliEditor } from "@foli/react";
 import { useState } from "react";
 
+const KEY = "my-document";
+
+/** The saved document in the browser; a new one on the server, which renders no content. */
 function load() {
   // `window`, not `localStorage`: recent Node versions have a server-side `localStorage`.
-  const saved = typeof window === "undefined" ? null : window.localStorage.getItem("doc");
+  const saved = typeof window === "undefined" ? null : window.localStorage.getItem(KEY);
   try {
     if (saved) return parseDocument(JSON.parse(saved));
-  } catch {}
+  } catch (error) {
+    console.warn("Ignoring the saved document:", error);
+  }
   return createDocument();
+}
+
+// Browser-only code (localStorage, addEventListener) runs in onChange, never during render.
+let latest;
+let timer;
+function save() {
+  if (latest) localStorage.setItem(KEY, JSON.stringify(latest.document));
+  latest = undefined;
 }
 
 export function Editor() {
   const [initial] = useState(load);
-  return <FoliEditor initialContent={initial} />;
+  return (
+    <FoliEditor
+      initialContent={initial}
+      onChange={(change) => {
+        latest = change;
+        clearTimeout(timer);
+        timer = setTimeout(save, 300);
+        addEventListener("pagehide", save, { once: true });
+      }}
+    />
+  );
 }
 ```
 
@@ -239,7 +291,7 @@ the toolbar and page shadows in print. Hide the rest of your page in print yours
 ```ts
 import { createDocument, createEditor } from "@foli/core";
 import { EditorView } from "@foli/view";
-import "@foli/react/styles.css"; // optional: the default theme's page styles
+import "@foli/react/styles.css"; // optional, see below
 
 const editor = createEditor({ document: createDocument() });
 const host = document.querySelector<HTMLElement>("#editor")!;
@@ -256,7 +308,9 @@ editor.subscribe((_state, transactions) => {
 ```
 
 The view makes `host` a `contenteditable` textbox and renders `.foli-page` sections into it.
-It does not name the textbox: set `aria-label` (or `aria-labelledby`) yourself. See [api.md](api.md#foliview).
+It does not name the textbox: set `aria-label` (or `aria-labelledby`) yourself. The default
+theme ships in `@foli/react` (which lists `react` as a peer dependency); without React, copy its
+`styles.css` into your project instead. See [api.md](api.md#foliview).
 
 ## Next
 

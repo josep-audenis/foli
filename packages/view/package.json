@@ -29,7 +29,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@foli/core": "workspace:*"
+    "@foli/core": "workspace:^"
   },
   "publishConfig": {
     "exports": {
