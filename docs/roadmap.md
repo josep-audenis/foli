@@ -454,7 +454,7 @@ criterion is the one from G3: type, format with shortcuts, undo, serialize, relo
   and focus. `FoliEditor` shows it by default (`toolbar={false}`); a `ref` on `FoliEditor`
   gives `{ editor, focus() }`, on `FoliCanvas` `{ focus() }`. Axe on the toolbar (editable and
   read-only) in all three engines; keyboard-only and mouse Playwright tests.
-- [x] 6.3 Lifecycle and SSR: replacing the document from React (`editor.setDocument` through
+- [x] 6.3 (#26) Lifecycle and SSR: replacing the document from React (`editor.setDocument` through
   `FoliEditor`'s `ref`: new content and page settings, new history, selection at the start,
   `onChange` not called; unit test and Playwright through the playground's new "Open…"
   button, which loads a JSON file); every package imports in Node without a DOM;
