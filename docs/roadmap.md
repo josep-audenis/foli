@@ -531,7 +531,7 @@ top-level block, marks rendered without attrs).
   (`href` limited to http, https, mailto, tel and relative URLs; not inclusive), `textColor`
   and `highlight` (`#rrggbb`). JSON types, docs/document-model.md. Headless only: the view
   supports the new types from 7.3, so nothing user-facing changes until then.
-- [ ] 7.3 Nested blocks in the view (ADR-0004): decide how nested blocks render on pages
+- [x] 7.3 (#35) Nested blocks in the view (ADR-0004): decide how nested blocks render on pages
   (proposed: layout over the flattened leaf blocks, each page rebuilding the open `ul`/`ol`/`li`
   ancestors of its blocks, so list semantics survive). Render lists, list items and rules;
   positions, selection read/write and composition read-back at any depth; `NodeSelection`
