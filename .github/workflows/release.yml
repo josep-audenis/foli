@@ -38,12 +38,16 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      - name: Refuse unreleased changesets
+      - name: Refuse unapplied changesets and unversioned packages
         run: |
           pending=$(find .changeset -name '*.md' ! -name README.md)
           if [ -n "$pending" ]; then
             echo "::error::Changesets not applied yet: run 'pnpm changeset version' and commit first."
             echo "$pending"
+            exit 1
+          fi
+          if grep -l '"version": "0.0.0"' packages/*/package.json; then
+            echo "::error::Version 0.0.0 is the unreleased placeholder: version the packages first."
             exit 1
           fi
 

@@ -59,7 +59,8 @@ examples are never published.
    version in each `package.json`, `CHANGELOG.md` entries) and deletes the changeset files.
    Review, commit ("Version packages"), PR, merge to `main`.
 3. **Publish**: GitHub → Actions → **Release** → Run workflow (on `main`). It installs from the
-   lockfile, refuses to run while unapplied changesets exist, runs `pnpm check`, publishes every
+   lockfile, refuses to run while unapplied changesets exist or a package is still at the
+   `0.0.0` placeholder, runs `pnpm check`, publishes every
    version not yet on npm with [provenance](https://docs.npmjs.com/generating-provenance-statements),
    and pushes the tags (`@folijs/core@0.1.0`…). Publishing an existing version is skipped, so a
    failed run can be re-run.
