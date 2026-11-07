@@ -463,7 +463,7 @@ criterion is the one from G3: type, format with shortcuts, undo, serialize, relo
   (React 18 warns about `useLayoutEffect` on the server). React 18 at runtime moved to 6.4:
   aliasing React 18 inside `@foli/react` resolves react-dom's `react` peer to React 19, and
   the example apps install the packed packages with their own React.
-- [x] 6.4 Packaging: exports maps checked (ESM, types, `@foli/react/styles.css`; React and React
+- [x] 6.4 (#27) Packaging: exports maps checked (ESM, types, `@foli/react/styles.css`; React and React
   DOM the only peer dependencies; `sideEffects`; `repository` per package, which npm
   provenance checks; `publishConfig.exports` without the workspace's `@foli/source` condition;
   `build` empties `dist` first); `publint --strict` (MIT) on every package and bundle size budgets
