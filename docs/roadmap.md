@@ -516,7 +516,7 @@ non-inclusive mark. The view, layout and clipboard assume blocks are textblocks 
 `doc` (one `BlockDesc` per top-level child, positions from top-level offsets, one layout box per
 top-level block, marks rendered without attrs).
 
-- [ ] 7.1 Structure engine (`@folijs/core`, no schema change): `ReplaceAroundStep` (apply,
+- [x] 7.1 (#33) Structure engine (`@folijs/core`, no schema change): `ReplaceAroundStep` (apply,
   invert, map, merge rules); `Transform.wrap`, `lift`, `split` at depth > 1 with types after,
   `join` across nesting; helpers `findWrapping`, `liftTarget`, `canSplit`, `canJoin`;
   `NodeSelection` (JSON, mapping, `selectable`/`atom` node specs); mark spec `inclusive`
@@ -527,7 +527,7 @@ top-level block, marks rendered without attrs).
   migrations before validation (registry, tests with v1 documents written by 0.1.0, unknown
   future versions rejected); v1 → v2 keeps content as is. Schema v2 adds `bulletList`,
   `orderedList` (`start`), `listItem` (`paragraph block*`), `horizontalRule` (atom, selectable),
-  `align` on paragraph and heading (`left`, `center`, `right`, `justify`), marks `link`
+  `align` on paragraph and heading (`start`, `center`, `end`, `justify`), marks `link`
   (`href` limited to http, https, mailto, tel and relative URLs; not inclusive), `textColor`
   and `highlight` (`#rrggbb`). JSON types, docs/document-model.md. Headless only: the view
   supports the new types from 7.3, so nothing user-facing changes until then.
@@ -549,7 +549,8 @@ top-level block, marks rendered without attrs).
   keys Tab/Shift-Tab inside lists only (Tab elsewhere still leaves the editor), Mod-Shift-7/8;
   the `beforeinput` fallback runs the same commands; toolbar buttons (bulleted, numbered,
   indent, outdent). Undo restores document and selection exactly; e2e in three engines.
-- [ ] 7.6 Links: `setLink(href)`/`removeLink` commands validating `href`; React link editing
+- [ ] 7.6 Links: `setLink(href)`/`removeLink` commands validating `href`; `normalizeHref`
+  (trim, percent-encode spaces, `\` to `/`) before validation, for pasted and typed URLs; React link editing
   (toolbar button and Mod-K open a small accessible dialog: URL field, apply, remove);
   Ctrl/Cmd+click opens the link in a new tab (`noopener`); autolink of a pasted plain-text URL.
   Every entry point (parse, paste, command, dialog) rejects unsafe protocols, with tests.

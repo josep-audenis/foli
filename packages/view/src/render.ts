@@ -1,13 +1,14 @@
-import type { MarkName, Node as ModelNode } from "@folijs/core";
+import type { Node as ModelNode, SimpleMarkName } from "@folijs/core";
 
-// Every schema v1 mark must have a tag; marks of other schemas fall back to <span>.
+// Every mark without attributes has a tag. Others (link, colors: task 7.3) and marks of other
+// schemas fall back to <span>.
 const MARK_TAGS: ReadonlyMap<string, string> = new Map(
   Object.entries({
     bold: "strong",
     italic: "em",
     underline: "u",
     strike: "s",
-  } satisfies Record<MarkName, string>),
+  } satisfies Record<SimpleMarkName, string>),
 );
 
 /** Marks the <br> of an explicit page break. */
