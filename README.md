@@ -21,16 +21,23 @@ npm install @foli/react @foli/core react react-dom
 ```
 
 ```tsx
+import { createDocument, parseDocument } from "@foli/core";
 import { type FoliChange, FoliEditor } from "@foli/react";
 import "@foli/react/styles.css";
 
+// Load: parseDocument validates the saved JSON (throws FoliDocumentError when invalid).
+const saved = localStorage.getItem("doc");
+const initial = saved ? parseDocument(JSON.parse(saved)) : createDocument();
+
+// Save once typing pauses: reading `change.document` serializes the whole document.
+let timer: ReturnType<typeof setTimeout> | undefined;
 function onChange(change: FoliChange) {
-  // Debounce this: reading `change.document` serializes the whole document.
-  localStorage.setItem("doc", JSON.stringify(change.document));
+  clearTimeout(timer);
+  timer = setTimeout(() => localStorage.setItem("doc", JSON.stringify(change.document)), 300);
 }
 
 export function App() {
-  return <FoliEditor placeholder="Start writing…" onChange={onChange} />;
+  return <FoliEditor initialContent={initial} placeholder="Start writing…" onChange={onChange} />;
 }
 ```
 
