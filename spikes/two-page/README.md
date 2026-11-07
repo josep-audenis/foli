@@ -12,8 +12,8 @@ during IME composition, where the browser edits the DOM and the spike reads it b
 
 ```bash
 pnpm exec playwright install                           # once: download test browsers
-pnpm --filter @foli/spike-two-page dev --port 5174     # http://localhost:5174
-pnpm --filter @foli/spike-two-page dev --port 5174 --host          # also reachable from phones/other machines on the LAN
+pnpm --filter @folijs/spike-two-page dev --port 5174     # http://localhost:5174
+pnpm --filter @folijs/spike-two-page dev --port 5174 --host          # also reachable from phones/other machines on the LAN
 pnpm test:e2e --project="spike-*"                      # automated experiments, all three engines
 ```
 

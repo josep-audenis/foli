@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { createDocument, type FoliDocument, PAGE_SIZES } from "@foli/core";
+import { createDocument, type FoliDocument, PAGE_SIZES } from "@folijs/core";
 import { act, cleanup, render, screen } from "@testing-library/react";
 import { createRef, useLayoutEffect } from "react";
 import { hydrateRoot, type Root } from "react-dom/client";

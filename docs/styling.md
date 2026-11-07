@@ -1,10 +1,10 @@
 # Styling
 
-`@foli/react/styles.css` is the default theme. Import it once (in the app entry or, with
+`@folijs/react/styles.css` is the default theme. Import it once (in the app entry or, with
 Next.js, the root layout):
 
 ```ts
-import "@foli/react/styles.css";
+import "@folijs/react/styles.css";
 ```
 
 Without it the editor still works, but pages have no background, shadow or gap and the toolbar

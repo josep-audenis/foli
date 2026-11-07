@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 /// <reference types="vite/client" />
-import { createDocument, createEditor, type DocJSON, parseContent } from "@foli/core";
+import { createDocument, createEditor, type DocJSON, parseContent } from "@folijs/core";
 import { afterEach, describe, expect, it } from "vitest";
 import googleDocs from "../fixtures/clipboard/google-docs.html?raw";
 import libreOffice from "../fixtures/clipboard/libreoffice.html?raw";

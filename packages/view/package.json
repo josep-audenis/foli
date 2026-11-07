@@ -1,5 +1,5 @@
 {
-  "name": "@foli/view",
+  "name": "@folijs/view",
   "version": "0.0.0",
   "description": "Framework-agnostic DOM view for the Foli document engine: rendering, input, selection, layout.",
   "license": "MIT",
@@ -14,7 +14,7 @@
   "sideEffects": false,
   "exports": {
     ".": {
-      "@foli/source": "./src/index.ts",
+      "@folijs/source": "./src/index.ts",
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     }
@@ -29,7 +29,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@foli/core": "workspace:^"
+    "@folijs/core": "workspace:^"
   },
   "publishConfig": {
     "exports": {

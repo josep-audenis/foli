@@ -10,16 +10,16 @@ This document describes **what exists** and **what is decided**. Planned parts a
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
-│ @foli/react   components · hooks · toolbar                   │
+│ @folijs/react   components · hooks · toolbar                   │
 └──────────────────────────────┬───────────────────────────────┘
                                │ mounts, subscribes
 ┌──────────────────────────────▼───────────────────────────────┐
-│ @foli/view    DOM rendering · input · selection · clipboard  │
+│ @folijs/view    DOM rendering · input · selection · clipboard  │
 │               layout & pagination                            │
 └──────────────────────────────┬───────────────────────────────┘
                                │ dispatches transactions, renders state
 ┌──────────────────────────────▼───────────────────────────────┐
-│ @foli/core    schema · nodes · positions · steps · mapping   │
+│ @folijs/core    schema · nodes · positions · steps · mapping   │
 │               state · history · commands        (no DOM)     │
 └──────────────────────────────▲───────────────────────────────┘
                                │ same JSON format
@@ -34,7 +34,7 @@ This document describes **what exists** and **what is decided**. Planned parts a
 | Document model      | Schema, immutable tree, marks, positions, JSON, validation                     | ✅ (Phase 2)                                                     |
 | Editing engine      | Steps, position mapping, selection, state, history, commands                   | ✅ headless (Phase 3)                                            |
 | View                | Render state to DOM, DOM ↔ model mapping, `beforeinput`, IME, clipboard, focus | ✅ (G3 provisional; manual IME/SR checks open)                   |
-| Layout              | Measurement, line breaking, page flow, fragments, incremental reflow, print    | Phase 5 (inside `@foli/view` until the seam is proven)           |
+| Layout              | Measurement, line breaking, page flow, fragments, incremental reflow, print    | Phase 5 (inside `@folijs/view` until the seam is proven)         |
 | React integration   | Components, hooks, toolbar                                                     | Hooks, provider, canvas, `FoliEditor` ✅ (6.1); toolbar ✅ (6.2) |
 | Document processing | DOCX/HTML interop, Rust/WASM                                                   | Phase 10                                                         |
 
@@ -56,7 +56,7 @@ The DOM is never parsed as the source of truth. The one exception is IME composi
 Android input, where the browser must mutate the DOM; the view reads those changes back and
 converts them into steps immediately.
 
-## Editing engine (`@foli/core`)
+## Editing engine (`@folijs/core`)
 
 Implemented headless in Phase 3 (`packages/core/src/transform/`, `packages/core/src/state/`).
 The design follows prosemirror-transform, -state, -history and -commands (MIT); the code is
@@ -130,7 +130,7 @@ Known limits:
   them (the toolbar uses cheap checks).
 - Plugins, `Transaction` metadata and mapping internals are exported but not yet a stable API.
 
-## Editor view (`@foli/view`)
+## Editor view (`@folijs/view`)
 
 `packages/view/src/view.ts`, design per ADR-0003: one `contenteditable` host holding real pages.
 Built in Phase 5 (gate G4 passed provisionally): blocks flow from page to page (5.1) and split
@@ -377,9 +377,9 @@ Known limits:
 foli/
 ├── apps/playground/     Vite demo; consumes packages by name; no engine logic.
 ├── packages/
-│   ├── core/  @foli/core   Envelope, schema, immutable model, positions, slices. Pure TS, no DOM.
-│   ├── view/  @foli/view   Editable DOM view (EditorView). Framework-agnostic.
-│   └── react/ @foli/react  React components + default stylesheet.
+│   ├── core/  @folijs/core   Envelope, schema, immutable model, positions, slices. Pure TS, no DOM.
+│   ├── view/  @folijs/view   Editable DOM view (EditorView). Framework-agnostic.
+│   └── react/ @folijs/react  React components + default stylesheet.
 └── docs/
 ```
 
@@ -387,13 +387,13 @@ Dependency direction: `playground → react → view → core`. Never the revers
 
 Planned, created only when needed:
 
-| Package / folder         | When                                                                          |
-| ------------------------ | ----------------------------------------------------------------------------- |
-| `spikes/two-page/`       | Phase 1, throwaway, never published                                           |
-| `@foli/layout`           | Split out of `@foli/view` once the layout/view boundary is stable             |
-| `@foli/ui`               | Only if a non-React UI appears; until then the toolbar lives in `@foli/react` |
-| `crates/*`, `@foli/wasm` | Phase 10                                                                      |
-| `examples/`              | Phase 6 (Vite and Next.js install tests)                                      |
+| Package / folder           | When                                                                            |
+| -------------------------- | ------------------------------------------------------------------------------- |
+| `spikes/two-page/`         | Phase 1, throwaway, never published                                             |
+| `@folijs/layout`           | Split out of `@folijs/view` once the layout/view boundary is stable             |
+| `@folijs/ui`               | Only if a non-React UI appears; until then the toolbar lives in `@folijs/react` |
+| `crates/*`, `@folijs/wasm` | Phase 10                                                                        |
+| `examples/`                | Phase 6 (Vite and Next.js install tests)                                        |
 
 ## Dependency policy
 
@@ -408,15 +408,15 @@ Planned, created only when needed:
 
 ## Build and dev wiring
 
-- Each package exports an `@foli/source` condition pointing at `src/index.ts`. Vite, Vitest and
+- Each package exports an `@folijs/source` condition pointing at `src/index.ts`. Vite, Vitest and
   `tsc --noEmit` resolve it, so dev and tests run on source while importing by package name.
 - `pnpm build` runs `tsc` per package (topological) to `dist/` with `.d.ts`; build configs drop
   the condition so published types point at `dist`.
-- ESM-only, `sideEffects` declared (`@foli/react`: its CSS only), React and React DOM the only
+- ESM-only, `sideEffects` declared (`@folijs/react`: its CSS only), React and React DOM the only
   peer dependencies (18.2+ or 19), `repository` per package (npm provenance checks that it
   matches the repository that built the package; `directory` links the package's folder).
-  Exports: `.` (`types`, `default`) and `@foli/react/styles.css`; inside the workspace the
-  `@foli/source` condition also maps them to `src`, and `publishConfig.exports` leaves it out of
+  Exports: `.` (`types`, `default`) and `@folijs/react/styles.css`; inside the workspace the
+  `@folijs/source` condition also maps them to `src`, and `publishConfig.exports` leaves it out of
   the published packages. `build` empties `dist` first, so deleted modules are not shipped.
 - `pnpm check` also runs `publint --strict` on every package (exports, `files`, types) and
   `pnpm size`: each package's published entry bundled as an app would (fully minified, its
@@ -427,7 +427,7 @@ Planned, created only when needed:
   TypeScript) and `examples/next` (React 19, server rendering) with npm, builds them, and runs
   the success criterion in Playwright; see [examples/README.md](../examples/README.md).
 
-## React integration (`@foli/react`)
+## React integration (`@folijs/react`)
 
 Uncontrolled: the engine owns document state; React observes. `initialContent` is read once;
 external replacement goes through an imperative `setDocument()`. No fully controlled `value`

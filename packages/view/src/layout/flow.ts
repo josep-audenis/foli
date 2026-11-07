@@ -1,4 +1,4 @@
-import type { DocumentSettings } from "@foli/core";
+import type { DocumentSettings } from "@folijs/core";
 
 /** CSS pixels per millimetre (CSS fixes 1in = 96px = 25.4mm). */
 export const PX_PER_MM = 96 / 25.4;

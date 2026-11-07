@@ -1,5 +1,5 @@
 {
-  "name": "@foli/core",
+  "name": "@folijs/core",
   "version": "0.0.0",
   "description": "Document model and headless editing engine of Foli: format, validation, schema, transactions, history, commands. No DOM.",
   "license": "MIT",
@@ -14,7 +14,7 @@
   "sideEffects": false,
   "exports": {
     ".": {
-      "@foli/source": "./src/index.ts",
+      "@folijs/source": "./src/index.ts",
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     }

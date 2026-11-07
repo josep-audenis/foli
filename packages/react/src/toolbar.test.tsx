@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { createDocument, EditorState } from "@foli/core";
+import { createDocument, EditorState } from "@folijs/core";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { createRef } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";

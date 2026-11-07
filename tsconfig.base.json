@@ -17,6 +17,6 @@
     "sourceMap": true,
     // Resolve workspace packages to their TypeScript source during dev/typecheck/test.
     // Build configs drop this so published .d.ts files point at dist.
-    "customConditions": ["@foli/source"]
+    "customConditions": ["@folijs/source"]
   }
 }

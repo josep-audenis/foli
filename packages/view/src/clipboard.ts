@@ -7,7 +7,7 @@ import {
   type MarkName,
   type Node as ModelNode,
   parseContent,
-} from "@foli/core";
+} from "@folijs/core";
 import { PAGE_BREAK_ATTR, renderBlock } from "./render.js";
 
 /**

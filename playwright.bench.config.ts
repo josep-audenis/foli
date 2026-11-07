@@ -20,7 +20,7 @@ export default defineConfig({
     { name: "webkit", use: { ...devices["Desktop Safari"], baseURL: `http://localhost:${PORT}` } },
   ],
   webServer: {
-    command: `pnpm --filter @foli/playground dev --port ${PORT} --strictPort`,
+    command: `pnpm --filter @folijs/playground dev --port ${PORT} --strictPort`,
     url: `http://localhost:${PORT}`,
     reuseExistingServer: !process.env.CI,
   },

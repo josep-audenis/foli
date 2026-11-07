@@ -9,9 +9,9 @@
     "ssr-check": "node ssr-check.mjs"
   },
   "dependencies": {
-    "@foli/core": "file:../../.packs/foli-core.tgz",
-    "@foli/react": "file:../../.packs/foli-react.tgz",
-    "@foli/view": "file:../../.packs/foli-view.tgz",
+    "@folijs/core": "file:../../.packs/folijs-core.tgz",
+    "@folijs/react": "file:../../.packs/folijs-react.tgz",
+    "@folijs/view": "file:../../.packs/folijs-view.tgz",
     "react": "18.3.1",
     "react-dom": "18.3.1"
   },

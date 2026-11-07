@@ -1,4 +1,4 @@
-import { DEFAULT_SETTINGS } from "@foli/core";
+import { DEFAULT_SETTINGS } from "@folijs/core";
 import { describe, expect, it } from "vitest";
 import { type BlockBox, contentHeight, type Fragment, flow, flowFrom, PX_PER_MM } from "./flow.js";
 

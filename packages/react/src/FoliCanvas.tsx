@@ -1,5 +1,5 @@
-import type { Editor } from "@foli/core";
-import { EditorView } from "@foli/view";
+import type { Editor } from "@folijs/core";
+import { EditorView } from "@folijs/view";
 import { forwardRef, useImperativeHandle, useRef } from "react";
 import { useEditorOrContext, useIsomorphicLayoutEffect } from "./editor.js";
 

@@ -45,8 +45,8 @@ editor state ──► measure the blocks without a cached measurement (DOM read
 - **Geometry:** each page gets the settings' size (`width`, `min-height`) and margins
   (`padding`) inline in mm; the content box is `height − top − bottom` by
   `width − left − right`. A scaled ancestor (`transform`, `zoom`) is divided out of every
-  measurement. The React theme (`@foli/react/styles.css`) adds background, shadow and the gap
-  between pages; a bare `@foli/view` host gets none of them.
+  measurement. The React theme (`@folijs/react/styles.css`) adds background, shadow and the gap
+  between pages; a bare `@folijs/view` host gets none of them.
 - **Measuring:** each block's border-box height and vertical margins, read from the rendered
   block. Lines only for blocks that cross a page end or hold a page break: per-character `Range` rects, a binary
   search per line, splits snapped to grapheme clusters. The browser shapes the text; Foli only

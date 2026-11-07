@@ -1,4 +1,4 @@
-# @foli/react
+# @folijs/react
 
 React components for [Foli](https://github.com/josep-audenis/foli), a document editor for the
 web: documents on real pages (A4, Letter), edited in the browser, stored as JSON. Its own
@@ -7,15 +7,15 @@ editing engine, no ProseMirror or similar underneath.
 > Pre-release: the API may change in any 0.x version.
 
 ```bash
-npm install @foli/react @foli/core react react-dom
+npm install @folijs/react @folijs/core react react-dom
 ```
 
-Keep all `@foli/*` packages on the same version.
+Keep all `@folijs/*` packages on the same version.
 
 ```tsx
-import { createDocument, parseDocument } from "@foli/core";
-import { type FoliChange, FoliEditor } from "@foli/react";
-import "@foli/react/styles.css";
+import { createDocument, parseDocument } from "@folijs/core";
+import { type FoliChange, FoliEditor } from "@folijs/react";
+import "@folijs/react/styles.css";
 
 // Load: parseDocument validates the saved JSON (throws FoliDocumentError when invalid).
 const saved = localStorage.getItem("doc");

@@ -1,5 +1,5 @@
 {
-  "name": "@foli/spike-two-page",
+  "name": "@folijs/spike-two-page",
   "private": true,
   "description": "Phase 1 throwaway spike: one contenteditable host, paragraphs split across pages. Never published.",
   "type": "module",

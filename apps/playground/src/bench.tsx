@@ -2,11 +2,11 @@
  * The benchmark page (`/bench.html`, dev server only): mounts the editor on demand and times it
  * from inside the page. Driven by `apps/playground/bench/`; see docs/benchmarks.md.
  */
-import { parseDocument } from "@foli/core";
-import { type FoliChange, FoliEditor } from "@foli/react";
+import { parseDocument } from "@folijs/core";
+import { type FoliChange, FoliEditor } from "@folijs/react";
 import { flushSync } from "react-dom";
 import { createRoot, type Root } from "react-dom/client";
-import "@foli/react/styles.css";
+import "@folijs/react/styles.css";
 
 /** Resolves after the next frame has been painted (a task queued from its rAF callback). */
 function painted(): Promise<number> {

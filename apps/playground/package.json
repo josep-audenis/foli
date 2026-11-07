@@ -1,5 +1,5 @@
 {
-  "name": "@foli/playground",
+  "name": "@folijs/playground",
   "private": true,
   "type": "module",
   "scripts": {
@@ -9,8 +9,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@foli/core": "workspace:*",
-    "@foli/react": "workspace:*",
+    "@folijs/core": "workspace:*",
+    "@folijs/react": "workspace:*",
     "react": "^19.3.1",
     "react-dom": "^19.3.1"
   },

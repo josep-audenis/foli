@@ -5,7 +5,7 @@ and how to reproduce it. Re-run and update a section when the code it measures c
 
 ## Document model: build and serialize (Phase 2)
 
-**Run:** `pnpm --filter @foli/core bench` (Vitest 5 benchmark mode, tinybench under the hood;
+**Run:** `pnpm --filter @folijs/core bench` (Vitest 5 benchmark mode, tinybench under the hood;
 source: `packages/core/src/model/model.bench.ts`).
 
 **Fixtures:** `pagesFixture(n)` in `packages/core/src/testing/index.ts`: per page one heading and
@@ -47,7 +47,7 @@ well under one frame. Nothing here is on the keystroke path; edits will reuse un
 
 ## Block type change over many blocks (Phase 6 follow-up)
 
-**Run:** `pnpm --filter @foli/core bench` (source: `packages/core/src/transform/transform.bench.ts`).
+**Run:** `pnpm --filter @folijs/core bench` (source: `packages/core/src/transform/transform.bench.ts`).
 
 **Fixture:** 4,000 paragraphs of ~40 characters, no marks (about a 200-page document's block
 count).
@@ -200,14 +200,14 @@ would (Vite 8, ES module, fully minified: identifiers, whitespace and comments),
 packages it depends on and without React (a peer dependency), then gzipped (level 9). Plus an
 app-like bundle that imports only `FoliEditor`, where the packages' `sideEffects` and tree
 shaking decide what is left (almost everything: the editor uses most of the engine). CSS
-(`@foli/react/styles.css`, about 0.8 kB gzipped in the Vite example) is not counted. The check
+(`@folijs/react/styles.css`, about 0.8 kB gzipped in the Vite example) is not counted. The check
 fails when a bundle passes its budget.
 
 | Bundle            | Includes          | Minified | Gzipped |  Budget |
 | ----------------- | ----------------- | -------: | ------: | ------: |
-| `@foli/core`      | core              |  44.4 kB | 14.1 kB | 16.1 kB |
-| `@foli/view`      | view, core        |  60.9 kB | 19.9 kB | 22.9 kB |
-| `@foli/react`     | react, view, core |  77.4 kB | 25.3 kB | 29.1 kB |
+| `@folijs/core`    | core              |  44.4 kB | 14.1 kB | 16.1 kB |
+| `@folijs/view`    | view, core        |  60.9 kB | 19.9 kB | 22.9 kB |
+| `@folijs/react`   | react, view, core |  77.4 kB | 25.3 kB | 29.1 kB |
 | `FoliEditor` only | what it reaches   |  77.1 kB | 25.2 kB | 29.1 kB |
 
 (kB = 1,024 bytes; measured 2026-11-07.) For comparison, the whole Vite example app (React 18,

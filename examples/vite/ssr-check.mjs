@@ -1,7 +1,7 @@
 // Server rendering with React 18 and the installed packages: the markup is the editor's shell, and
 // React logs nothing (React 18 warns about layout effects during server rendering).
-import { createDocument } from "@foli/core";
-import { FoliEditor } from "@foli/react";
+import { createDocument } from "@folijs/core";
+import { FoliEditor } from "@folijs/react";
 import { createElement, version } from "react";
 import { renderToString } from "react-dom/server";
 
