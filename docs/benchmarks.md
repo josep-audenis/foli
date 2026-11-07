@@ -45,6 +45,35 @@ Mean time per operation, in milliseconds (lower is better):
 well under one frame. Nothing here is on the keystroke path; edits will reuse unchanged nodes
 (structural sharing) instead of rebuilding the tree.
 
+## Block type change over many blocks (Phase 6 follow-up)
+
+**Run:** `pnpm --filter @foli/core bench` (source: `packages/core/src/transform/transform.bench.ts`).
+
+**Fixture:** 4,000 paragraphs of ~40 characters, no marks (about a 200-page document's block
+count).
+
+**Operations:**
+
+- **Transform.setBlockType:** every block to heading level 1 in one transform.
+- **undo:** invert that step against the old document and apply it to the new one.
+- **editor command:** `editor.commands.setBlockType` with everything selected (`selectAll`),
+  alternating H1 and paragraph, including history and selection mapping.
+
+**Environment:** Intel Core i7-13700H, Windows 11, Vitest 5.1.0, 2026-11-07, laptop under normal
+desktop load.
+
+Mean time per operation, in milliseconds:
+
+| Transform.setBlockType | undo | editor command |
+| ---------------------: | ---: | -------------: |
+|                   1.65 | 1.32 |           2.61 |
+
+**Before:** one `NodeMarkupStep` per block, each rebuilding the document, took 1.4-1.9 s for the
+same `Transform.setBlockType` (three runs, Vitest test runner). Now a single
+`NodeMarkupBatchStep` rebuilds the document once; positions do not move (empty step map).
+`packages/core/src/state/editor.test.ts` ("setBlockType over many blocks") guards it with a
+generous 250 ms bound.
+
 ## Pagination: layout, keystrokes and re-flow (Phase 5)
 
 **Run:** `pnpm bench:layout` (Playwright, `playwright.bench.config.ts`, one worker; about 3
