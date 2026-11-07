@@ -5,10 +5,13 @@ model, transactions, view and layout, designed around native pagination, with fi
 integration.
 
 > **Status: pre-alpha — engine under construction.** Foli edits documents with its own model,
-> engine and view (no ProseMirror/Tiptap/Lexical) on one page-sized sheet: typing, Enter,
-> Backspace, bold/italic/underline shortcuts, undo/redo, IME and dead keys (automated tests
-> only; manual checks pending), copy/cut/paste (HTML mapped to the schema; pastes from
-> real Word and Google Docs not yet verified). Not yet: pagination. See [docs/roadmap.md](docs/roadmap.md).
+> engine and view (no ProseMirror/Tiptap/Lexical) on real pages: paragraphs split across pages
+> at a line, explicit page breaks, widow/orphan and keep-with-next rules, incremental reflow,
+> print with one sheet per page. Typing, Enter, Backspace, bold/italic/underline shortcuts,
+> undo/redo, IME and dead keys (automated tests only; manual checks pending, also at page
+> breaks), copy/cut/paste (HTML mapped to the schema; pastes from real Word and Google Docs not
+> yet verified). Next: the React API and the first release (Phase 6). See
+> [docs/roadmap.md](docs/roadmap.md).
 > Not published to npm yet.
 
 ## Usage (current, provisional API)

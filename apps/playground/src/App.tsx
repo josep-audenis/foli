@@ -89,8 +89,8 @@ export function App() {
           className="playground-hint"
           title="Foli playground: typing, marks, undo, IME, paste, read-only mode, placeholder, pages"
         >
-          Pagination in progress (Phase 5): blocks flow onto A4 pages and paragraphs split across
-          them; Ctrl/Cmd+Enter inserts a page break. Typing, marks, undo, paste, read-only mode.
+          Real pages: blocks flow onto A4 pages and paragraphs split across them; Ctrl/Cmd+Enter
+          inserts a page break; prints one sheet per page. Typing, marks, undo, paste, read-only.
         </span>
         <label>
           <input

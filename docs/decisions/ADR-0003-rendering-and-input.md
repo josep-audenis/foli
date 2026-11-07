@@ -3,8 +3,8 @@
 - **Status:** Accepted provisionally (2026-11-04). Automated evidence is complete; manual checks
   are partial (see "Manual results"). The untested items are accepted risks: the checks that do not
   need pages must pass on the Phase 4 view (gate G3), the page-break versions on the Phase 5 view
-  (gate G4). G3 passed provisionally on automated evidence (2026-11-05); its manual checks are
-  still open (see "Gate G3").
+  (gate G4). G3 passed provisionally on automated evidence (2026-11-05), and G4 likewise
+  (2026-11-07); their manual checks are still open (see "Gate G3" and "Gate G4").
 - **Date:** 2026-11-04
 - **Evidence:** `spikes/two-page` (spike) and `spikes/two-page/e2e/experiments.spec.ts`
 
@@ -150,6 +150,47 @@ The checklist is [`docs/testing/ime.md`](../testing/ime.md). These checks run be
 release at the latest, or together with their page-break versions at G4; until then they are
 listed in the release notes of any canary. A failure that cannot be fixed in the view triggers
 the fallback below.
+
+### Gate G4: passed provisionally (2026-11-07)
+
+As for G3, the project owner chose to continue without the manual checks. Automated evidence on
+the Phase 5 view (Playwright 1.64.1, Chromium, Firefox and WebKit, Windows 11):
+
+- **T5** (`apps/playground/e2e/pages.spec.ts`): a paragraph split at a line onto two pages;
+  typing at the end of page 1 inside it keeps text and caret; ArrowLeft/Right cross the break
+  one character per press (caret affinity, finding 2), also right after a hard break;
+  Backspace/Delete at the break remove one character; Shift-select across the break, replace,
+  undo: exact text and selection back; mouse drag across, delete, undo; ArrowDown across the
+  page gap; Enter pushes blocks onto page 2 and undo pulls them back; Mod+Enter page breaks
+  with undo, redo and Backspace; typing on page 1 of a 200-paragraph document keeps every page
+  valid. Run three times in a row in every engine with the visual and print suites, all
+  passing.
+- **IME at the break, automated part only:** a composition just before the break, then typing,
+  gives exact text (Chromium CDP emulation). The view does not re-split during a composition;
+  the test checks the final text and a valid flow.
+- **Determinism:** seven fixtures with the bundled test font give the same page breaks on a
+  second load and after a (simulated) font-load re-flow, matching recorded snapshots per
+  engine (`visual.spec.ts`). Print (`print.spec.ts`): in print media every page fits its sheet
+  (all three engines); a PDF has one sheet of the page size per page (Chromium only).
+- **Benchmarks:** baseline and targets in [benchmarks.md](../benchmarks.md). Finding 6 is
+  answered for keystrokes: with incremental reflow a keystroke at 100 pages takes 3-5 ms in the
+  view and paints within 8-19 ms (p95) in Chromium and Firefox; the spike's full re-render took
+  3-22 ms (median) at 50 pages. Its other half stands: WebKit's initial layout is still 2-3×
+  slower (84 ms at 100 pages, 278 ms at 199, against 40 and 82 ms in Chromium; Playwright's
+  Windows port, not Safari).
+
+**Still open (accepted risks, not run),** in addition to the G3 list:
+
+- IME composition at a fragment edge on real platforms (Windows Japanese/Chinese/Korean in
+  Chrome and Firefox, macOS Safari, Android Gboard), including one that pushes text onto the
+  next page.
+- NVDA and VoiceOver reading a paragraph split across pages: one paragraph or two, and reading
+  line by line across the break.
+- Spellcheck and autocorrect replacing a word at the end or start of a fragment.
+
+The checklist rows are in [`docs/testing/ime.md`](../testing/ime.md) ("Page breaks"). They run
+before the 0.1.0 release at the latest; until then they are listed in the release notes of any
+canary. A failure that cannot be fixed at the fragment edge triggers the fallback below.
 
 ## Decision
 

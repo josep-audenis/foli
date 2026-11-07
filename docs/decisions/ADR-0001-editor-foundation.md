@@ -57,4 +57,4 @@ ProseMirror plugins/decorations, using `@tiptap/pm` directly where Tiptap has no
 - Pagination risk stays ours, but the primitives (decorations excluded from the doc and the
   undo history) fit the "continuous document, paginated presentation" design.
 - Reconsider if: Tiptap moves core capabilities we rely on behind a paid tier, or
-  decoration-based pagination proves unworkable (see open questions in pagination.md).
+  decoration-based pagination proves unworkable (see the fallbacks in ADR-0003).
