@@ -5,6 +5,11 @@ import { FoliEditor } from "@foli/react";
 import { createElement, version } from "react";
 import { renderToString } from "react-dom/server";
 
+// React leaves out its development warnings in production: the check would pass unseen.
+if (process.env.NODE_ENV === "production") {
+  process.stderr.write("SSR check needs React's development build: unset NODE_ENV\n");
+  process.exit(1);
+}
 const logged = [];
 for (const level of ["error", "warn"]) {
   console[level] = (...args) => logged.push(`${level}: ${args.join(" ")}`);

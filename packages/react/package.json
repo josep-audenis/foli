@@ -29,7 +29,7 @@
     "!src/**/*.test.*"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
+    "build": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\" && tsc -p tsconfig.build.json",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
@@ -43,5 +43,14 @@
   "devDependencies": {
     "react": "^19.3.1",
     "react-dom": "^19.3.1"
+  },
+  "publishConfig": {
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "./styles.css": "./styles.css"
+    }
   }
 }

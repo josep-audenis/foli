@@ -12,7 +12,13 @@ const run = (command, cwd = root) => {
   execSync(command, {
     cwd,
     stdio: "inherit",
-    env: { ...process.env, NEXT_TELEMETRY_DISABLED: "1" },
+    // pnpm passes its own npm_config_* settings to scripts; npm warns about the unknown ones.
+    env: {
+      ...Object.fromEntries(
+        Object.entries(process.env).filter(([key]) => !key.toLowerCase().startsWith("npm_config_")),
+      ),
+      NEXT_TELEMETRY_DISABLED: "1",
+    },
   });
 };
 

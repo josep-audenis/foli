@@ -6,10 +6,15 @@ import { createRoot } from "react-dom/client";
 
 const KEY = "foli-example";
 
-/** The saved document, or a new one. */
+/** The saved document, or a new one (also when the saved one no longer parses). */
 function load(): FoliDocument {
   const saved = localStorage.getItem(KEY);
-  return saved ? parseDocument(JSON.parse(saved)) : createDocument();
+  try {
+    if (saved) return parseDocument(JSON.parse(saved));
+  } catch (error) {
+    console.warn("Ignoring the saved document:", error);
+  }
+  return createDocument();
 }
 
 // Save once typing pauses: `change.document` is serialized only when read.

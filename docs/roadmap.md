@@ -464,9 +464,11 @@ criterion is the one from G3: type, format with shortcuts, undo, serialize, relo
   aliasing React 18 inside `@foli/react` resolves react-dom's `react` peer to React 19, and
   the example apps install the packed packages with their own React.
 - [x] 6.4 Packaging: exports maps checked (ESM, types, `@foli/react/styles.css`; React and React
-  DOM the only peer dependencies; `sideEffects`; `repository` per package for npm
-  provenance); `publint --strict` (MIT) on every package and bundle size budgets
-  (`scripts/size.mjs`: gzip per package with its Foli dependencies; 15.6 / 22.0 / 28.1 kB)
+  DOM the only peer dependencies; `sideEffects`; `repository` per package, which npm
+  provenance checks; `publishConfig.exports` without the workspace's `@foli/source` condition;
+  `build` empties `dist` first); `publint --strict` (MIT) on every package and bundle size budgets
+  (`scripts/size.mjs`: gzip per package with its Foli dependencies, fully minified, plus an
+  app importing only `FoliEditor`; 14.1 / 19.9 / 25.3 / 25.2 kB)
   in `pnpm check`; `pnpm examples` packs the packages, installs the tarballs with npm into
   `examples/vite` (React 18, strict TypeScript over the published types, a React 18
   `renderToString` check that fails on the layout-effect warning) and `examples/next` (Next.js
@@ -477,8 +479,9 @@ criterion is the one from G3: type, format with shortcuts, undo, serialize, relo
   workflow that publishes with npm provenance. Needs the owner: control of the `@foli` npm
   scope (an npm org named `foli` already exists: confirm it is yours, or choose another
   scope) and an npm token as a repository secret.
-- [ ] 6.6 Docs: getting started, API reference, styling (CSS variables, theme, print), known
-  limitations (from architecture.md, pagination.md and ADR-0003's open risks).
+- [ ] 6.6 Docs: a README per package (the npm pages), getting started, API reference, styling
+  (CSS variables, theme, print), known limitations (from architecture.md, pagination.md and
+  ADR-0003's open risks).
 - [ ] 6.7 Release 0.1.0: ADR-0003's manual checks (G3 and G4 lists) run, or the owner accepts
   them as known risks listed in the release notes; tarball success criterion and toolbar axe
   green; the owner approves the publish.

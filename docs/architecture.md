@@ -413,13 +413,16 @@ Planned, created only when needed:
 - `pnpm build` runs `tsc` per package (topological) to `dist/` with `.d.ts`; build configs drop
   the condition so published types point at `dist`.
 - ESM-only, `sideEffects` declared (`@foli/react`: its CSS only), React and React DOM the only
-  peer dependencies (18.2+ or 19), `repository` per package (with its `directory`, as npm
-  provenance needs). Exports: `.` (`types`, `default`; the `@foli/source` condition maps to
-  `src` inside the workspace) and `@foli/react/styles.css`.
+  peer dependencies (18.2+ or 19), `repository` per package (npm provenance checks that it
+  matches the repository that built the package; `directory` links the package's folder).
+  Exports: `.` (`types`, `default`) and `@foli/react/styles.css`; inside the workspace the
+  `@foli/source` condition also maps them to `src`, and `publishConfig.exports` leaves it out of
+  the published packages. `build` empties `dist` first, so deleted modules are not shipped.
 - `pnpm check` also runs `publint --strict` on every package (exports, `files`, types) and
-  `pnpm size`: each package's published entry bundled as an app would (minified, its Foli
-  dependencies included, React external) against a gzip budget (6.4: core 15.6 kB, view
-  22.0 kB, react 28.1 kB; budgets about 15% above, in `scripts/size.mjs`).
+  `pnpm size`: each package's published entry bundled as an app would (fully minified, its
+  Foli dependencies included, React external), and an app importing only `FoliEditor`, against
+  gzip budgets (6.4: core 14.1 kB, view 19.9 kB, react 25.3 kB; budgets about 15% above, in
+  `scripts/size.mjs`).
 - `pnpm examples` installs the packed tarballs into `examples/vite` (React 18, strict
   TypeScript) and `examples/next` (React 19, server rendering) with npm, builds them, and runs
   the success criterion in Playwright; see [examples/README.md](../examples/README.md).

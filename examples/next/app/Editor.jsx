@@ -7,12 +7,18 @@ import { useState } from "react";
 const KEY = "foli-example";
 
 /**
- * The saved document in the browser; a new one on the server, which renders no content anyway.
+ * The saved document in the browser (a new one when it no longer parses); a new one on the
+ * server, which renders no content anyway.
  * (`window`, not `localStorage`: recent Node versions have a server-side `localStorage`.)
  */
 function load() {
   const saved = typeof window === "undefined" ? null : window.localStorage.getItem(KEY);
-  return saved ? parseDocument(JSON.parse(saved)) : createDocument();
+  try {
+    if (saved) return parseDocument(JSON.parse(saved));
+  } catch (error) {
+    console.warn("Ignoring the saved document:", error);
+  }
+  return createDocument();
 }
 
 // Save once typing pauses: `change.document` is serialized only when read.

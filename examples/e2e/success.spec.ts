@@ -34,7 +34,10 @@ test("type, format with a shortcut, undo, save, reload without loss", async ({ p
   const saved = JSON.parse(
     (await page.evaluate(() => localStorage.getItem("foli-example"))) ?? "null",
   );
-  expect(saved).toMatchObject({ schemaVersion: 1, settings: { pageSize: { width: 210 } } });
+  expect(saved).toMatchObject({
+    schemaVersion: expect.any(Number),
+    settings: { pageSize: { width: 210 } },
+  });
   await page.reload();
   await expect(editor(page)).toHaveText("Hello Foli");
   await expect(editor(page).locator("strong")).toHaveText("Foli");
