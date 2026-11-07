@@ -86,7 +86,10 @@ You can style headings and paragraphs (`.foli-page h1 { font-size: 20pt }`). Mar
 padding on blocks are measured, so pagination follows them. List elements must take no
 vertical space of their own (the view sets their block margins and paddings to 0 inline; do not
 add vertical borders, or margins with `!important`): pagination treats the blocks inside lists
-as siblings. Indent lists horizontally (`padding-inline-start`) as you like. A paragraph split across two pages
+as siblings. Also avoid `list-style-position: inside` (it adds a line box of its own) and
+anything that makes a list a block formatting context (`display: flow-root`, `overflow`
+other than `visible`, `float`): margins would stop collapsing through it. Indent lists
+horizontally (`padding-inline-start`) as you like. A paragraph split across two pages
 is two elements: its padding and border repeat on each part. Avoid negative margins on blocks
 and `vertical-align` on inline text; pagination does not model them.
 

@@ -3,10 +3,11 @@ import {
   createDocument,
   createEditor,
   type DocJSON,
+  findWrapping,
   NodeSelection,
   TextSelection,
 } from "@folijs/core";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { serializeRange } from "./clipboard.js";
 import { EditorView } from "./index.js";
 
@@ -244,5 +245,100 @@ describe("nested blocks (ADR-0004)", () => {
     expect(html).toContain('<ol start="3"><li>');
     expect(html).toContain("<hr>");
     expect(html).not.toContain("data-foli-wrapper");
+  });
+});
+
+describe("nested blocks: review regressions (PR #35)", () => {
+  const listType = (editor: ReturnType<typeof mount>["editor"]) =>
+    editor.state.schema.nodes.bulletList as NonNullable<
+      ReturnType<typeof mount>["editor"]["state"]["schema"]["nodes"]["bulletList"]
+    >;
+
+  it("wraps a reused block in a new list without losing its place (A, B, C: wrap A)", () => {
+    const { host, editor } = mount({ type: "doc", content: [p("A"), p("B"), p("C")] } as DocJSON);
+    const { doc } = editor.state;
+    const range = doc.resolve(1).blockRange(doc.resolve(2));
+    const wrappers = range && findWrapping(range, listType(editor));
+    expect(range && wrappers).toBeTruthy();
+    editor.dispatch(editor.state.tr.wrap(range as never, wrappers as never));
+    expect(pageHTML(host)).toBe("<ul><li><p>A</p></li></ul><p>B</p><p>C</p>");
+    editor.commands.undo();
+    expect(pageHTML(host)).toBe("<p>A</p><p>B</p><p>C</p>");
+  });
+
+  it("indents a middle item into a nested list (ul > li > [X, Y, Z]: wrap Y)", () => {
+    const { host, editor } = mount({
+      type: "doc",
+      content: [{ type: "bulletList", content: [item(p("X"), p("Y"), p("Z"))] }],
+    } as DocJSON);
+    const { doc } = editor.state;
+    let y = -1;
+    doc.descendants((node, pos) => {
+      if (node.textContent === "Y" && node.isTextblock) y = pos + 1;
+      return true;
+    });
+    const range = doc.resolve(y).blockRange(doc.resolve(y + 1));
+    const wrappers = range && findWrapping(range, listType(editor));
+    editor.dispatch(editor.state.tr.wrap(range as never, wrappers as never));
+    expect(pageHTML(host)).toBe("<ul><li><p>X</p><ul><li><p>Y</p></li></ul><p>Z</p></li></ul>");
+  });
+
+  it("measures a block again when it moves into a container (its width changed)", () => {
+    const { host, editor } = mount({ type: "doc", content: [p("A"), p("B")] } as DocJSON);
+    const a = host.querySelector("p") as HTMLElement;
+    const spy = vi.spyOn(a, "getBoundingClientRect");
+    const { doc } = editor.state;
+    const range = doc.resolve(1).blockRange(doc.resolve(2));
+    const wrappers = range && findWrapping(range, listType(editor));
+    editor.dispatch(editor.state.tr.wrap(range as never, wrappers as never));
+    expect(host.querySelector("li > p")).toBe(a); // the same element, reused
+    expect(spy).toHaveBeenCalled(); // and measured again
+  });
+
+  it("does not move later list items when one item moves to the next page", () => {
+    const { host, view } = mount({
+      type: "doc",
+      content: [
+        {
+          type: "orderedList",
+          content: ["1", "2", "3", "4", "5", "6"].map((t) => item(p(t))),
+        },
+      ],
+    } as DocJSON);
+    const internal = view as unknown as {
+      place(b: unknown, pages: number[][], chains: unknown): void;
+      blocks: unknown;
+      chains: unknown;
+    };
+    internal.place(internal.blocks, [[0], [0], [0], [1], [1], [1]], internal.chains);
+    const fifth = [...host.querySelectorAll("p")].find((el) => el.textContent === "5");
+    const li = fifth?.parentElement;
+    internal.place(internal.blocks, [[0], [0], [1], [1], [1], [1]], internal.chains);
+    expect(fifth?.parentElement).toBe(li); // still in its own <li>
+    const pages = host.querySelectorAll(".foli-page");
+    expect(pages[1]?.querySelectorAll("li > p")).toHaveLength(4);
+  });
+
+  it("copies a word from a list item as text, not as a one-item list", () => {
+    const { editor } = mount();
+    let at = -1;
+    editor.state.doc.descendants((node, pos) => {
+      if (node.isText && node.text === "two") at = pos;
+      return true;
+    });
+    const { html, json } = serializeRange(editor.state.doc, at, at + 3, document);
+    expect(html).toBe('<p style="white-space: pre-wrap;">two</p>');
+    expect(json).toContain('"listItem"'); // the JSON keeps the context
+  });
+
+  it("keeps a node selection out of a Shift+click on a rule (the native extension applies)", () => {
+    const { host, editor, view } = mount();
+    view.focus();
+    editor.select(2);
+    const hr = host.querySelector("hr") as HTMLElement;
+    hr.dispatchEvent(
+      new MouseEvent("mousedown", { bubbles: true, button: 0, detail: 1, shiftKey: true }),
+    );
+    expect(editor.state.selection).not.toBeInstanceOf(NodeSelection);
   });
 });

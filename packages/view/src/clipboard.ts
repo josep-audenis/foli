@@ -51,7 +51,14 @@ export function serializeRange(
   const blocks = doc.type.createOpen(null, content);
   const container = ownerDocument.createElement("div");
   // Built with createElement/textContent (render.ts); reading innerHTML only serializes it.
-  renderTree(blocks.content.content, container, ownerDocument);
+  // A range inside one textblock is that block's text: its lists around it stay out of the HTML
+  // (a word copied from a list item must not paste as a one-item list); the JSON keeps them.
+  const $to = doc.resolve(to);
+  const inline = $from.parent.isTextblock && $from.sameParent($to);
+  const htmlBlocks = inline
+    ? [$from.parent.copy(doc.slice(from, to).content)]
+    : blocks.content.content;
+  renderTree(htmlBlocks, container, ownerDocument);
   // Keep repeated and leading spaces in other apps.
   for (const block of container.querySelectorAll("p, h1, h2, h3, h4, h5, h6"))
     (block as HTMLElement).style.whiteSpace = "pre-wrap";

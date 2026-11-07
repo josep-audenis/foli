@@ -135,6 +135,8 @@ export class EditorView {
   private chains: (readonly Container[])[] = [];
   /** The index of each block in `blocks`. */
   private indexOf = new Map<BlockDesc, number>();
+  /** The container types around each block at its last render (a change means re-measuring). */
+  private chainKeys = new WeakMap<ModelNode, string>();
   /** The element that shows a node selection, if any. */
   private selectedDom: HTMLElement | null = null;
   /** The page of each fragment of each block. */
@@ -389,6 +391,12 @@ export class EditorView {
         open.push({ node, pos, index, firstBlock: blocks.length });
         return true;
       }
+      // A block moved into or out of a container (wrapped in a list, indented, lifted) keeps its
+      // node but not its line width or margins: measure it again, and re-flow from it.
+      const chainKey = open.map((container) => container.node.type.name).join(">");
+      const before = this.chainKeys.get(node);
+      if (before !== undefined && before !== chainKey) this.stale.add(node);
+      this.chainKeys.set(node, chainKey);
       let reused = previous.get(node);
       // A split block about to be measured again (fonts, CSS) is rendered whole first: each
       // fragment's end breaks its line, so its lines would depend on where it was split before.
@@ -509,6 +517,11 @@ export class EditorView {
         at = next;
       }
     };
+    // Block fragments not placed yet, and their blocks. A container element whose first block is
+    // still to be placed, in another container at that level, belongs to that later container: a
+    // block before it gets a new element instead of taking it (which would move every later block
+    // into the next element along, e.g. when one list item moves to the next page).
+    const pending = new Map<Node, number>(items.map((item) => [item.dom, item.block]));
     let i = 0;
     for (let p = 0; p < count; p++) {
       const page = this.pages[p] as HTMLElement;
@@ -531,8 +544,15 @@ export class EditorView {
           const container = chain[k] as Container;
           const parent = stack[stack.length - 1] as (typeof stack)[number];
           let element: HTMLElement;
-          if (isWrapperFor(parent.at, container.node)) {
-            element = parent.at;
+          const candidate = parent.at;
+          const later = isWrapperFor(candidate, container.node)
+            ? pending.get(firstBlockIn(candidate) as Node)
+            : undefined;
+          if (
+            isWrapperFor(candidate, container.node) &&
+            (later === undefined || chains[later]?.[k]?.pos === container.pos)
+          ) {
+            element = candidate;
             parent.at = element.nextSibling;
           } else {
             element = createWrapper(container.node, ownerDocument);
@@ -543,7 +563,13 @@ export class EditorView {
         }
         const top = stack[stack.length - 1] as (typeof stack)[number];
         if (item.dom === top.at) top.at = top.at.nextSibling;
-        else top.el.insertBefore(item.dom, top.at);
+        else {
+          // A cursor of an outer level may point at this block (it moves into a new container):
+          // step it past, or it would point into the container.
+          for (const level of stack) if (level.at === item.dom) level.at = item.dom.nextSibling;
+          top.el.insertBefore(item.dom, top.at);
+        }
+        pending.delete(item.dom);
       }
       while (stack.length) closeLevel(stack.pop() as (typeof stack)[number]);
     }
@@ -988,8 +1014,9 @@ export class EditorView {
     const start = this.starts[index] as number;
     let selection: Selection;
     if (!desc.node.isTextblock) {
-      // A click on a rule selects it (the browser would put the caret beside it).
-      if (!NodeSelection.isSelectable(desc.node)) return;
+      // A click on a rule selects it (the browser would put the caret beside it); Shift+click
+      // extends the selection natively.
+      if (event.shiftKey || !NodeSelection.isSelectable(desc.node)) return;
       selection = NodeSelection.create(doc, start);
     } else if (event.detail === 3) {
       selection = TextSelection.create(doc, start + 1, start + 1 + desc.node.content.size);
@@ -1003,8 +1030,9 @@ export class EditorView {
   /** A link in the document does not navigate when clicked (editing places the caret in it). */
   private onClick = (event: MouseEvent): void => {
     const target = event.target;
-    if (target instanceof Element && target.closest("a") && this.host.contains(target))
-      event.preventDefault();
+    const link = target instanceof Element ? target.closest("a") : null;
+    // shortcut: no way to follow a link yet, read-only included; Ctrl/Cmd+click opens it (7.6).
+    if (link && this.host.contains(link)) event.preventDefault();
   };
 
   private onKeyDown = (event: KeyboardEvent): void => {
@@ -1336,6 +1364,13 @@ export class EditorView {
   private onSelectionChange = (): void => {
     if (!this.composing && this.hasFocus()) this.syncSelection();
   };
+}
+
+/** The first block element inside a container element (through nested containers), or null. */
+function firstBlockIn(element: Element): Element | null {
+  let child = element.firstElementChild;
+  while (child?.hasAttribute(WRAPPER_ATTR)) child = child.firstElementChild;
+  return child;
 }
 
 /**
