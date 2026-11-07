@@ -4,8 +4,9 @@ import type { MarkJSON, NodeJSON } from "../model/index.js";
 import { Schema } from "../model/index.js";
 
 /**
- * A schema richer than v1, built through the public spec API: nested blocks (blockquote), a
- * block leaf (rule), a mark with attrs (link) and a mark that excludes all others (code).
+ * A schema richer than v1, built through the public spec API: nested blocks (blockquote, a list
+ * whose items start with a paragraph), a block leaf (rule), a mark with attrs that is not
+ * inclusive (link) and a mark that excludes all others (code).
  */
 export const testSchema = new Schema({
   nodes: {
@@ -22,6 +23,8 @@ export const testSchema = new Schema({
       },
     },
     blockquote: { group: "block", content: "block+" },
+    bulletList: { group: "block", content: "listItem+" },
+    listItem: { content: "paragraph block*" },
     rule: { group: "block" },
     text: { group: "inline" },
     hardBreak: { group: "inline", inline: true },
@@ -29,13 +32,13 @@ export const testSchema = new Schema({
   marks: {
     bold: {},
     italic: {},
-    link: { attrs: { href: {} } },
+    link: { attrs: { href: {} }, inclusive: false },
     code: { excludes: "_" },
   },
 });
 
 export interface JSONOptions {
-  /** Use testSchema's extra node and mark types (blockquote, rule, link, code). */
+  /** Use testSchema's extra node and mark types (blockquote, list, rule, link, code). */
   rich: boolean;
 }
 
@@ -99,6 +102,17 @@ export function docJSON({ rich }: JSONOptions): fc.Arbitrary<NodeJSON> {
       fc
         .array(tie("block"), { minLength: 1, maxLength: 3, depthIdentifier: "block" })
         .map((content) => ({ type: "blockquote", content })),
+      fc
+        .array(
+          fc
+            .tuple(
+              textblock.filter((block) => block.type === "paragraph"),
+              fc.array(tie("block"), { maxLength: 2, depthIdentifier: "block" }),
+            )
+            .map(([first, rest]) => ({ type: "listItem", content: [first, ...rest] })),
+          { minLength: 1, maxLength: 3, depthIdentifier: "block" },
+        )
+        .map((content) => ({ type: "bulletList", content })),
     ),
   }));
   return fc

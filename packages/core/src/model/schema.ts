@@ -19,6 +19,13 @@ export interface NodeSpec {
    */
   marks?: string;
   attrs?: AttributeSpecs;
+  /**
+   * Edited as one unit: the caret never enters it. Leaf nodes are atoms whatever this says;
+   * set it on a non-leaf node whose content is managed by code.
+   */
+  atom?: boolean;
+  /** Whether a NodeSelection may select this node (default true; text is never selectable). */
+  selectable?: boolean;
 }
 
 export interface MarkSpec {
@@ -30,6 +37,11 @@ export interface MarkSpec {
    * Defaults to the mark itself (at most one mark of a type per node).
    */
   excludes?: string;
+  /**
+   * Whether text typed at the end of this mark gets it too (default true). A link is not
+   * inclusive: typing right after it continues as plain text.
+   */
+  inclusive?: boolean;
 }
 
 export interface SchemaSpec {
@@ -77,6 +89,16 @@ export class NodeType {
     return this.isBlock && this.inlineContent;
   }
 
+  /** Edited as one unit (leaf nodes, and nodes whose spec says `atom`). */
+  get isAtom(): boolean {
+    return this.isLeaf || !!this.spec.atom;
+  }
+
+  /** True when some attribute has no default (the type cannot be created without attrs). */
+  hasRequiredAttrs(): boolean {
+    return Object.values(this.spec.attrs ?? {}).some((spec) => !("default" in spec));
+  }
+
   /** Creates a validated node. Throws FoliDocumentError on bad attrs or content. */
   create(
     attrs?: Attrs | null,
@@ -91,6 +113,21 @@ export class NodeType {
       computeAttrs(this.spec.attrs, attrs ?? undefined, `${this.name}.attrs`),
       fragment,
       Mark.setFrom(marks),
+    );
+  }
+
+  /**
+   * Creates a node without checking its content, for a transform that completes it before the
+   * document is rebuilt (a wrapper filled with the wrapped blocks, the open half of a split).
+   * Attributes are still validated. The step that uses it validates the result.
+   */
+  createOpen(attrs?: Attrs | null, content?: Fragment | Node | readonly Node[] | null): Node {
+    if (this.isText) throw new RangeError("Use Schema.text to create text nodes");
+    return new Node(
+      this,
+      computeAttrs(this.spec.attrs, attrs ?? undefined, `${this.name}.attrs`),
+      Fragment.from(content),
+      Mark.none,
     );
   }
 
@@ -157,6 +194,10 @@ export class MarkType {
   create(attrs?: Attrs | null): Mark {
     if (this.instance && !(attrs && Object.keys(attrs).length)) return this.instance;
     return new Mark(this, computeAttrs(this.spec.attrs, attrs ?? undefined, `${this.name}.attrs`));
+  }
+
+  get inclusive(): boolean {
+    return this.spec.inclusive ?? true;
   }
 
   excludes(other: MarkType): boolean {

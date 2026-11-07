@@ -59,17 +59,25 @@ export abstract class Step {
   abstract map(mapping: Mappable): Step | null;
 }
 
-/** Replaces `from..to` with a slice. */
+/**
+ * Replaces `from..to` with a slice. A `structure` step only moves node boundaries (split, join):
+ * it fails instead of deleting content that, after mapping through other changes, now sits in
+ * its range.
+ */
 export class ReplaceStep extends Step {
   constructor(
     readonly from: number,
     readonly to: number,
     readonly slice: Slice,
+    readonly structure = false,
   ) {
     super();
   }
 
   apply(doc: Node): StepResult {
+    if (this.structure && contentBetween(doc, this.from, this.to)) {
+      return StepResult.fail("Structure replace would overwrite content");
+    }
     return StepResult.fromReplace(doc, this.from, this.to, this.slice);
   }
 
@@ -85,7 +93,7 @@ export class ReplaceStep extends Step {
     const from = mapping.mapResult(this.from, 1);
     const to = mapping.mapResult(this.to, -1);
     if (from.deleted && to.deleted) return null;
-    return new ReplaceStep(from.pos, Math.max(from.pos, to.pos), this.slice);
+    return new ReplaceStep(from.pos, Math.max(from.pos, to.pos), this.slice, this.structure);
   }
 
   /**
@@ -93,7 +101,7 @@ export class ReplaceStep extends Step {
    * (e.g. consecutive keystrokes); null otherwise. Keeps typing history to one step per run.
    */
   merge(next: Step): ReplaceStep | null {
-    if (!(next instanceof ReplaceStep)) return null;
+    if (!(next instanceof ReplaceStep) || next.structure || this.structure) return null;
     const join = (a: Slice, b: Slice) =>
       a.size + b.size === 0
         ? Slice.empty
@@ -110,6 +118,119 @@ export class ReplaceStep extends Step {
     }
     return null;
   }
+}
+
+/**
+ * Replaces `from..to` with a slice while keeping the content between `gapFrom` and `gapTo`,
+ * which is inserted into the slice at `insert`. Wrapping blocks in a list (the slice holds the
+ * empty wrappers) and lifting them out (the slice holds the split ancestors) are such steps:
+ * the moved content is not deleted and re-inserted, so positions inside it map through.
+ */
+export class ReplaceAroundStep extends Step {
+  constructor(
+    readonly from: number,
+    readonly to: number,
+    readonly gapFrom: number,
+    readonly gapTo: number,
+    readonly slice: Slice,
+    readonly insert: number,
+    readonly structure = false,
+  ) {
+    super();
+  }
+
+  apply(doc: Node): StepResult {
+    if (
+      this.from < 0 ||
+      this.from > this.gapFrom ||
+      this.gapFrom > this.gapTo ||
+      this.gapTo > this.to ||
+      this.to > doc.content.size
+    ) {
+      return StepResult.fail(`Invalid gap range ${this.from}..${this.to}`);
+    }
+    if (
+      this.structure &&
+      (contentBetween(doc, this.from, this.gapFrom) || contentBetween(doc, this.gapTo, this.to))
+    ) {
+      return StepResult.fail("Structure gap-replace would overwrite content");
+    }
+    const gap = doc.slice(this.gapFrom, this.gapTo);
+    if (gap.openStart || gap.openEnd) return StepResult.fail("Gap is not a flat range");
+    let inserted: Slice | null;
+    try {
+      inserted = this.slice.insertAt(this.insert, gap.content);
+    } catch (error) {
+      if (error instanceof RangeError) return StepResult.fail(error.message);
+      throw error;
+    }
+    if (!inserted) return StepResult.fail("Content does not fit in gap");
+    return StepResult.fromReplace(doc, this.from, this.to, inserted);
+  }
+
+  override getMap(): StepMap {
+    return new StepMap([
+      this.from,
+      this.gapFrom - this.from,
+      this.insert,
+      this.gapTo,
+      this.to - this.gapTo,
+      this.slice.size - this.insert,
+    ]);
+  }
+
+  invert(doc: Node): Step {
+    const gap = this.gapTo - this.gapFrom;
+    return new ReplaceAroundStep(
+      this.from,
+      this.from + this.slice.size + gap,
+      this.from + this.insert,
+      this.from + this.insert + gap,
+      doc.slice(this.from, this.to).removeBetween(this.gapFrom - this.from, this.gapTo - this.from),
+      this.gapFrom - this.from,
+      this.structure,
+    );
+  }
+
+  map(mapping: Mappable): Step | null {
+    const from = mapping.mapResult(this.from, 1);
+    const to = mapping.mapResult(this.to, -1);
+    const gapFrom = this.from === this.gapFrom ? from.pos : mapping.map(this.gapFrom, -1);
+    const gapTo = this.to === this.gapTo ? to.pos : mapping.map(this.gapTo, 1);
+    if ((from.deleted && to.deleted) || gapFrom < from.pos || gapTo > to.pos) return null;
+    return new ReplaceAroundStep(
+      from.pos,
+      to.pos,
+      gapFrom,
+      gapTo,
+      this.slice,
+      this.insert,
+      this.structure,
+    );
+  }
+}
+
+/**
+ * Whether `from..to` holds anything but node boundaries: text, a leaf, or a node that is not
+ * the first or last along the path. Used by structure steps.
+ */
+function contentBetween(doc: Node, from: number, to: number): boolean {
+  const $from = doc.resolve(from);
+  let dist = to - from;
+  let depth = $from.depth;
+  while (dist > 0 && depth > 0 && $from.indexAfter(depth) === $from.node(depth).childCount) {
+    depth--;
+    dist--;
+  }
+  if (dist > 0) {
+    let next = $from.node(depth).maybeChild($from.indexAfter(depth));
+    while (dist > 0) {
+      if (!next || next.isLeaf) return true;
+      next = next.firstChild;
+      dist--;
+    }
+  }
+  return false;
 }
 
 /** Rebuilds inline nodes of a fragment with `f`, descending into block content. */

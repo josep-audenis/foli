@@ -4,7 +4,7 @@ export { FoliDocumentError, ReplaceError } from "./errors.js";
 export { Fragment } from "./fragment.js";
 export { Mark, type MarkJSON } from "./mark.js";
 export { Node, type NodeJSON, TextNode } from "./node.js";
-export { ResolvedPos } from "./resolvedpos.js";
+export { NodeRange, ResolvedPos } from "./resolvedpos.js";
 export {
   type MarkSpec,
   MarkType,

@@ -7,6 +7,7 @@ import {
   type Mark,
   MarkType,
   type Node,
+  type NodeRange,
   type NodeType,
   Slice,
 } from "../model/index.js";
@@ -16,10 +17,12 @@ import {
   NodeMarkupBatchStep,
   NodeMarkupStep,
   RemoveMarkStep,
+  ReplaceAroundStep,
   ReplaceStep,
   type Step,
   type StepResult,
 } from "./steps.js";
+import type { NodeTypeWithAttrs } from "./structure.js";
 
 /** A step could not be applied (the change would break the schema or the range is invalid). */
 export class TransformError extends Error {
@@ -150,26 +153,119 @@ export class Transform {
   }
 
   /**
-   * Splits the textblock around `pos` in two. The second half gets the same markup unless
-   * `after` says otherwise. shortcut: splits one level only; nested splits arrive with lists (Phase 7).
+   * Splits the node around `pos` and `depth - 1` of its ancestors in two (depth 2 in a list
+   * item's paragraph splits the item). The new nodes after the split get the types in
+   * `typesAfter` (outermost first); missing entries keep the original type and attributes.
+   * Check with `canSplit` first: an invalid split throws TransformError.
    */
-  split(pos: number, after?: { type: NodeType; attrs?: Attrs | null }): this {
-    const parent = this.doc.resolve(pos).parent;
-    const second = after ? after.type.create(after.attrs) : parent.copy();
-    return this.replace(pos, pos, new Slice(Fragment.from([parent.copy(), second]), 1, 1));
+  split(
+    pos: number,
+    depth = 1,
+    typesAfter?: readonly (NodeTypeWithAttrs | null | undefined)[],
+  ): this {
+    const $pos = this.doc.resolve(pos);
+    if (depth < 1 || depth > $pos.depth)
+      throw new TransformError(`Cannot split ${depth} levels at ${pos}`);
+    let before = Fragment.empty;
+    let after = Fragment.empty;
+    for (let d = $pos.depth, i = depth - 1; d > $pos.depth - depth; d--, i--) {
+      before = Fragment.from($pos.node(d).copy(before));
+      const typeAfter = typesAfter?.[i];
+      after = Fragment.from(
+        typeAfter ? typeAfter.type.createOpen(typeAfter.attrs, after) : $pos.node(d).copy(after),
+      );
+    }
+    return this.step(
+      new ReplaceStep(pos, pos, new Slice(before.append(after), depth, depth), true),
+    );
   }
 
   /**
-   * Joins the two textblocks on either side of `pos`. Throws TransformError for any other position.
-   * shortcut: textblocks only; joining other compatible blocks (lists, Phase 7) needs a content check.
+   * Joins the nodes on either side of `pos` (and, with `depth` > 1, their last and first
+   * descendants down to that depth). Throws TransformError when they cannot be joined; check
+   * with `canJoin` first.
    */
-  join(pos: number): this {
-    // Without this check a position inside text would silently delete the two characters around it.
+  join(pos: number, depth = 1): this {
+    // Without this check a position inside text would silently delete the characters around it.
     const $pos = pos > 0 && pos < this.doc.content.size ? this.doc.resolve(pos) : null;
-    if (!$pos?.nodeBefore?.isTextblock || !$pos.nodeAfter?.isTextblock) {
-      throw new TransformError(`Position ${pos} is not between two textblocks`);
+    const before = $pos?.nodeBefore;
+    const after = $pos?.nodeAfter;
+    if (!before || !after || before.isLeaf || after.isLeaf || $pos?.textOffset) {
+      throw new TransformError(`Position ${pos} is not between two joinable nodes`);
     }
-    return this.delete(pos - 1, pos + 1);
+    return this.step(new ReplaceStep(pos - depth, pos + depth, Slice.empty, true));
+  }
+
+  /**
+   * Wraps the blocks of `range` in `wrappers` (outermost first, as `findWrapping` returns
+   * them). The blocks move inside without being re-created, so positions in them map through.
+   */
+  wrap(range: NodeRange, wrappers: readonly NodeTypeWithAttrs[]): this {
+    let content = Fragment.empty;
+    for (let i = wrappers.length - 1; i >= 0; i--) {
+      const wrapper = wrappers[i] as NodeTypeWithAttrs;
+      if (content.size && !wrapper.type.contentMatch.matchFragment(content)?.validEnd) {
+        throw new TransformError(`${wrapper.type.name} cannot hold the next wrapper`);
+      }
+      content = Fragment.from(wrapper.type.createOpen(wrapper.attrs, content));
+    }
+    const { start, end } = range;
+    return this.step(
+      new ReplaceAroundStep(
+        start,
+        end,
+        start,
+        end,
+        new Slice(content, 0, 0),
+        wrappers.length,
+        true,
+      ),
+    );
+  }
+
+  /**
+   * Moves the blocks of `range` up to `target` depth (from `liftTarget`), splitting the
+   * ancestors they leave around them; ancestors left empty on a side are removed.
+   */
+  lift(range: NodeRange, target: number): this {
+    const { $from, $to, depth } = range;
+    const gapStart = $from.before(depth + 1);
+    const gapEnd = $to.after(depth + 1);
+    let start = gapStart;
+    let end = gapEnd;
+    let before = Fragment.empty;
+    let openStart = 0;
+    for (let d = depth, splitting = false; d > target; d--) {
+      if (splitting || $from.index(d) > 0) {
+        splitting = true;
+        before = Fragment.from($from.node(d).copy(before));
+        openStart++;
+      } else {
+        start--;
+      }
+    }
+    let after = Fragment.empty;
+    let openEnd = 0;
+    for (let d = depth, splitting = false; d > target; d--) {
+      if (splitting || $to.after(d + 1) < $to.end(d)) {
+        splitting = true;
+        after = Fragment.from($to.node(d).copy(after));
+        openEnd++;
+      } else {
+        end++;
+      }
+    }
+    return this.step(
+      new ReplaceAroundStep(
+        start,
+        end,
+        gapStart,
+        gapEnd,
+        new Slice(before.append(after), openStart, openEnd),
+        before.size - openStart,
+        true,
+      ),
+    );
   }
 
   /** Changes every textblock touching `from..to` to `type` with `attrs`, keeping content. */

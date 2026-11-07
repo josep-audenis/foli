@@ -7,8 +7,8 @@ import {
   Slice,
 } from "../model/index.js";
 import type { Step } from "../transform/steps.js";
-import { Transform } from "../transform/transform.js";
-import { AllSelection, Selection, TextSelection } from "./selection.js";
+import { Transform, TransformError } from "../transform/transform.js";
+import { AllSelection, NodeSelection, Selection, TextSelection } from "./selection.js";
 
 /**
  * A command: checks whether it applies to `state` and, given `dispatch`, performs it.
@@ -128,6 +128,15 @@ export class Transaction extends Transform {
       return this.setSelection(Selection.atStart(this.doc));
     }
     const start = this.steps.length;
+    const { $from } = selection;
+    const index = $from.index();
+    if (selection instanceof NodeSelection && !$from.parent.canReplace(index, index + 1)) {
+      // The parent cannot lose its only (or a required) child: leave an empty default block.
+      const type = $from.parent.contentMatchAt(index).defaultType;
+      if (!type?.isTextblock) throw new TransformError("The selected node cannot be deleted");
+      this.replace(selection.from, selection.to, new Slice(Fragment.from(type.create()), 0, 0));
+      return this.setSelection(TextSelection.create(this.doc, selection.from + 1));
+    }
     this.delete(selection.from, selection.to);
     const caret = this.mapping.slice(start).map(selection.from, -1);
     return this.setSelection(TextSelection.create(this.doc, caret));

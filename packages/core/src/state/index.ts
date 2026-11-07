@@ -28,6 +28,7 @@ export {
 export {
   AllSelection,
   marksAt,
+  NodeSelection,
   Selection,
   type SelectionJSON,
   TextSelection,

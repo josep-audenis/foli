@@ -79,6 +79,62 @@ export class ContentMatch {
     return match;
   }
 
+  /** The node types that may come next, in expression order, each once. */
+  get nextTypes(): readonly NodeType[] {
+    const types: NodeType[] = [];
+    for (const state of this.states) {
+      for (const type of this.program.elements[state]?.types ?? []) {
+        if (!types.includes(type)) types.push(type);
+      }
+    }
+    return types;
+  }
+
+  /** The first type that may come next and can be created without attributes or content. */
+  get defaultType(): NodeType | null {
+    return (
+      this.nextTypes.find(
+        (type) => !type.isText && !type.hasRequiredAttrs() && type.contentMatch.validEnd,
+      ) ?? null
+    );
+  }
+
+  /**
+   * The shortest chain of wrapper types (outermost first) that makes a node of `target` fit
+   * here: `[]` when it fits as is, null when no chain of creatable types does. Wrappers must
+   * be creatable without attributes; inner wrappers must leave their parent complete.
+   */
+  findWrapping(target: NodeType): readonly NodeType[] | null {
+    interface Step {
+      match: ContentMatch;
+      type: NodeType | null;
+      via: Step | null;
+    }
+    const seen = new Set<NodeType>();
+    const active: Step[] = [{ match: this, type: null, via: null }];
+    while (active.length) {
+      const current = active.shift() as Step;
+      if (current.match.matchType(target)) {
+        const result: NodeType[] = [];
+        for (let step: Step | null = current; step?.type; step = step.via) result.push(step.type);
+        return result.reverse();
+      }
+      for (const type of current.match.nextTypes) {
+        const next = current.match.matchType(type);
+        if (
+          !type.isLeaf &&
+          !type.hasRequiredAttrs() &&
+          !seen.has(type) &&
+          (!current.type || next?.validEnd)
+        ) {
+          seen.add(type);
+          active.push({ match: type.contentMatch, type, via: current });
+        }
+      }
+    }
+    return null;
+  }
+
   /** True when the expression's node types are inline (all are, or none are). */
   get inlineContent(): boolean {
     return this.program.elements[0]?.types[0]?.isInline ?? false;

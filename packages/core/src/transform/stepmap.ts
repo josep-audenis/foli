@@ -33,7 +33,11 @@ export class StepMap implements Mappable {
     readonly inverted = false,
   ) {}
 
-  mapResult(pos: number, assoc = 1): MapResult {
+  /**
+   * Maps `pos`. `sides` (from `sides()` of a map with the same ranges) overrides `assoc` per
+   * range at pure insertions, where the side decides which side of the new content `pos` ends up.
+   */
+  mapResult(pos: number, assoc = 1, sides?: readonly number[]): MapResult {
     let diff = 0;
     const oldIndex = this.inverted ? 2 : 1;
     const newIndex = this.inverted ? 1 : 2;
@@ -44,7 +48,13 @@ export class StepMap implements Mappable {
       const newSize = this.ranges[i + newIndex] as number;
       const end = start + oldSize;
       if (pos <= end) {
-        const side = !oldSize ? assoc : pos === start ? -1 : pos === end ? 1 : assoc;
+        const side = !oldSize
+          ? sides?.[i / 3] || assoc
+          : pos === start
+            ? -1
+            : pos === end
+              ? 1
+              : assoc;
         // Recoverable unless the position sits on the range edge it associates with; a start edge
         // with right association must be recoverable, or it drifts past re-inserted content.
         const recoverable = pos !== (assoc < 0 ? start : end);
@@ -91,19 +101,15 @@ export class StepMap implements Mappable {
   }
 
   /**
-   * Which side of the changed ranges `pos` (in input coordinates) lies on: -1 at or before the
-   * nearest range ahead of it, 1 at or after the last range behind it, 0 for an empty map.
-   * shortcut: one side for the whole map, exact only for single-range maps (every step today);
-   * record a side per range when multi-range steps (ReplaceAroundStep, Phase 7) arrive.
+   * Which side of each changed range `pos` (in input coordinates) lies on: -1 at or before the
+   * range, 1 at or after it, 0 strictly inside. One entry per range, in order.
    */
-  side(pos: number): -1 | 0 | 1 {
-    let side: -1 | 0 | 1 = 0;
+  sides(pos: number): (-1 | 0 | 1)[] {
+    const sides: (-1 | 0 | 1)[] = [];
     this.forEach((oldStart, oldEnd) => {
-      if (side === -1) return;
-      if (pos <= oldStart) side = -1;
-      else if (pos >= oldEnd) side = 1;
+      sides.push(pos <= oldStart ? -1 : pos >= oldEnd ? 1 : 0);
     });
-    return side;
+    return sides;
   }
 
   invert(): StepMap {

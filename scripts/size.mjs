@@ -19,10 +19,11 @@ writeFileSync(appEntry, `export { FoliEditor } from "${dist("react")}";\n`);
 
 /**
  * Gzipped bytes allowed per bundle, about 15% over its size when set (6.4: 14.1, 19.9, 25.3 and
- * 25.2 kB). Raise one only with a reason in the PR.
+ * 25.2 kB). Raise one only with a reason in the PR. Core raised in 7.1 (16.6 kB): the structure
+ * engine for lists (ReplaceAroundStep, wrap/lift/split/join and their checks, NodeSelection).
  */
 const BUNDLES = [
-  { name: "@folijs/core", entry: dist("core"), budget: 16_500 },
+  { name: "@folijs/core", entry: dist("core"), budget: 19_500 },
   { name: "@folijs/view", entry: dist("view"), budget: 23_500 },
   { name: "@folijs/react", entry: dist("react"), budget: 29_800 },
   { name: "FoliEditor only", entry: appEntry, budget: 29_800 },

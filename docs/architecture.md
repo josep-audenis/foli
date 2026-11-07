@@ -62,17 +62,33 @@ Implemented headless in Phase 3 (`packages/core/src/transform/`, `packages/core/
 The design follows prosemirror-transform, -state, -history and -commands (MIT); the code is
 Foli's own (see `THIRD_PARTY_NOTICES.md`).
 
-- **Steps** change the document atomically and are invertible: `ReplaceStep`, `AddMarkStep`,
-  `RemoveMarkStep` and `NodeMarkupStep`. `NodeMarkupStep` handles type and attribute changes that
-  keep inner positions; it replaces the planned `AttrStep`. A failing step returns a failed
-  `StepResult`; `Transform.step` throws `TransformError` and leaves the transform unchanged.
-- **Mapping**: each step has a `StepMap`. `Mapping` chains them, with association bias, deletion
-  detection, and mirrored maps that recover positions inside re-inserted content.
+- **Steps** change the document atomically and are invertible: `ReplaceStep`,
+  `ReplaceAroundStep`, `AddMarkStep`, `RemoveMarkStep` and `NodeMarkupStep`. `NodeMarkupStep`
+  handles type and attribute changes that keep inner positions; it replaces the planned
+  `AttrStep`. `ReplaceAroundStep` replaces a range but keeps a gap of content inside it (moved
+  into the new slice, not deleted and re-inserted), so wrapping blocks in a list and lifting
+  them out map positions inside the moved blocks through. Structure steps (split, join, wrap,
+  lift) fail instead of deleting content that, after mapping, now sits in their range. A
+  failing step returns a failed `StepResult`; `Transform.step` throws `TransformError` and
+  leaves the transform unchanged.
+- **Mapping**: each step has a `StepMap` (one changed range, or two for `ReplaceAroundStep`).
+  `Mapping` chains them, with association bias, deletion detection, and mirrored maps that
+  recover positions inside re-inserted content.
 - **Transform helpers**: replace/delete/insert/insertText, addMark/removeMark (exactly
-  invertible), split, join (only between two textblocks), setBlockType, setNodeMarkup.
+  invertible), setBlockType, setNodeMarkup, and structure:
+  - `split(pos, depth, typesAfter)` splits a node and `depth - 1` ancestors (a list item);
+    `join(pos, depth)` joins adjacent nodes (two lists, two paragraphs), never a leaf.
+  - `wrap(range, wrappers)` and `lift(range, target)` move a range of sibling blocks into
+    wrappers or out of their ancestors, splitting the ancestors left around them.
+  - Checks before acting: `findWrapping` (the wrappers a node type needs, e.g. list then list
+    item), `liftTarget`, `canSplit`, `canJoin`; `ResolvedPos.blockRange` gives the range.
+- **Schema specs** for structure: node `atom` and `selectable`, mark `inclusive` (a link is
+  not: typing at its end continues as plain text). `ContentMatch.findWrapping` and
+  `defaultType` answer which nodes fit where.
 - **State**: an immutable `EditorState` holds the doc, selection, stored marks and plugin fields.
   A `Transaction` adds selection tracking, stored marks and metadata (`addToHistory`, time).
-  Selections are `TextSelection` and `AllSelection`; `NodeSelection` waits for a block leaf node.
+  Selections are `TextSelection`, `NodeSelection` (one selectable node, e.g. a rule; deleting
+  the only child of a node leaves an empty paragraph) and `AllSelection`.
 - **Plugins** (internal API, used by history and keymaps): state fields, `filterTransaction`,
   `appendTransaction`, `keymap`.
 - **History**: undo/redo of inverted steps.
@@ -82,10 +98,12 @@ Foli's own (see `THIRD_PARTY_NOTICES.md`).
   - Changes with `addToHistory: false` are rebased into the stored events.
     - Each rebased step is applied to a running copy of the document and dropped if it no longer
       applies. A step whose target node was deleted is dropped.
-    - Positions keep the side of each original step's changed range they were on, so a deletion
-      right next to re-inserted content cannot move them across it.
+    - Positions keep the side of each changed range of the original step they were on (two
+      ranges for a gap-replace), so a deletion right next to re-inserted content cannot move
+      them across it.
     - Property tests cover recorded edits interleaved with unrecorded marker insertions and
-      deletions and with plugin reactions. Arbitrary unrecorded edits that overlap recorded
+      deletions and with plugin reactions, and recorded wrap, lift, split and join on nested
+      blocks (blockquotes, lists) around unrecorded edits. Arbitrary unrecorded edits that overlap recorded
       content have no exact oracle; there, undo is best-effort but always valid and reversible.
   - Changes a plugin appends join the event of the transaction they react to.
   - A plugin's reaction to an undo or redo joins the reverse event, so it cannot trap the history,
@@ -107,7 +125,8 @@ Foli's own (see `THIRD_PARTY_NOTICES.md`).
 Known limits:
 - No general slice fitting: paste (Phase 4.3) joins open content or replaces an empty textblock
   with whole blocks; fitting blocks into nested structures comes with lists (Phase 7).
-- Splits one level only (lists, Phase 7).
+- Nested blocks (lists) exist only in custom schemas until schema v2 (task 7.2); the view
+  renders top-level textblocks only until task 7.3.
 - Each unrecorded change (and each plugin reaction to undo/redo) rebases the stored history.
   This costs O(n²) in the number of stored steps (not events), and every step is re-applied to the
   document, which also scales with document size.
