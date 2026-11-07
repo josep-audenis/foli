@@ -600,6 +600,7 @@ test("a page break at the end of a paragraph starts the next block on a new page
 test("a heading never ends a page: it moves to the next page with its paragraph", async ({
   page,
 }) => {
+  test.slow(); // 17 reloads: over the default timeout in WebKit on a loaded machine
   let moved = 0;
   // Slide a heading over the end of page 1 by adding short paragraphs before it.
   for (let count = 14; count <= 30; count++) {
