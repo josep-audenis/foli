@@ -417,14 +417,15 @@ stable before 0.1.0):
   a layout effect, destroys it on unmount or when the editor changes, passes `readOnly` and
   `placeholder` to every view it creates; `label` names the textbox.
 - `useEditorState(selector, { editor, isEqual })`: `useSyncExternalStore` over
-  `editor.subscribe`; the selection is cached per state and selector, and an equal one
+  `editor.subscribe`; the selected value is cached per state and selector, and an equal one
   (`isEqual`, default `Object.is`) keeps its identity, so the component re-renders only when
-  its slice changes. The selector runs after every transaction.
+  its slice changes. The selector runs after every transaction and after `setDocument`.
 - `FoliEditor`: `useFoliEditor` + provider + canvas, `children` rendered above the pages inside
   the provider. `onChange(change)` fires after transactions that change the content (not
-  selection-only ones) with `{ editor, transactions, document }`; `document` is serialized on
-  first read, so an app that saves later (the playground: after a 300 ms pause) pays nothing
-  per keystroke.
+  selection-only ones, nor `setDocument`) with `{ editor, transactions, document }`.
+  `document` is the document right after that change (the change keeps the immutable state),
+  serialized on first read, so an app that saves later (the playground: after a 300 ms pause)
+  pays nothing per keystroke.
 
 ## Styling
 

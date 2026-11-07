@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { createDocument, type Editor } from "@foli/core";
+import { createDocument, createEditor, type Editor } from "@foli/core";
 import { act, cleanup, render, screen } from "@testing-library/react";
 import { StrictMode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -100,6 +100,17 @@ function Swap({ text }: { text: string }) {
   return <FoliCanvas editor={text === "first" ? first : second} readOnly />;
 }
 
+function Text() {
+  const text = useEditorState((state) => state.doc.textContent);
+  return <span data-testid="text">{text}</span>;
+}
+
+/** An object selector without isEqual: a new object per state, the same one within a state. */
+function Head() {
+  const head = useEditorState((state) => ({ head: state.selection.head }));
+  return <span data-testid="head">{head.head}</span>;
+}
+
 function Lost() {
   useCurrentEditor();
   return null;
@@ -138,12 +149,39 @@ describe("FoliEditor", () => {
   it("serializes the document only when a change's document is read, once", () => {
     const changes: FoliChange[] = [];
     const { editor } = renderEditor({ onChange: (change) => changes.push(change) });
-    const getDocument = vi.spyOn(editor, "getDocument");
+    const toJSON = vi.spyOn(Object.getPrototypeOf(editor.state.doc), "toJSON");
     type("a");
     type("b");
-    expect(getDocument).not.toHaveBeenCalled();
-    expect(changes[1]?.document).toBe(changes[1]?.document);
-    expect(getDocument).toHaveBeenCalledTimes(1);
+    expect(toJSON).not.toHaveBeenCalled();
+    const document = changes[1]?.document;
+    const calls = toJSON.mock.calls.length;
+    expect(calls).toBeGreaterThan(0);
+    expect(changes[1]?.document).toBe(document);
+    expect(toJSON.mock.calls.length).toBe(calls);
+    toJSON.mockRestore();
+  });
+
+  it("a change's document is the one right after it, even when read after later edits", () => {
+    const changes: FoliChange[] = [];
+    const { editor } = renderEditor({ onChange: (change) => changes.push(change) });
+    type("a");
+    type("b");
+    act(() => editor.setDocument(hello));
+    const text = (change: FoliChange | undefined) =>
+      JSON.stringify(change?.document.content).match(/"text":"(\w*)"/)?.[1];
+    expect(text(changes[0])).toBe("a");
+    expect(text(changes[1])).toBe("ab");
+    expect(changes[0]?.document.settings).toEqual(editor.settings);
+  });
+
+  it("setDocument re-renders state selectors but does not call onChange", () => {
+    const onChange = vi.fn();
+    const { editor } = renderEditor({ onChange, children: <Text /> });
+    expect(screen.getByTestId("text").textContent).toBe("");
+    act(() => editor.setDocument(hello));
+    expect(screen.getByTestId("text").textContent).toBe("Hello Foli");
+    expect(screen.getByRole("textbox").textContent).toBe("Hello Foli");
+    expect(onChange).not.toHaveBeenCalled();
   });
 
   it("calls the latest onChange, and none after unmount", () => {
@@ -246,6 +284,51 @@ describe("hooks and composition", () => {
     rerender(<Swap text="second" />);
     expect(host.textContent).toBe("second");
     expect(host.getAttribute("contenteditable")).toBe("false");
+  });
+
+  it("useEditorState with an object selector and no isEqual caches its snapshot (no warning)", () => {
+    const error = vi.spyOn(console, "error");
+    const { editor } = renderEditor({
+      initialContent: hello,
+      children: (
+        <StrictMode>
+          <Head />
+        </StrictMode>
+      ),
+    });
+    act(() => editor.select(3));
+    act(() => editor.commands.insertText("x"));
+    expect(screen.getByTestId("head").textContent).toBe("4");
+    expect(error).not.toHaveBeenCalled();
+    error.mockRestore();
+  });
+
+  it("unmounting removes every subscription to the editor", () => {
+    const editor = createEditor({ document: hello });
+    const unsubscribed = vi.fn();
+    const subscribe = editor.subscribe.bind(editor);
+    let active = 0;
+    vi.spyOn(editor, "subscribe").mockImplementation((listener) => {
+      active++;
+      const unsubscribe = subscribe(listener);
+      return () => {
+        active--;
+        unsubscribed();
+        return unsubscribe();
+      };
+    });
+    const { unmount } = render(
+      <StrictMode>
+        <FoliEditorProvider editor={editor}>
+          <Head />
+          <FoliCanvas />
+        </FoliEditorProvider>
+      </StrictMode>,
+    );
+    expect(active).toBeGreaterThan(0);
+    unmount();
+    expect(unsubscribed).toHaveBeenCalled();
+    expect(active).toBe(0);
   });
 
   it("useCurrentEditor and FoliCanvas without an editor throw a clear error", () => {

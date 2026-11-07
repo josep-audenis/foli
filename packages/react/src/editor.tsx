@@ -37,7 +37,13 @@ export function useFoliEditor(options: UseFoliEditorOptions = {}): Editor {
 const EditorContext = createContext<Editor | null>(null);
 
 /** Makes `editor` the one `useCurrentEditor`, `useEditorState` and `FoliCanvas` use below it. */
-export function FoliEditorProvider({ editor, children }: { editor: Editor; children?: ReactNode }) {
+export function FoliEditorProvider({
+  editor,
+  children,
+}: {
+  editor: Editor;
+  children?: ReactNode | undefined;
+}) {
   return <EditorContext.Provider value={editor}>{children}</EditorContext.Provider>;
 }
 
@@ -58,9 +64,9 @@ export function useEditorOrContext(editor: Editor | undefined, caller: string): 
 
 export interface UseEditorStateOptions<T> {
   /** Default: the context's editor. */
-  editor?: Editor;
-  /** When the selection is equal to the previous one, the component does not re-render (default `Object.is`). */
-  isEqual?: (a: T, b: T) => boolean;
+  editor?: Editor | undefined;
+  /** When the selected value equals the previous one, the component does not re-render (default `Object.is`). */
+  isEqual?: ((a: T, b: T) => boolean) | undefined;
 }
 
 /**
@@ -73,7 +79,7 @@ export function useEditorState<T>(
   { editor: given, isEqual = Object.is }: UseEditorStateOptions<T> = {},
 ): T {
   const editor = useEditorOrContext(given, "useEditorState");
-  // The last selection, kept across renders so an equal one keeps its identity (an inline
+  // The last selected value, kept across renders so an equal one keeps its identity (an inline
   // selector is a new function every render: it runs again, the result stays the same object).
   const last = useRef<{ state: EditorState; selector: unknown; value: T } | null>(null);
   const subscribe = useCallback((notify: () => void) => editor.subscribe(notify), [editor]);

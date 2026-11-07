@@ -5,14 +5,14 @@ import { useEditorOrContext } from "./editor.js";
 
 export interface FoliCanvasProps {
   /** Default: the editor of the nearest `FoliEditorProvider`. */
-  editor?: Editor;
+  editor?: Editor | undefined;
   /** The user can read, select and copy, but not change the document. */
-  readOnly?: boolean;
+  readOnly?: boolean | undefined;
   /** Shown while the document is empty. */
-  placeholder?: string;
+  placeholder?: string | undefined;
   /** Accessible name of the editable area (default "Document"). */
-  label?: string;
-  className?: string;
+  label?: string | undefined;
+  className?: string | undefined;
 }
 
 /**

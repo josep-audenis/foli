@@ -71,6 +71,7 @@ addEventListener("pagehide", flush);
 
 function reset(): void {
   pending = null;
+  clearTimeout(timer);
   try {
     localStorage.removeItem(STORAGE_KEY);
   } catch {

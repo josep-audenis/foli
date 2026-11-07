@@ -18,15 +18,23 @@ integration.
 
 ```tsx
 import { createDocument, parseDocument } from "@foli/core";
-import { FoliEditor } from "@foli/react";
+import { type FoliChange, FoliEditor } from "@foli/react";
 import "@foli/react/styles.css";
 
 const doc = parseDocument(JSON.parse(saved)); // throws FoliDocumentError on invalid input
 // or: createDocument({ type: "doc", content: [{ type: "paragraph" }] })
 
+// `change.document` is serialized when read: read it when saving, not on every keystroke.
+let latest: FoliChange | undefined;
+let timer: ReturnType<typeof setTimeout> | undefined;
+function onChange(change: FoliChange) {
+  latest = change;
+  clearTimeout(timer);
+  timer = setTimeout(() => save(JSON.stringify(latest?.document)), 500);
+}
+
 export function App() {
-  // `change.document` is serialized when read: read it when saving, not on every keystroke.
-  return <FoliEditor initialContent={doc} onChange={(change) => save(change.document)} />;
+  return <FoliEditor initialContent={doc} onChange={onChange} />;
 }
 ```
 

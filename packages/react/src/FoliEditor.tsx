@@ -1,26 +1,43 @@
-import type { Editor, FoliDocument, Plugin, Transaction } from "@foli/core";
+import {
+  createDocument,
+  type DocJSON,
+  type Editor,
+  type FoliDocument,
+  type Plugin,
+  type Transaction,
+} from "@foli/core";
 import { type ReactNode, useLayoutEffect, useRef } from "react";
 import { FoliEditorProvider, useFoliEditor } from "./editor.js";
 import { FoliCanvas, type FoliCanvasProps } from "./FoliCanvas.js";
 
-/** A change to the document's content, as `FoliEditor` reports it. */
+/**
+ * A change to the document's content, as `FoliEditor` reports it. `document` is a getter:
+ * spreading the object or `JSON.stringify(change)` serializes the document (and walks `editor`).
+ */
 export interface FoliChange {
   readonly editor: Editor;
   /** The transactions of this change (several when plugins append their own). */
   readonly transactions: readonly Transaction[];
-  /** The whole document, serialized on first read (keep it out of the hot path of typing). */
+  /**
+   * The whole document right after this change, serialized on first read (keep reads out of
+   * the hot path of typing: a debounced save reads only the last change's).
+   */
   readonly document: FoliDocument;
 }
 
 export interface FoliEditorProps extends Omit<FoliCanvasProps, "editor"> {
   /** Read once on mount. To load another document later: `editor.setDocument()` or a new `key`. */
-  initialContent?: FoliDocument;
+  initialContent?: FoliDocument | undefined;
   /** Read once on mount. */
-  plugins?: readonly Plugin[];
-  /** Called after every change to the document's content (not for selection changes). */
-  onChange?: (change: FoliChange) => void;
+  plugins?: readonly Plugin[] | undefined;
+  /**
+   * Called after every change to the document's content made through transactions (typing,
+   * commands, undo). Not for selection changes, and not for `editor.setDocument()`, whose
+   * caller already has the document.
+   */
+  onChange?: ((change: FoliChange) => void) | undefined;
   /** Rendered above the pages, inside the editor's context (e.g. a toolbar). */
-  children?: ReactNode;
+  children?: ReactNode | undefined;
 }
 
 /**
@@ -43,15 +60,17 @@ export function FoliEditor({
 
   useLayoutEffect(
     () =>
-      editor.subscribe((_state, transactions) => {
+      editor.subscribe((state, transactions) => {
         const listener = onChangeRef.current;
         if (!listener || !transactions.some((tr) => tr.docChanged)) return;
+        // The state is immutable: keeping it makes a later read give this change's document.
+        const { settings } = editor;
         let document: FoliDocument | undefined;
         listener({
           editor,
           transactions,
           get document() {
-            document ??= editor.getDocument();
+            document ??= createDocument(state.doc.toJSON() as DocJSON, settings);
             return document;
           },
         });

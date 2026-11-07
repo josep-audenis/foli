@@ -450,10 +450,14 @@ criterion is the one from G3: type, format with shortcuts, undo, serialize, relo
 - [ ] 6.2 Toolbar: `FoliToolbar` (bold, italic, underline, strike, paragraph/heading levels,
   undo, redo, page break), state from `useEditorState` and command dry runs (`editor.can`);
   roving tabindex, `aria-pressed`, labels, visible focus; clicks keep the editor's selection
-  and focus. Axe on the toolbar in all three engines; keyboard-only Playwright test.
+  and focus (so `FoliCanvas` exposes focusing its view). A parent of `FoliEditor` gets its
+  editor (a `ref` or an `onReady` callback). Axe on the toolbar in all three engines;
+  keyboard-only Playwright test.
 - [ ] 6.3 Lifecycle and SSR: replacing the document from React (`editor.setDocument`: view,
   selection, history and `onChange` behave as documented); importing every package and
-  `renderToString(<FoliEditor />)` in Node without a DOM works; hydration attaches the view.
+  `renderToString(<FoliEditor />)` in Node without a DOM works; hydration attaches the view;
+  React 18 (allowed by the peer range) warns about `useLayoutEffect` on the server: an
+  isomorphic layout effect, or a React 19 peer range, tested either way.
 - [ ] 6.4 Packaging: exports maps (ESM, types, `@foli/react/styles.css`), React and React DOM
   as the only peer dependencies, `sideEffects`; a package check (e.g. publint, if its license
   fits); bundle size per package recorded with a budget; `pnpm pack` tarballs installed into
