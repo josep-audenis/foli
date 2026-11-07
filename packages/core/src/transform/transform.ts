@@ -13,6 +13,7 @@ import {
 import { Mapping } from "./stepmap.js";
 import {
   AddMarkStep,
+  NodeMarkupBatchStep,
   NodeMarkupStep,
   RemoveMarkStep,
   ReplaceStep,
@@ -173,14 +174,16 @@ export class Transform {
 
   /** Changes every textblock touching `from..to` to `type` with `attrs`, keeping content. */
   setBlockType(from: number, to: number, type: NodeType, attrs: Attrs | null = null): this {
+    const changed: NodeMarkupStep[] = [];
     this.doc.nodesBetween(from, to, (node, pos) => {
       if (!node.isTextblock) return undefined;
       if (node.type !== type || !deepEqual(node.attrs, attrs ?? {})) {
-        this.step(new NodeMarkupStep(pos, type, attrs));
+        changed.push(new NodeMarkupStep(pos, type, attrs));
       }
       return false;
     });
-    return this;
+    // One step for all blocks: a step per block rebuilt the document each time (quadratic).
+    return changed.length ? this.step(new NodeMarkupBatchStep(changed)) : this;
   }
 
   /** Changes the markup of the node at `pos` (see NodeMarkupStep). */

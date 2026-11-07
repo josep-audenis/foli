@@ -248,3 +248,83 @@ export class NodeMarkupStep extends Step {
     return new NodeMarkupStep(pos.pos, this.type, this.attrs, this.marks);
   }
 }
+
+/** `parent` with the nodes that `steps` (sorted, inside its content at `start`) target re-marked. */
+function remarkup(parent: Node, start: number, steps: readonly NodeMarkupStep[]): Node {
+  const children: Node[] = [];
+  let i = 0;
+  parent.forEach((child, offset) => {
+    const pos = start + offset;
+    const first = i;
+    while (i < steps.length && (steps[i] as NodeMarkupStep).pos < pos + child.nodeSize) i++;
+    if (first === i) {
+      children.push(child);
+      return;
+    }
+    const own = (steps[first] as NodeMarkupStep).pos === pos ? steps[first] : undefined;
+    const inner = steps.slice(own ? first + 1 : first, i);
+    let node = inner.length ? remarkup(child, pos + 1, inner) : child;
+    if (own) {
+      if (node.isText) throw new RangeError(`No node at position ${pos}`);
+      node = own.type.create(own.attrs, node.content, own.marks ?? node.marks);
+    }
+    children.push(node);
+  });
+  // Steps left over point inside text or past the end of the content.
+  if (i < steps.length) throw new RangeError(`No node at position ${steps[i]?.pos}`);
+  const content = Fragment.fromArray(children);
+  if (!parent.type.validContent(content)) {
+    throw new RangeError(`Invalid content for node ${parent.type.name}`);
+  }
+  return parent.copy(content);
+}
+
+/**
+ * Several NodeMarkupSteps (sorted by position) applied in one pass, so changing many blocks
+ * rebuilds the document once instead of once per block. Positions do not move (empty map).
+ */
+export class NodeMarkupBatchStep extends Step {
+  constructor(readonly steps: readonly NodeMarkupStep[]) {
+    super();
+  }
+
+  apply(doc: Node): StepResult {
+    for (let i = 0; i < this.steps.length; i++) {
+      const pos = (this.steps[i] as NodeMarkupStep).pos;
+      if (pos < 0 || (i > 0 && pos <= (this.steps[i - 1] as NodeMarkupStep).pos)) {
+        return StepResult.fail(`Unsorted or invalid node markup position ${pos}`);
+      }
+    }
+    try {
+      return StepResult.ok(remarkup(doc, 0, this.steps));
+    } catch (error) {
+      if (error instanceof FoliDocumentError || error instanceof RangeError) {
+        return StepResult.fail(error.message);
+      }
+      throw error;
+    }
+  }
+
+  invert(doc: Node): Step {
+    const old: NodeMarkupStep[] = [];
+    const last = this.steps[this.steps.length - 1];
+    if (last) {
+      doc.nodesBetween((this.steps[0] as NodeMarkupStep).pos, last.pos + 1, (node, pos) => {
+        if (this.steps[old.length]?.pos === pos) {
+          old.push(new NodeMarkupStep(pos, node.type, node.attrs, node.marks));
+        }
+        const next = this.steps[old.length];
+        return next !== undefined && next.pos < pos + node.nodeSize;
+      });
+    }
+    if (old.length !== this.steps.length) throw new RangeError("Node markup batch does not fit");
+    return new NodeMarkupBatchStep(old);
+  }
+
+  map(mapping: Mappable): Step | null {
+    const steps = this.steps
+      .map((step) => step.map(mapping))
+      .filter((step): step is NodeMarkupStep => step !== null);
+    return steps.length ? new NodeMarkupBatchStep(steps) : null;
+  }
+}

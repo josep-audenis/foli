@@ -121,11 +121,13 @@ Known limits:
   Batch per-paragraph mark steps before documents get that large.
 - Selections snap out of surrogate pairs but not to full grapheme clusters; the view shows them
   at cluster boundaries (Phase 4.4).
-- `setBlockType` over many blocks adds one step per block, each rebuilding the document:
-  quadratic. Measured by review: H1 with everything selected in a ~200-page document takes about
-  1.3 s (Node). Command dry runs (`editor.can`) build the same transaction, so nothing that runs
-  per transaction uses them (the toolbar uses cheap checks). Build the new content once before
-  documents get that large.
+- `setBlockType` adds one `NodeMarkupBatchStep` for all changed blocks, which rebuilds the
+  document once: linear in the number of blocks (H1 over 4,000 selected paragraphs takes about
+  2-3 ms, was about 1.4 s with a step per block; [benchmarks.md](benchmarks.md)). If any block
+  cannot take the new markup the whole step fails, and so does its undo after a rebase that
+  makes one block invalid (per-block steps dropped only that block). Command dry runs
+  (`editor.can`) still build the whole transaction, so nothing that runs per transaction uses
+  them (the toolbar uses cheap checks).
 - Plugins, `Transaction` metadata and mapping internals are exported but not yet a stable API.
 
 ## Editor view (`@foli/view`)
@@ -440,7 +442,7 @@ stable before 0.1.0):
   `aria-pressed` from the marks and block types of the selection (O(selection)), `aria-disabled`
   from cheap checks (undo/redo depth; marks, block types and page breaks always apply in schema
   v1), not command dry runs: `editor.can` builds the whole transaction, and a block-type dry run
-  over a select-all is quadratic in the number of blocks (seconds per keystroke at 200 pages).
+  over a select-all costs O(blocks) per keystroke.
   One tab stop (`role="toolbar"`, roving `tabindex`: arrows, Home, End, wrapping; with Alt, Ctrl
   or Meta the keys are the browser's; the last button reached by keyboard keeps the stop);
   disabled buttons stay focusable (`aria-disabled`, not `disabled`). `mousedown` is prevented,

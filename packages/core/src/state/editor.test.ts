@@ -548,3 +548,26 @@ describe("rebasing next to deleted content (post-merge review of PR #4)", () => 
     expect(content(editor)).toEqual(docJSON(para("xx")));
   });
 });
+
+describe("setBlockType over many blocks", () => {
+  it("changes 4,000 selected paragraphs in one step, linear time, exact undo", () => {
+    const blocks = Array.from({ length: 4000 }, (_, i) => para(`paragraph ${i}`));
+    const editor = editorWith(...blocks);
+    const before = editor.state.doc;
+    editor.commands.selectAll();
+    const start = performance.now();
+    expect(editor.commands.setBlockType("heading", { level: 1 })).toBe(true);
+    const elapsed = performance.now() - start;
+    expect(editor.state.doc.childCount).toBe(4000);
+    editor.state.doc.forEach((node) => {
+      expect(node.type.name).toBe("heading");
+    });
+    expect(editor.state.selection.from).toBe(0);
+    expect(editor.state.selection.to).toBe(before.content.size);
+    // One step per block made this ~1.3 s (quadratic); measured ~5 ms now (docs/benchmarks.md).
+    expect(elapsed).toBeLessThan(250);
+    expect(undoDepth(editor.state)).toBe(1);
+    expect(editor.commands.undo()).toBe(true);
+    expect(editor.state.doc.eq(before)).toBe(true);
+  });
+});
