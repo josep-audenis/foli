@@ -126,9 +126,9 @@ Known limits:
 ## Editor view (`@foli/view`)
 
 `packages/view/src/view.ts`, design per ADR-0003: one `contenteditable` host holding real pages.
-Phase 5 in progress: blocks flow from page to page (5.1) and split across pages at a line
-(5.2), with pagination rules (5.3), incremental reflow (5.4), print (5.6) and benchmarks
-(5.7, [benchmarks.md](benchmarks.md)).
+Built in Phase 5 (gate G4 passed provisionally): blocks flow from page to page (5.1) and split
+across pages at a line (5.2), with pagination rules (5.3), incremental reflow (5.4), print (5.6)
+and benchmarks (5.7, [benchmarks.md](benchmarks.md)); overview in [pagination.md](pagination.md).
 
 - `new EditorView(host, editor, { editable, placeholder })` renders the state of a core
   `Editor` into `host` and subscribes to it. Edits go through `editor.dispatch`, so history,

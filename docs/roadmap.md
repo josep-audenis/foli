@@ -9,16 +9,16 @@ leaves `main` green with a working playground.
 **Update this table in the same PR that starts, advances or finishes a phase.** It is the only
 place that says what is in progress; check it before starting work.
 
-| Phase                    | Status                   | Branch               | Notes                                                                                      |
-| ------------------------ | ------------------------ | -------------------- | ------------------------------------------------------------------------------------------ |
-| 0 Foundation             | ✅ Done                  | —                    |                                                                                            |
-| 1 Architecture spike     | ✅ Done (G1 provisional) | —                    | Merged in #1; ADR-0003 accepted provisionally; IME, dead-key and screen-reader checks open |
-| 2 Document model         | ✅ Done                  | —                    | Merged in #2                                                                               |
-| 3 Transactions & history | ✅ Done                  | —                    | Merged in #4; gate G2 passed                                                               |
-| 4 Editor view            | ✅ Done (G3 provisional) | —                    | Merged in #8–#13; manual checks (4.6) deferred, open risks in ADR-0003                     |
-| 5 Native pagination      | In progress              | `phase-5/pagination` | Plan below; G3 passed provisionally (manual checks open in ADR-0003)                       |
-| 6 React API & 0.1.0      | Blocked by G4            |                      |                                                                                            |
-| 7–12                     | Not started              |                      |                                                                                            |
+| Phase                    | Status                   | Branch | Notes                                                                                      |
+| ------------------------ | ------------------------ | ------ | ------------------------------------------------------------------------------------------ |
+| 0 Foundation             | ✅ Done                  | —      |                                                                                            |
+| 1 Architecture spike     | ✅ Done (G1 provisional) | —      | Merged in #1; ADR-0003 accepted provisionally; IME, dead-key and screen-reader checks open |
+| 2 Document model         | ✅ Done                  | —      | Merged in #2                                                                               |
+| 3 Transactions & history | ✅ Done                  | —      | Merged in #4; gate G2 passed                                                               |
+| 4 Editor view            | ✅ Done (G3 provisional) | —      | Merged in #8–#13; manual checks (4.6) deferred, open risks in ADR-0003                     |
+| 5 Native pagination      | ✅ Done (G4 provisional) | —      | Merged in #15–#22; page-break manual checks open, risks in ADR-0003                        |
+| 6 React API & 0.1.0      | Ready                    |        | G4 passed provisionally; the open manual checks (ADR-0003) run before 0.1.0                |
+| 7–12                     | Not started              |        |                                                                                            |
 
 Status values: `Ready` (dependencies met, nobody on it) · `In progress` · `In review` (PR open) ·
 `✅ Done` (merged, acceptance criteria met) · `Blocked by …`.
@@ -409,9 +409,13 @@ Each task is one PR that leaves `pnpm check` green and the playground working. L
   handler p50 ≤ 8 ms, keystroke-to-paint p95 ≤ 25 ms, layout ≤ 60 ms, re-flow ≤ 100 ms in
   Chromium and Firefox). WebKit's paint times on Windows are Playwright's software-painting
   port, not Safari.
-- [ ] 5.8 Gate G4 review: T5 in all three engines; the page-break manual checks (IME at a
-  fragment edge, a screen reader reading a split paragraph) run or recorded as open risks in
-  ADR-0003; `docs/pagination.md` rewritten to match what was built.
+- [x] 5.8 (#22) Gate G4 review: T5 passes in all three engines (pages, visual and print suites run
+  three times in a row); the page-break manual checks (IME at a fragment edge, a screen reader
+  reading a split paragraph, spellcheck at the break) are recorded as open risks in ADR-0003,
+  with checklist rows in `docs/testing/ime.md`; `docs/pagination.md` rewritten to match what was
+  built (design, evidence, known limits).
+- [x] Gate G4 review (provisional): T5 in the browser matrix, deterministic fixtures, benchmark
+  baseline published; see ADR-0003.
 
 ## Phase 6 — React API & first release · M → 0.1.0
 

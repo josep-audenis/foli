@@ -5,8 +5,8 @@ Chromium (`apps/playground/e2e/ime.spec.ts`). Copy the results into
 [ADR-0003](../decisions/ADR-0003-rendering-and-input.md) ("Manual results") with date, OS and
 browser versions.
 
-Page-break variants (composition at a fragment edge, a split paragraph read aloud) need
-pagination and belong to gate G4.
+Page-break variants (composition at a fragment edge, a split paragraph read aloud) are in
+"Page breaks" below (gate G4).
 
 ## Setup
 
@@ -90,3 +90,23 @@ behave as in TextEdit, and typing afterwards must land at the new caret.
 | NVDA / Firefox          | read-only (playground checkbox): announced as read-only; reads text |        |       |
 | NVDA / Firefox          | empty document: placeholder announced once, not read as content     |        |       |
 | VoiceOver / Safari      | the rows above                                                      |        |       |
+
+## Page breaks (gate G4)
+
+Make a paragraph cross the end of page 1: paste or type text into the last paragraph of page 1
+until it continues at the top of page 2 (the same paragraph on both pages). "At the break" is
+the end of its last line on page 1. Same "Pass" rules as above.
+
+| Platform / browser | Case                                                                           | Result | Notes |
+| ------------------ | ------------------------------------------------------------------------------ | ------ | ----- |
+| Windows / Chrome   | Japanese IME: compose + commit at the break                                    |        |       |
+| Windows / Chrome   | Japanese IME: compose a long phrase at the end of page 1 so it moves a line on |        |       |
+| Windows / Firefox  | the two rows above                                                             |        |       |
+| Windows / Chrome   | Korean IME: type 한국어 at the break                                           |        |       |
+| Windows / Chrome   | dead keys (`é ñ`) at the break                                                 |        |       |
+| macOS / Safari     | Japanese – Romaji: compose + commit at the break                               |        |       |
+| Android / Chrome   | Gboard: type at the break, accept a suggestion                                 |        |       |
+| Any / Chrome       | spellcheck: replace a misspelled last word of page 1 (context menu)            |        |       |
+| NVDA / Firefox     | read the split paragraph: one paragraph or two? Line by line across the break  |        |       |
+| NVDA / Chrome      | same                                                                           |        |       |
+| VoiceOver / Safari | same                                                                           |        |       |
