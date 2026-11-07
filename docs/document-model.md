@@ -46,7 +46,7 @@ Input may be loose; output is canonical, so equal documents serialize to identic
 - Mark sets are sorted in schema order (v2: `link`, `bold`, `italic`, `underline`, `strike`,
   `textColor`, `highlight`).
 - Empty `content` and `marks` arrays are omitted. `attrs` holds only attributes that differ from
-  their default (required ones always) and is omitted when none do: a left-aligned paragraph has
+  their default (required ones always) and is omitted when none do: a start-aligned paragraph has
   no `attrs`, a heading has `{ "level": n }`. Parsing fills the defaults back in. (Until v2,
   `attrs` held every attribute; v1 content has no default-valued attribute, so it serializes
   the same.)
@@ -56,18 +56,18 @@ Input may be loose; output is canonical, so equal documents serialize to identic
 
 ## Schema v2
 
-| Node             | Group  | Content                                       | Attrs                                                   |
-| ---------------- | ------ | --------------------------------------------- | ------------------------------------------------------- |
-| `doc`            | root   | one or more blocks                            | —                                                       |
-| `paragraph`      | block  | inline\*                                      | `align`: `left` (default), `center`, `right`, `justify` |
-| `heading`        | block  | inline\*                                      | `level`: 1–6 (required); `align` as paragraph           |
-| `bulletList`     | block  | one or more `listItem`                        | —                                                       |
-| `orderedList`    | block  | one or more `listItem`                        | `start`: integer 0–99999 (default 1)                    |
-| `listItem`       | —      | a `paragraph`, then any blocks (nested lists) | —                                                       |
-| `horizontalRule` | block  | — (leaf)                                      | —                                                       |
-| `text`           | inline | —                                             | `text`: non-empty string, `marks`                       |
-| `hardBreak`      | inline | —                                             | `marks`                                                 |
-| `pageBreak`      | inline | —                                             | `marks`                                                 |
+| Node             | Group  | Content                                       | Attrs                                                  |
+| ---------------- | ------ | --------------------------------------------- | ------------------------------------------------------ |
+| `doc`            | root   | one or more blocks                            | —                                                      |
+| `paragraph`      | block  | inline\*                                      | `align`: `start` (default), `center`, `end`, `justify` |
+| `heading`        | block  | inline\*                                      | `level`: 1–6 (required); `align` as paragraph          |
+| `bulletList`     | block  | one or more `listItem`                        | —                                                      |
+| `orderedList`    | block  | one or more `listItem`                        | `start`: integer 0–99999 (default 1)                   |
+| `listItem`       | —      | a `paragraph`, then any blocks (nested lists) | —                                                      |
+| `horizontalRule` | block  | — (leaf)                                      | —                                                      |
+| `text`           | inline | —                                             | `text`: non-empty string, `marks`                      |
+| `hardBreak`      | inline | —                                             | `marks`                                                |
+| `pageBreak`      | inline | —                                             | `marks`                                                |
 
 | Mark                                    | Attrs                                                                          |
 | --------------------------------------- | ------------------------------------------------------------------------------ |
@@ -86,6 +86,14 @@ URLs only with the protocols above (case-insensitive), relative URLs (`/path`, `
 `#fragment`, `?query`, `//host`) allowed; control characters, spaces and backslashes anywhere
 are rejected (browsers drop tabs and newlines inside a scheme, so `java\tscript:` would run).
 `javascript:`, `data:`, `vbscript:`, `file:` and every other scheme are rejected, not repaired.
+The rule is part of the format: it may be relaxed, but never made stricter without a
+migration, or saved documents would stop loading. Values the rule rejects but that are
+harmless (a URL with a space or a backslash, as people paste them) are normalized before they
+reach a document (percent-encoding, by paste and the link UI: tasks 7.6 and 7.8), not stored.
+
+**Alignment** is `start` or `end` rather than left or right, so it means the right thing in
+right-to-left text (as CSS and strict OOXML do): in left-to-right text, `start` is left.
+Changing a block's type keeps the alignment.
 
 **Colors** are stored as lowercase `#rrggbb` only (`isColor`); paste and the UI convert other
 CSS colors before they reach the document, so equal colors serialize equally.
@@ -227,3 +235,21 @@ Migrations never drop content. A published version never changes in place.
 0.1.0 reads only version 1: it rejects documents saved by 0.2.0 ("Unsupported schemaVersion: 2").
 Tests load a document exactly as 0.1.0 saved it (`document.test.ts`), and the playground's e2e
 fixtures are still v1 documents, loaded through the migration.
+
+## Planned envelope additions (not implemented)
+
+Each added only when a feature needs it, with a migration:
+
+- `metadata` (title, author, timestamps, app-defined fields).
+- `styles` (named paragraph/character styles) — Phase 9.
+- `headers` / `footers` as separate content trees — Phase 9.
+- `resources` (image references by id, no inline binary) — Phase 8.
+- Extension-owned data under a namespaced key.
+
+## Open questions
+
+- Generate a JSON Schema from the TypeScript schema so Rust and other consumers validate the
+  same format (Phase 10).
+- Positions count UTF-16 code units, so a position can fall between the two halves of a
+  surrogate pair. Deletion commands move by grapheme (`Intl.Segmenter`); the view (Phase 4)
+  must do the same for caret movement. The model does not prevent it.

@@ -216,13 +216,13 @@ describe("schema v2 and migrations", () => {
       withContent({
         type: "doc",
         content: [
-          { type: "paragraph", attrs: { align: "left" } },
+          { type: "paragraph", attrs: { align: "start" } },
           {
             type: "orderedList",
             attrs: { start: 1 },
             content: [{ type: "listItem", content: [{ type: "paragraph" }] }],
           },
-          { type: "heading", attrs: { level: 3, align: "left" } },
+          { type: "heading", attrs: { level: 3, align: "start" } },
         ],
       }),
     );
@@ -232,7 +232,7 @@ describe("schema v2 and migrations", () => {
       { type: "heading", attrs: { level: 3 } },
     ]);
     const node = parseContent(loaded.content);
-    expect(node.child(0).attrs).toEqual({ align: "left" });
+    expect(node.child(0).attrs).toEqual({ align: "start" });
     expect(node.child(1).attrs).toEqual({ start: 1 });
   });
 

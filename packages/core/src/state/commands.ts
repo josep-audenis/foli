@@ -1,5 +1,11 @@
-import { deepEqual } from "../model/attrs.js";
-import type { Attrs, MarkType, NodeType, ResolvedPos } from "../model/index.js";
+import {
+  type Attrs,
+  FoliDocumentError,
+  type Mark,
+  type MarkType,
+  type NodeType,
+  type ResolvedPos,
+} from "../model/index.js";
 import { TransformError } from "../transform/transform.js";
 import { redo, undo } from "./history.js";
 import { AllSelection, marksAt, TextSelection } from "./selection.js";
@@ -235,9 +241,11 @@ export function toggleMark(type: string | MarkType, attrs?: Attrs | null): Comma
       if (!$caret.parent.type.allowsMarkType(mark)) return false;
       const marks = state.storedMarks ?? marksAt($caret);
       const existing = mark.isInSet(marks);
+      const created = existing ? null : createMark(mark, attrs);
+      if (!existing && !created) return false;
       dispatch?.(
         state.tr.setStoredMarks(
-          existing ? existing.removeFromSet(marks) : mark.create(attrs).addToSet(marks),
+          existing ? existing.removeFromSet(marks) : (created as Mark).addToSet(marks),
         ),
       );
       return true;
@@ -248,14 +256,24 @@ export function toggleMark(type: string | MarkType, attrs?: Attrs | null): Comma
       return !applicable;
     });
     if (!applicable) return false;
+    const remove = rangeHasMark(state, selection.from, selection.to, mark);
+    const created = remove ? null : createMark(mark, attrs);
+    if (!remove && !created) return false;
     return attempt(state, dispatch, (tr) => {
-      if (rangeHasMark(state, selection.from, selection.to, mark)) {
-        tr.removeMark(selection.from, selection.to, mark);
-      } else {
-        tr.addMark(selection.from, selection.to, mark.create(attrs));
-      }
+      if (remove) tr.removeMark(selection.from, selection.to, mark);
+      else tr.addMark(selection.from, selection.to, created as Mark);
     });
   };
+}
+
+/** The mark, or null when `attrs` are invalid for it (e.g. a link with an unsafe href). */
+function createMark(type: MarkType, attrs?: Attrs | null): Mark | null {
+  try {
+    return type.create(attrs);
+  } catch (error) {
+    if (error instanceof FoliDocumentError) return null;
+    throw error;
+  }
 }
 
 /** Whether the mark is active: in stored marks at a caret, or on all selected text. */
@@ -267,19 +285,16 @@ export function isMarkActive(state: EditorState, type: string | MarkType): boole
   return rangeHasMark(state, state.selection.from, state.selection.to, mark);
 }
 
-/** Changes the textblocks in the selection to `type` (e.g. heading level 2, or paragraph). */
+/**
+ * Changes the textblocks in the selection to `type` (e.g. heading level 2, or paragraph),
+ * keeping attributes both types have (alignment). Does not apply when nothing would change.
+ */
 export function setBlockType(type: string | NodeType, attrs: Attrs | null = null): Command {
   return (state, dispatch) => {
     const nodeType = typeof type === "string" ? state.schema.nodes[type] : type;
     if (!nodeType?.isTextblock) return false;
     const { from, to } = state.selection;
-    let changes = false;
-    state.doc.nodesBetween(from, to, (node) => {
-      if (node.isTextblock && (node.type !== nodeType || !deepEqual(node.attrs, attrs ?? {})))
-        changes = true;
-      return !node.isTextblock;
-    });
-    if (!changes) return false;
+    // A transaction with no step (every block already like that) does not apply.
     return attempt(state, dispatch, (tr) => tr.setBlockType(from, to, nodeType, attrs));
   };
 }

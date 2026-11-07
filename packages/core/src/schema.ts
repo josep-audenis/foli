@@ -18,7 +18,8 @@ export type MarkName = (typeof MARK_TYPES)[number];
 export const HEADING_LEVELS = [1, 2, 3, 4, 5, 6] as const;
 export type HeadingLevel = (typeof HEADING_LEVELS)[number];
 
-export const ALIGNMENTS = ["left", "center", "right", "justify"] as const;
+/** `start` and `end` follow the text direction (left and right in left-to-right text). */
+export const ALIGNMENTS = ["start", "center", "end", "justify"] as const;
 export type Alignment = (typeof ALIGNMENTS)[number];
 
 /** URL schemes a link may use; anything else (javascript:, data:, file:…) is rejected. */
@@ -46,7 +47,7 @@ export function isColor(color: unknown): color is string {
 }
 
 const align = {
-  default: "left",
+  default: "start",
   validate: (value: unknown) =>
     (ALIGNMENTS as readonly unknown[]).includes(value)
       ? undefined
@@ -154,7 +155,7 @@ export interface PageBreakJSON {
 
 export type InlineJSON = TextJSON | HardBreakJSON | PageBreakJSON;
 
-/** Attributes equal to their default (`align: "left"`, `start: 1`) are omitted. */
+/** Attributes equal to their default (`align: "start"`, `start: 1`) are omitted. */
 export interface ParagraphJSON {
   type: "paragraph";
   attrs?: { align?: Alignment };

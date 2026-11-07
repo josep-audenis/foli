@@ -571,3 +571,53 @@ describe("setBlockType over many blocks", () => {
     expect(editor.state.doc.eq(before)).toBe(true);
   });
 });
+
+describe("schema v2 commands (PR #34 review)", () => {
+  it("setBlockType does not apply when every block is already like that", () => {
+    const editor = editorWith(para("ab"), heading(2, "cd"));
+    editor.select(2);
+    expect(editor.commands.setBlockType("paragraph")).toBe(false);
+    expect(editor.commands.undo()).toBe(false); // nothing recorded
+    editor.select(6);
+    expect(editor.commands.setBlockType("heading", { level: 2 })).toBe(false);
+  });
+
+  it("setBlockType keeps alignment across block types, and changes only what it is given", () => {
+    const editor = editorWith({
+      type: "paragraph",
+      attrs: { align: "center" },
+      content: [text("ab")],
+    });
+    editor.select(2);
+    expect(editor.commands.setBlockType("heading", { level: 1 })).toBe(true);
+    expect(content(editor).content[0]).toMatchObject({ attrs: { level: 1, align: "center" } });
+    expect(editor.commands.setBlockType("heading", { level: 3 })).toBe(true);
+    expect(content(editor).content[0]).toMatchObject({ attrs: { level: 3, align: "center" } });
+    expect(editor.commands.setBlockType("paragraph")).toBe(true);
+    expect(content(editor).content[0]).toEqual({
+      type: "paragraph",
+      attrs: { align: "center" },
+      content: [{ type: "text", text: "ab" }],
+    });
+  });
+
+  it("setBlockType with invalid attributes does not apply (no exception)", () => {
+    const editor = editorWith(para("ab"));
+    editor.select(2);
+    expect(editor.commands.setBlockType("heading", { level: 9 })).toBe(false);
+    expect(editor.commands.setBlockType("heading")).toBe(false); // level is required
+  });
+
+  it("toggleMark with an unsafe or missing href does not apply; removing a link needs no href", () => {
+    const editor = editorWith(para("abcd"));
+    editor.select(1, 3);
+    expect(editor.commands.toggleMark("link")).toBe(false);
+    expect(editor.commands.toggleMark("link", { href: "javascript:alert(1)" })).toBe(false);
+    expect(editor.commands.toggleMark("link", { href: "https://x.test" })).toBe(true);
+    expect(editor.isMarkActive("link")).toBe(true);
+    expect(editor.commands.toggleMark("link")).toBe(true); // removes it
+    expect(editor.isMarkActive("link")).toBe(false);
+    editor.select(2); // a caret: stored marks
+    expect(editor.commands.toggleMark("link", { href: "data:x" })).toBe(false);
+  });
+});

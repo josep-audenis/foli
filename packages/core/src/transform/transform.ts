@@ -25,6 +25,25 @@ import {
 } from "./steps.js";
 import type { NodeTypeWithAttrs } from "./structure.js";
 
+/** The attributes a block gets when it becomes `type` (see Transform.setBlockType). */
+function blockAttrs(node: Node, type: NodeType, attrs: Attrs | null): Attrs {
+  const merged: Record<string, unknown> = {};
+  const own = node.type.spec.attrs ?? {};
+  for (const name of Object.keys(type.spec.attrs ?? {})) {
+    if (attrs && Object.hasOwn(attrs, name)) merged[name] = attrs[name];
+    else if (Object.hasOwn(own, name)) merged[name] = node.attrs[name];
+  }
+  for (const name of Object.keys(attrs ?? {})) {
+    if (!Object.hasOwn(merged, name)) merged[name] = attrs?.[name]; // unknown: rejected below
+  }
+  try {
+    return type.createOpen(merged).attrs;
+  } catch (error) {
+    if (error instanceof FoliDocumentError) throw new TransformError(error.message);
+    throw error;
+  }
+}
+
 /** A step could not be applied (the change would break the schema or the range is invalid). */
 export class TransformError extends Error {
   override name = "TransformError";
@@ -277,13 +296,19 @@ export class Transform {
     );
   }
 
-  /** Changes every textblock touching `from..to` to `type` with `attrs`, keeping content. */
+  /**
+   * Changes every textblock touching `from..to` to `type`, keeping content. Attributes come from
+   * `attrs`, then from the block itself for attributes both types declare (a centered paragraph
+   * stays centered as a heading), then from defaults. Blocks already like that are untouched.
+   * Invalid attributes throw TransformError.
+   */
   setBlockType(from: number, to: number, type: NodeType, attrs: Attrs | null = null): this {
     const changed: NodeMarkupStep[] = [];
     this.doc.nodesBetween(from, to, (node, pos) => {
       if (!node.isTextblock) return undefined;
-      if (node.type !== type || !deepEqual(node.attrs, attrs ?? {})) {
-        changed.push(new NodeMarkupStep(pos, type, attrs));
+      const next = blockAttrs(node, type, attrs);
+      if (node.type !== type || !deepEqual(node.attrs, next)) {
+        changed.push(new NodeMarkupStep(pos, type, next));
       }
       return false;
     });
