@@ -475,7 +475,7 @@ criterion is the one from G3: type, format with shortcuts, undo, serialize, relo
   16, React 19, server rendering and hydration), builds both, and runs the success criterion
   in Playwright in all three engines (no console errors; the editor's shell in the server
   HTML).
-- [x] 6.5 Release tooling: packages renamed to `@folijs/*` (#29; the `@foli` npm scope belongs to
+- [x] 6.5 (#29, #30) Release tooling: packages renamed to `@folijs/*` ( the `@foli` npm scope belongs to
   another user); Changesets (one fixed version for the three packages, changelogs); a
   release-only GitHub Actions workflow (`.github/workflows/release.yml`, started by hand on
   `main`) that runs `pnpm check` and publishes with npm provenance. Owner setup before 6.7
