@@ -1,6 +1,6 @@
 {
   "name": "@folijs/view",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Framework-agnostic DOM view for the Foli document engine: rendering, input, selection, layout.",
   "license": "MIT",
   "repository": {
@@ -21,6 +21,7 @@
   },
   "files": [
     "dist",
+    "CHANGELOG.md",
     "src",
     "!src/**/*.test.*"
   ],

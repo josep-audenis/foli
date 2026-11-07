@@ -192,6 +192,13 @@ The checklist rows are in [`docs/testing/ime.md`](../testing/ime.md) ("Page brea
 before the 0.1.0 release at the latest; until then they are listed in the release notes of any
 canary. A failure that cannot be fixed at the fragment edge triggers the fallback below.
 
+### Release 0.1.0: shipped with the manual checks open (2026-11-07)
+
+The project owner released 0.1.0 without running the G3 and G4 manual checks, as roadmap task
+6.7 allows: they are listed as known risks in the release notes (the 0.1.0 changelog) and in
+[docs/limitations.md](../limitations.md). They stay open here; a failure found later is fixed
+in a 0.x release or, if the fragment edge cannot fix it, triggers the fallback below.
+
 ## Decision
 
 **Option A: `contenteditable` with page fragments** (provisional). Every automated experiment

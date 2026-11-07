@@ -9,16 +9,16 @@ leaves `main` green with a working playground.
 **Update this table in the same PR that starts, advances or finishes a phase.** It is the only
 place that says what is in progress; check it before starting work.
 
-| Phase                    | Status                   | Branch              | Notes                                                                                      |
-| ------------------------ | ------------------------ | ------------------- | ------------------------------------------------------------------------------------------ |
-| 0 Foundation             | ✅ Done                  | —                   |                                                                                            |
-| 1 Architecture spike     | ✅ Done (G1 provisional) | —                   | Merged in #1; ADR-0003 accepted provisionally; IME, dead-key and screen-reader checks open |
-| 2 Document model         | ✅ Done                  | —                   | Merged in #2                                                                               |
-| 3 Transactions & history | ✅ Done                  | —                   | Merged in #4; gate G2 passed                                                               |
-| 4 Editor view            | ✅ Done (G3 provisional) | —                   | Merged in #8–#13; manual checks (4.6) deferred, open risks in ADR-0003                     |
-| 5 Native pagination      | ✅ Done (G4 provisional) | —                   | Merged in #15–#22; page-break manual checks open, risks in ADR-0003                        |
-| 6 React API & 0.1.0      | In progress              | `phase-6/react-api` | Plan below; G4 passed provisionally (manual checks open in ADR-0003)                       |
-| 7–12                     | Not started              |                     |                                                                                            |
+| Phase                    | Status                   | Branch              | Notes                                                                                           |
+| ------------------------ | ------------------------ | ------------------- | ----------------------------------------------------------------------------------------------- |
+| 0 Foundation             | ✅ Done                  | —                   |                                                                                                 |
+| 1 Architecture spike     | ✅ Done (G1 provisional) | —                   | Merged in #1; ADR-0003 accepted provisionally; IME, dead-key and screen-reader checks open      |
+| 2 Document model         | ✅ Done                  | —                   | Merged in #2                                                                                    |
+| 3 Transactions & history | ✅ Done                  | —                   | Merged in #4; gate G2 passed                                                                    |
+| 4 Editor view            | ✅ Done (G3 provisional) | —                   | Merged in #8–#13; manual checks (4.6) deferred, open risks in ADR-0003                          |
+| 5 Native pagination      | ✅ Done (G4 provisional) | —                   | Merged in #15–#22; page-break manual checks open, risks in ADR-0003                             |
+| 6 React API & 0.1.0      | In review                | `phase-6/react-api` | 6.1–6.6 merged; 6.7 release PR open, publish after merge (manual checks shipped as known risks) |
+| 7–12                     | Not started              |                     |                                                                                                 |
 
 Status values: `Ready` (dependencies met, nobody on it) · `In progress` · `In review` (PR open) ·
 `✅ Done` (merged, acceptance criteria met) · `Blocked by …`.

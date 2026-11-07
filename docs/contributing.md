@@ -66,7 +66,7 @@ examples are never published.
    tags. A failed run can be re-run: published versions are skipped, and their missing tags
    are added.
 
-Before the first release, the owner sets up (once):
+The owner set up, once (done before 0.1.0; repeat when a token expires or moves):
 
 - The npm org `folijs` (npmjs.com → Add Organization, free plan for public packages), owning
   the `@folijs` scope.

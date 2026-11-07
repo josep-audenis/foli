@@ -3,7 +3,7 @@ import { type DocJSON, schema } from "./schema.js";
 
 /**
  * Bump when the persisted envelope or content schema changes incompatibly; add a migration.
- * Nothing is published yet, so v1 may still change until the first release.
+ * v1 is published (0.1.0): saved documents exist, so it never changes in place.
  */
 export const SCHEMA_VERSION = 1;
 

@@ -4,7 +4,7 @@ React components for [Foli](https://github.com/josep-audenis/foli), a document e
 web: documents on real pages (A4, Letter), edited in the browser, stored as JSON. Its own
 editing engine, no ProseMirror or similar underneath.
 
-> Pre-release: the API may change in any 0.x version.
+> Early release: the API may change in any 0.x minor version (changes in `CHANGELOG.md`).
 
 ```bash
 npm install @folijs/react @folijs/core react react-dom

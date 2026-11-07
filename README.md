@@ -4,15 +4,14 @@ An open-source document-editing engine for the web, built from the ground up: it
 model, transactions, view and layout, designed around native pagination, with first-class React
 integration.
 
-> **Status: pre-alpha — engine under construction.** Foli edits documents with its own model,
-> engine and view (no ProseMirror/Tiptap/Lexical) on real pages: paragraphs split across pages
-> at a line, explicit page breaks, widow/orphan and keep-with-next rules, incremental reflow,
-> print with one sheet per page. Typing, Enter, Backspace, bold/italic/underline shortcuts,
-> undo/redo, IME and dead keys (automated tests only; manual checks pending, also at page
-> breaks), copy/cut/paste (HTML mapped to the schema; pastes from real Word and Google Docs not
-> yet verified). React components with a toolbar, server rendering, and per-package docs. Next:
-> the first release, 0.1.0 (Phase 6). See [docs/roadmap.md](docs/roadmap.md).
-> Not published to npm yet.
+> **Status: 0.1.0, the first release.** Foli edits documents with its own model, engine and
+> view (no ProseMirror/Tiptap/Lexical) on real pages: paragraphs split across pages at a line,
+> explicit page breaks, widow/orphan and keep-with-next rules, incremental reflow, print with
+> one sheet per page. Paragraphs and headings; bold, italic, underline, strikethrough;
+> undo/redo; IME; copy/cut/paste (HTML mapped to the schema). React components with a toolbar
+> and server rendering. The API may change in any 0.x version. Manual IME, screen-reader and
+> real-paste checks are not run yet: read the [known limitations](docs/limitations.md). Next:
+> lists, links and alignment (Phase 7, [roadmap](docs/roadmap.md)).
 
 ## Usage
 
