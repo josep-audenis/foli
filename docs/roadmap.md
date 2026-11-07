@@ -404,10 +404,11 @@ Each task is one PR that leaves `pnpm check` green and the playground working. L
 - [x] 5.7 Benchmarks: 1/10/50/100/199 pages in all three engines (`pnpm bench:layout`,
   Playwright, a dev-only bench page that mounts the editor and times it from inside): initial
   layout and paint, keystroke handler and keystroke-to-paint p50/p95 (typing and Enter at the
-  start of page 1), full re-flow; hardware, browsers and method in `docs/benchmarks.md`;
-  targets set from the baseline (100 pages: keystroke-to-paint p95 within one frame, layout
-  ≤ 60 ms, re-flow ≤ 30 ms in Chromium and Firefox). WebKit's paint times on Windows are
-  Playwright's software-painting port, not Safari.
+  start of page 1, with an `onChange`), full re-flow after a font change; hardware, browsers
+  and method in `docs/benchmarks.md`; targets set from the baseline with headroom (100 pages:
+  handler p50 ≤ 8 ms, keystroke-to-paint p95 ≤ 25 ms, layout ≤ 60 ms, re-flow ≤ 100 ms in
+  Chromium and Firefox). WebKit's paint times on Windows are Playwright's software-painting
+  port, not Safari.
 - [ ] 5.8 Gate G4 review: T5 in all three engines; the page-break manual checks (IME at a
   fragment edge, a screen reader reading a split paragraph) run or recorded as open risks in
   ADR-0003; `docs/pagination.md` rewritten to match what was built.

@@ -19,12 +19,18 @@ const pages = () => document.querySelectorAll(".foli-page").length;
 const container = document.getElementById("root") as HTMLElement;
 let root: Root | null = null;
 
-/** Time from the keydown event to the end of the editor's handlers, and to the next paint. */
+/**
+ * One key: time from the start of its keydown dispatch in the page to the end of the editor's
+ * handlers, and from the event's creation (`timeStamp`: input delivery included) to the next
+ * paint. `seq` counts keydowns, so the caller can check it is reading the key it pressed.
+ */
 interface KeySample {
+  seq: number;
   handlerMs: number;
   paintMs: number;
 }
 let key: Promise<KeySample> | null = null;
+let keys = 0;
 let handled = 0;
 // Bubble listeners on the window run after the editor's own (on its host).
 for (const type of ["keydown", "beforeinput", "input"]) {
@@ -35,14 +41,22 @@ for (const type of ["keydown", "beforeinput", "input"]) {
 addEventListener(
   "keydown",
   (event) => {
-    const start = event.timeStamp;
+    const seq = ++keys;
+    const created = event.timeStamp;
+    const start = performance.now();
     key = painted().then(() => ({
+      seq,
       handlerMs: handled - start,
-      paintMs: performance.now() - start,
+      paintMs: performance.now() - created,
     }));
   },
   { capture: true },
 );
+
+// Every change reads the document back, as an app that saves it does (the playground's
+// `onChange`); with the current `DocumentEditor` that serializes the whole document.
+const ignore = () => {};
+let swapped = false;
 
 const bench = {
   /** Mounts a stored document: time until it is laid out (synchronous), and until painted. */
@@ -51,7 +65,7 @@ const bench = {
     root?.unmount();
     root = createRoot(container);
     const start = performance.now();
-    flushSync(() => root?.render(<DocumentEditor initialContent={document} />));
+    flushSync(() => root?.render(<DocumentEditor initialContent={document} onChange={ignore} />));
     const layoutMs = performance.now() - start;
     await painted();
     return { layoutMs, paintMs: performance.now() - start, pages: pages() };
@@ -62,10 +76,15 @@ const bench = {
     return key;
   },
   /**
-   * A full re-flow without an edit, as when web fonts finish loading: every block measured
-   * again. Time from the start of the frame that re-flows until it is painted.
+   * A full re-flow as when a web font with other metrics finishes loading: the editor's font
+   * family switches (between the test font and the default sans-serif) and `loadingdone`
+   * fires. The browser lays all the text out again and the view measures every block and
+   * flows the whole document. Time from the start of the frame that re-flows until painted.
    */
   async reflow(): Promise<{ ms: number; pages: number }> {
+    swapped = !swapped;
+    const canvas = document.querySelector<HTMLElement>(".foli-canvas");
+    canvas?.style.setProperty("--foli-font-family", swapped ? "sans-serif" : null);
     document.fonts.dispatchEvent(new Event("loadingdone"));
     const frame = await painted();
     return { ms: performance.now() - frame, pages: pages() };

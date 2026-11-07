@@ -9,8 +9,9 @@ import { benchDocument, loadTestFont, routeTestFont } from "../e2e/fixtures.js";
 const SIZES = [1, 10, 50, 100, 200];
 const MOUNTS = 5;
 const TYPED = "the quick brown fox jumps over the lazy dog ".repeat(2);
-const ENTERS = 10;
-const REFLOWS = 5;
+const ENTERS = 40;
+/** Even: as many re-flows into the other font as back into the test font. */
+const REFLOWS = 6;
 
 const median = (values: number[]) => percentile(values, 50);
 function percentile(values: number[], p: number): number {
@@ -36,19 +37,25 @@ for (const sections of SIZES) {
     const pages = mounts[0]?.pages ?? 0;
     expect(mounts.every((mount) => mount.pages === pages)).toBe(true);
 
-    // Into the first paragraph of page 1: everything after it may move.
+    // Into the first paragraph of page 1: a key that changes its line count moves every later
+    // page (each Enter does; a typed character rarely does).
     await page
       .locator('[role="textbox"] p')
       .first()
       .click({ position: { x: 2, y: 4 } });
+    let lastSeq: number | undefined;
     const keys = async (press: () => Promise<void>, count: number) => {
-      const samples: { handlerMs: number; paintMs: number }[] = [];
+      const samples: { seq: number; handlerMs: number; paintMs: number }[] = [];
       for (let i = 0; i < count; i++) {
         // Real keys arrive at any point of a frame; pressed right after a paint they would
         // always wait a whole frame. 40-56 ms apart, about a fast typist's pace.
         await page.waitForTimeout(40 + ((i * 7) % 17));
         await press();
-        samples.push(await page.evaluate(() => window.foliBench.lastKey()));
+        const sample = await page.evaluate(() => window.foliBench.lastKey());
+        // One keydown per press, read after it: not the previous key's sample again.
+        if (lastSeq !== undefined) expect(sample.seq).toBe(lastSeq + 1);
+        lastSeq = sample.seq;
+        samples.push(sample);
       }
       return samples;
     };
@@ -56,9 +63,9 @@ for (const sections of SIZES) {
     const typed = await keys(() => page.keyboard.type(TYPED[typedChars++] ?? ""), TYPED.length);
     const enters = await keys(() => page.keyboard.press("Enter"), ENTERS);
 
-    const reflows: number[] = [];
+    const reflows: { ms: number; pages: number }[] = [];
     for (let i = 0; i < REFLOWS; i++) {
-      reflows.push((await page.evaluate(() => window.foliBench.reflow())).ms);
+      reflows.push(await page.evaluate(() => window.foliBench.reflow()));
     }
 
     const paint = (samples: { paintMs: number }[]) => samples.map((sample) => sample.paintMs);
@@ -75,7 +82,9 @@ for (const sections of SIZES) {
       enterHandlerP50: round(median(handler(enters))),
       enterPaintP50: round(median(paint(enters))),
       enterPaintP95: round(percentile(paint(enters), 95)),
-      reflowMs: round(median(reflows)),
+      reflowMs: round(median(reflows.map((reflow) => reflow.ms))),
+      // Pages in the other font, then in the test font again: the font swap re-flowed.
+      reflowPages: [reflows[0]?.pages, reflows[1]?.pages],
     };
     console.log(`BENCH ${JSON.stringify(result)}`);
     test.info().annotations.push({ type: "bench", description: JSON.stringify(result) });

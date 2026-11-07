@@ -162,7 +162,7 @@ export async function loadTestFont(page: Page, extraCss = ""): Promise<void> {
     ([family, faces]) =>
       Promise.all(
         faces.map((face) => document.fonts.load(`${face.style} ${face.weight} 16px "${family}"`)),
-      ),
+      ).then(() => {}),
     [FONT_FAMILY, FACES] as const,
   );
   // WebKit applies a loaded font to the layout a while after `load()` resolves: wait until text
