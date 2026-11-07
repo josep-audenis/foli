@@ -1,4 +1,5 @@
 import { type Attrs, deepEqual, NO_ATTRS } from "./attrs.js";
+import type { ContentMatch } from "./content.js";
 import { FoliDocumentError } from "./errors.js";
 import { Fragment } from "./fragment.js";
 import { Mark, type MarkJSON } from "./mark.js";
@@ -71,6 +72,11 @@ export class Node {
     return this.type.isLeaf;
   }
 
+  /** Edited as one unit: leaf nodes and `atom` node types. */
+  get isAtom(): boolean {
+    return this.type.isAtom;
+  }
+
   /** True if this node holds inline content (a caret can sit directly inside it). */
   get inlineContent(): boolean {
     return this.type.inlineContent;
@@ -130,6 +136,39 @@ export class Node {
   /** Same markup, new content. Not validated; see `check`. */
   copy(content: Fragment = Fragment.empty): Node {
     return content === this.content ? this : new Node(this.type, this.attrs, content, this.marks);
+  }
+
+  /** The content match after the first `index` children. */
+  contentMatchAt(index: number): ContentMatch {
+    const match = this.type.contentMatch.matchFragment(this.content, 0, index);
+    if (!match) throw new RangeError(`Invalid content in ${this.type.name}`);
+    return match;
+  }
+
+  /**
+   * Whether replacing children `from..to` with `replacement` (its children `start..end`) leaves
+   * valid content: allowed types in a valid order, allowed marks.
+   */
+  canReplace(
+    from: number,
+    to: number,
+    replacement: Fragment = Fragment.empty,
+    start = 0,
+    end = replacement.childCount,
+  ): boolean {
+    const one = this.contentMatchAt(from).matchFragment(replacement, start, end);
+    const two = one?.matchFragment(this.content, to);
+    if (!two?.validEnd) return false;
+    for (let i = start; i < end; i++) {
+      if (!this.type.allowsMarks(replacement.child(i).marks)) return false;
+    }
+    return true;
+  }
+
+  /** Whether replacing children `from..to` with one node of `type` leaves valid content. */
+  canReplaceWith(from: number, to: number, type: NodeType): boolean {
+    const start = this.contentMatchAt(from).matchType(type);
+    return !!start?.matchFragment(this.content, to)?.validEnd;
   }
 
   /** Same node with the given (canonical) mark set. */

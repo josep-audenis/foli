@@ -83,15 +83,20 @@ export class ResolvedPos {
     return this.start(d) + this.node(d).content.size;
   }
 
-  /** Absolute position before the ancestor at `depth` (not defined for the root). */
+  /**
+   * Absolute position before the ancestor at `depth` (not defined for the root). At
+   * `depth + 1`, the position itself: it is between two children, before the one after it.
+   */
   before(depth = this.depth): number {
+    if (depth === this.depth + 1) return this.pos;
     const d = this.at(depth);
     if (!d) throw new RangeError("There is no position before the root node");
     return this.start(d) - 1;
   }
 
-  /** Absolute position after the ancestor at `depth` (not defined for the root). */
+  /** Absolute position after the ancestor at `depth` (not defined for the root); see `before`. */
   after(depth = this.depth): number {
+    if (depth === this.depth + 1) return this.pos;
     const d = this.at(depth);
     if (!d) throw new RangeError("There is no position after the root node");
     return this.end(d) + 1;
@@ -127,6 +132,22 @@ export class ResolvedPos {
     return 0;
   }
 
+  /**
+   * The range of sibling blocks around this position and `other`: the deepest depth (below the
+   * textblock, if the positions are in one) whose node holds both and satisfies `pred`.
+   * Null when no ancestor qualifies.
+   */
+  blockRange(other: ResolvedPos = this, pred?: (node: Node) => boolean): NodeRange | null {
+    if (other.pos < this.pos) return other.blockRange(this, pred);
+    const top = this.depth - (this.parent.inlineContent || this.pos === other.pos ? 1 : 0);
+    for (let depth = top; depth >= 0; depth--) {
+      if (other.pos <= this.end(depth) && (!pred || pred(this.node(depth)))) {
+        return new NodeRange(this, other, depth);
+      }
+    }
+    return null;
+  }
+
   sameParent(other: ResolvedPos): boolean {
     return this.pos - this.parentOffset === other.pos - other.parentOffset;
   }
@@ -140,5 +161,37 @@ export class ResolvedPos {
     const d = depth < 0 ? this.depth + depth : depth;
     if (d < 0 || d > this.depth) throw new RangeError(`Depth ${depth} out of range`);
     return d;
+  }
+}
+
+/** A flat range of sibling nodes: the children of the node at `depth` from `$from` to `$to`. */
+export class NodeRange {
+  constructor(
+    readonly $from: ResolvedPos,
+    readonly $to: ResolvedPos,
+    readonly depth: number,
+  ) {}
+
+  /** Position before the first node of the range. */
+  get start(): number {
+    return this.$from.before(this.depth + 1);
+  }
+
+  /** Position after the last node of the range. */
+  get end(): number {
+    return this.$to.after(this.depth + 1);
+  }
+
+  /** The node that holds the range. */
+  get parent(): Node {
+    return this.$from.node(this.depth);
+  }
+
+  get startIndex(): number {
+    return this.$from.index(this.depth);
+  }
+
+  get endIndex(): number {
+    return this.$to.indexAfter(this.depth);
   }
 }

@@ -2,7 +2,7 @@ import { Mark, type Node, type ResolvedPos } from "../model/index.js";
 import type { Mappable } from "../transform/stepmap.js";
 
 export interface SelectionJSON {
-  type: "text" | "all";
+  type: "text" | "node" | "all";
   anchor: number;
   head: number;
 }
@@ -78,6 +78,13 @@ export abstract class Selection {
   static fromJSON(doc: Node, json: SelectionJSON): Selection {
     if (json.type === "all") return new AllSelection(doc);
     const clamp = (pos: number) => Math.max(0, Math.min(pos, doc.content.size));
+    if (json.type === "node") {
+      const $pos = doc.resolve(clamp(json.anchor));
+      const node = $pos.nodeAfter;
+      return node && !$pos.textOffset && NodeSelection.isSelectable(node)
+        ? new NodeSelection($pos)
+        : Selection.near($pos);
+    }
     return TextSelection.between(doc.resolve(clamp(json.anchor)), doc.resolve(clamp(json.head)));
   }
 }
@@ -141,6 +148,55 @@ export class TextSelection extends Selection {
   }
 }
 
+/**
+ * One node selected as a unit (a horizontal rule, later an image): `from` is the position
+ * before it, `to` the position after it. Only selectable nodes (not text) can be selected.
+ */
+export class NodeSelection extends Selection {
+  readonly node: Node;
+
+  constructor($pos: ResolvedPos) {
+    const node = $pos.nodeAfter;
+    if (!node || $pos.textOffset || !NodeSelection.isSelectable(node)) {
+      throw new RangeError(`No selectable node at position ${$pos.pos}`);
+    }
+    super($pos, $pos.doc.resolve($pos.pos + node.nodeSize));
+    this.node = node;
+  }
+
+  static create(doc: Node, from: number): NodeSelection {
+    return new NodeSelection(doc.resolve(from));
+  }
+
+  static isSelectable(node: Node): boolean {
+    return !node.isText && node.type.spec.selectable !== false;
+  }
+
+  /** Still the same node when it survives the mapping; a text selection near it otherwise. */
+  map(doc: Node, mapping: Mappable): Selection {
+    const from = mapping.mapResult(this.anchor, 1);
+    const to = mapping.mapResult(this.head, -1);
+    const $pos = doc.resolve(from.pos);
+    const node = $pos.nodeAfter;
+    // The node now at the start must still end at the mapped end: otherwise it was deleted
+    // (both ends collapse) or its content moved out (a lift maps its edges onto a child's).
+    if (
+      from.deleted ||
+      to.deleted ||
+      !node ||
+      $pos.textOffset ||
+      from.pos + node.nodeSize !== to.pos
+    ) {
+      return Selection.near($pos);
+    }
+    return NodeSelection.isSelectable(node) ? new NodeSelection($pos) : Selection.near($pos);
+  }
+
+  toJSON(): SelectionJSON {
+    return { type: "node", anchor: this.anchor, head: this.head };
+  }
+}
+
 /** The whole document. */
 export class AllSelection extends Selection {
   constructor(doc: Node) {
@@ -156,9 +212,22 @@ export class AllSelection extends Selection {
   }
 }
 
-/** Marks that text typed at `$pos` should get: those of the text before it (or after, at a block start). */
+/**
+ * Marks that text typed at `$pos` should get: those of the text before it (or after, at a block
+ * start). A mark that is not inclusive (a link) continues only where the text after has it too.
+ */
 export function marksAt($pos: ResolvedPos): readonly Mark[] {
   if (!$pos.parent.inlineContent) return Mark.none;
   if ($pos.textOffset) return $pos.parent.child($pos.index()).marks;
-  return ($pos.nodeBefore ?? $pos.nodeAfter)?.marks ?? Mark.none;
+  const before = $pos.nodeBefore;
+  const after = $pos.nodeAfter;
+  const main = before ?? after;
+  const other = before ? after : null;
+  let marks = main?.marks ?? Mark.none;
+  for (const mark of marks) {
+    if (!mark.type.inclusive && !(other && mark.isInSet(other.marks))) {
+      marks = mark.removeFromSet(marks);
+    }
+  }
+  return marks;
 }

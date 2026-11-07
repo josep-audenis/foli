@@ -162,7 +162,7 @@ export const splitBlock: Command = (state, dispatch) => {
     const $pos = tr.selection.$from;
     const atEnd = $pos.parentOffset === $pos.parent.content.size;
     const normal = defaultTextblockType(state.schema);
-    tr.split($pos.pos, atEnd && $pos.parent.type !== normal ? { type: normal } : undefined);
+    tr.split($pos.pos, 1, atEnd && $pos.parent.type !== normal ? [{ type: normal }] : undefined);
     tr.setSelection(TextSelection.create(tr.doc, $pos.pos + 2));
     if (marks.length) tr.setStoredMarks(marks);
   });

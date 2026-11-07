@@ -172,9 +172,9 @@ class RebaseMapping implements Mappable {
     // Which side of each original step's changed range the position was on. Content deleted
     // outside history can collapse that distinction; the rebased step's map must restore it, or a
     // position left of re-inserted content ends up right of it (and vice versa).
-    const sides: number[] = [];
+    const sides: number[][] = [];
     for (let i = this.inverted.length - 1; i >= 0; i--) {
-      sides[i] = (this.inverted[i] as StepMap).side(pos);
+      sides[i] = (this.inverted[i] as StepMap).sides(pos);
       const result = (this.inverted[i] as StepMap).mapResult(pos, assoc);
       const mirror = this.rebased[i];
       if (result.recover !== null && mirror) {
@@ -192,7 +192,7 @@ class RebaseMapping implements Mappable {
       pos = result.pos;
     }
     for (let i = from; i < this.rebased.length; i++) {
-      const result = this.rebased[i]?.mapResult(pos, sides[i] || assoc);
+      const result = this.rebased[i]?.mapResult(pos, assoc, sides[i]);
       if (!result) continue;
       deleted ||= result.deleted;
       pos = result.pos;

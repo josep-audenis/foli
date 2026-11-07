@@ -145,6 +145,13 @@ export class Fragment {
     return new Fragment(result, size);
   }
 
+  /** The children from index `from` to `to`. */
+  cutByIndex(from: number, to: number): Fragment {
+    if (from === to) return Fragment.empty;
+    if (from === 0 && to === this.content.length) return this;
+    return Fragment.fromArray(this.content.slice(from, to));
+  }
+
   /** A copy with the child at `index` replaced. Does not merge text; callers keep normal form. */
   replaceChild(index: number, node: Node): Fragment {
     const current = this.child(index);

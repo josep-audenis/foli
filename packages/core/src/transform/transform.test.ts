@@ -177,7 +177,7 @@ describe("Transform helpers", () => {
         content: [{ type: "heading", attrs: { level: 1 }, content: [text("T")] }],
       }),
     );
-    tr.split(2, { type: nodeType("paragraph") });
+    tr.split(2, 1, [{ type: nodeType("paragraph") }]);
     expect(tr.doc.toJSON()).toEqual({
       type: "doc",
       content: [
@@ -255,12 +255,26 @@ describe("post-merge review of PR #4", () => {
     expect(tr.steps).toHaveLength(0);
   });
 
-  it("StepMap.side tells which side of the changed range a position is on", () => {
+  it("StepMap.sides tells which side of each changed range a position is on", () => {
     const map = new StepMap([3, 2, 0]); // deletes 3..5
-    expect([map.side(1), map.side(3), map.side(4), map.side(5), map.side(9)]).toEqual([
-      -1, -1, 0, 1, 1,
+    expect([map.sides(1), map.sides(3), map.sides(4), map.sides(5), map.sides(9)]).toEqual([
+      [-1],
+      [-1],
+      [0],
+      [1],
+      [1],
     ]);
-    expect(StepMap.empty.side(4)).toBe(0);
+    expect(StepMap.empty.sides(4)).toEqual([]);
+    // Two ranges (a gap-replace): a position between them is after the first, before the second.
+    expect(new StepMap([2, 1, 0, 6, 1, 0]).sides(4)).toEqual([1, -1]);
+  });
+
+  it("StepMap.mapResult uses a per-range side at pure insertions", () => {
+    const map = new StepMap([2, 0, 1, 5, 0, 1]); // inserts one token at 2 and one at 5
+    expect(map.map(2, 1)).toBe(3);
+    expect(map.mapResult(2, 1, [-1, -1]).pos).toBe(2);
+    expect(map.mapResult(5, -1, [1, 1]).pos).toBe(7);
+    expect(map.mapResult(5, -1, [1, -1]).pos).toBe(6);
   });
 });
 

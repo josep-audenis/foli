@@ -1,7 +1,20 @@
 import fc from "fast-check";
 import { afterAll, beforeAll, describe, it, vi } from "vitest";
 import { createDocument } from "../document.js";
-import { Mapping, Selection, Transform, TransformError } from "../index.js";
+import {
+  canJoin,
+  canSplit,
+  EditorState,
+  findWrapping,
+  history,
+  liftTarget,
+  Mapping,
+  type NodeType,
+  Selection,
+  Transform,
+  TransformError,
+  undo,
+} from "../index.js";
 import type { Node } from "../model/index.js";
 import type { DocJSON } from "../schema.js";
 import { docJSON, testSchema } from "../testing/index.js";
@@ -18,7 +31,18 @@ function ok(condition: unknown, message: string): asserts condition {
 // default bias piles values on the edges; either collapses most positions to the document start.
 const fraction = fc.noBias(fc.integer({ min: 0, max: 10_000 })).map((n) => n / 10_000);
 const op = fc.record({
-  kind: fc.constantFrom("delete", "text", "addMark", "removeMark", "split", "join", "setBlock"),
+  kind: fc.constantFrom(
+    "delete",
+    "text",
+    "addMark",
+    "removeMark",
+    "split",
+    "join",
+    "setBlock",
+    "wrap",
+    "lift",
+    "splitDeep",
+  ),
   a: fraction,
   b: fraction,
   mark: fc.constantFrom("bold", "italic", "link", "code"),
@@ -41,6 +65,9 @@ function applyOp(tr: Transform, o: Op): void {
     else if (o.kind === "removeMark" && from < to) tr.removeMark(from, to, mark.type);
     else if (o.kind === "split") tr.split(caret);
     else if (o.kind === "join" && from > 0 && from < size) tr.join(from);
+    else if (o.kind === "wrap") wrapOp(tr, from, to, o.b);
+    else if (o.kind === "lift") liftOp(tr, from, to);
+    else if (o.kind === "splitDeep") splitDeepOp(tr, caret, o.b);
     else if (o.kind === "setBlock") {
       tr.setBlockType(
         from,
@@ -52,6 +79,27 @@ function applyOp(tr: Transform, o: Op): void {
   } catch (error) {
     if (!(error instanceof TransformError)) throw error;
   }
+}
+
+/** Wraps the blocks around `from..to` in a blockquote or a list, when possible. */
+function wrapOp(tr: Transform, from: number, to: number, choice: number): void {
+  const range = tr.doc.resolve(from).blockRange(tr.doc.resolve(to));
+  const type = testSchema.nodes[choice < 0.5 ? "blockquote" : "bulletList"] as NodeType;
+  const wrappers = range && findWrapping(range, type);
+  if (range && wrappers) tr.wrap(range, wrappers);
+}
+
+/** Lifts the blocks around `from..to` out of their parent, when possible. */
+function liftOp(tr: Transform, from: number, to: number): void {
+  const range = tr.doc.resolve(from).blockRange(tr.doc.resolve(to));
+  const target = range && liftTarget(range);
+  if (range && target !== null) tr.lift(range, target);
+}
+
+/** Splits 1–3 levels at `pos` (a list item, a blockquote), when valid. */
+function splitDeepOp(tr: Transform, pos: number, choice: number): void {
+  const depth = 1 + Math.floor(choice * 3);
+  if (canSplit(tr.doc, pos, depth)) tr.split(pos, depth);
 }
 
 const richDocs = docJSON({ rich: true }).map((json) => testSchema.nodeFromJSON(json));
@@ -439,6 +487,89 @@ describe("history with changes kept out of it (10k runs)", () => {
         ),
         RUNS,
       );
+    },
+    TIMEOUT,
+  );
+});
+
+describe("structure history on the rich schema (10k runs)", () => {
+  const structureOp = fc.record({
+    kind: fc.constantFrom("wrap", "lift", "splitDeep", "join", "text", "mark", "unmark"),
+    a: fraction,
+    b: fraction,
+  });
+
+  /** Positions of every marker character. */
+  const markers = (doc: Node): number[] => {
+    const out: number[] = [];
+    doc.descendants((node, pos) => {
+      if (!node.isText) return true;
+      [...(node.text ?? "")].forEach((ch, i) => {
+        if (ch === "\u00a7") out.push(pos + i);
+      });
+      return false;
+    });
+    return out;
+  };
+
+  it(
+    "undoing every recorded wrap, lift, split and join around unrecorded edits restores the document",
+    () => {
+      const made: Record<string, number> = { wrap: 0, lift: 0, splitDeep: 0, join: 0 };
+      fc.assert(
+        fc.property(richDocs, fc.array(structureOp, { minLength: 1, maxLength: 8 }), (doc, ops) => {
+          let state = EditorState.create({ doc, plugins: [history()] });
+          for (const o of ops) {
+            const tr = state.tr;
+            const size = tr.doc.content.size;
+            const a = Math.round(o.a * size);
+            const b = Math.round(o.b * size);
+            const [from, to] = a <= b ? [a, b] : [b, a];
+            const caret = Selection.near(tr.doc.resolve(from)).from;
+            const unrecorded = o.kind === "mark" || o.kind === "unmark";
+            if (unrecorded) tr.setMeta("addToHistory", false);
+            try {
+              if (o.kind === "wrap") wrapOp(tr, from, to, o.b);
+              else if (o.kind === "lift") liftOp(tr, from, to);
+              else if (o.kind === "splitDeep") splitDeepOp(tr, caret, o.b);
+              else if (o.kind === "join") {
+                // The joinable boundary nearest the chosen position (random ones rarely are).
+                let best: number | null = null;
+                for (let p = 1; p < size; p++) {
+                  if (
+                    canJoin(tr.doc, p) &&
+                    (best === null || Math.abs(p - from) < Math.abs(best - from))
+                  )
+                    best = p;
+                }
+                if (best !== null) tr.join(best);
+              } else if (o.kind === "text") tr.insertText("t", caret);
+              else if (o.kind === "mark") tr.insertText("\u00a7", caret);
+              else if (o.kind === "unmark") {
+                const at = markers(tr.doc)[0];
+                if (at !== undefined) tr.delete(at, at + 1);
+              }
+            } catch (error) {
+              if (!(error instanceof TransformError)) throw error;
+            }
+            if (!tr.docChanged) continue;
+            if (o.kind in made) made[o.kind] = (made[o.kind] ?? 0) + 1;
+            // Separate history events, so undo steps back one operation at a time.
+            state = state.apply(tr.setMeta("closeHistory", true));
+            state.doc.check();
+          }
+          while (undo(state, (tr) => (state = state.apply(tr)))) state.doc.check();
+          // Undo restored the structure and recorded text; only unrecorded markers remain.
+          const cleanup = state.tr;
+          for (const at of markers(state.doc).reverse()) cleanup.delete(at, at + 1);
+          ok(cleanup.doc.eq(doc), "undo did not restore the document around unrecorded edits");
+        }),
+        RUNS,
+      );
+      // Guard against generators that make an operation a no-op (which would pass trivially).
+      for (const [kind, count] of Object.entries(made)) {
+        ok(count > RUNS.numRuns / 20, `only ${count} ${kind} operations changed the document`);
+      }
     },
     TIMEOUT,
   );
