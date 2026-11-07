@@ -1,5 +1,9 @@
-/* Foli default theme. Override any token on .foli-canvas or an ancestor. */
-.foli-canvas {
+/*
+ * Foli default theme. The tokens' defaults live on the root (and a shadow host), so a value set
+ * on any ancestor of the editor, or on .foli-canvas / .foli-toolbar themselves, overrides them.
+ */
+:root,
+:host {
   --foli-canvas-background: #f3f3f1;
   --foli-page-background: #ffffff;
   --foli-page-shadow: 0 1px 2px rgb(0 0 0 / 0.08), 0 2px 8px rgb(0 0 0 / 0.06);
@@ -10,7 +14,14 @@
   --foli-font-size: 11pt;
   --foli-line-height: 1.5;
   --foli-page-gap: 24px;
+  --foli-toolbar-background: #ffffff;
+  --foli-toolbar-color: #1d1d1b;
+  --foli-toolbar-pressed: #dfe8f8;
+  --foli-toolbar-hover: #f0f0ee;
+  --foli-focus-ring: #2367dc;
+}
 
+.foli-canvas {
   padding: 32px 16px;
   background: var(--foli-canvas-background);
 }
@@ -38,6 +49,81 @@
   background: var(--foli-selection-color);
 }
 
+/* Toolbar (FoliToolbar). */
+.foli-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--foli-border-color);
+  background: var(--foli-toolbar-background);
+  color: var(--foli-toolbar-color);
+  font:
+    14px / 1 system-ui,
+    sans-serif;
+}
+
+.foli-toolbar-button {
+  min-width: 32px;
+  height: 32px;
+  padding: 0 8px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.foli-toolbar-button:not([aria-disabled="true"]):hover {
+  background: var(--foli-toolbar-hover);
+}
+
+.foli-toolbar-button[aria-pressed="true"] {
+  border-color: var(--foli-focus-ring);
+  background: var(--foli-toolbar-pressed);
+}
+
+.foli-toolbar-button[aria-disabled="true"] {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.foli-toolbar-button:focus-visible {
+  outline: 2px solid var(--foli-focus-ring);
+  outline-offset: 1px;
+}
+
+.foli-toolbar-bold {
+  font-weight: 700;
+}
+.foli-toolbar-italic {
+  font-style: italic;
+}
+.foli-toolbar-underline {
+  text-decoration: underline;
+}
+.foli-toolbar-strike {
+  text-decoration: line-through;
+}
+
+/* Forced colors (Windows High Contrast) drop backgrounds: mark pressed buttons another way. */
+@media (forced-colors: active) {
+  .foli-toolbar-button[aria-pressed="true"] {
+    outline: 2px solid Highlight;
+    outline-offset: -2px;
+  }
+}
+
+.foli-toolbar-separator {
+  align-self: stretch;
+  width: 1px;
+  margin: 4px 4px;
+  border: none;
+  background: var(--foli-border-color);
+}
+
 /*
  * The view prints one sheet per page (size from the document settings); this drops the chrome.
  * Hide the rest of your page in print: anything printed before the pages adds sheets.
@@ -49,5 +135,8 @@
   }
   .foli-page {
     box-shadow: none;
+  }
+  .foli-toolbar {
+    display: none;
   }
 }

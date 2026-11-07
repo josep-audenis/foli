@@ -38,10 +38,13 @@ export function App() {
 }
 ```
 
-Build your own layout from the parts: `useFoliEditor()` creates an editor,
-`<FoliEditorProvider editor>` shares it, `<FoliCanvas />` shows its pages, `useCurrentEditor()`
-reads it and `useEditorState(selector)` re-renders a component only when its slice of the state
-changes. The API is not stable before 0.1.0.
+`FoliEditor` shows a formatting toolbar (`toolbar={false}` hides it); a `ref` gives its
+`editor` (e.g. `ref.current.editor.setDocument(doc)`) and `focus()`. Build your own layout from
+the parts: `useFoliEditor()` creates an editor, `<FoliEditorProvider editor>` shares it,
+`<FoliToolbar />` and `<FoliCanvas />` show it (with `<FoliCanvas readOnly />`, pass
+`<FoliToolbar disabled />` too), `useCurrentEditor()` reads it and
+`useEditorState(selector)` re-renders a component only when its slice of the state changes. The
+API is not stable before 0.1.0.
 
 Peer dependencies: `react`, `react-dom`.
 
