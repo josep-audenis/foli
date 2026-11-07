@@ -4,7 +4,7 @@ An open-source document-editing engine for the web, built from the ground up: it
 model, transactions, view and layout, designed around native pagination, with first-class React
 integration.
 
-> **Status: 0.1.0, the first release.** Foli edits documents with its own model, engine and
+> **Status: 0.1.0, the first release (on npm once its release run finishes).** Foli edits documents with its own model, engine and
 > view (no ProseMirror/Tiptap/Lexical) on real pages: paragraphs split across pages at a line,
 > explicit page breaks, widow/orphan and keep-with-next rules, incremental reflow, print with
 > one sheet per page. Paragraphs and headings; bold, italic, underline, strikethrough;

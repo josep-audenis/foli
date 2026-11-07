@@ -487,7 +487,8 @@ criterion is the one from G3: type, format with shortcuts, undo, serialize, relo
 - [ ] 6.7 Release 0.1.0: ADR-0003's manual checks (G3 and G4 lists) run, or the owner accepts
   them as known risks listed in the release notes; tarball success criterion and toolbar axe
   green; the "not on npm yet" notes (README.md, docs/getting-started.md) removed; the owner
-  approves the publish.
+  approves the publish. Versioned in #31; ticked, with Phase 6 done and the README's "on npm
+  once its release run finishes" removed, in a follow-up PR after the publish run.
 
 ## Phase 7 — Rich content · L → 0.2.0
 
