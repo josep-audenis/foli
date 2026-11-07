@@ -447,7 +447,7 @@ criterion is the one from G3: type, format with shortcuts, undo, serialize, relo
   document lazily (no whole-document serialization per keystroke unless asked). Final names;
   `DocumentEditor` removed (nothing is published yet), playground migrated. Tests: StrictMode
   double mount, unmount cleanup, re-render counts with selectors.
-- [x] 6.2 Toolbar: `FoliToolbar` (bold, italic, underline, strike, paragraph/heading levels,
+- [x] 6.2 (#24) Toolbar: `FoliToolbar` (bold, italic, underline, strike, paragraph/heading levels,
   undo, redo, page break), state from `useEditorState` and cheap applicability checks (command
   dry runs build whole transactions: too slow after every transaction on large selections);
   roving tabindex, `aria-pressed`, labels, visible focus; clicks keep the editor's selection
