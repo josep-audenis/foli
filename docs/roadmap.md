@@ -9,16 +9,16 @@ leaves `main` green with a working playground.
 **Update this table in the same PR that starts, advances or finishes a phase.** It is the only
 place that says what is in progress; check it before starting work.
 
-| Phase                    | Status                   | Branch | Notes                                                                                      |
-| ------------------------ | ------------------------ | ------ | ------------------------------------------------------------------------------------------ |
-| 0 Foundation             | ✅ Done                  | —      |                                                                                            |
-| 1 Architecture spike     | ✅ Done (G1 provisional) | —      | Merged in #1; ADR-0003 accepted provisionally; IME, dead-key and screen-reader checks open |
-| 2 Document model         | ✅ Done                  | —      | Merged in #2                                                                               |
-| 3 Transactions & history | ✅ Done                  | —      | Merged in #4; gate G2 passed                                                               |
-| 4 Editor view            | ✅ Done (G3 provisional) | —      | Merged in #8–#13; manual checks (4.6) deferred, open risks in ADR-0003                     |
-| 5 Native pagination      | ✅ Done (G4 provisional) | —      | Merged in #15–#22; page-break manual checks open, risks in ADR-0003                        |
-| 6 React API & 0.1.0      | Ready                    |        | G4 passed provisionally; the open manual checks (ADR-0003) run before 0.1.0                |
-| 7–12                     | Not started              |        |                                                                                            |
+| Phase                    | Status                   | Branch              | Notes                                                                                      |
+| ------------------------ | ------------------------ | ------------------- | ------------------------------------------------------------------------------------------ |
+| 0 Foundation             | ✅ Done                  | —                   |                                                                                            |
+| 1 Architecture spike     | ✅ Done (G1 provisional) | —                   | Merged in #1; ADR-0003 accepted provisionally; IME, dead-key and screen-reader checks open |
+| 2 Document model         | ✅ Done                  | —                   | Merged in #2                                                                               |
+| 3 Transactions & history | ✅ Done                  | —                   | Merged in #4; gate G2 passed                                                               |
+| 4 Editor view            | ✅ Done (G3 provisional) | —                   | Merged in #8–#13; manual checks (4.6) deferred, open risks in ADR-0003                     |
+| 5 Native pagination      | ✅ Done (G4 provisional) | —                   | Merged in #15–#22; page-break manual checks open, risks in ADR-0003                        |
+| 6 React API & 0.1.0      | In progress              | `phase-6/react-api` | Plan below; G4 passed provisionally (manual checks open in ADR-0003)                       |
+| 7–12                     | Not started              |                     |                                                                                            |
 
 Status values: `Ready` (dependencies met, nobody on it) · `In progress` · `In review` (PR open) ·
 `✅ Done` (merged, acceptance criteria met) · `Blocked by …`.
@@ -432,6 +432,42 @@ Each task is one PR that leaves `pnpm check` green and the playground working. L
 - Docs: getting started, API, styling, known limitations.
 
 **Acceptance:** success criterion via npm-installed tarballs; axe checks on toolbar; 0.1.0 published.
+
+### Tasks
+
+Each task is one PR that leaves `pnpm check` green and the playground working. The success
+criterion is the one from G3: type, format with shortcuts, undo, serialize, reload without loss.
+
+- [x] Claim phase, branch `phase-6/react-api`
+- [ ] 6.1 React API: `useFoliEditor(options)` (one `Editor` per component, created once),
+  `FoliCanvas` (mounts the `EditorView` for an editor: `editable`, `placeholder`, `label`),
+  `FoliEditorProvider` and a context hook, `useEditorState(selector, isEqual?)` on
+  `useSyncExternalStore` (a component re-renders only when its slice changes), `FoliEditor`
+  (provider + canvas; toolbar from 6.2). `onChange` gets the transactions and reads the
+  document lazily (no whole-document serialization per keystroke unless asked). Final names;
+  `DocumentEditor` removed (nothing is published yet), playground migrated. Tests: StrictMode
+  double mount, unmount cleanup, re-render counts with selectors.
+- [ ] 6.2 Toolbar: `FoliToolbar` (bold, italic, underline, strike, paragraph/heading levels,
+  undo, redo, page break), state from `useEditorState` and command dry runs (`editor.can`);
+  roving tabindex, `aria-pressed`, labels, visible focus; clicks keep the editor's selection
+  and focus. Axe on the toolbar in all three engines; keyboard-only Playwright test.
+- [ ] 6.3 Lifecycle and SSR: replacing the document from React (`editor.setDocument`: view,
+  selection, history and `onChange` behave as documented); importing every package and
+  `renderToString(<FoliEditor />)` in Node without a DOM works; hydration attaches the view.
+- [ ] 6.4 Packaging: exports maps (ESM, types, `@foli/react/styles.css`), React and React DOM
+  as the only peer dependencies, `sideEffects`; a package check (e.g. publint, if its license
+  fits); bundle size per package recorded with a budget; `pnpm pack` tarballs installed into
+  fresh `examples/vite` and `examples/next` apps that build and pass a Playwright smoke test
+  (the success criterion).
+- [ ] 6.5 Release tooling: Changesets (versions, changelogs); a release-only GitHub Actions
+  workflow that publishes with npm provenance. Needs the owner: control of the `@foli` npm
+  scope (an npm org named `foli` already exists: confirm it is yours, or choose another
+  scope) and an npm token as a repository secret.
+- [ ] 6.6 Docs: getting started, API reference, styling (CSS variables, theme, print), known
+  limitations (from architecture.md, pagination.md and ADR-0003's open risks).
+- [ ] 6.7 Release 0.1.0: ADR-0003's manual checks (G3 and G4 lists) run, or the owner accepts
+  them as known risks listed in the release notes; tarball success criterion and toolbar axe
+  green; the owner approves the publish.
 
 ## Phase 7 — Rich content · L → 0.2.0
 
