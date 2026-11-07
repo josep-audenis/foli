@@ -166,13 +166,18 @@ the Phase 5 view (Playwright 1.64.1, Chromium, Firefox and WebKit, Windows 11):
   valid. Run three times in a row in every engine with the visual and print suites, all
   passing.
 - **IME at the break, automated part only:** a composition just before the break, then typing,
-  gives exact text (Chromium CDP emulation; no re-split while composing).
+  gives exact text (Chromium CDP emulation). The view does not re-split during a composition;
+  the test checks the final text and a valid flow.
 - **Determinism:** seven fixtures with the bundled test font give the same page breaks on a
-  second load and after a font-load re-flow, matching recorded snapshots per engine
-  (`visual.spec.ts`); print gives one sheet per page (`print.spec.ts`).
+  second load and after a (simulated) font-load re-flow, matching recorded snapshots per
+  engine (`visual.spec.ts`). Print (`print.spec.ts`): in print media every page fits its sheet
+  (all three engines); a PDF has one sheet of the page size per page (Chromium only).
 - **Benchmarks:** baseline and targets in [benchmarks.md](../benchmarks.md). Finding 6 is
-  answered: with incremental reflow a keystroke at 100 pages takes 3-5 ms in the view and paints
-  within 8-19 ms (p95); the spike's full re-render took 3-22 ms (median) at 50 pages.
+  answered for keystrokes: with incremental reflow a keystroke at 100 pages takes 3-5 ms in the
+  view and paints within 8-19 ms (p95) in Chromium and Firefox; the spike's full re-render took
+  3-22 ms (median) at 50 pages. Its other half stands: WebKit's initial layout is still 2-3×
+  slower (84 ms at 100 pages, 278 ms at 199, against 40 and 82 ms in Chromium; Playwright's
+  Windows port, not Safari).
 
 **Still open (accepted risks, not run),** in addition to the G3 list:
 

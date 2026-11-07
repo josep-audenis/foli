@@ -93,20 +93,27 @@ behave as in TextEdit, and typing afterwards must land at the new caret.
 
 ## Page breaks (gate G4)
 
-Make a paragraph cross the end of page 1: paste or type text into the last paragraph of page 1
-until it continues at the top of page 2 (the same paragraph on both pages). "At the break" is
-the end of its last line on page 1. Same "Pass" rules as above.
+Setup, once (the document can be reused for every row; Reset only when a row damaged it):
+press Reset, click at the end of the last paragraph, press Enter about 30 times, then type or
+paste text into the last empty paragraph of page 1 until that paragraph continues at the top of
+page 2 (it moves whole until it has at least four lines: two stay, two go on). The break has two
+caret positions: the end of the paragraph's last line on page 1 (click there) and the start of
+its first line on page 2 (ArrowRight from there, or click). Run each IME row at both. Same "Pass"
+rules as above, and the paragraph stays one paragraph (no break inserted at the page edge).
 
 | Platform / browser | Case                                                                           | Result | Notes |
 | ------------------ | ------------------------------------------------------------------------------ | ------ | ----- |
-| Windows / Chrome   | Japanese IME: compose + commit at the break                                    |        |       |
+| Windows / Chrome   | Japanese IME: compose + commit at the break (both positions)                   |        |       |
 | Windows / Chrome   | Japanese IME: compose a long phrase at the end of page 1 so it moves a line on |        |       |
-| Windows / Firefox  | the two rows above                                                             |        |       |
+| Windows / Chrome   | Microsoft Pinyin: compose + commit at the break                                |        |       |
 | Windows / Chrome   | Korean IME: type 한국어 at the break                                           |        |       |
 | Windows / Chrome   | dead keys (`é ñ`) at the break                                                 |        |       |
+| Windows / Firefox  | the Japanese, Pinyin, Korean and dead-key rows above                           |        |       |
 | macOS / Safari     | Japanese – Romaji: compose + commit at the break                               |        |       |
+| macOS / Safari     | autocorrect a misspelled last word of page 1                                   |        |       |
 | Android / Chrome   | Gboard: type at the break, accept a suggestion                                 |        |       |
-| Any / Chrome       | spellcheck: replace a misspelled last word of page 1 (context menu)            |        |       |
+| iOS / Safari       | type at the break, accept autocorrect                                          |        |       |
+| Any / Chrome       | spellcheck (context menu): the last word of page 1, the first word of page 2   |        |       |
 | NVDA / Firefox     | read the split paragraph: one paragraph or two? Line by line across the break  |        |       |
 | NVDA / Chrome      | same                                                                           |        |       |
 | VoiceOver / Safari | same                                                                           |        |       |

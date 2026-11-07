@@ -202,9 +202,10 @@ and benchmarks (5.7, [benchmarks.md](benchmarks.md)); overview in [pagination.md
     other blocks without changing their height; WebKit fires no `loadingdone` for CSS fonts,
     so this is how it notices them), and a split block measured again is first rendered whole
     (a fragment's end breaks its line, so lines measured across the old split would depend
-    on it). Web fonts finishing loading (`document.fonts` `loadingdone`) and a change of page
-    settings drop every measurement. These re-flows are batched into one per animation
-    frame; a re-flow due during a composition waits for its end. A block is measured
+    on it). Web fonts finishing loading (`document.fonts` `loadingdone`) drop every
+    measurement; these re-flows are batched into one per animation frame, and one due during a
+    composition waits for its end. A change of page settings (`setDocument`) drops every
+    measurement too, in the synchronous render that applies it. A block is measured
     whole, so its fragments are compared with that height plus the vertical padding and
     border every further fragment repeats, within a pixel per split for rounding (compared
     with the height alone, a split block would re-flow every frame); the zoom scale comes

@@ -44,21 +44,25 @@ editor state ──► measure the blocks without a cached measurement (DOM read
 
 - **Geometry:** each page gets the settings' size (`width`, `min-height`) and margins
   (`padding`) inline in mm; the content box is `height − top − bottom` by
-  `width − left − right`. The theme adds background, shadow and the gap between pages. A scaled
-  ancestor (`transform`, `zoom`) is divided out of every measurement.
+  `width − left − right`. A scaled ancestor (`transform`, `zoom`) is divided out of every
+  measurement. The React theme (`@foli/react/styles.css`) adds background, shadow and the gap
+  between pages; a bare `@foli/view` host gets none of them.
 - **Measuring:** each block's border-box height and vertical margins, read from the rendered
-  block. Lines only for blocks that cross a page end: per-character `Range` rects, a binary
+  block. Lines only for blocks that cross a page end or hold a page break: per-character `Range` rects, a binary
   search per line, splits snapped to grapheme clusters. The browser shapes the text; Foli only
   reads where its lines fall.
 - **Flow:** blocks fill a page's content box with CSS margin collapsing; a block that does not
   fit is split at a line (over as many pages as it takes). Rules:
-  - a line holding a `pageBreak` (Mod+Enter; pasted from Word and Google Docs) ends its page;
-  - widows and orphans: at least 2 lines of a split block on each page (`FlowRules`);
+  - a line holding a `pageBreak` (Mod+Enter; pasted from Word and Google Docs markup, checked
+    with hand-written fixture HTML) ends its page;
+  - widows and orphans: at least 2 lines of a split block on each page (`FlowRules`; a block too
+    short for both moves whole; not applied across a page break, nor where only an empty page
+    could hold the lines);
   - headings keep with the next block (chains too);
   - only a single line taller than a page makes its page grow.
 - **Fragments:** each fragment is the same element type with its slice of the content and
   marks; the split edges drop their margins, so the fragments together take the block's
-  height. Measuring the fragments of a split block gives the lines of the whole block, so a
+  height (plus the padding and border each further fragment repeats). Measuring the fragments of a split block gives the lines of the whole block, so a
   reload gives the same split.
 - **Caret and selection** are native: all pages live in one editable host. At a split the end
   of one fragment and the start of the next are two caret stops for one model position (caret
@@ -72,9 +76,10 @@ editor state ──► measure the blocks without a cached measurement (DOM read
   identity). An edit measures only the blocks it changed; `flowFrom` starts at the first
   changed block from the previous flow's state and stops once the state before an unchanged
   block equals the previous one (property test: equal to a full flow). Unchanged fragments keep
-  their DOM. Edits flow synchronously; a block resized without an edit (CSS, a font, a
-  container; seen by a `ResizeObserver`), web fonts loading and a settings change re-flow in
-  the next animation frame, at most once per frame, never during a composition.
+  their DOM. Edits flow synchronously, and so does a settings change (`setDocument`, measuring
+  every block again). A block resized without an edit (CSS, a font, a container; seen by a
+  `ResizeObserver`) and web fonts loading re-flow in the next animation frame, at most once per
+  frame, never during a composition.
 - **Print:** the view writes a print stylesheet from the settings: `@page` of the page size
   without margins, each page exactly one sheet tall with `break-after: page`. A print shows the
   screen's pagination; it does not re-flow.
@@ -117,7 +122,8 @@ All in Playwright on Chromium, Firefox and WebKit (Windows 11), plus unit and pr
   sheet size. Print-only CSS must not change text metrics. Firefox and Safari PDF output is not
   checked.
 - Not verified by hand (ADR-0003, open risks): real IME at a fragment edge (only Chromium's
-  emulation), and how screen readers read a split paragraph (possibly as two paragraphs).
+  emulation), how screen readers read a split paragraph (possibly as two paragraphs), and
+  spellcheck and autocorrect at a break.
 
 ## Fallbacks
 
