@@ -134,12 +134,8 @@ export const FIXTURES: Fixture[] = [
   },
 ];
 
-/**
- * Opens the playground on a fixture, laid out with the bundled test font. The playground first
- * lays it out with its own font, then re-flows once the test font has loaded (the path of a
- * web font on a real page); a benchmark of the first layout needs the font loaded before.
- */
-export async function openFixture(page: Page, fixture: Fixture): Promise<void> {
+/** Serves the bundled test font to the page; call before the page loads. */
+export async function routeTestFont(page: Page): Promise<void> {
   await page.route(`**${FONT_PATH}*`, (route) => {
     const file = new URL(route.request().url()).pathname.slice(FONT_PATH.length);
     if (!FACES.some((face) => fontFile(face) === file)) return route.abort();
@@ -148,16 +144,10 @@ export async function openFixture(page: Page, fixture: Fixture): Promise<void> {
       body: readFileSync(require.resolve(`@fontsource/tinos/files/${file}`)),
     });
   });
-  await page.goto("/");
-  await page.evaluate(([key, doc]) => localStorage.setItem(key, doc), [
-    STORAGE_KEY,
-    JSON.stringify({
-      schemaVersion: 1,
-      settings: fixture.settings,
-      content: { type: "doc", content: fixture.blocks },
-    }),
-  ] as const);
-  await page.reload();
+}
+
+/** Makes the editor use the test font, and resolves once text is laid out with it. */
+export async function loadTestFont(page: Page, extraCss = ""): Promise<void> {
   await page.addStyleTag({
     content: [
       ...FACES.map(
@@ -165,22 +155,18 @@ export async function openFixture(page: Page, fixture: Fixture): Promise<void> {
           `@font-face { font-family: "${FONT_FAMILY}"; src: url("${FONT_PATH}${fontFile(face)}") format("woff2"); font-weight: ${face.weight}; font-style: ${face.style}; font-display: block; }`,
       ),
       `.foli-canvas.foli-canvas { --foli-font-family: "${FONT_FAMILY}"; }`,
-      // The sticky bar would cover pages in element screenshots of a scrolled page.
-      ".playground-bar { position: static; }",
+      extraCss,
     ].join("\n"),
   });
   await page.evaluate(
-    async ([family, faces]) => {
-      await Promise.all(
+    ([family, faces]) =>
+      Promise.all(
         faces.map((face) => document.fonts.load(`${face.style} ${face.weight} 16px "${family}"`)),
-      );
-      getSelection()?.removeAllRanges();
-      (document.activeElement as HTMLElement | null)?.blur();
-    },
+      ).then(() => {}),
     [FONT_FAMILY, FACES] as const,
   );
   // WebKit applies a loaded font to the layout a while after `load()` resolves: wait until text
-  // is laid out with it, or `settled` could see the fallback font's layout as final.
+  // is laid out with it, or a caller could see the fallback font's layout as final.
   await page.waitForFunction((family) => {
     const width = (font: string) => {
       const probe = document.createElement("span");
@@ -193,7 +179,47 @@ export async function openFixture(page: Page, fixture: Fixture): Promise<void> {
     };
     return width(`"${family}", monospace`) !== width("monospace");
   }, FONT_FAMILY);
+}
+
+/** The stored form of a document (what the playground keeps in localStorage). */
+export function stored(settings: Settings, blocks: Block[]) {
+  return { schemaVersion: 1, settings, content: { type: "doc", content: blocks } };
+}
+
+/**
+ * Opens the playground on a fixture, laid out with the bundled test font. The playground first
+ * lays it out with its own font, then re-flows once the test font has loaded (the path of a
+ * web font on a real page); the benchmarks load the font first.
+ */
+export async function openFixture(page: Page, fixture: Fixture): Promise<void> {
+  await routeTestFont(page);
+  await page.goto("/");
+  await page.evaluate(([key, doc]) => localStorage.setItem(key, doc), [
+    STORAGE_KEY,
+    JSON.stringify(stored(fixture.settings, fixture.blocks)),
+  ] as const);
+  await page.reload();
+  // The sticky bar would cover pages in element screenshots of a scrolled page.
+  await loadTestFont(page, ".playground-bar { position: static; }");
+  await page.evaluate(() => {
+    getSelection()?.removeAllRanges();
+    (document.activeElement as HTMLElement | null)?.blur();
+  });
   await settled(page);
+}
+
+/**
+ * A document of `sections` sections, each a heading and thirteen paragraphs of one to five lines
+ * (some split across pages): about one A4 page per section with the test font.
+ */
+export function benchDocument(sections: number) {
+  return stored(
+    A4,
+    Array.from({ length: sections }, (_, i) => [
+      heading(2, `Section ${i + 1}`),
+      ...mixed(13, i),
+    ]).flat(),
+  );
 }
 
 /**

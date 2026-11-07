@@ -43,8 +43,8 @@ Peer dependencies: `react`, `react-dom`.
 - [Architecture](docs/architecture.md) — subsystems, packages, dependency policy, risks
 - [ADR-0002: Foli owns its editing engine](docs/decisions/ADR-0002-own-editing-engine.md)
 - [Document model](docs/document-model.md) — persisted format, schema v1, units, migrations
-- [Benchmarks](docs/benchmarks.md) — model build/serialize timings with method
-- [Pagination](docs/pagination.md) — design for native multi-page editing (not implemented yet)
+- [Benchmarks](docs/benchmarks.md) — model build/serialize and pagination (layout, keystroke, re-flow) timings with method
+- [Pagination](docs/pagination.md) — native multi-page editing: design and what is built (Phase 5)
 - [Contributing](docs/contributing.md)
 
 ## Development

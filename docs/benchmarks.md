@@ -44,3 +44,116 @@ Mean time per operation, in milliseconds (lower is better):
 **Reading:** loading a 100-page document (parse, validate, normalize) takes a few milliseconds,
 well under one frame. Nothing here is on the keystroke path; edits will reuse unchanged nodes
 (structural sharing) instead of rebuilding the tree.
+
+## Pagination: layout, keystrokes and re-flow (Phase 5)
+
+**Run:** `pnpm bench:layout` (Playwright, `playwright.bench.config.ts`, one worker; about 3
+minutes for all three engines). Each test prints a `BENCH {…}` line. Not part of `pnpm check` or
+`pnpm test:e2e`. Source: `apps/playground/bench/pagination.bench.ts`, driving the dev-only page
+`apps/playground/bench.html` (`src/bench.tsx`), which mounts `DocumentEditor` and times it from
+inside the page.
+
+**Fixtures:** `benchDocument(sections)` in `apps/playground/e2e/fixtures.ts`: per section a level-2
+heading and thirteen paragraphs of one to five lines (synthetic words, no marks), A4 with 25.4 mm
+margins, laid out with the bundled test font (Tinos, loaded before the editor mounts). One section
+is about one page; paragraphs split across pages and the keep-with-next and widow/orphan rules
+apply. 1, 10, 50, 100 and 200 sections give 1, 10, 50, 100 and 199 pages.
+
+**Operations:**
+
+- **layout:** mounting the editor (`flushSync` render of `DocumentEditor`: view creation, measuring
+  every block, the page flow, the DOM of every page), synchronous. **To paint:** until the next
+  frame has been painted. Median of 5 mounts.
+- **type / Enter:** 88 characters typed, then 40 Enter presses, at the start of the first
+  paragraph on page 1. Each Enter adds a line there and moves every later page (the incremental
+  re-flow runs to the end of the document). A typed character changes the paragraph's line count
+  about once in 80 keys, so the typing samples are mostly edits that move nothing (the re-flow
+  stops after that paragraph).
+  - **handler:** from the start of the `keydown` dispatch in the page to the end of the editor's
+    handlers (transaction, view update, incremental re-flow, `onChange`).
+  - **paint:** from the event's `timeStamp` (input delivery included) to the next painted frame
+    (`requestAnimationFrame`, then a task: the main thread has finished the frame's style,
+    layout and paint; rasterizing and compositing are not included).
+  - Keys are 40-56 ms apart plus a round trip, so they arrive at any point of a frame; each
+    sample is checked to belong to the key just pressed.
+  - The editor has an `onChange` that ignores the document, as an app that saves it has one.
+    With the current `DocumentEditor` (its API is decided in Phase 6) that serializes the whole
+    document on every change.
+- **re-flow:** a full re-flow as when a web font with other metrics finishes loading: the editor's
+  font family switches (to the default sans-serif, then back to the test font; the page count
+  changes, e.g. 101 → 105 pages) and a `loadingdone` event fires on `document.fonts`. The browser
+  lays all the text out again, and the view measures every block and flows the whole document.
+  Timed from the start of the frame that re-flows to its paint. Median of 6 (3 each way); by then
+  the document also holds the 40 paragraphs the Enter presses added.
+
+**Environment:** Intel Core i7-13700H, 16 GB RAM, Windows 11, laptop under normal desktop load;
+Playwright 1.64.1 with its bundled Chromium 156.0.8078.4, Firefox 157.0 and WebKit 27.2
+(headless, Desktop Chrome/Firefox/Safari device settings, 1280×720), Node.js 25.3.0, Vite dev
+server (unminified source, React's development build), 2026-11-07. Mean of two full runs.
+
+Milliseconds (lower is better). Keystroke paint columns are p50 / p95 of the samples:
+
+| Engine   | Pages | layout | to paint | type handler p50 | type paint p50 / p95 | Enter handler p50 | Enter paint p50 / p95 | re-flow |
+| -------- | ----: | -----: | -------: | ---------------: | -------------------: | ----------------: | --------------------: | ------: |
+| Chromium |     1 |    1.5 |     13.1 |              0.9 |            2.2 / 3.5 |               1.1 |             2.0 / 9.5 |     3.0 |
+| Chromium |    10 |    5.6 |     10.9 |              1.1 |            2.1 / 3.5 |               2.0 |             3.5 / 5.4 |     7.7 |
+| Chromium |    50 |   18.8 |     34.3 |              1.9 |            3.2 / 5.5 |               3.0 |            5.0 / 10.7 |    30.6 |
+| Chromium |   100 |   39.8 |     68.0 |              3.5 |            5.2 / 7.9 |               5.1 |            7.8 / 13.2 |    57.5 |
+| Chromium |   199 |   82.2 |    136.5 |              5.0 |           7.5 / 10.8 |               6.8 |           10.4 / 21.2 |   131.9 |
+| Firefox  |     1 |      3 |       10 |                1 |                2 / 4 |                 2 |                3 / 16 |     2.4 |
+| Firefox  |    10 |    7.5 |       11 |              1.5 |                3 / 5 |                 2 |              3.5 / 14 |     5.5 |
+| Firefox  |    50 |     20 |       32 |                2 |                4 / 6 |                 3 |                5 / 14 |      29 |
+| Firefox  |   100 |     44 |       64 |                3 |              5.5 / 8 |               4.5 |              6.5 / 19 |      64 |
+| Firefox  |   199 |     88 |      128 |                5 |             8.5 / 14 |                 6 |               10 / 20 |     187 |
+| WebKit   |     1 |    2.5 |       62 |              1.5 |              15 / 23 |                 2 |               14 / 30 |      14 |
+| WebKit   |    10 |      8 |       55 |                2 |              15 / 23 |                 2 |               15 / 22 |      14 |
+| WebKit   |    50 |     31 |       68 |                2 |              15 / 23 |                 3 |               15 / 30 |      46 |
+| WebKit   |   100 |     84 |      134 |                3 |              15 / 31 |               4.5 |               19 / 38 |      86 |
+| WebKit   |   199 |    278 |      350 |                5 |              22 / 39 |               6.5 |               23 / 54 |     248 |
+
+**Caveats:**
+
+- Firefox and WebKit round `performance.now()` to whole milliseconds (the halves are means of
+  two runs). Run-to-run differences were up to ~30% on single cells; treat them as magnitudes.
+- **WebKit here is Playwright's Windows port, not Safari.** It paints in software: the page
+  shadows of the default theme make its frames slow (keys pressed back to back took ~90 ms to
+  paint, ~25 ms with `box-shadow: none`), which is most of its "to paint" and paint columns. Its
+  handler columns are comparable with the other engines; its paint columns say nothing about
+  Safari on macOS.
+- Paint times depend on the frame clock (60 Hz headless): a key that arrives just after a frame
+  waits for the next one, so p95 includes up to one frame of waiting. That is why Firefox's Enter
+  p95 is 14-20 ms at every size, one page included.
+- Pressing keys back to back right after each paint (no gap) put every key at the start of a frame
+  and measured a full frame of waiting (~15 ms in Chromium at any size); the gap avoids that.
+- An edit later in the document, or one that changes a block's height in the middle, costs
+  between the two keystroke rows: the re-flow runs from the edited block to wherever the pages
+  line up again.
+
+**Reading:**
+
+- **Keystrokes paint within a frame up to 100 pages in Chromium** (p95 at most 13.2 ms, with
+  Enter moving every later page); in Firefox the p95 adds up to a frame of waiting at every size.
+  The handler grows linearly with the document (about 0.03 ms per page in Chromium): the view
+  walks every block on each update, `onChange` serializes the document, and an Enter re-flows to
+  the end. At 200 pages Enter's p95 is just over one frame (20-21 ms).
+- **Mounting** costs about 0.4-0.45 ms per page synchronously in Chromium and Firefox (every block
+  measured once), so 100 pages block the main thread for ~40-45 ms and paint after ~65 ms.
+- **A full re-flow after a font change** costs about 0.6 ms per page at 100 pages (the browser's
+  own text layout plus the view's measuring) and grows faster than linearly in Firefox (187 ms at
+  200 pages). It happens once per font load or settings change, not per keystroke.
+
+**Targets** (set from this baseline with headroom, on this machine, in Chromium and Firefox; for
+WebKit the handler columns only). A target counts as broken when two runs in a row exceed it; a
+change that breaks one needs a reason in its PR, and the table above re-run:
+
+| Measure                                 | 100 pages | 200 pages |
+| --------------------------------------- | --------: | --------: |
+| Keystroke handler p50 (type and Enter)  |    ≤ 8 ms |   ≤ 12 ms |
+| Keystroke-to-paint p95 (type and Enter) |   ≤ 25 ms |   ≤ 33 ms |
+| Initial layout (synchronous)            |   ≤ 60 ms |  ≤ 120 ms |
+| Full re-flow after a font change        |  ≤ 100 ms |  ≤ 250 ms |
+
+Not done yet: the per-keystroke walk over every block, the whole-document `onChange`
+serialization, virtualizing pages far from the viewport, and moving the first layout off the main
+thread. None is needed for these targets; revisit when a target fails or documents grow past a
+few hundred pages.

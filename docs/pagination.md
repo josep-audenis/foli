@@ -4,8 +4,8 @@
 > across pages at a line with caret affinity at the split (5.2), and the rules: explicit page
 > breaks, widows and orphans, keep-with-next for headings (5.3), and incremental reflow with
 > cached measurements (5.4), deterministic fixtures with a bundled test font and visual
-> regression (5.5), print with one sheet per page (5.6); see "Editor view" in
-> [architecture.md](architecture.md). Not built yet: benchmarks. The rendering approach is
+> regression (5.5), print with one sheet per page (5.6), benchmarks up to 200 pages (5.7, in
+> [benchmarks.md](benchmarks.md)); see "Editor view" in [architecture.md](architecture.md). The rendering approach is
 > validated by the Phase 1 spike (ADR-0003).
 
 ## Invariant
@@ -86,15 +86,15 @@ width or zoom change, and settings change.
 
 ## Risks and open questions
 
-| Risk                       | Notes                                                                                                      |
-| -------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| Selection across fragments | Does the browser treat two `<p>` fragments as one selectable run? Arrow keys at boundaries? (spike E2, E4) |
-| IME at a fragment boundary | Composition that pushes text onto the next page (spike E3)                                                 |
-| Screen readers             | Two fragments may be read as two paragraphs; may need ARIA hints (spike E6)                                |
-| Justified text             | The last line of fragment 1 must stay justified; CSS `text-align-last` on fragments                        |
-| Print                      | Print pages from our page containers with `break-after: page`; verify with Playwright PDF                  |
-| Fonts                      | Pagination is valid only after fonts load; bundled font for tests                                          |
-| Large documents            | Measuring every block on load; benchmark before virtualizing anything                                      |
+| Risk                       | Notes                                                                                                       |
+| -------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| Selection across fragments | Does the browser treat two `<p>` fragments as one selectable run? Arrow keys at boundaries? (spike E2, E4)  |
+| IME at a fragment boundary | Composition that pushes text onto the next page (spike E3)                                                  |
+| Screen readers             | Two fragments may be read as two paragraphs; may need ARIA hints (spike E6)                                 |
+| Justified text             | The last line of fragment 1 must stay justified; CSS `text-align-last` on fragments                         |
+| Print                      | Print pages from our page containers with `break-after: page`; verify with Playwright PDF                   |
+| Fonts                      | Pagination is valid only after fonts load; bundled font for tests                                           |
+| Large documents            | Every block measured on load; measured up to 200 pages ([benchmarks](benchmarks.md)); no virtualization yet |
 
 ## Rust?
 
