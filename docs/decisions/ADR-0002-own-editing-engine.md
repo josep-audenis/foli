@@ -42,7 +42,8 @@ everything, so we stop now, while the codebase is a skeleton.
    consume the same JSON format. No duplicate transaction logic in two languages.
 6. **Package boundaries** start small: `@folijs/core` (model, transactions; no DOM),
    `@folijs/view` (DOM rendering, input, selection, layout), `@folijs/react`. More packages only
-   when a boundary has proven itself in code.
+   when a boundary has proven itself in code. (Written as `@foli/*`; renamed to `@folijs/*` in
+   roadmap task 6.5 because the `@foli` npm scope belongs to another user.)
 
 ## Consequences
 

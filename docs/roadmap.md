@@ -428,7 +428,7 @@ Each task is one PR that leaves `pnpm check` green and the playground working. L
   external replacement; no per-keystroke controlled `value`. SSR-safe imports.
 - Packaging: ESM, exports map, types, CSS entry, peer deps only for React; bundle size tracked;
   tarball install test into fresh Vite and Next.js apps (`examples/`); Changesets; npm publish
-  with provenance from CI; npm scope registered (`@folijs`: `@foli` belongs to another npm user).
+  with provenance from CI; the owner registers the npm scope (`@folijs`; `@foli` belongs to another npm user).
 - Docs: getting started, API, styling, known limitations.
 
 **Acceptance:** success criterion via npm-installed tarballs; axe checks on toolbar; 0.1.0 published.
