@@ -448,7 +448,8 @@ criterion is the one from G3: type, format with shortcuts, undo, serialize, relo
   `DocumentEditor` removed (nothing is published yet), playground migrated. Tests: StrictMode
   double mount, unmount cleanup, re-render counts with selectors.
 - [x] 6.2 Toolbar: `FoliToolbar` (bold, italic, underline, strike, paragraph/heading levels,
-  undo, redo, page break), state from `useEditorState` and command dry runs (`editor.can`);
+  undo, redo, page break), state from `useEditorState` and cheap applicability checks (command
+  dry runs build whole transactions: too slow after every transaction on large selections);
   roving tabindex, `aria-pressed`, labels, visible focus; clicks keep the editor's selection
   and focus. `FoliEditor` shows it by default (`toolbar={false}`); a `ref` on `FoliEditor`
   gives `{ editor, focus() }`, on `FoliCanvas` `{ focus() }`. Axe on the toolbar (editable and

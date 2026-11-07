@@ -76,6 +76,9 @@ apply. 1, 10, 50, 100 and 200 sections give 1, 10, 50, 100 and 199 pages.
     layout and paint; rasterizing and compositing are not included).
   - Keys are 40-56 ms apart plus a round trip, so they arrive at any point of a frame; each
     sample is checked to belong to the key just pressed.
+  - Since 6.2 the bench page's `FoliEditor` includes its toolbar (state updated after every
+    transaction); re-run at 100 and 200 pages in Chromium and Firefox, every number stays within
+    the targets below (handler p50 3-7 ms).
   - The editor has an `onChange` that reads `change.document`, as an app that saves on every
     change does: the whole document is serialized per keystroke. (Measured with Phase 5's
     `DocumentEditor`, which always serialized; `FoliEditor` only does when `document` is read,

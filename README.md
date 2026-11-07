@@ -41,7 +41,8 @@ export function App() {
 `FoliEditor` shows a formatting toolbar (`toolbar={false}` hides it); a `ref` gives its
 `editor` (e.g. `ref.current.editor.setDocument(doc)`) and `focus()`. Build your own layout from
 the parts: `useFoliEditor()` creates an editor, `<FoliEditorProvider editor>` shares it,
-`<FoliToolbar />` and `<FoliCanvas />` show it, `useCurrentEditor()` reads it and
+`<FoliToolbar />` and `<FoliCanvas />` show it (with `<FoliCanvas readOnly />`, pass
+`<FoliToolbar disabled />` too), `useCurrentEditor()` reads it and
 `useEditorState(selector)` re-renders a component only when its slice of the state changes. The
 API is not stable before 0.1.0.
 

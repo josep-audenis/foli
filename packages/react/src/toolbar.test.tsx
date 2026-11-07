@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
-import { createDocument } from "@foli/core";
+import { createDocument, EditorState } from "@foli/core";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { createRef } from "react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { FoliEditor, type FoliEditorHandle } from "./index.js";
 
 const doc = createDocument({
@@ -127,6 +127,51 @@ describe("FoliToolbar", () => {
     cleanup();
     setup({ toolbar: false });
     expect(screen.queryByRole("toolbar")).toBeNull();
+  });
+
+  it("builds no transactions to update its state, however large the selection", () => {
+    const big = createDocument({
+      type: "doc",
+      content: Array.from({ length: 2000 }, (_, i) => ({
+        type: "paragraph",
+        content: [{ type: "text", text: `Paragraph ${i}` }],
+      })),
+    });
+    const transactionsFor = (toolbar: boolean) => {
+      const { editor } = setup({ initialContent: big, toolbar });
+      const tr = vi.spyOn(EditorState.prototype, "tr", "get");
+      act(() => editor.select(0, editor.state.doc.content.size));
+      act(() => editor.select(5));
+      const count = tr.mock.calls.length;
+      tr.mockRestore();
+      cleanup();
+      return count;
+    };
+    // Only the selection changes themselves: none from the toolbar's dry runs.
+    expect(transactionsFor(true)).toBe(transactionsFor(false));
+  });
+
+  it("a click focuses the document to show the result; keyboard activation keeps the focus", () => {
+    const { editor } = setup();
+    const outside = document.createElement("button");
+    document.body.append(outside);
+    act(() => outside.focus());
+    act(() => editor.select(1, 6));
+    fireEvent.click(button("Bold"), { detail: 1 });
+    expect(document.activeElement).toBe(screen.getByRole("textbox"));
+    act(() => button("Italic").focus());
+    fireEvent.click(button("Italic"), { detail: 0 });
+    expect(editor.isMarkActive("italic")).toBe(true);
+    expect(document.activeElement).toBe(button("Italic"));
+    outside.remove();
+  });
+
+  it("leaves arrow keys with Alt, Ctrl or Meta to the browser", () => {
+    setup();
+    const first = buttons()[0] as HTMLElement;
+    act(() => first.focus());
+    expect(fireEvent.keyDown(first, { key: "ArrowLeft", altKey: true })).toBe(true);
+    expect(document.activeElement).toBe(first);
   });
 
   it("a ref on FoliEditor gives its editor and focuses the document", () => {

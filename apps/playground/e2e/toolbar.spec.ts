@@ -71,3 +71,37 @@ test("keyboard only: Tab to the toolbar, arrows to a heading level, Enter, Tab b
   await page.keyboard.press("Shift+Tab");
   await expect(button(page, "H1")).toBeFocused();
 });
+
+test("a click while the document is not focused focuses it and shows the change", async ({
+  page,
+}) => {
+  await page.goto("/");
+  const paragraph = blocks(page).nth(1);
+  await paragraph.click({ position: { x: 2, y: 4 } });
+  await page.keyboard.press("Home");
+  for (let i = 0; i < 6; i++) await page.keyboard.press("Shift+ArrowRight");
+  await page.getByRole("checkbox", { name: "Read-only" }).focus();
+  await button(page, "Bold").click();
+  await expect(editor(page)).toBeFocused();
+  await expect(paragraph.locator("strong").first()).toHaveText("Edited");
+  expect(await page.evaluate(() => String(getSelection()))).toBe("Edited");
+});
+
+test("keyboard activation over a selected range: Tab back and typing replaces the range", async ({
+  page,
+}) => {
+  await page.goto("/");
+  const paragraph = blocks(page).nth(1);
+  await paragraph.click({ position: { x: 2, y: 4 } });
+  await page.keyboard.press("Home");
+  for (let i = 0; i < 6; i++) await page.keyboard.press("Shift+ArrowRight");
+  await page.keyboard.press("Shift+Tab");
+  await page.keyboard.press("ArrowRight"); // Italic
+  await page.keyboard.press("Enter");
+  await expect(paragraph.locator("em").first()).toHaveText("Edited");
+  await page.keyboard.press("Tab");
+  await expect(editor(page)).toBeFocused();
+  expect(await page.evaluate(() => String(getSelection()))).toBe("Edited");
+  await page.keyboard.type("Typed");
+  await expect(paragraph).toContainText("Typed by Foli");
+});

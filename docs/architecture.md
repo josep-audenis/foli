@@ -121,6 +121,11 @@ Known limits:
   Batch per-paragraph mark steps before documents get that large.
 - Selections snap out of surrogate pairs but not to full grapheme clusters; the view shows them
   at cluster boundaries (Phase 4.4).
+- `setBlockType` over many blocks adds one step per block, each rebuilding the document:
+  quadratic. Measured by review: H1 with everything selected in a ~200-page document takes about
+  1.3 s (Node). Command dry runs (`editor.can`) build the same transaction, so nothing that runs
+  per transaction uses them (the toolbar uses cheap checks). Build the new content once before
+  documents get that large.
 - Plugins, `Transaction` metadata and mapping internals are exported but not yet a stable API.
 
 ## Editor view (`@foli/view`)
@@ -431,13 +436,22 @@ stable before 0.1.0):
   pays nothing per keystroke.
 - `FoliToolbar` (6.2): bold, italic, underline, strikethrough; paragraph and heading levels
   1-3 (a pressed heading turns back into a paragraph); undo, redo; page break. Its state is one
-  `useEditorState` selector: `aria-pressed` from the marks and block types of the selection,
-  `aria-disabled` from command dry runs (`editor.can`), compared item by item so typing does not
-  re-render it. One tab stop (`role="toolbar"`, roving `tabindex`: arrows, Home, End, wrapping;
-  the last used button keeps the stop); disabled buttons stay focusable (`aria-disabled`, not
-  `disabled`). `mousedown` is prevented, so a click leaves the focus and the selection in the
-  document; keyboard activation keeps the focus on the button, and Tab returns to the document
-  at its selection. Buttons with a symbol (B, I, U, S, ¶) are named by `aria-label`; the others
+  module-level `useEditorState` selector, compared item by item so typing does not re-render it:
+  `aria-pressed` from the marks and block types of the selection (O(selection)), `aria-disabled`
+  from cheap checks (undo/redo depth; marks, block types and page breaks always apply in schema
+  v1), not command dry runs: `editor.can` builds the whole transaction, and a block-type dry run
+  over a select-all is quadratic in the number of blocks (seconds per keystroke at 200 pages).
+  One tab stop (`role="toolbar"`, roving `tabindex`: arrows, Home, End, wrapping; with Alt, Ctrl
+  or Meta the keys are the browser's; the last button reached by keyboard keeps the stop);
+  disabled buttons stay focusable (`aria-disabled`, not `disabled`). `mousedown` is prevented,
+  so a click leaves the focus and the selection in the document; a click while the document is
+  not focused focuses it (`onClickCommand`, which `FoliEditor` sets), so the change is visible.
+  Keyboard activation keeps the focus on the button, and Tab returns to the document at its
+  selection; meanwhile a selected range is not highlighted (the view writes the DOM selection
+  only into a focused host). The paragraph and heading buttons are toggle buttons; pressing a
+  pressed paragraph button does nothing. `FoliToolbar` has no read-only state of its own:
+  composed with `<FoliCanvas readOnly />` it needs `disabled` too (commands run through the
+  editor, which code may always change). Buttons with a symbol (B, I, U, S, ¶) are named by `aria-label`; the others
   by their visible text (H1, Undo), so speech input matches what is on screen; every button has
   a `title`. Axe (scoped to the toolbar, editable and read-only) and keyboard-only flows run in
   Playwright in all three engines.

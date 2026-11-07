@@ -89,7 +89,13 @@ export const FoliEditor = forwardRef<FoliEditorHandle, FoliEditorProps>(function
 
   return (
     <FoliEditorProvider editor={editor}>
-      {toolbar && <FoliToolbar editor={editor} disabled={canvas.readOnly} />}
+      {toolbar && (
+        <FoliToolbar
+          editor={editor}
+          disabled={canvas.readOnly}
+          onClickCommand={() => canvasRef.current?.focus()}
+        />
+      )}
       {children}
       <FoliCanvas ref={canvasRef} editor={editor} {...canvas} />
     </FoliEditorProvider>

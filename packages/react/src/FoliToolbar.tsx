@@ -4,18 +4,28 @@ import {
   type EditorState,
   insertPageBreak,
   redo,
+  redoDepth,
   setBlockType,
   toggleMark,
   undo,
+  undoDepth,
 } from "@foli/core";
-import { Fragment, type KeyboardEvent, useRef, useState } from "react";
+import { Fragment, type KeyboardEvent, type MouseEvent, useRef, useState } from "react";
 import { useEditorOrContext, useEditorState } from "./editor.js";
 
 export interface FoliToolbarProps {
   /** Default: the editor of the nearest `FoliEditorProvider`. */
   editor?: Editor | undefined;
-  /** Every button is disabled (pair it with the canvas's `readOnly`). */
+  /**
+   * Every button is disabled. Pass it whenever the canvas is `readOnly`: commands run through
+   * the editor, which code may always change (`FoliEditor` does this for you).
+   */
   disabled?: boolean | undefined;
+  /**
+   * Called after a click ran a command, to show its result in the document (`FoliEditor`
+   * focuses its canvas). Keyboard activation keeps the focus in the toolbar.
+   */
+  onClickCommand?: (() => void) | undefined;
   /** Accessible name of the toolbar (default "Formatting"). */
   label?: string | undefined;
   className?: string | undefined;
@@ -30,19 +40,30 @@ interface Item {
   symbol?: boolean;
   /** Whether the button shows as pressed (toggle buttons only). */
   pressed?: (state: EditorState, editor: Editor) => boolean;
+  /**
+   * Whether the command can run now (default: always; in schema v1 every selection is in
+   * textblocks, which take every mark, block type and page break). A cheap check, not a dry
+   * run: it runs after every transaction, and a dry run builds the whole transaction (for a
+   * block type over a large selection, quadratic in the number of blocks).
+   */
+  enabled?: (state: EditorState) => boolean;
   command: (state: EditorState) => Command;
 }
 
-/** Whether every textblock in the selection is `type` with `level` (if given). */
+/** Whether the selection holds textblocks and all of them are `type` with `level` (if given). */
 function blockIs(state: EditorState, type: string, level?: number): boolean {
   const { from, to } = state.selection;
   let all = true;
+  let any = false;
   state.doc.nodesBetween(from, to, (node) => {
-    if (node.isTextblock && (node.type.name !== type || (level && node.attrs.level !== level)))
-      all = false;
+    if (!all) return false;
+    if (node.isTextblock) {
+      any = true;
+      if (node.type.name !== type || (level && node.attrs.level !== level)) all = false;
+    }
     return !node.isTextblock;
   });
-  return all;
+  return any && all;
 }
 
 const mark = (key: string, label: string, text: string): Item => ({
@@ -87,8 +108,20 @@ const GROUPS: Item[][] = [
     heading(3),
   ],
   [
-    { key: "undo", label: "Undo", text: "Undo", command: () => undo },
-    { key: "redo", label: "Redo", text: "Redo", command: () => redo },
+    {
+      key: "undo",
+      label: "Undo",
+      text: "Undo",
+      enabled: (state) => undoDepth(state) > 0,
+      command: () => undo,
+    },
+    {
+      key: "redo",
+      label: "Redo",
+      text: "Redo",
+      enabled: (state) => redoDepth(state) > 0,
+      command: () => redo,
+    },
   ],
   [{ key: "pageBreak", label: "Page break", text: "Page break", command: () => insertPageBreak }],
 ];
@@ -103,6 +136,13 @@ const sameStates = (a: ItemState[], b: ItemState[]) =>
   a.length === b.length &&
   a.every((item, i) => item.pressed === b[i]?.pressed && item.enabled === b[i]?.enabled);
 
+/** Runs after every transaction: O(selection), no transactions built. */
+const selectStates = (state: EditorState, editor: Editor): ItemState[] =>
+  ITEMS.map((item) => ({
+    pressed: item.pressed?.(state, editor),
+    enabled: item.enabled?.(state) ?? true,
+  }));
+
 /**
  * Formatting buttons for an editor: marks, paragraph and heading levels, undo, redo, page
  * break. One tab stop (arrow keys, Home and End move between buttons); toggles carry
@@ -112,29 +152,26 @@ const sameStates = (a: ItemState[], b: ItemState[]) =>
 export function FoliToolbar({
   editor: given,
   disabled = false,
+  onClickCommand,
   label = "Formatting",
   className,
 }: FoliToolbarProps) {
   const editor = useEditorOrContext(given, "FoliToolbar");
-  const states = useEditorState(
-    (state, current) =>
-      ITEMS.map((item) => {
-        const pressed = item.pressed?.(state, current);
-        // A pressed block type is a no-op, not a disabled button.
-        return { pressed, enabled: Boolean(pressed) || current.can(item.command(state)) };
-      }),
-    { editor, isEqual: sameStates },
-  );
+  const states = useEditorState(selectStates, { editor, isEqual: sameStates });
   const [active, setActive] = useState(0);
   const buttons = useRef<(HTMLButtonElement | null)[]>([]);
 
-  const run = (index: number) => {
+  const run = (index: number, event: MouseEvent) => {
     const item = ITEMS[index];
     if (!item || disabled || !states[index]?.enabled) return;
     editor.run(item.command(editor.state));
+    // `detail` counts pointer clicks; Enter and Space on a button give 0.
+    if (event.detail > 0) onClickCommand?.();
   };
 
   const onKeyDown = (event: KeyboardEvent) => {
+    // Alt+Left (back) and other shortcuts are the browser's.
+    if (event.altKey || event.ctrlKey || event.metaKey) return;
     const count = ITEMS.length;
     const moves: Record<string, number> = {
       ArrowRight: (active + 1) % count,
@@ -181,7 +218,7 @@ export function FoliToolbar({
                 // Keep the focus (and the selection) in the document on click.
                 onMouseDown={(event) => event.preventDefault()}
                 onFocus={() => setActive(i)}
-                onClick={() => run(i)}
+                onClick={(event) => run(i, event)}
               >
                 {item.text}
               </button>
