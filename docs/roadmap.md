@@ -516,7 +516,7 @@ non-inclusive mark. The view, layout and clipboard assume blocks are textblocks 
 `doc` (one `BlockDesc` per top-level child, positions from top-level offsets, one layout box per
 top-level block, marks rendered without attrs).
 
-- [ ] 7.1 Structure engine (`@folijs/core`, no schema change): `ReplaceAroundStep` (apply,
+- [x] 7.1 (#33) Structure engine (`@folijs/core`, no schema change): `ReplaceAroundStep` (apply,
   invert, map, merge rules); `Transform.wrap`, `lift`, `split` at depth > 1 with types after,
   `join` across nesting; helpers `findWrapping`, `liftTarget`, `canSplit`, `canJoin`;
   `NodeSelection` (JSON, mapping, `selectable`/`atom` node specs); mark spec `inclusive`
