@@ -267,6 +267,9 @@ function remarkup(parent: Node, start: number, steps: readonly NodeMarkupStep[])
     if (own) {
       if (node.isText) throw new RangeError(`No node at position ${pos}`);
       node = own.type.create(own.attrs, node.content, own.marks ?? node.marks);
+      // An empty map is only right while sizes stay the same (no leaf <-> non-leaf changes).
+      if (node.nodeSize !== child.nodeSize)
+        throw new RangeError("Node markup must keep the node size");
     }
     children.push(node);
   });

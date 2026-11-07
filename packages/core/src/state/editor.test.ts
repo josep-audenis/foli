@@ -564,7 +564,7 @@ describe("setBlockType over many blocks", () => {
     });
     expect(editor.state.selection.from).toBe(0);
     expect(editor.state.selection.to).toBe(before.content.size);
-    // One step per block made this ~1.3 s (quadratic); measured ~5 ms now (docs/benchmarks.md).
+    // One step per block made this ~1.3 s (quadratic); a few ms now (docs/benchmarks.md).
     expect(elapsed).toBeLessThan(250);
     expect(undoDepth(editor.state)).toBe(1);
     expect(editor.commands.undo()).toBe(true);

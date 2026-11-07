@@ -298,6 +298,14 @@ describe("NodeMarkupBatchStep", () => {
     expect(level9.apply(start).failed).not.toBeNull();
     const text = new NodeMarkupBatchStep([new NodeMarkupStep(1, p, null)]);
     expect(text.apply(start).failed).not.toBeNull(); // a text node
+    const rules = testSchema.nodeFromJSON({
+      type: "doc",
+      content: [{ type: "rule" }, { type: "rule" }],
+    });
+    const grow = new NodeMarkupBatchStep([
+      new NodeMarkupStep(0, testSchema.nodes.paragraph as NodeType, null),
+    ]);
+    expect(grow.apply(rules).failed).toMatch(/keep the node size/); // leaf to textblock
   });
 
   it("maps like its single steps, dropping blocks that were deleted", () => {
