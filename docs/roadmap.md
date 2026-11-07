@@ -523,7 +523,7 @@ top-level block, marks rendered without attrs).
   (typing at a link's edge does not extend it). Tests on `testSchema` (blockquote, rule, link),
   property tests: step invert/map round-trips including `ReplaceAroundStep`, undo of wrap/lift
   exact.
-- [ ] 7.2 Schema v2 and migrations: `SCHEMA_VERSION` 2; `parseDocument` runs `vN → vN+1`
+- [x] 7.2 (#34) Schema v2 and migrations: `SCHEMA_VERSION` 2; `parseDocument` runs `vN → vN+1`
   migrations before validation (registry, tests with v1 documents written by 0.1.0, unknown
   future versions rejected); v1 → v2 keeps content as is. Schema v2 adds `bulletList`,
   `orderedList` (`start`), `listItem` (`paragraph block*`), `horizontalRule` (atom, selectable),
