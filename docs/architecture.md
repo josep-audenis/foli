@@ -412,7 +412,17 @@ Planned, created only when needed:
   `tsc --noEmit` resolve it, so dev and tests run on source while importing by package name.
 - `pnpm build` runs `tsc` per package (topological) to `dist/` with `.d.ts`; build configs drop
   the condition so published types point at `dist`.
-- ESM-only, `sideEffects` declared, React as a peer dependency.
+- ESM-only, `sideEffects` declared (`@foli/react`: its CSS only), React and React DOM the only
+  peer dependencies (18.2+ or 19), `repository` per package (with its `directory`, as npm
+  provenance needs). Exports: `.` (`types`, `default`; the `@foli/source` condition maps to
+  `src` inside the workspace) and `@foli/react/styles.css`.
+- `pnpm check` also runs `publint --strict` on every package (exports, `files`, types) and
+  `pnpm size`: each package's published entry bundled as an app would (minified, its Foli
+  dependencies included, React external) against a gzip budget (6.4: core 15.6 kB, view
+  22.0 kB, react 28.1 kB; budgets about 15% above, in `scripts/size.mjs`).
+- `pnpm examples` installs the packed tarballs into `examples/vite` (React 18, strict
+  TypeScript) and `examples/next` (React 19, server rendering) with npm, builds them, and runs
+  the success criterion in Playwright; see [examples/README.md](../examples/README.md).
 
 ## React integration (`@foli/react`)
 

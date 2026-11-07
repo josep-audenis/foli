@@ -3,6 +3,13 @@
   "version": "0.0.0",
   "description": "React components for the Foli document editor.",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/josep-audenis/foli.git",
+    "directory": "packages/react"
+  },
+  "homepage": "https://github.com/josep-audenis/foli#readme",
+  "bugs": "https://github.com/josep-audenis/foli/issues",
   "type": "module",
   "sideEffects": [
     "*.css"

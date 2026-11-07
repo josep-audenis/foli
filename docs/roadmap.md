@@ -463,12 +463,16 @@ criterion is the one from G3: type, format with shortcuts, undo, serialize, relo
   (React 18 warns about `useLayoutEffect` on the server). React 18 at runtime moved to 6.4:
   aliasing React 18 inside `@foli/react` resolves react-dom's `react` peer to React 19, and
   the example apps install the packed packages with their own React.
-- [ ] 6.4 Packaging: exports maps (ESM, types, `@foli/react/styles.css`), React and React DOM
-  as the only peer dependencies, `sideEffects`; a package check (e.g. publint, if its license
-  fits); bundle size per package recorded with a budget; `pnpm pack` tarballs installed into
-  fresh `examples/vite` (React 18, plus a `renderToString` check without warnings) and
-  `examples/next` (React 19, server rendering and hydration) apps that build and pass a
-  Playwright smoke test (the success criterion).
+- [x] 6.4 Packaging: exports maps checked (ESM, types, `@foli/react/styles.css`; React and React
+  DOM the only peer dependencies; `sideEffects`; `repository` per package for npm
+  provenance); `publint --strict` (MIT) on every package and bundle size budgets
+  (`scripts/size.mjs`: gzip per package with its Foli dependencies; 15.6 / 22.0 / 28.1 kB)
+  in `pnpm check`; `pnpm examples` packs the packages, installs the tarballs with npm into
+  `examples/vite` (React 18, strict TypeScript over the published types, a React 18
+  `renderToString` check that fails on the layout-effect warning) and `examples/next` (Next.js
+  16, React 19, server rendering and hydration), builds both, and runs the success criterion
+  in Playwright in all three engines (no console errors; the editor's shell in the server
+  HTML).
 - [ ] 6.5 Release tooling: Changesets (versions, changelogs); a release-only GitHub Actions
   workflow that publishes with npm provenance. Needs the owner: control of the `@foli` npm
   scope (an npm org named `foli` already exists: confirm it is yours, or choose another

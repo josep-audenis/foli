@@ -190,3 +190,21 @@ Not done yet: the per-keystroke walk over every block, the whole-document `onCha
 serialization, virtualizing pages far from the viewport, and moving the first layout off the main
 thread. None is needed for these targets; revisit when a target fails or documents grow past a
 few hundred pages.
+
+## Bundle size (Phase 6.4)
+
+**Run:** `pnpm size` (after `pnpm build`; part of `pnpm check`; source: `scripts/size.mjs`).
+
+**Method:** each package's published entry (`dist/index.js`) bundled the way an app's bundler
+would (Vite 8, ES module, minified), with the Foli packages it depends on and without React
+(a peer dependency), then gzipped (level 9). CSS (`@foli/react/styles.css`, about 0.8 kB gzipped
+in the Vite example) is not counted. The check fails when a package passes its budget.
+
+| Package       | Includes          | Minified | Gzipped |  Budget |
+| ------------- | ----------------- | -------: | ------: | ------: |
+| `@foli/core`  | core              |  56.0 kB | 15.6 kB | 18.1 kB |
+| `@foli/view`  | view, core        |  76.3 kB | 22.0 kB | 25.4 kB |
+| `@foli/react` | react, view, core |  97.6 kB | 28.1 kB | 32.2 kB |
+
+(kB = 1,024 bytes; measured 2026-11-07.) For comparison, the whole Vite example app (React 18,
+React DOM and Foli) is 72 kB gzipped.
