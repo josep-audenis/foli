@@ -5,8 +5,13 @@ import { defineConfig, devices } from "@playwright/test";
  * first; see scripts/examples.mjs). Not part of `pnpm check`.
  */
 const APPS = [
-  { name: "vite", port: 5180, command: "npm run preview -- --port 5180 --strictPort" },
-  { name: "next", port: 5181, command: "npm run start -- --port 5181" },
+  // Started with node directly: through npm, pnpm's npm_config_* settings make npm warn.
+  {
+    name: "vite",
+    port: 5180,
+    command: "node node_modules/vite/bin/vite.js preview --port 5180 --strictPort",
+  },
+  { name: "next", port: 5181, command: "node node_modules/next/dist/bin/next start --port 5181" },
 ];
 const BROWSERS = [
   { name: "chromium", device: devices["Desktop Chrome"] },
