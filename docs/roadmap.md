@@ -9,17 +9,18 @@ leaves `main` green with a working playground.
 **Update this table in the same PR that starts, advances or finishes a phase.** It is the only
 place that says what is in progress; check it before starting work.
 
-| Phase                    | Status                   | Branch                 | Notes                                                                                      |
-| ------------------------ | ------------------------ | ---------------------- | ------------------------------------------------------------------------------------------ |
-| 0 Foundation             | ✅ Done                  | —                      |                                                                                            |
-| 1 Architecture spike     | ✅ Done (G1 provisional) | —                      | Merged in #1; ADR-0003 accepted provisionally; IME, dead-key and screen-reader checks open |
-| 2 Document model         | ✅ Done                  | —                      | Merged in #2                                                                               |
-| 3 Transactions & history | ✅ Done                  | —                      | Merged in #4; gate G2 passed                                                               |
-| 4 Editor view            | ✅ Done (G3 provisional) | —                      | Merged in #8–#13; manual checks (4.6) deferred, open risks in ADR-0003                     |
-| 5 Native pagination      | ✅ Done (G4 provisional) | —                      | Merged in #15–#22; page-break manual checks open, risks in ADR-0003                        |
-| 6 React API & 0.1.0      | ✅ Done                  | —                      | Merged in #23–#31; 0.1.0 on npm; manual checks shipped as known risks (ADR-0003)           |
-| 7 Rich content           | In review                | `phase-7/rich-content` | 7.1–7.8 merged (#33–#40); 7.9 (docs, 0.2.0 version) in review; publish after approval      |
-| 8–12                     | Not started              |                        |                                                                                            |
+| Phase                    | Status                   | Branch | Notes                                                                                      |
+| ------------------------ | ------------------------ | ------ | ------------------------------------------------------------------------------------------ |
+| 0 Foundation             | ✅ Done                  | —      |                                                                                            |
+| 1 Architecture spike     | ✅ Done (G1 provisional) | —      | Merged in #1; ADR-0003 accepted provisionally; IME, dead-key and screen-reader checks open |
+| 2 Document model         | ✅ Done                  | —      | Merged in #2                                                                               |
+| 3 Transactions & history | ✅ Done                  | —      | Merged in #4; gate G2 passed                                                               |
+| 4 Editor view            | ✅ Done (G3 provisional) | —      | Merged in #8–#13; manual checks (4.6) deferred, open risks in ADR-0003                     |
+| 5 Native pagination      | ✅ Done (G4 provisional) | —      | Merged in #15–#22; page-break manual checks open, risks in ADR-0003                        |
+| 6 React API & 0.1.0      | ✅ Done                  | —      | Merged in #23–#31; 0.1.0 on npm; manual checks shipped as known risks (ADR-0003)           |
+| 7 Rich content           | ✅ Done                  | —      | Merged in #33–#41; 0.2.0 on npm; list-document benchmark misses accepted (known limit)     |
+| 8 Tables & images        | Ready                    |        | Dependencies met (Phase 7); plan with tasks before starting                                |
+| 9–12                     | Not started              |        |                                                                                            |
 
 Status values: `Ready` (dependencies met, nobody on it) · `In progress` · `In review` (PR open) ·
 `✅ Done` (merged, acceptance criteria met) · `Blocked by …`.
@@ -564,7 +565,7 @@ top-level block, marks rendered without attrs).
   and Google Docs list markup (fixtures, best effort), `a[href]` (sanitized), `hr`, `color`,
   `background-color`, `text-align`; copy writes the same structures; fixture corpus extended;
   T3 rerun.
-- [ ] 7.9 Close: docs (architecture, document model, pagination, limitations, API, styling,
+- [x] 7.9 (#41) Close: docs (architecture, document model, pagination, limitations, API, styling,
   getting started), playground sample document with every v2 feature, example apps updated,
   benchmark rerun; 0.2.0 changeset, version PR, publish after the owner's approval.
 
