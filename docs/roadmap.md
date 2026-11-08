@@ -560,7 +560,7 @@ top-level block, marks rendered without attrs).
   removal), `insertHorizontalRule`; arrows and Backspace around a rule (`NodeSelection`);
   toolbar controls: alignment group, color and highlight menus (accessible menu buttons with a
   fixed palette), rule button; CSS variables for link, marker and rule styling.
-- [ ] 7.8 Clipboard and interop: HTML ↔ schema v2 for `ul`/`ol`/`li` (nesting, `start`), Word
+- [x] 7.8 (#40) Clipboard and interop: HTML ↔ schema v2 for `ul`/`ol`/`li` (nesting, `start`), Word
   and Google Docs list markup (fixtures, best effort), `a[href]` (sanitized), `hr`, `color`,
   `background-color`, `text-align`; copy writes the same structures; fixture corpus extended;
   T3 rerun.
