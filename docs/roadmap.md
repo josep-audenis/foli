@@ -556,7 +556,7 @@ top-level block, marks rendered without attrs).
   (toolbar button and Mod-K open a small accessible dialog: URL field, apply, remove);
   Ctrl/Cmd+click opens the link in a new tab (`noopener`); autolink of a pasted plain-text URL.
   Every entry point (parse, paste, command, dialog) rejects unsafe protocols, with tests.
-- [ ] 7.7 Alignment, colors, rule: commands `setAlign`, `setTextColor`, `setHighlight` (and
+- [x] 7.7 (#39) Alignment, colors, rule: commands `setAlign`, `setTextColor`, `setHighlight` (and
   removal), `insertHorizontalRule`; arrows and Backspace around a rule (`NodeSelection`);
   toolbar controls: alignment group, color and highlight menus (accessible menu buttons with a
   fixed palette), rule button; CSS variables for link, marker and rule styling.
