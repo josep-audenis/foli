@@ -441,13 +441,16 @@ Known limits:
   or headings, with their `text-align` (or `align`), inherited by blocks inside; `ul`/`ol`/`li`
   become lists at any depth (`start` kept when the schema takes it; a list directly inside a
   list, as Google Docs writes nesting, goes into the previous item; an item gets a first
-  paragraph when it has none, a heading becoming one); `hr` is a rule. Word's list paragraphs
-  (`mso-list:lN levelM`) become nested lists by level, numbered when their marker (the
-  `mso-list:Ignore` span) ends in "." or ")", starting at its number. `a[href]` is a link when
+  paragraph when it has none, a heading becoming one); `hr` is a rule. Each list and item
+  closes everything opened inside it, so unbalanced markup cannot leak into what follows.
+  Word's list paragraphs (`<p style="mso-list:lN levelM">`, not headings, not inside an HTML
+  list) become nested lists by level, numbered when their marker (the `mso-list:Ignore` span)
+  ends in "." or ")" or is multi-level ("1.2"), starting at its last number. `a[href]` is a link when
   the href is safe (`isSafeHref`, after trimming and encoding spaces; `#…` anchors into the
   source document are dropped); inline `color`, `<font color>` and `background-color` become
-  text color and highlight (hex, `rgb()`, basic names; black text and white highlight are the
-  defaults and dropped, system colors such as `windowtext` ignored), only on inline elements: a
+  text color and highlight (hex, `rgb()` read by splitting, not a backtracking pattern, basic
+  names; black text and white highlight are the defaults and dropped, white text too (dark
+  pages), system colors such as `windowtext` and malformed values ignored), only on inline elements: a
   page's colored containers are layout. A link's underline and color are its look, dropped.
   `b/strong`, `i/em`, `u/ins`,
   `s/strike/del` and inline `font-weight`, `font-style` and `text-decoration` become marks

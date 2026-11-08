@@ -241,13 +241,16 @@ export function parseColor(value: string): string | null {
   const short = /^#([0-9a-f])([0-9a-f])([0-9a-f])$/.exec(color);
   if (short) return `#${short[1]}${short[1]}${short[2]}${short[2]}${short[3]}${short[3]}`;
   if (/^#[0-9a-f]{6}$/.test(color)) return color;
-  const rgb =
-    /^rgba?\(\s*([\d.]+)\s*[,\s]\s*([\d.]+)\s*[,\s]\s*([\d.]+)\s*(?:[,/]\s*([\d.]+)(%?)\s*)?\)$/.exec(
-      color,
-    );
-  if (!rgb) return null;
-  if (rgb[4] !== undefined && Number(rgb[4]) === 0) return null; // fully transparent
-  return `#${hex2(Number(rgb[1]))}${hex2(Number(rgb[2]))}${hex2(Number(rgb[3]))}`;
+  // rgb(r, g, b), rgb(r g b), rgba(r, g, b, a), rgb(r g b / a): split, no backtracking regex.
+  const body = /^rgba?\(([^()]*)\)$/.exec(color)?.[1];
+  if (body === undefined) return null;
+  const parts = body.trim().split(/\s*[,/]\s*|\s+/);
+  if (parts.length < 3 || parts.length > 4) return null;
+  if (!parts.every((part) => /^\d+(?:\.\d+)?%?$/.test(part))) return null;
+  const numbers = parts.map((part) => Number.parseFloat(part));
+  if (numbers[3] === 0) return null; // fully transparent
+  const hex = `#${hex2(numbers[0] as number)}${hex2(numbers[1] as number)}${hex2(numbers[2] as number)}`;
+  return hex;
 }
 
 /**
@@ -283,7 +286,8 @@ function marksOf(element: Element, inherited: Marks): Map<string, MarkJSON> {
     const color = parseColor(
       style.color || (tag === "font" ? (element.getAttribute("color") ?? "") : ""),
     );
-    if (color === "#000000") marks.delete("textColor");
+    // Black is the default; white text comes from dark pages and would be invisible.
+    if (color === "#000000" || color === "#ffffff") marks.delete("textColor");
     else if (color) marks.set("textColor", { type: "textColor", attrs: { color } } as MarkJSON);
     const background = parseColor(style.backgroundColor);
     if (background === "#ffffff") marks.delete("highlight");
@@ -351,8 +355,9 @@ function wordListItem(
       break;
     }
   }
-  const ordered = /^\(?[0-9a-zA-Z]{1,6}[.)]$/.test(marker);
-  const number = /^\(?(\d+)/.exec(marker);
+  // "1.", "a)", "(iv)", and multi-level "1.2." or "1.2": numbered; its last part is its number.
+  const ordered = /^\(?[0-9a-zA-Z]{1,6}(?:\.[0-9]{1,6})*[.)]$|^\d{1,6}(?:\.\d{1,6})+$/.test(marker);
+  const number = /(\d+)[.)]?$/.exec(marker);
   return {
     list: match[1] as string,
     level: Number(match[2]),
@@ -469,7 +474,11 @@ function readHTML(html: string): { content: DocJSON; open: boolean } | null {
   const addText = (raw: string, marks: Marks, pre: boolean) => {
     // Source formatting between blocks ("</p>\n<br>\n<p>") is not content.
     if (!inline && !pre && !/[^ \t\n\r\f]/.test(raw)) return;
-    if (!inline) open("paragraph", 1, pre);
+    if (!inline) {
+      // Text of its own after Word list paragraphs ends them (it is not part of an item).
+      if (stack.some((entry) => entry.word)) closeWordLists();
+      open("paragraph", 1, pre);
+    }
     const lines = pre ? raw.replace(/\r\n?/g, "\n").split("\n") : [raw];
     lines.forEach((line, i) => {
       if (i > 0) addBreak();
@@ -516,6 +525,12 @@ function readHTML(html: string): { content: DocJSON; open: boolean } | null {
   /** Closes the top container: an item gets its first paragraph, a list goes to its parent. */
   const pop = () => {
     const container = stack.pop() as Container;
+    if (container.kind === "item" && container.implicit && !container.node.content?.length) {
+      // An item opened for content that never came (`<ul><ul></ul></ul>`): not an empty bullet.
+      const items = top().node.content as BlockNode[];
+      items.splice(items.indexOf(container.node), 1);
+      return;
+    }
     if (container.kind === "item") finishItem(container.node);
     if (container.kind === "list" && container.node.content?.length) {
       container.parent?.push(container.node);
@@ -547,24 +562,12 @@ function readHTML(html: string): { content: DocJSON; open: boolean } | null {
       ...(word && { word }),
     });
   };
-  const closeList = () => {
-    close(false);
-    while (top().kind === "item" && top().implicit) pop();
-    if (top().kind === "list") pop();
-    // The item this list was nested into because its parent was a list.
-    if (top().kind === "item" && top().implicit) pop();
-  };
   const openItem = (word?: Container["word"]) => {
     close(false);
     while (top().kind === "item" && (top().implicit || word)) pop();
     const item: BlockNode = { type: "listItem", content: [] };
     (top().node.content as BlockNode[]).push(item);
     stack.push({ node: item, kind: "item", ...(word && { word }) });
-  };
-  const closeItem = () => {
-    close(false);
-    while (top().kind === "item" && top().implicit) pop();
-    if (top().kind === "item") pop();
   };
 
   /** Word lists are flat paragraphs with levels: open and close lists to nest them. */
@@ -639,7 +642,12 @@ function readHTML(html: string): { content: DocJSON; open: boolean } | null {
     };
     if (!BLOCK_TAGS.has(tag)) return children();
     sawBlock = true;
-    const word = wordListItem(element);
+    // Word list paragraphs: <p> only (a numbered Word heading stays a heading), and not inside an
+    // HTML list (Outlook writes `<li style="mso-list:…">` in real lists).
+    const word =
+      tag === "p" && !stack.some((entry) => entry.kind === "list" && !entry.word)
+        ? wordListItem(element)
+        : null;
     if (word) {
       wordItem(word);
       open("paragraph", 1, child.pre, child.align);
@@ -649,19 +657,26 @@ function readHTML(html: string): { content: DocJSON; open: boolean } | null {
     }
     // Word wraps its content in a <div>: only a block of its own content ends Word lists.
     if (!/^(div|body|section|article|main)$/.test(tag)) closeWordLists();
+    // A list or item closes everything opened inside it, so unbalanced input cannot leak.
+    const base = stack.length;
+    const closeTo = (height: number) => {
+      close(false);
+      while (stack.length > height) pop();
+    };
     if (tag === "ul" || tag === "ol") {
-      const start = Number(element.getAttribute("start") ?? 1);
-      openList(tag === "ol", start);
+      const start = Number.parseInt(element.getAttribute("start") ?? "", 10);
+      openList(tag === "ol", Number.isNaN(start) ? 1 : start);
       children();
-      closeList();
+      closeTo(base);
       return true;
     }
     if (tag === "li" && stack.some((entry) => entry.kind === "list")) {
       // Inside a list item that is itself still open, an <li> is a sibling: close down to a list.
-      while (top().kind === "item") closeItem();
+      while (top().kind === "item") closeTo(stack.length - 1);
+      const height = stack.length;
       openItem();
       children();
-      closeItem();
+      closeTo(height);
       return true;
     }
     if (tag === "hr") {

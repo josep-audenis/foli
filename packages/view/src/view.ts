@@ -1444,8 +1444,9 @@ export class EditorView {
     }
     const marks = (state.storedMarks ?? marksAt(state.selection.$from)).map((m) => m.toJSON());
     const pasted = docFromClipboard(data, marks);
-    // One empty block: nothing to paste.
-    if (!pasted || pasted.doc.content.size <= 2) return false;
+    // One empty textblock: nothing to paste (a lone rule is something).
+    const only = pasted?.doc.childCount === 1 ? pasted.doc.firstChild : null;
+    if (!pasted || (only?.isTextblock && !only.content.size)) return false;
     const { doc, open } = pasted;
     // As a slice (text joins the text around the caret); where the schema refuses that (a
     // list in a paragraph), as whole blocks fitted at the caret.
@@ -1456,6 +1457,10 @@ export class EditorView {
         tr.replace(from, $pos.after(), new Slice(doc.content, 0, 0));
         tr.setSelection(Selection.near(tr.doc.resolve(from + doc.content.size), -1));
       } else {
+        // A slice opens into its first and last blocks: a rule there has no inside.
+        if (doc.firstChild?.isLeaf || doc.lastChild?.isLeaf) {
+          throw new TransformError("A rule at an end is pasted as a block");
+        }
         tr.replaceSelection(doc.slice(1, doc.content.size - 1));
       }
     };
@@ -1507,9 +1512,16 @@ function insertBlocks(tr: Transaction, doc: ModelNode): void {
     if (atStart && atEnd && item.childCount === 1) {
       at = $pos.before(depth);
       tr.delete(at, $pos.after(depth));
-    } else if (atEnd && $pos.indexAfter(depth) === item.childCount) at = $pos.after(depth);
-    else if (atStart && $pos.index(depth) === 0) at = $pos.before(depth);
-    else {
+    } else if (atEnd) {
+      // After the item (and its nested list, if it has one): no item left without its text.
+      at = $pos.after(depth);
+    } else if (atStart && $pos.index(depth) === 0) at = $pos.before(depth);
+    else if (atStart) {
+      // At a later block's start: split the item between blocks, not inside the text.
+      const boundary = $pos.before();
+      tr.split(boundary, 1);
+      at = boundary + 1;
+    } else {
       tr.split($pos.pos, 2);
       at = $pos.pos + 2;
     }

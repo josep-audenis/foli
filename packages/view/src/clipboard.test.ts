@@ -252,6 +252,65 @@ describe("htmlToDoc lists, links, colors, alignment", () => {
     ]);
   });
 
+  it("parseColor refuses long and malformed values quickly (no backtracking)", () => {
+    const spaces = " ".repeat(3000);
+    const started = performance.now();
+    expect(parseColor(`rgb(1${spaces}1${spaces}1${spaces}!`)).toBeNull();
+    expect(parseColor(`rgb(1${" ".repeat(20)}1${" ".repeat(20)}1${" ".repeat(10)}!`)).toBeNull();
+    expect(performance.now() - started).toBeLessThan(50);
+    for (const bad of [
+      "rgb(1.2.3,0,0)",
+      "rgb(.,0,0)",
+      "rgb(1,2)",
+      "rgb(1,2,3,4,5)",
+      "rgb(a,b,c)",
+    ]) {
+      expect(parseColor(bad)).toBeNull();
+    }
+    expect(parseColor("rgb(300, -0, 12.6)")).toBeNull(); // "-0" is not a channel
+    expect(parseColor("rgb(300, 0, 12.6)")).toBe("#ff000d"); // clamped and rounded
+  });
+
+  it("a malformed color drops only that color, never the paste's structure", () => {
+    expect(parsed('<ul><li><font color="rgb(1.2.3,0,0)">x</font></li></ul>')).toEqual([
+      ul(item(p(t("x")))),
+    ]);
+  });
+
+  it("Outlook lists (mso-list on <li>) and Word paragraphs inside HTML lists stay one list", () => {
+    const style = "style='mso-list:l0 level1 lfo1'";
+    expect(
+      parsed(`<ul><li ${style}>a</li><li ${style}>b</li></ul><p>after</p><p>after2</p>`),
+    ).toEqual([ul(item(p(t("a"))), item(p(t("b")))), p(t("after")), p(t("after2"))]);
+    expect(parsed(`<ul><li><p ${style}>w</p></li><li>x</li></ul>`)).toEqual([
+      ul(item(p(t("w"))), item(p(t("x")))),
+    ]);
+  });
+
+  it("a numbered Word heading stays a heading; multi-level numbers are numbered lists", () => {
+    const marker = (text: string) => `<span style='mso-list:Ignore'>${text}</span>`;
+    expect(
+      parsed(
+        `<h1 style='mso-list:l0 level1 lfo1'>${marker("1.")}Intro</h1><p>body</p>` +
+          `<p style='mso-list:l1 level1 lfo2'>${marker("1.1.")}A</p>` +
+          `<p style='mso-list:l1 level2 lfo2'>${marker("1.2")}B</p>`,
+      ),
+    ).toEqual([h(1, t("Intro")), p(t("body")), ol(1, item(p(t("A")), ol(2, item(p(t("B"))))))]);
+  });
+
+  it("text after Word list paragraphs, empty nested lists, white text, start attributes", () => {
+    expect(
+      parsed(
+        "<div class=WordSection1><p style='mso-list:l0 level1 lfo1'>a</p>plain text<p>p</p></div>",
+      ),
+    ).toEqual([ul(item(p(t("a")))), p(t("plain text")), p(t("p"))]);
+    expect(parsed("<ul><ul></ul></ul><p>x</p>")).toEqual([p(t("x"))]);
+    expect(parsed('<p><span style="color:#fff">dark page</span></p>')).toEqual([p(t("dark page"))]);
+    expect(
+      parsed('<ol start=""><li>a</li></ol><ol start><li>b</li></ol><ol start="7x"><li>c</li></ol>'),
+    ).toEqual([ol(1, item(p(t("a")))), ol(1, item(p(t("b")))), ol(7, item(p(t("c"))))]);
+  });
+
   it("parseColor reads hex, rgb() and basic names; others are null", () => {
     expect(parseColor("#ABC")).toBe("#aabbcc");
     expect(parseColor(" #A1b2C3 ")).toBe("#a1b2c3");
@@ -327,6 +386,19 @@ describe("textToDoc", () => {
     ]);
   });
 });
+
+/** How many nodes of type `name` are in `node`. */
+function count(
+  node: { descendants(f: (node: { type: { name: string } }) => boolean | undefined): void },
+  name: string,
+): number {
+  let found = 0;
+  node.descendants((child) => {
+    if (child.type.name === name) found++;
+    return undefined;
+  });
+  return found;
+}
 
 describe("EditorView clipboard", () => {
   let view: EditorView | undefined;
@@ -526,7 +598,8 @@ describe("EditorView clipboard", () => {
     for (const html of fixtures) {
       // Each pasted textblock's text must be in the result, in one piece.
       const pieces: string[] = [];
-      parseContent(htmlToDoc(html) as DocJSON).descendants((node) => {
+      const pasted = parseContent(htmlToDoc(html) as DocJSON);
+      pasted.descendants((node) => {
         if (node.isTextblock && node.textContent) pieces.push(node.textContent);
         return !node.isTextblock;
       });
@@ -543,6 +616,12 @@ describe("EditorView clipboard", () => {
           expect(view.paste(data({ "text/html": html }))).toBe(true);
           editor.state.doc.check();
           for (const piece of pieces) expect(editor.state.doc.textContent).toContain(piece);
+          // No list item, rule or page break of the paste is lost (lists may merge).
+          for (const name of ["listItem", "horizontalRule", "pageBreak"]) {
+            expect(count(editor.state.doc, name)).toBeGreaterThanOrEqual(
+              count(before, name) + count(pasted, name),
+            );
+          }
           editor.commands.undo();
           expect(editor.state.doc.eq(before)).toBe(true);
           pastes++;
@@ -589,6 +668,27 @@ describe("EditorView clipboard", () => {
     expect(into([ul(item(p(t("xy"))))], 5)).toEqual([ul(item(p(t("xy"))), a, b)]);
     expect(into([ul(item(p(t("xy"))))], 3)).toEqual([ul(a, b, item(p(t("xy"))))]);
     expect(into([ul(item(p(t("xy"))), item(p()))], 9)).toEqual([ul(item(p(t("xy"))), a, b)]);
+  });
+
+  it("pastes a lone rule; items after a nested list's parent; between an item's blocks", () => {
+    const rule = mount(doc(p(t("xy"))));
+    rule.editor.select(2);
+    expect(rule.view.paste(data({ "text/html": "<hr>" }))).toBe(true);
+    expect(blocks(rule.editor)).toEqual([p(t("x")), hr, p(t("y"))]);
+    rule.view.destroy();
+    // At the end of an item's first paragraph, the item going on with a nested list.
+    const nested = mount(doc(ul(item(p(t("x")), ul(item(p(t("sub"))))))));
+    nested.editor.select(4);
+    expect(nested.view.paste(data({ "text/html": "<ul><li>a</li></ul>" }))).toBe(true);
+    expect(blocks(nested.editor)).toEqual([
+      ul(item(p(t("x")), ul(item(p(t("sub"))))), item(p(t("a")))),
+    ]);
+    nested.view.destroy();
+    // At the start of an item's second paragraph: the item splits between its paragraphs.
+    const second = mount(doc(ul(item(p(t("x")), p(t("y"))))));
+    second.editor.select(6);
+    expect(second.view.paste(data({ "text/html": "<ul><li>a</li></ul>" }))).toBe(true);
+    expect(blocks(second.editor)).toEqual([ul(item(p(t("x"))), item(p(t("a"))), item(p(t("y"))))]);
   });
 
   it("keeps an item's first paragraph first, replaces an empty nested one, keeps rules", () => {

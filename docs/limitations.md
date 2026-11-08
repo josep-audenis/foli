@@ -61,9 +61,10 @@ checklist in [testing/ime.md](testing/ime.md)):
     protocol (allowed by the format; the protocol is still http or https).
 - HTML paste keeps paragraphs, headings, lists, rules, links, colors and alignment; table cells
   become paragraphs, images are dropped. Word and Google Docs lists are read best effort, from
-  hand-written fixtures, not real captures. Pasted text colors equal to black and highlights
-  equal to white are dropped (they are the defaults); colors on block containers (a web
-  page's colored sections) and a link's own underline and color are not kept. A pasted
+  hand-written fixtures, not real captures. Pasted text colors equal to black or white and
+  highlights equal to white are dropped (defaults, or text from a dark page); colors on block
+  containers (a web page's colored sections) and a link's own underline and color are not
+  kept. A pasted
   plain-text URL becomes a link.
 - Drag and drop of text does nothing.
 - Some Android keyboards insert paragraphs without the events the editor needs; such an edit is
