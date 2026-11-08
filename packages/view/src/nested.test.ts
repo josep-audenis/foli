@@ -378,3 +378,64 @@ describe("justified text across a page break", () => {
     expect(split.fragments.map((f) => f.style.textAlignLast)).toEqual(["", ""]);
   });
 });
+
+describe("list keys in the view", () => {
+  const listDoc = {
+    type: "doc",
+    content: [{ type: "bulletList", content: [item(p("a")), item(p("b"))] }, p("after")],
+  } as DocJSON;
+  const keydown = (host: HTMLElement, init: KeyboardEventInit) => {
+    const event = new KeyboardEvent("keydown", { bubbles: true, cancelable: true, ...init });
+    host.dispatchEvent(event);
+    return event;
+  };
+  const caretAt = (editor: ReturnType<typeof mount>["editor"], text: string) => {
+    let at = -1;
+    editor.state.doc.descendants((node, pos) => {
+      if (at < 0 && node.isText && node.text === text) at = pos + text.length;
+      return at < 0;
+    });
+    editor.select(at);
+  };
+
+  it("Tab in a list nests the item (default prevented); outside a list it is left to the browser", () => {
+    const { host, editor, view } = mount(listDoc);
+    view.focus();
+    caretAt(editor, "b");
+    expect(keydown(host, { key: "Tab" }).defaultPrevented).toBe(true);
+    expect(host.querySelector("ul ul")).not.toBeNull();
+    caretAt(editor, "after");
+    expect(keydown(host, { key: "Tab" }).defaultPrevented).toBe(false); // focus moves on
+  });
+
+  it("an insertParagraph input (no keydown, e.g. Android) on an empty item leaves the list", () => {
+    const { host, editor, view } = mount({
+      type: "doc",
+      content: [{ type: "bulletList", content: [item(p("a")), item(p())] }],
+    } as DocJSON);
+    view.focus();
+    editor.select(8);
+    const input = new InputEvent("beforeinput", {
+      inputType: "insertParagraph",
+      cancelable: true,
+      bubbles: true,
+    });
+    host.dispatchEvent(input);
+    expect(pageHTML(host)).toBe("<ul><li><p>a</p></li></ul><p><br></p>");
+  });
+
+  it("a deleteContentBackward input at an item's start lifts it, as Backspace does", () => {
+    const { host, editor, view } = mount(listDoc);
+    view.focus();
+    caretAt(editor, "b");
+    editor.select(editor.state.selection.from - 1); // the start of "b"
+    host.dispatchEvent(
+      new InputEvent("beforeinput", {
+        inputType: "deleteContentBackward",
+        cancelable: true,
+        bubbles: true,
+      }),
+    );
+    expect(pageHTML(host)).toBe("<ul><li><p>a</p></li></ul><p>b</p><p>after</p>");
+  });
+});

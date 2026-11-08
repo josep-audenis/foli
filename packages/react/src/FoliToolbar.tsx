@@ -3,12 +3,17 @@ import {
   type Editor,
   type EditorState,
   insertPageBreak,
+  liftListItem,
+  listTypeAt,
   redo,
   redoDepth,
   setBlockType,
+  sinkListItem,
+  toggleList,
   toggleMark,
   undo,
   undoDepth,
+  wrapInList,
 } from "@folijs/core";
 import { Fragment, type KeyboardEvent, type MouseEvent, useRef, useState } from "react";
 import { useEditorOrContext, useEditorState } from "./editor.js";
@@ -109,6 +114,43 @@ const GROUPS: Item[][] = [
   ],
   [
     {
+      key: "bulletList",
+      label: "Bulleted list",
+      text: "•",
+      symbol: true,
+      pressed: (state) => listTypeAt(state)?.name === "bulletList",
+      enabled: (state) => listTypeAt(state) !== null || wrapInList("bulletList")(state),
+      command: () => toggleList("bulletList"),
+    },
+    {
+      key: "orderedList",
+      label: "Numbered list",
+      // A symbol, not "1.": visible text that is not part of the name fails WCAG 2.5.3.
+      text: "№",
+      symbol: true,
+      pressed: (state) => listTypeAt(state)?.name === "orderedList",
+      enabled: (state) => listTypeAt(state) !== null || wrapInList("orderedList")(state),
+      command: () => toggleList("orderedList"),
+    },
+    {
+      key: "outdent",
+      label: "Decrease indent",
+      text: "⇤",
+      symbol: true,
+      enabled: (state) => listTypeAt(state) !== null,
+      command: () => liftListItem(),
+    },
+    {
+      key: "indent",
+      label: "Increase indent",
+      text: "⇥",
+      symbol: true,
+      enabled: (state) => canIndent(state),
+      command: () => sinkListItem(),
+    },
+  ],
+  [
+    {
       key: "undo",
       label: "Undo",
       text: "Undo",
@@ -127,6 +169,15 @@ const GROUPS: Item[][] = [
 ];
 const ITEMS = GROUPS.flat();
 
+/** Whether the selection starts in a list item that has an item before it (cheap: no dry run). */
+function canIndent(state: EditorState): boolean {
+  const { $from } = state.selection;
+  for (let depth = $from.depth; depth > 0; depth--) {
+    if ($from.node(depth).type.name === "listItem") return $from.index(depth - 1) > 0;
+  }
+  return false;
+}
+
 interface ItemState {
   pressed: boolean | undefined;
   enabled: boolean;
@@ -144,8 +195,9 @@ const selectStates = (state: EditorState, editor: Editor): ItemState[] =>
   }));
 
 /**
- * Formatting buttons for an editor: marks, paragraph and heading levels, undo, redo, page
- * break. One tab stop (arrow keys, Home and End move between buttons); toggles carry
+ * Formatting buttons for an editor: marks, paragraph and heading levels, lists (bulleted,
+ * numbered, decrease and increase indent), undo, redo, page break. One tab stop (arrow keys,
+ * Home and End move between buttons); toggles carry
  * `aria-pressed`; a button whose command cannot run now is `aria-disabled` (still focusable).
  * Clicks leave the focus and selection in the document.
  */

@@ -3,6 +3,7 @@ import {
   FoliDocumentError,
   type Mark,
   type MarkType,
+  type Node,
   type NodeType,
   type ResolvedPos,
 } from "../model/index.js";
@@ -137,22 +138,80 @@ export const joinBackward: Command = (state, dispatch) => {
   if (before.isTextblock) return attempt(state, dispatch, (tr) => tr.join(boundary));
   if (before.isLeaf)
     return attempt(state, dispatch, (tr) => tr.delete(boundary - before.nodeSize, boundary));
-  return false;
+  // After a container (a list): into its last textblock, at any depth.
+  let levels = 1;
+  let target: Node | null = before;
+  while (target && !target.isTextblock && !target.isLeaf) {
+    target = target.lastChild;
+    levels++;
+  }
+  if (target?.isLeaf) {
+    // A container ending in a leaf block (a rule): delete the leaf.
+    const end = boundary - (levels - 1);
+    const leaf = target;
+    return attempt(state, dispatch, (tr) => tr.delete(end - leaf.nodeSize, end));
+  }
+  if (!target?.isTextblock) return false;
+  const parent = $pos.node($pos.depth - 1);
+  if (!parent.canReplace(index, index + 1)) return false;
+  const joinAt = boundary - levels;
+  const content = $pos.parent.content;
+  return attempt(state, dispatch, (tr) => {
+    tr.insert(joinAt, content);
+    const start = tr.mapping.map(boundary);
+    tr.delete(start, start + $pos.parent.nodeSize);
+    tr.setSelection(TextSelection.create(tr.doc, joinAt));
+  });
 };
 
-/** At the end of a textblock: merges the next textblock into it, or deletes a next leaf block. */
+/**
+ * At the end of a textblock: merges the next textblock into it, or deletes a next leaf block. At
+ * the end of a container's last block (a list item), what follows the container comes in.
+ */
 export const joinForward: Command = (state, dispatch) => {
   const $pos = caret(state);
   if (!$pos?.parent.isTextblock || $pos.parentOffset < $pos.parent.content.size || $pos.depth < 1) {
     return false;
   }
-  const parent = $pos.node($pos.depth - 1);
-  const after = parent.maybeChild($pos.index($pos.depth - 1) + 1);
-  const boundary = $pos.after();
-  if (after?.isTextblock) return attempt(state, dispatch, (tr) => tr.join(boundary));
-  if (after?.isLeaf)
+  // The innermost container in which something follows the caret's block.
+  let base = $pos.depth - 1;
+  while (base > 0 && $pos.index(base) === $pos.node(base).childCount - 1) base--;
+  const after = $pos.node(base).maybeChild($pos.index(base) + 1);
+  if (!after) return false;
+  const boundary = $pos.after(base + 1);
+  if (after.isTextblock && base === $pos.depth - 1) {
+    return attempt(state, dispatch, (tr) => tr.join(boundary));
+  }
+  if (after.isLeaf) {
     return attempt(state, dispatch, (tr) => tr.delete(boundary, boundary + after.nodeSize));
-  return false;
+  }
+  // Before a container (a list): its first textblock joins this one; the containers it leaves
+  // empty go too (a list item, a list). Not when its container must keep it (a list item that
+  // goes on with a nested list): that needs a lift first.
+  let levels = 1;
+  let target: Node | null = after;
+  while (target && !target.isTextblock && !target.isLeaf) {
+    target = target.firstChild;
+    levels++;
+  }
+  if (!target?.isTextblock) return false;
+  const $target = state.doc.resolve(boundary + levels);
+  let depth = $target.depth;
+  while (depth > base + 1) {
+    const holder = $target.node(depth - 1);
+    const at = $target.index(depth - 1);
+    if (holder.canReplace(at, at + 1)) break;
+    if (holder.childCount !== 1) return false;
+    depth--;
+  }
+  const from = $target.before(depth);
+  const to = $target.after(depth);
+  const content = target.content;
+  return attempt(state, dispatch, (tr) => {
+    tr.delete(from, to);
+    tr.insert($pos.pos, content);
+    tr.setSelection(TextSelection.create(tr.doc, $pos.pos));
+  });
 };
 
 /**

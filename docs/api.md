@@ -52,9 +52,9 @@ selection and scrolls it into view).
 
 ### `<FoliToolbar>`
 
-The default toolbar: bold, italic, underline, strikethrough · paragraph, H1–H3 · undo, redo ·
-page break. A WAI-ARIA toolbar: one Tab stop, arrow keys, Home and End move between buttons;
-toggle buttons have `aria-pressed`; buttons stay focusable when disabled (`aria-disabled`).
+The default toolbar: bold, italic, underline, strikethrough · paragraph, H1–H3 · bulleted list,
+numbered list (pressed inside one), decrease and increase indent · undo, redo · page break.
+A WAI-ARIA toolbar: one Tab stop, arrow keys, Home and End move between buttons; toggle buttons have `aria-pressed`; buttons stay focusable when disabled (`aria-disabled`).
 Clicking a button keeps the document's selection.
 
 | Prop             | Type         | Default        | Notes                                                               |
@@ -121,6 +121,10 @@ settings are not, so pass a document from `parseDocument` or `createDocument`.
 | `subscribe(listener)`          | `(state, transactions) => void` after every change (selection included); returns unsubscribe. `transactions.some(tr => tr.docChanged)` tells content changes apart.                                                                                                                                                           |
 
 Headings: `setBlockType("heading", { level: 2 })`; back to text: `setBlockType("paragraph")`.
+Lists: `commands.toggleList("bulletList" | "orderedList", attrs?)` (wraps the selection, changes
+the list's type, or takes the selected items out of every list of that type they are in),
+`wrapInList(type, attrs?)`, `indentListItem()` and `outdentListItem()` (Tab and Shift+Tab). Each
+list change is its own undo step.
 
 ### Commands
 
@@ -128,7 +132,11 @@ Commands are `(state, dispatch?) => boolean` and run with `editor.run(command)`:
 `insertText(text)`, `deleteSelection`, `deleteBackward(unit?)`, `deleteForward(unit?)` (unit
 `"char"` or `"word"`), `joinBackward`, `joinForward`, `splitBlock`, `insertHardBreak`,
 `insertPageBreak`, `selectAll`, `toggleMark(type, attrs?)`, `setBlockType(type, attrs?)`,
-`undo`, `redo`. Helpers: `isMarkActive(state, type)`, `undoDepth(state)`, `redoDepth(state)`,
+`undo`, `redo`; lists: `toggleList(type, attrs?)`, `wrapInList(type, attrs?)`,
+`splitListItem()` (Enter), `sinkListItem()` (Tab), `liftListItem()` (Shift+Tab),
+`liftListItemAtStart()` (Backspace at an item's start), and `listKeymap()` binding them (part of
+every editor, before `baseKeymap()`). Helpers: `isMarkActive(state, type)`, `listTypeAt(state)`,
+`undoDepth(state)`, `redoDepth(state)`,
 `marksAt`. `baseKeymap()` is the default key binding plugin (keys in
 [getting-started.md](getting-started.md#keyboard)).
 

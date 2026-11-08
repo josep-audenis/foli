@@ -974,7 +974,8 @@ export class EditorView {
         this.run(insertText(text));
         return;
       case "insertParagraph":
-        this.run(splitBlock);
+        // The same as Enter (a list item splits or ends), for keyboards that send no keydown.
+        if (!this.runKey("Enter")) this.run(splitBlock);
         return;
       case "insertLineBreak":
         this.run(insertHardBreak);
@@ -1015,8 +1016,19 @@ export class EditorView {
       return;
     }
     const unit = type.startsWith("deleteWord") ? "word" : "char";
+    // A one-character delete goes through the key bindings first (Backspace at a list item's
+    // start lifts it), as the key itself would.
+    if (unit === "char" && this.runKey(type.endsWith("Forward") ? "Delete" : "Backspace")) return;
     this.run(type.endsWith("Forward") ? deleteForward(unit) : deleteBackward(unit));
   };
+
+  /** Runs the first command bound to `name` that applies, through the view's dispatch. */
+  private runKey(name: string): boolean {
+    return this.state.plugins.some((plugin) => {
+      const command = plugin.spec.keymap?.[name];
+      return command ? this.run(command) : false;
+    });
+  }
 
   /**
    * Triple-click selects the clicked block's content. Chromium and WebKit natively extend the
@@ -1069,11 +1081,8 @@ export class EditorView {
     // Ctrl/Cmd+Shift+V: the paste event that follows uses only the plain text.
     this.plainPaste = name === "Mod-Shift-v";
     // Like `editor.handleKey`, but through the view's dispatch, so read-only mode drops edits.
-    const handled = this.state.plugins.some((plugin) => {
-      const command = plugin.spec.keymap?.[name];
-      return command ? this.run(command) : false;
-    });
-    if (handled) event.preventDefault();
+    // A key no command takes keeps its default (Tab outside a list moves the focus on).
+    if (this.runKey(name)) event.preventDefault();
   };
 
   /**
@@ -1717,9 +1726,10 @@ const IS_MAC = typeof navigator !== "undefined" && /Mac|iP(hone|[oa]d)/.test(nav
 export function keyName(event: KeyboardEvent): string {
   let key = event.key.length === 1 ? event.key.toLowerCase() : event.key;
   const mod = IS_MAC ? event.metaKey : event.ctrlKey;
-  // Non-Latin layouts: Ctrl+B still means "b" (use the physical key when the character is not a-z).
-  if (mod && !/^[a-z]$/.test(key) && /^Key[A-Z]$/.test(event.code))
-    key = event.code.slice(3).toLowerCase();
+  // Non-Latin layouts: Ctrl+B still means "b" (use the physical key when the character is not a-z);
+  // with Shift, Ctrl+Shift+7 still means "7" (the character is "&" or "/" depending on layout).
+  if (mod && !/^[a-z0-9]$/.test(key) && /^(Key[A-Z]|Digit[0-9])$/.test(event.code))
+    key = event.code.slice(-1).toLowerCase();
   let name = key;
   if (event.shiftKey && key !== "Shift") name = `Shift-${name}`;
   if (event.altKey) name = `Alt-${name}`;

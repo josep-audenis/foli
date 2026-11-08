@@ -540,7 +540,7 @@ top-level block, marks rendered without attrs).
   (rule) shown and read back; triple-click, placeholder and paste target in nested
   paragraphs; marks with attrs (link as `<a>` that does not navigate on a plain click, colors
   as styles); alignment. Pagination unchanged for flat documents (all existing suites green).
-- [ ] 7.4 Lists across pages: the flow works on the flattened blocks with nesting-aware margins;
+- [x] 7.4 (#36) Lists across pages: the flow works on the flattened blocks with nesting-aware margins;
   a list item splits at a line, a nested list continues on the next page (continued item
   without a second marker, `ol` numbering continues); widow/orphan and keep-with-next inside
   lists; justified text keeps its alignment across a break (`text-align-last` on continued
