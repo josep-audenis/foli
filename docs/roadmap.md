@@ -546,7 +546,7 @@ top-level block, marks rendered without attrs).
   lists; justified text keeps its alignment across a break (`text-align-last` on continued
   fragments). Deterministic fixtures and visual snapshots in three engines, print, the
   benchmark with lists.
-- [ ] 7.5 List editing: commands `wrapInList`, `liftListItem`, `sinkListItem`, `splitListItem`
+- [x] 7.5 (#37) List editing: commands `wrapInList`, `liftListItem`, `sinkListItem`, `splitListItem`
   (Enter on an empty item leaves the list), Backspace at an item's start, list type toggle;
   keys Tab/Shift-Tab inside lists only (Tab elsewhere still leaves the editor), Mod-Shift-7/8;
   the `beforeinput` fallback runs the same commands; toolbar buttons (bulleted, numbered,
