@@ -26,6 +26,17 @@ export {
   undoDepth,
 } from "./history.js";
 export {
+  autolinkHref,
+  insertLink,
+  linkAt,
+  linkEditorRequest,
+  normalizeHref,
+  openLinkEditor,
+  removeLink,
+  requestsLinkEditor,
+  setLink,
+} from "./links.js";
+export {
   liftListItem,
   liftListItemAtStart,
   listKeymap,

@@ -233,9 +233,22 @@ describe("nested blocks (ADR-0004)", () => {
     expect(link.firstElementChild?.tagName).toBe("STRONG"); // the link wraps the formatting
     expect((para.querySelector("span") as HTMLElement).style.color).toBe("rgb(192, 0, 0)");
     expect(para.querySelectorAll("span")[1]?.style.backgroundColor).toBe("rgb(255, 255, 0)");
+    const open = vi.spyOn(window, "open").mockReturnValue(null);
     const click = new MouseEvent("click", { bubbles: true, cancelable: true });
     link.dispatchEvent(click);
     expect(click.defaultPrevented).toBe(true);
+    expect(open).not.toHaveBeenCalled();
+    // Ctrl+click (Cmd on Apple platforms) opens the model's href in a new tab, without opener.
+    const ctrl = new MouseEvent("click", { bubbles: true, cancelable: true, ctrlKey: true });
+    (link.firstElementChild as HTMLElement).dispatchEvent(ctrl);
+    expect(ctrl.defaultPrevented).toBe(true);
+    expect(open).toHaveBeenCalledWith("https://x.test/", "_blank", "noopener,noreferrer");
+    // A middle click (auxclick) does not navigate and opens nothing either.
+    const aux = new MouseEvent("auxclick", { bubbles: true, cancelable: true, ctrlKey: true });
+    link.dispatchEvent(aux);
+    expect(aux.defaultPrevented).toBe(true);
+    expect(open).toHaveBeenCalledTimes(1);
+    open.mockRestore();
   });
 
   it("copies nested blocks as real lists", () => {

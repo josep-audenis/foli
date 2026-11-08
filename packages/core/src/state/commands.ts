@@ -8,7 +8,9 @@ import {
   type ResolvedPos,
 } from "../model/index.js";
 import { TransformError } from "../transform/transform.js";
+import { attempt } from "./attempt.js";
 import { redo, undo } from "./history.js";
+import { openLinkEditor } from "./links.js";
 import { AllSelection, marksAt, TextSelection } from "./selection.js";
 import {
   type Command,
@@ -27,26 +29,6 @@ export type DeleteUnit = "char" | "word";
 const LEAF = "\n";
 const graphemes = new Intl.Segmenter(undefined, { granularity: "grapheme" });
 const words = new Intl.Segmenter(undefined, { granularity: "word" });
-
-/** Runs `build`; a TransformError means the command does not apply. */
-function attempt(
-  state: EditorState,
-  dispatch: ((tr: Transaction) => void) | undefined,
-  build: (tr: Transaction) => void,
-): boolean {
-  const tr = state.tr;
-  try {
-    build(tr);
-  } catch (error) {
-    if (error instanceof TransformError) return false;
-    throw error;
-  }
-  if (!tr.docChanged && tr.selection.eq(state.selection) && tr.storedMarks === state.storedMarks) {
-    return false;
-  }
-  dispatch?.(tr);
-  return true;
-}
 
 function caret(state: EditorState): ResolvedPos | null {
   const { selection } = state;
@@ -374,6 +356,7 @@ export function baseKeymap(): Plugin {
       "Mod-b": toggleMark("bold"),
       "Mod-i": toggleMark("italic"),
       "Mod-u": toggleMark("underline"),
+      "Mod-k": openLinkEditor,
       "Mod-a": selectAll,
       "Mod-z": undo,
       "Mod-Shift-z": redo,

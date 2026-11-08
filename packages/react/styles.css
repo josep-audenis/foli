@@ -19,6 +19,7 @@
   --foli-toolbar-pressed: #dfe8f8;
   --foli-toolbar-hover: #f0f0ee;
   --foli-focus-ring: #2367dc;
+  --foli-error-color: #b3261e;
 }
 
 .foli-canvas {
@@ -114,6 +115,60 @@
   text-decoration: line-through;
 }
 
+/* Link dialog (FoliToolbar): under the toolbar. */
+.foli-link-dialog {
+  padding: 8px;
+  border-bottom: 1px solid var(--foli-border-color);
+  background: var(--foli-toolbar-background);
+  color: var(--foli-toolbar-color);
+  font:
+    14px / 1.4 system-ui,
+    sans-serif;
+}
+
+.foli-link-dialog form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.foli-link-dialog input {
+  flex: 1 1 16em;
+  min-width: 0;
+  height: 32px;
+  padding: 0 8px;
+  border: 1px solid var(--foli-border-color);
+  border-radius: 4px;
+  font: inherit;
+}
+
+.foli-link-dialog input[aria-invalid="true"] {
+  border-color: var(--foli-error-color);
+}
+
+.foli-link-dialog button {
+  height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--foli-border-color);
+  border-radius: 4px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.foli-link-dialog :focus-visible {
+  outline: 2px solid var(--foli-focus-ring);
+  outline-offset: 1px;
+}
+
+.foli-link-error {
+  flex-basis: 100%;
+  margin: 0;
+  color: var(--foli-error-color);
+}
+
 /* Forced colors (Windows High Contrast) drop backgrounds: mark pressed buttons another way. */
 @media (forced-colors: active) {
   .foli-toolbar-button[aria-pressed="true"] {
@@ -142,7 +197,8 @@
   .foli-page {
     box-shadow: none;
   }
-  .foli-toolbar {
+  .foli-toolbar,
+  .foli-link-dialog {
     display: none;
   }
 }

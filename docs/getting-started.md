@@ -30,7 +30,7 @@ export function App() {
 ```
 
 That gives an empty A4 document with a formatting toolbar (bold, italic, underline,
-strikethrough, paragraph, headings 1–3, bulleted and numbered lists, indent, undo, redo, page
+strikethrough, link, paragraph, headings 1–3, bulleted and numbered lists, indent, undo, redo, page
 break). The stylesheet holds the
 default theme; see [styling.md](styling.md) to change it.
 
@@ -213,6 +213,8 @@ its context.
 | Ctrl+Enter                                 | page break                                               |
 | Ctrl+A                                     | select all                                               |
 | Ctrl+Shift+V                               | paste as plain text                                      |
+| Ctrl+K                                     | add or edit a link (the toolbar's link dialog)           |
+| Ctrl+click on a link                       | open it in a new tab                                     |
 | Ctrl+Shift+8; Ctrl+Shift+7                 | bulleted list; numbered list (again: back to paragraphs) |
 | Tab; Shift+Tab (in a list)                 | nest the item; lift it one level                         |
 | Enter on an empty list item                | leave the list (a nested one: up one level)              |

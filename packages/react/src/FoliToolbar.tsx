@@ -3,11 +3,18 @@ import {
   type Editor,
   type EditorState,
   insertPageBreak,
+  isSafeHref,
   liftListItem,
+  linkAt,
   listTypeAt,
+  normalizeHref,
+  openLinkEditor,
   redo,
   redoDepth,
+  removeLink,
+  requestsLinkEditor,
   setBlockType,
+  setLink,
   sinkListItem,
   toggleList,
   toggleMark,
@@ -15,7 +22,16 @@ import {
   undoDepth,
   wrapInList,
 } from "@folijs/core";
-import { Fragment, type KeyboardEvent, type MouseEvent, useRef, useState } from "react";
+import {
+  type FormEvent,
+  Fragment,
+  type KeyboardEvent,
+  type MouseEvent,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+} from "react";
 import { useEditorOrContext, useEditorState } from "./editor.js";
 
 export interface FoliToolbarProps {
@@ -98,6 +114,15 @@ const GROUPS: Item[][] = [
     mark("italic", "Italic", "I"),
     mark("underline", "Underline", "U"),
     mark("strike", "Strikethrough", "S"),
+    {
+      key: "link",
+      label: "Link",
+      text: "Link",
+      pressed: (state) => linkAt(state) !== null,
+      enabled: (state) => openLinkEditor(state),
+      // Asks for the link dialog, as Mod-K does: the toolbar listens for that request.
+      command: () => openLinkEditor,
+    },
   ],
   [
     {
@@ -178,6 +203,15 @@ function canIndent(state: EditorState): boolean {
   return false;
 }
 
+interface LinkDialogState {
+  /** The link at the selection when the dialog opened ("" for none). */
+  href: string;
+  selection: EditorState["selection"];
+  /** Where the focus goes back to on close. */
+  restore: HTMLElement | null;
+  request: number;
+}
+
 interface ItemState {
   pressed: boolean | undefined;
   enabled: boolean;
@@ -195,7 +229,8 @@ const selectStates = (state: EditorState, editor: Editor): ItemState[] =>
   }));
 
 /**
- * Formatting buttons for an editor: marks, paragraph and heading levels, lists (bulleted,
+ * Formatting buttons for an editor: marks and link (a dialog, also on Mod-K in the document),
+ * paragraph and heading levels, lists (bulleted,
  * numbered, decrease and increase indent), undo, redo, page break. One tab stop (arrow keys,
  * Home and End move between buttons); toggles carry
  * `aria-pressed`; a button whose command cannot run now is `aria-disabled` (still focusable).
@@ -221,6 +256,47 @@ export function FoliToolbar({
     if (event.detail > 0) onClickCommand?.();
   };
 
+  // The link dialog opens on a request from the link button or Mod-K in the document, and
+  // gives the focus back to where it was (the document, or the button) when it closes. It is
+  // for the selection it opened on: a change to the document or the selection (a click in the
+  // document) closes it. A second request while it is open focuses it again.
+  const [dialog, setDialog] = useState<LinkDialogState | null>(null);
+  useEffect(
+    () =>
+      editor.subscribe((state, transactions) => {
+        if (disabled) return;
+        if (!transactions.some(requestsLinkEditor)) {
+          setDialog((current) =>
+            current &&
+            (transactions.some((tr) => tr.docChanged) || !state.selection.eq(current.selection))
+              ? null
+              : current,
+          );
+          return;
+        }
+        const active = typeof document === "undefined" ? null : document.activeElement;
+        setDialog((current) =>
+          current
+            ? { ...current, request: current.request + 1 }
+            : {
+                href: linkAt(state) ?? "",
+                selection: state.selection,
+                restore: active instanceof HTMLElement ? active : null,
+                request: 0,
+              },
+        );
+      }),
+    [editor, disabled],
+  );
+  // A dialog never outlives a disabled toolbar (it would come back when enabled again).
+  useEffect(() => {
+    if (disabled) setDialog(null);
+  }, [disabled]);
+  const closeDialog = () => {
+    dialog?.restore?.focus();
+    setDialog(null);
+  };
+
   const onKeyDown = (event: KeyboardEvent) => {
     // Alt+Left (back) and other shortcuts are the browser's.
     if (event.altKey || event.ctrlKey || event.metaKey) return;
@@ -240,44 +316,145 @@ export function FoliToolbar({
 
   let index = 0;
   return (
+    <>
+      <div
+        role="toolbar"
+        aria-label={label}
+        className={className ? `foli-toolbar ${className}` : "foli-toolbar"}
+        onKeyDown={onKeyDown}
+      >
+        {GROUPS.map((group, g) => (
+          <Fragment key={group[0]?.key}>
+            {g > 0 && <hr className="foli-toolbar-separator" aria-orientation="vertical" />}
+            {group.map((item) => {
+              const i = index++;
+              const state = states[i];
+              const off = disabled || !state?.enabled;
+              return (
+                <button
+                  key={item.key}
+                  ref={(element) => {
+                    buttons.current[i] = element;
+                  }}
+                  type="button"
+                  className={`foli-toolbar-button foli-toolbar-${item.key}`}
+                  // Speech input users say what they see: "H1", "Undo"; symbols get a name.
+                  aria-label={item.symbol ? item.label : undefined}
+                  title={item.label}
+                  aria-pressed={item.pressed ? Boolean(state?.pressed) : undefined}
+                  aria-disabled={off || undefined}
+                  tabIndex={i === active ? 0 : -1}
+                  // Keep the focus (and the selection) in the document on click.
+                  onMouseDown={(event) => event.preventDefault()}
+                  onFocus={() => setActive(i)}
+                  onClick={(event) => run(i, event)}
+                >
+                  {item.text}
+                </button>
+              );
+            })}
+          </Fragment>
+        ))}
+      </div>
+      {dialog && !disabled && (
+        <LinkDialog
+          editor={editor}
+          href={dialog.href}
+          request={dialog.request}
+          onClose={closeDialog}
+        />
+      )}
+    </>
+  );
+}
+
+/**
+ * The link dialog: a URL field (prefilled with the link at the selection), Apply, Remove link
+ * (for an existing link) and Cancel; Escape cancels. An unsafe or invalid URL is not applied:
+ * the field is marked invalid and the message is announced.
+ */
+function LinkDialog({
+  editor,
+  href,
+  request,
+  onClose,
+}: {
+  editor: Editor;
+  href: string;
+  /** Counts the open requests: each one focuses the field. */
+  request: number;
+  onClose: () => void;
+}) {
+  const [value, setValue] = useState(href);
+  const [invalid, setInvalid] = useState(false);
+  const input = useRef<HTMLInputElement>(null);
+  const id = useId();
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: each request focuses the field again.
+  useEffect(() => {
+    input.current?.focus();
+    input.current?.select();
+  }, [request]);
+
+  const apply = (event: FormEvent) => {
+    event.preventDefault();
+    // The same link again changes nothing (the command does not apply): that is not an error.
+    const normalized = normalizeHref(value);
+    const unchanged = isSafeHref(normalized) && linkAt(editor.state) === normalized;
+    if (unchanged || editor.run(setLink(value))) onClose();
+    else {
+      setInvalid(true);
+      input.current?.focus();
+    }
+  };
+  const remove = () => {
+    editor.run(removeLink);
+    onClose();
+  };
+
+  return (
     <div
-      role="toolbar"
-      aria-label={label}
-      className={className ? `foli-toolbar ${className}` : "foli-toolbar"}
-      onKeyDown={onKeyDown}
+      role="dialog"
+      aria-label={href ? "Edit link" : "Add link"}
+      className="foli-link-dialog"
+      onKeyDown={(event) => {
+        if (event.key !== "Escape") return;
+        event.preventDefault();
+        onClose();
+      }}
     >
-      {GROUPS.map((group, g) => (
-        <Fragment key={group[0]?.key}>
-          {g > 0 && <hr className="foli-toolbar-separator" aria-orientation="vertical" />}
-          {group.map((item) => {
-            const i = index++;
-            const state = states[i];
-            const off = disabled || !state?.enabled;
-            return (
-              <button
-                key={item.key}
-                ref={(element) => {
-                  buttons.current[i] = element;
-                }}
-                type="button"
-                className={`foli-toolbar-button foli-toolbar-${item.key}`}
-                // Speech input users say what they see: "H1", "Undo"; symbols get a name.
-                aria-label={item.symbol ? item.label : undefined}
-                title={item.label}
-                aria-pressed={item.pressed ? Boolean(state?.pressed) : undefined}
-                aria-disabled={off || undefined}
-                tabIndex={i === active ? 0 : -1}
-                // Keep the focus (and the selection) in the document on click.
-                onMouseDown={(event) => event.preventDefault()}
-                onFocus={() => setActive(i)}
-                onClick={(event) => run(i, event)}
-              >
-                {item.text}
-              </button>
-            );
-          })}
-        </Fragment>
-      ))}
+      <form onSubmit={apply} noValidate>
+        <label htmlFor={`${id}-url`}>URL</label>
+        <input
+          ref={input}
+          id={`${id}-url`}
+          type="text"
+          inputMode="url"
+          autoComplete="off"
+          spellCheck={false}
+          value={value}
+          aria-invalid={invalid || undefined}
+          aria-describedby={invalid ? `${id}-error` : undefined}
+          onChange={(event) => {
+            setValue(event.target.value);
+            setInvalid(false);
+          }}
+        />
+        <button type="submit">Apply</button>
+        {href && (
+          <button type="button" onClick={remove}>
+            Remove link
+          </button>
+        )}
+        <button type="button" onClick={onClose}>
+          Cancel
+        </button>
+        {invalid && (
+          <p id={`${id}-error`} className="foli-link-error" role="alert">
+            Enter a web or email address, or a link starting with http, https, mailto or tel.
+          </p>
+        )}
+      </form>
     </div>
   );
 }

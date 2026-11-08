@@ -1,5 +1,6 @@
 import {
   AllSelection,
+  autolinkHref,
   type Command,
   closeHistory,
   type DocumentSettings,
@@ -9,6 +10,7 @@ import {
   type Editor,
   type EditorState,
   insertHardBreak,
+  insertLink,
   insertText,
   type Node as ModelNode,
   marksAt,
@@ -16,6 +18,7 @@ import {
   redo,
   Selection,
   Slice,
+  setLink,
   splitBlock,
   TextSelection,
   type Transaction,
@@ -1062,13 +1065,30 @@ export class EditorView {
     this.writeSelection(true);
   };
 
-  /** A link in the document does not navigate when clicked (editing places the caret in it). */
+  /**
+   * A click on a link in the document does not navigate (it places the caret, also in read-only
+   * mode); Ctrl+click (Cmd+click on Apple platforms) opens it in a new tab, without `opener`.
+   */
   private onClick = (event: MouseEvent): void => {
     const target = event.target;
-    const link = target instanceof Element ? target.closest("a") : null;
-    // shortcut: no way to follow a link yet, read-only included; Ctrl/Cmd+click opens it (7.6).
-    if (link && this.host.contains(link)) event.preventDefault();
+    const element = target instanceof Element ? target.closest("a") : null;
+    if (!element || !this.host.contains(element)) return;
+    event.preventDefault();
+    if (event.type !== "click" || !(IS_MAC ? event.metaKey : event.ctrlKey)) return;
+    const href = this.linkHref(element);
+    if (href) this.host.ownerDocument.defaultView?.open(href, "_blank", "noopener,noreferrer");
   };
+
+  /** The href of the link an `<a>` shows, read from the model (the DOM is never the truth). */
+  private linkHref(element: Element): string | null {
+    const pos = this.posFromDOM(element, 0);
+    const type = this.state.schema.marks.link;
+    if (pos === null || !type) return null;
+    const $pos = this.state.doc.resolve(pos);
+    const node = $pos.parent.maybeChild($pos.index());
+    const href = node && type.isInSet(node.marks)?.attrs.href;
+    return typeof href === "string" ? href : null;
+  }
 
   private onKeyDown = (event: KeyboardEvent): void => {
     if (event.isComposing || this.composing) return;
@@ -1358,6 +1378,7 @@ export class EditorView {
     const data = event.clipboardData;
     this.paste(
       plain ? { getData: (type) => (type === "text/plain" ? data.getData(type) : "") } : data,
+      !plain,
     );
   };
 
@@ -1366,10 +1387,27 @@ export class EditorView {
    * paste starts a new undo step (typing right after it joins that step). Closed content (whole
    * blocks) goes into an empty textblock whole, so a pasted heading stays a heading; open
    * content, and anything pasted into a non-empty block, joins the text around the selection,
-   * so the target block keeps its type. Returns whether anything was inserted.
+   * so the target block keeps its type. Plain text that is one URL becomes a link (`autolink`,
+   * not for paste as plain text): over selected text inside one block, that text is linked;
+   * otherwise the URL is inserted as linked text. Returns whether anything was inserted.
    */
-  paste(data: Pick<DataTransfer, "getData">): boolean {
+  paste(data: Pick<DataTransfer, "getData">, autolink = true): boolean {
     const { state } = this;
+    const text = autolink && !data.getData(FOLI_MIME) ? data.getData("text/plain") : "";
+    const href = text ? autolinkHref(text) : null;
+    if (href) {
+      const { selection } = state;
+      const inside =
+        !selection.empty &&
+        selection.$from.sameParent(selection.$to) &&
+        selection.$from.parent.inlineContent;
+      let applied = false;
+      const command = inside ? setLink(href) : insertLink(href, text.trim());
+      const dispatch = (tr: Transaction) => {
+        applied = this.dispatch(tr.setMeta(closeHistory, true));
+      };
+      if (command(state, dispatch)) return applied;
+    }
     const marks = (state.storedMarks ?? marksAt(state.selection.$from)).map((m) => m.toJSON());
     const pasted = docFromClipboard(data, marks);
     // One empty block: nothing to paste.

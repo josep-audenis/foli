@@ -121,6 +121,11 @@ Foli's own (see `THIRD_PARTY_NOTICES.md`).
   - splitBlock: Enter at the end of a heading starts a paragraph, and formatting carries over.
   - Formatting and selection: toggleMark, setBlockType, selectAll, undo, redo, plus `isMarkActive`.
   - `baseKeymap()` binds them to key names (`Mod-b`, `Enter`…).
+  - Links (7.6, `state/links.ts`): `setLink`, `removeLink`, `insertLink`, `linkAt`, with
+    `normalizeHref` before `isSafeHref` at every entry (command, dialog, paste); a caret at a
+    link's edge edits that link. Mod-K is `openLinkEditor`: core has no UI, so it dispatches
+    an empty transaction with `linkEditorRequest` metadata, and `FoliToolbar` (subscribed to
+    the editor) opens its dialog. The link button runs the same command, so both paths meet.
   - Lists (7.5, `state/lists.ts`): `toggleList`, `wrapInList`, `splitListItem` (Enter; on an
     empty item, lift it), `sinkListItem` (Tab: into a sublist of the item before, joining one
     that ends it), `liftListItem` (Shift+Tab: into the outer list, or out of a top-level list,
@@ -141,8 +146,8 @@ Foli's own (see `THIRD_PARTY_NOTICES.md`).
 Known limits:
 - No general slice fitting: paste (Phase 4.3) joins open content or replaces an empty textblock
   with whole blocks; fitting blocks into nested structures comes with lists (Phase 7).
-- Paste of lists, links and colors is 7.8. Typing over a node-selected rule does nothing yet
-  (7.7).
+- Paste of lists, links and colors from HTML is 7.8 (a pasted plain-text URL already becomes a
+  link, 7.6). Typing over a node-selected rule does nothing yet (7.7).
 - Each unrecorded change (and each plugin reaction to undo/redo) rebases the stored history.
   This costs O(n²) in the number of stored steps (not events), and every step is re-applied to the
   document, which also scales with document size.
@@ -192,7 +197,7 @@ and benchmarks (5.7, [benchmarks.md](benchmarks.md)); overview in [pagination.md
     selects it as a `NodeSelection`, shown as a DOM range around the element plus the class
     `foli-selected-node`, and read back as a node selection.
   - **Marks with attributes:** a link is an `<a href>` (validated by the schema) that does not
-    navigate on click; text color and highlight are spans with `color` / `background-color`.
+    navigate on click (Ctrl/Cmd+click opens the model's href in a new tab, `noopener`); text color and highlight are spans with `color` / `background-color`.
     Alignment is `text-align` on the block (`start` is the default and is not written).
   - Copy renders the same structures (`renderTree`: real nested lists, `start` on ordered
     lists, without the view's attributes).

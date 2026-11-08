@@ -89,7 +89,8 @@ are rejected (browsers drop tabs and newlines inside a scheme, so `java\tscript:
 The rule is part of the format: it may be relaxed, but never made stricter without a
 migration, or saved documents would stop loading. Values the rule rejects but that are
 harmless (a URL with a space or a backslash, as people paste them) are normalized before they
-reach a document (percent-encoding, by paste and the link UI: tasks 7.6 and 7.8), not stored.
+reach a document (`normalizeHref`: by the link commands, the link dialog and plain-text URL
+paste since 7.6; HTML paste in 7.8), not stored.
 
 **Alignment** is `start` or `end` rather than left or right, so it means the right thing in
 right-to-left text (as CSS and strict OOXML do): in left-to-right text, `start` is left.

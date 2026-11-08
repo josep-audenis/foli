@@ -53,11 +53,8 @@ test("keyboard only: Tab to the toolbar, arrows to a heading level, Enter, Tab b
     .click({ position: { x: 4, y: 4 } });
   await page.keyboard.press("Shift+Tab");
   await expect(button(page, "Bold")).toBeFocused();
-  await page.keyboard.press("ArrowRight");
-  await page.keyboard.press("ArrowRight");
-  await page.keyboard.press("ArrowRight");
-  await page.keyboard.press("ArrowRight");
-  await page.keyboard.press("ArrowRight");
+  // Italic, Underline, Strikethrough, Link, Paragraph, H1.
+  for (let i = 0; i < 6; i++) await page.keyboard.press("ArrowRight");
   await expect(button(page, "H1")).toBeFocused();
   await page.keyboard.press("Enter");
   await expect(button(page, "H1")).toHaveAttribute("aria-pressed", "true");
