@@ -1,8 +1,9 @@
 import {
+  type Alignment,
   type DocJSON,
   Fragment,
-  type HeadingJSON,
   type InlineJSON,
+  isSafeHref,
   type MarkJSON,
   type Node as ModelNode,
   type ParagraphJSON,
@@ -197,24 +198,118 @@ const TAG_MARKS: ReadonlyMap<string, SimpleMarkName> = new Map([
   ["del", "strike"],
 ]);
 
-/** Marks of an element on top of the inherited ones: tags first, then inline styles. */
-function marksOf(element: Element, inherited: ReadonlySet<SimpleMarkName>): Set<SimpleMarkName> {
-  const marks = new Set(inherited);
-  const tagMark = TAG_MARKS.get(element.localName);
-  if (tagMark) marks.add(tagMark);
+/** Marks by type: one of each (a link, a text color and a highlight carry attributes). */
+type Marks = ReadonlyMap<string, MarkJSON>;
+
+const NAMED_COLORS: Readonly<Record<string, string>> = {
+  black: "#000000",
+  white: "#ffffff",
+  red: "#ff0000",
+  green: "#008000",
+  blue: "#0000ff",
+  yellow: "#ffff00",
+  gray: "#808080",
+  grey: "#808080",
+  silver: "#c0c0c0",
+  maroon: "#800000",
+  navy: "#000080",
+  purple: "#800080",
+  teal: "#008080",
+  olive: "#808000",
+  orange: "#ffa500",
+  lime: "#00ff00",
+  aqua: "#00ffff",
+  cyan: "#00ffff",
+  fuchsia: "#ff00ff",
+  magenta: "#ff00ff",
+};
+
+const hex2 = (n: number) =>
+  Math.max(0, Math.min(255, Math.round(n)))
+    .toString(16)
+    .padStart(2, "0");
+
+/**
+ * A CSS color as the schema stores it (lowercase `#rrggbb`), or null: transparent, unknown
+ * (system colors such as Word's `windowtext`) or empty. Hex (3 or 6 digits), `rgb()`/`rgba()`
+ * and the basic named colors.
+ */
+export function parseColor(value: string): string | null {
+  const color = value.trim().toLowerCase();
+  const named = NAMED_COLORS[color];
+  if (named) return named;
+  const short = /^#([0-9a-f])([0-9a-f])([0-9a-f])$/.exec(color);
+  if (short) return `#${short[1]}${short[1]}${short[2]}${short[2]}${short[3]}${short[3]}`;
+  if (/^#[0-9a-f]{6}$/.test(color)) return color;
+  // rgb(r, g, b), rgb(r g b), rgba(r, g, b, a), rgb(r g b / a): split, no backtracking regex.
+  const body = /^rgba?\(([^()]*)\)$/.exec(color)?.[1];
+  if (body === undefined) return null;
+  const parts = body.trim().split(/\s*[,/]\s*|\s+/);
+  if (parts.length < 3 || parts.length > 4) return null;
+  if (!parts.every((part) => /^\d+(?:\.\d+)?%?$/.test(part))) return null;
+  const numbers = parts.map((part) => Number.parseFloat(part));
+  if (numbers[3] === 0) return null; // fully transparent
+  const hex = `#${hex2(numbers[0] as number)}${hex2(numbers[1] as number)}${hex2(numbers[2] as number)}`;
+  return hex;
+}
+
+/**
+ * Marks of an element on top of the inherited ones: tags first, then inline styles; a link
+ * from `a[href]` when the href is safe (`isSafeHref`; links inside the source page, `#…`, are
+ * dropped); text color and highlight from inline elements only (a page's colored containers
+ * are layout, not formatting), black text and white highlight being the defaults.
+ */
+function marksOf(element: Element, inherited: Marks): Map<string, MarkJSON> {
+  const marks = new Map(inherited);
+  const tag = element.localName;
+  const tagMark = TAG_MARKS.get(tag);
+  if (tagMark) marks.set(tagMark, { type: tagMark });
+  if (tag === "a") {
+    const href = element.getAttribute("href")?.trim().replace(/ /g, "%20");
+    if (href && !href.startsWith("#") && isSafeHref(href)) {
+      marks.set("link", { type: "link", attrs: { href } } as MarkJSON);
+    }
+  }
   const style = (element as HTMLElement).style;
   if (!style) return marks;
   const weight = style.fontWeight;
   // Google Docs wraps everything in <b style="font-weight:normal">.
-  if (/^(bold|bolder|[6-9]00)$/.test(weight)) marks.add("bold");
+  if (/^(bold|bolder|[6-9]00)$/.test(weight)) marks.set("bold", { type: "bold" });
   else if (/^(normal|lighter|[1-5]00)$/.test(weight)) marks.delete("bold");
-  if (/^(italic|oblique)/.test(style.fontStyle)) marks.add("italic");
+  if (/^(italic|oblique)/.test(style.fontStyle)) marks.set("italic", { type: "italic" });
   else if (style.fontStyle === "normal") marks.delete("italic");
   const decoration = `${style.textDecorationLine} ${style.textDecoration}`;
-  if (decoration.includes("underline")) marks.add("underline");
-  if (decoration.includes("line-through")) marks.add("strike");
+  if (decoration.includes("underline")) marks.set("underline", { type: "underline" });
+  if (decoration.includes("line-through")) marks.set("strike", { type: "strike" });
   // `text-decoration: none` on a child does not remove a parent's line in CSS: keep it.
+  if (!BLOCK_TAGS.has(tag)) {
+    const color = parseColor(
+      style.color || (tag === "font" ? (element.getAttribute("color") ?? "") : ""),
+    );
+    // Black is the default; white text comes from dark pages and would be invisible.
+    if (color === "#000000" || color === "#ffffff") marks.delete("textColor");
+    else if (color) marks.set("textColor", { type: "textColor", attrs: { color } } as MarkJSON);
+    const background = parseColor(style.backgroundColor);
+    if (background === "#ffffff") marks.delete("highlight");
+    else if (background) {
+      marks.set("highlight", { type: "highlight", attrs: { color: background } } as MarkJSON);
+    }
+  }
   return marks;
+}
+
+/** A block's own alignment (`text-align`, or the old `align` attribute), or undefined. */
+function alignOf(element: Element): Alignment | undefined {
+  const value = (
+    (element as HTMLElement).style?.textAlign ||
+    element.getAttribute("align") ||
+    ""
+  ).toLowerCase();
+  if (value === "left" || value === "start") return "start";
+  if (value === "center" || value === "-webkit-center") return "center";
+  if (value === "right" || value === "end") return "end";
+  if (value === "justify") return "justify";
+  return undefined;
 }
 
 /**
@@ -239,12 +334,75 @@ function isNoise(element: Element): boolean {
   if ((element as HTMLElement).style?.display === "none" || element.hasAttribute("hidden")) {
     return true;
   }
-  return element.localName === "o:p" && !element.textContent?.replace(/[\s ]/g, "");
+  return element.localName === "o:p" && !element.textContent?.replace(/[\s ]/g, "");
 }
 
 /**
- * Own HTML reader: maps known tags and inline styles to schema v1, drops everything else
- * (links keep their text). The HTML is parsed into an inert document and never inserted.
+ * A Word list paragraph (`style="mso-list:l0 level2 lfo1"`): its list and level, and from its
+ * marker (the `mso-list:Ignore` span Word adds for other apps) whether it is numbered and
+ * where the numbering starts. Best effort: a marker ending in "." or ")" is a number or
+ * letter (numbered); anything else ("·", "o", "§") a bullet.
+ */
+function wordListItem(
+  element: Element,
+): { list: string; level: number; ordered: boolean; start: number } | null {
+  const match = /mso-list:\s*(l\d+)\s+level(\d+)/i.exec(element.getAttribute("style") ?? "");
+  if (!match) return null;
+  let marker = "";
+  for (const child of element.querySelectorAll("[style]")) {
+    if (/mso-list:\s*ignore/i.test(child.getAttribute("style") ?? "")) {
+      marker = (child.textContent ?? "").replace(/[\s ]+/g, "");
+      break;
+    }
+  }
+  // "1.", "a)", "(iv)", and multi-level "1.2." or "1.2": numbered; its last part is its number.
+  const ordered = /^\(?[0-9a-zA-Z]{1,6}(?:\.[0-9]{1,6})*[.)]$|^\d{1,6}(?:\.\d{1,6})+$/.test(marker);
+  const number = /(\d+)[.)]?$/.exec(marker);
+  return {
+    list: match[1] as string,
+    level: Number(match[2]),
+    ordered,
+    start: ordered && number ? Number(number[1]) : 1,
+  };
+}
+
+/** Loose block JSON while reading (validated by the schema afterwards). */
+interface BlockNode {
+  type: string;
+  attrs?: Record<string, unknown>;
+  content?: (BlockNode | InlineJSON)[];
+}
+
+interface Container {
+  node: BlockNode;
+  kind: "doc" | "list" | "item";
+  /** An item the reader opened itself (text directly in a list, a list nested in a list). */
+  implicit?: boolean;
+  /** Where a list goes when it closes (lists with no items are dropped). */
+  parent?: BlockNode[];
+  /** A Word list paragraph's list and level (Word lists are flat paragraphs). */
+  word?: { list: string; level: number; ordered: boolean };
+}
+
+/** A list item must start with a paragraph: a heading becomes one, else one is added. */
+function finishItem(item: BlockNode): void {
+  if (!item.content) item.content = [];
+  const content = item.content as BlockNode[];
+  const first = content[0];
+  if (first?.type === "heading") {
+    first.type = "paragraph";
+    const align = first.attrs?.align;
+    if (align) first.attrs = { align };
+    else delete first.attrs;
+  } else if (first?.type !== "paragraph") {
+    content.unshift({ type: "paragraph" });
+  }
+}
+
+/**
+ * Own HTML reader: maps known tags and inline styles to the schema (paragraphs, headings,
+ * lists, rules; bold, italic, underline, strike, links, colors; alignment), drops everything
+ * else. The HTML is parsed into an inert document and never inserted.
  */
 export function htmlToDoc(html: string): DocJSON | null {
   return readHTML(html)?.content ?? null;
@@ -253,19 +411,41 @@ export function htmlToDoc(html: string): DocJSON | null {
 /** `htmlToDoc`, plus whether the HTML had no block elements (`Pasted.open`). */
 function readHTML(html: string): { content: DocJSON; open: boolean } | null {
   const parsed = new DOMParser().parseFromString(html, "text/html");
-  // Paste maps HTML to paragraphs and headings (lists, links, rules: task 7.8).
-  const blocks: (ParagraphJSON | HeadingJSON)[] = [];
+  const doc: BlockNode = { type: "doc", content: [] };
+  const stack: Container[] = [{ node: doc, kind: "doc" }];
   let inline: InlineJSON[] | null = null;
-  let blockType: (ParagraphJSON | HeadingJSON)["type"] = "paragraph";
+  let blockType: "paragraph" | "heading" = "paragraph";
   let level = 1;
+  let blockAlign: Alignment | undefined;
   let blockPre = false;
   let sawBlock = false;
   let afterSpace = true; // collapse leading and repeated whitespace like HTML layout does
 
-  const open = (type: (ParagraphJSON | HeadingJSON)["type"], headingLevel = 1, pre = false) => {
+  const top = () => stack[stack.length - 1] as Container;
+  /** Where blocks go now: the open item or the document (text directly in a list gets an item). */
+  const container = (): BlockNode[] => {
+    if (top().kind === "list") {
+      const item: BlockNode = { type: "listItem", content: [] };
+      (top().node.content as BlockNode[]).push(item);
+      stack.push({ node: item, kind: "item", implicit: true });
+    }
+    return top().node.content as BlockNode[];
+  };
+  const lastBlock = (): BlockNode | undefined => {
+    const blocks = top().node.content as BlockNode[];
+    return blocks[blocks.length - 1];
+  };
+
+  const open = (
+    type: "paragraph" | "heading",
+    headingLevel = 1,
+    pre = false,
+    align: Alignment | undefined = undefined,
+  ) => {
     inline = [];
     blockType = type;
     level = headingLevel;
+    blockAlign = align;
     blockPre = pre;
     afterSpace = true;
   };
@@ -277,22 +457,28 @@ function readHTML(html: string): { content: DocJSON; open: boolean } | null {
     if (tail?.type === "text" && !blockPre) tail.text = tail.text.replace(/ +$/, "");
     // Non-breaking spaces survive the trimming above, then become ordinary spaces.
     for (const node of inline) {
-      if (node.type === "text") node.text = node.text.replace(/\u00a0/g, " ");
+      if (node.type === "text") node.text = node.text.replace(/ /g, " ");
     }
     const content = inline.filter((node) => node.type !== "text" || node.text);
-    if (content.length || keepEmpty) {
-      blocks.push(
-        blockType === "heading"
-          ? ({ type: "heading", attrs: { level }, content } as HeadingJSON)
-          : ({ type: "paragraph", content } as ParagraphJSON),
-      );
-    }
     inline = null;
+    if (!content.length && !keepEmpty) return;
+    const attrs: Record<string, unknown> = {};
+    if (blockType === "heading") attrs.level = level;
+    if (blockAlign && blockAlign !== "start") attrs.align = blockAlign;
+    container().push({
+      type: blockType,
+      ...(Object.keys(attrs).length ? { attrs } : {}),
+      ...(content.length ? { content } : {}),
+    });
   };
-  const addText = (raw: string, marks: ReadonlySet<SimpleMarkName>, pre: boolean) => {
+  const addText = (raw: string, marks: Marks, pre: boolean) => {
     // Source formatting between blocks ("</p>\n<br>\n<p>") is not content.
     if (!inline && !pre && !/[^ \t\n\r\f]/.test(raw)) return;
-    if (!inline) open("paragraph", 1, pre);
+    if (!inline) {
+      // Text of its own after Word list paragraphs ends them (it is not part of an item).
+      if (stack.some((entry) => entry.word)) closeWordLists();
+      open("paragraph", 1, pre);
+    }
     const lines = pre ? raw.replace(/\r\n?/g, "\n").split("\n") : [raw];
     lines.forEach((line, i) => {
       if (i > 0) addBreak();
@@ -300,7 +486,10 @@ function readHTML(html: string): { content: DocJSON; open: boolean } | null {
       if (!pre && afterSpace) text = text.replace(/^ /, "");
       if (!text) return;
       afterSpace = !pre && text.endsWith(" ");
-      const markJSON = [...marks].map((type) => ({ type }));
+      // A link's own look (Google Docs' blue underline) is the link's, not formatting.
+      const markJSON = [...marks.values()].filter(
+        (mark) => !marks.has("link") || (mark.type !== "underline" && mark.type !== "textColor"),
+      );
       (inline as InlineJSON[]).push({
         type: "text",
         text,
@@ -308,12 +497,13 @@ function readHTML(html: string): { content: DocJSON; open: boolean } | null {
       } as InlineJSON);
     });
   };
-  /** An explicit page break: in the open block, else at the end of the previous one. */
+  /** An explicit page break: in the open block, else at the end of the previous textblock. */
   const addPageBreak = () => {
-    const previous = blocks[blocks.length - 1];
+    const previous = lastBlock();
     if (inline) inline.push({ type: "pageBreak" });
-    else if (previous) previous.content = [...(previous.content ?? []), { type: "pageBreak" }];
-    else {
+    else if (previous && (previous.type === "paragraph" || previous.type === "heading")) {
+      previous.content = [...(previous.content ?? []), { type: "pageBreak" }];
+    } else {
       open("paragraph");
       (inline as InlineJSON[] | null)?.push({ type: "pageBreak" });
     }
@@ -322,7 +512,7 @@ function readHTML(html: string): { content: DocJSON; open: boolean } | null {
   const addBreak = () => {
     // A <br> between blocks is an empty line (Google Docs writes empty paragraphs this way).
     if (!inline) {
-      blocks.push({ type: "paragraph" });
+      container().push({ type: "paragraph" });
       return;
     }
     const list = inline as InlineJSON[];
@@ -332,10 +522,97 @@ function readHTML(html: string): { content: DocJSON; open: boolean } | null {
     afterSpace = true;
   };
 
+  /** Closes the top container: an item gets its first paragraph, a list goes to its parent. */
+  const pop = () => {
+    const container = stack.pop() as Container;
+    if (container.kind === "item" && container.implicit && !container.node.content?.length) {
+      // An item opened for content that never came (`<ul><ul></ul></ul>`): not an empty bullet.
+      const items = top().node.content as BlockNode[];
+      items.splice(items.indexOf(container.node), 1);
+      return;
+    }
+    if (container.kind === "item") finishItem(container.node);
+    if (container.kind === "list" && container.node.content?.length) {
+      container.parent?.push(container.node);
+    }
+  };
+  /** Opens a list; one directly inside a list (sloppy HTML, Google Docs) nests in its last item. */
+  const openList = (ordered: boolean, start: number, word?: Container["word"]) => {
+    close(false);
+    if (top().kind === "list") {
+      const items = top().node.content as BlockNode[];
+      let item = items[items.length - 1];
+      if (!item) {
+        item = { type: "listItem", content: [] };
+        items.push(item);
+      }
+      stack.push({ node: item, kind: "item", implicit: true });
+    }
+    const node: BlockNode = {
+      type: ordered ? "orderedList" : "bulletList",
+      ...(ordered && start !== 1 && Number.isInteger(start) && start >= 0 && start <= 99_999
+        ? { attrs: { start } }
+        : {}),
+      content: [],
+    };
+    stack.push({
+      node,
+      kind: "list",
+      parent: top().node.content as BlockNode[],
+      ...(word && { word }),
+    });
+  };
+  const openItem = (word?: Container["word"]) => {
+    close(false);
+    while (top().kind === "item" && (top().implicit || word)) pop();
+    const item: BlockNode = { type: "listItem", content: [] };
+    (top().node.content as BlockNode[]).push(item);
+    stack.push({ node: item, kind: "item", ...(word && { word }) });
+  };
+
+  /** Word lists are flat paragraphs with levels: open and close lists to nest them. */
+  const wordItem = (item: NonNullable<ReturnType<typeof wordListItem>>) => {
+    close(false);
+    const wordList = () => {
+      for (let i = stack.length - 1; i > 0; i--) {
+        const entry = stack[i] as Container;
+        if (entry.kind === "list" && entry.word) return { entry, index: i };
+      }
+      return null;
+    };
+    for (let found = wordList(); found; found = wordList()) {
+      const { word } = found.entry;
+      if (!word) break;
+      const same =
+        word.level === item.level && word.list === item.list && word.ordered === item.ordered;
+      if (word.level < item.level || (same && word.level === item.level)) break;
+      while (stack.length > found.index) pop();
+    }
+    const current = wordList();
+    const word = { list: item.list, level: item.level, ordered: item.ordered };
+    if (!current || current.entry.word?.level !== item.level) {
+      openList(item.ordered, item.start, word);
+    } else {
+      // A sibling item: close the previous one (and anything nested in it).
+      while (stack.length > current.index + 1) pop();
+    }
+    openItem(word);
+  };
+  const closeWordLists = () => {
+    close(false);
+    while (stack.some((entry) => entry.word)) pop();
+  };
+
+  interface Context {
+    marks: Marks;
+    pre: boolean;
+    align: Alignment | undefined;
+  }
+
   /** Walks `node`; returns whether it contained a block element. */
-  const walk = (node: Node, marks: ReadonlySet<SimpleMarkName>, pre: boolean): boolean => {
+  const walk = (node: Node, context: Context): boolean => {
     if (node.nodeType === 3) {
-      addText((node as Text).data, marks, pre);
+      addText((node as Text).data, context.marks, context.pre);
       return false;
     }
     if (node.nodeType !== 1) return false; // comments (Word's conditional comments), etc.
@@ -352,28 +629,80 @@ function readHTML(html: string): { content: DocJSON; open: boolean } | null {
       if (!element.classList.contains("Apple-interchange-newline")) addBreak();
       return false;
     }
-    const childMarks = marksOf(element, marks);
     const whiteSpace = (element as HTMLElement).style?.whiteSpace ?? "";
-    const childPre = pre || tag === "pre" || whiteSpace.startsWith("pre");
-    if (!BLOCK_TAGS.has(tag)) {
+    const child: Context = {
+      marks: marksOf(element, context.marks),
+      pre: context.pre || tag === "pre" || whiteSpace.startsWith("pre"),
+      align: BLOCK_TAGS.has(tag) ? (alignOf(element) ?? context.align) : context.align,
+    };
+    const children = () => {
       let hasBlock = false;
-      for (const child of element.childNodes)
-        hasBlock = walk(child, childMarks, childPre) || hasBlock;
+      for (const node of element.childNodes) hasBlock = walk(node, child) || hasBlock;
       return hasBlock;
-    }
+    };
+    if (!BLOCK_TAGS.has(tag)) return children();
     sawBlock = true;
+    // Word list paragraphs: <p> only (a numbered Word heading stays a heading), and not inside an
+    // HTML list (Outlook writes `<li style="mso-list:…">` in real lists).
+    const word =
+      tag === "p" && !stack.some((entry) => entry.kind === "list" && !entry.word)
+        ? wordListItem(element)
+        : null;
+    if (word) {
+      wordItem(word);
+      open("paragraph", 1, child.pre, child.align);
+      children();
+      close(true);
+      return true;
+    }
+    // Word wraps its content in a <div>: only a block of its own content ends Word lists.
+    if (!/^(div|body|section|article|main)$/.test(tag)) closeWordLists();
+    // A list or item closes everything opened inside it, so unbalanced input cannot leak.
+    const base = stack.length;
+    const closeTo = (height: number) => {
+      close(false);
+      while (stack.length > height) pop();
+    };
+    if (tag === "ul" || tag === "ol") {
+      const start = Number.parseInt(element.getAttribute("start") ?? "", 10);
+      openList(tag === "ol", Number.isNaN(start) ? 1 : start);
+      children();
+      closeTo(base);
+      return true;
+    }
+    if (tag === "li" && stack.some((entry) => entry.kind === "list")) {
+      // Inside a list item that is itself still open, an <li> is a sibling: close down to a list.
+      while (top().kind === "item") closeTo(stack.length - 1);
+      const height = stack.length;
+      openItem();
+      children();
+      closeTo(height);
+      return true;
+    }
+    if (tag === "hr") {
+      close(false);
+      container().push({ type: "horizontalRule" });
+      return true;
+    }
     close(false);
     const heading = /^h([1-6])$/.exec(tag);
-    open(heading ? "heading" : "paragraph", heading ? Number(heading[1]) : 1, childPre);
-    let hasBlock = false;
-    for (const child of element.childNodes)
-      hasBlock = walk(child, childMarks, childPre) || hasBlock;
+    open(
+      heading ? "heading" : "paragraph",
+      heading ? Number(heading[1]) : 1,
+      child.pre,
+      child.align,
+    );
+    const hasBlock = children();
     // <p></p> is an empty line; a container such as <div><p>…</p></div> adds none.
-    close(!hasBlock && tag !== "hr" && !/^(ol|ul|dl|table|tbody|thead|tfoot|tr)$/.test(tag));
+    close(!hasBlock && !/^(ol|ul|dl|table|tbody|thead|tfoot|tr|li)$/.test(tag));
     return true;
   };
 
-  walk(parsed.body, new Set(), false);
+  walk(parsed.body, { marks: new Map(), pre: false, align: undefined });
   close(false);
-  return blocks.length ? { content: { type: "doc", content: blocks }, open: !sawBlock } : null;
+  while (stack.length > 1) pop();
+  const content = doc.content as BlockNode[];
+  return content.length
+    ? { content: { type: "doc", content } as unknown as DocJSON, open: !sawBlock }
+    : null;
 }

@@ -59,9 +59,13 @@ checklist in [testing/ime.md](testing/ime.md)):
     one editor, each opens its own dialog.
   - Relative links include `//host/path`, which goes to another site over the page's own
     protocol (allowed by the format; the protocol is still http or https).
-- HTML paste keeps what the schema held in 0.1.0: links keep their text, lists and table cells
-  become paragraphs, images and colors are dropped (7.8 maps them). A pasted plain-text URL
-  becomes a link.
+- HTML paste keeps paragraphs, headings, lists, rules, links, colors and alignment; table cells
+  become paragraphs, images are dropped. Word and Google Docs lists are read best effort, from
+  hand-written fixtures, not real captures. Pasted text colors equal to black or white and
+  highlights equal to white are dropped (defaults, or text from a dark page); colors on block
+  containers (a web page's colored sections) and a link's own underline and color are not
+  kept. A pasted
+  plain-text URL becomes a link.
 - Drag and drop of text does nothing.
 - Some Android keyboards insert paragraphs without the events the editor needs; such an edit is
   discarded with a `Foli:` console warning.

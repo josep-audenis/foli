@@ -3,10 +3,12 @@
 import { createDocument, createEditor, type DocJSON, parseContent } from "@folijs/core";
 import { afterEach, describe, expect, it } from "vitest";
 import googleDocs from "../fixtures/clipboard/google-docs.html?raw";
+import googleDocsLists from "../fixtures/clipboard/google-docs-lists.html?raw";
 import libreOffice from "../fixtures/clipboard/libreoffice.html?raw";
 import webPage from "../fixtures/clipboard/web-page.html?raw";
 import word from "../fixtures/clipboard/word.html?raw";
-import { FOLI_MIME, htmlToDoc, textToDoc } from "./clipboard.js";
+import wordLists from "../fixtures/clipboard/word-lists.html?raw";
+import { FOLI_MIME, htmlToDoc, parseColor, serializeRange, textToDoc } from "./clipboard.js";
 import { EditorView } from "./view.js";
 
 /** The parsed HTML after schema validation and normalization (what paste inserts). */
@@ -30,6 +32,23 @@ const t = (text: string, ...marks: string[]) => ({
   ...(marks.length ? { marks: marks.map((type) => ({ type })) } : {}),
 });
 const br = { type: "hardBreak" };
+const hr = { type: "horizontalRule" };
+const item = (...content: unknown[]) => ({ type: "listItem", content });
+const ul = (...items: unknown[]) => ({ type: "bulletList", content: items });
+const ol = (start: number, ...items: unknown[]) => ({
+  type: "orderedList",
+  ...(start !== 1 ? { attrs: { start } } : {}),
+  content: items,
+});
+const pa = (align: string, ...content: unknown[]) => ({
+  type: "paragraph",
+  attrs: { align },
+  ...(content.length ? { content } : {}),
+});
+/** Text with marks given as JSON (links, colors). */
+const tm = (text: string, ...marks: object[]) => ({ type: "text", text, marks });
+const link = (href: string) => ({ type: "link", attrs: { href } });
+const color = (type: string, value: string) => ({ type, attrs: { color: value } });
 
 describe("htmlToDoc fixtures", () => {
   it("reads Word HTML: classes, <o:p>, list bullets and conditional comments dropped", () => {
@@ -43,8 +62,37 @@ describe("htmlToDoc fixtures", () => {
         t(" held."),
       ),
       p(),
-      p(t("First "), t("point", "underline")),
+      ul(item(p(t("First "), t("point", "underline")))),
       p(t("Line one"), br, t("line two  end")),
+    ]);
+  });
+
+  it("reads Word lists: levels nest, numbers keep their start, colors, alignment, links", () => {
+    expect(parsed(wordLists)).toEqual([
+      ol(
+        3,
+        item(
+          p(t("Third step")),
+          ul(item(p(t("Detail "), tm("red", color("textColor", "#c00000"))))),
+        ),
+        item(p(t("Fourth step"))),
+        item(p(tm("Fifth", color("highlight", "#ffff00")))),
+      ),
+      pa("center", t("Centered black")),
+      // A link inside the source document (#…) keeps its text only.
+      p(tm("the report", link("https://example.com/report")), t(" and a heading")),
+    ]);
+  });
+
+  it("reads Google Docs lists: nested <ul> in <ul>, start, alignment, links, colors, rules", () => {
+    expect(parsed(googleDocsLists)).toEqual([
+      ul(
+        item(p(t("Alpha")), ul(item(p(tm("a link", link("https://example.com/x")))))),
+        item(pa("center", tm("Beta", color("highlight", "#ffff00")))),
+      ),
+      ol(2, item(p(t("Two", "bold")))),
+      hr,
+      pa("justify", tm("Red", color("textColor", "#ff0000"))),
     ]);
   });
 
@@ -70,15 +118,22 @@ describe("htmlToDoc fixtures", () => {
     const content = parsed(webPage);
     expect(content).toEqual([
       h(2, t("How to paste", "bold")),
-      p(t("Read the docs and use "), t("care", "bold"), t(", "), t("always", "italic"), t(".")),
-      p(t("Item one")),
-      p(t("Item two")),
+      p(
+        t("Read the "),
+        tm("docs", link("https://example.com/docs")),
+        t(" and use "),
+        t("care", "bold"),
+        t(", "),
+        t("always", "italic"),
+        t("."),
+      ),
+      ul(item(p(t("Item one"))), item(p(t("Item two")))),
       p(t("Nested "), t("div", "bold")),
       p(t("keep   these"), br, t("spaces")),
       p(t("Cell A")),
       p(t("Cell B")),
     ]);
-    expect(JSON.stringify(content)).not.toMatch(/alert|steal|never|onerror|https:/);
+    expect(JSON.stringify(content)).not.toMatch(/alert|steal|never|onerror/);
   });
 });
 
@@ -120,6 +175,177 @@ describe("htmlToDoc rules", () => {
   });
 });
 
+describe("htmlToDoc lists, links, colors, alignment", () => {
+  it("nests lists in items and in lists, starts numbers, gives items their first paragraph", () => {
+    expect(
+      parsed(
+        '<ol start="0"><li>a<ul><li>b</li></ul></li><li><h3>c</h3><p>d</p></li><li></li></ol>' +
+          "<ul><ul><li>deep</li></ul></ul><ul></ul><li>loose</li>",
+      ),
+    ).toEqual([
+      ol(0, item(p(t("a")), ul(item(p(t("b"))))), item(p(t("c")), p(t("d"))), item(p())),
+      ul(item(p(), ul(item(p(t("deep")))))),
+      p(t("loose")),
+    ]);
+    // A start the schema does not take is dropped, not the list.
+    expect(parsed('<ol start="-2"><li>x</li></ol><ol start="abc"><li>y</li></ol>')).toEqual([
+      ol(1, item(p(t("x")))),
+      ol(1, item(p(t("y")))),
+    ]);
+  });
+
+  it("keeps only safe links: unsafe protocols and in-page anchors keep their text", () => {
+    for (const href of [
+      "javascript:alert(1)",
+      " JavaScript:alert(1)",
+      "java\tscript:x",
+      "data:text/html,x",
+      "vbscript:x",
+      "#top",
+      "",
+    ]) {
+      expect(parsed(`<p><a href="${href}">x</a></p>`)).toEqual([p(t("x"))]);
+    }
+    expect(parsed('<p><a href=" https://a.test/b c ">x</a></p>')).toEqual([
+      p(tm("x", link("https://a.test/b%20c"))),
+    ]);
+    expect(parsed('<p><a href="mailto:a@b.co"><u>m</u></a></p>')).toEqual([
+      p(tm("m", link("mailto:a@b.co"))),
+    ]);
+  });
+
+  it("reads inline colors; black text, white highlight and transparent are defaults", () => {
+    expect(
+      parsed(
+        '<p><span style="color:#C00">a</span><span style="color: rgb(31, 95, 191)">b</span>' +
+          '<font color="green">c</font><span style="color:black">d</span>' +
+          '<span style="background-color: rgba(255, 255, 0, 1)">e</span>' +
+          '<span style="background-color:transparent">f</span><span style="background:#fff">g</span>' +
+          '<span style="color:windowtext">h</span></p>' +
+          '<div style="background:yellow;color:red"><p>block colors are layout</p></div>',
+      ),
+    ).toEqual([
+      p(
+        tm("a", color("textColor", "#cc0000")),
+        tm("b", color("textColor", "#1f5fbf")),
+        tm("c", color("textColor", "#008000")),
+        t("d"),
+        tm("e", color("highlight", "#ffff00")),
+        t("fgh"),
+      ),
+      p(t("block colors are layout")),
+    ]);
+  });
+
+  it("reads block alignment from text-align or align, inherited by blocks inside", () => {
+    expect(
+      parsed(
+        '<p style="text-align:right">r</p><p align="center">c</p><div style="text-align:justify">' +
+          '<p>j</p><h2 style="text-align:left">l</h2></div><p style="text-align:start">s</p>',
+      ),
+    ).toEqual([
+      pa("end", t("r")),
+      pa("center", t("c")),
+      pa("justify", t("j")),
+      h(2, t("l")),
+      p(t("s")),
+    ]);
+  });
+
+  it("parseColor refuses long and malformed values quickly (no backtracking)", () => {
+    const spaces = " ".repeat(3000);
+    const started = performance.now();
+    expect(parseColor(`rgb(1${spaces}1${spaces}1${spaces}!`)).toBeNull();
+    expect(parseColor(`rgb(1${" ".repeat(20)}1${" ".repeat(20)}1${" ".repeat(10)}!`)).toBeNull();
+    expect(performance.now() - started).toBeLessThan(50);
+    for (const bad of [
+      "rgb(1.2.3,0,0)",
+      "rgb(.,0,0)",
+      "rgb(1,2)",
+      "rgb(1,2,3,4,5)",
+      "rgb(a,b,c)",
+    ]) {
+      expect(parseColor(bad)).toBeNull();
+    }
+    expect(parseColor("rgb(300, -0, 12.6)")).toBeNull(); // "-0" is not a channel
+    expect(parseColor("rgb(300, 0, 12.6)")).toBe("#ff000d"); // clamped and rounded
+  });
+
+  it("a malformed color drops only that color, never the paste's structure", () => {
+    expect(parsed('<ul><li><font color="rgb(1.2.3,0,0)">x</font></li></ul>')).toEqual([
+      ul(item(p(t("x")))),
+    ]);
+  });
+
+  it("Outlook lists (mso-list on <li>) and Word paragraphs inside HTML lists stay one list", () => {
+    const style = "style='mso-list:l0 level1 lfo1'";
+    expect(
+      parsed(`<ul><li ${style}>a</li><li ${style}>b</li></ul><p>after</p><p>after2</p>`),
+    ).toEqual([ul(item(p(t("a"))), item(p(t("b")))), p(t("after")), p(t("after2"))]);
+    expect(parsed(`<ul><li><p ${style}>w</p></li><li>x</li></ul>`)).toEqual([
+      ul(item(p(t("w"))), item(p(t("x")))),
+    ]);
+  });
+
+  it("a numbered Word heading stays a heading; multi-level numbers are numbered lists", () => {
+    const marker = (text: string) => `<span style='mso-list:Ignore'>${text}</span>`;
+    expect(
+      parsed(
+        `<h1 style='mso-list:l0 level1 lfo1'>${marker("1.")}Intro</h1><p>body</p>` +
+          `<p style='mso-list:l1 level1 lfo2'>${marker("1.1.")}A</p>` +
+          `<p style='mso-list:l1 level2 lfo2'>${marker("1.2")}B</p>`,
+      ),
+    ).toEqual([h(1, t("Intro")), p(t("body")), ol(1, item(p(t("A")), ol(2, item(p(t("B"))))))]);
+  });
+
+  it("text after Word list paragraphs, empty nested lists, white text, start attributes", () => {
+    expect(
+      parsed(
+        "<div class=WordSection1><p style='mso-list:l0 level1 lfo1'>a</p>plain text<p>p</p></div>",
+      ),
+    ).toEqual([ul(item(p(t("a")))), p(t("plain text")), p(t("p"))]);
+    expect(parsed("<ul><ul></ul></ul><p>x</p>")).toEqual([p(t("x"))]);
+    expect(parsed('<p><span style="color:#fff">dark page</span></p>')).toEqual([p(t("dark page"))]);
+    expect(
+      parsed('<ol start=""><li>a</li></ol><ol start><li>b</li></ol><ol start="7x"><li>c</li></ol>'),
+    ).toEqual([ol(1, item(p(t("a")))), ol(1, item(p(t("b")))), ol(7, item(p(t("c"))))]);
+  });
+
+  it("parseColor reads hex, rgb() and basic names; others are null", () => {
+    expect(parseColor("#ABC")).toBe("#aabbcc");
+    expect(parseColor(" #A1b2C3 ")).toBe("#a1b2c3");
+    expect(parseColor("rgb(255,0,128)")).toBe("#ff0080");
+    expect(parseColor("rgb(255 0 128 / 50%)")).toBe("#ff0080");
+    expect(parseColor("rgba(1, 2, 3, 0)")).toBeNull();
+    expect(parseColor("Navy")).toBe("#000080");
+    for (const value of ["", "transparent", "windowtext", "inherit", "#12345", "hsl(0,0%,0%)"]) {
+      expect(parseColor(value)).toBeNull();
+    }
+  });
+
+  it("copy writes HTML that reads back as the same document", () => {
+    const content = [
+      pa("center", t("Title", "bold")),
+      ol(
+        4,
+        item(
+          p(
+            tm("link", link("https://a.test/")),
+            t(" and "),
+            tm("red", color("textColor", "#c00000")),
+          ),
+          ul(item(p(tm("lit", color("highlight", "#fff59d"))))),
+        ),
+      ),
+      hr,
+      pa("justify", t("end")),
+    ];
+    const doc = parseContent({ type: "doc", content } as DocJSON);
+    const { html } = serializeRange(doc, 0, doc.content.size, document);
+    expect(parsed(html)).toEqual(content);
+  });
+});
+
 describe("htmlToDoc page breaks", () => {
   const pb = { type: "pageBreak" };
   it("reads Word's and Foli's page-break <br>", () => {
@@ -147,7 +373,7 @@ describe("htmlToDoc page breaks", () => {
   });
 
   it("keeps an ordinary <br> and <hr> what they were", () => {
-    expect(parsed("<p>a<br>b</p><hr><p>c</p>")).toEqual([p(t("a"), br, t("b")), p(t("c"))]);
+    expect(parsed("<p>a<br>b</p><hr><p>c</p>")).toEqual([p(t("a"), br, t("b")), hr, p(t("c"))]);
   });
 });
 
@@ -160,6 +386,19 @@ describe("textToDoc", () => {
     ]);
   });
 });
+
+/** How many nodes of type `name` are in `node`. */
+function count(
+  node: { descendants(f: (node: { type: { name: string } }) => boolean | undefined): void },
+  name: string,
+): number {
+  let found = 0;
+  node.descendants((child) => {
+    if (child.type.name === name) found++;
+    return undefined;
+  });
+  return found;
+}
 
 describe("EditorView clipboard", () => {
   let view: EditorView | undefined;
@@ -344,6 +583,129 @@ describe("EditorView clipboard", () => {
       }),
     );
     expect(blocks(editor)).toEqual([p(t("click"))]);
+  });
+
+  it("T3: every fixture pastes at every text position without corrupting the document", {
+    timeout: 60_000,
+  }, () => {
+    const fixtures = [word, wordLists, googleDocs, googleDocsLists, libreOffice, webPage];
+    const targets = [
+      doc(p(t("ab")), h(2, t("cd"))),
+      doc(ul(item(p(t("ab")), p()), item(p(t("cd")), ol(1, item(p(t("ef"))))))),
+      doc(p(), hr, p(t("gh"))),
+    ];
+    let pastes = 0;
+    for (const html of fixtures) {
+      // Each pasted textblock's text must be in the result, in one piece.
+      const pieces: string[] = [];
+      const pasted = parseContent(htmlToDoc(html) as DocJSON);
+      pasted.descendants((node) => {
+        if (node.isTextblock && node.textContent) pieces.push(node.textContent);
+        return !node.isTextblock;
+      });
+      for (const target of targets) {
+        const { editor, view } = mount(target);
+        const positions: number[] = [];
+        editor.state.doc.descendants((node, pos) => {
+          if (node.isTextblock)
+            for (let i = 0; i <= node.content.size; i++) positions.push(pos + 1 + i);
+        });
+        for (const at of positions) {
+          const before = editor.state.doc;
+          editor.select(at);
+          expect(view.paste(data({ "text/html": html }))).toBe(true);
+          editor.state.doc.check();
+          for (const piece of pieces) expect(editor.state.doc.textContent).toContain(piece);
+          // No list item, rule or page break of the paste is lost (lists may merge).
+          for (const name of ["listItem", "horizontalRule", "pageBreak"]) {
+            expect(count(editor.state.doc, name)).toBeGreaterThanOrEqual(
+              count(before, name) + count(pasted, name),
+            );
+          }
+          editor.commands.undo();
+          expect(editor.state.doc.eq(before)).toBe(true);
+          pastes++;
+        }
+        view.destroy();
+      }
+    }
+    expect(pastes).toBeGreaterThan(100);
+  });
+
+  it("pastes a list into a paragraph: split around it, at its start or end; undo restores", () => {
+    const list = "<ul><li>a</li><li>b</li></ul>";
+    const pastedList = ul(item(p(t("a"))), item(p(t("b"))));
+    const cases: [number, unknown[]][] = [
+      [2, [p(t("x")), pastedList, p(t("y"))]],
+      [1, [pastedList, p(t("xy"))]],
+      [3, [p(t("xy")), pastedList]],
+    ];
+    for (const [at, after] of cases) {
+      const { editor, view } = mount(doc(p(t("xy"))));
+      editor.select(at);
+      expect(view.paste(data({ "text/html": list }))).toBe(true);
+      expect(blocks(editor)).toEqual(after);
+      expect(editor.state.selection.$from.parent.textContent).toBe("b"); // after the paste
+      editor.commands.undo();
+      expect(blocks(editor)).toEqual([p(t("xy"))]);
+      view.destroy();
+    }
+  });
+
+  it("pastes a list into a list item as sibling items (an empty item is replaced)", () => {
+    const list = "<ol><li>a</li><li>b</li></ol>";
+    const into = (blocksBefore: unknown[], at: number) => {
+      const { editor, view } = mount(doc(...blocksBefore));
+      editor.select(at);
+      expect(view.paste(data({ "text/html": list }))).toBe(true);
+      const result = blocks(editor);
+      view.destroy();
+      return result;
+    };
+    const a = item(p(t("a")));
+    const b = item(p(t("b")));
+    expect(into([ul(item(p(t("xy"))))], 4)).toEqual([ul(item(p(t("x"))), a, b, item(p(t("y"))))]);
+    expect(into([ul(item(p(t("xy"))))], 5)).toEqual([ul(item(p(t("xy"))), a, b)]);
+    expect(into([ul(item(p(t("xy"))))], 3)).toEqual([ul(a, b, item(p(t("xy"))))]);
+    expect(into([ul(item(p(t("xy"))), item(p()))], 9)).toEqual([ul(item(p(t("xy"))), a, b)]);
+  });
+
+  it("pastes a lone rule; items after a nested list's parent; between an item's blocks", () => {
+    const rule = mount(doc(p(t("xy"))));
+    rule.editor.select(2);
+    expect(rule.view.paste(data({ "text/html": "<hr>" }))).toBe(true);
+    expect(blocks(rule.editor)).toEqual([p(t("x")), hr, p(t("y"))]);
+    rule.view.destroy();
+    // At the end of an item's first paragraph, the item going on with a nested list.
+    const nested = mount(doc(ul(item(p(t("x")), ul(item(p(t("sub"))))))));
+    nested.editor.select(4);
+    expect(nested.view.paste(data({ "text/html": "<ul><li>a</li></ul>" }))).toBe(true);
+    expect(blocks(nested.editor)).toEqual([
+      ul(item(p(t("x")), ul(item(p(t("sub"))))), item(p(t("a")))),
+    ]);
+    nested.view.destroy();
+    // At the start of an item's second paragraph: the item splits between its paragraphs.
+    const second = mount(doc(ul(item(p(t("x")), p(t("y"))))));
+    second.editor.select(6);
+    expect(second.view.paste(data({ "text/html": "<ul><li>a</li></ul>" }))).toBe(true);
+    expect(blocks(second.editor)).toEqual([ul(item(p(t("x"))), item(p(t("a"))), item(p(t("y"))))]);
+  });
+
+  it("keeps an item's first paragraph first, replaces an empty nested one, keeps rules", () => {
+    const start = mount(doc(ul(item(p(t("xy"))))));
+    start.editor.select(3); // the start of the item's (first) paragraph
+    expect(start.view.paste(data({ "text/html": "<hr><ul><li>b</li></ul>" }))).toBe(true);
+    expect(blocks(start.editor)).toEqual([ul(item(p(), hr, ul(item(p(t("b")))), p(t("xy"))))]);
+    start.view.destroy();
+    const nested = mount(doc(ul(item(p(t("x")), p()))));
+    nested.editor.select(6); // in the empty second paragraph
+    expect(nested.view.paste(data({ "text/html": "<p>A</p><ul><li>b</li></ul>" }))).toBe(true);
+    expect(blocks(nested.editor)).toEqual([ul(item(p(t("x")), p(t("A")), ul(item(p(t("b"))))))]);
+    // A rule pasted with text into a paragraph's middle stays a rule.
+    const middle = mount(doc(p(t("xy"))));
+    middle.editor.select(2);
+    expect(middle.view.paste(data({ "text/html": "<p>A</p><hr><p>B</p>" }))).toBe(true);
+    expect(blocks(middle.editor)).toEqual([p(t("xA")), hr, p(t("By"))]);
   });
 
   it("pastes plain text with the marks typing would get, over a selection", () => {

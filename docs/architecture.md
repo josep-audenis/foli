@@ -154,10 +154,8 @@ Foli's own (see `THIRD_PARTY_NOTICES.md`).
   `handleKey`, `select`, `getDocument`, `setDocument` and `subscribe`.
 
 Known limits:
-- No general slice fitting: paste (Phase 4.3) joins open content or replaces an empty textblock
-  with whole blocks; fitting blocks into nested structures comes with lists (Phase 7).
-- Paste of lists, links and colors from HTML is 7.8 (a pasted plain-text URL already becomes a
-  link, 7.6).
+- No general slice fitting: paste joins open content, replaces an empty textblock with whole
+  blocks, and fits lists and rules as whole blocks at the caret (7.8); see Clipboard below.
 - Each unrecorded change (and each plugin reaction to undo/redo) rebases the stored history.
   This costs O(n²) in the number of stored steps (not events), and every step is re-applied to the
   document, which also scales with document size.
@@ -393,17 +391,17 @@ Known limits:
   deletes. The fallback is tested only with synthetic events; whether every engine gives a
   target range for line deletes (macOS Cmd+Backspace, Ctrl+K) is part of the manual checks.
 - Drag and drop does nothing (both the drop and the drag source are prevented).
-- Paste keeps only schema v1: links keep their text, lists and table cells become paragraphs,
-  images and colors are dropped. The fixture corpus is hand-written approximations; real Word,
-  Google Docs and LibreOffice captures are part of the open manual checks (ADR-0003).
-- Content the schema cannot fit at the selection is not pasted (only possible once nested
-  blocks exist).
+- Paste maps HTML to schema v2 (7.8): tables become paragraphs and images are dropped. Word
+  and Google Docs list markup is read best effort. The fixture corpus is hand-written
+  approximations; real Word, Google Docs and LibreOffice captures are part of the open manual
+  checks (ADR-0003).
+- Content the schema cannot fit at the selection, neither as a slice nor as whole blocks, is
+  not pasted (no case known: the T3 sweep pastes every fixture at every text position).
 - The placeholder stylesheet is added when a placeholder is first shown, to the host's shadow
   root or the document head; a host moved into a shadow root after that keeps no styles there.
 - The placeholder stylesheet is an inline `<style>`: a Content Security Policy without
   `'unsafe-inline'` for styles blocks it, and the placeholder is not shown (`aria-placeholder`
   still is announced).
-- Assumes schema v1 depth (doc > textblock > inline).
 - `setDocument` during an IME composition is not handled: the composition's read-back would
   compare the browser's DOM with the new document. Load documents when the user is not
   composing (a file picker or a button click already ends it).
@@ -430,18 +428,39 @@ Known limits:
   - **Closed** content (whole blocks) pasted into an empty textblock replaces it, so a pasted
     heading stays a heading. Elsewhere its first and last blocks join the text around the
     selection; text after the selection then ends up in the last pasted block (ProseMirror's
-    open-slice behaviour).
+    open-slice behaviour). Where the schema refuses that slice (a list pasted into a
+    paragraph), the blocks go in whole (`insertBlocks`): a single list pasted into a list item
+    joins that list (its items replace an empty item, or go before, after or between the
+    item's halves); other blocks go before or after the caret's textblock, or replace it when
+    empty, where its parent takes them (a list item's first paragraph stays first), else
+    between its two halves.
   - A paste starts a new undo step; typing right after it (within the 500 ms grouping window)
     joins that step.
 - **HTML reader** (`htmlToDoc`): the HTML is parsed with `DOMParser` into an inert document and
-  never inserted. Known block tags become paragraphs or headings; `b/strong`, `i/em`, `u/ins`,
+  never inserted. It builds blocks on a stack of containers. Known block tags become paragraphs
+  or headings, with their `text-align` (or `align`), inherited by blocks inside; `ul`/`ol`/`li`
+  become lists at any depth (`start` kept when the schema takes it; a list directly inside a
+  list, as Google Docs writes nesting, goes into the previous item; an item gets a first
+  paragraph when it has none, a heading becoming one); `hr` is a rule. Each list and item
+  closes everything opened inside it, so unbalanced markup cannot leak into what follows.
+  Word's list paragraphs (`<p style="mso-list:lN levelM">`, not headings, not inside an HTML
+  list) become nested lists by level, numbered when their marker (the `mso-list:Ignore` span)
+  ends in "." or ")" or is multi-level ("1.2"), starting at its last number. `a[href]` is a link when
+  the href is safe (`isSafeHref`, after trimming and encoding spaces; `#…` anchors into the
+  source document are dropped); inline `color`, `<font color>` and `background-color` become
+  text color and highlight (hex, `rgb()` read by splitting, not a backtracking pattern, basic
+  names; black text and white highlight are the defaults and dropped, white text too (dark
+  pages), system colors such as `windowtext` and malformed values ignored), only on inline elements: a
+  page's colored containers are layout. A link's underline and color are its look, dropped.
+  `b/strong`, `i/em`, `u/ins`,
   `s/strike/del` and inline `font-weight`, `font-style` and `text-decoration` become marks
   (Google Docs' `<b style="font-weight:normal">` wrapper is honoured; a child's
   `text-decoration: none` keeps the parent's line, as in CSS). Whitespace collapses as in HTML
   layout, except in `pre` and `white-space: pre*`; non-breaking spaces become spaces. Hidden
   text (`display: none`, `hidden`, Word's `mso-hide: all`), scripts, styles, images, media, form
-  controls, Word's list bullets and empty `<o:p>` are dropped; everything else keeps only its
-  text. Fixtures: `packages/view/fixtures/clipboard/`.
+  controls, Word's list markers and empty `<o:p>` are dropped; everything else keeps only its
+  text. Copy writes the same structures (lists with `start`, links, colors, alignment, rules),
+  so Foli's HTML reads back as the same document. Fixtures: `packages/view/fixtures/clipboard/`.
 
 ## Packages
 

@@ -9,7 +9,6 @@ import {
   type ResolvedPos,
   Slice,
 } from "../model/index.js";
-import { TransformError } from "../transform/transform.js";
 import { attempt } from "./attempt.js";
 import { redo, undo } from "./history.js";
 import { openLinkEditor } from "./links.js";
