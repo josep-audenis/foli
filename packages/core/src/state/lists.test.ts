@@ -21,16 +21,28 @@ function editorWith(...blocks: NodeJSON[]): Editor {
 }
 const json = (editor: Editor) => editor.getDocument().content.content;
 
-/** Puts the caret in the text `text`, `offset` characters in (end by default). */
-function caretIn(editor: Editor, text: string, offset = text.length): void {
+/** The position `offset` characters into the text `text` (end by default). */
+function textPos(editor: Editor, text: string, offset = text.length): number {
   let found = -1;
   editor.state.doc.descendants((node, pos) => {
     if (found < 0 && node.isText && node.text === text) found = pos + offset;
     return found < 0;
   });
   if (found < 0) throw new Error(`no text ${text}`);
-  editor.select(found);
+  return found;
 }
+
+/** Puts the caret in the text `text`, `offset` characters in (end by default). */
+function caretIn(editor: Editor, text: string, offset = text.length): void {
+  editor.select(textPos(editor, text, offset));
+}
+
+/** Selects from the start of the text `from` to the end of the text `to`. */
+function selectTexts(editor: Editor, from: string, to: string): void {
+  editor.select(textPos(editor, from, 0), textPos(editor, to));
+}
+
+const hr: NodeJSON = { type: "horizontalRule" };
 
 /** Runs `act`, checks the result, then undo restores the exact document and selection. */
 function expectUndoable(editor: Editor, act: () => boolean, after: NodeJSON[]): void {
@@ -140,7 +152,7 @@ describe("list commands", () => {
     expectUndoable(editor, () => editor.handleKey("Shift-Tab"), [
       ol(item(p("a"))),
       p("b"),
-      ol(item(p("c"))),
+      { type: "orderedList", attrs: { start: 2 }, content: [item(p("c"))] },
     ]);
   });
 
@@ -179,6 +191,99 @@ describe("list commands", () => {
     caretIn(only, "x");
     expect(only.handleKey("Delete")).toBe(true);
     expect(json(only)).toEqual([p("xy")]);
+  });
+
+  it("Delete at the end of an item's last block pulls in what follows the item", () => {
+    const items = editorWith(ul(item(p("a")), item(p("b"))));
+    caretIn(items, "a");
+    expectUndoable(items, () => items.handleKey("Delete"), [ul(item(p("ab")))]);
+    const twoBlocks = editorWith(ul(item(p("a"), p("c")), item(p("b"))));
+    caretIn(twoBlocks, "c");
+    expectUndoable(twoBlocks, () => twoBlocks.handleKey("Delete"), [ul(item(p("a"), p("cb")))]);
+    // The last item of a (nested) list: the paragraph after the list comes in.
+    const after = editorWith(ul(item(p("a"), ul(item(p("b"))))), p("c"));
+    caretIn(after, "b");
+    expectUndoable(after, () => after.handleKey("Delete"), [ul(item(p("a"), ul(item(p("bc")))))]);
+    // A rule after the list is deleted; at the end of the document nothing happens.
+    const rule = editorWith(ul(item(p("a"))), hr);
+    caretIn(rule, "a");
+    expectUndoable(rule, () => rule.handleKey("Delete"), [ul(item(p("a")))]);
+    const last = editorWith(ul(item(p("a"))));
+    caretIn(last, "a");
+    expect(last.handleKey("Delete")).toBe(false);
+  });
+
+  it("Backspace after a list that ends with a rule deletes the rule", () => {
+    const editor = editorWith(ul(item(p("a"), hr)), p("b"));
+    caretIn(editor, "b", 0);
+    expectUndoable(editor, () => editor.handleKey("Backspace"), [ul(item(p("a"))), p("b")]);
+  });
+
+  it("toggleList off a range lifts only the lists of that type it touches, innermost first", () => {
+    // From a nested numbered item into the bulleted list around it: the bullets stay.
+    const mixed = editorWith(ul(item(p("a"), ol(item(p("b")))), item(p("c"))));
+    selectTexts(mixed, "b", "c");
+    expect(listTypeAt(mixed.state)?.name).toBe("orderedList");
+    expectUndoable(mixed, () => mixed.commands.toggleList("orderedList"), [
+      ul(item(p("a")), item(p("b")), item(p("c"))),
+    ]);
+    // Everything selected: nested lists of the type go too.
+    const nested = editorWith(ol(item(p("a"), ol(item(p("b")))), item(p("c"))));
+    nested.commands.selectAll();
+    expectUndoable(nested, () => nested.commands.toggleList("orderedList"), [
+      p("a"),
+      p("b"),
+      p("c"),
+    ]);
+    const outer = editorWith(ol(item(p("a"), ol(item(p("b"))))));
+    selectTexts(outer, "a", "b");
+    expectUndoable(outer, () => outer.commands.toggleList("orderedList"), [p("a"), p("b")]);
+  });
+
+  it("toggleList off and Shift+Tab work on a selection that runs past the list", () => {
+    const editor = editorWith(ul(item(p("a"))), p("b"));
+    selectTexts(editor, "a", "b");
+    expectUndoable(editor, () => editor.commands.toggleList("bulletList"), [p("a"), p("b")]);
+    const all = editorWith(ul(item(p("a")), item(p("b"))), p("c"));
+    all.commands.selectAll();
+    expectUndoable(all, () => all.handleKey("Shift-Tab"), [p("a"), p("b"), p("c")]);
+    expectUndoable(all, () => all.commands.toggleList("bulletList"), [p("a"), p("b"), p("c")]);
+  });
+
+  it("lifting items out of a numbered list keeps the numbers after them", () => {
+    const editor = editorWith({
+      type: "orderedList",
+      attrs: { start: 5 },
+      content: [item(p("a")), item(p("b")), item(p("c"))],
+    });
+    caretIn(editor, "b");
+    expectUndoable(editor, () => editor.handleKey("Shift-Tab"), [
+      { type: "orderedList", attrs: { start: 5 }, content: [item(p("a"))] },
+      p("b"),
+      { type: "orderedList", attrs: { start: 6 }, content: [item(p("c"))] },
+    ]);
+    // Past the largest start, the list after them starts where the list did.
+    const big = editorWith({
+      type: "orderedList",
+      attrs: { start: 99_999 },
+      content: [item(p("a")), item(p("b")), item(p("c"))],
+    });
+    caretIn(big, "b");
+    expect(big.handleKey("Shift-Tab")).toBe(true);
+    expect(json(big)[2]).toEqual({
+      type: "orderedList",
+      attrs: { start: 99_999 },
+      content: [item(p("c"))],
+    });
+  });
+
+  it("Enter over a range across items deletes it, then splits the item", () => {
+    const editor = editorWith(ul(item(p("ab")), item(p("cd"))));
+    editor.select(textPos(editor, "ab", 1), textPos(editor, "cd", 1));
+    expectUndoable(editor, () => editor.handleKey("Enter"), [ul(item(p("a")), item(p("d")))]);
+    expect(editor.handleKey("Enter")).toBe(true);
+    expect(editor.state.selection.empty).toBe(true);
+    expect(editor.state.selection.$from.parent.textContent).toBe("d");
   });
 
   it("Mod-Shift-7 and Mod-Shift-8 toggle numbered and bulleted lists", () => {
@@ -232,6 +337,12 @@ describe("list editing properties (2,000 runs)", () => {
       "type",
     ),
     at: fc.noBias(fc.integer({ min: 0, max: 1000 })),
+    // A range to another point, or everything selected, or a caret.
+    to: fc.oneof(
+      fc.constant(undefined),
+      fc.constant("all" as const),
+      fc.noBias(fc.integer({ min: 0, max: 1000 })),
+    ),
   });
 
   it("every list key keeps the document valid; undo restores it exactly; redo the result", () => {
@@ -241,9 +352,11 @@ describe("list editing properties (2,000 runs)", () => {
         const editor = editorWith(...blocks);
         const initial = editor.state.doc;
         for (const k of keys) {
-          // A caret inside text, chosen from the fraction.
+          // A caret or range, chosen from the fractions, or everything.
           const size = editor.state.doc.content.size;
-          editor.select(Math.round((k.at / 1000) * size));
+          const at = (fraction: number) => Math.round((fraction / 1000) * size);
+          if (k.to === "all") editor.commands.selectAll();
+          else editor.select(at(k.at), k.to === undefined ? at(k.at) : at(k.to));
           const before = editor.state.doc;
           if (k.name === "type") editor.commands.insertText("x");
           else editor.handleKey(k.name);

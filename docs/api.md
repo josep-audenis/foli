@@ -53,8 +53,8 @@ selection and scrolls it into view).
 ### `<FoliToolbar>`
 
 The default toolbar: bold, italic, underline, strikethrough · paragraph, H1–H3 · bulleted list,
-numbered list (pressed inside one), decrease and increase indent · undo, redo · page break. A WAI-ARIA toolbar: one Tab stop, arrow keys, Home and End move between buttons;
-toggle buttons have `aria-pressed`; buttons stay focusable when disabled (`aria-disabled`).
+numbered list (pressed inside one), decrease and increase indent · undo, redo · page break.
+A WAI-ARIA toolbar: one Tab stop, arrow keys, Home and End move between buttons; toggle buttons have `aria-pressed`; buttons stay focusable when disabled (`aria-disabled`).
 Clicking a button keeps the document's selection.
 
 | Prop             | Type         | Default        | Notes                                                               |
@@ -122,8 +122,9 @@ settings are not, so pass a document from `parseDocument` or `createDocument`.
 
 Headings: `setBlockType("heading", { level: 2 })`; back to text: `setBlockType("paragraph")`.
 Lists: `commands.toggleList("bulletList" | "orderedList", attrs?)` (wraps the selection, changes
-the list's type, or takes the items out), `wrapInList(type, attrs?)`, `indentListItem()` and
-`outdentListItem()` (Tab and Shift+Tab). Each list change is its own undo step.
+the list's type, or takes the selected items out of every list of that type they are in),
+`wrapInList(type, attrs?)`, `indentListItem()` and `outdentListItem()` (Tab and Shift+Tab). Each
+list change is its own undo step.
 
 ### Commands
 

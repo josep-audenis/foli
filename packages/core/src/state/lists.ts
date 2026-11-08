@@ -2,6 +2,7 @@
 // independent implementation on Foli's model.
 import {
   type Attrs,
+  FoliDocumentError,
   Fragment,
   type Node,
   NodeRange,
@@ -47,12 +48,61 @@ function apply(
   return true;
 }
 
-/** The range of whole list items the selection covers (in text), or null outside a list. */
+/**
+ * The range of whole list items the selection covers (in text), or null outside a list. A
+ * selection that runs past the innermost list around its start is cut at that list's end.
+ */
 function itemRange(state: EditorState, item: NodeType): NodeRange | null {
   const $from = textStart(state);
   const { $to } = state.selection;
-  const $end = $to.parent.inlineContent ? $to : Selection.near($to, -1).$to;
+  let $end = $to.parent.inlineContent ? $to : Selection.near($to, -1).$to;
+  const depth = listDepth($from, item);
+  if (depth >= 0 && $end.pos > $from.end(depth)) {
+    $end = Selection.near(state.doc.resolve($from.end(depth)), -1).$to;
+  }
   return $from.blockRange($end, (node) => node.childCount > 0 && node.firstChild?.type === item);
+}
+
+interface FoundList {
+  list: Node;
+  pos: number;
+  depth: number;
+}
+
+/**
+ * The items of the innermost list of `type` that the text between `from` and `to` touches, or
+ * null when no list of `type` does.
+ */
+function innermostListRange(
+  doc: Node,
+  from: number,
+  to: number,
+  type: NodeType,
+  item: NodeType,
+): NodeRange | null {
+  let found: FoundList | null = null as FoundList | null;
+  doc.nodesBetween(from, to, (node, pos) => {
+    if (node.isTextblock) return false;
+    if (node.type === type && isList(node, item)) {
+      const depth = doc.resolve(pos).depth;
+      if (!found || depth > found.depth) found = { list: node, pos, depth };
+    }
+    return undefined;
+  });
+  if (!found) return null;
+  const { list, pos, depth } = found;
+  let first = -1;
+  let last = -1;
+  list.forEach((child, offset) => {
+    const start = pos + 1 + offset;
+    const end = start + child.nodeSize;
+    if (start < to && end > from) {
+      if (first < 0) first = start;
+      last = end;
+    }
+  });
+  if (first < 0) return null;
+  return new NodeRange(doc.resolve(first + 1), doc.resolve(last - 1), depth + 1);
 }
 
 /** The depth of the innermost list around `$pos`, or -1. */
@@ -90,6 +140,7 @@ export function wrapInList(listType: string | NodeType, attrs: Attrs | null = nu
     const range = $from.blockRange($to);
     const wrappers = range && findWrapping(range, type, attrs);
     if (!range || !wrappers) return false;
+    if (!dispatch) return true; // a dry run (the toolbar) builds nothing
     return apply(state, dispatch, (tr) => {
       tr.wrap(range, wrappers);
       return true;
@@ -106,9 +157,8 @@ export function splitListItem(itemType?: string | NodeType): Command {
   return (state, dispatch) => {
     const item = itemType ? nodeTypeOf(state, itemType) : itemTypeOf(state);
     const { $from, $to } = state.selection;
-    if (!item || $from.depth < 2 || !$from.sameParent($to) || !$from.parent.isTextblock) {
-      return false;
-    }
+    if (item && !$from.sameParent($to)) return splitAfterDelete(state, dispatch, item);
+    if (!item || $from.depth < 2 || !$from.parent.isTextblock) return false;
     if ($from.node(-1).type !== item) return false;
     if (!$from.parent.content.size && $from.node(-1).childCount === $from.indexAfter(-1)) {
       // An empty last block: the whole item, or a trailing empty paragraph in it.
@@ -132,6 +182,33 @@ export function splitListItem(itemType?: string | NodeType): Command {
       return true;
     });
   };
+}
+
+/** Enter over a range across blocks: deletes it, then splits the list item where it was. */
+function splitAfterDelete(
+  state: EditorState,
+  dispatch: ((tr: Transaction) => void) | undefined,
+  item: NodeType,
+): boolean {
+  const tr = state.tr;
+  try {
+    tr.deleteSelection();
+  } catch (error) {
+    if (error instanceof TransformError) return false;
+    throw error;
+  }
+  const deleted = state.apply(tr);
+  if (!deleted.selection.$from.sameParent(deleted.selection.$to)) return false;
+  const splits: Transaction[] = [];
+  if (!splitListItem(item)(deleted, (split) => splits.push(split))) return false;
+  const split = splits[0];
+  if (dispatch && split) {
+    for (const step of split.steps) tr.step(step);
+    const { from, to } = split.selection;
+    tr.setSelection(TextSelection.create(tr.doc, from, to));
+    dispatch(tr.setMeta(closeHistory, true));
+  }
+  return true;
 }
 
 /**
@@ -183,6 +260,7 @@ function liftToOuterList(tr: Transaction, item: NodeType, initial: NodeRange): b
 
 function liftOutOfList(tr: Transaction, range: NodeRange): boolean {
   const list = range.parent;
+  const rest = continuation(list, range.startIndex);
   // Merge the lifted items into one, so that one lift takes their content out.
   for (let pos = range.end, i = range.endIndex - 1; i > range.startIndex; i--) {
     pos -= list.child(i).nodeSize;
@@ -215,7 +293,7 @@ function liftOutOfList(tr: Transaction, range: NodeRange): boolean {
       end - 1,
       new Slice(
         (atStart ? Fragment.empty : Fragment.from(list.copy(Fragment.empty))).append(
-          atEnd ? Fragment.empty : Fragment.from(list.copy(Fragment.empty)),
+          atEnd ? Fragment.empty : Fragment.from(rest),
         ),
         atStart ? 0 : 1,
         atEnd ? 0 : 1,
@@ -225,6 +303,21 @@ function liftOutOfList(tr: Transaction, range: NodeRange): boolean {
     ),
   );
   return true;
+}
+
+/**
+ * The (empty) list that goes on after items lifted out of `list`: a numbered list goes on
+ * counting from the items before the lifted ones (as word processors do).
+ */
+function continuation(list: Node, before: number): Node {
+  const start = list.attrs.start;
+  if (typeof start !== "number" || before === 0) return list.copy(Fragment.empty);
+  try {
+    return list.type.createOpen({ ...list.attrs, start: start + before });
+  } catch (error) {
+    if (error instanceof FoliDocumentError) return list.copy(Fragment.empty);
+    throw error;
+  }
 }
 
 /** Tab: nests the selected list items in the item before them (a sublist of the same type). */
@@ -288,18 +381,26 @@ export function toggleList(listType: string | NodeType, attrs: Attrs | null = nu
         return true;
       });
     }
-    // Out of every level of lists of this type around the selection, in one undo step.
+    // Out of every list of this type the selection touches (innermost first, so items of an
+    // outer list that are not selected stay), in one undo step.
     return apply(state, dispatch, (tr) => {
       let lifted = false;
-      for (let guard = 0; guard < 32; guard++) {
+      // shortcut: one pass per list level and list touched (each re-resolves the document);
+      // fine for documents of a few hundred lists, batch the passes if that ever shows up.
+      for (let guard = 0; guard < 10_000; guard++) {
         const current = state.apply(tr);
-        const $at = textStart(current);
-        const at = listDepth($at, item);
-        if (at < 0 || $at.node(at).type !== type) break;
-        const appended = (next: Transaction) => {
-          for (const step of next.steps) tr.step(step);
-        };
-        if (!liftListItem(item)(current, appended)) break;
+        const { from, to } = current.selection;
+        const range = innermostListRange(current.doc, from, to, type, item);
+        if (!range) break;
+        const pass = current.tr;
+        const nested = range.depth > 0 && range.$from.node(range.depth - 1).type === item;
+        try {
+          if (!(nested ? liftToOuterList(pass, item, range) : liftOutOfList(pass, range))) break;
+        } catch (error) {
+          if (error instanceof TransformError) break;
+          throw error;
+        }
+        for (const step of pass.steps) tr.step(step);
         lifted = true;
       }
       return lifted;

@@ -124,11 +124,17 @@ Foli's own (see `THIRD_PARTY_NOTICES.md`).
   - Lists (7.5, `state/lists.ts`): `toggleList`, `wrapInList`, `splitListItem` (Enter; on an
     empty item, lift it), `sinkListItem` (Tab: into a sublist of the item before, joining one
     that ends it), `liftListItem` (Shift+Tab: into the outer list, or out of a top-level list,
-    splitting it), `liftListItemAtStart` (Backspace at an item's start). `listKeymap()` binds
-    them before `baseKeymap()`; Tab outside a list is not taken. Each list change closes the
-    history event before it (own undo step). `joinBackward` after a list joins into its last
-    textblock; `joinForward` before one pulls its first textblock in (removing the item, and
-    the list, it leaves empty), unless the item goes on with more blocks.
+    splitting it; a numbered list after the lifted items goes on counting),
+    `liftListItemAtStart` (Backspace at an item's start). A selection that runs past the list
+    around its start is cut at that list's end. `toggleList` off lifts the items of the
+    innermost list of its type the selection touches, again until none is left (items of an
+    outer list that are not selected stay). Enter over a range across items deletes it, then
+    splits. `listKeymap()` binds them before `baseKeymap()`; Tab outside a list is not taken.
+    Each list change closes the history event before it (own undo step). `joinBackward` after
+    a list joins into its last textblock (or deletes a rule ending it); `joinForward` before
+    one, or at the end of an item's last block (the next item, or what follows the list),
+    pulls the next first textblock in (removing the item, and the list, it leaves empty),
+    unless that item goes on with more blocks.
 - **Headless editor**: `createEditor({ document })` returns `commands.*`, `run`, `can`,
   `handleKey`, `select`, `getDocument`, `setDocument` and `subscribe`.
 

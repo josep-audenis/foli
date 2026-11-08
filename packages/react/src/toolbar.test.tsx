@@ -119,6 +119,13 @@ describe("FoliToolbar", () => {
     const { editor } = setup();
     const pressed = (name: string) => button(name).getAttribute("aria-pressed");
     const disabled = (name: string) => button(name).getAttribute("aria-disabled");
+    // A heading cannot become a list item: the list buttons are disabled there.
+    act(() => editor.select(2));
+    act(() => button("H1").click());
+    expect(disabled("Bulleted list")).toBe("true");
+    expect(disabled("Numbered list")).toBe("true");
+    act(() => button("H1").click());
+    expect(disabled("Bulleted list")).toBeNull();
     act(() => editor.select(2, 15)); // both paragraphs
     expect(disabled("Increase indent")).toBe("true");
     expect(disabled("Decrease indent")).toBe("true");

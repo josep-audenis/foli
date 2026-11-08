@@ -13,6 +13,7 @@ import {
   toggleMark,
   undo,
   undoDepth,
+  wrapInList,
 } from "@folijs/core";
 import { Fragment, type KeyboardEvent, type MouseEvent, useRef, useState } from "react";
 import { useEditorOrContext, useEditorState } from "./editor.js";
@@ -118,6 +119,7 @@ const GROUPS: Item[][] = [
       text: "•",
       symbol: true,
       pressed: (state) => listTypeAt(state)?.name === "bulletList",
+      enabled: (state) => listTypeAt(state) !== null || wrapInList("bulletList")(state),
       command: () => toggleList("bulletList"),
     },
     {
@@ -127,6 +129,7 @@ const GROUPS: Item[][] = [
       text: "№",
       symbol: true,
       pressed: (state) => listTypeAt(state)?.name === "orderedList",
+      enabled: (state) => listTypeAt(state) !== null || wrapInList("orderedList")(state),
       command: () => toggleList("orderedList"),
     },
     {
@@ -193,7 +196,8 @@ const selectStates = (state: EditorState, editor: Editor): ItemState[] =>
 
 /**
  * Formatting buttons for an editor: marks, paragraph and heading levels, lists (bulleted,
- * numbered, decrease and increase indent), undo, redo, page break. One tab stop (arrow keys, Home and End move between buttons); toggles carry
+ * numbered, decrease and increase indent), undo, redo, page break. One tab stop (arrow keys,
+ * Home and End move between buttons); toggles carry
  * `aria-pressed`; a button whose command cannot run now is `aria-disabled` (still focusable).
  * Clicks leave the focus and selection in the document.
  */

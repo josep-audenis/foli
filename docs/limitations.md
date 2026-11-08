@@ -1,6 +1,7 @@
 # Known limitations
 
-What Foli does not do yet, or does with caveats, as of 0.1.0. Read it before you ship. Details
+What Foli does not do yet, or does with caveats, as of 0.1.0 and the unreleased Phase 7 work on
+`main`. Read it before you ship. Details
 and the reasons are in [architecture.md](architecture.md), [pagination.md](pagination.md) and
 [ADR-0003](decisions/ADR-0003-rendering-and-input.md); what comes next is in the
 [roadmap](roadmap.md).
@@ -26,16 +27,26 @@ checklist in [testing/ime.md](testing/ime.md)):
 
 ## Content
 
-- Schema v1 only: paragraphs, headings 1–6, line breaks, page breaks; bold, italic, underline,
-  strikethrough. No lists, links, alignment or colors (Phase 7), tables or images (Phase 8),
-  headers, footers or page numbers (Phase 9).
+- 0.1.0 has schema v1 only: paragraphs, headings 1–6, line breaks, page breaks; bold, italic,
+  underline, strikethrough. Schema v2 (lists, links, alignment, colors, rules) is on `main` for
+  0.2.0: lists render, paginate and edit; link, alignment and color controls are still to come
+  (Phase 7). No tables or images (Phase 8), headers, footers or page numbers (Phase 9).
+- List editing:
+  - Delete before (or at the end of the item before) an item that goes on with a nested list
+    does nothing: lift the nested items first.
+  - Tab in a list's first item cannot nest it, so it moves the focus on, as outside lists.
+  - Toggling a list over paragraphs and a list next to them nests that list in the new one
+    instead of joining them.
+  - Shift+Tab over items at several levels lifts only the innermost list's items.
+  - On Android, Backspace at an item's start may join it into the item before instead of
+    lifting it (untested on a device).
 - Paste keeps what the schema holds: links keep their text, lists and table cells become
   paragraphs, images and colors are dropped.
 - Drag and drop of text does nothing.
 - Some Android keyboards insert paragraphs without the events the editor needs; such an edit is
   discarded with a `Foli:` console warning.
-- The document format (`schemaVersion: 1`) is the first one: later versions will migrate it
-  without dropping content.
+- Documents in `schemaVersion: 1` load in later versions: they migrate without dropping
+  content.
 
 ## Pages
 
