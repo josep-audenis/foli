@@ -301,8 +301,34 @@ describe("FoliToolbar", () => {
     expect(screen.queryByRole("menu")).toBeNull();
   });
 
-  it("inserts a horizontal rule", () => {
+  it("a menu closed by its own button gives the focus back (document by pointer, button by key)", () => {
     const handle = setup();
+    const documentBox = screen.getByRole("textbox", { name: "Document" });
+    act(() => handle.focus());
+    act(() => handle.editor.select(1, 6));
+    fireEvent.click(button("Text color"), { detail: 1 });
+    expect(document.activeElement?.getAttribute("role")).toBe("menuitemradio");
+    fireEvent.click(button("Text color"), { detail: 1 });
+    expect(screen.queryByRole("menu")).toBeNull();
+    expect(document.activeElement).toBe(documentBox);
+    fireEvent.click(button("Highlight"), { detail: 0 });
+    fireEvent.click(button("Highlight"), { detail: 0 });
+    expect(screen.queryByRole("menu")).toBeNull();
+    expect(document.activeElement).toBe(button("Highlight"));
+    // Tab closes a menu and leaves it from its button (the browser moves on; not prevented).
+    fireEvent.keyDown(button("Highlight"), { key: "ArrowDown" });
+    const item = screen.getByRole("menuitemradio", { name: "None" });
+    expect(fireEvent.keyDown(item, { key: "Tab" })).toBe(true);
+    expect(screen.queryByRole("menu")).toBeNull();
+    expect(document.activeElement).toBe(button("Highlight"));
+  });
+
+  it("inserts a horizontal rule, also with everything selected", () => {
+    const handle = setup();
+    act(() => {
+      handle.editor.commands.selectAll();
+    });
+    expect(button("Horizontal rule").hasAttribute("aria-disabled")).toBe(false);
     act(() => handle.editor.select(11)); // end of "Hello Foli"
     fireEvent.click(button("Horizontal rule"), { detail: 1 });
     expect(handle.editor.getDocument().content.content.map((block) => block.type)).toEqual([

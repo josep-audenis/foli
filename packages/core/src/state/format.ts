@@ -89,8 +89,10 @@ export function colorAt(state: EditorState, name: "textColor" | "highlight"): st
 
 /**
  * Inserts a horizontal rule at the selection: at the start of a textblock, before it; at its
- * end, after it, with a new empty paragraph for the caret; inside it, splitting it. With a
- * block selected (a rule), after that block. The caret goes to the text after the rule.
+ * end, after it, with a new empty paragraph for the caret; inside it, splitting it. Where a
+ * rule cannot go before the textblock (a list item's first paragraph), an empty one is treated
+ * as its end and a non-empty one is split at its start. With a block selected (a rule), after
+ * that block. The caret goes to the text after the rule, keeping the marks typing had.
  */
 export const insertHorizontalRule: Command = (state, dispatch) => {
   const rule = state.schema.nodes.horizontalRule;
@@ -98,6 +100,7 @@ export const insertHorizontalRule: Command = (state, dispatch) => {
   const paragraph = defaultTextblockType(state.schema);
   const { selection } = state;
   return attempt(state, dispatch, (tr) => {
+    const marks = state.storedMarks ?? marksAt(selection.$from);
     let at: number;
     let newParagraph: boolean;
     if (selection instanceof NodeSelection && selection.node.isBlock) {
@@ -107,7 +110,9 @@ export const insertHorizontalRule: Command = (state, dispatch) => {
       tr.deleteSelection();
       const $pos = tr.selection.$from;
       if (!$pos.parent.isTextblock) throw new TransformError("No rule here");
-      if ($pos.parentOffset === 0) {
+      const index = $pos.index(-1);
+      const before = $pos.node(-1).canReplaceWith(index, index, rule);
+      if ($pos.parentOffset === 0 && before) {
         at = $pos.before();
         newParagraph = false;
       } else if ($pos.parentOffset === $pos.parent.content.size) {
@@ -123,5 +128,6 @@ export const insertHorizontalRule: Command = (state, dispatch) => {
     if (newParagraph) content.push(paragraph.create());
     tr.replace(at, at, new Slice(Fragment.from(content), 0, 0));
     tr.setSelection(TextSelection.create(tr.doc, at + 2));
+    if (marks.length) tr.setStoredMarks(marks);
   });
 };

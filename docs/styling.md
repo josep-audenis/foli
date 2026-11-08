@@ -36,7 +36,7 @@ the editor, or on `.foli-canvas` and `.foli-toolbar` themselves, to override it 
 | `--foli-error-color`        | `#b3261e`                                                  | link dialog: invalid URL      |
 | `--foli-link-color`         | `#1f5fbf`                                                  | links in the document         |
 | `--foli-marker-color`       | `currentColor`                                             | list bullets and numbers      |
-| `--foli-rule-color`         | `#c4c4bf`                                                  | horizontal rules              |
+| `--foli-rule-color`         | `#8c8c87`                                                  | horizontal rules              |
 | `--foli-rule-thickness`     | `1px`                                                      | horizontal rules              |
 
 Page breaks follow the text's real line boxes: a font, size or line-height change re-flows the

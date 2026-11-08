@@ -1,5 +1,6 @@
 import {
   type Alignment,
+  AllSelection,
   alignAt,
   type Command,
   colorAt,
@@ -118,14 +119,15 @@ const HIGHLIGHTS: readonly ColorOption[] = [
   { name: "Gray", color: "#e0e0e0" },
 ];
 
-/** Whether the selection holds a textblock (cheap: stops at the first). */
+/** Whether the selection holds a textblock (a caret's own block first; else it walks the range). */
 function hasTextblock(state: EditorState): boolean {
+  if (state.selection.$from.parent.isTextblock) return true;
   let found = false;
   state.doc.nodesBetween(state.selection.from, state.selection.to, (node) => {
     if (node.isTextblock) found = true;
     return !found;
   });
-  return found || state.selection.$from.parent.isTextblock;
+  return found;
 }
 
 /** Four bars, like the alignment they stand for (x and width per bar). */
@@ -326,6 +328,7 @@ const GROUPS: Item[][] = [
       symbol: true,
       enabled: (state) =>
         state.selection.$from.parent.isTextblock ||
+        state.selection instanceof AllSelection ||
         (state.selection instanceof NodeSelection && state.selection.node.isBlock),
       command: () => insertHorizontalRule,
     },
@@ -405,7 +408,14 @@ export function FoliToolbar({
     const item = ITEMS[index];
     if (!item || disabled || !states[index]?.enabled) return;
     if (item.menu) {
-      setMenu((open) => (open === item.key ? null : item.key));
+      if (menu !== item.key) {
+        setMenu(item.key);
+        return;
+      }
+      // Closing by its button: the focus was in the menu, which goes away.
+      setMenu(null);
+      if (event.detail > 0 && onClickCommand) onClickCommand();
+      else buttons.current[index]?.focus();
       return;
     }
     if (!item.command) return;
@@ -568,8 +578,8 @@ export function FoliToolbar({
 
 /**
  * A color menu (WAI-ARIA menu with radio items): the current color checked and focused on
- * open; arrow keys, Home and End move; Enter or Space (or a click) picks; Escape and Tab close
- * it back to its button; leaving it (a click elsewhere) closes it.
+ * open; arrow keys, Home and End move; Enter or Space (or a click) picks; Escape closes it back
+ * to its button, Tab closes it and moves on; leaving it (a click elsewhere) closes it.
  */
 function ColorMenu({
   label,
@@ -609,8 +619,11 @@ function ColorMenu({
     if (next !== undefined) {
       event.preventDefault();
       items.current[next]?.focus();
-    } else if (event.key === "Escape" || event.key === "Tab") {
+    } else if (event.key === "Escape") {
       event.preventDefault();
+      onClose(true);
+    } else if (event.key === "Tab") {
+      // Back to the button, then the browser's Tab moves on from it (out of the toolbar).
       onClose(true);
     }
   };

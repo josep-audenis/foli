@@ -1101,16 +1101,19 @@ export class EditorView {
     const name = keyName(event);
     // Ctrl/Cmd+Shift+V: the paste event that follows uses only the plain text.
     this.plainPaste = name === "Mod-Shift-v";
-    // Up/Down on a textblock's first/last line next to a rule select it (only the view knows
-    // lines); otherwise the browser moves the caret.
-    const vertical = name === "ArrowUp" ? -1 : name === "ArrowDown" ? 1 : 0;
-    if (vertical && this.caretOnEdgeLine(vertical) && this.run(arrowAcrossLeaf(vertical, "line"))) {
+    // Like `editor.handleKey`, but through the view's dispatch, so read-only mode drops edits.
+    // A key no command takes keeps its default (Tab outside a list moves the focus on).
+    if (this.runKey(name)) {
       event.preventDefault();
       return;
     }
-    // Like `editor.handleKey`, but through the view's dispatch, so read-only mode drops edits.
-    // A key no command takes keeps its default (Tab outside a list moves the focus on).
-    if (this.runKey(name)) event.preventDefault();
+    // Up/Down on a textblock's first/last line next to a rule select it (only the view knows
+    // lines; measured only when a rule is beside the block); else the browser moves the caret.
+    const vertical = name === "ArrowUp" ? -1 : name === "ArrowDown" ? 1 : 0;
+    const across = vertical ? arrowAcrossLeaf(vertical, "line") : null;
+    if (across?.(this.state) && this.caretOnEdgeLine(vertical as -1 | 1) && this.run(across)) {
+      event.preventDefault();
+    }
   };
 
   /**

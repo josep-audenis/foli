@@ -163,10 +163,27 @@ describe("horizontal rules", () => {
     const list = editorWith(ul(item(p("ab"))));
     list.select(5); // end of "ab"
     expectUndoable(list, () => list.commands.insertHorizontalRule(), [ul(item(p("ab"), hr, p()))]);
-    // A list item starts with a paragraph: no rule before its first one.
+    // A list item starts with a paragraph: at its first one's start, the paragraph splits (an
+    // empty one is treated as its end), so the rule goes after a paragraph.
     list.select(3);
-    expect(list.commands.insertHorizontalRule()).toBe(false);
-    list.state.doc.check();
+    expectUndoable(list, () => list.commands.insertHorizontalRule(), [ul(item(p(), hr, p("ab")))]);
+    list.commands.insertHorizontalRule();
+    expect(list.state.selection.$from.parent.textContent).toBe("ab");
+    const empty = editorWith(ul(item(p())));
+    empty.select(3);
+    expectUndoable(empty, () => empty.commands.insertHorizontalRule(), [ul(item(p(), hr, p()))]);
+  });
+
+  it("keeps the marks typing had (a color set at the caret) after a rule", () => {
+    const editor = editorWith(p("ab"));
+    editor.select(3);
+    editor.commands.setTextColor("#c00000");
+    expect(editor.commands.insertHorizontalRule()).toBe(true);
+    editor.commands.insertText("x");
+    expect(json(editor)[2]).toEqual({
+      type: "paragraph",
+      content: [t("x", color("textColor", "#c00000"))],
+    });
   });
 
   it("typing over a selected rule replaces it with a paragraph; Enter adds one after it", () => {

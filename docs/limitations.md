@@ -43,6 +43,9 @@ checklist in [testing/ime.md](testing/ime.md)):
     lifting it (untested on a device).
 - Colors come from a fixed palette in the toolbar (seven text colors, six highlights); any
   `#rrggbb` works through `setTextColor` / `setHighlight`.
+- Left and Right next to a rule treat Left as backward: in right-to-left text, Left at the
+  start of a paragraph selects the rule before it (left-to-right is the only direction the
+  view handles fully).
 - Up and Down next to a rule decide "first or last line" from the caret's on-screen box: at a
   position where the browser gives none (beside some line breaks) the browser moves the caret
   instead, past the rule.

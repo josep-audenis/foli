@@ -22,7 +22,7 @@
   --foli-error-color: #b3261e;
   --foli-link-color: #1f5fbf;
   --foli-marker-color: currentColor;
-  --foli-rule-color: #c4c4bf;
+  --foli-rule-color: #8c8c87;
   --foli-rule-thickness: 1px;
 }
 
@@ -282,6 +282,11 @@
   .foli-toolbar-button[aria-pressed="true"] {
     outline: 2px solid Highlight;
     outline-offset: -2px;
+  }
+  /* Swatches show their color (the names say it too). */
+  .foli-toolbar-swatch,
+  .foli-menu-swatch {
+    forced-color-adjust: none;
   }
 }
 
