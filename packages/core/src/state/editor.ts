@@ -25,6 +25,7 @@ import {
   toggleMark,
 } from "./commands.js";
 import { history, redo, undo } from "./history.js";
+import { removeLink, setLink } from "./links.js";
 import { liftListItem, listKeymap, sinkListItem, toggleList, wrapInList } from "./lists.js";
 import { TextSelection } from "./selection.js";
 import { type Command, EditorState, type Plugin, type Transaction } from "./state.js";
@@ -75,6 +76,13 @@ export interface Editor {
     indentListItem(): boolean;
     /** Shift+Tab in a list: lifts the selected items one level (out of the list at the top). */
     outdentListItem(): boolean;
+    /**
+     * Links the selection to `href` (normalized, then validated: unsafe hrefs do not apply); at
+     * a caret in a link, changes it; elsewhere inserts the href as linked text.
+     */
+    setLink(href: string): boolean;
+    /** Removes the links in the selection, or the link around the caret. */
+    removeLink(): boolean;
   };
   isMarkActive(type: string): boolean;
   /** The current document as a persisted FoliDocument. */
@@ -143,6 +151,8 @@ export function createEditor({
       toggleList: (type, attrs) => run(toggleList(type, attrs)),
       indentListItem: () => run(sinkListItem()),
       outdentListItem: () => run(liftListItem()),
+      setLink: (href) => run(setLink(href)),
+      removeLink: () => run(removeLink),
     },
     isMarkActive: (type) => isMarkActive(state, type),
     getDocument: () => ({

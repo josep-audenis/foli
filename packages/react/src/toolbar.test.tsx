@@ -35,6 +35,7 @@ describe("FoliToolbar", () => {
       "Italic",
       "Underline",
       "Strikethrough",
+      "Link",
       "Paragraph",
       "H1",
       "H2",
@@ -204,6 +205,82 @@ describe("FoliToolbar", () => {
     expect(editor.isMarkActive("italic")).toBe(true);
     expect(document.activeElement).toBe(button("Italic"));
     outside.remove();
+  });
+
+  it("adds a link from the dialog: URL normalized, focus back in the document", () => {
+    const handle = setup();
+    const { editor } = handle;
+    const documentBox = screen.getByRole("textbox", { name: "Document" });
+    act(() => handle.focus());
+    act(() => editor.select(1, 6)); // "Hello"
+    expect(button("Link").getAttribute("aria-pressed")).toBe("false");
+    fireEvent.click(button("Link"), { detail: 1 });
+    const dialog = screen.getByRole("dialog", { name: "Add link" });
+    const url = screen.getByRole("textbox", { name: "URL" });
+    expect(dialog.contains(url)).toBe(true);
+    expect(document.activeElement).toBe(url); // not taken back by the document
+    expect(screen.queryByRole("button", { name: "Remove link" })).toBeNull();
+    fireEvent.change(url, { target: { value: " example.com " } });
+    fireEvent.click(button("Apply"));
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(document.activeElement).toBe(documentBox);
+    expect(editor.getDocument().content.content[0]).toEqual({
+      type: "paragraph",
+      content: [
+        {
+          type: "text",
+          text: "Hello",
+          marks: [{ type: "link", attrs: { href: "https://example.com" } }],
+        },
+        { type: "text", text: " Foli" },
+      ],
+    });
+    expect(button("Link").getAttribute("aria-pressed")).toBe("true");
+  });
+
+  it("Mod-K edits the link at the caret; an unsafe URL is refused; Escape and Remove", () => {
+    const handle = setup();
+    const { editor } = handle;
+    const documentBox = screen.getByRole("textbox", { name: "Document" });
+    act(() => handle.focus());
+    act(() => editor.select(1, 6));
+    act(() => {
+      editor.commands.setLink("https://a.test");
+    });
+    act(() => editor.select(3));
+    const before = editor.state.doc;
+    fireEvent.keyDown(documentBox, { key: "k", ctrlKey: true });
+    screen.getByRole("dialog", { name: "Edit link" });
+    const url = screen.getByRole("textbox", { name: "URL" }) as HTMLInputElement;
+    expect(url.value).toBe("https://a.test");
+    fireEvent.change(url, { target: { value: "javascript:alert(1)" } });
+    fireEvent.submit(url.form as HTMLFormElement);
+    expect(screen.getByRole("alert").textContent).toContain("http, https, mailto or tel");
+    expect(url.getAttribute("aria-invalid")).toBe("true");
+    expect(url.getAttribute("aria-describedby")).toBe(screen.getByRole("alert").id);
+    expect(editor.state.doc).toBe(before);
+    expect(document.activeElement).toBe(url);
+    // Escape cancels: nothing changes, the focus goes back to the document.
+    fireEvent.keyDown(url, { key: "Escape" });
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(document.activeElement).toBe(documentBox);
+    expect(editor.state.doc).toBe(before);
+    // Remove link takes the whole link out.
+    fireEvent.keyDown(documentBox, { key: "k", ctrlKey: true });
+    fireEvent.click(button("Remove link"));
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(editor.state.doc.textContent).toBe("Hello FoliSecond");
+    expect(JSON.stringify(editor.getDocument())).not.toContain("link");
+  });
+
+  it("opens no link dialog in read-only mode, not even after it ends", () => {
+    const { rerender } = render(<FoliEditor initialContent={doc} readOnly />);
+    const documentBox = screen.getByRole("textbox", { name: "Document" });
+    fireEvent.keyDown(documentBox, { key: "k", ctrlKey: true });
+    fireEvent.click(button("Link"), { detail: 1 });
+    expect(screen.queryByRole("dialog")).toBeNull();
+    rerender(<FoliEditor initialContent={doc} />);
+    expect(screen.queryByRole("dialog")).toBeNull();
   });
 
   it("leaves arrow keys with Alt, Ctrl or Meta to the browser", () => {

@@ -9,6 +9,7 @@ import {
 } from "../model/index.js";
 import { TransformError } from "../transform/transform.js";
 import { redo, undo } from "./history.js";
+import { openLinkEditor } from "./links.js";
 import { AllSelection, marksAt, TextSelection } from "./selection.js";
 import {
   type Command,
@@ -29,7 +30,8 @@ const graphemes = new Intl.Segmenter(undefined, { granularity: "grapheme" });
 const words = new Intl.Segmenter(undefined, { granularity: "word" });
 
 /** Runs `build`; a TransformError means the command does not apply. */
-function attempt(
+/** @internal Runs `build`; a TransformError, or a transaction that changes nothing, does not apply. */
+export function attempt(
   state: EditorState,
   dispatch: ((tr: Transaction) => void) | undefined,
   build: (tr: Transaction) => void,
@@ -374,6 +376,7 @@ export function baseKeymap(): Plugin {
       "Mod-b": toggleMark("bold"),
       "Mod-i": toggleMark("italic"),
       "Mod-u": toggleMark("underline"),
+      "Mod-k": openLinkEditor,
       "Mod-a": selectAll,
       "Mod-z": undo,
       "Mod-Shift-z": redo,

@@ -22,13 +22,14 @@ writeFileSync(appEntry, `export { FoliEditor } from "${dist("react")}";\n`);
  * 25.2 kB). Raise one only with a reason in the PR. Core raised in 7.1 (16.6 kB): the structure
  * engine for lists (ReplaceAroundStep, wrap/lift/split/join and their checks, NodeSelection).
  * View and React raised in 7.3 (22.7 and 29.0 kB): schema v2 and nested blocks on pages.
- * Core raised again in 7.5 (18.8 kB): list editing commands.
+ * Core raised again in 7.5 (18.8 kB): list editing commands. React raised in 7.6 (33.5 kB): the
+ * link dialog, and core's link commands.
  */
 const BUNDLES = [
   { name: "@folijs/core", entry: dist("core"), budget: 22_100 },
   { name: "@folijs/view", entry: dist("view"), budget: 26_700 },
-  { name: "@folijs/react", entry: dist("react"), budget: 34_200 },
-  { name: "FoliEditor only", entry: appEntry, budget: 34_200 },
+  { name: "@folijs/react", entry: dist("react"), budget: 39_400 },
+  { name: "FoliEditor only", entry: appEntry, budget: 39_400 },
 ];
 
 let failed = false;

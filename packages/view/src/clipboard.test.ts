@@ -293,6 +293,59 @@ describe("EditorView clipboard", () => {
     expect(blocks(editor)).toEqual([p(t("h1", "bold")), p(t("2", "bold"))]);
   });
 
+  it("autolinks pasted text that is one URL: inserted as a link, or linking the selection", () => {
+    const link = (href: string) => ({ type: "link", attrs: { href } });
+    const { editor, view } = mount(doc(p(t("ab"))));
+    editor.select(2);
+    expect(view.paste(data({ "text/plain": " www.example.com\n", "text/html": "<p>x</p>" }))).toBe(
+      true,
+    );
+    expect(blocks(editor)).toEqual([
+      p(t("a"), { ...t("www.example.com"), marks: [link("https://www.example.com")] }, t("b")),
+    ]);
+    // Its own undo step.
+    editor.commands.undo();
+    expect(blocks(editor)).toEqual([p(t("ab"))]);
+    editor.select(1, 3);
+    expect(view.paste(data({ "text/plain": "https://x.test\\a" }))).toBe(true);
+    expect(blocks(editor)).toEqual([p({ ...t("ab"), marks: [link("https://x.test/a")] })]);
+    // Unsafe or not a lone URL: plain text.
+    editor.select(3);
+    view.paste(data({ "text/plain": "javascript:alert(1)" }));
+    view.paste(data({ "text/plain": " see https://x.test" }));
+    expect(editor.state.doc.textContent).toBe("abjavascript:alert(1) see https://x.test");
+    expect(JSON.stringify(blocks(editor))).not.toContain('javascript:alert(1)","marks');
+  });
+
+  it("does not autolink a paste as plain text (Ctrl+Shift+V), nor Foli content", () => {
+    const { host, editor } = mount(doc(p()));
+    host.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "V", ctrlKey: true, shiftKey: true, cancelable: true }),
+    );
+    const { event, store } = clipboardEvent("paste");
+    store.set("text/plain", "https://x.test");
+    host.dispatchEvent(event);
+    expect(blocks(editor)).toEqual([p(t("https://x.test"))]);
+    const json = JSON.stringify({ open: true, content: doc(p(t("foli"))) });
+    view?.paste(data({ [FOLI_MIME]: json, "text/plain": "https://x.test" }));
+    expect(editor.state.doc.textContent).toBe("https://x.testfoli");
+  });
+
+  it("rejects Foli JSON with an unsafe link (falls back to the plain text)", () => {
+    const { editor, view } = mount(doc(p()));
+    const evil = {
+      ...t("click"),
+      marks: [{ type: "link", attrs: { href: "javascript:alert(1)" } }],
+    };
+    view.paste(
+      data({
+        [FOLI_MIME]: JSON.stringify({ open: true, content: doc(p(evil)) }),
+        "text/plain": "click",
+      }),
+    );
+    expect(blocks(editor)).toEqual([p(t("click"))]);
+  });
+
   it("pastes plain text with the marks typing would get, over a selection", () => {
     const { editor, view } = mount(doc(p(t("ab", "italic"), t("cd"))));
     editor.select(2, 4);

@@ -29,8 +29,8 @@ checklist in [testing/ime.md](testing/ime.md)):
 
 - 0.1.0 has schema v1 only: paragraphs, headings 1–6, line breaks, page breaks; bold, italic,
   underline, strikethrough. Schema v2 (lists, links, alignment, colors, rules) is on `main` for
-  0.2.0: lists render, paginate and edit; link, alignment and color controls are still to come
-  (Phase 7). No tables or images (Phase 8), headers, footers or page numbers (Phase 9).
+  0.2.0: lists render, paginate and edit; links edit (dialog, Ctrl/Cmd+K) and open with
+  Ctrl/Cmd+click; alignment and color controls are still to come (Phase 7). No tables or images (Phase 8), headers, footers or page numbers (Phase 9).
 - List editing:
   - Delete before (or at the end of the item before) an item that goes on with a nested list
     does nothing: lift the nested items first.
@@ -40,8 +40,16 @@ checklist in [testing/ime.md](testing/ime.md)):
   - Shift+Tab over items at several levels lifts only the innermost list's items.
   - On Android, Backspace at an item's start may join it into the item before instead of
     lifting it (untested on a device).
-- Paste keeps what the schema holds: links keep their text, lists and table cells become
-  paragraphs, images and colors are dropped.
+- Links:
+  - A link address without a scheme that looks like a host name gets `https://`
+    (`page.html` too): write `./page.html` for a relative link.
+  - Links are not followed on touch devices (no Ctrl/Cmd+click), nor with a middle click;
+    there is no hover preview of the address.
+  - Mod-K opens the dialog only with a `FoliToolbar` for the editor; elsewhere it does
+    nothing (the browser's own Ctrl+K is not run inside the document).
+- HTML paste keeps what the schema held in 0.1.0: links keep their text, lists and table cells
+  become paragraphs, images and colors are dropped (7.8 maps them). A pasted plain-text URL
+  becomes a link.
 - Drag and drop of text does nothing.
 - Some Android keyboards insert paragraphs without the events the editor needs; such an edit is
   discarded with a `Foli:` console warning.

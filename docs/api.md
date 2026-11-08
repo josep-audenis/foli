@@ -52,10 +52,19 @@ selection and scrolls it into view).
 
 ### `<FoliToolbar>`
 
-The default toolbar: bold, italic, underline, strikethrough · paragraph, H1–H3 · bulleted list,
-numbered list (pressed inside one), decrease and increase indent · undo, redo · page break.
-A WAI-ARIA toolbar: one Tab stop, arrow keys, Home and End move between buttons; toggle buttons have `aria-pressed`; buttons stay focusable when disabled (`aria-disabled`).
-Clicking a button keeps the document's selection.
+The default toolbar: bold, italic, underline, strikethrough, link · paragraph, H1–H3 · bulleted
+list, numbered list (pressed inside one), decrease and increase indent · undo, redo · page break.
+A WAI-ARIA toolbar: one Tab stop, arrow keys, Home and End move between buttons; toggle buttons
+have `aria-pressed`; buttons stay focusable when disabled (`aria-disabled`). Clicking a button
+keeps the document's selection.
+
+Link (pressed in a link) and Mod-K in the document open the link dialog under the toolbar
+(`.foli-link-dialog`, `role="dialog"`, "Add link" or "Edit link"): a URL field prefilled with
+the link at the selection, Apply (Enter), Remove link (for an existing link), Cancel (Escape).
+The URL is normalized (`normalizeHref`) and validated: an unsafe one is not applied, the field
+gets `aria-invalid` and an announced message. Closing returns the focus where it was (the
+document, or the button). The toolbar opens the dialog for any `openLinkEditor` request, so
+Mod-K needs a `FoliToolbar` for the editor; none opens while it is `disabled`.
 
 | Prop             | Type         | Default        | Notes                                                               |
 | ---------------- | ------------ | -------------- | ------------------------------------------------------------------- |
@@ -124,7 +133,10 @@ Headings: `setBlockType("heading", { level: 2 })`; back to text: `setBlockType("
 Lists: `commands.toggleList("bulletList" | "orderedList", attrs?)` (wraps the selection, changes
 the list's type, or takes the selected items out of every list of that type they are in),
 `wrapInList(type, attrs?)`, `indentListItem()` and `outdentListItem()` (Tab and Shift+Tab). Each
-list change is its own undo step.
+list change is its own undo step. Links: `commands.setLink(href)` (links the selection, replacing
+links there; at a caret in a link, changes that link; elsewhere inserts the href as linked
+text) and `removeLink()` (the links in the selection, or the whole link around the caret). Both
+normalize then validate: an unsafe href (`javascript:`…) does not apply.
 
 ### Commands
 
@@ -135,7 +147,15 @@ Commands are `(state, dispatch?) => boolean` and run with `editor.run(command)`:
 `undo`, `redo`; lists: `toggleList(type, attrs?)`, `wrapInList(type, attrs?)`,
 `splitListItem()` (Enter), `sinkListItem()` (Tab), `liftListItem()` (Shift+Tab),
 `liftListItemAtStart()` (Backspace at an item's start), and `listKeymap()` binding them (part of
-every editor, before `baseKeymap()`). Helpers: `isMarkActive(state, type)`, `listTypeAt(state)`,
+every editor, before `baseKeymap()`); links: `setLink(href)`, `removeLink`,
+`insertLink(href, text?)` (replaces the selection with linked text), `openLinkEditor` (Mod-K:
+dispatches a transaction that changes nothing and carries `linkEditorRequest`; check it with
+`requestsLinkEditor(tr)` to open your own link UI). `normalizeHref(input)` trims, turns `\` into
+`/`, percent-encodes spaces, and adds `mailto:` to an email address and `https://` to a host
+name (`example.com/page`; a relative file name like `page.html` becomes one too: write
+`./page.html`); `autolinkHref(text)` is the href for pasted text that is one URL
+(`http(s)://…`, `mailto:…`, `www.…`), or null. Helpers: `isMarkActive(state, type)`,
+`listTypeAt(state)`, `linkAt(state)` (the href of the link at the selection, or null),
 `undoDepth(state)`, `redoDepth(state)`,
 `marksAt`. `baseKeymap()` is the default key binding plugin (keys in
 [getting-started.md](getting-started.md#keyboard)).
@@ -157,4 +177,11 @@ const view = new EditorView(host, editor, { editable: true, placeholder: "" });
   host.
 - Clipboard: copy writes Foli JSON (`FOLI_MIME`), HTML and plain text; paste prefers Foli JSON,
   then HTML (`htmlToDoc`, mapped to the schema, never `innerHTML`), then text (`textToDoc`).
+  Plain text that is one URL (`autolinkHref`) becomes a link: over selected text inside one
+  block that text is linked, otherwise the URL is inserted as linked text; not on paste as
+  plain text (Ctrl/Cmd+Shift+V), nor when the clipboard holds Foli JSON.
+  `view.paste(data, autolink = true)` pastes clipboard data from code.
+- Links: a click places the caret (no navigation, read-only mode too); Ctrl+click (Cmd+click
+  on Apple platforms) opens the link's href, read from the document, in a new tab with
+  `noopener,noreferrer`.
 - `keyName(event)`: the key name `handleKey` expects (`"Mod-b"`, `"Shift-Enter"`).
