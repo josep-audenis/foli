@@ -121,14 +121,22 @@ Foli's own (see `THIRD_PARTY_NOTICES.md`).
   - splitBlock: Enter at the end of a heading starts a paragraph, and formatting carries over.
   - Formatting and selection: toggleMark, setBlockType, selectAll, undo, redo, plus `isMarkActive`.
   - `baseKeymap()` binds them to key names (`Mod-b`, `Enter`…).
+  - Lists (7.5, `state/lists.ts`): `toggleList`, `wrapInList`, `splitListItem` (Enter; on an
+    empty item, lift it), `sinkListItem` (Tab: into a sublist of the item before, joining one
+    that ends it), `liftListItem` (Shift+Tab: into the outer list, or out of a top-level list,
+    splitting it), `liftListItemAtStart` (Backspace at an item's start). `listKeymap()` binds
+    them before `baseKeymap()`; Tab outside a list is not taken. Each list change closes the
+    history event before it (own undo step). `joinBackward` after a list joins into its last
+    textblock; `joinForward` before one pulls its first textblock in (removing the item, and
+    the list, it leaves empty), unless the item goes on with more blocks.
 - **Headless editor**: `createEditor({ document })` returns `commands.*`, `run`, `can`,
   `handleKey`, `select`, `getDocument`, `setDocument` and `subscribe`.
 
 Known limits:
 - No general slice fitting: paste (Phase 4.3) joins open content or replaces an empty textblock
   with whole blocks; fitting blocks into nested structures comes with lists (Phase 7).
-- Lists render and paginate (7.3, 7.4); list editing commands and keys are 7.5, paste of
-  lists, links and colors 7.8. Typing over a node-selected rule does nothing yet (7.7).
+- Paste of lists, links and colors is 7.8. Typing over a node-selected rule does nothing yet
+  (7.7).
 - Each unrecorded change (and each plugin reaction to undo/redo) rebases the stored history.
   This costs O(n²) in the number of stored steps (not events), and every step is re-applied to the
   document, which also scales with document size.

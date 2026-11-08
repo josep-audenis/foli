@@ -26,6 +26,16 @@ export {
   undoDepth,
 } from "./history.js";
 export {
+  liftListItem,
+  liftListItemAtStart,
+  listKeymap,
+  listTypeAt,
+  sinkListItem,
+  splitListItem,
+  toggleList,
+  wrapInList,
+} from "./lists.js";
+export {
   AllSelection,
   marksAt,
   NodeSelection,

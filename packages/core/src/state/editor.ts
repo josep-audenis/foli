@@ -25,6 +25,7 @@ import {
   toggleMark,
 } from "./commands.js";
 import { history, redo, undo } from "./history.js";
+import { liftListItem, listKeymap, sinkListItem, toggleList, wrapInList } from "./lists.js";
 import { TextSelection } from "./selection.js";
 import { type Command, EditorState, type Plugin, type Transaction } from "./state.js";
 
@@ -66,6 +67,14 @@ export interface Editor {
     selectAll(): boolean;
     undo(): boolean;
     redo(): boolean;
+    /** Wraps the selected blocks in a list ("bulletList" or "orderedList"). */
+    wrapInList(type: string, attrs?: Attrs | null): boolean;
+    /** The list buttons: removes the list, changes its type, or wraps in a new one. */
+    toggleList(type: string, attrs?: Attrs | null): boolean;
+    /** Tab in a list: nests the selected items in the item before them. */
+    indentListItem(): boolean;
+    /** Shift+Tab in a list: lifts the selected items one level (out of the list at the top). */
+    outdentListItem(): boolean;
   };
   isMarkActive(type: string): boolean;
   /** The current document as a persisted FoliDocument. */
@@ -80,7 +89,7 @@ export function createEditor({
   plugins = [],
 }: EditorOptions = {}): Editor {
   let settings = document.settings;
-  const allPlugins = [...plugins, history(), baseKeymap()];
+  const allPlugins = [...plugins, history(), listKeymap(), baseKeymap()];
   let state = EditorState.create({ doc: parseContent(document.content), plugins: allPlugins });
   const listeners = new Set<EditorListener>();
 
@@ -130,6 +139,10 @@ export function createEditor({
       selectAll: () => run(selectAll),
       undo: () => run(undo),
       redo: () => run(redo),
+      wrapInList: (type, attrs) => run(wrapInList(type, attrs)),
+      toggleList: (type, attrs) => run(toggleList(type, attrs)),
+      indentListItem: () => run(sinkListItem()),
+      outdentListItem: () => run(liftListItem()),
     },
     isMarkActive: (type) => isMarkActive(state, type),
     getDocument: () => ({

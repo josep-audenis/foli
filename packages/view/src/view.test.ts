@@ -501,6 +501,15 @@ describe("keyName", () => {
     expect(key({ key: "a" })).toBe("a");
   });
 
+  it("names Ctrl+Shift+digit by the digit, whatever character the layout gives", () => {
+    const ctrlOrMeta = /Mac|iP(hone|[oa]d)/.test(navigator.platform)
+      ? { metaKey: true }
+      : { ctrlKey: true };
+    expect(key({ key: "&", code: "Digit7", shiftKey: true, ...ctrlOrMeta })).toBe("Mod-Shift-7");
+    expect(key({ key: "(", code: "Digit8", shiftKey: true, ...ctrlOrMeta })).toBe("Mod-Shift-8");
+    expect(key({ key: "&", code: "Digit7", shiftKey: true })).toBe("Shift-&"); // no Mod: the character
+  });
+
   it("falls back to the physical key on non-Latin layouts", () => {
     expect(key({ key: "и", code: "KeyB", ctrlKey: true })).toMatch(/^(Mod|Ctrl)-/);
     expect(key({ key: "и", code: "KeyB", ctrlKey: true })).not.toContain("и");

@@ -39,6 +39,10 @@ describe("FoliToolbar", () => {
       "H1",
       "H2",
       "H3",
+      "Bulleted list",
+      "Numbered list",
+      "Decrease indent",
+      "Increase indent",
       "Undo",
       "Redo",
       "Page break",
@@ -109,6 +113,35 @@ describe("FoliToolbar", () => {
     expect(button("Undo").getAttribute("aria-disabled")).toBe("true");
     act(() => button("Undo").click());
     expect(editor.state.doc.textContent).toBe("Hello FoliSecond");
+  });
+
+  it("makes lists, shows the list type pressed, and indents and outdents items", () => {
+    const { editor } = setup();
+    const pressed = (name: string) => button(name).getAttribute("aria-pressed");
+    const disabled = (name: string) => button(name).getAttribute("aria-disabled");
+    act(() => editor.select(2, 15)); // both paragraphs
+    expect(disabled("Increase indent")).toBe("true");
+    expect(disabled("Decrease indent")).toBe("true");
+    act(() => button("Bulleted list").click());
+    expect(editor.getDocument().content.content[0]?.type).toBe("bulletList");
+    expect(pressed("Bulleted list")).toBe("true");
+    expect(pressed("Numbered list")).toBe("false");
+    act(() => button("Numbered list").click());
+    expect(editor.getDocument().content.content[0]?.type).toBe("orderedList");
+    expect(pressed("Numbered list")).toBe("true");
+    // One item per paragraph: put the caret in the second, split into its own item first.
+    act(() => button("Numbered list").click()); // off again
+    act(() => editor.select(1, 15));
+    act(() => button("Bulleted list").click());
+    act(() => editor.select(editor.state.doc.content.size - 3));
+    act(() => editor.handleKey("Enter"));
+    expect(disabled("Increase indent")).toBeNull(); // the new item has one before it
+    act(() => button("Increase indent").click());
+    expect(JSON.stringify(editor.getDocument().content)).toContain(
+      '"bulletList","content":[{"type":"listItem","content":[{"type":"paragraph"}]}]',
+    );
+    act(() => button("Decrease indent").click());
+    expect(editor.getDocument().content.content).toHaveLength(1);
   });
 
   it("inserts a page break", () => {

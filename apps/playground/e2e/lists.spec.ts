@@ -169,3 +169,67 @@ test("an item split across pages shows its marker once; a split justified paragr
   expect(styles.alignLast.slice(0, -1).every((value) => value === "justify")).toBe(true);
   expect(styles.alignLast.at(-1)).not.toBe("justify");
 });
+
+/** The document's structure as compact text: lists as `ul[…]`/`ol[…]`, items as `li[…]`. */
+function shape(page: Page): Promise<string> {
+  return editor(page).evaluate((host) => {
+    const walk = (el: Element): string => {
+      const tag = el.tagName.toLowerCase();
+      if (tag === "p" || /^h\d$/.test(tag)) return JSON.stringify(el.textContent ?? "");
+      return `${tag}[${[...el.children].map(walk).join(",")}]`;
+    };
+    // Pages are one document: join the top-level blocks of every page.
+    return [...host.querySelectorAll(":scope > .foli-page > *")].map(walk).join(",");
+  });
+}
+
+test("list editing with the keyboard, then undo back to the start", async ({ page }) => {
+  await openDoc(page, [p("start")]);
+  await editor(page).getByText("start").click();
+  await page.keyboard.press("End");
+  await page.keyboard.press("ControlOrMeta+Shift+Digit8");
+  expect(await shape(page)).toBe('ul[li["start"]]');
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("two");
+  await page.keyboard.press("Tab");
+  expect(await shape(page)).toBe('ul[li["start",ul[li["two"]]]]');
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("three");
+  await page.keyboard.press("Shift+Tab");
+  expect(await shape(page)).toBe('ul[li["start",ul[li["two"]]],li["three"]]');
+  await page.keyboard.press("Enter");
+  await page.keyboard.press("Enter"); // on the empty item: leaves the list
+  await page.keyboard.type("after");
+  expect(await shape(page)).toBe('ul[li["start",ul[li["two"]]],li["three"]],"after"');
+  await page.keyboard.press("ArrowUp");
+  await page.keyboard.press("Home");
+  await page.keyboard.press("Backspace"); // at the start of "three": lifts it out of the list
+  expect(await shape(page)).toBe('ul[li["start",ul[li["two"]]]],"three","after"');
+  for (let i = 0; i < 30; i++) await page.keyboard.press("ControlOrMeta+z");
+  expect(await shape(page)).toBe('"start"');
+});
+
+test("the toolbar makes a numbered list; Tab outside a list leaves the editor", async ({
+  page,
+}) => {
+  await openDoc(page, [p("one"), p("two")]);
+  await editor(page).getByText("one").click();
+  await page.keyboard.press("ControlOrMeta+a");
+  await page.getByRole("button", { name: "Numbered list" }).click();
+  expect(await shape(page)).toBe('ol[li["one","two"]]');
+  await expect(page.getByRole("button", { name: "Numbered list" })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await page.getByRole("button", { name: "Numbered list" }).click();
+  expect(await shape(page)).toBe('"one","two"');
+  // Outside a list, Tab and Shift+Tab are the browser's: Shift+Tab goes back to the toolbar
+  // (Tab would go on to whatever follows the editor; the playground has nothing after it).
+  await editor(page).getByText("two").click();
+  await page.keyboard.press("Shift+Tab");
+  await expect(editor(page)).not.toBeFocused();
+  await expect
+    .poll(() => page.evaluate(() => document.activeElement?.closest('[role="toolbar"]') !== null))
+    .toBe(true);
+  expect(await shape(page)).toBe('"one","two"');
+});
