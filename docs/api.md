@@ -189,7 +189,10 @@ const view = new EditorView(host, editor, { editable: true, placeholder: "" });
 - `view.destroy()`: removes listeners, injected styles and the attributes it added; empties the
   host.
 - Clipboard: copy writes Foli JSON (`FOLI_MIME`), HTML and plain text; paste prefers Foli JSON,
-  then HTML (`htmlToDoc`, mapped to the schema, never `innerHTML`), then text (`textToDoc`).
+  then HTML (`htmlToDoc`, mapped to the schema, never `innerHTML`: lists at any depth, Word
+  and Google Docs lists, rules, safe links, colors, alignment), then text (`textToDoc`). Lists
+  and rules the slice cannot fit at the caret go in as whole blocks (a list pasted into a list
+  item joins it).
   Plain text that is one URL (`autolinkHref`) becomes a link: over selected text inside one
   block that text is linked, otherwise the URL is inserted as linked text; not on paste as
   plain text (Ctrl/Cmd+Shift+V), nor when the clipboard holds Foli JSON.

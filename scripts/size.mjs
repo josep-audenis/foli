@@ -23,11 +23,12 @@ writeFileSync(appEntry, `export { FoliEditor } from "${dist("react")}";\n`);
  * engine for lists (ReplaceAroundStep, wrap/lift/split/join and their checks, NodeSelection).
  * View and React raised in 7.3 (22.7 and 29.0 kB): schema v2 and nested blocks on pages.
  * Core raised again in 7.5 (18.8 kB): list editing commands. React raised in 7.6 (33.5 kB): the
- * link dialog, and core's link commands.
+ * link dialog, and core's link commands. View raised in 7.8 (26.7 kB): the HTML reader for
+ * schema v2 (lists, Word and Google Docs lists, links, colors, alignment) and block paste.
  */
 const BUNDLES = [
   { name: "@folijs/core", entry: dist("core"), budget: 22_100 },
-  { name: "@folijs/view", entry: dist("view"), budget: 26_700 },
+  { name: "@folijs/view", entry: dist("view"), budget: 31_400 },
   { name: "@folijs/react", entry: dist("react"), budget: 39_400 },
   { name: "FoliEditor only", entry: appEntry, budget: 39_400 },
 ];

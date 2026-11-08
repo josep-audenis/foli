@@ -113,3 +113,25 @@ test("pasted HTML never runs scripts or loads images", async ({ page }) => {
   expect(requests.filter((url) => url.includes("should-not-load"))).toEqual([]);
   await expect(editor(page).locator("img, script")).toHaveCount(0);
 });
+
+test("pasting Google Docs lists keeps nesting, numbering, links, colors, rules and alignment", async ({
+  page,
+}) => {
+  await openEmpty(page);
+  const html = readFileSync("packages/view/fixtures/clipboard/google-docs-lists.html", "utf8");
+  await paste(page, { "text/html": html, "text/plain": "Alpha" });
+  const content = editor(page);
+  await expect(content.locator("ul > li")).toHaveCount(3);
+  await expect(content.locator("ul ul a")).toHaveAttribute("href", "https://example.com/x");
+  // The view numbers ordered items with `value` (numbering continues across pages).
+  await expect(content.locator("ol > li")).toHaveText("Two");
+  await expect(content.locator("ol > li")).toHaveAttribute("value", "2");
+  await expect(content.locator("hr")).toHaveCount(1);
+  await expect(content.locator("li p").filter({ hasText: "Beta" })).toHaveCSS(
+    "text-align",
+    "center",
+  );
+  await expect(content.locator("span", { hasText: "Red" })).toHaveCSS("color", "rgb(255, 0, 0)");
+  await page.keyboard.press(`${MOD}+z`);
+  await expect.poll(() => texts(page)).toEqual([""]);
+});

@@ -1447,8 +1447,9 @@ export class EditorView {
     // One empty block: nothing to paste.
     if (!pasted || pasted.doc.content.size <= 2) return false;
     const { doc, open } = pasted;
-    try {
-      const tr = state.tr.deleteSelection();
+    // As a slice (text joins the text around the caret); where the schema refuses that (a
+    // list in a paragraph), as whole blocks fitted at the caret.
+    const asSlice = (tr: Transaction) => {
       const $pos = tr.selection.$from;
       if (!open && $pos.depth === 1 && $pos.parent.isTextblock && !$pos.parent.content.size) {
         const from = $pos.before();
@@ -1457,17 +1458,78 @@ export class EditorView {
       } else {
         tr.replaceSelection(doc.slice(1, doc.content.size - 1));
       }
+    };
+    const asBlocks = (tr: Transaction) => {
+      if (open) throw new TransformError("Open content is pasted as a slice");
+      insertBlocks(tr, doc);
+    };
+    const strategies = [asSlice, asBlocks];
+    for (const strategy of strategies) {
+      const tr = state.tr;
+      try {
+        tr.deleteSelection();
+        strategy(tr);
+      } catch (error) {
+        if (error instanceof TransformError) continue;
+        throw error;
+      }
       return this.dispatch(tr.setMeta(closeHistory, true));
-    } catch (error) {
-      // shortcut: content the schema cannot fit at the selection is not pasted; general fitting comes with nested blocks (Phase 7).
-      if (error instanceof TransformError) return false;
-      throw error;
     }
+    return false;
   }
 
   private onSelectionChange = (): void => {
     if (!this.composing && this.hasFocus()) this.syncSelection();
   };
+}
+
+/**
+ * Pastes whole blocks at the caret (after deleting the selection), for content a slice cannot
+ * fit (lists): a single pasted list inside a list item joins that list (its items replace an
+ * empty item, go before or after the item, or between its two halves); other blocks go before
+ * or after the caret's textblock (replacing it when empty) where its parent takes them, else
+ * between its two halves. Throws TransformError where the schema does not allow it.
+ */
+function insertBlocks(tr: Transaction, doc: ModelNode): void {
+  const $pos = tr.selection.$from;
+  if (!$pos.parent.isTextblock) throw new TransformError("No textblock at the caret");
+  const atStart = $pos.parentOffset === 0;
+  const atEnd = $pos.parentOffset === $pos.parent.content.size;
+  const only = doc.childCount === 1 ? doc.firstChild : null;
+  const itemType = tr.doc.type.schema.nodes.listItem;
+  const inItem = $pos.depth >= 2 && $pos.node(-1).type === itemType;
+  let at: number;
+  let content = doc.content;
+  if (only && inItem && only.firstChild?.type === itemType) {
+    content = only.content;
+    const depth = $pos.depth - 1;
+    const item = $pos.node(depth);
+    if (atStart && atEnd && item.childCount === 1) {
+      at = $pos.before(depth);
+      tr.delete(at, $pos.after(depth));
+    } else if (atEnd && $pos.indexAfter(depth) === item.childCount) at = $pos.after(depth);
+    else if (atStart && $pos.index(depth) === 0) at = $pos.before(depth);
+    else {
+      tr.split($pos.pos, 2);
+      at = $pos.pos + 2;
+    }
+  } else {
+    // Before, after, or in place of the textblock where its parent takes the blocks there (a
+    // list item's first paragraph must stay first); else between its two halves.
+    const parent = $pos.node(-1);
+    const index = $pos.index(-1);
+    if (atStart && atEnd && parent.canReplace(index, index + 1, content)) {
+      at = $pos.before();
+      tr.delete(at, $pos.after());
+    } else if (atStart && parent.canReplace(index, index, content)) at = $pos.before();
+    else if (atEnd && parent.canReplace(index + 1, index + 1, content)) at = $pos.after();
+    else {
+      tr.split($pos.pos);
+      at = $pos.pos + 1;
+    }
+  }
+  tr.insert(at, content);
+  tr.setSelection(Selection.near(tr.doc.resolve(at + content.size), -1));
 }
 
 /** The first block element inside a container element (through nested containers), or null. */
