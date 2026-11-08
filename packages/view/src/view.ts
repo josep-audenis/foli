@@ -36,10 +36,10 @@ import {
 import {
   type BlockDesc,
   createWrapper,
+  isWrapper,
   isWrapperFor,
   PAGE_BREAK_ATTR,
   renderBlock,
-  WRAPPER_ATTR,
 } from "./render.js";
 
 /**
@@ -381,19 +381,30 @@ export class EditorView {
     const chains: (readonly Container[])[] = [];
     // Leaf blocks at any depth, in document order, with the containers around each.
     const open: Container[] = [];
+    // The chain of the open containers and its key, rebuilt only when they change (blocks in
+    // the same container share one array).
+    let chain: readonly Container[] = [];
+    let chainKey = "";
+    const changed = () => {
+      chain = open.slice();
+      chainKey = open.map((container) => container.node.type.name).join(">");
+    };
     doc.descendants((node, pos, _parent, index) => {
+      let popped = false;
       while (open.length) {
         const last = open[open.length - 1] as Container;
         if (pos < last.pos + last.node.nodeSize) break;
         open.pop();
+        popped = true;
       }
       if (!node.isTextblock && !node.isLeaf) {
         open.push({ node, pos, index, firstBlock: blocks.length });
+        changed();
         return true;
       }
+      if (popped) changed();
       // A block moved into or out of a container (wrapped in a list, indented, lifted) keeps its
       // node but not its line width or margins: measure it again, and re-flow from it.
-      const chainKey = open.map((container) => container.node.type.name).join(">");
       const before = this.chainKeys.get(node);
       if (before !== undefined && before !== chainKey) this.stale.add(node);
       this.chainKeys.set(node, chainKey);
@@ -405,7 +416,7 @@ export class EditorView {
       if (reused) previous.delete(node);
       blocks.push(reused ?? renderBlock(node, ownerDocument));
       starts.push(pos);
-      chains.push(open.slice());
+      chains.push(chain);
       return false;
     });
     for (const stale of previous.values())
@@ -522,6 +533,8 @@ export class EditorView {
     // block before it gets a new element instead of taking it (which would move every later block
     // into the next element along, e.g. when one list item moves to the next page).
     const pending = new Map<Node, number>(items.map((item) => [item.dom, item.block]));
+    /** Container elements placed in this pass (never taken twice). */
+    const claimed = new Set<Node>();
     let i = 0;
     for (let p = 0; p < count; p++) {
       const page = this.pages[p] as HTMLElement;
@@ -548,16 +561,30 @@ export class EditorView {
           const later = isWrapperFor(candidate, container.node)
             ? pending.get(firstBlockIn(candidate) as Node)
             : undefined;
+          // The element that holds this block now, at the innermost level: a list item whose
+          // block moves to another page takes its element along (as a paragraph does), instead
+          // of a new one replacing it on every page an edit shifts.
+          const own = k === chain.length - 1 ? item.dom.parentNode : null;
           if (
             isWrapperFor(candidate, container.node) &&
+            !claimed.has(candidate) &&
             (later === undefined || chains[later]?.[k]?.pos === container.pos)
           ) {
             element = candidate;
             parent.at = element.nextSibling;
+          } else if (
+            isWrapperFor(own, container.node) &&
+            !claimed.has(own) &&
+            !own.contains(parent.el)
+          ) {
+            element = own;
+            for (const level of stack) if (level.at === element) level.at = element.nextSibling;
+            parent.el.insertBefore(element, parent.at);
           } else {
             element = createWrapper(container.node, ownerDocument);
             parent.el.insertBefore(element, parent.at);
           }
+          claimed.add(element);
           styleContainer(element, container, chain[k - 1], item);
           stack.push({ el: element, at: element.firstChild, pos: container.pos });
         }
@@ -703,11 +730,7 @@ export class EditorView {
 
   /** Whether `node` holds blocks rather than content: the host, a page or a container. */
   private holdsBlocks(node: Node): boolean {
-    return (
-      node === this.host ||
-      this.pages.includes(node as HTMLElement) ||
-      (node instanceof Element && node.hasAttribute(WRAPPER_ATTR))
-    );
+    return node === this.host || this.pages.includes(node as HTMLElement) || isWrapper(node);
   }
 
   /** Index of the first block that starts at or after `pos` (the block count if none). */
@@ -1369,7 +1392,7 @@ export class EditorView {
 /** The first block element inside a container element (through nested containers), or null. */
 function firstBlockIn(element: Element): Element | null {
   let child = element.firstElementChild;
-  while (child?.hasAttribute(WRAPPER_ATTR)) child = child.firstElementChild;
+  while (isWrapper(child)) child = child.firstElementChild;
   return child;
 }
 
@@ -1384,13 +1407,22 @@ function styleContainer(
   parent: Container | undefined,
   item: { block: number; fragment: number },
 ): void {
-  if (element.tagName !== "LI") return;
+  if (element.localName !== "li") return;
   const continued = item.block !== container.firstBlock || item.fragment > 0;
-  element.style.listStyleType = continued ? "none" : "";
   const start = parent?.node.type.name === "orderedList" ? parent.node.attrs.start : undefined;
-  if (typeof start === "number") element.setAttribute("value", String(start + container.index));
-  else element.removeAttribute("value");
+  const value = typeof start === "number" ? String(start + container.index) : null;
+  // Written only when they change (checked against what was written last, without reading the
+  // DOM): this runs for every list item on every render, and every write invalidates style.
+  const state = `${continued}|${value}`;
+  if (containerStates.get(element) === state) return;
+  containerStates.set(element, state);
+  element.style.listStyleType = continued ? "none" : "";
+  if (value === null) element.removeAttribute("value");
+  else element.setAttribute("value", value);
 }
+
+/** What `styleContainer` last wrote on each list item element. */
+const containerStates = new WeakMap<HTMLElement, string>();
 
 /**
  * Client rects are scaled by CSS `zoom` or a `transform` on an ancestor, while margins and the

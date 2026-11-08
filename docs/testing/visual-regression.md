@@ -8,20 +8,23 @@ with Times New Roman. Foli itself ships no font.
 
 `apps/playground/e2e/fixtures.ts` holds deterministic documents (no randomness):
 
-| Fixture               | What it covers                                                   |
-| --------------------- | ---------------------------------------------------------------- |
-| `short`               | One page, marks                                                  |
-| `multi-page`          | Paragraphs of one to five lines over three pages                 |
-| `long-paragraph`      | One paragraph split over several pages                           |
-| `heading-at-boundary` | A heading that would end page 1 moves with its paragraph         |
-| `explicit-breaks`     | `pageBreak` in the middle and at the end of a paragraph          |
-| `mixed-font-sizes`    | Heading levels 1–6, bold and italic (schema v1 has no font size) |
-| `different-margins`   | US Letter with uneven margins                                    |
+| Fixture               | What it covers                                                                                                                           |
+| --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `short`               | One page, marks                                                                                                                          |
+| `multi-page`          | Paragraphs of one to five lines over three pages                                                                                         |
+| `long-paragraph`      | One paragraph split over several pages                                                                                                   |
+| `heading-at-boundary` | A heading that would end page 1 moves with its paragraph                                                                                 |
+| `explicit-breaks`     | `pageBreak` in the middle and at the end of a paragraph                                                                                  |
+| `mixed-font-sizes`    | Heading levels 1–6, bold and italic (schema v1 has no font size)                                                                         |
+| `different-margins`   | US Letter with uneven margins                                                                                                            |
+| `lists`               | Lists across pages (7.4): an item split at a line, a nested list across a break, a justified paragraph split, a rule, a centered heading |
 
 `openFixture(page, fixture)` stores the fixture as the playground document, reloads, serves
 the font (intercepted requests to `/__foli-test-font/`), applies it with `--foli-font-family`,
 waits for the faces to load, and waits until the layout stops changing between frames.
-`pageBreaks(page)` lists each page's elements as `<block>[.<fragment>] (<characters>) <start>`.
+`pageBreaks(page)` lists each page's blocks (paragraphs, headings, rules, at any depth) as
+`[>…] <block>[.<fragment>] (<characters>) <start>`, with one `>` per list item around the
+block. Fixtures are stored as format v2.
 
 ## Print
 

@@ -64,6 +64,33 @@ const mixed = (count: number, seed = 0) =>
   Array.from({ length: count }, (_, i) =>
     paragraph(text(`${i + 1}. ${words(4 + ((i * 13 + seed) % 5) * 14, i + seed)}`)),
   );
+const listItem = (...content: Block[]): Block => ({ type: "listItem", content });
+const bulletList = (...items: Block[]): Block => ({ type: "bulletList", content: items });
+const orderedList = (start: number, ...items: Block[]): Block => ({
+  type: "orderedList",
+  ...(start !== 1 ? { attrs: { start } } : {}),
+  content: items,
+});
+/**
+ * An ordered list of `count` items of one to five lines (longer with more `lineWords`); items 3
+ * and 8 (of each ten) hold a nested bulleted list of three items.
+ */
+const mixedList = (count: number, seed = 0, start = 1, lineWords = 14) =>
+  orderedList(
+    start,
+    ...Array.from({ length: count }, (_, i) => {
+      const first = paragraph(text(words(4 + ((i * 13 + seed) % 5) * lineWords, i + seed)));
+      if (i % 10 !== 3 && i % 10 !== 8) return listItem(first);
+      return listItem(
+        first,
+        bulletList(
+          ...[0, 1, 2].map((k) =>
+            listItem(paragraph(text(words(6 + k * Math.round(lineWords / 1.5), i + k + seed)))),
+          ),
+        ),
+      );
+    }),
+  );
 
 export const FIXTURES: Fixture[] = [
   {
@@ -125,6 +152,29 @@ export const FIXTURES: Fixture[] = [
     ]),
   },
   {
+    // Lists across pages (7.4): an item split at a line, a nested list across a break, a
+    // justified paragraph split across a break, a rule, alignment.
+    name: "lists",
+    settings: A4,
+    blocks: [
+      heading(1, "Lists across pages"),
+      paragraph(text(words(40, 2))),
+      mixedList(24, 1, 3, 24),
+      { type: "paragraph", attrs: { align: "justify" }, content: [text(words(700, 4))] },
+      { type: "horizontalRule" },
+      {
+        type: "heading",
+        attrs: { level: 2, align: "center" },
+        content: [text("A centered heading")],
+      },
+      bulletList(
+        ...Array.from({ length: 12 }, (_, i) =>
+          listItem(paragraph(text(words(10 + (i % 4) * 12, i)))),
+        ),
+      ),
+    ],
+  },
+  {
     name: "different-margins",
     settings: {
       pageSize: { width: 215.9, height: 279.4 },
@@ -183,7 +233,7 @@ export async function loadTestFont(page: Page, extraCss = ""): Promise<void> {
 
 /** The stored form of a document (what the playground keeps in localStorage). */
 export function stored(settings: Settings, blocks: Block[]) {
-  return { schemaVersion: 1, settings, content: { type: "doc", content: blocks } };
+  return { schemaVersion: 2, settings, content: { type: "doc", content: blocks } };
 }
 
 /**
@@ -210,32 +260,39 @@ export async function openFixture(page: Page, fixture: Fixture): Promise<void> {
 
 /**
  * A document of `sections` sections, each a heading and thirteen paragraphs of one to five lines
- * (some split across pages): about one A4 page per section with the test font.
+ * (some split across pages): about one A4 page per section with the test font. With `lists`,
+ * each section's paragraphs are an ordered list instead (eleven items, two holding a nested
+ * list of three), about as long.
  */
-export function benchDocument(sections: number) {
+export function benchDocument(sections: number, lists = false) {
   return stored(
     A4,
     Array.from({ length: sections }, (_, i) => [
       heading(2, `Section ${i + 1}`),
-      ...mixed(13, i),
+      ...(lists ? [mixedList(11, i)] : mixed(13, i)),
     ]).flat(),
   );
 }
 
 /**
- * Each page's elements as `<block>[.<fragment>] (<characters>) <first characters>`, for
- * snapshots: the page breaks of the document as laid out.
+ * Each page's blocks as `[>…] <block>[.<fragment>] (<characters>) <first characters>`, for
+ * snapshots: the page breaks of the document as laid out. Blocks inside lists are listed in
+ * order, prefixed with one `>` per list item around them.
  */
 export function pageBreaks(page: Page): Promise<string[][]> {
   return page.evaluate(() => {
     const host = document.querySelector('[role="textbox"]');
     let block = -1;
     return [...(host?.querySelectorAll(":scope > .foli-page") ?? [])].map((sheet) =>
-      [...sheet.children].map((element) => {
+      [...sheet.querySelectorAll("p, h1, h2, h3, h4, h5, h6, hr")].map((element) => {
         const fragment = Number(element.getAttribute("data-fragment") ?? 0);
         if (fragment === 0) block++;
         const content = element.textContent ?? "";
-        return `${block}${fragment ? `.${fragment}` : ""} (${content.length}) ${content.slice(0, 24)}`;
+        let depth = 0;
+        for (let up = element.parentElement; up && up !== sheet; up = up.parentElement)
+          if (up.tagName === "LI") depth++;
+        const prefix = depth ? `${">".repeat(depth)} ` : "";
+        return `${prefix}${block}${fragment ? `.${fragment}` : ""} (${content.length}) ${content.slice(0, 24)}`;
       }),
     );
   });

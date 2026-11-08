@@ -10,6 +10,7 @@ import {
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { serializeRange } from "./clipboard.js";
 import { EditorView } from "./index.js";
+import { renderBlock } from "./render.js";
 
 const text = (t: string) => ({ type: "text", text: t });
 const p = (t?: string) => ({ type: "paragraph", ...(t ? { content: [text(t)] } : {}) });
@@ -311,10 +312,18 @@ describe("nested blocks: review regressions (PR #35)", () => {
       chains: unknown;
     };
     internal.place(internal.blocks, [[0], [0], [0], [1], [1], [1]], internal.chains);
-    const fifth = [...host.querySelectorAll("p")].find((el) => el.textContent === "5");
+    const byText = (t: string) =>
+      [...host.querySelectorAll("p")].find((el) => el.textContent === t);
+    const fifth = byText("5");
     const li = fifth?.parentElement;
+    const thirdLi = byText("3")?.parentElement;
     internal.place(internal.blocks, [[0], [0], [1], [1], [1], [1]], internal.chains);
     expect(fifth?.parentElement).toBe(li); // still in its own <li>
+    // The item that moved to the next page took its <li> along, as a paragraph moves itself.
+    expect(byText("3")?.parentElement).toBe(thirdLi);
+    expect(host.querySelectorAll(".foli-page")[1]?.firstElementChild?.firstElementChild).toBe(
+      thirdLi,
+    );
     const pages = host.querySelectorAll(".foli-page");
     expect(pages[1]?.querySelectorAll("li > p")).toHaveLength(4);
   });
@@ -340,5 +349,22 @@ describe("nested blocks: review regressions (PR #35)", () => {
       new MouseEvent("mousedown", { bubbles: true, button: 0, detail: 1, shiftKey: true }),
     );
     expect(editor.state.selection).not.toBeInstanceOf(NodeSelection);
+  });
+});
+
+describe("justified text across a page break", () => {
+  it("keeps a split justified paragraph justified up to the break, not after its end", () => {
+    const { editor } = mount({
+      type: "doc",
+      content: [{ type: "paragraph", attrs: { align: "justify" }, content: [text("abcdef")] }],
+    } as DocJSON);
+    const node = editor.state.doc.child(0);
+    const { fragments } = renderBlock(node, document, [2, 4]);
+    expect(fragments.map((f) => f.style.textAlignLast)).toEqual(["justify", "justify", ""]);
+    expect(fragments.map((f) => f.style.textAlign)).toEqual(["justify", "justify", "justify"]);
+    // Other alignments do not justify a fragment's last line.
+    const centered = editor.state.schema.nodes.paragraph?.create({ align: "center" }, node.content);
+    const split = renderBlock(centered as typeof node, document, [3]);
+    expect(split.fragments.map((f) => f.style.textAlignLast)).toEqual(["", ""]);
   });
 });

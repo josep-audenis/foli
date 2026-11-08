@@ -186,6 +186,41 @@ change that breaks one needs a reason in its PR, and the table above re-run:
 | Initial layout (synchronous)            |   ≤ 60 ms |  ≤ 120 ms |
 | Full re-flow after a font change        |  ≤ 100 ms |  ≤ 250 ms |
 
+### Lists (7.4)
+
+`benchDocument(100, true)`: the same 100 sections with each section's paragraphs as an ordered
+list (eleven items of one to five lines, two of them holding a nested list of three short
+items): 114 pages, about 1,800 blocks (1,400 in the paragraph document). Same operations; run
+next to the paragraph document in one session (2026-11-08, same machine, one run, so single
+cells may be off by ~30%):
+
+| Engine   | Document   | Pages | layout | type handler p50 | type paint p50 / p95 | Enter handler p50 | Enter paint p50 / p95 | re-flow |
+| -------- | ---------- | ----: | -----: | ---------------: | -------------------: | ----------------: | --------------------: | ------: |
+| Chromium | paragraphs |   100 |   48.3 |              4.2 |           7.2 / 11.2 |               5.0 |            8.1 / 19.9 |    99.3 |
+| Chromium | lists      |   114 |   88.7 |              6.8 |          10.4 / 20.7 |              14.4 |           21.1 / 56.4 |   155.2 |
+| Firefox  | paragraphs |   100 |     45 |                5 |               7 / 12 |                 5 |                8 / 13 |    50.7 |
+| Firefox  | lists      |   114 |     82 |                8 |              11 / 18 |                16 |               18 / 53 |   124.5 |
+| WebKit   | paragraphs |   100 |     72 |                4 |              15 / 31 |                 6 |               16 / 41 |      93 |
+| WebKit   | lists      |   114 |    121 |               10 |              25 / 46 |                16 |               31 / 94 |     155 |
+
+**Reading:**
+
+- **Typing in a list stays within the targets** (handler p50 7-8 ms in Chromium and Firefox,
+  p95 18-21 ms). **Enter at the top of the document does not** (handler p50 14-16 ms, p95 about
+  55 ms), nor do the initial layout (82-89 ms) and the re-flow in Chromium (155 ms).
+- Most of the Enter difference is the document, not lists: in the paragraph document a
+  paragraph split across the end of page 1 absorbs the extra line and the later pages stay as
+  they were (about 18 DOM nodes added per Enter); in the list document page ends fall between
+  short items that cannot split, so every Enter on page 1 moves the last item of every page to
+  the next one (about 136 nodes per Enter, counted with a `MutationObserver`). A paragraph
+  document of short paragraphs would behave the same.
+- What lists add on top: about 30% more blocks for the same text, container elements per page
+  (a moved item takes its `<li>` along, its number is rewritten only when it changes), and more
+  DOM for the browser to lay out (initial layout per block ~0.049 ms against ~0.034 ms).
+- Not done: placing only the pages an edit changed (today every render walks every block), and
+  the items in "Not done yet" below. The paragraph document's numbers above, from the same
+  session, stay within the targets.
+
 Not done yet: the per-keystroke walk over every block, the whole-document `onChange`
 serialization, virtualizing pages far from the viewport, and moving the first layout off the main
 thread. None is needed for these targets; revisit when a target fails or documents grow past a

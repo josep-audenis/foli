@@ -1,4 +1,5 @@
 import { expect, type Page, test } from "@playwright/test";
+import { FIXTURES, openFixture } from "./fixtures.js";
 
 /** Nested blocks on pages (task 7.3, ADR-0004): lists, list items, a rule, a link. */
 
@@ -140,4 +141,29 @@ test("a click on a rule selects it; a click on a link does not navigate", async 
   await editor(page).getByText("a link").click();
   await expect(hr).not.toHaveClass(/foli-selected-node/);
   expect(page.url()).toBe(url);
+});
+
+test("an item split across pages shows its marker once; a split justified paragraph stays justified", async ({
+  page,
+}) => {
+  const fixture = FIXTURES.find((f) => f.name === "lists");
+  if (!fixture) throw new Error("no lists fixture");
+  await openFixture(page, fixture);
+  const styles = await page.evaluate(() => {
+    const split = [...document.querySelectorAll('.foli-page li > p[data-fragment="1"]')];
+    const firsts = [...document.querySelectorAll('.foli-page li > p[data-fragment="0"]')];
+    const justified = [...document.querySelectorAll(".foli-page > p[data-fragment]")];
+    const marker = (p: Element) => getComputedStyle(p.parentElement as Element).listStyleType;
+    return {
+      continued: split.map(marker),
+      started: firsts.map(marker),
+      alignLast: justified.map((p) => getComputedStyle(p).textAlignLast),
+    };
+  });
+  expect(styles.continued.length).toBeGreaterThan(0);
+  expect(styles.continued.every((type) => type === "none")).toBe(true);
+  expect(styles.started.every((type) => type === "decimal")).toBe(true);
+  // Every fragment but the last justifies its last line.
+  expect(styles.alignLast.slice(0, -1).every((value) => value === "justify")).toBe(true);
+  expect(styles.alignLast.at(-1)).not.toBe("justify");
 });

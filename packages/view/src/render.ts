@@ -89,7 +89,12 @@ export function renderBlock(
     if (all.length > 1) {
       fragment.dataset.fragment = String(i);
       if (i > 0) fragment.style.marginTop = "0";
-      if (i < all.length - 1) fragment.style.marginBottom = "0";
+      if (i < all.length - 1) {
+        fragment.style.marginBottom = "0";
+        // A fragment's last line is not the paragraph's last line: justified text stays
+        // justified up to the page break (CSS would align a block's last line to the start).
+        if (align === "justify") fragment.style.textAlignLast = "justify";
+      }
     }
     return fragment;
   });
@@ -141,9 +146,13 @@ export function renderBlock(
  * (block margins and paddings 0): the page flow treats the blocks inside as siblings, whose
  * margins collapse through it (ADR-0004).
  */
+/** Every container element the view created (a set: checked for every block on every render). */
+const wrappers = new WeakSet<Node>();
+
 export function createWrapper(node: ModelNode, doc: Document): HTMLElement {
   const element = doc.createElement(WRAPPER_TAGS.get(node.type.name) ?? "div");
   element.setAttribute(WRAPPER_ATTR, "");
+  wrappers.add(element);
   const { style } = element;
   style.marginTop = style.marginBottom = style.paddingTop = style.paddingBottom = "0";
   return element;
@@ -152,10 +161,15 @@ export function createWrapper(node: ModelNode, doc: Document): HTMLElement {
 /** Whether `element` is the container element `createWrapper` makes for `node`. */
 export function isWrapperFor(element: Node | null, node: ModelNode): element is HTMLElement {
   return (
-    element instanceof HTMLElement &&
-    element.hasAttribute(WRAPPER_ATTR) &&
-    element.tagName.toLowerCase() === (WRAPPER_TAGS.get(node.type.name) ?? "div")
+    element !== null &&
+    wrappers.has(element) &&
+    (element as HTMLElement).localName === (WRAPPER_TAGS.get(node.type.name) ?? "div")
   );
+}
+
+/** Whether `node` is a container element the view created. */
+export function isWrapper(node: Node | null): node is HTMLElement {
+  return node !== null && wrappers.has(node);
 }
 
 /**
@@ -169,6 +183,7 @@ export function renderTree(content: Iterable<ModelNode>, parent: Node, doc: Docu
       continue;
     }
     const element = createWrapper(node, doc);
+    wrappers.delete(element);
     element.removeAttribute(WRAPPER_ATTR);
     element.removeAttribute("style");
     const start = node.attrs.start;
