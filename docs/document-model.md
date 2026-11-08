@@ -3,8 +3,7 @@
 > Status: envelope, schema v2 (with the v1 → v2 migration) and the document model (schema from
 > specs, immutable nodes, positions, slices, JSON in/out) are implemented in `@folijs/core`
 > (`packages/core/src/document.ts`, `packages/core/src/schema.ts`, `packages/core/src/model/`).
-> The view shows v2's lists, rules, links, colors and alignment from task 7.3 on; until then
-> they exist only in the engine. Steps, transactions, history and
+> The view renders and edits all of v2 (0.2.0). Steps, transactions, history and
 > commands (Phase 3) are described in [architecture.md](architecture.md#editing-engine-folicore).
 
 ## Canonical form

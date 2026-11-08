@@ -4,14 +4,17 @@ An open-source document-editing engine for the web, built from the ground up: it
 model, transactions, view and layout, designed around native pagination, with first-class React
 integration.
 
-> **Status: 0.1.0, the first release ([npm](https://www.npmjs.com/package/@folijs/react)).** Foli edits documents with its own model, engine and
-> view (no ProseMirror/Tiptap/Lexical) on real pages: paragraphs split across pages at a line,
-> explicit page breaks, widow/orphan and keep-with-next rules, incremental reflow, print with
-> one sheet per page. Paragraphs and headings; bold, italic, underline, strikethrough;
-> undo/redo; IME; copy/cut/paste (HTML mapped to the schema). React components with a toolbar
-> and server rendering. The API may change in any 0.x version. Manual IME, screen-reader and
-> real-paste checks are not run yet: read the [known limitations](docs/limitations.md). Next:
-> lists, links and alignment (Phase 7, [roadmap](docs/roadmap.md)).
+> **Status: 0.2.0 ([npm](https://www.npmjs.com/package/@folijs/react)).** Foli edits documents
+> with its own model, engine and view (no ProseMirror/Tiptap/Lexical) on real pages: paragraphs
+> and list items split across pages at a line, explicit page breaks, widow/orphan and
+> keep-with-next rules, incremental reflow, print with one sheet per page. Paragraphs, headings,
+> bulleted and numbered lists (nested), horizontal rules; bold, italic, underline,
+> strikethrough, links, text color, highlight; alignment; undo/redo; IME; copy/cut/paste (HTML
+> from Word, Google Docs and web pages mapped to the schema). React components with a toolbar
+> and server rendering. Documents saved by 0.1.0 load unchanged. The API may change in any 0.x
+> version. Manual IME, screen-reader and real-paste checks are not run yet: read the
+> [known limitations](docs/limitations.md). Next: tables and images (Phase 8,
+> [roadmap](docs/roadmap.md)).
 
 ## Usage
 

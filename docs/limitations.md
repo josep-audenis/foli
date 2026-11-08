@@ -1,7 +1,6 @@
 # Known limitations
 
-What Foli does not do yet, or does with caveats, as of 0.1.0 and the unreleased Phase 7 work on
-`main`. Read it before you ship. Details
+What Foli does not do yet, or does with caveats, as of 0.2.0. Read it before you ship. Details
 and the reasons are in [architecture.md](architecture.md), [pagination.md](pagination.md) and
 [ADR-0003](decisions/ADR-0003-rendering-and-input.md); what comes next is in the
 [roadmap](roadmap.md).
@@ -27,11 +26,9 @@ checklist in [testing/ime.md](testing/ime.md)):
 
 ## Content
 
-- 0.1.0 has schema v1 only: paragraphs, headings 1–6, line breaks, page breaks; bold, italic,
-  underline, strikethrough. Schema v2 (lists, links, alignment, colors, rules) is on `main` for
-  0.2.0: lists render, paginate and edit; links edit (dialog, Ctrl/Cmd+K) and open with
-  Ctrl/Cmd+click; alignment, colors and rules edit from the toolbar (pasting them from other
-  apps is 7.8). No tables or images (Phase 8), headers, footers or page numbers (Phase 9).
+- Schema v2: paragraphs, headings 1–6, bulleted and numbered lists, horizontal rules, line and
+  page breaks; bold, italic, underline, strikethrough, links, text color, highlight; alignment.
+  No tables or images (Phase 8), headers, footers or page numbers (Phase 9).
 - List editing:
   - Delete before (or at the end of the item before) an item that goes on with a nested list
     does nothing: lift the nested items first.

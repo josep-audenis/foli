@@ -51,3 +51,39 @@ test("the server HTML holds the editor's shell (Next.js)", async ({ request }, i
   expect(html).toContain('role="textbox"');
   expect(html).toContain('aria-label="Document"');
 });
+
+test("a document saved by 0.1.0 loads (schema v1 → v2); lists from the keyboard save as v2", async ({
+  page,
+}) => {
+  await page.goto("/");
+  // What 0.1.0 saved: schema v1, which the packages migrate on load.
+  await page.evaluate(() =>
+    localStorage.setItem(
+      "foli-example",
+      JSON.stringify({
+        schemaVersion: 1,
+        settings: {
+          pageSize: { width: 210, height: 297 },
+          margins: { top: 25.4, right: 25.4, bottom: 25.4, left: 25.4 },
+        },
+        content: {
+          type: "doc",
+          content: [{ type: "paragraph", content: [{ type: "text", text: "from 0.1.0" }] }],
+        },
+      }),
+    ),
+  );
+  await page.reload();
+  await expect(editor(page)).toHaveText("from 0.1.0");
+  await editor(page).click();
+  await page.keyboard.press("End");
+  await page.keyboard.press("ControlOrMeta+Shift+8");
+  await expect(editor(page).locator("ul > li")).toHaveText("from 0.1.0");
+  await expect
+    .poll(() => page.evaluate(() => localStorage.getItem("foli-example") ?? ""))
+    .toContain('"bulletList"');
+  const saved = JSON.parse(
+    (await page.evaluate(() => localStorage.getItem("foli-example"))) ?? "null",
+  );
+  expect(saved.schemaVersion).toBe(2);
+});

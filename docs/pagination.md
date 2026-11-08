@@ -2,7 +2,8 @@
 
 > Status: **built (Phase 5); gate G4 passed provisionally** (2026-11-07, on automated evidence;
 > the page-break manual checks are open risks in
-> [ADR-0003](decisions/ADR-0003-rendering-and-input.md)). This page describes what is built and
+> [ADR-0003](decisions/ADR-0003-rendering-and-input.md)); nested blocks (lists, rules) paginate
+> since 0.2.0 ([ADR-0004](decisions/ADR-0004-nested-blocks-on-pages.md)). This page describes what is built and
 > why; the implementation details are in "Editor view" in [architecture.md](architecture.md),
 > the numbers in [benchmarks.md](benchmarks.md).
 

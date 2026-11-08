@@ -33,6 +33,100 @@ const sample = createDocument({
         { type: "text", text: "after a hard break." },
       ],
     },
+    // Schema v2 (0.2.0): every feature once, so the playground shows them all.
+    { type: "heading", attrs: { level: 2 }, content: [{ type: "text", text: "Rich content" }] },
+    {
+      type: "paragraph",
+      content: [
+        { type: "text", text: "A " },
+        {
+          type: "text",
+          text: "link",
+          marks: [{ type: "link", attrs: { href: "https://github.com/josep-audenis/foli" } }],
+        },
+        { type: "text", text: " (Ctrl/Cmd+K edits it, Ctrl/Cmd+click opens it), " },
+        {
+          type: "text",
+          text: "red text",
+          marks: [{ type: "textColor", attrs: { color: "#c00000" } }],
+        },
+        { type: "text", text: " and a " },
+        {
+          type: "text",
+          text: "highlight",
+          marks: [{ type: "highlight", attrs: { color: "#fff59d" } }],
+        },
+        { type: "text", text: "." },
+      ],
+    },
+    {
+      type: "bulletList",
+      content: [
+        {
+          type: "listItem",
+          content: [
+            {
+              type: "paragraph",
+              content: [{ type: "text", text: "A bulleted list (Ctrl/Cmd+Shift+8)." }],
+            },
+          ],
+        },
+        {
+          type: "listItem",
+          content: [
+            {
+              type: "paragraph",
+              content: [{ type: "text", text: "Tab nests an item, Shift+Tab lifts it:" }],
+            },
+            {
+              type: "orderedList",
+              attrs: { start: 3 },
+              content: [
+                {
+                  type: "listItem",
+                  content: [
+                    {
+                      type: "paragraph",
+                      content: [{ type: "text", text: "a numbered list (Ctrl/Cmd+Shift+7)" }],
+                    },
+                  ],
+                },
+                {
+                  type: "listItem",
+                  content: [
+                    {
+                      type: "paragraph",
+                      content: [{ type: "text", text: "starting at 3" }],
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    },
+    { type: "horizontalRule" },
+    {
+      type: "paragraph",
+      attrs: { align: "center" },
+      content: [{ type: "text", text: "Centered, after a horizontal rule." }],
+    },
+    {
+      type: "paragraph",
+      attrs: { align: "end" },
+      content: [{ type: "text", text: "Aligned to the end." }],
+    },
+    {
+      type: "paragraph",
+      attrs: { align: "justify" },
+      content: [
+        {
+          type: "text",
+          text: "Justified text spreads its words to fill every line but the last, so both edges of the paragraph line up, as in a printed book or a newspaper column.",
+        },
+      ],
+    },
   ],
 });
 

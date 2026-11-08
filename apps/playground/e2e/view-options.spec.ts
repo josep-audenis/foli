@@ -62,7 +62,7 @@ test("read-only mode keeps the document unchanged and still copies", async ({ pa
   await readOnly(page).check();
   await expect(editor(page)).toHaveAttribute("contenteditable", "false");
 
-  await editor(page).getByRole("heading").click();
+  await editor(page).getByRole("heading", { level: 1 }).click();
   for (const key of ["x", "Enter", "Backspace", "Delete", `${MOD}+b`, `${MOD}+z`]) {
     await page.keyboard.press(key);
   }
@@ -89,7 +89,7 @@ test("read-only mode keeps the document unchanged and still copies", async ({ pa
   });
   // Drag across "Foli" (a double-click at the heading's centre lands past its text).
   const word = await editor(page)
-    .getByRole("heading")
+    .getByRole("heading", { level: 1 })
     .evaluate((h1) => {
       const range = document.createRange();
       range.setStart(h1.firstChild as Text, 0);
@@ -111,7 +111,7 @@ test("read-only mode keeps the document unchanged and still copies", async ({ pa
   // Editable again: typing works.
   await readOnly(page).uncheck();
   await expect(editor(page)).toHaveAttribute("contenteditable", "true");
-  await editor(page).getByRole("heading").click();
+  await editor(page).getByRole("heading", { level: 1 }).click();
   await page.keyboard.press("End");
   await page.keyboard.type("!");
   await expect.poll(async () => (await texts(page))[0]).toBe("Foli Playground!");
