@@ -551,7 +551,7 @@ top-level block, marks rendered without attrs).
   keys Tab/Shift-Tab inside lists only (Tab elsewhere still leaves the editor), Mod-Shift-7/8;
   the `beforeinput` fallback runs the same commands; toolbar buttons (bulleted, numbered,
   indent, outdent). Undo restores document and selection exactly; e2e in three engines.
-- [ ] 7.6 Links: `setLink(href)`/`removeLink` commands validating `href`; `normalizeHref`
+- [x] 7.6 (#38) Links: `setLink(href)`/`removeLink` commands validating `href`; `normalizeHref`
   (trim, percent-encode spaces, `\` to `/`) before validation, for pasted and typed URLs; React link editing
   (toolbar button and Mod-K open a small accessible dialog: URL field, apply, remove);
   Ctrl/Cmd+click opens the link in a new tab (`noopener`); autolink of a pasted plain-text URL.
