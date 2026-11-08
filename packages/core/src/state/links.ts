@@ -1,13 +1,16 @@
 import type { Mark, MarkType, ResolvedPos } from "../model/index.js";
 import { isSafeHref } from "../schema.js";
 import { TransformError } from "../transform/transform.js";
-import { attempt } from "./commands.js";
+import { attempt } from "./attempt.js";
 import { AllSelection, marksAt, TextSelection } from "./selection.js";
 import type { Command, EditorState, Transaction } from "./state.js";
 
-const EMAIL = /^[^\s@/:]+@[^\s@/:]+\.[a-z]{2,}$/i;
-/** A host name with a dot and a letter TLD (`www.` alone is enough), then a port, path or end. */
-const DOMAIN = /^(?:www\.|(?:[a-z0-9-]+\.)+[a-z]{2,}(?:[:/?#]|$))/i;
+const EMAIL = /^[^\s@/:]+@[^\s@/:]+\.\p{L}{2,}$/iu;
+/**
+ * A host name with a dot and a letter TLD (`www.` alone is enough; letters in any script), then a
+ * port, path or end.
+ */
+const DOMAIN = /^(?:www\.|(?:[\p{L}\p{N}-]+\.)+\p{L}{2,}(?:[:/?#]|$))/iu;
 const AUTOLINK = /^(?:https?:\/\/|mailto:|www\.)\S+$/i;
 
 /**

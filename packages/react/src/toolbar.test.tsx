@@ -273,6 +273,70 @@ describe("FoliToolbar", () => {
     expect(JSON.stringify(editor.getDocument())).not.toContain("link");
   });
 
+  it("Apply with the link unchanged closes the dialog, without an error", () => {
+    const handle = setup();
+    const { editor } = handle;
+    const documentBox = screen.getByRole("textbox", { name: "Document" });
+    act(() => handle.focus());
+    act(() => editor.select(1, 6));
+    act(() => {
+      editor.commands.setLink("https://x.test");
+    });
+    act(() => editor.select(3));
+    fireEvent.keyDown(documentBox, { key: "k", ctrlKey: true });
+    const url = screen.getByRole("textbox", { name: "URL" });
+    fireEvent.change(url, { target: { value: "x.test" } }); // normalizes to the same href
+    fireEvent.click(button("Apply"));
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(document.activeElement).toBe(documentBox);
+  });
+
+  it("the dialog closes when the selection or document changes; a second Mod-K refocuses it", () => {
+    const handle = setup();
+    const { editor } = handle;
+    const documentBox = screen.getByRole("textbox", { name: "Document" });
+    act(() => handle.focus());
+    act(() => editor.select(1, 6));
+    fireEvent.keyDown(documentBox, { key: "k", ctrlKey: true });
+    const url = screen.getByRole("textbox", { name: "URL" });
+    // Back in the document (a click there), Mod-K again: the same dialog, focused again.
+    act(() => documentBox.focus());
+    fireEvent.keyDown(documentBox, { key: "k", ctrlKey: true });
+    expect(screen.getAllByRole("dialog")).toHaveLength(1);
+    expect(document.activeElement).toBe(url);
+    // The selection moves (a click elsewhere in the document): the dialog is for the old one.
+    act(() => editor.select(8));
+    expect(screen.queryByRole("dialog")).toBeNull();
+    fireEvent.keyDown(documentBox, { key: "k", ctrlKey: true });
+    act(() => {
+      editor.commands.insertText("z");
+    });
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("the Link button by keyboard gives the focus back to it on close", () => {
+    const handle = setup();
+    act(() => handle.focus());
+    act(() => handle.editor.select(1, 6));
+    act(() => button("Link").focus());
+    fireEvent.click(button("Link"), { detail: 0 });
+    fireEvent.keyDown(screen.getByRole("textbox", { name: "URL" }), { key: "Escape" });
+    expect(document.activeElement).toBe(button("Link"));
+  });
+
+  it("a dialog open when the toolbar is disabled does not come back after", () => {
+    const { rerender } = render(<FoliEditor initialContent={doc} />);
+    const documentBox = screen.getByRole("textbox", { name: "Document" });
+    act(() => documentBox.focus());
+    fireEvent.keyDown(documentBox, { key: "k", ctrlKey: true });
+    expect(screen.getByRole("dialog")).toBeTruthy();
+    rerender(<FoliEditor initialContent={doc} readOnly />);
+    expect(screen.queryByRole("dialog")).toBeNull();
+    rerender(<FoliEditor initialContent={doc} />);
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
   it("opens no link dialog in read-only mode, not even after it ends", () => {
     const { rerender } = render(<FoliEditor initialContent={doc} readOnly />);
     const documentBox = screen.getByRole("textbox", { name: "Document" });

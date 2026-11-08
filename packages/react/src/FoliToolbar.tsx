@@ -3,9 +3,11 @@ import {
   type Editor,
   type EditorState,
   insertPageBreak,
+  isSafeHref,
   liftListItem,
   linkAt,
   listTypeAt,
+  normalizeHref,
   openLinkEditor,
   redo,
   redoDepth,
@@ -201,6 +203,15 @@ function canIndent(state: EditorState): boolean {
   return false;
 }
 
+interface LinkDialogState {
+  /** The link at the selection when the dialog opened ("" for none). */
+  href: string;
+  selection: EditorState["selection"];
+  /** Where the focus goes back to on close. */
+  restore: HTMLElement | null;
+  request: number;
+}
+
 interface ItemState {
   pressed: boolean | undefined;
   enabled: boolean;
@@ -246,23 +257,41 @@ export function FoliToolbar({
   };
 
   // The link dialog opens on a request from the link button or Mod-K in the document, and
-  // gives the focus back to where it was (the document, or the button) when it closes.
-  const [dialog, setDialog] = useState<{ href: string; restore: HTMLElement | null } | null>(null);
+  // gives the focus back to where it was (the document, or the button) when it closes. It is
+  // for the selection it opened on: a change to the document or the selection (a click in the
+  // document) closes it. A second request while it is open focuses it again.
+  const [dialog, setDialog] = useState<LinkDialogState | null>(null);
   useEffect(
     () =>
       editor.subscribe((state, transactions) => {
-        if (disabled || !transactions.some(requestsLinkEditor)) return;
+        if (disabled) return;
+        if (!transactions.some(requestsLinkEditor)) {
+          setDialog((current) =>
+            current &&
+            (transactions.some((tr) => tr.docChanged) || !state.selection.eq(current.selection))
+              ? null
+              : current,
+          );
+          return;
+        }
         const active = typeof document === "undefined" ? null : document.activeElement;
-        setDialog(
-          (current) =>
-            current ?? {
-              href: linkAt(state) ?? "",
-              restore: active instanceof HTMLElement ? active : null,
-            },
+        setDialog((current) =>
+          current
+            ? { ...current, request: current.request + 1 }
+            : {
+                href: linkAt(state) ?? "",
+                selection: state.selection,
+                restore: active instanceof HTMLElement ? active : null,
+                request: 0,
+              },
         );
       }),
     [editor, disabled],
   );
+  // A dialog never outlives a disabled toolbar (it would come back when enabled again).
+  useEffect(() => {
+    if (disabled) setDialog(null);
+  }, [disabled]);
   const closeDialog = () => {
     dialog?.restore?.focus();
     setDialog(null);
@@ -328,7 +357,12 @@ export function FoliToolbar({
         ))}
       </div>
       {dialog && !disabled && (
-        <LinkDialog editor={editor} href={dialog.href} onClose={closeDialog} />
+        <LinkDialog
+          editor={editor}
+          href={dialog.href}
+          request={dialog.request}
+          onClose={closeDialog}
+        />
       )}
     </>
   );
@@ -342,10 +376,13 @@ export function FoliToolbar({
 function LinkDialog({
   editor,
   href,
+  request,
   onClose,
 }: {
   editor: Editor;
   href: string;
+  /** Counts the open requests: each one focuses the field. */
+  request: number;
   onClose: () => void;
 }) {
   const [value, setValue] = useState(href);
@@ -353,14 +390,18 @@ function LinkDialog({
   const input = useRef<HTMLInputElement>(null);
   const id = useId();
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: each request focuses the field again.
   useEffect(() => {
     input.current?.focus();
     input.current?.select();
-  }, []);
+  }, [request]);
 
   const apply = (event: FormEvent) => {
     event.preventDefault();
-    if (editor.run(setLink(value))) onClose();
+    // The same link again changes nothing (the command does not apply): that is not an error.
+    const normalized = normalizeHref(value);
+    const unchanged = isSafeHref(normalized) && linkAt(editor.state) === normalized;
+    if (unchanged || editor.run(setLink(value))) onClose();
     else {
       setInvalid(true);
       input.current?.focus();

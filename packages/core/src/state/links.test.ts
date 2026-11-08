@@ -64,6 +64,10 @@ describe("normalizeHref and autolinkHref", () => {
     expect(normalizeHref("www.example.com/path?q=1")).toBe("https://www.example.com/path?q=1");
     expect(normalizeHref("sub.example.org:8080/x")).toBe("https://sub.example.org:8080/x");
     expect(normalizeHref("someone@example.com")).toBe("mailto:someone@example.com");
+    // Host names and email addresses in any script.
+    expect(normalizeHref("пример.рф/путь")).toBe("https://пример.рф/путь");
+    expect(normalizeHref("имя@пример.рф")).toBe("mailto:имя@пример.рф");
+    expect(isSafeHref(normalizeHref("пример.рф"))).toBe(true);
     // Already complete, or relative: unchanged.
     for (const href of ["https://example.com", "mailto:a@b.co", "tel:+34600", "/docs", "#top"]) {
       expect(normalizeHref(href)).toBe(href);
@@ -113,6 +117,18 @@ describe("link commands", () => {
         p(t("a "), t("link", link("https://new.com")), t(" b")),
       ]);
     }
+  });
+
+  it("a caret between two different links edits the one before it", () => {
+    const editor = editorWith(p(t("ab", link("https://a.test")), t("cd", link("https://c.test"))));
+    editor.select(3);
+    expect(linkAt(editor.state)).toBe("https://a.test");
+    expect(editor.commands.setLink("https://z.test")).toBe(true);
+    expect(json(editor)).toEqual([
+      p(t("ab", link("https://z.test")), t("cd", link("https://c.test"))),
+    ]);
+    // The same link again changes nothing: the command does not apply.
+    expect(editor.commands.setLink("z.test")).toBe(false);
   });
 
   it("setLink at a caret outside links inserts the href as linked text", () => {

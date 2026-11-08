@@ -46,7 +46,10 @@ checklist in [testing/ime.md](testing/ime.md)):
   - Links are not followed on touch devices (no Ctrl/Cmd+click), nor with a middle click;
     there is no hover preview of the address.
   - Mod-K opens the dialog only with a `FoliToolbar` for the editor; elsewhere it does
-    nothing (the browser's own Ctrl+K is not run inside the document).
+    nothing (the browser's own Ctrl+K is not run inside the document). With two toolbars for
+    one editor, each opens its own dialog.
+  - Relative links include `//host/path`, which goes to another site over the page's own
+    protocol (allowed by the format; the protocol is still http or https).
 - HTML paste keeps what the schema held in 0.1.0: links keep their text, lists and table cells
   become paragraphs, images and colors are dropped (7.8 maps them). A pasted plain-text URL
   becomes a link.
