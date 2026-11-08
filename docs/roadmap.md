@@ -508,7 +508,7 @@ schema (fixtures) and copies back out; no `href` outside the safe protocols reac
 document by any path; axe passes on the new toolbar controls; the 100-page benchmark stays
 within its targets; 0.2.0 published. (Accepted 2026-11-08 by the owner: the paragraph benchmark
 stays within the targets; the 100-section list document misses them on Enter at the top,
-initial layout and Chromium's re-flow, a known limit for 0.2.0; benchmarks.md, "Lists".)
+initial layout and the full re-flow, a known limit for 0.2.0; benchmarks.md, "Lists".)
 
 ### Tasks
 

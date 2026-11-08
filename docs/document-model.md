@@ -233,8 +233,9 @@ Migrations never drop content. A published version never changes in place.
 | 2       | 0.2.0       | —                                                                               |
 
 0.1.0 reads only version 1: it rejects documents saved by 0.2.0 ("Unsupported schemaVersion: 2").
-Tests load a document exactly as 0.1.0 saved it (`document.test.ts`), and the playground's e2e
-fixtures are still v1 documents, loaded through the migration.
+Tests load a document exactly as 0.1.0 saved it (`document.test.ts`); in the browser, the
+page-break e2e (`pages.spec.ts`) and the examples' smoke test load v1 documents through the
+migration.
 
 ## Planned envelope additions (not implemented)
 

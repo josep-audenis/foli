@@ -229,7 +229,10 @@ cells may be off by ~30%):
 The whole benchmark again before 0.2.0 (2026-11-08, same machine and versions, one run), with
 everything Phase 7 added (nested blocks in the view, the list keymap, the toolbar's new
 controls and their state after every transaction). The paragraph document stays within every
-target in Chromium and Firefox; the list document stays the accepted known limit above.
+target in Chromium and Firefox; the list document stays the accepted known limit above,
+with one cell clearly worse than the 7.4 run: Firefox's Enter handler p50 (24 ms against 16,
+more than the single-run noise). Chromium's Enter improved (8.6 ms against 14.4); the other
+list cells moved within the noise. Not investigated for 0.2.0.
 
 | Engine   | Document   | Pages | layout | type handler p50 | type paint p50 / p95 | Enter handler p50 | Enter paint p50 / p95 | re-flow |
 | -------- | ---------- | ----: | -----: | ---------------: | -------------------: | ----------------: | --------------------: | ------: |
