@@ -123,7 +123,8 @@ const GROUPS: Item[][] = [
     {
       key: "orderedList",
       label: "Numbered list",
-      text: "1.",
+      // A symbol, not "1.": visible text that is not part of the name fails WCAG 2.5.3.
+      text: "№",
       symbol: true,
       pressed: (state) => listTypeAt(state)?.name === "orderedList",
       command: () => toggleList("orderedList"),
