@@ -20,6 +20,10 @@
   --foli-toolbar-hover: #f0f0ee;
   --foli-focus-ring: #2367dc;
   --foli-error-color: #b3261e;
+  --foli-link-color: #1f5fbf;
+  --foli-marker-color: currentColor;
+  --foli-rule-color: #c4c4bf;
+  --foli-rule-thickness: 1px;
 }
 
 .foli-canvas {
@@ -48,6 +52,34 @@
 
 .foli-content ::selection {
   background: var(--foli-selection-color);
+}
+
+/* Links and list markers in the document. */
+.foli-page a {
+  color: var(--foli-link-color);
+}
+
+.foli-page li::marker {
+  color: var(--foli-marker-color);
+}
+
+/*
+ * A horizontal rule: a line in the middle of a taller box, so it is easy to click (a click
+ * selects it). Drawn with a border, which prints (backgrounds may not).
+ */
+.foli-page hr {
+  position: relative;
+  height: 12px;
+  margin: 6px 0;
+  border: 0;
+  overflow: visible;
+}
+
+.foli-page hr::after {
+  content: "";
+  position: absolute;
+  inset: 50% 0 auto;
+  border-top: var(--foli-rule-thickness) solid var(--foli-rule-color);
 }
 
 /* A node-selected block (a horizontal rule): the view adds the class. */
@@ -113,6 +145,82 @@
 }
 .foli-toolbar-strike {
   text-decoration: line-through;
+}
+
+/* Text color and highlight menu buttons: the letter over the current color. */
+.foli-toolbar-menu {
+  position: relative;
+  display: inline-flex;
+}
+
+.foli-toolbar-textColor,
+.foli-toolbar-highlight {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+}
+
+.foli-toolbar-swatch {
+  width: 16px;
+  height: 4px;
+  border-radius: 1px;
+  box-shadow: inset 0 0 0 1px var(--foli-border-color);
+}
+
+.foli-menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  min-width: 10em;
+  margin-top: 2px;
+  padding: 4px;
+  border: 1px solid var(--foli-border-color);
+  border-radius: 4px;
+  background: var(--foli-toolbar-background);
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.15);
+}
+
+.foli-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 28px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 3px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+.foli-menu-item:hover,
+.foli-menu-item:focus-visible {
+  background: var(--foli-toolbar-hover);
+}
+
+.foli-menu-item:focus-visible {
+  outline: 2px solid var(--foli-focus-ring);
+  outline-offset: -2px;
+}
+
+.foli-menu-swatch {
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.2);
+}
+
+/* The checked color: a ring around its swatch (an outline also shows in forced colors). */
+.foli-menu-item[aria-checked="true"] .foli-menu-swatch {
+  outline: 2px solid var(--foli-focus-ring);
+  outline-offset: 1px;
 }
 
 /* Link dialog (FoliToolbar): under the toolbar. */

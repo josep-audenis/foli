@@ -1,5 +1,6 @@
 import {
   AllSelection,
+  arrowAcrossLeaf,
   autolinkHref,
   type Command,
   closeHistory,
@@ -1100,10 +1101,40 @@ export class EditorView {
     const name = keyName(event);
     // Ctrl/Cmd+Shift+V: the paste event that follows uses only the plain text.
     this.plainPaste = name === "Mod-Shift-v";
+    // Up/Down on a textblock's first/last line next to a rule select it (only the view knows
+    // lines); otherwise the browser moves the caret.
+    const vertical = name === "ArrowUp" ? -1 : name === "ArrowDown" ? 1 : 0;
+    if (vertical && this.caretOnEdgeLine(vertical) && this.run(arrowAcrossLeaf(vertical, "line"))) {
+      event.preventDefault();
+      return;
+    }
     // Like `editor.handleKey`, but through the view's dispatch, so read-only mode drops edits.
     // A key no command takes keeps its default (Tab outside a list moves the focus on).
     if (this.runKey(name)) event.preventDefault();
   };
+
+  /**
+   * Whether the caret is on the first (`dir` -1) or last (1) line of its textblock, in the
+   * block's first or last fragment (a block split across pages has several).
+   */
+  private caretOnEdgeLine(dir: -1 | 1): boolean {
+    const sel = this.host.ownerDocument.getSelection();
+    if (!sel?.rangeCount || !sel.isCollapsed || !sel.focusNode) return false;
+    const element = this.blockElement(sel.focusNode);
+    const desc = element ? this.owner.get(element) : undefined;
+    if (!desc?.node.isTextblock) return false;
+    const fragment = desc.fragments[dir < 0 ? 0 : desc.fragments.length - 1];
+    if (!fragment || element !== fragment) return false;
+    if (!desc.node.content.size) return true;
+    const caret = sel.getRangeAt(0).getClientRects()[0];
+    const lines = this.host.ownerDocument.createRange();
+    lines.selectNodeContents(fragment);
+    const rects = lines.getClientRects();
+    const edge = rects[dir < 0 ? 0 : rects.length - 1];
+    // No caret box (some positions next to a line break): leave the move to the browser.
+    if (!caret || !edge) return false;
+    return dir < 0 ? caret.top + 1 < edge.bottom : caret.bottom - 1 > edge.top;
+  }
 
   /**
    * Caret affinity at a page break. The end of one fragment and the start of the next are two

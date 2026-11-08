@@ -52,8 +52,13 @@ selection and scrolls it into view).
 
 ### `<FoliToolbar>`
 
-The default toolbar: bold, italic, underline, strikethrough, link · paragraph, H1–H3 · bulleted
-list, numbered list (pressed inside one), decrease and increase indent · undo, redo · page break.
+The default toolbar: bold, italic, underline, strikethrough, link, text color, highlight ·
+paragraph, H1–H3 · align left, center, align right, justify · bulleted list, numbered list
+(pressed inside one), decrease and increase indent · undo, redo · horizontal rule, page break.
+Text color and highlight are menu buttons (WAI-ARIA menu, `menuitemradio` items) with a fixed
+palette, the current color checked; arrow keys, Home and End move, Enter picks, Escape closes
+back to the button. The alignment buttons show the selection's alignment pressed (none when
+mixed).
 A WAI-ARIA toolbar: one Tab stop, arrow keys, Home and End move between buttons; toggle buttons
 have `aria-pressed`; buttons stay focusable when disabled (`aria-disabled`). Clicking a button
 keeps the document's selection.
@@ -136,7 +141,10 @@ the list's type, or takes the selected items out of every list of that type they
 list change is its own undo step. Links: `commands.setLink(href)` (links the selection, replacing
 links there; at a caret in a link, changes that link; elsewhere inserts the href as linked
 text) and `removeLink()` (the links in the selection, or the whole link around the caret). Both
-normalize then validate: an unsafe href (`javascript:`…) does not apply.
+normalize then validate: an unsafe href (`javascript:`…) does not apply. Formatting:
+`commands.setAlign("start" | "center" | "end" | "justify")` (paragraphs and headings; `start`
+is the default), `setTextColor(color | null)` and `setHighlight(color | null)` (lowercase
+`#rrggbb`; null removes; at a caret, for the next typed text), `insertHorizontalRule()`.
 
 ### Commands
 
@@ -147,7 +155,10 @@ Commands are `(state, dispatch?) => boolean` and run with `editor.run(command)`:
 `undo`, `redo`; lists: `toggleList(type, attrs?)`, `wrapInList(type, attrs?)`,
 `splitListItem()` (Enter), `sinkListItem()` (Tab), `liftListItem()` (Shift+Tab),
 `liftListItemAtStart()` (Backspace at an item's start), and `listKeymap()` binding them (part of
-every editor, before `baseKeymap()`); links: `setLink(href)`, `removeLink`,
+every editor, before `baseKeymap()`); formatting: `setAlign(align)`, `setTextColor(color)`,
+`setHighlight(color)`, `insertHorizontalRule`, and `arrowAcrossLeaf(dir, from)` (arrow keys
+around a rule: `"char"` from a caret at a textblock edge, `"line"` when the caret is on its
+first or last line, `"none"` only from a selected rule); links: `setLink(href)`, `removeLink`,
 `insertLink(href, text?)` (replaces the selection with linked text), `openLinkEditor` (Mod-K:
 dispatches a transaction that changes nothing and carries `linkEditorRequest`; check it with
 `requestsLinkEditor(tr)` to open your own link UI). `normalizeHref(input)` trims, turns `\` into
@@ -156,6 +167,8 @@ name (`example.com/page`; a relative file name like `page.html` becomes one too:
 `./page.html`); `autolinkHref(text)` is the href for pasted text that is one URL
 (`http(s)://…`, `mailto:…`, `www.…`), or null. Helpers: `isMarkActive(state, type)`,
 `listTypeAt(state)`, `linkAt(state)` (the href of the link at the selection, or null),
+`alignAt(state)` and `colorAt(state, "textColor" | "highlight")` (shared by the whole
+selection, else null),
 `undoDepth(state)`, `redoDepth(state)`,
 `marksAt`. `baseKeymap()` is the default key binding plugin (keys in
 [getting-started.md](getting-started.md#keyboard)).

@@ -6,7 +6,7 @@ import {
   SCHEMA_VERSION,
 } from "../document.js";
 import type { Attrs } from "../model/index.js";
-import type { DocJSON } from "../schema.js";
+import type { Alignment, DocJSON } from "../schema.js";
 import {
   baseKeymap,
   type DeleteUnit,
@@ -24,6 +24,7 @@ import {
   splitBlock,
   toggleMark,
 } from "./commands.js";
+import { insertHorizontalRule, setAlign, setHighlight, setTextColor } from "./format.js";
 import { history, redo, undo } from "./history.js";
 import { removeLink, setLink } from "./links.js";
 import { liftListItem, listKeymap, sinkListItem, toggleList, wrapInList } from "./lists.js";
@@ -83,6 +84,14 @@ export interface Editor {
     setLink(href: string): boolean;
     /** Removes the links in the selection, or the link around the caret. */
     removeLink(): boolean;
+    /** Aligns the selected paragraphs and headings ("start", "center", "end", "justify"). */
+    setAlign(align: Alignment): boolean;
+    /** Text color (lowercase `#rrggbb`) of the selected or next typed text; null removes it. */
+    setTextColor(color: string | null): boolean;
+    /** Highlight (`#rrggbb`) of the selected or next typed text; null removes it. */
+    setHighlight(color: string | null): boolean;
+    /** Inserts a horizontal rule at the selection (the caret goes to the text after it). */
+    insertHorizontalRule(): boolean;
   };
   isMarkActive(type: string): boolean;
   /** The current document as a persisted FoliDocument. */
@@ -153,6 +162,10 @@ export function createEditor({
       outdentListItem: () => run(liftListItem()),
       setLink: (href) => run(setLink(href)),
       removeLink: () => run(removeLink),
+      setAlign: (align) => run(setAlign(align)),
+      setTextColor: (color) => run(setTextColor(color)),
+      setHighlight: (color) => run(setHighlight(color)),
+      insertHorizontalRule: () => run(insertHorizontalRule),
     },
     isMarkActive: (type) => isMarkActive(state, type),
     getDocument: () => ({

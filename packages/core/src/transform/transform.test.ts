@@ -193,6 +193,25 @@ describe("Transform helpers", () => {
     expectInvertible(tr);
   });
 
+  it("setBlockAttrs sets attributes only on textblocks whose type declares them", () => {
+    const start = testSchema.nodeFromJSON({
+      type: "doc",
+      content: [
+        { type: "paragraph", content: [{ type: "text", text: "p" }] },
+        { type: "heading", attrs: { level: 1 }, content: [{ type: "text", text: "h" }] },
+      ],
+    });
+    const tr = new Transform(start).setBlockAttrs(0, start.content.size, { level: 2 });
+    expect(tr.steps).toHaveLength(1);
+    expect(tr.doc.child(0).eq(start.child(0))).toBe(true); // a paragraph has no level
+    expect(tr.doc.child(1).attrs.level).toBe(2);
+    expectInvertible(tr);
+    // Nothing to change: no step.
+    expect(
+      new Transform(tr.doc).setBlockAttrs(0, tr.doc.content.size, { level: 2 }).steps,
+    ).toHaveLength(0);
+  });
+
   it("setBlockType changes every textblock in range", () => {
     const tr = new Transform(doc(para("a"), para("b"), para("c")));
     tr.setBlockType(2, 5, nodeType("heading"), { level: 3 });

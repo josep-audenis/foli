@@ -36,16 +36,23 @@ describe("FoliToolbar", () => {
       "Underline",
       "Strikethrough",
       "Link",
+      "Text color",
+      "Highlight",
       "Paragraph",
       "H1",
       "H2",
       "H3",
+      "Align left",
+      "Center",
+      "Align right",
+      "Justify",
       "Bulleted list",
       "Numbered list",
       "Decrease indent",
       "Increase indent",
       "Undo",
       "Redo",
+      "Horizontal rule",
       "Page break",
     ]);
     expect(buttons().filter((b) => b.tabIndex === 0)).toHaveLength(1);
@@ -205,6 +212,105 @@ describe("FoliToolbar", () => {
     expect(editor.isMarkActive("italic")).toBe(true);
     expect(document.activeElement).toBe(button("Italic"));
     outside.remove();
+  });
+
+  it("aligns the selected blocks and shows the alignment pressed", () => {
+    const handle = setup();
+    const { editor } = handle;
+    act(() => editor.select(2));
+    expect(button("Align left").getAttribute("aria-pressed")).toBe("true");
+    fireEvent.click(button("Center"), { detail: 1 });
+    expect(editor.getDocument().content.content[0]).toMatchObject({ attrs: { align: "center" } });
+    expect(button("Center").getAttribute("aria-pressed")).toBe("true");
+    expect(button("Align left").getAttribute("aria-pressed")).toBe("false");
+    act(() => editor.select(2, 15)); // mixed: none pressed
+    for (const name of ["Align left", "Center", "Align right", "Justify"]) {
+      expect(button(name).getAttribute("aria-pressed")).toBe("false");
+    }
+    fireEvent.click(button("Justify"), { detail: 1 });
+    expect(JSON.stringify(editor.getDocument())).not.toContain('"center"');
+    expect(button("Justify").getAttribute("aria-pressed")).toBe("true");
+  });
+
+  it("colors text from a menu button: keyboard, current color checked, Escape", () => {
+    const handle = setup();
+    const { editor } = handle;
+    act(() => handle.focus());
+    act(() => editor.select(1, 6)); // "Hello"
+    const textColor = button("Text color");
+    expect(textColor.getAttribute("aria-haspopup")).toBe("menu");
+    expect(textColor.getAttribute("aria-expanded")).toBe("false");
+    act(() => textColor.focus());
+    fireEvent.keyDown(textColor, { key: "ArrowDown" });
+    screen.getByRole("menu", { name: "Text color" });
+    expect(textColor.getAttribute("aria-expanded")).toBe("true");
+    const items = screen.getAllByRole("menuitemradio");
+    expect(items.map((item) => item.textContent)).toEqual([
+      "Automatic",
+      "Gray",
+      "Red",
+      "Orange",
+      "Green",
+      "Blue",
+      "Purple",
+    ]);
+    expect(document.activeElement).toBe(items[0]); // the checked one: no color yet
+    expect(items[0]?.getAttribute("aria-checked")).toBe("true");
+    // Arrow keys stay in the menu (the toolbar does not move).
+    fireEvent.keyDown(items[0] as HTMLElement, { key: "ArrowDown" });
+    expect(document.activeElement).toBe(items[1]);
+    fireEvent.keyDown(items[1] as HTMLElement, { key: "End" });
+    expect(document.activeElement).toBe(items[6]);
+    fireEvent.keyDown(items[6] as HTMLElement, { key: "ArrowUp" });
+    fireEvent.keyDown(items[5] as HTMLElement, { key: "ArrowUp" });
+    fireEvent.click(items[4] as HTMLElement, { detail: 0 }); // Green, by keyboard
+    expect(screen.queryByRole("menu")).toBeNull();
+    expect(document.activeElement).toBe(textColor);
+    expect(JSON.stringify(editor.getDocument())).toContain('"color":"#2e7d32"');
+    // Open again: Green is checked and focused; Escape closes back to the button.
+    fireEvent.click(textColor, { detail: 0 });
+    const green = screen.getByRole("menuitemradio", { name: "Green" });
+    expect(green.getAttribute("aria-checked")).toBe("true");
+    expect(document.activeElement).toBe(green);
+    fireEvent.keyDown(green, { key: "Escape" });
+    expect(screen.queryByRole("menu")).toBeNull();
+    expect(document.activeElement).toBe(textColor);
+  });
+
+  it("highlights and removes a highlight with the mouse; focus goes back to the document", () => {
+    const handle = setup();
+    const { editor } = handle;
+    const documentBox = screen.getByRole("textbox", { name: "Document" });
+    act(() => handle.focus());
+    act(() => editor.select(1, 6));
+    fireEvent.click(button("Highlight"), { detail: 1 });
+    fireEvent.click(screen.getByRole("menuitemradio", { name: "Yellow" }), { detail: 1 });
+    expect(document.activeElement).toBe(documentBox);
+    expect(JSON.stringify(editor.getDocument())).toContain(
+      '"highlight","attrs":{"color":"#fff59d"}',
+    );
+    const swatch = button("Highlight").querySelector(".foli-toolbar-swatch") as HTMLElement;
+    expect(swatch.style.background).toBe("rgb(255, 245, 157)");
+    fireEvent.click(button("Highlight"), { detail: 1 });
+    fireEvent.click(screen.getByRole("menuitemradio", { name: "None" }), { detail: 1 });
+    expect(JSON.stringify(editor.getDocument())).not.toContain("highlight");
+    // Leaving an open menu (a click elsewhere) closes it.
+    fireEvent.click(button("Highlight"), { detail: 1 });
+    const menu = screen.getByRole("menu");
+    fireEvent.blur(menu.firstElementChild as HTMLElement, { relatedTarget: documentBox });
+    expect(screen.queryByRole("menu")).toBeNull();
+  });
+
+  it("inserts a horizontal rule", () => {
+    const handle = setup();
+    act(() => handle.editor.select(11)); // end of "Hello Foli"
+    fireEvent.click(button("Horizontal rule"), { detail: 1 });
+    expect(handle.editor.getDocument().content.content.map((block) => block.type)).toEqual([
+      "paragraph",
+      "horizontalRule",
+      "paragraph",
+      "paragraph",
+    ]);
   });
 
   it("adds a link from the dialog: URL normalized, focus back in the document", () => {

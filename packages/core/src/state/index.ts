@@ -1,4 +1,5 @@
 export {
+  arrowAcrossLeaf,
   baseKeymap,
   type DeleteUnit,
   deleteBackward,
@@ -16,6 +17,14 @@ export {
   toggleMark,
 } from "./commands.js";
 export { createEditor, type Editor, type EditorListener, type EditorOptions } from "./editor.js";
+export {
+  alignAt,
+  colorAt,
+  insertHorizontalRule,
+  setAlign,
+  setHighlight,
+  setTextColor,
+} from "./format.js";
 export {
   closeHistory,
   type HistoryOptions,
