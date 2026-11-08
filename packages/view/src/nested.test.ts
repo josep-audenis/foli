@@ -306,6 +306,7 @@ describe("nested blocks: review regressions (PR #35)", () => {
         },
       ],
     } as DocJSON);
+    // place() is private; this reaches it to give it page assignments a jsdom flow cannot.
     const internal = view as unknown as {
       place(b: unknown, pages: number[][], chains: unknown): void;
       blocks: unknown;
@@ -363,6 +364,15 @@ describe("justified text across a page break", () => {
     expect(fragments.map((f) => f.style.textAlignLast)).toEqual(["justify", "justify", ""]);
     expect(fragments.map((f) => f.style.textAlign)).toEqual(["justify", "justify", "justify"]);
     // Other alignments do not justify a fragment's last line.
+    // A fragment holding a forced break keeps the default: text-align-last would also stretch
+    // the line before the break, which the whole paragraph shows start-aligned.
+    const withBreak = editor.state.schema.nodes.paragraph?.create({ align: "justify" }, [
+      editor.state.schema.text("ab"),
+      editor.state.schema.node("hardBreak"),
+      editor.state.schema.text("cdef"),
+    ]);
+    const broken = renderBlock(withBreak as typeof node, document, [5]);
+    expect(broken.fragments.map((f) => f.style.textAlignLast)).toEqual(["", ""]);
     const centered = editor.state.schema.nodes.paragraph?.create({ align: "center" }, node.content);
     const split = renderBlock(centered as typeof node, document, [3]);
     expect(split.fragments.map((f) => f.style.textAlignLast)).toEqual(["", ""]);

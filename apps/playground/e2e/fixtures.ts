@@ -277,7 +277,8 @@ export function benchDocument(sections: number, lists = false) {
 /**
  * Each page's blocks as `[>…] <block>[.<fragment>] (<characters>) <first characters>`, for
  * snapshots: the page breaks of the document as laid out. Blocks inside lists are listed in
- * order, prefixed with one `>` per list item around them.
+ * order, prefixed with one `>` per list item around them; the last one is a `+` when the block
+ * starts its list item element (so two items wrongly in one element change the snapshot).
  */
 export function pageBreaks(page: Page): Promise<string[][]> {
   return page.evaluate(() => {
@@ -291,7 +292,10 @@ export function pageBreaks(page: Page): Promise<string[][]> {
         let depth = 0;
         for (let up = element.parentElement; up && up !== sheet; up = up.parentElement)
           if (up.tagName === "LI") depth++;
-        const prefix = depth ? `${">".repeat(depth)} ` : "";
+        const startsItem =
+          element.parentElement?.tagName === "LI" &&
+          element.parentElement.firstElementChild === element;
+        const prefix = depth ? `${">".repeat(depth - 1)}${startsItem ? "+" : ">"} ` : "";
         return `${prefix}${block}${fragment ? `.${fragment}` : ""} (${content.length}) ${content.slice(0, 24)}`;
       }),
     );

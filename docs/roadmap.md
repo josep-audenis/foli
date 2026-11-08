@@ -506,7 +506,9 @@ and print one sheet per page; documents saved by 0.1.0 load through the v1 → v
 unchanged in content; HTML with lists, links, rules, colors and alignment pastes into the
 schema (fixtures) and copies back out; no `href` outside the safe protocols reaches the
 document by any path; axe passes on the new toolbar controls; the 100-page benchmark stays
-within its targets; 0.2.0 published.
+within its targets; 0.2.0 published. (Accepted 2026-11-08 by the owner: the paragraph benchmark
+stays within the targets; the 100-section list document misses them on Enter at the top,
+initial layout and Chromium's re-flow, a known limit for 0.2.0; benchmarks.md, "Lists".)
 
 ### Tasks
 

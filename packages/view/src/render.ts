@@ -89,12 +89,7 @@ export function renderBlock(
     if (all.length > 1) {
       fragment.dataset.fragment = String(i);
       if (i > 0) fragment.style.marginTop = "0";
-      if (i < all.length - 1) {
-        fragment.style.marginBottom = "0";
-        // A fragment's last line is not the paragraph's last line: justified text stays
-        // justified up to the page break (CSS would align a block's last line to the start).
-        if (align === "justify") fragment.style.textAlignLast = "justify";
-      }
+      if (i < all.length - 1) fragment.style.marginBottom = "0";
     }
     return fragment;
   });
@@ -138,6 +133,14 @@ export function renderBlock(
   // An empty block, or one ending in a hard break, needs an extra <br> to show its last line.
   if (!node.lastChild?.isText)
     (fragments[fragments.length - 1] as HTMLElement).append(doc.createElement("br"));
+  // A fragment's last line is not the paragraph's last line: justified text stays justified up
+  // to the page break (CSS aligns a block's last line to the start). `text-align-last` also
+  // applies to every line before a forced break, which the paragraph shows start-aligned, so it
+  // is only set on fragments without one.
+  // shortcut: a fragment holding a hard break keeps its last line start-aligned at the page break; fixing that needs a per-line wrapper.
+  if (align === "justify")
+    for (const fragment of fragments.slice(0, -1))
+      if (!fragment.querySelector("br")) fragment.style.textAlignLast = "justify";
   return { node, dom, fragments, splits, leaves };
 }
 

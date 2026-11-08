@@ -176,7 +176,8 @@ Milliseconds (lower is better). Keystroke paint columns are p50 / p95 of the sam
   200 pages). It happens once per font load or settings change, not per keystroke.
 
 **Targets** (set from this baseline with headroom, on this machine, in Chromium and Firefox; for
-WebKit the handler columns only). A target counts as broken when two runs in a row exceed it; a
+WebKit the handler columns only; for the paragraph document: the list document's misses are an
+accepted known limit, see "Lists"). A target counts as broken when two runs in a row exceed it; a
 change that breaks one needs a reason in its PR, and the table above re-run:
 
 | Measure                                 | 100 pages | 200 pages |
@@ -206,15 +207,17 @@ cells may be off by ~30%):
 **Reading:**
 
 - **Typing in a list stays within the targets** (handler p50 7-8 ms in Chromium and Firefox,
-  p95 18-21 ms). **Enter at the top of the document does not** (handler p50 14-16 ms, p95 about
-  55 ms), nor do the initial layout (82-89 ms) and the re-flow in Chromium (155 ms).
+  keystroke-to-paint p95 18-21 ms). **Enter at the top of the document does not** (handler p50
+  14-16 ms, keystroke-to-paint p95 about 55 ms), nor do the initial layout (82-89 ms) and the
+  full re-flow (125-155 ms in all three engines).
 - Most of the Enter difference is the document, not lists: in the paragraph document a
   paragraph split across the end of page 1 absorbs the extra line and the later pages stay as
   they were (about 18 DOM nodes added per Enter); in the list document page ends fall between
   short items that cannot split, so every Enter on page 1 moves the last item of every page to
   the next one (about 136 nodes per Enter, counted with a `MutationObserver`). A paragraph
   document of short paragraphs would behave the same.
-- What lists add on top: about 30% more blocks for the same text, container elements per page
+- What lists add on top: more, shorter blocks (about 1,800 against 1,400; the documents are of
+  similar but not equal length: 114 pages against 100), container elements per page
   (a moved item takes its `<li>` along, its number is rewritten only when it changes), and more
   DOM for the browser to lay out (initial layout per block ~0.049 ms against ~0.034 ms).
 - Not done: placing only the pages an edit changed (today every render walks every block), and

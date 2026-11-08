@@ -167,7 +167,8 @@ and benchmarks (5.7, [benchmarks.md](benchmarks.md)); overview in [pagination.md
   each with its position and the chain of containers around it (lists, list items). The flow,
   the measurement cache and the line measurement see only these blocks (ADR-0004).
   - **Containers per page:** `place` puts each block fragment into its page inside `ul`/`ol`/`li`
-    elements for its containers (`data-foli-wrapper`), reusing the container elements already
+    elements for its containers (`data-foli-wrapper`; the view tracks the elements it created,
+    so a pasted or foreign element with the attribute is stray DOM, not a container), reusing the container elements already
     at the same place on the page (same tag, in order), so typing in a list moves no DOM. A list
     continued on the next page gets new containers there; an item continued from the previous
     page shows no marker (`list-style-type: none` inline); ordered list items carry their number

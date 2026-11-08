@@ -161,6 +161,8 @@ test("an item split across pages shows its marker once; a split justified paragr
     };
   });
   expect(styles.continued.length).toBeGreaterThan(0);
+  expect(styles.started.length).toBeGreaterThan(0);
+  expect(styles.alignLast.length).toBeGreaterThanOrEqual(2); // the paragraph is split
   expect(styles.continued.every((type) => type === "none")).toBe(true);
   expect(styles.started.every((type) => type === "decimal")).toBe(true);
   // Every fragment but the last justifies its last line.
