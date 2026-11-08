@@ -7,6 +7,11 @@ import { expect, test } from "@playwright/test";
 import { benchDocument, loadTestFont, routeTestFont } from "../e2e/fixtures.js";
 
 const SIZES = [1, 10, 50, 100, 200];
+/** Every size with paragraphs; 100 sections also with each section's paragraphs as a list (7.4). */
+const CASES = [
+  ...SIZES.map((sections) => ({ sections, lists: false })),
+  { sections: 100, lists: true },
+];
 const MOUNTS = 5;
 const TYPED = "the quick brown fox jumps over the lazy dog ".repeat(2);
 const ENTERS = 40;
@@ -22,13 +27,16 @@ const round = (value: number) => Math.round(value * 10) / 10;
 
 test.describe.configure({ mode: "serial" });
 
-for (const sections of SIZES) {
-  test(`${sections}-section document`, async ({ page, browserName }) => {
+for (const { sections, lists } of CASES) {
+  test(`${sections}-section document${lists ? " with lists" : ""}`, async ({
+    page,
+    browserName,
+  }) => {
     test.setTimeout(600_000);
     await routeTestFont(page);
     await page.goto("/bench.html");
     await loadTestFont(page);
-    const json = benchDocument(sections);
+    const json = benchDocument(sections, lists);
 
     const mounts: { layoutMs: number; paintMs: number; pages: number }[] = [];
     for (let i = 0; i < MOUNTS; i++) {
@@ -39,6 +47,7 @@ for (const sections of SIZES) {
 
     // Into the first paragraph of page 1: a key that changes its line count moves every later
     // page (each Enter does; a typed character rarely does).
+    // The first paragraph of the first section's text (a list item's with lists).
     await page
       .locator('[role="textbox"] p')
       .first()
@@ -73,6 +82,7 @@ for (const sections of SIZES) {
     const result = {
       browser: browserName,
       sections,
+      lists,
       pages,
       layoutMs: round(median(mounts.map((mount) => mount.layoutMs))),
       layoutPaintMs: round(median(mounts.map((mount) => mount.paintMs))),

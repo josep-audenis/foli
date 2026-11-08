@@ -10,6 +10,7 @@ import {
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { serializeRange } from "./clipboard.js";
 import { EditorView } from "./index.js";
+import { renderBlock } from "./render.js";
 
 const text = (t: string) => ({ type: "text", text: t });
 const p = (t?: string) => ({ type: "paragraph", ...(t ? { content: [text(t)] } : {}) });
@@ -305,16 +306,25 @@ describe("nested blocks: review regressions (PR #35)", () => {
         },
       ],
     } as DocJSON);
+    // place() is private; this reaches it to give it page assignments a jsdom flow cannot.
     const internal = view as unknown as {
       place(b: unknown, pages: number[][], chains: unknown): void;
       blocks: unknown;
       chains: unknown;
     };
     internal.place(internal.blocks, [[0], [0], [0], [1], [1], [1]], internal.chains);
-    const fifth = [...host.querySelectorAll("p")].find((el) => el.textContent === "5");
+    const byText = (t: string) =>
+      [...host.querySelectorAll("p")].find((el) => el.textContent === t);
+    const fifth = byText("5");
     const li = fifth?.parentElement;
+    const thirdLi = byText("3")?.parentElement;
     internal.place(internal.blocks, [[0], [0], [1], [1], [1], [1]], internal.chains);
     expect(fifth?.parentElement).toBe(li); // still in its own <li>
+    // The item that moved to the next page took its <li> along, as a paragraph moves itself.
+    expect(byText("3")?.parentElement).toBe(thirdLi);
+    expect(host.querySelectorAll(".foli-page")[1]?.firstElementChild?.firstElementChild).toBe(
+      thirdLi,
+    );
     const pages = host.querySelectorAll(".foli-page");
     expect(pages[1]?.querySelectorAll("li > p")).toHaveLength(4);
   });
@@ -340,5 +350,31 @@ describe("nested blocks: review regressions (PR #35)", () => {
       new MouseEvent("mousedown", { bubbles: true, button: 0, detail: 1, shiftKey: true }),
     );
     expect(editor.state.selection).not.toBeInstanceOf(NodeSelection);
+  });
+});
+
+describe("justified text across a page break", () => {
+  it("keeps a split justified paragraph justified up to the break, not after its end", () => {
+    const { editor } = mount({
+      type: "doc",
+      content: [{ type: "paragraph", attrs: { align: "justify" }, content: [text("abcdef")] }],
+    } as DocJSON);
+    const node = editor.state.doc.child(0);
+    const { fragments } = renderBlock(node, document, [2, 4]);
+    expect(fragments.map((f) => f.style.textAlignLast)).toEqual(["justify", "justify", ""]);
+    expect(fragments.map((f) => f.style.textAlign)).toEqual(["justify", "justify", "justify"]);
+    // Other alignments do not justify a fragment's last line.
+    // A fragment holding a forced break keeps the default: text-align-last would also stretch
+    // the line before the break, which the whole paragraph shows start-aligned.
+    const withBreak = editor.state.schema.nodes.paragraph?.create({ align: "justify" }, [
+      editor.state.schema.text("ab"),
+      editor.state.schema.node("hardBreak"),
+      editor.state.schema.text("cdef"),
+    ]);
+    const broken = renderBlock(withBreak as typeof node, document, [5]);
+    expect(broken.fragments.map((f) => f.style.textAlignLast)).toEqual(["", ""]);
+    const centered = editor.state.schema.nodes.paragraph?.create({ align: "center" }, node.content);
+    const split = renderBlock(centered as typeof node, document, [3]);
+    expect(split.fragments.map((f) => f.style.textAlignLast)).toEqual(["", ""]);
   });
 });

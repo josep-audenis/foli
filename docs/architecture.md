@@ -127,9 +127,8 @@ Foli's own (see `THIRD_PARTY_NOTICES.md`).
 Known limits:
 - No general slice fitting: paste (Phase 4.3) joins open content or replaces an empty textblock
   with whole blocks; fitting blocks into nested structures comes with lists (Phase 7).
-- Lists render and paginate at block level (7.3); list editing commands and keys are 7.5,
-  pagination rules inside lists and justified text across a break 7.4, paste of lists, links
-  and colors 7.8. Typing over a node-selected rule does nothing yet (7.7).
+- Lists render and paginate (7.3, 7.4); list editing commands and keys are 7.5, paste of
+  lists, links and colors 7.8. Typing over a node-selected rule does nothing yet (7.7).
 - Each unrecorded change (and each plugin reaction to undo/redo) rebases the stored history.
   This costs O(n²) in the number of stored steps (not events), and every step is re-applied to the
   document, which also scales with document size.
@@ -168,7 +167,8 @@ and benchmarks (5.7, [benchmarks.md](benchmarks.md)); overview in [pagination.md
   each with its position and the chain of containers around it (lists, list items). The flow,
   the measurement cache and the line measurement see only these blocks (ADR-0004).
   - **Containers per page:** `place` puts each block fragment into its page inside `ul`/`ol`/`li`
-    elements for its containers (`data-foli-wrapper`), reusing the container elements already
+    elements for its containers (`data-foli-wrapper`; the view tracks the elements it created,
+    so a pasted or foreign element with the attribute is stray DOM, not a container), reusing the container elements already
     at the same place on the page (same tag, in order), so typing in a list moves no DOM. A list
     continued on the next page gets new containers there; an item continued from the previous
     page shows no marker (`list-style-type: none` inline); ordered list items carry their number
@@ -350,8 +350,8 @@ Known limits:
   every block crossing a page end (about one per page): fine for a font swap, costly for a
   CSS animation of one block's height. Line measurement assumes
   left-to-right text without vertical-align offsets; block padding and borders are not split
-  (a fragment keeps both). Justified text would need `text-align-last` on continued fragments
-  (alignment arrives in Phase 7). Page breaks depend on the fonts available: the tests use
+  (a fragment keeps both). Justified text keeps its fragments' last lines justified
+  (`text-align-last`, 7.4). Page breaks depend on the fonts available: the tests use
   a bundled font (see [testing/visual-regression.md](testing/visual-regression.md)). Negative block margins
   are not modelled.
 - A read-back that would add blocks or line breaks is discarded with a `Foli:` console warning

@@ -80,6 +80,16 @@ editor state ──► measure the blocks without a cached measurement (DOM read
   every block again). A block resized without an edit (CSS, a font, a container; seen by a
   `ResizeObserver`) and web fonts loading re-flow in the next animation frame, at most once per
   frame, never during a composition.
+- **Lists and other nested blocks** (7.3, 7.4, ADR-0004): the flow sees the leaf blocks at any
+  depth (paragraphs, headings, rules), so a list item's paragraph splits at a line and the rules
+  above apply inside lists as anywhere. Each page rebuilds the `ul`/`ol`/`li` elements around the
+  blocks it holds: a list on several pages is a list per page, an item continued from the
+  previous page shows no second marker, ordered items carry their number (`value`), so numbering
+  continues. List elements take no vertical space of their own (block margins and paddings 0),
+  so the blocks' margins collapse through them exactly as between siblings. A rule is a block
+  without lines: never split, moved whole.
+- **Justified text** keeps its last line justified on every fragment but the block's last
+  (`text-align-last: justify`): a fragment's last line is not the paragraph's.
 - **Print:** the view writes a print stylesheet from the settings: `@page` of the page size
   without margins, each page exactly one sheet tall with `break-after: page`. A print shows the
   screen's pagination; it does not re-flow.
@@ -95,14 +105,21 @@ All in Playwright on Chromium, Firefox and WebKit (Windows 11), plus unit and pr
   gap; Enter pushing blocks onto page 2 and undo pulling them back; Mod+Enter, undo, redo,
   Backspace; the pagination rules; typing on page 1 of a long document keeps every page valid.
   An IME composition just before the break gives exact text (Chromium only: CDP emulation).
-- **Determinism** (`visual.spec.ts`, `docs/testing/visual-regression.md`): seven fixtures with
+- **Determinism** (`visual.spec.ts`, `docs/testing/visual-regression.md`): eight fixtures with
   the bundled test font give the same page breaks on a second load and after a font-load
-  re-flow, matching recorded snapshots, plus a screenshot per engine.
+  re-flow, matching recorded snapshots, plus a screenshot per engine. The `lists` fixture (7.4)
+  has a list item split at a line, a nested list crossing a page break and a justified
+  paragraph split across pages.
+- **Lists** (`lists.spec.ts`): a 70-item ordered list across four pages (no block overflows,
+  numbering continues, nested lists nested); typing in an item on page 2; a split item shows
+  its marker once; a split justified paragraph stays justified up to the break.
 - **Print** (`print.spec.ts`): in print media every page fits its sheet (all engines); a PDF has
   one sheet of the page size per page (Chromium).
 - **Performance** ([benchmarks.md](benchmarks.md)): at 100 pages, initial layout ~40-45 ms,
   a keystroke's handler 3-5 ms, keystroke-to-paint p95 8-19 ms, a re-flow after a font change
-  ~60 ms (Chromium and Firefox).
+  ~60 ms (Chromium and Firefox). A 100-section document of lists (114 pages): typing within the
+  targets; an Enter at the top that moves every later page, the initial layout and Chromium's
+  re-flow are not (about twice the paragraph document's cost; why in benchmarks.md, "Lists").
 
 ## Known limits
 
@@ -110,8 +127,7 @@ All in Playwright on Chromium, Firefox and WebKit (Windows 11), plus unit and pr
   around them on each page (ADR-0004). A list split across pages is two lists in the DOM.
   Tables and images (Phase 8) are not laid out yet.
 - No page chrome: headers, footers and page numbers arrive in Phase 9.
-- Line measurement assumes left-to-right text without vertical-align offsets. Justified text
-  would need `text-align-last` on continued fragments (alignment is Phase 7). A split block's
+- Line measurement assumes left-to-right text without vertical-align offsets. A split block's
   padding and border repeat on every fragment. Negative block margins are not modelled.
 - Page breaks depend on the fonts the browser has: the same document can paginate differently
   on another machine or before a web font loads (the view re-flows when it does).

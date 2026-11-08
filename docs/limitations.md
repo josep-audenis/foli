@@ -50,6 +50,10 @@ checklist in [testing/ime.md](testing/ime.md)):
 - No virtualization: every page is in the DOM and measured on load. Fine up to a few hundred
   pages ([benchmarks.md](benchmarks.md): 100 pages lay out in about 40–85 ms, a keystroke
   paints within 8–19 ms at p95 in Chromium and Firefox).
+- Long documents made of lists are slower: in a 114-page list document, Enter near the top
+  takes about 15 ms to handle and up to ~55 ms to paint (p95), and the first layout ~85 ms,
+  about twice a paragraph document. An edit there moves the last item of every later page to
+  the next one; every render also walks every block.
 - Formatting thousands of paragraphs at once is slow: bold over 4,000 paragraphs takes about
   0.6 s, the next edit about 0.7 s, its undo about 0.5 s.
 - Undo history keeps the last 100 undo steps (a run of typing is one step).
