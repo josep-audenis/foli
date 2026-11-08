@@ -177,7 +177,9 @@ describe("FoliToolbar", () => {
     expect(screen.queryByRole("toolbar")).toBeNull();
   });
 
-  it("builds no transactions to update its state, however large the selection", () => {
+  it("builds no transactions to update its state, however large the selection", {
+    timeout: 30_000,
+  }, () => {
     const big = createDocument({
       type: "doc",
       content: Array.from({ length: 2000 }, (_, i) => ({

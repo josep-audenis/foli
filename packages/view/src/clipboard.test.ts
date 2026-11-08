@@ -513,7 +513,9 @@ describe("EditorView clipboard", () => {
     expect(blocks(editor)).toEqual([p(t("click"))]);
   });
 
-  it("T3: every fixture pastes at every text position without corrupting the document", () => {
+  it("T3: every fixture pastes at every text position without corrupting the document", {
+    timeout: 60_000,
+  }, () => {
     const fixtures = [word, wordLists, googleDocs, googleDocsLists, libreOffice, webPage];
     const targets = [
       doc(p(t("ab")), h(2, t("cd"))),

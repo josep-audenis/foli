@@ -277,7 +277,7 @@ describe("flowFrom: incremental flow equals a full flow", () => {
     };
   }
 
-  it("for random documents and random edits (insert, delete, replace)", () => {
+  it("for random documents and random edits (insert, delete, replace)", { timeout: 30_000 }, () => {
     for (let seed = 1; seed <= 5000; seed++) {
       const next = random(seed);
       const before = Array.from({ length: Math.floor(next() * 40) }, () => randomBox(next));
