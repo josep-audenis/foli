@@ -3,8 +3,7 @@
 > Status: envelope, schema v2 (with the v1 → v2 migration) and the document model (schema from
 > specs, immutable nodes, positions, slices, JSON in/out) are implemented in `@folijs/core`
 > (`packages/core/src/document.ts`, `packages/core/src/schema.ts`, `packages/core/src/model/`).
-> The view shows v2's lists, rules, links, colors and alignment from task 7.3 on; until then
-> they exist only in the engine. Steps, transactions, history and
+> The view renders and edits all of v2 (0.2.0). Steps, transactions, history and
 > commands (Phase 3) are described in [architecture.md](architecture.md#editing-engine-folicore).
 
 ## Canonical form
@@ -234,8 +233,9 @@ Migrations never drop content. A published version never changes in place.
 | 2       | 0.2.0       | —                                                                               |
 
 0.1.0 reads only version 1: it rejects documents saved by 0.2.0 ("Unsupported schemaVersion: 2").
-Tests load a document exactly as 0.1.0 saved it (`document.test.ts`), and the playground's e2e
-fixtures are still v1 documents, loaded through the migration.
+Tests load a document exactly as 0.1.0 saved it (`document.test.ts`); in the browser, the
+page-break e2e (`pages.spec.ts`) and the examples' smoke test load v1 documents through the
+migration.
 
 ## Planned envelope additions (not implemented)
 

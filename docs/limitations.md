@@ -1,7 +1,6 @@
 # Known limitations
 
-What Foli does not do yet, or does with caveats, as of 0.1.0 and the unreleased Phase 7 work on
-`main`. Read it before you ship. Details
+What Foli does not do yet, or does with caveats, as of 0.2.0. Read it before you ship. Details
 and the reasons are in [architecture.md](architecture.md), [pagination.md](pagination.md) and
 [ADR-0003](decisions/ADR-0003-rendering-and-input.md); what comes next is in the
 [roadmap](roadmap.md).
@@ -27,11 +26,9 @@ checklist in [testing/ime.md](testing/ime.md)):
 
 ## Content
 
-- 0.1.0 has schema v1 only: paragraphs, headings 1–6, line breaks, page breaks; bold, italic,
-  underline, strikethrough. Schema v2 (lists, links, alignment, colors, rules) is on `main` for
-  0.2.0: lists render, paginate and edit; links edit (dialog, Ctrl/Cmd+K) and open with
-  Ctrl/Cmd+click; alignment, colors and rules edit from the toolbar (pasting them from other
-  apps is 7.8). No tables or images (Phase 8), headers, footers or page numbers (Phase 9).
+- Schema v2: paragraphs, headings 1–6, bulleted and numbered lists, horizontal rules, line and
+  page breaks; bold, italic, underline, strikethrough, links, text color, highlight; alignment.
+  No tables or images (Phase 8), headers, footers or page numbers (Phase 9).
 - List editing:
   - Delete before (or at the end of the item before) an item that goes on with a nested list
     does nothing: lift the nested items first.
@@ -86,8 +83,8 @@ checklist in [testing/ime.md](testing/ime.md)):
   pages ([benchmarks.md](benchmarks.md): 100 pages lay out in about 40–85 ms, a keystroke
   paints within 8–19 ms at p95 in Chromium and Firefox).
 - Long documents made of lists are slower: in a 114-page list document, Enter near the top
-  takes about 15 ms to handle and up to ~55 ms to paint (p95), and the first layout ~85 ms,
-  about twice a paragraph document. An edit there moves the last item of every later page to
+  takes about 9-24 ms to handle (p50) and up to ~65 ms to paint (p95), and the first layout
+  ~85-95 ms, about twice a paragraph document (two runs, [benchmarks.md](benchmarks.md)). An edit there moves the last item of every later page to
   the next one; every render also walks every block.
 - Formatting thousands of paragraphs at once is slow: bold over 4,000 paragraphs takes about
   0.6 s, the next edit about 0.7 s, its undo about 0.5 s.

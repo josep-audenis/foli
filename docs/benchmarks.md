@@ -224,6 +224,33 @@ cells may be off by ~30%):
   the items in "Not done yet" below. The paragraph document's numbers above, from the same
   session, stay within the targets.
 
+### 0.2.0 rerun (7.9)
+
+The whole benchmark again before 0.2.0 (2026-11-08, same machine and versions, one run), with
+everything Phase 7 added (nested blocks in the view, the list keymap, the toolbar's new
+controls and their state after every transaction). The paragraph document stays within every
+target in Chromium and Firefox; the list document stays the accepted known limit above,
+with one cell clearly worse than the 7.4 run: Firefox's Enter handler p50 (24 ms against 16,
+more than the single-run noise). Chromium's Enter improved (8.6 ms against 14.4); the other
+list cells moved within the noise. Not investigated for 0.2.0.
+
+| Engine   | Document   | Pages | layout | type handler p50 | type paint p50 / p95 | Enter handler p50 | Enter paint p50 / p95 | re-flow |
+| -------- | ---------- | ----: | -----: | ---------------: | -------------------: | ----------------: | --------------------: | ------: |
+| Chromium | paragraphs |   100 |   40.9 |              4.1 |            6.1 / 9.1 |               5.7 |            8.2 / 15.4 |    57.6 |
+| Chromium | paragraphs |   199 |   82.4 |              6.1 |           8.6 / 11.7 |               7.4 |           10.9 / 23.6 |   159.2 |
+| Chromium | lists      |   114 |   95.5 |              6.9 |          10.1 / 20.0 |               8.6 |           13.1 / 39.2 |   124.0 |
+| Firefox  | paragraphs |   100 |     46 |                3 |               6 / 12 |                 5 |                7 / 16 |    55.8 |
+| Firefox  | paragraphs |   199 |    101 |                6 |              10 / 16 |                 8 |               11 / 19 |   110.3 |
+| Firefox  | lists      |   114 |     87 |                7 |              10 / 15 |                24 |               27 / 63 |   135.6 |
+| WebKit   | paragraphs |   100 |     76 |                4 |              15 / 16 |                 5 |               15 / 46 |      78 |
+| WebKit   | paragraphs |   199 |    157 |                6 |              14 / 29 |                 7 |               14 / 45 |     164 |
+| WebKit   | lists      |   114 |    131 |                7 |              15 / 30 |                 9 |               16 / 79 |     140 |
+
+Against the targets (paragraph document, Chromium / Firefox): handler p50 at most 5.7 / 5 ms
+(≤ 8) at 100 pages and 7.4 / 8 ms (≤ 12) at 200; keystroke-to-paint p95 at most 15.4 / 16 ms
+(≤ 25) and 23.6 / 19 ms (≤ 33); initial layout 40.9 / 46 ms (≤ 60) and 82.4 / 101 ms (≤ 120);
+full re-flow 57.6 / 55.8 ms (≤ 100) and 159.2 / 110.3 ms (≤ 250).
+
 Not done yet: the per-keystroke walk over every block, the whole-document `onChange`
 serialization, virtualizing pages far from the viewport, and moving the first layout off the main
 thread. None is needed for these targets; revisit when a target fails or documents grow past a

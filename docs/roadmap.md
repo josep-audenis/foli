@@ -18,7 +18,7 @@ place that says what is in progress; check it before starting work.
 | 4 Editor view            | ✅ Done (G3 provisional) | —                      | Merged in #8–#13; manual checks (4.6) deferred, open risks in ADR-0003                     |
 | 5 Native pagination      | ✅ Done (G4 provisional) | —                      | Merged in #15–#22; page-break manual checks open, risks in ADR-0003                        |
 | 6 React API & 0.1.0      | ✅ Done                  | —                      | Merged in #23–#31; 0.1.0 on npm; manual checks shipped as known risks (ADR-0003)           |
-| 7 Rich content           | In progress              | `phase-7/rich-content` | Plan below (tasks 7.1–7.9); nested blocks in the paged view need ADR-0004 (7.3)            |
+| 7 Rich content           | In review                | `phase-7/rich-content` | 7.1–7.8 merged (#33–#40); 7.9 (docs, 0.2.0 version) in review; publish after approval      |
 | 8–12                     | Not started              |                        |                                                                                            |
 
 Status values: `Ready` (dependencies met, nobody on it) · `In progress` · `In review` (PR open) ·
@@ -508,7 +508,7 @@ schema (fixtures) and copies back out; no `href` outside the safe protocols reac
 document by any path; axe passes on the new toolbar controls; the 100-page benchmark stays
 within its targets; 0.2.0 published. (Accepted 2026-11-08 by the owner: the paragraph benchmark
 stays within the targets; the 100-section list document misses them on Enter at the top,
-initial layout and Chromium's re-flow, a known limit for 0.2.0; benchmarks.md, "Lists".)
+initial layout and the full re-flow, a known limit for 0.2.0; benchmarks.md, "Lists".)
 
 ### Tasks
 
@@ -560,7 +560,7 @@ top-level block, marks rendered without attrs).
   removal), `insertHorizontalRule`; arrows and Backspace around a rule (`NodeSelection`);
   toolbar controls: alignment group, color and highlight menus (accessible menu buttons with a
   fixed palette), rule button; CSS variables for link, marker and rule styling.
-- [ ] 7.8 Clipboard and interop: HTML ↔ schema v2 for `ul`/`ol`/`li` (nesting, `start`), Word
+- [x] 7.8 (#40) Clipboard and interop: HTML ↔ schema v2 for `ul`/`ol`/`li` (nesting, `start`), Word
   and Google Docs list markup (fixtures, best effort), `a[href]` (sanitized), `hr`, `color`,
   `background-color`, `text-align`; copy writes the same structures; fixture corpus extended;
   T3 rerun.
