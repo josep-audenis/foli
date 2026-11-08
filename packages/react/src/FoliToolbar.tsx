@@ -1,20 +1,29 @@
 import {
+  type Alignment,
+  AllSelection,
+  alignAt,
   type Command,
+  colorAt,
   type Editor,
   type EditorState,
+  insertHorizontalRule,
   insertPageBreak,
   isSafeHref,
   liftListItem,
   linkAt,
   listTypeAt,
+  NodeSelection,
   normalizeHref,
   openLinkEditor,
   redo,
   redoDepth,
   removeLink,
   requestsLinkEditor,
+  setAlign,
   setBlockType,
+  setHighlight,
   setLink,
+  setTextColor,
   sinkListItem,
   toggleList,
   toggleMark,
@@ -27,6 +36,7 @@ import {
   Fragment,
   type KeyboardEvent,
   type MouseEvent,
+  type ReactNode,
   useEffect,
   useId,
   useRef,
@@ -59,6 +69,8 @@ interface Item {
   /** Visible text: the accessible name, unless it is a symbol (then the label is). */
   text: string;
   symbol?: boolean;
+  /** Shown instead of `text` (a symbol: the label is the name). */
+  icon?: ReactNode;
   /** Whether the button shows as pressed (toggle buttons only). */
   pressed?: (state: EditorState, editor: Editor) => boolean;
   /**
@@ -68,8 +80,76 @@ interface Item {
    * block type over a large selection, quadratic in the number of blocks).
    */
   enabled?: (state: EditorState) => boolean;
-  command: (state: EditorState) => Command;
+  /** The command a press runs (not for a menu button). */
+  command?: (state: EditorState) => Command;
+  /** A menu button: its options, the current value, and what picking one runs. */
+  menu?: {
+    options: readonly ColorOption[];
+    value: (state: EditorState) => string | null;
+    pick: (color: string | null) => Command;
+  };
 }
+
+interface ColorOption {
+  name: string;
+  /** Lowercase `#rrggbb`; null removes the color. */
+  color: string | null;
+}
+
+/**
+ * The palettes (fixed: a document should not need a color picker). Text colors keep at least
+ * 4.5:1 contrast on white; highlights keep dark text readable.
+ */
+const TEXT_COLORS: readonly ColorOption[] = [
+  { name: "Automatic", color: null },
+  { name: "Gray", color: "#5f6368" },
+  { name: "Red", color: "#c00000" },
+  { name: "Orange", color: "#b45309" },
+  { name: "Green", color: "#2e7d32" },
+  { name: "Blue", color: "#1f5fbf" },
+  { name: "Purple", color: "#7030a0" },
+];
+const HIGHLIGHTS: readonly ColorOption[] = [
+  { name: "None", color: null },
+  { name: "Yellow", color: "#fff59d" },
+  { name: "Green", color: "#c8e6c9" },
+  { name: "Blue", color: "#bbdefb" },
+  { name: "Pink", color: "#f8bbd0" },
+  { name: "Orange", color: "#ffe0b2" },
+  { name: "Gray", color: "#e0e0e0" },
+];
+
+/** Whether the selection holds a textblock (a caret's own block first; else it walks the range). */
+function hasTextblock(state: EditorState): boolean {
+  if (state.selection.$from.parent.isTextblock) return true;
+  let found = false;
+  state.doc.nodesBetween(state.selection.from, state.selection.to, (node) => {
+    if (node.isTextblock) found = true;
+    return !found;
+  });
+  return found;
+}
+
+/** Four bars, like the alignment they stand for (x and width per bar). */
+const alignIcon = (bars: readonly [number, number][]) => (
+  <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false">
+    {bars.map(([x, width], i) => (
+      // biome-ignore lint/suspicious/noArrayIndexKey: a fixed drawing.
+      <rect key={i} x={x} y={2.5 + i * 3.5} width={width} height="1.5" fill="currentColor" />
+    ))}
+  </svg>
+);
+
+const align = (value: Alignment, label: string, bars: readonly [number, number][]): Item => ({
+  key: `align-${value}`,
+  label,
+  text: label,
+  symbol: true,
+  icon: alignIcon(bars),
+  pressed: (state) => alignAt(state) === value,
+  enabled: hasTextblock,
+  command: () => setAlign(value),
+});
 
 /** Whether the selection holds textblocks and all of them are `type` with `level` (if given). */
 function blockIs(state: EditorState, type: string, level?: number): boolean {
@@ -123,6 +203,30 @@ const GROUPS: Item[][] = [
       // Asks for the link dialog, as Mod-K does: the toolbar listens for that request.
       command: () => openLinkEditor,
     },
+    {
+      key: "textColor",
+      label: "Text color",
+      text: "A",
+      symbol: true,
+      enabled: hasTextblock,
+      menu: {
+        options: TEXT_COLORS,
+        value: (state) => colorAt(state, "textColor"),
+        pick: setTextColor,
+      },
+    },
+    {
+      key: "highlight",
+      label: "Highlight",
+      text: "H",
+      symbol: true,
+      enabled: hasTextblock,
+      menu: {
+        options: HIGHLIGHTS,
+        value: (state) => colorAt(state, "highlight"),
+        pick: setHighlight,
+      },
+    },
   ],
   [
     {
@@ -136,6 +240,32 @@ const GROUPS: Item[][] = [
     heading(1),
     heading(2),
     heading(3),
+  ],
+  [
+    align("start", "Align left", [
+      [1, 14],
+      [1, 9],
+      [1, 14],
+      [1, 9],
+    ]),
+    align("center", "Center", [
+      [1, 14],
+      [3.5, 9],
+      [1, 14],
+      [3.5, 9],
+    ]),
+    align("end", "Align right", [
+      [1, 14],
+      [6, 9],
+      [1, 14],
+      [6, 9],
+    ]),
+    align("justify", "Justify", [
+      [1, 14],
+      [1, 14],
+      [1, 14],
+      [1, 14],
+    ]),
   ],
   [
     {
@@ -190,7 +320,20 @@ const GROUPS: Item[][] = [
       command: () => redo,
     },
   ],
-  [{ key: "pageBreak", label: "Page break", text: "Page break", command: () => insertPageBreak }],
+  [
+    {
+      key: "horizontalRule",
+      label: "Horizontal rule",
+      text: "―",
+      symbol: true,
+      enabled: (state) =>
+        state.selection.$from.parent.isTextblock ||
+        state.selection instanceof AllSelection ||
+        (state.selection instanceof NodeSelection && state.selection.node.isBlock),
+      command: () => insertHorizontalRule,
+    },
+    { key: "pageBreak", label: "Page break", text: "Page break", command: () => insertPageBreak },
+  ],
 ];
 const ITEMS = GROUPS.flat();
 
@@ -215,23 +358,31 @@ interface LinkDialogState {
 interface ItemState {
   pressed: boolean | undefined;
   enabled: boolean;
+  /** A menu button's current value (a color, or null). */
+  value: string | null | undefined;
 }
 
 const sameStates = (a: ItemState[], b: ItemState[]) =>
   a.length === b.length &&
-  a.every((item, i) => item.pressed === b[i]?.pressed && item.enabled === b[i]?.enabled);
+  a.every(
+    (item, i) =>
+      item.pressed === b[i]?.pressed &&
+      item.enabled === b[i]?.enabled &&
+      item.value === b[i]?.value,
+  );
 
 /** Runs after every transaction: O(selection), no transactions built. */
 const selectStates = (state: EditorState, editor: Editor): ItemState[] =>
   ITEMS.map((item) => ({
     pressed: item.pressed?.(state, editor),
     enabled: item.enabled?.(state) ?? true,
+    value: item.menu?.value(state),
   }));
 
 /**
- * Formatting buttons for an editor: marks and link (a dialog, also on Mod-K in the document),
- * paragraph and heading levels, lists (bulleted,
- * numbered, decrease and increase indent), undo, redo, page break. One tab stop (arrow keys,
+ * Formatting buttons for an editor: marks, link (a dialog, also on Mod-K in the document), text
+ * color and highlight menus, paragraph and heading levels, alignment, lists (bulleted,
+ * numbered, decrease and increase indent), undo, redo, horizontal rule, page break. One tab stop (arrow keys,
  * Home and End move between buttons); toggles carry
  * `aria-pressed`; a button whose command cannot run now is `aria-disabled` (still focusable).
  * Clicks leave the focus and selection in the document.
@@ -247,10 +398,27 @@ export function FoliToolbar({
   const states = useEditorState(selectStates, { editor, isEqual: sameStates });
   const [active, setActive] = useState(0);
   const buttons = useRef<(HTMLButtonElement | null)[]>([]);
+  // The open menu (a menu button's key), if any.
+  const [menu, setMenu] = useState<string | null>(null);
+  useEffect(() => {
+    if (disabled) setMenu(null);
+  }, [disabled]);
 
   const run = (index: number, event: MouseEvent) => {
     const item = ITEMS[index];
     if (!item || disabled || !states[index]?.enabled) return;
+    if (item.menu) {
+      if (menu !== item.key) {
+        setMenu(item.key);
+        return;
+      }
+      // Closing by its button: the focus was in the menu, which goes away.
+      setMenu(null);
+      if (event.detail > 0 && onClickCommand) onClickCommand();
+      else buttons.current[index]?.focus();
+      return;
+    }
+    if (!item.command) return;
     editor.run(item.command(editor.state));
     // `detail` counts pointer clicks; Enter and Space on a button give 0.
     if (event.detail > 0) onClickCommand?.();
@@ -330,7 +498,7 @@ export function FoliToolbar({
               const i = index++;
               const state = states[i];
               const off = disabled || !state?.enabled;
-              return (
+              const button = (
                 <button
                   key={item.key}
                   ref={(element) => {
@@ -342,15 +510,55 @@ export function FoliToolbar({
                   aria-label={item.symbol ? item.label : undefined}
                   title={item.label}
                   aria-pressed={item.pressed ? Boolean(state?.pressed) : undefined}
+                  aria-haspopup={item.menu ? "menu" : undefined}
+                  aria-expanded={item.menu ? menu === item.key : undefined}
                   aria-disabled={off || undefined}
                   tabIndex={i === active ? 0 : -1}
                   // Keep the focus (and the selection) in the document on click.
                   onMouseDown={(event) => event.preventDefault()}
                   onFocus={() => setActive(i)}
                   onClick={(event) => run(i, event)}
+                  onKeyDown={(event) => {
+                    // ArrowDown opens a menu (the WAI-ARIA menu button pattern).
+                    if (!item.menu || off || event.key !== "ArrowDown") return;
+                    event.preventDefault();
+                    setMenu(item.key);
+                  }}
                 >
-                  {item.text}
+                  {item.icon ?? item.text}
+                  {item.menu && (
+                    <span
+                      className="foli-toolbar-swatch"
+                      aria-hidden="true"
+                      style={{ background: state?.value ?? "transparent" }}
+                    />
+                  )}
                 </button>
+              );
+              const options = item.menu?.options;
+              if (!options || !item.menu) return button;
+              const { pick } = item.menu;
+              return (
+                <span key={item.key} className="foli-toolbar-menu">
+                  {button}
+                  {menu === item.key && !disabled && (
+                    <ColorMenu
+                      label={item.label}
+                      options={options}
+                      current={state?.value ?? null}
+                      onPick={(color, pointer) => {
+                        editor.run(pick(color));
+                        setMenu(null);
+                        if (pointer) onClickCommand?.();
+                        else buttons.current[i]?.focus();
+                      }}
+                      onClose={(refocus) => {
+                        setMenu(null);
+                        if (refocus) buttons.current[i]?.focus();
+                      }}
+                    />
+                  )}
+                </span>
               );
             })}
           </Fragment>
@@ -365,6 +573,94 @@ export function FoliToolbar({
         />
       )}
     </>
+  );
+}
+
+/**
+ * A color menu (WAI-ARIA menu with radio items): the current color checked and focused on
+ * open; arrow keys, Home and End move; Enter or Space (or a click) picks; Escape closes it back
+ * to its button, Tab closes it and moves on; leaving it (a click elsewhere) closes it.
+ */
+function ColorMenu({
+  label,
+  options,
+  current,
+  onPick,
+  onClose,
+}: {
+  label: string;
+  options: readonly ColorOption[];
+  current: string | null;
+  onPick: (color: string | null, pointer: boolean) => void;
+  onClose: (refocus: boolean) => void;
+}) {
+  const items = useRef<(HTMLButtonElement | null)[]>([]);
+  const checked = Math.max(
+    0,
+    options.findIndex((option) => option.color === current),
+  );
+  // biome-ignore lint/correctness/useExhaustiveDependencies: focus once, on open.
+  useEffect(() => {
+    items.current[checked]?.focus();
+  }, []);
+
+  const onKeyDown = (event: KeyboardEvent) => {
+    const count = options.length;
+    const at = items.current.indexOf(event.target as HTMLButtonElement);
+    const moves: Record<string, number> = {
+      ArrowDown: (at + 1) % count,
+      ArrowUp: (at - 1 + count) % count,
+      Home: 0,
+      End: count - 1,
+    };
+    const next = moves[event.key];
+    // The toolbar's own arrow keys must not see these.
+    event.stopPropagation();
+    if (next !== undefined) {
+      event.preventDefault();
+      items.current[next]?.focus();
+    } else if (event.key === "Escape") {
+      event.preventDefault();
+      onClose(true);
+    } else if (event.key === "Tab") {
+      // Back to the button, then the browser's Tab moves on from it (out of the toolbar).
+      onClose(true);
+    }
+  };
+
+  return (
+    <div
+      role="menu"
+      aria-label={label}
+      className="foli-menu"
+      onKeyDown={onKeyDown}
+      onBlur={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) onClose(false);
+      }}
+    >
+      {options.map((option, i) => (
+        <button
+          key={option.name}
+          ref={(element) => {
+            items.current[i] = element;
+          }}
+          type="button"
+          role="menuitemradio"
+          aria-checked={option.color === current}
+          tabIndex={-1}
+          className="foli-menu-item"
+          onMouseDown={(event) => event.preventDefault()}
+          onClick={(event) => onPick(option.color, event.detail > 0)}
+        >
+          <span
+            className="foli-menu-swatch"
+            aria-hidden="true"
+            style={{ background: option.color ?? "transparent" }}
+          />
+          {option.name}
+        </button>
+      ))}
+    </div>
   );
 }
 

@@ -316,6 +316,25 @@ export class Transform {
     return changed.length ? this.step(new NodeMarkupBatchStep(changed)) : this;
   }
 
+  /**
+   * Sets `attrs` on every textblock touching `from..to` whose type declares them (alignment on
+   * paragraphs and headings), keeping each block's type. Blocks already like that are untouched.
+   * Invalid attributes throw TransformError.
+   */
+  setBlockAttrs(from: number, to: number, attrs: Attrs): this {
+    const changed: NodeMarkupStep[] = [];
+    this.doc.nodesBetween(from, to, (node, pos) => {
+      if (!node.isTextblock) return undefined;
+      const declared = node.type.spec.attrs ?? {};
+      const own = Object.fromEntries(Object.entries(attrs).filter(([name]) => name in declared));
+      if (!Object.keys(own).length) return false;
+      const next = { ...node.attrs, ...own };
+      if (!deepEqual(node.attrs, next)) changed.push(new NodeMarkupStep(pos, node.type, next));
+      return false;
+    });
+    return changed.length ? this.step(new NodeMarkupBatchStep(changed)) : this;
+  }
+
   /** Changes the markup of the node at `pos` (see NodeMarkupStep). */
   setNodeMarkup(
     pos: number,

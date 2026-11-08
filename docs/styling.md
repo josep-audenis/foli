@@ -34,6 +34,10 @@ the editor, or on `.foli-canvas` and `.foli-toolbar` themselves, to override it 
 | `--foli-toolbar-pressed`    | `#dfe8f8`                                                  | pressed (active) toggle       |
 | `--foli-focus-ring`         | `#2367dc`                                                  | focus outline, pressed border |
 | `--foli-error-color`        | `#b3261e`                                                  | link dialog: invalid URL      |
+| `--foli-link-color`         | `#1f5fbf`                                                  | links in the document         |
+| `--foli-marker-color`       | `currentColor`                                             | list bullets and numbers      |
+| `--foli-rule-color`         | `#8c8c87`                                                  | horizontal rules              |
+| `--foli-rule-thickness`     | `1px`                                                      | horizontal rules              |
 
 Page breaks follow the text's real line boxes: a font, size or line-height change re-flows the
 pages. The document's fonts must be available (loaded web fonts or installed ones); the view
@@ -69,20 +73,21 @@ pages should print white.
 
 ## Elements and classes
 
-| Selector                             | What                                                                                                 |
-| ------------------------------------ | ---------------------------------------------------------------------------------------------------- |
-| `.foli-canvas`                       | `FoliCanvas`'s outer element (`className` is added here)                                             |
-| `.foli-content`                      | the editable host (`role="textbox"`); `FoliCanvas` adds the class, with `EditorView` add it yourself |
-| `.foli-page`                         | one page (`<section>`), size and padding inline                                                      |
-| `p`, `h1`–`h6` inside `.foli-page`   | paragraphs and headings (alignment as inline `text-align`)                                           |
-| `ul`, `ol`, `li` inside `.foli-page` | lists and list items (`data-foli-wrapper`); one set per page a list is on                            |
-| `hr` inside `.foli-page`             | a horizontal rule; `.foli-selected-node` while it is selected                                        |
-| `a`                                  | a link (a click places the caret; Ctrl/Cmd+click opens it in a new tab)                              |
-| `strong`, `em`, `u`, `s`             | bold, italic, underline, strikethrough; text color and highlight are spans with inline colors        |
-| `.foli-toolbar`                      | `FoliToolbar` (`className` is added here)                                                            |
-| `.foli-toolbar-button`               | each button, plus `.foli-toolbar-<key>` (`bold`, `h1`, `undo`, `pageBreak`…)                         |
-| `.foli-toolbar-separator`            | between button groups                                                                                |
-| `.foli-link-dialog`                  | the link dialog under the toolbar; `.foli-link-error` its message for an invalid URL                 |
+| Selector                             | What                                                                                                                                           |
+| ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `.foli-canvas`                       | `FoliCanvas`'s outer element (`className` is added here)                                                                                       |
+| `.foli-content`                      | the editable host (`role="textbox"`); `FoliCanvas` adds the class, with `EditorView` add it yourself                                           |
+| `.foli-page`                         | one page (`<section>`), size and padding inline                                                                                                |
+| `p`, `h1`–`h6` inside `.foli-page`   | paragraphs and headings (alignment as inline `text-align`)                                                                                     |
+| `ul`, `ol`, `li` inside `.foli-page` | lists and list items (`data-foli-wrapper`); one set per page a list is on                                                                      |
+| `hr` inside `.foli-page`             | a horizontal rule: a 12px box (easy to click) with the line in its middle (`::after`); `.foli-selected-node` while it is selected              |
+| `a`                                  | a link (a click places the caret; Ctrl/Cmd+click opens it in a new tab)                                                                        |
+| `strong`, `em`, `u`, `s`             | bold, italic, underline, strikethrough; text color and highlight are spans with inline colors                                                  |
+| `.foli-toolbar`                      | `FoliToolbar` (`className` is added here)                                                                                                      |
+| `.foli-toolbar-button`               | each button, plus `.foli-toolbar-<key>` (`bold`, `h1`, `undo`, `pageBreak`…)                                                                   |
+| `.foli-toolbar-separator`            | between button groups                                                                                                                          |
+| `.foli-toolbar-menu`, `.foli-menu`   | a color menu button's wrapper, its menu (`.foli-menu-item`, `.foli-menu-swatch`); `.foli-toolbar-swatch` shows the current color on the button |
+| `.foli-link-dialog`                  | the link dialog under the toolbar; `.foli-link-error` its message for an invalid URL                                                           |
 
 You can style headings and paragraphs (`.foli-page h1 { font-size: 20pt }`). Margins and
 padding on blocks are measured, so pagination follows them. List elements must take no

@@ -243,12 +243,12 @@ fails when a bundle passes its budget.
 
 | Bundle            | Includes          | Minified | Gzipped |  Budget |
 | ----------------- | ----------------- | -------: | ------: | ------: |
-| `@folijs/core`    | core              |  63.9 kB | 20.0 kB | 21.6 kB |
-| `@folijs/view`    | view, core        |  74.5 kB | 24.2 kB | 26.1 kB |
-| `@folijs/react`   | react, view, core | 103.8 kB | 33.5 kB | 38.5 kB |
-| `FoliEditor` only | what it reaches   | 103.6 kB | 33.4 kB | 38.5 kB |
+| `@folijs/core`    | core              |  67.6 kB | 21.1 kB | 21.6 kB |
+| `@folijs/view`    | view, core        |  76.5 kB | 24.8 kB | 26.1 kB |
+| `@folijs/react`   | react, view, core | 111.3 kB | 35.8 kB | 38.5 kB |
+| `FoliEditor` only | what it reaches   | 111.1 kB | 35.7 kB | 38.5 kB |
 
-(kB = 1,024 bytes; measured 2026-11-08 after task 7.6. At 0.1.0 (6.4) they were 14.1, 19.9,
+(kB = 1,024 bytes; measured 2026-11-08 after task 7.7. At 0.1.0 (6.4) they were 14.1, 19.9,
 25.3 and 25.2 kB gzipped. Phase 7 added the structure engine (7.1, core budget raised from
 16.1 kB), schema v2 (7.2), nested blocks on pages (7.3, view and React budgets raised from
 22.9 and 29.1 kB) list editing (7.5, core budget raised again from 19.0 kB) and links (7.6, React budgets raised

@@ -30,8 +30,8 @@ export function App() {
 ```
 
 That gives an empty A4 document with a formatting toolbar (bold, italic, underline,
-strikethrough, link, paragraph, headings 1–3, bulleted and numbered lists, indent, undo, redo, page
-break). The stylesheet holds the
+strikethrough, link, text color, highlight, paragraph, headings 1–3, alignment, bulleted and
+numbered lists, indent, undo, redo, horizontal rule, page break). The stylesheet holds the
 default theme; see [styling.md](styling.md) to change it.
 
 ## Load and save
@@ -205,20 +205,22 @@ its context.
 
 ## Keyboard
 
-| Keys (Ctrl on Windows/Linux, Cmd on macOS) | Does                                                     |
-| ------------------------------------------ | -------------------------------------------------------- |
-| Ctrl+B, Ctrl+I, Ctrl+U                     | bold, italic, underline                                  |
-| Ctrl+Z; Ctrl+Shift+Z or Ctrl+Y             | undo; redo                                               |
-| Enter; Shift+Enter                         | new paragraph; line break                                |
-| Ctrl+Enter                                 | page break                                               |
-| Ctrl+A                                     | select all                                               |
-| Ctrl+Shift+V                               | paste as plain text                                      |
-| Ctrl+K                                     | add or edit a link (the toolbar's link dialog)           |
-| Ctrl+click on a link                       | open it in a new tab                                     |
-| Ctrl+Shift+8; Ctrl+Shift+7                 | bulleted list; numbered list (again: back to paragraphs) |
-| Tab; Shift+Tab (in a list)                 | nest the item; lift it one level                         |
-| Enter on an empty list item                | leave the list (a nested one: up one level)              |
-| Backspace at a list item's start           | lift the item (out of the list at the top)               |
+| Keys (Ctrl on Windows/Linux, Cmd on macOS)  | Does                                                     |
+| ------------------------------------------- | -------------------------------------------------------- |
+| Ctrl+B, Ctrl+I, Ctrl+U                      | bold, italic, underline                                  |
+| Ctrl+Z; Ctrl+Shift+Z or Ctrl+Y              | undo; redo                                               |
+| Enter; Shift+Enter                          | new paragraph; line break                                |
+| Ctrl+Enter                                  | page break                                               |
+| Ctrl+A                                      | select all                                               |
+| Ctrl+Shift+V                                | paste as plain text                                      |
+| Ctrl+K                                      | add or edit a link (the toolbar's link dialog)           |
+| Ctrl+click on a link                        | open it in a new tab                                     |
+| Arrows next to a horizontal rule            | select it (a click does too); arrows again: past it      |
+| Typing, Enter, Backspace on a selected rule | replace it with text; new paragraph after; delete it     |
+| Ctrl+Shift+8; Ctrl+Shift+7                  | bulleted list; numbered list (again: back to paragraphs) |
+| Tab; Shift+Tab (in a list)                  | nest the item; lift it one level                         |
+| Enter on an empty list item                 | leave the list (a nested one: up one level)              |
+| Backspace at a list item's start            | lift the item (out of the list at the top)               |
 
 Word and line deletion use the platform's own keys (Ctrl+Backspace, Option+Backspace,
 Cmd+Backspace…). Outside a list, Tab and Shift+Tab are left to the browser (they move the focus

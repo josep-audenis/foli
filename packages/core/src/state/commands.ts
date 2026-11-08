@@ -1,17 +1,19 @@
 import {
   type Attrs,
   FoliDocumentError,
+  Fragment,
   type Mark,
   type MarkType,
   type Node,
   type NodeType,
   type ResolvedPos,
+  Slice,
 } from "../model/index.js";
 import { TransformError } from "../transform/transform.js";
 import { attempt } from "./attempt.js";
 import { redo, undo } from "./history.js";
 import { openLinkEditor } from "./links.js";
-import { AllSelection, marksAt, TextSelection } from "./selection.js";
+import { AllSelection, marksAt, NodeSelection, Selection, TextSelection } from "./selection.js";
 import {
   type Command,
   defaultTextblockType,
@@ -45,6 +47,14 @@ export function insertText(text: string): Command {
   return (state, dispatch) => {
     if (!text) return false;
     const { selection } = state;
+    if (selectedBlock(state)) {
+      // Typing over a selected block (a rule) replaces it with a paragraph of the text.
+      return replaceSelectedBlock(
+        state,
+        dispatch,
+        state.schema.text(text, state.storedMarks ?? []),
+      );
+    }
     if (!(selection instanceof AllSelection) && !selection.$from.parent.inlineContent) return false;
     return attempt(state, dispatch, (tr) => {
       const $from = selection.$from;
@@ -202,6 +212,14 @@ export const joinForward: Command = (state, dispatch) => {
  */
 export const splitBlock: Command = (state, dispatch) => {
   const { selection } = state;
+  const block = selectedBlock(state);
+  if (block) {
+    // Enter on a selected block (a rule): a new paragraph after it.
+    return attempt(state, dispatch, (tr) => {
+      tr.insert(selection.to, defaultTextblockType(state.schema).create());
+      tr.setSelection(TextSelection.create(tr.doc, selection.to + 1));
+    });
+  }
   if (!(selection instanceof AllSelection) && !selection.$from.parent.isTextblock) return false;
   return attempt(state, dispatch, (tr) => {
     const marks = state.storedMarks ?? marksAt(selection.$from);
@@ -214,6 +232,89 @@ export const splitBlock: Command = (state, dispatch) => {
     if (marks.length) tr.setStoredMarks(marks);
   });
 };
+
+/** The selected block node (a rule), when the selection is a node selection of a block. */
+function selectedBlock(state: EditorState): Node | null {
+  const { selection } = state;
+  return selection instanceof NodeSelection && selection.node.isBlock ? selection.node : null;
+}
+
+/** Replaces the selected block with a default textblock holding `content` (caret at its end). */
+function replaceSelectedBlock(
+  state: EditorState,
+  dispatch: ((tr: Transaction) => void) | undefined,
+  content: Node,
+): boolean {
+  const { from, to } = state.selection;
+  const block = defaultTextblockType(state.schema).create(null, content);
+  return attempt(state, dispatch, (tr) => {
+    tr.replace(from, to, new Slice(Fragment.from(block), 0, 0));
+    tr.setSelection(TextSelection.create(tr.doc, from + 1 + content.nodeSize));
+  });
+}
+
+/**
+ * The leaf block or textblock next to `pos` (a position between blocks) in direction `dir`,
+ * through container boundaries (the rule ending the list item before), or null at the end.
+ */
+function blockBeside(doc: Node, pos: number, dir: -1 | 1): { node: Node; pos: number } | null {
+  let $pos = doc.resolve(pos);
+  for (;;) {
+    let node = dir < 0 ? $pos.nodeBefore : $pos.nodeAfter;
+    if (node) {
+      let start = dir < 0 ? $pos.pos - node.nodeSize : $pos.pos;
+      while (!node.isTextblock && !node.isLeaf) {
+        const child: Node | null = dir < 0 ? node.lastChild : node.firstChild;
+        if (!child) return null;
+        start = dir < 0 ? start + node.nodeSize - 1 - child.nodeSize : start + 1;
+        node = child;
+      }
+      return { node, pos: start };
+    }
+    if ($pos.depth === 0) return null;
+    $pos = doc.resolve(dir < 0 ? $pos.before() : $pos.after());
+  }
+}
+
+/**
+ * Arrow keys around a block leaf (a rule, which has no caret stop). From a selected leaf: to the
+ * text beside it (the end of the text before, the start of the text after), or the next leaf.
+ * From a caret: selects the leaf beside the caret's textblock, when the caret is at its edge
+ * (`"char"`: Left/Right at the textblock's first or last position) or the view found it on the
+ * first or last line (`"line"`: Up/Down). `"none"` only moves from a selected leaf. `dir` -1 is
+ * back (left, up), 1 forward.
+ */
+export function arrowAcrossLeaf(dir: -1 | 1, from: "char" | "line" | "none"): Command {
+  return (state, dispatch) => {
+    const { selection, doc } = state;
+    if (selectedBlock(state)) {
+      const beside = blockBeside(doc, dir < 0 ? selection.from : selection.to, dir);
+      // At the document's edge: stay (a native arrow would leave a broken DOM range).
+      if (!beside) return true;
+      const next = beside.node.isTextblock
+        ? TextSelection.create(
+            doc,
+            dir < 0 ? beside.pos + beside.node.nodeSize - 1 : beside.pos + 1,
+          )
+        : NodeSelection.isSelectable(beside.node)
+          ? NodeSelection.create(doc, beside.pos)
+          : Selection.near(doc.resolve(beside.pos), dir);
+      dispatch?.(state.tr.setSelection(next));
+      return true;
+    }
+    if (from === "none" || !selection.empty || !(selection instanceof TextSelection)) return false;
+    const { $from } = selection;
+    if (!$from.parent.isTextblock || $from.depth < 1) return false;
+    const atEdge =
+      dir < 0 ? $from.parentOffset === 0 : $from.parentOffset === $from.parent.content.size;
+    if (from === "char" && !atEdge) return false;
+    const beside = blockBeside(doc, dir < 0 ? $from.before() : $from.after(), dir);
+    if (!beside || beside.node.isTextblock || !NodeSelection.isSelectable(beside.node))
+      return false;
+    dispatch?.(state.tr.setSelection(NodeSelection.create(doc, beside.pos)));
+    return true;
+  };
+}
 
 /** Inserts a hard break (a line break inside the block) in place of the selection. */
 export const insertHardBreak: Command = (state, dispatch) =>
@@ -358,6 +459,11 @@ export function baseKeymap(): Plugin {
       "Mod-u": toggleMark("underline"),
       "Mod-k": openLinkEditor,
       "Mod-a": selectAll,
+      // Up/Down from a caret need the view's line geometry: it runs arrowAcrossLeaf(dir, "line").
+      ArrowLeft: arrowAcrossLeaf(-1, "char"),
+      ArrowRight: arrowAcrossLeaf(1, "char"),
+      ArrowUp: arrowAcrossLeaf(-1, "none"),
+      ArrowDown: arrowAcrossLeaf(1, "none"),
       "Mod-z": undo,
       "Mod-Shift-z": redo,
       "Mod-y": redo,

@@ -30,7 +30,8 @@ checklist in [testing/ime.md](testing/ime.md)):
 - 0.1.0 has schema v1 only: paragraphs, headings 1–6, line breaks, page breaks; bold, italic,
   underline, strikethrough. Schema v2 (lists, links, alignment, colors, rules) is on `main` for
   0.2.0: lists render, paginate and edit; links edit (dialog, Ctrl/Cmd+K) and open with
-  Ctrl/Cmd+click; alignment and color controls are still to come (Phase 7). No tables or images (Phase 8), headers, footers or page numbers (Phase 9).
+  Ctrl/Cmd+click; alignment, colors and rules edit from the toolbar (pasting them from other
+  apps is 7.8). No tables or images (Phase 8), headers, footers or page numbers (Phase 9).
 - List editing:
   - Delete before (or at the end of the item before) an item that goes on with a nested list
     does nothing: lift the nested items first.
@@ -40,6 +41,14 @@ checklist in [testing/ime.md](testing/ime.md)):
   - Shift+Tab over items at several levels lifts only the innermost list's items.
   - On Android, Backspace at an item's start may join it into the item before instead of
     lifting it (untested on a device).
+- Colors come from a fixed palette in the toolbar (seven text colors, six highlights); any
+  `#rrggbb` works through `setTextColor` / `setHighlight`.
+- Left and Right next to a rule treat Left as backward: in right-to-left text, Left at the
+  start of a paragraph selects the rule before it (left-to-right is the only direction the
+  view handles fully).
+- Up and Down next to a rule decide "first or last line" from the caret's on-screen box: at a
+  position where the browser gives none (beside some line breaks) the browser moves the caret
+  instead, past the rule.
 - Links:
   - A link address without a scheme that looks like a host name gets `https://`
     (`page.html` too): write `./page.html` for a relative link.

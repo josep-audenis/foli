@@ -90,7 +90,8 @@ Foli's own (see `THIRD_PARTY_NOTICES.md`).
   Selections are `TextSelection`, `NodeSelection` (one selectable node, e.g. a rule) and
   `AllSelection`. Deleting a node-selected block that its parent cannot lose (its only child)
   leaves an empty paragraph where the parent takes one; otherwise the delete does not apply
-  (e.g. the only item of a list). Typing over a node-selected block does nothing yet (7.7).
+  (e.g. the only item of a list). Typing over a node-selected block replaces it with a
+  paragraph of the text; Enter adds a paragraph after it.
 - **Plugins** (internal API, used by history and keymaps): state fields, `filterTransaction`,
   `appendTransaction`, `keymap`.
 - **History**: undo/redo of inverted steps.
@@ -121,6 +122,15 @@ Foli's own (see `THIRD_PARTY_NOTICES.md`).
   - splitBlock: Enter at the end of a heading starts a paragraph, and formatting carries over.
   - Formatting and selection: toggleMark, setBlockType, selectAll, undo, redo, plus `isMarkActive`.
   - `baseKeymap()` binds them to key names (`Mod-b`, `Enter`…).
+  - Formatting (7.7, `state/format.ts`): `setAlign` (`Transform.setBlockAttrs`: the attribute
+    on every textblock whose type declares it, one step), `setTextColor` / `setHighlight`
+    (a color mark, replacing the one there; `null` removes; stored marks at a caret),
+    `alignAt` / `colorAt` for the toolbar, `insertHorizontalRule` (before a textblock at its
+    start, after it at its end with a new paragraph, splitting it in the middle).
+  - Rules have no caret stop: `arrowAcrossLeaf(dir, from)` selects a rule from a caret at
+    the edge of the textblock beside it (Left/Right in `baseKeymap`; Up/Down when the view
+    finds the caret on the block's first or last line, from the caret's and the lines' client
+    rects) and leaves a selected rule to the text beside it, crossing container boundaries.
   - Links (7.6, `state/links.ts`): `setLink`, `removeLink`, `insertLink`, `linkAt`, with
     `normalizeHref` before `isSafeHref` at every entry (command, dialog, paste); a caret at a
     link's edge edits that link. Mod-K is `openLinkEditor`: core has no UI, so it dispatches
@@ -147,7 +157,7 @@ Known limits:
 - No general slice fitting: paste (Phase 4.3) joins open content or replaces an empty textblock
   with whole blocks; fitting blocks into nested structures comes with lists (Phase 7).
 - Paste of lists, links and colors from HTML is 7.8 (a pasted plain-text URL already becomes a
-  link, 7.6). Typing over a node-selected rule does nothing yet (7.7).
+  link, 7.6).
 - Each unrecorded change (and each plugin reaction to undo/redo) rebases the stored history.
   This costs O(n²) in the number of stored steps (not events), and every step is re-applied to the
   document, which also scales with document size.
