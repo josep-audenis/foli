@@ -9,18 +9,18 @@ leaves `main` green with a working playground.
 **Update this table in the same PR that starts, advances or finishes a phase.** It is the only
 place that says what is in progress; check it before starting work.
 
-| Phase                    | Status                   | Branch | Notes                                                                                                     |
-| ------------------------ | ------------------------ | ------ | --------------------------------------------------------------------------------------------------------- |
-| 0 Foundation             | ✅ Done                  | —      |                                                                                                           |
-| 1 Architecture spike     | ✅ Done (G1 provisional) | —      | Merged in #1; ADR-0003 accepted provisionally; IME, dead-key and screen-reader checks open                |
-| 2 Document model         | ✅ Done                  | —      | Merged in #2                                                                                              |
-| 3 Transactions & history | ✅ Done                  | —      | Merged in #4; gate G2 passed                                                                              |
-| 4 Editor view            | ✅ Done (G3 provisional) | —      | Merged in #8–#13; manual checks (4.6) deferred, open risks in ADR-0003                                    |
-| 5 Native pagination      | ✅ Done (G4 provisional) | —      | Merged in #15–#22; page-break manual checks open, risks in ADR-0003                                       |
-| 6 React API & 0.1.0      | ✅ Done                  | —      | Merged in #23–#31; 0.1.0 on npm; manual checks shipped as known risks (ADR-0003)                          |
-| 7 Rich content           | ✅ Done                  | —      | Merged in #33–#41; 0.2.0 on npm; list-document benchmark misses accepted (known limit)                    |
-| 8 Word model & DOCX      | Ready                    |        | [ADR-0005](decisions/ADR-0005-word-compatible-model.md) accepted; plan tasks and collect the corpus first |
-| 9–12                     | Not started              |        |                                                                                                           |
+| Phase                    | Status                   | Branch               | Notes                                                                                      |
+| ------------------------ | ------------------------ | -------------------- | ------------------------------------------------------------------------------------------ |
+| 0 Foundation             | ✅ Done                  | —                    |                                                                                            |
+| 1 Architecture spike     | ✅ Done (G1 provisional) | —                    | Merged in #1; ADR-0003 accepted provisionally; IME, dead-key and screen-reader checks open |
+| 2 Document model         | ✅ Done                  | —                    | Merged in #2                                                                               |
+| 3 Transactions & history | ✅ Done                  | —                    | Merged in #4; gate G2 passed                                                               |
+| 4 Editor view            | ✅ Done (G3 provisional) | —                    | Merged in #8–#13; manual checks (4.6) deferred, open risks in ADR-0003                     |
+| 5 Native pagination      | ✅ Done (G4 provisional) | —                    | Merged in #15–#22; page-break manual checks open, risks in ADR-0003                        |
+| 6 React API & 0.1.0      | ✅ Done                  | —                    | Merged in #23–#31; 0.1.0 on npm; manual checks shipped as known risks (ADR-0003)           |
+| 7 Rich content           | ✅ Done                  | —                    | Merged in #33–#41; 0.2.0 on npm; list-document benchmark misses accepted (known limit)     |
+| 8 Word model & DOCX      | In progress              | `phase-8/word-model` | [ADR-0005](decisions/ADR-0005-word-compatible-model.md); tasks below (8.1 corpus first)    |
+| 9–12                     | Not started              |                      |                                                                                            |
 
 Status values: `Ready` (dependencies met, nobody on it) · `In progress` · `In review` (PR open) ·
 `✅ Done` (merged, acceptance criteria met) · `Blocked by …`.
@@ -612,6 +612,36 @@ it, and saves it back without losing anything ([ADR-0005](decisions/ADR-0005-wor
 with Word measured and published as a baseline; opaque nodes per document reported; T1–T5 pass
 on schema v3 in three engines; documents saved by 0.1.0 and 0.2.0 migrate without content loss;
 0.3.0 published.
+
+### Tasks
+
+Each task is a PR on `phase-8/word-model`, the build green after each.
+
+- [ ] 8.1 Corpus and Word harness. Synthetic Word-authored documents (`corpus/word/`: an NDA with
+  legal numbering, a redlined services agreement with comments, a template with content
+  controls and merge fields, a board report, a business letter) and their generator
+  (`scripts/corpus/build-word-corpus.ps1`, Word automation); then the harness: for every
+  document (synthetic or a private folder), Word's PDF, Word's page for each paragraph, and
+  "re-saved by Word opens without repair", as reference data the later tasks compare with.
+- [ ] 8.2 `@folijs/docx` package reading: zip (audited dependency), own XML tokenizer keeping the
+  exact source text of every element, package parts and relationships; untouched parts written
+  back byte for byte (round trip of the package without the model).
+- [ ] 8.3 Schema v3 in `@folijs/core`: paragraph properties as attributes, run properties as
+  marks, styles (with `basedOn`, defaults, theme), numbering definitions, sections, review
+  content (insertion and deletion marks, comment anchors), opaque block and inline nodes; the
+  v1/v2 → v3 migration; validation.
+- [ ] 8.4 DOCX import to v3: paragraphs, runs, styles, numbering, sections, tracked changes,
+  comments; everything else as opaque content; a coverage report (opaque nodes per document).
+- [ ] 8.5 Lossless export: v3 → DOCX rewriting only the parts the editor owns; harness: a round
+  trip without edits equals the original after canonicalization, every export opens in Word
+  without repair.
+- [ ] 8.6 Rendering from the document: resolved styles as a per-document stylesheet, numbering
+  markers, headings as `h1`–`h6`, fonts with metric-compatible substitutes, tracked changes and
+  comment anchors shown; harness: per-paragraph page agreement with Word.
+- [ ] 8.7 Editing on v3: existing commands and keys ported, list levels and numbering, style
+  picker, font family and size, paragraph spacing and indentation; HTML clipboard mapped to
+  v3; T1–T5 on v3 in three engines.
+- [ ] 8.8 Close: docs, gate G5 numbers, 0.3.0 (changeset, version PR, publish after approval).
 
 ## Phase 9 — Review: tracked changes & comments · XL → 0.4.0
 
