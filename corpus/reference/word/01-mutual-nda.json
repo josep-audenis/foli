@@ -3,6 +3,7 @@
     "word":  "16.0.20527",
     "opened":  true,
     "error":  null,
+    "revisionsAccepted":  0,
     "pages":  2,
     "paragraphs":  [
                        {
@@ -246,14 +247,6 @@
                            "inTable":  true
                        },
                        {
-                           "text":  "",
-                           "page":  2,
-                           "line":  9,
-                           "endPage":  2,
-                           "listString":  "",
-                           "inTable":  true
-                       },
-                       {
                            "text":  "Signature: ____________________",
                            "page":  2,
                            "line":  11,
@@ -263,14 +256,6 @@
                        },
                        {
                            "text":  "Signature: ____________________",
-                           "page":  2,
-                           "line":  11,
-                           "endPage":  2,
-                           "listString":  "",
-                           "inTable":  true
-                       },
-                       {
-                           "text":  "",
                            "page":  2,
                            "line":  11,
                            "endPage":  2,
@@ -294,14 +279,6 @@
                            "inTable":  true
                        },
                        {
-                           "text":  "",
-                           "page":  2,
-                           "line":  12,
-                           "endPage":  2,
-                           "listString":  "",
-                           "inTable":  true
-                       },
-                       {
                            "text":  "Title: Chief Executive Officer",
                            "page":  2,
                            "line":  13,
@@ -311,14 +288,6 @@
                        },
                        {
                            "text":  "Title: Director General",
-                           "page":  2,
-                           "line":  13,
-                           "endPage":  2,
-                           "listString":  "",
-                           "inTable":  true
-                       },
-                       {
-                           "text":  "",
                            "page":  2,
                            "line":  13,
                            "endPage":  2,

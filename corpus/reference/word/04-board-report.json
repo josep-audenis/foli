@@ -3,6 +3,7 @@
     "word":  "16.0.20527",
     "opened":  true,
     "error":  null,
+    "revisionsAccepted":  0,
     "pages":  4,
     "paragraphs":  [
                        {
@@ -326,14 +327,6 @@
                            "inTable":  true
                        },
                        {
-                           "text":  "",
-                           "page":  4,
-                           "line":  3,
-                           "endPage":  4,
-                           "listString":  "",
-                           "inTable":  true
-                       },
-                       {
                            "text":  "Madrid hub expansion",
                            "page":  4,
                            "line":  4,
@@ -375,14 +368,6 @@
                        },
                        {
                            "text":  "2.4",
-                           "page":  4,
-                           "line":  4,
-                           "endPage":  4,
-                           "listString":  "",
-                           "inTable":  true
-                       },
-                       {
-                           "text":  "",
                            "page":  4,
                            "line":  4,
                            "endPage":  4,
@@ -438,14 +423,6 @@
                            "inTable":  true
                        },
                        {
-                           "text":  "",
-                           "page":  4,
-                           "line":  5,
-                           "endPage":  4,
-                           "listString":  "",
-                           "inTable":  true
-                       },
-                       {
                            "text":  "Fleet renewal",
                            "page":  4,
                            "line":  6,
@@ -487,14 +464,6 @@
                        },
                        {
                            "text":  "2.2",
-                           "page":  4,
-                           "line":  6,
-                           "endPage":  4,
-                           "listString":  "",
-                           "inTable":  true
-                       },
-                       {
-                           "text":  "",
                            "page":  4,
                            "line":  6,
                            "endPage":  4,

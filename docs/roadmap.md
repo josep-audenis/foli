@@ -622,9 +622,9 @@ Each task is a PR on `phase-8/word-model`, the build green after each.
   comments, a template with content controls and merge fields, a board report, a business
   letter) and their generator (`scripts/corpus/build-word-corpus.ps1`, Word automation); the
   harness (`scripts/corpus/word-reference.ps1`): for every document (synthetic or a private
-  folder), whether Word opens it without repair, its page count, every paragraph's start page
-  and line, end page and list number, and Word's PDF, as reference data (`corpus/reference/`)
-  the later tasks compare with. LibreOffice headless as a fallback where Word is not installed:
+  folder), whether Word opens it without repair, then, with tracked changes accepted, its page
+  count, every paragraph's start page and line, end page and list number, and Word's PDF, as
+  reference data (`corpus/reference/`) the later tasks compare with. LibreOffice headless as a fallback where Word is not installed:
   when a machine without Word needs it.
 - [ ] 8.2 `@folijs/docx` package reading: zip (audited dependency), own XML tokenizer keeping the
   exact source text of every element, package parts and relationships; untouched parts written
