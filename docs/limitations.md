@@ -28,7 +28,8 @@ checklist in [testing/ime.md](testing/ime.md)):
 
 - Schema v2: paragraphs, headings 1–6, bulleted and numbered lists, horizontal rules, line and
   page breaks; bold, italic, underline, strikethrough, links, text color, highlight; alignment.
-  No tables or images (Phase 8), headers, footers or page numbers (Phase 9).
+  No DOCX import or export yet (Phase 8, [ADR-0005](decisions/ADR-0005-word-compatible-model.md)),
+  no tables or images (Phase 9), headers, footers or page numbers (Phase 10).
 - List editing:
   - Delete before (or at the end of the item before) an item that goes on with a nested list
     does nothing: lift the nested items first.

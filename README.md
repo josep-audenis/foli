@@ -13,8 +13,9 @@ integration.
 > from Word, Google Docs and web pages mapped to the schema). React components with a toolbar
 > and server rendering. Documents saved by 0.1.0 load unchanged. The API may change in any 0.x
 > version. Manual IME, screen-reader and real-paste checks are not run yet: read the
-> [known limitations](docs/limitations.md). Next: tables and images (Phase 8,
-> [roadmap](docs/roadmap.md)).
+> [known limitations](docs/limitations.md). Next: real Word documents, a Word-shaped model
+> with lossless `.docx` round trip (Phase 8, [ADR-0005](docs/decisions/ADR-0005-word-compatible-model.md),
+> proposed; [roadmap](docs/roadmap.md)).
 
 ## Usage
 

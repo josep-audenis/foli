@@ -242,15 +242,17 @@ migration.
 Each added only when a feature needs it, with a migration:
 
 - `metadata` (title, author, timestamps, app-defined fields).
-- `styles` (named paragraph/character styles) — Phase 9.
-- `headers` / `footers` as separate content trees — Phase 9.
-- `resources` (image references by id, no inline binary) — Phase 8.
+- `styles` (paragraph, character, table and numbering styles, document defaults, theme),
+  numbering definitions and sections — Phase 8 (schema v3,
+  [ADR-0005](decisions/ADR-0005-word-compatible-model.md), proposed).
+- `resources` (the original DOCX package's parts, images by id, no inline binary) — Phases 8–9.
+- `headers` / `footers` as separate content trees — Phase 10.
 - Extension-owned data under a namespaced key.
 
 ## Open questions
 
 - Generate a JSON Schema from the TypeScript schema so Rust and other consumers validate the
-  same format (Phase 10).
+  same format (when a non-TypeScript consumer appears).
 - Positions count UTF-16 code units, so a position can fall between the two halves of a
   surrogate pair. Deletion commands move by grapheme (`Intl.Segmenter`); the view (Phase 4)
   must do the same for caret movement. The model does not prevent it.

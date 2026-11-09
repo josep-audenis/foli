@@ -9,18 +9,18 @@ leaves `main` green with a working playground.
 **Update this table in the same PR that starts, advances or finishes a phase.** It is the only
 place that says what is in progress; check it before starting work.
 
-| Phase                    | Status                   | Branch | Notes                                                                                      |
-| ------------------------ | ------------------------ | ------ | ------------------------------------------------------------------------------------------ |
-| 0 Foundation             | ✅ Done                  | —      |                                                                                            |
-| 1 Architecture spike     | ✅ Done (G1 provisional) | —      | Merged in #1; ADR-0003 accepted provisionally; IME, dead-key and screen-reader checks open |
-| 2 Document model         | ✅ Done                  | —      | Merged in #2                                                                               |
-| 3 Transactions & history | ✅ Done                  | —      | Merged in #4; gate G2 passed                                                               |
-| 4 Editor view            | ✅ Done (G3 provisional) | —      | Merged in #8–#13; manual checks (4.6) deferred, open risks in ADR-0003                     |
-| 5 Native pagination      | ✅ Done (G4 provisional) | —      | Merged in #15–#22; page-break manual checks open, risks in ADR-0003                        |
-| 6 React API & 0.1.0      | ✅ Done                  | —      | Merged in #23–#31; 0.1.0 on npm; manual checks shipped as known risks (ADR-0003)           |
-| 7 Rich content           | ✅ Done                  | —      | Merged in #33–#41; 0.2.0 on npm; list-document benchmark misses accepted (known limit)     |
-| 8 Tables & images        | Ready                    |        | Dependencies met (Phase 7); plan with tasks before starting                                |
-| 9–12                     | Not started              |        |                                                                                            |
+| Phase                    | Status                   | Branch | Notes                                                                                              |
+| ------------------------ | ------------------------ | ------ | -------------------------------------------------------------------------------------------------- |
+| 0 Foundation             | ✅ Done                  | —      |                                                                                                    |
+| 1 Architecture spike     | ✅ Done (G1 provisional) | —      | Merged in #1; ADR-0003 accepted provisionally; IME, dead-key and screen-reader checks open         |
+| 2 Document model         | ✅ Done                  | —      | Merged in #2                                                                                       |
+| 3 Transactions & history | ✅ Done                  | —      | Merged in #4; gate G2 passed                                                                       |
+| 4 Editor view            | ✅ Done (G3 provisional) | —      | Merged in #8–#13; manual checks (4.6) deferred, open risks in ADR-0003                             |
+| 5 Native pagination      | ✅ Done (G4 provisional) | —      | Merged in #15–#22; page-break manual checks open, risks in ADR-0003                                |
+| 6 React API & 0.1.0      | ✅ Done                  | —      | Merged in #23–#31; 0.1.0 on npm; manual checks shipped as known risks (ADR-0003)                   |
+| 7 Rich content           | ✅ Done                  | —      | Merged in #33–#41; 0.2.0 on npm; list-document benchmark misses accepted (known limit)             |
+| 8 Word model & DOCX      | Blocked by ADR-0005      |        | Proposed plan: [ADR-0005](decisions/ADR-0005-word-compatible-model.md); starts once it is accepted |
+| 9–12                     | Not started              |        |                                                                                                    |
 
 Status values: `Ready` (dependencies met, nobody on it) · `In progress` · `In review` (PR open) ·
 `✅ Done` (merged, acceptance criteria met) · `Blocked by …`.
@@ -71,12 +71,13 @@ Foli's engine is not credible until all five pass in Chromium, Firefox and WebKi
 
 ## Gates
 
-| Gate                           | After   | Passes when                                                                       |
-| ------------------------------ | ------- | --------------------------------------------------------------------------------- |
-| **G1 Rendering approach**      | Phase 1 | ADR-0003 records the chosen DOM/input approach with spike evidence for T4 and T5  |
-| **G2 Headless correctness**    | Phase 3 | T1 and T2 pass headless (no DOM); property tests for steps, mapping and undo pass |
-| **G3 Interactive correctness** | Phase 4 | T1–T4 pass in the browser matrix                                                  |
-| **G4 Native pagination**       | Phase 5 | T5 passes; pagination fixtures deterministic; benchmark baseline published        |
+| Gate                           | After   | Passes when                                                                          |
+| ------------------------------ | ------- | ------------------------------------------------------------------------------------ |
+| **G1 Rendering approach**      | Phase 1 | ADR-0003 records the chosen DOM/input approach with spike evidence for T4 and T5     |
+| **G2 Headless correctness**    | Phase 3 | T1 and T2 pass headless (no DOM); property tests for steps, mapping and undo pass    |
+| **G3 Interactive correctness** | Phase 4 | T1–T4 pass in the browser matrix                                                     |
+| **G4 Native pagination**       | Phase 5 | T5 passes; pagination fixtures deterministic; benchmark baseline published           |
+| **G5 Word fidelity**           | Phase 8 | Corpus round-trips without loss and opens in Word; page agreement with Word measured |
 
 ## Overview
 
@@ -90,20 +91,25 @@ Foli's engine is not credible until all five pass in Chromium, Firefox and WebKi
 | 5     | Native pagination         | Real pages, fragments, incremental reflow, print            | —            | XL   |
 | 6     | React API & first release | `FoliEditor`, hooks, toolbar, packaging                     | **0.1.0**    | M    |
 | 7     | Rich content              | Lists, links, alignment, color, highlight, rules            | 0.2.0        | L    |
-| 8     | Tables & images           | Tables across pages, images with resources                  | 0.3.0        | XL   |
-| 9     | Professional layout       | Headers/footers, page numbers, styles, find/replace         | 0.4.0        | L    |
-| 10    | Interop & Rust/WASM       | HTML + DOCX import/export, Rust document processing         | 0.5.0        | XL   |
-| 11    | Ecosystem & 1.0           | Extension API freeze, docs site, examples                   | **1.0.0**    | L    |
-| 12    | Optional                  | Collaboration, comments, track changes, AI hooks            | —            | —    |
+| 8     | Word model & DOCX         | Schema v3 (Word-shaped), styles, numbering, lossless DOCX   | 0.3.0        | XL   |
+| 9     | Tables & images           | Word tables across pages, inline and floating images        | 0.4.0        | XL   |
+| 10    | Sections & fields         | Headers/footers, page numbers, fields, notes, columns, TOC  | 0.5.0        | L    |
+| 11    | Review                    | Comments and tracked changes, Word-compatible               | 0.6.0        | XL   |
+| 12    | Ecosystem & 1.0           | Extension API freeze, docs site, performance in CI          | **1.0.0**    | L    |
+| —     | Optional                  | Real-time collaboration, AI-assisted editing                | —            | —    |
 
 ```
 P0 ─┬─► P1 spike ────────────────┐
     └─► P2 model ─► P3 transactions ─┴─► P4 view ─► P5 pagination ─► P6 (0.1)
                                                                        │
               P7 rich content ◄────────────────────────────────────────┘
-               ├─► P8 tables & images ─► P9 professional layout ─► P11 (1.0)
-               └─► P10 interop & Rust (parallel once the JSON format covers lists)
+               └─► P8 Word model & DOCX (ADR-0005) ─► P9 tables & images ─► P10 sections & fields
+                                                                  └─► P11 review ─► P12 (1.0)
 ```
+
+Phases 8–12 follow [ADR-0005](decisions/ADR-0005-word-compatible-model.md) (proposed
+2026-11-09): Foli edits real Word documents, so the model follows Word and DOCX round-trips
+without loss before more content types are added.
 
 Phases 1 and 2 can run in parallel: the model does not depend on how text is rendered.
 
@@ -569,44 +575,73 @@ top-level block, marks rendered without attrs).
   getting started), playground sample document with every v2 feature, example apps updated,
   benchmark rerun; 0.2.0 changeset, version PR, publish after the owner's approval.
 
-## Phase 8 — Tables & images · XL → 0.3.0
+## Phase 8 — Word model & lossless DOCX round trip · XL → 0.3.0
 
-- Tables: table/row/cell with colspan/rowspan, cell selection, table commands, keyboard
-  navigation; row-level page breaks with repeated header rows.
-- Images: resource references in the envelope (no inline base64 by default), upload hook API,
-  resize, required alt text, layout within pages.
+**Goal:** Foli opens a real `.docx`, shows it with the file's own styles on real pages, edits
+it, and saves it back without losing anything ([ADR-0005](decisions/ADR-0005-word-compatible-model.md)).
 
-## Phase 9 — Professional layout · L → 0.4.0
+**Depends on:** ADR-0005 accepted. Phase 7.
 
-- Headers/footers as separate content in the envelope, edited in place with their own state.
-- Page numbers and fields; different first page.
-- Named paragraph/character styles in the envelope.
-- Document outline/navigation; find & replace.
-- Print/PDF polish.
+- **Schema v3, Word-shaped** (with the v1/v2 → v3 migration): paragraph properties as
+  attributes (style, justification, indentation, spacing, keep/widow rules, page break before,
+  outline level, numbering, tab stops); run properties as marks (character style, bold,
+  italic, underline styles, strike, font, size, color, highlight, shading, vertical alignment,
+  caps); headings as styled paragraphs; lists as numbered paragraphs; sections (page size,
+  orientation, margins) instead of one `settings`; Word's units.
+- **Styles and numbering in the envelope:** paragraph, character and numbering styles with
+  `basedOn`, document defaults, theme fonts and colors; numbering definitions (formats, starts,
+  restarts, levels, legal and heading numbering). Effective formatting resolved like Word.
+- **Rendering from the document:** a per-document stylesheet from the resolved styles; list
+  markers from numbering; fonts with metric-compatible substitutes, reported.
+- **`@folijs/docx`:** import and export in TypeScript (browser, worker, Node), own XML tokenizer
+  keeping exact source text, the original package kept; unknown elements as opaque block and
+  inline nodes written back verbatim; unknown properties kept on their node or mark.
+- **Editing like Word:** style picker, font family and size, paragraph spacing, indentation and
+  line spacing, list levels and numbering formats; existing commands and keys ported to v3;
+  HTML clipboard mapped to v3.
+- **Verification harness** (local, Windows): Word through automation, LibreOffice as fallback;
+  round trip without loss, opens without repair, per-paragraph page agreement with Word, PDF
+  page comparison; a corpus of real documents.
 
-## Phase 10 — Interop & Rust/WASM · XL → 0.5.0
+**Acceptance (gate G5):** every corpus document round-trips with no part or element lost
+(canonical comparison) and opens in Word without a repair prompt; per-paragraph page agreement
+with Word measured and published as a baseline; opaque nodes per document reported; T1–T5 pass
+on schema v3 in three engines; documents saved by 0.1.0 and 0.2.0 migrate without content loss;
+0.3.0 published.
 
-Can start after Phase 7, in parallel with 8–9.
+## Phase 9 — Tables & images · XL → 0.4.0
 
-- HTML import/export (sanitized, schema-mapped).
-- DOCX import/export: Rust crate (`zip` + XML) compiled to WASM, run in a Web Worker; also usable
-  natively server-side. TypeScript baseline benchmarked first (e.g. against `docx`, MIT).
-- JSON Schema generated from the TypeScript schema so Rust validates the same format
-  (single source of truth).
-- Fidelity corpus: documents authored in Word and LibreOffice; content round-trip tests.
-  Content fidelity is the goal, not identical pagination to Word.
-- Other Rust candidates (validation, batch transforms) only with before/after benchmarks.
+- Tables as Word models them: grid, row and cell properties, horizontal and vertical merges,
+  borders and shading, table styles (conditional formatting), widths and autofit; rows across
+  pages with repeated header rows; cell selection, table commands, keyboard navigation.
+- Images: inline and floating (anchored, text wrapping) drawings, kept as resources in the
+  package (no inline base64 by default); upload hook API, resize, required alt text.
 
-## Phase 11 — Ecosystem & 1.0 · L
+## Phase 10 — Sections, headers, footers, fields & notes · L → 0.5.0
+
+- Several sections per document (page size, orientation, margins and columns per section).
+- Headers and footers (default, first page, even pages) edited in place with their own state.
+- Fields: page numbers, page count, dates, cross-references, table of contents (shown with their
+  cached result, updated on demand).
+- Footnotes and endnotes placed on their pages; bookmarks; document outline; find and replace.
+
+## Phase 11 — Review: comments & tracked changes · XL → 0.6.0
+
+- Comments (ranges, replies, resolved state) and tracked changes (insertions, deletions,
+  formatting changes) stored as Word stores them; accept and reject, one by one or all; a
+  review pane; authors and dates. Tracked changes ride on step metadata.
+
+## Phase 12 — Ecosystem & 1.0 · L
 
 Freeze the extension API (custom nodes, marks, commands, keymaps, plugins), docs site, examples,
-theming guide, deprecation policy, contributor onboarding, performance tracking in CI.
+theming guide, deprecation policy, contributor onboarding, performance tracking in CI. Rust/WASM
+only where a benchmark shows the need.
 
-## Phase 12 — Optional
+## Optional
 
-Collaboration (steps + mapping enable a central-authority protocol; CRDT binding evaluated
-separately), comments, tracked changes (step metadata), AI-assisted editing on the
-programmatic transaction API, headless server-side processing.
+Real-time collaboration (steps and mapping enable a central-authority protocol; a CRDT binding
+evaluated separately), AI-assisted editing on the programmatic transaction API, headless
+server-side processing.
 
 ---
 
