@@ -1,0 +1,337 @@
+{
+    "document":  "01-mutual-nda.docx",
+    "word":  "16.0.20527",
+    "opened":  true,
+    "error":  null,
+    "pages":  2,
+    "paragraphs":  [
+                       {
+                           "text":  "MUTUAL NON-DISCLOSURE AGREEMENT",
+                           "page":  1,
+                           "line":  1,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  false
+                       },
+                       {
+                           "text":  "This Mutual Non-Disclosure Agreement (the \"Agreement\") is made on 3 March 2026 between:",
+                           "page":  1,
+                           "line":  3,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  false
+                       },
+                       {
+                           "text":  "Northwind Traders Limited, a company incorporated in England and Wales with company number 01234567, whose registered office is at 1 Harbour Street, London E14 5AB (\"Northwind\"); and",
+                           "page":  1,
+                           "line":  4,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  false
+                       },
+                       {
+                           "text":  "Contoso Pharmaceuticals S.L., a company incorporated in Spain with tax number B12345678, whose registered office is at Calle Mayor 10, 28013 Madrid (\"Contoso\"),",
+                           "page":  1,
+                           "line":  7,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  false
+                       },
+                       {
+                           "text":  "each a \"Party\" and together the \"Parties\".",
+                           "page":  1,
+                           "line":  9,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  false
+                       },
+                       {
+                           "text":  "DEFINITIONS AND INTERPRETATION",
+                           "page":  1,
+                           "line":  10,
+                           "endPage":  1,
+                           "listString":  "1.",
+                           "inTable":  false
+                       },
+                       {
+                           "text":  "In this Agreement the following definitions apply:",
+                           "page":  1,
+                           "line":  11,
+                           "endPage":  1,
+                           "listString":  "1.1",
+                           "inTable":  false
+                       },
+                       {
+                           "text":  "\"Confidential Information\" means all information of a confidential nature disclosed by a Party to the other Party, whether in writing, orally or by any other means, including the information described in clause 2.2;",
+                           "page":  1,
+                           "line":  12,
+                           "endPage":  1,
+                           "listString":  "(a)",
+                           "inTable":  false
+                       },
+                       {
+                           "text":  "\"Purpose\" means the evaluation of a possible supply and distribution arrangement between the Parties;",
+                           "page":  1,
+                           "line":  15,
+                           "endPage":  1,
+                           "listString":  "(b)",
+                           "inTable":  false
+                       },
+                       {
+                           "text":  "\"Representatives\" means a Party\u0027s employees, officers, professional advisers and contractors who need to know the Confidential Information for the Purpose.",
+                           "page":  1,
+                           "line":  17,
+                           "endPage":  1,
+                           "listString":  "(c)",
+                           "inTable":  false
+                       },
+                       {
+                           "text":  "Clause headings do not affect the interpretation of this Agreement. Words in the singular include the plural and vice versa.",
+                           "page":  1,
+                           "line":  19,
+                           "endPage":  1,
+                           "listString":  "1.2",
+                           "inTable":  false
+                       },
+                       {
+                           "text":  "OBLIGATIONS OF CONFIDENTIALITY",
+                           "page":  1,
+                           "line":  21,
+                           "endPage":  1,
+                           "listString":  "2.",
+                           "inTable":  false
+                       },
+                       {
+                           "text":  "Each Party shall keep the other Party\u0027s Confidential Information confidential and shall not use it except for the Purpose.",
+                           "page":  1,
+                           "line":  22,
+                           "endPage":  1,
+                           "listString":  "2.1",
+                           "inTable":  false
+                       },
+                       {
+                           "text":  "Confidential Information includes, without limitation:",
+                           "page":  1,
+                           "line":  24,
+                           "endPage":  1,
+                           "listString":  "2.2",
+                           "inTable":  false
+                       },
+                       {
+                           "text":  "technical data, formulae, specifications and know-how;",
+                           "page":  1,
+                           "line":  25,
+                           "endPage":  1,
+                           "listString":  "(a)",
+                           "inTable":  false
+                       },
+                       {
+                           "text":  "commercial information, including pricing, customers and suppliers; and",
+                           "page":  1,
+                           "line":  26,
+                           "endPage":  1,
+                           "listString":  "(b)",
+                           "inTable":  false
+                       },
+                       {
+                           "text":  "the existence and terms of the discussions between the Parties.",
+                           "page":  1,
+                           "line":  27,
+                           "endPage":  1,
+                           "listString":  "(c)",
+                           "inTable":  false
+                       },
+                       {
+                           "text":  "The obligations in this clause do not apply to information that:",
+                           "page":  1,
+                           "line":  28,
+                           "endPage":  1,
+                           "listString":  "2.3",
+                           "inTable":  false
+                       },
+                       {
+                           "text":  "is or becomes generally available to the public other than through a breach of this Agreement;",
+                           "page":  1,
+                           "line":  29,
+                           "endPage":  1,
+                           "listString":  "(a)",
+                           "inTable":  false
+                       },
+                       {
+                           "text":  "was lawfully in the possession of the receiving Party before disclosure; or",
+                           "page":  1,
+                           "line":  31,
+                           "endPage":  1,
+                           "listString":  "(b)",
+                           "inTable":  false
+                       },
+                       {
+                           "text":  "is required to be disclosed by law, provided that the receiving Party:",
+                           "page":  1,
+                           "line":  32,
+                           "endPage":  1,
+                           "listString":  "(c)",
+                           "inTable":  false
+                       },
+                       {
+                           "text":  "gives the disclosing Party prompt written notice; and",
+                           "page":  1,
+                           "line":  33,
+                           "endPage":  1,
+                           "listString":  "(i)",
+                           "inTable":  false
+                       },
+                       {
+                           "text":  "discloses only the minimum information required.",
+                           "page":  1,
+                           "line":  34,
+                           "endPage":  1,
+                           "listString":  "(ii)",
+                           "inTable":  false
+                       },
+                       {
+                           "text":  "TERM AND RETURN OF INFORMATION",
+                           "page":  2,
+                           "line":  1,
+                           "endPage":  2,
+                           "listString":  "3.",
+                           "inTable":  false
+                       },
+                       {
+                           "text":  "This Agreement continues for a period of three (3) years from its date. On request, each Party shall return or destroy the other Party\u0027s Confidential Information, subject to the exceptions in clause 2.3.",
+                           "page":  2,
+                           "line":  2,
+                           "endPage":  2,
+                           "listString":  "3.1",
+                           "inTable":  false
+                       },
+                       {
+                           "text":  "GOVERNING LAW",
+                           "page":  2,
+                           "line":  5,
+                           "endPage":  2,
+                           "listString":  "4.",
+                           "inTable":  false
+                       },
+                       {
+                           "text":  "This Agreement and any dispute arising out of it are governed by the law of England and Wales, and the courts of England have exclusive jurisdiction.",
+                           "page":  2,
+                           "line":  6,
+                           "endPage":  2,
+                           "listString":  "4.1",
+                           "inTable":  false
+                       },
+                       {
+                           "text":  "Signed by the Parties on the date stated above.",
+                           "page":  2,
+                           "line":  8,
+                           "endPage":  2,
+                           "listString":  "",
+                           "inTable":  false
+                       },
+                       {
+                           "text":  "For and on behalf of Northwind Traders Limited",
+                           "page":  2,
+                           "line":  9,
+                           "endPage":  2,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "For and on behalf of Contoso Pharmaceuticals S.L.",
+                           "page":  2,
+                           "line":  9,
+                           "endPage":  2,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "",
+                           "page":  2,
+                           "line":  9,
+                           "endPage":  2,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "Signature: ____________________",
+                           "page":  2,
+                           "line":  11,
+                           "endPage":  2,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "Signature: ____________________",
+                           "page":  2,
+                           "line":  11,
+                           "endPage":  2,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "",
+                           "page":  2,
+                           "line":  11,
+                           "endPage":  2,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "Name: Jane Ellis",
+                           "page":  2,
+                           "line":  12,
+                           "endPage":  2,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "Name: Carlos Ruiz",
+                           "page":  2,
+                           "line":  12,
+                           "endPage":  2,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "",
+                           "page":  2,
+                           "line":  12,
+                           "endPage":  2,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "Title: Chief Executive Officer",
+                           "page":  2,
+                           "line":  13,
+                           "endPage":  2,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "Title: Director General",
+                           "page":  2,
+                           "line":  13,
+                           "endPage":  2,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "",
+                           "page":  2,
+                           "line":  13,
+                           "endPage":  2,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "",
+                           "page":  2,
+                           "line":  14,
+                           "endPage":  2,
+                           "listString":  "",
+                           "inTable":  false
+                       }
+                   ]
+}

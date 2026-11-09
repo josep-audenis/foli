@@ -37,7 +37,30 @@ restored by the next run. The text is English (UK) whatever the generating Word'
 a document still takes the generating machine's Normal template and regional settings (decimal
 symbol): after regenerating, check the files for anything personal before committing them.
 
+## Word's reference data (`reference/word/`)
+
+What Word does with each document, recorded by `scripts/corpus/word-reference.ps1` (Word
+automation, read only), for Foli to be compared with:
+
+```bash
+powershell -ExecutionPolicy Bypass -File scripts/corpus/word-reference.ps1 [-In <folder>] [-Out <folder>] [-PdfDir <folder>]
+```
+
+One `<name>.json` per document:
+
+| Field        | Meaning                                                                                                                                                                                     |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `word`       | Word's build number (results differ between versions and fonts)                                                                                                                             |
+| `opened`     | Word opened the file without complaint (under automation Word refuses a file it would offer to repair); `error` says why not                                                                |
+| `pages`      | Word's page count                                                                                                                                                                           |
+| `paragraphs` | Every paragraph of the main text in Word's order, table cells included: `text`, `page` and `line` where it starts, `endPage`, `listString` (the number Word shows, "1.1", "(a)"), `inTable` |
+
+`-PdfDir` exports Word's PDF of each document too (not committed). The same script checks any
+`.docx`, such as Foli's exports later: `opened` false means Word would need to repair it.
+Regenerate the committed data when the corpus changes or Word updates (the `word` field).
+
 ## Private documents
 
 Real documents (contracts, templates) are never committed. Keep them in a folder outside the
-repository; the Word harness (Phase 8) takes its path as an argument and reports only numbers.
+repository and run the harness with `-In` on that folder and `-Out` outside the repository too:
+its JSON holds the documents' text.

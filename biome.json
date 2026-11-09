@@ -10,7 +10,8 @@
       "**",
       "!packages/view/fixtures/clipboard/*.html",
       "!**/*-snapshots",
-      "!.changeset/*.md"
+      "!.changeset/*.md",
+      "!corpus/reference/**"
     ]
   },
   "formatter": {
