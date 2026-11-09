@@ -29,14 +29,14 @@ This document describes **what exists** and **what is decided**. Planned parts a
 └──────────────────────────────────────────────────────────────┘
 ```
 
-| Subsystem           | Responsibility                                                                 | Status                                                           |
-| ------------------- | ------------------------------------------------------------------------------ | ---------------------------------------------------------------- |
-| Document model      | Schema, immutable tree, marks, positions, JSON, validation                     | ✅ (Phase 2)                                                     |
-| Editing engine      | Steps, position mapping, selection, state, history, commands                   | ✅ headless (Phase 3)                                            |
-| View                | Render state to DOM, DOM ↔ model mapping, `beforeinput`, IME, clipboard, focus | ✅ (G3 provisional; manual IME/SR checks open)                   |
-| Layout              | Measurement, line breaking, page flow, fragments, incremental reflow, print    | Phase 5 (inside `@folijs/view` until the seam is proven)         |
-| React integration   | Components, hooks, toolbar                                                     | Hooks, provider, canvas, `FoliEditor` ✅ (6.1); toolbar ✅ (6.2) |
-| Document processing | DOCX/HTML interop, Rust/WASM                                                   | Phase 10                                                         |
+| Subsystem           | Responsibility                                                                 | Status                                                                     |
+| ------------------- | ------------------------------------------------------------------------------ | -------------------------------------------------------------------------- |
+| Document model      | Schema, immutable tree, marks, positions, JSON, validation                     | ✅ (Phase 2)                                                               |
+| Editing engine      | Steps, position mapping, selection, state, history, commands                   | ✅ headless (Phase 3)                                                      |
+| View                | Render state to DOM, DOM ↔ model mapping, `beforeinput`, IME, clipboard, focus | ✅ (G3 provisional; manual IME/SR checks open)                             |
+| Layout              | Measurement, line breaking, page flow, fragments, incremental reflow, print    | Phase 5 (inside `@folijs/view` until the seam is proven)                   |
+| React integration   | Components, hooks, toolbar                                                     | Hooks, provider, canvas, `FoliEditor` ✅ (6.1); toolbar ✅ (6.2)           |
+| Document processing | DOCX import/export with lossless round trip (`@folijs/docx`)                   | Phase 8, planned ([ADR-0005](decisions/ADR-0005-word-compatible-model.md)) |
 
 ## Editing data flow (target design)
 
@@ -483,7 +483,8 @@ Planned, created only when needed:
 | `spikes/two-page/`         | Phase 1, throwaway, never published                                             |
 | `@folijs/layout`           | Split out of `@folijs/view` once the layout/view boundary is stable             |
 | `@folijs/ui`               | Only if a non-React UI appears; until then the toolbar lives in `@folijs/react` |
-| `crates/*`, `@folijs/wasm` | Phase 10                                                                        |
+| `@folijs/docx`             | Phase 8 (ADR-0005): DOCX import/export, no DOM                                  |
+| `crates/*`, `@folijs/wasm` | Only for a measured need                                                        |
 | `examples/`                | Phase 6 (Vite and Next.js install tests)                                        |
 
 ## Dependency policy

@@ -126,8 +126,8 @@ All in Playwright on Chromium, Firefox and WebKit (Windows 11), plus unit and pr
 
 - Layout works on leaf blocks (paragraphs, headings, rules) at any depth; lists are rebuilt
   around them on each page (ADR-0004). A list split across pages is two lists in the DOM.
-  Tables and images (Phase 8) are not laid out yet.
-- No page chrome: headers, footers and page numbers arrive in Phase 9.
+  Tables and images (Phase 10) are not laid out yet.
+- No page chrome: headers, footers and page numbers arrive in Phase 11.
 - Line measurement assumes left-to-right text without vertical-align offsets. A split block's
   padding and border repeat on every fragment. Negative block margins are not modelled.
 - Page breaks depend on the fonts the browser has: the same document can paginate differently
