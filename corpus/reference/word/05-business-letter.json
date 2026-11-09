@@ -1,0 +1,146 @@
+{
+    "document":  "05-business-letter.docx",
+    "word":  "16.0.20527",
+    "opened":  true,
+    "error":  null,
+    "revisionsAccepted":  0,
+    "pages":  2,
+    "paragraphs":  [
+                       {
+                           "text":  "Northwind Traders Limited",
+                           "page":  1,
+                           "line":  1,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  false
+                       },
+                       {
+                           "text":  "Our ref: NT/SALES/2026/041\t12 February 2026",
+                           "page":  1,
+                           "line":  2,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  false
+                       },
+                       {
+                           "text":  "Ms Laura Petit, Purchasing Director, Litware SAS, 22 rue de la Paix, 75002 Paris, France",
+                           "page":  1,
+                           "line":  3,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  false
+                       },
+                       {
+                           "text":  "Re: Price list for the 2026 season",
+                           "page":  1,
+                           "line":  5,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  false
+                       },
+                       {
+                           "text":  "Dear Ms Petit,",
+                           "page":  1,
+                           "line":  6,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  false
+                       },
+                       {
+                           "text":  "Thank you for your enquiry of 4 February. We are delighted to confirm our prices for the 2026 season, which remain unchanged for all products ordered before 31 March 2026. Orders placed after that date will be charged at the new rates shown below.",
+                           "page":  1,
+                           "line":  7,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  false
+                       },
+                       {
+                           "text":  "Organic green tea, 250 g\tEUR 8.40",
+                           "page":  1,
+                           "line":  10,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  false
+                       },
+                       {
+                           "text":  "Darjeeling first flush, 100 g\tEUR 12.90",
+                           "page":  1,
+                           "line":  11,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  false
+                       },
+                       {
+                           "text":  "Ceramic teapot, 1 l\tEUR 34.00",
+                           "page":  1,
+                           "line":  12,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  false
+                       },
+                       {
+                           "text":  "Delivery is free for orders above EUR 500. Our 2nd delivery window opens on 1 May.",
+                           "page":  1,
+                           "line":  13,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  false
+                       },
+                       {
+                           "text":  "Payment terms. Payment is due within thirty days of the invoice date; late payments bear interest at the statutory rate. Please quote our reference on all correspondence.",
+                           "page":  1,
+                           "line":  14,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  false
+                       },
+                       {
+                           "text":  "We look forward to working with you again this year.",
+                           "page":  1,
+                           "line":  16,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  false
+                       },
+                       {
+                           "text":  "",
+                           "page":  1,
+                           "line":  17,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  false
+                       },
+                       {
+                           "text":  "",
+                           "page":  2,
+                           "line":  1,
+                           "endPage":  2,
+                           "listString":  "",
+                           "inTable":  false
+                       },
+                       {
+                           "text":  "Enclosure: general terms and conditions of sale (2 pages).",
+                           "page":  2,
+                           "line":  2,
+                           "endPage":  2,
+                           "listString":  "",
+                           "inTable":  false
+                       },
+                       {
+                           "text":  "Yours sincerely,",
+                           "page":  2,
+                           "line":  3,
+                           "endPage":  2,
+                           "listString":  "",
+                           "inTable":  false
+                       },
+                       {
+                           "text":  "Tom Becker, Sales Director",
+                           "page":  2,
+                           "line":  4,
+                           "endPage":  2,
+                           "listString":  "",
+                           "inTable":  false
+                       }
+                   ]
+}

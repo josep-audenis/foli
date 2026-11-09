@@ -37,7 +37,38 @@ restored by the next run. The text is English (UK) whatever the generating Word'
 a document still takes the generating machine's Normal template and regional settings (decimal
 symbol): after regenerating, check the files for anything personal before committing them.
 
+## Word's reference data (`reference/word/`)
+
+What Word does with each document, recorded by `scripts/corpus/word-reference.ps1` (Word
+automation; documents opened read-only with macros disabled, closed without saving), for Foli to
+be compared with:
+
+```bash
+powershell -ExecutionPolicy Bypass -File scripts/corpus/word-reference.ps1 [-In <folder>] [-Out <folder>] [-PdfDir <folder>]
+```
+
+One `<name>.json` per document:
+
+| Field               | Meaning                                                                                                                                                                             |
+| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `word`              | Word's build number                                                                                                                                                                 |
+| `opened`            | Word opened the file; if not, `error` says why (a damaged file, a password, a busy Word). Word refuses a damaged file under automation: checked with a `document.xml` cut short     |
+| `revisionsAccepted` | Tracked changes in the document. They are accepted in memory before measuring: the numbers below describe the final text, whatever markup view Word is set to                       |
+| `pages`             | Word's page count                                                                                                                                                                   |
+| `paragraphs`        | One per `w:p` of the main text, in order, table cells included: `text`, `page` and `line` where it starts, `endPage`, `listString` (the number Word shows: "1.1", "(a)"), `inTable` |
+
+In `text` a manual line break is a newline; bullets in `listString` are the bullet font's code point
+(U+F0B7 for Symbol's bullet). Pages and lines depend on the Word build, the installed fonts and
+the default printer: compare on the machine that produced the data, or regenerate there.
+
+`-PdfDir` exports Word's PDF of each document too (the final text; not committed). The same
+script checks any `.docx`, such as Foli's exports later. It exits 1 when a document opened but
+could not be measured, keeping that document's earlier JSON. Regenerate the committed data when
+the corpus changes or Word updates (the `word` field), and delete the JSON of a document removed
+from the corpus.
+
 ## Private documents
 
 Real documents (contracts, templates) are never committed. Keep them in a folder outside the
-repository; the Word harness (Phase 8) takes its path as an argument and reports only numbers.
+repository and run the harness with `-In` on that folder and `-Out` outside the repository: its
+JSON holds the documents' text, so the script refuses to write it into the repository.

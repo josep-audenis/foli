@@ -1,0 +1,130 @@
+{
+    "document":  "03-offer-letter-template.docx",
+    "word":  "16.0.20527",
+    "opened":  true,
+    "error":  null,
+    "revisionsAccepted":  0,
+    "pages":  1,
+    "paragraphs":  [
+                       {
+                           "text":  "PRIVATE AND CONFIDENTIAL",
+                           "page":  1,
+                           "line":  1,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  false
+                       },
+                       {
+                           "text":  "Date: Click or tap to enter a date.",
+                           "page":  1,
+                           "line":  2,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  false
+                       },
+                       {
+                           "text":  "Dear «CandidateFirstName»,",
+                           "page":  1,
+                           "line":  3,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  false
+                       },
+                       {
+                           "text":  "We are pleased to offer you the position below, on the terms set out in this letter and in the enclosed contract of employment.",
+                           "page":  1,
+                           "line":  4,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  false
+                       },
+                       {
+                           "text":  "Position: Choose an item.",
+                           "page":  1,
+                           "line":  6,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  false
+                       },
+                       {
+                           "text":  "Annual salary (EUR): Click or tap here to enter text.",
+                           "page":  1,
+                           "line":  7,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  false
+                       },
+                       {
+                           "text":  "Start date: «StartDate»",
+                           "page":  1,
+                           "line":  8,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  false
+                       },
+                       {
+                           "text":  "☐ Remote working eligible",
+                           "page":  1,
+                           "line":  9,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  false
+                       },
+                       {
+                           "text":  "Benefits:",
+                           "page":  1,
+                           "line":  10,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  false
+                       },
+                       {
+                           "text":  "Private health insurance; 25 days\u0027 annual leave; pension contribution of 5%.",
+                           "page":  1,
+                           "line":  11,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  false
+                       },
+                       {
+                           "text":  "This offer is conditional on satisfactory references and proof of your right to work. Please sign and return a copy of this letter by the date stated in the enclosed contract.",
+                           "page":  1,
+                           "line":  12,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  false
+                       },
+                       {
+                           "text":  "Yours sincerely,",
+                           "page":  1,
+                           "line":  14,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  false
+                       },
+                       {
+                           "text":  "",
+                           "page":  1,
+                           "line":  15,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  false
+                       },
+                       {
+                           "text":  "Maria Lopez",
+                           "page":  1,
+                           "line":  16,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  false
+                       },
+                       {
+                           "text":  "Head of People",
+                           "page":  1,
+                           "line":  17,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  false
+                       }
+                   ]
+}
