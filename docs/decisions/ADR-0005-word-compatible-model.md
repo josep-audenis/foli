@@ -4,9 +4,11 @@
 - **Context:** Foli's purpose sharpens: an embeddable editor that feels like Word and works on
   real `.docx` files with as few problems as possible, so it can replace existing embeddable
   DOCX editors (which store the OOXML package as the truth and project it into an editor
-  surface; in use, editing is where they fall short). Assumed use (to confirm): business
-  documents (contracts, reports, letters, templates) that come from Word users and go back to
-  them, so a document that is opened, edited and saved must lose nothing.
+  surface; in use, editing is where they fall short, and they have no tracked changes).
+  Confirmed use (owner, 2026-11-09): any business document, first of all contracts and
+  templates; edited files go back to Word users as `.docx`, or out as PDF; tracked changes and
+  comments are required. So a document that is opened, edited and saved must lose nothing,
+  and review is a core feature, not an extra.
 
 Until now Foli has been JSON-native: its own schema (v2) styled by the host app's CSS, with DOCX
 planned as an import/export converter in Phase 10 ("content fidelity, not identical
@@ -45,6 +47,13 @@ view, React API)?
      level, numbering (`numId`, level), tab stops, borders and shading as they are added.
      Headings become paragraphs with a heading style (Word has no heading element); the view
      still renders `h1`–`h6` for those, for accessibility.
+   - **Review content is part of the model from the start:** insertions and deletions (author,
+     date) as marks, formatting changes as recorded previous properties, comment ranges as
+     anchors with the comments in the envelope. Contracts arrive with them; carrying them as
+     opaque content would make the text around them uneditable. Phase 8 imports, shows and
+     exports them; Phase 9 records new changes, accepts and rejects them, and edits comments.
+   - **Template content:** content controls (`w:sdt`: plain and rich text, drop-down, date,
+     check box) and merge and form fields are modeled nodes (Phase 11), opaque until then.
    - **Text** carries Word's run properties as marks: character style, bold, italic, the
      underline styles, strike and double strike, font (per script), size, color, highlight
      (Word's named highlight colors) and shading, vertical alignment, caps and small caps,
@@ -109,8 +118,12 @@ view, React API)?
   numbering commands, the nested-list rendering of ADR-0004 is no longer needed for lists
   (it remains the base for tables), the toolbar's heading buttons become a style picker.
 - The roadmap changes (below): the Word model and the round trip come first (Phase 8), then
-  tables and images, sections with headers, footers, fields and notes, then review (comments
-  and tracked changes, moved up from "optional"), then 1.0.
+  review (comments and tracked changes, from "optional" to Phase 9: the owner's documents
+  depend on it), tables and images, sections with headers, footers, fields, content controls
+  and notes, with PDF export, then 1.0.
+- PDF output: today a browser prints the pages (one sheet per page). A programmatic export
+  (`exportPdf`, headless browser on a server, the same layout) comes with headers, footers and
+  fields (Phase 11), when the pages are complete.
 - Hard areas, planned and measured rather than promised: tab stops (right, center, decimal,
   leaders), Word's table layout, floating images and text wrapping, columns, footnote placement,
   fonts not on the machine, Word's line breaking.
@@ -120,11 +133,11 @@ view, React API)?
 
 ## Roadmap (replaces Phases 8–12)
 
-| Phase | Name                               | Outcome                                                                              | Release |
-| ----- | ---------------------------------- | ------------------------------------------------------------------------------------ | ------- |
-| 8     | Word model & DOCX round trip       | Schema v3, styles, numbering, sections, `@folijs/docx`, opaque content, Word harness | 0.3.0   |
-| 9     | Tables & images                    | Word tables (merges, borders, table styles) across pages, inline and floating images | 0.4.0   |
-| 10    | Sections, headers, footers, fields | Headers/footers, page numbers and fields, footnotes/endnotes, columns, TOC           | 0.5.0   |
-| 11    | Review                             | Comments and tracked changes, Word-compatible, accept/reject                         | 0.6.0   |
-| 12    | Ecosystem & 1.0                    | API freeze, extension API, docs site, performance in CI                              | 1.0.0   |
-| —     | Optional                           | Real-time collaboration, AI-assisted editing on the transaction API                  | —       |
+| Phase | Name                             | Outcome                                                                                              | Release |
+| ----- | -------------------------------- | ---------------------------------------------------------------------------------------------------- | ------- |
+| 8     | Word model & DOCX round trip     | Schema v3, styles, numbering, sections, review content, `@folijs/docx`, opaque content, Word harness | 0.3.0   |
+| 9     | Review                           | Tracked changes (recording, accept/reject) and comments, Word-compatible                             | 0.4.0   |
+| 10    | Tables & images                  | Word tables (merges, borders, table styles) across pages, inline and floating images                 | 0.5.0   |
+| 11    | Sections, fields, templates, PDF | Headers/footers, page numbers and fields, content controls, notes, columns, TOC, PDF export          | 0.6.0   |
+| 12    | Ecosystem & 1.0                  | API freeze, extension API, docs site, performance in CI                                              | 1.0.0   |
+| —     | Optional                         | Real-time collaboration, AI-assisted editing on the transaction API                                  | —       |

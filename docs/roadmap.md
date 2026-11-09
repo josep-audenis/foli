@@ -92,9 +92,9 @@ Foli's engine is not credible until all five pass in Chromium, Firefox and WebKi
 | 6     | React API & first release | `FoliEditor`, hooks, toolbar, packaging                     | **0.1.0**    | M    |
 | 7     | Rich content              | Lists, links, alignment, color, highlight, rules            | 0.2.0        | L    |
 | 8     | Word model & DOCX         | Schema v3 (Word-shaped), styles, numbering, lossless DOCX   | 0.3.0        | XL   |
-| 9     | Tables & images           | Word tables across pages, inline and floating images        | 0.4.0        | XL   |
-| 10    | Sections & fields         | Headers/footers, page numbers, fields, notes, columns, TOC  | 0.5.0        | L    |
-| 11    | Review                    | Comments and tracked changes, Word-compatible               | 0.6.0        | XL   |
+| 9     | Review                    | Tracked changes and comments, Word-compatible               | 0.4.0        | XL   |
+| 10    | Tables & images           | Word tables across pages, inline and floating images        | 0.5.0        | XL   |
+| 11    | Sections & templates      | Headers/footers, fields, content controls, notes, PDF       | 0.6.0        | L    |
 | 12    | Ecosystem & 1.0           | Extension API freeze, docs site, performance in CI          | **1.0.0**    | L    |
 | —     | Optional                  | Real-time collaboration, AI-assisted editing                | —            | —    |
 
@@ -103,8 +103,8 @@ P0 ─┬─► P1 spike ────────────────┐
     └─► P2 model ─► P3 transactions ─┴─► P4 view ─► P5 pagination ─► P6 (0.1)
                                                                        │
               P7 rich content ◄────────────────────────────────────────┘
-               └─► P8 Word model & DOCX (ADR-0005) ─► P9 tables & images ─► P10 sections & fields
-                                                                  └─► P11 review ─► P12 (1.0)
+               └─► P8 Word model & DOCX (ADR-0005) ─► P9 review ─► P10 tables & images
+                                                                  └─► P11 sections & templates ─► P12 (1.0)
 ```
 
 Phases 8–12 follow [ADR-0005](decisions/ADR-0005-word-compatible-model.md) (proposed
@@ -582,6 +582,10 @@ it, and saves it back without losing anything ([ADR-0005](decisions/ADR-0005-wor
 
 **Depends on:** ADR-0005 accepted. Phase 7.
 
+- **Review content in the model:** tracked insertions and deletions (author, date) as marks,
+  formatting changes, comment anchors with the comments in the envelope; imported, shown
+  (insertions underlined, deletions struck, in the author's color) and exported. Recording and
+  accept/reject come in Phase 9.
 - **Schema v3, Word-shaped** (with the v1/v2 → v3 migration): paragraph properties as
   attributes (style, justification, indentation, spacing, keep/widow rules, page break before,
   outline level, numbering, tab stops); run properties as marks (character style, bold,
@@ -609,7 +613,20 @@ with Word measured and published as a baseline; opaque nodes per document report
 on schema v3 in three engines; documents saved by 0.1.0 and 0.2.0 migrate without content loss;
 0.3.0 published.
 
-## Phase 9 — Tables & images · XL → 0.4.0
+## Phase 9 — Review: tracked changes & comments · XL → 0.4.0
+
+The owner's documents (contracts) live in review: this comes right after the model.
+
+- Track changes on and off; every edit recorded as Word records it (insertions, deletions,
+  formatting changes, moves where practical), with author and date; changes shown inline or as
+  a simple markup view.
+- Accept and reject: one change, a selection, all, by author; next and previous change.
+- Comments: add on a range, reply, resolve, delete; a comments pane beside the pages; anchors
+  kept through edits.
+- Round trip with Word: changes and comments made in Foli show in Word and back, checked by the
+  harness.
+
+## Phase 10 — Tables & images · XL → 0.5.0
 
 - Tables as Word models them: grid, row and cell properties, horizontal and vertical merges,
   borders and shading, table styles (conditional formatting), widths and autofit; rows across
@@ -617,19 +634,17 @@ on schema v3 in three engines; documents saved by 0.1.0 and 0.2.0 migrate withou
 - Images: inline and floating (anchored, text wrapping) drawings, kept as resources in the
   package (no inline base64 by default); upload hook API, resize, required alt text.
 
-## Phase 10 — Sections, headers, footers, fields & notes · L → 0.5.0
+## Phase 11 — Sections, fields, templates & PDF · L → 0.6.0
 
 - Several sections per document (page size, orientation, margins and columns per section).
 - Headers and footers (default, first page, even pages) edited in place with their own state.
 - Fields: page numbers, page count, dates, cross-references, table of contents (shown with their
-  cached result, updated on demand).
+  cached result, updated on demand); merge and form fields.
+- Templates: content controls (plain and rich text, drop-down, date, check box), filled from
+  the UI or through the API.
 - Footnotes and endnotes placed on their pages; bookmarks; document outline; find and replace.
-
-## Phase 11 — Review: comments & tracked changes · XL → 0.6.0
-
-- Comments (ranges, replies, resolved state) and tracked changes (insertions, deletions,
-  formatting changes) stored as Word stores them; accept and reject, one by one or all; a
-  review pane; authors and dates. Tracked changes ride on step metadata.
+- PDF export: `exportPdf` with the editor's own layout (headless browser on a server, or the
+  browser's print), checked against Word's PDF of the same document.
 
 ## Phase 12 — Ecosystem & 1.0 · L
 
