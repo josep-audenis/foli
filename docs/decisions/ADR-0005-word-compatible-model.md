@@ -1,6 +1,6 @@
 # ADR-0005: A Word-compatible document model with lossless DOCX round trip
 
-- **Status:** Proposed (2026-11-09). Replaces the Phase 8–12 plan of the roadmap.
+- **Status:** Accepted (2026-11-09, by the owner). Replaces the Phase 8–12 plan of the roadmap.
 - **Context:** Foli's purpose sharpens: an embeddable editor that feels like Word and works on
   real `.docx` files with as few problems as possible, so it can replace existing embeddable
   DOCX editors (which store the OOXML package as the truth and project it into an editor

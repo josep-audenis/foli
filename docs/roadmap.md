@@ -9,18 +9,18 @@ leaves `main` green with a working playground.
 **Update this table in the same PR that starts, advances or finishes a phase.** It is the only
 place that says what is in progress; check it before starting work.
 
-| Phase                    | Status                   | Branch | Notes                                                                                              |
-| ------------------------ | ------------------------ | ------ | -------------------------------------------------------------------------------------------------- |
-| 0 Foundation             | ✅ Done                  | —      |                                                                                                    |
-| 1 Architecture spike     | ✅ Done (G1 provisional) | —      | Merged in #1; ADR-0003 accepted provisionally; IME, dead-key and screen-reader checks open         |
-| 2 Document model         | ✅ Done                  | —      | Merged in #2                                                                                       |
-| 3 Transactions & history | ✅ Done                  | —      | Merged in #4; gate G2 passed                                                                       |
-| 4 Editor view            | ✅ Done (G3 provisional) | —      | Merged in #8–#13; manual checks (4.6) deferred, open risks in ADR-0003                             |
-| 5 Native pagination      | ✅ Done (G4 provisional) | —      | Merged in #15–#22; page-break manual checks open, risks in ADR-0003                                |
-| 6 React API & 0.1.0      | ✅ Done                  | —      | Merged in #23–#31; 0.1.0 on npm; manual checks shipped as known risks (ADR-0003)                   |
-| 7 Rich content           | ✅ Done                  | —      | Merged in #33–#41; 0.2.0 on npm; list-document benchmark misses accepted (known limit)             |
-| 8 Word model & DOCX      | Blocked by ADR-0005      |        | Proposed plan: [ADR-0005](decisions/ADR-0005-word-compatible-model.md); starts once it is accepted |
-| 9–12                     | Not started              |        |                                                                                                    |
+| Phase                    | Status                   | Branch | Notes                                                                                                     |
+| ------------------------ | ------------------------ | ------ | --------------------------------------------------------------------------------------------------------- |
+| 0 Foundation             | ✅ Done                  | —      |                                                                                                           |
+| 1 Architecture spike     | ✅ Done (G1 provisional) | —      | Merged in #1; ADR-0003 accepted provisionally; IME, dead-key and screen-reader checks open                |
+| 2 Document model         | ✅ Done                  | —      | Merged in #2                                                                                              |
+| 3 Transactions & history | ✅ Done                  | —      | Merged in #4; gate G2 passed                                                                              |
+| 4 Editor view            | ✅ Done (G3 provisional) | —      | Merged in #8–#13; manual checks (4.6) deferred, open risks in ADR-0003                                    |
+| 5 Native pagination      | ✅ Done (G4 provisional) | —      | Merged in #15–#22; page-break manual checks open, risks in ADR-0003                                       |
+| 6 React API & 0.1.0      | ✅ Done                  | —      | Merged in #23–#31; 0.1.0 on npm; manual checks shipped as known risks (ADR-0003)                          |
+| 7 Rich content           | ✅ Done                  | —      | Merged in #33–#41; 0.2.0 on npm; list-document benchmark misses accepted (known limit)                    |
+| 8 Word model & DOCX      | Ready                    |        | [ADR-0005](decisions/ADR-0005-word-compatible-model.md) accepted; plan tasks and collect the corpus first |
+| 9–12                     | Not started              |        |                                                                                                           |
 
 Status values: `Ready` (dependencies met, nobody on it) · `In progress` · `In review` (PR open) ·
 `✅ Done` (merged, acceptance criteria met) · `Blocked by …`.
@@ -107,7 +107,7 @@ P0 ─┬─► P1 spike ────────────────┐
                                                                   └─► P11 sections & templates ─► P12 (1.0)
 ```
 
-Phases 8–12 follow [ADR-0005](decisions/ADR-0005-word-compatible-model.md) (proposed
+Phases 8–12 follow [ADR-0005](decisions/ADR-0005-word-compatible-model.md) (accepted
 2026-11-09): Foli edits real Word documents, so the model follows Word and DOCX round-trips
 without loss before more content types are added.
 

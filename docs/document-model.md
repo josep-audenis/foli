@@ -244,7 +244,7 @@ Each added only when a feature needs it, with a migration:
 - `metadata` (title, author, timestamps, app-defined fields).
 - `styles` (paragraph, character, table and numbering styles, document defaults, theme),
   numbering definitions and sections — Phase 8 (schema v3,
-  [ADR-0005](decisions/ADR-0005-word-compatible-model.md), proposed).
+  [ADR-0005](decisions/ADR-0005-word-compatible-model.md)).
 - `resources` (the original DOCX package's parts, images by id, no inline binary) — Phases 8 and 10.
 - comments (review) — Phase 8–9; `headers` / `footers` as separate content trees — Phase 11.
 - Extension-owned data under a namespaced key.

@@ -15,7 +15,7 @@ integration.
 > version. Manual IME, screen-reader and real-paste checks are not run yet: read the
 > [known limitations](docs/limitations.md). Next: real Word documents, a Word-shaped model
 > with lossless `.docx` round trip (Phase 8, [ADR-0005](docs/decisions/ADR-0005-word-compatible-model.md),
-> proposed; [roadmap](docs/roadmap.md)).
+> [roadmap](docs/roadmap.md)).
 
 ## Usage
 
