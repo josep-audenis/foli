@@ -617,7 +617,7 @@ on schema v3 in three engines; documents saved by 0.1.0 and 0.2.0 migrate withou
 
 Each task is a PR on `phase-8/word-model`, the build green after each.
 
-- [ ] 8.1 Corpus and Word harness. Synthetic Word-authored documents (`corpus/word/`: an NDA with
+- [ ] 8.1 Corpus and Word harness (corpus and generator: #44; harness: next). Synthetic Word-authored documents (`corpus/word/`: an NDA with
   legal numbering, a redlined services agreement with comments, a template with content
   controls and merge fields, a board report, a business letter) and their generator
   (`scripts/corpus/build-word-corpus.ps1`, Word automation); then the harness: for every
