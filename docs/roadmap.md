@@ -622,7 +622,9 @@ Each task is a PR on `phase-8/word-model`, the build green after each.
   controls and merge fields, a board report, a business letter) and their generator
   (`scripts/corpus/build-word-corpus.ps1`, Word automation); then the harness: for every
   document (synthetic or a private folder), Word's PDF, Word's page for each paragraph, and
-  "re-saved by Word opens without repair", as reference data the later tasks compare with.
+  "re-saved by Word opens without repair", as reference data the later tasks compare with;
+  the PDF page comparison as a tracked number; LibreOffice headless as the fallback where Word
+  is not installed.
 - [ ] 8.2 `@folijs/docx` package reading: zip (audited dependency), own XML tokenizer keeping the
   exact source text of every element, package parts and relationships; untouched parts written
   back byte for byte (round trip of the package without the model).

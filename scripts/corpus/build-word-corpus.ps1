@@ -36,26 +36,7 @@ $CC_RICH = 0; $CC_TEXT = 1; $CC_DROPDOWN = 4; $CC_DATE = 6; $CC_CHECKBOX = 8
 $ORIENT_LANDSCAPE = 1
 $COLOR_LIGHT_GRAY = 15132390   # BGR
 $COLOR_DARK_BLUE = 6299648     # RGB(0, 32, 96) as BGR
-
-$word = New-Object -ComObject Word.Application
-$word.Visible = $false
-$word.DisplayAlerts = 0
-# The user's own name and initials, restored at the end. Kept in a file too: if a run is killed
-# before it restores them, the next run restores the original, not the last corpus author.
-$userFile = Join-Path ([System.IO.Path]::GetTempPath()) "foli-corpus-word-user.txt"
-if (Test-Path $userFile) {
-  $savedUser, $savedInitials, $savedUseLocal = Get-Content $userFile -Encoding UTF8
-  $savedUseLocal = $savedUseLocal -eq "True"
-} else {
-  $savedUser = $word.UserName
-  $savedInitials = $word.UserInitials
-  $savedUseLocal = [bool]$word.Options.UseLocalUserInfo
-  Set-Content $userFile @($savedUser, $savedInitials, "$savedUseLocal") -Encoding UTF8
-}
-# Signed in to Office, Word authors changes and comments with the account's name unless "Always
-# use these values regardless of sign in" is on: on for the run (no real names in the corpus),
-# restored at the end.
-$word.Options.UseLocalUserInfo = $true
+$LANG_EN_GB = 2057              # wdEnglishUK
 
 # Progress log (Word automation can stall on a dialog; the log shows where).
 $logFile = Join-Path ([System.IO.Path]::GetTempPath()) "foli-corpus.log"
@@ -72,6 +53,9 @@ function Set-Author([string]$name, [string]$initials) {
 function New-Doc {
   $doc = $word.Documents.Add()
   $doc.Content.Style = $doc.Styles.Item($S_NORMAL)
+  # English (UK) text, whatever the language of the Word that generates the corpus.
+  $doc.Styles.Item($S_NORMAL).LanguageID = $LANG_EN_GB
+  $doc.Content.LanguageID = $LANG_EN_GB
   # A4, 2.54 cm margins (72 pt = 1 inch).
   $setup = $doc.Sections.Item(1).PageSetup
   $setup.PageWidth = 595.3; $setup.PageHeight = 841.9
@@ -174,6 +158,7 @@ function Save-Doc($doc, [string]$name) {
   Log "save $name"
   $path = [string](Join-Path $out $name)
   if (Test-Path $path) { Remove-Item $path }
+  $doc.Repaginate()
   $doc.Fields.Update() | Out-Null
   Log "fields updated"
   $doc.SaveAs2($path, $FORMAT_DOCX)
@@ -218,7 +203,38 @@ New-Png $chart 480 280 {
   for ($i = 0; $i -lt $values.Count; $i++) { $g.FillRectangle($brush, 60 + $i * 66, 250 - $values[$i], 44, $values[$i]) }
 }
 
+$word = New-Object -ComObject Word.Application
+# Everything after Word starts runs inside try/finally: Word always quits and the user's settings
+# are always restored, whatever fails.
+$savedUser = $null
+$addedCaptionLabel = $false
 try {
+  $word.Visible = $false
+  $word.DisplayAlerts = 0
+  # The user's own name and initials, restored at the end. Kept in a file too: if a run is killed
+  # before it restores them, the next run restores the original, not the last corpus author.
+  $userFile = Join-Path ([System.IO.Path]::GetTempPath()) "foli-corpus-word-user.txt"
+  if (Test-Path $userFile) {
+    $savedUser, $savedInitials, $savedUseLocal = Get-Content $userFile -Encoding UTF8
+    $savedUseLocal = $savedUseLocal -eq "True"
+  } else {
+    $savedUser = $word.UserName
+    $savedInitials = $word.UserInitials
+    $savedUseLocal = [bool]$word.Options.UseLocalUserInfo
+    Set-Content $userFile @($savedUser, $savedInitials, "$savedUseLocal") -Encoding UTF8
+  }
+  # Signed in to Office, Word authors changes and comments with the account's name unless "Always
+  # use these values regardless of sign in" is on: on for the run (no real names in the corpus),
+  # restored at the end.
+  $word.Options.UseLocalUserInfo = $true
+  # InsertCaption with a label Word does not know ("Table" in a non-English Word) adds it to the
+  # user's caption labels: removed again at the end if this run added it.
+  $knownLabels = @($word.CaptionLabels | ForEach-Object { $_.Name })
+  if ($knownLabels -notcontains "Table") {
+    $word.CaptionLabels.Add("Table") | Out-Null
+    $addedCaptionLabel = $true
+  }
+
   Set-Author "Legal Department" "LD"
 
   # ---------------------------------------------------------------------------------------
@@ -348,8 +364,12 @@ try {
   Add-Para $doc "" | Out-Null
   $table = $doc.Tables.Add($doc.Paragraphs.Last.Range, 5, 3)
   $table.Borders.Enable = $true
-  $cells = @(@("Fee schedule", "", ""), @("Milestone", "Due", "Amount (EUR)"), @("Platform design", "On signature", "40,000"), @("Implementation", "On acceptance", "85,000"), @("Training and support", "Monthly", "6,500"))
-  for ($row = 1; $row -le 5; $row++) { for ($col = 1; $col -le 3; $col++) { $table.Cell($row, $col).Range.Text = $cells[$row - 1][$col - 1] } }
+  $cells = @(@("Fee schedule", "", ""), @("Milestone", "Due", "Amount (EUR)"), @("Platform design", "On signature", "40,000"), @("Implementation", "On acceptance", "85,000"))
+  # Monthly support for two years: the table crosses a page, so its header rows repeat.
+  $months = @("January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December")
+  foreach ($year in @(2026, 2027)) { foreach ($month in $months) { $cells += , @("Support and training, $month $year", "End of month", "6,500") } }
+  while ($table.Rows.Count -lt $cells.Count) { $table.Rows.Add() | Out-Null }
+  for ($row = 1; $row -le $cells.Count; $row++) { for ($col = 1; $col -le 3; $col++) { $table.Cell($row, $col).Range.Text = $cells[$row - 1][$col - 1] } }
   $table.Cell(1, 1).Merge($table.Cell(1, 3))
   $table.Rows.Item(1).Range.Font.Bold = $true
   $table.Rows.Item(1).Range.ParagraphFormat.Alignment = $ALIGN_CENTER
@@ -359,7 +379,7 @@ try {
   $table.Rows.Item(2).Shading.BackgroundPatternColor = $COLOR_LIGHT_GRAY
   $table.Rows.Item(1).HeadingFormat = -1
   $table.Rows.Item(2).HeadingFormat = -1
-  for ($row = 3; $row -le 5; $row++) { $table.Cell($row, 3).Range.ParagraphFormat.Alignment = $ALIGN_RIGHT }
+  for ($row = 3; $row -le $cells.Count; $row++) { $table.Cell($row, 3).Range.ParagraphFormat.Alignment = $ALIGN_RIGHT }
   $h = Add-Para $doc "Liability" $S_H1
   $h.ListFormat.ApplyListTemplateWithLevel($template, $true, 2, $missing, 1) | Out-Null
   $c = Add-Para $doc "Each Party's total liability under this Agreement is limited to the fees paid in the twelve (12) months before the claim. Neither Party is liable for indirect or consequential loss." "Clause"
@@ -411,7 +431,7 @@ try {
   $r.Font.Bold = $true
   $r = Add-Para $doc "Date: "
   $cc = $doc.ContentControls.Add($CC_DATE, $doc.Paragraphs.Last.Range.Characters.Last)
-  $cc.Title = "Offer date"; $cc.Tag = "offer_date"; $cc.DateDisplayFormat = "d MMMM yyyy"
+  $cc.Title = "Offer date"; $cc.Tag = "offer_date"; $cc.DateDisplayFormat = "d MMMM yyyy"; $cc.DateDisplayLocale = $LANG_EN_GB
   $r = Add-Para $doc "Dear "
   $f = $doc.Paragraphs.Last.Range
   $f.MoveEnd(1, -1) | Out-Null
@@ -578,11 +598,20 @@ try {
   Save-Doc $doc "05-business-letter.docx"
 }
 finally {
-  $word.UserName = $savedUser
-  $word.UserInitials = $savedInitials
-  $word.Options.UseLocalUserInfo = $savedUseLocal
-  Remove-Item $userFile -ErrorAction SilentlyContinue
-  foreach ($d in @($word.Documents)) { $d.Close(0) }
-  $word.Quit()
+  # Each step on its own: one failing must not keep Word running or the others from running. The
+  # saved-settings file is removed only once the settings are back.
+  if ($null -ne $savedUser) {
+    try {
+      $word.UserName = $savedUser
+      $word.UserInitials = $savedInitials
+      $word.Options.UseLocalUserInfo = $savedUseLocal
+      Remove-Item $userFile -ErrorAction SilentlyContinue
+    } catch { Write-Warning "Could not restore Word's user settings: $_ (the next run restores them)" }
+  }
+  if ($addedCaptionLabel) {
+    try { $word.CaptionLabels.Item("Table").Delete() } catch { Write-Warning "Could not remove the caption label 'Table': $_" }
+  }
+  try { foreach ($d in @($word.Documents)) { $d.Close(0) } } catch {}
+  try { $word.Quit() } catch {}
   [System.Runtime.InteropServices.Marshal]::ReleaseComObject($word) | Out-Null
 }
