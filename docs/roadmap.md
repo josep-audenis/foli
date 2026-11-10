@@ -635,7 +635,9 @@ Each task is a PR on `phase-8/word-model`, the build green after each.
 - [ ] 8.3 Schema v3 in `@folijs/core`: paragraph properties as attributes, run properties as
   marks, styles (with `basedOn`, defaults, theme), numbering definitions, sections, review
   content (insertion and deletion marks, comment anchors), opaque block and inline nodes; the
-  v1/v2 → v3 migration; validation.
+  v1/v2 → v3 migration; validation. v3 is defined beside v2 (`packages/core/src/v3/`): the
+  view and commands keep running on v2 until 8.6 and 8.7 move them, and `SCHEMA_VERSION`
+  becomes 3 with that switch.
 - [ ] 8.4 DOCX import to v3: paragraphs, runs, styles, numbering, sections, tracked changes,
   comments; everything else as opaque content; a coverage report (opaque nodes per document).
 - [ ] 8.5 Lossless export: v3 → DOCX rewriting only the parts the editor owns; harness: a round

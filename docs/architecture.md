@@ -31,7 +31,7 @@ This document describes **what exists** and **what is decided**. Planned parts a
 
 | Subsystem           | Responsibility                                                                 | Status                                                                                                              |
 | ------------------- | ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------- |
-| Document model      | Schema, immutable tree, marks, positions, JSON, validation                     | ✅ (Phase 2)                                                                                                        |
+| Document model      | Schema, immutable tree, marks, positions, JSON, validation                     | ✅ (Phase 2); schema v3 (Word model) defined beside v2 (8.3)                                                        |
 | Editing engine      | Steps, position mapping, selection, state, history, commands                   | ✅ headless (Phase 3)                                                                                               |
 | View                | Render state to DOM, DOM ↔ model mapping, `beforeinput`, IME, clipboard, focus | ✅ (G3 provisional; manual IME/SR checks open)                                                                      |
 | Layout              | Measurement, line breaking, page flow, fragments, incremental reflow, print    | Phase 5 (inside `@folijs/view` until the seam is proven)                                                            |

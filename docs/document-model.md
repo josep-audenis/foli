@@ -3,7 +3,8 @@
 > Status: envelope, schema v2 (with the v1 → v2 migration) and the document model (schema from
 > specs, immutable nodes, positions, slices, JSON in/out) are implemented in `@folijs/core`
 > (`packages/core/src/document.ts`, `packages/core/src/schema.ts`, `packages/core/src/model/`).
-> The view renders and edits all of v2 (0.2.0). Steps, transactions, history and
+> The view renders and edits all of v2 (0.2.0). Schema v3, the Word model, is defined and
+> validated beside it (`packages/core/src/v3/`, 8.3); the editor moves to it in 8.6–8.7. Steps, transactions, history and
 > commands (Phase 3) are described in [architecture.md](architecture.md#editing-engine-folicore).
 
 ## Canonical form
@@ -112,6 +113,77 @@ the next page, as a trailing hard break does; the next block follows it.
 
 The schema is defined in `packages/core/src/schema.ts` through the same spec API extensions
 will use.
+
+### Schema v3: the Word model (8.3, alongside v2)
+
+[ADR-0005](decisions/ADR-0005-word-compatible-model.md)'s model, in
+`packages/core/src/v3/`: `schemaV3`, the envelope `FoliDocumentV3`, `parseDocumentV3` (also
+reads v1 and v2, validating then migrating them) and `migrateToV3`. The editor still runs on
+v2: rendering (8.6) and editing (8.7) move to v3, and then `SCHEMA_VERSION` becomes 3 and v2's
+types go. Until then v3 is a format and its validation, not something the view shows.
+
+The shape follows Word, in Word's units (twips = 1/20 pt for geometry, indentation, spacing
+and tab stops; half-points for font sizes; eighths of a point for borders: `units.ts` converts),
+so values survive a DOCX round trip exactly. An unset property is `null` and omitted from the
+JSON: the style, then the defaults, decide (resolution comes with rendering, 8.6).
+
+| Node                                                   | Content / attrs                                                                                                                                                                                                                                                                                              |
+| ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `doc`                                                  | one or more blocks                                                                                                                                                                                                                                                                                           |
+| `paragraph`                                            | inline\*; Word's paragraph properties: `style`, `justification`, `indent`, `spacing`, `keepNext`, `keepLines`, `widowControl`, `pageBreakBefore`, `contextualSpacing`, `outlineLevel`, `numbering` (`id`, `level`), `tabs`, `borders`, `shading`, `markFormat`, `ext`; `section`, `revision`, `formatChange` |
+| `opaqueBlock`                                          | `xml` (verbatim), `label`: block content Foli does not model yet (tables until Phase 10)                                                                                                                                                                                                                     |
+| `text`, `tab`, `hardBreak`, `pageBreak`, `columnBreak` | inline                                                                                                                                                                                                                                                                                                       |
+| `commentStart`, `commentEnd`, `commentReference`       | `id`: a comment's range and its reference mark, as Word places them                                                                                                                                                                                                                                          |
+| `opaqueInline`                                         | `xml`, `label`: fields, drawings, symbols… until modeled                                                                                                                                                                                                                                                     |
+
+Marks, in canonical order: `link` (`href` checked as in v2, or `anchor`, `tooltip`),
+`insertion` and `deletion` (`id`, `author`, `date`: tracked changes; deleted text stays in the
+content, marked), `characterStyle`, `bold`, `italic`, `underline` (`style`, `color`), `strike`,
+`doubleStrike`, `caps`, `smallCaps`, `hidden`, `font` (per script and theme fonts), `fontSize`
+(half-points), `color` (`RRGGBB` or `auto`, theme color), `highlight` (Word's 16 named colors),
+`shading` (any fill), `verticalAlign`, `characterSpacing`, `formatChange` (the previous marks of
+a tracked formatting change), `runExt`. Toggles (`bold`…`hidden`) take `value: false` to turn
+off what a style turns on (`<w:b w:val="0"/>`).
+
+- **Headings** are paragraphs with a heading style (`Heading1`…); **lists** are numbered
+  paragraphs (`numbering` references an instance of the envelope's numbering).
+- **Sections:** a paragraph's `section` ends a section with that page setup (Word's `w:sectPr`
+  in the paragraph's properties); the envelope's `section` is the last one.
+- **Lossless:** `ext` (paragraph), `runExt` (run), and `ext` on sections, styles, numbering and
+  comments keep the unknown children of known elements as verbatim XML; opaque nodes keep
+  whole unknown elements. Export (8.5) writes them back while the element is unchanged.
+
+```ts
+interface FoliDocumentV3 {
+  schemaVersion: 3;
+  section: SectionJSON; // page size, orientation, margins (twips), headers/footers by relationship id
+  defaults: { paragraph?: ParagraphProperties; run?: MarkJSON[] }; // w:docDefaults
+  styles: StyleJSON[]; // id, type, name, basedOn, next, link, isDefault, paragraph, run, ext
+  numbering: { abstracts: AbstractNumberingJSON[]; instances: NumberingInstanceJSON[] };
+  theme?: ThemeJSON; // major/minor fonts, theme colors
+  comments: CommentJSON[]; // id, author, initials, date, content (v3 blocks), parent, done
+  content: NodeJSON; // a v3 doc
+}
+```
+
+Validation (`parseDocumentV3`) checks every value's shape and range and the references the
+engine depends on: unique style, numbering and comment ids; no style based on itself; every
+numbering instance's definition exists; distinct levels; a reply's parent exists. References
+Word itself tolerates when missing (a paragraph's unknown style or numbering instance) are
+kept, not rejected, so real files load.
+
+**Migration v2 → v3** (`migrateToV3`): every character, break and mark is kept
+(property-tested on generated v2 documents). Headings become `Heading1`–`Heading6` paragraphs;
+lists become `ListParagraph` paragraphs numbered with one instance per list (a nested list of
+the same kind starting at 1 continues its parent's numbering a level down; ordered lists get
+an explicit start, so each restarts as in v2); further blocks of a list item are indented to
+its text; a horizontal rule becomes an empty paragraph with a bottom border; `align` becomes
+`justification` (`end` → `right`, `justify` → `both`); `textColor` becomes `color`, and
+`highlight` becomes `shading` (Word's highlight has only 16 colors; a fill keeps any color);
+`settings` becomes the section in twips (rounded to the twip, under 0.02 mm). The styles
+(`Normal`, headings, `ListParagraph`) and numbering definitions (bullets, and
+decimal/letter/roman numbers) these reference are added. Lists nested past Word's nine levels
+stay at the ninth.
 
 ### Schema v1 (0.1.0)
 
@@ -230,7 +302,7 @@ Migrations never drop content. A published version never changes in place.
 | Version | Released in | Migration to the next                                                           |
 | ------- | ----------- | ------------------------------------------------------------------------------- |
 | 1       | 0.1.0       | v1 → v2: only the version changes (v2 only adds types and defaulted attributes) |
-| 2       | 0.2.0       | —                                                                               |
+| 2       | 0.2.0       | v2 → v3 (`migrateToV3`, 8.3): Word's model; becomes the current version in 8.7  |
 
 0.1.0 reads only version 1: it rejects documents saved by 0.2.0 ("Unsupported schemaVersion: 2").
 Tests load a document exactly as 0.1.0 saved it (`document.test.ts`); in the browser, the
@@ -242,11 +314,10 @@ migration.
 Each added only when a feature needs it, with a migration:
 
 - `metadata` (title, author, timestamps, app-defined fields).
-- `styles` (paragraph, character, table and numbering styles, document defaults, theme),
-  numbering definitions and sections — Phase 8 (schema v3,
-  [ADR-0005](decisions/ADR-0005-word-compatible-model.md)).
+- `styles`, numbering definitions, sections, theme and comments: defined in schema v3
+  (above, 8.3); the current envelope once the editor moves to v3 (8.7).
 - `resources` (the original DOCX package's parts, images by id, no inline binary) — Phases 8 and 10.
-- comments (review) — Phase 8–9; `headers` / `footers` as separate content trees — Phase 11.
+- `headers` / `footers` as separate content trees — Phase 11.
 - Extension-owned data under a namespaced key.
 
 ## Open questions
