@@ -1,5 +1,6 @@
 export {
   type AbstractNumberingJSON,
+  type BorderJSON,
   type CommentJSON,
   type FoliDocumentV3,
   type NumberingInstanceJSON,

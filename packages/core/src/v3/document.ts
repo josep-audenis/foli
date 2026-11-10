@@ -10,6 +10,7 @@ import {
   listOf,
   oneOf,
   shape,
+  str,
   text,
   token,
   xml,
@@ -17,22 +18,22 @@ import {
 import { migrateToV3 } from "./migrate.js";
 import {
   checkSection,
-  checkMarks as marks,
   checkParagraphProperties as paragraphProperties,
+  checkRunProperties as runProperties,
   schemaV3,
 } from "./schema.js";
 
 /** The schema version of documents in the Word model (ADR-0005). */
 export const SCHEMA_VERSION_V3 = 3;
 
-/** Page setup of a section, in twips (1/1440 inch). */
+/** Page setup of a section, in twips (1/1440 inch). Missing parts take Word's defaults. */
 export interface SectionJSON {
-  pageSize: { width: number; height: number; orientation?: "portrait" | "landscape" };
-  margins: {
-    top: number;
-    right: number;
-    bottom: number;
-    left: number;
+  pageSize?: { width?: number; height?: number; orientation?: "portrait" | "landscape" };
+  margins?: {
+    top?: number;
+    right?: number;
+    bottom?: number;
+    left?: number;
     header?: number;
     footer?: number;
     gutter?: number;
@@ -42,14 +43,48 @@ export interface SectionJSON {
   /** Relationship ids of the header and footer parts (their content stays in the package until Phase 11). */
   headers?: { default?: string; first?: string; even?: string };
   footers?: { default?: string; first?: string; even?: string };
+  /** The `w:sectPr` this was read from, verbatim. */
   ext?: string;
 }
 
-/** Paragraph properties as a style, a numbering level or the defaults give them: paragraph attributes. */
-export type ParagraphPropertiesJSON = Record<string, unknown>;
+export interface BorderJSON {
+  style: string;
+  size?: number;
+  space?: number;
+  color?: string;
+  themeColor?: string;
+}
+
+/** Paragraph properties (`w:pPr`) as a paragraph's attributes, a style, a numbering level or the defaults give them. */
+export interface ParagraphPropertiesJSON {
+  style?: string;
+  justification?: string;
+  /** Twips; with both `firstLine` and `hanging`, Word applies `hanging`. */
+  indent?: { left?: number; right?: number; firstLine?: number; hanging?: number };
+  spacing?: {
+    before?: number;
+    after?: number;
+    line?: number;
+    lineRule?: "auto" | "exact" | "atLeast";
+    beforeAutospacing?: boolean;
+    afterAutospacing?: boolean;
+  };
+  keepNext?: boolean;
+  keepLines?: boolean;
+  widowControl?: boolean;
+  pageBreakBefore?: boolean;
+  contextualSpacing?: boolean;
+  outlineLevel?: number;
+  numbering?: { id?: number; level?: number };
+  tabs?: { position: number; kind: string; leader?: string }[];
+  borders?: Partial<Record<"top" | "bottom" | "left" | "right" | "between" | "bar", BorderJSON>>;
+  shading?: { pattern: string; color?: string; fill?: string; themeFill?: string };
+  markFormat?: MarkJSON[];
+  ext?: string;
+}
 
 export interface StyleJSON {
-  /** `w:styleId`, what paragraphs and runs reference. */
+  /** `w:styleId`, what paragraphs and runs reference. With duplicates, the first wins, as in Word. */
   id: string;
   type: "paragraph" | "character" | "table" | "numbering";
   name?: string;
@@ -60,15 +95,15 @@ export interface StyleJSON {
   isDefault?: boolean;
   paragraph?: ParagraphPropertiesJSON;
   run?: MarkJSON[];
-  /** Unknown children of `w:style` (table properties, UI priority…), verbatim. */
+  /** The `w:style` this was read from, verbatim (table properties, UI priority…). */
   ext?: string;
 }
 
 export interface NumberingLevelJSON {
   level: number;
   start?: number;
-  /** `w:numFmt`: decimal, bullet, lowerLetter, upperRoman, none… */
-  format: string;
+  /** `w:numFmt`: decimal (Word's default), bullet, lowerLetter, upperRoman, none… */
+  format?: string;
   /** `w:lvlText`: "%1.", "%1.%2", "•"… */
   text?: string;
   justification?: "left" | "center" | "right" | "start" | "end";
@@ -81,6 +116,7 @@ export interface NumberingLevelJSON {
   style?: string;
   paragraph?: ParagraphPropertiesJSON;
   run?: MarkJSON[];
+  /** The `w:lvl` this was read from, verbatim. */
   ext?: string;
 }
 
@@ -97,6 +133,7 @@ export interface AbstractNumberingJSON {
 export interface NumberingInstanceJSON {
   /** `w:numId`, what paragraphs reference. */
   id: number;
+  /** May name a definition that does not exist: the paragraphs are then not numbered, as in Word. */
   abstract: number;
   overrides?: { level: number; start?: number; definition?: NumberingLevelJSON }[];
   ext?: string;
@@ -118,7 +155,7 @@ export interface CommentJSON {
   date?: string;
   /** The comment's paragraphs (schema v3 blocks). */
   content: NodeJSON[];
-  /** The comment this one replies to. */
+  /** The comment this one replies to (a missing one makes it a thread of its own). */
   parent?: number;
   /** Resolved. */
   done?: boolean;
@@ -140,9 +177,15 @@ export interface FoliDocumentV3 {
 }
 
 /**
- * Validates untrusted input against schema v3 and returns it in canonical form. Documents of
- * schema 1 and 2 are validated as such and migrated (`migrateToV3`). Throws FoliDocumentError
- * instead of dropping anything.
+ * Validates untrusted input against schema v3. Returns a copy that shares nothing with the
+ * input, with the content and the comments' content in canonical form. Documents of schema 1
+ * and 2 are validated as such and migrated (`migrateToV3`). Throws FoliDocumentError instead
+ * of dropping anything.
+ *
+ * What Word opens is accepted: duplicate ids (the first wins), a numbering instance or a reply
+ * whose target is missing, references to styles that do not exist. Rejected is only what the
+ * engine cannot work with: wrong types, out-of-range values, and cycles (a style based on
+ * itself, comments replying to each other) that would never end when followed.
  */
 export function parseDocumentV3(input: unknown): FoliDocumentV3 {
   if (!isRecord(input)) throw new FoliDocumentError("Document must be an object");
@@ -155,7 +198,11 @@ export function parseDocumentV3(input: unknown): FoliDocumentV3 {
     if (!ENVELOPE_KEYS.includes(key)) throw new FoliDocumentError(`${key}: unknown key`);
   }
   check("section", input.section, checkSection);
-  check("defaults", input.defaults, shape({ paragraph: paragraphProperties, run: marks }), true);
+  check(
+    "defaults",
+    input.defaults,
+    shape({ paragraph: paragraphProperties, run: runProperties }, [], true),
+  );
   check("styles", input.styles, listOf(checkStyle));
   check(
     "numbering",
@@ -168,43 +215,40 @@ export function parseDocumentV3(input: unknown): FoliDocumentV3 {
   if (input.theme !== undefined) check("theme", input.theme, checkTheme);
   check("comments", input.comments, listOf(checkComment));
   const styles = input.styles as StyleJSON[];
-  const numbering = input.numbering as FoliDocumentV3["numbering"];
   const comments = input.comments as CommentJSON[];
-  checkStyleGraph(styles);
-  unique(
-    "numbering.abstracts",
-    numbering.abstracts.map((a) => a.id),
+  noCycles(
+    "styles",
+    styles,
+    (s) => s.id,
+    (s) => s.basedOn,
+    (s) => `${s.id} is based on itself`,
   );
-  unique(
-    "numbering.instances",
-    numbering.instances.map((n) => n.id),
-  );
-  const abstracts = new Set(numbering.abstracts.map((a) => a.id));
-  numbering.instances.forEach((n, i) => {
-    if (!abstracts.has(n.abstract))
-      fail(`numbering.instances[${i}].abstract`, `no abstract numbering ${n.abstract}`);
-  });
-  unique(
+  noCycles(
     "comments",
-    comments.map((c) => c.id),
+    comments,
+    (c) => c.id,
+    (c) => c.parent,
+    (c) => `comment ${c.id} replies to itself`,
   );
-  const ids = new Set(comments.map((c) => c.id));
-  comments.forEach((c, i) => {
-    if (c.parent !== undefined && (!ids.has(c.parent) || c.parent === c.id)) {
-      fail(`comments[${i}].parent`, `no other comment ${c.parent}`);
-    }
-  });
 
   const content = parseContentV3(input.content);
+  // A copy: the validated document must not change when the caller's input does.
+  const envelope = structuredClone({
+    section: input.section,
+    defaults: input.defaults,
+    styles,
+    numbering: input.numbering,
+    theme: input.theme,
+  }) as Pick<FoliDocumentV3, "section" | "defaults" | "styles" | "numbering" | "theme">;
   return {
     schemaVersion: SCHEMA_VERSION_V3,
-    section: input.section as SectionJSON,
-    defaults: input.defaults as FoliDocumentV3["defaults"],
-    styles,
-    numbering,
-    ...(input.theme === undefined ? {} : { theme: input.theme as ThemeJSON }),
+    section: envelope.section,
+    defaults: envelope.defaults,
+    styles: envelope.styles,
+    numbering: envelope.numbering,
+    ...(envelope.theme === undefined ? {} : { theme: envelope.theme }),
     comments: comments.map((c, i) => ({
-      ...c,
+      ...structuredClone({ ...c, content: [] }),
       content: blocks(c.content, `comments[${i}].content`).map((block) => block.toJSON()),
     })),
     content: content.toJSON(),
@@ -234,17 +278,38 @@ function fail(path: string, message: string): never {
   throw new FoliDocumentError(`${path}: ${message}`);
 }
 
-function check(path: string, value: unknown, checker: Check, emptyAllowed = false): void {
-  if (emptyAllowed && isRecord(value) && Object.keys(value).length === 0) return;
+function check(path: string, value: unknown, checker: Check): void {
   const error = checker(value);
   if (error) fail(path, error);
 }
 
-function unique(path: string, ids: readonly unknown[]): void {
-  const seen = new Set<unknown>();
-  ids.forEach((id, i) => {
-    if (seen.has(id)) fail(`${path}[${i}].id`, `duplicate id ${String(id)}`);
-    seen.add(id);
+/**
+ * Following `next` from any item ends (no item reaches itself). Linear: each item is walked
+ * once. Ids that occur twice resolve to the first, as Word does.
+ */
+function noCycles<T>(
+  path: string,
+  items: readonly T[],
+  id: (item: T) => unknown,
+  next: (item: T) => unknown,
+  message: (item: T) => string,
+): void {
+  const byId = new Map<unknown, number>();
+  items.forEach((item, i) => {
+    if (!byId.has(id(item))) byId.set(id(item), i);
+  });
+  const state = new Uint8Array(items.length); // 0 unseen, 1 on the current path, 2 ends
+  items.forEach((_, start) => {
+    const path_: number[] = [];
+    let at: number | undefined = start;
+    while (at !== undefined && state[at] === 0) {
+      state[at] = 1;
+      path_.push(at);
+      const target = next(items[at] as T);
+      at = target === undefined ? undefined : byId.get(target);
+    }
+    if (at !== undefined && state[at] === 1) fail(`${path}[${at}]`, message(items[at] as T));
+    for (const i of path_) state[i] = 2;
   });
 }
 
@@ -261,99 +326,62 @@ const checkStyle: Check = shape(
   {
     id: text(),
     type: oneOf(["paragraph", "character", "table", "numbering"]),
-    name: text(),
+    name: str(),
     basedOn: text(),
     next: text(),
     link: text(),
     isDefault: bool,
     paragraph: paragraphProperties,
-    run: marks,
+    run: runProperties,
     ext: xml,
   },
   ["id", "type"],
 );
-
-/** Unique style ids, and no style based on itself through its chain (resolution would not end). */
-function checkStyleGraph(styles: readonly StyleJSON[]): void {
-  unique(
-    "styles",
-    styles.map((s) => s.id),
-  );
-  const byId = new Map(styles.map((s) => [s.id, s]));
-  styles.forEach((style, i) => {
-    const seen = new Set<string>([style.id]);
-    for (let next = style.basedOn; next !== undefined; next = byId.get(next)?.basedOn) {
-      if (seen.has(next)) fail(`styles[${i}].basedOn`, `${style.id} is based on itself`);
-      seen.add(next);
-    }
-  });
-}
 
 const checkLevel: Check = shape(
   {
     level: int(0, 8),
     start: int(0, 2_147_483_647),
     format: token,
-    text: (v) => (typeof v === "string" && v.length <= 255 ? undefined : "must be a string"),
+    text: str(),
     justification: oneOf(["left", "center", "right", "start", "end"]),
     restart: int(0, 9),
     legal: bool,
     suffix: oneOf(["tab", "space", "nothing"]),
     style: text(),
     paragraph: paragraphProperties,
-    run: marks,
+    run: runProperties,
     ext: xml,
   },
-  ["level", "format"],
+  ["level"],
 );
 
-const checkAbstract: Check = (v) => {
-  const error = shape(
-    {
-      id: int(0, 2_147_483_647),
-      multiLevelType: oneOf(["singleLevel", "multilevel", "hybridMultilevel"]),
-      levels: listOf(checkLevel, 9),
-      styleLink: text(),
-      numStyleLink: text(),
-      ext: xml,
-    },
-    ["id", "levels"],
-  )(v);
-  if (error) return error;
-  return distinctLevels((v as AbstractNumberingJSON).levels.map((l) => l.level));
-};
-
-const checkInstance: Check = (v) => {
-  const error = shape(
-    {
-      id: int(1, 2_147_483_647),
-      abstract: int(0, 2_147_483_647),
-      overrides: listOf(
-        shape({ level: int(0, 8), start: int(0, 2_147_483_647), definition: checkLevel }, [
-          "level",
-        ]),
-        9,
-      ),
-      ext: xml,
-    },
-    ["id", "abstract"],
-  )(v);
-  if (error) return error;
-  return distinctLevels(((v as NumberingInstanceJSON).overrides ?? []).map((o) => o.level));
-};
-
-function distinctLevels(levels: readonly number[]): string | undefined {
-  return new Set(levels).size === levels.length ? undefined : "levels must be distinct";
-}
-
-const font = shape(
+const checkAbstract: Check = shape(
   {
-    latin: (v) => (typeof v === "string" ? undefined : "must be a string"),
-    eastAsia: (v) => (typeof v === "string" ? undefined : "must be a string"),
-    cs: (v) => (typeof v === "string" ? undefined : "must be a string"),
+    id: int(0, 2_147_483_647),
+    multiLevelType: oneOf(["singleLevel", "multilevel", "hybridMultilevel"]),
+    levels: listOf(checkLevel, 9),
+    styleLink: text(),
+    numStyleLink: text(),
+    ext: xml,
   },
-  ["latin"],
+  ["id", "levels"],
 );
+
+const checkInstance: Check = shape(
+  {
+    id: int(1, 2_147_483_647),
+    abstract: int(0, 2_147_483_647),
+    overrides: listOf(
+      shape({ level: int(0, 8), start: int(0, 2_147_483_647), definition: checkLevel }, ["level"]),
+      9,
+    ),
+    ext: xml,
+  },
+  ["id", "abstract"],
+);
+
+const font = shape({ latin: str(), eastAsia: str(), cs: str() }, ["latin"]);
 
 const checkTheme: Check = shape(
   {
@@ -375,8 +403,8 @@ const checkTheme: Check = shape(
 const checkComment: Check = shape(
   {
     id: int(0, 2_147_483_647),
-    author: text(),
-    initials: text(9),
+    author: str(),
+    initials: str(9),
     date: date,
     content: (v) => (Array.isArray(v) ? undefined : "must be an array of blocks"),
     parent: int(0, 2_147_483_647),

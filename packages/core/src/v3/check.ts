@@ -1,6 +1,8 @@
 /**
  * Small validators for schema v3's JSON-valued attributes and envelope. A check returns an
- * error message, or undefined when the value is valid.
+ * error message, or undefined when the value is valid. They are the trust boundary for
+ * untrusted documents: only own keys are looked up, so `__proto__`, `constructor` and other
+ * inherited names are unknown keys, never checks.
  */
 
 export type Check = (value: unknown) => string | undefined;
@@ -18,7 +20,15 @@ export const int =
       ? undefined
       : `must be an integer from ${min} to ${max}`;
 
-/** A Word identifier-like string: style ids, font names, relationship ids, authors. */
+/** A string of at most `max` characters, empty allowed (Word's ST_String: authors, initials). */
+export const str =
+  (max = 255): Check =>
+  (v) =>
+    typeof v === "string" && v.length <= max
+      ? undefined
+      : `must be a string of at most ${max} characters`;
+
+/** A non-empty string: ids and names things are referenced by. */
 export const text =
   (max = 255): Check =>
   (v) =>
@@ -48,11 +58,25 @@ export const date: Check = (v) =>
     ? undefined
     : "must be an ISO 8601 date-time";
 
-/** Verbatim XML kept for export (unknown properties, opaque content): never parsed by Foli. */
+/** Verbatim XML kept for export: never parsed by the engine. */
 export const xml: Check = (v) =>
   typeof v === "string" && v.length > 0 && v.length <= 16_777_216
     ? undefined
     : "must be an XML string";
+
+/** An element's own attributes Foli does not model, by qualified name (`w14:paraId`). */
+export const attributes: Check = (v) => {
+  if (!isRecord(v)) return "must be an object";
+  const entries = Object.entries(v);
+  if (entries.length === 0) return "must not be empty (use null)";
+  if (entries.length > 64) return "must have at most 64 attributes";
+  for (const [name, value] of entries) {
+    if (!/^[A-Za-z_][\w.-]*(:[A-Za-z_][\w.-]*)?$/.test(name))
+      return `${name} is not an attribute name`;
+    if (typeof value !== "string" || value.length > 65_535) return `${name} must be a string`;
+  }
+  return undefined;
+};
 
 export const nullable =
   (check: Check): Check =>
@@ -60,7 +84,7 @@ export const nullable =
     v === null ? undefined : check(v);
 
 export const listOf =
-  (check: Check, max = 10_000): Check =>
+  (check: Check, max = 100_000): Check =>
   (v) => {
     if (!Array.isArray(v)) return "must be an array";
     if (v.length > max) return `must have at most ${max} items`;
@@ -72,31 +96,24 @@ export const listOf =
   };
 
 /**
- * An object with only the given keys, each optional unless listed in `required`, and at least
- * one present (an empty object means "not set": use null).
+ * An object with only the given keys, each optional unless listed in `required`. Unless
+ * `allowEmpty`, at least one key is present (an empty object means "not set": use null).
  */
 export const shape =
-  (fields: Readonly<Record<string, Check>>, required: readonly string[] = []): Check =>
+  (
+    fields: Readonly<Record<string, Check>>,
+    required: readonly string[] = [],
+    allowEmpty = false,
+  ): Check =>
   (v) => {
     if (!isRecord(v)) return "must be an object";
     const keys = Object.keys(v);
-    if (keys.length === 0) return "must not be empty (use null)";
+    if (keys.length === 0 && !allowEmpty) return "must not be empty (use null)";
     for (const key of keys) {
-      const check = fields[key];
-      if (!check) return `unknown key ${key}`;
-      const error = check(v[key]);
+      if (!Object.hasOwn(fields, key)) return `unknown key ${key}`;
+      const error = (fields[key] as Check)(v[key]);
       if (error) return `${key} ${error}`;
     }
-    for (const key of required) if (!(key in v)) return `${key} is required`;
-    return undefined;
-  };
-
-export const both =
-  (...checks: Check[]): Check =>
-  (v) => {
-    for (const check of checks) {
-      const error = check(v);
-      if (error) return error;
-    }
+    for (const key of required) if (!Object.hasOwn(v, key)) return `${key} is required`;
     return undefined;
   };

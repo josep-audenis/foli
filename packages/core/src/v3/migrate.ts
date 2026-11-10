@@ -30,9 +30,16 @@ export function migrateToV3(doc: FoliDocument): FoliDocumentV3 {
   return {
     schemaVersion: 3,
     section: section(doc.settings),
-    defaults: {},
-    styles: STYLES,
-    numbering: { abstracts: [BULLETS, NUMBERS], instances },
+    // The default stylesheet's look (11 pt Georgia), rather than Word's empty-defaults 10 pt.
+    defaults: {
+      run: [
+        { type: "font", attrs: { ascii: "Georgia", hAnsi: "Georgia", cs: "Georgia" } },
+        { type: "fontSize", attrs: { value: 22, complexScript: 22 } },
+      ],
+    },
+    // Copies: no two documents share an object.
+    styles: structuredClone(STYLES),
+    numbering: { abstracts: structuredClone([BULLETS, NUMBERS]), instances },
     comments: [],
     content: { type: "doc", content },
   };
@@ -47,20 +54,25 @@ type Kind = "bullet" | "number";
 const INDENT = 720; // twips per list level: 0.5 inch, Word's
 const HANGING = 360;
 
+/** Millimetres to twips within Word's limits (22 inches: v2 allowed any size). */
+function twips(mm: number): number {
+  return Math.min(mmToTwips(mm), 31_680);
+}
+
 function section(settings: FoliDocument["settings"]): SectionJSON {
   const { width, height } = settings.pageSize;
   const { top, right, bottom, left } = settings.margins;
   return {
     pageSize: {
-      width: mmToTwips(width),
-      height: mmToTwips(height),
+      width: Math.max(twips(width), 1),
+      height: Math.max(twips(height), 1),
       ...(width > height ? { orientation: "landscape" as const } : {}),
     },
     margins: {
-      top: mmToTwips(top),
-      right: mmToTwips(right),
-      bottom: mmToTwips(bottom),
-      left: mmToTwips(left),
+      top: twips(top),
+      right: twips(right),
+      bottom: twips(bottom),
+      left: twips(left),
     },
   };
 }
@@ -81,7 +93,7 @@ function blocks(list: readonly BlockJSON[], context: Context): NodeJSON[] {
 function listBlocks(
   list: Extract<BlockJSON, { type: "bulletList" | "orderedList" }>,
   depth: number,
-  parent: { id: number; kind: Kind } | undefined,
+  parent: { id: number; kind: Kind; item: { continued: boolean } } | undefined,
   context: Context,
   out: NodeJSON[],
 ): void {
@@ -89,8 +101,20 @@ function listBlocks(
   const kind: Kind = list.type === "bulletList" ? "bullet" : "number";
   const start = list.type === "orderedList" ? (list.attrs?.start ?? 1) : 1;
   // A nested list of the same kind starting at 1 continues its parent's numbering one level
-  // down (Word restarts the deeper level after each item, as v2 numbered it).
-  let id = parent?.kind === kind && start === 1 ? parent.id : undefined;
+  // down: Word restarts the deeper level after each item, as v2 numbered it. Only the item's
+  // first such list (a second one would continue the first's count) and only while the level
+  // goes down (past the ninth, it would continue the parent's).
+  const continues =
+    parent !== undefined &&
+    parent.kind === kind &&
+    start === 1 &&
+    depth <= 8 &&
+    !parent.item.continued;
+  let id: number | undefined;
+  if (continues) {
+    id = parent.id;
+    parent.item.continued = true;
+  }
   if (id === undefined) {
     id = context.instances.length + 1;
     context.instances.push({
@@ -102,10 +126,11 @@ function listBlocks(
   }
   for (const item of list.content) {
     const [first, ...rest] = item.content;
+    const state = { continued: false };
     out.push(paragraph(first, { style: "ListParagraph", numbering: { id, level } }));
     for (const block of rest) {
       if (block.type === "bulletList" || block.type === "orderedList") {
-        listBlocks(block, depth + 1, { id, kind }, context, out);
+        listBlocks(block, depth + 1, { id, kind, item: state }, context, out);
       } else {
         // More of the item: aligned with its text.
         const style =
@@ -205,10 +230,8 @@ function levels(kind: Kind): AbstractNumberingJSON["levels"] {
   return Array.from({ length: 9 }, (_, level) => ({
     level,
     start: 1,
-    format:
-      kind === "bullet"
-        ? "bullet"
-        : (["decimal", "lowerLetter", "lowerRoman"][level % 3] as string),
+    // v2 showed nested numbers as decimal at every level (the browser's default).
+    format: kind === "bullet" ? "bullet" : "decimal",
     text: kind === "bullet" ? (["•", "◦", "▪"][level % 3] as string) : `%${level + 1}.`,
     justification: "left",
     paragraph: { indent: { left: INDENT * (level + 1), hanging: HANGING } },
