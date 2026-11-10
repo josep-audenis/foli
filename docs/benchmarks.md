@@ -270,7 +270,7 @@ fails when a bundle passes its budget.
 
 | Bundle            | Includes          | Minified | Gzipped |  Budget |
 | ----------------- | ----------------- | -------: | ------: | ------: |
-| `@folijs/core`    | core              |  67.7 kB | 21.1 kB | 21.6 kB |
+| `@folijs/core`    | core              |  80.8 kB | 25.9 kB | 26.6 kB |
 | `@folijs/view`    | view, core        |  82.2 kB | 26.9 kB | 30.7 kB |
 | `@folijs/react`   | react, view, core | 117.2 kB | 38.0 kB | 43.4 kB |
 | `FoliEditor` only | what it reaches   | 117.0 kB | 37.9 kB | 43.4 kB |
@@ -281,5 +281,6 @@ fails when a bundle passes its budget.
 16.1 kB), schema v2 (7.2), nested blocks on pages (7.3, view and React budgets raised from
 22.9 and 29.1 kB) list editing (7.5, core budget raised again from 19.0 kB) links (7.6, React budgets raised
 from 33.4 kB: the link dialog) and the schema v2 HTML reader (7.8, view budget raised from
-26.1 kB, React from 38.5 kB). `@folijs/docx` measured 2026-11-10 after task 8.2.) For comparison, the whole Vite example app (React 18,
+26.1 kB, React from 38.5 kB). `@folijs/docx` measured 2026-11-10 after task 8.2; core after 8.3 (schema v3 beside v2,
+budget raised from 21.6 kB; view and React do not include it).) For comparison, the whole Vite example app (React 18,
 React DOM and Foli) is about 70 kB gzipped.
