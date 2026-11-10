@@ -103,7 +103,8 @@ view, React API)?
    substitution reported. Identical line breaks to Word are not promised; agreement is
    measured (3.).
 5. **Processing.** A new package `@folijs/docx` (no DOM: browser, worker and Node): zip with an
-   audited small dependency (license checked), XML through an own tokenizer that keeps the
+   audited small dependency (license checked; in 8.2 the platform's `deflate-raw` streams
+   made one unnecessary), XML through an own tokenizer that keeps the
    exact source text of every element (needed to carry opaque content verbatim). Rust/WASM only
    for a measured need, as before.
 6. **Everything in the model is editable.** One model, one engine: the editor's commands apply
