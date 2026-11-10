@@ -632,7 +632,7 @@ Each task is a PR on `phase-8/word-model`, the build green after each.
   byte for byte, so a package written without replacements is the identical file. Checked with
   Word (`scripts/corpus/rewrite-corpus.mjs`, then the harness): every corpus document written
   back, unchanged and with a replaced main part, opens with the reference numbers.
-- [ ] 8.3 Schema v3 in `@folijs/core`: paragraph properties as attributes, run properties as
+- [x] 8.3 Schema v3 in `@folijs/core` (#47): paragraph properties as attributes, run properties as
   marks, styles (with `basedOn`, defaults, theme), numbering definitions, sections, review
   content (insertion and deletion marks, comment anchors), opaque block and inline nodes; the
   v1/v2 → v3 migration; validation. v3 is defined beside v2 (`packages/core/src/v3/`): the
