@@ -23,18 +23,27 @@ const bytes = await pkg.write(new Map([["/word/document.xml", new TextEncoder().
 
 - **Zip:** central directory reader and writer on the platform's `DecompressionStream` and
   `CompressionStream` (`deflate-raw`). Entries keep their headers and compressed data; only
-  replaced parts are compressed again. Data descriptors supported; encrypted entries, ZIP64 and
-  methods other than stored and deflate are refused. Limits on entry count and uncompressed size
-  (`maxEntries`, default 10 000; `maxSize`, default 512 MiB), and every entry's size and CRC-32
-  checked while inflating.
+  replaced parts are compressed again (keeping their name bytes). Data descriptors supported;
+  encrypted entries, ZIP64 and methods other than stored and deflate are refused. Untrusted
+  files are expected: every local header must match its directory record, entries may not
+  overlap, an end record counts only with its directory right before it, declared sizes must be
+  ones deflate can produce, and every entry's size and CRC-32 is checked while inflating, one
+  entry at a time. Limits on entry count and uncompressed size (`maxEntries`, default 10 000;
+  `maxSize`, default 512 MiB).
 - **XML:** `parseXml` keeps the source string and every node's offsets (`start`, `end`, and for
   elements `openEnd` and `closeStart`), so content the importer does not understand is written
-  back as the exact characters it was read from. Namespaces resolved (`ns`), references decoded,
-  line ends and attribute whitespace normalized as XML defines. No DTD: a document type
-  declaration is refused (OOXML forbids one), so no entity expansion.
-- **Package:** part names compare case-insensitively (and percent-decoded), content types by
-  override then default extension, relationship targets resolved against their source part.
-  Text parts decode as UTF-8 or UTF-16 by byte order mark; invalid bytes throw.
+  back as the exact characters it was read from (attributes also give `valueStart` and
+  `valueEnd`). Namespaces resolved (`ns`, reserved prefixes enforced), references decoded, line
+  ends and attribute whitespace normalized as XML defines; characters XML forbids, `--` in
+  comments and `]]>` in text refused. No DTD: a document type declaration is refused (OOXML
+  forbids one), so no entity expansion. Nesting limited (`maxDepth`, default 1000) so code
+  walking the tree recursively is safe; linear time in the input.
+- **Package:** part names compare case-insensitively and percent-decoded (never decoding a
+  `/`), content types by override then default extension, relationship targets resolved
+  against their source part (a target that is a full URI is not a part). The main part must be
+  WordprocessingML (document, template, or their macro-enabled kinds). Text parts decode as
+  UTF-8 or UTF-16 by byte order mark; invalid bytes throw. Each XML part is parsed once.
 
 Errors: `ZipError` (the container), `XmlError` (with the `offset`), `DocxError` (the package,
-naming the part).
+naming the part; an XML error is its `cause`). `readPackage` takes the zip limits and
+`maxDepth`.

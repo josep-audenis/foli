@@ -158,9 +158,14 @@ describe("errors", () => {
     expect(() => readZip(patch(zip, central(zip, 1), 0, 4))).toThrow(
       /bad central directory record/,
     );
-    expect(() => readZip(patch(zip, zip.length - 22 + 16, zip.length, 4))).toThrow(
-      /central directory out of range/,
+    // An end record whose directory is not right before it is not taken.
+    expect(() => readZip(patch(zip, zip.length - 22 + 16, dir + 1, 4))).toThrow(
+      /Not a zip archive/,
     );
+    // Fewer records than the directory's size.
+    expect(() =>
+      readZip(patch(patch(zip, zip.length - 22 + 8, 2, 2), zip.length - 22 + 10, 2, 2)),
+    ).toThrow(/central directory size mismatch/);
     expect(() => readZip(patch(zip, central(zip, 1) + 42, 1, 4))).toThrow(
       /no local header for media\/b\.bin/,
     );
@@ -204,12 +209,91 @@ describe("errors", () => {
     await expect(inflateEntry({ ...entry, crc32: entry.crc32 ^ 1 })).rejects.toThrow(
       /CRC mismatch for x/,
     );
-    const raw = entry.raw.slice();
-    raw[0] = 0xff;
-    await expect(inflateEntry({ ...entry, raw })).rejects.toThrow(
-      /cannot decompress x|wrong size|CRC mismatch/,
-    );
+    const cut = entry.raw.subarray(0, entry.raw.length >> 1);
+    await expect(inflateEntry({ ...entry, raw: cut })).rejects.toThrow(/cannot decompress x/);
+    const invalid = entry.raw.slice();
+    invalid[0] = 0xff; // block type 3: reserved, invalid
+    await expect(inflateEntry({ ...entry, raw: invalid })).rejects.toThrow(/cannot decompress x/);
     const stored = storedEntry("s", encode("abc"));
     await expect(inflateEntry({ ...stored, size: 4 })).rejects.toThrow(/wrong size for s/);
+  });
+
+  it("refuses declared sizes deflate cannot produce, before any allocation", async () => {
+    const zip = await sample();
+    // a.xml: 600 bytes deflated to a few; declaring 400 MiB is a lie.
+    expect(() => readZip(patch(zip, central(zip, 0) + 24, 400 * 1024 * 1024, 4))).toThrow(
+      /impossible size for a\.xml/,
+    );
+    // A stored entry is exactly as large as its data.
+    expect(() => readZip(patch(zip, central(zip, 1) + 24, 5, 4))).toThrow(
+      /impossible size for media\/b\.bin/,
+    );
+  });
+
+  it("requires each local header to match its directory record", async () => {
+    const zip = await sample();
+    const name = 30; // the first local header's name
+    const mismatch = /local header does not match the directory for a\.xml/;
+    expect(() => readZip(patch(zip, name, 0x62, 2))).toThrow(mismatch);
+    expect(() => readZip(patch(zip, 8, 0, 2))).toThrow(mismatch);
+    expect(() => readZip(patch(zip, 14, 1, 4))).toThrow(mismatch);
+    expect(() => readZip(patch(zip, 22, 601, 4))).toThrow(mismatch);
+  });
+
+  it("refuses entries that overlap", async () => {
+    // b.txt is a whole entry hidden inside a.bin's stored data: two names, the same bytes.
+    const inner = writeZip([storedEntry("b.txt", encode("hidden"))]);
+    const innerLocal = inner.subarray(0, 30 + 5 + 6);
+    const innerCentral = inner.slice(30 + 5 + 6, -22);
+    const outer = writeZip([storedEntry("a.bin", innerLocal)]);
+    const outerLocalLength = 30 + 5;
+    new DataView(innerCentral.buffer).setUint32(42, outerLocalLength, true);
+    const outerCentral = outer.subarray(outerLocalLength + innerLocal.length, -22);
+    const dirOffset = outerLocalLength + innerLocal.length;
+    const end = new Uint8Array(22);
+    const e = new DataView(end.buffer);
+    e.setUint32(0, 0x06054b50, true);
+    e.setUint16(8, 2, true);
+    e.setUint16(10, 2, true);
+    e.setUint32(12, outerCentral.length + innerCentral.length, true);
+    e.setUint32(16, dirOffset, true);
+    const zip = new Uint8Array([
+      ...outer.subarray(0, dirOffset),
+      ...outerCentral,
+      ...innerCentral,
+      ...end,
+    ]);
+    expect(() => readZip(zip)).toThrow(/b\.txt overlaps another entry/);
+  });
+
+  it("does not take an end record hidden in the archive comment", async () => {
+    const zip = await sample();
+    const fake = new Uint8Array(22);
+    new DataView(fake.buffer).setUint32(0, 0x06054b50, true);
+    const withFake = new Uint8Array([...patch(zip, zip.length - 2, 22, 2), ...fake]);
+    expect(readZip(withFake)).toHaveLength(3);
+  });
+
+  it("checks a data descriptor against the directory", async () => {
+    const zip = await sample();
+    // Flag the first entry as described (central and local), with a descriptor that lies: the
+    // bytes after its data are the next local header, not its CRC and sizes.
+    const flagged = patch(patch(zip, 6, 0x08, 2), central(zip, 0) + 8, 0x08, 2);
+    expect(() => readZip(flagged)).toThrow(/local header does not match the directory for a\.xml/);
+  });
+
+  it("keeps the replaced entry's name bytes and their encoding", async () => {
+    // A CP437 name (no UTF-8 flag): 0x82 is "é" there, invalid alone in UTF-8.
+    const old: ZipEntry = {
+      ...storedEntry("x", encode("1")),
+      nameBytes: new Uint8Array([0x82]),
+      flags: 0,
+    };
+    const replaced = await deflateEntry(old.name, encode("2"), old);
+    expect(replaced.nameBytes).toEqual(new Uint8Array([0x82]));
+    expect(replaced.flags & 0x0800).toBe(0);
+    const fresh = await deflateEntry("é", encode("2"));
+    expect(fresh.nameBytes).toEqual(new Uint8Array([0xc3, 0xa9]));
+    expect(fresh.flags & 0x0800).toBe(0x0800);
   });
 });

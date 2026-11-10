@@ -67,6 +67,17 @@ could not be measured, keeping that document's earlier JSON. Regenerate the comm
 the corpus changes or Word updates (the `word` field), and delete the JSON of a document removed
 from the corpus.
 
+## Checking Foli's writing with Word
+
+`scripts/corpus/rewrite-corpus.mjs` (after `pnpm build`) writes each document back through
+`@folijs/docx`, unchanged and with its main part replaced; the harness then checks that Word
+opens every one and finds the reference numbers:
+
+```bash
+node scripts/corpus/rewrite-corpus.mjs <folder>
+powershell -ExecutionPolicy Bypass -File scripts/corpus/word-reference.ps1 -In <folder> -Out <folder>
+```
+
 ## Private documents
 
 Real documents (contracts, templates) are never committed. Keep them in a folder outside the

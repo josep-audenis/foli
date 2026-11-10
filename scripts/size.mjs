@@ -25,14 +25,15 @@ writeFileSync(appEntry, `export { FoliEditor } from "${dist("react")}";\n`);
  * Core raised again in 7.5 (18.8 kB): list editing commands. React raised in 7.6 (33.5 kB): the
  * link dialog, and core's link commands. View raised in 7.8 (26.7 kB): the HTML reader for
  * schema v2 (lists, Word and Google Docs lists, links, colors, alignment) and block paste;
- * React with it (37.7 kB, 2% headroom left). Docx added in 8.2 (5.0 kB): zip, XML reader, package.
+ * React with it (37.7 kB, 2% headroom left). Docx added in 8.2
+ * (5.9 kB): zip, XML reader, package, with the checks untrusted files need.
  */
 const BUNDLES = [
   { name: "@folijs/core", entry: dist("core"), budget: 22_100 },
   { name: "@folijs/view", entry: dist("view"), budget: 31_400 },
   { name: "@folijs/react", entry: dist("react"), budget: 44_400 },
   { name: "FoliEditor only", entry: appEntry, budget: 44_400 },
-  { name: "@folijs/docx", entry: dist("docx"), budget: 5_800 },
+  { name: "@folijs/docx", entry: dist("docx"), budget: 6_800 },
 ];
 
 let failed = false;

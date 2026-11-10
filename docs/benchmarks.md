@@ -274,7 +274,7 @@ fails when a bundle passes its budget.
 | `@folijs/view`    | view, core        |  82.2 kB | 26.9 kB | 30.7 kB |
 | `@folijs/react`   | react, view, core | 117.2 kB | 38.0 kB | 43.4 kB |
 | `FoliEditor` only | what it reaches   | 117.0 kB | 37.9 kB | 43.4 kB |
-| `@folijs/docx`    | docx              |  13.3 kB |  5.0 kB |  5.7 kB |
+| `@folijs/docx`    | docx              |  15.4 kB |  5.9 kB |  6.6 kB |
 
 (kB = 1,024 bytes; measured 2026-11-08 after task 7.8. At 0.1.0 (6.4) they were 14.1, 19.9,
 25.3 and 25.2 kB gzipped. Phase 7 added the structure engine (7.1, core budget raised from

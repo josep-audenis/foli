@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { rebuild } from "./testing/rebuild.js";
-import { parseXml, type XmlElement, XmlError, type XmlNode } from "./xml.js";
+import { parseXml, type XmlAttribute, type XmlElement, XmlError, type XmlNode } from "./xml.js";
 
 const W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
 
@@ -81,12 +81,47 @@ describe("parseXml", () => {
     expect(elements(parseXml('<a xmlns="urn:a"><b xmlns=""/></a>').root)[0]?.ns).toBe("");
   });
 
+  it("accepts what XML allows at the edges", () => {
+    const xml = parseXml('<a xmlns:xml="http://www.w3.org/XML/1998/namespace" xml:lang="en"/>');
+    expect(xml.root.attributes[1]?.ns).toBe("http://www.w3.org/XML/1998/namespace");
+    const text = parseXml("<a>😀 \u00A0 \uFFFD</a>").root.children[0] as { text: string };
+    expect(text.text).toBe("😀 \u00A0 \uFFFD");
+    expect(parseXml("<a><!-- - --></a>").root.children[0]?.kind).toBe("comment");
+    expect(parseXml("<_a.b-c/>").root.local).toBe("_a.b-c");
+  });
+
+  it("records where each attribute value is", () => {
+    const source = `<a x = 'one' y="t&amp;o"/>`;
+    const [x, y] = parseXml(source).root.attributes as [XmlAttribute, XmlAttribute];
+    expect(source.slice(x.valueStart, x.valueEnd)).toBe("one");
+    expect(source.slice(y.valueStart, y.valueEnd)).toBe("t&amp;o");
+    expect(source.slice(x.start, x.end)).toBe("x = 'one'");
+  });
+
+  it("limits nesting depth", () => {
+    const nested = (depth: number) => "<a>".repeat(depth) + "</a>".repeat(depth);
+    expect(() => parseXml(nested(1000))).not.toThrow();
+    expect(() => parseXml(nested(1001))).toThrow(/Elements nested deeper than 1000/);
+    expect(() => parseXml("<a><b><c/></b></a>", { maxDepth: 2 })).toThrow(/nested deeper than 2/);
+    expect(parseXml("<a><b/></a>", { maxDepth: 2 }).root.children).toHaveLength(1);
+  });
+
+  it("parses many attributes in linear time", () => {
+    const attributes = Array.from({ length: 60_000 }, (_, i) => `p:a${i}="${i}"`).join(" ");
+    const started = performance.now();
+    const doc = parseXml(`<r xmlns:p="urn:p" ${attributes}/>`);
+    expect(doc.root.attributes).toHaveLength(60_001);
+    // Quadratic duplicate checks took over a minute here; linear ones take milliseconds.
+    expect(performance.now() - started).toBeLessThan(2000);
+  });
+
   it("decodes references and normalizes line ends", () => {
     const t = (xml: string) => (parseXml(xml).root.children[0] as { text: string }).text;
     expect(t("<a> a &amp; b &lt;c&gt; &quot;&apos; &#x41;&#66;&#x1F600;</a>")).toBe(
       " a & b <c> \"' AB😀",
     );
     expect(t("<a>x\r\ny\rz</a>")).toBe("x\ny\nz");
+    expect(t("<a><![CDATA[x\r\ny\rz]]></a>")).toBe("x\ny\nz");
     const value = (xml: string) => parseXml(xml).root.attributes[0]?.value;
     expect(value('<a v="x\ty\r\nz\nw"/>')).toBe("x y z w");
     expect(value('<a v="x&#10;y&#9;z"/>')).toBe("x\ny\tz");
@@ -130,6 +165,26 @@ describe("parseXml", () => {
       ["<a><?pi</a>", /Unclosed processing instruction/],
       ["<a><!-- x</a>", /Unclosed comment/],
       ["<a><![CDATA[x</a>", /Unclosed CDATA section/],
+      ["<a>\u0001</a>", /Character U\+0001 not allowed/],
+      ["<a>\uD800</a>", /Character U\+D800 not allowed/],
+      ["<a>x\uDC00</a>", /Character U\+DC00 not allowed/],
+      ["<a>\uFFFE</a>", /Character U\+FFFE not allowed/],
+      ['<a v="\u000C"/>', /Character U\+000C not allowed/],
+      ["\uFEFF<a/>", /Byte order mark/],
+      ["<a><!-- a -- b --></a>", /"--" in a comment/],
+      ["<a><!-- a ---></a>", /"--" in a comment/],
+      ["<a>x ]]> y</a>", /"]]>" in text/],
+      ['<a xmlns:xml="urn:x"/>', /Reserved namespace declaration xmlns:xml/],
+      ['<a xmlns:xmlns="urn:x"/>', /Reserved namespace declaration xmlns:xmlns/],
+      [
+        '<a xmlns:p="http://www.w3.org/XML/1998/namespace"/>',
+        /Reserved namespace declaration xmlns:p/,
+      ],
+      ['<a xmlns="http://www.w3.org/2000/xmlns/"/>', /Reserved namespace declaration xmlns/],
+      ["<xmlns:a/>", /Reserved prefix in <xmlns:a>/],
+      ["<1a/>", /Malformed qualified name 1a/],
+      ["<a -x='1'/>", /Malformed qualified name -x/],
+      ["<p:.a xmlns:p='urn:p'/>", /Malformed qualified name p:\.a/],
     ];
     for (const [source, message] of cases) {
       expect(() => parseXml(source), source).toThrow(message);

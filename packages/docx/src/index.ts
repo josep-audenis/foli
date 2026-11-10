@@ -7,6 +7,7 @@ export {
   readPackage,
 } from "./package.js";
 export {
+  type ParseXmlOptions,
   parseXml,
   type XmlAttribute,
   type XmlDocument,

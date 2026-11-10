@@ -630,8 +630,8 @@ Each task is a PR on `phase-8/word-model`, the build green after each.
   dependency; an audited one was planned), own XML tokenizer keeping the exact source text of
   every element, package parts, content types and relationships; untouched parts written back
   byte for byte, so a package written without replacements is the identical file. Checked with
-  Word: every corpus document written back, unchanged and with a replaced main part, opens with
-  the reference numbers.
+  Word (`scripts/corpus/rewrite-corpus.mjs`, then the harness): every corpus document written
+  back, unchanged and with a replaced main part, opens with the reference numbers.
 - [ ] 8.3 Schema v3 in `@folijs/core`: paragraph properties as attributes, run properties as
   marks, styles (with `basedOn`, defaults, theme), numbering definitions, sections, review
   content (insertion and deletion marks, comment anchors), opaque block and inline nodes; the

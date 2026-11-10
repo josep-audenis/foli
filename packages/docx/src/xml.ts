@@ -24,6 +24,9 @@ export interface XmlAttribute extends XmlName {
   /** From the name to the closing quote. */
   readonly start: number;
   readonly end: number;
+  /** The raw value between the quotes. */
+  readonly valueStart: number;
+  readonly valueEnd: number;
 }
 
 export interface XmlElement extends XmlName {
@@ -94,8 +97,42 @@ const ROOT_SCOPE: ReadonlyMap<string, string> = new Map([
   ["xmlns", XMLNS_NS],
 ]);
 
+export interface ParseXmlOptions {
+  /**
+   * Deepest element nesting accepted. Default 1000: Word's deepest structures (tables in
+   * tables, content controls) stay far below, and code walking the tree recursively is safe.
+   */
+  readonly maxDepth?: number;
+}
+
+/** The first character XML 1.0 does not allow (outside its Char production), or -1. */
+function illegalCharacter(source: string): number {
+  for (let i = 0; i < source.length; i++) {
+    const c = source.charCodeAt(i);
+    if (c < 0x20) {
+      if (c !== 0x09 && c !== 0x0a && c !== 0x0d) return i;
+    } else if (c >= 0xd800 && c <= 0xdbff) {
+      const next = source.charCodeAt(i + 1);
+      if (!(next >= 0xdc00 && next <= 0xdfff)) return i;
+      i++;
+    } else if ((c >= 0xdc00 && c <= 0xdfff) || c === 0xfffe || c === 0xffff) {
+      return i;
+    }
+  }
+  return -1;
+}
+
 /** Parses `source`; throws {@link XmlError} where it is not well-formed. */
-export function parseXml(source: string): XmlDocument {
+export function parseXml(source: string, options: ParseXmlOptions = {}): XmlDocument {
+  const maxDepth = options.maxDepth ?? 1000;
+  if (source.charCodeAt(0) === 0xfeff) {
+    throw new XmlError("Byte order mark in the text: decode the bytes without it", 0);
+  }
+  const illegal = illegalCharacter(source);
+  if (illegal !== -1) {
+    const code = source.charCodeAt(illegal).toString(16).toUpperCase().padStart(4, "0");
+    throw new XmlError(`Character U+${code} not allowed in XML`, illegal);
+  }
   const top: XmlNode[] = [];
   const stack: Open[] = [];
   let root: XmlElement | undefined;
@@ -112,6 +149,8 @@ export function parseXml(source: string): XmlDocument {
       if (stack.length === 0) {
         if (!/^[ \t\r\n]*$/.test(raw)) throw new XmlError("Text outside the root element", at);
       }
+      const cdataEnd = raw.indexOf("]]>");
+      if (cdataEnd !== -1) throw new XmlError('"]]>" in text', at + cdataEnd);
       siblings().push({
         kind: "text",
         text: decode(raw, false, at),
@@ -126,6 +165,8 @@ export function parseXml(source: string): XmlDocument {
     if (source.startsWith("<!--", at)) {
       const close = source.indexOf("-->", at + 4);
       if (close === -1) throw new XmlError("Unclosed comment", at);
+      const dashes = source.indexOf("--", at + 4);
+      if (dashes < close) throw new XmlError('"--" in a comment', dashes);
       siblings().push({ kind: "comment", start: at, end: close + 3 });
       at = close + 3;
     } else if (source.startsWith("<![CDATA[", at)) {
@@ -134,7 +175,7 @@ export function parseXml(source: string): XmlDocument {
       if (close === -1) throw new XmlError("Unclosed CDATA section", at);
       siblings().push({
         kind: "text",
-        text: source.slice(at + 9, close),
+        text: source.slice(at + 9, close).replace(/\r\n?/g, "\n"),
         cdata: true,
         start: at,
         end: close + 3,
@@ -193,7 +234,8 @@ export function parseXml(source: string): XmlDocument {
     const nameEnd = scanName(source, start + 1);
     const name = source.slice(start + 1, nameEnd);
     if (name === "") throw new XmlError("Malformed start tag", start);
-    const raw: { name: string; value: string; start: number; end: number }[] = [];
+    const raw: { name: string; value: string; start: number; end: number; open: number }[] = [];
+    const names = new Set<string>();
     let at = nameEnd;
     let empty = false;
     for (;;) {
@@ -221,13 +263,14 @@ export function parseXml(source: string): XmlDocument {
       if (close === -1) throw new XmlError(`Unclosed attribute ${attrName}`, open);
       const value = source.slice(open + 1, close);
       if (value.includes("<")) throw new XmlError(`"<" in attribute ${attrName}`, open);
-      if (raw.some((a) => a.name === attrName))
-        throw new XmlError(`Duplicate attribute ${attrName}`, next);
+      if (names.has(attrName)) throw new XmlError(`Duplicate attribute ${attrName}`, next);
+      names.add(attrName);
       raw.push({
         name: attrName,
         value: decode(value, true, open + 1),
         start: next,
         end: close + 1,
+        open,
       });
       at = close + 1;
     }
@@ -238,9 +281,16 @@ export function parseXml(source: string): XmlDocument {
       const declared =
         a.name === "xmlns" ? "" : a.name.startsWith("xmlns:") ? a.name.slice(6) : undefined;
       if (declared === undefined) continue;
+      // The reserved prefixes and their namespaces (Namespaces in XML 1.0, section 3).
+      const reserved =
+        declared === "xml"
+          ? a.value !== XML_NS
+          : declared === "xmlns" || a.value === XML_NS || a.value === XMLNS_NS;
+      if (reserved) throw new XmlError(`Reserved namespace declaration ${a.name}`, a.start);
       if (scope === parentScope) scope = new Map(parentScope);
       (scope as Map<string, string>).set(declared, a.value);
     }
+    const expanded = new Set<string>();
     const attributes = raw.map((a) => {
       const qualified = splitName(a.name, a.start);
       const ns =
@@ -249,18 +299,26 @@ export function parseXml(source: string): XmlDocument {
           : qualified.prefix === ""
             ? ""
             : resolve(scope, qualified.prefix, a.start);
-      return { ...qualified, ns, value: a.value, start: a.start, end: a.end };
-    });
-    for (let i = 0; i < attributes.length; i++) {
-      const a = attributes[i] as XmlAttribute;
-      if (a.ns === "") continue;
-      for (let j = 0; j < i; j++) {
-        const b = attributes[j] as XmlAttribute;
-        if (b.ns === a.ns && b.local === a.local)
-          throw new XmlError(`Duplicate attribute ${a.name}`, a.start);
+      if (ns !== "") {
+        const key = `${ns}\u0000${qualified.local}`;
+        if (expanded.has(key)) throw new XmlError(`Duplicate attribute ${a.name}`, a.start);
+        expanded.add(key);
       }
-    }
+      return {
+        ...qualified,
+        ns,
+        value: a.value,
+        start: a.start,
+        end: a.end,
+        valueStart: a.open + 1,
+        valueEnd: a.end - 1,
+      };
+    });
     const qualified = splitName(name, start);
+    if (qualified.prefix === "xmlns") throw new XmlError(`Reserved prefix in <${name}>`, start);
+    if (stack.length >= maxDepth) {
+      throw new XmlError(`Elements nested deeper than ${maxDepth}`, start);
+    }
     const element = {
       kind: "element" as const,
       ...qualified,
@@ -280,11 +338,14 @@ export function parseXml(source: string): XmlDocument {
 
 function splitName(name: string, at: number): { name: string; prefix: string; local: string } {
   const colon = name.indexOf(":");
-  if (colon === -1) return { name, prefix: "", local: name };
-  if (colon === 0 || colon === name.length - 1 || name.indexOf(":", colon + 1) !== -1) {
+  const prefix = colon === -1 ? "" : name.slice(0, colon);
+  const local = colon === -1 ? name : name.slice(colon + 1);
+  // A name part cannot start with a digit, "-" or "." (XML's NameStartChar), nor be empty.
+  const bad = (part: string) => part === "" || /^[-.0-9·]/.test(part);
+  if ((colon !== -1 && bad(prefix)) || bad(local) || local.includes(":")) {
     throw new XmlError(`Malformed qualified name ${name}`, at);
   }
-  return { name, prefix: name.slice(0, colon), local: name.slice(colon + 1) };
+  return { name, prefix, local };
 }
 
 function resolve(scope: ReadonlyMap<string, string>, prefix: string, at: number): string {

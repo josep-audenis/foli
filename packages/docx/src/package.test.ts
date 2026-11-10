@@ -2,6 +2,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { DocxError, readPackage } from "./package.js";
 import { rebuild } from "./testing/rebuild.js";
+import { XmlError } from "./xml.js";
 import { deflateEntry, readZip, writeZip } from "./zip.js";
 
 const CORPUS = new URL("../../../corpus/word/", import.meta.url);
@@ -224,6 +225,76 @@ describe("readPackage", () => {
     const bytes = (corpus[0] as { bytes: Uint8Array }).bytes;
     await expect(readPackage(bytes, { maxEntries: 3 })).rejects.toThrow(/Too many entries/);
     await expect(readPackage(bytes, { maxSize: 1000 })).rejects.toThrow(/Too large/);
+  });
+
+  it("compares part names percent-decoded on both sides, never decoding a slash", async () => {
+    const pkg = await readPackage(
+      await zip({
+        "[Content_Types].xml": TYPES,
+        "_rels/.rels": ROOT_RELS,
+        "word/document.xml": "<document/>",
+        "word/_rels/document.xml.rels": rels(
+          '<Relationship Id="a" Type="t" Target="a b.xml"/>',
+          '<Relationship Id="b" Type="t" Target="http://evil.example/x"/>',
+          '<Relationship Id="c" Type="t" Target="file:///C:/x.xml"/>',
+        ),
+        "word/a%20b.xml": "<ab/>",
+      }),
+    );
+    const [a, b, c] = pkg.relationships("/word/document.xml");
+    expect(pkg.part(a?.partName as string)?.name).toBe("/word/a%20b.xml");
+    expect(pkg.part("/word/A B.xml")?.name).toBe("/word/a%20b.xml");
+    // Internal in mode, but a full URI is not a part.
+    expect(b).toEqual({ id: "b", type: "t", target: "http://evil.example/x", external: false });
+    expect(c?.partName).toBeUndefined();
+    // %2F is a character of the name, not a new segment.
+    expect(pkg.part("/word%2Fdocument.xml")).toBeUndefined();
+  });
+
+  it("requires the main part to be WordprocessingML", async () => {
+    const types = (main: string) => TYPES.replace(MAIN, main);
+    const files = (main: string) => ({
+      "[Content_Types].xml": types(main),
+      "_rels/.rels": ROOT_RELS,
+      "word/document.xml": "<d/>",
+    });
+    await expect(readPackage(await zip(files("application/xml")))).rejects.toThrow(
+      /the main part is application\/xml/,
+    );
+    for (const ok of [
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.template.main+xml",
+      "application/vnd.ms-word.document.macroEnabled.main+xml",
+      "application/vnd.ms-word.template.macroEnabledTemplate.main+xml",
+    ]) {
+      expect((await readPackage(await zip(files(ok)))).mainDocument).toBe("/word/document.xml");
+    }
+  });
+
+  it("parses each XML part once, keeping the XmlError as the cause", async () => {
+    const pkg = await readPackage(
+      await zip({
+        "[Content_Types].xml": TYPES,
+        "_rels/.rels": ROOT_RELS,
+        "word/document.xml": "<document/>",
+        "word/broken.xml": "<a>\n<b></a>",
+      }),
+    );
+    expect(pkg.xml("/word/document.xml")).toBe(pkg.xml("/WORD/document.xml"));
+    const error = (() => {
+      try {
+        pkg.xml("/word/broken.xml");
+      } catch (caught) {
+        return caught as DocxError;
+      }
+    })();
+    expect(error?.cause).toBeInstanceOf(XmlError);
+    expect(error?.cause instanceof XmlError && error.cause.offset).toBe(7);
+  });
+
+  it("passes the nesting limit to the XML parser", async () => {
+    const bytes = (corpus[0] as { bytes: Uint8Array }).bytes;
+    const pkg = await readPackage(bytes, { maxDepth: 3 });
+    expect(() => pkg.xml(pkg.mainDocument)).toThrow(/nested deeper than 3/);
   });
 
   it("replaces only parts it has", async () => {

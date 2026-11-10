@@ -55,7 +55,8 @@ const textDecoder = new TextDecoder();
 
 /**
  * Lists the entries of a zip from its central directory, in the directory's order. Nothing is
- * decompressed: see {@link inflateEntry}.
+ * decompressed: see {@link inflateEntry}. Every entry is checked against its local header, and
+ * entries may not overlap: Foli reads what any other zip reader would.
  */
 export function readZip(bytes: Uint8Array, limits: ZipLimits = {}): ZipEntry[] {
   const maxEntries = limits.maxEntries ?? 10_000;
@@ -73,9 +74,9 @@ export function readZip(bytes: Uint8Array, limits: ZipLimits = {}): ZipEntry[] {
     throw new ZipError("ZIP64 archives are not supported");
   }
   if (count > maxEntries) throw new ZipError(`Too many entries: ${count} (limit ${maxEntries})`);
-  if (dirOffset + dirSize > end) throw new ZipError("Damaged zip: central directory out of range");
 
   const entries: ZipEntry[] = [];
+  const spans: { start: number; end: number; name: string }[] = [];
   const seen = new Set<string>();
   let total = 0;
   let at = dirOffset;
@@ -95,8 +96,8 @@ export function readZip(bytes: Uint8Array, limits: ZipLimits = {}): ZipEntry[] {
       46 + nameLength + view.getUint16(at + 30, true) + view.getUint16(at + 32, true);
     const local = view.getUint32(at + 42, true);
     if (at + recordLength > end) throw new ZipError("Damaged zip: bad central directory record");
-    const central = bytes.slice(at, at + recordLength);
-    const nameBytes = bytes.slice(at + 46, at + 46 + nameLength);
+    const central = bytes.subarray(at, at + recordLength);
+    const nameBytes = bytes.subarray(at + 46, at + 46 + nameLength);
     // shortcut: names without the UTF-8 flag (CP437) are read as UTF-8, right for ASCII, which
     // part names are; the bytes are written back unchanged either way.
     const name = textDecoder.decode(nameBytes);
@@ -109,6 +110,11 @@ export function readZip(bytes: Uint8Array, limits: ZipLimits = {}): ZipEntry[] {
     if (method !== 0 && method !== 8) {
       throw new ZipError(`Unsupported compression method ${method}: ${name}`);
     }
+    // Deflate expands at most 1032 times: a larger declared size is a lie meant to make the
+    // reader allocate it.
+    if (method === 0 ? size !== compressedSize : size > compressedSize * 1032 + 1024) {
+      throw new ZipError(`Damaged zip: impossible size for ${name}`);
+    }
     const key = name.toLowerCase();
     if (seen.has(key)) throw new ZipError(`Duplicate entry: ${name}`);
     seen.add(key);
@@ -118,20 +124,42 @@ export function readZip(bytes: Uint8Array, limits: ZipLimits = {}): ZipEntry[] {
     if (local + 30 > dirOffset || view.getUint32(local, true) !== LOCAL) {
       throw new ZipError(`Damaged zip: no local header for ${name}`);
     }
-    // The data follows the local header, whose name and extra lengths may differ from the
-    // central record's; its sizes may be zero (data descriptor): the central record's count.
-    const data = local + 30 + view.getUint16(local + 26, true) + view.getUint16(local + 28, true);
-    if (data + compressedSize > dirOffset)
+    const localNameLength = view.getUint16(local + 26, true);
+    // The data follows the local header, whose extra field may differ from the central record's.
+    const data = local + 30 + localNameLength + view.getUint16(local + 28, true);
+    if (data + compressedSize > dirOffset) {
       throw new ZipError(`Damaged zip: data out of range for ${name}`);
-    // A data descriptor (flag 3) follows the data: CRC and sizes, with or without a signature.
+    }
+    const mismatch = () =>
+      new ZipError(`Damaged zip: local header does not match the directory for ${name}`);
+    if (
+      view.getUint16(local + 8, true) !== method ||
+      !equalBytes(bytes.subarray(local + 30, local + 30 + localNameLength), nameBytes)
+    ) {
+      throw mismatch();
+    }
+    // A data descriptor (flag 3) follows the data with the CRC and sizes, with or without a
+    // signature; the local header then may hold zeros. Either way they must agree.
     let descriptorLength = 0;
+    let check = local + 14;
     if (flags & 0x08) {
       const after = data + compressedSize;
-      descriptorLength =
-        after + 4 <= dirOffset && view.getUint32(after, true) === DESCRIPTOR ? 16 : 12;
-      if (after + descriptorLength > dirOffset)
+      const signed = after + 4 <= dirOffset && view.getUint32(after, true) === DESCRIPTOR;
+      descriptorLength = signed ? 16 : 12;
+      if (after + descriptorLength > dirOffset) {
         throw new ZipError(`Damaged zip: no data descriptor for ${name}`);
+      }
+      check = signed ? after + 4 : after;
     }
+    if (
+      view.getUint32(check, true) !== crc32 ||
+      view.getUint32(check + 4, true) !== compressedSize ||
+      view.getUint32(check + 8, true) !== size
+    ) {
+      throw mismatch();
+    }
+    const stop = data + compressedSize + descriptorLength;
+    spans.push({ start: local, end: stop, name });
     entries.push({
       name,
       nameBytes,
@@ -141,27 +169,55 @@ export function readZip(bytes: Uint8Array, limits: ZipLimits = {}): ZipEntry[] {
       date,
       crc32,
       size,
-      raw: bytes.slice(data, data + compressedSize),
+      raw: bytes.subarray(data, data + compressedSize),
       stored: {
-        local: bytes.slice(local, data),
-        descriptor: bytes.slice(data + compressedSize, data + compressedSize + descriptorLength),
+        local: bytes.subarray(local, data),
+        descriptor: bytes.subarray(data + compressedSize, stop),
         central,
       },
     });
   }
+  if (at !== dirOffset + dirSize) {
+    throw new ZipError("Damaged zip: central directory size mismatch");
+  }
+  // Overlapping entries share data: another reader could see other content, and a small file
+  // could expand without limit.
+  spans.sort((a, b) => a.start - b.start);
+  for (let i = 1; i < spans.length; i++) {
+    const span = spans[i] as (typeof spans)[number];
+    if (span.start < (spans[i - 1] as (typeof spans)[number]).end) {
+      throw new ZipError(`Damaged zip: ${span.name} overlaps another entry`);
+    }
+  }
   return entries;
 }
 
+function equalBytes(a: Uint8Array, b: Uint8Array): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+  return true;
+}
+
+/** The end record: the last one whose central directory is where it says (not one in a comment). */
 function findEnd(view: DataView): number {
   // The end record is 22 bytes plus a comment of at most 65 535.
   const last = view.byteLength - 22;
   for (let at = last; at >= 0 && at >= last - 0xffff; at--) {
-    if (
-      view.getUint32(at, true) === END &&
-      at + 22 + view.getUint16(at + 20, true) <= view.byteLength
-    ) {
-      return at;
-    }
+    if (view.getUint32(at, true) !== END) continue;
+    if (at + 22 + view.getUint16(at + 20, true) > view.byteLength) continue;
+    const count = view.getUint16(at + 10, true);
+    const dirSize = view.getUint32(at + 12, true);
+    const dirOffset = view.getUint32(at + 16, true);
+    // ZIP64 and multi-disk archives: accepted here to be refused by name.
+    const special =
+      count === 0xffff ||
+      dirOffset === 0xffffffff ||
+      view.getUint16(at + 4, true) !== 0 ||
+      view.getUint16(at + 6, true) !== 0;
+    // The directory ends where the end record starts (no ZIP64 records in between).
+    const directory =
+      dirOffset + dirSize === at && (count === 0 || view.getUint32(dirOffset, true) === CENTRAL);
+    if (special || directory) return at;
   }
   const head = view.byteLength >= 4 ? view.getUint32(0, false) : 0;
   // Compound File Binary: an encrypted .docx, or a .doc.
@@ -182,7 +238,8 @@ export async function inflateEntry(entry: ZipEntry): Promise<Uint8Array> {
 }
 
 async function inflateRaw(raw: Uint8Array, size: number, name: string): Promise<Uint8Array> {
-  const out = new Uint8Array(size);
+  // Collected as it comes, not allocated from the declared size.
+  const chunks: Uint8Array[] = [];
   let length = 0;
   const reader = streamOf(raw).pipeThrough(new DecompressionStream("deflate-raw")).getReader();
   try {
@@ -191,7 +248,7 @@ async function inflateRaw(raw: Uint8Array, size: number, name: string): Promise<
       if (done) break;
       // Never past the declared size: a zip bomb stops here.
       if (length + value.length > size) throw new ZipError(`Damaged zip: wrong size for ${name}`);
-      out.set(value, length);
+      chunks.push(value);
       length += value.length;
     }
   } catch (error) {
@@ -200,14 +257,17 @@ async function inflateRaw(raw: Uint8Array, size: number, name: string): Promise<
     throw new ZipError(`Damaged zip: cannot decompress ${name}`);
   }
   if (length !== size) throw new ZipError(`Damaged zip: wrong size for ${name}`);
-  return out;
+  return concat(chunks);
 }
 
-/** A new deflated entry holding `data`. */
+/**
+ * A new deflated entry holding `data`. With `like` (the entry it replaces) it keeps that entry's
+ * name bytes, name encoding flag, time and date.
+ */
 export async function deflateEntry(
   name: string,
   data: Uint8Array,
-  like?: Pick<ZipEntry, "time" | "date">,
+  like?: Pick<ZipEntry, "time" | "date" | "nameBytes" | "flags">,
 ): Promise<ZipEntry> {
   const chunks: Uint8Array[] = [];
   const reader = streamOf(data).pipeThrough(new CompressionStream("deflate-raw")).getReader();
@@ -218,9 +278,9 @@ export async function deflateEntry(
   }
   return {
     name,
-    nameBytes: new TextEncoder().encode(name),
+    nameBytes: like?.nameBytes ?? new TextEncoder().encode(name),
     method: 8,
-    flags: UTF8_NAME,
+    flags: like ? like.flags & UTF8_NAME : UTF8_NAME,
     time: like?.time ?? 0,
     // 1980-01-01, the earliest DOS date, when there is no entry to take it from.
     date: like?.date ?? 0x21,
