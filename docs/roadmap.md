@@ -624,11 +624,14 @@ Each task is a PR on `phase-8/word-model`, the build green after each.
   harness (`scripts/corpus/word-reference.ps1`): for every document (synthetic or a private
   folder), whether Word opens it without repair, then, with tracked changes accepted, its page
   count, every paragraph's start page and line, end page and list number, and Word's PDF, as
-  reference data (`corpus/reference/`) the later tasks compare with. LibreOffice headless as a fallback where Word is not installed:
-  when a machine without Word needs it.
-- [ ] 8.2 `@folijs/docx` package reading: zip (audited dependency), own XML tokenizer keeping the
-  exact source text of every element, package parts and relationships; untouched parts written
-  back byte for byte (round trip of the package without the model).
+  reference data (`corpus/reference/`) the later tasks compare with. LibreOffice headless as a
+  fallback where Word is not installed: when a machine without Word needs it.
+- [ ] 8.2 `@folijs/docx` package reading: zip on the platform's `deflate-raw` streams (no
+  dependency; an audited one was planned), own XML tokenizer keeping the exact source text of
+  every element, package parts, content types and relationships; untouched parts written back
+  byte for byte, so a package written without replacements is the identical file. Checked with
+  Word: every corpus document written back, unchanged and with a replaced main part, opens with
+  the reference numbers.
 - [ ] 8.3 Schema v3 in `@folijs/core`: paragraph properties as attributes, run properties as
   marks, styles (with `basedOn`, defaults, theme), numbering definitions, sections, review
   content (insertion and deletion marks, comment anchors), opaque block and inline nodes; the

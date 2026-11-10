@@ -18,7 +18,7 @@
     "test:e2e": "playwright test",
     "bench:layout": "playwright test --config playwright.bench.config.ts",
     "prepare": "node scripts/install-hooks.mjs",
-    "check:packages": "publint --strict packages/core && publint --strict packages/view && publint --strict packages/react",
+    "check:packages": "publint --strict packages/core && publint --strict packages/view && publint --strict packages/react && publint --strict packages/docx",
     "size": "node scripts/size.mjs",
     "examples": "node scripts/examples.mjs && playwright test --config playwright.examples.config.ts"
   },
