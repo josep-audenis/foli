@@ -626,7 +626,7 @@ Each task is a PR on `phase-8/word-model`, the build green after each.
   count, every paragraph's start page and line, end page and list number, and Word's PDF, as
   reference data (`corpus/reference/`) the later tasks compare with. LibreOffice headless as a
   fallback where Word is not installed: when a machine without Word needs it.
-- [ ] 8.2 `@folijs/docx` package reading: zip on the platform's `deflate-raw` streams (no
+- [x] 8.2 `@folijs/docx` package reading (#46): zip on the platform's `deflate-raw` streams (no
   dependency; an audited one was planned), own XML tokenizer keeping the exact source text of
   every element, package parts, content types and relationships; untouched parts written back
   byte for byte, so a package written without replacements is the identical file. Checked with
