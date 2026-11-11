@@ -29,14 +29,14 @@ This document describes **what exists** and **what is decided**. Planned parts a
 └──────────────────────────────────────────────────────────────┘
 ```
 
-| Subsystem           | Responsibility                                                                 | Status                                                                                                              |
-| ------------------- | ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------- |
-| Document model      | Schema, immutable tree, marks, positions, JSON, validation                     | ✅ (Phase 2); schema v3 (Word model) defined beside v2 (8.3)                                                        |
-| Editing engine      | Steps, position mapping, selection, state, history, commands                   | ✅ headless (Phase 3)                                                                                               |
-| View                | Render state to DOM, DOM ↔ model mapping, `beforeinput`, IME, clipboard, focus | ✅ (G3 provisional; manual IME/SR checks open)                                                                      |
-| Layout              | Measurement, line breaking, page flow, fragments, incremental reflow, print    | Phase 5 (inside `@folijs/view` until the seam is proven)                                                            |
-| React integration   | Components, hooks, toolbar                                                     | Hooks, provider, canvas, `FoliEditor` ✅ (6.1); toolbar ✅ (6.2)                                                    |
-| Document processing | DOCX import/export with lossless round trip (`@folijs/docx`)                   | Package and XML reading ✅ (8.2); import, export: Phase 8 ([ADR-0005](decisions/ADR-0005-word-compatible-model.md)) |
+| Subsystem           | Responsibility                                                                 | Status                                                                                                                             |
+| ------------------- | ------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------- |
+| Document model      | Schema, immutable tree, marks, positions, JSON, validation                     | ✅ (Phase 2); schema v3 (Word model) defined beside v2 (8.3)                                                                       |
+| Editing engine      | Steps, position mapping, selection, state, history, commands                   | ✅ headless (Phase 3)                                                                                                              |
+| View                | Render state to DOM, DOM ↔ model mapping, `beforeinput`, IME, clipboard, focus | ✅ (G3 provisional; manual IME/SR checks open)                                                                                     |
+| Layout              | Measurement, line breaking, page flow, fragments, incremental reflow, print    | Phase 5 (inside `@folijs/view` until the seam is proven)                                                                           |
+| React integration   | Components, hooks, toolbar                                                     | Hooks, provider, canvas, `FoliEditor` ✅ (6.1); toolbar ✅ (6.2)                                                                   |
+| Document processing | DOCX import/export with lossless round trip (`@folijs/docx`)                   | Package and XML reading ✅ (8.2), import to v3 ✅ (8.4); export: Phase 8 ([ADR-0005](decisions/ADR-0005-word-compatible-model.md)) |
 
 ## Editing data flow (target design)
 
@@ -471,12 +471,11 @@ foli/
 │   ├── core/  @folijs/core   Envelope, schema, immutable model, positions, slices. Pure TS, no DOM.
 │   ├── view/  @folijs/view   Editable DOM view (EditorView). Framework-agnostic.
 │   ├── react/ @folijs/react  React components + default stylesheet.
-│   └── docx/  @folijs/docx   DOCX package (zip, parts, relationships), XML keeping source text. No DOM.
+│   └── docx/  @folijs/docx   DOCX import to schema v3; package (zip, parts, relationships), XML keeping source text. No DOM.
 └── docs/
 ```
 
-Dependency direction: `playground → react → view → core`. Never the reverse. `@folijs/docx`
-depends on nothing yet; its import and export (Phase 8) will depend on `@folijs/core`.
+Dependency direction: `playground → react → view → core`, and `docx → core`. Never the reverse.
 
 Planned, created only when needed:
 

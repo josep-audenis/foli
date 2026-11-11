@@ -1,11 +1,50 @@
 # @folijs/docx
 
-DOCX for [Foli](https://github.com/josep-audenis/foli): reads a `.docx` package (its zip, parts,
-content types and relationships) and its XML, keeping every byte it does not change. No DOM and
-no dependencies: runs in the browser, workers and Node 20.12+.
+DOCX for [Foli](https://github.com/josep-audenis/foli): imports a `.docx` into Foli's Word model
+(schema v3 of `@folijs/core`), and reads its package (zip, parts, content types, relationships)
+and XML keeping every byte it does not change. No DOM: runs in the browser, workers and Node
+20.12+. Depends only on `@folijs/core`.
 
-> In development (Phase 8): the package and XML layer are here; import to Foli's document model
-> and export come next. Not published yet.
+> In development (Phase 8): import, the package and XML layer are here; export comes next (8.5).
+> Not published yet.
+
+```ts
+import { importDocx } from "@folijs/docx";
+
+const {
+  document,
+  package: pkg,
+  report,
+} = await importDocx(new Uint8Array(await file.arrayBuffer()));
+document.content; // schema v3: paragraphs with Word's properties, runs as text with marks
+document.styles; // with basedOn, run and paragraph properties
+report.opaque; // { "w:tbl": 1, "w:drawing": 1 }: kept verbatim, not editable yet
+```
+
+**Import** (`importDocx`, `importPackage`) reads the main document, styles (with the document
+defaults), numbering, the theme's fonts and colors, comments (with replies and resolved state
+from `commentsExtended`) and sections:
+
+- **Paragraphs** with their properties (style, justification, indentation, spacing, keep rules,
+  outline level, numbering, tab stops, borders, shading, the paragraph mark's formatting and
+  tracked insertion or deletion, formatting changes, section breaks) and their own attributes
+  (`w14:paraId`…). **Runs** become text, tabs and breaks with their properties as marks; tracked
+  insertions, deletions and moves, hyperlinks (target from the relationship, or a bookmark),
+  bookmarks, comment ranges and references are modeled.
+- **Lossless:** every properties element is kept verbatim (`ext` on paragraphs, sections,
+  styles, numbering; `runExt` on runs), every element Foli does not model yet (tables, content
+  controls, pictures, fields' structure, footnote references, equations…) becomes an opaque node
+  holding its source, and export will write all of it back (8.5). Keep `package` with the
+  document: the parts Foli does not edit are written back from it.
+- **What Word opens, imports:** each value is checked on its own; one the model cannot hold (out
+  of range, a unit such as `1.5cm`) is left out of the model, kept in the verbatim element and
+  listed in `report.unmodeled`. A style cycle is broken where it closes, a reply that would close
+  a cycle of replies is not kept. Not imported, because Word recomputes them: spelling marks
+  (`w:proofErr`), rendered page breaks (`w:lastRenderedPageBreak`) and run attributes (editing
+  session ids): counted in `report.dropped`.
+- Strict Open XML documents are refused (`DocxError`) until a real file needs them.
+
+The package layer underneath:
 
 ```ts
 import { readPackage } from "@folijs/docx";

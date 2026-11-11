@@ -78,6 +78,25 @@ node scripts/corpus/rewrite-corpus.mjs <folder>
 powershell -ExecutionPolicy Bypass -File scripts/corpus/word-reference.ps1 -In <folder> -Out <folder>
 ```
 
+## Import coverage
+
+`scripts/corpus/import-report.mjs` (after `pnpm build`) imports each document and prints what
+became editable and what stayed opaque; counts and element names only, never text, so it runs
+on a private folder too (`node scripts/corpus/import-report.mjs <folder>`). On the corpus
+(2026-11-11):
+
+| Document                       | Paragraphs | Opaque                                                        | Unmodeled values |
+| ------------------------------ | ---------: | ------------------------------------------------------------- | ---------------: |
+| 01-mutual-nda                  |         29 | table 1; field structure 4                                    |                0 |
+| 02-services-agreement-redlined |         16 | table 1; comment reference marks 4                            |                0 |
+| 03-offer-letter-template       |         14 | content controls 5, merge field 1; field structure 4          |                0 |
+| 04-board-report                |         35 | table 1, picture 1, footnote references 2; field structure 36 |                0 |
+| 05-business-letter             |         17 | none                                                          |                0 |
+
+Field structure (`w:fldChar`, `w:instrText`) and comment reference marks have nothing to show:
+the field's result stays editable text. The tests check every imported paragraph's text against
+Word's (`reference/word/`).
+
 ## Private documents
 
 Real documents (contracts, templates) are never committed. Keep them in a folder outside the
