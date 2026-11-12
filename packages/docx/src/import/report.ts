@@ -3,9 +3,9 @@ export interface ImportReport {
   /** Opaque nodes (kept verbatim, not editable yet) by element name: `{ "w:tbl": 1 }`. */
   readonly opaque: Readonly<Record<string, number>>;
   /**
-   * Things not imported because Word recomputes them: spelling and grammar marks
-   * (`w:proofErr`), Word's last page breaks (`w:lastRenderedPageBreak`), and run attributes
-   * (`w:r@w:rsidR`: editing session ids).
+   * Things not imported because Word recomputes them or they show nothing: spelling and grammar
+   * marks (`w:proofErr`), Word's last page breaks (`w:lastRenderedPageBreak`), editing session
+   * ids on runs (`w:r@w:rsidR`…), and runs with properties but no content (`w:r (empty)`).
    */
   readonly dropped: Readonly<Record<string, number>>;
   /**
@@ -18,39 +18,47 @@ export interface ImportReport {
 }
 
 export class Recorder {
-  readonly opaqueCounts: Record<string, number> = {};
-  readonly droppedCounts: Record<string, number> = {};
-  readonly unmodeledList: string[] = [];
-  unmodeledCount = 0;
+  // Maps, not objects: element names such as `constructor` are only names.
+  readonly #opaque = new Map<string, number>();
+  readonly #dropped = new Map<string, number>();
+  readonly #unmodeled: string[] = [];
+  #unmodeledCount = 0;
   /** The part being read, for messages. */
   part = "";
 
   opaque(name: string): void {
-    this.opaqueCounts[name] = (this.opaqueCounts[name] ?? 0) + 1;
+    this.#opaque.set(name, (this.#opaque.get(name) ?? 0) + 1);
   }
 
   dropped(name: string): void {
-    this.droppedCounts[name] = (this.droppedCounts[name] ?? 0) + 1;
+    this.#dropped.set(name, (this.#dropped.get(name) ?? 0) + 1);
   }
 
   unmodeled(element: string, reason: string): void {
-    this.unmodeledCount++;
-    if (this.unmodeledList.length < 100)
-      this.unmodeledList.push(`${this.part}: ${element}: ${reason}`);
+    this.#unmodeledCount++;
+    if (this.#unmodeled.length < 100) this.#unmodeled.push(`${this.part}: ${element}: ${reason}`);
   }
 
   report(): ImportReport {
     return {
-      opaque: sorted(this.opaqueCounts),
-      dropped: sorted(this.droppedCounts),
-      unmodeled: this.unmodeledList,
-      unmodeledCount: this.unmodeledCount,
+      opaque: sorted(this.#opaque),
+      dropped: sorted(this.#dropped),
+      unmodeled: [...this.#unmodeled],
+      unmodeledCount: this.#unmodeledCount,
     };
   }
 }
 
-function sorted(counts: Record<string, number>): Record<string, number> {
-  return Object.fromEntries(
-    Object.entries(counts).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)),
-  );
+/** Counts as a plain object sorted by name, each name an own property. */
+function sorted(counts: ReadonlyMap<string, number>): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const [name, n] of [...counts].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))) {
+    Object.defineProperty(out, name, {
+      value: n,
+      enumerable: true,
+      writable: true,
+      configurable: true,
+    });
+  }
+  return out;
 }

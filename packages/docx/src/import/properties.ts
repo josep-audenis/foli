@@ -5,9 +5,9 @@
  * element's verbatim `ext`, so nothing is lost.
  */
 
-import { checkSection, type MarkJSON, schemaV3 } from "@folijs/core";
+import { checkSection, type MarkJSON, RUN_PROPERTY_MARKS, schemaV3 } from "@folijs/core";
 import type { XmlElement } from "../xml.js";
-import { attr, child, compact, elements, integer, isW, R, toggle } from "./ooxml.js";
+import { attr, child, compact, elements, integer, isW, R, toggle, W } from "./ooxml.js";
 import type { Recorder } from "./report.js";
 
 export interface Context {
@@ -17,6 +17,36 @@ export interface Context {
 
 export function sourceOf(context: Context, element: XmlElement): string {
   return context.source.slice(element.start, element.end);
+}
+
+const ATTRIBUTE_NAME = /^[A-Za-z_][\w.-]*(:[A-Za-z_][\w.-]*)?$/;
+
+/**
+ * An element's attributes not in `modeled`, as an `attributes` bag (undefined when none). One
+ * the bag cannot hold (a name outside its pattern, a value over 64 KiB, past 64) is reported.
+ */
+export function attributeBag(
+  element: XmlElement,
+  modeled: readonly string[],
+  context: Context,
+): Record<string, string> | undefined {
+  const bag: Record<string, string> = {};
+  let count = 0;
+  for (const a of element.attributes) {
+    if (modeled.includes(a.name)) continue;
+    if (!ATTRIBUTE_NAME.test(a.name) || a.value.length > 65_535 || count === 64) {
+      context.report.unmodeled(`${element.name}@${a.name}`, "not kept as an attribute");
+      continue;
+    }
+    Object.defineProperty(bag, a.name, {
+      value: a.value,
+      enumerable: true,
+      writable: true,
+      configurable: true,
+    });
+    count++;
+  }
+  return count ? bag : undefined;
 }
 
 const PARAGRAPH_ATTRS = schemaV3.nodes.paragraph?.spec.attrs ?? {};
@@ -74,7 +104,8 @@ export function revisionMark(
     context.report.unmodeled(element.name, "no w:id");
     return undefined;
   }
-  const attrs = { id, author, date, move };
+  const attributes = attributeBag(element, ["w:id", "w:author", "w:date"], context) ?? null;
+  const attrs = { id, author, date, move, attributes };
   return (
     mark({ type, attrs }, element.name, context) ??
     mark({ type, attrs: { ...attrs, date: null } }, element.name, context)
@@ -145,7 +176,7 @@ export function runProperties(rPr: XmlElement | undefined, context: Context): Ma
                 asciiTheme: attr(el, "asciiTheme") ?? null,
                 hAnsiTheme: attr(el, "hAnsiTheme") ?? null,
                 eastAsiaTheme: attr(el, "eastAsiaTheme") ?? null,
-                // Word writes `w:cstheme`; the schema says `w:csTheme`.
+                // ECMA-376 spells it `w:cstheme`; some writers use `w:csTheme`.
                 csTheme: attr(el, "cstheme") ?? attr(el, "csTheme") ?? null,
                 hint: attr(el, "hint") ?? null,
               },
@@ -230,7 +261,7 @@ export function runProperties(rPr: XmlElement | undefined, context: Context): Ma
         break;
       }
       default: {
-        const type = TOGGLES[el.local];
+        const type = Object.hasOwn(TOGGLES, el.local) ? TOGGLES[el.local] : undefined;
         if (type) {
           const value = toggle(el);
           if (value === undefined) context.report.unmodeled(el.name, `w:val ${val}`);
@@ -271,6 +302,21 @@ function whole(
   return n;
 }
 
+/** An ST_OnOff attribute (`w:beforeAutospacing="1"`); another value is reported, read as missing. */
+export function onOff(
+  element: XmlElement | undefined,
+  local: string,
+  context: Context,
+  ns = W,
+): boolean | undefined {
+  const value = attr(element, local, ns);
+  if (value === undefined) return undefined;
+  if (value === "1" || value === "true" || value === "on") return true;
+  if (value === "0" || value === "false" || value === "off") return false;
+  context.report.unmodeled(`${element?.name}@${local}`, `${value} is not on or off`);
+  return undefined;
+}
+
 const toggleProperty = (el: XmlElement | undefined) => (el ? toggle(el) : undefined);
 
 /**
@@ -304,10 +350,7 @@ export function paragraphProperties(
   }
   const spacing = at("spacing");
   if (spacing) {
-    const auto = (local: string) => {
-      const value = attr(spacing, local);
-      return value === undefined ? undefined : value === "1" || value === "true" || value === "on";
-    };
+    const auto = (local: string) => onOff(spacing, local, context);
     set(
       "spacing",
       compact({
@@ -384,7 +427,10 @@ export function paragraphProperties(
       "shd",
     );
   const rPr = at("rPr");
-  const markFormat = runProperties(rPr, context);
+  // The mark's recorded formatting change stays in `ext`: a list of run properties holds none.
+  const markFormat = runProperties(rPr, context)
+    .filter((m) => RUN_PROPERTY_MARKS.includes(m.type))
+    .map((m) => schemaV3.markFromJSON(m).toJSON());
   if (markFormat.length) set("markFormat", markFormat, "rPr");
   if (!paragraph) return out;
 

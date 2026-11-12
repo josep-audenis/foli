@@ -298,9 +298,13 @@ const reviewMark: MarkSpec = {
     date: markAttr(nullable(date), null),
     /** A tracked move (`w:moveFrom`, `w:moveTo`): the move's name, shared by both ends. */
     move: markAttr(nullable(text()), null),
+    /** The change element's other attributes (`w16du:dateUtc`…). */
+    attributes: markAttr(nullable(attributes), null),
   },
   inclusive: false,
 };
+/** A marker's own unknown attributes (`w:displacedByCustomXml`…). */
+const markerAttributes = { attributes: nullableAttr(attributes) };
 const fontName = markAttr(nullable(text()), null);
 const themeFont = markAttr(nullable(oneOf(THEME_FONTS)), null);
 const hexByte = (v: unknown) =>
@@ -350,28 +354,32 @@ export const schemaV3 = new Schema({
       group: "inline",
       inline: true,
       selectable: false,
-      attrs: { id: { validate: ID }, name: { validate: str() } },
+      attrs: { id: { validate: ID }, name: { validate: str() }, ...markerAttributes },
     },
     bookmarkEnd: {
       group: "inline",
       inline: true,
       selectable: false,
-      attrs: { id: { validate: ID } },
+      attrs: { id: { validate: ID }, ...markerAttributes },
     },
     /** Where a comment's range starts and ends (`w:commentRangeStart`/`End`), and its reference mark. */
     commentStart: {
       group: "inline",
       inline: true,
       selectable: false,
-      attrs: { id: { validate: ID } },
+      attrs: { id: { validate: ID }, ...markerAttributes },
     },
     commentEnd: {
       group: "inline",
       inline: true,
       selectable: false,
-      attrs: { id: { validate: ID } },
+      attrs: { id: { validate: ID }, ...markerAttributes },
     },
-    commentReference: { group: "inline", inline: true, attrs: { id: { validate: ID } } },
+    commentReference: {
+      group: "inline",
+      inline: true,
+      attrs: { id: { validate: ID }, ...markerAttributes },
+    },
     /** Inline content Foli does not model yet (fields, drawings, symbols…), kept verbatim. */
     opaqueInline: {
       group: "inline",

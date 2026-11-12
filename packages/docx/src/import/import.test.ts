@@ -2,6 +2,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import type { NodeJSON } from "@folijs/core";
 import { describe, expect, it } from "vitest";
 import { importDocx } from "../index.js";
+import type { XmlElement } from "../xml.js";
 import { deflateEntry, writeZip } from "../zip.js";
 
 const CORPUS = new URL("../../../../corpus/word/", import.meta.url);
@@ -421,5 +422,283 @@ describe("importing WordprocessingML", () => {
     const bag = blocks[0]?.attrs?.attributes as Record<string, string>;
     expect(Object.getPrototypeOf(bag)).toBe(Object.prototype);
     expect(Object.hasOwn(bag, "__proto__") && bag.constructor).toBe("y");
+  });
+});
+
+/** Attributes import models as values (not kept as written): element → attribute names. */
+const MODELED: Record<string, readonly string[]> = {
+  "w:ins": ["w:id", "w:author", "w:date"],
+  "w:del": ["w:id", "w:author", "w:date"],
+  "w:moveFrom": ["w:id", "w:author", "w:date"],
+  "w:moveTo": ["w:id", "w:author", "w:date"],
+  "w:bookmarkStart": ["w:id", "w:name"],
+  "w:bookmarkEnd": ["w:id"],
+  "w:commentRangeStart": ["w:id"],
+  "w:commentRangeEnd": ["w:id"],
+  "w:commentReference": ["w:id"],
+  "w:hyperlink": ["w:anchor", "w:tooltip"],
+  "w:br": ["w:type", "w:clear"],
+  // Regenerated: whether text needs `xml:space="preserve"` follows from the text.
+  "w:t": ["xml:space"],
+  "w:delText": ["xml:space"],
+};
+const REGENERATED = new Set(["w:t@xml:space", "w:delText@xml:space"]);
+
+describe("import keeps every attribute of the corpus", () => {
+  for (const name of names) {
+    it(`${name}: every attribute is kept as written, in a bag, as a modeled value, or dropped by rule`, async () => {
+      const result = await load(name);
+      const json = JSON.stringify(result.document);
+      const has = (text: string) => json.includes(JSON.stringify(text).slice(1, -1));
+      for (const part of ["/word/document.xml", "/word/comments.xml"]) {
+        if (!result.package.part(part)) continue;
+        const xml = result.package.xml(part);
+        const walk = (el: XmlElement, depth: number) => {
+          if (depth > 1) {
+            for (const a of el.attributes) {
+              if (a.prefix === "xmlns" || a.name === "xmlns") continue;
+              if (el.name === "w:r" && a.local.startsWith("rsid")) continue; // dropped by rule
+              const raw = xml.source.slice(a.start, a.end);
+              const bagged = json.includes(`${JSON.stringify(a.name)}:${JSON.stringify(a.value)}`);
+              const modeled =
+                (MODELED[el.name] ?? []).includes(a.name) &&
+                (REGENERATED.has(`${el.name}@${a.name}`) || has(a.value));
+              expect(
+                has(raw) || bagged || modeled,
+                `${part} ${el.name}@${a.name}="${a.value}"`,
+              ).toBe(true);
+            }
+          }
+          for (const c of el.children) if (c.kind === "element") walk(c, depth + 1);
+        };
+        walk(xml.root, 0);
+      }
+    });
+  }
+});
+
+describe("import never strips an element it cannot model", () => {
+  it("keeps current Word's extra attributes on tracked changes and markers", async () => {
+    const { blocks, report } = await blocksOf(
+      `<w:p><w:ins w:id="1" w:author="A" w:date="2026-01-01T10:00:00Z" w16du:dateUtc="2026-01-01T09:00:00Z" xmlns:w16du="urn:du"><w:r><w:t>new</w:t></w:r></w:ins>` +
+        `<w:bookmarkStart w:id="0" w:name="b" w:displacedByCustomXml="next"/><w:commentRangeStart w:id="3" x:extra="1"/></w:p>`,
+    );
+    const nodes = blocks[0]?.content ?? [];
+    // Its own namespace declaration included: written back, the attribute still resolves.
+    expect(nodes[0]?.marks?.[0]?.attrs?.attributes).toEqual({
+      "w16du:dateUtc": "2026-01-01T09:00:00Z",
+      "xmlns:w16du": "urn:du",
+    });
+    expect(nodes[1]?.attrs).toEqual({
+      id: 0,
+      name: "b",
+      attributes: { "w:displacedByCustomXml": "next" },
+    });
+    expect(nodes[2]?.attrs).toEqual({ id: 3, attributes: { "x:extra": "1" } });
+    expect(report.unmodeledCount).toBe(0);
+  });
+
+  it("keeps a change or link the model rejects whole, never as plain text", async () => {
+    const long = "x".repeat(300);
+    const { blocks } = await blocksOf(
+      `<w:p><w:del w:id="1" w:author="${long}"><w:r><w:delText>gone</w:delText></w:r></w:del>` +
+        `<w:ins w:id="3000000000" w:author="A"><w:r><w:t>new</w:t></w:r></w:ins>` +
+        `<w:hyperlink w:anchor=""><w:r><w:t>empty anchor</w:t></w:r></w:hyperlink>` +
+        `<w:hyperlink w:anchor="a"><w:hyperlink w:anchor="b"><w:r><w:t>nested</w:t></w:r></w:hyperlink></w:hyperlink></w:p>`,
+    );
+    const nodes = blocks[0]?.content ?? [];
+    expect(nodes.map((n) => [n.type, n.attrs?.label])).toEqual([
+      ["opaqueInline", "gone"],
+      ["opaqueInline", "new"],
+      ["opaqueInline", "empty anchor"],
+      ["opaqueInline", "nested"],
+    ]);
+    expect(nodes[3]?.marks?.[0]?.attrs?.anchor).toBe("a");
+    expect(nodes[0]?.attrs?.xml).toMatch(/^<w:del /);
+  });
+
+  it("keeps a run with attributes it does not model whole", async () => {
+    const { blocks, report } = await blocksOf(
+      `<w:p><w:r w:rsidR="00AA" x:keep="1"><w:t>run</w:t></w:r><w:r><w:rPr><w:b/></w:rPr></w:r></w:p>`,
+    );
+    expect(blocks[0]?.content?.map((n) => [n.type, n.attrs?.label])).toEqual([
+      ["opaqueInline", "run"],
+    ]);
+    expect(report.opaque).toEqual({ "w:r@x:keep": 1 });
+    expect(report.dropped).toEqual({ "w:r (empty)": 1 });
+  });
+
+  it("keeps the body's section when it is not the last element, and others opaque", async () => {
+    const { document, blocks } = await blocksOf(
+      `<w:p/><w:sectPr><w:pgSz w:w="11906" w:h="16838"/></w:sectPr><w:bookmarkEnd w:id="0"/>`,
+    );
+    expect(document.section.pageSize).toEqual({ width: 11906, height: 16838 });
+    expect(blocks.map((b) => b.type)).toEqual(["paragraph", "opaqueBlock"]);
+    const two = await blocksOf(
+      `<w:sectPr><w:type w:val="continuous"/></w:sectPr><w:p/><w:sectPr/>`,
+    );
+    expect(two.blocks.map((b) => b.attrs?.label ?? b.type)).toEqual(["sectPr", "paragraph"]);
+  });
+
+  it("keeps the valid attributes of a paragraph and reports the rest", async () => {
+    const many = Array.from({ length: 70 }, (_, i) => `x:a${i}="${i}"`).join(" ");
+    const { blocks, report } = await blocksOf(`<w:p w14:paraId="1A2B" ${many}/>`);
+    const bag = blocks[0]?.attrs?.attributes as Record<string, string>;
+    expect(Object.keys(bag).length).toBe(64);
+    expect(bag["w14:paraId"]).toBe("1A2B");
+    expect(report.unmodeledCount).toBe(7);
+  });
+});
+
+describe("import names moves by their innermost open range", () => {
+  it("returns to the outer range's name once the inner one closes", async () => {
+    const { blocks } = await blocksOf(
+      `<w:p><w:moveFromRangeStart w:id="1" w:name="outer"/><w:moveFromRangeStart w:id="2" w:name="inner"/>` +
+        `<w:moveFrom w:id="3" w:author="A"><w:r><w:t>a</w:t></w:r></w:moveFrom><w:moveFromRangeEnd w:id="2"/>` +
+        `<w:moveFrom w:id="4" w:author="A"><w:r><w:t>b</w:t></w:r></w:moveFrom><w:moveFromRangeEnd w:id="1"/>` +
+        `<w:moveFrom w:id="5" w:author="A"><w:r><w:t>c</w:t></w:r></w:moveFrom></w:p>`,
+    );
+    const moves = (blocks[0]?.content ?? [])
+      .filter((n) => n.type === "text")
+      .map((n) => n.marks?.[0]?.attrs?.move);
+    expect(moves).toEqual(["inner", "outer", "move"]);
+  });
+});
+
+describe("import accepts what Word opens, and fails only with DocxError", () => {
+  const STYLES = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles";
+  const NUMBERING = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/numbering";
+  const THEME = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme";
+  const COMMENTS = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/comments";
+  const EXTENDED = "http://schemas.microsoft.com/office/2011/relationships/commentsExtended";
+  const rels =
+    `<Relationship Id="s" Type="${STYLES}" Target="styles.xml"/><Relationship Id="n" Type="${NUMBERING}" Target="numbering.xml"/>` +
+    `<Relationship Id="t" Type="${THEME}" Target="theme.xml"/><Relationship Id="c" Type="${COMMENTS}" Target="comments.xml"/><Relationship Id="e" Type="${EXTENDED}" Target="ext.xml"/>`;
+  const change = '<w:rPrChange w:id="9" w:author="A"><w:rPr><w:i/></w:rPr></w:rPrChange>';
+
+  it("imports values beyond the model's limits, reporting them", async () => {
+    const { document, report } = await importDocx(
+      await docx(`<w:p><w:pPr><w:rPr><w:b/>${change}</w:rPr></w:pPr></w:p>`, {
+        rels,
+        parts: {
+          "word/styles.xml": `<w:styles xmlns:w="${W_NS}"><w:docDefaults><w:rPrDefault><w:rPr><w:lang w:val="en-US"/>${change}</w:rPr></w:rPrDefault><w:pPrDefault><w:pPr><w:textAlignment w:val="center"/></w:pPr></w:pPrDefault></w:docDefaults><w:style w:type="paragraph" w:styleId="S"><w:rPr><w:b/>${change}</w:rPr></w:style></w:styles>`,
+          "word/numbering.xml": `<w:numbering xmlns:w="${W_NS}"><w:abstractNum w:abstractNumId="3000000000"/><w:abstractNum w:abstractNumId="0"><w:lvl w:ilvl="0"><w:start w:val="99999999999"/><w:rPr>${change}</w:rPr></w:lvl></w:abstractNum><w:num w:numId="3000000000"><w:abstractNumId w:val="0"/></w:num><w:num w:numId="1"><w:abstractNumId w:val="0"/><w:lvlOverride w:ilvl="0"><w:startOverride w:val="3000000000"/></w:lvlOverride></w:num></w:numbering>`,
+          "word/theme.xml": `<a:theme xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:themeElements><a:fontScheme><a:majorFont><a:latin typeface="${"F".repeat(300)}"/></a:majorFont><a:minorFont><a:latin typeface="B"/></a:minorFont></a:fontScheme></a:themeElements></a:theme>`,
+          "word/comments.xml": `<w:comments xmlns:w="${W_NS}"><w:comment w:id="3000000000" w:author="A"><w:p/></w:comment><w:comment w:id="1" w:author="${"a".repeat(300)}" w:initials="ABCDEFGHIJK" w:date="2026-01-01"><w:p/></w:comment></w:comments>`,
+        },
+      }),
+    );
+    // A recorded change stays in the verbatim element; the run properties are kept.
+    expect(document.content.content?.[0]?.attrs?.markFormat).toEqual([{ type: "bold" }]);
+    expect(document.styles[0]?.run).toEqual([{ type: "bold" }]);
+    expect(document.defaults.ext).toMatch(/^<w:docDefaults>.*w:textAlignment.*<\/w:docDefaults>$/);
+    expect(document.numbering.abstracts.map((a) => [a.id, a.levels[0]?.start])).toEqual([
+      [0, undefined],
+    ]);
+    expect(document.numbering.instances).toEqual([
+      { id: 1, abstract: 0, overrides: [{ level: 0 }], ext: expect.any(String) },
+    ]);
+    expect(document.theme).toBeUndefined();
+    expect(document.comments.map((c) => [c.id, c.author.length, c.initials, c.date])).toEqual([
+      [1, 255, undefined, undefined],
+    ]);
+    expect(document.comments[0]?.ext).toMatch(
+      /^<w:comment w:id="1" w:author="a{300}" w:initials="ABCDEFGHIJK" w:date="2026-01-01">$/,
+    );
+    // Two abstract ids and instance ids out of range, a start and a start override, the theme,
+    // a comment id, a date without a time, a long author and long initials.
+    expect(report.unmodeledCount).toBe(9);
+    expect(report.unmodeled.join(" | ")).toMatch(/w:abstractNum: id 3000000000/);
+    expect(report.unmodeled.join(" | ")).toMatch(/w:comment@w:date: 2026-01-01/);
+  });
+
+  it("fails with DocxError past what the model holds at all", async () => {
+    const huge = `<w:tbl>${"<w:tr/>".repeat(2_400_000)}</w:tbl>`;
+    await expect(importDocx(await docx(huge))).rejects.toMatchObject({
+      name: "DocxError",
+      message: expect.stringMatching(/^Cannot import: /),
+    });
+  });
+
+  it("keeps resolved state and replies on the right comment when ids repeat", async () => {
+    const { document } = await importDocx(
+      await docx("<w:p/>", {
+        rels,
+        parts: {
+          "word/comments.xml": `<w:comments xmlns:w="${W_NS}" xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml"><w:comment w:id="1" w:author="X1"><w:p w14:paraId="0001"/></w:comment><w:comment w:id="2" w:author="Y"><w:p w14:paraId="0002"/></w:comment><w:comment w:id="1" w:author="X2"><w:p w14:paraId="0003"/></w:comment></w:comments>`,
+          "word/ext.xml": `<w15:commentsEx xmlns:w15="http://schemas.microsoft.com/office/word/2012/wordml"><w15:commentEx w15:paraId="0001" w15:done="1"/><w15:commentEx w15:paraId="0002" w15:paraIdParent="0001" w15:done="on"/><w15:commentEx w15:paraId="0003" w15:done="maybe"/></w15:commentsEx>`,
+        },
+      }),
+    );
+    expect(document.comments.map((c) => [c.author, c.parent, c.done])).toEqual([
+      ["X1", undefined, true],
+      ["Y", 1, true],
+      ["X2", undefined, undefined],
+    ]);
+    const same = await importDocx(
+      await docx("<w:p/>", {
+        rels,
+        parts: {
+          "word/comments.xml": `<w:comments xmlns:w="${W_NS}" xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml"><w:comment w:id="1" w:author="First"><w:p w14:paraId="0001"/></w:comment><w:comment w:id="2" w:author="Second"><w:p w14:paraId="0001"/></w:comment></w:comments>`,
+          "word/ext.xml": `<w15:commentsEx xmlns:w15="http://schemas.microsoft.com/office/word/2012/wordml"><w15:commentEx w15:paraId="0001" w15:done="1"/></w15:commentsEx>`,
+        },
+      }),
+    );
+    // Two comments with one paragraph id: the first has it, as Word resolves it.
+    expect(same.document.comments.map((c) => [c.author, c.done])).toEqual([
+      ["First", true],
+      ["Second", undefined],
+    ]);
+  });
+
+  it("counts element names that are object keys as names", async () => {
+    const { report } = await blocksOf("<constructor/><toString/><w:p/>");
+    expect(report.opaque).toEqual({ constructor: 1, toString: 1 });
+  });
+});
+
+describe("import takes linear time on crafted files", () => {
+  const timed = async (body: string, options?: Parameters<typeof docx>[1]) => {
+    const bytes = await docx(body, options);
+    const started = performance.now();
+    await importDocx(bytes);
+    return performance.now() - started;
+  };
+
+  it("long style chains", async () => {
+    const STYLES = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles";
+    const chain = Array.from(
+      { length: 10_000 },
+      (_, i) =>
+        `<w:style w:type="paragraph" w:styleId="S${i}">${i ? `<w:basedOn w:val="S${i - 1}"/>` : ""}</w:style>`,
+    ).join("");
+    const ms = await timed("<w:p/>", {
+      rels: `<Relationship Id="s" Type="${STYLES}" Target="styles.xml"/>`,
+      parts: { "word/styles.xml": `<w:styles xmlns:w="${W_NS}">${chain}</w:styles>` },
+    });
+    // Quadratic took about 15 s here.
+    expect(ms).toBeLessThan(3000);
+  });
+
+  it("many open moves and many hyperlinks", async () => {
+    const moves = Array.from(
+      { length: 10_000 },
+      (_, i) =>
+        `<w:moveFromRangeStart w:id="${i}" w:name="m${i}"/><w:moveFrom w:id="${i}" w:author="A"><w:r><w:t>x</w:t></w:r></w:moveFrom>`,
+    ).join("");
+    expect(await timed(`<w:p>${moves}</w:p>`)).toBeLessThan(3000);
+    const HYPERLINK =
+      "http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink";
+    const n = 10_000;
+    const linkRels = Array.from(
+      { length: n },
+      (_, i) =>
+        `<Relationship Id="h${i}" Type="${HYPERLINK}" Target="https://e.com/${i}" TargetMode="External"/>`,
+    ).join("");
+    const links = Array.from(
+      { length: n },
+      (_, i) => `<w:hyperlink r:id="h${i}"><w:r><w:t>l</w:t></w:r></w:hyperlink>`,
+    ).join("");
+    expect(await timed(`<w:p>${links}</w:p>`, { rels: linkRels })).toBeLessThan(3000);
   });
 });

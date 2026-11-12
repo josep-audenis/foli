@@ -1,44 +1,77 @@
 /** The parts beside the document: styles, numbering, theme, comments. */
 
-import type {
-  AbstractNumberingJSON,
-  CommentJSON,
-  NumberingInstanceJSON,
-  NumberingLevelJSON,
-  StyleJSON,
-  ThemeJSON,
+import {
+  type AbstractNumberingJSON,
+  type CommentJSON,
+  type MarkJSON,
+  type NumberingInstanceJSON,
+  type NumberingLevelJSON,
+  RUN_PROPERTY_MARKS,
+  type StyleJSON,
+  schemaV3,
+  type ThemeJSON,
 } from "@folijs/core";
 import type { XmlElement } from "../xml.js";
 import { blocks, type ContentContext } from "./content.js";
 import { A, attr, child, compact, elements, integer, isW, toggle, W14, W15 } from "./ooxml.js";
-import { type Context, paragraphProperties, runProperties, sourceOf } from "./properties.js";
+import { type Context, onOff, paragraphProperties, runProperties, sourceOf } from "./properties.js";
 
 const STYLE_TYPES = ["paragraph", "character", "table", "numbering"];
+/** Word's ids (`w:numId`, `w:abstractNumId`, comment ids): what the model holds. */
+const MAX_ID = 2_147_483_647;
 
-/** `w:styles`: the document defaults and the styles (each with its `w:style` verbatim). */
+/**
+ * Run properties as a style, a level or the defaults hold them: a recorded formatting change
+ * (`w:rPrChange`) stays in the element's verbatim `ext`.
+ */
+function runList(rPr: XmlElement | undefined, context: Context): MarkJSON[] {
+  return runProperties(rPr, context)
+    .filter((m) => RUN_PROPERTY_MARKS.includes(m.type))
+    .map((m) => schemaV3.markFromJSON(m).toJSON()); // canonical: default values left out
+}
+
+/** An id within what the model holds; reported otherwise. */
+function id(
+  value: string | undefined,
+  min: number,
+  element: string,
+  context: Context,
+): number | undefined {
+  const n = integer(value);
+  if (n === undefined || n < min || n > MAX_ID) {
+    context.report.unmodeled(element, `id ${value} out of range (kept in the original part)`);
+    return undefined;
+  }
+  return n;
+}
+
+/** `w:styles`: the document defaults and the styles (each with its element verbatim). */
 export function styles(
   root: XmlElement,
   context: Context,
 ): { defaults: Record<string, unknown>; styles: StyleJSON[] } {
   const docDefaults = child(root, "docDefaults");
-  const pPr = child(child(docDefaults ?? root, "pPrDefault") ?? root, "pPr");
-  const rPr = child(child(docDefaults ?? root, "rPrDefault") ?? root, "rPr");
-  const paragraph = docDefaults && pPr ? paragraphProperties(pPr, context, false) : {};
-  const run = docDefaults && rPr ? runProperties(rPr, context) : [];
-  const defaults =
-    compact({
-      paragraph: Object.keys(paragraph).length ? paragraph : undefined,
-      run: run.length ? run : undefined,
-    }) ?? {};
+  let defaults: Record<string, unknown> = {};
+  if (docDefaults) {
+    const pPr = child(child(docDefaults, "pPrDefault") ?? docDefaults, "pPr");
+    const rPr = child(child(docDefaults, "rPrDefault") ?? docDefaults, "rPr");
+    const paragraph = pPr ? paragraphProperties(pPr, context, false) : {};
+    const run = runList(rPr, context);
+    defaults = {
+      ...(Object.keys(paragraph).length ? { paragraph } : {}),
+      ...(run.length ? { run } : {}),
+      ext: sourceOf(context, docDefaults),
+    };
+  }
 
   const list: StyleJSON[] = [];
   for (const el of elements(root)) {
     if (!isW(el, "style")) continue;
-    const id = attr(el, "styleId");
+    const styleId = attr(el, "styleId");
     const type = attr(el, "type") ?? "paragraph";
-    if (!id || id.length > 255 || !STYLE_TYPES.includes(type)) {
+    if (!styleId || styleId.length > 255 || !STYLE_TYPES.includes(type)) {
       context.report.unmodeled(
-        `w:style ${id ?? ""}`,
+        `w:style ${styleId ?? ""}`,
         "no usable w:styleId or w:type (kept in the original styles part)",
       );
       continue;
@@ -48,54 +81,67 @@ export function styles(
       return v && v.length <= 255 ? v : undefined;
     };
     const stylePPr = child(el, "pPr");
-    const styleRPr = child(el, "rPr");
     const props = stylePPr ? paragraphProperties(stylePPr, context, false) : {};
-    const marks = runProperties(styleRPr, context);
-    const isDefault = attr(el, "default");
+    const marks = runList(child(el, "rPr"), context);
+    const name = attr(child(el, "name"), "val");
     list.push(
       compact({
-        id,
+        id: styleId,
         type: type as StyleJSON["type"],
-        name: attr(child(el, "name"), "val")?.slice(0, 255),
+        name: name !== undefined && name.length <= 255 ? name : undefined,
         basedOn: value("basedOn"),
         next: value("next"),
         link: value("link"),
-        isDefault:
-          isDefault === undefined
-            ? undefined
-            : isDefault === "1" || isDefault === "true" || isDefault === "on",
+        isDefault: onOff(el, "default", context),
         paragraph: Object.keys(props).length ? props : undefined,
         run: marks.length ? marks : undefined,
         ext: sourceOf(context, el),
       }) as StyleJSON,
     );
   }
-  breakCycles(list, context);
+  breakCycles(
+    list,
+    (s) => s.id,
+    (s) => s.basedOn,
+    (s) => {
+      context.report.unmodeled(`w:style ${s.id}`, `w:basedOn ${s.basedOn} closes a cycle`);
+      delete s.basedOn;
+    },
+  );
   return { defaults, styles: list };
 }
 
 /**
- * A style based on itself through its chain would never resolve: Word ignores the link that
- * closes the cycle, and so does the import (reported). Ids that repeat resolve to the first.
+ * Following `next` from any item ends: the link that closes a cycle is removed (`cut`), as
+ * Word ignores it. Linear: each item is walked once. Ids that repeat resolve to the first.
  */
-function breakCycles(list: StyleJSON[], context: Context): void {
-  const byId = new Map<string, StyleJSON>();
-  for (const style of list) if (!byId.has(style.id)) byId.set(style.id, style);
-  for (const style of list) {
-    const seen = new Set<string>([style.id]);
-    let at = style;
-    while (at.basedOn !== undefined) {
-      if (seen.has(at.basedOn)) {
-        context.report.unmodeled(`w:style ${at.id}`, `w:basedOn ${at.basedOn} closes a cycle`);
-        delete at.basedOn;
+function breakCycles<T>(
+  items: readonly T[],
+  key: (item: T) => unknown,
+  next: (item: T) => unknown,
+  cut: (item: T) => void,
+): void {
+  const byId = new Map<unknown, number>();
+  items.forEach((item, i) => {
+    if (!byId.has(key(item))) byId.set(key(item), i);
+  });
+  const state = new Uint8Array(items.length); // 0 unseen, 1 on the current path, 2 ends
+  items.forEach((_, start) => {
+    const path: number[] = [];
+    let at: number | undefined = start;
+    while (at !== undefined && state[at] === 0) {
+      state[at] = 1;
+      path.push(at);
+      const target = next(items[at] as T);
+      const following: number | undefined = target === undefined ? undefined : byId.get(target);
+      if (following !== undefined && state[following] === 1) {
+        cut(items[at] as T);
         break;
       }
-      seen.add(at.basedOn);
-      const next = byId.get(at.basedOn);
-      if (!next) break;
-      at = next;
+      at = following;
     }
-  }
+    for (const i of path) state[i] = 2;
+  });
 }
 
 function level(lvl: XmlElement, context: Context): NumberingLevelJSON | undefined {
@@ -108,7 +154,7 @@ function level(lvl: XmlElement, context: Context): NumberingLevelJSON | undefine
   const legal = child(lvl, "isLgl");
   const pPr = child(lvl, "pPr");
   const props = pPr ? paragraphProperties(pPr, context, false) : {};
-  const run = runProperties(child(lvl, "rPr"), context);
+  const run = runList(child(lvl, "rPr"), context);
   const json = compact({
     level: index,
     start: integer(value("start")),
@@ -122,32 +168,28 @@ function level(lvl: XmlElement, context: Context): NumberingLevelJSON | undefine
     paragraph: Object.keys(props).length ? props : undefined,
     run: run.length ? run : undefined,
     ext: sourceOf(context, lvl),
-  }) as NumberingLevelJSON;
-  return checked(
-    json as unknown as Record<string, unknown>,
-    LEVEL_CHECKS,
-    "w:lvl",
-    context,
-  ) as unknown as NumberingLevelJSON;
+  }) as Record<string, unknown>;
+  return checked(json, LEVEL_CHECKS, "w:lvl", context) as unknown as NumberingLevelJSON;
 }
 
 /** Per-field checks of a numbering level, so one bad value does not lose the level. */
 const LEVEL_CHECKS: Record<string, (v: unknown) => boolean> = {
-  start: (v) => Number.isInteger(v) && (v as number) >= 0,
+  start: (v) => Number.isInteger(v) && (v as number) >= 0 && (v as number) <= MAX_ID,
   format: (v) => typeof v === "string" && /^[A-Za-z][A-Za-z0-9-]{0,63}$/.test(v),
   text: (v) => typeof v === "string" && v.length <= 255,
   justification: (v) => ["left", "center", "right", "start", "end"].includes(v as string),
   restart: (v) => Number.isInteger(v) && (v as number) >= 0 && (v as number) <= 9,
+  legal: (v) => typeof v === "boolean",
   suffix: (v) => ["tab", "space", "nothing"].includes(v as string),
   style: (v) => typeof v === "string" && v.length > 0 && v.length <= 255,
 };
 
-function checked<T extends Record<string, unknown>>(
-  json: T,
+function checked(
+  json: Record<string, unknown>,
   checks: Record<string, (v: unknown) => boolean>,
   element: string,
   context: Context,
-): T {
+): Record<string, unknown> {
   const out: Record<string, unknown> = { ...json };
   for (const [key, ok] of Object.entries(checks)) {
     if (key in out && !ok(out[key])) {
@@ -155,7 +197,7 @@ function checked<T extends Record<string, unknown>>(
       delete out[key];
     }
   }
-  return out as T;
+  return out;
 }
 
 /** `w:numbering`: abstract definitions and instances (each with its element verbatim). */
@@ -167,18 +209,15 @@ export function numbering(
   const instances: NumberingInstanceJSON[] = [];
   for (const el of elements(root)) {
     if (isW(el, "abstractNum")) {
-      const id = integer(attr(el, "abstractNumId"));
-      if (id === undefined || id < 0) {
-        context.report.unmodeled("w:abstractNum", `w:abstractNumId ${attr(el, "abstractNumId")}`);
-        continue;
-      }
+      const abstractId = id(attr(el, "abstractNumId"), 0, "w:abstractNum", context);
+      if (abstractId === undefined) continue;
       const seen = new Set<number>();
       const levels: NumberingLevelJSON[] = [];
       for (const lvl of elements(el)) {
         if (!isW(lvl, "lvl")) continue;
         const json = level(lvl, context);
         // A repeated level: Word uses the first.
-        if (json && !seen.has(json.level) && levels.length < 9) {
+        if (json && !seen.has(json.level)) {
           seen.add(json.level);
           levels.push(json);
         }
@@ -190,7 +229,7 @@ export function numbering(
       };
       abstracts.push(
         compact({
-          id,
+          id: abstractId,
           multiLevelType:
             multi && ["singleLevel", "multilevel", "hybridMultilevel"].includes(multi)
               ? multi
@@ -202,33 +241,41 @@ export function numbering(
         }) as AbstractNumberingJSON,
       );
     } else if (isW(el, "num")) {
-      const id = integer(attr(el, "numId"));
-      const abstract = integer(attr(child(el, "abstractNumId"), "val"));
-      if (id === undefined || id < 1 || abstract === undefined || abstract < 0) {
-        context.report.unmodeled("w:num", `w:numId ${attr(el, "numId")}`);
-        continue;
-      }
+      const numId = id(attr(el, "numId"), 1, "w:num", context);
+      const abstract = id(
+        attr(child(el, "abstractNumId"), "val"),
+        0,
+        "w:num/w:abstractNumId",
+        context,
+      );
+      if (numId === undefined || abstract === undefined) continue;
       const seen = new Set<number>();
       const overrides: NonNullable<NumberingInstanceJSON["overrides"]> = [];
       for (const o of elements(el)) {
         if (!isW(o, "lvlOverride")) continue;
         const index = integer(attr(o, "ilvl"));
-        if (index === undefined || index < 0 || index > 8 || seen.has(index)) continue;
+        if (index === undefined || index < 0 || index > 8 || seen.has(index)) {
+          context.report.unmodeled("w:lvlOverride", `w:ilvl ${attr(o, "ilvl")}`);
+          continue;
+        }
         seen.add(index);
         const start = integer(attr(child(o, "startOverride"), "val"));
+        const startOk = start !== undefined && start >= 0 && start <= MAX_ID;
+        if (start !== undefined && !startOk)
+          context.report.unmodeled("w:startOverride", `${start}`);
         const lvl = child(o, "lvl");
         const definition = lvl ? level(lvl, context) : undefined;
         overrides.push(
           compact({
             level: index,
-            start: start !== undefined && start >= 0 ? start : undefined,
+            start: startOk ? start : undefined,
             definition: definition ? { ...definition, level: index } : undefined,
           }) as { level: number },
         );
       }
       instances.push(
         compact({
-          id,
+          id: numId,
           abstract,
           overrides: overrides.length ? overrides : undefined,
           ext: sourceOf(context, el),
@@ -241,20 +288,6 @@ export function numbering(
 
 /** As core checks it (ISO 8601 date-time). */
 const DATE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:\d{2})?$/;
-
-/** Whether `from`'s chain of parents reaches `target` (a reply that would close a cycle is not kept). */
-function repliesTo(byId: ReadonlyMap<number, CommentJSON>, from: number, target: number): boolean {
-  const seen = new Set<number>();
-  for (
-    let at: number | undefined = from;
-    at !== undefined && !seen.has(at);
-    at = byId.get(at)?.parent
-  ) {
-    if (at === target) return true;
-    seen.add(at);
-  }
-  return false;
-}
 
 const THEME_COLORS = [
   "dk1",
@@ -271,8 +304,8 @@ const THEME_COLORS = [
   "folHlink",
 ];
 
-/** `a:theme`'s fonts and colors; undefined when it has neither. */
-export function theme(root: XmlElement): ThemeJSON | undefined {
+/** `a:theme`'s fonts and colors; undefined (reported) when its fonts are missing or unusable. */
+export function theme(root: XmlElement, context: Context): ThemeJSON | undefined {
   const a = (el: XmlElement | undefined, local: string) =>
     el?.children.find(
       (c): c is XmlElement => c.kind === "element" && c.ns === A && c.local === local,
@@ -300,58 +333,76 @@ export function theme(root: XmlElement): ThemeJSON | undefined {
     )?.value;
     if (value && /^[0-9A-Fa-f]{6}$/.test(value)) colors[name] = value;
   }
-  if (!major || !minor) return undefined;
+  const usable = (f: Record<string, unknown> | undefined) =>
+    f !== undefined && Object.values(f).every((v) => typeof v === "string" && v.length <= 255);
+  if (!usable(major) || !usable(minor)) {
+    context.report.unmodeled("a:fontScheme", "no usable major and minor fonts (theme left out)");
+    return undefined;
+  }
   return { fonts: { major, minor } as ThemeJSON["fonts"], colors };
 }
 
 /**
  * `w:comments`, with replies and resolved state from `commentsExtended` (keyed by the
- * `w14:paraId` of each comment's last paragraph).
+ * `w14:paraId` of each comment's last paragraph). Each comment keeps its start tag verbatim
+ * (`ext`): values the model cannot hold (a long author, a date without a time) stay there.
  */
 export function comments(
   root: XmlElement,
   extended: XmlElement | undefined,
   context: ContentContext,
 ): CommentJSON[] {
-  const byParaId = new Map<string, number>();
+  const byParaId = new Map<string, CommentJSON>();
   const list: CommentJSON[] = [];
   for (const el of elements(root)) {
     if (!isW(el, "comment")) continue;
-    const id = integer(attr(el, "id"));
-    if (id === undefined || id < 0) {
-      context.report.unmodeled("w:comment", `w:id ${attr(el, "id")}`);
-      continue;
-    }
+    const commentId = id(attr(el, "id"), 0, "w:comment", context);
+    if (commentId === undefined) continue;
     const date = attr(el, "date");
+    const author = attr(el, "author") ?? "";
+    const initials = attr(el, "initials");
+    if (date !== undefined && !DATE.test(date)) context.report.unmodeled("w:comment@w:date", date);
+    if (author.length > 255) context.report.unmodeled("w:comment@w:author", "longer than 255");
+    if (initials !== undefined && initials.length > 9) {
+      context.report.unmodeled("w:comment@w:initials", "longer than 9");
+    }
     const content = blocks(el.children, context);
-    const paragraphs = elements(el).filter((p) => isW(p, "p"));
-    const paraId = paragraphs
+    const comment = compact({
+      id: commentId,
+      author: author.length <= 255 ? author : author.slice(0, 255),
+      initials: initials !== undefined && initials.length <= 9 ? initials : undefined,
+      date: date && DATE.test(date) ? date : undefined,
+      content: content.length ? content : [{ type: "paragraph" }],
+      ext: context.source.slice(el.start, el.openEnd),
+    }) as CommentJSON;
+    list.push(comment);
+    const paraId = elements(el)
+      .filter((p) => isW(p, "p"))
       .at(-1)
       ?.attributes.find((x) => x.ns === W14 && x.local === "paraId")?.value;
-    if (paraId) byParaId.set(paraId, id);
-    list.push(
-      compact({
-        id,
-        author: (attr(el, "author") ?? "").slice(0, 255),
-        initials: attr(el, "initials")?.slice(0, 9),
-        date: date && DATE.test(date) ? date : undefined,
-        content: content.length ? content : [{ type: "paragraph" }],
-      }) as CommentJSON,
-    );
+    if (paraId && !byParaId.has(paraId)) byParaId.set(paraId, comment);
   }
   if (extended) {
-    const byId = new Map(list.map((c) => [c.id, c]));
     for (const ex of elements(extended)) {
       if (ex.ns !== W15 || ex.local !== "commentEx") continue;
       const get = (local: string) =>
         ex.attributes.find((x) => x.ns === W15 && x.local === local)?.value;
-      const comment = byId.get(byParaId.get(get("paraId") ?? "") ?? -1);
+      const comment = byParaId.get(get("paraId") ?? "");
       if (!comment) continue;
       const parent = byParaId.get(get("paraIdParent") ?? "");
-      if (parent !== undefined && !repliesTo(byId, parent, comment.id)) comment.parent = parent;
-      const done = get("done");
-      if (done !== undefined) comment.done = done === "1" || done === "true";
+      if (parent && parent !== comment) comment.parent = parent.id;
+      const done = onOff(ex, "done", context, W15);
+      if (done !== undefined) comment.done = done;
     }
+    breakCycles(
+      list,
+      (c) => c.id,
+      (c) => c.parent,
+      (c) => {
+        context.report.unmodeled(`w:comment ${c.id}`, "a reply closing a cycle of replies");
+        delete c.parent;
+      },
+    );
   }
   return list;
 }

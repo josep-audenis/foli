@@ -32,17 +32,30 @@ from `commentsExtended`) and sections:
   insertions, deletions and moves, hyperlinks (target from the relationship, or a bookmark),
   bookmarks, comment ranges and references are modeled.
 - **Lossless:** every properties element is kept verbatim (`ext` on paragraphs, sections,
-  styles, numbering; `runExt` on runs), every element Foli does not model yet (tables, content
-  controls, pictures, fields' structure, footnote references, equations…) becomes an opaque node
-  holding its source, and export will write all of it back (8.5). Keep `package` with the
-  document: the parts Foli does not edit are written back from it.
+  styles, numbering levels and definitions, the document defaults; `runExt` on runs; a comment's
+  start tag), and unknown attributes of modeled elements go to attribute bags (paragraphs,
+  links, tracked changes, bookmarks and comment anchors: `w16du:dateUtc`, `w14:paraId`…). Every
+  element Foli does not model yet (tables, content controls, pictures, fields' structure,
+  footnote references, equations…) becomes an opaque node holding its source, and so does an
+  element the model rejects as a whole (a tracked change with an id past Word's range, a link in
+  a link, a run with an unknown attribute): never stripped to plain text. Export (8.5) writes all
+  of it back; keep `package` with the document, the parts Foli does not edit come from it. The
+  tests check every attribute of the corpus's document and comments parts is kept.
 - **What Word opens, imports:** each value is checked on its own; one the model cannot hold (out
-  of range, a unit such as `1.5cm`) is left out of the model, kept in the verbatim element and
-  listed in `report.unmodeled`. A style cycle is broken where it closes, a reply that would close
-  a cycle of replies is not kept. Not imported, because Word recomputes them: spelling marks
-  (`w:proofErr`), rendered page breaks (`w:lastRenderedPageBreak`) and run attributes (editing
-  session ids): counted in `report.dropped`.
-- Strict Open XML documents are refused (`DocxError`) until a real file needs them.
+  of range, a unit such as `1.5cm`, a date without a time) is left out of the model, kept in the
+  verbatim element and listed in `report.unmodeled`. A style cycle is broken where it closes, a
+  reply that would close a cycle of replies is not kept. Not imported, because Word recomputes
+  them or they show nothing: spelling marks (`w:proofErr`), rendered page breaks
+  (`w:lastRenderedPageBreak`), editing session ids on runs (`w:rsid*`) and runs with no content:
+  counted in `report.dropped`. Import time is linear in the file (crafted files included).
+- **Failures** are `DocxError` (or `ZipError` from the package): a file that is not a
+  WordprocessingML document, Strict Open XML (refused until a real file needs it), or an element
+  past the model's absolute limits (over 16 MiB kept verbatim).
+- **Not kept exactly**, to be equal under export's canonical comparison (8.5): run boundaries
+  (adjacent runs with the same properties become one text), `xml:space`, `w:cr` (read as a line
+  break), `w:noBreakHyphen` and `w:softHyphen` (read as U+2011 and U+00AD), an explicit
+  `w:type="textWrapping"` on a break, XML comments, processing instructions and whitespace
+  between elements, and the empty paragraph given to an empty body or comment.
 
 The package layer underneath:
 

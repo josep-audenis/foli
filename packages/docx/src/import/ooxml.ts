@@ -43,12 +43,12 @@ export function textOf(element: XmlElement): string {
   return element.children.map((c) => (c.kind === "text" ? c.text : "")).join("");
 }
 
-/** Every `w:t` of an element's descendants, in order (a field's or content control's visible text). */
+/** Every `w:t` and `w:delText` of an element's descendants, in order (the text it shows). */
 export function deepText(element: XmlElement): string {
   let out = "";
   for (const c of element.children) {
     if (c.kind !== "element") continue;
-    out += isW(c, "t") ? textOf(c) : deepText(c);
+    out += isW(c, "t") || isW(c, "delText") ? textOf(c) : deepText(c);
   }
   return out;
 }

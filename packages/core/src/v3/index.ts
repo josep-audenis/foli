@@ -19,6 +19,7 @@ export {
   HIGHLIGHT_COLORS,
   JUSTIFICATIONS,
   type Justification,
+  RUN_PROPERTY_MARKS,
   schemaV3,
 } from "./schema.js";
 export * from "./units.js";

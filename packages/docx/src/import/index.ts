@@ -1,7 +1,13 @@
 import { type FoliDocumentV3, parseDocumentV3 } from "@folijs/core";
-import { DocxError, type DocxPackage, type ReadPackageOptions, readPackage } from "../package.js";
+import {
+  DocxError,
+  type DocxPackage,
+  type ReadPackageOptions,
+  type Relationship,
+  readPackage,
+} from "../package.js";
 import type { XmlElement } from "../xml.js";
-import { blocks, type ContentContext } from "./content.js";
+import { blocks, type ContentContext, Moves } from "./content.js";
 import { child, isW, REL, W_STRICT } from "./ooxml.js";
 import { comments, numbering, styles, theme } from "./parts.js";
 import { section } from "./properties.js";
@@ -28,9 +34,11 @@ export async function importDocx(
 
 /**
  * The document of a package in schema v3: paragraphs with their properties, runs as text with
- * marks, tracked changes, comments, styles, numbering, the theme and sections. Everything
- * else is kept verbatim as opaque content and counted in the report; nothing is dropped
- * except what Word recomputes (see `ImportReport.dropped`).
+ * marks, tracked changes, comments, styles, numbering, the theme and sections. Every element
+ * Foli does not model is kept verbatim (opaque nodes, `ext`, attribute bags) and counted in the
+ * report; a value the model cannot hold stays in its verbatim element and is reported
+ * (`unmodeled`); not imported is only what Word recomputes or shows nothing (`dropped`).
+ * Every failure is a `DocxError` (or the package's `ZipError`).
  */
 export function importPackage(pkg: DocxPackage): DocxImport {
   const report = new Recorder();
@@ -44,7 +52,13 @@ export function importPackage(pkg: DocxPackage): DocxImport {
 
   const contextFor = (part: string, source: string): ContentContext => {
     report.part = part;
-    return { source, report, pkg, part, moves: new Map() };
+    // One lookup table per part: hyperlinks resolve in constant time.
+    let byId: Map<string, Relationship> | undefined;
+    const relationship = (id: string) => {
+      byId ??= new Map(pkg.relationships(part).map((r) => [r.id, r]));
+      return byId.get(id);
+    };
+    return { source, report, pkg, part, moves: new Moves(), relationship };
   };
   const related = (
     type: string,
@@ -59,10 +73,13 @@ export function importPackage(pkg: DocxPackage): DocxImport {
   };
 
   const mainContext = contextFor(pkg.mainDocument, main.source);
-  let content = blocks(body.children, mainContext);
+  // The body's section: its last `w:sectPr`, whatever follows it (a bookmark end…).
+  const sectPr = body.children
+    .filter((c): c is XmlElement => c.kind === "element" && isW(c, "sectPr"))
+    .at(-1);
+  let content = blocks(body.children, mainContext, sectPr);
   if (content.length === 0) content = [{ type: "paragraph" }];
-  const last = body.children.filter((c): c is XmlElement => c.kind === "element").at(-1);
-  const lastSection = last && isW(last, "sectPr") ? section(last, mainContext) : {};
+  const lastSection = sectPr ? section(sectPr, mainContext) : {};
 
   const stylesPart = related(REL.styles);
   const styled = stylesPart
@@ -73,7 +90,9 @@ export function importPackage(pkg: DocxPackage): DocxImport {
     ? numbering(numberingPart.root, contextFor(numberingPart.name, numberingPart.source))
     : { abstracts: [], instances: [] };
   const themePart = related(REL.theme);
-  const themed = themePart ? theme(themePart.root) : undefined;
+  const themed = themePart
+    ? theme(themePart.root, contextFor(themePart.name, themePart.source))
+    : undefined;
   const commentsPart = related(REL.comments);
   const extended = related(REL.commentsExtended);
   const commented = commentsPart
@@ -84,16 +103,23 @@ export function importPackage(pkg: DocxPackage): DocxImport {
       )
     : [];
 
-  const document = parseDocumentV3({
-    schemaVersion: 3,
-    section: lastSection,
-    defaults: styled.defaults,
-    styles: styled.styles,
-    numbering: numbered,
-    ...(themed ? { theme: themed } : {}),
-    comments: commented,
-    content: { type: "doc", content },
-  });
+  let document: FoliDocumentV3;
+  try {
+    document = parseDocumentV3({
+      schemaVersion: 3,
+      section: lastSection,
+      defaults: styled.defaults,
+      styles: styled.styles,
+      numbering: numbered,
+      ...(themed ? { theme: themed } : {}),
+      comments: commented,
+      content: { type: "doc", content },
+    });
+  } catch (error) {
+    // Each value was checked as it was read; what is left is beyond the model's limits (an
+    // element over 16 MiB kept verbatim…). A DocxError like every other import failure.
+    throw new DocxError(`Cannot import: ${(error as Error).message}`, { cause: error });
+  }
   return { document, package: pkg, report: report.report() };
 }
 
