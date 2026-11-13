@@ -192,7 +192,8 @@ function mergeParagraph(target: Merging, props: ParagraphPropertiesJSON | undefi
     target.tabs = [...stops.values()].sort((a, b) => a.position - b.position);
   }
   for (const [key, value] of Object.entries(props)) {
-    if (PLAIN_KEYS.has(key) && value !== undefined) (target as unknown as Json)[key] = value;
+    // A live node's attributes carry null for what is not set: it inherits.
+    if (PLAIN_KEYS.has(key) && value != null) (target as unknown as Json)[key] = value;
   }
 }
 
@@ -201,8 +202,11 @@ function cloneParagraph(p: Merging): Merging {
     ...p,
     indent: { ...p.indent },
     spacing: { ...p.spacing },
-    tabs: [...p.tabs],
-    borders: p.borders ? { ...p.borders } : null,
+    tabs: p.tabs.map((t) => ({ ...t })),
+    borders: p.borders
+      ? Object.fromEntries(Object.entries(p.borders).map(([side, b]) => [side, { ...b }]))
+      : null,
+    shading: p.shading ? { ...p.shading } : null,
     numbering: p.numbering ? { ...p.numbering } : null,
   };
 }
@@ -270,7 +274,9 @@ function mergeRun(
       case "font":
         for (const script of ["ascii", "hAnsi", "eastAsia", "cs"] as const) {
           const themed = a[`${script}Theme`] as string | null | undefined;
-          const name = themed ? themeFont(theme, themed) : (a[script] as string | null | undefined);
+          // A theme font the document has no theme for falls back to the name the file gives.
+          const name =
+            (themed && themeFont(theme, themed)) || (a[script] as string | null | undefined);
           if (name) target.font[script] = name;
         }
         break;
@@ -279,10 +285,11 @@ function mergeRun(
         if (typeof a.complexScript === "number") target.sizeCs = a.complexScript;
         break;
       case "color": {
-        // shortcut: theme tint and shade are not applied; apply them when a sample needs it.
-        const themed = a.themeColor
-          ? theme?.colors[THEME_COLORS[a.themeColor as string] ?? (a.themeColor as string)]
-          : undefined;
+        // With a tint or shade, `value` is the computed color: Word writes it there.
+        const themed =
+          a.themeColor && !a.themeTint && !a.themeShade
+            ? theme?.colors[THEME_COLORS[a.themeColor as string] ?? (a.themeColor as string)]
+            : undefined;
         const value = (themed ?? a.value) as string | undefined;
         target.color = value === undefined || value === "auto" ? null : value.toUpperCase();
         break;
@@ -392,7 +399,9 @@ function roman(n: number): string {
 
 /** Word's letters: A…Z, then AA…ZZ, AAA… (the letter repeated). */
 function letters(n: number): string {
-  if (n <= 0) return String(n);
+  // shortcut: past 780 (30 letters) the number is written in digits, which bounds the string
+  // a hostile counter can build; check what Word shows there if a real document gets that far.
+  if (n <= 0 || n > 780) return String(n);
   return String.fromCharCode(65 + ((n - 1) % 26)).repeat(Math.floor((n - 1) / 26) + 1);
 }
 
@@ -417,7 +426,7 @@ interface Level {
  */
 export class Resolver {
   readonly #styles = new Map<string, StyleJSON>();
-  readonly #defaultParagraphStyle: string | undefined;
+  #defaultParagraphStyle: string | undefined;
   readonly #envelope: Envelope;
   readonly #paragraphStyles = new Map<
     string,
@@ -431,9 +440,9 @@ export class Resolver {
     this.#envelope = envelope;
     // With duplicate ids, the first wins, as in Word.
     for (const s of envelope.styles) if (!this.#styles.has(s.id)) this.#styles.set(s.id, s);
-    this.#defaultParagraphStyle = envelope.styles.find(
-      (s) => s.type === "paragraph" && s.isDefault,
-    )?.id;
+    // With several default paragraph styles, the last one applies (ECMA-376 17.7.4.17).
+    for (const s of envelope.styles)
+      if (s.type === "paragraph" && s.isDefault) this.#defaultParagraphStyle = s.id;
     for (const n of envelope.numbering.instances)
       if (!this.#instances.has(n.id)) this.#instances.set(n.id, n);
     for (const a of envelope.numbering.abstracts)
@@ -456,8 +465,7 @@ export class Resolver {
 
   /** A paragraph style's formatting over the defaults, memoized. */
   #paragraphStyle(id: string | undefined) {
-    const effective = id ?? this.#defaultParagraphStyle;
-    const key = effective ?? "";
+    const key = id ?? "";
     const known = this.#paragraphStyles.get(key);
     if (known) return known;
     const { defaults } = this.#envelope;
@@ -465,14 +473,16 @@ export class Resolver {
     const run = cloneRun(DEFAULT_RUN);
     mergeParagraph(paragraph, defaults.paragraph);
     applyDirect(run, defaults.run, this.#envelope.theme);
-    const chain = this.#chain(effective, "paragraph");
+    // A style that does not exist (or is not a paragraph style) is the default paragraph style.
+    let chain = id === undefined ? [] : this.#chain(id, "paragraph");
+    if (!chain.length) chain = this.#chain(this.#defaultParagraphStyle, "paragraph");
     for (const style of chain) mergeParagraph(paragraph, style.paragraph);
     applyStyles(
       run,
       chain.map((s) => s.run ?? []),
       this.#envelope.theme,
     );
-    paragraph.style = chain.length ? (effective ?? null) : (id ?? null);
+    paragraph.style = chain.at(-1)?.id ?? null;
     const result = { paragraph, run, chain };
     this.#paragraphStyles.set(key, result);
     return result;
@@ -480,13 +490,19 @@ export class Resolver {
 
   /**
    * A paragraph's effective properties, and the formatting of its text before a run's own marks
-   * (`attrs`: the paragraph node's attributes).
+   * (`attrs`: the paragraph node's attributes, as JSON or a live node has them). The results are
+   * the caller's: changing them changes nothing else.
    */
-  paragraph(attrs: Json): { paragraph: ParagraphFormat; run: RunFormat; level: Level | undefined } {
+  paragraph(attrs: Json): { paragraph: ParagraphFormat; run: RunFormat } {
+    const { paragraph, run } = this.#resolve(attrs);
+    return { paragraph, run };
+  }
+
+  #resolve(attrs: Json): { paragraph: ParagraphFormat; run: RunFormat; level: Level | undefined } {
     const props = attrs as ParagraphPropertiesJSON;
-    const base = this.#paragraphStyle(props.style);
+    const base = this.#paragraphStyle(props.style ?? undefined);
     let paragraph = cloneParagraph(base.paragraph);
-    const directNumbering = props.numbering?.id !== undefined;
+    const directNumbering = props.numbering?.id != null;
     if (props.numbering) mergeParagraph(paragraph, { numbering: props.numbering });
     const level = this.#levelOf(paragraph);
     if (level?.level.paragraph) {
@@ -507,7 +523,12 @@ export class Resolver {
     const { style: _style, numbering: _numbering, ...direct } = props;
     mergeParagraph(paragraph, direct);
     const numbering = level ? { id: level.instance.id, level: level.index } : null;
-    return { paragraph: { ...paragraph, numbering }, run: cloneRun(base.run), level };
+    // Cloned: the merged values may be the styles' own objects.
+    return {
+      paragraph: { ...cloneParagraph(paragraph), numbering },
+      run: cloneRun(base.run),
+      level,
+    };
   }
 
   /** A run's formatting: its paragraph's (`paragraphRun`), its character style, then its own marks. */
@@ -572,7 +593,7 @@ export class Resolver {
     const counters = new Map<number, (number | undefined)[]>();
     const overridden = new Set<string>();
     return paragraphs.map((attrs) => {
-      const { run, level: found } = this.paragraph(attrs);
+      const { run, level: found } = this.#resolve(attrs);
       if (!found) return null;
       const { instance, abstract, index, level } = found;
       let levels = counters.get(abstract.id);
@@ -604,7 +625,7 @@ export class Resolver {
       applyDirect(marker, attrs.markFormat as MarkJSON[] | undefined, this.#envelope.theme);
       applyDirect(marker, level.run, this.#envelope.theme);
       return {
-        text: level.format === "none" ? "" : text,
+        text,
         suffix: level.suffix ?? "tab",
         justification: level.justification ?? "left",
         run: marker,

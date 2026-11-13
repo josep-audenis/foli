@@ -208,11 +208,15 @@ for each document.
 
 **Resolution** (`Resolver`, 8.6a): how a v3 document looks, computed in core with no DOM.
 `new Resolver(document)` reads the envelope once; `paragraph(attrs)` gives a paragraph's
-effective properties (defaults, then the paragraph style's `basedOn` chain root first, the
-default paragraph style when none is named, then direct formatting) and the formatting of its
-text; `run(paragraphRun, marks)` adds a character style's chain and the run's own marks;
-`markers(paragraphs)` numbers a document's paragraphs in order. As Word does:
+effective properties (defaults, then the paragraph style's `basedOn` chain root first, then
+direct formatting) and the formatting of its text; `run(paragraphRun, marks)` adds a character
+style's chain and the run's own marks; `markers(paragraphs)` numbers a document's paragraphs in
+order. Attributes are taken as JSON or as a live node has them (null for unset: inherited), and
+results are copies the caller may change. The rules, written to Word's behaviour as ECMA-376
+describes it:
 
+- A missing paragraph style (or none) is the default paragraph style; of several marked
+  default, the last.
 - Properties inherit attribute by attribute (an indent's `left` from one style, `hanging` from
   another); `firstLine` and `hanging` replace each other; tab stops accumulate, a `clear` stop
   removing an inherited one.
@@ -220,9 +224,10 @@ text; `run(paragraphRun, marks)` adds a character style's chain and the run's ow
   caps, small caps, strike, double strike, hidden) then flip between the paragraph style and
   the character style, so a bold character style on a bold heading shows plain text; direct
   formatting sets them. Complex-script bold and italic are kept apart.
-- Theme fonts resolve per script (`minorHAnsi` → the theme's minor Latin font); theme colors
-  resolve through the color scheme (tint and shade are not applied yet). Without any value:
-  10 pt and no font name (the view chooses).
+- Theme fonts resolve per script (`minorHAnsi` → the theme's minor Latin font), falling back to
+  the font the file names when there is no theme; a theme color resolves through the color
+  scheme, and with a tint or shade is the computed color Word writes beside it. Without any
+  value: 10 pt and no font name (the view chooses).
 - Numbering: a level's paragraph properties come over the paragraph style's when the
   numbering is direct, under them when the style gives it (numbered headings); a style naming
   only the instance is in the level whose `style` is that style; numId 0 takes numbering away;
@@ -230,12 +235,16 @@ text; `run(paragraphRun, marks)` adds a character style's chain and the run's ow
   definition (instances sharing one continue the list); an instance's start override restarts
   it where it is first used; a deeper level restarts after a higher one unless its `restart`
   says otherwise; `%1`–`%9` take each level's format (decimal, decimalZero, roman, letters with
-  Word's `aa`, ordinal, none; others as decimal), all decimal in a legal level; bullets are
-  their text as written. A marker's formatting is the paragraph's, then its mark's, then the
-  level's.
+  Word's `aa` up to 30 letters, ordinal, none; others as decimal), all decimal in a legal
+  level; bullets are their text as written. A marker's formatting is the paragraph's, then its
+  mark's, then the level's.
 
-Checked against Word: every paragraph of the corpus gets the list number Word shows for it
-(`packages/docx/src/import/resolve.test.ts`).
+Checked against Word: every list number outside tables in the corpus is the one Word shows
+(`packages/docx/src/import/resolve.test.ts`: 41 numbered paragraphs, legal `1.`/`1.1`/`(a)`/
+`(i)` numbering, bullets, lists continued across instances). Unit-tested only, with no Word
+sample yet: start overrides, `restart`, legal levels, numbering styles, the numbering and style
+indent precedence, run formatting, theme colors and fonts. Rendering (8.6b) compares pages
+with Word.
 
 ### Schema v1 (0.1.0)
 

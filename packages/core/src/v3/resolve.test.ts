@@ -7,6 +7,7 @@ import type {
   StyleJSON,
 } from "./document.js";
 import { formatNumber, Resolver } from "./resolve.js";
+import { schemaV3 } from "./schema.js";
 
 type Envelope = Pick<FoliDocumentV3, "defaults" | "styles" | "numbering" | "theme">;
 
@@ -41,6 +42,10 @@ describe("formatNumber", () => {
     expect(formatNumber(27, "lowerLetter")).toBe("aa");
     expect(formatNumber(53, "upperLetter")).toBe("AAA");
     expect(formatNumber(0, "lowerLetter")).toBe("0");
+    expect(formatNumber(780, "lowerLetter")).toBe("z".repeat(30));
+    // Past 30 letters, digits (bounds what a hostile counter builds).
+    expect(formatNumber(781, "lowerLetter")).toBe("781");
+    expect(formatNumber(2_000_000_000, "upperLetter")).toBe("2000000000");
     expect(formatNumber(1, "ordinal")).toBe("1st");
     expect(formatNumber(2, "ordinal")).toBe("2nd");
     expect(formatNumber(3, "ordinal")).toBe("3rd");
@@ -126,9 +131,58 @@ describe("Resolver: paragraphs", () => {
 
   it("survives cycles and missing styles", () => {
     expect(resolver.paragraph({ style: "Loop1" }).paragraph.justification).toBe("center");
-    const missing = resolver.paragraph({ style: "Nope" }).paragraph;
-    expect(missing.style).toBe("Nope");
-    expect(missing.spacing.after).toBe(0);
+    // A style that does not exist, or is not a paragraph style, is the default paragraph style.
+    for (const style of ["Nope", "Strong"]) {
+      const missing = resolver.paragraph({ style }).paragraph;
+      expect(missing.style).toBe("Normal");
+      expect(missing.spacing.after).toBe(160);
+    }
+  });
+
+  it("takes the last of several default paragraph styles", () => {
+    const two = new Resolver(
+      envelope({
+        styles: [
+          { id: "A", type: "paragraph", isDefault: true },
+          { id: "B", type: "paragraph", isDefault: true, paragraph: { justification: "center" } },
+        ],
+      }),
+    );
+    expect(two.paragraph({}).paragraph).toMatchObject({ style: "B", justification: "center" });
+    expect(new Resolver(envelope()).paragraph({ style: "X" }).paragraph.style).toBeNull();
+  });
+
+  it("reads a live node's attributes: null inherits", () => {
+    const live = new Resolver(
+      envelope({
+        styles: [
+          {
+            id: "Normal",
+            type: "paragraph",
+            isDefault: true,
+            paragraph: {
+              justification: "center",
+              keepNext: true,
+              outlineLevel: 0,
+              indent: { left: 360 },
+              numbering: { id: 0 },
+            },
+          },
+        ],
+      }),
+    );
+    const attrs = schemaV3.nodeFromJSON({ type: "paragraph" }).attrs as Record<string, unknown>;
+    expect(Object.values(attrs)).toContain(null);
+    const { paragraph } = live.paragraph(attrs);
+    expect(paragraph).toMatchObject({
+      style: "Normal",
+      justification: "center",
+      keepNext: true,
+      outlineLevel: 0,
+      indent: { left: 360 },
+      numbering: null,
+    });
+    expect(live.markers([attrs])).toEqual([null]);
   });
 
   it("does not let callers change memoized results", () => {
@@ -140,6 +194,58 @@ describe("Resolver: paragraphs", () => {
     expect(again.paragraph.tabs).toHaveLength(2);
     expect(again.paragraph.indent.left).toBe(0);
     expect(again.run.bold).toBe(false);
+  });
+
+  it("does not let callers change the document or the cache through nested values", () => {
+    const style: StyleJSON = {
+      id: "Normal",
+      type: "paragraph",
+      isDefault: true,
+      paragraph: {
+        borders: { top: { style: "single", size: 4 } },
+        shading: { pattern: "clear", fill: "FF0000" },
+        tabs: [{ position: 720, kind: "left" }],
+      },
+    };
+    const own = new Resolver(envelope({ styles: [style] }));
+    for (const attrs of [{}, { numbering: { id: 0 } }, { indent: { left: 1 } }]) {
+      const p = own.paragraph(attrs).paragraph;
+      (p.borders?.top as { size: number }).size = 99;
+      (p.shading as { fill: string }).fill = "00FF00";
+      (p.tabs[0] as { position: number }).position = 77;
+    }
+    expect(style.paragraph?.borders?.top?.size).toBe(4);
+    expect(style.paragraph?.shading?.fill).toBe("FF0000");
+    expect(style.paragraph?.tabs?.[0]?.position).toBe(720);
+    const again = own.paragraph({}).paragraph;
+    expect(again.tabs[0]?.position).toBe(720);
+    expect(again.borders?.top?.size).toBe(4);
+    expect(again.shading?.fill).toBe("FF0000");
+  });
+
+  it("does not let callers change a numbering level through the results", () => {
+    const level = lvl(0, {
+      style: "Numbered",
+      paragraph: {
+        shading: { pattern: "clear", fill: "FF0000" },
+        tabs: [{ position: 9, kind: "num" }],
+      },
+    });
+    const own = new Resolver(
+      envelope({
+        styles: [{ id: "Numbered", type: "paragraph", paragraph: { numbering: { id: 5 } } }],
+        numbering: { abstracts: [{ id: 1, levels: [level] }], instances: [{ id: 5, abstract: 1 }] },
+      }),
+    );
+    // Numbering from the style, and direct.
+    for (const attrs of [{ style: "Numbered" }, { numbering: { id: 5, level: 0 } }]) {
+      const p = own.paragraph(attrs).paragraph;
+      expect(p.shading?.fill).toBe("FF0000");
+      (p.shading as { fill: string }).fill = "00FF00";
+      (p.tabs[0] as { position: number }).position = 77;
+    }
+    expect(level.paragraph?.shading?.fill).toBe("FF0000");
+    expect(level.paragraph?.tabs?.[0]?.position).toBe(9);
   });
 });
 
@@ -256,6 +362,23 @@ describe("Resolver: runs", () => {
       "44546A",
     );
     expect(run("Heading1", [mark("color", { value: "auto" })]).color).toBeNull();
+    // With a tint or a shade, Word writes the computed color in `value`.
+    expect(
+      run(undefined, [mark("color", { value: "0F4761", themeColor: "accent1", themeShade: "BF" })])
+        .color,
+    ).toBe("0F4761");
+    expect(
+      run(undefined, [mark("color", { value: "595959", themeColor: "text1", themeTint: "A6" })])
+        .color,
+    ).toBe("595959");
+  });
+
+  it("falls back to the named font when there is no theme", () => {
+    const bare = new Resolver(envelope());
+    const font = bare.run(bare.paragraph({}).run, [
+      mark("font", { asciiTheme: "minorHAnsi", ascii: "Calibri", hAnsiTheme: "minorHAnsi" }),
+    ]).font;
+    expect(font).toMatchObject({ ascii: "Calibri", hAnsi: null });
   });
 
   it("reads the other run properties", () => {
@@ -502,12 +625,12 @@ describe("Resolver: list markers", () => {
     ]);
   });
 
-  it("gives bullets as written, and no text for format none", () => {
+  it("gives bullets as written, and only the literal text for format none", () => {
     const abstract: AbstractNumberingJSON = {
       id: 1,
       levels: [
         lvl(0, { format: "bullet", text: "", suffix: "space", justification: "right" }),
-        lvl(1, { format: "none", text: "%2." }),
+        lvl(1, { format: "none", text: "Schedule %2" }),
       ],
     };
     const env = envelope({ numbering: numbering([abstract], [{ id: 5, abstract: 1 }]) });
@@ -519,7 +642,7 @@ describe("Resolver: list markers", () => {
       instance: 5,
       level: 0,
     });
-    expect(none).toMatchObject({ text: "", suffix: "tab", justification: "left" });
+    expect(none).toMatchObject({ text: "Schedule ", suffix: "tab", justification: "left" });
   });
 
   it("formats the marker: the paragraph's run, its mark's, then the level's", () => {
