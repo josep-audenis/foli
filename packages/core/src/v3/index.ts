@@ -15,6 +15,13 @@ export {
 } from "./document.js";
 export { migrateToV3 } from "./migrate.js";
 export {
+  formatNumber,
+  type ListMarker,
+  type ParagraphFormat,
+  Resolver,
+  type RunFormat,
+} from "./resolve.js";
+export {
   checkSection,
   HIGHLIGHT_COLORS,
   JUSTIFICATIONS,
