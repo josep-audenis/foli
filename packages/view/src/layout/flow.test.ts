@@ -345,3 +345,85 @@ describe("flowFrom: incremental flow equals a full flow", () => {
     expect(measured).toBeLessThanOrEqual(1);
   });
 });
+
+describe("flow: Word spacing", () => {
+  const WORD = { orphans: 1, widows: 1, spacing: "word" as const };
+
+  it("adds the space after one block and the space before the next", () => {
+    // 10 + 30 | + (20 + 5) + 30 = 95 | + (20 + 10) + 20 = 145
+    const boxes = [box(30, 10, 20), box(30, 5, 20), box(20, 10, 0)];
+    expect(pagesOf(flow(boxes, 145, WORD))).toEqual([0, 0, 0]);
+    expect(pagesOf(flow(boxes, 144, WORD))).toEqual([0, 0, 1]);
+    // CSS collapses the same margins: 10 + 30 + 20 + 30 + 20 + 20 = 130.
+    expect(pagesOf(flow(boxes, 130, ANY))).toEqual([0, 0, 0]);
+  });
+
+  it("lets the space after the last block on a page hang below it", () => {
+    expect(pagesOf(flow([box(50, 0, 40), box(50, 0, 0)], 100, WORD))).toEqual([0, 1]);
+    expect(pagesOf(flow([box(90, 0, 40)], 100, WORD))).toEqual([0]);
+    // CSS needs the bottom margin to fit: the next block goes to the next page.
+    expect(pagesOf(flow([box(90, 0, 40), box(10)], 100, ANY))).toEqual([0, 1]);
+    expect(pagesOf(flow([box(50, 0, 0), box(10, 0, 40)], 70, ANY))).toEqual([0, 1]);
+    expect(pagesOf(flow([box(50, 0, 0), box(10, 0, 40)], 70, WORD))).toEqual([0, 0]);
+    // Split: the last line fits without the space after.
+    const split = flow([box(40), box(60, 0, 30, 10)], 100, WORD);
+    expect(split[1]).toEqual([whole(0)]);
+  });
+
+  it("drops the space before at the top of a page the flow moved to, not the first or a forced one", () => {
+    // First page: kept (10 + 40 = 50).
+    // Second block: 50 + 30 + 60 > 100, moves to page 1, its space before dropped: 60.
+    // Third: 60 + 30 + 10 = 100 fits only because the space before was dropped.
+    const boxes = [box(40, 10), box(60, 30), box(10, 30)];
+    expect(pagesOf(flow(boxes, 100, WORD))).toEqual([0, 1, 1]);
+    // After an explicit break the space before stays: 30 + 60 + 30 + 10 = 130 > 100.
+    const broken: BlockBox = { ...box(40, 10), breaksAfter: () => [0] };
+    expect(pagesOf(flow([broken, box(60, 30), box(10, 30)], 100, WORD))).toEqual([0, 1, 2]);
+  });
+
+  it("keeps the space before on the page a split block's explicit break starts", () => {
+    // Two lines, a break after the first: the second line starts page 1, a forced page.
+    const broken: BlockBox = { ...box(20, 0, 0, 10), breaksAfter: () => [0] };
+    // Page 1: 10 (the line), then 30 + 30 + 40 = 80: 90 fits; the space before was kept.
+    const result = flow([broken, box(40, 30), box(40, 30)], 100, WORD);
+    expect(result[0]).toEqual([
+      { page: 0, fromLine: 0, toLine: 1 },
+      { page: 1, fromLine: 1, toLine: 2 },
+    ]);
+    expect(pagesOf(result).slice(1)).toEqual([1, 2]);
+  });
+
+  it("matches a full flow when reused", () => {
+    const boxes = [box(40, 10, 10), box(60, 30, 10), box(10, 30, 10), box(50, 20, 20)];
+    const previous = flowFrom(boxes, 100, WORD);
+    const after = [box(45, 10, 10), ...boxes.slice(1)];
+    const incremental = flowFrom(after, 100, WORD, {
+      previous,
+      from: 0,
+      previousIndex: (i) => (i >= 1 ? i : -1),
+    });
+    expect(incremental).toEqual(flowFrom(after, 100, WORD));
+  });
+});
+
+describe("flow: repeated headers", () => {
+  it("adds the repeated height at the top of each continuation", () => {
+    const table: BlockBox = { ...box(150, 0, 0, 10), repeat: 20 };
+    // Page 0: 10 lines (100). Page 1: 20 + 5 lines = 70.
+    expect(flow([table], 100, ANY)[0]).toEqual([
+      { page: 0, fromLine: 0, toLine: 10 },
+      { page: 1, fromLine: 10, toLine: 15 },
+    ]);
+    // Without the header, 5 lines and a 40 px block fit page 1; with it, only 5 lines and the
+    // header: the block goes to page 2.
+    expect(pagesOf(flow([table, box(30)], 100, ANY))[1]).toBe(1);
+    expect(pagesOf(flow([table, box(40)], 100, ANY))[1]).toBe(2);
+    expect(pagesOf(flow([{ ...table, repeat: 0 }, box(40)], 100, ANY))[1]).toBe(1);
+  });
+
+  it("repeats on every page of a long block", () => {
+    const table: BlockBox = { ...box(250, 0, 0, 10), repeat: 20 };
+    // 10 lines, then 8 per page (20 + 80).
+    expect(flow([table], 100, ANY)[0]?.map((f) => f.toLine - f.fromLine)).toEqual([10, 8, 7]);
+  });
+});

@@ -35,7 +35,7 @@ writeFileSync(appEntry, `export { FoliEditor } from "${dist("react")}";\n`);
  */
 const BUNDLES = [
   { name: "@folijs/core", entry: dist("core"), budget: 30_300 },
-  { name: "@folijs/view", entry: dist("view"), budget: 31_400 },
+  { name: "@folijs/view", entry: dist("view"), budget: 37_100 },
   { name: "@folijs/react", entry: dist("react"), budget: 44_400 },
   { name: "FoliEditor only", entry: appEntry, budget: 44_400 },
   { name: "@folijs/docx", entry: dist("docx"), budget: 36_900 },

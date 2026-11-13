@@ -409,6 +409,48 @@ Known limits:
   runs): no preview without JavaScript, nothing for crawlers. A static server render of the
   pages could come later.
 
+### Word pages (`packages/view/src/word/`, 8.6b)
+
+`renderDocumentV3(document, container, { review })` shows a schema v3 document on pages, as
+Word lays it out; read-only until the editor moves to v3 (8.7).
+
+- **Blocks** (`blocks.ts`): each paragraph's and run's formatting from core's `Resolver` as
+  inline CSS, built with createElement and textContent only. Paragraphs with an outline level
+  1-6 are `h1`-`h6`. List markers sit in the hanging indent. Fonts are listed with their
+  metric-compatible substitutes (Calibri, Carlito; Cambria, Caladea; Arial, Liberation Sans;
+  Times New Roman, Liberation Serif; Courier New, Liberation Mono; Georgia, Gelasio); Foli
+  ships no font. Word's line spacing is a multiple of the font's own line height, measured in
+  the page (`line-height: normal` of each font) and set per run. Tracked changes show as
+  `ins`/`del` (`markup`) or are applied (`final`: deletions left out, a paragraph whose mark was
+  deleted merged into the next, numbered once; not into a table). Commented text is shaded. Content the model keeps opaque is
+  read from its XML with the browser's XML parser (an inert document; text, table structure,
+  paragraph style and alignment, and basic run properties are read): a table as a table (grid,
+  spans, margins, borders, shading, header rows; rows and cells inside content controls; nested
+  tables), a content control or field as its text, a picture or text box as nothing (the text
+  of a text box, and the fallback copy of alternate content, are left out of the line).
+- **Pages** (`pages.ts`): sections in order (each its page size and margins; a continuous
+  section with the same geometry goes on). The blocks are measured in a hidden page of the
+  section's width; their lines are the clusters of their text's client rects. The pure `flow`
+  places them with Word's spacing (`spacing: "word"`): the space after one paragraph and the
+  space before the next add up, a page the text flowed onto drops the space before its first
+  paragraph (a page an explicit break started keeps it), and the space after the last paragraph
+  on a page may hang below it. Keep with next, keep lines together (not for a paragraph taller
+  than a page, or one with a page break in it), page break before, explicit page breaks, widow
+  and orphan control (two lines) apply; a table's header rows are repeated
+  at the top of each page it continues on (`BlockBox.repeat`). A block split across pages is
+  shown as a clip of the whole block per page.
+- `pageOf(index)` and `lineOf(index)` give where a top-level node starts (the page, and the
+  line on it as Word numbers lines); the corpus harness compares them with Word's
+  (`pnpm corpus:pages`, numbers in corpus/README.md).
+
+Not yet: headers and footers, footnotes, floating objects, columns, custom tab stops (default
+stops every half inch), widow control turned off for one paragraph, right-aligned or centered
+list numbers, and a marker wider than its hanging indent (Word moves the text to the next tab
+stop). Sections starting on an even or odd page (the blank page Word inserts). A table row
+splits between its lines. Paragraphs inside opaque blocks and table cells collapse their
+spacing (the larger of after and before) where Word adds it. Measuring is synchronous: fonts
+must have loaded, and the container must not be scaled (`transform`, `zoom`).
+
 ### Clipboard (`packages/view/src/clipboard.ts`)
 
 - **Copy and cut** come from the model, never from the DOM (ADR-0003 finding 5). The selected

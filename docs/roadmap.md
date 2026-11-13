@@ -649,13 +649,16 @@ Each task is a PR on `phase-8/word-model`, the build green after each.
   (`scripts/corpus/rewrite-corpus.mjs`: unchanged, edited, and a new package from schema v2).
 - [ ] 8.6 Rendering from the document, in three parts (the view and editor run on v2 until 8.7, so
   each part lands without breaking them):
-  - [ ] 8.6a Resolution in `@folijs/core` (no DOM): a paragraph's and a run's effective
+  - [x] 8.6a Resolution in `@folijs/core` (#50, no DOM): a paragraph's and a run's effective
     formatting from defaults, styles and direct formatting as Word computes it (toggle
     properties, theme fonts and colors, numbering indents), and list markers numbered as Word
     numbers them; checked against the number Word shows for every paragraph of the corpus.
-  - [ ] 8.6b Rendering v3 in the view: resolved formatting as CSS, numbering markers, headings
-    as `h1`–`h6`, fonts with metric-compatible substitutes, tracked changes and comment anchors
-    shown, opaque content as placeholders; harness: per-paragraph page agreement with Word.
+  - [ ] 8.6b Rendering v3 in the view (`renderDocumentV3`, read-only until 8.7): resolved
+    formatting as CSS, numbering markers, headings as `h1`–`h6`, fonts with metric-compatible
+    substitutes, tracked changes (markup or final) and comment anchors shown, opaque content
+    shown from its XML (tables as tables, content controls and fields as their text), sections
+    and Word's paragraph spacing on pages; harness: per-paragraph page and line agreement with
+    Word (`pnpm corpus:pages`; baseline in corpus/README.md).
   - [ ] 8.6c The PDF page comparison as a tracked number.
 - [ ] 8.7 Editing on v3: existing commands and keys ported, list levels and numbering, style
   picker, font family and size, paragraph spacing and indentation; HTML clipboard mapped to

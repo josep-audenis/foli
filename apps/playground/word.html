@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Foli: Word pages</title>
+    <style>
+      body { margin: 0; background: #e8e8e8; font-family: system-ui, sans-serif; }
+      header { padding: 8px 16px; }
+      #pages { display: flex; flex-direction: column; align-items: center; gap: 16px; padding: 16px; }
+      .foli-word-page { box-shadow: 0 1px 4px rgb(0 0 0 / 0.25); }
+    </style>
+  </head>
+  <body>
+    <header>
+      <label>Open a .docx <input id="file" type="file" accept=".docx" /></label>
+      <label><input id="final" type="checkbox" /> Final (changes accepted)</label>
+    </header>
+    <div id="pages"></div>
+    <script type="module" src="/src/word.ts"></script>
+  </body>
+</html>
