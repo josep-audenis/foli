@@ -638,7 +638,7 @@ Each task is a PR on `phase-8/word-model`, the build green after each.
   v1/v2 → v3 migration; validation. v3 is defined beside v2 (`packages/core/src/v3/`): the
   view and commands keep running on v2 until 8.6 and 8.7 move them, and `SCHEMA_VERSION`
   becomes 3 with that switch.
-- [ ] 8.4 DOCX import to v3: paragraphs, runs, styles, numbering, sections, tracked changes,
+- [x] 8.4 DOCX import to v3 (#48): paragraphs, runs, styles, numbering, sections, tracked changes,
   comments; everything else as opaque content; a coverage report (opaque nodes per document:
   `scripts/corpus/import-report.mjs`, corpus numbers in `corpus/README.md`); every imported
   paragraph's text checked against Word's.
