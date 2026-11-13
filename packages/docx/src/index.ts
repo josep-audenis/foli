@@ -1,8 +1,10 @@
+export { exportDocx } from "./export/index.js";
 export { type DocxImport, type ImportReport, importDocx, importPackage } from "./import/index.js";
 export {
   DocxError,
   DocxPackage,
   type DocxPart,
+  type NewPart,
   type ReadPackageOptions,
   type Relationship,
   readPackage,

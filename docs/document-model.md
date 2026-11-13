@@ -136,7 +136,7 @@ JSON: the style, then the defaults, decide (resolution comes with rendering, 8.6
 | `text`, `tab`, `hardBreak` (`clear`), `pageBreak`, `columnBreak` | inline                                                                                                                                                                                                                                                                                                                           |
 | `bookmarkStart` (`id`, `name`), `bookmarkEnd` (`id`)             | a bookmark's ends: what cross-references and internal links point at                                                                                                                                                                                                                                                             |
 | `commentStart`, `commentEnd`, `commentReference`                 | `id`: a comment's range and its reference mark, as Word places them (ranges overlap freely, so they are points, not marks)                                                                                                                                                                                                       |
-| `opaqueInline`                                                   | `xml`, `label`: fields, drawings, symbols… until modeled                                                                                                                                                                                                                                                                         |
+| `opaqueInline`                                                   | `xml`, `label`, `run` (content of a run, written back inside one): fields, drawings, symbols… until modeled                                                                                                                                                                                                                      |
 
 Marks, in canonical order: `link` (`href` as the file has it, `anchor`, `tooltip`,
 `attributes`), `insertion` and `deletion` (`id`, `author`, `date`, `move`: tracked changes and
@@ -175,7 +175,7 @@ interface FoliDocumentV3 {
   defaults: { paragraph?: ParagraphPropertiesJSON; run?: MarkJSON[] }; // w:docDefaults
   styles: StyleJSON[]; // id, type, name, basedOn, next, link, isDefault, paragraph, run, ext
   numbering: { abstracts: AbstractNumberingJSON[]; instances: NumberingInstanceJSON[] };
-  theme?: ThemeJSON; // major/minor fonts, theme colors
+  theme?: ThemeJSON; // major/minor fonts, theme colors (read-only: export keeps the original part)
   comments: CommentJSON[]; // id, author, initials, date, content (v3 blocks), parent, done
   content: NodeJSON; // a v3 doc
 }

@@ -2,8 +2,8 @@ import { readdirSync, readFileSync } from "node:fs";
 import type { NodeJSON } from "@folijs/core";
 import { describe, expect, it } from "vitest";
 import { importDocx } from "../index.js";
+import { docx } from "../testing/package.js";
 import type { XmlElement } from "../xml.js";
-import { deflateEntry, writeZip } from "../zip.js";
 
 const CORPUS = new URL("../../../../corpus/word/", import.meta.url);
 const REFERENCE = new URL("../../../../corpus/reference/word/", import.meta.url);
@@ -11,27 +11,6 @@ const names = readdirSync(CORPUS).filter((n) => n.endsWith(".docx"));
 const load = (name: string) => importDocx(new Uint8Array(readFileSync(new URL(name, CORPUS))));
 
 const W_NS = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
-const R_NS = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
-
-/** A minimal package around `body` (the inside of `w:body`), with optional extra parts. */
-async function docx(
-  body: string,
-  options: { rels?: string; parts?: Record<string, string>; root?: string } = {},
-): Promise<Uint8Array> {
-  const files: Record<string, string> = {
-    "[Content_Types].xml": `<?xml version="1.0"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>`,
-    "_rels/.rels": `<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>`,
-    "word/document.xml":
-      options.root ??
-      `<w:document xmlns:w="${W_NS}" xmlns:r="${R_NS}" xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml" xmlns:x="urn:x"><w:body>${body}</w:body></w:document>`,
-    "word/_rels/document.xml.rels": `<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${options.rels ?? ""}</Relationships>`,
-    ...options.parts,
-  };
-  const entries = [];
-  for (const [name, text] of Object.entries(files))
-    entries.push(await deflateEntry(name, new TextEncoder().encode(text)));
-  return writeZip(entries);
-}
 
 const blocksOf = async (body: string, options?: Parameters<typeof docx>[1]) => {
   const result = await importDocx(await docx(body, options));
@@ -254,6 +233,13 @@ describe("importing WordprocessingML", () => {
       "w:proofErr": 1,
       "w:r@w:rsidR": 1,
     });
+  });
+
+  it("reads text as Word does: ends trimmed unless xml:space is preserve", async () => {
+    const { blocks } = await blocksOf(
+      '<w:p><w:r><w:t> a </w:t></w:r></w:p><w:p><w:r><w:t xml:space="preserve"> b </w:t></w:r></w:p>',
+    );
+    expect(blocks.map((p) => p.content?.[0]?.text)).toEqual(["a", " b "]);
   });
 
   it("resolves hyperlinks against the part's relationships", async () => {

@@ -85,6 +85,9 @@ importers:
       '@types/node':
         specifier: ^20.19.43
         version: 20.19.43
+      fast-check:
+        specifier: ^4.10.2
+        version: 4.10.2
 
   packages/react:
     dependencies:

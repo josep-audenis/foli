@@ -51,53 +51,12 @@ export function styles(
   context: Context,
 ): { defaults: Record<string, unknown>; styles: StyleJSON[] } {
   const docDefaults = child(root, "docDefaults");
-  let defaults: Record<string, unknown> = {};
-  if (docDefaults) {
-    const pPr = child(child(docDefaults, "pPrDefault") ?? docDefaults, "pPr");
-    const rPr = child(child(docDefaults, "rPrDefault") ?? docDefaults, "rPr");
-    const paragraph = pPr ? paragraphProperties(pPr, context, false) : {};
-    const run = runList(rPr, context);
-    defaults = {
-      ...(Object.keys(paragraph).length ? { paragraph } : {}),
-      ...(run.length ? { run } : {}),
-      ext: sourceOf(context, docDefaults),
-    };
-  }
-
+  const defaults = docDefaults ? defaultsOf(docDefaults, context) : {};
   const list: StyleJSON[] = [];
   for (const el of elements(root)) {
     if (!isW(el, "style")) continue;
-    const styleId = attr(el, "styleId");
-    const type = attr(el, "type") ?? "paragraph";
-    if (!styleId || styleId.length > 255 || !STYLE_TYPES.includes(type)) {
-      context.report.unmodeled(
-        `w:style ${styleId ?? ""}`,
-        "no usable w:styleId or w:type (kept in the original styles part)",
-      );
-      continue;
-    }
-    const value = (local: string) => {
-      const v = attr(child(el, local), "val");
-      return v && v.length <= 255 ? v : undefined;
-    };
-    const stylePPr = child(el, "pPr");
-    const props = stylePPr ? paragraphProperties(stylePPr, context, false) : {};
-    const marks = runList(child(el, "rPr"), context);
-    const name = attr(child(el, "name"), "val");
-    list.push(
-      compact({
-        id: styleId,
-        type: type as StyleJSON["type"],
-        name: name !== undefined && name.length <= 255 ? name : undefined,
-        basedOn: value("basedOn"),
-        next: value("next"),
-        link: value("link"),
-        isDefault: onOff(el, "default", context),
-        paragraph: Object.keys(props).length ? props : undefined,
-        run: marks.length ? marks : undefined,
-        ext: sourceOf(context, el),
-      }) as StyleJSON,
-    );
+    const style = styleOf(el, context);
+    if (style) list.push(style);
   }
   breakCycles(
     list,
@@ -109,6 +68,60 @@ export function styles(
     },
   );
   return { defaults, styles: list };
+}
+
+/** `w:docDefaults` as the envelope's defaults (with the element verbatim). */
+export function defaultsOf(docDefaults: XmlElement, context: Context): Record<string, unknown> {
+  const pPr = child(child(docDefaults, "pPrDefault") ?? docDefaults, "pPr");
+  const rPr = child(child(docDefaults, "rPrDefault") ?? docDefaults, "rPr");
+  const paragraph = pPr ? paragraphProperties(pPr, context, false) : {};
+  const run = runList(rPr, context);
+  return {
+    ...(Object.keys(paragraph).length ? { paragraph } : {}),
+    ...(run.length ? { run } : {}),
+    ext: sourceOf(context, docDefaults),
+  };
+}
+
+/** Whether import keeps a `w:style` (it has a usable id and type); others stay in the part only. */
+export function usableStyle(el: XmlElement): boolean {
+  const styleId = attr(el, "styleId");
+  return (
+    !!styleId && styleId.length <= 255 && STYLE_TYPES.includes(attr(el, "type") ?? "paragraph")
+  );
+}
+
+/** A `w:style` as a style (with the element verbatim); undefined (reported) when unusable. */
+export function styleOf(el: XmlElement, context: Context): StyleJSON | undefined {
+  const styleId = attr(el, "styleId");
+  const type = attr(el, "type") ?? "paragraph";
+  if (!usableStyle(el)) {
+    context.report.unmodeled(
+      `w:style ${styleId ?? ""}`,
+      "no usable w:styleId or w:type (kept in the original styles part)",
+    );
+    return undefined;
+  }
+  const value = (local: string) => {
+    const v = attr(child(el, local), "val");
+    return v && v.length <= 255 ? v : undefined;
+  };
+  const stylePPr = child(el, "pPr");
+  const props = stylePPr ? paragraphProperties(stylePPr, context, false) : {};
+  const marks = runList(child(el, "rPr"), context);
+  const name = attr(child(el, "name"), "val");
+  return compact({
+    id: styleId,
+    type: type as StyleJSON["type"],
+    name: name !== undefined && name.length <= 255 ? name : undefined,
+    basedOn: value("basedOn"),
+    next: value("next"),
+    link: value("link"),
+    isDefault: onOff(el, "default", context),
+    paragraph: Object.keys(props).length ? props : undefined,
+    run: marks.length ? marks : undefined,
+    ext: sourceOf(context, el),
+  }) as StyleJSON;
 }
 
 /**
@@ -144,7 +157,7 @@ function breakCycles<T>(
   });
 }
 
-function level(lvl: XmlElement, context: Context): NumberingLevelJSON | undefined {
+export function level(lvl: XmlElement, context: Context): NumberingLevelJSON | undefined {
   const index = integer(attr(lvl, "ilvl"));
   if (index === undefined || index < 0 || index > 8) {
     context.report.unmodeled("w:lvl", `w:ilvl ${attr(lvl, "ilvl")}`);
@@ -209,81 +222,83 @@ export function numbering(
   const instances: NumberingInstanceJSON[] = [];
   for (const el of elements(root)) {
     if (isW(el, "abstractNum")) {
-      const abstractId = id(attr(el, "abstractNumId"), 0, "w:abstractNum", context);
-      if (abstractId === undefined) continue;
-      const seen = new Set<number>();
-      const levels: NumberingLevelJSON[] = [];
-      for (const lvl of elements(el)) {
-        if (!isW(lvl, "lvl")) continue;
-        const json = level(lvl, context);
-        // A repeated level: Word uses the first.
-        if (json && !seen.has(json.level)) {
-          seen.add(json.level);
-          levels.push(json);
-        }
-      }
-      const multi = attr(child(el, "multiLevelType"), "val");
-      const link = (local: string) => {
-        const v = attr(child(el, local), "val");
-        return v && v.length <= 255 ? v : undefined;
-      };
-      abstracts.push(
-        compact({
-          id: abstractId,
-          multiLevelType:
-            multi && ["singleLevel", "multilevel", "hybridMultilevel"].includes(multi)
-              ? multi
-              : undefined,
-          levels,
-          styleLink: link("styleLink"),
-          numStyleLink: link("numStyleLink"),
-          ext: sourceOf(context, el),
-        }) as AbstractNumberingJSON,
-      );
+      const abstract = abstractOf(el, context);
+      if (abstract) abstracts.push(abstract);
     } else if (isW(el, "num")) {
-      const numId = id(attr(el, "numId"), 1, "w:num", context);
-      const abstract = id(
-        attr(child(el, "abstractNumId"), "val"),
-        0,
-        "w:num/w:abstractNumId",
-        context,
-      );
-      if (numId === undefined || abstract === undefined) continue;
-      const seen = new Set<number>();
-      const overrides: NonNullable<NumberingInstanceJSON["overrides"]> = [];
-      for (const o of elements(el)) {
-        if (!isW(o, "lvlOverride")) continue;
-        const index = integer(attr(o, "ilvl"));
-        if (index === undefined || index < 0 || index > 8 || seen.has(index)) {
-          context.report.unmodeled("w:lvlOverride", `w:ilvl ${attr(o, "ilvl")}`);
-          continue;
-        }
-        seen.add(index);
-        const start = integer(attr(child(o, "startOverride"), "val"));
-        const startOk = start !== undefined && start >= 0 && start <= MAX_ID;
-        if (start !== undefined && !startOk)
-          context.report.unmodeled("w:startOverride", `${start}`);
-        const lvl = child(o, "lvl");
-        const definition = lvl ? level(lvl, context) : undefined;
-        overrides.push(
-          compact({
-            level: index,
-            start: startOk ? start : undefined,
-            definition: definition ? { ...definition, level: index } : undefined,
-          }) as { level: number },
-        );
-      }
-      instances.push(
-        compact({
-          id: numId,
-          abstract,
-          overrides: overrides.length ? overrides : undefined,
-          ext: sourceOf(context, el),
-        }) as NumberingInstanceJSON,
-      );
+      const instance = instanceOf(el, context);
+      if (instance) instances.push(instance);
     }
   }
   return { abstracts, instances };
+}
+
+/** A `w:abstractNum` as a definition (with the element verbatim); undefined (reported) when unusable. */
+export function abstractOf(el: XmlElement, context: Context): AbstractNumberingJSON | undefined {
+  const abstractId = id(attr(el, "abstractNumId"), 0, "w:abstractNum", context);
+  if (abstractId === undefined) return undefined;
+  const seen = new Set<number>();
+  const levels: NumberingLevelJSON[] = [];
+  for (const lvl of elements(el)) {
+    if (!isW(lvl, "lvl")) continue;
+    const json = level(lvl, context);
+    // A repeated level: Word uses the first.
+    if (json && !seen.has(json.level)) {
+      seen.add(json.level);
+      levels.push(json);
+    }
+  }
+  const multi = attr(child(el, "multiLevelType"), "val");
+  const link = (local: string) => {
+    const v = attr(child(el, local), "val");
+    return v && v.length <= 255 ? v : undefined;
+  };
+  return compact({
+    id: abstractId,
+    multiLevelType:
+      multi && ["singleLevel", "multilevel", "hybridMultilevel"].includes(multi)
+        ? multi
+        : undefined,
+    levels,
+    styleLink: link("styleLink"),
+    numStyleLink: link("numStyleLink"),
+    ext: sourceOf(context, el),
+  }) as AbstractNumberingJSON;
+}
+
+/** A `w:num` as an instance (with the element verbatim); undefined (reported) when unusable. */
+export function instanceOf(el: XmlElement, context: Context): NumberingInstanceJSON | undefined {
+  const numId = id(attr(el, "numId"), 1, "w:num", context);
+  const abstract = id(attr(child(el, "abstractNumId"), "val"), 0, "w:num/w:abstractNumId", context);
+  if (numId === undefined || abstract === undefined) return undefined;
+  const seen = new Set<number>();
+  const overrides: NonNullable<NumberingInstanceJSON["overrides"]> = [];
+  for (const o of elements(el)) {
+    if (!isW(o, "lvlOverride")) continue;
+    const index = integer(attr(o, "ilvl"));
+    if (index === undefined || index < 0 || index > 8 || seen.has(index)) {
+      context.report.unmodeled("w:lvlOverride", `w:ilvl ${attr(o, "ilvl")}`);
+      continue;
+    }
+    seen.add(index);
+    const start = integer(attr(child(o, "startOverride"), "val"));
+    const startOk = start !== undefined && start >= 0 && start <= MAX_ID;
+    if (start !== undefined && !startOk) context.report.unmodeled("w:startOverride", `${start}`);
+    const lvl = child(o, "lvl");
+    const definition = lvl ? level(lvl, context) : undefined;
+    overrides.push(
+      compact({
+        level: index,
+        start: startOk ? start : undefined,
+        definition: definition ? { ...definition, level: index } : undefined,
+      }) as { level: number },
+    );
+  }
+  return compact({
+    id: numId,
+    abstract,
+    overrides: overrides.length ? overrides : undefined,
+    ext: sourceOf(context, el),
+  }) as NumberingInstanceJSON;
 }
 
 /** As core checks it (ISO 8601 date-time). */

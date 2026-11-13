@@ -384,7 +384,15 @@ export const schemaV3 = new Schema({
     opaqueInline: {
       group: "inline",
       inline: true,
-      attrs: { xml: { validate: xml }, label: nullableAttr(text()) },
+      attrs: {
+        xml: { validate: xml },
+        label: nullableAttr(text()),
+        /**
+         * Content of a run (`w:drawing`, `w:fldChar`… inside `w:r`): written back inside a run
+         * with the node's run properties. Otherwise it stands between runs (`w:sdt`…).
+         */
+        run: { default: false, validate: bool },
+      },
     },
   },
   marks: {

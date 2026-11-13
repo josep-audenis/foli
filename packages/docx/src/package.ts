@@ -72,6 +72,9 @@ export class DocxPackage {
   readonly #byName = new Map<string, DocxPart>();
   readonly #relationships = new Map<string, readonly Relationship[]>();
   readonly #xml = new Map<string, XmlDocument>();
+  readonly #defaults: ReadonlyMap<string, string>;
+  readonly #overridden: ReadonlySet<string>;
+  readonly #contentTypesText: string;
 
   /** @internal Use {@link readPackage}. */
   constructor(entries: readonly ZipEntry[], data: readonly Uint8Array[], options: ParseXmlOptions) {
@@ -79,7 +82,15 @@ export class DocxPackage {
     this.#options = options.maxDepth === undefined ? {} : { maxDepth: options.maxDepth };
     const index = entries.findIndex((e) => key(partName(e.name)) === key(CONTENT_TYPES));
     if (index === -1) throw new DocxError("Not a .docx: no [Content_Types].xml");
-    const types = contentTypes(xml(data[index] as Uint8Array, CONTENT_TYPES, this.#options).root);
+    const typesXml = xml(data[index] as Uint8Array, CONTENT_TYPES, this.#options);
+    const types = contentTypes(typesXml.root);
+    this.#defaults = types.defaults;
+    this.#overridden = new Set(types.overrides.keys());
+    // Rewritten as UTF-8 when parts are added: the declaration says so.
+    this.#contentTypesText = typesXml.source.replace(
+      /^(<\?xml[^?]*?encoding=)(["'])[^"']*\2/,
+      "$1$2UTF-8$2",
+    );
 
     const parts: DocxPart[] = [];
     entries.forEach((entry, i) => {
@@ -140,26 +151,70 @@ export class DocxPackage {
   }
 
   /**
-   * The package as a `.docx` file. Parts in `replace` (by part name) get the new bytes; every
-   * other entry, `[Content_Types].xml` included, is copied from the original file as it was
-   * stored. Entries keep their order and names.
+   * The package as a `.docx` file. Parts in `replace` (by part name) get the new bytes; parts in
+   * `add` are new (their content type declared in `[Content_Types].xml` unless its defaults
+   * already give it). Every other entry, `[Content_Types].xml` included when nothing is added,
+   * is copied from the original file as it was stored. Entries keep their order; added ones
+   * come last.
    */
-  async write(replace: ReadonlyMap<string, Uint8Array> = new Map()): Promise<Uint8Array> {
+  async write(
+    replace: ReadonlyMap<string, Uint8Array> = new Map(),
+    add: readonly NewPart[] = [],
+  ): Promise<Uint8Array> {
     const pending = new Map<string, Uint8Array>();
     for (const [name, data] of replace) {
       const part = this.part(name);
-      // shortcut: replaces existing parts only; adding and removing parts (with their content
-      // types and relationships) comes with export (8.5).
       if (!part) throw new DocxError(`No part ${name} to replace`);
       pending.set(key(part.name), data);
+    }
+    const overrides: string[] = [];
+    for (const part of add) {
+      if (!part.name.startsWith("/") || part.name.endsWith("/"))
+        throw new DocxError(`Not a part name: ${part.name}`);
+      if (this.part(part.name) || add.filter((p) => key(p.name) === key(part.name)).length > 1) {
+        throw new DocxError(`Part ${part.name} already exists`);
+      }
+      // An Override already there (a stale one, for a part the zip lacks) is not repeated.
+      const declared = this.#overridden.has(key(part.name));
+      if (
+        part.contentType &&
+        !declared &&
+        this.#defaults.get(extension(part.name)) !== part.contentType
+      ) {
+        overrides.push(
+          `<Override PartName="${escapeXml(part.name)}" ContentType="${escapeXml(part.contentType)}"/>`,
+        );
+      }
+    }
+    if (overrides.length) {
+      const types = this.#contentTypesText;
+      const close = types.lastIndexOf("</");
+      pending.set(
+        key(CONTENT_TYPES),
+        new TextEncoder().encode(types.slice(0, close) + overrides.join("") + types.slice(close)),
+      );
     }
     const entries: ZipEntry[] = [];
     for (const entry of this.#entries) {
       const data = pending.get(key(partName(entry.name)));
       entries.push(data ? await deflateEntry(entry.name, data, entry) : entry);
     }
+    for (const part of add) entries.push(await deflateEntry(part.name.slice(1), part.data));
     return writeZip(entries);
   }
+}
+
+/** A part to add to a package. */
+export interface NewPart {
+  /** `/word/numbering.xml`. */
+  readonly name: string;
+  readonly data: Uint8Array;
+  /** Declared unless the extension's default content type is already this one. */
+  readonly contentType?: string;
+}
+
+function escapeXml(value: string): string {
+  return value.replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`);
 }
 
 /** `word/document.xml` (zip) → `/word/document.xml` (part name). */
