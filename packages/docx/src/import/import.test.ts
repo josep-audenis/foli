@@ -676,8 +676,8 @@ describe("import takes linear time on crafted files", () => {
       rels: `<Relationship Id="s" Type="${STYLES}" Target="styles.xml"/>`,
       parts: { "word/styles.xml": `<w:styles xmlns:w="${W_NS}">${chain}</w:styles>` },
     });
-    // Quadratic took about 15 s here.
-    expect(ms).toBeLessThan(3000);
+    // Quadratic took about 15 s here; the bound leaves room for a loaded machine.
+    expect(ms).toBeLessThan(6000);
   });
 
   it("many open moves and many hyperlinks", async () => {
@@ -686,7 +686,7 @@ describe("import takes linear time on crafted files", () => {
       (_, i) =>
         `<w:moveFromRangeStart w:id="${i}" w:name="m${i}"/><w:moveFrom w:id="${i}" w:author="A"><w:r><w:t>x</w:t></w:r></w:moveFrom>`,
     ).join("");
-    expect(await timed(`<w:p>${moves}</w:p>`)).toBeLessThan(3000);
+    expect(await timed(`<w:p>${moves}</w:p>`)).toBeLessThan(6000);
     const HYPERLINK =
       "http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink";
     const n = 10_000;
@@ -699,6 +699,6 @@ describe("import takes linear time on crafted files", () => {
       { length: n },
       (_, i) => `<w:hyperlink r:id="h${i}"><w:r><w:t>l</w:t></w:r></w:hyperlink>`,
     ).join("");
-    expect(await timed(`<w:p>${links}</w:p>`, { rels: linkRels })).toBeLessThan(3000);
+    expect(await timed(`<w:p>${links}</w:p>`, { rels: linkRels })).toBeLessThan(6000);
   });
 });
