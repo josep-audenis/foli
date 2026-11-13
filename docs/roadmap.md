@@ -653,7 +653,7 @@ Each task is a PR on `phase-8/word-model`, the build green after each.
     formatting from defaults, styles and direct formatting as Word computes it (toggle
     properties, theme fonts and colors, numbering indents), and list markers numbered as Word
     numbers them; checked against the number Word shows for every paragraph of the corpus.
-  - [ ] 8.6b Rendering v3 in the view (`renderDocumentV3`, read-only until 8.7): resolved
+  - [x] 8.6b Rendering v3 in the view (#51, `renderDocumentV3`, read-only until 8.7): resolved
     formatting as CSS, numbering markers, headings as `h1`–`h6`, fonts with metric-compatible
     substitutes, tracked changes (markup or final) and comment anchors shown, opaque content
     shown from its XML (tables as tables, content controls and fields as their text), sections
