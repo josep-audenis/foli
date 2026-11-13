@@ -642,7 +642,7 @@ Each task is a PR on `phase-8/word-model`, the build green after each.
   comments; everything else as opaque content; a coverage report (opaque nodes per document:
   `scripts/corpus/import-report.mjs`, corpus numbers in `corpus/README.md`); every imported
   paragraph's text checked against Word's.
-- [ ] 8.5 Lossless export: v3 → DOCX rewriting only the parts the editor owns; harness: a round
+- [x] 8.5 Lossless export (#49): v3 → DOCX rewriting only the parts the editor owns; harness: a round
   trip without edits equals the original after canonicalization (what import does not keep
   exactly is listed in `packages/docx/README.md`; the comparison is
   `packages/docx/src/testing/canonical.ts`), every export opens in Word without repair
