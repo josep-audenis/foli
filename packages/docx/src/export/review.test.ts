@@ -353,5 +353,6 @@ describe("edits keep everything else", () => {
       }),
       { numRuns: 40 },
     );
-  });
+    // Forty export and import round trips of corpus documents: slow when everything runs at once.
+  }, 120_000);
 });

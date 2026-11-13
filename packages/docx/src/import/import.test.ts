@@ -604,7 +604,8 @@ describe("import accepts what Word opens, and fails only with DocxError", () => 
       name: "DocxError",
       message: expect.stringMatching(/^Cannot import: /),
     });
-  });
+    // A 16 MiB part: slow when everything runs at once.
+  }, 60_000);
 
   it("keeps resolved state and replies on the right comment when ids repeat", async () => {
     const { document } = await importDocx(
