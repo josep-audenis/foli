@@ -83,6 +83,8 @@ describe("fontStack", () => {
     expect(fontStack("Aptos")).toBe('"Aptos", sans-serif');
     expect(fontStack(null)).toBe('"Times New Roman", "Liberation Serif", "Tinos", serif');
     expect(fontStack('Evil"Font\\')).toBe('"EvilFont", sans-serif');
+    expect(fontStack("constructor")).toBe('"constructor", sans-serif');
+    expect(fontStack("__proto__")).toBe('"__proto__", sans-serif');
   });
 });
 
@@ -335,6 +337,25 @@ describe("renderBlocks: review", () => {
     expect(markup).toHaveLength(2);
   });
 
+  it("final view: a deleted mark before a table keeps its paragraph; joined items number once", () => {
+    const deleted = { revision: { deletion: { id: 3, author: "Ben" } } };
+    const table = { type: "opaqueBlock", attrs: { xml: "<w:tbl/>" } };
+    const kept = render([p(deleted, text("a")), p(deleted, text("b")), table, p({}, text("c"))], {
+      review: "final",
+    });
+    expect(kept.map((b) => [b.nodes, b.element.textContent])).toEqual([
+      [[0, 1], "ab"],
+      [[2], ""],
+      [[3], "c"],
+    ]);
+    const item = { numbering: { id: 1, level: 0 } };
+    const list = render(
+      [p({ ...item, ...deleted }, text("one")), p(item, text("two")), p(item, text("three"))],
+      { review: "final" },
+    );
+    expect(list.map((b) => b.element.textContent)).toEqual(["1.onetwo", "2.three"]);
+  });
+
   it("marks commented text and comment references", () => {
     const [block] = render([
       p(
@@ -455,6 +476,38 @@ describe("renderBlocks: opaque content", () => {
     expect(content?.element.querySelector("p")?.style.marginBottom).toBe(`${160 / 15}px`);
     expect(broken?.element.childNodes).toHaveLength(0);
     expect(broken?.element.style.minHeight).toBe("1em");
+  });
+
+  it("leaves text boxes and the fallback copy of a drawing out of the line", () => {
+    const box = (text: string) =>
+      `<w:txbxContent><w:p><w:r><w:t>${text}</w:t></w:r></w:p></w:txbxContent>`;
+    const drawing = `<mc:AlternateContent><mc:Choice Requires="wps"><w:drawing>${box("BOX")}</w:drawing></mc:Choice><mc:Fallback><w:pict><v:shape><v:textbox>${box("BOX")}</v:textbox></v:shape></w:pict><w:r><w:t>OLD</w:t></w:r></mc:Fallback></mc:AlternateContent>`;
+    const [inline, sdt] = render([
+      p({}, text("body "), { type: "opaqueInline", attrs: { xml: drawing, label: "Shape" } }),
+      {
+        type: "opaqueBlock",
+        attrs: {
+          xml: `<w:sdt><w:sdtContent><w:p><w:r><w:t>in </w:t></w:r><w:r>${drawing}</w:r><w:r><w:t>sdt</w:t></w:r></w:p></w:sdtContent></w:sdt>`,
+        },
+      },
+    ]);
+    expect(inline?.element.textContent).toBe("body ");
+    expect(inline?.element.querySelector("[data-foli-opaque]")).not.toBeNull();
+    expect([...(sdt?.element.querySelectorAll("p") ?? [])].map((e) => e.textContent)).toEqual([
+      "in sdt",
+    ]);
+    // Its paragraphs' margins stay inside it, as measured.
+    expect(sdt?.element.style.display).toBe("flow-root");
+  });
+
+  it("reads table rows and cells inside content controls, and nested tables", () => {
+    const cell = (text: string) => `<w:tc><w:p><w:r><w:t>${text}</w:t></w:r></w:p></w:tc>`;
+    const xml = `<w:tbl><w:sdt><w:sdtContent><w:tr>${cell("A")}<w:customXml>${cell("B")}</w:customXml></w:tr></w:sdtContent></w:sdt><w:tr><w:tc><w:tbl><w:tr>${cell("inner")}</w:tr></w:tbl><w:p/></w:tc></w:tr></w:tbl>`;
+    const [block] = render([{ type: "opaqueBlock", attrs: { xml } }]);
+    const outer = block?.element.querySelector("table") as HTMLTableElement;
+    const rows = outer.querySelectorAll(":scope > tbody > tr");
+    expect([...(rows[0]?.children ?? [])].map((td) => td.textContent)).toEqual(["A", "B"]);
+    expect(rows[1]?.querySelector("table")?.textContent).toBe("inner");
   });
 
   it("shows opaque inline content as its text, or an empty placeholder", () => {

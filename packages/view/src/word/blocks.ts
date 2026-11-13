@@ -71,7 +71,8 @@ export function fontStack(name: string | null): string {
   const key = font.toLowerCase();
   const generic = SERIF.has(key) ? "serif" : MONOSPACE.has(key) ? "monospace" : "sans-serif";
   const quote = (f: string) => `"${f.replace(/["\\]/g, "")}"`;
-  return [font, ...(SUBSTITUTES[key] ?? [])].map(quote).concat(generic).join(", ");
+  const substitutes = Object.hasOwn(SUBSTITUTES, key) ? (SUBSTITUTES[key] as string[]) : [];
+  return [font, ...substitutes].map(quote).concat(generic).join(", ");
 }
 
 /** Word's highlight colors (`w:highlight`). */
@@ -199,15 +200,42 @@ function styleParagraph(element: HTMLElement, paragraph: ParagraphFormat): void 
   }
 }
 
+/**
+ * Opaque XML not shown in the line: a text box's content (it floats; shortcut: not shown until
+ * Phase 11 lays out drawings) and the fallback copy of alternate content (`mc:Fallback`, the
+ * same drawing again for older readers).
+ */
+const NOT_INLINE = new Set(["txbxContent", "Fallback"]);
+
 /** Text a run of opaque XML shows: its `w:t` elements (field results, content controls). */
 function opaqueText(element: Element): string {
   let text = "";
-  for (const node of element.getElementsByTagNameNS("*", "*")) {
+  for (const node of element.children) {
+    if (NOT_INLINE.has(node.localName)) continue;
     if (node.localName === "t") text += node.textContent;
-    else if (node.localName === "tab" && node.parentElement?.localName === "r") text += "\t";
+    else if (node.localName === "tab") text += "\t";
+    else text += opaqueText(node);
   }
   return text;
 }
+
+/**
+ * The outermost descendants of opaque XML with one of `names` (local names), in order: not those
+ * inside a match (a run's text box, a cell's nested table) or content not shown in the line.
+ */
+function outermost(element: Element, names: ReadonlySet<string>): Element[] {
+  const found: Element[] = [];
+  for (const node of element.children) {
+    if (names.has(node.localName)) found.push(node);
+    else if (!NOT_INLINE.has(node.localName)) found.push(...outermost(node, names));
+  }
+  return found;
+}
+const PARAGRAPHS = new Set(["p"]);
+const RUNS = new Set(["r"]);
+const ROWS = new Set(["tr"]);
+const CELLS = new Set(["tc"]);
+const CELL_CONTENT = new Set(["p", "tbl"]);
 
 /**
  * Parses verbatim WordprocessingML (opaque content) into an inert XML document, declaring the
@@ -253,8 +281,23 @@ export function renderBlocks(
   const resolver = new Resolver(document);
   const content = document.content.content ?? [];
   const attrsOf = (node: NodeJSON) => (node.attrs ?? {}) as Record<string, unknown>;
+  // In the final view a paragraph whose mark was deleted joins the next paragraph (not a
+  // table, and the document's last mark cannot be deleted).
+  const joins = (index: number) => {
+    const node = content[index];
+    const revision = node && (attrsOf(node).revision as { deletion?: unknown } | null | undefined);
+    return (
+      review === "final" &&
+      node?.type === "paragraph" &&
+      !!revision?.deletion &&
+      content[index + 1]?.type === "paragraph"
+    );
+  };
+  // A joined paragraph is numbered once, with the first paragraph's marker.
   const markers = resolver.markers(
-    content.map((node) => (node.type === "paragraph" ? attrsOf(node) : { numbering: { id: 0 } })),
+    content.map((node, index) =>
+      node.type === "paragraph" && !joins(index - 1) ? attrsOf(node) : { numbering: { id: 0 } },
+    ),
   );
   const blocks: WordBlock[] = [];
   let carried: { nodes: number[]; inline: NodeJSON[] } | null = null;
@@ -263,16 +306,11 @@ export function renderBlocks(
 
   content.forEach((node, index) => {
     if (node.type !== "paragraph") {
-      if (carried) {
-        // A deleted paragraph mark before a table: nothing to merge into; shown as it is.
-        carried = null;
-      }
       blocks.push(opaqueBlock(node, index, resolver, doc, ratio));
       return;
     }
     const attrs = attrsOf(node);
-    const revision = attrs.revision as { deletion?: unknown } | null | undefined;
-    if (review === "final" && revision?.deletion && index < content.length - 1) {
+    if (joins(index)) {
       const previous: { nodes: number[]; inline: NodeJSON[] } = carried ?? {
         nodes: [],
         inline: [],
@@ -486,11 +524,12 @@ function opaqueBlock(
   const element = doc.createElement("div");
   element.dataset.foliOpaque = String(attrs.label ?? "");
   element.style.margin = "0";
+  element.style.display = "flow-root";
   const xml = parseOpaque(String(attrs.xml ?? ""), doc);
   let after = 0;
   if (xml?.localName === "tbl") element.append(opaqueTable(xml, resolver, doc, ratio));
   else if (xml) {
-    const paragraphs = [...xml.getElementsByTagNameNS("*", "p")];
+    const paragraphs = outermost(xml, PARAGRAPHS);
     paragraphs.forEach((p, i) => {
       const rendered = opaqueParagraph(p, resolver, doc, ratio);
       if (i < paragraphs.length - 1) rendered.element.style.marginBottom = `${rendered.after}px`;
@@ -545,7 +584,7 @@ function opaqueParagraph(
   const element = doc.createElement(tagOf(paragraph));
   styleParagraph(element, paragraph);
   styleRun(element, run, lineHeight(paragraph, run, ratio(fontStack(latin(run)))));
-  for (const r of p.getElementsByTagNameNS("*", "r")) {
+  for (const r of outermost(p, RUNS)) {
     // Deleted text is `w:delText`: not read, in markup too (shortcut: shown as accepted).
     const text = opaqueText(r);
     const formatted = resolver.run(run, runMarks(child(r, "rPr")));
@@ -654,8 +693,7 @@ function opaqueTable(
     vertical: borderCss(child(borders, "insideV")),
   };
   const body = doc.createElement("tbody");
-  for (const tr of tbl.children) {
-    if (tr.localName !== "tr") continue;
+  for (const tr of outermost(tbl, ROWS)) {
     const row = doc.createElement("tr");
     const trPr = child(tr, "trPr");
     // A header row, repeated at the top of each page the table continues on.
@@ -663,8 +701,7 @@ function opaqueTable(
     if (child(trPr, "tblHeader") && header !== "0" && header !== "false")
       row.dataset.foliHeader = "";
     const rowMargins = margins(child(child(tr, "tblPrEx"), "tblCellMar"), tableMargins);
-    for (const tc of tr.children) {
-      if (tc.localName !== "tc") continue;
+    for (const tc of outermost(tr, CELLS)) {
       const tcPr = child(tc, "tcPr");
       const cell = doc.createElement("td");
       const span = Number(childValue(tcPr, "gridSpan"));
@@ -686,8 +723,11 @@ function opaqueTable(
         row.append(cell);
         continue;
       }
-      for (const p of tc.children) {
-        if (p.localName !== "p") continue;
+      for (const p of outermost(tc, CELL_CONTENT)) {
+        if (p.localName === "tbl") {
+          cell.append(opaqueTable(p, resolver, doc, ratio));
+          continue;
+        }
         // Word counts the space after a cell's last paragraph in the row's height too.
         const rendered = opaqueParagraph(p, resolver, doc, ratio);
         rendered.element.style.marginBottom = `${rendered.after}px`;

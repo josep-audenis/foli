@@ -271,7 +271,7 @@ fails when a bundle passes its budget.
 | Bundle            | Includes          | Minified | Gzipped |  Budget |
 | ----------------- | ----------------- | -------: | ------: | ------: |
 | `@folijs/core`    | core              |  88.5 kB | 28.6 kB | 29.6 kB |
-| `@folijs/view`    | view, core        | 106.0 kB | 35.5 kB | 36.2 kB |
+| `@folijs/view`    | view, core        | 106.4 kB | 35.6 kB | 36.2 kB |
 | `@folijs/react`   | react, view, core | 117.4 kB | 38.0 kB | 43.4 kB |
 | `FoliEditor` only | what it reaches   | 117.1 kB | 37.9 kB | 43.4 kB |
 | `@folijs/docx`    | docx, core        | 106.9 kB | 34.4 kB | 36.0 kB |

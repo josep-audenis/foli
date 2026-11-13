@@ -154,6 +154,21 @@ test("a paragraph kept together moves whole to the next page", async ({ page }) 
     [1, 1],
     [1, 6],
   ]);
+  // Taller than a page: split anyway (60 lines: 46 + 14), not cut off.
+  shown = await show(page, [lines(60, { keepLines: true }), p({}, text("after"))]);
+  expect(shown.map((s) => [s.page, s.line])).toEqual([
+    [0, 1],
+    [1, 15],
+  ]);
+  // A page break inside it still ends the page.
+  shown = await show(page, [
+    p({ keepLines: true }, text("a"), { type: "hardBreak" }, text("b"), { type: "pageBreak" }),
+    p({}, text("after")),
+  ]);
+  expect(shown.map((s) => [s.page, s.line])).toEqual([
+    [0, 1],
+    [1, 1],
+  ]);
 });
 
 test("a heading keeps with the paragraph after it", async ({ page }) => {
@@ -246,6 +261,19 @@ test("a table split across pages repeats its header rows", async ({ page }) => {
     p({}, text("after")),
   ]);
   expect(after[1]?.page).toBe(2);
+  // Two header rows, the first holding a nested table (its row and an empty paragraph: 40 px):
+  // the header is 60 px, not cut at the nested table's row. Page 1: 3 header lines and 43 rows.
+  const header = "<w:trPr><w:tblHeader/></w:trPr>";
+  const nested = `<w:tr>${header}<w:tc><w:tbl><w:tr><w:tc><w:p><w:r><w:t>inner</w:t></w:r></w:p></w:tc></w:tr></w:tbl><w:p/></w:tc></w:tr><w:tr>${header}<w:tc><w:p><w:r><w:t>Head 2</w:t></w:r></w:p></w:tc></w:tr>`;
+  await show(page, [
+    {
+      type: "opaqueBlock",
+      attrs: {
+        xml: `<w:tbl><w:tblGrid><w:gridCol w:w="4000"/></w:tblGrid>${nested}${rows}</w:tbl>`,
+      },
+    },
+  ]);
+  expect((await pages(page))[1]?.blocks[0]?.height).toBe(60 + 17 * 20);
 });
 
 test("the final view merges a paragraph whose mark was deleted into the next", async ({ page }) => {

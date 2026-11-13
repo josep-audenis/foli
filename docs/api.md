@@ -217,4 +217,6 @@ const view = new EditorView(host, editor, { editable: true, placeholder: "" });
   formats it. `review`: `"markup"` (default: insertions underlined, deletions struck through)
   or `"final"` (as if accepted). `DocumentPages`: `pages`, `pageOf(index)` and `lineOf(index)`
   (where the top-level node at `index` starts: the page, 0-based, and the line on that page,
-  1-based), `destroy()`. See [architecture.md](architecture.md#word-pages-packagesviewsrcword-86b).
+  1-based), `destroy()`. Measures as it is called: render after the document's fonts have
+  loaded (`document.fonts.ready`), into a container that is laid out and not scaled. See
+  [architecture.md](architecture.md#word-pages-packagesviewsrcword-86b).

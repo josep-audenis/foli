@@ -158,7 +158,8 @@ export function lineBottoms(element: HTMLElement): number[] {
 /** The height of a table's leading header rows (repeated on each page it continues on), or 0. */
 function headerHeight(element: HTMLElement): number {
   let bottom = 0;
-  for (const row of element.querySelectorAll("tr")) {
+  // The table's own rows: not those of a table nested in a cell.
+  for (const row of element.querySelectorAll(":scope > table > tbody > tr")) {
     if (!(row as HTMLElement).dataset || !("foliHeader" in (row as HTMLElement).dataset)) break;
     bottom = row.getBoundingClientRect().bottom;
   }
@@ -232,33 +233,34 @@ export function renderDocumentV3(
       return value;
     };
     const headers = new Map<WordBlock, number>();
+    const pageHeight = g.height - g.top - g.bottom;
     const boxes: BlockBox[] = group.blocks.map((block, i) => {
       const height = block.element.getBoundingClientRect().height;
       const repeat = block.element.querySelector("tr") ? headerHeight(block.element) : 0;
       if (repeat) headers.set(block, repeat);
       const next = group.blocks[i + 1];
+      const hasBreak = !!block.element.querySelector(`br[${WORD_PAGE_BREAK_ATTR}]`);
+      // A paragraph kept together is one line to the flow, unless it cannot be: taller than a
+      // page, or broken by a page break.
+      const kept = block.keepLines && !hasBreak && height <= pageHeight;
       return {
         height,
         marginTop: block.before,
         marginBottom: block.after,
         repeat,
         keepWithNext: block.keepNext,
-        // A paragraph kept together is one line to the flow.
-        lines: () => (block.keepLines ? [height] : linesOf(block)),
+        lines: () => (kept ? [height] : linesOf(block)),
         breaksAfter: () => {
-          const breaks = block.element.querySelector(`br[${WORD_PAGE_BREAK_ATTR}]`)
-            ? breakLines(block.element, linesOf(block))
-            : [];
+          const breaks = hasBreak ? breakLines(block.element, linesOf(block)) : [];
           // The next block starts a page: this one's last line ends it.
-          if (next?.pageBreakBefore) breaks.push((block.keepLines ? 1 : linesOf(block).length) - 1);
+          if (next?.pageBreakBefore) breaks.push((kept ? 1 : linesOf(block).length) - 1);
           return breaks;
         },
       };
     });
-    const height = g.height - g.top - g.bottom;
     // shortcut: widow and orphan control is on for every paragraph (Word's Normal has it; a
     // paragraph turning it off is still kept to two lines).
-    const fragments = flow(boxes, height, { orphans: 2, widows: 2, spacing: "word" });
+    const fragments = flow(boxes, pageHeight, { orphans: 2, widows: 2, spacing: "word" });
     // What placing needs of the layout, read while the blocks are still laid out: the lines of
     // split blocks, and which blocks end with an explicit page break.
     const endsWithBreak = new Set<WordBlock>();
