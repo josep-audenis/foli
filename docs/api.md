@@ -113,6 +113,16 @@ No DOM: runs in Node, workers and the browser.
   JSON types
   (`DocJSON`, `ParagraphJSON`, `HeadingJSON`, `TextJSON`…).
 
+### Schema v3 (the Word model; the editor moves to it in 0.3.0)
+
+- `parseDocumentV3(input)`, `migrateToV3(document)`, `schemaV3`, `FoliDocumentV3` and its parts:
+  [document-model.md](document-model.md#schema-v3-the-word-model-83-alongside-v2).
+- `new Resolver(document)`: a document's effective formatting, as Word computes it.
+  `paragraph(attrs)` gives a paragraph's properties (`ParagraphFormat`) and the formatting of its
+  text (`RunFormat`); `run(paragraphRun, marks)` a run's; `markers(paragraphs)` the list markers
+  (`ListMarker`: text, suffix, formatting) of a document's paragraphs in order.
+  `formatNumber(n, format)` writes a number in a Word number format.
+
 ### Editor
 
 `createEditor({ document?, plugins? }): Editor`: a headless editor (state, commands, undo
@@ -201,3 +211,10 @@ const view = new EditorView(host, editor, { editable: true, placeholder: "" });
   on Apple platforms) opens the link's href, read from the document, in a new tab with
   `noopener,noreferrer`.
 - `keyName(event)`: the key name `handleKey` expects (`"Mod-b"`, `"Shift-Enter"`).
+- `renderDocumentV3(document, container, { review? }): DocumentPages` (read-only preview of
+  the Word model, until the editor moves to it in 0.3.0): lays a schema v3 document out on
+  pages (`.foli-word-page`, `WORD_PAGE_CLASS`) appended to `container`, formatted as Word
+  formats it. `review`: `"markup"` (default: insertions underlined, deletions struck through)
+  or `"final"` (as if accepted). `DocumentPages`: `pages`, `pageOf(index)` and `lineOf(index)`
+  (where the top-level node at `index` starts: the page, 0-based, and the line on that page,
+  1-based), `destroy()`. See [architecture.md](architecture.md#word-pages-packagesviewsrcword-86b).

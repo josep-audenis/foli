@@ -18,6 +18,8 @@ export interface BlockBox {
   keepWithNext?: boolean;
   /** The lines that end with an explicit page break (indices into `lines()`), if any. */
   breaksAfter?(): readonly number[];
+  /** Height shown again at the top of each fragment after the first (a table's header rows). */
+  repeat?: number;
 }
 
 /** The lines `[fromLine, toLine)` of a block, placed on one page (`toLine` Infinity: to the end). */
@@ -32,6 +34,13 @@ export interface FlowRules {
   orphans: number;
   /** Fewest lines of a split block carried to the top of the next page. */
   widows: number;
+  /**
+   * How margins (paragraph spacing) combine. `css` (the default): as CSS in a padded page.
+   * `word`: as Word spaces paragraphs. The space after one and the space before the next add up.
+   * A page that a block flowed onto (not one an explicit break started, nor the first) drops
+   * the space before its first block. The space after the last block on a page need not fit.
+   */
+  spacing?: "css" | "word";
 }
 
 export const DEFAULT_RULES: FlowRules = { orphans: 2, widows: 2 };
@@ -52,6 +61,8 @@ export interface FlowState {
   onPage: number;
   /** An explicit page break ended the previous block: the next one starts a new page. */
   breakPending: boolean;
+  /** The page is the first or an explicit break started it (Word keeps its first space before). */
+  forcedPage: boolean;
 }
 
 /**
@@ -122,27 +133,31 @@ export function flowFrom(
   let state: FlowState = (
     reuse && reuse.previous.states[start]
       ? { ...reuse.previous.states[start] }
-      : { page: 0, used: 0, previousMargin: 0, onPage: 0, breakPending: false }
+      : { page: 0, used: 0, previousMargin: 0, onPage: 0, breakPending: false, forcedPage: true }
   ) as FlowState;
   /** Blocks that start a page because the keep-with-next rule moved them. */
   const breakBefore = new Set<number>();
-  const newPage = () => {
+  const word = rules.spacing === "word";
+  const newPage = (forced = false) => {
     state.page++;
     state.used = 0;
     state.onPage = 0;
+    state.forcedPage = forced;
   };
 
   const place = (box: BlockBox, index: number): Fragment[] => {
-    if ((state.breakPending || breakBefore.has(index)) && state.onPage) newPage();
+    if ((state.breakPending || breakBefore.has(index)) && state.onPage) newPage(state.breakPending);
     state.breakPending = false;
     const above = state.previousMargin;
     state.previousMargin = box.marginBottom;
-    const gap = () => (state.onPage ? Math.max(above, box.marginTop) : box.marginTop);
+    const gap = () => {
+      if (!state.onPage) return word && !state.forcedPage ? 0 : box.marginTop;
+      return word ? above + box.marginTop : Math.max(above, box.marginTop);
+    };
+    // The bottom margin that must fit on the page (Word lets the space after hang).
+    const below = word ? 0 : box.marginBottom;
     const forced = box.breaksAfter?.() ?? [];
-    if (
-      !forced.length &&
-      state.used + gap() + box.height + box.marginBottom <= pageHeight + SLACK
-    ) {
+    if (!forced.length && state.used + gap() + box.height + below <= pageHeight + SLACK) {
       state.used += gap() + box.height;
       state.onPage++;
       return [{ page: state.page, fromLine: 0, toLine: Infinity }];
@@ -158,11 +173,11 @@ export function flowFrom(
       while (segmentEnd < count && !breaks.has(segmentEnd)) segmentEnd++;
       segmentEnd = Math.min(segmentEnd + 1, count);
       const top = line ? (lines[line - 1] as number) : 0;
-      // Only the block's first fragment has the gap above it.
-      const spacing = line === 0 ? gap() : 0;
+      // Only the block's first fragment has the gap above it; the others repeat its header.
+      const spacing = line === 0 ? gap() : (box.repeat ?? 0);
       let end = line;
       while (end < segmentEnd) {
-        const bottom = (lines[end] as number) - top + (end + 1 === count ? box.marginBottom : 0);
+        const bottom = (lines[end] as number) - top + (end + 1 === count ? below : 0);
         if (state.used + spacing + bottom > pageHeight + SLACK) break;
         end++;
       }
@@ -276,6 +291,7 @@ function sameState(a: FlowState, b: FlowState): boolean {
     a.used === b.used &&
     a.previousMargin === b.previousMargin &&
     a.onPage === b.onPage &&
-    a.breakPending === b.breakPending
+    a.breakPending === b.breakPending &&
+    a.forcedPage === b.forcedPage
   );
 }

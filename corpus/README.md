@@ -99,6 +99,39 @@ Field structure (`w:fldChar`, `w:instrText`) and comment reference marks have no
 the field's result stays editable text. The tests check every imported paragraph's text against
 Word's (`reference/word/`).
 
+## Page agreement with Word
+
+`pnpm corpus:pages` (Playwright, Chromium) lays each document out with `renderDocumentV3`
+(`@folijs/view`, read-only, tracked changes accepted as in the reference data) and compares
+every paragraph outside tables with Word's reference: the page it starts on, and the line of
+that page. Paragraphs are matched by text, in order; those Foli does not show as paragraphs
+(inside content controls) are left out. Results go to `test-results/word-pages.json`.
+
+The numbers depend on the fonts. Chromium uses the installed ones; Word's default since 2023,
+Aptos, is an Office cloud font that is not installed system-wide, so the run serves it to the
+page from Office's font cache when one exists (`FOLI_FONT_DIR`, default the Windows cache;
+families in `FOLI_FONTS`, default `Aptos,Aptos Display`). The font files are read in place for
+that run only: never copied or committed.
+
+Baseline (2026-11-13, Word 16.0.20527, Chromium; of 106 paragraphs compared):
+
+| Document                       | Compared | On Word's page | On Word's line | Within a line | Without Aptos: page / line |
+| ------------------------------ | -------: | -------------: | -------------: | ------------: | -------------------------: |
+| 01-mutual-nda                  |       29 |             29 |             29 |            29 |                     29 / 8 |
+| 02-services-agreement-redlined |       16 |             16 |             15 |            16 |                    14 / 10 |
+| 03-offer-letter-template       |        9 |              9 |              9 |             9 |                      9 / 9 |
+| 04-board-report                |       35 |             35 |             33 |            34 |                    35 / 33 |
+| 05-business-letter             |       17 |             17 |             17 |            17 |                    17 / 17 |
+| **Total**                      |  **106** |        **106** |        **103** |       **105** |               **104 / 77** |
+
+The documents are short (1-4 pages) and most of their page breaks are explicit, so the page
+number alone says little: the line is the stricter measure, and it moves with the fonts. The
+three lines that differ: the paragraph after the fee table in 02 (Word counts the header row it
+repeats on the second page as a line; Foli does not), and two empty paragraphs around the table
+of contents in 04 (a field Foli keeps opaque). Not laid out yet, so not measured: headers and
+footers (their space is Word's margin here), footnotes, floating pictures, and text inside
+tables. Word's own PDF of each page is the next comparison (8.6c).
+
 ## Private documents
 
 Real documents (contracts, templates) are never committed. Keep them in a folder outside the

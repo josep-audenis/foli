@@ -10,7 +10,9 @@
   },
   "dependencies": {
     "@folijs/core": "workspace:*",
+    "@folijs/docx": "workspace:*",
     "@folijs/react": "workspace:*",
+    "@folijs/view": "workspace:*",
     "react": "^19.3.1",
     "react-dom": "^19.3.1"
   },
