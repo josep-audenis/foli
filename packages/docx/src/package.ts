@@ -73,6 +73,7 @@ export class DocxPackage {
   readonly #relationships = new Map<string, readonly Relationship[]>();
   readonly #xml = new Map<string, XmlDocument>();
   readonly #defaults: ReadonlyMap<string, string>;
+  readonly #overridden: ReadonlySet<string>;
   readonly #contentTypesText: string;
 
   /** @internal Use {@link readPackage}. */
@@ -84,7 +85,12 @@ export class DocxPackage {
     const typesXml = xml(data[index] as Uint8Array, CONTENT_TYPES, this.#options);
     const types = contentTypes(typesXml.root);
     this.#defaults = types.defaults;
-    this.#contentTypesText = typesXml.source;
+    this.#overridden = new Set(types.overrides.keys());
+    // Rewritten as UTF-8 when parts are added: the declaration says so.
+    this.#contentTypesText = typesXml.source.replace(
+      /^(<\?xml[^?]*?encoding=)(["'])[^"']*\2/,
+      "$1$2UTF-8$2",
+    );
 
     const parts: DocxPart[] = [];
     entries.forEach((entry, i) => {
@@ -168,7 +174,13 @@ export class DocxPackage {
       if (this.part(part.name) || add.filter((p) => key(p.name) === key(part.name)).length > 1) {
         throw new DocxError(`Part ${part.name} already exists`);
       }
-      if (part.contentType && this.#defaults.get(extension(part.name)) !== part.contentType) {
+      // An Override already there (a stale one, for a part the zip lacks) is not repeated.
+      const declared = this.#overridden.has(key(part.name));
+      if (
+        part.contentType &&
+        !declared &&
+        this.#defaults.get(extension(part.name)) !== part.contentType
+      ) {
         overrides.push(
           `<Override PartName="${escapeXml(part.name)}" ContentType="${escapeXml(part.contentType)}"/>`,
         );

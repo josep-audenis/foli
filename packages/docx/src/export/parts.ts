@@ -60,8 +60,8 @@ function otherAttributes(
     .join("");
 }
 
-function original(ext: string | undefined, ns: Namespaces) {
-  return ext ? fragment(ext, ns) : undefined;
+function original(ext: string | undefined, ns: Namespaces, expected?: string) {
+  return ext ? fragment(ext, ns, expected) : undefined;
 }
 
 function childSource(
@@ -100,15 +100,23 @@ function rebuild<T>(
   part: OriginalPart | undefined,
   modeled: (child: XmlElement) => T | null | undefined,
   write: (item: T, child: XmlElement | undefined) => string,
-  added: readonly { item: T; after: (child: XmlElement) => boolean }[],
+  added: readonly {
+    item: T;
+    after: (child: XmlElement) => boolean;
+    before?: (child: XmlElement) => boolean;
+  }[],
 ): string {
   const out: string[] = [];
   const insertAfter: (number | undefined)[] = added.map(() => undefined);
+  const insertBefore: (number | undefined)[] = added.map(() => undefined);
   for (const node of part?.root.children ?? []) {
     if (node.kind !== "element") {
       out.push(text(part as OriginalPart, node));
       continue;
     }
+    added.forEach((a, i) => {
+      if (insertBefore[i] === undefined && a.before?.(node)) insertBefore[i] = out.length;
+    });
     const item = modeled(node);
     if (item === undefined) out.push(text(part as OriginalPart, node));
     else if (item !== null) out.push(write(item, node));
@@ -118,7 +126,7 @@ function rebuild<T>(
   }
   // Insert from the end so earlier positions stay valid.
   const order = added
-    .map((a, i) => ({ a, at: insertAfter[i] ?? out.length, i }))
+    .map((a, i) => ({ a, at: insertAfter[i] ?? insertBefore[i] ?? out.length, i }))
     .sort((x, y) => y.at - x.at || y.i - x.i);
   for (const { a, at } of order) out.splice(at, 0, write(a.item, undefined));
   return out.join("");
@@ -188,9 +196,18 @@ function styleXml(style: StyleJSON, ns: Namespaces): string {
       "pPr",
       o && same(style.paragraph ?? {}, reread?.paragraph ?? {})
         ? (childSource(o, "pPr") ?? "")
-        : paragraphPropertiesXml({ ...(style.paragraph ?? {}), ext: childSource(o, "pPr") }, ns),
+        : paragraphPropertiesXml(
+            { ...(style.paragraph ?? {}), ext: childSource(o, "pPr") },
+            ns,
+            "w:pPr",
+            false,
+            true,
+          ),
     ],
-    ["rPr", runPropertiesXml(style.run ?? [], childSource(o, "rPr"), ns)],
+    [
+      "rPr",
+      runPropertiesXml(style.run ?? [], childSource(o, "rPr"), ns, "w:rPr", false, undefined, true),
+    ],
   ]);
   const children = merged(STYLE_ORDER, new Set(generated.keys()), generated, o);
   const open =
@@ -219,10 +236,21 @@ function defaultsXml(defaults: FoliDocumentV3["defaults"], ns: Namespaces): stri
   const pPrDefault = o ? child(o.element, "pPrDefault") : undefined;
   const sub = (e: XmlElement | undefined) =>
     e && o ? { element: e, source: o.source } : undefined;
-  const rPr = runPropertiesXml(defaults.run ?? [], childSource(sub(rPrDefault), "rPr"), ns);
+  const rPr = runPropertiesXml(
+    defaults.run ?? [],
+    childSource(sub(rPrDefault), "rPr"),
+    ns,
+    "w:rPr",
+    false,
+    undefined,
+    true,
+  );
   const pPr = paragraphPropertiesXml(
     { ...(defaults.paragraph ?? {}), ext: childSource(sub(pPrDefault), "pPr") },
     ns,
+    "w:pPr",
+    false,
+    true,
   );
   return `<w:docDefaults${attributesOf(o)}>${rPr ? `<w:rPrDefault>${rPr}</w:rPrDefault>` : "<w:rPrDefault/>"}${pPr ? `<w:pPrDefault>${pPr}</w:pPrDefault>` : "<w:pPrDefault/>"}</w:docDefaults>`;
 }
@@ -294,9 +322,18 @@ function levelXml(level: NumberingLevelJSON, ns: Namespaces): string {
       "pPr",
       o && same(level.paragraph ?? {}, reread?.paragraph ?? {})
         ? (childSource(o, "pPr") ?? "")
-        : paragraphPropertiesXml({ ...(level.paragraph ?? {}), ext: childSource(o, "pPr") }, ns),
+        : paragraphPropertiesXml(
+            { ...(level.paragraph ?? {}), ext: childSource(o, "pPr") },
+            ns,
+            "w:pPr",
+            false,
+            true,
+          ),
     ],
-    ["rPr", runPropertiesXml(level.run ?? [], childSource(o, "rPr"), ns)],
+    [
+      "rPr",
+      runPropertiesXml(level.run ?? [], childSource(o, "rPr"), ns, "w:rPr", false, undefined, true),
+    ],
   ]);
   const children = merged(LEVEL_ORDER, new Set(generated.keys()), generated, o);
   const open =
@@ -416,10 +453,12 @@ export function numberingXml(
       ...newAbstracts.map((a) => ({
         item: { kind: "abstract", a } as Item,
         after: (c: XmlElement) => isW(c, "abstractNum") || isW(c, "numPicBullet"),
+        before: (c: XmlElement) => isW(c, "num") || isW(c, "numIdMacAtCleanup"),
       })),
       ...newInstances.map((n) => ({
         item: { kind: "num", n } as Item,
         after: (c: XmlElement) => isW(c, "num") || isW(c, "abstractNum") || isW(c, "numPicBullet"),
+        before: (c: XmlElement) => isW(c, "numIdMacAtCleanup"),
       })),
     ],
   );
@@ -431,8 +470,8 @@ export function numberingXml(
 /** A comment's start tag: as written while author, initials and date are what was read from it. */
 function commentStart(comment: CommentJSON, ns: Namespaces): string {
   if (comment.ext) {
-    const o = fragment(`${comment.ext}</w:comment>`, ns);
-    if (o) {
+    const o = fragment(`${comment.ext}</w:comment>`, ns, "comment");
+    {
       const author = attr(o.element, "author") ?? "";
       const initials = attr(o.element, "initials");
       const date = attr(o.element, "date");
@@ -502,5 +541,5 @@ export function commentsExtendedXml(doc: FoliDocumentV3, part: OriginalPart | un
   if (!part) {
     return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\r\n<w15:commentsEx xmlns:w15="${W15}" xmlns:w="${W}">${entries}</w15:commentsEx>`;
   }
-  return wrapPart(part, part.root.name, { declarations: "" }, entries);
+  return wrapPart(part, part.root.name, { declarations: "", prefixes: new Set() }, entries);
 }

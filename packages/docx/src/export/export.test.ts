@@ -88,8 +88,10 @@ describe("the canonical comparison", () => {
     const a = p(
       '<w:r w:rsidR="1"><w:t>a</w:t></w:r><w:proofErr w:type="spellStart"/><w:r><w:t xml:space="preserve"> b</w:t><w:noBreakHyphen/><w:cr/></w:r><!-- x -->',
     );
-    const b = p("<w:r><w:t>a </w:t></w:r><w:r><w:t>b‑</w:t><w:br/></w:r>");
+    const b = p('<w:r><w:t xml:space="preserve">a </w:t></w:r><w:r><w:t>b‑</w:t><w:br/></w:r>');
     expect(canonical(a)).toBe(canonical(b));
+    // Without `preserve`, Word drops the ends' whitespace: so does the comparison.
+    expect(canonical(p("<w:r><w:t> a </w:t></w:r>"))).toBe(canonical(p("<w:r><w:t>a</w:t></w:r>")));
     const nested = p(
       '<w:hyperlink w:anchor="x"><w:ins w:id="1" w:author="A"><w:r><w:t>t</w:t></w:r></w:ins></w:hyperlink>',
     );
@@ -103,6 +105,13 @@ describe("the canonical comparison", () => {
     const base = p(
       '<w:r><w:rPr><w:b/></w:rPr><w:t>ab</w:t></w:r><w:bookmarkStart w:id="0" w:name="n"/>',
     );
+    // Whitespace Word keeps is text; deleted text is not inserted text.
+    expect(canonical(p('<w:r><w:t xml:space="preserve"> a</w:t></w:r>'))).not.toBe(
+      canonical(p("<w:r><w:t> a</w:t></w:r>")),
+    );
+    expect(
+      canonical(p('<w:del w:id="1" w:author="A"><w:r><w:delText>a</w:delText></w:r></w:del>')),
+    ).not.toBe(canonical(p('<w:del w:id="1" w:author="A"><w:r><w:t>a</w:t></w:r></w:del>')));
     for (const other of [
       p('<w:r><w:rPr><w:b/></w:rPr><w:t>ac</w:t></w:r><w:bookmarkStart w:id="0" w:name="n"/>'),
       p('<w:r><w:rPr><w:i/></w:rPr><w:t>ab</w:t></w:r><w:bookmarkStart w:id="0" w:name="n"/>'),
@@ -357,7 +366,16 @@ describe("exporting without a package", () => {
     const bytes = await exportDocx(document);
     const again = await importDocx(bytes);
     expect(again.report.opaque).toEqual({});
-    expect(values(again.document)).toEqual(values(document));
+    // The page margins Word requires but the document leaves out come back as Word's defaults.
+    expect(again.document.section.margins).toEqual({
+      ...document.section.margins,
+      header: 720,
+      footer: 720,
+      gutter: 0,
+    });
+    expect(values({ ...again.document, section: undefined })).toEqual(
+      values({ ...document, section: undefined }),
+    );
   });
 
   it("round-trips the model's values for any content", async () => {

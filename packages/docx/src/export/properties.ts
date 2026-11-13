@@ -209,6 +209,8 @@ function markChildren(m: MarkJSON | undefined, type: string, ns: Namespaces): st
         ns,
         "w:rPr",
         true,
+        undefined,
+        true,
       );
       return el(
         "w:rPrChange",
@@ -224,8 +226,10 @@ function markChildren(m: MarkJSON | undefined, type: string, ns: Namespaces): st
 const RUN_MODELED = new Set(Object.values(MARK_CHILDREN).flat());
 
 /**
- * A run's (or a style's, a level's, the defaults') properties as `w:rPr`. `ext` is the `w:rPr`
- * they were read from, if any. `always` writes `<w:rPr/>` even when empty.
+ * A run's properties as `w:rPr`. `ext` is the `w:rPr` they were read from, if any. `always`
+ * writes `<w:rPr/>` even when empty. With `properties` (a style's, a level's, the defaults', a
+ * paragraph mark's, a recorded change's previous properties) the model holds no formatting
+ * change: a `w:rPrChange` stays as the original has it.
  */
 export function runPropertiesXml(
   marks: readonly MarkJSON[],
@@ -234,14 +238,21 @@ export function runPropertiesXml(
   name = "w:rPr",
   always = false,
   extra?: { modeled: ReadonlySet<string>; generated: Map<string, string> },
+  properties = false,
 ): string {
-  const original = ext ? fragment(ext, ns) : undefined;
-  if (ext && !original) return ext; // not readable: as it was
-  const current = canonicalMarks(marks.filter((m) => Object.hasOwn(MARK_CHILDREN, m.type)));
-  const reread = original ? canonicalMarks(runProperties(original.element, reading(original))) : [];
+  const original = ext ? fragment(ext, ns, "rPr") : undefined;
+  const owned = (type: string) =>
+    Object.hasOwn(MARK_CHILDREN, type) && !(properties && type === "formatChange");
+  const current = canonicalMarks(marks.filter((m) => owned(m.type)));
+  const reread = original
+    ? canonicalMarks(
+        runProperties(original.element, reading(original)).filter((m) => owned(m.type)),
+      )
+    : [];
   if (original && same(current, reread) && !extra) return ext as string;
   const generated = new Map(extra?.generated);
   for (const [type, locals] of Object.entries(MARK_CHILDREN)) {
+    if (!owned(type)) continue;
     const now = current.find((m) => m.type === type);
     const before = reread.find((m) => m.type === type);
     const text = child(original, same(now, before), locals, () => markChildren(now, type, ns));
@@ -249,6 +260,7 @@ export function runPropertiesXml(
     for (const local of locals.slice(1)) generated.set(local, "");
   }
   const modeled = new Set([...RUN_MODELED, ...(extra?.modeled ?? [])]);
+  if (properties) modeled.delete("rPrChange");
   const children = merged(RPR_ORDER, modeled, generated, original);
   return children || attributesOf(original) || always
     ? `<${name}${attributesOf(original)}>${children}</${name}>`
@@ -392,7 +404,7 @@ function paragraphChild(name: string, value: unknown, ns: Namespaces): string {
     case "section":
       return sectionXml(v, ns);
     case "formatChange": {
-      const previous = paragraphPropertiesXml((v.previous as Json) ?? {}, ns, "w:pPr", true);
+      const previous = paragraphPropertiesXml((v.previous as Json) ?? {}, ns, "w:pPr", true, true);
       return el(
         "w:pPrChange",
         { "w:id": s(v.id), "w:author": s(v.author) ?? "", "w:date": s(v.date) },
@@ -439,34 +451,51 @@ function markRunProperties(attrs: Json, original: Original, ns: Namespaces): str
     generated.set("moveFrom", "");
     generated.set("moveTo", "");
   }
-  return runPropertiesXml((attrs.markFormat as MarkJSON[]) ?? [], ext, ns, "w:rPr", false, {
-    modeled: new Set(["ins", "del", "moveFrom", "moveTo"]),
-    generated,
-  });
+  return runPropertiesXml(
+    (attrs.markFormat as MarkJSON[]) ?? [],
+    ext,
+    ns,
+    "w:rPr",
+    false,
+    { modeled: new Set(["ins", "del", "moveFrom", "moveTo"]), generated },
+    true,
+  );
 }
 
+/** What only a paragraph's `w:pPr` has: a style's, a level's, the defaults' keep theirs as written. */
+const PARAGRAPH_ONLY = new Set(["section", "formatChange", "revision", "markFormat"]);
+
 /**
- * Paragraph properties (a paragraph's attributes, or a style's, a level's, the defaults') as
- * `w:pPr`; empty when there are none. A paragraph's `ext` is the `w:pPr` it was read from.
+ * Paragraph properties as `w:pPr`; empty when there are none. `ext` is the `w:pPr` they were
+ * read from. With `properties` (a style's, a level's, the defaults', a recorded change's
+ * previous properties) the model does not hold the mark's run properties, a section or a
+ * formatting change there: those stay as the original has them.
  */
 export function paragraphPropertiesXml(
   attrs: Json,
   ns: Namespaces,
   name = "w:pPr",
   always = false,
+  properties = false,
 ): string {
   const ext = attrs.ext as string | undefined;
-  const original = ext ? fragment(ext, ns) : undefined;
-  if (ext && !original) return ext;
-  const current = canonicalParagraph(
-    Object.fromEntries(Object.entries(attrs).filter(([k]) => k !== "attributes")),
-  );
+  const original = ext ? fragment(ext, ns, "pPr") : undefined;
+  const keep = ([k]: [string, unknown]) =>
+    k !== "attributes" && !(properties && PARAGRAPH_ONLY.has(k));
+  const current = canonicalParagraph(Object.fromEntries(Object.entries(attrs).filter(keep)));
   const reread = original
-    ? canonicalParagraph(paragraphProperties(original.element, reading(original), true))
+    ? canonicalParagraph(
+        Object.fromEntries(
+          Object.entries(
+            paragraphProperties(original.element, reading(original), !properties),
+          ).filter(keep),
+        ),
+      )
     : {};
   if (original && same(current, reread)) return ext as string;
   const generated = new Map<string, string>();
   for (const [prop, local] of Object.entries(PARAGRAPH_CHILDREN)) {
+    if (properties && PARAGRAPH_ONLY.has(prop)) continue;
     generated.set(
       local,
       child(original, same(current[prop], reread[prop]), [local], () =>
@@ -474,8 +503,11 @@ export function paragraphPropertiesXml(
       ),
     );
   }
-  generated.set("rPr", markRunProperties(current, original, ns));
-  const children = merged(PPR_ORDER, PARAGRAPH_MODELED, generated, original);
+  if (!properties) generated.set("rPr", markRunProperties(current, original, ns));
+  const modeled = properties
+    ? new Set([...PARAGRAPH_MODELED].filter((l) => !["rPr", "sectPr", "pPrChange"].includes(l)))
+    : PARAGRAPH_MODELED;
+  const children = merged(PPR_ORDER, modeled, generated, original);
   return children || attributesOf(original) || always
     ? `<${name}${attributesOf(original)}>${children}</${name}>`
     : "";
@@ -536,14 +568,15 @@ function sectionChild(name: string, value: unknown): string {
     case "pageSize":
       return el("w:pgSz", { "w:w": s(v.width), "w:h": s(v.height), "w:orient": s(v.orientation) });
     case "margins":
+      // CT_PageMar requires all seven: a missing one takes Word's default.
       return el("w:pgMar", {
-        "w:top": s(v.top),
-        "w:right": s(v.right),
-        "w:bottom": s(v.bottom),
-        "w:left": s(v.left),
-        "w:header": s(v.header),
-        "w:footer": s(v.footer),
-        "w:gutter": s(v.gutter),
+        "w:top": s(v.top ?? 1440),
+        "w:right": s(v.right ?? 1440),
+        "w:bottom": s(v.bottom ?? 1440),
+        "w:left": s(v.left ?? 1440),
+        "w:header": s(v.header ?? 720),
+        "w:footer": s(v.footer ?? 720),
+        "w:gutter": s(v.gutter ?? 0),
       });
     case "titlePage":
       return onOff("titlePg", value as boolean);
@@ -555,8 +588,7 @@ function sectionChild(name: string, value: unknown): string {
 /** A section as `w:sectPr` (always written: an empty one is a section break with Word's defaults). */
 export function sectionXml(section: Json, ns: Namespaces): string {
   const ext = section.ext as string | undefined;
-  const original = ext ? fragment(ext, ns) : undefined;
-  if (ext && !original) return ext;
+  const original = ext ? fragment(ext, ns, "sectPr") : undefined;
   const reread = original ? readSection(original.element, reading(original)) : {};
   if (original && same({ ...section, ext: undefined }, { ...reread, ext: undefined }))
     return ext as string;

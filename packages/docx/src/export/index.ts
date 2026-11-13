@@ -18,7 +18,13 @@ import {
   stylesXml,
 } from "./parts.js";
 import { sectionXml } from "./properties.js";
-import { DEFAULT_NAMESPACES, escapeAttribute, type Namespaces, namespacesOf } from "./xmlout.js";
+import {
+  DEFAULT_NAMESPACES,
+  escapeAttribute,
+  type Namespaces,
+  NEW_ROOT_ATTRIBUTES,
+  namespacesOf,
+} from "./xmlout.js";
 
 const CT = {
   main: "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml",
@@ -107,8 +113,68 @@ export async function exportDocx(
   document: FoliDocumentV3,
   original?: DocxPackage,
 ): Promise<Uint8Array> {
-  const doc = parseDocumentV3(document);
+  const doc = withThreadIds(parseDocumentV3(document), original);
   return original ? intoPackage(doc, original) : newPackage(doc);
+}
+
+const PARA_ID = "w14:paraId";
+type Json = Record<string, unknown>;
+
+/** A comment's last paragraph's `w14:paraId`: what `commentsExtended` keys its thread state by. */
+function paraIdOf(comment: FoliDocumentV3["comments"][number]): string | undefined {
+  const last = comment.content.filter((b) => b.type === "paragraph").at(-1);
+  return (last?.attrs?.attributes as Record<string, string> | undefined)?.[PARA_ID];
+}
+
+/**
+ * The document with a `w14:paraId` on the last paragraph of each comment that is in a thread
+ * (a reply, replied to, or resolved) and has none (a comment made in the editor), so its thread
+ * state can be written. Unique, below 0x80000000 as Word requires. Not when the comments part
+ * cannot declare it (an existing part without the `w14` namespace).
+ */
+function withThreadIds(doc: FoliDocumentV3, pkg: DocxPackage | undefined): FoliDocumentV3 {
+  const parents = new Set(doc.comments.map((c) => c.parent).filter((p) => p !== undefined));
+  const needs = doc.comments.filter(
+    (c) =>
+      (c.parent !== undefined || c.done !== undefined || parents.has(c.id)) &&
+      !paraIdOf(c) &&
+      c.content.some((b) => b.type === "paragraph"),
+  );
+  if (!needs.length) return doc;
+  if (pkg) {
+    const name = pkg
+      .relationships(pkg.mainDocument)
+      .find((r) => r.type === REL.comments && !r.external)?.partName;
+    const part = name ? pkg.part(name) : undefined;
+    if (
+      part &&
+      !namespacesOf(pkg.xml(part.name).root, pkg.xml(part.name).source).prefixes.has("w14")
+    )
+      return doc;
+  }
+  const used = new Set<string>();
+  JSON.stringify(doc, (key, value) => {
+    if (key === PARA_ID && typeof value === "string") used.add(value.toUpperCase());
+    return value;
+  });
+  let next = 0x10000000;
+  const fresh = () => {
+    let id: string;
+    do id = (next++).toString(16).toUpperCase().padStart(8, "0");
+    while (used.has(id));
+    used.add(id);
+    return id;
+  };
+  const copy = structuredClone(doc);
+  for (const comment of copy.comments) {
+    if (!needs.some((c) => c.id === comment.id) || paraIdOf(comment)) continue;
+    const last = comment.content.filter((b) => b.type === "paragraph").at(-1) as { attrs?: Json };
+    last.attrs = {
+      ...(last.attrs ?? {}),
+      attributes: { ...((last.attrs?.attributes as Json) ?? {}), [PARA_ID]: fresh() },
+    };
+  }
+  return copy;
 }
 
 async function intoPackage(doc: FoliDocumentV3, pkg: DocxPackage): Promise<Uint8Array> {
@@ -120,9 +186,7 @@ async function intoPackage(doc: FoliDocumentV3, pkg: DocxPackage): Promise<Uint8
   const rels = new Relationships(pkg.relationships(mainName));
   const context = contextFor(namespaces, rels);
 
-  const content =
-    blocksXml(doc.content.content ?? [], context) +
-    sectionXml(doc.section as Record<string, unknown>, namespaces);
+  const content = blocksXml(doc.content.content ?? [], context) + bodySection(doc, namespaces);
   const documentXml =
     body.openEnd === body.end
       ? `${main.source.slice(0, body.start)}<${body.name}>${content}</${body.name}>${main.source.slice(body.end)}`
@@ -131,7 +195,7 @@ async function intoPackage(doc: FoliDocumentV3, pkg: DocxPackage): Promise<Uint8
   const replace = new Map<string, Uint8Array>();
   const add: NewPart[] = [];
   const set = (name: string, text: string) => {
-    if (pkg.text(name) !== text) replace.set(name, encoder.encode(text));
+    if (pkg.text(name) !== text) replace.set(name, encoder.encode(utf8Declaration(text)));
   };
   set(mainName, documentXml);
 
@@ -154,6 +218,16 @@ async function intoPackage(doc: FoliDocumentV3, pkg: DocxPackage): Promise<Uint8
       return existing.name;
     }
     if (!needed) return undefined;
+    if (pkg.part(defaultName)) {
+      // There, but not related to the document: written in place, then related.
+      const xml = pkg.xml(defaultName);
+      set(
+        defaultName,
+        write({ root: xml.root, source: xml.source }, namespacesOf(xml.root, xml.source)),
+      );
+      rels.add(type, relative(mainName, defaultName), false);
+      return defaultName;
+    }
     add.push({
       name: defaultName,
       data: encoder.encode(write(undefined, namespaces)),
@@ -233,11 +307,9 @@ function changedThreads(doc: FoliDocumentV3, pkg: DocxPackage): boolean {
       states.set(get("paraId") ?? "", { parent: get("paraIdParent"), done: get("done") });
     }
   }
-  const paraId = (id: number | undefined) => {
-    const comment = doc.comments.find((c) => c.id === id);
-    const last = comment?.content.filter((b) => b.type === "paragraph").at(-1);
-    return (last?.attrs?.attributes as Record<string, string> | undefined)?.["w14:paraId"];
-  };
+  const byId = new Map<number, string | undefined>();
+  for (const c of doc.comments) if (!byId.has(c.id)) byId.set(c.id, paraIdOf(c));
+  const paraId = (id: number | undefined) => (id === undefined ? undefined : byId.get(id));
   for (const comment of doc.comments) {
     const id = paraId(comment.id);
     if (!id) continue;
@@ -255,9 +327,15 @@ function changedThreads(doc: FoliDocumentV3, pkg: DocxPackage): boolean {
 
 /** A new package: content types, relationships, the document and the parts it needs. */
 async function newPackage(doc: FoliDocumentV3): Promise<Uint8Array> {
+  const reference = packageReference(doc);
+  if (reference) {
+    throw new DocxError(
+      `The document refers to a part of its original package (${reference}): export it with that package`,
+    );
+  }
   const rels = new Relationships([]);
   const context = contextFor(DEFAULT_NAMESPACES, rels);
-  const main = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\r\n<w:document ${DEFAULT_NAMESPACES.declarations}><w:body>${blocksXml(doc.content.content ?? [], context)}${sectionXml(doc.section as Record<string, unknown>, DEFAULT_NAMESPACES)}</w:body></w:document>`;
+  const main = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\r\n<w:document ${NEW_ROOT_ATTRIBUTES}><w:body>${blocksXml(doc.content.content ?? [], context)}${bodySection(doc, DEFAULT_NAMESPACES)}</w:body></w:document>`;
   const parts: { name: string; text: string; contentType: string }[] = [
     { name: "/word/document.xml", text: main, contentType: CT.main },
   ];
@@ -288,6 +366,14 @@ async function newPackage(doc: FoliDocumentV3): Promise<Uint8Array> {
         text: commentRels.xml(undefined),
         contentType: CT.rels,
       });
+    if (doc.comments.some((c) => paraIdOf(c) && (c.parent !== undefined || c.done !== undefined))) {
+      add(
+        "/word/commentsExtended.xml",
+        REL.commentsExtended,
+        CT.commentsExtended,
+        commentsExtendedXml(doc, undefined),
+      );
+    }
   }
   parts.push({
     name: "/word/_rels/document.xml.rels",
@@ -312,4 +398,48 @@ async function newPackage(doc: FoliDocumentV3): Promise<Uint8Array> {
   const entries = [];
   for (const [name, text] of files) entries.push(await deflateEntry(name, encoder.encode(text)));
   return writeZip(entries);
+}
+
+/** The body's last section: written when the document has one or read one (an empty `{}` read
+ * from nothing is Word's default page, written as no `w:sectPr`). */
+function bodySection(doc: FoliDocumentV3, namespaces: Namespaces): string {
+  const section = doc.section as Record<string, unknown>;
+  return Object.keys(section).length ? sectionXml(section, namespaces) : "";
+}
+
+/**
+ * Where the document refers to a part of a package by relationship id (headers, footers,
+ * pictures and other content kept verbatim): such a document needs that package to export.
+ */
+function packageReference(doc: FoliDocumentV3): string | undefined {
+  const sections = [doc.section, ...(doc.content.content ?? []).map((b) => b.attrs?.section)];
+  for (const s of sections) {
+    const section = s as { headers?: object; footers?: object } | undefined;
+    if (section?.headers || section?.footers) return "a header or footer";
+  }
+  let found: string | undefined;
+  JSON.stringify([doc.content, doc.comments], (key, value) => {
+    if (!found && key === "xml" && typeof value === "string" && /\sr:[A-Za-z]+="/.test(value))
+      found = "content kept verbatim";
+    const link = value as {
+      type?: string;
+      attrs?: { href?: unknown; attributes?: Record<string, string> };
+    };
+    // A link with a target gets a new relationship; one without keeps its reference.
+    if (
+      !found &&
+      link?.type === "link" &&
+      link.attrs?.href == null &&
+      link.attrs?.attributes?.["r:id"]
+    ) {
+      found = "a hyperlink";
+    }
+    return value;
+  });
+  return found;
+}
+
+/** A part's text with an encoding declaration of UTF-8, the encoding it is written in. */
+function utf8Declaration(text: string): string {
+  return text.replace(/^(<\?xml[^?]*?encoding=)(["'])[^"']*\2/, "$1$2UTF-8$2");
 }

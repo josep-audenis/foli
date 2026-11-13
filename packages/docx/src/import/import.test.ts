@@ -11,7 +11,6 @@ const names = readdirSync(CORPUS).filter((n) => n.endsWith(".docx"));
 const load = (name: string) => importDocx(new Uint8Array(readFileSync(new URL(name, CORPUS))));
 
 const W_NS = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
-const R_NS = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
 
 const blocksOf = async (body: string, options?: Parameters<typeof docx>[1]) => {
   const result = await importDocx(await docx(body, options));
@@ -234,6 +233,13 @@ describe("importing WordprocessingML", () => {
       "w:proofErr": 1,
       "w:r@w:rsidR": 1,
     });
+  });
+
+  it("reads text as Word does: ends trimmed unless xml:space is preserve", async () => {
+    const { blocks } = await blocksOf(
+      '<w:p><w:r><w:t> a </w:t></w:r></w:p><w:p><w:r><w:t xml:space="preserve"> b </w:t></w:r></w:p>',
+    );
+    expect(blocks.map((p) => p.content?.[0]?.text)).toEqual(["a", " b "]);
   });
 
   it("resolves hyperlinks against the part's relationships", async () => {

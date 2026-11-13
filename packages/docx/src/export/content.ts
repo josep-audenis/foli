@@ -5,7 +5,7 @@
 
 import type { MarkJSON, NodeJSON } from "@folijs/core";
 import { paragraphPropertiesXml, runPropertiesXml, same } from "./properties.js";
-import { el, escapeAttribute, escapeText, type Namespaces } from "./xmlout.js";
+import { bagXml, el, escapeText, fragment, type Namespaces } from "./xmlout.js";
 
 export interface WriteContext {
   readonly namespaces: Namespaces;
@@ -18,26 +18,26 @@ export interface WriteContext {
 
 type Json = Record<string, unknown>;
 
+/** Opaque XML as kept, once checked to be one element that fits the part (DocxError otherwise). */
+function verbatim(xml: unknown, context: WriteContext): string {
+  const text = typeof xml === "string" ? xml : "";
+  fragment(text, context.namespaces);
+  return text;
+}
+
 export function blocksXml(blocks: readonly NodeJSON[], context: WriteContext): string {
   let out = "";
   for (const block of blocks) {
     if (block.type === "paragraph") out += paragraphXml(block, context);
-    else if (block.type === "opaqueBlock") out += (block.attrs?.xml as string) ?? "";
+    else if (block.type === "opaqueBlock") out += verbatim(block.attrs?.xml, context);
   }
   return out;
 }
 
-/** An element's own attributes from its `attributes` bag, as written. */
-function bag(attributes: unknown): string {
-  if (!attributes || typeof attributes !== "object") return "";
-  return Object.entries(attributes as Record<string, string>)
-    .map(([name, value]) => ` ${name}="${escapeAttribute(value)}"`)
-    .join("");
-}
-
 export function paragraphXml(p: NodeJSON, context: WriteContext): string {
   const attrs = (p.attrs ?? {}) as Json;
-  return `<w:p${bag(attrs.attributes)}>${paragraphPropertiesXml(attrs, context.namespaces)}${inlinesXml(p.content ?? [], context)}</w:p>`;
+  const own = bagXml(attrs.attributes, context.namespaces);
+  return `<w:p${own}>${paragraphPropertiesXml(attrs, context.namespaces)}${inlinesXml(p.content ?? [], context)}</w:p>`;
 }
 
 const markOf = (node: NodeJSON, type: string) => node.marks?.find((m) => m.type === type);
@@ -82,8 +82,10 @@ function inlinesXml(nodes: readonly NodeJSON[], context: WriteContext): string {
                   "del",
                   "moveFrom",
                   runsXml(g2, !!del, context),
+                  context,
                 ),
             ),
+            context,
           ),
       );
       return link ? hyperlinkXml(link as MarkJSON, inner, context) : inner;
@@ -91,11 +93,14 @@ function inlinesXml(nodes: readonly NodeJSON[], context: WriteContext): string {
   );
 }
 
+const CHANGE_ATTRIBUTES = ["w:id", "w:author", "w:date"];
+
 function wrapChange(
   mark: MarkJSON | undefined,
   local: string,
   moveLocal: string,
   inner: string,
+  context: WriteContext,
 ): string {
   if (!mark) return inner;
   const a = (mark.attrs ?? {}) as Json;
@@ -105,7 +110,7 @@ function wrapChange(
     "w:author": String(a.author ?? ""),
     "w:date": a.date as string | undefined,
   }).slice(0, -2);
-  return `${open}${bag(a.attributes)}>${inner}</${name}>`;
+  return `${open}${bagXml(a.attributes, context.namespaces, CHANGE_ATTRIBUTES)}>${inner}</${name}>`;
 }
 
 function hyperlinkXml(link: MarkJSON, inner: string, context: WriteContext): string {
@@ -113,13 +118,15 @@ function hyperlinkXml(link: MarkJSON, inner: string, context: WriteContext): str
   const attributes = { ...((a.attributes as Record<string, string>) ?? {}) };
   const original = attributes["r:id"];
   delete attributes["r:id"];
-  const id = typeof a.href === "string" ? context.hyperlink(a.href, original) : undefined;
+  // A target: its relationship. None (a relationship the package does not have, read as no
+  // target): the original reference as it was.
+  const id = typeof a.href === "string" ? context.hyperlink(a.href, original) : original;
   const open = el("w:hyperlink", {
     "r:id": id,
     "w:anchor": a.anchor as string | undefined,
     "w:tooltip": a.tooltip as string | undefined,
   }).slice(0, -2);
-  return `${open}${bag(attributes)}>${inner}</w:hyperlink>`;
+  return `${open}${bagXml(attributes, context.namespaces, ["r:id", "w:anchor", "w:tooltip"])}>${inner}</w:hyperlink>`;
 }
 
 /** Inline nodes that are a run's content (the rest stands between runs). */
@@ -143,7 +150,7 @@ function runsXml(nodes: readonly NodeJSON[], deleted: boolean, context: WriteCon
     (n) => (inRun(n) ? runMarks(n) : n),
     (group) => {
       const first = group[0] as NodeJSON;
-      if (!inRun(first)) return group.map(markerXml).join("");
+      if (!inRun(first)) return group.map((n) => markerXml(n, context)).join("");
       const marks = runMarks(first);
       const ext = marks.find((m) => m.type === "runExt")?.attrs?.xml as string | undefined;
       const rPr = runPropertiesXml(
@@ -151,15 +158,15 @@ function runsXml(nodes: readonly NodeJSON[], deleted: boolean, context: WriteCon
         ext,
         context.namespaces,
       );
-      return `<w:r>${rPr}${group.map((n) => runContentXml(n, deleted)).join("")}</w:r>`;
+      return `<w:r>${rPr}${group.map((n) => runContentXml(n, deleted, context)).join("")}</w:r>`;
     },
   );
 }
 
-function markerXml(node: NodeJSON): string {
+function markerXml(node: NodeJSON, context: WriteContext): string {
   const a = (node.attrs ?? {}) as Json;
   const tag = (name: string, attrs: Record<string, string | undefined>) =>
-    `${el(name, attrs).slice(0, -2)}${bag(a.attributes)}/>`;
+    `${el(name, attrs).slice(0, -2)}${bagXml(a.attributes, context.namespaces, Object.keys(attrs))}/>`;
   switch (node.type) {
     case "bookmarkStart":
       return tag("w:bookmarkStart", { "w:id": String(a.id), "w:name": String(a.name ?? "") });
@@ -170,21 +177,27 @@ function markerXml(node: NodeJSON): string {
     case "commentEnd":
       return tag("w:commentRangeEnd", { "w:id": String(a.id) });
     case "opaqueInline":
-      return (a.xml as string) ?? "";
+      return verbatim(a.xml, context);
     default:
       return "";
   }
 }
 
-/** Text as `w:t` (or `w:delText`), with tabs and Word's special hyphens as their elements. */
+/**
+ * Text as `w:t` (or `w:delText`), with tabs and Word's special hyphens as their elements, and
+ * line ends and vertical tabs (Office's line break in pasted text) as breaks.
+ */
 function textXml(text: string, deleted: boolean): string {
   const name = deleted ? "w:delText" : "w:t";
   let out = "";
-  for (const piece of text.split(/([\t‑­])/)) {
+  // A vertical tab (U+000B) is a line break, as Office pastes it.
+  const lines = text.split(String.fromCharCode(11)).join("\n");
+  for (const piece of lines.split(/(\r\n|[\t‑­\n\r])/)) {
     if (piece === "") continue;
     if (piece === "\t") out += "<w:tab/>";
     else if (piece === "‑") out += "<w:noBreakHyphen/>";
     else if (piece === "­") out += "<w:softHyphen/>";
+    else if (piece === "\n" || piece === "\r" || piece === "\r\n") out += "<w:br/>";
     else {
       const preserve = /^\s|\s$/.test(piece) ? ' xml:space="preserve"' : "";
       out += `<${name}${preserve}>${escapeText(piece)}</${name}>`;
@@ -193,7 +206,7 @@ function textXml(text: string, deleted: boolean): string {
   return out;
 }
 
-function runContentXml(node: NodeJSON, deleted: boolean): string {
+function runContentXml(node: NodeJSON, deleted: boolean, context: WriteContext): string {
   const a = (node.attrs ?? {}) as Json;
   switch (node.type) {
     case "text":
@@ -207,9 +220,9 @@ function runContentXml(node: NodeJSON, deleted: boolean): string {
     case "columnBreak":
       return el("w:br", { "w:type": "column" });
     case "commentReference":
-      return `${el("w:commentReference", { "w:id": String(a.id) }).slice(0, -2)}${bag(a.attributes)}/>`;
+      return `${el("w:commentReference", { "w:id": String(a.id) }).slice(0, -2)}${bagXml(a.attributes, context.namespaces, ["w:id"])}/>`;
     case "opaqueInline":
-      return (a.xml as string) ?? "";
+      return verbatim(a.xml, context);
     default:
       return "";
   }

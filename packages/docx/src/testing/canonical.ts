@@ -2,7 +2,8 @@
  * The canonical form export is compared with (8.5): a part's XML as a tree in which exactly
  * what import does not keep (packages/docx/README.md, "Not kept exactly") is normalized away.
  * - Comments, processing instructions, and whitespace between elements are ignored; attribute
- *   order is irrelevant; `xml:space` is ignored.
+ *   order is irrelevant; text is read as Word reads it (ends trimmed unless `xml:space` is
+ *   `preserve`), whether or not `xml:space` is written.
  * - Spelling marks (`w:proofErr`), Word's rendered page breaks (`w:lastRenderedPageBreak`) and
  *   editing session ids on runs (`w:r@w:rsid*`) are dropped.
  * - A paragraph's content is a list of leaves, each a run's content item (text, break, …) or a
@@ -79,7 +80,9 @@ function paragraph(p: XmlElement): Canon {
         ]);
         for (const x of c.children) {
           if (x.kind !== "element" || x === rPr || (x.ns === W && DROPPED.has(x.local))) continue;
-          leaves.push({ context, item: runItem(x) });
+          // Deleted text (w:delText) is not text (w:t): joined only with its own kind.
+          const kind = x.ns === W && x.local === "delText" ? `${context}|delText` : context;
+          leaves.push({ context: kind, item: runItem(x) });
         }
       } else {
         leaves.push({ context: JSON.stringify([[...wrappers].sort()]), item: element(c) });
@@ -114,7 +117,12 @@ function paragraph(p: XmlElement): Canon {
 function runItem(x: XmlElement): Canon {
   if (x.ns === W) {
     if (x.local === "t" || x.local === "delText") {
-      return x.children.map((c) => (c.kind === "text" ? c.text : "")).join("");
+      // As Word reads it: ends trimmed unless `xml:space="preserve"`.
+      const text = x.children.map((c) => (c.kind === "text" ? c.text : "")).join("");
+      const preserve = x.attributes.some(
+        (a) => a.local === "space" && a.prefix === "xml" && a.value === "preserve",
+      );
+      return preserve ? text : text.trim();
     }
     if (x.local === "noBreakHyphen") return "‑";
     if (x.local === "softHyphen") return "­";

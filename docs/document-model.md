@@ -175,7 +175,7 @@ interface FoliDocumentV3 {
   defaults: { paragraph?: ParagraphPropertiesJSON; run?: MarkJSON[] }; // w:docDefaults
   styles: StyleJSON[]; // id, type, name, basedOn, next, link, isDefault, paragraph, run, ext
   numbering: { abstracts: AbstractNumberingJSON[]; instances: NumberingInstanceJSON[] };
-  theme?: ThemeJSON; // major/minor fonts, theme colors
+  theme?: ThemeJSON; // major/minor fonts, theme colors (read-only: export keeps the original part)
   comments: CommentJSON[]; // id, author, initials, date, content (v3 blocks), parent, done
   content: NodeJSON; // a v3 doc
 }

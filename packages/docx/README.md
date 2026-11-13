@@ -51,36 +51,53 @@ from `commentsExtended`) and sections:
 - **Failures** are `DocxError` (or `ZipError` from the package): a file that is not a
   WordprocessingML document, Strict Open XML (refused until a real file needs it), or an element
   past the model's absolute limits (over 16 MiB kept verbatim).
-  **Export** (`exportDocx(document, package?)`) writes the parts the editor owns (`document.xml`,
-  `styles.xml`, `numbering.xml`, `comments.xml`, `commentsExtended.xml`, and relationships for new
-  hyperlink targets) and copies every other part of the original package byte for byte (its
-  compressed entry included). Within the parts it writes:
+- **Not kept exactly**, to be equal under export's canonical comparison: run boundaries
+  (adjacent runs with the same properties become one text), `w:cr` (read as a line break),
+  `w:noBreakHyphen` and `w:softHyphen` (read as U+2011 and U+00AD), an explicit
+  `w:type="textWrapping"` on a break, XML comments, processing instructions and whitespace
+  between elements, and the empty paragraph given to an empty body or comment. Text is read as
+  Word reads it: without `xml:space="preserve"`, whitespace at the ends of a `w:t` is not text.
+
+**Export** (`exportDocx(document, package?)`) writes the parts the editor owns (`document.xml`,
+`styles.xml`, `numbering.xml`, `comments.xml`, `commentsExtended.xml`, and relationships for new
+hyperlink targets) and copies every other part of the original package byte for byte (its
+compressed entry included). Within the parts it writes:
 
 - An element read from the file comes back verbatim while its values are what import read from
   it (a paragraph's `w:pPr`, a run's `w:rPr`, a section, a style, a numbering level or
   definition, a comment's start tag). Changed, it is rewritten child by child: unchanged
   properties keep their original element (unknown attributes included), changed ones are
   written from the model, and children Foli does not model stay in the order Word requires.
+  Recorded formatting changes inside a style's, a level's, the defaults' or a paragraph mark's
+  properties are not modeled: they stay as written.
 - Opaque content, unknown attributes in bags, latent styles, picture bullets and anything else
   the parts hold outside the model come back as they were; styles, definitions and comments the
   editor removed are left out; new ones are added where Word expects them; a part the document
-  now needs (numbering, comments) is added with its content type and relationship.
+  now needs (numbering, comments, comment threads) is added with its content type and
+  relationship. Comments made in the editor that are in a thread get a `w14:paraId`, so their
+  replies and resolved state are written.
 - Runs are regrouped from the model: hyperlinks outermost, then insertions (or move
   destinations), deletions (or move sources) with `w:delText`, then runs of equal properties.
-- Without a package, a new one is made (from a migrated v2 document, say).
+  Line ends and vertical tabs in text become breaks, a tab character `w:tab` (read back as a
+  `tab` node); a character XML cannot hold (other control characters, lone surrogates) is
+  refused with a `DocxError`, never written.
+- Verbatim content (opaque nodes, `ext`, attribute bags) is checked against the part it goes
+  into: one element of the expected kind, prefixes the part declares, no attribute the writer
+  writes itself. What does not fit is a `DocxError`, never ill-formed XML.
+- Without a package, a new one is made (from a migrated v2 document, say), declaring Word's
+  namespaces. A document that refers to parts of its original package (headers, footers,
+  pictures, content kept verbatim with relationship ids) needs that package: exporting it
+  without one is a `DocxError`.
+- Not written: the theme (read-only in the model: the original part is kept; a new package has
+  none, so Word's default applies). Page margins Word requires but the document leaves out are
+  written with Word's defaults. A part read as UTF-16 is written as UTF-8, declared so.
 
 Checked: the corpus exported without edits equals the original under the canonical comparison
 (`src/testing/canonical.ts`), with every other part, and every unchanged element, byte for byte;
-re-imported, it is the same document; Word opens the exports (unchanged, edited, and new
+re-imported, it is the same document; random edits leave every other paragraph identical and
+the edited one's unknown properties in place; Word opens the exports (unchanged, edited, and new
 packages) and finds the reference numbers in the unchanged ones
 (`scripts/corpus/rewrite-corpus.mjs`).
-
-- **Not kept exactly**, to be equal under export's canonical comparison (8.5): run boundaries
-  (adjacent runs with the same properties become one text), `xml:space`, `w:cr` (read as a line
-  break), `w:noBreakHyphen` and `w:softHyphen` (read as U+2011 and U+00AD), an explicit
-  `w:type="textWrapping"` on a break, XML comments, processing instructions and whitespace
-  between elements, and the empty paragraph given to an empty body or comment. A tab character
-  in a text node is written as `w:tab` and reads back as a `tab` node.
 
 The package layer underneath:
 

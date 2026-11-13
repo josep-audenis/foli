@@ -346,7 +346,7 @@ function run(
     switch (el.local) {
       case "t":
       case "delText":
-        text(textOf(el));
+        text(spaced(el));
         break;
       case "tab":
         out.push(node("tab", marks));
@@ -398,4 +398,16 @@ function run(
       }),
     );
   }
+}
+
+/**
+ * A `w:t`'s text as Word reads it: without `xml:space="preserve"`, whitespace at its ends is not
+ * part of the text (Word writes `preserve` whenever it is).
+ */
+function spaced(el: XmlElement): string {
+  const value = textOf(el);
+  const preserve = el.attributes.some(
+    (a) => a.local === "space" && a.prefix === "xml" && a.value === "preserve",
+  );
+  return preserve ? value : value.trim();
 }
