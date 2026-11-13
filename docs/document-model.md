@@ -206,6 +206,37 @@ stylesheet's 11 pt Georgia; the styles (`Normal`, headings, `ListParagraph`) and
 definitions (bullets • ◦ ▪, numbers decimal at every level, as v2 showed them) are added, fresh
 for each document.
 
+**Resolution** (`Resolver`, 8.6a): how a v3 document looks, computed in core with no DOM.
+`new Resolver(document)` reads the envelope once; `paragraph(attrs)` gives a paragraph's
+effective properties (defaults, then the paragraph style's `basedOn` chain root first, the
+default paragraph style when none is named, then direct formatting) and the formatting of its
+text; `run(paragraphRun, marks)` adds a character style's chain and the run's own marks;
+`markers(paragraphs)` numbers a document's paragraphs in order. As Word does:
+
+- Properties inherit attribute by attribute (an indent's `left` from one style, `hanging` from
+  another); `firstLine` and `hanging` replace each other; tab stops accumulate, a `clear` stop
+  removing an inherited one.
+- Within a style chain a style overrides what it is based on; toggle properties (bold, italic,
+  caps, small caps, strike, double strike, hidden) then flip between the paragraph style and
+  the character style, so a bold character style on a bold heading shows plain text; direct
+  formatting sets them. Complex-script bold and italic are kept apart.
+- Theme fonts resolve per script (`minorHAnsi` → the theme's minor Latin font); theme colors
+  resolve through the color scheme (tint and shade are not applied yet). Without any value:
+  10 pt and no font name (the view chooses).
+- Numbering: a level's paragraph properties come over the paragraph style's when the
+  numbering is direct, under them when the style gives it (numbered headings); a style naming
+  only the instance is in the level whose `style` is that style; numId 0 takes numbering away;
+  a numbering style's link is followed to the definition it uses. Counters are kept per abstract
+  definition (instances sharing one continue the list); an instance's start override restarts
+  it where it is first used; a deeper level restarts after a higher one unless its `restart`
+  says otherwise; `%1`–`%9` take each level's format (decimal, decimalZero, roman, letters with
+  Word's `aa`, ordinal, none; others as decimal), all decimal in a legal level; bullets are
+  their text as written. A marker's formatting is the paragraph's, then its mark's, then the
+  level's.
+
+Checked against Word: every paragraph of the corpus gets the list number Word shows for it
+(`packages/docx/src/import/resolve.test.ts`).
+
 ### Schema v1 (0.1.0)
 
 v1 had `doc`, `paragraph` and `heading` (without `align`), `text`, `hardBreak`, `pageBreak` and

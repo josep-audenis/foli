@@ -34,7 +34,7 @@ writeFileSync(appEntry, `export { FoliEditor } from "${dist("react")}";\n`);
  * Docx raised again in 8.5 (32.7 kB): lossless export (writers, part rebuilding, merges).
  */
 const BUNDLES = [
-  { name: "@folijs/core", entry: dist("core"), budget: 27_200 },
+  { name: "@folijs/core", entry: dist("core"), budget: 30_300 },
   { name: "@folijs/view", entry: dist("view"), budget: 31_400 },
   { name: "@folijs/react", entry: dist("react"), budget: 44_400 },
   { name: "FoliEditor only", entry: appEntry, budget: 44_400 },

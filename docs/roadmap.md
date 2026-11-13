@@ -647,10 +647,16 @@ Each task is a PR on `phase-8/word-model`, the build green after each.
   exactly is listed in `packages/docx/README.md`; the comparison is
   `packages/docx/src/testing/canonical.ts`), every export opens in Word without repair
   (`scripts/corpus/rewrite-corpus.mjs`: unchanged, edited, and a new package from schema v2).
-- [ ] 8.6 Rendering from the document: resolved styles as a per-document stylesheet, numbering
-  markers, headings as `h1`–`h6`, fonts with metric-compatible substitutes, tracked changes and
-  comment anchors shown; harness: per-paragraph page agreement with Word, and the PDF page
-  comparison as a tracked number.
+- [ ] 8.6 Rendering from the document, in three parts (the view and editor run on v2 until 8.7, so
+  each part lands without breaking them):
+  - [ ] 8.6a Resolution in `@folijs/core` (no DOM): a paragraph's and a run's effective
+    formatting from defaults, styles and direct formatting as Word computes it (toggle
+    properties, theme fonts and colors, numbering indents), and list markers numbered as Word
+    numbers them; checked against the number Word shows for every paragraph of the corpus.
+  - [ ] 8.6b Rendering v3 in the view: resolved formatting as CSS, numbering markers, headings
+    as `h1`–`h6`, fonts with metric-compatible substitutes, tracked changes and comment anchors
+    shown, opaque content as placeholders; harness: per-paragraph page agreement with Word.
+  - [ ] 8.6c The PDF page comparison as a tracked number.
 - [ ] 8.7 Editing on v3: existing commands and keys ported, list levels and numbering, style
   picker, font family and size, paragraph spacing and indentation; HTML clipboard mapped to
   v3; T1–T5 on v3 in three engines.
