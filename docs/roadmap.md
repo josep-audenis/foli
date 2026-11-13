@@ -632,17 +632,19 @@ Each task is a PR on `phase-8/word-model`, the build green after each.
   byte for byte, so a package written without replacements is the identical file. Checked with
   Word (`scripts/corpus/rewrite-corpus.mjs`, then the harness): every corpus document written
   back, unchanged and with a replaced main part, opens with the reference numbers.
-- [ ] 8.3 Schema v3 in `@folijs/core`: paragraph properties as attributes, run properties as
+- [x] 8.3 Schema v3 in `@folijs/core` (#47): paragraph properties as attributes, run properties as
   marks, styles (with `basedOn`, defaults, theme), numbering definitions, sections, review
   content (insertion and deletion marks, comment anchors), opaque block and inline nodes; the
   v1/v2 → v3 migration; validation. v3 is defined beside v2 (`packages/core/src/v3/`): the
   view and commands keep running on v2 until 8.6 and 8.7 move them, and `SCHEMA_VERSION`
   becomes 3 with that switch.
 - [ ] 8.4 DOCX import to v3: paragraphs, runs, styles, numbering, sections, tracked changes,
-  comments; everything else as opaque content; a coverage report (opaque nodes per document).
+  comments; everything else as opaque content; a coverage report (opaque nodes per document:
+  `scripts/corpus/import-report.mjs`, corpus numbers in `corpus/README.md`); every imported
+  paragraph's text checked against Word's.
 - [ ] 8.5 Lossless export: v3 → DOCX rewriting only the parts the editor owns; harness: a round
-  trip without edits equals the original after canonicalization, every export opens in Word
-  without repair.
+  trip without edits equals the original after canonicalization (what import does not keep
+  exactly is listed in `packages/docx/README.md`), every export opens in Word without repair.
 - [ ] 8.6 Rendering from the document: resolved styles as a per-document stylesheet, numbering
   markers, headings as `h1`–`h6`, fonts with metric-compatible substitutes, tracked changes and
   comment anchors shown; harness: per-paragraph page agreement with Word, and the PDF page

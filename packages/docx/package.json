@@ -1,7 +1,7 @@
 {
   "name": "@folijs/docx",
   "version": "0.2.0",
-  "description": "DOCX for the Foli document engine: the package (zip, parts, relationships) and an XML reader that keeps the exact source text. No DOM, no dependencies.",
+  "description": "DOCX for the Foli document engine: import to Foli's Word model (schema v3), the package (zip, parts, relationships) and an XML reader that keeps the exact source text. No DOM.",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -30,6 +30,12 @@
     "build": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\" && tsc -p tsconfig.build.json",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
+  "dependencies": {
+    "@folijs/core": "workspace:^"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.43"
+  },
   "publishConfig": {
     "exports": {
       ".": {
@@ -37,8 +43,5 @@
         "default": "./dist/index.js"
       }
     }
-  },
-  "devDependencies": {
-    "@types/node": "^20.19.43"
   }
 }

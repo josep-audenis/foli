@@ -77,6 +77,10 @@ importers:
         version: 4.10.2
 
   packages/docx:
+    dependencies:
+      '@folijs/core':
+        specifier: workspace:^
+        version: link:../core
     devDependencies:
       '@types/node':
         specifier: ^20.19.43

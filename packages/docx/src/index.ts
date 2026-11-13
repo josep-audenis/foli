@@ -1,3 +1,4 @@
+export { type DocxImport, type ImportReport, importDocx, importPackage } from "./import/index.js";
 export {
   DocxError,
   DocxPackage,

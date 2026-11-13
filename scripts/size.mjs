@@ -28,14 +28,16 @@ writeFileSync(appEntry, `export { FoliEditor } from "${dist("react")}";\n`);
  * React with it (37.7 kB, 2% headroom left). Docx added in 8.2
  * (5.9 kB): zip, XML reader, package, with the checks untrusted files need. Core raised in
  * 8.3 (25.9 kB): schema v3, its envelope validation and the v2 -> v3 migration, beside v2 until
- * the editor moves to v3 (8.7) and v2's types go; view and React do not include it.
+ * the editor moves to v3 (8.7) and v2's types go; view and React do not include it. Docx raised
+ * in 8.4 (24.0 kB): the import, and core with it (schema v3, its validation), which an app
+ * with the editor already loads.
  */
 const BUNDLES = [
   { name: "@folijs/core", entry: dist("core"), budget: 27_200 },
   { name: "@folijs/view", entry: dist("view"), budget: 31_400 },
   { name: "@folijs/react", entry: dist("react"), budget: 44_400 },
   { name: "FoliEditor only", entry: appEntry, budget: 44_400 },
-  { name: "@folijs/docx", entry: dist("docx"), budget: 6_800 },
+  { name: "@folijs/docx", entry: dist("docx"), budget: 27_600 },
 ];
 
 let failed = false;

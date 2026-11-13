@@ -162,7 +162,9 @@ properties may hold only the marks that describe how text looks (`RUN_PROPERTY_M
   writes it back as it was while the modeled values still match it, and otherwise writes the
   modeled values into it, keeping its unknown children (in the order Word requires) and
   unknown attributes. `attributes` holds an element's own unknown attributes (`w14:paraId`,
-  revision save ids on a paragraph; `w:history` on a link). Opaque nodes hold whole elements.
+  revision save ids on a paragraph; `w:history` on a link; `w16du:dateUtc` on a tracked change;
+  any on a bookmark or comment anchor). The defaults keep their `w:docDefaults` (`ext`), a
+  comment its start tag. Opaque nodes hold whole elements.
   The parts of `styles.xml` and `numbering.xml` the envelope does not hold (latent styles,
   picture bullets) are written back from the original package, which import keeps (8.4).
 

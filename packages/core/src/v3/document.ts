@@ -159,6 +159,7 @@ export interface CommentJSON {
   parent?: number;
   /** Resolved. */
   done?: boolean;
+  /** The `w:comment` start tag, verbatim: its attributes as the file has them. */
   ext?: string;
 }
 
@@ -168,7 +169,12 @@ export interface FoliDocumentV3 {
   /** The last section's page setup (`w:body/w:sectPr`); earlier sections end at paragraphs. */
   section: SectionJSON;
   /** Document defaults (`w:docDefaults`). */
-  defaults: { paragraph?: ParagraphPropertiesJSON; run?: MarkJSON[] };
+  defaults: {
+    paragraph?: ParagraphPropertiesJSON;
+    run?: MarkJSON[];
+    /** The `w:docDefaults` these were read from, verbatim. */
+    ext?: string;
+  };
   styles: StyleJSON[];
   numbering: { abstracts: AbstractNumberingJSON[]; instances: NumberingInstanceJSON[] };
   theme?: ThemeJSON;
@@ -201,7 +207,7 @@ export function parseDocumentV3(input: unknown): FoliDocumentV3 {
   check(
     "defaults",
     input.defaults,
-    shape({ paragraph: paragraphProperties, run: runProperties }, [], true),
+    shape({ paragraph: paragraphProperties, run: runProperties, ext: xml }, [], true),
   );
   check("styles", input.styles, listOf(checkStyle));
   check(
