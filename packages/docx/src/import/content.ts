@@ -391,6 +391,11 @@ function run(
 
   function opaqueRun(el: XmlElement, labelValue = label(INLINE_LABELS, el)): void {
     context.report.opaque(el.name);
-    out.push(node("opaqueInline", marks, withLabel({ xml: sourceOf(context, el) }, labelValue)));
+    out.push(
+      node("opaqueInline", marks, {
+        ...withLabel({ xml: sourceOf(context, el) }, labelValue),
+        run: true,
+      }),
+    );
   }
 }

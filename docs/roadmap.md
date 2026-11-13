@@ -644,7 +644,9 @@ Each task is a PR on `phase-8/word-model`, the build green after each.
   paragraph's text checked against Word's.
 - [ ] 8.5 Lossless export: v3 → DOCX rewriting only the parts the editor owns; harness: a round
   trip without edits equals the original after canonicalization (what import does not keep
-  exactly is listed in `packages/docx/README.md`), every export opens in Word without repair.
+  exactly is listed in `packages/docx/README.md`; the comparison is
+  `packages/docx/src/testing/canonical.ts`), every export opens in Word without repair
+  (`scripts/corpus/rewrite-corpus.mjs`: unchanged, edited, and a new package from schema v2).
 - [ ] 8.6 Rendering from the document: resolved styles as a per-document stylesheet, numbering
   markers, headings as `h1`–`h6`, fonts with metric-compatible substitutes, tracked changes and
   comment anchors shown; harness: per-paragraph page agreement with Word, and the PDF page

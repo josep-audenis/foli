@@ -31,13 +31,14 @@ writeFileSync(appEntry, `export { FoliEditor } from "${dist("react")}";\n`);
  * the editor moves to v3 (8.7) and v2's types go; view and React do not include it. Docx raised
  * in 8.4 (24.0 kB): the import, and core with it (schema v3, its validation), which an app
  * with the editor already loads.
+ * Docx raised again in 8.5 (32.7 kB): lossless export (writers, part rebuilding, merges).
  */
 const BUNDLES = [
   { name: "@folijs/core", entry: dist("core"), budget: 27_200 },
   { name: "@folijs/view", entry: dist("view"), budget: 31_400 },
   { name: "@folijs/react", entry: dist("react"), budget: 44_400 },
   { name: "FoliEditor only", entry: appEntry, budget: 44_400 },
-  { name: "@folijs/docx", entry: dist("docx"), budget: 27_600 },
+  { name: "@folijs/docx", entry: dist("docx"), budget: 36_900 },
 ];
 
 let failed = false;

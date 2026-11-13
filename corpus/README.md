@@ -70,8 +70,10 @@ from the corpus.
 ## Checking Foli's writing with Word
 
 `scripts/corpus/rewrite-corpus.mjs` (after `pnpm build`) writes each document back through
-`@folijs/docx`, unchanged and with its main part replaced; the harness then checks that Word
-opens every one and finds the reference numbers:
+`@folijs/docx`: the package unchanged and with its main part replaced (8.2), imported and
+exported without edits and with edits (8.5), and a new package from a schema v2 document. The
+harness then checks that Word opens every one, and finds the reference numbers in those
+without edits (2026-11-13: all 21 open; the 15 without edits match their reference exactly):
 
 ```bash
 node scripts/corpus/rewrite-corpus.mjs <folder>

@@ -5,8 +5,8 @@ DOCX for [Foli](https://github.com/josep-audenis/foli): imports a `.docx` into F
 and XML keeping every byte it does not change. No DOM: runs in the browser, workers and Node
 20.12+. Depends only on `@folijs/core`.
 
-> In development (Phase 8): import, the package and XML layer are here; export comes next (8.5).
-> Not published yet.
+> In development (Phase 8): import, export, the package and XML layer are here. Not published
+> yet.
 
 ```ts
 import { importDocx } from "@folijs/docx";
@@ -51,11 +51,36 @@ from `commentsExtended`) and sections:
 - **Failures** are `DocxError` (or `ZipError` from the package): a file that is not a
   WordprocessingML document, Strict Open XML (refused until a real file needs it), or an element
   past the model's absolute limits (over 16 MiB kept verbatim).
+  **Export** (`exportDocx(document, package?)`) writes the parts the editor owns (`document.xml`,
+  `styles.xml`, `numbering.xml`, `comments.xml`, `commentsExtended.xml`, and relationships for new
+  hyperlink targets) and copies every other part of the original package byte for byte (its
+  compressed entry included). Within the parts it writes:
+
+- An element read from the file comes back verbatim while its values are what import read from
+  it (a paragraph's `w:pPr`, a run's `w:rPr`, a section, a style, a numbering level or
+  definition, a comment's start tag). Changed, it is rewritten child by child: unchanged
+  properties keep their original element (unknown attributes included), changed ones are
+  written from the model, and children Foli does not model stay in the order Word requires.
+- Opaque content, unknown attributes in bags, latent styles, picture bullets and anything else
+  the parts hold outside the model come back as they were; styles, definitions and comments the
+  editor removed are left out; new ones are added where Word expects them; a part the document
+  now needs (numbering, comments) is added with its content type and relationship.
+- Runs are regrouped from the model: hyperlinks outermost, then insertions (or move
+  destinations), deletions (or move sources) with `w:delText`, then runs of equal properties.
+- Without a package, a new one is made (from a migrated v2 document, say).
+
+Checked: the corpus exported without edits equals the original under the canonical comparison
+(`src/testing/canonical.ts`), with every other part, and every unchanged element, byte for byte;
+re-imported, it is the same document; Word opens the exports (unchanged, edited, and new
+packages) and finds the reference numbers in the unchanged ones
+(`scripts/corpus/rewrite-corpus.mjs`).
+
 - **Not kept exactly**, to be equal under export's canonical comparison (8.5): run boundaries
   (adjacent runs with the same properties become one text), `xml:space`, `w:cr` (read as a line
   break), `w:noBreakHyphen` and `w:softHyphen` (read as U+2011 and U+00AD), an explicit
   `w:type="textWrapping"` on a break, XML comments, processing instructions and whitespace
-  between elements, and the empty paragraph given to an empty body or comment.
+  between elements, and the empty paragraph given to an empty body or comment. A tab character
+  in a text node is written as `w:tab` and reads back as a `tab` node.
 
 The package layer underneath:
 

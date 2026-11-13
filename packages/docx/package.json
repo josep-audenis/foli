@@ -34,7 +34,8 @@
     "@folijs/core": "workspace:^"
   },
   "devDependencies": {
-    "@types/node": "^20.19.43"
+    "@types/node": "^20.19.43",
+    "fast-check": "^4.10.2"
   },
   "publishConfig": {
     "exports": {
