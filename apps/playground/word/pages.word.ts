@@ -119,13 +119,18 @@ interface Result {
   pdf?: PdfResult;
 }
 interface PdfResult {
-  /** Per page of the longer of the two; a page only one has scores 0. */
-  pages: { page: number; body: number }[];
+  /**
+   * Per page of the longer of the two; a page only one has, or of another size than the other
+   * (`sizes`: Word's and Foli's), scores 0.
+   */
+  pages: { page: number; body: number; sizes?: number[][] }[];
   /** Their means. */
   page: number;
   body: number;
 }
 const results: Record<string, Result> = {};
+/** Documents without Word's PDF: left out of the page comparison, listed so it shows. */
+const missingPdfs: string[] = [];
 
 interface Agreement {
   score: number;
@@ -159,7 +164,12 @@ async function comparePdf(page: Page, file: string, base: string): Promise<PdfRe
               pages: unknown,
             ): Promise<{
               wordPages: number;
-              compared: { page: Agreement; body: Agreement; overlay: string }[];
+              compared: {
+                sizes: number[][];
+                page: Agreement | null;
+                body: Agreement | null;
+                overlay: string | null;
+              }[];
             }>;
           };
         }
@@ -169,15 +179,20 @@ async function comparePdf(page: Page, file: string, base: string): Promise<PdfRe
   const out = new URL("test-results/word-pdf/", ROOT);
   mkdirSync(out, { recursive: true });
   compared.forEach((c, i) => {
-    writeFileSync(
-      new URL(`${base}-${i + 1}.png`, out),
-      Buffer.from(c.overlay.slice(c.overlay.indexOf(",") + 1), "base64"),
-    );
+    if (c.overlay)
+      writeFileSync(
+        new URL(`${base}-${i + 1}.png`, out),
+        Buffer.from(c.overlay.slice(c.overlay.indexOf(",") + 1), "base64"),
+      );
   });
-  const pages = Array.from({ length: Math.max(wordPages, shots.length) }, (_, i) => ({
-    page: round(compared[i]?.page.score ?? 0),
-    body: round(compared[i]?.body.score ?? 0),
-  }));
+  const pages = Array.from({ length: Math.max(wordPages, shots.length) }, (_, i) => {
+    const c = compared[i];
+    return {
+      page: round(c?.page?.score ?? 0),
+      body: round(c?.body?.score ?? 0),
+      ...(c && !c.page ? { sizes: c.sizes } : {}),
+    };
+  });
   return {
     pages,
     page: round(mean(pages.map((p) => p.page))),
@@ -254,7 +269,16 @@ for (const name of names) {
       console.log(
         `  against Word's PDF: ${result.page} on the page, ${result.body} inside the margins (${result.pages.map((p) => `${p.page}/${p.body}`).join(", ")})`,
       );
-    } else if (PDF_DIR) console.log(`  no PDF of ${name} in ${PDF_DIR}`);
+      result.pages.forEach((p, i) => {
+        if (p.sizes)
+          console.log(
+            `  page ${i + 1}: Word's is ${p.sizes[0]}, Foli's ${p.sizes[1]} px: not compared`,
+          );
+      });
+    } else if (PDF_DIR) {
+      missingPdfs.push(name);
+      console.log(`  no PDF of ${name} in ${PDF_DIR}`);
+    }
     // The comparison itself must hold: most paragraphs matched by text.
     expect(compared).toBeGreaterThanOrEqual(Math.floor(expected.length * 0.6));
   });
@@ -276,6 +300,7 @@ test.afterAll(() => {
   const pdf = pdfPages.length
     ? {
         pages: pdfPages.length,
+        missing: missingPdfs,
         page: round(mean(pdfPages.map((p) => p.page))),
         body: round(mean(pdfPages.map((p) => p.body))),
       }
@@ -289,6 +314,6 @@ test.afterAll(() => {
   );
   if (pdf)
     console.log(
-      `Against Word's PDF, of ${pdf.pages} pages: ${pdf.page} on the page, ${pdf.body} inside the margins`,
+      `Against Word's PDF, of ${pdf.pages} pages: ${pdf.page} on the page, ${pdf.body} inside the margins${missingPdfs.length ? `; without a PDF: ${missingPdfs.join(", ")}` : ""}`,
     );
 });

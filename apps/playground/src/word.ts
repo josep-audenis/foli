@@ -7,7 +7,7 @@
 import { type FoliDocumentV3, type NodeJSON, parseDocumentV3 } from "@folijs/core";
 import { importDocx } from "@folijs/docx";
 import { type DocumentPages, type ReviewView, renderDocumentV3 } from "@folijs/view";
-import { type Agreement, agreement, inkGrid, inkPixels, overlay } from "./ink.js";
+import { type Agreement, agreement, bodyRegion, inkPixels, overlay, samePage } from "./ink.js";
 
 const container = document.getElementById("pages") as HTMLElement;
 let shown: DocumentPages | null = null;
@@ -53,15 +53,17 @@ function show(doc: FoliDocumentV3, review: ReviewView): Shown[] {
   }));
 }
 
-/** Grid cells of the page comparison: 4 px; ink within one cell of the other's matches. */
-const CELL = 4;
-
-/** One page compared with Word's: on the whole page, and inside the margins. */
+/**
+ * One page compared with Word's: on the whole page, and inside the margins; null when the two
+ * are not the same page size (another orientation or paper size), which scores 0.
+ */
 interface PageComparison {
-  page: Agreement;
-  body: Agreement;
+  /** Word's page size and Foli's, in pixels. */
+  sizes: [[number, number], [number, number]];
+  page: Agreement | null;
+  body: Agreement | null;
   /** The overlay (PNG data URL): black both, red Word only, blue Foli only. */
-  overlay: string;
+  overlay: string | null;
 }
 
 function pixels(source: CanvasImageSource, width: number, height: number) {
@@ -89,10 +91,11 @@ async function comparePdf(
     import("pdfjs-dist/build/pdf.worker.min.mjs?url"),
   ]);
   GlobalWorkerOptions.workerSrc = worker;
-  const word = await getDocument({ data: Uint8Array.from(atob(pdf), (c) => c.charCodeAt(0)) })
-    .promise;
+  const loading = getDocument({ data: Uint8Array.from(atob(pdf), (c) => c.charCodeAt(0)) });
+  const word = await loading.promise;
   const compared: PageComparison[] = [];
   for (let i = 0; i < Math.min(word.numPages, pages.length); i++) {
+    // shortcut: every page is held at once, as data URLs (fine for the corpus's few pages).
     const foliPage = pages[i] as (typeof pages)[number];
     const image = new Image();
     image.src = `data:image/png;base64,${foliPage.png}`;
@@ -103,20 +106,19 @@ async function comparePdf(
     canvas.width = Math.round(viewport.width);
     canvas.height = Math.round(viewport.height);
     await pdfPage.render({ canvas, viewport }).promise;
-    // The same page size within a pixel of rounding: compared on what both cover.
+    const sizes: PageComparison["sizes"] = [
+      [canvas.width, canvas.height],
+      [image.naturalWidth, image.naturalHeight],
+    ];
+    if (!samePage(...sizes)) {
+      compared.push({ sizes, page: null, body: null, overlay: null });
+      continue;
+    }
+    // The same page size within a pixel or two of rounding: compared on what both cover.
     const width = Math.min(canvas.width, image.naturalWidth);
     const height = Math.min(canvas.height, image.naturalHeight);
     const wordInk = pixels(canvas, width, height);
     const foliInk = pixels(image, width, height);
-    const a = inkGrid(wordInk, width, height, CELL);
-    const b = inkGrid(foliInk, width, height, CELL);
-    const [top, right, bottom, left] = foliPage.margins;
-    const body = [
-      Math.floor(left / CELL),
-      Math.floor(top / CELL),
-      Math.ceil((width - right) / CELL),
-      Math.ceil((height - bottom) / CELL),
-    ] as const;
     const out = document.createElement("canvas");
     out.width = width;
     out.height = height;
@@ -126,12 +128,15 @@ async function comparePdf(
       0,
     );
     compared.push({
-      page: agreement(a, b),
-      body: agreement(a, b, 1, body),
+      sizes,
+      page: agreement(wordInk, foliInk),
+      body: agreement(wordInk, foliInk, undefined, bodyRegion(foliPage.margins, width, height)),
       overlay: out.toDataURL("image/png"),
     });
   }
-  return { wordPages: word.numPages, compared };
+  const wordPages = word.numPages;
+  await loading.destroy();
+  return { wordPages, compared };
 }
 
 declare global {

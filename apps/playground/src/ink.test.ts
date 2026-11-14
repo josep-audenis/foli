@@ -1,14 +1,33 @@
 import { describe, expect, it } from "vitest";
-import { agreement, type InkGrid, inkGrid, inkPixels, overlay } from "./ink.js";
+import { agreement, bodyRegion, type Ink, inkPixels, overlay, samePage } from "./ink.js";
 
-/** A grid from rows of "#" (ink) and "." (none). */
-function grid(...rows: string[]): InkGrid {
-  const cols = rows[0]?.length ?? 0;
+/** An ink image from rows of "#" (ink) and "." (none). */
+function image(...rows: string[]): Ink {
   return {
-    cols,
-    rows: rows.length,
+    width: rows[0]?.length ?? 0,
+    height: rows.length,
     ink: Uint8Array.from(rows.join(""), (c) => (c === "#" ? 1 : 0)),
   };
+}
+
+/**
+ * A page of text as ink: `lines` lines `pitch` px apart, each 10 px tall and made of 1 px
+ * strokes at places that differ from line to line (as glyphs do), starting at `top`.
+ */
+function text(lines: number, pitch: number, top: number, width = 400, height = 400): Ink {
+  const ink = new Uint8Array(width * height);
+  let seed = 7;
+  const random = () => {
+    seed = (seed * 1103515245 + 12345) % 2 ** 31;
+    return seed / 2 ** 31;
+  };
+  for (let line = 0; line < lines; line++)
+    for (let x = 20; x < width - 20; x++) {
+      if (random() > 0.15) continue;
+      for (let y = top + line * pitch; y < top + line * pitch + 10; y++)
+        if (y >= 0 && y < height) ink[y * width + x] = 1;
+    }
+  return { width, height, ink };
 }
 
 describe("inkPixels", () => {
@@ -22,44 +41,39 @@ describe("inkPixels", () => {
       ...[255, 255, 0, 255], // yellow highlight: luminance 237
       ...[0, 0, 255, 255], // blue text: luminance 18
     ]);
-    expect([...inkPixels(rgba, 7, 1)]).toEqual([1, 0, 1, 0, 0, 0, 1]);
-  });
-});
-
-describe("inkGrid", () => {
-  it("marks the cells holding ink; a partial cell at the edge counts", () => {
-    const ink = new Uint8Array(9 * 5);
-    ink[0 * 9 + 5] = 1; // (5, 0): cell (1, 0)
-    ink[4 * 9 + 8] = 1; // (8, 4): cell (2, 1)
-    expect(inkGrid(ink, 9, 5, 4)).toEqual({
-      cols: 3,
-      rows: 2,
-      ink: Uint8Array.from([0, 1, 0, 0, 0, 1]),
+    expect(inkPixels(rgba, 7, 1)).toEqual({
+      width: 7,
+      height: 1,
+      ink: Uint8Array.from([1, 0, 1, 0, 0, 0, 1]),
     });
-    expect(inkGrid(new Uint8Array(16), 2, 8, 4)).toMatchObject({ cols: 1, rows: 2 });
   });
 });
 
 describe("agreement", () => {
-  it("is 1 for the same ink, and for ink a cell away within the tolerance", () => {
-    const word = grid("#....", ".....", "..#..");
+  it("is 1 for the same ink, and for ink moved within the tolerance (2 px)", () => {
+    const word = image("#....", ".....", ".....", ".....");
     expect(agreement(word, word).score).toBe(1);
-    const moved = grid(".#...", ".....", "...#.");
+    const moved = image(".....", ".....", "..#..", ".....");
     expect(agreement(word, moved).score).toBe(1);
-    expect(agreement(word, moved, 0).score).toBe(0);
-    // Up and down too.
-    expect(agreement(grid("#..", "..."), grid("...", "#..")).score).toBe(1);
+    expect(agreement(word, moved, 1).score).toBe(0);
+    expect(agreement(word, image(".....", ".....", ".....", "..#..")).score).toBe(0);
+    expect(agreement(word, image(".....", ".....", "...#.", ".....")).score).toBe(0);
   });
 
-  it("is 0 for ink out of place: a line two cells lower", () => {
-    const word = grid("###", "...", "...");
-    const lower = grid("...", "...", "###");
-    expect(agreement(word, lower)).toMatchObject({ precision: 0, recall: 0, score: 0 });
+  it("falls when text is a line off, though lines look alike", () => {
+    const word = text(15, 18, 40);
+    // A pixel or two of rendering difference: the same.
+    expect(agreement(word, text(15, 18, 41)).score).toBe(1);
+    expect(agreement(word, text(15, 18, 42)).score).toBe(1);
+    // Further down, less agrees: half a line, a whole line (other glyphs in the same place).
+    expect(agreement(word, text(15, 18, 43)).score).toBeCloseTo(0.9);
+    expect(agreement(word, text(15, 18, 49)).score).toBeLessThan(0.5);
+    expect(agreement(word, text(15, 18, 58)).score).toBeLessThan(0.55);
   });
 
   it("counts ink only one side has: Foli's extra lowers precision, Word's missing recall", () => {
-    const word = grid("#.....", "......");
-    const extra = grid("#....#", "......");
+    const word = image("#.......", "........");
+    const extra = image("#......#", "........");
     expect(agreement(word, extra)).toEqual({
       word: 1,
       foli: 2,
@@ -71,34 +85,65 @@ describe("agreement", () => {
   });
 
   it("agrees on two empty pages", () => {
-    const empty = grid("...", "...");
+    const empty = image("...", "...");
     expect(agreement(empty, empty)).toMatchObject({ precision: 1, recall: 1, score: 1 });
   });
 
   it("compares inside a region, matching with ink just outside it", () => {
-    // A header only Word has (row 0), and body ink that matches.
-    const word = grid("####", "....", ".#..", "....");
-    const foli = grid("....", "....", "..#.", "....");
-    expect(agreement(word, foli).recall).toBe(0.2);
-    expect(agreement(word, foli, 1, [0, 2, 4, 4]).score).toBe(1);
-    // Ink inside the region matched by ink outside it, within the tolerance.
-    expect(agreement(grid("#...", "...."), grid("....", "#..."), 1, [0, 1, 4, 2]).score).toBe(1);
     // Ink only Word has on every side of the region (headers, footers, margins) is left out.
-    const framed = grid("#####", "#...#", "#.#.#", "#...#", "#####");
-    const centre = grid(".....", ".....", "..#..", ".....", ".....");
+    const framed = image(
+      "#######",
+      "#.....#",
+      "#.....#",
+      "#..#..#",
+      "#.....#",
+      "#.....#",
+      "#######",
+    );
+    const centre = image(
+      ".......",
+      ".......",
+      ".......",
+      "...#...",
+      ".......",
+      ".......",
+      ".......",
+    );
     expect(agreement(framed, centre).score).toBeLessThan(1);
-    expect(agreement(framed, centre, 1, [1, 1, 4, 4]).score).toBe(1);
+    expect(agreement(framed, centre, 2, [1, 1, 6, 6]).score).toBe(1);
+    // Ink inside the region matched by ink outside it, within the tolerance.
+    expect(agreement(image("#...", "...."), image("....", "#..."), 2, [0, 1, 4, 2]).score).toBe(1);
   });
 
-  it("refuses grids of different sizes", () => {
-    expect(() => agreement(grid("#."), grid("#.."))).toThrow();
-    expect(() => agreement(grid("#."), grid("#.", ".."))).toThrow();
+  it("refuses images of different sizes", () => {
+    expect(() => agreement(image("#."), image("#.."))).toThrow();
+    expect(() => agreement(image("#."), image("#.", ".."))).toThrow();
+  });
+});
+
+describe("samePage", () => {
+  it("takes sizes a pixel or two apart as the same page, not another orientation or paper", () => {
+    expect(samePage([794, 1123], [794, 1123])).toBe(true);
+    expect(samePage([794, 1123], [792, 1125])).toBe(true);
+    expect(samePage([794, 1123], [791, 1123])).toBe(false);
+    expect(samePage([794, 1123], [794, 1120])).toBe(false);
+    // A4 landscape, and US Letter.
+    expect(samePage([794, 1123], [1123, 794])).toBe(false);
+    expect(samePage([794, 1123], [816, 1056])).toBe(false);
+  });
+});
+
+describe("bodyRegion", () => {
+  it("is the page inside its margins (top, right, bottom, left), to the nearest pixel", () => {
+    expect(bodyRegion([96.6, 72.6, 96.6, 72.6], 794, 1123)).toEqual([73, 97, 721, 1026]);
+    // Top and left in that order: not swapped.
+    expect(bodyRegion([10, 0, 0, 20], 100, 100)).toEqual([20, 10, 100, 100]);
   });
 });
 
 describe("overlay", () => {
   it("shows ink in both black, Word's only red, Foli's only blue", () => {
-    const rgba = overlay(Uint8Array.from([1, 1, 0, 0]), Uint8Array.from([1, 0, 1, 0]));
+    const rgba = overlay(image("##.."), image("#.#."));
     expect([...rgba]).toEqual([
       ...[0, 0, 0, 255],
       ...[220, 0, 0, 255],

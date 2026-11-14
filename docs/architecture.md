@@ -540,7 +540,9 @@ Planned, created only when needed:
 - Dev-only exception: `@axe-core/playwright` / `axe-core` (MPL-2.0) for the accessibility check
   in Playwright. Test tooling, never bundled or published.
 - Dev-only: `pdfjs-dist` (Apache-2.0) renders Word's PDF pages in the corpus harness
-  (`pnpm corpus:pages`, playground only). Never bundled or published.
+  (`pnpm corpus:pages`, playground only). Never bundled or published. Its optional Node
+  canvas (`@napi-rs/canvas`, native binaries) is not installed (`ignoredOptionalDependencies`):
+  the harness renders in the browser.
 
 ## Build and dev wiring
 

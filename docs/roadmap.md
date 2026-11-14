@@ -660,7 +660,7 @@ Each task is a PR on `phase-8/word-model`, the build green after each.
     and Word's paragraph spacing on pages; harness: per-paragraph page and line agreement with
     Word (`pnpm corpus:pages`; baseline in corpus/README.md).
   - [ ] 8.6c The PDF page comparison as a tracked number: every page Foli shows compared with
-    Word's PDF of it by ink (pdf.js, 4 px cells, one cell of tolerance), a score per page and
+    Word's PDF of it by ink (pdf.js, pixel by pixel within 2 px), a score per page and
     inside the margins, overlays to look at (`FOLI_WORD_PDF=<folder> pnpm corpus:pages`;
     baseline in corpus/README.md).
 - [ ] 8.7 Editing on v3: existing commands and keys ported, list levels and numbering, style
