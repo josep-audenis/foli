@@ -219,6 +219,13 @@ export function opaqueText(element: Element): string {
   return text;
 }
 
+/** Opaque XML's text, a line per paragraph (`w:p`), or its runs' text when it has none. */
+export function opaqueParagraphsText(element: Element): string {
+  const paragraphs = [...element.getElementsByTagName("*")].filter((e) => e.localName === "p");
+  if (element.localName === "p") paragraphs.unshift(element);
+  return paragraphs.length ? paragraphs.map(opaqueText).join("\n") : opaqueText(element);
+}
+
 /**
  * The outermost descendants of opaque XML with one of `names` (local names), in order: not those
  * inside a match (a run's text box, a cell's nested table) or content not shown in the line.

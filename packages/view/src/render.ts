@@ -1,4 +1,4 @@
-import type { Mark, Node as ModelNode, SimpleMarkName } from "@folijs/core";
+import { isSafeHref, type Mark, type Node as ModelNode, type SimpleMarkName } from "@folijs/core";
 
 // Every mark without attributes has a tag. Marks with attributes are rendered by `markElement`;
 // marks of other schemas fall back to <span>.
@@ -47,15 +47,20 @@ export interface BlockDesc {
   readonly leaves: readonly LeafDesc[];
 }
 
-/** The element for a mark: a tag, a link, or a span with a color. Values come validated. */
+/** The element for a mark: a tag, a link, or a span with a color. */
 function markElement(mark: Mark, doc: Document): HTMLElement {
   const { name } = mark.type;
+  const { href, value, style } = mark.attrs;
   if (name === "link") {
+    // Schema v2 only lets safe hrefs in; schema v3 keeps the file's target as it is (`file:`,
+    // anything), so it is checked here too. Clicks do not navigate.
+    if (typeof href !== "string" || !isSafeHref(href)) return doc.createElement("span");
     const a = doc.createElement("a");
-    // The schema only lets safe hrefs into a document (isSafeHref); clicks do not navigate.
-    a.setAttribute("href", String(mark.attrs.href));
+    a.setAttribute("href", href);
     return a;
   }
+  // A schema v3 run property turned off (`bold` false, `underline` none) shows nothing.
+  if (value === false || value === null || style === "none") return doc.createElement("span");
   const element = doc.createElement(MARK_TAGS.get(name) ?? "span");
   if (name === "textColor") element.style.color = String(mark.attrs.color);
   if (name === "highlight") element.style.backgroundColor = String(mark.attrs.color);

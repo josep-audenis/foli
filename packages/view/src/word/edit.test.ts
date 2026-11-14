@@ -183,6 +183,44 @@ describe("EditorView on a schema v3 document", () => {
     expect(b?.style.backgroundColor).toBe("");
   });
 
+  it("pastes HTML that fits schema v3, and not as part of a tracked change", () => {
+    const deleted = { type: "deletion", attrs: { id: 1, author: "A" } };
+    const { editor, view } = mount(p({}, text("gone", [deleted])));
+    editor.select(3);
+    view.paste({
+      getData: (t: string) =>
+        t === "text/html" ? "<p><b>B</b></p>" : t === "text/plain" ? "B" : "",
+    });
+    expect(editor.getDocument().content.content).toEqual([
+      p({}, text("go", [deleted]), text("B", [{ type: "bold" }]), text("ne", [deleted])),
+    ]);
+  });
+
+  it("waits for a running composition before drawing every block for new fonts", () => {
+    const { host, view, editor } = mount(p({}, text("a")), p({}, text("b")));
+    view.focus();
+    editor.select(2);
+    host.dispatchEvent(new CompositionEvent("compositionstart"));
+    const before = blocks(host);
+    const frames: (() => void)[] = [];
+    const raf = window.requestAnimationFrame;
+    window.requestAnimationFrame = (callback) => frames.push(() => callback(0));
+    try {
+      const internal = view as unknown as { onFontsLoaded(): void; render(): void };
+      internal.onFontsLoaded();
+      for (const frame of frames) frame();
+      // A render during the composition (another edit) keeps the blocks.
+      internal.render();
+      expect(blocks(host)).toEqual(before);
+      host.dispatchEvent(new CompositionEvent("compositionend"));
+      for (const frame of frames.splice(0)) frame();
+      internal.render();
+    } finally {
+      window.requestAnimationFrame = raf;
+    }
+    expect(blocks(host)[0]).not.toBe(before[0]);
+  });
+
   it("draws every block again when web fonts load (line heights come from them)", () => {
     const { host, view } = mount(p({}, text("a")));
     const before = blocks(host)[0];
@@ -240,10 +278,35 @@ describe("EditorView on a schema v3 document", () => {
     expect(editor.getDocument().content.content).toEqual([p({}, text("ax")), p({}, text("yHb"))]);
   });
 
-  it("copies tabs as tabs and leaves bookmarks out of the plain text", () => {
-    const { editor } = mount(p({}, text("a"), { type: "tab" }, bookmark, text("b")), table);
+  it("copies tabs as tabs, opaque content as its text, and leaves bookmarks out", () => {
+    const twoCells =
+      "<w:tbl><w:tr><w:tc><w:p><w:r><w:t>c1</w:t></w:r></w:p></w:tc>" +
+      "<w:tc><w:p><w:r><w:t>c2</w:t></w:r></w:p></w:tc></w:tr></w:tbl>";
+    const { editor } = mount(
+      p({}, text("a"), { type: "tab" }, bookmark, text("b"), field),
+      { type: "opaqueBlock", attrs: { xml: twoCells } },
+      p({}, text("z")),
+    );
     const { doc } = editor.state;
-    expect(serializeRange(doc, 0, doc.content.size, document).text).toBe("a\tb\n");
+    expect(serializeRange(doc, 0, doc.content.size, document).text).toBe("a\tb7\nc1\nc2\nz");
+  });
+
+  it("copies HTML without turned-off properties or unsafe links", () => {
+    const { editor } = mount(
+      p(
+        {},
+        text("x", [
+          { type: "bold", attrs: { value: false } },
+          { type: "underline", attrs: { style: "none" } },
+        ]),
+        text("y", [{ type: "link", attrs: { href: "javascript:alert(1)" } }]),
+        text("z", [{ type: "link", attrs: { href: "https://example.com/" } }, { type: "italic" }]),
+      ),
+    );
+    const { doc } = editor.state;
+    const { html } = serializeRange(doc, 0, doc.content.size, document);
+    expect(html).not.toMatch(/<strong|<u>|javascript/);
+    expect(html).toContain('<a href="https://example.com/"><em>z</em></a>');
   });
 
   it("writes Word's space above each block: before, then after + before, contextual dropped", () => {

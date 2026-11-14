@@ -317,6 +317,16 @@ describe("bold, italic, underline and strike on a v3 document", () => {
     ]);
   });
 
+  it("leave markers unformatted", () => {
+    const marker: NodeJSON = { type: "bookmarkStart", attrs: { id: 1, name: "x" } };
+    const editor = editorOf(p({}, text("a"), marker, text("b")));
+    editor.select(1, 4);
+    editor.commands.toggleMark("bold");
+    expect(blocks(editor)).toEqual([
+      p({}, text("a", [bold(true)]), marker, text("b", [bold(true)])),
+    ]);
+  });
+
   it("leave other marks to the generic toggle", () => {
     const editor = editorOf(p({}, text("ab")));
     editor.select(1, 3);
@@ -355,6 +365,108 @@ describe("Backspace and Delete on a v3 document", () => {
     forward.select(3);
     forward.commands.deleteForward();
     expect(blocks(forward)).toEqual([p({}, text("ab"), end, text("cd"))]);
+  });
+
+  it("keep the second paragraph's mark when joining: its section break, its own attributes", () => {
+    const section = { pageSize: { width: 15840, height: 12240, orientation: "landscape" } };
+    const own = { attributes: { "w14:paraId": "0000000B" } };
+    const start = () =>
+      editorOf(
+        p({ justification: "center", attributes: { "w14:paraId": "0000000A" } }, text("a")),
+        p({ section, ...own }, text("b")),
+        p({}, text("c")),
+      );
+    const joined = [p({ justification: "center", section, ...own }, text("ab")), p({}, text("c"))];
+    const backspace = start();
+    backspace.select(4);
+    backspace.commands.deleteBackward();
+    expect(blocks(backspace)).toEqual(joined);
+    const del = start();
+    del.select(2);
+    del.commands.deleteForward();
+    expect(blocks(del)).toEqual(joined);
+    // A range across paragraphs: the merged one ends with the last one's mark.
+    const range = start();
+    range.select(1, 5);
+    range.commands.deleteSelection();
+    expect(blocks(range)).toEqual([
+      p({ justification: "center", section, ...own }),
+      p({}, text("c")),
+    ]);
+    range.commands.undo();
+    expect(blocks(range)).toEqual(blocks(start()));
+    // Into a paragraph that ends a section: deleting its mark merges the section into the next.
+    const merge = editorOf(p({ section }, text("a")), p({}, text("b")));
+    merge.select(4);
+    merge.commands.deleteBackward();
+    expect(blocks(merge)).toEqual([p({}, text("ab"))]);
+  });
+
+  it("delete a word up to the inline node before it, then the node", () => {
+    const editor = editorOf(p({}, text("ab"), field, text("cd ef")));
+    editor.select(9);
+    editor.commands.deleteBackward("word");
+    expect(blocks(editor)).toEqual([p({}, text("ab"), field, text("cd "))]);
+    editor.commands.deleteBackward("word");
+    expect(blocks(editor)).toEqual([p({}, text("ab"), field)]);
+    // A space after a field: only the space (the field is not part of the word before).
+    const spaced = editorOf(p({}, text("ab"), field, text(" ")));
+    spaced.select(5);
+    spaced.commands.deleteBackward("word");
+    expect(blocks(spaced)).toEqual([p({}, text("ab"), field)]);
+    // Right after a tab: the tab, as one.
+    const afterTab = editorOf(p({}, text("ab"), { type: "tab" }));
+    afterTab.select(4);
+    afterTab.commands.deleteBackward("word");
+    expect(blocks(afterTab)).toEqual([p({}, text("ab"))]);
+    // Next to the field: selected first.
+    editor.commands.deleteBackward("word");
+    expect(editor.state.selection).toBeInstanceOf(NodeSelection);
+    const tab = editorOf(p({}, text("ab"), { type: "tab" }, bookmark, text("cd")));
+    tab.select(1);
+    tab.commands.deleteForward("word");
+    expect(blocks(tab)).toEqual([p({}, { type: "tab" }, bookmark, text("cd"))]);
+    tab.commands.deleteForward("word");
+    expect(blocks(tab)).toEqual([p({}, bookmark, text("cd"))]);
+    // A word deleted backward stops at the bookmark, which stays.
+    tab.select(4);
+    tab.commands.deleteBackward("word");
+    expect(blocks(tab)).toEqual([p({}, bookmark)]);
+  });
+
+  it("typed text is not part of a tracked change around it", () => {
+    const strong: MarkJSON = { type: "bold" };
+    const change = (type: string): MarkJSON => ({ type, attrs: { id: 1, author: "A" } });
+    const editor = editorOf(
+      p({}, text("gone", [change("deletion")]), text("new", [change("insertion"), strong])),
+    );
+    editor.select(3);
+    editor.commands.insertText("X");
+    editor.select(7);
+    editor.commands.insertText("Y");
+    editor.select(9);
+    editor.commands.insertHardBreak();
+    expect(blocks(editor)).toEqual([
+      p(
+        {},
+        text("go", [change("deletion")]),
+        text("X"),
+        text("ne", [change("deletion")]),
+        text("n", [change("insertion"), strong]),
+        text("Y", [strong]),
+        text("e", [change("insertion"), strong]),
+        { type: "hardBreak", marks: [strong] },
+        text("w", [change("insertion"), strong]),
+      ),
+    ]);
+  });
+
+  it("keep a comment's reference mark", () => {
+    const reference: NodeJSON = { type: "commentReference", attrs: { id: 2 } };
+    const editor = editorOf(p({}, text("ab"), reference));
+    editor.select(4);
+    editor.commands.deleteBackward();
+    expect(blocks(editor)).toEqual([p({}, text("a"), reference)]);
   });
 
   it("select opaque content first, then delete it", () => {

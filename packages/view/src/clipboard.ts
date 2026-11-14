@@ -11,6 +11,7 @@ import {
   type SimpleMarkName,
 } from "@folijs/core";
 import { PAGE_BREAK_ATTR, renderTree } from "./render.js";
+import { opaqueParagraphsText, parseOpaque } from "./word/blocks.js";
 
 /**
  * Clipboard type for Foli content, read back first on paste: `{ open, content }`, the copied
@@ -67,16 +68,24 @@ export function serializeRange(
   for (const br of container.querySelectorAll(`br[${PAGE_BREAK_ATTR}]`))
     (br as HTMLElement).style.cssText = "page-break-before: always; break-before: page";
   return {
-    text: doc.textBetween(from, to, "\n", leafText),
+    text: doc.textBetween(from, to, "\n", (leaf) => leafText(leaf, ownerDocument)),
     html: container.innerHTML,
     json: JSON.stringify({ open: $from.sharedDepth(to) > 0, content: blocks.toJSON() }),
   };
 }
 
-/** Breaks, rules and opaque blocks as line feeds, a tab as a tab, markers (bookmarks) as nothing. */
-function leafText(leaf: ModelNode): string {
+/**
+ * A leaf as plain text: breaks and rules as line feeds, a tab as a tab, opaque content as the
+ * text it shows (a field's result, a table's paragraphs on their lines), markers as nothing.
+ */
+function leafText(leaf: ModelNode, doc: Document): string {
   const name = leaf.type.name;
   if (name === "tab") return "\t";
+  if (name === "opaqueInline" || name === "opaqueBlock") {
+    const xml = parseOpaque(String(leaf.attrs.xml ?? ""), doc);
+    const text = xml ? opaqueParagraphsText(xml) : "";
+    return leaf.isBlock ? `\n${text}` : text;
+  }
   return leaf.isBlock || name === "hardBreak" || name === "pageBreak" || name === "columnBreak"
     ? "\n"
     : "";

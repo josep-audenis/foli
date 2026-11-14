@@ -78,8 +78,12 @@ function load(document: FoliDocumentV3, from?: DocxPackage): void {
 (document.getElementById("file") as HTMLInputElement).addEventListener("change", async (e) => {
   const file = (e.target as HTMLInputElement).files?.[0];
   if (!file) return;
-  const imported = await importDocx(new Uint8Array(await file.arrayBuffer()));
-  load(imported.document, imported.package);
+  try {
+    const imported = await importDocx(new Uint8Array(await file.arrayBuffer()));
+    load(imported.document, imported.package);
+  } catch (error) {
+    alert(`Could not open ${file.name}: ${(error as Error).message}`);
+  }
 });
 
 (document.getElementById("save") as HTMLButtonElement).addEventListener("click", async () => {
@@ -93,7 +97,8 @@ function load(document: FoliDocumentV3, from?: DocxPackage): void {
   a.href = url;
   a.download = "document.docx";
   a.click();
-  URL.revokeObjectURL(url);
+  // Revoked once the download has started (at once, Firefox and Safari may cancel it).
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 });
 
 declare global {

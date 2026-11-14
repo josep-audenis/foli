@@ -140,8 +140,9 @@ end of a paragraph whose style names a next style (a heading: Normal) starts tha
 `toggleMark` and `isMarkActive` for bold, italic, underline, strike, double strike, caps,
 small caps and hidden act on what the text shows (turning bold off in a bold heading writes
 "not bold"); Backspace and Delete step over bookmarks and comment ranges, and select a field,
-content control or table before deleting it. Headings, lists, alignment, colors and rules on v3
-come with 8.7b.
+content control or table before deleting it; joining paragraphs keeps the second one's section
+break; typed text never takes a tracked-change mark. Headings, lists, alignment, colors and
+rules on v3 come with 8.7b.
 
 | Member                         | Notes                                                                                                                                                                                                                                                                                                                         |
 | ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

@@ -28,6 +28,7 @@ import {
   type Transaction,
   TransformError,
   toggleMark,
+  typedMarks,
   undo,
   wordContext,
 } from "@folijs/core";
@@ -210,6 +211,8 @@ export class EditorView {
   private word: WordRenderer | null = null;
   /** Fonts' normal line height ratios, measured once per family (Word's single spacing). */
   private readonly ratios = new Map<string, number>();
+  /** Web fonts loaded since the v3 blocks were drawn: the next render draws them again. */
+  private fontsChanged = false;
 
   constructor(
     readonly host: HTMLElement,
@@ -386,7 +389,11 @@ export class EditorView {
     const ownerDocument = this.host.ownerDocument;
     // A v3 document (or a new one) gets its renderer; nothing rendered before is reused then.
     const context = wordContext(this.state);
-    const renewed = context !== (this.word?.context ?? null);
+    // Fonts loaded: a new renderer (new line heights), but not while a composition runs in a
+    // block it would redraw.
+    const renewed =
+      context !== (this.word?.context ?? null) || (this.fontsChanged && !this.composing);
+    if (renewed) this.fontsChanged = false;
     if (renewed) {
       this.word = context ? new WordRenderer(context, ownerDocument, this.lineRatio) : null;
       this.invalidateLayout();
@@ -711,7 +718,7 @@ export class EditorView {
   private onFontsLoaded = (): void => {
     // v3 line heights come from the fonts' measured ratios: render every block again.
     this.ratios.clear();
-    this.word = null;
+    this.fontsChanged = true;
     this.invalidateLayout();
     this.scheduleRelayout();
   };
@@ -1512,8 +1519,11 @@ export class EditorView {
       };
       if (command(state, dispatch)) return applied;
     }
-    const marks = (state.storedMarks ?? marksAt(state.selection.$from)).map((m) => m.toJSON());
-    const pasted = docFromClipboard(data, marks, this.word ? parseContentV3 : parseContent);
+    const marks = typedMarks(state.storedMarks ?? marksAt(state.selection.$from)).map((m) =>
+      m.toJSON(),
+    );
+    const v3 = wordContext(state) !== null;
+    const pasted = docFromClipboard(data, marks, v3 ? parseContentV3 : parseContent);
     // One empty textblock: nothing to paste (a lone rule is something).
     const only = pasted?.doc.childCount === 1 ? pasted.doc.firstChild : null;
     if (!pasted || (only?.isTextblock && !only.content.size)) return false;

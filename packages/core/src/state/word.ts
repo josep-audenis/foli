@@ -12,6 +12,7 @@
 import type { Attrs, Mark, MarkType, Node } from "../model/index.js";
 import type { FoliDocumentV3 } from "../v3/document.js";
 import { Resolver, type RunFormat } from "../v3/resolve.js";
+import { MARK_ATTRS } from "./mark.js";
 import { NodeSelection, TextSelection } from "./selection.js";
 import { type EditorState, Plugin, PluginKey } from "./state.js";
 
@@ -37,11 +38,10 @@ export function wordContext(state: EditorState): WordContext | null {
 }
 
 /**
- * What the paragraph mark carries alone (Word keeps it on the mark): a split leaves the section
- * break, the mark's tracked change and the paragraph's own attributes (its `w14:paraId`) on the
- * second paragraph, which keeps the original mark.
+ * What the paragraph mark carries alone (`MARK_ATTRS`): a split leaves it on the second
+ * paragraph, which keeps the original mark.
  */
-const MARK_ONLY = { section: null, revision: null, formatChange: null, attributes: null };
+const MARK_ONLY = Object.fromEntries(MARK_ATTRS.map((key) => [key, null]));
 
 /** The id of the default paragraph style: the last one marked default, as `Resolver` reads it. */
 function defaultParagraphStyle(envelope: WordEnvelope): string | undefined {
@@ -117,11 +117,15 @@ function directMark(type: MarkType, on: boolean, inherited: boolean, existing?: 
   return type.create(hasTwin ? { value: on, complexScript: twin } : { value: on });
 }
 
-/** The text a toggle looks at in a range: text nodes, or every inline node when there is none. */
+/**
+ * The inline nodes a toggle formats in a range (not markers: nothing to format), and those it
+ * judges: text nodes, or every one when there is none.
+ */
 function inlineIn(state: EditorState, from: number, to: number, type: MarkType) {
   const found: { node: Node; pos: number; parent: Node }[] = [];
   state.doc.nodesBetween(from, to, (node, pos, parent) => {
     if (!node.isInline || !parent?.type.allowsMarkType(type)) return undefined;
+    if (MARKERS.has(node.type.name)) return false;
     found.push({ node, pos, parent });
     return false;
   });
@@ -184,7 +188,14 @@ export function toggleRanges(
 }
 
 /** Zero-width markers: nothing to see, so the caret and deletion step over them. */
-const MARKERS = new Set(["bookmarkStart", "bookmarkEnd", "commentStart", "commentEnd"]);
+const MARKERS = new Set([
+  "bookmarkStart",
+  "bookmarkEnd",
+  "commentStart",
+  "commentEnd",
+  // A comment's reference mark: deleting it would take the comment's anchor.
+  "commentReference",
+]);
 
 /** Whether `node` is an invisible marker of a v3 document. */
 export function isMarker(context: WordContext | null, node: Node | null | undefined): boolean {

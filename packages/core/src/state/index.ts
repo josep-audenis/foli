@@ -62,6 +62,7 @@ export {
   toggleList,
   wrapInList,
 } from "./lists.js";
+export { typedMarks } from "./mark.js";
 export {
   AllSelection,
   marksAt,

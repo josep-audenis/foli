@@ -165,9 +165,16 @@ Foli's own (see `THIRD_PARTY_NOTICES.md`).
     else none does; per text node a direct mark is written only where the styles do not
     already give the wanted value (`value: false` turns off a style's bold; `underline` `none`
     a character style's underline), and bold's and italic's complex-script twin is kept.
-  - Backspace and Delete step over the zero-width markers (bookmarks, comment ranges), which
-    stay, and select opaque content (a field, a content control, a table) instead of deleting
-    it; the next key deletes the selection.
+  - Joins (Backspace at a paragraph's start, Delete at its end) and deletions across paragraphs
+    keep the last paragraph's mark: the merged paragraph takes its section break, tracked
+    change and own attributes (`state/mark.ts`), so deleting a paragraph's mark merges its
+    section into the next, as in Word.
+  - Backspace and Delete step over the zero-width markers (bookmarks, comment ranges, comment
+    reference marks), which stay, and select opaque content (a field, a content control, a
+    table) instead of deleting it; the next key deletes the selection. A word deletion stops at
+    the inline node before or after it (a tab, a break, a marker, a field).
+  - Typed, inserted and pasted text never takes a tracked-change mark (`insertion`, `deletion`,
+    `formatChange`) from the text around it (`typedMarks`; changes are recorded from Phase 9).
 
 Known limits:
 - No general slice fitting: paste joins open content, replaces an empty textblock with whole
@@ -442,8 +449,19 @@ as its top margin after the flow (none at the top of a page the text flowed onto
 the last section's (`editor.settings`). Fonts' line height ratios are measured once per family
 outside the host and measured again after web fonts load (every block is drawn again).
 
+Copy from a v3 document: plain text has tabs as tabs, opaque content as its text (a table's
+paragraphs on their lines), markers as nothing; the HTML leaves out run properties turned off
+(`bold` false, `underline` none) and links whose target `isSafeHref` refuses (schema v3 keeps
+any target).
+
 Not yet on v3 (8.7b–d): sections with other page setups, headers and footers, HTML paste
-beyond what fits v3, a final (changes accepted) editing view, Ctrl+click on links.
+beyond what fits v3 and HTML copy as Word formats it, a final (changes accepted) editing
+view, Ctrl+click on links. Pasting Foli JSON inside a v3 document copies its bookmark, comment
+and paragraph ids (made unique in 8.7c). Each render resolves the list numbers and open comment
+ranges of every paragraph and writes the gaps of every block (O(document); measured before
+8.7d). Whether Word keeps the mark's run properties (`markFormat`) on the paragraph after a
+heading, and a tracked formatting change on both halves of a split, is not checked against
+Word yet: Foli keeps neither on the new paragraph.
 
 ### Word pages (`packages/view/src/word/`, 8.6b)
 

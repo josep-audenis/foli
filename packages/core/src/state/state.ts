@@ -8,6 +8,7 @@ import {
 } from "../model/index.js";
 import type { Step } from "../transform/steps.js";
 import { Transform, TransformError } from "../transform/transform.js";
+import { keepLastMark } from "./mark.js";
 import { AllSelection, NodeSelection, Selection, TextSelection } from "./selection.js";
 
 /**
@@ -137,7 +138,17 @@ export class Transaction extends Transform {
       this.replace(selection.from, selection.to, new Slice(Fragment.from(type.create()), 0, 0));
       return this.setSelection(TextSelection.create(this.doc, selection.from + 1));
     }
+    // Across paragraphs: the merged one ends with the last one's mark (schema v3: its section).
+    const { $to } = selection;
+    const last =
+      $from.depth > 0 &&
+      $from.parent !== $to.parent &&
+      $from.parent.isTextblock &&
+      $to.parent.isTextblock
+        ? $to.parent
+        : null;
     this.delete(selection.from, selection.to);
+    if (last) keepLastMark(this, $from.before(), last);
     const caret = this.mapping.slice(start).map(selection.from, -1);
     return this.setSelection(TextSelection.create(this.doc, caret));
   }

@@ -12,6 +12,7 @@ import {
 import { attempt } from "./attempt.js";
 import { redo, undo } from "./history.js";
 import { openLinkEditor } from "./links.js";
+import { keepLastMark, typedMarks } from "./mark.js";
 import { AllSelection, marksAt, NodeSelection, Selection, TextSelection } from "./selection.js";
 import {
   type Command,
@@ -80,16 +81,28 @@ export function insertText(text: string): Command {
         (selection.empty ? marksAt($from) : ($from.nodeAfter?.marks ?? marksAt($from)));
       tr.deleteSelection();
       const $pos = tr.selection.$from;
-      const allowed = marks.filter((mark) => $pos.parent.type.allowsMarkType(mark.type));
+      const allowed = typedMarks(marks).filter((mark) =>
+        $pos.parent.type.allowsMarkType(mark.type),
+      );
       tr.insertText(text, $pos.pos, $pos.pos, allowed);
       tr.setSelection(TextSelection.create(tr.doc, $pos.pos + text.length));
     });
   };
 }
 
-/** Length (in positions) of the last grapheme or word before `$pos` in its textblock. */
-function backwardExtent($pos: ResolvedPos, unit: DeleteUnit): number {
-  const text = $pos.parent.textBetween(0, $pos.parentOffset, "", LEAF);
+/**
+ * Length (in positions) of the last grapheme or word before `$pos` in its textblock. With
+ * `textOnly` (schema v3) a word stops at the inline node before it (a tab, a break, a field, a
+ * marker): those go one per key, as Word deletes them; the node itself counts as one position.
+ */
+function backwardExtent($pos: ResolvedPos, unit: DeleteUnit, textOnly = false): number {
+  let from = 0;
+  if (textOnly && unit === "word")
+    $pos.parent.forEach((child, offset) => {
+      if (!child.isText && offset < $pos.parentOffset) from = offset + child.nodeSize;
+    });
+  if (from === $pos.parentOffset && from > 0) return 1;
+  const text = $pos.parent.textBetween(from, $pos.parentOffset, "", LEAF);
   if (unit === "char") return [...graphemes.segment(text)].pop()?.segment.length ?? 0;
   const segments = [...words.segment(text)];
   let length = 0;
@@ -98,9 +111,15 @@ function backwardExtent($pos: ResolvedPos, unit: DeleteUnit): number {
   return length + (segments.pop()?.segment.length ?? 0);
 }
 
-/** Length of the first grapheme or word after `$pos` in its textblock. */
-function forwardExtent($pos: ResolvedPos, unit: DeleteUnit): number {
-  const text = $pos.parent.textBetween($pos.parentOffset, $pos.parent.content.size, "", LEAF);
+/** Length of the first grapheme or word after `$pos` in its textblock (`textOnly`: as backward). */
+function forwardExtent($pos: ResolvedPos, unit: DeleteUnit, textOnly = false): number {
+  let to = $pos.parent.content.size;
+  if (textOnly && unit === "word")
+    $pos.parent.forEach((child, offset) => {
+      if (!child.isText && offset >= $pos.parentOffset && offset < to) to = offset;
+    });
+  if (to === $pos.parentOffset && to < $pos.parent.content.size) return 1;
+  const text = $pos.parent.textBetween($pos.parentOffset, to, "", LEAF);
   const segments = [...(unit === "char" ? graphemes : words).segment(text)];
   if (unit === "char") return segments[0]?.segment.length ?? 0;
   let length = 0;
@@ -126,7 +145,7 @@ export function deleteBackward(unit: DeleteUnit = "char"): Command {
       dispatch?.(state.tr.setSelection(selectionAt(state, $pos.pos - node.nodeSize)));
       return true;
     }
-    const size = backwardExtent($pos, unit);
+    const size = backwardExtent($pos, unit, word !== null);
     return attempt(state, dispatch, (tr) => tr.delete($pos.pos - size, $pos.pos));
   };
 }
@@ -147,7 +166,7 @@ export function deleteForward(unit: DeleteUnit = "char"): Command {
       dispatch?.(state.tr.setSelection(selectionAt(state, $pos.pos)));
       return true;
     }
-    const size = forwardExtent($pos, unit);
+    const size = forwardExtent($pos, unit, word !== null);
     return attempt(state, dispatch, (tr) => tr.delete($pos.pos, $pos.pos + size));
   };
 }
@@ -163,7 +182,12 @@ export const joinBackward: Command = (state, dispatch) => {
   if (index === 0) return false;
   const before = $pos.node($pos.depth - 1).child(index - 1);
   const boundary = $pos.before();
-  if (before.isTextblock) return attempt(state, dispatch, (tr) => tr.join(boundary));
+  if (before.isTextblock)
+    return attempt(state, dispatch, (tr) => {
+      tr.join(boundary);
+      // The merged paragraph ends with this one's mark (schema v3: its section break).
+      keepLastMark(tr, boundary - before.nodeSize, $pos.parent);
+    });
   if (before.isLeaf && isOpaque(wordContext(state), before)) {
     dispatch?.(state.tr.setSelection(selectionAt(state, boundary - before.nodeSize)));
     return true;
@@ -212,7 +236,10 @@ export const joinForward: Command = (state, dispatch) => {
   if (!after) return false;
   const boundary = $pos.after(base + 1);
   if (after.isTextblock && base === $pos.depth - 1) {
-    return attempt(state, dispatch, (tr) => tr.join(boundary));
+    return attempt(state, dispatch, (tr) => {
+      tr.join(boundary);
+      keepLastMark(tr, $pos.before(), after);
+    });
   }
   if (after.isLeaf && isOpaque(wordContext(state), after)) {
     dispatch?.(state.tr.setSelection(selectionAt(state, boundary)));
@@ -392,7 +419,7 @@ function insertLeaf(name: string, ...[state, dispatch]: Parameters<Command>): bo
       type.create(
         null,
         null,
-        marks.filter((m) => tr.doc.resolve(pos).parent.type.allowsMarkType(m.type)),
+        typedMarks(marks).filter((m) => tr.doc.resolve(pos).parent.type.allowsMarkType(m.type)),
       ),
     );
     tr.setSelection(TextSelection.create(tr.doc, pos + 1));
