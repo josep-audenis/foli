@@ -32,6 +32,7 @@ import {
   wordContext,
   wordToggleActive,
 } from "./word.js";
+import { defaultParagraphStyleOf, setParagraphStyle, styleNamed } from "./wordformat.js";
 
 export type DeleteUnit = "char" | "word";
 
@@ -395,6 +396,9 @@ export function arrowAcrossLeaf(dir: -1 | 1, from: "char" | "line" | "none"): Co
   };
 }
 
+/** Inserts a tab (schema v3) in place of the selection; does not apply where there is none. */
+export const insertTab: Command = (state, dispatch) => insertLeaf("tab", state, dispatch);
+
 /** Inserts a hard break (a line break inside the block) in place of the selection. */
 export const insertHardBreak: Command = (state, dispatch) =>
   insertLeaf("hardBreak", state, dispatch);
@@ -535,6 +539,18 @@ export function isMarkActive(state: EditorState, type: string | MarkType): boole
  */
 export function setBlockType(type: string | NodeType, attrs: Attrs | null = null): Command {
   return (state, dispatch) => {
+    const word = wordContext(state);
+    if (word) {
+      // Schema v3: headings are paragraphs in Word's heading styles.
+      const name = typeof type === "string" ? type : type.name;
+      const style =
+        name === "heading"
+          ? styleNamed(word, `heading ${String(attrs?.level ?? 1)}`)
+          : name === "paragraph"
+            ? defaultParagraphStyleOf(word)
+            : null;
+      return style !== null && setParagraphStyle(style)(state, dispatch);
+    }
     const nodeType = typeof type === "string" ? state.schema.nodes[type] : type;
     if (!nodeType?.isTextblock) return false;
     const { from, to } = state.selection;
@@ -554,6 +570,8 @@ export function baseKeymap(): Plugin {
       Enter: splitBlock,
       "Shift-Enter": insertHardBreak,
       "Mod-Enter": insertPageBreak,
+      // Schema v3 types a tab (a list's Tab runs first); v2 has none, so Tab leaves the editor.
+      Tab: insertTab,
       Backspace: deleteBackward(),
       Delete: deleteForward(),
       "Mod-b": toggleMark("bold"),

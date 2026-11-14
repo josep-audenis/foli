@@ -393,3 +393,41 @@ describe("WordRenderer", () => {
     expect(renderer.render(doc.child(2), 2).dom.querySelectorAll("br")).toHaveLength(1);
   });
 });
+
+describe("list markers in Symbol and Wingdings", () => {
+  it("are shown as the Unicode character they draw", () => {
+    const host = document.createElement("div");
+    document.body.append(host);
+    const bullet = (text: string, font: string) => ({
+      level: 0,
+      format: "bullet",
+      text,
+      run: [{ type: "font", attrs: { ascii: font, hAnsi: font } }],
+    });
+    const editor = createEditor({
+      document: {
+        ...documentOf(
+          p({ numbering: { id: 1, level: 0 } }),
+          p({ numbering: { id: 2, level: 0 } }),
+          p({ numbering: { id: 3, level: 0 } }),
+        ),
+        numbering: {
+          abstracts: [
+            { id: 0, levels: [bullet("", "Symbol")] },
+            { id: 1, levels: [bullet("", "Wingdings")] },
+            { id: 2, levels: [bullet("", "Arial")] },
+          ],
+          instances: [
+            { id: 1, abstract: 0 },
+            { id: 2, abstract: 1 },
+            { id: 3, abstract: 2 },
+          ],
+        },
+      },
+    });
+    views.push(new EditorView(host, editor));
+    const markers = [...host.querySelectorAll<HTMLElement>("[data-foli-marker]")];
+    expect(markers.map((m) => m.textContent?.charAt(0))).toEqual(["•", "▪", ""]);
+    expect(markers[0]?.style.fontFamily).toBe("sans-serif");
+  });
+});

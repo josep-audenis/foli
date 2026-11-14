@@ -4,9 +4,19 @@ import { TransformError } from "../transform/transform.js";
 import { attempt } from "./attempt.js";
 import { marksAt, NodeSelection, TextSelection } from "./selection.js";
 import { type Command, defaultTextblockType, type EditorState } from "./state.js";
+import { wordContext } from "./word.js";
+import {
+  setWordAlign,
+  setWordHighlight,
+  setWordTextColor,
+  wordAlignAt,
+  wordHighlightAt,
+  wordTextColorAt,
+} from "./wordformat.js";
 
 /** The alignment all textblocks in the selection share, or null (mixed, or no textblock). */
 export function alignAt(state: EditorState): Alignment | null {
+  if (wordContext(state)) return wordAlignAt(state);
   let align: Alignment | null | undefined;
   const { from, to } = state.selection;
   state.doc.nodesBetween(from, to, (node) => {
@@ -25,6 +35,7 @@ export function alignAt(state: EditorState): Alignment | null {
  */
 export function setAlign(align: Alignment): Command {
   return (state, dispatch) => {
+    if (wordContext(state)) return setWordAlign(align)(state, dispatch);
     const { from, to } = state.selection;
     return attempt(state, dispatch, (tr) => tr.setBlockAttrs(from, to, { align }));
   };
@@ -37,9 +48,12 @@ export function setAlign(align: Alignment): Command {
  */
 function setColorMark(name: string, color: string | null): Command {
   return (state, dispatch) => {
-    const type: MarkType | undefined = state.schema.marks[name];
     const value = color?.toLowerCase() ?? null;
-    if (!type || (value !== null && !isColor(value))) return false;
+    if (value !== null && !isColor(value)) return false;
+    if (wordContext(state))
+      return (name === "highlight" ? setWordHighlight : setWordTextColor)(value)(state, dispatch);
+    const type: MarkType | undefined = state.schema.marks[name];
+    if (!type) return false;
     const mark = value === null ? null : type.create({ color: value });
     const { selection } = state;
     if (selection.empty && selection instanceof TextSelection) {
@@ -70,6 +84,8 @@ export const setHighlight = (color: string | null): Command => setColorMark("hig
  * has (at a caret, the one typing gets), or null (none, or mixed).
  */
 export function colorAt(state: EditorState, name: "textColor" | "highlight"): string | null {
+  if (wordContext(state))
+    return name === "highlight" ? wordHighlightAt(state) : wordTextColorAt(state);
   const type = state.schema.marks[name];
   if (!type) return null;
   const read = (marks: Parameters<MarkType["isInSet"]>[0]) =>
