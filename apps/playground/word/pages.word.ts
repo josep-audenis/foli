@@ -7,6 +7,10 @@
  * Fonts: Chromium uses the fonts installed on the machine. Office's cloud fonts (Aptos, the
  * default since 2023) are not installed system-wide: they are served to the page from Office's
  * font cache (`FOLI_FONT_DIR`, default the Windows cache) when present, for this run only.
+ *
+ * Pages against Word's PDF (8.6c): with `FOLI_WORD_PDF` set to a folder of Word's PDFs of the
+ * corpus (`word-reference.ps1 -PdfDir`, not committed), each page Foli shows is compared with
+ * Word's by ink (`src/ink.ts`); overlays go to `test-results/word-pdf/`.
  */
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -20,6 +24,7 @@ const FONT_DIR =
   join(process.env.LOCALAPPDATA ?? "", "Microsoft", "FontCache", "4", "CloudFonts");
 const FAMILIES = (process.env.FOLI_FONTS ?? "Aptos,Aptos Display").split(",");
 const FONT_PATH = "/__foli-word-fonts/";
+const PDF_DIR = process.env.FOLI_WORD_PDF;
 
 interface Face {
   family: string;
@@ -110,8 +115,75 @@ interface Result {
   /** On Word's page, at most one line from Word's. */
   nearLine: number;
   pages: [number, number];
+  /** Against Word's PDF: each page's ink agreement, on the page and inside the margins. */
+  pdf?: PdfResult;
+}
+interface PdfResult {
+  /** Per page of the longer of the two; a page only one has scores 0. */
+  pages: { page: number; body: number }[];
+  /** Their means. */
+  page: number;
+  body: number;
 }
 const results: Record<string, Result> = {};
+
+interface Agreement {
+  score: number;
+}
+const round = (n: number) => Math.round(n * 1000) / 1000;
+const mean = (values: number[]) => values.reduce((a, b) => a + b, 0) / (values.length || 1);
+
+/** Foli's pages shown now, compared with Word's PDF of the same document. */
+async function comparePdf(page: Page, file: string, base: string): Promise<PdfResult> {
+  const elements = page.locator(".foli-word-page");
+  const shots: { png: string; margins: number[] }[] = [];
+  for (let i = 0; i < (await elements.count()); i++) {
+    const element = elements.nth(i);
+    shots.push({
+      png: (await element.screenshot({ scale: "css" })).toString("base64"),
+      margins: await element.evaluate((e) => {
+        const style = getComputedStyle(e);
+        return [style.paddingTop, style.paddingRight, style.paddingBottom, style.paddingLeft].map(
+          Number.parseFloat,
+        );
+      }),
+    });
+  }
+  const { wordPages, compared } = await page.evaluate(
+    ([pdf, pages]) =>
+      (
+        window as unknown as {
+          foliWord: {
+            comparePdf(
+              pdf: string,
+              pages: unknown,
+            ): Promise<{
+              wordPages: number;
+              compared: { page: Agreement; body: Agreement; overlay: string }[];
+            }>;
+          };
+        }
+      ).foliWord.comparePdf(pdf, pages),
+    [readFileSync(file).toString("base64"), shots] as const,
+  );
+  const out = new URL("test-results/word-pdf/", ROOT);
+  mkdirSync(out, { recursive: true });
+  compared.forEach((c, i) => {
+    writeFileSync(
+      new URL(`${base}-${i + 1}.png`, out),
+      Buffer.from(c.overlay.slice(c.overlay.indexOf(",") + 1), "base64"),
+    );
+  });
+  const pages = Array.from({ length: Math.max(wordPages, shots.length) }, (_, i) => ({
+    page: round(compared[i]?.page.score ?? 0),
+    body: round(compared[i]?.body.score ?? 0),
+  }));
+  return {
+    pages,
+    page: round(mean(pages.map((p) => p.page))),
+    body: round(mean(pages.map((p) => p.body))),
+  };
+}
 
 test.describe.configure({ mode: "serial" });
 
@@ -175,6 +247,14 @@ for (const name of names) {
       `${name}: of ${compared} paragraphs (${expected.length} outside tables), ${agreed} on Word's page, ${sameLine} on its line, ${nearLine} within a line; ${pages} pages (Word ${reference.pages})${faces.length ? "" : ", without Office cloud fonts"}`,
     );
     for (const line of disagreements) console.log(`  ${line}`);
+    const pdf = PDF_DIR && join(PDF_DIR, name.replace(/\.docx$/, ".pdf"));
+    if (pdf && existsSync(pdf)) {
+      const result = await comparePdf(page, pdf, name.replace(/\.docx$/, ""));
+      (results[name] as Result).pdf = result;
+      console.log(
+        `  against Word's PDF: ${result.page} on the page, ${result.body} inside the margins (${result.pages.map((p) => `${p.page}/${p.body}`).join(", ")})`,
+      );
+    } else if (PDF_DIR) console.log(`  no PDF of ${name} in ${PDF_DIR}`);
     // The comparison itself must hold: most paragraphs matched by text.
     expect(compared).toBeGreaterThanOrEqual(Math.floor(expected.length * 0.6));
   });
@@ -184,17 +264,31 @@ test.afterAll(() => {
   const out = new URL("test-results/", ROOT);
   mkdirSync(out, { recursive: true });
   const total = { compared: 0, agreed: 0, sameLine: 0, nearLine: 0 };
+  const pdfPages: { page: number; body: number }[] = [];
   for (const r of Object.values(results)) {
     total.compared += r.compared;
     total.agreed += r.agreed;
     total.sameLine += r.sameLine;
     total.nearLine += r.nearLine;
+    pdfPages.push(...(r.pdf?.pages ?? []));
   }
+  // Every page of the corpus weighs the same.
+  const pdf = pdfPages.length
+    ? {
+        pages: pdfPages.length,
+        page: round(mean(pdfPages.map((p) => p.page))),
+        body: round(mean(pdfPages.map((p) => p.body))),
+      }
+    : null;
   writeFileSync(
     new URL("word-pages.json", out),
-    `${JSON.stringify({ fonts: faces.map((f) => f.family), documents: results, total }, null, 2)}\n`,
+    `${JSON.stringify({ fonts: faces.map((f) => f.family), documents: results, total, pdf }, null, 2)}\n`,
   );
   console.log(
     `Total: of ${total.compared} paragraphs, ${total.agreed} on Word's page, ${total.sameLine} on its line, ${total.nearLine} within a line`,
   );
+  if (pdf)
+    console.log(
+      `Against Word's PDF, of ${pdf.pages} pages: ${pdf.page} on the page, ${pdf.body} inside the margins`,
+    );
 });
