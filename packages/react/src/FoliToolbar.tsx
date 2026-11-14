@@ -3,32 +3,45 @@ import {
   AllSelection,
   alignAt,
   type Command,
+  canOutdent,
+  changeIndent,
   colorAt,
   type Editor,
+  type EditorDocument,
   type EditorState,
+  fontFamilyAt,
+  fontSizeAt,
   insertHorizontalRule,
   insertPageBreak,
   isSafeHref,
   liftListItem,
+  lineSpacingAt,
   linkAt,
-  listTypeAt,
+  listKindAt,
   NodeSelection,
   normalizeHref,
   openLinkEditor,
+  paragraphStyleAt,
+  paragraphStyles,
   redo,
   redoDepth,
   removeLink,
   requestsLinkEditor,
   setAlign,
   setBlockType,
+  setFontFamily,
+  setFontSize,
   setHighlight,
+  setLineSpacing,
   setLink,
+  setParagraphStyle,
   setTextColor,
   sinkListItem,
   toggleList,
   toggleMark,
   undo,
   undoDepth,
+  wordContext,
   wrapInList,
 } from "@folijs/core";
 import {
@@ -45,8 +58,12 @@ import {
 import { useEditorOrContext, useEditorState } from "./editor.js";
 
 export interface FoliToolbarProps {
-  /** Default: the editor of the nearest `FoliEditorProvider`. */
-  editor?: Editor | undefined;
+  /**
+   * Default: the editor of the nearest `FoliEditorProvider`. An editor of a schema v3 document
+   * (Word's model) gets Word's controls: paragraph style, font, size, line spacing, Word's
+   * highlight colors; no heading buttons or horizontal rule.
+   */
+  editor?: Editor<EditorDocument> | undefined;
   /**
    * Every button is disabled. Pass it whenever the canvas is `readOnly`: commands run through
    * the editor, which code may always change (`FoliEditor` does this for you).
@@ -88,6 +105,12 @@ interface Item {
     value: (state: EditorState) => string | null;
     pick: (color: string | null) => Command;
   };
+  /** A drop-down list (a `select`): its options, the current value, and what picking runs. */
+  select?: {
+    options: (state: EditorState) => readonly { value: string; label: string }[];
+    value: (state: EditorState) => string | null;
+    pick: (value: string) => Command;
+  };
 }
 
 interface ColorOption {
@@ -117,6 +140,16 @@ const HIGHLIGHTS: readonly ColorOption[] = [
   { name: "Pink", color: "#f8bbd0" },
   { name: "Orange", color: "#ffe0b2" },
   { name: "Gray", color: "#e0e0e0" },
+];
+
+/** Word's highlight colors (a document opened in Word shows these exactly). */
+const WORD_HIGHLIGHTS: readonly ColorOption[] = [
+  { name: "None", color: null },
+  { name: "Yellow", color: "#ffff00" },
+  { name: "Bright green", color: "#00ff00" },
+  { name: "Turquoise", color: "#00ffff" },
+  { name: "Pink", color: "#ff00ff" },
+  { name: "Gray", color: "#c0c0c0" },
 ];
 
 /** Whether the selection holds a textblock (a caret's own block first; else it walks the range). */
@@ -273,8 +306,8 @@ const GROUPS: Item[][] = [
       label: "Bulleted list",
       text: "•",
       symbol: true,
-      pressed: (state) => listTypeAt(state)?.name === "bulletList",
-      enabled: (state) => listTypeAt(state) !== null || wrapInList("bulletList")(state),
+      pressed: (state) => listKindAt(state) === "bulletList",
+      enabled: (state) => listKindAt(state) !== null || wrapInList("bulletList")(state),
       command: () => toggleList("bulletList"),
     },
     {
@@ -283,8 +316,8 @@ const GROUPS: Item[][] = [
       // A symbol, not "1.": visible text that is not part of the name fails WCAG 2.5.3.
       text: "№",
       symbol: true,
-      pressed: (state) => listTypeAt(state)?.name === "orderedList",
-      enabled: (state) => listTypeAt(state) !== null || wrapInList("orderedList")(state),
+      pressed: (state) => listKindAt(state) === "orderedList",
+      enabled: (state) => listKindAt(state) !== null || wrapInList("orderedList")(state),
       command: () => toggleList("orderedList"),
     },
     {
@@ -292,7 +325,7 @@ const GROUPS: Item[][] = [
       label: "Decrease indent",
       text: "⇤",
       symbol: true,
-      enabled: (state) => listTypeAt(state) !== null,
+      enabled: (state) => listKindAt(state) !== null,
       command: () => liftListItem(),
     },
     {
@@ -335,7 +368,117 @@ const GROUPS: Item[][] = [
     { key: "pageBreak", label: "Page break", text: "Page break", command: () => insertPageBreak },
   ],
 ];
+const capitalized = (name: string) => name.charAt(0).toUpperCase() + name.slice(1);
+
+/** The fonts the font box offers (with the document's theme fonts, and the one shown now). */
+const FONTS = [
+  "Aptos",
+  "Arial",
+  "Calibri",
+  "Cambria",
+  "Courier New",
+  "Georgia",
+  "Times New Roman",
+  "Verdana",
+];
+const SIZES = [8, 9, 10, 10.5, 11, 12, 14, 16, 18, 20, 22, 24, 26, 28, 36, 48, 72];
+const LINE_SPACINGS = [1, 1.15, 1.5, 2, 2.5, 3];
+
+/** The toolbar for a schema v3 document: Word's controls. */
+const WORD_GROUPS: Item[][] = [
+  [
+    {
+      key: "style",
+      label: "Paragraph style",
+      text: "Style",
+      enabled: hasTextblock,
+      select: {
+        options: (state) =>
+          paragraphStyles(state).map((s) => ({ value: s.id, label: capitalized(s.name) })),
+        value: paragraphStyleAt,
+        pick: (id) => setParagraphStyle(id),
+      },
+    },
+    {
+      key: "font",
+      label: "Font",
+      text: "Font",
+      enabled: hasTextblock,
+      select: {
+        options: (state) => {
+          const theme = wordContext(state)?.envelope.theme?.fonts;
+          const names = [theme?.minor.latin, theme?.major.latin, ...FONTS];
+          return [...new Set(names.filter((n): n is string => !!n))]
+            .sort((a, b) => a.localeCompare(b))
+            .map((name) => ({ value: name, label: name }));
+        },
+        value: fontFamilyAt,
+        pick: (name) => setFontFamily(name),
+      },
+    },
+    {
+      key: "size",
+      label: "Font size",
+      text: "Size",
+      enabled: hasTextblock,
+      select: {
+        options: () => SIZES.map((size) => ({ value: String(size), label: String(size) })),
+        value: (state) => {
+          const size = fontSizeAt(state);
+          return size === null ? null : String(size);
+        },
+        pick: (size) => setFontSize(Number(size)),
+      },
+    },
+  ],
+  (GROUPS[0] as Item[]).map((item) =>
+    item.key === "highlight" && item.menu
+      ? { ...item, menu: { ...item.menu, options: WORD_HIGHLIGHTS } }
+      : item,
+  ),
+  [
+    ...(GROUPS[2] as Item[]),
+    {
+      key: "lineSpacing",
+      label: "Line spacing",
+      text: "Line spacing",
+      enabled: hasTextblock,
+      select: {
+        options: () =>
+          LINE_SPACINGS.map((n) => ({ value: String(n), label: n.toFixed(n % 1 ? 2 : 1) })),
+        value: (state) => {
+          const spacing = lineSpacingAt(state);
+          return spacing === null ? null : String(spacing);
+        },
+        pick: (n) => setLineSpacing(Number(n)),
+      },
+    },
+  ],
+  [
+    ...(GROUPS[3] as Item[]).slice(0, 2),
+    {
+      key: "outdent",
+      label: "Decrease indent",
+      text: "⇤",
+      symbol: true,
+      enabled: canOutdent,
+      command: () => changeIndent(-1),
+    },
+    {
+      key: "indent",
+      label: "Increase indent",
+      text: "⇥",
+      symbol: true,
+      enabled: hasTextblock,
+      command: () => changeIndent(1),
+    },
+  ],
+  GROUPS[4] as Item[],
+  (GROUPS[5] as Item[]).filter((item) => item.key !== "horizontalRule"),
+];
+
 const ITEMS = GROUPS.flat();
+const WORD_ITEMS = WORD_GROUPS.flat();
 
 /** Whether the selection starts in a list item that has an item before it (cheap: no dry run). */
 function canIndent(state: EditorState): boolean {
@@ -372,12 +515,16 @@ const sameStates = (a: ItemState[], b: ItemState[]) =>
   );
 
 /** Runs after every transaction: O(selection), no transactions built. */
-const selectStates = (state: EditorState, editor: Editor): ItemState[] =>
-  ITEMS.map((item) => ({
-    pressed: item.pressed?.(state, editor),
-    enabled: item.enabled?.(state) ?? true,
-    value: item.menu?.value(state),
-  }));
+const statesOf =
+  (items: readonly Item[]) =>
+  (state: EditorState, editor: Editor): ItemState[] =>
+    items.map((item) => ({
+      pressed: item.pressed?.(state, editor),
+      enabled: item.enabled?.(state) ?? true,
+      value: item.menu?.value(state) ?? item.select?.value(state),
+    }));
+const selectStates = statesOf(ITEMS);
+const selectWordStates = statesOf(WORD_ITEMS);
 
 /**
  * Formatting buttons for an editor: marks, link (a dialog, also on Mod-K in the document), text
@@ -394,10 +541,18 @@ export function FoliToolbar({
   label = "Formatting",
   className,
 }: FoliToolbarProps) {
-  const editor = useEditorOrContext(given, "FoliToolbar");
-  const states = useEditorState(selectStates, { editor, isEqual: sameStates });
+  // shortcut: the hooks take a schema v2 editor's type; both editors have the same members
+  // they use (8.7d makes v3 the only one).
+  const editor = useEditorOrContext(given as Editor | undefined, "FoliToolbar");
+  const word = useEditorState((state) => wordContext(state) !== null, { editor });
+  const groups = word ? WORD_GROUPS : GROUPS;
+  const items = word ? WORD_ITEMS : ITEMS;
+  const states = useEditorState(word ? selectWordStates : selectStates, {
+    editor,
+    isEqual: sameStates,
+  });
   const [active, setActive] = useState(0);
-  const buttons = useRef<(HTMLButtonElement | null)[]>([]);
+  const buttons = useRef<(HTMLButtonElement | HTMLSelectElement | null)[]>([]);
   // The open menu (a menu button's key), if any.
   const [menu, setMenu] = useState<string | null>(null);
   useEffect(() => {
@@ -405,7 +560,7 @@ export function FoliToolbar({
   }, [disabled]);
 
   const run = (index: number, event: MouseEvent) => {
-    const item = ITEMS[index];
+    const item = items[index];
     if (!item || disabled || !states[index]?.enabled) return;
     if (item.menu) {
       if (menu !== item.key) {
@@ -468,7 +623,7 @@ export function FoliToolbar({
   const onKeyDown = (event: KeyboardEvent) => {
     // Alt+Left (back) and other shortcuts are the browser's.
     if (event.altKey || event.ctrlKey || event.metaKey) return;
-    const count = ITEMS.length;
+    const count = items.length;
     const moves: Record<string, number> = {
       ArrowRight: (active + 1) % count,
       ArrowLeft: (active - 1 + count) % count,
@@ -491,13 +646,48 @@ export function FoliToolbar({
         className={className ? `foli-toolbar ${className}` : "foli-toolbar"}
         onKeyDown={onKeyDown}
       >
-        {GROUPS.map((group, g) => (
+        {groups.map((group, g) => (
           <Fragment key={group[0]?.key}>
             {g > 0 && <hr className="foli-toolbar-separator" aria-orientation="vertical" />}
             {group.map((item) => {
               const i = index++;
               const state = states[i];
               const off = disabled || !state?.enabled;
+              if (item.select) {
+                const { select } = item;
+                const value = state?.value ?? "";
+                const options = select.options(editor.state);
+                return (
+                  <select
+                    key={item.key}
+                    ref={(element) => {
+                      buttons.current[i] = element;
+                    }}
+                    className={`foli-toolbar-select foli-toolbar-${item.key}`}
+                    aria-label={item.label}
+                    title={item.label}
+                    // Still focusable when it cannot apply, like the buttons.
+                    aria-disabled={off || undefined}
+                    tabIndex={i === active ? 0 : -1}
+                    value={value}
+                    onFocus={() => setActive(i)}
+                    onChange={(event) => {
+                      if (!off) editor.run(select.pick(event.target.value));
+                    }}
+                  >
+                    {/* Mixed (or nothing to show): a blank entry; a value not offered: itself. */}
+                    {value === "" && <option value="" />}
+                    {value !== "" && !options.some((o) => o.value === value) && (
+                      <option value={value}>{value}</option>
+                    )}
+                    {options.map((o) => (
+                      <option key={o.value} value={o.value}>
+                        {o.label}
+                      </option>
+                    ))}
+                  </select>
+                );
+              }
               const button = (
                 <button
                   key={item.key}

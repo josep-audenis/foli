@@ -14,7 +14,7 @@ import type { FoliDocumentV3 } from "../v3/document.js";
 import { Resolver, type RunFormat } from "../v3/resolve.js";
 import { MARK_ATTRS } from "./mark.js";
 import { NodeSelection, TextSelection } from "./selection.js";
-import { type EditorState, Plugin, PluginKey } from "./state.js";
+import { type EditorState, Plugin, PluginKey, type Transaction } from "./state.js";
 
 /** A v3 document without its content: what the editor keeps beside the edited tree. */
 export type WordEnvelope = Omit<FoliDocumentV3, "content">;
@@ -26,10 +26,27 @@ export interface WordContext {
 
 const key = new PluginKey<WordContext>("word");
 
-/** The plugin that gives commands a v3 document's envelope (styles never change while editing yet). */
+/**
+ * The plugin that gives commands a v3 document's envelope. A transaction changes it with
+ * `withEnvelope` (a new list's numbering definition); undo leaves such additions, as Word does.
+ */
 export function wordPlugin(envelope: WordEnvelope): Plugin<WordContext> {
   const context: WordContext = { envelope, resolver: new Resolver(envelope) };
-  return new Plugin({ key, state: { init: () => context, apply: (_tr, value) => value } });
+  return new Plugin({
+    key,
+    state: {
+      init: () => context,
+      apply: (tr, value) => {
+        const next = tr.getMeta(key) as WordEnvelope | undefined;
+        return next ? { envelope: next, resolver: new Resolver(next) } : value;
+      },
+    },
+  });
+}
+
+/** Makes `tr` change the document's envelope to `envelope` (styles, numbering…). */
+export function withEnvelope(tr: Transaction, envelope: WordEnvelope): Transaction {
+  return tr.setMeta(key, envelope);
 }
 
 /** The envelope and resolver of the v3 document in `state`, or null for a v2 editor. */

@@ -395,6 +395,16 @@ function applyContextualSpacing(blocks: WordBlock[]): void {
   }
 }
 
+/** Symbol and Wingdings bullets (`w:lvlText`, private-use code points) as Unicode. */
+const SYMBOLS: Record<string, string> = {
+  "\uF0B7": "\u2022", // Symbol: bullet
+  "\uF0A7": "\u25AA", // Wingdings: small black square
+  "\uF0A8": "\u25C6", // Wingdings: black diamond
+  "\uF076": "\u2756", // Wingdings: black diamond minus white X
+  "\uF0D8": "\u27A2", // Wingdings: arrowhead
+  "\uF0FC": "\u2713", // Wingdings: check mark
+};
+
 /** A list marker: its text, then what follows it (a tab to the text's indent, a space). */
 export function markerElement(
   marker: ListMarker,
@@ -411,6 +421,15 @@ export function markerElement(
     lineHeight(paragraph, marker.run, ratio(fontStack(latin(marker.run)))),
   );
   span.textContent = marker.text;
+  // Bullets in Symbol and Wingdings are private-use code points: shown as the Unicode
+  // character they draw, in a font that has it.
+  const font = latin(marker.run)?.toLowerCase();
+  const glyph =
+    font === "symbol" || font?.startsWith("wingdings") ? SYMBOLS[marker.text] : undefined;
+  if (glyph) {
+    span.textContent = glyph;
+    span.style.fontFamily = "sans-serif";
+  }
   const hanging = paragraph.indent.hanging * PX_PER_TWIP;
   if (marker.suffix === "tab" && hanging > 0) {
     // shortcut: a marker wider than the hanging indent goes to the next default tab stop in

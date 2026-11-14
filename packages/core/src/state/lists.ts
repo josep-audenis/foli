@@ -16,6 +16,17 @@ import { TransformError } from "../transform/transform.js";
 import { closeHistory } from "./history.js";
 import { Selection, TextSelection } from "./selection.js";
 import { type Command, type EditorState, Plugin, type Transaction } from "./state.js";
+import { wordContext } from "./word.js";
+import {
+  endWordList,
+  type ListKind,
+  liftWordList,
+  removeWordListNumber,
+  sinkWordList,
+  toggleWordList,
+  wordListKindAt,
+  wrapInWordList,
+} from "./wordformat.js";
 
 /** The list node types this module treats as lists (any node holding list items). */
 const isList = (node: Node, item: NodeType) => node.firstChild?.type === item && !node.isTextblock;
@@ -122,6 +133,21 @@ function textStart(state: EditorState): ResolvedPos {
   return $from.parent.inlineContent ? $from : Selection.near($from, 1).$from;
 }
 
+/** A list type's name as a kind of list (schema v3 has no list nodes, only numbering). */
+const kindOf = (type: string | NodeType): ListKind =>
+  (typeof type === "string" ? type : type.name) === "bulletList" ? "bulletList" : "orderedList";
+
+/**
+ * The kind of list at the selection ("bulletList", "orderedList"), or null, for the toolbar: on
+ * schema v2 the innermost list around its start; on v3 the numbering all selected paragraphs
+ * share.
+ */
+export function listKindAt(state: EditorState): ListKind | null {
+  if (wordContext(state)) return wordListKindAt(state);
+  const name = listTypeAt(state)?.name;
+  return name === "bulletList" || name === "orderedList" ? name : null;
+}
+
 /** The type of the innermost list around the selection's start, or null (for the toolbar). */
 export function listTypeAt(state: EditorState): NodeType | null {
   const item = itemTypeOf(state);
@@ -134,6 +160,7 @@ export function listTypeAt(state: EditorState): NodeType | null {
 /** Wraps the selected blocks in a list of `listType` (each run of blocks becomes one item). */
 export function wrapInList(listType: string | NodeType, attrs: Attrs | null = null): Command {
   return (state, dispatch) => {
+    if (wordContext(state)) return wrapInWordList(kindOf(listType))(state, dispatch);
     const type = nodeTypeOf(state, listType);
     if (!type) return false;
     const { $from, $to } = state.selection;
@@ -155,6 +182,7 @@ export function wrapInList(listType: string | NodeType, attrs: Attrs | null = nu
  */
 export function splitListItem(itemType?: string | NodeType): Command {
   return (state, dispatch) => {
+    if (wordContext(state)) return endWordList(state, dispatch);
     const item = itemType ? nodeTypeOf(state, itemType) : itemTypeOf(state);
     const { $from, $to } = state.selection;
     if (item && !$from.sameParent($to)) return splitAfterDelete(state, dispatch, item);
@@ -217,6 +245,7 @@ function splitAfterDelete(
  */
 export function liftListItem(itemType?: string | NodeType): Command {
   return (state, dispatch) => {
+    if (wordContext(state)) return liftWordList(state, dispatch);
     const item = itemType ? nodeTypeOf(state, itemType) : itemTypeOf(state);
     if (!item) return false;
     const range = itemRange(state, item);
@@ -323,6 +352,7 @@ function continuation(list: Node, before: number): Node {
 /** Tab: nests the selected list items in the item before them (a sublist of the same type). */
 export function sinkListItem(itemType?: string | NodeType): Command {
   return (state, dispatch) => {
+    if (wordContext(state)) return sinkWordList(state, dispatch);
     const item = itemType ? nodeTypeOf(state, itemType) : itemTypeOf(state);
     if (!item) return false;
     const range = itemRange(state, item);
@@ -354,6 +384,7 @@ export function sinkListItem(itemType?: string | NodeType): Command {
  */
 export function liftListItemAtStart(itemType?: string | NodeType): Command {
   return (state, dispatch) => {
+    if (wordContext(state)) return removeWordListNumber(state, dispatch);
     const item = itemType ? nodeTypeOf(state, itemType) : itemTypeOf(state);
     const { $from, empty } = state.selection;
     if (!item || !empty || $from.parentOffset > 0 || $from.depth < 2) return false;
@@ -368,6 +399,7 @@ export function liftListItemAtStart(itemType?: string | NodeType): Command {
  */
 export function toggleList(listType: string | NodeType, attrs: Attrs | null = null): Command {
   return (state, dispatch) => {
+    if (wordContext(state)) return toggleWordList(kindOf(listType))(state, dispatch);
     const type = nodeTypeOf(state, listType);
     const item = itemTypeOf(state);
     if (!type || !item) return false;

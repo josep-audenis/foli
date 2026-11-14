@@ -52,6 +52,10 @@ selection and scrolls it into view).
 
 ### `<FoliToolbar>`
 
+Given an editor holding a schema v3 document (`editor` accepts one), it shows Word's controls:
+paragraph style, font and size boxes, line spacing, Word's highlight colors, indent buttons
+that move list levels and half-inch stops; no heading buttons or horizontal rule.
+
 The default toolbar: bold, italic, underline, strikethrough, link, text color, highlight ·
 paragraph, H1–H3 · align left, center, align right, justify · bulleted list, numbered list
 (pressed inside one), decrease and increase indent · undo, redo · horizontal rule, page break.
@@ -141,8 +145,32 @@ end of a paragraph whose style names a next style (a heading: Normal) starts tha
 small caps and hidden act on what the text shows (turning bold off in a bold heading writes
 "not bold"); Backspace and Delete step over bookmarks and comment ranges, and select a field,
 content control or table before deleting it; joining paragraphs keeps the second one's section
-break; typed text never takes a tracked-change mark. Headings, lists, alignment, colors and
-rules on v3 come with 8.7b.
+break; typed text never takes a tracked-change mark.
+
+Word formatting on a v3 document (8.7b; these do not apply to schema v2). Each writes direct
+formatting only where the styles do not already give the value:
+
+- Styles: `paragraphStyles(state)` (the document's paragraph styles, the default first),
+  `paragraphStyleAt(state)`, `setParagraphStyle(id)`. `setBlockType("heading", { level })` uses
+  the document's "heading N" style, `setBlockType("paragraph")` the default style.
+- Text: `setFontFamily(name | null)`, `fontFamilyAt(state)`, `setFontSize(points | null)`,
+  `fontSizeAt(state)`. `setTextColor` writes Word's color (null: "Automatic"); `setHighlight`
+  writes one of Word's highlight colors (`HIGHLIGHT_HEX`) as a highlight and any other color as
+  shading.
+- Paragraphs: `setAlign` writes Word's justification; `setLineSpacing(multiple | null)`,
+  `lineSpacingAt(state)`, `setParagraphSpacing({ before?, after? })` in points,
+  `changeIndent(1 | -1)` (a list level for a numbered paragraph, else the next half-inch stop),
+  `canOutdent(state)`.
+- Lists are Word's numbering: `toggleList` / `wrapInList` number the paragraphs (a list of the
+  kind right before goes on; otherwise bullets share one definition and a numbered list starts
+  at 1 in a new instance; definitions are added to the document's numbering), and put Normal
+  paragraphs in "List Paragraph" where the document has it; `listKindAt(state)` gives
+  `"bulletList"`, `"orderedList"` or null. Tab at a list paragraph's start goes a level deeper
+  (over several paragraphs it indents them), Shift+Tab a level up (out of the list at the top),
+  Enter in an empty list paragraph ends the list, Backspace at its start removes the number.
+  Elsewhere Tab types a tab (`insertTab`).
+- Links get the document's "Hyperlink" character style (or Word's hyperlink blue and
+  underline), removed with the link.
 
 | Member                         | Notes                                                                                                                                                                                                                                                                                                                         |
 | ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

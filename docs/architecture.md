@@ -432,6 +432,26 @@ Known limits:
   runs): no preview without JavaScript, nothing for crawlers. A static server render of the
   pages could come later.
 
+### Word formatting on schema v3 (`packages/core/src/state/wordformat.ts`, 8.7b)
+
+The generic commands branch to it on a v3 document (`setAlign`, `setTextColor`, `setHighlight`,
+`toggleList`, `wrapInList`, `sinkListItem`, `liftListItem`, list Enter and Backspace,
+`setBlockType`, links); styles, fonts, sizes, line spacing and space before and after are v3
+only. A property is written directly only where the resolved formatting without it differs
+(picking a heading's own size, color or alignment leaves no direct value; "Automatic" color and
+"no highlight" write `auto` and `none` where a style gives one). Paragraph changes are one
+`NodeMarkupBatchStep`. A transaction can replace the document's envelope (`withEnvelope`,
+plugin state): a new list's numbering definition is added that way. Undo keeps such a
+definition, unused (Word keeps them too).
+
+Lists: bullets reuse a plain definition of the document (not a numbering style's, nor one whose
+levels number headings) or add Word's (Symbol, Courier New, Wingdings bullets, half-inch levels);
+numbers start a new instance with a start override at 1, on a plain decimal definition or a new
+one, unless the paragraph before is in a plain list of the kind, which goes on. Bullets in
+Symbol and Wingdings are shown as the Unicode characters they draw (the view, `blocks.ts`).
+Tab types a tab on v3 (a list's Tab first): the keyboard leaves the editor with Shift+Tab
+outside lists, or the browser's own keys.
+
 ### Editing schema v3 in the view (`packages/view/src/word/edit.ts`, 8.7a)
 
 `EditorView` renders an editor holding a v3 document with `WordRenderer`: the paragraphs of the

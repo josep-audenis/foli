@@ -4,6 +4,7 @@ import { TransformError } from "../transform/transform.js";
 import { attempt } from "./attempt.js";
 import { AllSelection, marksAt, TextSelection } from "./selection.js";
 import type { Command, EditorState, Transaction } from "./state.js";
+import { styleLink, unstyleLink } from "./wordformat.js";
 
 const EMAIL = /^[^\s@/:]+@[^\s@/:]+\.\p{L}{2,}$/iu;
 /**
@@ -129,6 +130,7 @@ export function insertLink(href: string, text?: string): Command {
       }
       const allowed = marks.filter((mark) => parent.type.allowsMarkType(mark.type));
       tr.insertText(label, pos, pos, link.addToSet(allowed));
+      styleLink(tr, state, pos, pos + label.length);
       tr.setSelection(TextSelection.create(tr.doc, pos + label.length));
     });
   };
@@ -147,7 +149,10 @@ export function setLink(href: string): Command {
     const mark = type.create({ href: normalized });
     const { selection } = state;
     if (!selection.empty) {
-      return attempt(state, dispatch, (tr) => tr.addMark(selection.from, selection.to, mark));
+      return attempt(state, dispatch, (tr) => {
+        tr.addMark(selection.from, selection.to, mark);
+        styleLink(tr, state, selection.from, selection.to);
+      });
     }
     const around = linkAround(selection.$from, type);
     if (!around) return insertLink(normalized)(state, dispatch);
@@ -162,7 +167,10 @@ export const removeLink: Command = (state, dispatch) => {
   const { selection } = state;
   const range = selection.empty ? linkAround(selection.$from, type) : selection;
   if (!range) return false;
-  return attempt(state, dispatch, (tr) => tr.removeMark(range.from, range.to, type));
+  return attempt(state, dispatch, (tr) => {
+    tr.removeMark(range.from, range.to, type);
+    unstyleLink(tr, state, range.from, range.to);
+  });
 };
 
 /** Transaction metadata set by `openLinkEditor`; a link editing UI listens for it. */
