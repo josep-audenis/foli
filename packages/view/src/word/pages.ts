@@ -89,7 +89,7 @@ function createPage(doc: Document, g: Geometry): { page: HTMLElement; body: HTML
  * The ratio of a font's normal line height to its size, measured: a line of 100 px text with
  * `line-height: normal` (the font's own ascent, descent and gap, as Word's single spacing).
  */
-function measureLineRatio(container: HTMLElement): (family: string) => number {
+export function measureLineRatio(container: HTMLElement): (family: string) => number {
   return (family) => {
     const probe = container.ownerDocument.createElement("div");
     const { style } = probe;

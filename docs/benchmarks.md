@@ -270,10 +270,10 @@ fails when a bundle passes its budget.
 
 | Bundle            | Includes          | Minified | Gzipped |  Budget |
 | ----------------- | ----------------- | -------: | ------: | ------: |
-| `@folijs/core`    | core              |  88.5 kB | 28.6 kB | 29.6 kB |
-| `@folijs/view`    | view, core        | 106.4 kB | 35.6 kB | 36.2 kB |
-| `@folijs/react`   | react, view, core | 117.4 kB | 38.0 kB | 43.4 kB |
-| `FoliEditor` only | what it reaches   | 117.1 kB | 37.9 kB | 43.4 kB |
+| `@folijs/core`    | core              |  92.6 kB | 29.9 kB | 31.3 kB |
+| `@folijs/view`    | view, core        | 122.2 kB | 40.4 kB | 42.5 kB |
+| `@folijs/react`   | react, view, core | 157.5 kB | 51.9 kB | 54.5 kB |
+| `FoliEditor` only | what it reaches   | 157.2 kB | 51.8 kB | 54.5 kB |
 | `@folijs/docx`    | docx, core        | 106.9 kB | 34.4 kB | 36.0 kB |
 
 (kB = 1,024 bytes; measured 2026-11-08 after task 7.8. At 0.1.0 (6.4) they were 14.1, 19.9,
@@ -282,5 +282,5 @@ fails when a bundle passes its budget.
 22.9 and 29.1 kB) list editing (7.5, core budget raised again from 19.0 kB) links (7.6, React budgets raised
 from 33.4 kB: the link dialog) and the schema v2 HTML reader (7.8, view budget raised from
 26.1 kB, React from 38.5 kB). `@folijs/docx` measured 2026-11-13 after task 8.5 (import and export, with core; 24.7 kB after 8.4, 5.9 kB alone at 8.2); core after 8.3 (schema v3 beside v2,
-budget raised from 21.6 kB; view and React do not include it), and again after 8.6a (resolution of styles and numbering, measured 2026-11-13; budget raised from 26.6 kB). View after 8.6b (the read-only Word pages, with core's resolution; budget raised from 30.7 kB; React does not include them).) For comparison, the whole Vite example app (React 18,
+budget raised from 21.6 kB; view and React do not include it), and again after 8.6a (resolution of styles and numbering, measured 2026-11-13; budget raised from 26.6 kB). View after 8.6b (the read-only Word pages, with core's resolution; budget raised from 30.7 kB; React does not include them). Core, view and React measured 2026-11-14 after 8.7a: the editor and view take a schema v3 document beside v2, so every editor bundle now holds v3's validation, migration and resolution and Word's blocks (budgets raised from 29.6, 36.2 and 43.4 kB; set again when v2 goes in 8.7d).) For comparison, the whole Vite example app (React 18,
 React DOM and Foli) is about 70 kB gzipped.

@@ -97,8 +97,16 @@ export class Fragment {
     }
   }
 
-  /** Text between two positions; `blockSeparator` goes between textblocks, `leafText` for leaves. */
-  textBetween(from: number, to: number, blockSeparator = "", leafText = ""): string {
+  /**
+   * Text between two positions; `blockSeparator` goes between textblocks, `leafText` for leaves
+   * (a string, or one per leaf).
+   */
+  textBetween(
+    from: number,
+    to: number,
+    blockSeparator = "",
+    leafText: string | ((leaf: Node) => string) = "",
+  ): string {
     let text = "";
     let first = true;
     this.nodesBetween(from, to, (node, pos) => {
@@ -108,7 +116,7 @@ export class Fragment {
       } else if (node.isText) {
         text += node.textContent.slice(Math.max(from, pos) - pos, to - pos);
       } else if (node.isLeaf) {
-        text += leafText;
+        text += typeof leafText === "string" ? leafText : leafText(node);
       }
       return undefined;
     });

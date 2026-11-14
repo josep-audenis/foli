@@ -104,6 +104,11 @@ export function renderBlock(
     return fragments[i] as HTMLElement;
   };
   node.forEach((child, offset) => {
+    if (!child.isText && !["hardBreak", "pageBreak", "columnBreak"].includes(child.type.name)) {
+      // Another schema's inline leaf (v3 on the clipboard): a tab as one, the rest unseen.
+      if (child.type.name === "tab") fragmentAt(offset).append(doc.createTextNode("\t"));
+      return;
+    }
     if (!child.isText) {
       // A hard break or a page break: both end their line (the flow ends the page at a page break).
       const br = doc.createElement("br");

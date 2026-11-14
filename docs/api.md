@@ -130,6 +130,19 @@ history, change notifications). Its content is validated (as by `parseDocument`)
 settings are not, so pass a document from `parseDocument` or `createDocument`.
 `setDocument` behaves the same way.
 
+Given a schema v3 document (8.7a, beside v2 until 0.3.0), it returns an
+`Editor<FoliDocumentV3>`: the whole document is validated (`parseDocumentV3`), the editor
+keeps its styles, numbering and sections, `getDocument()` returns a v3 document (a copy) and
+`settings` are its last section's page (`sectionSettings(section)`; Word's Letter page with
+inch margins where the section leaves them out). The commands then edit as Word does: Enter
+leaves the section break and the paragraph's own attributes on the second paragraph, and at the
+end of a paragraph whose style names a next style (a heading: Normal) starts that style;
+`toggleMark` and `isMarkActive` for bold, italic, underline, strike, double strike, caps,
+small caps and hidden act on what the text shows (turning bold off in a bold heading writes
+"not bold"); Backspace and Delete step over bookmarks and comment ranges, and select a field,
+content control or table before deleting it. Headings, lists, alignment, colors and rules on v3
+come with 8.7b.
+
 | Member                         | Notes                                                                                                                                                                                                                                                                                                                         |
 | ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `state`                        | Current immutable `EditorState` (`state.doc`, `state.selection`).                                                                                                                                                                                                                                                             |
@@ -140,7 +153,7 @@ settings are not, so pass a document from `parseDocument` or `createDocument`.
 | `run(command)`, `can(command)` | Run any `Command`, or dry-run it. `can` builds the whole transaction: not per keystroke.                                                                                                                                                                                                                                      |
 | `handleKey(key)`               | Runs the first bound command for a key name such as `"Mod-b"`.                                                                                                                                                                                                                                                                |
 | `dispatch(tr)`                 | Applies a transaction (`state.tr`).                                                                                                                                                                                                                                                                                           |
-| `getDocument()`                | The current document as a `FoliDocument`.                                                                                                                                                                                                                                                                                     |
+| `getDocument()`                | The current document as a `FoliDocument` (a `FoliDocumentV3` for a v3 editor).                                                                                                                                                                                                                                                |
 | `setDocument(doc)`             | Replaces the document and settings, clears undo history. Listeners get an empty transaction list.                                                                                                                                                                                                                             |
 | `subscribe(listener)`          | `(state, transactions) => void` after every change (selection included); returns unsubscribe. `transactions.some(tr => tr.docChanged)` tells content changes apart.                                                                                                                                                           |
 
@@ -194,6 +207,11 @@ const view = new EditorView(host, editor, { editable: true, placeholder: "" });
 - Makes `host` a `contenteditable` textbox (`role="textbox"`, `aria-multiline`) and renders the
   editor's state into it as `section.foli-page` elements sized from the document settings.
   Removes the host's children. Give the host an accessible name yourself.
+- An editor holding a schema v3 document is shown as Word formats it (the blocks of
+  `renderDocumentV3`, list numbers, tracked changes as markup, opaque content shown and not
+  editable) and laid out with Word's paragraph spacing and keep rules, on its last section's
+  page. Paste takes Foli JSON and plain text, and HTML only where it fits schema v3 (8.7c maps
+  the rest).
 - `view.setOptions({ editable?, placeholder? })`: changes the given options.
 - `view.focus()`: focuses the host, shows the editor's selection, scrolls it into view.
 - `view.destroy()`: removes listeners, injected styles and the attributes it added; empties the

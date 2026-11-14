@@ -127,10 +127,10 @@ const BORDER_STYLES: Record<string, string> = {
 };
 
 /** The one font name a run shows for Latin text. */
-const latin = (run: RunFormat) => run.font.ascii ?? run.font.hAnsi;
+export const latin = (run: RunFormat) => run.font.ascii ?? run.font.hAnsi;
 
 /** A line height in CSS for text in `run` (`ratio`: its font's normal line height ratio). */
-function lineHeight(paragraph: ParagraphFormat, run: RunFormat, ratio: number): string {
+export function lineHeight(paragraph: ParagraphFormat, run: RunFormat, ratio: number): string {
   const sizePx = (run.size / 2) * (96 / 72);
   const { line, lineRule } = paragraph.spacing;
   if (line === null) return String(ratio);
@@ -140,7 +140,7 @@ function lineHeight(paragraph: ParagraphFormat, run: RunFormat, ratio: number): 
 }
 
 /** Run formatting as inline CSS on `element`. */
-function styleRun(element: HTMLElement, run: RunFormat, line: string): void {
+export function styleRun(element: HTMLElement, run: RunFormat, line: string): void {
   const { style } = element;
   style.fontFamily = fontStack(latin(run));
   style.fontSize = `${run.size / 2}pt`;
@@ -174,7 +174,7 @@ function styleRun(element: HTMLElement, run: RunFormat, line: string): void {
 }
 
 /** Paragraph properties as inline CSS on `element` (spacing is the flow's). */
-function styleParagraph(element: HTMLElement, paragraph: ParagraphFormat): void {
+export function styleParagraph(element: HTMLElement, paragraph: ParagraphFormat): void {
   const { style } = element;
   style.margin = "0";
   style.whiteSpace = "pre-wrap";
@@ -208,7 +208,7 @@ function styleParagraph(element: HTMLElement, paragraph: ParagraphFormat): void 
 const NOT_INLINE = new Set(["txbxContent", "Fallback"]);
 
 /** Text a run of opaque XML shows: its `w:t` elements (field results, content controls). */
-function opaqueText(element: Element): string {
+export function opaqueText(element: Element): string {
   let text = "";
   for (const node of element.children) {
     if (NOT_INLINE.has(node.localName)) continue;
@@ -371,7 +371,7 @@ export function renderBlocks(
 }
 
 /** A paragraph's element: a heading of its outline level (1-6), else a paragraph. */
-function tagOf(paragraph: ParagraphFormat): string {
+export function tagOf(paragraph: ParagraphFormat): string {
   const level = paragraph.outlineLevel;
   return level !== null && level >= 0 && level < 6 ? `h${level + 1}` : "p";
 }
@@ -389,7 +389,7 @@ function applyContextualSpacing(blocks: WordBlock[]): void {
 }
 
 /** A list marker: its text, then what follows it (a tab to the text's indent, a space). */
-function markerElement(
+export function markerElement(
   marker: ListMarker,
   paragraph: ParagraphFormat,
   doc: Document,
@@ -513,7 +513,7 @@ function renderInline(
  * its XML: a table as a table of its cells' paragraphs, anything else as its paragraphs. Only
  * text is read: no formatting beyond the paragraph styles.
  */
-function opaqueBlock(
+export function opaqueBlock(
   node: NodeJSON,
   index: number,
   resolver: Resolver,

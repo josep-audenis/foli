@@ -5,8 +5,16 @@ import {
   parseContent,
   SCHEMA_VERSION,
 } from "../document.js";
-import type { Attrs } from "../model/index.js";
+import type { Attrs, Node } from "../model/index.js";
 import type { Alignment, DocJSON } from "../schema.js";
+import {
+  type FoliDocumentV3,
+  parseContentV3,
+  parseDocumentV3,
+  SCHEMA_VERSION_V3,
+  type SectionJSON,
+} from "../v3/document.js";
+import { twipsToMm as mm } from "../v3/units.js";
 import {
   baseKeymap,
   type DeleteUnit,
@@ -30,10 +38,20 @@ import { removeLink, setLink } from "./links.js";
 import { liftListItem, listKeymap, sinkListItem, toggleList, wrapInList } from "./lists.js";
 import { TextSelection } from "./selection.js";
 import { type Command, EditorState, type Plugin, type Transaction } from "./state.js";
+import { type WordEnvelope, wordPlugin } from "./word.js";
 
-export interface EditorOptions {
-  /** Trusted or not, it is validated (`parseContent`) before use. Defaults to an empty document. */
-  document?: FoliDocument;
+/**
+ * A document an editor can hold: schema v2, or schema v3 (Word's model, 8.7).
+ * shortcut: both until 8.7d makes v3 the only one.
+ */
+export type EditorDocument = FoliDocument | FoliDocumentV3;
+
+export interface EditorOptions<D extends EditorDocument = FoliDocument> {
+  /**
+   * Trusted or not, it is validated (`parseContent`, `parseDocumentV3`) before use. Defaults to
+   * an empty schema v2 document.
+   */
+  document?: D;
   /** Run before the built-in plugins, so their keymaps take precedence. */
   plugins?: readonly Plugin[];
 }
@@ -41,9 +59,12 @@ export interface EditorOptions {
 export type EditorListener = (state: EditorState, transactions: readonly Transaction[]) => void;
 
 /** A headless editor: state, commands, history and change notifications, no DOM. */
-export interface Editor {
+export interface Editor<D extends EditorDocument = FoliDocument> {
   readonly state: EditorState;
-  /** Page size and margins of the current document. */
+  /**
+   * Page size and margins of the current document. For a schema v3 document, its last
+   * section's (shortcut: one page setup for every section until the view lays out sections).
+   */
   readonly settings: DocumentSettings;
   dispatch(tr: Transaction): void;
   /** Runs a command; returns whether it applied. */
@@ -94,20 +115,62 @@ export interface Editor {
     insertHorizontalRule(): boolean;
   };
   isMarkActive(type: string): boolean;
-  /** The current document as a persisted FoliDocument. */
-  getDocument(): FoliDocument;
+  /** The current document, persisted as it was given (schema v2 or v3). */
+  getDocument(): D;
   /** Replaces the whole document and resets history. */
-  setDocument(document: FoliDocument): void;
+  setDocument(document: D): void;
   subscribe(listener: EditorListener): () => void;
 }
 
+/** Word's page when a section leaves it out: Letter, 1 inch margins. */
+const LETTER = { width: 12240, height: 15840, margin: 1440 };
+
+/** A section's page setup as page settings (mm; the gutter added to the left margin, as Word does). */
+export function sectionSettings(section: SectionJSON): DocumentSettings {
+  const m = section.margins ?? {};
+  return {
+    pageSize: {
+      width: mm(section.pageSize?.width ?? LETTER.width),
+      height: mm(section.pageSize?.height ?? LETTER.height),
+    },
+    margins: {
+      top: mm(Math.abs(m.top ?? LETTER.margin)),
+      right: mm(m.right ?? LETTER.margin),
+      bottom: mm(Math.abs(m.bottom ?? LETTER.margin)),
+      left: mm((m.left ?? LETTER.margin) + (m.gutter ?? 0)),
+    },
+  };
+}
+
+interface Loaded {
+  doc: Node;
+  settings: DocumentSettings;
+  envelope: WordEnvelope | null;
+}
+
+/** Validates a document and reads what the editor keeps of it. */
+function load(document: EditorDocument): Loaded {
+  if (document.schemaVersion !== SCHEMA_VERSION_V3)
+    return { doc: parseContent(document.content), settings: document.settings, envelope: null };
+  const { content, ...envelope } = parseDocumentV3(document);
+  return { doc: parseContentV3(content), settings: sectionSettings(envelope.section), envelope };
+}
+
+export function createEditor(options?: EditorOptions<FoliDocument>): Editor;
+export function createEditor(options: EditorOptions<FoliDocumentV3>): Editor<FoliDocumentV3>;
 export function createEditor({
   document = createDocument(),
   plugins = [],
-}: EditorOptions = {}): Editor {
-  let settings = document.settings;
-  const allPlugins = [...plugins, history(), listKeymap(), baseKeymap()];
-  let state = EditorState.create({ doc: parseContent(document.content), plugins: allPlugins });
+}: EditorOptions<EditorDocument> = {}): Editor<EditorDocument> {
+  let loaded = load(document);
+  const pluginsFor = ({ envelope }: Loaded) => [
+    ...plugins,
+    history(),
+    ...(envelope ? [wordPlugin(envelope)] : []),
+    listKeymap(),
+    baseKeymap(),
+  ];
+  let state = EditorState.create({ doc: loaded.doc, plugins: pluginsFor(loaded) });
   const listeners = new Set<EditorListener>();
 
   const notify = (transactions: readonly Transaction[]) => {
@@ -122,7 +185,7 @@ export function createEditor({
 
   return {
     get settings() {
-      return settings;
+      return loaded.settings;
     },
     get state() {
       return state;
@@ -168,15 +231,17 @@ export function createEditor({
       insertHorizontalRule: () => run(insertHorizontalRule),
     },
     isMarkActive: (type) => isMarkActive(state, type),
-    getDocument: () => ({
-      schemaVersion: SCHEMA_VERSION,
-      settings,
-      content: state.doc.toJSON() as DocJSON,
-    }),
+    getDocument: () =>
+      loaded.envelope
+        ? { ...structuredClone(loaded.envelope), content: state.doc.toJSON() }
+        : {
+            schemaVersion: SCHEMA_VERSION,
+            settings: loaded.settings,
+            content: state.doc.toJSON() as DocJSON,
+          },
     setDocument(next) {
-      const doc = parseContent(next.content);
-      settings = next.settings;
-      state = EditorState.create({ doc, plugins: allPlugins });
+      loaded = load(next);
+      state = EditorState.create({ doc: loaded.doc, plugins: pluginsFor(loaded) });
       notify([]);
     },
     subscribe(listener) {

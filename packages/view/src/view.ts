@@ -9,6 +9,7 @@ import {
   deleteForward,
   deleteSelection,
   type Editor,
+  type EditorDocument,
   type EditorState,
   insertHardBreak,
   insertLink,
@@ -16,6 +17,8 @@ import {
   type Node as ModelNode,
   marksAt,
   NodeSelection,
+  parseContent,
+  parseContentV3,
   redo,
   Selection,
   Slice,
@@ -26,6 +29,7 @@ import {
   TransformError,
   toggleMark,
   undo,
+  wordContext,
 } from "@folijs/core";
 import { docFromClipboard, FOLI_MIME, serializeRange } from "./clipboard.js";
 import {
@@ -33,6 +37,7 @@ import {
   contentHeight,
   DEFAULT_RULES,
   type FlowResult,
+  type FlowRules,
   flowFrom,
   PX_PER_MM,
   type Reuse,
@@ -45,6 +50,8 @@ import {
   PAGE_BREAK_ATTR,
   renderBlock,
 } from "./render.js";
+import { spacing, type WordBlockDesc, WordRenderer } from "./word/edit.js";
+import { measureLineRatio } from "./word/pages.js";
 
 /**
  * A container around blocks (a list, a list item) as rendered: its node, the position before it
@@ -56,6 +63,9 @@ interface Container {
   readonly index: number;
   readonly firstBlock: number;
 }
+
+/** Word's paragraph spacing for a schema v3 document (`flow`'s `word` spacing). */
+const WORD_RULES: FlowRules = { ...DEFAULT_RULES, spacing: "word" };
 
 /** Class of the element of a node-selected block (a rule). */
 const SELECTED_CLASS = "foli-selected-node";
@@ -196,10 +206,14 @@ export class EditorView {
   private pointerFocus = false;
   /** Whether the view added the host's tabindex (a read-only host must stay focusable). */
   private readonly addedTabIndex: boolean;
+  /** Renders the blocks of a schema v3 document (8.7a); null for schema v2. */
+  private word: WordRenderer | null = null;
+  /** Fonts' normal line height ratios, measured once per family (Word's single spacing). */
+  private readonly ratios = new Map<string, number>();
 
   constructor(
     readonly host: HTMLElement,
-    readonly editor: Editor,
+    readonly editor: Editor<EditorDocument>,
     options: EditorViewOptions = {},
   ) {
     this.state = editor.state;
@@ -370,6 +384,14 @@ export class EditorView {
   private render(): void {
     const { doc } = this.state;
     const ownerDocument = this.host.ownerDocument;
+    // A v3 document (or a new one) gets its renderer; nothing rendered before is reused then.
+    const context = wordContext(this.state);
+    const renewed = context !== (this.word?.context ?? null);
+    if (renewed) {
+      this.word = context ? new WordRenderer(context, ownerDocument, this.lineRatio) : null;
+      this.invalidateLayout();
+    }
+    this.word?.prepare(doc);
     const previous = new Map(
       this.blocks.filter((desc) => !this.dirty.has(desc)).map((desc) => [desc.node, desc]),
     );
@@ -412,13 +434,18 @@ export class EditorView {
       const before = this.chainKeys.get(node);
       if (before !== undefined && before !== chainKey) this.stale.add(node);
       this.chainKeys.set(node, chainKey);
-      let reused = previous.get(node);
+      let reused = renewed ? undefined : previous.get(node);
+      // A v3 block whose list number or comment shading changed (an edit before it) is redrawn.
+      if (reused && this.word && (reused as WordBlockDesc).key !== this.word.key(blocks.length)) {
+        reused = undefined;
+        this.stale.add(node);
+      }
       // A split block about to be measured again (fonts, CSS) is rendered whole first: each
       // fragment's end breaks its line, so its lines would depend on where it was split before.
       const remeasure = dropLines || !this.measures.has(node) || this.stale.has(node);
       if (reused && reused.fragments.length > 1 && remeasure && !this.composing) reused = undefined;
       if (reused) previous.delete(node);
-      blocks.push(reused ?? renderBlock(node, ownerDocument));
+      blocks.push(reused ?? this.renderNode(node, blocks.length));
       starts.push(pos);
       chains.push(chain);
       return false;
@@ -445,7 +472,10 @@ export class EditorView {
           if (measure) delete measure.lines;
         }
       const nodes = blocks.map((desc) => desc.node);
-      const reuse = this.flowed ? reuseOf(this.flowed, nodes, this.stale) : undefined;
+      // A v3 block's spacing depends on its neighbours' styles: reuse stops a block earlier.
+      const reuse = this.flowed
+        ? reuseOf(this.flowed, nodes, this.stale, this.word ? 1 : 0)
+        : undefined;
       const measureOf = (desc: BlockDesc) => {
         let found = this.measures.get(desc.node);
         // A stale block is measured again once per render.
@@ -460,8 +490,14 @@ export class EditorView {
         found.lines ??= measureLines(desc, layoutPx());
         return found.lines;
       };
-      const boxes = blocks.map((desc) => blockBox(desc, measureOf(desc), () => lines(desc)));
-      const result = flowFrom(boxes, contentHeight(this.editor.settings), DEFAULT_RULES, reuse);
+      const pageHeight = contentHeight(this.editor.settings);
+      const boxes = blocks.map((desc, i) =>
+        this.word
+          ? wordBox(blocks as WordBlockDesc[], i, measureOf(desc), () => lines(desc), pageHeight)
+          : blockBox(desc, measureOf(desc), () => lines(desc)),
+      );
+      const rules = this.word ? WORD_RULES : DEFAULT_RULES;
+      const result = flowFrom(boxes, pageHeight, rules, reuse);
       this.flowed = { nodes, result };
       this.stale.clear();
       const flowed = result.fragments;
@@ -475,9 +511,10 @@ export class EditorView {
         });
         const same =
           splits.length === desc.splits.length && splits.every((at, k) => at === desc.splits[k]);
-        return same ? desc : renderBlock(desc.node, ownerDocument, splits);
+        return same ? desc : this.renderNode(desc.node, i, splits);
       });
       pages = flowed.map((fragments) => fragments.map((fragment) => fragment.page));
+      if (this.word) applyGaps(blocks, pages, boxes);
       this.place(blocks, pages, chains);
     }
     this.blocks = blocks;
@@ -497,6 +534,24 @@ export class EditorView {
     const records = this.observer.takeRecords();
     if (this.composing) this.pending.push(...records);
   }
+
+  /** Renders a block of the document (schema v2 or v3), split into fragments at `splits`. */
+  private renderNode(node: ModelNode, index: number, splits?: readonly number[]): BlockDesc {
+    return this.word
+      ? this.word.render(node, index, splits)
+      : renderBlock(node, this.host.ownerDocument, splits);
+  }
+
+  /** A font's normal line height ratio, measured outside the host (no input to read back). */
+  private lineRatio = (family: string): number => {
+    let ratio = this.ratios.get(family);
+    if (ratio === undefined) {
+      const doc = this.host.ownerDocument;
+      ratio = measureLineRatio(doc.body ?? doc.documentElement)(family);
+      this.ratios.set(family, ratio);
+    }
+    return ratio;
+  };
 
   /**
    * Puts each fragment of each block into its page (pages are non-decreasing in document
@@ -654,6 +709,9 @@ export class EditorView {
 
   /** Re-flows the pages once web fonts have loaded: line heights and wrapping change. */
   private onFontsLoaded = (): void => {
+    // v3 line heights come from the fonts' measured ratios: render every block again.
+    this.ratios.clear();
+    this.word = null;
     this.invalidateLayout();
     this.scheduleRelayout();
   };
@@ -823,7 +881,10 @@ export class EditorView {
       const point = before(last.dom);
       return { node: point.node, offset: point.offset + 1 };
     }
-    return { node: desc.dom, offset: 0 };
+    // An empty block: before its <br> (after a list number shown in front of it).
+    const tail = desc.dom.lastChild;
+    const end = tail?.nodeName === "BR" ? desc.dom.childNodes.length - 1 : 0;
+    return { node: desc.dom, offset: end };
   }
 
   // ---------- selection ----------
@@ -1277,6 +1338,8 @@ export class EditorView {
         if (node === sel?.focusNode) caret = domText.length + sel.focusOffset;
         domText += (node as Text).data;
       } else if (hardBreaks.has(node)) domText += HARD_BREAK;
+      // Shown but not document text (a list number, opaque content): never read back.
+      else if ((node as Element).getAttribute?.("contenteditable") === "false") return;
       else node.childNodes.forEach(walk);
     };
     let first = true;
@@ -1307,7 +1370,14 @@ export class EditorView {
     this.blocks.forEach(({ node: block }, i) => {
       if (i > 0) modelText += BLOCK_SEPARATOR;
       lineStarts.push(modelText.length);
-      modelText += block.textBetween(0, block.content.size, "", HARD_BREAK);
+      block.forEach((child) => {
+        // A tab is text in the DOM (a "\t" text node).
+        modelText += child.isText
+          ? (child.text ?? "")
+          : child.type.name === "tab"
+            ? "\t"
+            : HARD_BREAK;
+      });
     });
     /** Model position of an offset in `modelText`. */
     const posAt = (offset: number): number => {
@@ -1443,7 +1513,7 @@ export class EditorView {
       if (command(state, dispatch)) return applied;
     }
     const marks = (state.storedMarks ?? marksAt(state.selection.$from)).map((m) => m.toJSON());
-    const pasted = docFromClipboard(data, marks);
+    const pasted = docFromClipboard(data, marks, this.word ? parseContentV3 : parseContent);
     // One empty textblock: nothing to paste (a lone rule is something).
     const only = pasted?.doc.childCount === 1 ? pasted.doc.firstChild : null;
     if (!pasted || (only?.isTextblock && !only.content.size)) return false;
@@ -1649,6 +1719,76 @@ function blockBox(desc: BlockDesc, measure: Measure, lines: () => Lines): BlockB
 }
 
 /**
+ * What the flow needs of a schema v3 block: Word's spacing before and after (next to its
+ * neighbours), keep with next, keep lines together (not for a block taller than a page, or one
+ * with a page break in it), and a page break before the next block ending this one's page.
+ */
+function wordBox(
+  blocks: readonly WordBlockDesc[],
+  i: number,
+  measure: Measure,
+  lines: () => Lines,
+  pageHeight: number,
+): BlockBox {
+  const desc = blocks[i] as WordBlockDesc;
+  const next = blocks[i + 1];
+  const base = blockBox(desc, measure, lines);
+  const { before, after } = spacing(blocks[i - 1]?.word, desc.word, next?.word);
+  const hasBreak = desc.leaves.some(
+    (leaf) =>
+      leaf.dom.nodeType !== Node.TEXT_NODE && (leaf.dom as Element).hasAttribute(PAGE_BREAK_ATTR),
+  );
+  const kept = desc.word.keepLines && !hasBreak && measure.height <= pageHeight;
+  const bottoms = () => (kept ? [measure.height] : lines().bottoms);
+  return {
+    height: measure.height,
+    marginTop: before,
+    marginBottom: after,
+    keepWithNext: desc.word.keepNext,
+    lines: bottoms,
+    breaksAfter: () => {
+      const breaks = hasBreak ? [...(base.breaksAfter?.() ?? [])] : [];
+      if (next?.word.pageBreakBefore) breaks.push(bottoms().length - 1);
+      return breaks;
+    },
+  };
+}
+
+/**
+ * Writes Word's space above each v3 block as its top margin: the space after the block above
+ * and the space before this one, on the same page; at the top of a page only its space before,
+ * and only on the first page or after an explicit break (a page the text flowed onto drops it).
+ * Written only when it changes.
+ */
+function applyGaps(
+  blocks: readonly BlockDesc[],
+  pages: readonly (readonly number[])[],
+  boxes: readonly BlockBox[],
+): void {
+  blocks.forEach((desc, i) => {
+    const page = pages[i]?.[0] ?? 0;
+    const above = pages[i - 1];
+    const box = boxes[i] as BlockBox;
+    let gap: number;
+    if (above && above[above.length - 1] === page)
+      gap = (boxes[i - 1] as BlockBox).marginBottom + box.marginTop;
+    else {
+      const prior = boxes[i - 1];
+      const breaks = prior?.breaksAfter?.() ?? [];
+      const forced =
+        page === 0 || (!!prior && breaks.length > 0 && breaks.includes(prior.lines().length - 1));
+      gap = forced ? box.marginTop : 0;
+    }
+    if (gaps.get(desc.dom) === gap) return;
+    gaps.set(desc.dom, gap);
+    desc.dom.style.marginTop = `${gap}px`;
+  });
+}
+
+/** The gap `applyGaps` last wrote on each block element (the style serializes it rounded). */
+const gaps = new WeakMap<HTMLElement, number>();
+
+/**
  * What the next flow can reuse of the last one: the unchanged blocks before the first changed
  * (or stale) one, and the unchanged tail after the last.
  */
@@ -1656,6 +1796,7 @@ function reuseOf(
   last: { nodes: readonly ModelNode[]; result: FlowResult },
   nodes: readonly ModelNode[],
   stale: ReadonlySet<ModelNode>,
+  margin = 0,
 ): Reuse {
   const before = last.nodes;
   const same = (a: ModelNode | undefined, b: ModelNode | undefined) =>
@@ -1669,6 +1810,9 @@ function reuseOf(
     same(nodes[nodes.length - 1 - tail], before[before.length - 1 - tail])
   )
     tail++;
+  // Blocks whose box depends on a changed neighbour are not reused either.
+  from = Math.max(0, from - margin);
+  tail = Math.max(0, tail - margin);
   const delta = nodes.length - before.length;
   return {
     previous: last.result,

@@ -67,10 +67,19 @@ export function serializeRange(
   for (const br of container.querySelectorAll(`br[${PAGE_BREAK_ATTR}]`))
     (br as HTMLElement).style.cssText = "page-break-before: always; break-before: page";
   return {
-    text: doc.textBetween(from, to, "\n", "\n"),
+    text: doc.textBetween(from, to, "\n", leafText),
     html: container.innerHTML,
     json: JSON.stringify({ open: $from.sharedDepth(to) > 0, content: blocks.toJSON() }),
   };
+}
+
+/** Breaks, rules and opaque blocks as line feeds, a tab as a tab, markers (bookmarks) as nothing. */
+function leafText(leaf: ModelNode): string {
+  const name = leaf.type.name;
+  if (name === "tab") return "\t";
+  return leaf.isBlock || name === "hardBreak" || name === "pageBreak" || name === "columnBreak"
+    ? "\n"
+    : "";
 }
 
 /**
@@ -82,6 +91,7 @@ export function serializeRange(
 export function docFromClipboard(
   data: Pick<DataTransfer, "getData">,
   marks: readonly MarkJSON[] = [],
+  parse: (content: unknown) => ModelNode = parseContent,
 ): Pasted | null {
   const json = data.getData(FOLI_MIME);
   const html = data.getData("text/html");
@@ -101,7 +111,7 @@ export function docFromClipboard(
     try {
       const found = candidate();
       if (!found) continue;
-      return { doc: parseContent(found.content), open: found.open };
+      return { doc: parse(found.content), open: found.open };
     } catch {
       // Invalid or unreadable in this format: try the next one.
     }

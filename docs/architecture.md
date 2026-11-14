@@ -152,6 +152,22 @@ Foli's own (see `THIRD_PARTY_NOTICES.md`).
     unless that item goes on with more blocks.
 - **Headless editor**: `createEditor({ document })` returns `commands.*`, `run`, `can`,
   `handleKey`, `select`, `getDocument`, `setDocument` and `subscribe`.
+- **Editing schema v3** (8.7a, `state/word.ts`; beside v2 until 8.7d): an editor given a v3
+  document keeps its envelope (styles, numbering, defaults, theme, sections) in a plugin state
+  field with its `Resolver`, and the generic commands consult it (`wordContext(state)`).
+  - Enter: the paragraph mark carries the section break, its tracked change and the paragraph's
+    own attributes (`w14:paraId`), so a split leaves them on the second paragraph, which keeps
+    the original mark; the first gets a copy of the properties without them. At the end of a
+    paragraph whose style names another `next` style, the second paragraph is in that style
+    without the direct formatting.
+  - The toggles (bold, italic, underline, strike, double strike, caps, small caps, hidden) act
+    on the resolved formatting: on a range, text that does not all show the property gets it,
+    else none does; per text node a direct mark is written only where the styles do not
+    already give the wanted value (`value: false` turns off a style's bold; `underline` `none`
+    a character style's underline), and bold's and italic's complex-script twin is kept.
+  - Backspace and Delete step over the zero-width markers (bookmarks, comment ranges), which
+    stay, and select opaque content (a field, a content control, a table) instead of deleting
+    it; the next key deletes the selection.
 
 Known limits:
 - No general slice fitting: paste joins open content, replaces an empty textblock with whole
@@ -408,6 +424,26 @@ Known limits:
 - Server rendering gives no document content (an empty editable area until the JavaScript
   runs): no preview without JavaScript, nothing for crawlers. A static server render of the
   pages could come later.
+
+### Editing schema v3 in the view (`packages/view/src/word/edit.ts`, 8.7a)
+
+`EditorView` renders an editor holding a v3 document with `WordRenderer`: the paragraphs of the
+Word pages below, built from model nodes with their leaves (text nodes; a tab is a `"\t"` text
+node, read back as one; hard, column and page breaks are `<br>`; bookmarks, comment anchors
+and reference marks empty spans; an opaque inline node a non-editable span showing its text),
+split into fragments at content offsets like the v2 blocks (the first-line indent and the list
+number on the first fragment only). An opaque block is a non-editable block leaf, selected as a
+node. List numbers and comment shading depend on the blocks before, so a block is drawn again
+when they change (`key`), not only when its node does. What is shown but is not document text
+(`contenteditable="false"`: list numbers, opaque content) is skipped by the read-back. The flow
+uses Word's spacing (`spacing: "word"`, contextual spacing between paragraphs of one style,
+keep with next, keep lines together, page break before); the space above each block is written
+as its top margin after the flow (none at the top of a page the text flowed onto). The page is
+the last section's (`editor.settings`). Fonts' line height ratios are measured once per family
+outside the host and measured again after web fonts load (every block is drawn again).
+
+Not yet on v3 (8.7b–d): sections with other page setups, headers and footers, HTML paste
+beyond what fits v3, a final (changes accepted) editing view, Ctrl+click on links.
 
 ### Word pages (`packages/view/src/word/`, 8.6b)
 

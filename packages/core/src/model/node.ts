@@ -115,7 +115,12 @@ export class Node {
     this.nodesBetween(0, this.content.size, f);
   }
 
-  textBetween(from: number, to: number, blockSeparator?: string, leafText?: string): string {
+  textBetween(
+    from: number,
+    to: number,
+    blockSeparator?: string,
+    leafText?: string | ((leaf: Node) => string),
+  ): string {
     return this.content.textBetween(from, to, blockSeparator, leafText);
   }
 

@@ -16,7 +16,14 @@ export {
   splitBlock,
   toggleMark,
 } from "./commands.js";
-export { createEditor, type Editor, type EditorListener, type EditorOptions } from "./editor.js";
+export {
+  createEditor,
+  type Editor,
+  type EditorDocument,
+  type EditorListener,
+  type EditorOptions,
+  sectionSettings,
+} from "./editor.js";
 export {
   alignAt,
   colorAt,
@@ -73,3 +80,4 @@ export {
   type PluginSpec,
   Transaction,
 } from "./state.js";
+export { type WordContext, wordContext } from "./word.js";
