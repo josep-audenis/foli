@@ -102,7 +102,7 @@ export function serializeRange(
     json: JSON.stringify({
       open: $from.sharedDepth(to) > 0,
       content: blocks.toJSON(),
-      ...(word ? { word: copiedDefinitions(word.context.envelope, blocks) } : {}),
+      ...(word ? { word: copiedDefinitions(word.context, blocks) } : {}),
     }),
   };
 }

@@ -3,18 +3,23 @@
  * references (styles, numbering, comments); a paste fits them to the target document, as Word
  * does with its default "use destination styles":
  * - A style the target has by name is used; any other is added (a free id if its id is taken).
- * - A list keeps its numbering where the target has the same instance and definition (a copy
- *   inside one document); otherwise it gets an instance of its own (the target's definition
- *   when one is the same).
- * - Comments are copied with new ids, as Word duplicates them.
- * - A bookmark whose name the target already uses is left out, as in Word; others get new ids.
+ * - A list copied inside one document (the copy carries the document's id, `WordContext.id`)
+ *   goes on; otherwise it gets an instance of its own (the target's definition when one is the
+ *   same). Lists of different documents are never taken for each other: Foli makes equal ids
+ *   and definitions in every document.
+ * - Comments are copied with new ids, as Word duplicates them; an anchor without its comment
+ *   is left out.
+ * - A bookmark whose name the target already uses (outside the selection the paste replaces)
+ *   is left out, as in Word; others get new ids.
+ * - From another document, a style or list the copy does not define is not one: the text is in
+ *   the default style, not numbered (not the target's style or list of that id).
  * - Paragraph ids (`w14:paraId`, `w14:textId`) are left out: export makes the ones it needs.
  *
  * shortcut: ids inside opaque content (a table's bookmarks and paragraph ids) and tracked-change
  * ids are pasted as they are; Word tolerates repeats of both. Map them when a file shows otherwise.
  */
 import { DEFAULT_SETTINGS } from "../document.js";
-import type { Node, NodeJSON } from "../model/index.js";
+import type { MarkJSON, Node, NodeJSON } from "../model/index.js";
 import type { DocJSON } from "../schema.js";
 import {
   type AbstractNumberingJSON,
@@ -34,6 +39,8 @@ import { builtinStyle, levels } from "./wordformat.js";
 
 /** What a v3 copy carries beside its content: the definitions the content references. */
 export interface WordDefinitions {
+  /** The document copied from (`WordContext.id`). */
+  document?: string;
   styles: StyleJSON[];
   numbering: { abstracts: AbstractNumberingJSON[]; instances: NumberingInstanceJSON[] };
   comments: CommentJSON[];
@@ -50,29 +57,39 @@ function visit(nodes: readonly NodeJSON[], f: (node: NodeJSON) => void): void {
 
 const COMMENT_ANCHORS = new Set(["commentStart", "commentEnd", "commentReference"]);
 
+type Properties = Pick<ParagraphPropertiesJSON, "style" | "numbering" | "markFormat">;
+
 /**
- * The definitions `content` (copied from the document of `envelope`) references: its paragraphs' and
- * runs' styles with the styles they are based on, link to or are followed by, its lists'
- * numbering (a style's included), and its comments.
+ * The definitions `content` (copied from the document of `context`) references: its paragraphs'
+ * and runs' styles (the paragraph mark's and a tracked change's too) with the styles they are
+ * based on, link to or are followed by, its lists' numbering (a style's included), and its
+ * comments; with the document's id.
  */
-export function copiedDefinitions(envelope: WordEnvelope, content: Node): WordDefinitions {
-  const { styles, numbering, comments } = envelope;
+export function copiedDefinitions(context: WordContext, content: Node): WordDefinitions {
+  const { styles, numbering, comments } = context.envelope;
   const styleIds = new Set<string>();
   const numberingIds = new Set<number>();
   const commentIds = new Set<number>();
+  const marks = (list: readonly MarkJSON[] | null | undefined) => {
+    for (const mark of list ?? [])
+      if (mark.type === "characterStyle") styleIds.add(String(mark.attrs?.id));
+  };
+  const properties = (p: Properties | null | undefined) => {
+    if (p?.style) styleIds.add(p.style);
+    if (p?.numbering?.id) numberingIds.add(p.numbering.id);
+    marks(p?.markFormat);
+  };
   const references = (node: NodeJSON) => {
-    const attrs = (node.attrs ?? {}) as {
-      style?: string;
-      numbering?: { id?: number };
+    const attrs = (node.attrs ?? {}) as Properties & {
       id?: number;
+      formatChange?: { previous: Properties } | null;
     };
     if (node.type === "paragraph") {
-      if (attrs.style) styleIds.add(attrs.style);
-      if (attrs.numbering?.id) numberingIds.add(attrs.numbering.id);
+      properties(attrs);
+      properties(attrs.formatChange?.previous);
     }
     if (COMMENT_ANCHORS.has(node.type)) commentIds.add(attrs.id as number);
-    for (const mark of node.marks ?? [])
-      if (mark.type === "characterStyle") styleIds.add(String(mark.attrs?.id));
+    marks(node.marks);
   };
   visit([content.toJSON()], references);
   const copied = comments.filter((c) => commentIds.has(c.id));
@@ -101,8 +118,12 @@ export function copiedDefinitions(envelope: WordEnvelope, content: Node): WordDe
         ...abstract.levels.map((l) => l.style),
       ])
         if (id) styleIds.add(id);
+    for (const instance of instances())
+      for (const o of instance.overrides ?? [])
+        if (o.definition?.style) styleIds.add(o.definition.style);
   }
   return {
+    document: context.id,
     styles: styles.filter((s) => styleIds.has(s.id)),
     numbering: { abstracts: abstracts(), instances: instances() },
     comments: copied,
@@ -119,7 +140,6 @@ export function fitPastedV2(
   state: EditorState,
   content: Node,
 ): { doc: Node; envelope: WordEnvelope } {
-  const context = wordContext(state) as WordContext;
   const migrated = migrateToV3({
     schemaVersion: 2,
     settings: DEFAULT_SETTINGS,
@@ -127,7 +147,8 @@ export function fitPastedV2(
   });
   const definitions: WordDefinitions = {
     styles: migrated.styles.map((style) => {
-      const builtin = style.name ? builtinStyle(context, style.name) : null;
+      // Based on the paste's Normal, which is the target's by name.
+      const builtin = style.name ? builtinStyle({ envelope: migrated }, style.name) : null;
       return builtin ? { ...builtin, id: style.id } : style;
     }),
     numbering: {
@@ -163,7 +184,7 @@ export function fitPastedV2(
   return { doc: parseContentV3(json), envelope: fitted.envelope };
 }
 
-const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
+const equal = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
 const PARAGRAPH_IDS = ["w14:paraId", "w14:textId"];
 
 /**
@@ -177,10 +198,11 @@ export function fitPaste(
   content: unknown,
   definitions?: unknown,
 ): { doc: Node; envelope: WordEnvelope } {
-  const target = (wordContext(state) as WordContext).envelope;
+  const context = wordContext(state) as WordContext;
+  const target = context.envelope;
   if (definitions === undefined || definitions === null)
     return fit(state, target, parseContentV3(content).toJSON(), true);
-  const { styles, numbering, comments } = definitions as Partial<WordDefinitions>;
+  const { document, styles, numbering, comments } = definitions as Partial<WordDefinitions>;
   // Validated as a document's envelope: types, ranges, no style based on itself.
   const checked = parseDocumentV3({
     schemaVersion: 3,
@@ -191,15 +213,18 @@ export function fitPaste(
     comments,
     content,
   });
-  return fit(state, checked, checked.content, true);
+  return fit(state, checked, checked.content, document === context.id);
 }
 
-/** `fitPaste` on validated input; `keepLists`: a list the target has the same goes on. */
+/**
+ * `fitPaste` on validated input. `same`: the content is the target document's own (its lists go
+ * on, and an id the definitions lack is kept; from elsewhere it names nothing).
+ */
 function fit(
   state: EditorState,
   source: WordDefinitions,
   json: NodeJSON,
-  keepLists: boolean,
+  same: boolean,
 ): { doc: Node; envelope: WordEnvelope } {
   const target = (wordContext(state) as WordContext).envelope;
   let styles = target.styles;
@@ -207,11 +232,11 @@ function fit(
   const styleIds = new Map<string, string>();
   const numberingIds = new Map<number, number>();
 
-  const mapStyle = (id: string): string => {
+  const mapStyle = (id: string): string | null => {
     const known = styleIds.get(id);
     if (known !== undefined) return known;
     const style = source.styles.find((s) => s.id === id);
-    if (!style) return id; // a style that does not exist stays one
+    if (!style) return same ? id : null;
     const name = style.name?.toLowerCase();
     const found = styles.find(
       (s) =>
@@ -227,32 +252,37 @@ function fit(
     // Reserved first: styles name each other (a paragraph style and its linked character style).
     styleIds.set(id, next);
     const copy: StyleJSON = { ...style, id: next };
+    // The target keeps its own default style.
+    delete copy.isDefault;
     styles = [...styles, copy];
     for (const key of ["basedOn", "next", "link"] as const) {
-      const ref = style[key];
-      if (ref) copy[key] = mapStyle(ref);
+      const ref = style[key] && mapStyle(style[key]);
+      if (ref) copy[key] = ref;
+      else delete copy[key];
     }
     if (style.paragraph) copy.paragraph = paragraphProperties(style.paragraph);
     return next;
   };
 
-  const mapLevel = (level: NumberingLevelJSON): NumberingLevelJSON => ({
-    ...level,
-    ...(level.style ? { style: mapStyle(level.style) } : {}),
-  });
+  const mapLevel = (level: NumberingLevelJSON): NumberingLevelJSON => {
+    const { style, ...rest } = level;
+    const mapped = style && mapStyle(style);
+    return mapped ? { ...level, style: mapped } : rest;
+  };
 
   const mapNumbering = (id: number): number => {
     const known = numberingIds.get(id);
     if (known !== undefined) return known;
     const instance = source.numbering.instances.find((n) => n.id === id);
     const abstract = source.numbering.abstracts.find((a) => a.id === instance?.abstract);
-    if (!instance || !abstract) return id;
-    const own = keepLists && instances.find((n) => n.id === id);
+    if (!instance || !abstract) return same ? id : 0;
+    // The target's own list, not one this paste added.
+    const own = same && target.numbering.instances.find((n) => n.id === id);
     if (
       own &&
-      same(own, instance) &&
-      same(
-        abstracts.find((a) => a.id === own.abstract),
+      equal(own, instance) &&
+      equal(
+        target.numbering.abstracts.find((a) => a.id === own.abstract),
         abstract,
       )
     ) {
@@ -270,13 +300,13 @@ function fit(
       copy.overrides = instance.overrides.map((o) =>
         o.definition ? { ...o, definition: mapLevel(o.definition) } : o,
       );
-    const mapped: AbstractNumberingJSON = {
-      ...abstract,
-      levels: abstract.levels.map(mapLevel),
-      ...(abstract.styleLink ? { styleLink: mapStyle(abstract.styleLink) } : {}),
-      ...(abstract.numStyleLink ? { numStyleLink: mapStyle(abstract.numStyleLink) } : {}),
-    };
-    let existing = abstracts.find((a) => same({ ...a, id: 0 }, { ...mapped, id: 0 }));
+    const mapped: AbstractNumberingJSON = { ...abstract, levels: abstract.levels.map(mapLevel) };
+    for (const key of ["styleLink", "numStyleLink"] as const) {
+      const ref = abstract[key] && mapStyle(abstract[key]);
+      if (ref) mapped[key] = ref;
+      else delete mapped[key];
+    }
+    let existing = abstracts.find((a) => equal({ ...a, id: 0 }, { ...mapped, id: 0 }));
     if (!existing) {
       existing = { ...mapped, id: Math.max(-1, ...abstracts.map((a) => a.id)) + 1 };
       abstracts = [...abstracts, existing];
@@ -285,23 +315,36 @@ function fit(
     return copy.id;
   };
 
+  const runMarks = (marks: readonly MarkJSON[]) =>
+    marks.flatMap((m) => {
+      if (m.type !== "characterStyle") return [m];
+      const id = mapStyle(String(m.attrs?.id));
+      return id ? [{ ...m, attrs: { id } }] : [];
+    });
+
+  /** Properties with their style, list and the mark's character style mapped (none: left out). */
   function paragraphProperties<T extends ParagraphPropertiesJSON>(properties: T): T {
-    const { style, numbering } = properties;
-    return {
-      ...properties,
-      ...(style ? { style: mapStyle(style) } : {}),
-      ...(numbering?.id ? { numbering: { ...numbering, id: mapNumbering(numbering.id) } } : {}),
-    };
+    const { style, numbering, markFormat } = properties;
+    const next: T = { ...properties };
+    const mapped = style && mapStyle(style);
+    if (mapped) next.style = mapped;
+    else if (style) delete next.style;
+    if (numbering?.id) next.numbering = { ...numbering, id: mapNumbering(numbering.id) };
+    if (markFormat) next.markFormat = runMarks(markFormat);
+    return next;
   }
 
   // New ids start above the target's; a pasted bookmark whose name it uses is left out.
   const nextId = { comment: 0, bookmark: 0 };
   for (const c of target.comments) nextId.comment = Math.max(nextId.comment, c.id + 1);
   const names = new Set<string>();
-  state.doc.descendants((node) => {
+  const { from, to } = state.selection;
+  state.doc.descendants((node, pos) => {
     const id = (node.attrs.id as number) + 1;
     if (COMMENT_ANCHORS.has(node.type.name)) nextId.comment = Math.max(nextId.comment, id);
-    if (node.type.name === "bookmarkStart") names.add(String(node.attrs.name));
+    // A bookmark in the selection goes with it.
+    if (node.type.name === "bookmarkStart" && (pos < from || pos >= to))
+      names.add(String(node.attrs.name));
     if (node.type.name.startsWith("bookmark")) nextId.bookmark = Math.max(nextId.bookmark, id);
     return node.type.name === "doc" || node.isTextblock;
   });
@@ -314,6 +357,7 @@ function fit(
     return next;
   };
   const commentIds = new Map<number, number>();
+  const defined = new Set(source.comments.map((c) => c.id));
   const bookmarkIds = new Map<number, number>();
   const leftOut = new Set<number>();
 
@@ -333,7 +377,9 @@ function fit(
         else delete next.attributes;
       }
     } else if (COMMENT_ANCHORS.has(node.type)) {
-      next = { ...attrs, id: fresh("comment", commentIds, attrs?.id as number) };
+      const id = attrs?.id as number;
+      if (!defined.has(id)) return null;
+      next = { ...attrs, id: fresh("comment", commentIds, id) };
     } else if (node.type === "bookmarkStart" || node.type === "bookmarkEnd") {
       const id = attrs?.id as number;
       if (node.type === "bookmarkStart" && names.has(String(attrs?.name))) leftOut.add(id);
@@ -341,9 +387,7 @@ function fit(
       if (node.type === "bookmarkStart") names.add(String(attrs?.name));
       next = { ...attrs, id: fresh("bookmark", bookmarkIds, id) };
     }
-    const marks = node.marks?.map((m) =>
-      m.type === "characterStyle" ? { ...m, attrs: { id: mapStyle(String(m.attrs?.id)) } } : m,
-    );
+    const marks = node.marks && runMarks(node.marks);
     const children = node.content
       ?.map(mapNode)
       .filter((child): child is NodeJSON => child !== null);

@@ -553,7 +553,7 @@ describe("the clipboard on a schema v3 document", () => {
   it("copies HTML as Word's: headings, list numbers Word reads, margins, no editor-only marks", () => {
     const { editor } = mount(
       p({ style: "Heading1", spacing: { before: 240 } }, text("Title")),
-      p(numbered, ...commented(0, "a"), field),
+      p(numbered, ...commented(0, "a"), field, { type: "pageBreak" }),
       table,
     );
     const { doc } = editor.state;
@@ -567,7 +567,8 @@ describe("the clipboard on a schema v3 document", () => {
     expect(marker.getAttribute("style")).toMatch(/;mso-list:Ignore$/);
     expect(marker.textContent).toBe("1.\t");
     expect(opaque?.textContent).toBe("cell");
-    expect(html).not.toMatch(/contenteditable|rgba\(255, 213, 79/);
+    expect(html).not.toMatch(/contenteditable|data-foli|data-fragment|rgba\(255, 213, 79/);
+    expect(html).toContain("data-page-break");
     // Text from inside one numbered paragraph is not a list item.
     const inline = copy(editor, 9, 10).html;
     expect(inline).not.toMatch(/mso-list/);
@@ -658,6 +659,22 @@ describe("the clipboard on a schema v3 document", () => {
     expect(paragraph?.content).toEqual([text("p", [{ type: "bold" }])]);
   });
 
+  it("pasted over a selection, a bookmark keeps the name of the one it replaces", () => {
+    const named = (id: number, value: string): NodeJSON[] => [
+      { type: "bookmarkStart", attrs: { id, name: "Section1" } },
+      text(value),
+      { type: "bookmarkEnd", attrs: { id } },
+    ];
+    const { editor, view } = mount(p({}, ...named(1, "old")));
+    editor.select(1, 6);
+    const json = JSON.stringify({
+      open: true,
+      content: { type: "doc", content: [p({}, ...named(7, "new"))] },
+    });
+    view.paste(data({ [FOLI_MIME]: json }));
+    expect(editor.getDocument().content.content).toEqual([p({}, ...named(2, "new"))]);
+  });
+
   it("pastes invalid definitions as the HTML instead", () => {
     const { editor, view } = mount(p({}));
     const json = JSON.stringify({
@@ -715,7 +732,10 @@ describe("the clipboard on a schema v3 document", () => {
     let total = 0;
     for (const { types, pieces, breaks, items } of pastes) {
       for (const target of targets) {
-        const { editor, view } = mount(...target);
+        const { editor, view } = mountDocument({
+          ...documentOf(...target),
+          comments: [{ id: 0, author: "A", content: [p({}, text("note"))] }],
+        });
         const positions: number[] = [];
         editor.state.doc.descendants((node, pos) => {
           if (node.isTextblock)
@@ -727,7 +747,16 @@ describe("the clipboard on a schema v3 document", () => {
           editor.select(at);
           expect(view.paste(data(types))).toBe(true);
           // The whole document, envelope included, is still one schema v3 accepts.
-          parseDocumentV3(editor.getDocument());
+          const whole = parseDocumentV3(editor.getDocument());
+          // Every comment anchor has its comment; bookmark names stay unique.
+          const comments = new Set(whole.comments.map((c) => c.id));
+          const names: string[] = [];
+          editor.state.doc.descendants((node) => {
+            if (node.type.name.startsWith("comment"))
+              expect(comments.has(node.attrs.id as number)).toBe(true);
+            if (node.type.name === "bookmarkStart") names.push(String(node.attrs.name));
+          });
+          expect(new Set(names).size).toBe(names.length);
           const { doc } = editor.state;
           for (const piece of pieces) expect(doc.textContent).toContain(piece);
           expect(count(doc, isPageBreak)).toBeGreaterThanOrEqual(

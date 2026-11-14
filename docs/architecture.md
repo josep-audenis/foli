@@ -481,24 +481,37 @@ spacing as margins, a list number as Word's HTML writes it (`mso-list:Ignore` on
 links whose target `isSafeHref` takes as `<a>` (schema v3 keeps any target), and nothing only
 the editor needs (comment shading, `contenteditable`). Text copied from inside one paragraph
 takes no number. The Foli JSON carries the definitions the content references
-(`copiedDefinitions`: its styles with those they are based on, link to or are followed by, its
-lists' numbering, its comments).
+(`copiedDefinitions`: its styles, the paragraph mark's and a tracked change's included, with
+those they are based on, link to or are followed by, its lists' numbering, its comments) and
+the document's id (`WordContext.id`, made when the document is loaded).
 
 Paste on v3 (8.7c, `state/wordclip.ts`) fits the content to the document as Word does with
 "use destination styles" (`fitPaste`): a style the document has by name is used, any other is
-added (a free id when its id is taken); a list keeps its numbering where the document has the
-same instance and definition (a copy inside one document goes on numbering), otherwise it gets
-an instance of its own (on the document's definition when one is the same); comments are
-copied with new ids (as Word duplicates them), a reply whose comment was not copied becoming a
-comment of its own; a bookmark whose name the document uses is left out, others get new ids;
-paragraph ids (`w14:paraId`, `w14:textId`) are left for export to make. The definitions are
+added (a free id when its id is taken, never as the document's default); a list copied
+inside the same document (the copy carries its id) goes on numbering where the instance and
+definition are unchanged, any other gets an instance of its own (on the document's definition
+when one is the same): Foli makes equal ids and definitions in every document, so equality alone
+would join lists of different documents (Word tells them apart by `w:nsid`); from another
+document, a style or list the copy does not define is none (default style, not numbered), not
+the target's of that id; comments are copied with new ids (as Word duplicates them), a reply
+whose comment was not copied becoming a comment of its own, an anchor without its comment left
+out; a bookmark whose name the document uses outside the replaced selection is left out, others
+get new ids; paragraph ids (`w14:paraId`, `w14:textId`) are left for export to make. The definitions are
 validated as a document's envelope first (`parseDocumentV3`): invalid ones fall through to the
 HTML. HTML is read as schema v2 (`htmlToDoc`) and structured by `migrateToV3` (`fitPastedV2`),
 with Word's built-in heading, List Paragraph and Hyperlink styles where the document lacks
 them, the list levels the list buttons make, each list a new one, and without bold, italic,
 underline or strike the paragraph's style already gives (HTML writes a heading's bold on its
-text). What a paste adds to the envelope stays after undo, as in Word. Ids inside opaque content
-and tracked-change ids are pasted as they are (Word tolerates repeats of both).
+text). What a paste adds to the envelope stays after undo: styles and list definitions as in
+Word, but also copied comments, which Word's undo removes (they stay without anchors and are
+exported; Phase 9 makes comments part of the history). Ids inside opaque content and
+tracked-change ids are pasted as they are (Word tolerates repeats of both). Pasted definitions
+keep their verbatim `ext` XML, which export writes back when it still matches the model: a
+page that sets Foli's clipboard type can put XML into `styles.xml` and `numbering.xml`, as
+opaque content could already put it into the body (both arrive as strings checked only for
+type and length; export writes `ext` back only where it reads back as the model's values). Each copy resolves the list numbers of the whole document, and
+each paste walks it once for comment and bookmark ids (O(document); not measured on large
+documents yet).
 
 The view moves the caret over a list number in one press: browsers stop before and after the
 non-editable number, the same model position, so Right at the end of the paragraph before and

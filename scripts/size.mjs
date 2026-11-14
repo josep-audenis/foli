@@ -37,7 +37,7 @@ writeFileSync(appEntry, `export { FoliEditor } from "${dist("react")}";\n`);
  * blocks); v2 goes in 8.7d, and the budgets are set again then. Core and React raised again in
  * 8.7b (33.4 and 56.2 kB): Word formatting on v3 (styles, fonts, sizes, spacing, indentation,
  * lists as numbering) and the toolbar's Word controls. Core, view and React raised in 8.7c
- * (35.9, 46.5 and 59.1 kB): copy and paste on v3 (definitions carried and fitted to the
+ * (36.1, 46.7 and 59.4 kB): copy and paste on v3 (definitions carried and fitted to the
  * document, HTML through the v2 -> v3 migration). The view's share is mostly core's envelope
  * validation and migration, which `createEditor` already brings into an app.
  */

@@ -329,8 +329,13 @@ export function clipboardBlocks(
   renderer.prepare(doc);
   return nodes.map((node, i) => {
     const { dom } = renderer.render(node, first < 0 ? -1 : first + i);
-    for (const element of [dom, ...dom.querySelectorAll("[contenteditable]")])
-      element.removeAttribute("contenteditable");
+    for (const element of [dom, ...dom.querySelectorAll("*")])
+      for (const name of element.getAttributeNames())
+        if (
+          name === "contenteditable" ||
+          (name.startsWith("data-") && name !== WORD_PAGE_BREAK_ATTR)
+        )
+          element.removeAttribute(name);
     return dom;
   });
 }

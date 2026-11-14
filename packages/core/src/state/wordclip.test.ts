@@ -8,7 +8,7 @@ import type {
   StyleJSON,
 } from "../v3/document.js";
 import { createEditor } from "./editor.js";
-import { wordContext } from "./word.js";
+import { type WordContext, wordContext } from "./word.js";
 import { copiedDefinitions, fitPaste, fitPastedV2, type WordDefinitions } from "./wordclip.js";
 import { levels } from "./wordformat.js";
 
@@ -68,8 +68,8 @@ function editorOf(blocks: NodeJSON[], over: Partial<FoliDocumentV3> = {}) {
     },
   });
 }
-const envelopeOf = (editor: ReturnType<typeof editorOf>) =>
-  wordContext(editor.state)?.envelope as NonNullable<ReturnType<typeof wordContext>>["envelope"];
+const contextOf = (editor: ReturnType<typeof editorOf>) => wordContext(editor.state) as WordContext;
+const envelopeOf = (editor: ReturnType<typeof editorOf>) => contextOf(editor).envelope;
 
 describe("copiedDefinitions", () => {
   it("takes the styles, numbering and comments the content references, and what they name", () => {
@@ -108,7 +108,7 @@ describe("copiedDefinitions", () => {
     );
     const { state } = editor;
     const first = editorOf([p({ style: "Numbered" }, text("c"))], envelopeOf(editor)).state;
-    const defs = copiedDefinitions(envelopeOf(editor), state.doc);
+    const defs = copiedDefinitions(contextOf(editor), state.doc);
     expect(defs.styles.map((s) => s.id).sort()).toEqual([
       "CommentText",
       "DefaultParagraphFont",
@@ -120,9 +120,52 @@ describe("copiedDefinitions", () => {
     expect(defs.numbering).toEqual({ abstracts: [BULLETS], instances: [{ id: 1, abstract: 0 }] });
     expect(defs.comments.map((c) => c.id)).toEqual([4]);
     // A style's numbering, and the styles its levels number.
-    const styled = copiedDefinitions(envelopeOf(editor), first.doc);
+    const styled = copiedDefinitions(contextOf(editor), first.doc);
     expect(styled.numbering.instances.map((n) => n.id)).toEqual([9]);
     expect(styled.styles.map((s) => s.id).sort()).toEqual(["Normal", "Numbered", "Title"]);
+    expect(defs.document).toBe(contextOf(editor).id);
+  });
+
+  it("takes the paragraph mark's and a tracked change's styles, and override definitions'", () => {
+    const quote: StyleJSON = { id: "Quote", type: "paragraph", name: "Quote" };
+    const editor = editorOf(
+      [
+        p(
+          {
+            markFormat: [{ type: "characterStyle", attrs: { id: "Hyperlink" } }],
+            formatChange: {
+              id: 1,
+              author: "A",
+              previous: { style: "Quote", numbering: { id: 2 } },
+            },
+          },
+          text("a"),
+        ),
+      ],
+      {
+        styles: [...STYLES, quote],
+        numbering: {
+          abstracts: [BULLETS],
+          instances: [
+            { id: 1, abstract: 0 },
+            {
+              id: 2,
+              abstract: 0,
+              overrides: [{ level: 0, definition: { level: 0, style: "Title" } }],
+            },
+          ],
+        },
+      },
+    );
+    const defs = copiedDefinitions(contextOf(editor), editor.state.doc);
+    expect(defs.styles.map((s) => s.id).sort()).toEqual([
+      "DefaultParagraphFont",
+      "Hyperlink",
+      "Normal",
+      "Quote",
+      "Title",
+    ]);
+    expect(defs.numbering.instances.map((n) => n.id)).toEqual([2]);
   });
 });
 
@@ -131,7 +174,11 @@ describe("fitPaste", () => {
     const editor = editorOf([p({ style: "Heading1", numbering: { id: 1, level: 0 } }, text("a"))]);
     const envelope = envelopeOf(editor);
     const content = editor.state.doc.toJSON();
-    const fitted = fitPaste(editor.state, content, copiedDefinitions(envelope, editor.state.doc));
+    const fitted = fitPaste(
+      editor.state,
+      content,
+      copiedDefinitions(contextOf(editor), editor.state.doc),
+    );
     expect(fitted.envelope).toBe(envelope);
     expect(fitted.doc.toJSON()).toEqual(content);
     // Without definitions (plain text, older copies): the document's own.
@@ -170,7 +217,8 @@ describe("fitPaste", () => {
       "Heading1",
       "Title1",
       "Quote",
-      "Missing",
+      // Not defined by the copy: the default style, not a style of the target's of that id.
+      undefined,
     ]);
     expect(fitted.doc.toJSON().content?.[1]?.attrs?.formatChange).toEqual({
       id: 1,
@@ -244,12 +292,19 @@ describe("fitPaste", () => {
     const of = (
       instance: WordDefinitions["numbering"]["instances"][number],
       abstract = BULLETS,
+      document: string | undefined = contextOf(editor).id,
     ) => ({
+      document,
       styles: [],
       numbering: { abstracts: [abstract], instances: [instance] },
       comments: [],
     });
     expect(idFor(of({ id: 1, abstract: 0 }))).toEqual({ id: 1, level: 0 });
+    // The same ids and definitions from another document (Foli makes equal ones in each): its own.
+    expect(idFor(of({ id: 1, abstract: 0 }, BULLETS, "another"))).toEqual({ id: 2, level: 0 });
+    // A copy without the id (crafted, or from before 8.7c): not this document's either.
+    const { document: _, ...anonymous } = of({ id: 1, abstract: 0 });
+    expect(idFor(anonymous)).toEqual({ id: 2, level: 0 });
     // The same definition, another instance (a restart): a list of its own.
     expect(idFor(of({ id: 1, abstract: 0, overrides: [{ level: 0, start: 4 }] }))).toEqual({
       id: 2,
@@ -257,6 +312,103 @@ describe("fitPaste", () => {
     });
     // The same instance of another definition.
     expect(idFor(of({ id: 1, abstract: 0 }, numbers))).toEqual({ id: 2, level: 0 });
+  });
+
+  it("keeps two pasted lists apart when the first one's copy takes the second one's id", () => {
+    const numbers: AbstractNumberingJSON = { id: 1, levels: [{ level: 0, format: "decimal" }] };
+    const editor = editorOf([p({ numbering: { id: 2, level: 0 } }, text("x"))], {
+      numbering: {
+        abstracts: [BULLETS, numbers],
+        instances: [
+          { id: 1, abstract: 0 },
+          { id: 2, abstract: 1, overrides: [{ level: 0, start: 5 }] },
+        ],
+      },
+    });
+    const restart = [{ level: 0, start: 1 }];
+    const fitted = fitPaste(
+      editor.state,
+      docOf(
+        p({ numbering: { id: 2, level: 0 } }, text("a")),
+        p({ numbering: { id: 3, level: 0 } }, text("b")),
+      ),
+      {
+        document: contextOf(editor).id,
+        styles: [],
+        numbering: {
+          abstracts: [numbers],
+          instances: [
+            { id: 2, abstract: 1, overrides: restart },
+            { id: 3, abstract: 1, overrides: restart },
+          ],
+        },
+        comments: [],
+      },
+    );
+    expect(fitted.doc.toJSON().content?.map((b) => b.attrs?.numbering)).toEqual([
+      { id: 3, level: 0 },
+      { id: 4, level: 0 },
+    ]);
+  });
+
+  it("from another document, a style or list the copy does not define is not the target's", () => {
+    const editor = editorOf([p({ numbering: { id: 1, level: 0 } }, text("x"))]);
+    const fitted = fitPaste(
+      editor.state,
+      docOf(
+        p(
+          { style: "Title", numbering: { id: 1, level: 0 } },
+          text("a", [{ type: "characterStyle", attrs: { id: "Hyperlink" } }]),
+        ),
+      ),
+      {
+        document: "another",
+        styles: [],
+        numbering: { abstracts: [], instances: [] },
+        comments: [],
+      },
+    );
+    expect(fitted.doc.toJSON().content).toEqual([p({ numbering: { id: 0, level: 0 } }, text("a"))]);
+    // From this document, its own ids stay.
+    const own = fitPaste(editor.state, docOf(p({ style: "Nope" }, text("a"))));
+    expect(own.doc.toJSON().content?.[0]?.attrs?.style).toBe("Nope");
+  });
+
+  it("maps the paragraph mark's character style, and drops one the copy does not define", () => {
+    const editor = editorOf([p({}, text("x"))]);
+    const mark = (id: string) => ({ type: "characterStyle", attrs: { id } });
+    const fitted = fitPaste(
+      editor.state,
+      docOf(
+        p({ markFormat: [mark("Link")] }, text("a")),
+        p({ markFormat: [mark("Gone"), { type: "bold" }] }, text("b")),
+      ),
+      {
+        styles: [{ id: "Link", type: "character", name: "Hyperlink" }],
+        numbering: { abstracts: [], instances: [] },
+        comments: [],
+      },
+    );
+    expect(fitted.doc.toJSON().content?.map((b) => b.attrs?.markFormat)).toEqual([
+      [mark("Hyperlink")],
+      [{ type: "bold" }],
+    ]);
+  });
+
+  it("does not make a copied style the target's default", () => {
+    const editor = editorOf([p({}, text("x"))]);
+    const fitted = fitPaste(editor.state, docOf(p({ style: "Body" }, text("a"))), {
+      styles: [
+        { id: "Standard", type: "paragraph", name: "Standard", isDefault: true },
+        { id: "Body", type: "paragraph", name: "Body Text", basedOn: "Standard" },
+      ],
+      numbering: { abstracts: [], instances: [] },
+      comments: [],
+    });
+    expect(fitted.envelope.styles.slice(STYLES.length)).toEqual([
+      { id: "Body", type: "paragraph", name: "Body Text", basedOn: "Standard" },
+      { id: "Standard", type: "paragraph", name: "Standard" },
+    ]);
   });
 
   it("uses an unnamed style the target has by id", () => {
@@ -346,8 +498,8 @@ describe("fitPaste", () => {
     expect(first?.content?.filter((n) => n.type !== "text").map((n) => n.attrs?.id)).toEqual([
       1, 1, 1, 2, 2, 2, 3, 3, 3,
     ]);
-    // An anchor without its comment still gets an id of its own.
-    expect(second?.content?.[0]?.attrs?.id).toBe(4);
+    // An anchor without its comment is left out (it would point at nothing).
+    expect(second?.content).toBeUndefined();
     expect(fitted.envelope.comments).toStrictEqual([
       comment(0),
       { ...comment(1), content: [p({ style: "CommentText" }, text("note"))] },
@@ -361,10 +513,31 @@ describe("fitPaste", () => {
     ]);
   });
 
+  it("leaves out an anchor whose comment the paste does not have", () => {
+    const editor = editorOf([p({}, text("x"))]);
+    const fitted = fitPaste(
+      editor.state,
+      docOf(
+        p({}, { type: "commentStart", attrs: { id: 0 } }, text("a"), {
+          type: "commentEnd",
+          attrs: { id: 0 },
+        }),
+      ),
+    );
+    expect(fitted.doc.toJSON().content).toEqual([p({}, text("a"))]);
+    expect(fitted.envelope.comments).toEqual([]);
+  });
+
   it("numbers new comments above the target's comments and its anchors without one", () => {
     const pasted = docOf(p({}, { type: "commentReference", attrs: { id: 0 } }));
+    const definitions: WordDefinitions = {
+      styles: STYLES,
+      numbering: { abstracts: [], instances: [] },
+      comments: [comment(0)],
+    };
     const idOf = (editor: ReturnType<typeof editorOf>) =>
-      fitPaste(editor.state, pasted).doc.toJSON().content?.[0]?.content?.[0]?.attrs?.id;
+      fitPaste(editor.state, pasted, definitions).doc.toJSON().content?.[0]?.content?.[0]?.attrs
+        ?.id;
     expect(idOf(editorOf([p({})], { comments: [comment(9)] }))).toBe(10);
     expect(idOf(editorOf([p({}, { type: "commentReference", attrs: { id: 12 } })]))).toBe(13);
   });
@@ -443,6 +616,26 @@ describe("fitPastedV2 formatting", () => {
       "underline",
       "strike",
     ]);
+  });
+});
+
+describe("fitPastedV2 styles", () => {
+  it("bases Word's headings on the document's Normal whatever its id", () => {
+    const editor = editorOf([p({}, text("x"))], {
+      styles: [{ id: "Standard", type: "paragraph", name: "Normal", isDefault: true }],
+    });
+    const fitted = fitPastedV2(
+      editor.state,
+      parseContent({
+        type: "doc",
+        content: [{ type: "heading", attrs: { level: 2 }, content: [{ type: "text", text: "h" }] }],
+      }),
+    );
+    expect(fitted.envelope.styles[1]).toMatchObject({
+      id: "Heading2",
+      basedOn: "Standard",
+      next: "Standard",
+    });
   });
 });
 

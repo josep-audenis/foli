@@ -270,10 +270,10 @@ fails when a bundle passes its budget.
 
 | Bundle            | Includes          | Minified | Gzipped |  Budget |
 | ----------------- | ----------------- | -------: | ------: | ------: |
-| `@folijs/core`    | core              | 112.2 kB | 35.9 kB | 36.6 kB |
-| `@folijs/view`    | view, core        | 140.9 kB | 46.5 kB | 47.5 kB |
-| `@folijs/react`   | react, view, core | 181.1 kB | 59.1 kB | 60.4 kB |
-| `FoliEditor` only | what it reaches   | 180.9 kB | 59.1 kB | 60.4 kB |
+| `@folijs/core`    | core              | 112.9 kB | 36.1 kB | 36.6 kB |
+| `@folijs/view`    | view, core        | 141.5 kB | 46.7 kB | 47.5 kB |
+| `@folijs/react`   | react, view, core | 181.8 kB | 59.4 kB | 60.4 kB |
+| `FoliEditor` only | what it reaches   | 181.5 kB | 59.3 kB | 60.4 kB |
 | `@folijs/docx`    | docx, core        | 107.1 kB | 34.5 kB | 36.0 kB |
 
 (kB = 1,024 bytes; measured 2026-11-08 after task 7.8. At 0.1.0 (6.4) they were 14.1, 19.9,
