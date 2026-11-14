@@ -2,8 +2,9 @@ import { defineConfig, devices } from "@playwright/test";
 
 /**
  * Page agreement with Word (`pnpm corpus:pages`): each corpus document laid out by Foli and
- * compared, paragraph by paragraph, with the page Word puts it on. Not part of `pnpm check`:
- * the numbers depend on the fonts installed. See corpus/README.md.
+ * compared, paragraph by paragraph, with the page Word puts it on, and page by page with Word's
+ * PDF when `FOLI_WORD_PDF` names a folder of them. Not part of `pnpm check`: the numbers depend
+ * on the fonts installed. See corpus/README.md.
  */
 const PORT = 5176;
 

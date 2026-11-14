@@ -440,8 +440,8 @@ Word lays it out; read-only until the editor moves to v3 (8.7).
   at the top of each page it continues on (`BlockBox.repeat`). A block split across pages is
   shown as a clip of the whole block per page.
 - `pageOf(index)` and `lineOf(index)` give where a top-level node starts (the page, and the
-  line on it as Word numbers lines); the corpus harness compares them with Word's
-  (`pnpm corpus:pages`, numbers in corpus/README.md).
+  line on it as Word numbers lines); the corpus harness compares them with Word's, and each
+  page's ink with Word's PDF of it (`pnpm corpus:pages`, numbers in corpus/README.md).
 
 Not yet: headers and footers, footnotes, floating objects, columns, custom tab stops (default
 stops every half inch), widow control turned off for one paragraph, right-aligned or centered
@@ -539,6 +539,10 @@ Planned, created only when needed:
 - Runtime dependencies today: none besides React (peer) and our own packages.
 - Dev-only exception: `@axe-core/playwright` / `axe-core` (MPL-2.0) for the accessibility check
   in Playwright. Test tooling, never bundled or published.
+- Dev-only: `pdfjs-dist` (Apache-2.0) renders Word's PDF pages in the corpus harness
+  (`pnpm corpus:pages`, playground only). Never bundled or published. Its optional Node
+  canvas (`@napi-rs/canvas`, native binaries) is not installed (`ignoredOptionalDependencies`):
+  the harness renders in the browser.
 
 ## Build and dev wiring
 

@@ -653,13 +653,16 @@ Each task is a PR on `phase-8/word-model`, the build green after each.
     formatting from defaults, styles and direct formatting as Word computes it (toggle
     properties, theme fonts and colors, numbering indents), and list markers numbered as Word
     numbers them; checked against the number Word shows for every paragraph of the corpus.
-  - [ ] 8.6b Rendering v3 in the view (`renderDocumentV3`, read-only until 8.7): resolved
+  - [x] 8.6b Rendering v3 in the view (#51, `renderDocumentV3`, read-only until 8.7): resolved
     formatting as CSS, numbering markers, headings as `h1`–`h6`, fonts with metric-compatible
     substitutes, tracked changes (markup or final) and comment anchors shown, opaque content
     shown from its XML (tables as tables, content controls and fields as their text), sections
     and Word's paragraph spacing on pages; harness: per-paragraph page and line agreement with
     Word (`pnpm corpus:pages`; baseline in corpus/README.md).
-  - [ ] 8.6c The PDF page comparison as a tracked number.
+  - [ ] 8.6c The PDF page comparison as a tracked number: every page Foli shows compared with
+    Word's PDF of it by ink (pdf.js, pixel by pixel within 2 px), a score per page and
+    inside the margins, overlays to look at (`FOLI_WORD_PDF=<folder> pnpm corpus:pages`;
+    baseline in corpus/README.md).
 - [ ] 8.7 Editing on v3: existing commands and keys ported, list levels and numbering, style
   picker, font family and size, paragraph spacing and indentation; HTML clipboard mapped to
   v3; T1–T5 on v3 in three engines.

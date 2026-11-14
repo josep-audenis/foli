@@ -3,3 +3,7 @@ packages:
   - packages/*
   # Throwaway experiments (private, never published). See docs/roadmap.md Phase 1.
   - spikes/*
+
+# pdfjs-dist (corpus harness) renders in the browser: its Node canvas (native binaries) is not needed.
+ignoredOptionalDependencies:
+  - "@napi-rs/canvas"

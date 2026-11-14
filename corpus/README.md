@@ -130,7 +130,48 @@ three lines that differ: the paragraph after the fee table in 02 (Word counts th
 repeats on the second page as a line; Foli does not), and two empty paragraphs around the table
 of contents in 04 (a field Foli keeps opaque). Not laid out yet, so not measured: headers and
 footers (their space is Word's margin here), footnotes, floating pictures, and text inside
-tables. Word's own PDF of each page is the next comparison (8.6c).
+tables.
+
+## Pages against Word's PDF
+
+The same run compares every page Foli shows with Word's page as Word prints it, when it is
+given Word's PDFs (not committed; `word-reference.ps1 -PdfDir` writes them):
+
+```bash
+powershell -ExecutionPolicy Bypass -File scripts/corpus/word-reference.ps1 -Out <folder> -PdfDir <pdf-folder>
+FOLI_WORD_PDF=<pdf-folder> pnpm corpus:pages
+```
+
+Word's page is rendered by pdf.js and Foli's is a screenshot, both at 96 px per inch. Each is
+reduced to the pixels that hold ink (darker than mid grey: text and rules, not highlights or
+shading), and ink in one counts as matched where the other has ink within 2 px across and
+down (`apps/playground/src/ink.ts`): enough for antialiasing and hinting, not for another
+line, whose glyphs fall elsewhere. A page's score is the harmonic mean of the two shares
+matched: 1 when the pages agree, falling as text moves or wraps differently (in the unit test,
+a block of text 3 px lower scores 0.9, half a line lower under 0.5, a whole line lower about
+0.5), 0 when no ink is where the other has it. A page only one of them has, or of another size
+(another orientation or paper), scores 0 and is reported. The score inside the margins leaves
+out headers, footers and page numbers, which Foli does not lay out yet. Documents without a
+PDF are listed in the results (`pdf.missing`). Overlays go to `test-results/word-pdf/`: black
+where both have ink, red Word only, blue Foli only.
+
+Baseline (2026-11-14, Word 16.0.20527, Chromium, with Aptos; mean of the pages; the same on
+a second run):
+
+| Document                       | Pages | Page score | Inside the margins | Per page (inside the margins) |
+| ------------------------------ | ----: | ---------: | -----------------: | ----------------------------- |
+| 01-mutual-nda                  |     2 |      0.420 |              0.428 | 0.410, 0.446                  |
+| 02-services-agreement-redlined |     3 |      0.523 |              0.528 | 0.427, 0.598, 0.560           |
+| 03-offer-letter-template       |     1 |      0.164 |              0.191 | 0.191                         |
+| 04-board-report                |     4 |      0.514 |              0.527 | 1.000, 0.663, 0.184, 0.261    |
+| 05-business-letter             |     2 |      0.927 |              0.968 | 0.936, 1.000                  |
+| **All 12 pages**               |       |  **0.540** |          **0.556** |                               |
+
+The number is strict where the page and line numbers are not: in 01 every paragraph starts on
+Word's line, yet the numbered clauses drift down the page (Foli's lines there are taller than
+Word's) and some wrap at a different word. In 03 the whole text sits higher than Word's, which
+moves it below a letterhead taller than the top margin. In 04 the footnotes and the floating
+chart are missing (Foli's text does not wrap around it), and the headings sit lower than Word's.
 
 ## Private documents
 
