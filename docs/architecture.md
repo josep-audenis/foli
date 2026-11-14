@@ -474,14 +474,38 @@ the last section's (`editor.settings`). Fonts' line height ratios are measured o
 outside the host and measured again after web fonts load (every block is drawn again).
 
 Copy from a v3 document: plain text has tabs as tabs, opaque content as its text (a table's
-paragraphs on their lines), markers as nothing; the HTML leaves out run properties turned off
-(`bold` false, `underline` none) and links whose target `isSafeHref` refuses (schema v3 keeps
-any target).
+paragraphs on their lines), markers as nothing. The HTML is the blocks as the editor draws them
+(`clipboardBlocks`): the resolved formatting as inline CSS, outline levels as `h1`–`h6`, Word's
+spacing as margins, a list number as Word's HTML writes it (`mso-list:Ignore` on the number,
+`mso-list:lN levelM lfoN` on its paragraph, which Foli's reader and Word take back as a list),
+links whose target `isSafeHref` takes as `<a>` (schema v3 keeps any target), and nothing only
+the editor needs (comment shading, `contenteditable`). Text copied from inside one paragraph
+takes no number. The Foli JSON carries the definitions the content references
+(`copiedDefinitions`: its styles with those they are based on, link to or are followed by, its
+lists' numbering, its comments).
 
-Not yet on v3 (8.7b–d): sections with other page setups, headers and footers, HTML paste
-beyond what fits v3 and HTML copy as Word formats it, a final (changes accepted) editing
-view, Ctrl+click on links. Pasting Foli JSON inside a v3 document copies its bookmark, comment
-and paragraph ids (made unique in 8.7c). Each render resolves the list numbers and open comment
+Paste on v3 (8.7c, `state/wordclip.ts`) fits the content to the document as Word does with
+"use destination styles" (`fitPaste`): a style the document has by name is used, any other is
+added (a free id when its id is taken); a list keeps its numbering where the document has the
+same instance and definition (a copy inside one document goes on numbering), otherwise it gets
+an instance of its own (on the document's definition when one is the same); comments are
+copied with new ids (as Word duplicates them), a reply whose comment was not copied becoming a
+comment of its own; a bookmark whose name the document uses is left out, others get new ids;
+paragraph ids (`w14:paraId`, `w14:textId`) are left for export to make. The definitions are
+validated as a document's envelope first (`parseDocumentV3`): invalid ones fall through to the
+HTML. HTML is read as schema v2 (`htmlToDoc`) and structured by `migrateToV3` (`fitPastedV2`),
+with Word's built-in heading, List Paragraph and Hyperlink styles where the document lacks
+them, the list levels the list buttons make, each list a new one, and without bold, italic,
+underline or strike the paragraph's style already gives (HTML writes a heading's bold on its
+text). What a paste adds to the envelope stays after undo, as in Word. Ids inside opaque content
+and tracked-change ids are pasted as they are (Word tolerates repeats of both).
+
+The view moves the caret over a list number in one press: browsers stop before and after the
+non-editable number, the same model position, so Right at the end of the paragraph before and
+Left at a numbered paragraph's start step over the boundary themselves.
+
+Not yet on v3 (8.7d): sections with other page setups, headers and footers, a final (changes
+accepted) editing view, Ctrl+click on links. Each render resolves the list numbers and open comment
 ranges of every paragraph and writes the gaps of every block (O(document); measured before
 8.7d). Whether Word keeps the mark's run properties (`markFormat`) on the paragraph after a
 heading, and a tracked formatting change on both halves of a split, is not checked against

@@ -20,7 +20,8 @@ import { mmToTwips } from "./units.js";
  *   the ninth.
  * - A horizontal rule becomes an empty paragraph with a bottom border.
  * - Alignment becomes justification; text color `color`; highlight (any color) `shading`, as
- *   Word records a background color that is not one of its highlight colors.
+ *   Word records a background color that is not one of its highlight colors. Linked text gets
+ *   Word's "Hyperlink" character style (blue, underlined), the look links had.
  * - `settings` becomes the section, in twips (rounded to the twip: under 0.02 mm).
  * The styles and numbering definitions the result references are added.
  */
@@ -170,7 +171,11 @@ function paragraph(
 const JUSTIFY = { center: "center", end: "right", justify: "both" } as const;
 
 function inline(node: InlineJSON): NodeJSON {
-  const marks = node.marks?.map(mark);
+  const marks = node.marks?.flatMap((m) =>
+    m.type === "link"
+      ? [mark(m), { type: "characterStyle", attrs: { id: "Hyperlink" } }]
+      : [mark(m)],
+  );
   return { ...node, ...(marks?.length ? { marks } : {}) } as NodeJSON;
 }
 
@@ -223,6 +228,16 @@ const STYLES: StyleJSON[] = [
     type: "character",
     name: "Default Paragraph Font",
     isDefault: true,
+  },
+  {
+    id: "Hyperlink",
+    type: "character",
+    name: "Hyperlink",
+    basedOn: "DefaultParagraphFont",
+    run: [
+      { type: "color", attrs: { value: "0563C1", themeColor: "hyperlink" } },
+      { type: "underline" },
+    ],
   },
 ];
 

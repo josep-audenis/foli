@@ -181,6 +181,12 @@ definitions (the Word 2013 to 2019 template's) the first time they are applied, 
   Tab types a tab (`insertTab`); in the view, Escape then Tab (or Shift+Tab) moves the focus on
   instead, and a read-only view leaves Tab to the browser.
 - Links get the document's "Hyperlink" character style, removed with the link.
+- Clipboard (the view uses these): `copiedDefinitions(envelope, content)` gives the styles,
+  numbering and comments copied content references; `fitPaste(state, content, definitions?)`
+  validates pasted v3 content and definitions (none: the document's own) and returns
+  `{ doc, envelope }`, the content fitted to the document and its envelope with what it added;
+  `fitPastedV2(state, content)` does the same for schema v2 content (pasted HTML). Apply the
+  envelope with `withEnvelope(tr, envelope)`; `wordContext(state)` gives the current one.
 
 | Member                         | Notes                                                                                                                                                                                                                                                                                                                         |
 | ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -249,8 +255,11 @@ const view = new EditorView(host, editor, { editable: true, placeholder: "" });
 - An editor holding a schema v3 document is shown as Word formats it (the blocks of
   `renderDocumentV3`, list numbers, tracked changes as markup, opaque content shown and not
   editable) and laid out with Word's paragraph spacing and keep rules, on its last section's
-  page. Paste takes Foli JSON and plain text, and HTML only where it fits schema v3 (8.7c maps
-  the rest).
+  page. Copy writes the HTML as Word formats it (resolved formatting inline, headings, list
+  numbers Word reads back) and Foli JSON with the styles, numbering and comments the content
+  uses; paste fits Foli JSON, HTML and text to the document (`fitPaste`, `fitPastedV2`: its own
+  styles by name, others added, lists of another document as lists of their own, comments
+  copied, bookmarks whose names it has left out).
 - `view.setOptions({ editable?, placeholder? })`: changes the given options.
 - `view.focus()`: focuses the host, shows the editor's selection, scrolls it into view.
 - `view.destroy()`: removes listeners, injected styles and the attributes it added; empties the

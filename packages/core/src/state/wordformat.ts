@@ -76,7 +76,7 @@ function common<T>(values: readonly T[]): T | null {
 
 // ---------- paragraph styles ----------
 
-type HasEnvelope = Pick<WordContext, "envelope">;
+export type HasEnvelope = Pick<WordContext, "envelope">;
 
 /** The id of the document's style of `type` named `name` (Word's names: "heading 1"), if any. */
 export function styleNamed(
@@ -114,7 +114,7 @@ const builtinName = (id: string) =>
  * "Hyperlink"), as Word adds it to a document the first time it is used (the Word 2013–2019
  * template's values; not checked against newer Word).
  */
-function builtinStyle(context: HasEnvelope, name: string): StyleJSON | null {
+export function builtinStyle(context: HasEnvelope, name: string): StyleJSON | null {
   const normal = defaultParagraphStyleOf(context);
   const based = normal ? { basedOn: normal } : {};
   const heading = /^heading ([1-9])$/.exec(name)?.[1];
@@ -736,7 +736,7 @@ function withoutNumbering(context: WordContext, node: Node): Attrs {
 }
 
 /** Word's levels for a new list: bullets (Symbol, Courier New, Wingdings) or numbers. */
-function levels(kind: ListKind): NumberingLevelJSON[] {
+export function levels(kind: ListKind): NumberingLevelJSON[] {
   const bullets = [
     ["", "Symbol"],
     ["o", "Courier New"],
