@@ -1,5 +1,6 @@
 import {
   type Alignment,
+  copiedDefinitions,
   type DocJSON,
   Fragment,
   type InlineJSON,
@@ -9,19 +10,35 @@ import {
   type ParagraphJSON,
   parseContent,
   type SimpleMarkName,
+  type WordContext,
+  type WordEnvelope,
 } from "@folijs/core";
 import { PAGE_BREAK_ATTR, renderTree } from "./render.js";
 import { opaqueParagraphsText, parseOpaque } from "./word/blocks.js";
+import { clipboardBlocks } from "./word/edit.js";
 
 /**
- * Clipboard type for Foli content, read back first on paste: `{ open, content }`, the copied
- * blocks as `DocJSON` and whether they were cut out of one block (see `Pasted.open`).
+ * Clipboard type for Foli content, read back first on paste: `{ open, content, word? }`, the
+ * copied blocks as `DocJSON`, whether they were cut out of one block (see `Pasted.open`), and
+ * from a schema v3 document the definitions they reference (`copiedDefinitions`).
  */
 export const FOLI_MIME = "application/x-foli+json";
+
+/** One clipboard format's content, before validation. */
+export interface Found {
+  content: unknown;
+  open: boolean;
+  /** Read from HTML: schema v2 content as `htmlToDoc` reads it. */
+  html?: boolean;
+  /** The definitions a schema v3 copy carries. */
+  word?: unknown;
+}
 
 /** Validated clipboard content. */
 export interface Pasted {
   doc: ModelNode;
+  /** A schema v3 paste: the target's envelope with what the content needs (styles, lists...). */
+  envelope?: WordEnvelope;
   /**
    * True when no block boundary was copied (text from inside one block, plain text, inline
    * HTML): the content always joins the block it is pasted into, which keeps its type. Closed
@@ -36,12 +53,17 @@ export interface ClipboardContent {
   json: string;
 }
 
-/** Serializes `from..to` of `doc` for the clipboard. Hard breaks and block ends become "\n". */
+/**
+ * Serializes `from..to` of `doc` for the clipboard. Hard breaks and block ends become "\n". A
+ * schema v3 document (`word`: its context and the fonts' line height ratios) is copied as its
+ * Word renderer draws it: resolved formatting as inline CSS, list numbers as Word's HTML has them.
+ */
 export function serializeRange(
   doc: ModelNode,
   from: number,
   to: number,
   ownerDocument: Document,
+  word?: { context: WordContext; ratio: (family: string) => number },
 ): ClipboardContent {
   // A slice inside one textblock holds only inline content: wrap it back in its ancestors.
   const $from = doc.resolve(from);
@@ -60,17 +82,28 @@ export function serializeRange(
   const htmlBlocks = inline
     ? [$from.parent.copy(doc.slice(from, to).content)]
     : blocks.content.content;
-  renderTree(htmlBlocks, container, ownerDocument);
-  // Keep repeated and leading spaces in other apps.
-  for (const block of container.querySelectorAll("p, h1, h2, h3, h4, h5, h6"))
-    (block as HTMLElement).style.whiteSpace = "pre-wrap";
+  if (word) {
+    const first = inline ? -1 : $from.index(0);
+    container.append(
+      ...clipboardBlocks(word.context, doc, htmlBlocks, first, ownerDocument, word.ratio),
+    );
+  } else renderTree(htmlBlocks, container, ownerDocument);
+  // Keep repeated and leading spaces in other apps (v3 blocks have it already: writing the style
+  // again would drop the `mso-list` Word reads, which the CSS object model does not know).
+  if (!word)
+    for (const block of container.querySelectorAll("p, h1, h2, h3, h4, h5, h6"))
+      (block as HTMLElement).style.whiteSpace = "pre-wrap";
   // How other apps (and print) recognize a page break; the editor itself does not need it.
   for (const br of container.querySelectorAll(`br[${PAGE_BREAK_ATTR}]`))
     (br as HTMLElement).style.cssText = "page-break-before: always; break-before: page";
   return {
     text: doc.textBetween(from, to, "\n", (leaf) => leafText(leaf, ownerDocument)),
     html: container.innerHTML,
-    json: JSON.stringify({ open: $from.sharedDepth(to) > 0, content: blocks.toJSON() }),
+    json: JSON.stringify({
+      open: $from.sharedDepth(to) > 0,
+      content: blocks.toJSON(),
+      ...(word ? { word: copiedDefinitions(word.context, blocks) } : {}),
+    }),
   };
 }
 
@@ -93,34 +126,41 @@ function leafText(leaf: ModelNode, doc: Document): string {
 
 /**
  * The content of clipboard data, validated, or null. Priority: Foli JSON, then HTML, then plain
- * text. Every format is validated by the schema (`parseContent`); a format that fails falls
- * through to the next. `marks` are given to plain text (the marks typing would get at the
- * insertion point).
+ * text. Every format is validated by `parse` (by default the schema's `parseContent`); a format
+ * that fails falls through to the next. `marks` are given to plain text (the marks typing would
+ * get at the insertion point).
  */
 export function docFromClipboard(
   data: Pick<DataTransfer, "getData">,
   marks: readonly MarkJSON[] = [],
-  parse: (content: unknown) => ModelNode = parseContent,
+  parse: (found: Found) => Omit<Pasted, "open"> = (found) => ({ doc: parseContent(found.content) }),
 ): Pasted | null {
   const json = data.getData(FOLI_MIME);
   const html = data.getData("text/html");
   const text = data.getData("text/plain");
-  const candidates: (() => { content: unknown; open: boolean } | null)[] = [
+  const candidates: (() => Found | null)[] = [
     () => {
       if (!json) return null;
       const value: unknown = JSON.parse(json);
       if (typeof value !== "object" || value === null) return null;
-      const { open, content } = value as { open?: unknown; content?: unknown };
-      return { content, open: open === true };
+      const { open, content, word } = value as {
+        open?: unknown;
+        content?: unknown;
+        word?: unknown;
+      };
+      return { content, open: open === true, word };
     },
-    () => (html ? readHTML(html) : null),
+    () => {
+      const read = html ? readHTML(html) : null;
+      return read && { ...read, html: true };
+    },
     () => (text ? { content: textToDoc(text, marks), open: true } : null),
   ];
   for (const candidate of candidates) {
     try {
       const found = candidate();
       if (!found) continue;
-      return { doc: parse(found.content), open: found.open };
+      return { ...parse(found), open: found.open };
     } catch {
       // Invalid or unreadable in this format: try the next one.
     }

@@ -55,7 +55,10 @@ is discarded with a `Foli:` console warning. Record it if you see one.
 
 Automation covers copy/cut/paste inside the editor (Chromium, Firefox) and pastes of
 hand-written fixture HTML. Playwright's WebKit on Windows gives paste events empty clipboard
-data, so Safari needs these rows by hand. When pasting from another app, also save the HTML it
+data, so Safari needs these rows by hand. Playwright's Firefox keeps text and HTML but drops
+Foli's own clipboard type (measured in 8.7c), so its copies inside a Word (v3) document paste
+from the HTML there: a pasted list item starts a list of its own instead of going on. Check
+that row in a real Firefox. When pasting from another app, also save the HTML it
 put on the clipboard as a fixture (see `packages/view/fixtures/clipboard/README.md`).
 
 | Platform / browser | Case                                                                 | Result | Notes |
@@ -66,6 +69,8 @@ put on the clipboard as a fixture (see `packages/view/fixtures/clipboard/README.
 | Any / Chrome       | paste from LibreOffice Writer: same                                  |        |       |
 | Any / Firefox      | paste from a web page with links and images (text only, no images)   |        |       |
 | Any                | copy from the editor, paste into Word / Google Docs: formatting kept |        |       |
+| Any / Firefox      | Word (v3) page: copy a list item, paste after it: the list goes on   |        |       |
+| Any / Chrome       | Word (v3) page: paste from Word: heading style, numbered lists       |        |       |
 
 ## Keyboard (macOS)
 

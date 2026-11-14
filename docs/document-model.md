@@ -200,9 +200,10 @@ Word's nine levels, gets its own instance with an explicit start, so it restarts
 further blocks of a list item are indented to its text; a horizontal rule becomes an empty
 paragraph with a bottom border; `align` becomes `justification` (`end` → `right`, `justify` →
 `both`); `textColor` becomes `color`, and `highlight` becomes `shading` (Word's highlight has
-only 16 colors; a fill keeps any color); `settings` becomes the section in twips (rounded to
+only 16 colors; a fill keeps any color); linked text takes Word's `Hyperlink` character style
+(blue, underlined: the look v2 gave links); `settings` becomes the section in twips (rounded to
 the twip, under 0.02 mm, and kept within Word's 22-inch page). The defaults take the default
-stylesheet's 11 pt Georgia; the styles (`Normal`, headings, `ListParagraph`) and numbering
+stylesheet's 11 pt Georgia; the styles (`Normal`, headings, `ListParagraph`, `Hyperlink`) and numbering
 definitions (bullets • ◦ ▪, numbers decimal at every level, as v2 showed them) are added, fresh
 for each document.
 

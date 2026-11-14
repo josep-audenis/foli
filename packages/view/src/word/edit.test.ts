@@ -1,15 +1,25 @@
 // @vitest-environment jsdom
 import {
   createEditor,
+  type DocJSON,
   type FoliDocumentV3,
   type MarkJSON,
+  type Node as ModelNode,
   type NodeJSON,
+  parseContent,
+  parseDocumentV3,
   type StyleJSON,
   type WordContext,
   wordContext,
 } from "@folijs/core";
 import { afterEach, describe, expect, it } from "vitest";
-import { serializeRange } from "../clipboard.js";
+import googleDocs from "../../fixtures/clipboard/google-docs.html?raw";
+import googleDocsLists from "../../fixtures/clipboard/google-docs-lists.html?raw";
+import libreOffice from "../../fixtures/clipboard/libreoffice.html?raw";
+import webPage from "../../fixtures/clipboard/web-page.html?raw";
+import wordHTML from "../../fixtures/clipboard/word.html?raw";
+import wordLists from "../../fixtures/clipboard/word-lists.html?raw";
+import { FOLI_MIME, htmlToDoc, serializeRange } from "../clipboard.js";
 import { EditorView } from "../index.js";
 import { WordRenderer } from "./edit.js";
 
@@ -61,9 +71,13 @@ afterEach(() => {
 });
 
 function mount(...content: NodeJSON[]) {
+  return mountDocument(documentOf(...content));
+}
+
+function mountDocument(doc: FoliDocumentV3) {
   const host = document.createElement("div");
   document.body.append(host);
-  const editor = createEditor({ document: documentOf(...content) });
+  const editor = createEditor({ document: doc });
   const view = new EditorView(host, editor);
   views.push(view);
   return { host, editor, view };
@@ -133,6 +147,42 @@ describe("EditorView on a schema v3 document", () => {
     expect(second.childNodes[point.offset]?.nodeName).toBe("BR");
     // A click on the number maps to the paragraph's start.
     expect(view.posFromDOM(second.firstChild as Node, 0)).toBe(start);
+  });
+
+  it("moves the caret over a list number in one press (browsers stop before and after it)", () => {
+    const { host, editor, view } = mount(p({}, text("ab")), p(numbered, text("c")), p({}));
+    view.focus();
+    const press = (key: string, shiftKey = false, ctrlKey = false) => {
+      const event = new KeyboardEvent("keydown", { key, shiftKey, ctrlKey, cancelable: true });
+      host.dispatchEvent(event);
+      return event.defaultPrevented;
+    };
+    const at = () => [editor.state.selection.anchor, editor.state.selection.head];
+    editor.select(3);
+    expect(press("ArrowRight")).toBe(true);
+    expect(at()).toEqual([5, 5]);
+    expect(press("ArrowLeft")).toBe(true);
+    expect(at()).toEqual([3, 3]);
+    // Extending keeps the anchor.
+    editor.select(2, 3);
+    expect(press("ArrowRight", true)).toBe(true);
+    expect(at()).toEqual([2, 5]);
+    // Left to the browser: inside text, into a paragraph without a number, word moves.
+    editor.select(2);
+    expect(press("ArrowRight")).toBe(false);
+    editor.select(6);
+    expect(press("ArrowRight")).toBe(false);
+    editor.select(3);
+    expect(press("ArrowRight", false, true)).toBe(false);
+    editor.select(2, 3);
+    expect(press("ArrowRight")).toBe(false);
+    // Next to an opaque block (no text to put the caret in), Left selects the block, as before.
+    const opaque = mount(table, p(numbered, text("c")));
+    opaque.view.focus();
+    opaque.editor.select(2);
+    opaque.host.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowLeft", cancelable: true }));
+    const { from, to } = opaque.editor.state.selection;
+    expect([from, to]).toEqual([0, 1]);
   });
 
   it("renumbers the paragraphs after an inserted item", () => {
@@ -273,7 +323,7 @@ describe("EditorView on a schema v3 document", () => {
     const data = (types: Record<string, string>) => ({ getData: (t: string) => types[t] ?? "" });
     view.paste(data({ "text/plain": "x\ny" }), false);
     expect(editor.getDocument().content.content).toEqual([p({}, text("ax")), p({}, text("yb"))]);
-    // HTML schema v3 cannot hold (a heading) falls back to its plain text.
+    // A pasted heading's text joins the paragraph it is pasted into, which keeps its style.
     view.paste(data({ "text/html": "<h1>H</h1>", "text/plain": "H" }));
     expect(editor.getDocument().content.content).toEqual([p({}, text("ax")), p({}, text("yHb"))]);
   });
@@ -304,9 +354,16 @@ describe("EditorView on a schema v3 document", () => {
       ),
     );
     const { doc } = editor.state;
-    const { html } = serializeRange(doc, 0, doc.content.size, document);
-    expect(html).not.toMatch(/<strong|<u>|javascript/);
-    expect(html).toContain('<a href="https://example.com/"><em>z</em></a>');
+    const context = wordContext(editor.state) as WordContext;
+    const { html } = serializeRange(doc, 0, doc.content.size, document, {
+      context,
+      ratio: () => 1.2,
+    });
+    expect(html).not.toMatch(/font-weight: 700|underline|javascript/);
+    const link = new DOMParser().parseFromString(html, "text/html").querySelector("a");
+    expect(link?.getAttribute("href")).toBe("https://example.com/");
+    expect(link?.textContent).toBe("z");
+    expect(link?.querySelector("span")?.style.fontStyle).toBe("italic");
   });
 
   it("writes Word's space above each block: before, then after + before, contextual dropped", () => {
@@ -476,5 +533,244 @@ describe("Tab on a v3 document", () => {
     const { host, editor } = mount(false);
     expect(key(host, "Tab")).toBe(false);
     expect(editor.state.doc.firstChild?.childCount).toBe(1);
+  });
+});
+
+describe("the clipboard on a schema v3 document", () => {
+  const word = (editor: ReturnType<typeof mount>["editor"]) => ({
+    context: wordContext(editor.state) as WordContext,
+    ratio: () => 1.2,
+  });
+  const copy = (editor: ReturnType<typeof mount>["editor"], from: number, to: number) =>
+    serializeRange(editor.state.doc, from, to, document, word(editor));
+  const data = (types: Record<string, string>) => ({ getData: (t: string) => types[t] ?? "" });
+  const commented = (id: number, value: string): NodeJSON[] => [
+    { type: "commentStart", attrs: { id } },
+    text(value),
+    { type: "commentEnd", attrs: { id } },
+  ];
+
+  it("copies HTML as Word's: headings, list numbers Word reads, margins, no editor-only marks", () => {
+    const { editor } = mount(
+      p({ style: "Heading1", spacing: { before: 240 } }, text("Title")),
+      p(numbered, ...commented(0, "a"), field, { type: "pageBreak" }),
+      table,
+    );
+    const { doc } = editor.state;
+    const html = copy(editor, 0, doc.content.size).html;
+    const parsed = new DOMParser().parseFromString(html, "text/html").body;
+    const [heading, item, opaque] = [...parsed.children] as HTMLElement[];
+    expect(heading?.tagName).toBe("H1");
+    expect(heading?.style.marginTop).toBe("16px");
+    expect(item?.getAttribute("style")).toMatch(/;mso-list:l1 level1 lfo1$/);
+    const marker = item?.firstElementChild as HTMLElement;
+    expect(marker.getAttribute("style")).toMatch(/;mso-list:Ignore$/);
+    expect(marker.textContent).toBe("1.\t");
+    expect(opaque?.textContent).toBe("cell");
+    expect(html).not.toMatch(/contenteditable|data-foli|data-fragment|rgba\(255, 213, 79/);
+    expect(html).toContain("data-page-break");
+    // Text from inside one numbered paragraph is not a list item.
+    const inline = copy(editor, 9, 10).html;
+    expect(inline).not.toMatch(/mso-list/);
+    expect(inline).toContain(">a</span>");
+  });
+
+  it("pastes into another document: its styles, list and comment come along", () => {
+    const quote: StyleJSON = { id: "Quote", type: "paragraph", name: "Quote", basedOn: "Normal" };
+    const source = mountDocument({
+      ...documentOf(p({ style: "Quote" }, ...commented(4, "q")), p(numbered, text("i"))),
+      styles: [...STYLES, quote],
+      comments: [{ id: 4, author: "A", content: [p({}, text("note"))] }],
+    });
+    const { doc } = source.editor.state;
+    const copied = copy(source.editor, 0, doc.content.size);
+    const target = mountDocument({
+      ...documentOf(p({}, ...commented(4, "t")), p({})),
+      numbering: { abstracts: [], instances: [] },
+      comments: [{ id: 4, author: "B", content: [p({})] }],
+    });
+    target.editor.select(target.editor.state.doc.content.size - 1);
+    expect(target.view.paste(data({ [FOLI_MIME]: copied.json, "text/html": copied.html }))).toBe(
+      true,
+    );
+    const pasted = target.editor.getDocument();
+    expect(pasted.content.content?.slice(1)).toEqual([
+      p({ style: "Quote" }, ...commented(5, "q")),
+      p({ numbering: { id: 1, level: 0 } }, text("i")),
+    ]);
+    expect(pasted.styles.map((s) => s.id)).toContain("Quote");
+    expect(pasted.numbering).toEqual(documentOf().numbering);
+    expect(pasted.comments.map((c) => [c.id, c.author])).toEqual([
+      [4, "B"],
+      [5, "A"],
+    ]);
+    // Undo takes the content out; what it added to the document stays, as in Word.
+    target.editor.commands.undo();
+    expect(target.editor.getDocument().content.content).toHaveLength(2);
+    expect(target.editor.getDocument().styles.map((s) => s.id)).toContain("Quote");
+  });
+
+  it("pastes inside the document: the list goes on, a comment is copied", () => {
+    const { editor, view } = mountDocument({
+      ...documentOf(p(numbered, ...commented(0, "a")), p({})),
+      comments: [{ id: 0, author: "A", content: [p({}, text("note"))] }],
+    });
+    const { json } = copy(editor, 0, editor.state.doc.firstChild?.nodeSize ?? 0);
+    editor.select(editor.state.doc.content.size - 1);
+    view.paste(data({ [FOLI_MIME]: json }));
+    const pasted = editor.getDocument();
+    expect(pasted.content.content?.map((b) => b.attrs?.numbering)).toEqual([
+      { id: 1, level: 0 },
+      { id: 1, level: 0 },
+    ]);
+    expect(pasted.numbering).toEqual(documentOf().numbering);
+    expect(pasted.content.content?.[1]?.content?.[0]?.attrs?.id).toBe(1);
+    expect(pasted.comments.map((c) => c.id)).toEqual([0, 1]);
+  });
+
+  it("reads its own HTML back: a heading in its style, numbered paragraphs", () => {
+    const source = mount(p({ style: "Heading1" }, text("T")), p(numbered, text("a")));
+    const { html } = copy(source.editor, 0, source.editor.state.doc.content.size);
+    const { editor, view } = mount(p({}));
+    view.paste(data({ "text/html": html }));
+    const pasted = editor.getDocument();
+    const [heading, item] = pasted.content.content ?? [];
+    expect(heading?.attrs?.style).toBe("Heading1");
+    expect(item?.attrs?.style).toBe("ListParagraph");
+    const { numbering } = (item?.attrs ?? {}) as { numbering: { id: number; level: number } };
+    expect(numbering.level).toBe(0);
+    const instance = pasted.numbering.instances.find((n) => n.id === numbering.id);
+    expect(
+      pasted.numbering.abstracts.find((a) => a.id === instance?.abstract)?.levels[0]?.format,
+    ).toBe("decimal");
+    // The heading's bold (in the HTML on its text) is its style's, not the text's own.
+    expect(heading?.content).toEqual([text("T")]);
+  });
+
+  it("keeps pasted formatting the paragraph's style does not give", () => {
+    const { editor, view } = mount(p({}));
+    view.paste(data({ "text/html": "<h1><b>b</b><i>i</i><u>u</u></h1><p><b>p</b></p>" }));
+    const [heading, paragraph] = editor.getDocument().content.content ?? [];
+    expect(heading?.content).toEqual([
+      text("b"),
+      text("i", [{ type: "italic" }]),
+      text("u", [{ type: "underline" }]),
+    ]);
+    expect(paragraph?.content).toEqual([text("p", [{ type: "bold" }])]);
+  });
+
+  it("pasted over a selection, a bookmark keeps the name of the one it replaces", () => {
+    const named = (id: number, value: string): NodeJSON[] => [
+      { type: "bookmarkStart", attrs: { id, name: "Section1" } },
+      text(value),
+      { type: "bookmarkEnd", attrs: { id } },
+    ];
+    const { editor, view } = mount(p({}, ...named(1, "old")));
+    editor.select(1, 6);
+    const json = JSON.stringify({
+      open: true,
+      content: { type: "doc", content: [p({}, ...named(7, "new"))] },
+    });
+    view.paste(data({ [FOLI_MIME]: json }));
+    expect(editor.getDocument().content.content).toEqual([p({}, ...named(2, "new"))]);
+  });
+
+  it("pastes invalid definitions as the HTML instead", () => {
+    const { editor, view } = mount(p({}));
+    const json = JSON.stringify({
+      open: false,
+      content: { type: "doc", content: [p({}, text("json"))] },
+      word: { styles: [{ id: "A", type: "paragraph", basedOn: "A" }] },
+    });
+    view.paste(data({ [FOLI_MIME]: json, "text/html": "<p>html</p>" }));
+    expect(editor.getDocument().content.content).toEqual([p({}, text("html"))]);
+  });
+
+  it("T3: every fixture and a v3 copy paste at every text position, keeping the document valid", {
+    timeout: 120_000,
+  }, () => {
+    const count = (doc: ModelNode, test: (node: ModelNode) => boolean) => {
+      let n = 0;
+      doc.descendants((node) => {
+        if (test(node)) n++;
+      });
+      return n;
+    };
+    const isPageBreak = (node: ModelNode) => node.type.name === "pageBreak";
+    const isNumbered = (node: ModelNode) => !!(node.attrs.numbering as { id?: number } | null)?.id;
+    const own = mount(...sample);
+    const sampleCopy = copy(own.editor, 0, own.editor.state.doc.content.size);
+    const pastes: {
+      types: Record<string, string>;
+      pieces: string[];
+      breaks: number;
+      items: number;
+    }[] = [wordHTML, wordLists, googleDocs, googleDocsLists, libreOffice, webPage].map((html) => {
+      const v2 = parseContent(htmlToDoc(html) as DocJSON);
+      const pieces: string[] = [];
+      v2.descendants((node) => {
+        if (node.isTextblock && node.textContent) pieces.push(node.textContent);
+        return !node.isTextblock;
+      });
+      return {
+        types: { "text/html": html },
+        pieces,
+        breaks: count(v2, isPageBreak),
+        items: count(v2, (node) => node.type.name === "listItem"),
+      };
+    });
+    pastes.push({
+      types: { [FOLI_MIME]: sampleCopy.json },
+      pieces: ["Title", "ab", "xy"],
+      breaks: 0,
+      items: 2,
+    });
+    const targets = [
+      [p({ style: "Heading1" }, text("ab")), p(numbered, text("cd"))],
+      [p({}), table, p({}, ...commented(0, "gh"), bookmark)],
+    ];
+    let total = 0;
+    for (const { types, pieces, breaks, items } of pastes) {
+      for (const target of targets) {
+        const { editor, view } = mountDocument({
+          ...documentOf(...target),
+          comments: [{ id: 0, author: "A", content: [p({}, text("note"))] }],
+        });
+        const positions: number[] = [];
+        editor.state.doc.descendants((node, pos) => {
+          if (node.isTextblock)
+            for (let i = 0; i <= node.content.size; i++) positions.push(pos + 1 + i);
+          return !node.isTextblock;
+        });
+        for (const at of positions) {
+          const before = editor.state.doc;
+          editor.select(at);
+          expect(view.paste(data(types))).toBe(true);
+          // The whole document, envelope included, is still one schema v3 accepts.
+          const whole = parseDocumentV3(editor.getDocument());
+          // Every comment anchor has its comment; bookmark names stay unique.
+          const comments = new Set(whole.comments.map((c) => c.id));
+          const names: string[] = [];
+          editor.state.doc.descendants((node) => {
+            if (node.type.name.startsWith("comment"))
+              expect(comments.has(node.attrs.id as number)).toBe(true);
+            if (node.type.name === "bookmarkStart") names.push(String(node.attrs.name));
+          });
+          expect(new Set(names).size).toBe(names.length);
+          const { doc } = editor.state;
+          for (const piece of pieces) expect(doc.textContent).toContain(piece);
+          expect(count(doc, isPageBreak)).toBeGreaterThanOrEqual(
+            count(before, isPageBreak) + breaks,
+          );
+          expect(count(doc, isNumbered)).toBeGreaterThanOrEqual(
+            count(before, isNumbered) + items - 1,
+          );
+          editor.commands.undo();
+          expect(editor.state.doc.eq(before)).toBe(true);
+          total++;
+        }
+      }
+    }
+    expect(total).toBeGreaterThan(50);
   });
 });

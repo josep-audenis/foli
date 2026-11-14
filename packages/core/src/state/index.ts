@@ -83,7 +83,13 @@ export {
   type PluginSpec,
   Transaction,
 } from "./state.js";
-export { type WordContext, wordContext } from "./word.js";
+export { type WordContext, type WordEnvelope, withEnvelope, wordContext } from "./word.js";
+export {
+  copiedDefinitions,
+  fitPaste,
+  fitPastedV2,
+  type WordDefinitions,
+} from "./wordclip.js";
 export {
   canOutdent,
   changeIndent,

@@ -551,7 +551,11 @@ describe("v2 → v3 migration", () => {
           {
             type: "text",
             text: "a",
-            marks: [{ type: "link", attrs: { href: "https://example.com" } }, { type: "bold" }],
+            marks: [
+              { type: "link", attrs: { href: "https://example.com" } },
+              { type: "characterStyle", attrs: { id: "Hyperlink" } },
+              { type: "bold" },
+            ],
           },
           {
             type: "text",
@@ -609,6 +613,7 @@ describe("v2 → v3 migration", () => {
       "Heading6",
       "ListParagraph",
       "DefaultParagraphFont",
+      "Hyperlink",
     ]);
     // v2 showed nested numbers as decimal at every level.
     expect(
@@ -796,7 +801,11 @@ describe("v2 → v3 migration", () => {
     const V3_NAMES: Record<string, string> = { textColor: "color", highlight: "shading" };
     const inlines = (node: NodeJSON, out: string[]) => {
       for (const child of node.content ?? []) {
-        const types = (child.marks ?? []).map((m) => V3_NAMES[m.type] ?? m.type).sort();
+        // A link's Hyperlink style is its look, not a mark of its own.
+        const types = (child.marks ?? [])
+          .filter((m) => m.type !== "characterStyle")
+          .map((m) => V3_NAMES[m.type] ?? m.type)
+          .sort();
         out.push(child.type === "text" ? `${child.text}|${types}` : `${child.type}|${types}`);
       }
     };

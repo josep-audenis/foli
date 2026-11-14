@@ -22,6 +22,12 @@ export type WordEnvelope = Omit<FoliDocumentV3, "content">;
 export interface WordContext {
   readonly envelope: WordEnvelope;
   readonly resolver: Resolver;
+  /**
+   * Made when the document is loaded and kept while it is edited: a copy carries it, so a paste
+   * tells this document's lists from another's (Word's `w:nsid`; Foli makes equal definitions
+   * in every document).
+   */
+  readonly id: string;
 }
 
 const key = new PluginKey<WordContext>("word");
@@ -31,14 +37,16 @@ const key = new PluginKey<WordContext>("word");
  * `withEnvelope` (a new list's numbering definition); undo leaves such additions, as Word does.
  */
 export function wordPlugin(envelope: WordEnvelope): Plugin<WordContext> {
-  const context: WordContext = { envelope, resolver: new Resolver(envelope) };
+  // Not a secret: only tells documents apart.
+  const id = `${Date.now().toString(36)}${Math.random().toString(36).slice(2)}`;
+  const context: WordContext = { envelope, resolver: new Resolver(envelope), id };
   return new Plugin({
     key,
     state: {
       init: () => context,
       apply: (tr, value) => {
         const next = tr.getMeta(key) as WordEnvelope | undefined;
-        return next ? { envelope: next, resolver: new Resolver(next) } : value;
+        return next ? { envelope: next, resolver: new Resolver(next), id: value.id } : value;
       },
     },
   });

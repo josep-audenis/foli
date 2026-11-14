@@ -8,13 +8,14 @@
  * keeps opaque is shown from its XML and cannot be edited: an opaque block is a block leaf, an
  * opaque inline node a leaf element.
  */
-import type {
-  ListMarker,
-  Mark,
-  MarkJSON,
-  Node as ModelNode,
-  RunFormat,
-  WordContext,
+import {
+  isSafeHref,
+  type ListMarker,
+  type Mark,
+  type MarkJSON,
+  type Node as ModelNode,
+  type RunFormat,
+  type WordContext,
 } from "@folijs/core";
 import type { BlockDesc, LeafDesc } from "../render.js";
 import {
@@ -60,14 +61,22 @@ export class WordRenderer {
   readonly #context: WordContext;
   readonly #doc: Document;
   readonly #ratio: (family: string) => number;
+  /** For the clipboard (`clipboardBlocks`): links as links, list numbers as Word's HTML has them. */
+  readonly #clipboard: boolean;
   #markers: (ListMarker | null)[] = [];
   /** Comment ranges open at the start of each block. */
   #comments: number[][] = [];
 
-  constructor(context: WordContext, doc: Document, ratio: (family: string) => number) {
+  constructor(
+    context: WordContext,
+    doc: Document,
+    ratio: (family: string) => number,
+    clipboard = false,
+  ) {
     this.#context = context;
     this.#doc = doc;
     this.#ratio = ratio;
+    this.#clipboard = clipboard;
   }
 
   get context(): WordContext {
@@ -90,6 +99,11 @@ export class WordRenderer {
     });
     this.#markers = this.#context.resolver.markers(attrs);
     this.#comments = comments;
+  }
+
+  /** Whether the top-level block at `index` shows a list number. */
+  hasMarker(index: number): boolean {
+    return !!this.#markers[index];
   }
 
   /** What a block's rendering depends on at `index`, besides its node. */
@@ -122,8 +136,10 @@ export class WordRenderer {
     const marker = this.#markers[index];
     if (marker) {
       const element = markerElement(marker, paragraph, doc, this.#ratio);
-      // Shown, not document text: no caret inside, not read back.
-      element.setAttribute("contenteditable", "false");
+      // Shown, not document text: no caret inside, not read back. Other apps take it as Word's
+      // number for its list paragraph (set below).
+      if (this.#clipboard) element.setAttribute("style", `${styleOf(element)}mso-list:Ignore`);
+      else element.setAttribute("contenteditable", "false");
       dom.append(element);
     }
     const fragmentAt = (at: number) => {
@@ -215,6 +231,17 @@ export class WordRenderer {
       style: paragraph.style,
       contextual: paragraph.contextualSpacing,
     };
+    if (this.#clipboard) {
+      // The flow places the spacing in the editor; elsewhere it is the paragraph's margins.
+      dom.style.marginTop = `${word.before}px`;
+      dom.style.marginBottom = `${word.after}px`;
+      // Written as text: the CSS object model drops properties it does not know.
+      const numbering = marker && paragraph.numbering;
+      if (numbering) {
+        const list = `l${numbering.id} level${numbering.level + 1} lfo${numbering.id}`;
+        dom.setAttribute("style", `${styleOf(dom)}mso-list:${list}`);
+      }
+    }
     return { node, dom, fragments, splits, leaves, word, key: this.key(index) };
   }
 
@@ -233,17 +260,25 @@ export class WordRenderer {
 
   /** Tracked changes and comment shading around a rendered run. */
   #wrap(element: HTMLElement, marks: readonly Mark[], commented: boolean): HTMLElement {
-    if (commented && !element.style.backgroundColor)
+    if (commented && !this.#clipboard && !element.style.backgroundColor)
       element.style.backgroundColor = "rgba(255, 213, 79, 0.35)";
+    let outer = element;
     const change = marks.find((m) => m.type.name === "insertion" || m.type.name === "deletion");
-    if (!change) return element;
-    const inserted = change.type.name === "insertion";
-    const wrapper = this.#doc.createElement(inserted ? "ins" : "del");
-    if (change.attrs.author) wrapper.title = String(change.attrs.author);
-    wrapper.style.color = "#B5082E";
-    wrapper.style.textDecorationLine = inserted ? "underline" : "line-through";
-    wrapper.append(element);
-    return wrapper;
+    if (change) {
+      const inserted = change.type.name === "insertion";
+      outer = this.#doc.createElement(inserted ? "ins" : "del");
+      if (change.attrs.author) outer.title = String(change.attrs.author);
+      outer.style.color = "#B5082E";
+      outer.style.textDecorationLine = inserted ? "underline" : "line-through";
+      outer.append(element);
+    }
+    // Schema v3 keeps any target (`file:`…): only a safe one is a link on the clipboard.
+    const href = this.#clipboard && marks.find((m) => m.type.name === "link")?.attrs.href;
+    if (typeof href !== "string" || !isSafeHref(href)) return outer;
+    const a = this.#doc.createElement("a");
+    a.setAttribute("href", href);
+    a.append(outer);
+    return a;
   }
 
   /** An opaque block, shown from its XML: a block leaf, not editable inside. */
@@ -269,6 +304,40 @@ export class WordRenderer {
       },
     };
   }
+}
+
+/** An element's style attribute, ready for one more declaration. */
+function styleOf(element: Element): string {
+  const style = element.getAttribute("style")?.trim() ?? "";
+  return style && !style.endsWith(";") ? `${style};` : style;
+}
+
+/**
+ * The HTML of copied v3 blocks `nodes`: drawn as the editor draws them, with their list numbers
+ * in `doc` (from top-level block `first`; -1 for text from inside one paragraph, which takes no
+ * number), without what only the editor needs (comment shading, `contenteditable`).
+ */
+export function clipboardBlocks(
+  context: WordContext,
+  doc: ModelNode,
+  nodes: readonly ModelNode[],
+  first: number,
+  ownerDocument: Document,
+  ratio: (family: string) => number,
+): HTMLElement[] {
+  const renderer = new WordRenderer(context, ownerDocument, ratio, true);
+  renderer.prepare(doc);
+  return nodes.map((node, i) => {
+    const { dom } = renderer.render(node, first < 0 ? -1 : first + i);
+    for (const element of [dom, ...dom.querySelectorAll("*")])
+      for (const name of element.getAttributeNames())
+        if (
+          name === "contenteditable" ||
+          (name.startsWith("data-") && name !== WORD_PAGE_BREAK_ATTR)
+        )
+          element.removeAttribute(name);
+    return dom;
+  });
 }
 
 /**

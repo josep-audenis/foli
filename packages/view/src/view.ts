@@ -11,6 +11,8 @@ import {
   type Editor,
   type EditorDocument,
   type EditorState,
+  fitPaste,
+  fitPastedV2,
   insertHardBreak,
   insertLink,
   insertText,
@@ -18,7 +20,6 @@ import {
   marksAt,
   NodeSelection,
   parseContent,
-  parseContentV3,
   redo,
   Selection,
   Slice,
@@ -30,6 +31,7 @@ import {
   toggleMark,
   typedMarks,
   undo,
+  withEnvelope,
   wordContext,
 } from "@folijs/core";
 import { docFromClipboard, FOLI_MIME, serializeRange } from "./clipboard.js";
@@ -1164,7 +1166,7 @@ export class EditorView {
   private onKeyDown = (event: KeyboardEvent): void => {
     if (event.isComposing || this.composing) return;
     this.syncSelection();
-    if (this.crossFragmentEdge(event)) {
+    if (this.crossFragmentEdge(event) || this.crossListNumber(event)) {
       event.preventDefault();
       return;
     }
@@ -1266,6 +1268,30 @@ export class EditorView {
         word ? "word" : "character",
       );
     this.syncSelection();
+    return true;
+  }
+
+  /**
+   * A v3 list number is not text, but browsers stop the caret before it as well as after: Right
+   * at the end of the paragraph before, or Left at a numbered paragraph's start, would seem to do
+   * nothing. Moves over the paragraph boundary in one step (word moves are left to the browser).
+   */
+  private crossListNumber(event: KeyboardEvent): boolean {
+    const forward = event.key === "ArrowRight";
+    if (!this.word || (!forward && event.key !== "ArrowLeft")) return false;
+    if (event.metaKey || event.ctrlKey || event.altKey) return false;
+    const { selection, doc } = this.state;
+    if (!(selection instanceof TextSelection) || (!event.shiftKey && !selection.empty))
+      return false;
+    const { $head } = selection;
+    if ($head.depth !== 1 || $head.parentOffset !== (forward ? $head.parent.content.size : 0))
+      return false;
+    const numbered = $head.index(0) + (forward ? 1 : 0);
+    const other = doc.maybeChild($head.index(0) + (forward ? 1 : -1));
+    if (!other?.isTextblock || !this.word.hasMarker(numbered)) return false;
+    const head = forward ? $head.after() + 1 : $head.before() - 1;
+    const anchor = event.shiftKey ? selection.anchor : head;
+    this.dispatch(this.state.tr.setSelection(TextSelection.create(doc, anchor, head)));
     return true;
   }
 
@@ -1468,11 +1494,13 @@ export class EditorView {
     const { selection, doc } = this.state;
     if (selection.empty || !event.clipboardData) return;
     event.preventDefault();
+    const context = wordContext(this.state);
     const { text, html, json } = serializeRange(
       doc,
       selection.from,
       selection.to,
       this.host.ownerDocument,
+      context ? { context, ratio: this.lineRatio } : undefined,
     );
     event.clipboardData.setData("text/plain", text);
     event.clipboardData.setData("text/html", html);
@@ -1530,12 +1558,21 @@ export class EditorView {
     const marks = typedMarks(state.storedMarks ?? marksAt(state.selection.$from)).map((m) =>
       m.toJSON(),
     );
-    const v3 = wordContext(state) !== null;
-    const pasted = docFromClipboard(data, marks, v3 ? parseContentV3 : parseContent);
+    // A v3 document takes the styles, lists and comments the content needs (HTML as v2 content).
+    const pasted = docFromClipboard(
+      data,
+      marks,
+      wordContext(state)
+        ? (found) =>
+            found.html
+              ? fitPastedV2(state, parseContent(found.content))
+              : fitPaste(state, found.content, found.word)
+        : undefined,
+    );
     // One empty textblock: nothing to paste (a lone rule is something).
     const only = pasted?.doc.childCount === 1 ? pasted.doc.firstChild : null;
     if (!pasted || (only?.isTextblock && !only.content.size)) return false;
-    const { doc, open } = pasted;
+    const { doc, open, envelope } = pasted;
     // As a slice (text joins the text around the caret); where the schema refuses that (a
     // list in a paragraph), as whole blocks fitted at the caret.
     const asSlice = (tr: Transaction) => {
@@ -1562,6 +1599,7 @@ export class EditorView {
       try {
         tr.deleteSelection();
         strategy(tr);
+        if (envelope && envelope !== wordContext(state)?.envelope) withEnvelope(tr, envelope);
       } catch (error) {
         if (error instanceof TransformError) continue;
         throw error;
