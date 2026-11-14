@@ -32,12 +32,15 @@ writeFileSync(appEntry, `export { FoliEditor } from "${dist("react")}";\n`);
  * in 8.4 (24.0 kB): the import, and core with it (schema v3, its validation), which an app
  * with the editor already loads.
  * Docx raised again in 8.5 (32.7 kB): lossless export (writers, part rebuilding, merges).
+ * Core, view and React raised in 8.7a (30.2, 40.8 and 52.3 kB): the editor and view take a
+ * schema v3 document beside v2 (its validation and migration, formatting resolution, Word's
+ * blocks); v2 goes in 8.7d, and the budgets are set again then.
  */
 const BUNDLES = [
-  { name: "@folijs/core", entry: dist("core"), budget: 30_300 },
-  { name: "@folijs/view", entry: dist("view"), budget: 37_100 },
-  { name: "@folijs/react", entry: dist("react"), budget: 44_400 },
-  { name: "FoliEditor only", entry: appEntry, budget: 44_400 },
+  { name: "@folijs/core", entry: dist("core"), budget: 32_000 },
+  { name: "@folijs/view", entry: dist("view"), budget: 43_500 },
+  { name: "@folijs/react", entry: dist("react"), budget: 55_800 },
+  { name: "FoliEditor only", entry: appEntry, budget: 55_800 },
   { name: "@folijs/docx", entry: dist("docx"), budget: 36_900 },
 ];
 

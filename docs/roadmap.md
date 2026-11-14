@@ -647,7 +647,7 @@ Each task is a PR on `phase-8/word-model`, the build green after each.
   exactly is listed in `packages/docx/README.md`; the comparison is
   `packages/docx/src/testing/canonical.ts`), every export opens in Word without repair
   (`scripts/corpus/rewrite-corpus.mjs`: unchanged, edited, and a new package from schema v2).
-- [ ] 8.6 Rendering from the document, in three parts (the view and editor run on v2 until 8.7, so
+- [x] 8.6 Rendering from the document, in three parts (the view and editor run on v2 until 8.7, so
   each part lands without breaking them):
   - [x] 8.6a Resolution in `@folijs/core` (#50, no DOM): a paragraph's and a run's effective
     formatting from defaults, styles and direct formatting as Word computes it (toggle
@@ -659,13 +659,27 @@ Each task is a PR on `phase-8/word-model`, the build green after each.
     shown from its XML (tables as tables, content controls and fields as their text), sections
     and Word's paragraph spacing on pages; harness: per-paragraph page and line agreement with
     Word (`pnpm corpus:pages`; baseline in corpus/README.md).
-  - [ ] 8.6c The PDF page comparison as a tracked number: every page Foli shows compared with
+  - [x] 8.6c The PDF page comparison as a tracked number (#52): every page Foli shows compared with
     Word's PDF of it by ink (pdf.js, pixel by pixel within 2 px), a score per page and
     inside the margins, overlays to look at (`FOLI_WORD_PDF=<folder> pnpm corpus:pages`;
     baseline in corpus/README.md).
-- [ ] 8.7 Editing on v3: existing commands and keys ported, list levels and numbering, style
-  picker, font family and size, paragraph spacing and indentation; HTML clipboard mapped to
-  v3; T1–T5 on v3 in three engines.
+- [ ] 8.7 Editing on v3, in four parts (each lands with the v2 editor still working; v2 goes in
+  8.7d):
+  - [ ] 8.7a The editor and view on a v3 document: `createEditor` takes a v3 document (envelope
+    kept, page from its last section), `EditorView` renders it with Word's blocks and spacing
+    and edits it; Enter, the bold/italic/underline/strike toggles, Backspace and Delete as
+    Word does them (style's next style, formatting from styles, markers kept, opaque content
+    selected first); plain-text paste; T1, T2 and T5 on v3 in three engines (the editing page,
+    `apps/playground/edit.html`).
+  - [ ] 8.7b Word formatting on v3: style picker (headings as styles), font family and size,
+    paragraph spacing, indentation, alignment, colors and highlight, links; lists as numbering
+    (bullets and numbers, levels with Tab and Shift+Tab, Enter and Backspace in lists); the
+    React toolbar on v3.
+  - [ ] 8.7c Clipboard and input on v3: HTML paste and copy mapped to v3 (T3), composition and
+    dead keys (T4).
+  - [ ] 8.7d The switch: `SCHEMA_VERSION` 3, documents of 0.1.0 and 0.2.0 migrated on load,
+    schema v2 and the `V3` names removed, React and the playground on v3, sections with their
+    own page setups in the editable view; T1–T5 on v3 in three engines.
 - [ ] 8.8 Close: docs, gate G5 numbers, 0.3.0 (changeset, version PR, publish after approval).
 
 ## Phase 9 — Review: tracked changes & comments · XL → 0.4.0

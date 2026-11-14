@@ -12,6 +12,7 @@ import {
 import { attempt } from "./attempt.js";
 import { redo, undo } from "./history.js";
 import { openLinkEditor } from "./links.js";
+import { keepLastMark, typedMarks } from "./mark.js";
 import { AllSelection, marksAt, NodeSelection, Selection, TextSelection } from "./selection.js";
 import {
   type Command,
@@ -20,6 +21,17 @@ import {
   Plugin,
   type Transaction,
 } from "./state.js";
+import {
+  isMarker,
+  isOpaque,
+  isWordToggle,
+  selectionAt,
+  splitAttrs,
+  toggledCaretMarks,
+  toggleRanges,
+  wordContext,
+  wordToggleActive,
+} from "./word.js";
 
 export type DeleteUnit = "char" | "word";
 
@@ -30,6 +42,13 @@ export type DeleteUnit = "char" | "word";
 const LEAF = "\n";
 const graphemes = new Intl.Segmenter(undefined, { granularity: "grapheme" });
 const words = new Intl.Segmenter(undefined, { granularity: "word" });
+
+/** `state` with a caret at `pos` (a command then runs as if the caret were there). */
+function at(state: EditorState, pos: number): EditorState {
+  return pos === state.selection.head
+    ? state
+    : state.apply(state.tr.setSelection(TextSelection.create(state.doc, pos)));
+}
 
 function caret(state: EditorState): ResolvedPos | null {
   const { selection } = state;
@@ -62,16 +81,28 @@ export function insertText(text: string): Command {
         (selection.empty ? marksAt($from) : ($from.nodeAfter?.marks ?? marksAt($from)));
       tr.deleteSelection();
       const $pos = tr.selection.$from;
-      const allowed = marks.filter((mark) => $pos.parent.type.allowsMarkType(mark.type));
+      const allowed = typedMarks(marks).filter((mark) =>
+        $pos.parent.type.allowsMarkType(mark.type),
+      );
       tr.insertText(text, $pos.pos, $pos.pos, allowed);
       tr.setSelection(TextSelection.create(tr.doc, $pos.pos + text.length));
     });
   };
 }
 
-/** Length (in positions) of the last grapheme or word before `$pos` in its textblock. */
-function backwardExtent($pos: ResolvedPos, unit: DeleteUnit): number {
-  const text = $pos.parent.textBetween(0, $pos.parentOffset, "", LEAF);
+/**
+ * Length (in positions) of the last grapheme or word before `$pos` in its textblock. With
+ * `textOnly` (schema v3) a word stops at the inline node before it (a tab, a break, a field, a
+ * marker): those go one per key, as Word deletes them; the node itself counts as one position.
+ */
+function backwardExtent($pos: ResolvedPos, unit: DeleteUnit, textOnly = false): number {
+  let from = 0;
+  if (textOnly && unit === "word")
+    $pos.parent.forEach((child, offset) => {
+      if (!child.isText && offset < $pos.parentOffset) from = offset + child.nodeSize;
+    });
+  if (from === $pos.parentOffset && from > 0) return 1;
+  const text = $pos.parent.textBetween(from, $pos.parentOffset, "", LEAF);
   if (unit === "char") return [...graphemes.segment(text)].pop()?.segment.length ?? 0;
   const segments = [...words.segment(text)];
   let length = 0;
@@ -80,9 +111,15 @@ function backwardExtent($pos: ResolvedPos, unit: DeleteUnit): number {
   return length + (segments.pop()?.segment.length ?? 0);
 }
 
-/** Length of the first grapheme or word after `$pos` in its textblock. */
-function forwardExtent($pos: ResolvedPos, unit: DeleteUnit): number {
-  const text = $pos.parent.textBetween($pos.parentOffset, $pos.parent.content.size, "", LEAF);
+/** Length of the first grapheme or word after `$pos` in its textblock (`textOnly`: as backward). */
+function forwardExtent($pos: ResolvedPos, unit: DeleteUnit, textOnly = false): number {
+  let to = $pos.parent.content.size;
+  if (textOnly && unit === "word")
+    $pos.parent.forEach((child, offset) => {
+      if (!child.isText && offset >= $pos.parentOffset && offset < to) to = offset;
+    });
+  if (to === $pos.parentOffset && to < $pos.parent.content.size) return 1;
+  const text = $pos.parent.textBetween($pos.parentOffset, to, "", LEAF);
   const segments = [...(unit === "char" ? graphemes : words).segment(text)];
   if (unit === "char") return segments[0]?.segment.length ?? 0;
   let length = 0;
@@ -95,10 +132,20 @@ function forwardExtent($pos: ResolvedPos, unit: DeleteUnit): number {
 export function deleteBackward(unit: DeleteUnit = "char"): Command {
   return (state, dispatch) => {
     if (!state.selection.empty) return deleteSelection(state, dispatch);
-    const $pos = caret(state);
-    if (!$pos) return false;
-    if ($pos.parentOffset === 0) return joinBackward(state, dispatch);
-    const size = backwardExtent($pos, unit);
+    const found = caret(state);
+    if (!found) return false;
+    // Invisible markers (a bookmark, a comment's range) stay: the character before them goes.
+    const word = wordContext(state);
+    let $pos = found;
+    while ($pos.parentOffset > 0 && isMarker(word, $pos.nodeBefore))
+      $pos = state.doc.resolve($pos.pos - 1);
+    if ($pos.parentOffset === 0) return joinBackward(at(state, $pos.pos), dispatch);
+    if (isOpaque(word, $pos.nodeBefore)) {
+      const node = $pos.nodeBefore as Node;
+      dispatch?.(state.tr.setSelection(selectionAt(state, $pos.pos - node.nodeSize)));
+      return true;
+    }
+    const size = backwardExtent($pos, unit, word !== null);
     return attempt(state, dispatch, (tr) => tr.delete($pos.pos - size, $pos.pos));
   };
 }
@@ -107,10 +154,19 @@ export function deleteBackward(unit: DeleteUnit = "char"): Command {
 export function deleteForward(unit: DeleteUnit = "char"): Command {
   return (state, dispatch) => {
     if (!state.selection.empty) return deleteSelection(state, dispatch);
-    const $pos = caret(state);
-    if (!$pos) return false;
-    if ($pos.parentOffset === $pos.parent.content.size) return joinForward(state, dispatch);
-    const size = forwardExtent($pos, unit);
+    const found = caret(state);
+    if (!found) return false;
+    const word = wordContext(state);
+    let $pos = found;
+    while ($pos.parentOffset < $pos.parent.content.size && isMarker(word, $pos.nodeAfter))
+      $pos = state.doc.resolve($pos.pos + 1);
+    if ($pos.parentOffset === $pos.parent.content.size)
+      return joinForward(at(state, $pos.pos), dispatch);
+    if (isOpaque(word, $pos.nodeAfter)) {
+      dispatch?.(state.tr.setSelection(selectionAt(state, $pos.pos)));
+      return true;
+    }
+    const size = forwardExtent($pos, unit, word !== null);
     return attempt(state, dispatch, (tr) => tr.delete($pos.pos, $pos.pos + size));
   };
 }
@@ -126,7 +182,16 @@ export const joinBackward: Command = (state, dispatch) => {
   if (index === 0) return false;
   const before = $pos.node($pos.depth - 1).child(index - 1);
   const boundary = $pos.before();
-  if (before.isTextblock) return attempt(state, dispatch, (tr) => tr.join(boundary));
+  if (before.isTextblock)
+    return attempt(state, dispatch, (tr) => {
+      tr.join(boundary);
+      // The merged paragraph ends with this one's mark (schema v3: its section break).
+      keepLastMark(tr, boundary - before.nodeSize, $pos.parent);
+    });
+  if (before.isLeaf && isOpaque(wordContext(state), before)) {
+    dispatch?.(state.tr.setSelection(selectionAt(state, boundary - before.nodeSize)));
+    return true;
+  }
   if (before.isLeaf)
     return attempt(state, dispatch, (tr) => tr.delete(boundary - before.nodeSize, boundary));
   // After a container (a list): into its last textblock, at any depth.
@@ -171,7 +236,14 @@ export const joinForward: Command = (state, dispatch) => {
   if (!after) return false;
   const boundary = $pos.after(base + 1);
   if (after.isTextblock && base === $pos.depth - 1) {
-    return attempt(state, dispatch, (tr) => tr.join(boundary));
+    return attempt(state, dispatch, (tr) => {
+      tr.join(boundary);
+      keepLastMark(tr, $pos.before(), after);
+    });
+  }
+  if (after.isLeaf && isOpaque(wordContext(state), after)) {
+    dispatch?.(state.tr.setSelection(selectionAt(state, boundary)));
+    return true;
   }
   if (after.isLeaf) {
     return attempt(state, dispatch, (tr) => tr.delete(boundary, boundary + after.nodeSize));
@@ -225,8 +297,16 @@ export const splitBlock: Command = (state, dispatch) => {
     tr.deleteSelection();
     const $pos = tr.selection.$from;
     const atEnd = $pos.parentOffset === $pos.parent.content.size;
-    const normal = defaultTextblockType(state.schema);
-    tr.split($pos.pos, 1, atEnd && $pos.parent.type !== normal ? [{ type: normal }] : undefined);
+    const word = wordContext(state);
+    if (word && $pos.parent.type.name === "paragraph") {
+      // Word: the first paragraph gets a new mark, the second keeps the original one.
+      const { before, after } = splitAttrs(word, $pos.parent, atEnd);
+      tr.split($pos.pos, 1, [{ type: $pos.parent.type, attrs: after }]);
+      if (before) tr.setNodeMarkup($pos.before(), $pos.parent.type, before);
+    } else {
+      const normal = defaultTextblockType(state.schema);
+      tr.split($pos.pos, 1, atEnd && $pos.parent.type !== normal ? [{ type: normal }] : undefined);
+    }
     tr.setSelection(TextSelection.create(tr.doc, $pos.pos + 2));
     if (marks.length) tr.setStoredMarks(marks);
   });
@@ -339,7 +419,7 @@ function insertLeaf(name: string, ...[state, dispatch]: Parameters<Command>): bo
       type.create(
         null,
         null,
-        marks.filter((m) => tr.doc.resolve(pos).parent.type.allowsMarkType(m.type)),
+        typedMarks(marks).filter((m) => tr.doc.resolve(pos).parent.type.allowsMarkType(m.type)),
       ),
     );
     tr.setSelection(TextSelection.create(tr.doc, pos + 1));
@@ -381,6 +461,11 @@ export function toggleMark(type: string | MarkType, attrs?: Attrs | null): Comma
     if ($caret) {
       if (!$caret.parent.type.allowsMarkType(mark)) return false;
       const marks = state.storedMarks ?? marksAt($caret);
+      const word = wordContext(state);
+      if (word && isWordToggle(word, mark)) {
+        dispatch?.(state.tr.setStoredMarks(toggledCaretMarks(word, $caret.parent, marks, mark)));
+        return true;
+      }
       const existing = mark.isInSet(marks);
       const created = existing ? null : createMark(mark, attrs);
       if (!existing && !created) return false;
@@ -397,6 +482,16 @@ export function toggleMark(type: string | MarkType, attrs?: Attrs | null): Comma
       return !applicable;
     });
     if (!applicable) return false;
+    const word = wordContext(state);
+    if (word && isWordToggle(word, mark)) {
+      const on = !wordToggleActive(word, state, mark, null);
+      return attempt(state, dispatch, (tr) => {
+        for (const range of toggleRanges(word, state, selection.from, selection.to, mark, on)) {
+          tr.removeMark(range.from, range.to, mark);
+          if (range.mark) tr.addMark(range.from, range.to, range.mark);
+        }
+      });
+    }
     const remove = rangeHasMark(state, selection.from, selection.to, mark);
     const created = remove ? null : createMark(mark, attrs);
     if (!remove && !created) return false;
@@ -422,6 +517,14 @@ export function isMarkActive(state: EditorState, type: string | MarkType): boole
   const mark = markType(state, type);
   if (!mark) return false;
   const $caret = caret(state);
+  const word = wordContext(state);
+  if (word && isWordToggle(word, mark))
+    return wordToggleActive(
+      word,
+      state,
+      mark,
+      $caret ? (state.storedMarks ?? marksAt($caret)) : null,
+    );
   if ($caret) return mark.isInSet(state.storedMarks ?? marksAt($caret)) !== undefined;
   return rangeHasMark(state, state.selection.from, state.selection.to, mark);
 }
