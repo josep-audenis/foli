@@ -531,6 +531,15 @@ export class Resolver {
     };
   }
 
+  /**
+   * The number format (`decimal`, `bullet`…) of the numbering level a paragraph is in (`attrs`:
+   * its attributes), or null when it is not numbered.
+   */
+  numberFormat(attrs: Json): string | null {
+    const level = this.#resolve(attrs).level;
+    return level ? (level.level.format ?? "decimal") : null;
+  }
+
   /** A run's formatting: its paragraph's (`paragraphRun`), its character style, then its own marks. */
   run(paragraphRun: RunFormat, marks: readonly MarkJSON[]): RunFormat {
     const run = cloneRun(paragraphRun);

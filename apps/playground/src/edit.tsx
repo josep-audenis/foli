@@ -1,11 +1,15 @@
 /**
  * The Word editing page (`/edit.html`, dev server only, 8.7a): a schema v3 document, imported
- * from a .docx or the sample below, edited in `EditorView` and saved back as a .docx. The
- * editing tests on schema v3 drive it (`e2e/word-editing.spec.ts`).
+ * from a .docx or the sample below, edited in `EditorView` with `FoliToolbar` (8.7b) and saved
+ * back as a .docx. The editing tests on schema v3 drive it (`e2e/word-editing.spec.ts`,
+ * `e2e/word-format.spec.ts`).
  */
 import { createEditor, type Editor, type FoliDocumentV3, parseDocumentV3 } from "@folijs/core";
 import { type DocxPackage, exportDocx, importDocx } from "@folijs/docx";
+import { FoliToolbar } from "@folijs/react";
+import "@folijs/react/styles.css";
 import { EditorView } from "@folijs/view";
+import { createRoot } from "react-dom/client";
 
 /** A short A4 document with Word's Normal and Heading 1 styles. */
 export const SAMPLE: FoliDocumentV3 = {
@@ -64,6 +68,11 @@ export const SAMPLE: FoliDocumentV3 = {
 const host = document.getElementById("editor") as HTMLElement;
 let editor: Editor<FoliDocumentV3> = createEditor({ document: SAMPLE });
 let view = new EditorView(host, editor);
+const toolbar = createRoot(document.getElementById("toolbar") as HTMLElement);
+/** The formatting toolbar for the current editor; a click puts the focus back in the document. */
+const showToolbar = () =>
+  toolbar.render(<FoliToolbar editor={editor} onClickCommand={() => view.focus()} />);
+showToolbar();
 /** The package the document came from: export writes what Foli does not edit back from it. */
 let original: DocxPackage | undefined;
 
@@ -73,6 +82,7 @@ function load(document: FoliDocumentV3, from?: DocxPackage): void {
   editor = createEditor({ document: parseDocumentV3(document) });
   view = new EditorView(host, editor);
   original = from;
+  showToolbar();
 }
 
 (document.getElementById("file") as HTMLInputElement).addEventListener("change", async (e) => {

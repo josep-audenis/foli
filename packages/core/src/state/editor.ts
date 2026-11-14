@@ -38,7 +38,7 @@ import { removeLink, setLink } from "./links.js";
 import { liftListItem, listKeymap, sinkListItem, toggleList, wrapInList } from "./lists.js";
 import { TextSelection } from "./selection.js";
 import { type Command, EditorState, type Plugin, type Transaction } from "./state.js";
-import { type WordEnvelope, wordPlugin } from "./word.js";
+import { type WordEnvelope, wordContext, wordPlugin } from "./word.js";
 
 /**
  * A document an editor can hold: schema v2, or schema v3 (Word's model, 8.7).
@@ -233,7 +233,10 @@ export function createEditor({
     isMarkActive: (type) => isMarkActive(state, type),
     getDocument: () =>
       loaded.envelope
-        ? { ...structuredClone(loaded.envelope), content: state.doc.toJSON() }
+        ? {
+            ...structuredClone(wordContext(state)?.envelope ?? loaded.envelope),
+            content: state.doc.toJSON(),
+          }
         : {
             schemaVersion: SCHEMA_VERSION,
             settings: loaded.settings,

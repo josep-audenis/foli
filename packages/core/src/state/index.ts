@@ -7,6 +7,7 @@ export {
   deleteSelection,
   insertHardBreak,
   insertPageBreak,
+  insertTab,
   insertText,
   isMarkActive,
   joinBackward,
@@ -56,6 +57,7 @@ export {
   liftListItem,
   liftListItemAtStart,
   listKeymap,
+  listKindAt,
   listTypeAt,
   sinkListItem,
   splitListItem,
@@ -82,3 +84,19 @@ export {
   Transaction,
 } from "./state.js";
 export { type WordContext, wordContext } from "./word.js";
+export {
+  canOutdent,
+  changeIndent,
+  fontFamilyAt,
+  fontSizeAt,
+  HIGHLIGHT_HEX,
+  type ListKind,
+  lineSpacingAt,
+  paragraphStyleAt,
+  paragraphStyles,
+  setFontFamily,
+  setFontSize,
+  setLineSpacing,
+  setParagraphSpacing,
+  setParagraphStyle,
+} from "./wordformat.js";

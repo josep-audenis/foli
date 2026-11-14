@@ -200,6 +200,8 @@ export class EditorView {
   private readonly observer: MutationObserver;
   private readonly unsubscribe: () => void;
   private editable = true;
+  /** Escape was the last key: Tab now leaves the editor. */
+  private tabLeaves = false;
   private placeholder = "";
   /** The block that shows the placeholder, if any. */
   private placeholderDom: HTMLElement | null = null;
@@ -1169,6 +1171,12 @@ export class EditorView {
     const name = keyName(event);
     // Ctrl/Cmd+Shift+V: the paste event that follows uses only the plain text.
     this.plainPaste = name === "Mod-Shift-v";
+    // Tab and Shift+Tab move the focus on in read-only mode, and right after Escape where Tab
+    // would type a tab (no keyboard trap).
+    const tab = name === "Tab" || name === "Shift-Tab";
+    const leave = tab && (this.tabLeaves || !this.editable);
+    if (event.key !== "Shift") this.tabLeaves = name === "Escape";
+    if (leave) return;
     // Like `editor.handleKey`, but through the view's dispatch, so read-only mode drops edits.
     // A key no command takes keeps its default (Tab outside a list moves the focus on).
     if (this.runKey(name)) {

@@ -393,3 +393,88 @@ describe("WordRenderer", () => {
     expect(renderer.render(doc.child(2), 2).dom.querySelectorAll("br")).toHaveLength(1);
   });
 });
+
+describe("list markers in Symbol and Wingdings", () => {
+  it("are shown as the Unicode character they draw", () => {
+    const host = document.createElement("div");
+    document.body.append(host);
+    const bullet = (text: string, font: string) => ({
+      level: 0,
+      format: "bullet",
+      text,
+      run: [{ type: "font", attrs: { ascii: font, hAnsi: font } }],
+    });
+    const editor = createEditor({
+      document: {
+        ...documentOf(
+          p({ numbering: { id: 1, level: 0 } }),
+          p({ numbering: { id: 2, level: 0 } }),
+          p({ numbering: { id: 3, level: 0 } }),
+          p({ numbering: { id: 4, level: 0 } }),
+          p({ numbering: { id: 5, level: 0 } }),
+        ),
+        numbering: {
+          abstracts: [
+            { id: 0, levels: [bullet("", "Symbol")] },
+            { id: 1, levels: [bullet("", "Wingdings")] },
+            { id: 2, levels: [bullet("", "Arial")] },
+            { id: 3, levels: [bullet("", "Wingdings")] },
+            { id: 4, levels: [bullet("", "Wingdings")] },
+          ],
+          instances: [
+            { id: 1, abstract: 0 },
+            { id: 2, abstract: 1 },
+            { id: 3, abstract: 2 },
+            { id: 4, abstract: 3 },
+            { id: 5, abstract: 4 },
+          ],
+        },
+      },
+    });
+    views.push(new EditorView(host, editor));
+    const markers = [...host.querySelectorAll<HTMLElement>("[data-foli-marker]")];
+    expect(markers.map((m) => m.textContent?.charAt(0))).toEqual(["•", "▪", "", "◻", "●"]);
+    expect(markers[0]?.style.fontFamily).toBe("sans-serif");
+  });
+});
+
+describe("Tab on a v3 document", () => {
+  const mount = (editable: boolean) => {
+    const host = document.createElement("div");
+    document.body.append(host);
+    // A list paragraph: Shift+Tab would take it a level up.
+    const editor = createEditor({ document: documentOf(p(numbered, text("ab"))) });
+    views.push(new EditorView(host, editor, { editable }));
+    host.focus();
+    editor.select(2);
+    return { host, editor };
+  };
+  const key = (host: HTMLElement, key: string, shiftKey = false) => {
+    const event = new KeyboardEvent("keydown", { key, shiftKey, cancelable: true });
+    host.dispatchEvent(event);
+    return event.defaultPrevented;
+  };
+
+  it("types a tab; Escape first lets Tab and Shift+Tab move the focus on", () => {
+    const { host, editor } = mount(true);
+    expect(key(host, "Tab")).toBe(true);
+    expect(editor.state.doc.firstChild?.childCount).toBe(3);
+    expect(key(host, "Escape")).toBe(false);
+    expect(key(host, "Tab")).toBe(false);
+    // Only right after Escape (Shift pressed in between does not count).
+    expect(key(host, "Tab")).toBe(true);
+    key(host, "Escape");
+    key(host, "Shift", true);
+    expect(key(host, "Tab", true)).toBe(false);
+    expect(editor.state.doc.firstChild?.attrs.numbering).toEqual({ id: 1, level: 0 });
+    key(host, "Escape");
+    key(host, "a");
+    expect(key(host, "Tab")).toBe(true);
+  });
+
+  it("read-only: Tab keeps its default (the focus moves on)", () => {
+    const { host, editor } = mount(false);
+    expect(key(host, "Tab")).toBe(false);
+    expect(editor.state.doc.firstChild?.childCount).toBe(1);
+  });
+});
