@@ -32,7 +32,7 @@ import {
   wordContext,
   wordToggleActive,
 } from "./word.js";
-import { defaultParagraphStyleOf, setParagraphStyle, styleNamed } from "./wordformat.js";
+import { defaultParagraphStyleOf, setParagraphStyle, setStyleNamed } from "./wordformat.js";
 
 export type DeleteUnit = "char" | "word";
 
@@ -543,12 +543,9 @@ export function setBlockType(type: string | NodeType, attrs: Attrs | null = null
     if (word) {
       // Schema v3: headings are paragraphs in Word's heading styles.
       const name = typeof type === "string" ? type : type.name;
-      const style =
-        name === "heading"
-          ? styleNamed(word, `heading ${String(attrs?.level ?? 1)}`)
-          : name === "paragraph"
-            ? defaultParagraphStyleOf(word)
-            : null;
+      if (name === "heading")
+        return setStyleNamed(`heading ${String(attrs?.level ?? 1)}`)(state, dispatch);
+      const style = name === "paragraph" ? defaultParagraphStyleOf(word) : null;
       return style !== null && setParagraphStyle(style)(state, dispatch);
     }
     const nodeType = typeof type === "string" ? state.schema.nodes[type] : type;

@@ -553,6 +553,8 @@ export function FoliToolbar({
   });
   const [active, setActive] = useState(0);
   const buttons = useRef<(HTMLButtonElement | HTMLSelectElement | null)[]>([]);
+  // Whether a select box was last used with the pointer (its pick then goes back to the document).
+  const pointer = useRef(false);
   // The open menu (a menu button's key), if any.
   const [menu, setMenu] = useState<string | null>(null);
   useEffect(() => {
@@ -671,8 +673,18 @@ export function FoliToolbar({
                     tabIndex={i === active ? 0 : -1}
                     value={value}
                     onFocus={() => setActive(i)}
+                    onMouseDown={() => {
+                      pointer.current = true;
+                    }}
+                    onKeyDown={() => {
+                      pointer.current = false;
+                    }}
+                    // shortcut: Up and Down on a closed box apply each value they pass (Chrome
+                    // and Firefox on Windows), one undo step each; apply on Enter if it matters.
                     onChange={(event) => {
-                      if (!off) editor.run(select.pick(event.target.value));
+                      if (off) return;
+                      editor.run(select.pick(event.target.value));
+                      if (pointer.current) onClickCommand?.();
                     }}
                   >
                     {/* Mixed (or nothing to show): a blank entry; a value not offered: itself. */}

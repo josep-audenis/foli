@@ -74,8 +74,116 @@ describe("paragraph styles", () => {
       "Title",
       "Heading1",
       "ListParagraph",
+      // Word's Heading 2 and 3, not in the document yet.
+      "Heading2",
+      "Heading3",
     ]);
     expect(paragraphStyles(editor.state)[2]?.name).toBe("heading 1");
+    expect(paragraphStyles(editor.state)[5]?.name).toBe("heading 3");
+  });
+
+  it("adds Word's built-in heading style the first time it is used", () => {
+    const editor = editorOf(p({}, text("a")));
+    editor.select(1);
+    expect(editor.run(setParagraphStyle("Heading2"))).toBe(true);
+    expect(attrsOf(editor)).toEqual([{ style: "Heading2" }]);
+    const added = editor.getDocument().styles.find((s) => s.id === "Heading2");
+    expect(added).toEqual({
+      id: "Heading2",
+      type: "paragraph",
+      name: "heading 2",
+      basedOn: "Normal",
+      next: "Normal",
+      paragraph: {
+        keepNext: true,
+        keepLines: true,
+        spacing: { before: 40, after: 0 },
+        outlineLevel: 1,
+      },
+      run: [
+        {
+          type: "font",
+          attrs: {
+            asciiTheme: "majorHAnsi",
+            eastAsiaTheme: "majorEastAsia",
+            hAnsiTheme: "majorHAnsi",
+            csTheme: "majorBidi",
+          },
+        },
+        { type: "color", attrs: { value: "2F5496", themeShade: "BF", themeColor: "accent1" } },
+        { type: "fontSize", attrs: { value: 26, complexScript: 26 } },
+      ],
+    });
+    expect(paragraphStyles(editor.state).map((s) => s.id)).not.toContain("Heading21");
+    // Once only; and the style resolves (16 pt... Word's heading 2 is 13 pt).
+    editor.run(setParagraphStyle("Heading2"));
+    expect(editor.getDocument().styles.filter((s) => s.name === "heading 2")).toHaveLength(1);
+    expect(fontSizeAt(editor.state)).toBe(13);
+    const styles = (n: number) =>
+      editor.getDocument().styles.find((s) => s.name === `heading ${n}`);
+    for (const n of [1, 3, 4, 7, 8, 9]) {
+      editor.select(1);
+      editor.run(setParagraphStyle(`Heading${n}`));
+    }
+    // Heading 1 was in the document: not redefined.
+    expect(styles(1)?.paragraph?.outlineLevel).toBeUndefined();
+    expect(styles(3)?.run).toContainEqual({
+      type: "color",
+      attrs: { value: "1F3763", themeShade: "7F", themeColor: "accent1" },
+    });
+    expect(styles(4)?.run).toContainEqual({ type: "italic", attrs: { complexScript: true } });
+    expect(styles(4)?.run?.some((m) => m.type === "fontSize")).toBe(false);
+    expect(styles(7)?.run).toContainEqual({ type: "italic", attrs: { complexScript: true } });
+    expect(styles(8)?.run).toContainEqual({
+      type: "color",
+      attrs: { value: "272727", themeColor: "text1", themeTint: "D8" },
+    });
+    expect(styles(9)?.run).toContainEqual({
+      type: "fontSize",
+      attrs: { value: 21, complexScript: 21 },
+    });
+    expect(styles(3)?.paragraph?.outlineLevel).toBe(2);
+    expect(editor.run(setParagraphStyle("Heading0"))).toBe(false);
+  });
+
+  it("a document without headings gets Word's Heading 1; a localized one is not offered twice", () => {
+    const editor = createEditor({
+      document: documentOf([p({}, text("a"))], {
+        styles: [
+          ...STYLES.filter((s) => s.id !== "Heading1"),
+          { id: "Titre2", type: "paragraph", name: "heading 2" },
+        ],
+      }),
+    });
+    expect(paragraphStyles(editor.state).map((s) => s.id)).toEqual([
+      "Normal",
+      "Title",
+      "ListParagraph",
+      "Titre2",
+      "Heading1",
+      "Heading3",
+    ]);
+    editor.select(1);
+    editor.commands.setBlockType("heading", { level: 1 });
+    expect(editor.getDocument().styles.at(-1)?.paragraph).toEqual({
+      keepNext: true,
+      keepLines: true,
+      spacing: { before: 240, after: 0 },
+      outlineLevel: 0,
+    });
+    editor.commands.setBlockType("heading", { level: 2 });
+    expect(attrsOf(editor)).toEqual([{ style: "Titre2" }]);
+  });
+
+  it("a built-in style's id taken by another style gets a free one", () => {
+    const document = documentOf([p({}, text("a"))], {
+      styles: [...STYLES, { id: "Heading2", type: "paragraph", name: "Custom" }],
+    });
+    const editor = createEditor({ document });
+    editor.select(1);
+    editor.commands.setBlockType("heading", { level: 2 });
+    expect(attrsOf(editor)).toEqual([{ style: "Heading21" }]);
+    expect(editor.getDocument().styles.at(-1)?.name).toBe("heading 2");
   });
 
   it("puts paragraphs in a style (the default one: no style named), and tells which", () => {
@@ -109,8 +217,9 @@ describe("paragraph styles", () => {
     editor.select(1);
     expect(editor.commands.setBlockType("heading", { level: 1 })).toBe(true);
     expect(attrsOf(editor)).toEqual([{ style: "Heading1" }]);
-    // No "heading 2" in this document.
-    expect(editor.commands.setBlockType("heading", { level: 2 })).toBe(false);
+    // No "heading 2" in this document: Word's is added.
+    expect(editor.commands.setBlockType("heading", { level: 2 })).toBe(true);
+    expect(attrsOf(editor)).toEqual([{ style: "Heading2" }]);
     expect(editor.commands.setBlockType("paragraph")).toBe(true);
     expect(attrsOf(editor)).toEqual([{}]);
     expect(editor.commands.setBlockType("horizontalRule")).toBe(false);
@@ -155,6 +264,11 @@ describe("font family and size", () => {
     );
     expect(fontSizeAt(editor.state)).toBe(10.5);
     editor.select(5, 6);
+    // The style's 16 pt is for Latin text only: complex scripts get it directly.
+    expect(editor.run(setFontSize(16))).toBe(true);
+    expect(blocks(editor)[1]).toEqual(
+      p({ style: "Heading1" }, text("h", [{ type: "fontSize", attrs: { complexScript: 32 } }])),
+    );
     expect(editor.run(setFontSize(16))).toBe(false);
     expect(editor.run(setFontSize(0))).toBe(false);
     expect(editor.run(setFontSize(2000))).toBe(false);
@@ -473,8 +587,18 @@ describe("links on a v3 document", () => {
     expect(blocks(editor)[0]).toEqual(p({}, text("ab")));
   });
 
-  it("look like Word's links where the document has no Hyperlink style", () => {
-    const document = documentOf([p({}, text("ab"))], { styles: STYLES.slice(0, 2) });
+  it("add Word's Hyperlink style where the document has none", () => {
+    const document = documentOf([p({}, text("ab"))], {
+      styles: [
+        ...STYLES.slice(0, 2),
+        {
+          id: "DefaultParagraphFont",
+          type: "character",
+          name: "Default Paragraph Font",
+          isDefault: true,
+        },
+      ],
+    });
     const editor = createEditor({ document });
     editor.select(3);
     editor.commands.setLink("https://example.com/");
@@ -484,11 +608,23 @@ describe("links on a v3 document", () => {
         text("ab"),
         text("https://example.com/", [
           { type: "link", attrs: { href: "https://example.com/" } },
-          { type: "underline" },
-          { type: "color", attrs: { value: "0563C1" } },
+          { type: "characterStyle", attrs: { id: "Hyperlink" } },
         ]),
       ),
     );
+    expect(editor.getDocument().styles.at(-1)).toEqual({
+      id: "Hyperlink",
+      type: "character",
+      name: "Hyperlink",
+      basedOn: "DefaultParagraphFont",
+      run: [
+        { type: "color", attrs: { value: "0563C1", themeColor: "hyperlink" } },
+        { type: "underline", attrs: { style: "single" } },
+      ],
+    });
+    editor.select(3, 23);
+    editor.commands.removeLink();
+    expect(blocks(editor)[0]).toEqual(p({}, text("abhttps://example.com/")));
   });
 });
 
@@ -619,5 +755,188 @@ describe("Word formatting edge cases", () => {
     editor.select(1);
     editor.commands.setBlockType("heading", { level: 2 });
     expect(attrsOf(editor)[0]).toEqual({ style: "Heading2" });
+  });
+});
+
+describe("Word formatting review cases", () => {
+  it("line spacing replaces a style's at-least or exact spacing of the same value", () => {
+    for (const lineRule of ["atLeast", "exact"] as const) {
+      const document = documentOf([p({}, text("a"))], {
+        styles: STYLES.map((s) =>
+          s.id === "Normal" ? { ...s, paragraph: { spacing: { line: 360, lineRule } } } : s,
+        ),
+      });
+      const editor = createEditor({ document });
+      editor.select(1);
+      expect(lineSpacingAt(editor.state)).toBeNull();
+      expect(editor.run(setLineSpacing(1.5))).toBe(true);
+      expect(attrsOf(editor)[0]).toEqual({ spacing: { line: 360, lineRule: "auto" } });
+      expect(lineSpacingAt(editor.state)).toBe(1.5);
+    }
+  });
+
+  it("highlights leave patterned shading; none removes only a plain fill", () => {
+    const patterned = { type: "shading", attrs: { pattern: "pct10", color: "FF0000" } };
+    const editor = editorOf(p({}, text("a", [patterned])));
+    editor.select(1, 2);
+    editor.commands.setHighlight("#FFFF00");
+    expect(blocks(editor)[0]).toEqual(
+      p({}, text("a", [{ type: "highlight", attrs: { value: "yellow" } }, patterned])),
+    );
+    editor.commands.setHighlight(null);
+    expect(blocks(editor)[0]).toEqual(p({}, text("a", [patterned])));
+    // A plain fill (a color outside Word's highlights) is what "no highlight" takes off.
+    editor.commands.setHighlight("#fff59d");
+    editor.commands.setHighlight("#00FF00");
+    expect(blocks(editor)[0]).toEqual(
+      p(
+        {},
+        text("a", [
+          { type: "highlight", attrs: { value: "green" } },
+          { type: "shading", attrs: { pattern: "clear", fill: "FFF59D" } },
+        ]),
+      ),
+    );
+    editor.commands.setHighlight(null);
+    expect(blocks(editor)[0]).toEqual(p({}, text("a")));
+  });
+
+  it("space before or after turns that side's auto spacing off", () => {
+    const editor = editorOf(
+      p({ spacing: { beforeAutospacing: true, afterAutospacing: true } }, text("a")),
+    );
+    editor.select(1);
+    editor.run(setParagraphSpacing({ before: 12 }));
+    expect(attrsOf(editor)[0]).toEqual({ spacing: { before: 240, afterAutospacing: true } });
+    // Auto spacing from the style: written off.
+    const styled = createEditor({
+      document: documentOf([p({}, text("a"))], {
+        styles: STYLES.map((s) =>
+          s.id === "Normal" ? { ...s, paragraph: { spacing: { afterAutospacing: true } } } : s,
+        ),
+      }),
+    });
+    styled.select(1);
+    styled.run(setParagraphSpacing({ before: 6, after: 6 }));
+    expect(attrsOf(styled)[0]).toEqual({
+      spacing: { before: 120, after: 120, afterAutospacing: false },
+    });
+  });
+
+  it("Enter in an empty nested list paragraph goes a level up first", () => {
+    const editor = createEditor({
+      document: documentOf([p({ numbering: { id: 1, level: 1 } })], { numbering: BULLETS }),
+    });
+    editor.select(1);
+    editor.handleKey("Enter");
+    expect(attrsOf(editor)).toEqual([{ numbering: { id: 1, level: 0 } }]);
+    editor.handleKey("Enter");
+    expect(attrsOf(editor)).toEqual([{}]);
+  });
+
+  it("Tab does not go to a level the list does not define", () => {
+    const editor = createEditor({
+      document: documentOf([p({ numbering: { id: 1, level: 1 } }, text("a"))], {
+        numbering: BULLETS,
+      }),
+    });
+    editor.select(1);
+    expect(editor.run(changeIndent(1))).toBe(false);
+  });
+
+  it("Tab on a numbered heading takes the next level's style", () => {
+    const styles: StyleJSON[] = [
+      ...STYLES.map((s) =>
+        s.id === "Heading1" ? { ...s, paragraph: { numbering: { id: 5, level: 0 } } } : s,
+      ),
+      {
+        id: "Heading2",
+        type: "paragraph",
+        name: "heading 2",
+        paragraph: { numbering: { id: 5, level: 1 } },
+      },
+    ];
+    const headings = {
+      abstracts: [
+        {
+          id: 3,
+          levels: [
+            { level: 0, format: "decimal", text: "%1", style: "Heading1" },
+            { level: 1, format: "decimal", text: "%1.%2", style: "Heading2" },
+            { level: 2, format: "decimal", text: "%1.%2.%3", style: "Heading3" },
+          ],
+        },
+      ],
+      instances: [{ id: 5, abstract: 3 }],
+    };
+    const editor = createEditor({
+      document: documentOf(
+        [
+          p({ style: "Heading1" }, text("a")),
+          p({ style: "Heading1", numbering: { id: 5, level: 0 } }, text("b")),
+        ],
+        { styles, numbering: headings },
+      ),
+    });
+    editor.select(1, 5);
+    editor.run(changeIndent(1));
+    expect(attrsOf(editor)).toEqual([
+      { style: "Heading2" },
+      { style: "Heading2", numbering: { id: 5, level: 1 } },
+    ]);
+    // Heading 3 is not in this document: direct numbering, the style stays.
+    editor.run(changeIndent(1));
+    expect(attrsOf(editor)).toEqual([
+      { style: "Heading2", numbering: { id: 5, level: 2 } },
+      { style: "Heading2", numbering: { id: 5, level: 2 } },
+    ]);
+  });
+
+  it("a list adds Word's List Paragraph where the document has none", () => {
+    const editor = createEditor({
+      document: documentOf([p({}, text("a")), p({ style: "Title" }, text("b"))], {
+        styles: STYLES.filter((s) => s.id !== "ListParagraph"),
+      }),
+    });
+    editor.select(1, 5);
+    editor.commands.toggleList("bulletList");
+    expect(attrsOf(editor)).toEqual([
+      { style: "ListParagraph", numbering: { id: 1, level: 0 } },
+      { style: "Title", numbering: { id: 1, level: 0 } },
+    ]);
+    const { styles, numbering } = editor.getDocument();
+    expect(styles.at(-1)).toEqual({
+      id: "ListParagraph",
+      type: "paragraph",
+      name: "List Paragraph",
+      basedOn: "Normal",
+      paragraph: { indent: { left: 720 }, contextualSpacing: true },
+    });
+    expect(numbering.instances).toHaveLength(1);
+    // Only paragraphs in the default style need it.
+    const titled = createEditor({
+      document: documentOf([p({ style: "Title" }, text("b"))], {
+        styles: STYLES.filter((s) => s.id !== "ListParagraph"),
+      }),
+    });
+    titled.select(1);
+    titled.commands.toggleList("orderedList");
+    expect(titled.getDocument().styles.some((s) => s.id === "ListParagraph")).toBe(false);
+  });
+
+  it("font size sets the complex-script size too, writing only what the styles do not give", () => {
+    const editor = editorOf(
+      p({}, text("a", [{ type: "fontSize", attrs: { value: 28, complexScript: 40 } }])),
+    );
+    editor.select(1, 2);
+    editor.run(setFontSize(11));
+    // The defaults give 11 pt (22) to Latin text only; complex scripts get Word's 10 pt.
+    expect(blocks(editor)[0]).toEqual(
+      p({}, text("a", [{ type: "fontSize", attrs: { complexScript: 22 } }])),
+    );
+    editor.run(setFontSize(20));
+    expect(blocks(editor)[0]).toEqual(
+      p({}, text("a", [{ type: "fontSize", attrs: { value: 40, complexScript: 40 } }])),
+    );
   });
 });

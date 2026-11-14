@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { createEditor, type FoliDocumentV3 } from "@folijs/core";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { FoliToolbar } from "./index.js";
 
 const document3: FoliDocumentV3 = {
@@ -53,6 +53,8 @@ describe("FoliToolbar on a schema v3 document", () => {
     expect([...select("Paragraph style").options].map((o) => o.text)).toEqual([
       "Normal",
       "Heading 1",
+      "Heading 2",
+      "Heading 3",
     ]);
     // The theme's fonts are offered too; the one shown now is selected.
     expect([...select("Font").options].map((o) => o.value)).toContain("Aptos Display");
@@ -103,5 +105,21 @@ describe("FoliToolbar on a schema v3 document", () => {
       .getAllByRole("menuitemradio")
       .map((i) => i.textContent ?? i.getAttribute("aria-label"));
     expect(items.join(" ")).toContain("Bright green");
+  });
+
+  it("a pointer pick goes back to the document (onClickCommand); a keyboard one stays", () => {
+    const editor = createEditor({ document: document3 });
+    const back = vi.fn();
+    render(<FoliToolbar editor={editor} onClickCommand={back} />);
+    act(() => editor.select(1));
+    fireEvent.mouseDown(select("Paragraph style"));
+    // Word's Heading 2, not in the document yet: added.
+    fireEvent.change(select("Paragraph style"), { target: { value: "Heading2" } });
+    expect(back).toHaveBeenCalledTimes(1);
+    expect(attrs(editor)[0]).toEqual({ style: "Heading2" });
+    expect(select("Paragraph style").value).toBe("Heading2");
+    fireEvent.keyDown(select("Paragraph style"), { key: "ArrowUp" });
+    fireEvent.change(select("Paragraph style"), { target: { value: "Heading1" } });
+    expect(back).toHaveBeenCalledTimes(1);
   });
 });

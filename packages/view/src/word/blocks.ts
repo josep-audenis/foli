@@ -399,7 +399,11 @@ function applyContextualSpacing(blocks: WordBlock[]): void {
 const SYMBOLS: Record<string, string> = {
   "\uF0B7": "\u2022", // Symbol: bullet
   "\uF0A7": "\u25AA", // Wingdings: small black square
-  "\uF0A8": "\u25C6", // Wingdings: black diamond
+  "\uF0A8": "\u25FB", // Wingdings: white medium square
+  "\uF06C": "\u25CF", // Wingdings: black circle
+  "\uF06E": "\u25A0", // Wingdings: black square
+  "\uF071": "\u2751", // Wingdings: shadowed white square
+  "\uF075": "\u25C6", // Wingdings: black diamond
   "\uF076": "\u2756", // Wingdings: black diamond minus white X
   "\uF0D8": "\u27A2", // Wingdings: arrowhead
   "\uF0FC": "\u2713", // Wingdings: check mark

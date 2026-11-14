@@ -53,8 +53,11 @@ selection and scrolls it into view).
 ### `<FoliToolbar>`
 
 Given an editor holding a schema v3 document (`editor` accepts one), it shows Word's controls:
-paragraph style, font and size boxes, line spacing, Word's highlight colors, indent buttons
-that move list levels and half-inch stops; no heading buttons or horizontal rule.
+paragraph style (with Word's Heading 1 to 3 when the document has not used them yet), font and
+size boxes, line spacing, Word's highlight colors, indent buttons that move list levels and
+half-inch stops; no heading buttons or horizontal rule. A pointer pick in a box calls
+`onClickCommand`, like a button click. Up and Down on a closed box apply each value they pass
+(Chrome and Firefox on Windows), one undo step each.
 
 The default toolbar: bold, italic, underline, strikethrough, link, text color, highlight ·
 paragraph, H1–H3 · align left, center, align right, justify · bulleted list, numbered list
@@ -147,30 +150,37 @@ small caps and hidden act on what the text shows (turning bold off in a bold hea
 content control or table before deleting it; joining paragraphs keeps the second one's section
 break; typed text never takes a tracked-change mark.
 
-Word formatting on a v3 document (8.7b; these do not apply to schema v2). Each writes direct
-formatting only where the styles do not already give the value:
+Word formatting on a v3 document (8.7b; these do not apply to schema v2). Run properties,
+alignment and line spacing are written directly only where the styles do not already give the
+value; space before and after and indents are always written. Built-in styles the document has
+not used yet ("heading 1" to "heading 9", "List Paragraph", "Hyperlink") are added with Word's
+definitions (the Word 2013 to 2019 template's) the first time they are applied, as Word does:
 
-- Styles: `paragraphStyles(state)` (the document's paragraph styles, the default first),
-  `paragraphStyleAt(state)`, `setParagraphStyle(id)`. `setBlockType("heading", { level })` uses
-  the document's "heading N" style, `setBlockType("paragraph")` the default style.
+- Styles: `paragraphStyles(state)` (the document's paragraph styles, the default first, then
+  Word's Heading 1 to 3 if missing), `paragraphStyleAt(state)`, `setParagraphStyle(id)` (an id
+  the document has, or `Heading1`–`Heading9`, `ListParagraph`). `setBlockType("heading",
+  { level })` uses the document's "heading N" style, `setBlockType("paragraph")` the default
+  style.
 - Text: `setFontFamily(name | null)`, `fontFamilyAt(state)`, `setFontSize(points | null)`,
-  `fontSizeAt(state)`. `setTextColor` writes Word's color (null: "Automatic"); `setHighlight`
-  writes one of Word's highlight colors (`HIGHLIGHT_HEX`) as a highlight and any other color as
-  shading.
+  `fontSizeAt(state)` (the size applies to complex scripts too, as Word's size box does).
+  `setTextColor` writes Word's color (null: "Automatic"); `setHighlight` writes one of Word's
+  highlight colors (`HIGHLIGHT_HEX`) as a highlight and any other color as a plain shading fill;
+  null removes the highlight and a plain fill (patterned shading stays).
 - Paragraphs: `setAlign` writes Word's justification; `setLineSpacing(multiple | null)`,
-  `lineSpacingAt(state)`, `setParagraphSpacing({ before?, after? })` in points,
-  `changeIndent(1 | -1)` (a list level for a numbered paragraph, else the next half-inch stop),
-  `canOutdent(state)`.
+  `lineSpacingAt(state)`, `setParagraphSpacing({ before?, after? })` in points (turning that
+  side's auto spacing off), `changeIndent(1 | -1)` (a list level for a numbered paragraph, only
+  to a level its list defines, and a numbered heading takes that level's style; else the next
+  half-inch stop), `canOutdent(state)`.
 - Lists are Word's numbering: `toggleList` / `wrapInList` number the paragraphs (a list of the
   kind right before goes on; otherwise bullets share one definition and a numbered list starts
   at 1 in a new instance; definitions are added to the document's numbering), and put Normal
-  paragraphs in "List Paragraph" where the document has it; `listKindAt(state)` gives
-  `"bulletList"`, `"orderedList"` or null. Tab at a list paragraph's start goes a level deeper
-  (over several paragraphs it indents them), Shift+Tab a level up (out of the list at the top),
-  Enter in an empty list paragraph ends the list, Backspace at its start removes the number.
-  Elsewhere Tab types a tab (`insertTab`).
-- Links get the document's "Hyperlink" character style (or Word's hyperlink blue and
-  underline), removed with the link.
+  paragraphs in "List Paragraph"; `listKindAt(state)` gives `"bulletList"`, `"orderedList"` or
+  null. Tab at a list paragraph's start goes a level deeper (over several paragraphs it indents
+  them), Shift+Tab a level up (out of the list at the top), Enter in an empty list paragraph a
+  level up (at the top it ends the list), Backspace at its start removes the number. Elsewhere
+  Tab types a tab (`insertTab`); in the view, Escape then Tab (or Shift+Tab) moves the focus on
+  instead, and a read-only view leaves Tab to the browser.
+- Links get the document's "Hyperlink" character style, removed with the link.
 
 | Member                         | Notes                                                                                                                                                                                                                                                                                                                         |
 | ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

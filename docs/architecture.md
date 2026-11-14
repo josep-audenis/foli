@@ -437,20 +437,24 @@ Known limits:
 The generic commands branch to it on a v3 document (`setAlign`, `setTextColor`, `setHighlight`,
 `toggleList`, `wrapInList`, `sinkListItem`, `liftListItem`, list Enter and Backspace,
 `setBlockType`, links); styles, fonts, sizes, line spacing and space before and after are v3
-only. A property is written directly only where the resolved formatting without it differs
-(picking a heading's own size, color or alignment leaves no direct value; "Automatic" color and
-"no highlight" write `auto` and `none` where a style gives one). Paragraph changes are one
+only. Run properties, alignment and line spacing are written directly only where the resolved
+formatting without them differs (picking a heading's own size, color or alignment leaves no
+direct value; "Automatic" color and "no highlight" write `auto` and `none` where a style gives
+one); space before and after and indents are always written. Paragraph changes are one
 `NodeMarkupBatchStep`. A transaction can replace the document's envelope (`withEnvelope`,
-plugin state): a new list's numbering definition is added that way. Undo keeps such a
-definition, unused (Word keeps them too).
+plugin state): a new list's numbering definition, and a built-in style the document has not
+used yet (headings, List Paragraph, Hyperlink, with the Word 2013 to 2019 template's
+definitions, not checked against newer Word), are added that way. Undo keeps such a definition,
+unused (a choice; not checked against what Word does).
 
 Lists: bullets reuse a plain definition of the document (not a numbering style's, nor one whose
 levels number headings) or add Word's (Symbol, Courier New, Wingdings bullets, half-inch levels);
 numbers start a new instance with a start override at 1, on a plain decimal definition or a new
 one, unless the paragraph before is in a plain list of the kind, which goes on. Bullets in
 Symbol and Wingdings are shown as the Unicode characters they draw (the view, `blocks.ts`).
-Tab types a tab on v3 (a list's Tab first): the keyboard leaves the editor with Shift+Tab
-outside lists, or the browser's own keys.
+Tab types a tab on v3 (a list's Tab first). The view lets the keyboard leave: Escape, then Tab
+or Shift+Tab, keeps the browser's focus move, and so does Tab in a read-only view. Tab on a numbered heading takes the next
+level's linked style (Heading 1 to Heading 2) where the document has it.
 
 ### Editing schema v3 in the view (`packages/view/src/word/edit.ts`, 8.7a)
 
