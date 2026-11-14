@@ -671,11 +671,13 @@ Each task is a PR on `phase-8/word-model`, the build green after each.
     Word does them (style's next style, formatting from styles, markers kept, opaque content
     selected first); plain-text paste; T1, T2 and T5 on v3 in three engines (the editing page,
     `apps/playground/edit.html`).
-  - [ ] 8.7b Word formatting on v3: style picker (headings as styles), font family and size,
+  - [x] 8.7b Word formatting on v3 (#54): style picker (headings as styles; Word's built-in
+    headings, List Paragraph and Hyperlink added on first use), font family and size,
     paragraph spacing, indentation, alignment, colors and highlight, links; lists as numbering
-    (bullets and numbers, levels with Tab and Shift+Tab, Enter and Backspace in lists); the
-    React toolbar on v3 (on the editing page; `FoliEditor` itself takes v3 in 8.7d). Rules
-    (Word's bottom border) are not offered on v3 yet.
+    (bullets and numbers, levels with Tab and Shift+Tab, Enter and Backspace in lists; Escape
+    then Tab leaves the editor); the React toolbar on v3 (on the editing page; `FoliEditor`
+    itself takes v3 in 8.7d). Rules (Word's bottom border) are not offered on v3 yet; the style
+    box lists every paragraph style (hidden ones too).
   - [ ] 8.7c Clipboard and input on v3: HTML paste and copy mapped to v3 (T3), composition and
     dead keys (T4).
   - [ ] 8.7d The switch: `SCHEMA_VERSION` 3, documents of 0.1.0 and 0.2.0 migrated on load,
