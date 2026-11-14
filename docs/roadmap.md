@@ -665,7 +665,7 @@ Each task is a PR on `phase-8/word-model`, the build green after each.
     baseline in corpus/README.md).
 - [ ] 8.7 Editing on v3, in four parts (each lands with the v2 editor still working; v2 goes in
   8.7d):
-  - [ ] 8.7a The editor and view on a v3 document: `createEditor` takes a v3 document (envelope
+  - [x] 8.7a The editor and view on a v3 document (#53): `createEditor` takes a v3 document (envelope
     kept, page from its last section), `EditorView` renders it with Word's blocks and spacing
     and edits it; Enter, the bold/italic/underline/strike toggles, Backspace and Delete as
     Word does them (style's next style, formatting from styles, markers kept, opaque content
