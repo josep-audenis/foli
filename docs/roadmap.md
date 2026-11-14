@@ -647,7 +647,7 @@ Each task is a PR on `phase-8/word-model`, the build green after each.
   exactly is listed in `packages/docx/README.md`; the comparison is
   `packages/docx/src/testing/canonical.ts`), every export opens in Word without repair
   (`scripts/corpus/rewrite-corpus.mjs`: unchanged, edited, and a new package from schema v2).
-- [ ] 8.6 Rendering from the document, in three parts (the view and editor run on v2 until 8.7, so
+- [x] 8.6 Rendering from the document, in three parts (the view and editor run on v2 until 8.7, so
   each part lands without breaking them):
   - [x] 8.6a Resolution in `@folijs/core` (#50, no DOM): a paragraph's and a run's effective
     formatting from defaults, styles and direct formatting as Word computes it (toggle
@@ -659,7 +659,7 @@ Each task is a PR on `phase-8/word-model`, the build green after each.
     shown from its XML (tables as tables, content controls and fields as their text), sections
     and Word's paragraph spacing on pages; harness: per-paragraph page and line agreement with
     Word (`pnpm corpus:pages`; baseline in corpus/README.md).
-  - [ ] 8.6c The PDF page comparison as a tracked number: every page Foli shows compared with
+  - [x] 8.6c The PDF page comparison as a tracked number (#52): every page Foli shows compared with
     Word's PDF of it by ink (pdf.js, pixel by pixel within 2 px), a score per page and
     inside the margins, overlays to look at (`FOLI_WORD_PDF=<folder> pnpm corpus:pages`;
     baseline in corpus/README.md).
