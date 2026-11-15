@@ -39,13 +39,15 @@ writeFileSync(appEntry, `export { FoliEditor } from "${dist("react")}";\n`);
  * lists as numbering) and the toolbar's Word controls. Core, view and React raised in 8.7c
  * (36.1, 46.7 and 59.4 kB): copy and paste on v3 (definitions carried and fitted to the
  * document, HTML through the v2 -> v3 migration). The view's share is mostly core's envelope
- * validation and migration, which `createEditor` already brings into an app.
+ * validation and migration, which `createEditor` already brings into an app. Set again in
+ * 8.7d2 (33.8, 44.7 and 54.4 kB, about 4% headroom): v2's editing commands, renderer, list
+ * containers and toolbar removed.
  */
 const BUNDLES = [
-  { name: "@folijs/core", entry: dist("core"), budget: 37_500 },
-  { name: "@folijs/view", entry: dist("view"), budget: 48_600 },
-  { name: "@folijs/react", entry: dist("react"), budget: 61_800 },
-  { name: "FoliEditor only", entry: appEntry, budget: 61_800 },
+  { name: "@folijs/core", entry: dist("core"), budget: 36_000 },
+  { name: "@folijs/view", entry: dist("view"), budget: 47_600 },
+  { name: "@folijs/react", entry: dist("react"), budget: 57_900 },
+  { name: "FoliEditor only", entry: appEntry, budget: 57_900 },
   { name: "@folijs/docx", entry: dist("docx"), budget: 36_900 },
 ];
 

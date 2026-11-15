@@ -1,15 +1,9 @@
 // @vitest-environment jsdom
-import {
-  createDocument,
-  createEditor,
-  type Editor,
-  EditorState,
-  type FoliDocument,
-} from "@folijs/core";
+import { createDocument, type EditorDocument, EditorState } from "@folijs/core";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { createRef, forwardRef, useImperativeHandle, useRef, useState } from "react";
+import { createRef } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { FoliCanvas, type FoliCanvasHandle, FoliEditorProvider, FoliToolbar } from "./index.js";
+import { FoliEditor, type FoliEditorHandle } from "./index.js";
 
 const doc = createDocument({
   type: "doc",
@@ -19,90 +13,35 @@ const doc = createDocument({
   ],
 });
 
-interface V2Props {
-  initialContent?: FoliDocument;
+interface Props {
+  initialContent?: EditorDocument;
   readOnly?: boolean;
   toolbar?: boolean;
 }
-interface V2Handle {
-  editor: Editor;
-  focus(): void;
-}
 
-/**
- * `FoliEditor` as it was on schema v2, for the v2 toolbar (`FoliEditor` edits schema v3 since
- * 8.7d1; the v2 toolbar goes with v2 in 8.7d2).
- */
-const V2Editor = forwardRef<V2Handle, V2Props>(function V2Editor(
-  { initialContent = doc, readOnly, toolbar = true },
-  ref,
-) {
-  const [editor] = useState(() => createEditor({ document: initialContent }));
-  const canvas = useRef<FoliCanvasHandle>(null);
-  useImperativeHandle(ref, () => ({ editor, focus: () => canvas.current?.focus() }), [editor]);
-  return (
-    <FoliEditorProvider editor={editor}>
-      {toolbar && (
-        <FoliToolbar
-          editor={editor}
-          disabled={readOnly}
-          onClickCommand={() => canvas.current?.focus()}
-        />
-      )}
-      <FoliCanvas ref={canvas} editor={editor} readOnly={readOnly} />
-    </FoliEditorProvider>
-  );
-});
-
-function setup(props: V2Props = {}) {
-  const ref = createRef<V2Handle>();
-  render(<V2Editor ref={ref} {...props} />);
+function setup({ initialContent = doc, ...props }: Props = {}) {
+  const ref = createRef<FoliEditorHandle>();
+  render(<FoliEditor ref={ref} initialContent={initialContent} {...props} />);
   const handle = ref.current;
   if (!handle) throw new Error("no handle");
   return handle;
 }
 const button = (name: string) => screen.getByRole("button", { name });
 const buttons = () => screen.getAllByRole("button");
+/** The toolbar's controls in order: the style, font and size boxes, then the buttons. */
+const controls = () => [
+  ...screen.getByRole("toolbar").querySelectorAll<HTMLElement>("button, select"),
+];
+/** The content as JSON (the envelope's styles name "Hyperlink", "highlight"...). */
+const contentJSON = (editor: FoliEditorHandle["editor"]) =>
+  JSON.stringify(editor.getDocument().content);
 
 describe("FoliToolbar", () => {
   afterEach(cleanup);
 
-  it("is one labelled toolbar with named buttons and a single tab stop", () => {
-    setup();
-    expect(screen.getByRole("toolbar", { name: "Formatting" })).toBeTruthy();
-    const names = buttons().map((b) => b.getAttribute("aria-label") ?? b.textContent);
-    expect(names).toEqual([
-      "Bold",
-      "Italic",
-      "Underline",
-      "Strikethrough",
-      "Link",
-      "Text color",
-      "Highlight",
-      "Paragraph",
-      "H1",
-      "H2",
-      "H3",
-      "Align left",
-      "Center",
-      "Align right",
-      "Justify",
-      "Bulleted list",
-      "Numbered list",
-      "Decrease indent",
-      "Increase indent",
-      "Undo",
-      "Redo",
-      "Horizontal rule",
-      "Page break",
-    ]);
-    expect(buttons().filter((b) => b.tabIndex === 0)).toHaveLength(1);
-    expect(button("H1").title).toBe("Heading 1");
-  });
-
   it("moves focus with the arrow keys, Home and End, wrapping, and keeps one tab stop", () => {
     setup();
-    const all = buttons();
+    const all = controls();
     act(() => all[0]?.focus());
     fireEvent.keyDown(all[0] as HTMLElement, { key: "ArrowLeft" });
     expect(document.activeElement).toBe(all.at(-1));
@@ -113,7 +52,7 @@ describe("FoliToolbar", () => {
     fireEvent.keyDown(document.activeElement as HTMLElement, { key: "Home" });
     fireEvent.keyDown(document.activeElement as HTMLElement, { key: "ArrowRight" });
     expect(document.activeElement).toBe(all[1]);
-    expect(buttons().filter((b) => b.tabIndex === 0)).toEqual([all[1]]);
+    expect(controls().filter((b) => b.tabIndex === 0)).toEqual([all[1]]);
   });
 
   it("toggles a mark on the selection and shows it pressed; a click keeps the focus", () => {
@@ -125,28 +64,8 @@ describe("FoliToolbar", () => {
     act(() => button("Bold").click());
     expect(editor.isMarkActive("bold")).toBe(true);
     expect(button("Bold").getAttribute("aria-pressed")).toBe("true");
-    expect(screen.getByRole("textbox").querySelector("strong")?.textContent).toBe("Hello");
-  });
-
-  it("sets heading levels, shows the block type pressed, and a second press goes back", () => {
-    const { editor } = setup();
-    act(() => editor.select(2));
-    expect(button("Paragraph").getAttribute("aria-pressed")).toBe("true");
-    act(() => button("H2").click());
-    expect(editor.state.doc.firstChild?.type.name).toBe("heading");
-    expect(editor.state.doc.firstChild?.attrs.level).toBe(2);
-    expect(button("H2").getAttribute("aria-pressed")).toBe("true");
-    expect(button("Paragraph").getAttribute("aria-pressed")).toBe("false");
-    act(() => button("H2").click());
-    expect(editor.state.doc.firstChild?.type.name).toBe("paragraph");
-    // A selection over a heading and a paragraph: neither type is pressed.
-    act(() => button("H1").click());
-    act(() => editor.select(2, 15));
-    expect(button("H1").getAttribute("aria-pressed")).toBe("false");
-    expect(button("Paragraph").getAttribute("aria-pressed")).toBe("false");
-    // A pressed block type stays enabled.
-    act(() => editor.select(2));
-    expect(button("H1").hasAttribute("aria-disabled")).toBe(false);
+    const bold = screen.getByRole("textbox").querySelector<HTMLElement>("span[style*='700']");
+    expect(bold?.textContent).toBe("Hello");
   });
 
   it("enables Undo and Redo from dry runs, and runs them", () => {
@@ -162,42 +81,6 @@ describe("FoliToolbar", () => {
     expect(button("Undo").getAttribute("aria-disabled")).toBe("true");
     act(() => button("Undo").click());
     expect(editor.state.doc.textContent).toBe("Hello FoliSecond");
-  });
-
-  it("makes lists, shows the list type pressed, and indents and outdents items", () => {
-    const { editor } = setup();
-    const pressed = (name: string) => button(name).getAttribute("aria-pressed");
-    const disabled = (name: string) => button(name).getAttribute("aria-disabled");
-    // A heading cannot become a list item: the list buttons are disabled there.
-    act(() => editor.select(2));
-    act(() => button("H1").click());
-    expect(disabled("Bulleted list")).toBe("true");
-    expect(disabled("Numbered list")).toBe("true");
-    act(() => button("H1").click());
-    expect(disabled("Bulleted list")).toBeNull();
-    act(() => editor.select(2, 15)); // both paragraphs
-    expect(disabled("Increase indent")).toBe("true");
-    expect(disabled("Decrease indent")).toBe("true");
-    act(() => button("Bulleted list").click());
-    expect(editor.getDocument().content.content[0]?.type).toBe("bulletList");
-    expect(pressed("Bulleted list")).toBe("true");
-    expect(pressed("Numbered list")).toBe("false");
-    act(() => button("Numbered list").click());
-    expect(editor.getDocument().content.content[0]?.type).toBe("orderedList");
-    expect(pressed("Numbered list")).toBe("true");
-    // One item per paragraph: put the caret in the second, split into its own item first.
-    act(() => button("Numbered list").click()); // off again
-    act(() => editor.select(1, 15));
-    act(() => button("Bulleted list").click());
-    act(() => editor.select(editor.state.doc.content.size - 3));
-    act(() => editor.handleKey("Enter"));
-    expect(disabled("Increase indent")).toBeNull(); // the new item has one before it
-    act(() => button("Increase indent").click());
-    expect(JSON.stringify(editor.getDocument().content)).toContain(
-      '"bulletList","content":[{"type":"listItem","content":[{"type":"paragraph"}]}]',
-    );
-    act(() => button("Decrease indent").click());
-    expect(editor.getDocument().content.content).toHaveLength(1);
   });
 
   it("inserts a page break", () => {
@@ -263,7 +146,9 @@ describe("FoliToolbar", () => {
     act(() => editor.select(2));
     expect(button("Align left").getAttribute("aria-pressed")).toBe("true");
     fireEvent.click(button("Center"), { detail: 1 });
-    expect(editor.getDocument().content.content[0]).toMatchObject({ attrs: { align: "center" } });
+    expect(editor.getDocument().content.content?.[0]).toMatchObject({
+      attrs: { justification: "center" },
+    });
     expect(button("Center").getAttribute("aria-pressed")).toBe("true");
     expect(button("Align left").getAttribute("aria-pressed")).toBe("false");
     act(() => editor.select(2, 15)); // mixed: none pressed
@@ -271,7 +156,7 @@ describe("FoliToolbar", () => {
       expect(button(name).getAttribute("aria-pressed")).toBe("false");
     }
     fireEvent.click(button("Justify"), { detail: 1 });
-    expect(JSON.stringify(editor.getDocument())).not.toContain('"center"');
+    expect(contentJSON(editor)).not.toContain('"center"');
     expect(button("Justify").getAttribute("aria-pressed")).toBe("true");
   });
 
@@ -309,7 +194,7 @@ describe("FoliToolbar", () => {
     fireEvent.click(items[4] as HTMLElement, { detail: 0 }); // Green, by keyboard
     expect(screen.queryByRole("menu")).toBeNull();
     expect(document.activeElement).toBe(textColor);
-    expect(JSON.stringify(editor.getDocument())).toContain('"color":"#2e7d32"');
+    expect(contentJSON(editor)).toContain('{"type":"color","attrs":{"value":"2E7D32"}}');
     // Open again: Green is checked and focused; Escape closes back to the button.
     fireEvent.click(textColor, { detail: 0 });
     const green = screen.getByRole("menuitemradio", { name: "Green" });
@@ -329,14 +214,13 @@ describe("FoliToolbar", () => {
     fireEvent.click(button("Highlight"), { detail: 1 });
     fireEvent.click(screen.getByRole("menuitemradio", { name: "Yellow" }), { detail: 1 });
     expect(document.activeElement).toBe(documentBox);
-    expect(JSON.stringify(editor.getDocument())).toContain(
-      '"highlight","attrs":{"color":"#fff59d"}',
-    );
+    // Word's highlight colors.
+    expect(contentJSON(editor)).toContain('{"type":"highlight","attrs":{"value":"yellow"}}');
     const swatch = button("Highlight").querySelector(".foli-toolbar-swatch") as HTMLElement;
-    expect(swatch.style.background).toBe("rgb(255, 245, 157)");
+    expect(swatch.style.background).toBe("rgb(255, 255, 0)");
     fireEvent.click(button("Highlight"), { detail: 1 });
     fireEvent.click(screen.getByRole("menuitemradio", { name: "None" }), { detail: 1 });
-    expect(JSON.stringify(editor.getDocument())).not.toContain("highlight");
+    expect(contentJSON(editor)).not.toContain("highlight");
     // Leaving an open menu (a click elsewhere) closes it.
     fireEvent.click(button("Highlight"), { detail: 1 });
     const menu = screen.getByRole("menu");
@@ -366,22 +250,6 @@ describe("FoliToolbar", () => {
     expect(document.activeElement).toBe(button("Highlight"));
   });
 
-  it("inserts a horizontal rule, also with everything selected", () => {
-    const handle = setup();
-    act(() => {
-      handle.editor.commands.selectAll();
-    });
-    expect(button("Horizontal rule").hasAttribute("aria-disabled")).toBe(false);
-    act(() => handle.editor.select(11)); // end of "Hello Foli"
-    fireEvent.click(button("Horizontal rule"), { detail: 1 });
-    expect(handle.editor.getDocument().content.content.map((block) => block.type)).toEqual([
-      "paragraph",
-      "horizontalRule",
-      "paragraph",
-      "paragraph",
-    ]);
-  });
-
   it("adds a link from the dialog: URL normalized, focus back in the document", () => {
     const handle = setup();
     const { editor } = handle;
@@ -399,13 +267,16 @@ describe("FoliToolbar", () => {
     fireEvent.click(button("Apply"));
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(document.activeElement).toBe(documentBox);
-    expect(editor.getDocument().content.content[0]).toEqual({
+    expect(editor.getDocument().content.content?.[0]).toEqual({
       type: "paragraph",
       content: [
         {
           type: "text",
           text: "Hello",
-          marks: [{ type: "link", attrs: { href: "https://example.com" } }],
+          marks: [
+            { type: "link", attrs: { href: "https://example.com" } },
+            { type: "characterStyle", attrs: { id: "Hyperlink" } },
+          ],
         },
         { type: "text", text: " Foli" },
       ],
@@ -445,7 +316,8 @@ describe("FoliToolbar", () => {
     fireEvent.click(button("Remove link"));
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(editor.state.doc.textContent).toBe("Hello FoliSecond");
-    expect(JSON.stringify(editor.getDocument())).not.toContain("link");
+    expect(contentJSON(editor)).not.toContain('"link"');
+    expect(contentJSON(editor)).not.toContain("Hyperlink");
   });
 
   it("Apply with the link unchanged closes the dialog, without an error", () => {
@@ -501,24 +373,24 @@ describe("FoliToolbar", () => {
   });
 
   it("a dialog open when the toolbar is disabled does not come back after", () => {
-    const { rerender } = render(<V2Editor />);
+    const { rerender } = render(<FoliEditor initialContent={doc} />);
     const documentBox = screen.getByRole("textbox", { name: "Document" });
     act(() => documentBox.focus());
     fireEvent.keyDown(documentBox, { key: "k", ctrlKey: true });
     expect(screen.getByRole("dialog")).toBeTruthy();
-    rerender(<V2Editor readOnly />);
+    rerender(<FoliEditor initialContent={doc} readOnly />);
     expect(screen.queryByRole("dialog")).toBeNull();
-    rerender(<V2Editor />);
+    rerender(<FoliEditor initialContent={doc} />);
     expect(screen.queryByRole("dialog")).toBeNull();
   });
 
   it("opens no link dialog in read-only mode, not even after it ends", () => {
-    const { rerender } = render(<V2Editor readOnly />);
+    const { rerender } = render(<FoliEditor initialContent={doc} readOnly />);
     const documentBox = screen.getByRole("textbox", { name: "Document" });
     fireEvent.keyDown(documentBox, { key: "k", ctrlKey: true });
     fireEvent.click(button("Link"), { detail: 1 });
     expect(screen.queryByRole("dialog")).toBeNull();
-    rerender(<V2Editor />);
+    rerender(<FoliEditor initialContent={doc} />);
     expect(screen.queryByRole("dialog")).toBeNull();
   });
 

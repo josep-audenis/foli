@@ -33,13 +33,12 @@ model, with Word's toolbar): a 0.1.0 or 0.2.0 document given to it is migrated
 | `className`      | `string`                       | —            | Added to the `.foli-canvas` element.                                                              |
 | `children`       | `ReactNode`                    | —            | Rendered between the toolbar and the pages, inside the editor's context.                          |
 
-`ref` → `FoliEditorHandle`: `{ editor: Editor<FoliDocumentV3>; focus(): void }`
-(`editor.setDocument` is typed for a v3 document; given an older one, from JavaScript or a cast,
-it migrates it with `parseDocumentV3`, so the editor stays on v3).
+`ref` → `FoliEditorHandle`: `{ editor: Editor; focus(): void }` (`editor.setDocument` takes
+a document of any version too).
 
 `FoliChange`:
 
-- `editor: Editor<FoliDocumentV3>`
+- `editor: Editor`
 - `transactions: readonly Transaction[]`: this change's transactions (several when plugins
   append their own).
 - `document: FoliDocumentV3`: the document right after this change (content, styles,
@@ -56,21 +55,16 @@ selection and scrolls it into view).
 
 ### `<FoliToolbar>`
 
-Given an editor holding a schema v3 document (`editor` accepts one), it shows Word's controls:
-paragraph style (with Word's Heading 1 to 3 when the document has not used them yet), font and
-size boxes, line spacing, Word's highlight colors, indent buttons that move list levels and
-half-inch stops; no heading buttons or horizontal rule. A pointer pick in a box calls
-`onClickCommand`, like a button click. Up and Down on a closed box apply each value they pass
-(Chrome and Firefox on Windows), one undo step each.
-
-Given a schema v2 editor (`createEditor` with a 0.2.0 document; gone in 8.7d2), the v2
-toolbar: bold, italic, underline, strikethrough, link, text color, highlight ·
-paragraph, H1–H3 · align left, center, align right, justify · bulleted list, numbered list
-(pressed inside one), decrease and increase indent · undo, redo · horizontal rule, page break.
-Text color and highlight are menu buttons (WAI-ARIA menu, `menuitemradio` items) with a fixed
-palette, the current color checked; arrow keys, Home and End move, Enter picks, Escape closes
-back to the button. The alignment buttons show the selection's alignment pressed (none when
-mixed).
+Word's controls: paragraph style (with Word's Heading 1 to 3 when the document has not used
+them yet), font and size boxes · bold, italic, underline, strikethrough, link, text color,
+highlight · align left, center, align right, justify, line spacing · bulleted list, numbered
+list (pressed inside one), decrease and increase indent (list levels, else half-inch stops) ·
+undo, redo · page break. A pointer pick in a box calls `onClickCommand`, like a button click.
+Up and Down on a closed box apply each value they pass (Chrome and Firefox on Windows), one
+undo step each. Text color and highlight are menu buttons (WAI-ARIA menu, `menuitemradio`
+items) with a fixed palette (Word's highlight colors), the current color checked; arrow keys,
+Home and End move, Enter picks, Escape closes back to the button. The alignment buttons show
+the selection's alignment pressed (none when mixed).
 A WAI-ARIA toolbar: one Tab stop, arrow keys, Home and End move between buttons; toggle buttons
 have `aria-pressed`; buttons stay focusable when disabled (`aria-disabled`). Clicking a button
 keeps the document's selection.
@@ -85,7 +79,7 @@ Mod-K needs a `FoliToolbar` for the editor; none opens while it is `disabled`.
 
 | Prop             | Type         | Default        | Notes                                                               |
 | ---------------- | ------------ | -------------- | ------------------------------------------------------------------- |
-| `editor`         | `AnyEditor`  | context        | An editor of either schema (`Editor<EditorDocument>`).              |
+| `editor`         | `Editor`     | context        |                                                                     |
 | `disabled`       | `boolean`    | `false`        | Pass it whenever the canvas is `readOnly`.                          |
 | `onClickCommand` | `() => void` | —              | After a click ran a command (`FoliEditor` focuses its canvas here). |
 | `label`          | `string`     | `"Formatting"` | Accessible name.                                                    |
@@ -93,14 +87,14 @@ Mod-K needs a `FoliToolbar` for the editor; none opens while it is `disabled`.
 
 ### Hooks and provider
 
-- `useFoliEditor({ initialContent?, plugins? }): Editor<FoliDocumentV3>`: creates an editor of
-  a schema v3 document on the first render (`initialContent` of any version, migrated; default
-  an empty document) and keeps it for the component's lifetime. Later option changes are
+- `useFoliEditor({ initialContent?, plugins? }): Editor`: creates an editor on the first render
+  (`initialContent` of any version, migrated; default an empty document) and keeps it for the
+  component's lifetime. Later option changes are
   ignored. Throws `FoliDocumentError` for invalid content.
 - `<FoliEditorProvider editor={editor}>`: makes `editor` the one the components and hooks
   below it use.
-- `useCurrentEditor(): AnyEditor`: the nearest provider's (or `FoliEditor`'s) editor. Throws
-  outside one. The components and hooks take an editor of either schema (`AnyEditor`).
+- `useCurrentEditor(): Editor`: the nearest provider's (or `FoliEditor`'s) editor. Throws
+  outside one.
 - `useEditorState(selector, { editor?, isEqual? })`: a slice of the state; the component
   re-renders only when it changes (`isEqual`, default `Object.is`). The selector
   `(state, editor) => T` runs after every transaction: keep it cheap.
@@ -140,15 +134,11 @@ No DOM: runs in Node, workers and the browser.
 ### Editor
 
 `createEditor({ document?, plugins? }): Editor`: a headless editor (state, commands, undo
-history, change notifications). Its content is validated (as by `parseDocument`); its
-settings are not, so pass a document from `parseDocument` or `createDocument`.
-`setDocument` behaves the same way.
-
-Given a schema v3 document (8.7a, beside v2 until 0.3.0), it returns an
-`Editor<FoliDocumentV3>`: the whole document is validated (`parseDocumentV3`), the editor
-keeps its styles, numbering and sections, `getDocument()` returns a v3 document (a copy) and
-`settings` are its last section's page (`sectionSettings(section)`; Word's Letter page with
-inch margins where the section leaves them out). The commands then edit as Word does: Enter
+history, change notifications) of a schema v3 document (Word's model). The document is
+validated and, when saved by 0.1.0 or 0.2.0, migrated (`parseDocumentV3`; default: an empty
+one); `setDocument` behaves the same way. The editor keeps its styles, numbering and sections,
+`getDocument()` returns a v3 document (a copy) and `settings` are its last section's page (`sectionSettings(section)`; Word's Letter page with
+inch margins where the section leaves them out). The commands edit as Word does: Enter
 leaves the section break and the paragraph's own attributes on the second paragraph, and at the
 end of a paragraph whose style names a next style (a heading: Normal) starts that style;
 `toggleMark` and `isMarkActive` for bold, italic, underline, strike, double strike, caps,
@@ -157,7 +147,7 @@ small caps and hidden act on what the text shows (turning bold off in a bold hea
 content control or table before deleting it; joining paragraphs keeps the second one's section
 break; typed text never takes a tracked-change mark.
 
-Word formatting on a v3 document (8.7b; these do not apply to schema v2). Run properties,
+Word formatting (these do not apply to a state without a v3 envelope). Run properties,
 alignment and line spacing are written directly only where the styles do not already give the
 value; space before and after and indents are always written. Built-in styles the document has
 not used yet ("heading 1" to "heading 9", "List Paragraph", "Hyperlink") are added with Word's
@@ -206,21 +196,20 @@ definitions (the Word 2013 to 2019 template's) the first time they are applied, 
 | `run(command)`, `can(command)` | Run any `Command`, or dry-run it. `can` builds the whole transaction: not per keystroke.                                                                                                                                                                                                                                      |
 | `handleKey(key)`               | Runs the first bound command for a key name such as `"Mod-b"`.                                                                                                                                                                                                                                                                |
 | `dispatch(tr)`                 | Applies a transaction (`state.tr`).                                                                                                                                                                                                                                                                                           |
-| `getDocument()`                | The current document as a `FoliDocument` (a `FoliDocumentV3` for a v3 editor).                                                                                                                                                                                                                                                |
+| `getDocument()`                | The current document (`FoliDocumentV3`).                                                                                                                                                                                                                                                                                      |
 | `setDocument(doc)`             | Replaces the document and settings, clears undo history. Listeners get an empty transaction list.                                                                                                                                                                                                                             |
 | `subscribe(listener)`          | `(state, transactions) => void` after every change (selection included); returns unsubscribe. `transactions.some(tr => tr.docChanged)` tells content changes apart.                                                                                                                                                           |
 
 Headings: `setBlockType("heading", { level: 2 })`; back to text: `setBlockType("paragraph")`.
-Lists: `commands.toggleList("bulletList" | "orderedList", attrs?)` (wraps the selection, changes
-the list's type, or takes the selected items out of every list of that type they are in),
-`wrapInList(type, attrs?)`, `indentListItem()` and `outdentListItem()` (Tab and Shift+Tab). Each
-list change is its own undo step. Links: `commands.setLink(href)` (links the selection, replacing
+Lists: `commands.toggleList("bulletList" | "orderedList")` (removes the selection's numbering
+when it is a list of that kind, else numbers it), `wrapInList(kind)`, `indentListItem()` and
+`outdentListItem()` (Tab and Shift+Tab). Links: `commands.setLink(href)` (links the selection, replacing
 links there; at a caret in a link, changes that link; elsewhere inserts the href as linked
 text) and `removeLink()` (the links in the selection, or the whole link around the caret). Both
 normalize then validate: an unsafe href (`javascript:`…) does not apply. Formatting:
-`commands.setAlign("start" | "center" | "end" | "justify")` (paragraphs and headings; `start`
-is the default), `setTextColor(color | null)` and `setHighlight(color | null)` (lowercase
-`#rrggbb`; null removes; at a caret, for the next typed text), `insertHorizontalRule()`.
+`commands.setAlign("start" | "center" | "end" | "justify")` (`start` is the default),
+`setTextColor(color | null)` and `setHighlight(color | null)` (`#rrggbb`; null removes; at a
+caret, for the next typed text). `toggleMark("link", { href })` refuses an unsafe href too.
 
 ### Commands
 
@@ -228,13 +217,13 @@ Commands are `(state, dispatch?) => boolean` and run with `editor.run(command)`:
 `insertText(text)`, `deleteSelection`, `deleteBackward(unit?)`, `deleteForward(unit?)` (unit
 `"char"` or `"word"`), `joinBackward`, `joinForward`, `splitBlock`, `insertHardBreak`,
 `insertPageBreak`, `selectAll`, `toggleMark(type, attrs?)`, `setBlockType(type, attrs?)`,
-`undo`, `redo`; lists: `toggleList(type, attrs?)`, `wrapInList(type, attrs?)`,
-`splitListItem()` (Enter), `sinkListItem()` (Tab), `liftListItem()` (Shift+Tab),
-`liftListItemAtStart()` (Backspace at an item's start), and `listKeymap()` binding them (part of
-every editor, before `baseKeymap()`); formatting: `setAlign(align)`, `setTextColor(color)`,
-`setHighlight(color)`, `insertHorizontalRule`, and `arrowAcrossLeaf(dir, from)` (arrow keys
-around a rule: `"char"` from a caret at a textblock edge, `"line"` when the caret is on its
-first or last line, `"none"` only from a selected rule); links: `setLink(href)`, `removeLink`,
+`undo`, `redo`; lists: `toggleList(kind)`, `wrapInList(kind)`, `splitListItem` (Enter in an
+empty list paragraph), `sinkListItem` (Tab), `liftListItem` (Shift+Tab), `liftListItemAtStart`
+(Backspace at a list paragraph's start), and `listKeymap()` binding them (part of every editor,
+before `baseKeymap()`); formatting: `setAlign(align)`, `setTextColor(color)`,
+`setHighlight(color)`, and `arrowAcrossLeaf(dir, from)` (arrow keys around an opaque block:
+`"char"` from a caret at a paragraph edge, `"line"` when the caret is on its first or last
+line, `"none"` only from a selected block); links: `setLink(href)`, `removeLink`,
 `insertLink(href, text?)` (replaces the selection with linked text), `openLinkEditor` (Mod-K:
 dispatches a transaction that changes nothing and carries `linkEditorRequest`; check it with
 `requestsLinkEditor(tr)` to open your own link UI). `normalizeHref(input)` trims, turns `\` into
@@ -242,7 +231,7 @@ dispatches a transaction that changes nothing and carries `linkEditorRequest`; c
 name (`example.com/page`; a relative file name like `page.html` becomes one too: write
 `./page.html`); `autolinkHref(text)` is the href for pasted text that is one URL
 (`http(s)://…`, `mailto:…`, `www.…`), or null. Helpers: `isMarkActive(state, type)`,
-`listTypeAt(state)`, `linkAt(state)` (the href of the link at the selection, or null),
+`listKindAt(state)`, `linkAt(state)` (the href of the link at the selection, or null),
 `alignAt(state)` and `colorAt(state, "textColor" | "highlight")` (shared by the whole
 selection, else null),
 `undoDepth(state)`, `redoDepth(state)`,

@@ -9,13 +9,13 @@ import {
   deleteForward,
   deleteSelection,
   type Editor,
-  type EditorDocument,
   type EditorState,
   fitPaste,
   fitPastedV2,
   insertHardBreak,
   insertLink,
   insertText,
+  isSafeHref,
   type Node as ModelNode,
   marksAt,
   NodeSelection,
@@ -31,6 +31,7 @@ import {
   toggleMark,
   typedMarks,
   undo,
+  type WordContext,
   withEnvelope,
   wordContext,
 } from "@folijs/core";
@@ -45,27 +46,9 @@ import {
   PX_PER_MM,
   type Reuse,
 } from "./layout/flow.js";
-import {
-  type BlockDesc,
-  createWrapper,
-  isWrapper,
-  isWrapperFor,
-  PAGE_BREAK_ATTR,
-  renderBlock,
-} from "./render.js";
+import { type BlockDesc, PAGE_BREAK_ATTR } from "./render.js";
 import { spacing, type WordBlockDesc, WordRenderer } from "./word/edit.js";
 import { measureLineRatio } from "./word/pages.js";
-
-/**
- * A container around blocks (a list, a list item) as rendered: its node, the position before it
- * (which identifies it within one render), its index in its parent and its first block's index.
- */
-interface Container {
-  readonly node: ModelNode;
-  readonly pos: number;
-  readonly index: number;
-  readonly firstBlock: number;
-}
 
 /** Word's paragraph spacing for a schema v3 document (`flow`'s `word` spacing). */
 const WORD_RULES: FlowRules = { ...DEFAULT_RULES, spacing: "word" };
@@ -139,21 +122,16 @@ function printStyles({ pageSize }: DocumentSettings, id: string): string {
  * view cannot prevent (Android keyboards, extensions). A MutationObserver records those; the view
  * then reads the changed text back into a transaction (`readBack`) and re-renders.
  *
- * Blocks are the leaf blocks of the document at any depth (paragraphs, headings, rules); the
- * containers around them (lists, list items) are rebuilt on each page around the blocks it holds
- * (ADR-0004).
+ * Blocks are the document's paragraphs and opaque blocks (a schema v3 document has no
+ * containers: a list is numbered paragraphs).
  */
 export class EditorView {
   private state: EditorState;
-  private blocks: BlockDesc[] = [];
+  private blocks: WordBlockDesc[] = [];
   /** Position before each block, parallel to `blocks`. */
   private starts: number[] = [];
-  /** The containers around each block, outermost first, parallel to `blocks`. */
-  private chains: (readonly Container[])[] = [];
   /** The index of each block in `blocks`. */
   private indexOf = new Map<BlockDesc, number>();
-  /** The container types around each block at its last render (a change means re-measuring). */
-  private chainKeys = new WeakMap<ModelNode, string>();
   /** The element that shows a node selection, if any. */
   private selectedDom: HTMLElement | null = null;
   /** The page of each fragment of each block. */
@@ -177,7 +155,7 @@ export class EditorView {
    * Measurements by model node: a node's rendered height, margins and lines only depend on
    * its content (unchanged node, same identity), the page width and the CSS. Cleared when the
    * page settings or the fonts change; single entries go stale when a block's size changes
-   * without an edit (`ResizeObserver`: CSS, fonts, a container).
+   * without an edit (`ResizeObserver`: CSS, fonts).
    */
   private measures = new WeakMap<ModelNode, Measure>();
   private readonly stale = new Set<ModelNode>();
@@ -211,7 +189,7 @@ export class EditorView {
   private pointerFocus = false;
   /** Whether the view added the host's tabindex (a read-only host must stay focusable). */
   private readonly addedTabIndex: boolean;
-  /** Renders the blocks of a schema v3 document (8.7a); null for schema v2. */
+  /** Renders the document's blocks; made by the first render. */
   private word: WordRenderer | null = null;
   /** Fonts' normal line height ratios, measured once per family (Word's single spacing). */
   private readonly ratios = new Map<string, number>();
@@ -220,7 +198,7 @@ export class EditorView {
 
   constructor(
     readonly host: HTMLElement,
-    readonly editor: Editor<EditorDocument>,
+    readonly editor: Editor,
     options: EditorViewOptions = {},
   ) {
     this.state = editor.state;
@@ -391,18 +369,20 @@ export class EditorView {
   private render(): void {
     const { doc } = this.state;
     const ownerDocument = this.host.ownerDocument;
-    // A v3 document (or a new one) gets its renderer; nothing rendered before is reused then.
-    const context = wordContext(this.state);
+    // A new document (envelope) gets its renderer; nothing rendered before is reused then. An
+    // editor's state always has one (`createEditor`).
+    const context = wordContext(this.state) as WordContext;
     // Fonts loaded: a new renderer (new line heights), but not while a composition runs in a
     // block it would redraw.
     const renewed =
       context !== (this.word?.context ?? null) || (this.fontsChanged && !this.composing);
     if (renewed) this.fontsChanged = false;
+    let word = this.word as WordRenderer;
     if (renewed) {
-      this.word = context ? new WordRenderer(context, ownerDocument, this.lineRatio) : null;
+      word = this.word = new WordRenderer(context, ownerDocument, this.lineRatio);
       this.invalidateLayout();
     }
-    this.word?.prepare(doc);
+    word.prepare(doc);
     const previous = new Map(
       this.blocks.filter((desc) => !this.dirty.has(desc)).map((desc) => [desc.node, desc]),
     );
@@ -413,41 +393,12 @@ export class EditorView {
       this.linesStale = false;
       this.flowed = null;
     }
-    let blocks: BlockDesc[] = [];
+    let blocks: WordBlockDesc[] = [];
     const starts: number[] = [];
-    const chains: (readonly Container[])[] = [];
-    // Leaf blocks at any depth, in document order, with the containers around each.
-    const open: Container[] = [];
-    // The chain of the open containers and its key, rebuilt only when they change (blocks in
-    // the same container share one array).
-    let chain: readonly Container[] = [];
-    let chainKey = "";
-    const changed = () => {
-      chain = open.slice();
-      chainKey = open.map((container) => container.node.type.name).join(">");
-    };
-    doc.descendants((node, pos, _parent, index) => {
-      let popped = false;
-      while (open.length) {
-        const last = open[open.length - 1] as Container;
-        if (pos < last.pos + last.node.nodeSize) break;
-        open.pop();
-        popped = true;
-      }
-      if (!node.isTextblock && !node.isLeaf) {
-        open.push({ node, pos, index, firstBlock: blocks.length });
-        changed();
-        return true;
-      }
-      if (popped) changed();
-      // A block moved into or out of a container (wrapped in a list, indented, lifted) keeps its
-      // node but not its line width or margins: measure it again, and re-flow from it.
-      const before = this.chainKeys.get(node);
-      if (before !== undefined && before !== chainKey) this.stale.add(node);
-      this.chainKeys.set(node, chainKey);
+    doc.forEach((node, pos) => {
       let reused = renewed ? undefined : previous.get(node);
-      // A v3 block whose list number or comment shading changed (an edit before it) is redrawn.
-      if (reused && this.word && (reused as WordBlockDesc).key !== this.word.key(blocks.length)) {
+      // A block whose list number or comment shading changed (an edit before it) is redrawn.
+      if (reused && reused.key !== word.key(blocks.length)) {
         reused = undefined;
         this.stale.add(node);
       }
@@ -456,10 +407,8 @@ export class EditorView {
       const remeasure = dropLines || !this.measures.has(node) || this.stale.has(node);
       if (reused && reused.fragments.length > 1 && remeasure && !this.composing) reused = undefined;
       if (reused) previous.delete(node);
-      blocks.push(reused ?? this.renderNode(node, blocks.length));
+      blocks.push(reused ?? word.render(node, blocks.length));
       starts.push(pos);
-      chains.push(chain);
-      return false;
     });
     for (const stale of previous.values())
       for (const fragment of stale.fragments) fragment.remove();
@@ -469,7 +418,7 @@ export class EditorView {
       const before = previousPages.get(desc);
       return desc.fragments.map((_, f) => (last = Math.max(last, before?.[f] ?? last)));
     });
-    this.place(blocks, pages, chains);
+    this.place(blocks, pages);
     if (!this.composing) {
       // DOM reads only for blocks without a valid measurement (new, changed or stale ones).
       let scale: number | undefined;
@@ -483,10 +432,8 @@ export class EditorView {
           if (measure) delete measure.lines;
         }
       const nodes = blocks.map((desc) => desc.node);
-      // A v3 block's spacing depends on its neighbours' styles: reuse stops a block earlier.
-      const reuse = this.flowed
-        ? reuseOf(this.flowed, nodes, this.stale, this.word ? 1 : 0)
-        : undefined;
+      // A block's spacing depends on its neighbours' styles: reuse stops a block earlier.
+      const reuse = this.flowed ? reuseOf(this.flowed, nodes, this.stale, 1) : undefined;
       const measureOf = (desc: BlockDesc) => {
         let found = this.measures.get(desc.node);
         // A stale block is measured again once per render.
@@ -503,12 +450,9 @@ export class EditorView {
       };
       const pageHeight = contentHeight(this.editor.settings);
       const boxes = blocks.map((desc, i) =>
-        this.word
-          ? wordBox(blocks as WordBlockDesc[], i, measureOf(desc), () => lines(desc), pageHeight)
-          : blockBox(desc, measureOf(desc), () => lines(desc)),
+        wordBox(blocks, i, measureOf(desc), () => lines(desc), pageHeight),
       );
-      const rules = this.word ? WORD_RULES : DEFAULT_RULES;
-      const result = flowFrom(boxes, pageHeight, rules, reuse);
+      const result = flowFrom(boxes, pageHeight, WORD_RULES, reuse);
       this.flowed = { nodes, result };
       this.stale.clear();
       const flowed = result.fragments;
@@ -522,15 +466,14 @@ export class EditorView {
         });
         const same =
           splits.length === desc.splits.length && splits.every((at, k) => at === desc.splits[k]);
-        return same ? desc : this.renderNode(desc.node, i, splits);
+        return same ? desc : word.render(desc.node, i, splits);
       });
       pages = flowed.map((fragments) => fragments.map((fragment) => fragment.page));
-      if (this.word) applyGaps(blocks, pages, boxes);
-      this.place(blocks, pages, chains);
+      applyGaps(blocks, pages, boxes);
+      this.place(blocks, pages);
     }
     this.blocks = blocks;
     this.starts = starts;
-    this.chains = chains;
     this.indexOf = new Map(blocks.map((desc, i) => [desc, i]));
     this.fragmentPages = new Map(blocks.map((desc, i) => [desc, pages[i] ?? []]));
     this.owner = new Map(
@@ -546,13 +489,6 @@ export class EditorView {
     if (this.composing) this.pending.push(...records);
   }
 
-  /** Renders a block of the document (schema v2 or v3), split into fragments at `splits`. */
-  private renderNode(node: ModelNode, index: number, splits?: readonly number[]): BlockDesc {
-    return this.word
-      ? this.word.render(node, index, splits)
-      : renderBlock(node, this.host.ownerDocument, splits);
-  }
-
   /** A font's normal line height ratio, measured outside the host (no input to read back). */
   private lineRatio = (family: string): number => {
     let ratio = this.ratios.get(family);
@@ -566,19 +502,13 @@ export class EditorView {
 
   /**
    * Puts each fragment of each block into its page (pages are non-decreasing in document
-   * order), inside the elements of the block's containers (lists, list items), creating and
-   * removing pages as needed. A page reuses the container elements already at the same place
-   * (same tag, in order), so an edit inside a list moves no DOM. Anything else in the host, a
-   * page or a container (stray DOM) is removed.
+   * order), creating and removing pages as needed. Anything else in the host or a page (stray
+   * DOM) is removed.
    */
-  private place(
-    blocks: readonly BlockDesc[],
-    pages: readonly (readonly number[])[],
-    chains: readonly (readonly Container[])[],
-  ): void {
+  private place(blocks: readonly BlockDesc[], pages: readonly (readonly number[])[]): void {
     const { host } = this;
     const items = blocks.flatMap((desc, i) =>
-      desc.fragments.map((dom, f) => ({ dom, page: pages[i]?.[f] ?? 0, block: i, fragment: f })),
+      desc.fragments.map((dom, f) => ({ dom, page: pages[i]?.[f] ?? 0 })),
     );
     const count = (items[items.length - 1]?.page ?? 0) + 1;
     while (this.pages.length < count) this.pages.push(this.createPage());
@@ -588,87 +518,21 @@ export class EditorView {
       if (page === cursor) cursor = cursor.nextSibling;
       else host.insertBefore(page, cursor);
     }
-    const ownerDocument = host.ownerDocument;
-    /** Removes what is left after the last placed child (strays, and blocks of later pages). */
-    const closeLevel = (level: { at: ChildNode | null }) => {
-      let at = level.at;
+    let i = 0;
+    for (let p = 0; p < count; p++) {
+      const page = this.pages[p] as HTMLElement;
+      let at = page.firstChild;
+      for (; i < items.length && items[i]?.page === p; i++) {
+        const { dom } = items[i] as (typeof items)[number];
+        if (dom === at) at = at.nextSibling;
+        else page.insertBefore(dom, at);
+      }
+      // What is left after the last placed block: strays, and blocks of later pages.
       while (at) {
         const next: ChildNode | null = at.nextSibling;
         at.remove();
         at = next;
       }
-    };
-    // Block fragments not placed yet, and their blocks. A container element whose first block is
-    // still to be placed, in another container at that level, belongs to that later container: a
-    // block before it gets a new element instead of taking it (which would move every later block
-    // into the next element along, e.g. when one list item moves to the next page).
-    const pending = new Map<Node, number>(items.map((item) => [item.dom, item.block]));
-    /** Container elements placed in this pass (never taken twice). */
-    const claimed = new Set<Node>();
-    let i = 0;
-    for (let p = 0; p < count; p++) {
-      const page = this.pages[p] as HTMLElement;
-      const stack: { el: HTMLElement; at: ChildNode | null; pos: number }[] = [
-        { el: page, at: page.firstChild, pos: -1 },
-      ];
-      for (; i < items.length && items[i]?.page === p; i++) {
-        const item = items[i] as (typeof items)[number];
-        const chain = chains[item.block] ?? [];
-        // Keep the open containers this block shares with the previous one on this page.
-        let common = 0;
-        while (
-          common < chain.length &&
-          common + 1 < stack.length &&
-          stack[common + 1]?.pos === (chain[common] as Container).pos
-        )
-          common++;
-        while (stack.length > common + 1) closeLevel(stack.pop() as (typeof stack)[number]);
-        for (let k = common; k < chain.length; k++) {
-          const container = chain[k] as Container;
-          const parent = stack[stack.length - 1] as (typeof stack)[number];
-          let element: HTMLElement;
-          const candidate = parent.at;
-          const later = isWrapperFor(candidate, container.node)
-            ? pending.get(firstBlockIn(candidate) as Node)
-            : undefined;
-          // The element that holds this block now, at the innermost level: a list item whose
-          // block moves to another page takes its element along (as a paragraph does), instead
-          // of a new one replacing it on every page an edit shifts.
-          const own = k === chain.length - 1 ? item.dom.parentNode : null;
-          if (
-            isWrapperFor(candidate, container.node) &&
-            !claimed.has(candidate) &&
-            (later === undefined || chains[later]?.[k]?.pos === container.pos)
-          ) {
-            element = candidate;
-            parent.at = element.nextSibling;
-          } else if (
-            isWrapperFor(own, container.node) &&
-            !claimed.has(own) &&
-            !own.contains(parent.el)
-          ) {
-            element = own;
-            for (const level of stack) if (level.at === element) level.at = element.nextSibling;
-            parent.el.insertBefore(element, parent.at);
-          } else {
-            element = createWrapper(container.node, ownerDocument);
-            parent.el.insertBefore(element, parent.at);
-          }
-          claimed.add(element);
-          styleContainer(element, container, chain[k - 1], item);
-          stack.push({ el: element, at: element.firstChild, pos: container.pos });
-        }
-        const top = stack[stack.length - 1] as (typeof stack)[number];
-        if (item.dom === top.at) top.at = top.at.nextSibling;
-        else {
-          // A cursor of an outer level may point at this block (it moves into a new container):
-          // step it past, or it would point into the container.
-          for (const level of stack) if (level.at === item.dom) level.at = item.dom.nextSibling;
-          top.el.insertBefore(item.dom, top.at);
-        }
-        pending.delete(item.dom);
-      }
-      while (stack.length) closeLevel(stack.pop() as (typeof stack)[number]);
     }
     // Pages no longer needed and stray DOM in the host: all after the last page by now.
     let rest = (this.pages[count - 1] as HTMLElement).nextSibling;
@@ -801,9 +665,9 @@ export class EditorView {
     return null;
   }
 
-  /** Whether `node` holds blocks rather than content: the host, a page or a container. */
+  /** Whether `node` holds blocks rather than content: the host or a page. */
   private holdsBlocks(node: Node): boolean {
-    return node === this.host || this.pages.includes(node as HTMLElement) || isWrapper(node);
+    return node === this.host || this.pages.includes(node as HTMLElement);
   }
 
   /** Index of the first block that starts at or after `pos` (the block count if none). */
@@ -1160,7 +1024,7 @@ export class EditorView {
     const $pos = this.state.doc.resolve(pos);
     const node = $pos.parent.maybeChild($pos.index());
     const href = node && type.isInSet(node.marks)?.attrs.href;
-    return typeof href === "string" ? href : null;
+    return isSafeHref(href) ? href : null;
   }
 
   private onKeyDown = (event: KeyboardEvent): void => {
@@ -1494,13 +1358,13 @@ export class EditorView {
     const { selection, doc } = this.state;
     if (selection.empty || !event.clipboardData) return;
     event.preventDefault();
-    const context = wordContext(this.state);
+    const context = wordContext(this.state) as WordContext;
     const { text, html, json } = serializeRange(
       doc,
       selection.from,
       selection.to,
       this.host.ownerDocument,
-      context ? { context, ratio: this.lineRatio } : undefined,
+      { context, ratio: this.lineRatio },
     );
     event.clipboardData.setData("text/plain", text);
     event.clipboardData.setData("text/html", html);
@@ -1558,23 +1422,19 @@ export class EditorView {
     const marks = typedMarks(state.storedMarks ?? marksAt(state.selection.$from)).map((m) =>
       m.toJSON(),
     );
-    // A v3 document takes the styles, lists and comments the content needs (HTML as v2 content).
-    const pasted = docFromClipboard(
-      data,
-      marks,
-      wordContext(state)
-        ? (found) =>
-            found.html
-              ? fitPastedV2(state, parseContent(found.content))
-              : fitPaste(state, found.content, found.word)
-        : undefined,
+    // The document takes the styles, lists and comments the content needs (HTML is read as
+    // schema v2 content, then migrated).
+    const pasted = docFromClipboard(data, marks, (found) =>
+      found.html
+        ? fitPastedV2(state, parseContent(found.content))
+        : fitPaste(state, found.content, found.word),
     );
     // One empty textblock: nothing to paste (a lone rule is something).
     const only = pasted?.doc.childCount === 1 ? pasted.doc.firstChild : null;
     if (!pasted || (only?.isTextblock && !only.content.size)) return false;
     const { doc, open, envelope } = pasted;
-    // As a slice (text joins the text around the caret); where the schema refuses that (a
-    // list in a paragraph), as whole blocks fitted at the caret.
+    // As a slice (text joins the text around the caret); where that cannot be (an opaque block
+    // at an end), as whole blocks at the caret.
     const asSlice = (tr: Transaction) => {
       const $pos = tr.selection.$from;
       if (!open && $pos.depth === 1 && $pos.parent.isTextblock && !$pos.parent.content.size) {
@@ -1582,9 +1442,9 @@ export class EditorView {
         tr.replace(from, $pos.after(), new Slice(doc.content, 0, 0));
         tr.setSelection(Selection.near(tr.doc.resolve(from + doc.content.size), -1));
       } else {
-        // A slice opens into its first and last blocks: a rule there has no inside.
+        // A slice opens into its first and last blocks: an opaque block there has no inside.
         if (doc.firstChild?.isLeaf || doc.lastChild?.isLeaf) {
-          throw new TransformError("A rule at an end is pasted as a block");
+          throw new TransformError("An opaque block at an end is pasted as a block");
         }
         tr.replaceSelection(doc.slice(1, doc.content.size - 1));
       }
@@ -1615,95 +1475,24 @@ export class EditorView {
 }
 
 /**
- * Pastes whole blocks at the caret (after deleting the selection), for content a slice cannot
- * fit (lists): a single pasted list inside a list item joins that list (its items replace an
- * empty item, go before or after the item, or between its two halves); other blocks go before
- * or after the caret's textblock (replacing it when empty) where its parent takes them, else
- * between its two halves. Throws TransformError where the schema does not allow it.
+ * Pastes whole blocks at the caret (after deleting the selection): before or after the caret's
+ * paragraph, else between its two halves (an empty one is replaced as a slice first).
  */
 function insertBlocks(tr: Transaction, doc: ModelNode): void {
   const $pos = tr.selection.$from;
   if (!$pos.parent.isTextblock) throw new TransformError("No textblock at the caret");
   const atStart = $pos.parentOffset === 0;
   const atEnd = $pos.parentOffset === $pos.parent.content.size;
-  const only = doc.childCount === 1 ? doc.firstChild : null;
-  const itemType = tr.doc.type.schema.nodes.listItem;
-  const inItem = $pos.depth >= 2 && $pos.node(-1).type === itemType;
   let at: number;
-  let content = doc.content;
-  if (only && inItem && only.firstChild?.type === itemType) {
-    content = only.content;
-    const depth = $pos.depth - 1;
-    const item = $pos.node(depth);
-    if (atStart && atEnd && item.childCount === 1) {
-      at = $pos.before(depth);
-      tr.delete(at, $pos.after(depth));
-    } else if (atEnd) {
-      // After the item (and its nested list, if it has one): no item left without its text.
-      at = $pos.after(depth);
-    } else if (atStart && $pos.index(depth) === 0) at = $pos.before(depth);
-    else if (atStart) {
-      // At a later block's start: split the item between blocks, not inside the text.
-      const boundary = $pos.before();
-      tr.split(boundary, 1);
-      at = boundary + 1;
-    } else {
-      tr.split($pos.pos, 2);
-      at = $pos.pos + 2;
-    }
-  } else {
-    // Before, after, or in place of the textblock where its parent takes the blocks there (a
-    // list item's first paragraph must stay first); else between its two halves.
-    const parent = $pos.node(-1);
-    const index = $pos.index(-1);
-    if (atStart && atEnd && parent.canReplace(index, index + 1, content)) {
-      at = $pos.before();
-      tr.delete(at, $pos.after());
-    } else if (atStart && parent.canReplace(index, index, content)) at = $pos.before();
-    else if (atEnd && parent.canReplace(index + 1, index + 1, content)) at = $pos.after();
-    else {
-      tr.split($pos.pos);
-      at = $pos.pos + 1;
-    }
+  if (atStart) at = $pos.before();
+  else if (atEnd) at = $pos.after();
+  else {
+    tr.split($pos.pos);
+    at = $pos.pos + 1;
   }
-  tr.insert(at, content);
-  tr.setSelection(Selection.near(tr.doc.resolve(at + content.size), -1));
+  tr.insert(at, doc.content);
+  tr.setSelection(Selection.near(tr.doc.resolve(at + doc.content.size), -1));
 }
-
-/** The first block element inside a container element (through nested containers), or null. */
-function firstBlockIn(element: Element): Element | null {
-  let child = element.firstElementChild;
-  while (isWrapper(child)) child = child.firstElementChild;
-  return child;
-}
-
-/**
- * Sets what a container element shows on a page: an ordered list item's number (so numbering
- * continues across pages), and no marker on an item continued from the previous page (its
- * first block is on an earlier page, or this is a continued fragment of it).
- */
-function styleContainer(
-  element: HTMLElement,
-  container: Container,
-  parent: Container | undefined,
-  item: { block: number; fragment: number },
-): void {
-  if (element.localName !== "li") return;
-  const continued = item.block !== container.firstBlock || item.fragment > 0;
-  const start = parent?.node.type.name === "orderedList" ? parent.node.attrs.start : undefined;
-  const value = typeof start === "number" ? String(start + container.index) : null;
-  // Written only when they change (checked against what was written last, without reading the
-  // DOM): this runs for every list item on every render, and every write invalidates style.
-  const state = `${continued}|${value}`;
-  if (containerStates.get(element) === state) return;
-  containerStates.set(element, state);
-  element.style.listStyleType = continued ? "none" : "";
-  if (value === null) element.removeAttribute("value");
-  else element.setAttribute("value", value);
-}
-
-/** What `styleContainer` last wrote on each list item element. */
-const containerStates = new WeakMap<HTMLElement, string>();
 
 /**
  * Client rects are scaled by CSS `zoom` or a `transform` on an ancestor, while margins and the
@@ -1746,38 +1535,10 @@ function measureBox(desc: BlockDesc, scale: number): Measure {
 }
 
 /**
- * What the flow needs of a block: its measurement, its lines (on demand), and what the rules
- * need: headings keep with the next block; page breaks end their line's page.
- */
-function blockBox(desc: BlockDesc, measure: Measure, lines: () => Lines): BlockBox {
-  return {
-    height: measure.height,
-    marginTop: measure.marginTop,
-    marginBottom: measure.marginBottom,
-    lines: () => lines().bottoms,
-    keepWithNext: desc.node.type.name === "heading",
-    breaksAfter: () => {
-      const breaks = desc.leaves.filter(
-        (leaf) =>
-          leaf.dom.nodeType !== Node.TEXT_NODE &&
-          (leaf.dom as Element).hasAttribute(PAGE_BREAK_ATTR),
-      );
-      if (!breaks.length) return [];
-      const { starts } = lines();
-      // The line holding the break: the last one starting at or before it.
-      return breaks.map((leaf) => {
-        let line = starts.length - 1;
-        while (line > 0 && (starts[line] as number) > leaf.offset) line--;
-        return line;
-      });
-    },
-  };
-}
-
-/**
- * What the flow needs of a schema v3 block: Word's spacing before and after (next to its
- * neighbours), keep with next, keep lines together (not for a block taller than a page, or one
- * with a page break in it), and a page break before the next block ending this one's page.
+ * What the flow needs of a block: its measurement, its lines (on demand), Word's spacing before
+ * and after (next to its neighbours), keep with next, keep lines together (not for a block
+ * taller than a page, or one with a page break in it), page breaks ending their line's page,
+ * and a page break before the next block ending this one's page.
  */
 function wordBox(
   blocks: readonly WordBlockDesc[],
@@ -1788,12 +1549,12 @@ function wordBox(
 ): BlockBox {
   const desc = blocks[i] as WordBlockDesc;
   const next = blocks[i + 1];
-  const base = blockBox(desc, measure, lines);
   const { before, after } = spacing(blocks[i - 1]?.word, desc.word, next?.word);
-  const hasBreak = desc.leaves.some(
+  const pageBreaks = desc.leaves.filter(
     (leaf) =>
       leaf.dom.nodeType !== Node.TEXT_NODE && (leaf.dom as Element).hasAttribute(PAGE_BREAK_ATTR),
   );
+  const hasBreak = pageBreaks.length > 0;
   const kept = desc.word.keepLines && !hasBreak && measure.height <= pageHeight;
   const bottoms = () => (kept ? [measure.height] : lines().bottoms);
   return {
@@ -1803,7 +1564,13 @@ function wordBox(
     keepWithNext: desc.word.keepNext,
     lines: bottoms,
     breaksAfter: () => {
-      const breaks = hasBreak ? [...(base.breaksAfter?.() ?? [])] : [];
+      // The line holding each break: the last one starting at or before it.
+      const breaks = pageBreaks.map((leaf) => {
+        const { starts } = lines();
+        let line = starts.length - 1;
+        while (line > 0 && (starts[line] as number) > leaf.offset) line--;
+        return line;
+      });
       if (next?.word.pageBreakBefore) breaks.push(bottoms().length - 1);
       return breaks;
     },

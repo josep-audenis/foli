@@ -1,10 +1,4 @@
-import {
-  createDocument,
-  type Editor,
-  type EditorDocument,
-  type FoliDocumentV3,
-  parseDocumentV3,
-} from "@folijs/core";
+import { createDocument, type Editor, type EditorDocument, parseDocumentV3 } from "@folijs/core";
 import { FoliEditor, type FoliEditorHandle } from "@folijs/react";
 import { type ChangeEvent, useRef, useState } from "react";
 
@@ -152,7 +146,7 @@ function load(): EditorDocument {
 }
 
 // The editor with unsaved changes: its document is serialized when saving, not per keystroke.
-let pending: Editor<FoliDocumentV3> | null = null;
+let pending: Editor | null = null;
 let timer: ReturnType<typeof setTimeout> | undefined;
 
 function flush(): void {
@@ -166,7 +160,7 @@ function flush(): void {
 }
 
 /** Saves once changes pause for 300 ms; leaving the page saves anything still pending. */
-function save({ editor }: { editor: Editor<FoliDocumentV3> }): void {
+function save({ editor }: { editor: Editor }): void {
   pending = editor;
   clearTimeout(timer);
   timer = setTimeout(flush, 300);

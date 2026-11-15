@@ -1,6 +1,8 @@
 # ADR-0004: Nested blocks on pages
 
-- **Status:** Accepted (2026-11-07), task 7.3.
+- **Status:** Accepted (2026-11-07), task 7.3. Superseded in 8.7d2 (2026-11-15): the editor holds
+  schema v3 only ([ADR-0005](ADR-0005-word-compatible-model.md)), whose blocks are flat (a list
+  is numbered paragraphs), and the containers per page went with v2's editing.
 - **Context:** schema v2 (7.2) nests blocks: a `listItem` holds a paragraph and further blocks
   (nested lists), lists hold items. The view (ADR-0003, Phase 5) was built for a flat document:
   one rendered block per child of `doc`, one layout box per block, positions from top-level

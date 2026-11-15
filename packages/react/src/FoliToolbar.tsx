@@ -1,22 +1,19 @@
 import {
   type Alignment,
-  AllSelection,
   alignAt,
   type Command,
   canOutdent,
   changeIndent,
   colorAt,
+  type Editor,
   type EditorState,
   fontFamilyAt,
   fontSizeAt,
-  insertHorizontalRule,
   insertPageBreak,
   isSafeHref,
-  liftListItem,
   lineSpacingAt,
   linkAt,
   listKindAt,
-  NodeSelection,
   normalizeHref,
   openLinkEditor,
   paragraphStyleAt,
@@ -26,7 +23,6 @@ import {
   removeLink,
   requestsLinkEditor,
   setAlign,
-  setBlockType,
   setFontFamily,
   setFontSize,
   setHighlight,
@@ -34,13 +30,11 @@ import {
   setLink,
   setParagraphStyle,
   setTextColor,
-  sinkListItem,
   toggleList,
   toggleMark,
   undo,
   undoDepth,
   wordContext,
-  wrapInList,
 } from "@folijs/core";
 import {
   type FormEvent,
@@ -53,7 +47,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { type AnyEditor, useEditorOrContext, useEditorState } from "./editor.js";
+import { useEditorOrContext, useEditorState } from "./editor.js";
 
 export interface FoliToolbarProps {
   /**
@@ -61,7 +55,7 @@ export interface FoliToolbarProps {
    * (Word's model) gets Word's controls: paragraph style, font, size, line spacing, Word's
    * highlight colors; no heading buttons or horizontal rule.
    */
-  editor?: AnyEditor | undefined;
+  editor?: Editor | undefined;
   /**
    * Every button is disabled. Pass it whenever the canvas is `readOnly`: commands run through
    * the editor, which code may always change (`FoliEditor` does this for you).
@@ -87,7 +81,7 @@ interface Item {
   /** Shown instead of `text` (a symbol: the label is the name). */
   icon?: ReactNode;
   /** Whether the button shows as pressed (toggle buttons only). */
-  pressed?: (state: EditorState, editor: AnyEditor) => boolean;
+  pressed?: (state: EditorState, editor: Editor) => boolean;
   /**
    * Whether the command can run now (default: always; in schema v1 every selection is in
    * textblocks, which take every mark, block type and page break). A cheap check, not a dry
@@ -130,18 +124,8 @@ const TEXT_COLORS: readonly ColorOption[] = [
   { name: "Blue", color: "#1f5fbf" },
   { name: "Purple", color: "#7030a0" },
 ];
-const HIGHLIGHTS: readonly ColorOption[] = [
-  { name: "None", color: null },
-  { name: "Yellow", color: "#fff59d" },
-  { name: "Green", color: "#c8e6c9" },
-  { name: "Blue", color: "#bbdefb" },
-  { name: "Pink", color: "#f8bbd0" },
-  { name: "Orange", color: "#ffe0b2" },
-  { name: "Gray", color: "#e0e0e0" },
-];
-
 /** Word's highlight colors (a document opened in Word shows these exactly). */
-const WORD_HIGHLIGHTS: readonly ColorOption[] = [
+const HIGHLIGHTS: readonly ColorOption[] = [
   { name: "None", color: null },
   { name: "Yellow", color: "#ffff00" },
   { name: "Bright green", color: "#00ff00" },
@@ -182,22 +166,6 @@ const align = (value: Alignment, label: string, bars: readonly [number, number][
   command: () => setAlign(value),
 });
 
-/** Whether the selection holds textblocks and all of them are `type` with `level` (if given). */
-function blockIs(state: EditorState, type: string, level?: number): boolean {
-  const { from, to } = state.selection;
-  let all = true;
-  let any = false;
-  state.doc.nodesBetween(from, to, (node) => {
-    if (!all) return false;
-    if (node.isTextblock) {
-      any = true;
-      if (node.type.name !== type || (level && node.attrs.level !== level)) all = false;
-    }
-    return !node.isTextblock;
-  });
-  return any && all;
-}
-
 const mark = (key: string, label: string, text: string): Item => ({
   key,
   label,
@@ -207,165 +175,6 @@ const mark = (key: string, label: string, text: string): Item => ({
   command: () => toggleMark(key),
 });
 
-const heading = (level: number): Item => ({
-  key: `h${level}`,
-  label: `Heading ${level}`,
-  text: `H${level}`,
-  pressed: (state) => blockIs(state, "heading", level),
-  // Pressing an active heading turns it back into a paragraph.
-  command: (state) =>
-    blockIs(state, "heading", level)
-      ? setBlockType("paragraph")
-      : setBlockType("heading", { level }),
-});
-
-const GROUPS: Item[][] = [
-  [
-    mark("bold", "Bold", "B"),
-    mark("italic", "Italic", "I"),
-    mark("underline", "Underline", "U"),
-    mark("strike", "Strikethrough", "S"),
-    {
-      key: "link",
-      label: "Link",
-      text: "Link",
-      pressed: (state) => linkAt(state) !== null,
-      enabled: (state) => openLinkEditor(state),
-      // Asks for the link dialog, as Mod-K does: the toolbar listens for that request.
-      command: () => openLinkEditor,
-    },
-    {
-      key: "textColor",
-      label: "Text color",
-      text: "A",
-      symbol: true,
-      enabled: hasTextblock,
-      menu: {
-        options: TEXT_COLORS,
-        value: (state) => colorAt(state, "textColor"),
-        pick: setTextColor,
-      },
-    },
-    {
-      key: "highlight",
-      label: "Highlight",
-      text: "H",
-      symbol: true,
-      enabled: hasTextblock,
-      menu: {
-        options: HIGHLIGHTS,
-        value: (state) => colorAt(state, "highlight"),
-        pick: setHighlight,
-      },
-    },
-  ],
-  [
-    {
-      key: "paragraph",
-      label: "Paragraph",
-      text: "¶",
-      symbol: true,
-      pressed: (state) => blockIs(state, "paragraph"),
-      command: () => setBlockType("paragraph"),
-    },
-    heading(1),
-    heading(2),
-    heading(3),
-  ],
-  [
-    align("start", "Align left", [
-      [1, 14],
-      [1, 9],
-      [1, 14],
-      [1, 9],
-    ]),
-    align("center", "Center", [
-      [1, 14],
-      [3.5, 9],
-      [1, 14],
-      [3.5, 9],
-    ]),
-    align("end", "Align right", [
-      [1, 14],
-      [6, 9],
-      [1, 14],
-      [6, 9],
-    ]),
-    align("justify", "Justify", [
-      [1, 14],
-      [1, 14],
-      [1, 14],
-      [1, 14],
-    ]),
-  ],
-  [
-    {
-      key: "bulletList",
-      label: "Bulleted list",
-      text: "•",
-      symbol: true,
-      pressed: (state) => listKindAt(state) === "bulletList",
-      enabled: (state) => listKindAt(state) !== null || wrapInList("bulletList")(state),
-      command: () => toggleList("bulletList"),
-    },
-    {
-      key: "orderedList",
-      label: "Numbered list",
-      // A symbol, not "1.": visible text that is not part of the name fails WCAG 2.5.3.
-      text: "№",
-      symbol: true,
-      pressed: (state) => listKindAt(state) === "orderedList",
-      enabled: (state) => listKindAt(state) !== null || wrapInList("orderedList")(state),
-      command: () => toggleList("orderedList"),
-    },
-    {
-      key: "outdent",
-      label: "Decrease indent",
-      text: "⇤",
-      symbol: true,
-      enabled: (state) => listKindAt(state) !== null,
-      command: () => liftListItem(),
-    },
-    {
-      key: "indent",
-      label: "Increase indent",
-      text: "⇥",
-      symbol: true,
-      enabled: (state) => canIndent(state),
-      command: () => sinkListItem(),
-    },
-  ],
-  [
-    {
-      key: "undo",
-      label: "Undo",
-      text: "Undo",
-      enabled: (state) => undoDepth(state) > 0,
-      command: () => undo,
-    },
-    {
-      key: "redo",
-      label: "Redo",
-      text: "Redo",
-      enabled: (state) => redoDepth(state) > 0,
-      command: () => redo,
-    },
-  ],
-  [
-    {
-      key: "horizontalRule",
-      label: "Horizontal rule",
-      text: "―",
-      symbol: true,
-      enabled: (state) =>
-        state.selection.$from.parent.isTextblock ||
-        state.selection instanceof AllSelection ||
-        (state.selection instanceof NodeSelection && state.selection.node.isBlock),
-      command: () => insertHorizontalRule,
-    },
-    { key: "pageBreak", label: "Page break", text: "Page break", command: () => insertPageBreak },
-  ],
-];
 const capitalized = (name: string) => name.charAt(0).toUpperCase() + name.slice(1);
 
 /** The fonts the font box offers (with the document's theme fonts, and the one shown now). */
@@ -382,8 +191,8 @@ const FONTS = [
 const SIZES = [8, 9, 10, 10.5, 11, 12, 14, 16, 18, 20, 22, 24, 26, 28, 36, 48, 72];
 const LINE_SPACINGS = [1, 1.15, 1.5, 2, 2.5, 3];
 
-/** The toolbar for a schema v3 document: Word's controls. */
-const WORD_GROUPS: Item[][] = [
+/** Word's controls. */
+const GROUPS: Item[][] = [
   [
     {
       key: "style",
@@ -429,13 +238,70 @@ const WORD_GROUPS: Item[][] = [
       },
     },
   ],
-  (GROUPS[0] as Item[]).map((item) =>
-    item.key === "highlight" && item.menu
-      ? { ...item, menu: { ...item.menu, options: WORD_HIGHLIGHTS } }
-      : item,
-  ),
   [
-    ...(GROUPS[2] as Item[]),
+    mark("bold", "Bold", "B"),
+    mark("italic", "Italic", "I"),
+    mark("underline", "Underline", "U"),
+    mark("strike", "Strikethrough", "S"),
+    {
+      key: "link",
+      label: "Link",
+      text: "Link",
+      pressed: (state) => linkAt(state) !== null,
+      enabled: (state) => openLinkEditor(state),
+      // Asks for the link dialog, as Mod-K does: the toolbar listens for that request.
+      command: () => openLinkEditor,
+    },
+    {
+      key: "textColor",
+      label: "Text color",
+      text: "A",
+      symbol: true,
+      enabled: hasTextblock,
+      menu: {
+        options: TEXT_COLORS,
+        value: (state) => colorAt(state, "textColor"),
+        pick: setTextColor,
+      },
+    },
+    {
+      key: "highlight",
+      label: "Highlight",
+      text: "H",
+      symbol: true,
+      enabled: hasTextblock,
+      menu: {
+        options: HIGHLIGHTS,
+        value: (state) => colorAt(state, "highlight"),
+        pick: setHighlight,
+      },
+    },
+  ],
+  [
+    align("start", "Align left", [
+      [1, 14],
+      [1, 9],
+      [1, 14],
+      [1, 9],
+    ]),
+    align("center", "Center", [
+      [1, 14],
+      [3.5, 9],
+      [1, 14],
+      [3.5, 9],
+    ]),
+    align("end", "Align right", [
+      [1, 14],
+      [6, 9],
+      [1, 14],
+      [6, 9],
+    ]),
+    align("justify", "Justify", [
+      [1, 14],
+      [1, 14],
+      [1, 14],
+      [1, 14],
+    ]),
     {
       key: "lineSpacing",
       label: "Line spacing",
@@ -453,7 +319,25 @@ const WORD_GROUPS: Item[][] = [
     },
   ],
   [
-    ...(GROUPS[3] as Item[]).slice(0, 2),
+    {
+      key: "bulletList",
+      label: "Bulleted list",
+      text: "•",
+      symbol: true,
+      pressed: (state) => listKindAt(state) === "bulletList",
+      enabled: hasTextblock,
+      command: () => toggleList("bulletList"),
+    },
+    {
+      key: "orderedList",
+      label: "Numbered list",
+      // A symbol, not "1.": visible text that is not part of the name fails WCAG 2.5.3.
+      text: "№",
+      symbol: true,
+      pressed: (state) => listKindAt(state) === "orderedList",
+      enabled: hasTextblock,
+      command: () => toggleList("orderedList"),
+    },
     {
       key: "outdent",
       label: "Decrease indent",
@@ -471,21 +355,26 @@ const WORD_GROUPS: Item[][] = [
       command: () => changeIndent(1),
     },
   ],
-  GROUPS[4] as Item[],
-  (GROUPS[5] as Item[]).filter((item) => item.key !== "horizontalRule"),
+  [
+    {
+      key: "undo",
+      label: "Undo",
+      text: "Undo",
+      enabled: (state) => undoDepth(state) > 0,
+      command: () => undo,
+    },
+    {
+      key: "redo",
+      label: "Redo",
+      text: "Redo",
+      enabled: (state) => redoDepth(state) > 0,
+      command: () => redo,
+    },
+  ],
+  [{ key: "pageBreak", label: "Page break", text: "Page break", command: () => insertPageBreak }],
 ];
 
 const ITEMS = GROUPS.flat();
-const WORD_ITEMS = WORD_GROUPS.flat();
-
-/** Whether the selection starts in a list item that has an item before it (cheap: no dry run). */
-function canIndent(state: EditorState): boolean {
-  const { $from } = state.selection;
-  for (let depth = $from.depth; depth > 0; depth--) {
-    if ($from.node(depth).type.name === "listItem") return $from.index(depth - 1) > 0;
-  }
-  return false;
-}
 
 interface LinkDialogState {
   /** The link at the selection when the dialog opened ("" for none). */
@@ -515,20 +404,19 @@ const sameStates = (a: ItemState[], b: ItemState[]) =>
 /** Runs after every transaction: O(selection), no transactions built. */
 const statesOf =
   (items: readonly Item[]) =>
-  (state: EditorState, editor: AnyEditor): ItemState[] =>
+  (state: EditorState, editor: Editor): ItemState[] =>
     items.map((item) => ({
       pressed: item.pressed?.(state, editor),
       enabled: item.enabled?.(state) ?? true,
       value: item.menu?.value(state) ?? item.select?.value(state),
     }));
 const selectStates = statesOf(ITEMS);
-const selectWordStates = statesOf(WORD_ITEMS);
 
 /**
- * Formatting buttons for an editor: marks, link (a dialog, also on Mod-K in the document), text
- * color and highlight menus, paragraph and heading levels, alignment, lists (bulleted,
- * numbered, decrease and increase indent), undo, redo, horizontal rule, page break. One tab stop (arrow keys,
- * Home and End move between buttons); toggles carry
+ * Word's formatting controls for an editor: paragraph style, font and size boxes, marks, link (a
+ * dialog, also on Mod-K in the document), text color and highlight menus, alignment and line
+ * spacing, lists (bulleted, numbered, decrease and increase indent), undo, redo, page break.
+ * One tab stop (arrow keys, Home and End move between buttons); toggles carry
  * `aria-pressed`; a button whose command cannot run now is `aria-disabled` (still focusable).
  * Clicks leave the focus and selection in the document.
  */
@@ -540,13 +428,9 @@ export function FoliToolbar({
   className,
 }: FoliToolbarProps) {
   const editor = useEditorOrContext(given, "FoliToolbar");
-  const word = useEditorState((state) => wordContext(state) !== null, { editor });
-  const groups = word ? WORD_GROUPS : GROUPS;
-  const items = word ? WORD_ITEMS : ITEMS;
-  const states = useEditorState(word ? selectWordStates : selectStates, {
-    editor,
-    isEqual: sameStates,
-  });
+  const groups = GROUPS;
+  const items = ITEMS;
+  const states = useEditorState(selectStates, { editor, isEqual: sameStates });
   const [active, setActive] = useState(0);
   const buttons = useRef<(HTMLButtonElement | HTMLSelectElement | null)[]>([]);
   // Whether a select box was last used with the pointer (its pick then goes back to the document).
@@ -873,7 +757,7 @@ function LinkDialog({
   request,
   onClose,
 }: {
-  editor: AnyEditor;
+  editor: Editor;
   href: string;
   /** Counts the open requests: each one focuses the field. */
   request: number;

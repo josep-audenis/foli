@@ -16,7 +16,7 @@ import { FoliToolbar } from "./FoliToolbar.js";
  * spreading the object or `JSON.stringify(change)` serializes the document (and walks `editor`).
  */
 export interface FoliChange {
-  readonly editor: Editor<FoliDocumentV3>;
+  readonly editor: Editor;
   /** The transactions of this change (several when plugins append their own). */
   readonly transactions: readonly Transaction[];
   /**
@@ -48,7 +48,7 @@ export interface FoliEditorProps extends Omit<FoliCanvasProps, "editor"> {
 
 /** What a `ref` on `FoliEditor` gives: its editor (commands, `setDocument`…) and focus. */
 export interface FoliEditorHandle extends FoliCanvasHandle {
-  readonly editor: Editor<FoliDocumentV3>;
+  readonly editor: Editor;
 }
 
 /**

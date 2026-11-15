@@ -2,9 +2,8 @@
  * The benchmark page (`/bench.html`, dev server only): mounts the editor on demand and times it
  * from inside the page. Driven by `apps/playground/bench/`; see docs/benchmarks.md.
  */
-import { createEditor, type FoliDocument, parseDocument } from "@folijs/core";
-import { FoliCanvas, FoliEditorProvider, FoliToolbar } from "@folijs/react";
-import { useLayoutEffect, useState } from "react";
+import { parseDocumentV3 } from "@folijs/core";
+import { type FoliChange, FoliEditor } from "@folijs/react";
 import { flushSync } from "react-dom";
 import { createRoot, type Root } from "react-dom/client";
 import "@folijs/react/styles.css";
@@ -54,37 +53,27 @@ addEventListener(
   { capture: true },
 );
 
+// Every change reads the document back, as an app that saves on each change does (the
+// playground saves after a pause instead): the whole document is serialized per keystroke.
+const readBack = (change: FoliChange) => change.document;
+
 /**
- * `FoliEditor`'s parts on a schema v2 editor (`FoliEditor` migrates to v3; 8.7d2 measures v3).
- * Every change reads the document back, as an app that saves on each change does (the
- * playground saves after a pause instead): the whole document is serialized per keystroke.
+ * The font swap: the document's runs carry their fonts inline (and the test font is forced over
+ * them), so the other font is a rule that overrides both.
  */
-function Bench({ document }: { document: FoliDocument }) {
-  const [editor] = useState(() => createEditor({ document }));
-  useLayoutEffect(
-    () =>
-      editor.subscribe((_, transactions) => {
-        if (transactions.some((tr) => tr.docChanged)) editor.getDocument();
-      }),
-    [editor],
-  );
-  return (
-    <FoliEditorProvider editor={editor}>
-      <FoliToolbar editor={editor} />
-      <FoliCanvas editor={editor} />
-    </FoliEditorProvider>
-  );
-}
-let swapped = false;
+const swap = document.createElement("style");
+swap.textContent =
+  "html body .foli-canvas .foli-page :is(p, h1, h2, h3, h4, h5, h6, span) " +
+  "{ font-family: sans-serif !important; }";
 
 const bench = {
   /** Mounts a stored document: time until it is laid out (synchronous), and until painted. */
   async mount(json: unknown): Promise<{ layoutMs: number; paintMs: number; pages: number }> {
-    const document = parseDocument(json);
+    const document = parseDocumentV3(json);
     root?.unmount();
     root = createRoot(container);
     const start = performance.now();
-    flushSync(() => root?.render(<Bench document={document} />));
+    flushSync(() => root?.render(<FoliEditor initialContent={document} onChange={readBack} />));
     const layoutMs = performance.now() - start;
     await painted();
     return { layoutMs, paintMs: performance.now() - start, pages: pages() };
@@ -95,18 +84,20 @@ const bench = {
     return key;
   },
   /**
-   * A full re-flow as when a web font with other metrics finishes loading: the editor's font
-   * family switches (between the test font and the default sans-serif) and `loadingdone`
-   * fires. The browser lays all the text out again and the view measures every block and
-   * flows the whole document. Time from the start of the frame that re-flows until painted.
+   * A full re-flow as when a web font with other metrics finishes loading: the text's font
+   * switches (between the test font and the default sans-serif) and `loadingdone` fires. The
+   * browser lays all the text out again and the view measures every block and flows the whole
+   * document. Time from the start of the frame that re-flows until painted, and the font the
+   * first paragraph's text then shows (the swap took).
    */
-  async reflow(): Promise<{ ms: number; pages: number }> {
-    swapped = !swapped;
-    const canvas = document.querySelector<HTMLElement>(".foli-canvas");
-    canvas?.style.setProperty("--foli-font-family", swapped ? "sans-serif" : null);
+  async reflow(): Promise<{ ms: number; pages: number; font: string }> {
+    if (swap.isConnected) swap.remove();
+    else document.head.append(swap);
     document.fonts.dispatchEvent(new Event("loadingdone"));
     const frame = await painted();
-    return { ms: performance.now() - frame, pages: pages() };
+    const span = document.querySelector(".foli-page p span");
+    const font = span ? getComputedStyle(span).fontFamily : "";
+    return { ms: performance.now() - frame, pages: pages(), font };
   },
 };
 

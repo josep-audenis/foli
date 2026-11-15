@@ -28,7 +28,6 @@ export {
 export {
   alignAt,
   colorAt,
-  insertHorizontalRule,
   setAlign,
   setHighlight,
   setTextColor,
@@ -58,7 +57,6 @@ export {
   liftListItemAtStart,
   listKeymap,
   listKindAt,
-  listTypeAt,
   sinkListItem,
   splitListItem,
   toggleList,

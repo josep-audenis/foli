@@ -8,12 +8,11 @@ import {
   type MarkJSON,
   type Node as ModelNode,
   type ParagraphJSON,
-  parseContent,
   type SimpleMarkName,
   type WordContext,
   type WordEnvelope,
 } from "@folijs/core";
-import { PAGE_BREAK_ATTR, renderTree } from "./render.js";
+import { PAGE_BREAK_ATTR } from "./render.js";
 import { opaqueParagraphsText, parseOpaque } from "./word/blocks.js";
 import { clipboardBlocks } from "./word/edit.js";
 
@@ -30,14 +29,14 @@ export interface Found {
   open: boolean;
   /** Read from HTML: schema v2 content as `htmlToDoc` reads it. */
   html?: boolean;
-  /** The definitions a schema v3 copy carries. */
+  /** The definitions (styles, numbering, comments) a copy carries. */
   word?: unknown;
 }
 
 /** Validated clipboard content. */
 export interface Pasted {
   doc: ModelNode;
-  /** A schema v3 paste: the target's envelope with what the content needs (styles, lists...). */
+  /** The target's envelope with what the content needs (styles, lists...), when it changed. */
   envelope?: WordEnvelope;
   /**
    * True when no block boundary was copied (text from inside one block, plain text, inline
@@ -54,45 +53,37 @@ export interface ClipboardContent {
 }
 
 /**
- * Serializes `from..to` of `doc` for the clipboard. Hard breaks and block ends become "\n". A
- * schema v3 document (`word`: its context and the fonts' line height ratios) is copied as its
- * Word renderer draws it: resolved formatting as inline CSS, list numbers as Word's HTML has them.
+ * Serializes `from..to` of `doc` for the clipboard. Hard breaks and block ends become "\n". The
+ * HTML is the document as its Word renderer draws it (`word`: its context and the fonts' line
+ * height ratios): resolved formatting as inline CSS, list numbers as Word's HTML has them.
  */
 export function serializeRange(
   doc: ModelNode,
   from: number,
   to: number,
   ownerDocument: Document,
-  word?: { context: WordContext; ratio: (family: string) => number },
+  word: { context: WordContext; ratio: (family: string) => number },
 ): ClipboardContent {
   // A slice inside one textblock holds only inline content: wrap it back in its ancestors.
   const $from = doc.resolve(from);
   let content = doc.slice(from, to).content;
   for (let depth = $from.sharedDepth(to); depth > 0; depth--)
     content = Fragment.from($from.node(depth).copy(content));
-  // Not validated: a cut-open list item may lack its first paragraph. The JSON is validated
-  // when pasted; the HTML is only markup.
+  // Not validated: the JSON is validated when pasted; the HTML is only markup.
   const blocks = doc.type.createOpen(null, content);
   const container = ownerDocument.createElement("div");
-  // Built with createElement/textContent (render.ts); reading innerHTML only serializes it.
-  // A range inside one textblock is that block's text: its lists around it stay out of the HTML
-  // (a word copied from a list item must not paste as a one-item list); the JSON keeps them.
+  // Built with createElement/textContent (word/edit.ts); reading innerHTML only serializes it.
+  // A range inside one paragraph is that paragraph's text: its list number stays out of the HTML
+  // (a word copied from a list item must not paste as a one-item list); the JSON keeps it.
   const $to = doc.resolve(to);
   const inline = $from.parent.isTextblock && $from.sameParent($to);
   const htmlBlocks = inline
     ? [$from.parent.copy(doc.slice(from, to).content)]
     : blocks.content.content;
-  if (word) {
-    const first = inline ? -1 : $from.index(0);
-    container.append(
-      ...clipboardBlocks(word.context, doc, htmlBlocks, first, ownerDocument, word.ratio),
-    );
-  } else renderTree(htmlBlocks, container, ownerDocument);
-  // Keep repeated and leading spaces in other apps (v3 blocks have it already: writing the style
-  // again would drop the `mso-list` Word reads, which the CSS object model does not know).
-  if (!word)
-    for (const block of container.querySelectorAll("p, h1, h2, h3, h4, h5, h6"))
-      (block as HTMLElement).style.whiteSpace = "pre-wrap";
+  const first = inline ? -1 : $from.index(0);
+  container.append(
+    ...clipboardBlocks(word.context, doc, htmlBlocks, first, ownerDocument, word.ratio),
+  );
   // How other apps (and print) recognize a page break; the editor itself does not need it.
   for (const br of container.querySelectorAll(`br[${PAGE_BREAK_ATTR}]`))
     (br as HTMLElement).style.cssText = "page-break-before: always; break-before: page";
@@ -102,7 +93,7 @@ export function serializeRange(
     json: JSON.stringify({
       open: $from.sharedDepth(to) > 0,
       content: blocks.toJSON(),
-      ...(word ? { word: copiedDefinitions(word.context, blocks) } : {}),
+      word: copiedDefinitions(word.context, blocks),
     }),
   };
 }
@@ -126,14 +117,14 @@ function leafText(leaf: ModelNode, doc: Document): string {
 
 /**
  * The content of clipboard data, validated, or null. Priority: Foli JSON, then HTML, then plain
- * text. Every format is validated by `parse` (by default the schema's `parseContent`); a format
- * that fails falls through to the next. `marks` are given to plain text (the marks typing would
- * get at the insertion point).
+ * text. Every format is validated and fitted to the document by `parse` (`fitPaste`,
+ * `fitPastedV2`); a format that fails falls through to the next. `marks` are given to plain text
+ * (the marks typing would get at the insertion point).
  */
 export function docFromClipboard(
   data: Pick<DataTransfer, "getData">,
-  marks: readonly MarkJSON[] = [],
-  parse: (found: Found) => Omit<Pasted, "open"> = (found) => ({ doc: parseContent(found.content) }),
+  marks: readonly MarkJSON[],
+  parse: (found: Found) => Omit<Pasted, "open">,
 ): Pasted | null {
   const json = data.getData(FOLI_MIME);
   const html = data.getData("text/html");

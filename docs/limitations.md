@@ -26,28 +26,24 @@ checklist in [testing/ime.md](testing/ime.md)):
 
 ## Content
 
-- Schema v2: paragraphs, headings 1–6, bulleted and numbered lists, horizontal rules, line and
-  page breaks; bold, italic, underline, strikethrough, links, text color, highlight; alignment.
-  No DOCX import or export yet (Phase 8, [ADR-0005](decisions/ADR-0005-word-compatible-model.md)),
-  no tracked changes or comments (Phase 9), no tables or images (Phase 10), no headers,
-  footers or page numbers (Phase 11).
-- List editing:
-  - Delete before (or at the end of the item before) an item that goes on with a nested list
-    does nothing: lift the nested items first.
-  - Tab in a list's first item cannot nest it, so it moves the focus on, as outside lists.
-  - Toggling a list over paragraphs and a list next to them nests that list in the new one
-    instead of joining them.
-  - Shift+Tab over items at several levels lifts only the innermost list's items.
-  - On Android, Backspace at an item's start may join it into the item before instead of
-    lifting it (untested on a device).
-- Colors come from a fixed palette in the toolbar (seven text colors, six highlights); any
-  `#rrggbb` works through `setTextColor` / `setHighlight`.
-- Left and Right next to a rule treat Left as backward: in right-to-left text, Left at the
-  start of a paragraph selects the rule before it (left-to-right is the only direction the
+- The editor holds schema v3 (Word's model, 8.7): paragraphs in styles (headings are Word's
+  heading styles), lists as Word's numbering, run formatting, line and page breaks, links;
+  everything else Word has (tables, fields, content controls...) is kept as opaque content,
+  selected and deleted whole. Documents saved by 0.1.0 and 0.2.0 are migrated when loaded.
+  No tracked changes or comments editing (Phase 9), no tables or images editing (Phase 10), no
+  headers, footers or page numbers (Phase 11); sections with other page setups show the last
+  one's page (8.7d4).
+- No horizontal rule button (Word's rule is a paragraph's bottom border, kept and shown).
+- On Android, Backspace at a list paragraph's start may join it into the paragraph before
+  instead of removing its number (untested on a device).
+- Colors come from a fixed palette in the toolbar (seven text colors, Word's highlights); any
+  `#rrggbb` works through `setTextColor` (a highlight outside Word's is written as shading).
+- Left and Right next to an opaque block treat Left as backward: in right-to-left text, Left at
+  the start of a paragraph selects the block before it (left-to-right is the only direction the
   view handles fully).
-- Up and Down next to a rule decide "first or last line" from the caret's on-screen box: at a
-  position where the browser gives none (beside some line breaks) the browser moves the caret
-  instead, past the rule.
+- Up and Down next to an opaque block decide "first or last line" from the caret's on-screen
+  box: at a position where the browser gives none (beside some line breaks) the browser moves
+  the caret instead, past the block.
 - Links:
   - A link address without a scheme that looks like a host name gets `https://`
     (`page.html` too): write `./page.html` for a relative link.

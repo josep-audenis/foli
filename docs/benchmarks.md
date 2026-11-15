@@ -79,9 +79,9 @@ generous 250 ms bound.
 **Run:** `pnpm bench:layout` (Playwright, `playwright.bench.config.ts`, one worker; about 3
 minutes for all three engines). Each test prints a `BENCH {…}` line. Not part of `pnpm check` or
 `pnpm test:e2e`. Source: `apps/playground/bench/pagination.bench.ts`, driving the dev-only page
-`apps/playground/bench.html` (`src/bench.tsx`), which mounts `FoliEditor`'s parts (toolbar and
-canvas) and times them from inside the page. Since 8.7d1 `FoliEditor` edits schema v3; the bench
-page keeps a schema v2 editor, the one measured here, until 8.7d2 measures v3.
+`apps/playground/bench.html` (`src/bench.tsx`), which mounts `FoliEditor` and times it from
+inside the page. Since 8.7d2 it edits schema v3 (the stored fixtures are migrated when loaded);
+the numbers below were measured on schema v2 and are measured again for gate G5 (8.8).
 
 **Fixtures:** `benchDocument(sections)` in `apps/playground/e2e/fixtures.ts`: per section a level-2
 heading and thirteen paragraphs of one to five lines (synthetic words, no marks), A4 with 25.4 mm
@@ -113,9 +113,11 @@ apply. 1, 10, 50, 100 and 200 sections give 1, 10, 50, 100 and 199 pages.
     change does: the whole document is serialized per keystroke. (Measured with Phase 5's
     `DocumentEditor`, which always serialized; `FoliEditor` only does when `document` is read,
     so the numbers carry over.)
-- **re-flow:** a full re-flow as when a web font with other metrics finishes loading: the editor's
-  font family switches (to the default sans-serif, then back to the test font; the page count
-  changes, e.g. 101 → 105 pages) and a `loadingdone` event fires on `document.fonts`. The browser
+- **re-flow:** a full re-flow as when a web font with other metrics finishes loading: the text's
+  font switches (to the default sans-serif, then back to the test font; the page count
+  changes, e.g. 101 → 105 pages) and a `loadingdone` event fires on `document.fonts`. On schema
+  v3 every run carries its font inline, so the swap is an `!important` rule over them; the bench
+  checks the text did change font each time. The browser
   lays all the text out again, and the view measures every block and flows the whole document.
   Timed from the start of the frame that re-flows to its paint. Median of 6 (3 each way); by then
   the document also holds the 40 paragraphs the Enter presses added.
@@ -271,10 +273,10 @@ fails when a bundle passes its budget.
 
 | Bundle            | Includes          | Minified | Gzipped |  Budget |
 | ----------------- | ----------------- | -------: | ------: | ------: |
-| `@folijs/core`    | core              | 112.9 kB | 36.1 kB | 36.6 kB |
-| `@folijs/view`    | view, core        | 141.6 kB | 46.7 kB | 47.5 kB |
-| `@folijs/react`   | react, view, core | 181.9 kB | 59.5 kB | 60.4 kB |
-| `FoliEditor` only | what it reaches   | 181.7 kB | 59.4 kB | 60.4 kB |
+| `@folijs/core`    | core              | 105.1 kB | 33.8 kB | 35.2 kB |
+| `@folijs/view`    | view, core        | 135.5 kB | 44.7 kB | 46.5 kB |
+| `@folijs/react`   | react, view, core | 165.4 kB | 54.4 kB | 56.5 kB |
+| `FoliEditor` only | what it reaches   | 165.2 kB | 54.3 kB | 56.5 kB |
 | `@folijs/docx`    | docx, core        | 107.2 kB | 34.5 kB | 36.0 kB |
 
 (kB = 1,024 bytes; measured 2026-11-08 after task 7.8. At 0.1.0 (6.4) they were 14.1, 19.9,
@@ -283,5 +285,5 @@ fails when a bundle passes its budget.
 22.9 and 29.1 kB) list editing (7.5, core budget raised again from 19.0 kB) links (7.6, React budgets raised
 from 33.4 kB: the link dialog) and the schema v2 HTML reader (7.8, view budget raised from
 26.1 kB, React from 38.5 kB). `@folijs/docx` measured 2026-11-13 after task 8.5 (import and export, with core; 24.7 kB after 8.4, 5.9 kB alone at 8.2); core after 8.3 (schema v3 beside v2,
-budget raised from 21.6 kB; view and React do not include it), and again after 8.6a (resolution of styles and numbering, measured 2026-11-13; budget raised from 26.6 kB). View after 8.6b (the read-only Word pages, with core's resolution; budget raised from 30.7 kB; React does not include them). Core, view and React measured 2026-11-14 after 8.7a: the editor and view take a schema v3 document beside v2, so every editor bundle now holds v3's validation, migration and resolution and Word's blocks (budgets raised from 29.6, 36.2 and 43.4 kB; set again when v2 goes in 8.7d). Core and React again after 8.7b (2026-11-14): Word formatting on v3 and the toolbar's Word controls (budgets raised from 31.3 and 54.5 kB). Core, view and React again after 8.7c (2026-11-14): copy and paste on v3; the view now also holds core's envelope validation and the v2 -> v3 migration, which an app already loads with `createEditor` (budgets raised from 34.7, 42.5 and 59.1 kB).) For comparison, the whole Vite example app (React 18,
+budget raised from 21.6 kB; view and React do not include it), and again after 8.6a (resolution of styles and numbering, measured 2026-11-13; budget raised from 26.6 kB). View after 8.6b (the read-only Word pages, with core's resolution; budget raised from 30.7 kB; React does not include them). Core, view and React measured 2026-11-14 after 8.7a: the editor and view take a schema v3 document beside v2, so every editor bundle now holds v3's validation, migration and resolution and Word's blocks (budgets raised from 29.6, 36.2 and 43.4 kB; set again when v2 goes in 8.7d). Core and React again after 8.7b (2026-11-14): Word formatting on v3 and the toolbar's Word controls (budgets raised from 31.3 and 54.5 kB). Core, view and React again after 8.7c (2026-11-14): copy and paste on v3; the view now also holds core's envelope validation and the v2 -> v3 migration, which an app already loads with `createEditor` (budgets raised from 34.7, 42.5 and 59.1 kB). Core, view and React again after 8.7d2 (2026-11-15): v2's editing removed (budgets lowered to 35.2, 46.5 and 56.5 kB).) For comparison, the whole Vite example app (React 18,
 React DOM and Foli) is about 70 kB gzipped.

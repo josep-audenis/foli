@@ -1,5 +1,4 @@
 export {
-  type AnyEditor,
   FoliEditorProvider,
   type UseEditorStateOptions,
   type UseFoliEditorOptions,

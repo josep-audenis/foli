@@ -8,7 +8,7 @@ import libreOffice from "../fixtures/clipboard/libreoffice.html?raw";
 import webPage from "../fixtures/clipboard/web-page.html?raw";
 import word from "../fixtures/clipboard/word.html?raw";
 import wordLists from "../fixtures/clipboard/word-lists.html?raw";
-import { FOLI_MIME, htmlToDoc, parseColor, serializeRange, textToDoc } from "./clipboard.js";
+import { FOLI_MIME, htmlToDoc, parseColor, textToDoc } from "./clipboard.js";
 import { EditorView } from "./view.js";
 
 /** The parsed HTML after schema validation and normalization (what paste inserts). */
@@ -25,6 +25,12 @@ const h = (level: number, ...content: unknown[]) => ({
   type: "heading",
   attrs: { level },
   content,
+});
+/** A heading as the editor holds it: a paragraph in Word's heading style. */
+const styled = (level: number, ...content: unknown[]) => ({
+  type: "paragraph",
+  attrs: { style: `Heading${level}` },
+  ...(content.length ? { content } : {}),
 });
 const t = (text: string, ...marks: string[]) => ({
   type: "text",
@@ -322,28 +328,6 @@ describe("htmlToDoc lists, links, colors, alignment", () => {
       expect(parseColor(value)).toBeNull();
     }
   });
-
-  it("copy writes HTML that reads back as the same document", () => {
-    const content = [
-      pa("center", t("Title", "bold")),
-      ol(
-        4,
-        item(
-          p(
-            tm("link", link("https://a.test/")),
-            t(" and "),
-            tm("red", color("textColor", "#c00000")),
-          ),
-          ul(item(p(tm("lit", color("highlight", "#fff59d"))))),
-        ),
-      ),
-      hr,
-      pa("justify", t("end")),
-    ];
-    const doc = parseContent({ type: "doc", content } as DocJSON);
-    const { html } = serializeRange(doc, 0, doc.content.size, document);
-    expect(parsed(html)).toEqual(content);
-  });
 });
 
 describe("htmlToDoc page breaks", () => {
@@ -387,19 +371,6 @@ describe("textToDoc", () => {
   });
 });
 
-/** How many nodes of type `name` are in `node`. */
-function count(
-  node: { descendants(f: (node: { type: { name: string } }) => boolean | undefined): void },
-  name: string,
-): number {
-  let found = 0;
-  node.descendants((child) => {
-    if (child.type.name === name) found++;
-    return undefined;
-  });
-  return found;
-}
-
 describe("EditorView clipboard", () => {
   let view: EditorView | undefined;
   afterEach(() => {
@@ -434,20 +405,6 @@ describe("EditorView clipboard", () => {
     return { event, store };
   }
 
-  it("copies a page break as a line break in text and a page-breaking <br> in HTML", () => {
-    const { host, editor } = mount(doc(p(t("a"), { type: "pageBreak" }, t("b"))));
-    editor.select(1, 4);
-    const { event, store } = clipboardEvent("copy");
-    host.dispatchEvent(event);
-    expect(store.get("text/plain")).toBe("a\nb");
-    expect(store.get("text/html")).toBe(
-      '<p style="white-space: pre-wrap;">a<br data-page-break="" style="page-break-before: always; break-before: page;">b</p>',
-    );
-    expect(JSON.parse(store.get(FOLI_MIME) ?? "").content.content[0].content[1]).toEqual({
-      type: "pageBreak",
-    });
-  });
-
   it("copies the model selection as text, HTML and Foli JSON", () => {
     const { host, editor } = mount(doc(p(t("ab"), t("cd", "bold")), h(2, t("ef"))));
     editor.select(2, 8); // "b" + bold "cd" | heading "e"
@@ -455,13 +412,20 @@ describe("EditorView clipboard", () => {
     host.dispatchEvent(event);
     expect(event.defaultPrevented).toBe(true);
     expect(store.get("text/plain")).toBe("bcd\ne");
-    expect(store.get("text/html")).toBe(
-      '<p style="white-space: pre-wrap;">b<strong>cd</strong></p><h2 style="white-space: pre-wrap;">e</h2>',
-    );
-    expect(JSON.parse(store.get(FOLI_MIME) ?? "")).toEqual({
+    // The HTML as the Word renderer draws it (word/edit.test.ts checks its formatting).
+    const html = document.createElement("div");
+    html.innerHTML = store.get("text/html") ?? "";
+    expect([...html.children].map((el) => `${el.localName}:${el.textContent}`)).toEqual([
+      "p:bcd",
+      "h2:e",
+    ]);
+    const json = JSON.parse(store.get(FOLI_MIME) ?? "");
+    expect(json).toMatchObject({
       open: false,
-      content: doc(p(t("b"), t("cd", "bold")), h(2, t("e"))),
+      content: doc(p(t("b"), t("cd", "bold")), styled(2, t("e"))),
+      word: { document: expect.any(String) },
     });
+    expect(json.word.styles.map((style: { id: string }) => style.id)).toContain("Heading2");
   });
 
   /** Copies `from..to` of `content` and returns the clipboard types. */
@@ -511,13 +475,13 @@ describe("EditorView clipboard", () => {
     editor.select(2);
     const json = JSON.stringify({
       open: false,
-      content: doc(p(t("b"), t("cd", "bold")), h(2, t("e"))),
+      content: doc(p(t("b"), t("cd", "bold")), p(t("e"))),
     });
     expect(
       view.paste(data({ [FOLI_MIME]: json, "text/html": "<p>no</p>", "text/plain": "no" })),
     ).toBe(true);
-    // The open end is a heading: the text after the caret joins it.
-    expect(blocks(editor)).toEqual([p(t("xb"), t("cd", "bold")), h(2, t("ey"))]);
+    // The text after the caret joins the last pasted paragraph.
+    expect(blocks(editor)).toEqual([p(t("xb"), t("cd", "bold")), p(t("ey"))]);
     editor.commands.undo();
     expect(blocks(editor)).toEqual([p(t("xy"))]);
   });
@@ -533,6 +497,8 @@ describe("EditorView clipboard", () => {
   });
 
   it("autolinks pasted text that is one URL: inserted as a link, or linking the selection", () => {
+    // Linked text gets Word's Hyperlink style.
+    const hyperlink = { type: "characterStyle", attrs: { id: "Hyperlink" } };
     const link = (href: string) => ({ type: "link", attrs: { href } });
     const { editor, view } = mount(doc(p(t("ab"))));
     editor.select(2);
@@ -540,14 +506,20 @@ describe("EditorView clipboard", () => {
       true,
     );
     expect(blocks(editor)).toEqual([
-      p(t("a"), { ...t("www.example.com"), marks: [link("https://www.example.com")] }, t("b")),
+      p(
+        t("a"),
+        { ...t("www.example.com"), marks: [link("https://www.example.com"), hyperlink] },
+        t("b"),
+      ),
     ]);
     // Its own undo step.
     editor.commands.undo();
     expect(blocks(editor)).toEqual([p(t("ab"))]);
     editor.select(1, 3);
     expect(view.paste(data({ "text/plain": "https://x.test\\a" }))).toBe(true);
-    expect(blocks(editor)).toEqual([p({ ...t("ab"), marks: [link("https://x.test/a")] })]);
+    expect(blocks(editor)).toEqual([
+      p({ ...t("ab"), marks: [link("https://x.test/a"), hyperlink] }),
+    ]);
     // Unsafe or not a lone URL: plain text.
     editor.select(3);
     view.paste(data({ "text/plain": "javascript:alert(1)" }));
@@ -585,129 +557,6 @@ describe("EditorView clipboard", () => {
     expect(blocks(editor)).toEqual([p(t("click"))]);
   });
 
-  it("T3: every fixture pastes at every text position without corrupting the document", {
-    timeout: 60_000,
-  }, () => {
-    const fixtures = [word, wordLists, googleDocs, googleDocsLists, libreOffice, webPage];
-    const targets = [
-      doc(p(t("ab")), h(2, t("cd"))),
-      doc(ul(item(p(t("ab")), p()), item(p(t("cd")), ol(1, item(p(t("ef"))))))),
-      doc(p(), hr, p(t("gh"))),
-    ];
-    let pastes = 0;
-    for (const html of fixtures) {
-      // Each pasted textblock's text must be in the result, in one piece.
-      const pieces: string[] = [];
-      const pasted = parseContent(htmlToDoc(html) as DocJSON);
-      pasted.descendants((node) => {
-        if (node.isTextblock && node.textContent) pieces.push(node.textContent);
-        return !node.isTextblock;
-      });
-      for (const target of targets) {
-        const { editor, view } = mount(target);
-        const positions: number[] = [];
-        editor.state.doc.descendants((node, pos) => {
-          if (node.isTextblock)
-            for (let i = 0; i <= node.content.size; i++) positions.push(pos + 1 + i);
-        });
-        for (const at of positions) {
-          const before = editor.state.doc;
-          editor.select(at);
-          expect(view.paste(data({ "text/html": html }))).toBe(true);
-          editor.state.doc.check();
-          for (const piece of pieces) expect(editor.state.doc.textContent).toContain(piece);
-          // No list item, rule or page break of the paste is lost (lists may merge).
-          for (const name of ["listItem", "horizontalRule", "pageBreak"]) {
-            expect(count(editor.state.doc, name)).toBeGreaterThanOrEqual(
-              count(before, name) + count(pasted, name),
-            );
-          }
-          editor.commands.undo();
-          expect(editor.state.doc.eq(before)).toBe(true);
-          pastes++;
-        }
-        view.destroy();
-      }
-    }
-    expect(pastes).toBeGreaterThan(100);
-  });
-
-  it("pastes a list into a paragraph: split around it, at its start or end; undo restores", () => {
-    const list = "<ul><li>a</li><li>b</li></ul>";
-    const pastedList = ul(item(p(t("a"))), item(p(t("b"))));
-    const cases: [number, unknown[]][] = [
-      [2, [p(t("x")), pastedList, p(t("y"))]],
-      [1, [pastedList, p(t("xy"))]],
-      [3, [p(t("xy")), pastedList]],
-    ];
-    for (const [at, after] of cases) {
-      const { editor, view } = mount(doc(p(t("xy"))));
-      editor.select(at);
-      expect(view.paste(data({ "text/html": list }))).toBe(true);
-      expect(blocks(editor)).toEqual(after);
-      expect(editor.state.selection.$from.parent.textContent).toBe("b"); // after the paste
-      editor.commands.undo();
-      expect(blocks(editor)).toEqual([p(t("xy"))]);
-      view.destroy();
-    }
-  });
-
-  it("pastes a list into a list item as sibling items (an empty item is replaced)", () => {
-    const list = "<ol><li>a</li><li>b</li></ol>";
-    const into = (blocksBefore: unknown[], at: number) => {
-      const { editor, view } = mount(doc(...blocksBefore));
-      editor.select(at);
-      expect(view.paste(data({ "text/html": list }))).toBe(true);
-      const result = blocks(editor);
-      view.destroy();
-      return result;
-    };
-    const a = item(p(t("a")));
-    const b = item(p(t("b")));
-    expect(into([ul(item(p(t("xy"))))], 4)).toEqual([ul(item(p(t("x"))), a, b, item(p(t("y"))))]);
-    expect(into([ul(item(p(t("xy"))))], 5)).toEqual([ul(item(p(t("xy"))), a, b)]);
-    expect(into([ul(item(p(t("xy"))))], 3)).toEqual([ul(a, b, item(p(t("xy"))))]);
-    expect(into([ul(item(p(t("xy"))), item(p()))], 9)).toEqual([ul(item(p(t("xy"))), a, b)]);
-  });
-
-  it("pastes a lone rule; items after a nested list's parent; between an item's blocks", () => {
-    const rule = mount(doc(p(t("xy"))));
-    rule.editor.select(2);
-    expect(rule.view.paste(data({ "text/html": "<hr>" }))).toBe(true);
-    expect(blocks(rule.editor)).toEqual([p(t("x")), hr, p(t("y"))]);
-    rule.view.destroy();
-    // At the end of an item's first paragraph, the item going on with a nested list.
-    const nested = mount(doc(ul(item(p(t("x")), ul(item(p(t("sub"))))))));
-    nested.editor.select(4);
-    expect(nested.view.paste(data({ "text/html": "<ul><li>a</li></ul>" }))).toBe(true);
-    expect(blocks(nested.editor)).toEqual([
-      ul(item(p(t("x")), ul(item(p(t("sub"))))), item(p(t("a")))),
-    ]);
-    nested.view.destroy();
-    // At the start of an item's second paragraph: the item splits between its paragraphs.
-    const second = mount(doc(ul(item(p(t("x")), p(t("y"))))));
-    second.editor.select(6);
-    expect(second.view.paste(data({ "text/html": "<ul><li>a</li></ul>" }))).toBe(true);
-    expect(blocks(second.editor)).toEqual([ul(item(p(t("x"))), item(p(t("a"))), item(p(t("y"))))]);
-  });
-
-  it("keeps an item's first paragraph first, replaces an empty nested one, keeps rules", () => {
-    const start = mount(doc(ul(item(p(t("xy"))))));
-    start.editor.select(3); // the start of the item's (first) paragraph
-    expect(start.view.paste(data({ "text/html": "<hr><ul><li>b</li></ul>" }))).toBe(true);
-    expect(blocks(start.editor)).toEqual([ul(item(p(), hr, ul(item(p(t("b")))), p(t("xy"))))]);
-    start.view.destroy();
-    const nested = mount(doc(ul(item(p(t("x")), p()))));
-    nested.editor.select(6); // in the empty second paragraph
-    expect(nested.view.paste(data({ "text/html": "<p>A</p><ul><li>b</li></ul>" }))).toBe(true);
-    expect(blocks(nested.editor)).toEqual([ul(item(p(t("x")), p(t("A")), ul(item(p(t("b"))))))]);
-    // A rule pasted with text into a paragraph's middle stays a rule.
-    const middle = mount(doc(p(t("xy"))));
-    middle.editor.select(2);
-    expect(middle.view.paste(data({ "text/html": "<p>A</p><hr><p>B</p>" }))).toBe(true);
-    expect(blocks(middle.editor)).toEqual([p(t("xA")), hr, p(t("By"))]);
-  });
-
   it("pastes plain text with the marks typing would get, over a selection", () => {
     const { editor, view } = mount(doc(p(t("ab", "italic"), t("cd"))));
     editor.select(2, 4);
@@ -715,21 +564,13 @@ describe("EditorView clipboard", () => {
     expect(blocks(editor)).toEqual([p(t("aX", "italic"), t("d"))]);
   });
 
-  it("pastes whole blocks into an empty block, so a heading stays a heading", () => {
-    const { editor, view } = mount(doc(p(t("a")), p(), p(t("b"))));
-    editor.select(4);
-    view.paste(data({ "text/html": "<h2>Title</h2><p>text</p>" }));
-    expect(blocks(editor)).toEqual([p(t("a")), h(2, t("Title")), p(t("text")), p(t("b"))]);
-    expect(editor.state.selection.head).toBe(15); // end of "text"
-  });
-
   it("keeps an empty heading a heading when pasting plain text or inline HTML", () => {
     const { editor, view } = mount(doc(h(1), p(t("b"))));
     editor.select(1);
     view.paste(data({ "text/plain": "Title" }));
-    expect(blocks(editor)).toEqual([h(1, t("Title")), p(t("b"))]);
+    expect(blocks(editor)).toEqual([styled(1, t("Title")), p(t("b"))]);
     view.paste(data({ "text/html": "<meta charset='utf-8'><span>&nbsp;and more</span>" }));
-    expect(blocks(editor)).toEqual([h(1, t("Title and more")), p(t("b"))]);
+    expect(blocks(editor)).toEqual([styled(1, t("Title and more")), p(t("b"))]);
   });
 
   it("pastes plain text on Ctrl/Cmd+Shift+V", () => {
