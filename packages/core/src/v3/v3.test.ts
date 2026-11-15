@@ -494,11 +494,37 @@ describe("createDocument", () => {
 
   it("takes the content and the section", () => {
     const content = doc(paragraph({ style: "Heading1" }, [{ type: "text", text: "Title" }]));
-    const section = { pageSize: { width: 12240, height: 15840 } };
-    const made = createDocument(content, section);
+    const made = createDocument(content, { pageSize: { width: 12240, height: 15840 } });
     expect(made.content).toBe(content);
-    expect(made.section).toBe(section);
+    expect(made.section).toEqual({
+      pageSize: { width: 12240, height: 15840 },
+      margins: { top: 1440, right: 1440, bottom: 1440, left: 1440 },
+    });
     expect(parseDocument(made).content).toEqual(content);
+  });
+
+  it("merges a partial section over A4, part by part", () => {
+    const section = createDocument(undefined, {
+      margins: { top: mmToTwips(20) },
+      type: "continuous",
+    }).section;
+    expect(section).toEqual({
+      pageSize: { width: 11906, height: 16838 },
+      margins: { top: 1134, right: 1440, bottom: 1440, left: 1440 },
+      type: "continuous",
+    });
+    const landscape = createDocument(undefined, {
+      pageSize: { width: 16838, height: 11906, orientation: "landscape" },
+    }).section.pageSize;
+    expect(landscape).toEqual({ width: 16838, height: 11906, orientation: "landscape" });
+    expect(createDocument(undefined, { pageSize: { height: 20000 } }).section.pageSize).toEqual({
+      width: 11906,
+      height: 20000,
+    });
+    // The defaults are not shared with the document made from them.
+    const a = createDocument();
+    (a.section.margins as { top: number }).top = 1;
+    expect(createDocument().section.margins?.top).toBe(1440);
   });
 
   it("shares no definitions between documents", () => {

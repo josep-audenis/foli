@@ -716,7 +716,9 @@ Each task is a PR on `phase-8/word-model`, the build green after each.
     apply; `toggleMark("link")` refuses an unsafe href.
   - Names: schema v3 takes the plain ones (`FoliDocument`, `parseDocument`, `parseContent`,
     `schema`, `SCHEMA_VERSION` 3, view's `renderDocument`); `createDocument(content?, section?)`
-    makes a v3 document. v2's are `FoliDocumentV2` and `parseContentV2`; v2's `schema`,
+    makes a v3 document: its content is v3 and its second argument a section in twips (0.2.0's:
+    v2 content and settings in millimetres; both still type-check, so a 0.2.0 call fails in
+    `createEditor` or gives a wrong page size). v2's are `FoliDocumentV2` and `parseContentV2`; v2's `schema`,
     `parseDocument` and `SCHEMA_VERSION` are no longer exported (`parseDocument` reads v1 and v2).
 
 ## Phase 9 — Review: tracked changes & comments · XL → 0.4.0

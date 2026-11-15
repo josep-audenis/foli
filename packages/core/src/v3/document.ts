@@ -183,10 +183,12 @@ export interface FoliDocument {
 }
 
 /**
- * A new document: `content` (default: one empty paragraph) on `section` (default: A4, 25.4 mm
- * margins), with the styles and list definitions the editor's commands use (Normal, Heading 1–6,
+ * A new document: `content` (schema v3; default: one empty paragraph) on A4 with 25.4 mm
+ * margins, with the styles and list definitions the editor's commands use (Normal, Heading 1–6,
  * List Paragraph, Hyperlink; bullets and numbers) and 11 pt Georgia, 1.5 lines: the look a
- * migrated 0.2.0 document has. Not validated: `parseDocument` (or `createEditor`) does that.
+ * migrated 0.2.0 document has. `section` (in twips: `mmToTwips`) is merged over that page:
+ * `pageSize` and `margins` part by part. Not validated: `parseDocument` (or `createEditor`) does
+ * that.
  */
 export function createDocument(
   content: NodeJSON = { type: "doc", content: [{ type: "paragraph" }] },
@@ -198,7 +200,17 @@ export function createDocument(
     settings: DEFAULT_SETTINGS,
     content: empty as never,
   });
-  return { ...blank, ...(section && { section }), content };
+  const base = blank.section;
+  return {
+    ...blank,
+    // The default (A4) section has only pageSize and margins: each merged part by part.
+    section: {
+      ...section,
+      pageSize: { ...base.pageSize, ...section?.pageSize },
+      margins: { ...base.margins, ...section?.margins },
+    },
+    content,
+  };
 }
 
 /**

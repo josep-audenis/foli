@@ -31,7 +31,7 @@ This document describes **what exists** and **what is decided**. Planned parts a
 
 | Subsystem           | Responsibility                                                                 | Status                                                                                                                                      |
 | ------------------- | ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| Document model      | Schema, immutable tree, marks, positions, JSON, validation                     | ✅ (Phase 2); schema v3 (Word model) defined beside v2 (8.3)                                                                                |
+| Document model      | Schema, immutable tree, marks, positions, JSON, validation                     | ✅ (Phase 2); schema v3 (Word model) current (8.3–8.7), v2 read and migrated                                                                |
 | Editing engine      | Steps, position mapping, selection, state, history, commands                   | ✅ headless (Phase 3)                                                                                                                       |
 | View                | Render state to DOM, DOM ↔ model mapping, `beforeinput`, IME, clipboard, focus | ✅ (G3 provisional; manual IME/SR checks open)                                                                                              |
 | Layout              | Measurement, line breaking, page flow, fragments, incremental reflow, print    | Phase 5 (inside `@folijs/view` until the seam is proven)                                                                                    |
@@ -514,7 +514,7 @@ Word yet: Foli keeps neither on the new paragraph.
 ### Word pages (`packages/view/src/word/`, 8.6b)
 
 `renderDocument(document, container, { review })` shows a schema v3 document on pages, as
-Word lays it out; read-only until the editor moves to v3 (8.7).
+Word lays it out, read-only and without an editor (`EditorView` edits on the same blocks).
 
 - **Blocks** (`blocks.ts`): each paragraph's and run's formatting from core's `Resolver` as
   inline CSS, built with createElement and textContent only. Paragraphs with an outline level
@@ -562,7 +562,7 @@ must have loaded, and the container must not be scaled (`transform`, `zoom`).
   `application/x-foli+json`: `{ open, content }`, the copied blocks as `DocJSON` and whether the
   copy was inside one block. Cut is copy plus `deleteSelection`, as its own undo step.
 - **Paste** reads, in order: Foli JSON, then HTML, then plain text (Ctrl/Cmd+Shift+V: plain
-  text only). Each candidate goes through `parseContent`, the same validation as loading a
+  text only). Each candidate goes through `parseContent` (HTML: `parseContentV2`), the same validation as loading a
   document; one that fails falls through to the next. Plain text becomes one paragraph per
   line, with the marks typing would get. A paste during a composition is ignored.
   - Content is **open** when no block boundary was copied: plain text, HTML without block

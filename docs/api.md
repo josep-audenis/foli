@@ -107,10 +107,13 @@ No DOM: runs in Node, workers and the browser.
 
 Documents are schema v3, Word's model ([document-model.md](document-model.md)).
 
-- `createDocument(content?, section?): FoliDocument`: a new document: `content` (default: one
-  empty paragraph) on `section` (default: A4 with 25.4 mm margins), with Normal, Heading 1–6,
-  List Paragraph and Hyperlink styles, bullet and number definitions, in 11 pt Georgia with 1.5
-  lines (the look a migrated 0.2.0 document has). Not validated.
+- `createDocument(content?, section?): FoliDocument`: a new document: `content` (schema v3;
+  default: one empty paragraph) on A4 with 25.4 mm margins, with Normal, Heading 1–6, List
+  Paragraph and Hyperlink styles, bullet and number definitions, in 11 pt Georgia with 1.5
+  lines (the look a migrated 0.2.0 document has). `section` is in twips (`mmToTwips(mm)`) and
+  merged over that page (`pageSize` and `margins` part by part). Not validated. (0.2.0's took
+  v2 content and millimetre settings; to start from those, pass
+  `{ schemaVersion: 2, settings, content }` to `parseDocument` or the editor.)
 - `parseDocument(input: unknown): FoliDocument`: validates untrusted input (e.g. parsed JSON)
   and returns a copy in canonical form; a document saved by 0.1.0 or 0.2.0 is validated as
   such and migrated (`migrateToV3`). Throws `FoliDocumentError`, whose message names the place
