@@ -663,7 +663,7 @@ Each task is a PR on `phase-8/word-model`, the build green after each.
     Word's PDF of it by ink (pdf.js, pixel by pixel within 2 px), a score per page and
     inside the margins, overlays to look at (`FOLI_WORD_PDF=<folder> pnpm corpus:pages`;
     baseline in corpus/README.md).
-- [ ] 8.7 Editing on v3, in four parts (each lands with the v2 editor still working; v2 goes in
+- [x] 8.7 Editing on v3, in four parts (each lands with the v2 editor still working; v2 goes in
   8.7d):
   - [x] 8.7a The editor and view on a v3 document (#53): `createEditor` takes a v3 document (envelope
     kept, page from its last section), `EditorView` renders it with Word's blocks and spacing
@@ -685,7 +685,7 @@ Each task is a PR on `phase-8/word-model`, the build green after each.
     paragraph ids dropped); HTML paste as Word's styles and lists; the caret over a list
     number in one press; T3 and T4 on v3 (the editing page; real Firefox's clipboard by
     hand). Pasted comments stay after undo, unlike Word (Phase 9).
-  - [ ] 8.7d The switch, in four parts:
+  - [x] 8.7d The switch, in four parts:
     - [x] 8.7d1 React and the playground on v3 (#56): `FoliEditor` and `useFoliEditor` take a
       document of any version (0.1.0 and 0.2.0 documents migrated on load, and by
       `setDocument`) and edit and report it as v3; the playground's main page on v3; its editing
@@ -703,9 +703,10 @@ Each task is a PR on `phase-8/word-model`, the build green after each.
       styles and lists, a twips section merged over A4); v2 exports only `FoliDocumentV2` and
       `parseContentV2` (old documents and pasted HTML); `parseDocument` says when a newer Foli
       saved a document.
-    - [ ] 8.7d4 Sections with their own page setups in the editable view: each section's pages
-      have its size and margins and its blocks are measured and split in its width; a section
-      starts a new page unless continuous with the same setup; a named print page per setup.
+    - [x] 8.7d4 Sections with their own page setups in the editable view (#59): each section's
+      pages have its size and margins and its blocks are measured and split in its width; a
+      section starts a new page unless continuous with the same setup; a named print page per
+      setup. Page setups are not editable yet, nor section breaks insertable.
 - [ ] 8.8 Close: docs, gate G5 numbers, 0.3.0 (changeset, version PR, publish after approval).
   The changeset lists the breaks:
   - Documents persist as v3 (0.2.0 cannot read them); `FoliChange.document`, `getDocument()` and
