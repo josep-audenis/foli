@@ -697,9 +697,12 @@ Each task is a PR on `phase-8/word-model`, the build green after each.
       documents and to read pasted HTML); budgets set again; the bench page measures v3 (its
       font swap overrides the runs' inline fonts). Links from outside the document must be safe
       (`isSafeLink`: a safe href, or a bookmark of the document).
-    - [ ] 8.7d3 The names: `SCHEMA_VERSION` 3, `createDocument` makes a v3 document, the `V3`
-      names renamed (`FoliDocumentV3` → `FoliDocument`, `parseDocumentV3` → `parseDocument`…),
-      v2's types kept for migration only.
+    - [x] 8.7d3 The names (#58): `SCHEMA_VERSION` 3; schema v3 takes the plain names
+      (`FoliDocument`, `parseDocument`, `parseContent`, `schema`, the view's `renderDocument`);
+      `createDocument(content?, section?)` makes a v3 document (a migrated 0.2.0 document's
+      styles and lists, a twips section merged over A4); v2 exports only `FoliDocumentV2` and
+      `parseContentV2` (old documents and pasted HTML); `parseDocument` says when a newer Foli
+      saved a document.
     - [ ] 8.7d4 Sections with their own page setups in the editable view.
 - [ ] 8.8 Close: docs, gate G5 numbers, 0.3.0 (changeset, version PR, publish after approval).
   The changeset lists the breaks:
