@@ -2,12 +2,12 @@
 import {
   createEditor,
   type DocJSON,
-  type FoliDocumentV3,
+  type FoliDocument,
   type MarkJSON,
   type Node as ModelNode,
   type NodeJSON,
-  parseContent,
-  parseDocumentV3,
+  parseContentV2,
+  parseDocument,
   type StyleJSON,
   type WordContext,
   wordContext,
@@ -46,7 +46,7 @@ const p = (attrs: Record<string, unknown>, ...content: NodeJSON[]): NodeJSON => 
 });
 const numbered = { numbering: { id: 1, level: 0 } };
 
-function documentOf(...blocks: NodeJSON[]): FoliDocumentV3 {
+function documentOf(...blocks: NodeJSON[]): FoliDocument {
   return {
     schemaVersion: 3,
     section: {},
@@ -74,7 +74,7 @@ function mount(...content: NodeJSON[]) {
   return mountDocument(documentOf(...content));
 }
 
-function mountDocument(doc: FoliDocumentV3) {
+function mountDocument(doc: FoliDocument) {
   const host = document.createElement("div");
   document.body.append(host);
   const editor = createEditor({ document: doc });
@@ -729,7 +729,7 @@ describe("the clipboard on a schema v3 document", () => {
       breaks: number;
       items: number;
     }[] = [wordHTML, wordLists, googleDocs, googleDocsLists, libreOffice, webPage].map((html) => {
-      const v2 = parseContent(htmlToDoc(html) as DocJSON);
+      const v2 = parseContentV2(htmlToDoc(html) as DocJSON);
       const pieces: string[] = [];
       v2.descendants((node) => {
         if (node.isTextblock && node.textContent) pieces.push(node.textContent);
@@ -770,7 +770,7 @@ describe("the clipboard on a schema v3 document", () => {
           editor.select(at);
           expect(view.paste(data(types))).toBe(true);
           // The whole document, envelope included, is still one schema v3 accepts.
-          const whole = parseDocumentV3(editor.getDocument());
+          const whole = parseDocument(editor.getDocument());
           // Every comment anchor has its comment; bookmark names stay unique.
           const comments = new Set(whole.comments.map((c) => c.id));
           const names: string[] = [];

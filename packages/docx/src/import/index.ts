@@ -1,4 +1,4 @@
-import { type FoliDocumentV3, parseDocumentV3 } from "@folijs/core";
+import { type FoliDocument, parseDocument } from "@folijs/core";
 import {
   DocxError,
   type DocxPackage,
@@ -15,7 +15,7 @@ import { type ImportReport, Recorder } from "./report.js";
 
 export interface DocxImport {
   /** The document in schema v3, validated. */
-  readonly document: FoliDocumentV3;
+  readonly document: FoliDocument;
   /**
    * The package it was read from. Export (8.5) writes the parts Foli does not edit back from
    * it, unchanged; keep it with the document.
@@ -103,9 +103,9 @@ export function importPackage(pkg: DocxPackage): DocxImport {
       )
     : [];
 
-  let document: FoliDocumentV3;
+  let document: FoliDocument;
   try {
-    document = parseDocumentV3({
+    document = parseDocument({
       schemaVersion: 3,
       section: lastSection,
       defaults: styled.defaults,

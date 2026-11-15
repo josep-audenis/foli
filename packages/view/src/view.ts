@@ -19,7 +19,7 @@ import {
   type Node as ModelNode,
   marksAt,
   NodeSelection,
-  parseContent,
+  parseContentV2,
   redo,
   Selection,
   Slice,
@@ -1426,7 +1426,7 @@ export class EditorView {
     // schema v2 content, then migrated).
     const pasted = docFromClipboard(data, marks, (found) =>
       found.html
-        ? fitPastedV2(state, parseContent(found.content))
+        ? fitPastedV2(state, parseContentV2(found.content))
         : fitPaste(state, found.content, found.word),
     );
     // One empty paragraph: nothing to paste (a lone opaque block is something).

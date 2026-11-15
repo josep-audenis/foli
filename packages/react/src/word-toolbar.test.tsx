@@ -1,10 +1,10 @@
 // @vitest-environment jsdom
-import { createEditor, type FoliDocumentV3 } from "@folijs/core";
+import { createEditor, type FoliDocument } from "@folijs/core";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { FoliToolbar } from "./index.js";
 
-const document3: FoliDocumentV3 = {
+const document3: FoliDocument = {
   schemaVersion: 3,
   section: {},
   defaults: { run: [{ type: "fontSize", attrs: { value: 22 } }] },

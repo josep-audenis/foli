@@ -691,11 +691,12 @@ Each task is a PR on `phase-8/word-model`, the build green after each.
       `setDocument`) and edit and report it as v3; the playground's main page on v3; its editing
       tests (T1–T5 and the rest) on v3 in three engines. The bench page keeps a v2 editor.
       `FoliEditor` loses v2's H1–H3 and rule buttons (the style box replaces them).
-    - [ ] 8.7d2 v2 editing removed: the editor always on v3 (older documents migrated when
-      loaded), v2's editing commands, blocks, toolbar and tests gone (behaviour they covered
-      that v3 tests do not is tested on v3; v2 kept only to read and migrate old documents and
-      to read pasted HTML); budgets set again; the bench page measures v3 (its font swap must
-      override the runs' inline fonts).
+    - [x] 8.7d2 v2 editing removed (#57): the editor always on v3 (older documents migrated
+      when loaded), v2's editing commands, blocks, toolbar and tests gone (behaviour they
+      covered that v3 tests do not is tested on v3; v2 kept only to read and migrate old
+      documents and to read pasted HTML); budgets set again; the bench page measures v3 (its
+      font swap overrides the runs' inline fonts). Links from outside the document must be safe
+      (`isSafeLink`: a safe href, or a bookmark of the document).
     - [ ] 8.7d3 The names: `SCHEMA_VERSION` 3, `createDocument` makes a v3 document, the `V3`
       names renamed (`FoliDocumentV3` → `FoliDocument`, `parseDocumentV3` → `parseDocument`…),
       v2's types kept for migration only.
@@ -713,6 +714,12 @@ Each task is a PR on `phase-8/word-model`, the build green after each.
     `--foli-rule-thickness`.
   - On a state without a v3 envelope, `setBlockType` and the list and format commands do not
     apply; `toggleMark("link")` refuses an unsafe href.
+  - Names: schema v3 takes the plain ones (`FoliDocument`, `parseDocument`, `parseContent`,
+    `schema`, `SCHEMA_VERSION` 3, view's `renderDocument`); `createDocument(content?, section?)`
+    makes a v3 document: its content is v3 and its second argument a section in twips (0.2.0's:
+    v2 content and settings in millimetres; both still type-check, so a 0.2.0 call fails in
+    `createEditor` or gives a wrong page size). v2's are `FoliDocumentV2` and `parseContentV2`; v2's `schema`,
+    `parseDocument` and `SCHEMA_VERSION` are no longer exported (`parseDocument` reads v1 and v2).
 
 ## Phase 9 — Review: tracked changes & comments · XL → 0.4.0
 

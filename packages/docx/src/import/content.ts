@@ -4,7 +4,7 @@
  * for markers that have nothing to show: field characters, range ends).
  */
 
-import { type MarkJSON, type NodeJSON, schemaV3 } from "@folijs/core";
+import { type MarkJSON, type NodeJSON, schema } from "@folijs/core";
 import type { DocxPackage, Relationship } from "../package.js";
 import type { XmlElement, XmlNode } from "../xml.js";
 import { attr, child, deepText, integer, isW, R, REL, textOf, W } from "./ooxml.js";
@@ -236,7 +236,7 @@ function inlines(
 /** The node if the schema accepts it (its marks were checked already); reported otherwise. */
 function valid(json: NodeJSON, el: XmlElement, context: Context): NodeJSON | undefined {
   try {
-    schemaV3.nodeFromJSON(json);
+    schema.nodeFromJSON(json);
     return json;
   } catch (error) {
     context.report.unmodeled(el.name, (error as Error).message);

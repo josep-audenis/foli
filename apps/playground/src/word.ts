@@ -1,12 +1,12 @@
 /**
  * The Word pages page (`/word.html`, dev server only): a .docx imported and laid out on pages
- * by `renderDocumentV3` (read-only, 8.6b). Driven by `apps/playground/word/` to measure page
+ * by `renderDocument` (read-only, 8.6b). Driven by `apps/playground/word/` to measure page
  * agreement with Word, and to compare the pages with Word's PDF (8.6c); see corpus/README.md.
  */
 
-import { type FoliDocumentV3, type NodeJSON, parseDocumentV3 } from "@folijs/core";
+import { type FoliDocument, type NodeJSON, parseDocument } from "@folijs/core";
 import { importDocx } from "@folijs/docx";
-import { type DocumentPages, type ReviewView, renderDocumentV3 } from "@folijs/view";
+import { type DocumentPages, type ReviewView, renderDocument } from "@folijs/view";
 import { type Agreement, agreement, bodyRegion, inkPixels, overlay, samePage } from "./ink.js";
 
 const container = document.getElementById("pages") as HTMLElement;
@@ -41,9 +41,9 @@ async function render(bytes: Uint8Array, review: ReviewView): Promise<Shown[]> {
 }
 
 /** Lays a v3 document out on pages (replacing the last one shown). */
-function show(doc: FoliDocumentV3, review: ReviewView): Shown[] {
+function show(doc: FoliDocument, review: ReviewView): Shown[] {
   shown?.destroy();
-  shown = renderDocumentV3(doc, container, { review });
+  shown = renderDocument(doc, container, { review });
   const pages = shown;
   return (doc.content.content ?? []).map((node, i) => ({
     type: node.type,
@@ -156,7 +156,7 @@ window.foliWord = {
       Uint8Array.from(atob(base64), (c) => c.charCodeAt(0)),
       review,
     ),
-  show: (json, review) => show(parseDocumentV3(json), review),
+  show: (json, review) => show(parseDocument(json), review),
   comparePdf,
 };
 

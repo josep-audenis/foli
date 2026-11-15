@@ -16,7 +16,7 @@ About 3,100 positions and 4.5 kB of JSON per page. Synthetic text, schema v1 onl
 
 - **build:** `schema.nodeFromJSON(json)`: strict validation plus construction of the immutable tree.
 - **serialize:** `doc.toJSON()`: canonical JSON object tree.
-- **load:** `JSON.parse` of the stored envelope + `parseDocument` (validate, normalize, re-serialize).
+- **load:** `JSON.parse` of the stored envelope + `parseDocumentV2` (validate, normalize, re-serialize; schema v2, as these numbers were measured).
 - **save:** `JSON.stringify(doc.toJSON())`.
 
 **Environment:** Intel Core i7-13700H, 16 GB RAM, Windows 11, Node.js 25.3.0, Vitest 5.1.0,

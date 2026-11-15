@@ -101,7 +101,7 @@ Word's (`reference/word/`).
 
 ## Page agreement with Word
 
-`pnpm corpus:pages` (Playwright, Chromium) lays each document out with `renderDocumentV3`
+`pnpm corpus:pages` (Playwright, Chromium) lays each document out with `renderDocument`
 (`@folijs/view`, read-only, tracked changes accepted as in the reference data) and compares
 every paragraph outside tables with Word's reference: the page it starts on, and the line of
 that page. Paragraphs are matched by text, in order; those Foli does not show as paragraphs

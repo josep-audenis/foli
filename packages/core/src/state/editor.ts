@@ -1,10 +1,11 @@
-import { createDocument, type DocumentSettings, type FoliDocument } from "../document.js";
+import type { DocumentSettings, FoliDocumentV2 } from "../document.js";
 import type { Attrs, Node } from "../model/index.js";
 import type { Alignment } from "../schema.js";
 import {
-  type FoliDocumentV3,
-  parseContentV3,
-  parseDocumentV3,
+  createDocument,
+  type FoliDocument,
+  parseContent,
+  parseDocument,
   type SectionJSON,
 } from "../v3/document.js";
 import { twipsToMm as mm } from "../v3/units.js";
@@ -36,12 +37,12 @@ import type { ListKind } from "./wordformat.js";
 
 /**
  * A document an editor loads: schema v3 (Word's model), or one saved by 0.1.0 or 0.2.0, migrated
- * to v3 when loaded (`parseDocumentV3`).
+ * to v3 when loaded (`parseDocument`).
  */
-export type EditorDocument = FoliDocument | FoliDocumentV3;
+export type EditorDocument = FoliDocument | FoliDocumentV2;
 
 export interface EditorOptions {
-  /** Trusted or not, it is validated (and migrated: `parseDocumentV3`). Default: an empty one. */
+  /** Trusted or not, it is validated (and migrated: `parseDocument`). Default: an empty one. */
   document?: EditorDocument;
   /** Run before the built-in plugins, so their keymaps take precedence. */
   plugins?: readonly Plugin[];
@@ -105,7 +106,7 @@ export interface Editor {
   };
   isMarkActive(type: string): boolean;
   /** The current document (schema v3). */
-  getDocument(): FoliDocumentV3;
+  getDocument(): FoliDocument;
   /** Replaces the whole document (an older one migrated) and resets history. */
   setDocument(document: EditorDocument): void;
   subscribe(listener: EditorListener): () => void;
@@ -139,8 +140,8 @@ interface Loaded {
 
 /** Validates (and migrates) a document and reads what the editor keeps of it. */
 function load(document: EditorDocument): Loaded {
-  const { content, ...envelope } = parseDocumentV3(document);
-  return { doc: parseContentV3(content), settings: sectionSettings(envelope.section), envelope };
+  const { content, ...envelope } = parseDocument(document);
+  return { doc: parseContent(content), settings: sectionSettings(envelope.section), envelope };
 }
 
 export function createEditor({

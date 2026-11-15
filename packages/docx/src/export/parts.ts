@@ -9,7 +9,7 @@
 import type {
   AbstractNumberingJSON,
   CommentJSON,
-  FoliDocumentV3,
+  FoliDocument,
   NumberingInstanceJSON,
   NumberingLevelJSON,
   StyleJSON,
@@ -225,7 +225,7 @@ function normalizeStyle(style: StyleJSON): Json {
   return { ...style, ext: undefined, paragraph: style.paragraph ?? {}, run: style.run ?? [] };
 }
 
-function defaultsXml(defaults: FoliDocumentV3["defaults"], ns: Namespaces): string {
+function defaultsXml(defaults: FoliDocument["defaults"], ns: Namespaces): string {
   const o = original(defaults.ext, ns);
   if (o) {
     const reread = defaultsOf(o.element, reading(o.source));
@@ -256,7 +256,7 @@ function defaultsXml(defaults: FoliDocumentV3["defaults"], ns: Namespaces): stri
 }
 
 export function stylesXml(
-  doc: FoliDocumentV3,
+  doc: FoliDocument,
   part: OriginalPart | undefined,
   ns: Namespaces,
 ): string {
@@ -398,7 +398,7 @@ function instanceXml(instance: NumberingInstanceJSON, ns: Namespaces): string {
 }
 
 export function numberingXml(
-  doc: FoliDocumentV3,
+  doc: FoliDocument,
   part: OriginalPart | undefined,
   ns: Namespaces,
 ): string {
@@ -496,7 +496,7 @@ function commentStart(comment: CommentJSON, ns: Namespaces): string {
 }
 
 export function commentsXml(
-  doc: FoliDocumentV3,
+  doc: FoliDocument,
   part: OriginalPart | undefined,
   context: WriteContext,
 ): string {
@@ -524,7 +524,7 @@ export function commentsXml(
  * `commentsExtended.xml` for the comments' replies and resolved state, keyed by the `w14:paraId`
  * of each comment's last paragraph (comments without one cannot be listed).
  */
-export function commentsExtendedXml(doc: FoliDocumentV3, part: OriginalPart | undefined): string {
+export function commentsExtendedXml(doc: FoliDocument, part: OriginalPart | undefined): string {
   const paraId = (c: CommentJSON) => {
     const last = c.content.filter((b) => b.type === "paragraph").at(-1);
     return (last?.attrs?.attributes as Record<string, string> | undefined)?.["w14:paraId"];

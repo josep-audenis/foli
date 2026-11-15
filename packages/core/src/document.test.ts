@@ -1,26 +1,20 @@
 import { describe, expect, it } from "vitest";
-import {
-  createDocument,
-  FoliDocumentError,
-  isColor,
-  isSafeHref,
-  parseContent,
-  parseDocument,
-} from "./index.js";
+import { createDocumentV2, parseDocumentV2 } from "./document.js";
+import { FoliDocumentError, isColor, isSafeHref, parseContentV2 } from "./index.js";
 
 const roundTrip = (value: unknown) => JSON.parse(JSON.stringify(value));
-const withContent = (content: unknown) => ({ ...createDocument(), content });
+const withContent = (content: unknown) => ({ ...createDocumentV2(), content });
 const withBlock = (block: unknown) => withContent({ type: "doc", content: [block] });
 const withInline = (inline: unknown) => withBlock({ type: "paragraph", content: [inline] });
 
-describe("parseDocument", () => {
+describe("parseDocumentV2", () => {
   it("accepts a freshly created document", () => {
-    const doc = createDocument();
-    expect(parseDocument(roundTrip(doc))).toEqual(doc);
+    const doc = createDocumentV2();
+    expect(parseDocumentV2(roundTrip(doc))).toEqual(doc);
   });
 
   it("round-trips formatted content without loss", () => {
-    const doc = createDocument({
+    const doc = createDocumentV2({
       type: "doc",
       content: [
         { type: "heading", attrs: { level: 1 }, content: [{ type: "text", text: "Title" }] },
@@ -36,11 +30,11 @@ describe("parseDocument", () => {
         { type: "paragraph" },
       ],
     });
-    expect(parseDocument(roundTrip(doc))).toEqual(doc);
+    expect(parseDocumentV2(roundTrip(doc))).toEqual(doc);
   });
 
   it("normalizes content: merged text, canonical mark order, no empty arrays", () => {
-    const loaded = parseDocument(
+    const loaded = parseDocumentV2(
       withBlock({
         type: "paragraph",
         content: [
@@ -61,29 +55,29 @@ describe("parseDocument", () => {
         ],
       },
     ]);
-    expect(parseDocument(withBlock({ type: "paragraph", content: [] })).content.content).toEqual([
+    expect(parseDocumentV2(withBlock({ type: "paragraph", content: [] })).content.content).toEqual([
       { type: "paragraph" },
     ]);
   });
 
   it("parses content into an immutable node tree", () => {
-    const doc = parseContent({ type: "doc", content: [{ type: "paragraph" }] });
+    const doc = parseContentV2({ type: "doc", content: [{ type: "paragraph" }] });
     expect(doc.type.name).toBe("doc");
     expect(doc.content.size).toBe(2);
-    expect(() => parseContent({ type: "paragraph" })).toThrow(
+    expect(() => parseContentV2({ type: "paragraph" })).toThrow(
       'content: root node must be of type "doc"',
     );
   });
 
   it("reports the path of invalid content", () => {
     expect(() =>
-      parseDocument(withInline({ type: "text", text: "x", marks: [{ type: "code" }] })),
+      parseDocumentV2(withInline({ type: "text", text: "x", marks: [{ type: "code" }] })),
     ).toThrow("content.content[0].content[0].marks[0].type: unknown mark type");
   });
 
   it.each([
     ["non-object", 42],
-    ["unknown version", { ...createDocument(), schemaVersion: 99 }],
+    ["unknown version", { ...createDocumentV2(), schemaVersion: 99 }],
     ["non-doc root", withContent({ type: "paragraph" })],
     [
       "marks on doc",
@@ -105,14 +99,14 @@ describe("parseDocument", () => {
     ["block inside paragraph", withInline({ type: "paragraph" })],
     [
       "negative margin",
-      createDocument(undefined, { margins: { top: -1, right: 0, bottom: 0, left: 0 } }),
+      createDocumentV2(undefined, { margins: { top: -1, right: 0, bottom: 0, left: 0 } }),
     ],
     [
       "margins wider than page",
-      createDocument(undefined, { margins: { top: 0, right: 150, bottom: 0, left: 150 } }),
+      createDocumentV2(undefined, { margins: { top: 0, right: 150, bottom: 0, left: 150 } }),
     ],
   ])("rejects %s", (_label, input) => {
-    expect(() => parseDocument(roundTrip(input))).toThrow(FoliDocumentError);
+    expect(() => parseDocumentV2(roundTrip(input))).toThrow(FoliDocumentError);
   });
 });
 
@@ -143,21 +137,21 @@ describe("schema v2 and migrations", () => {
   };
 
   it("loads a document saved by 0.1.0: version 2, content and settings unchanged", () => {
-    const loaded = parseDocument(roundTrip(savedBy010));
+    const loaded = parseDocumentV2(roundTrip(savedBy010));
     expect(loaded.schemaVersion).toBe(2);
     expect(loaded.settings).toEqual(savedBy010.settings);
     expect(loaded.content).toEqual(savedBy010.content);
   });
 
   it("rejects versions it cannot read, naming a newer document as such", () => {
-    const at = (schemaVersion: unknown) => () => parseDocument({ ...savedBy010, schemaVersion });
+    const at = (schemaVersion: unknown) => () => parseDocumentV2({ ...savedBy010, schemaVersion });
     expect(at(3)).toThrow(/newer/);
     for (const bad of [0, -1, 1.5, "2", null, undefined]) {
       expect(at(bad)).toThrow(FoliDocumentError);
     }
   });
 
-  const v2 = createDocument({
+  const v2 = createDocumentV2({
     type: "doc",
     content: [
       {
@@ -208,11 +202,11 @@ describe("schema v2 and migrations", () => {
   });
 
   it("round-trips every v2 type without loss", () => {
-    expect(parseDocument(roundTrip(v2))).toEqual(v2);
+    expect(parseDocumentV2(roundTrip(v2))).toEqual(v2);
   });
 
   it("leaves out attributes equal to their default, and fills them back in", () => {
-    const loaded = parseDocument(
+    const loaded = parseDocumentV2(
       withContent({
         type: "doc",
         content: [
@@ -231,13 +225,13 @@ describe("schema v2 and migrations", () => {
       { type: "orderedList", content: [{ type: "listItem", content: [{ type: "paragraph" }] }] },
       { type: "heading", attrs: { level: 3 } },
     ]);
-    const node = parseContent(loaded.content);
+    const node = parseContentV2(loaded.content);
     expect(node.child(0).attrs).toEqual({ align: "start" });
     expect(node.child(1).attrs).toEqual({ start: 1 });
   });
 
   it("puts a link outside the other marks (canonical order)", () => {
-    const loaded = parseDocument(
+    const loaded = parseDocumentV2(
       withInline({
         type: "text",
         text: "x",
@@ -267,7 +261,7 @@ describe("schema v2 and migrations", () => {
       { type: "orderedList", attrs: { start: 1.5 }, content: [item({ type: "paragraph" })] },
     ],
   ])("rejects %s", (_name, block) => {
-    expect(() => parseDocument(withBlock(block))).toThrow(FoliDocumentError);
+    expect(() => parseDocumentV2(withBlock(block))).toThrow(FoliDocumentError);
   });
 
   it.each([
@@ -285,7 +279,7 @@ describe("schema v2 and migrations", () => {
   ])("rejects the link href %j", (href) => {
     expect(isSafeHref(href)).toBe(false);
     const link = { type: "text", text: "x", marks: [{ type: "link", attrs: { href } }] };
-    expect(() => parseDocument(withInline(link))).toThrow(/href/);
+    expect(() => parseDocumentV2(withInline(link))).toThrow(/href/);
   });
 
   it.each([
@@ -305,12 +299,12 @@ describe("schema v2 and migrations", () => {
 
   it("rejects a link without href, and colors that are not lowercase #rrggbb", () => {
     expect(() =>
-      parseDocument(withInline({ type: "text", text: "x", marks: [{ type: "link" }] })),
+      parseDocumentV2(withInline({ type: "text", text: "x", marks: [{ type: "link" }] })),
     ).toThrow(FoliDocumentError);
     for (const color of ["#FFF", "#ABCDEF", "red", "#12345g", "", 0]) {
       expect(isColor(color)).toBe(false);
       const marked = { type: "text", text: "x", marks: [{ type: "highlight", attrs: { color } }] };
-      expect(() => parseDocument(withInline(marked))).toThrow(FoliDocumentError);
+      expect(() => parseDocumentV2(withInline(marked))).toThrow(FoliDocumentError);
     }
     expect(isColor("#a1b2c3")).toBe(true);
   });

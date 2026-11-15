@@ -7,7 +7,7 @@
 import type { MarkJSON } from "../model/index.js";
 import type {
   AbstractNumberingJSON,
-  FoliDocumentV3,
+  FoliDocument,
   NumberingInstanceJSON,
   NumberingLevelJSON,
   ParagraphPropertiesJSON,
@@ -411,7 +411,7 @@ function ordinal(n: number): string {
   return `${n}${suffix}`;
 }
 
-type Envelope = Pick<FoliDocumentV3, "defaults" | "styles" | "numbering" | "theme">;
+type Envelope = Pick<FoliDocument, "defaults" | "styles" | "numbering" | "theme">;
 
 interface Level {
   instance: NumberingInstanceJSON;

@@ -5,7 +5,7 @@
  * element's verbatim `ext`, so nothing is lost.
  */
 
-import { checkSection, type MarkJSON, RUN_PROPERTY_MARKS, schemaV3 } from "@folijs/core";
+import { checkSection, type MarkJSON, RUN_PROPERTY_MARKS, schema } from "@folijs/core";
 import type { XmlElement } from "../xml.js";
 import { attr, child, compact, elements, integer, isW, R, toggle, W } from "./ooxml.js";
 import type { Recorder } from "./report.js";
@@ -49,7 +49,7 @@ export function attributeBag(
   return count ? bag : undefined;
 }
 
-const PARAGRAPH_ATTRS = schemaV3.nodes.paragraph?.spec.attrs ?? {};
+const PARAGRAPH_ATTRS = schema.nodes.paragraph?.spec.attrs ?? {};
 
 /** Keeps `value` as paragraph attribute `name` if the schema accepts it; reports it otherwise. */
 export function setParagraph(
@@ -68,7 +68,7 @@ export function setParagraph(
 /** The mark if the schema accepts it; reported and left out otherwise. */
 export function mark(json: MarkJSON, element: string, context: Context): MarkJSON | undefined {
   try {
-    schemaV3.markFromJSON(json);
+    schema.markFromJSON(json);
     return json;
   } catch (error) {
     context.report.unmodeled(element, (error as Error).message);
@@ -430,7 +430,7 @@ export function paragraphProperties(
   // The mark's recorded formatting change stays in `ext`: a list of run properties holds none.
   const markFormat = runProperties(rPr, context)
     .filter((m) => RUN_PROPERTY_MARKS.includes(m.type))
-    .map((m) => schemaV3.markFromJSON(m).toJSON());
+    .map((m) => schema.markFromJSON(m).toJSON());
   if (markFormat.length) set("markFormat", markFormat, "rPr");
   if (!paragraph) return out;
 

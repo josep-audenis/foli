@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { parseContent } from "../document.js";
+import { parseContentV2 } from "../document.js";
 import type { MarkJSON, NodeJSON } from "../model/index.js";
 import type {
   AbstractNumberingJSON,
   CommentJSON,
-  FoliDocumentV3,
+  FoliDocument,
   StyleJSON,
 } from "../v3/document.js";
 import { createEditor } from "./editor.js";
@@ -54,7 +54,7 @@ const comment = (id: number, extra: Partial<CommentJSON> = {}): CommentJSON => (
   ...extra,
 });
 
-function editorOf(blocks: NodeJSON[], over: Partial<FoliDocumentV3> = {}) {
+function editorOf(blocks: NodeJSON[], over: Partial<FoliDocument> = {}) {
   return createEditor({
     document: {
       schemaVersion: 3,
@@ -625,7 +625,7 @@ describe("fitPastedV2 formatting", () => {
     const marks = ["bold", "italic", "underline", "strike"].map((type) => ({ type }));
     const fitted = fitPastedV2(
       editor.state,
-      parseContent({
+      parseContentV2({
         type: "doc",
         content: [
           { type: "heading", attrs: { level: 1 }, content: [{ type: "text", text: "h", marks }] },
@@ -651,7 +651,7 @@ describe("fitPastedV2 styles", () => {
     });
     const fitted = fitPastedV2(
       editor.state,
-      parseContent({
+      parseContentV2({
         type: "doc",
         content: [{ type: "heading", attrs: { level: 2 }, content: [{ type: "text", text: "h" }] }],
       }),
@@ -665,7 +665,7 @@ describe("fitPastedV2 styles", () => {
 });
 
 describe("fitPastedV2", () => {
-  const v2 = (content: unknown[]) => parseContent({ type: "doc", content });
+  const v2 = (content: unknown[]) => parseContentV2({ type: "doc", content });
   const item = (value: string) => ({
     type: "listItem",
     content: [{ type: "paragraph", content: [{ type: "text", text: value }] }],

@@ -5,7 +5,7 @@
  * byte for byte. Without a package, a new one is made.
  */
 
-import { type FoliDocumentV3, parseDocumentV3 } from "@folijs/core";
+import { type FoliDocument, parseDocument } from "@folijs/core";
 import { child, REL } from "../import/ooxml.js";
 import { DocxError, type DocxPackage, type NewPart } from "../package.js";
 import { deflateEntry, writeZip } from "../zip.js";
@@ -110,10 +110,10 @@ function relative(from: string, to: string): string {
  * Foli does not edit come back byte for byte and unchanged elements verbatim.
  */
 export async function exportDocx(
-  document: FoliDocumentV3,
+  document: FoliDocument,
   original?: DocxPackage,
 ): Promise<Uint8Array> {
-  const doc = withThreadIds(parseDocumentV3(document), original);
+  const doc = withThreadIds(parseDocument(document), original);
   return original ? intoPackage(doc, original) : newPackage(doc);
 }
 
@@ -121,7 +121,7 @@ const PARA_ID = "w14:paraId";
 type Json = Record<string, unknown>;
 
 /** A comment's last paragraph's `w14:paraId`: what `commentsExtended` keys its thread state by. */
-function paraIdOf(comment: FoliDocumentV3["comments"][number]): string | undefined {
+function paraIdOf(comment: FoliDocument["comments"][number]): string | undefined {
   const last = comment.content.filter((b) => b.type === "paragraph").at(-1);
   return (last?.attrs?.attributes as Record<string, string> | undefined)?.[PARA_ID];
 }
@@ -132,7 +132,7 @@ function paraIdOf(comment: FoliDocumentV3["comments"][number]): string | undefin
  * state can be written. Unique, below 0x80000000 as Word requires. Not when the comments part
  * cannot declare it (an existing part without the `w14` namespace).
  */
-function withThreadIds(doc: FoliDocumentV3, pkg: DocxPackage | undefined): FoliDocumentV3 {
+function withThreadIds(doc: FoliDocument, pkg: DocxPackage | undefined): FoliDocument {
   const parents = new Set(doc.comments.map((c) => c.parent).filter((p) => p !== undefined));
   const needs = doc.comments.filter(
     (c) =>
@@ -177,7 +177,7 @@ function withThreadIds(doc: FoliDocumentV3, pkg: DocxPackage | undefined): FoliD
   return copy;
 }
 
-async function intoPackage(doc: FoliDocumentV3, pkg: DocxPackage): Promise<Uint8Array> {
+async function intoPackage(doc: FoliDocument, pkg: DocxPackage): Promise<Uint8Array> {
   const mainName = pkg.mainDocument;
   const main = pkg.xml(mainName);
   const body = child(main.root, "body");
@@ -293,7 +293,7 @@ async function intoPackage(doc: FoliDocumentV3, pkg: DocxPackage): Promise<Uint8
 }
 
 /** Whether the comments' replies or resolved state differ from what the package says. */
-function changedThreads(doc: FoliDocumentV3, pkg: DocxPackage): boolean {
+function changedThreads(doc: FoliDocument, pkg: DocxPackage): boolean {
   const extended = pkg
     .relationships(pkg.mainDocument)
     .find((r) => r.type === REL.commentsExtended && !r.external)?.partName;
@@ -326,7 +326,7 @@ function changedThreads(doc: FoliDocumentV3, pkg: DocxPackage): boolean {
 }
 
 /** A new package: content types, relationships, the document and the parts it needs. */
-async function newPackage(doc: FoliDocumentV3): Promise<Uint8Array> {
+async function newPackage(doc: FoliDocument): Promise<Uint8Array> {
   const reference = packageReference(doc);
   if (reference) {
     throw new DocxError(
@@ -402,7 +402,7 @@ async function newPackage(doc: FoliDocumentV3): Promise<Uint8Array> {
 
 /** The body's last section: written when the document has one or read one (an empty `{}` read
  * from nothing is Word's default page, written as no `w:sectPr`). */
-function bodySection(doc: FoliDocumentV3, namespaces: Namespaces): string {
+function bodySection(doc: FoliDocument, namespaces: Namespaces): string {
   const section = doc.section as Record<string, unknown>;
   return Object.keys(section).length ? sectionXml(section, namespaces) : "";
 }
@@ -411,7 +411,7 @@ function bodySection(doc: FoliDocumentV3, namespaces: Namespaces): string {
  * Where the document refers to a part of a package by relationship id (headers, footers,
  * pictures and other content kept verbatim): such a document needs that package to export.
  */
-function packageReference(doc: FoliDocumentV3): string | undefined {
+function packageReference(doc: FoliDocument): string | undefined {
   const sections = [doc.section, ...(doc.content.content ?? []).map((b) => b.attrs?.section)];
   for (const s of sections) {
     const section = s as { headers?: object; footers?: object } | undefined;

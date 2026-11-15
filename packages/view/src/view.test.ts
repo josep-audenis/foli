@@ -1,5 +1,12 @@
 // @vitest-environment jsdom
-import { createDocument, createEditor, type DocJSON, parseDocumentV3 } from "@folijs/core";
+import {
+  createDocument,
+  createEditor,
+  DEFAULT_SETTINGS,
+  type DocJSON,
+  type FoliDocumentV2,
+  parseDocument,
+} from "@folijs/core";
 import { afterEach, describe, expect, it, onTestFinished, vi } from "vitest";
 import { EditorView, type EditorViewOptions, keyName } from "./index.js";
 
@@ -110,10 +117,17 @@ function fakeResizeObserver() {
 const blockReads = (spy: { mock: { contexts: unknown[] } }) =>
   spy.mock.contexts.filter((el) => !(el as Element).classList.contains("foli-page")).length;
 
+/** A schema v2 (0.2.0) document: the editor migrates it when loaded. */
+const v2 = (content: DocJSON): FoliDocumentV2 => ({
+  schemaVersion: 2,
+  settings: DEFAULT_SETTINGS,
+  content,
+});
+
 function mount(content: DocJSON = sample, options?: EditorViewOptions) {
   const host = document.createElement("div");
   document.body.append(host);
-  const editor = createEditor({ document: createDocument(content) });
+  const editor = createEditor({ document: v2(content) });
   const view = new EditorView(host, editor, options);
   views.push(view);
   return { host, editor, view };
@@ -121,7 +135,7 @@ function mount(content: DocJSON = sample, options?: EditorViewOptions) {
 
 /** A document on a Letter page (in twips, as Word's sections are), with uneven margins. */
 function letter(content: DocJSON) {
-  const document = parseDocumentV3(createDocument(content));
+  const document = parseDocument(v2(content));
   const { margins } = document.section;
   return {
     ...document,

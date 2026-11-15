@@ -6,7 +6,7 @@
  * does not model stay where Word requires them.
  */
 
-import { type MarkJSON, schemaV3 } from "@folijs/core";
+import { type MarkJSON, schema } from "@folijs/core";
 import { W } from "../import/ooxml.js";
 import {
   paragraphProperties,
@@ -39,13 +39,13 @@ const reading = (original: NonNullable<Original>) => ({
 
 /** Canonical paragraph attributes (defaults left out), as the document holds them. */
 function canonicalParagraph(attrs: Json): Json {
-  return (schemaV3.nodeFromJSON({ type: "paragraph", attrs }).toJSON().attrs ?? {}) as Json;
+  return (schema.nodeFromJSON({ type: "paragraph", attrs }).toJSON().attrs ?? {}) as Json;
 }
 
 /** Canonical marks, ordered by type: comparable whatever order they were read in. */
 function canonicalMarks(marks: readonly MarkJSON[]): MarkJSON[] {
   return marks
-    .map((m) => schemaV3.markFromJSON(m).toJSON())
+    .map((m) => schema.markFromJSON(m).toJSON())
     .sort((a, b) => (a.type < b.type ? -1 : a.type > b.type ? 1 : 0));
 }
 

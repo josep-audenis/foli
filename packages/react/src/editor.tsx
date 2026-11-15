@@ -27,7 +27,7 @@ export const useIsomorphicLayoutEffect =
 export interface UseFoliEditorOptions {
   /**
    * Read once, when the editor is created: a document of any version (0.1.0 and 0.2.0 documents
-   * are validated and migrated to schema v3, `parseDocumentV3`). Default: an empty document. To
+   * are validated and migrated to schema v3, `parseDocument`). Default: an empty document. To
    * load another document, `editor.setDocument()`.
    */
   initialContent?: EditorDocument | undefined;

@@ -1,6 +1,6 @@
 "use client";
 
-import { createDocument, parseDocumentV3 } from "@folijs/core";
+import { createDocument, parseDocument } from "@folijs/core";
 import { FoliEditor } from "@folijs/react";
 import { useState } from "react";
 
@@ -14,7 +14,7 @@ const KEY = "foli-example";
 function load() {
   const saved = typeof window === "undefined" ? null : window.localStorage.getItem(KEY);
   try {
-    if (saved) return parseDocumentV3(JSON.parse(saved));
+    if (saved) return parseDocument(JSON.parse(saved));
   } catch (error) {
     console.warn("Ignoring the saved document:", error);
   }

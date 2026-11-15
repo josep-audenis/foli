@@ -1,10 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { createDocument } from "../document.js";
+import { createDocumentV2 } from "../document.js";
 import type { NodeJSON } from "../model/index.js";
 import { Slice } from "../model/index.js";
 import type { BlockJSON, DocJSON } from "../schema.js";
 import { testSchema } from "../testing/index.js";
-import { parseDocumentV3 } from "../v3/index.js";
+import { parseDocument } from "../v3/index.js";
 import {
   createEditor,
   deleteBackward,
@@ -45,7 +45,7 @@ const styled = (level: number, ...content: string[]): NodeJSON => ({
 });
 const docJSON = (...blocks: NodeJSON[]) => ({ type: "doc", content: blocks }) as DocJSON;
 const editorWith = (...blocks: NodeJSON[]) =>
-  createEditor({ document: createDocument(docJSON(...(blocks as BlockJSON[]))) });
+  createEditor({ document: createDocumentV2(docJSON(...(blocks as BlockJSON[]))) });
 const content = (editor: Editor) => editor.getDocument().content;
 
 /** Types text one keystroke at a time, checking the document stays valid after each. */
@@ -87,7 +87,7 @@ describe("T1: type and format several paragraphs (headless)", () => {
         normal("Second", { type: "hardBreak" }, "line"),
       ),
     );
-    expect(parseDocumentV3(JSON.parse(JSON.stringify(editor.getDocument())))).toEqual(
+    expect(parseDocument(JSON.parse(JSON.stringify(editor.getDocument())))).toEqual(
       editor.getDocument(),
     );
   });
@@ -189,7 +189,7 @@ describe("history", () => {
     // A4 in whole twips (11906): 210.01 mm.
     expect(editor.settings.pageSize.width).toBeCloseTo(210, 1);
     editor.setDocument(
-      createDocument(undefined, { margins: { top: 10, right: 20, bottom: 30, left: 40 } }),
+      createDocumentV2(undefined, { margins: { top: 10, right: 20, bottom: 30, left: 40 } }),
     );
     const { top, right, bottom, left } = editor.settings.margins;
     expect([top, right, bottom, left].map(Math.round)).toEqual([10, 20, 30, 40]);
@@ -198,7 +198,7 @@ describe("history", () => {
   it("setDocument resets history", () => {
     const editor = createEditor();
     type(editor, "a");
-    editor.setDocument(createDocument());
+    editor.setDocument(createDocumentV2());
     expect(editor.commands.undo()).toBe(false);
   });
 });
@@ -369,7 +369,7 @@ describe("review regressions (PR #4)", () => {
           : null,
     });
     const editor = createEditor({
-      document: createDocument(docJSON(para("a") as BlockJSON)),
+      document: createDocumentV2(docJSON(para("a") as BlockJSON)),
       plugins: [trailing],
     });
     // No select(): a selection-only transaction would trigger the plugin as its own undo event.
@@ -489,7 +489,7 @@ describe("plugin reactions to undo/redo (PR #4 re-review)", () => {
     });
   const setup = (op: "undo" | "redo", secondAt: number) => {
     const editor = createEditor({
-      document: createDocument(docJSON(para("abc") as BlockJSON)),
+      document: createDocumentV2(docJSON(para("abc") as BlockJSON)),
       plugins: [reactTo(op)],
     });
     editor.select(4);

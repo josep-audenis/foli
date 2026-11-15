@@ -8,7 +8,7 @@ import {
   type NumberingLevelJSON,
   RUN_PROPERTY_MARKS,
   type StyleJSON,
-  schemaV3,
+  schema,
   type ThemeJSON,
 } from "@folijs/core";
 import type { XmlElement } from "../xml.js";
@@ -27,7 +27,7 @@ const MAX_ID = 2_147_483_647;
 function runList(rPr: XmlElement | undefined, context: Context): MarkJSON[] {
   return runProperties(rPr, context)
     .filter((m) => RUN_PROPERTY_MARKS.includes(m.type))
-    .map((m) => schemaV3.markFromJSON(m).toJSON()); // canonical: default values left out
+    .map((m) => schema.markFromJSON(m).toJSON()); // canonical: default values left out
 }
 
 /** An id within what the model holds; reported otherwise. */

@@ -2,7 +2,7 @@
  * The benchmark page (`/bench.html`, dev server only): mounts the editor on demand and times it
  * from inside the page. Driven by `apps/playground/bench/`; see docs/benchmarks.md.
  */
-import { parseDocumentV3 } from "@folijs/core";
+import { parseDocument } from "@folijs/core";
 import { type FoliChange, FoliEditor } from "@folijs/react";
 import { flushSync } from "react-dom";
 import { createRoot, type Root } from "react-dom/client";
@@ -69,7 +69,7 @@ swap.textContent =
 const bench = {
   /** Mounts a stored document: time until it is laid out (synchronous), and until painted. */
   async mount(json: unknown): Promise<{ layoutMs: number; paintMs: number; pages: number }> {
-    const document = parseDocumentV3(json);
+    const document = parseDocument(json);
     root?.unmount();
     root = createRoot(container);
     const start = performance.now();

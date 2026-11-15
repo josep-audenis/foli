@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { MarkJSON, NodeJSON } from "../model/index.js";
-import type { FoliDocumentV3, StyleJSON } from "../v3/document.js";
+import type { FoliDocument, StyleJSON } from "../v3/document.js";
 import { createEditor } from "./editor.js";
 import { NodeSelection, TextSelection } from "./selection.js";
 
@@ -32,7 +32,7 @@ const p = (attrs: Record<string, unknown>, ...content: NodeJSON[]): NodeJSON => 
   ...(content.length ? { content } : {}),
 });
 
-function documentOf(...blocks: NodeJSON[]): FoliDocumentV3 {
+function documentOf(...blocks: NodeJSON[]): FoliDocument {
   return {
     schemaVersion: 3,
     section: { pageSize: { width: 11906, height: 16838 }, margins: { top: 1440, left: 1800 } },

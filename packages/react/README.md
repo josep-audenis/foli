@@ -13,14 +13,14 @@ npm install @folijs/react @folijs/core react react-dom
 Keep all `@folijs/*` packages on the same version.
 
 ```tsx
-import { createDocument, parseDocumentV3 } from "@folijs/core";
+import { createDocument, parseDocument } from "@folijs/core";
 import { type FoliChange, FoliEditor } from "@folijs/react";
 import "@folijs/react/styles.css";
 
-// Load: parseDocumentV3 validates the saved JSON, migrating an older document (throws
+// Load: parseDocument validates the saved JSON, migrating an older document (throws
 // FoliDocumentError when invalid).
 const saved = localStorage.getItem("doc");
-const initial = saved ? parseDocumentV3(JSON.parse(saved)) : createDocument();
+const initial = saved ? parseDocument(JSON.parse(saved)) : createDocument();
 
 // Save once typing pauses: reading `change.document` serializes the whole document.
 let timer: ReturnType<typeof setTimeout> | undefined;

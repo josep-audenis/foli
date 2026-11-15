@@ -10,14 +10,14 @@
  * become the commands themselves.
  */
 import type { Attrs, Mark, MarkType, Node } from "../model/index.js";
-import type { FoliDocumentV3 } from "../v3/document.js";
+import type { FoliDocument } from "../v3/document.js";
 import { Resolver, type RunFormat } from "../v3/resolve.js";
 import { MARK_ATTRS } from "./mark.js";
 import { NodeSelection, TextSelection } from "./selection.js";
 import { type EditorState, Plugin, PluginKey, type Transaction } from "./state.js";
 
 /** A v3 document without its content: what the editor keeps beside the edited tree. */
-export type WordEnvelope = Omit<FoliDocumentV3, "content">;
+export type WordEnvelope = Omit<FoliDocument, "content">;
 
 export interface WordContext {
   readonly envelope: WordEnvelope;

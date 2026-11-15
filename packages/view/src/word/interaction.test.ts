@@ -2,16 +2,25 @@
 import {
   createDocument,
   createEditor,
+  DEFAULT_SETTINGS,
   type DocJSON,
+  type FoliDocumentV2,
   type NodeJSON,
   NodeSelection,
-  parseDocumentV3,
+  parseDocument,
   TextSelection,
 } from "@folijs/core";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { EditorView } from "../index.js";
 
 // Documents are written as 0.2.0 ones where that is shorter (lists): the editor migrates them.
+/** A schema v2 (0.2.0) document: the editor migrates it when loaded. */
+const v2 = (content: DocJSON): FoliDocumentV2 => ({
+  schemaVersion: 2,
+  settings: DEFAULT_SETTINGS,
+  content,
+});
+
 const text = (value: string): NodeJSON => ({ type: "text", text: value });
 const p = (...content: NodeJSON[]): NodeJSON => ({
   type: "paragraph",
@@ -38,9 +47,7 @@ function mount(blocks: NodeJSON[], v3 = false) {
   const host = document.createElement("div");
   document.body.append(host);
   const json = { type: "doc", content: blocks } as DocJSON;
-  const document_ = v3
-    ? { ...parseDocumentV3(createDocument()), content: json as never }
-    : createDocument(json);
+  const document_ = v3 ? { ...parseDocument(createDocument()), content: json as never } : v2(json);
   const editor = createEditor({ document: document_ });
   const view = new EditorView(host, editor);
   views.push(view);

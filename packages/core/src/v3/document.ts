@@ -1,4 +1,4 @@
-import { parseDocument } from "../document.js";
+import { DEFAULT_SETTINGS, parseDocumentV2 } from "../document.js";
 import { FoliDocumentError, type MarkJSON, type Node, type NodeJSON } from "../model/index.js";
 import {
   bool,
@@ -20,11 +20,11 @@ import {
   checkSection,
   checkParagraphProperties as paragraphProperties,
   checkRunProperties as runProperties,
-  schemaV3,
+  schema,
 } from "./schema.js";
 
 /** The schema version of documents in the Word model (ADR-0005). */
-export const SCHEMA_VERSION_V3 = 3;
+export const SCHEMA_VERSION = 3;
 
 /** Page setup of a section, in twips (1/1440 inch). Missing parts take Word's defaults. */
 export interface SectionJSON {
@@ -164,8 +164,8 @@ export interface CommentJSON {
 }
 
 /** A document in the Word model: the content tree and what Word keeps beside it. */
-export interface FoliDocumentV3 {
-  schemaVersion: typeof SCHEMA_VERSION_V3;
+export interface FoliDocument {
+  schemaVersion: typeof SCHEMA_VERSION;
   /** The last section's page setup (`w:body/w:sectPr`); earlier sections end at paragraphs. */
   section: SectionJSON;
   /** Document defaults (`w:docDefaults`). */
@@ -183,6 +183,37 @@ export interface FoliDocumentV3 {
 }
 
 /**
+ * A new document: `content` (schema v3; default: one empty paragraph) on A4 with 25.4 mm
+ * margins, with the styles and list definitions the editor's commands use (Normal, Heading 1–6,
+ * List Paragraph, Hyperlink; bullets and numbers) and 11 pt Georgia, 1.5 lines: the look a
+ * migrated 0.2.0 document has. `section` (in twips: `mmToTwips`) is merged over that page:
+ * `pageSize` and `margins` part by part. Not validated: `parseDocument` (or `createEditor`) does
+ * that.
+ */
+export function createDocument(
+  content: NodeJSON = { type: "doc", content: [{ type: "paragraph" }] },
+  section?: SectionJSON,
+): FoliDocument {
+  const empty = { type: "doc", content: [] } as const satisfies NodeJSON;
+  const blank = migrateToV3({
+    schemaVersion: 2,
+    settings: DEFAULT_SETTINGS,
+    content: empty as never,
+  });
+  const base = blank.section;
+  return {
+    ...blank,
+    // The default (A4) section has only pageSize and margins: each merged part by part.
+    section: {
+      ...section,
+      pageSize: { ...base.pageSize, ...section?.pageSize },
+      margins: { ...base.margins, ...section?.margins },
+    },
+    content,
+  };
+}
+
+/**
  * Validates untrusted input against schema v3. Returns a copy that shares nothing with the
  * input, with the content and the comments' content in canonical form. Documents of schema 1
  * and 2 are validated as such and migrated (`migrateToV3`). Throws FoliDocumentError instead
@@ -193,12 +224,16 @@ export interface FoliDocumentV3 {
  * engine cannot work with: wrong types, out-of-range values, and cycles (a style based on
  * itself, comments replying to each other) that would never end when followed.
  */
-export function parseDocumentV3(input: unknown): FoliDocumentV3 {
+export function parseDocument(input: unknown): FoliDocument {
   if (!isRecord(input)) throw new FoliDocumentError("Document must be an object");
   const version = input.schemaVersion;
-  if (version === 1 || version === 2) return parseDocumentV3(migrateToV3(parseDocument(input)));
-  if (version !== SCHEMA_VERSION_V3) {
-    throw new FoliDocumentError(`Unsupported schemaVersion: ${String(version)} (expected 1 to 3)`);
+  if (version === 1 || version === 2) return parseDocument(migrateToV3(parseDocumentV2(input)));
+  if (version !== SCHEMA_VERSION) {
+    const newer = Number.isInteger(version) && (version as number) > SCHEMA_VERSION;
+    throw new FoliDocumentError(
+      `Unsupported schemaVersion: ${String(version)} (this version of @folijs/core reads 1 to ` +
+        `${SCHEMA_VERSION}${newer ? "; the document was saved by a newer one" : ""})`,
+    );
   }
   for (const key of Object.keys(input)) {
     if (!ENVELOPE_KEYS.includes(key)) throw new FoliDocumentError(`${key}: unknown key`);
@@ -237,7 +272,7 @@ export function parseDocumentV3(input: unknown): FoliDocumentV3 {
     (c) => `comment ${c.id} replies to itself`,
   );
 
-  const content = parseContentV3(input.content);
+  const content = parseContent(input.content);
   // A copy: the validated document must not change when the caller's input does.
   const envelope = structuredClone({
     section: input.section,
@@ -245,9 +280,9 @@ export function parseDocumentV3(input: unknown): FoliDocumentV3 {
     styles,
     numbering: input.numbering,
     theme: input.theme,
-  }) as Pick<FoliDocumentV3, "section" | "defaults" | "styles" | "numbering" | "theme">;
+  }) as Pick<FoliDocument, "section" | "defaults" | "styles" | "numbering" | "theme">;
   return {
-    schemaVersion: SCHEMA_VERSION_V3,
+    schemaVersion: SCHEMA_VERSION,
     section: envelope.section,
     defaults: envelope.defaults,
     styles: envelope.styles,
@@ -262,9 +297,9 @@ export function parseDocumentV3(input: unknown): FoliDocumentV3 {
 }
 
 /** Parses untrusted schema v3 content into a `doc` node. */
-export function parseContentV3(value: unknown, path = "content"): Node {
-  const doc = schemaV3.nodeFromJSON(value, path);
-  if (doc.type !== schemaV3.topNodeType) fail(path, 'root node must be of type "doc"');
+export function parseContent(value: unknown, path = "content"): Node {
+  const doc = schema.nodeFromJSON(value, path);
+  if (doc.type !== schema.topNodeType) fail(path, 'root node must be of type "doc"');
   if (doc.marks.length) fail(`${path}.marks`, "doc cannot have marks");
   return doc;
 }
@@ -320,7 +355,7 @@ function noCycles<T>(
 }
 
 function blocks(content: NodeJSON[], path: string): Node[] {
-  const doc = parseContentV3({ type: "doc", content }, path);
+  const doc = parseContent({ type: "doc", content }, path);
   const list: Node[] = [];
   doc.forEach((block) => {
     list.push(block);
