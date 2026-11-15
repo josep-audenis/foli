@@ -13,11 +13,10 @@
     "10 (166) 10. dog an fox seven har",
     "11 (22) 11. bright wall a sail",
     "12 (238) 12. past brown while old",
-    "13 (94) 13. harbour over ships t",
-    "14 (198) 14. quick dog an fox sev"
+    "13 (94) 13. harbour over ships t"
   ],
   [
-    "14.1 (109) quick dog an fox seven h",
+    "14 (307) 14. quick dog an fox sev",
     "15 (167) 15. jumps bright wall a ",
     "16 (25) 16. lazy past brown whil",
     "17 (242) 17. seven harbour over s",
@@ -29,11 +28,11 @@
     "23 (94) 23. while old jumps brig",
     "24 (309) 24. ships the lazy past ",
     "25 (168) 25. an fox seven harbour",
-    "26 (21) 26. wall a sail quick",
-    "27 (238) 27. brown while old jump",
-    "28 (92) 28. over ships the lazy "
+    "26 (21) 26. wall a sail quick"
   ],
   [
+    "27 (238) 27. brown while old jump",
+    "28 (92) 28. over ships the lazy ",
     "29 (305) 29. dog an fox seven har",
     "30 (165) 30. bright wall a sail q",
     "31 (24) 31. past brown while old",
@@ -44,7 +43,9 @@
     "36 (28) 36. seven harbour over s",
     "37 (238) 37. sail quick dog an fo",
     "38 (94) 38. old jumps bright wal",
-    "39 (308) 39. the lazy past brown ",
+    "39 (308) 39. the lazy past brown "
+  ],
+  [
     "40 (172) 40. fox seven harbour ov"
   ]
 ]

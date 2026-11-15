@@ -1,9 +1,15 @@
 // @vitest-environment jsdom
-import { createDocument, EditorState } from "@folijs/core";
+import {
+  createDocument,
+  createEditor,
+  type Editor,
+  EditorState,
+  type FoliDocument,
+} from "@folijs/core";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { createRef } from "react";
+import { createRef, forwardRef, useImperativeHandle, useRef, useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { FoliEditor, type FoliEditorHandle } from "./index.js";
+import { FoliCanvas, type FoliCanvasHandle, FoliEditorProvider, FoliToolbar } from "./index.js";
 
 const doc = createDocument({
   type: "doc",
@@ -13,9 +19,44 @@ const doc = createDocument({
   ],
 });
 
-function setup(props: Parameters<typeof FoliEditor>[0] = {}) {
-  const ref = createRef<FoliEditorHandle>();
-  render(<FoliEditor ref={ref} initialContent={doc} {...props} />);
+interface V2Props {
+  initialContent?: FoliDocument;
+  readOnly?: boolean;
+  toolbar?: boolean;
+}
+interface V2Handle {
+  editor: Editor;
+  focus(): void;
+}
+
+/**
+ * `FoliEditor` as it was on schema v2, for the v2 toolbar (`FoliEditor` edits schema v3 since
+ * 8.7d1; the v2 toolbar goes with v2 in 8.7d2).
+ */
+const V2Editor = forwardRef<V2Handle, V2Props>(function V2Editor(
+  { initialContent = doc, readOnly, toolbar = true },
+  ref,
+) {
+  const [editor] = useState(() => createEditor({ document: initialContent }));
+  const canvas = useRef<FoliCanvasHandle>(null);
+  useImperativeHandle(ref, () => ({ editor, focus: () => canvas.current?.focus() }), [editor]);
+  return (
+    <FoliEditorProvider editor={editor}>
+      {toolbar && (
+        <FoliToolbar
+          editor={editor}
+          disabled={readOnly}
+          onClickCommand={() => canvas.current?.focus()}
+        />
+      )}
+      <FoliCanvas ref={canvas} editor={editor} readOnly={readOnly} />
+    </FoliEditorProvider>
+  );
+});
+
+function setup(props: V2Props = {}) {
+  const ref = createRef<V2Handle>();
+  render(<V2Editor ref={ref} {...props} />);
   const handle = ref.current;
   if (!handle) throw new Error("no handle");
   return handle;
@@ -460,24 +501,24 @@ describe("FoliToolbar", () => {
   });
 
   it("a dialog open when the toolbar is disabled does not come back after", () => {
-    const { rerender } = render(<FoliEditor initialContent={doc} />);
+    const { rerender } = render(<V2Editor />);
     const documentBox = screen.getByRole("textbox", { name: "Document" });
     act(() => documentBox.focus());
     fireEvent.keyDown(documentBox, { key: "k", ctrlKey: true });
     expect(screen.getByRole("dialog")).toBeTruthy();
-    rerender(<FoliEditor initialContent={doc} readOnly />);
+    rerender(<V2Editor readOnly />);
     expect(screen.queryByRole("dialog")).toBeNull();
-    rerender(<FoliEditor initialContent={doc} />);
+    rerender(<V2Editor />);
     expect(screen.queryByRole("dialog")).toBeNull();
   });
 
   it("opens no link dialog in read-only mode, not even after it ends", () => {
-    const { rerender } = render(<FoliEditor initialContent={doc} readOnly />);
+    const { rerender } = render(<V2Editor readOnly />);
     const documentBox = screen.getByRole("textbox", { name: "Document" });
     fireEvent.keyDown(documentBox, { key: "k", ctrlKey: true });
     fireEvent.click(button("Link"), { detail: 1 });
     expect(screen.queryByRole("dialog")).toBeNull();
-    rerender(<FoliEditor initialContent={doc} />);
+    rerender(<V2Editor />);
     expect(screen.queryByRole("dialog")).toBeNull();
   });
 
@@ -489,7 +530,7 @@ describe("FoliToolbar", () => {
     expect(document.activeElement).toBe(first);
   });
 
-  it("a ref on FoliEditor gives its editor and focuses the document", () => {
+  it("a ref gives the editor and focuses the document", () => {
     const handle = setup();
     expect(handle.editor.state.doc.textContent).toBe("Hello FoliSecond");
     act(() => handle.focus());

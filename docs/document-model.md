@@ -202,8 +202,10 @@ paragraph with a bottom border; `align` becomes `justification` (`end` → `righ
 `both`); `textColor` becomes `color`, and `highlight` becomes `shading` (Word's highlight has
 only 16 colors; a fill keeps any color); linked text takes Word's `Hyperlink` character style
 (blue, underlined: the look v2 gave links); `settings` becomes the section in twips (rounded to
-the twip, under 0.02 mm, and kept within Word's 22-inch page). The defaults take the default
-stylesheet's 11 pt Georgia; the styles (`Normal`, headings, `ListParagraph`, `Hyperlink`) and numbering
+the twip, under 0.02 mm, and kept within Word's 22-inch page). The defaults keep the default
+stylesheet's look, about: 11 pt Georgia, Word's 1.5 lines (1.5 times the font's own line
+height, a little taller than CSS's 1.5), and 11 pt after each paragraph (the browser's 1em between
+paragraphs); the styles (`Normal`, headings, `ListParagraph`, `Hyperlink`) and numbering
 definitions (bullets • ◦ ▪, numbers decimal at every level, as v2 showed them) are added, fresh
 for each document.
 

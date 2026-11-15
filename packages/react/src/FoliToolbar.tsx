@@ -6,8 +6,6 @@ import {
   canOutdent,
   changeIndent,
   colorAt,
-  type Editor,
-  type EditorDocument,
   type EditorState,
   fontFamilyAt,
   fontSizeAt,
@@ -55,7 +53,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { useEditorOrContext, useEditorState } from "./editor.js";
+import { type AnyEditor, useEditorOrContext, useEditorState } from "./editor.js";
 
 export interface FoliToolbarProps {
   /**
@@ -63,7 +61,7 @@ export interface FoliToolbarProps {
    * (Word's model) gets Word's controls: paragraph style, font, size, line spacing, Word's
    * highlight colors; no heading buttons or horizontal rule.
    */
-  editor?: Editor<EditorDocument> | undefined;
+  editor?: AnyEditor | undefined;
   /**
    * Every button is disabled. Pass it whenever the canvas is `readOnly`: commands run through
    * the editor, which code may always change (`FoliEditor` does this for you).
@@ -89,7 +87,7 @@ interface Item {
   /** Shown instead of `text` (a symbol: the label is the name). */
   icon?: ReactNode;
   /** Whether the button shows as pressed (toggle buttons only). */
-  pressed?: (state: EditorState, editor: Editor) => boolean;
+  pressed?: (state: EditorState, editor: AnyEditor) => boolean;
   /**
    * Whether the command can run now (default: always; in schema v1 every selection is in
    * textblocks, which take every mark, block type and page break). A cheap check, not a dry
@@ -517,7 +515,7 @@ const sameStates = (a: ItemState[], b: ItemState[]) =>
 /** Runs after every transaction: O(selection), no transactions built. */
 const statesOf =
   (items: readonly Item[]) =>
-  (state: EditorState, editor: Editor): ItemState[] =>
+  (state: EditorState, editor: AnyEditor): ItemState[] =>
     items.map((item) => ({
       pressed: item.pressed?.(state, editor),
       enabled: item.enabled?.(state) ?? true,
@@ -541,9 +539,7 @@ export function FoliToolbar({
   label = "Formatting",
   className,
 }: FoliToolbarProps) {
-  // shortcut: the hooks take a schema v2 editor's type; both editors have the same members
-  // they use (8.7d makes v3 the only one).
-  const editor = useEditorOrContext(given as Editor | undefined, "FoliToolbar");
+  const editor = useEditorOrContext(given, "FoliToolbar");
   const word = useEditorState((state) => wordContext(state) !== null, { editor });
   const groups = word ? WORD_GROUPS : GROUPS;
   const items = word ? WORD_ITEMS : ITEMS;
@@ -877,7 +873,7 @@ function LinkDialog({
   request,
   onClose,
 }: {
-  editor: Editor;
+  editor: AnyEditor;
   href: string;
   /** Counts the open requests: each one focuses the field. */
   request: number;

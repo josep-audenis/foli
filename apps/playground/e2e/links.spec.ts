@@ -24,10 +24,14 @@ async function openWith(page: Page, text: string): Promise<void> {
   await expect(editor(page)).toHaveText(text);
 }
 
+/** Linked text as Word has it: the link, and the "Hyperlink" character style that shows it. */
 const linked = (text: string, href: string) => ({
   type: "text",
   text,
-  marks: [{ type: "link", attrs: { href } }],
+  marks: [
+    { type: "link", attrs: { href } },
+    { type: "characterStyle", attrs: { id: "Hyperlink" } },
+  ],
 });
 
 test("Mod-K opens the link dialog; the link applies, and Ctrl/Cmd+click opens it", async ({

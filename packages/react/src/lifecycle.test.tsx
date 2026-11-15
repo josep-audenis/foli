@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { createDocument, type FoliDocument, PAGE_SIZES } from "@folijs/core";
+import { createDocument, type FoliDocument, PAGE_SIZES, parseDocumentV3 } from "@folijs/core";
 import { act, cleanup, render, screen } from "@testing-library/react";
 import { createRef, useLayoutEffect } from "react";
 import { hydrateRoot, type Root } from "react-dom/client";
@@ -38,12 +38,14 @@ describe("replacing the document (setDocument)", () => {
     const editor = ref.current?.editor;
     if (!editor) throw new Error("no editor");
 
-    act(() => editor.setDocument(text("Second", { pageSize: PAGE_SIZES.Letter })));
+    act(() => editor.setDocument(parseDocumentV3(text("Second", { pageSize: PAGE_SIZES.Letter }))));
     expect(screen.getByRole("textbox").textContent).toBe("Second");
     expect(container.querySelector<HTMLElement>(".foli-page")?.style.width).toBe("215.9mm");
     expect(editor.settings.pageSize).toEqual(PAGE_SIZES.Letter);
     // Not a change the app has to be told about: it passed the document itself.
     expect(changes).toHaveLength(1);
+    // A change read later still has the page it was made on (A4, in twips).
+    expect(changes[0]?.document.section.pageSize).toEqual({ width: 11906, height: 16838 });
     // History starts again: nothing to undo, so the old document cannot come back.
     expect(screen.getByRole("button", { name: "Undo" }).getAttribute("aria-disabled")).toBe("true");
     expect(editor.commands.undo()).toBe(false);
@@ -53,7 +55,20 @@ describe("replacing the document (setDocument)", () => {
     type("y");
     expect(screen.getByRole("textbox").textContent).toBe("ySecond");
     expect(changes).toHaveLength(2);
-    expect(changes[1]?.document.settings.pageSize).toEqual(PAGE_SIZES.Letter);
+    expect(changes[1]?.document.section.pageSize).toEqual({ width: 12240, height: 15840 });
+  });
+
+  it("migrates an older document (from JavaScript): changes are still schema v3", () => {
+    const ref = createRef<FoliEditorHandle>();
+    const changes: FoliChange[] = [];
+    render(<FoliEditor ref={ref} onChange={(c) => changes.push(c)} />);
+    const editor = ref.current?.editor;
+    if (!editor) throw new Error("no editor");
+    act(() => editor.setDocument(text("Old") as never));
+    type("x");
+    expect(screen.getByRole("textbox").textContent).toBe("xOld");
+    expect(changes[0]?.document).toMatchObject({ schemaVersion: 3, section: {} });
+    expect(() => parseDocumentV3(changes[0]?.document)).not.toThrow();
   });
 });
 

@@ -79,8 +79,9 @@ generous 250 ms bound.
 **Run:** `pnpm bench:layout` (Playwright, `playwright.bench.config.ts`, one worker; about 3
 minutes for all three engines). Each test prints a `BENCH {…}` line. Not part of `pnpm check` or
 `pnpm test:e2e`. Source: `apps/playground/bench/pagination.bench.ts`, driving the dev-only page
-`apps/playground/bench.html` (`src/bench.tsx`), which mounts `FoliEditor` and times it from
-inside the page.
+`apps/playground/bench.html` (`src/bench.tsx`), which mounts `FoliEditor`'s parts (toolbar and
+canvas) and times them from inside the page. Since 8.7d1 `FoliEditor` edits schema v3; the bench
+page keeps a schema v2 editor, the one measured here, until 8.7d2 measures v3.
 
 **Fixtures:** `benchDocument(sections)` in `apps/playground/e2e/fixtures.ts`: per section a level-2
 heading and thirteen paragraphs of one to five lines (synthetic words, no marks), A4 with 25.4 mm
@@ -271,10 +272,10 @@ fails when a bundle passes its budget.
 | Bundle            | Includes          | Minified | Gzipped |  Budget |
 | ----------------- | ----------------- | -------: | ------: | ------: |
 | `@folijs/core`    | core              | 112.9 kB | 36.1 kB | 36.6 kB |
-| `@folijs/view`    | view, core        | 141.5 kB | 46.7 kB | 47.5 kB |
-| `@folijs/react`   | react, view, core | 181.8 kB | 59.4 kB | 60.4 kB |
-| `FoliEditor` only | what it reaches   | 181.5 kB | 59.3 kB | 60.4 kB |
-| `@folijs/docx`    | docx, core        | 107.1 kB | 34.5 kB | 36.0 kB |
+| `@folijs/view`    | view, core        | 141.6 kB | 46.7 kB | 47.5 kB |
+| `@folijs/react`   | react, view, core | 181.9 kB | 59.5 kB | 60.4 kB |
+| `FoliEditor` only | what it reaches   | 181.7 kB | 59.4 kB | 60.4 kB |
+| `@folijs/docx`    | docx, core        | 107.2 kB | 34.5 kB | 36.0 kB |
 
 (kB = 1,024 bytes; measured 2026-11-08 after task 7.8. At 0.1.0 (6.4) they were 14.1, 19.9,
 25.3 and 25.2 kB gzipped. Phase 7 added the structure engine (7.1, core budget raised from

@@ -138,6 +138,22 @@ describe("EditorView on a schema v3 document", () => {
     });
   });
 
+  it("shows a safe link as a link, in its run's own look; any other target as text", () => {
+    const { host } = mount(
+      p(
+        {},
+        text("safe", [{ type: "link", attrs: { href: "https://example.com/" } }]),
+        text("file", [{ type: "link", attrs: { href: "file:///C:/x.docx" } }]),
+      ),
+    );
+    const links = [...host.querySelectorAll("a")];
+    expect(links.map((a) => [a.getAttribute("href"), a.textContent])).toEqual([
+      ["https://example.com/", "safe"],
+    ]);
+    expect(links[0]?.style.color).toBe("inherit");
+    expect(links[0]?.style.textDecoration).toBe("none");
+  });
+
   it("puts the caret of an empty numbered paragraph after its number", () => {
     const { host, view } = mount(...sample);
     const second = blocks(host)[2] as HTMLElement;

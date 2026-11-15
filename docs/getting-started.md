@@ -14,7 +14,7 @@ npm install @folijs/react @folijs/core react react-dom
 ```
 
 `@folijs/react` works with React 18.2+ and 19. `@folijs/core` holds the document functions
-(`createDocument`, `parseDocument`); import it directly rather than relying on it being a
+(`createDocument`, `parseDocumentV3`); import it directly rather than relying on it being a
 dependency of `@folijs/react`. Keep all `@folijs/*` packages on the same version (upgrade them
 together), so the app has one copy of the engine.
 
@@ -29,28 +29,30 @@ export function App() {
 }
 ```
 
-That gives an empty A4 document with a formatting toolbar (bold, italic, underline,
-strikethrough, link, text color, highlight, paragraph, headings 1–3, alignment, bulleted and
-numbered lists, indent, undo, redo, horizontal rule, page break). The stylesheet holds the
+That gives an empty A4 document with Word's formatting toolbar (paragraph style, font, size,
+bold, italic, underline, strikethrough, link, text color, highlight, alignment, line spacing,
+bulleted and numbered lists, indent, undo, redo, page break). The stylesheet holds the
 default theme; see [styling.md](styling.md) to change it.
 
 ## Load and save
 
-A saved document is a `FoliDocument`: a versioned envelope with the page settings and the
-content tree ([document-model.md](document-model.md)). Store it as JSON.
+A saved document is a schema v3 document (`FoliDocumentV3`, Word's model): its content tree
+with the styles, numbering, comments and page setup beside it
+([document-model.md](document-model.md)). Store it as JSON. Documents saved by 0.1.0 and 0.2.0
+(`FoliDocument`, schema v1 and v2) still load: `parseDocumentV3` and `FoliEditor` migrate them.
 
 ```tsx
-import { createDocument, type FoliDocument, parseDocument } from "@folijs/core";
+import { createDocument, type EditorDocument, parseDocumentV3 } from "@folijs/core";
 import { type FoliChange, FoliEditor } from "@folijs/react";
 import "@folijs/react/styles.css";
 
 const KEY = "my-document";
 
 /** The saved document, or a new one (also when the saved one no longer parses). */
-function load(): FoliDocument {
+function load(): EditorDocument {
   const saved = localStorage.getItem(KEY);
   try {
-    if (saved) return parseDocument(JSON.parse(saved));
+    if (saved) return parseDocumentV3(JSON.parse(saved));
   } catch (error) {
     console.warn("Ignoring the saved document:", error);
   }
@@ -81,11 +83,12 @@ export function App() {
 This runs in the browser only (module-level `localStorage` and `addEventListener`). With server
 rendering, see [Next.js](#server-rendering-nextjs-and-others).
 
-- `parseDocument` is the trust boundary: it validates input (content and page settings) and
-  throws `FoliDocumentError`, whose message names where the problem is
+- `parseDocumentV3` is the trust boundary: it validates input (content, styles, numbering,
+  comments and page setup; an older document before it is migrated) and throws
+  `FoliDocumentError`, whose message names where the problem is
   (`content.content[2]...`), instead of dropping content it does not understand.
 - Save `change.document`, never `change` itself: `JSON.stringify(change)` gives
-  `{ editor, transactions, document }`, which `parseDocument` rejects.
+  `{ editor, transactions, document }`, which `parseDocumentV3` rejects.
 - `onChange` runs after every change to the content (typing, commands, undo), not for selection
   changes. Read `change.document` when you save, not on every keystroke: it serializes the
   whole document.
@@ -97,14 +100,14 @@ rendering, see [Next.js](#server-rendering-nextjs-and-others).
 A `ref` on `FoliEditor` gives its `editor` and `focus()`:
 
 ```tsx
-import { parseDocument } from "@folijs/core";
+import { parseDocumentV3 } from "@folijs/core";
 import { FoliEditor, type FoliEditorHandle } from "@folijs/react";
 import { useRef } from "react";
 
 export function App() {
   const ref = useRef<FoliEditorHandle>(null);
   async function open(file: File) {
-    const doc = parseDocument(JSON.parse(await file.text()));
+    const doc = parseDocumentV3(JSON.parse(await file.text()));
     ref.current?.editor.setDocument(doc); // replaces the document and clears undo history
     ref.current?.focus();
   }
@@ -205,26 +208,28 @@ its context.
 
 ## Keyboard
 
-| Keys (Ctrl on Windows/Linux, Cmd on macOS)  | Does                                                     |
-| ------------------------------------------- | -------------------------------------------------------- |
-| Ctrl+B, Ctrl+I, Ctrl+U                      | bold, italic, underline                                  |
-| Ctrl+Z; Ctrl+Shift+Z or Ctrl+Y              | undo; redo                                               |
-| Enter; Shift+Enter                          | new paragraph; line break                                |
-| Ctrl+Enter                                  | page break                                               |
-| Ctrl+A                                      | select all                                               |
-| Ctrl+Shift+V                                | paste as plain text                                      |
-| Ctrl+K                                      | add or edit a link (the toolbar's link dialog)           |
-| Ctrl+click on a link                        | open it in a new tab                                     |
-| Arrows next to a horizontal rule            | select it (a click does too); arrows again: past it      |
-| Typing, Enter, Backspace on a selected rule | replace it with text; new paragraph after; delete it     |
-| Ctrl+Shift+8; Ctrl+Shift+7                  | bulleted list; numbered list (again: back to paragraphs) |
-| Tab; Shift+Tab (in a list)                  | nest the item; lift it one level                         |
-| Enter on an empty list item                 | leave the list (a nested one: up one level)              |
-| Backspace at a list item's start            | lift the item (out of the list at the top)               |
+| Keys (Ctrl on Windows/Linux, Cmd on macOS)                  | Does                                                        |
+| ----------------------------------------------------------- | ----------------------------------------------------------- |
+| Ctrl+B, Ctrl+I, Ctrl+U                                      | bold, italic, underline                                     |
+| Ctrl+Z; Ctrl+Shift+Z or Ctrl+Y                              | undo; redo                                                  |
+| Enter; Shift+Enter                                          | new paragraph; line break                                   |
+| Ctrl+Enter                                                  | page break                                                  |
+| Ctrl+A                                                      | select all                                                  |
+| Ctrl+Shift+V                                                | paste as plain text                                         |
+| Ctrl+K                                                      | add or edit a link (the toolbar's link dialog)              |
+| Ctrl+click on a link                                        | open it in a new tab                                        |
+| Arrows next to a table or other content Foli keeps as it is | select it (a click does too); arrows again: past it         |
+| Typing, Backspace on selected content                       | replace it with text; delete it                             |
+| Ctrl+Shift+8; Ctrl+Shift+7                                  | bulleted list; numbered list (again: back to paragraphs)    |
+| Tab; Shift+Tab at a list paragraph's start                  | one level deeper; one level up (out of the list at the top) |
+| Enter on an empty list paragraph                            | one level up; at the top, leave the list                    |
+| Backspace at a list paragraph's start                       | remove its number (the text stays where it was)             |
+| Tab elsewhere                                               | type a tab, as in Word                                      |
+| Escape, then Tab or Shift+Tab                               | move the focus on (out of the editor)                       |
 
 Word and line deletion use the platform's own keys (Ctrl+Backspace, Option+Backspace,
-Cmd+Backspace…). Outside a list, Tab and Shift+Tab are left to the browser (they move the focus
-on). In the toolbar, arrow keys move between buttons and Tab leaves it.
+Cmd+Backspace…). In a read-only editor, Tab and Shift+Tab move the focus on. In the toolbar,
+arrow keys move between controls and Tab leaves it.
 
 ## Server rendering (Next.js and others)
 
@@ -237,7 +242,7 @@ layout:
 ```jsx
 // app/Editor.jsx
 "use client";
-import { createDocument, parseDocument } from "@folijs/core";
+import { createDocument, parseDocumentV3 } from "@folijs/core";
 import { FoliEditor } from "@folijs/react";
 import { useState } from "react";
 
@@ -248,7 +253,7 @@ function load() {
   // `window`, not `localStorage`: recent Node versions have a server-side `localStorage`.
   const saved = typeof window === "undefined" ? null : window.localStorage.getItem(KEY);
   try {
-    if (saved) return parseDocument(JSON.parse(saved));
+    if (saved) return parseDocumentV3(JSON.parse(saved));
   } catch (error) {
     console.warn("Ignoring the saved document:", error);
   }

@@ -268,7 +268,7 @@ test("T1: typing and formatting keep a valid document after every keystroke", as
   await openEmpty(page);
   /**
    * The host holds only pages, the pages only blocks the renderer makes, and the blocks only
-   * mark elements and <br>.
+   * the spans that carry Word's run formatting and <br>.
    */
   const valid = () =>
     editor(page).evaluate((host) => {
@@ -282,9 +282,7 @@ test("T1: typing and formatting keep a valid document after every keystroke", as
             (block) =>
               block instanceof Element &&
               /^(P|H[1-6])$/.test(block.tagName) &&
-              [...block.querySelectorAll("*")].every((el) =>
-                /^(STRONG|EM|U|S|BR)$/.test(el.tagName),
-              ),
+              [...block.querySelectorAll("*")].every((el) => /^(SPAN|BR)$/.test(el.tagName)),
           ),
       );
     });

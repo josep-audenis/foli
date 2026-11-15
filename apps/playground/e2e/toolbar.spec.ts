@@ -1,7 +1,20 @@
 import AxeBuilder from "@axe-core/playwright";
-import { expect, type Page, test } from "@playwright/test";
+import { expect, type Locator, type Page, test } from "@playwright/test";
 
 const editor = (page: Page) => page.getByRole("textbox", { name: "Document" });
+
+/**
+ * The text a locator shows in `css` (Word's run formatting is inline CSS on the text's spans:
+ * `font-weight: 700`, `font-style: italic`).
+ */
+const styledText = (locator: Locator, css: string) =>
+  locator.evaluate(
+    (element, wanted) =>
+      [...element.querySelectorAll(`span[style*="${wanted}"]`)]
+        .map((span) => span.textContent)
+        .join(""),
+    css,
+  );
 const toolbar = (page: Page) => page.getByRole("toolbar", { name: "Formatting" });
 const button = (page: Page, name: string) => toolbar(page).getByRole("button", { name });
 const blocks = (page: Page) => editor(page).locator(":scope > .foli-page > *");
@@ -32,7 +45,8 @@ test("a click formats the selection and leaves focus and selection in the docume
 
   await button(page, "Italic").click();
   await expect(editor(page)).toBeFocused();
-  await expect(paragraph.locator("em").first()).toHaveText(/^Edited/);
+  // The sample's own italic text follows.
+  await expect.poll(() => styledText(paragraph, "font-style: italic")).toBe("EditedCtrl/Cmd+I");
   await expect(button(page, "Italic")).toHaveAttribute("aria-pressed", "true");
   expect(await page.evaluate(() => String(getSelection()))).toBe("Edited");
 
@@ -44,29 +58,34 @@ test("a click formats the selection and leaves focus and selection in the docume
   await expect(editor(page)).toBeFocused();
 });
 
-test("keyboard only: Tab to the toolbar, arrows to a heading level, Enter, Tab back to typing", async ({
+test("keyboard only: Tab to the toolbar, arrows to a style, Tab back to typing", async ({
   page,
 }) => {
   await page.goto("/");
   await blocks(page)
     .nth(1)
     .click({ position: { x: 4, y: 4 } });
+  const style = page.getByRole("combobox", { name: "Paragraph style" });
   await page.keyboard.press("Shift+Tab");
+  await expect(style).toBeFocused();
+  // Arrows in the toolbar go to Bold and back; Down on the style box takes the next style
+  // after Normal (Heading 1), as a closed select does on Windows.
+  await page.keyboard.press("ArrowRight");
+  await page.keyboard.press("ArrowRight");
+  await page.keyboard.press("ArrowRight");
   await expect(button(page, "Bold")).toBeFocused();
-  // Italic, Underline, Strikethrough, Link, Text color, Highlight, Paragraph, H1.
-  for (let i = 0; i < 8; i++) await page.keyboard.press("ArrowRight");
-  await expect(button(page, "H1")).toBeFocused();
-  await page.keyboard.press("Enter");
-  await expect(button(page, "H1")).toHaveAttribute("aria-pressed", "true");
+  for (let i = 0; i < 3; i++) await page.keyboard.press("ArrowLeft");
+  await expect(style).toBeFocused();
+  await page.keyboard.press("ArrowDown");
   await expect(blocks(page).nth(1)).toHaveJSProperty("tagName", "H1");
   // The toolbar is one tab stop: Tab goes to the document, where the caret was.
   await page.keyboard.press("Tab");
   await expect(editor(page)).toBeFocused();
   await page.keyboard.type("> ");
   await expect(blocks(page).nth(1)).toHaveText(/^> Edited by Foli/);
-  // Back in the toolbar, the last used button has the tab stop.
+  // Back in the toolbar, the last used control has the tab stop.
   await page.keyboard.press("Shift+Tab");
-  await expect(button(page, "H1")).toBeFocused();
+  await expect(style).toBeFocused();
 });
 
 test("a click while the document is not focused focuses it and shows the change", async ({
@@ -80,7 +99,7 @@ test("a click while the document is not focused focuses it and shows the change"
   await page.getByRole("checkbox", { name: "Read-only" }).focus();
   await button(page, "Bold").click();
   await expect(editor(page)).toBeFocused();
-  await expect(paragraph.locator("strong").first()).toHaveText("Edited");
+  await expect.poll(() => styledText(paragraph, "font-weight: 700")).toBe("EditedCtrl/Cmd+B");
   expect(await page.evaluate(() => String(getSelection()))).toBe("Edited");
 });
 
@@ -93,9 +112,10 @@ test("keyboard activation over a selected range: Tab back and typing replaces th
   await page.keyboard.press("Home");
   for (let i = 0; i < 6; i++) await page.keyboard.press("Shift+ArrowRight");
   await page.keyboard.press("Shift+Tab");
-  await page.keyboard.press("ArrowRight"); // Italic
+  // Style, font and size boxes, Bold, then Italic.
+  for (let i = 0; i < 4; i++) await page.keyboard.press("ArrowRight");
   await page.keyboard.press("Enter");
-  await expect(paragraph.locator("em").first()).toHaveText("Edited");
+  await expect.poll(() => styledText(paragraph, "font-style: italic")).toBe("EditedCtrl/Cmd+I");
   await page.keyboard.press("Tab");
   await expect(editor(page)).toBeFocused();
   expect(await page.evaluate(() => String(getSelection()))).toBe("Edited");

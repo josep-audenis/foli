@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
-import { createDocument, createEditor, type Editor } from "@folijs/core";
+import { createDocument, createEditor, parseDocumentV3, sectionSettings } from "@folijs/core";
 import { act, cleanup, render, screen } from "@testing-library/react";
 import { StrictMode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import type { AnyEditor } from "./editor.js";
 import {
   FoliCanvas,
   type FoliChange,
@@ -30,7 +31,7 @@ function type(text: string, host = screen.getByRole("textbox")) {
   });
 }
 
-let grabbed: Editor | undefined;
+let grabbed: AnyEditor | undefined;
 function Grab() {
   grabbed = useCurrentEditor();
   return null;
@@ -46,7 +47,7 @@ function renderEditor(props: FoliEditorProps = {}) {
     </FoliEditor>,
   );
   // Assigned during render, which TypeScript cannot see.
-  const editor = grabbed as Editor | undefined;
+  const editor = grabbed as AnyEditor | undefined;
   if (!editor) throw new Error("no editor");
   return { ...result, editor };
 }
@@ -70,7 +71,7 @@ function ComposedApp() {
   );
 }
 
-const probed: Editor[] = [];
+const probed: AnyEditor[] = [];
 function Probe({ text }: { text: string }) {
   probed.push(useFoliEditor({ initialContent: paragraph(text) }));
   return null;
@@ -123,7 +124,8 @@ describe("FoliEditor", () => {
     const { container } = render(<FoliEditor initialContent={hello} />);
     expect(await screen.findByText("Hello Foli")).toBeTruthy();
     const page = container.querySelector<HTMLElement>(".foli-page");
-    expect(page?.style.width).toBe("210mm");
+    // A4 as Word stores it: 11906 twips (210.01 mm).
+    expect(Number.parseFloat(page?.style.width ?? "")).toBeCloseTo(210, 1);
   });
 
   it("reports content changes with their transactions, not selection changes", () => {
@@ -166,12 +168,14 @@ describe("FoliEditor", () => {
     const { editor } = renderEditor({ onChange: (change) => changes.push(change) });
     type("a");
     type("b");
-    act(() => editor.setDocument(hello));
+    act(() => editor.setDocument(parseDocumentV3(hello)));
     const text = (change: FoliChange | undefined) =>
       JSON.stringify(change?.document.content).match(/"text":"(\w*)"/)?.[1];
     expect(text(changes[0])).toBe("a");
     expect(text(changes[1])).toBe("ab");
-    expect(changes[0]?.document.settings).toEqual(editor.settings);
+    // A schema v3 document, with the page the editor shows.
+    expect(changes[0]?.document.schemaVersion).toBe(3);
+    expect(sectionSettings(changes[0]?.document.section ?? {})).toEqual(editor.settings);
   });
 
   it("setDocument re-renders state selectors but does not call onChange", () => {
@@ -204,8 +208,12 @@ describe("FoliEditor", () => {
     expect(host.getAttribute("aria-readonly")).toBe("true");
     expect(host.getAttribute("aria-placeholder")).toBe("Write…");
     expect(host.querySelector("[data-foli-placeholder]")).toBeTruthy();
+    // The toolbar follows: no command while read-only.
+    const bold = () => screen.getByRole("button", { name: "Bold" });
+    expect(bold().getAttribute("aria-disabled")).toBe("true");
 
     rerender(<FoliEditor placeholder="" label="Notes" />);
+    expect(bold().getAttribute("aria-disabled")).not.toBe("true");
     expect(host.getAttribute("contenteditable")).toBe("true");
     expect(host.hasAttribute("aria-readonly")).toBe(false);
     expect(host.querySelector("[data-foli-placeholder]")).toBeNull();

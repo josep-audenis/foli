@@ -92,8 +92,10 @@ test("read-only mode keeps the document unchanged and still copies", async ({ pa
     .getByRole("heading", { level: 1 })
     .evaluate((h1) => {
       const range = document.createRange();
-      range.setStart(h1.firstChild as Text, 0);
-      range.setEnd(h1.firstChild as Text, 4);
+      // The heading's first text node (Word's run formatting wraps it in a span).
+      const text = document.createTreeWalker(h1, NodeFilter.SHOW_TEXT).nextNode() as Text;
+      range.setStart(text, 0);
+      range.setEnd(text, 4);
       const { left, right, top, height } = range.getBoundingClientRect();
       return { left, right, y: top + height / 2 };
     });

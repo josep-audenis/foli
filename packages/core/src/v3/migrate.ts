@@ -31,8 +31,10 @@ export function migrateToV3(doc: FoliDocument): FoliDocumentV3 {
   return {
     schemaVersion: 3,
     section: section(doc.settings),
-    // The default stylesheet's look (11 pt Georgia), rather than Word's empty-defaults 10 pt.
+    // The default stylesheet's look, rather than Word's empty-defaults 10 pt: 11 pt Georgia, 1.5
+    // lines, and the browser's 1em between paragraphs as space after.
     defaults: {
+      paragraph: { spacing: { after: 220, line: 360, lineRule: "auto" } },
       run: [
         { type: "font", attrs: { ascii: "Georgia", hAnsi: "Georgia", cs: "Georgia" } },
         { type: "fontSize", attrs: { value: 22, complexScript: 22 } },

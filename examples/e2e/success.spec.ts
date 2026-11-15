@@ -6,6 +6,13 @@
 import { expect, type Page, test } from "@playwright/test";
 
 const editor = (page: Page) => page.getByRole("textbox", { name: "Document" });
+/** The bold text shown (Word's run formatting is inline CSS on the text's spans). */
+const bold = (page: Page) =>
+  editor(page).evaluate((host) =>
+    [...host.querySelectorAll('span[style*="font-weight: 700"]')]
+      .map((span) => span.textContent)
+      .join(""),
+  );
 
 test("type, format with a shortcut, undo, save, reload without loss", async ({ page }) => {
   const errors: string[] = [];
@@ -21,11 +28,11 @@ test("type, format with a shortcut, undo, save, reload without loss", async ({ p
   await page.keyboard.type("Hello Foli");
   for (let i = 0; i < 4; i++) await page.keyboard.press("Shift+ArrowLeft");
   await page.keyboard.press("ControlOrMeta+b");
-  await expect(editor(page).locator("strong")).toHaveText("Foli");
+  await expect.poll(() => bold(page)).toBe("Foli");
   await page.keyboard.press("ControlOrMeta+z");
-  await expect(editor(page).locator("strong")).toHaveCount(0);
+  await expect.poll(() => bold(page)).toBe("");
   await page.keyboard.press("ControlOrMeta+Shift+z");
-  await expect(editor(page).locator("strong")).toHaveText("Foli");
+  await expect.poll(() => bold(page)).toBe("Foli");
 
   // Saved (serialized after a pause) and back after a reload.
   await expect
@@ -34,13 +41,11 @@ test("type, format with a shortcut, undo, save, reload without loss", async ({ p
   const saved = JSON.parse(
     (await page.evaluate(() => localStorage.getItem("foli-example"))) ?? "null",
   );
-  expect(saved).toMatchObject({
-    schemaVersion: expect.any(Number),
-    settings: { pageSize: { width: 210 } },
-  });
+  // Schema v3: Word's model, the page in twips (A4).
+  expect(saved).toMatchObject({ schemaVersion: 3, section: { pageSize: { width: 11906 } } });
   await page.reload();
   await expect(editor(page)).toHaveText("Hello Foli");
-  await expect(editor(page).locator("strong")).toHaveText("Foli");
+  await expect.poll(() => bold(page)).toBe("Foli");
   expect(errors).toEqual([]);
 });
 
@@ -52,7 +57,7 @@ test("the server HTML holds the editor's shell (Next.js)", async ({ request }, i
   expect(html).toContain('aria-label="Document"');
 });
 
-test("a document saved by 0.1.0 loads (schema v1 → v2); lists from the keyboard save as v2", async ({
+test("a document saved by 0.1.0 loads (schema v1 → v3); lists from the keyboard save as v3", async ({
   page,
 }) => {
   await page.goto("/");
@@ -78,12 +83,17 @@ test("a document saved by 0.1.0 loads (schema v1 → v2); lists from the keyboar
   await editor(page).click();
   await page.keyboard.press("End");
   await page.keyboard.press("ControlOrMeta+Shift+8");
-  await expect(editor(page).locator("ul > li")).toHaveText("from 0.1.0");
+  // A Word list paragraph: numbered, its bullet shown before the text.
   await expect
     .poll(() => page.evaluate(() => localStorage.getItem("foli-example") ?? ""))
-    .toContain('"bulletList"');
+    .toContain('"numbering"');
+  await expect(editor(page).locator("[contenteditable=false]")).toHaveCount(1);
   const saved = JSON.parse(
     (await page.evaluate(() => localStorage.getItem("foli-example"))) ?? "null",
   );
-  expect(saved.schemaVersion).toBe(2);
+  expect(saved.schemaVersion).toBe(3);
+  expect(saved.content.content[0]).toMatchObject({
+    attrs: { numbering: { level: 0 } },
+    content: [{ type: "text", text: "from 0.1.0" }],
+  });
 });

@@ -66,7 +66,10 @@ async function caretAtEnd(page: Page, text: string): Promise<void> {
     const block = [...document.querySelectorAll(".foli-page > *")].find(
       (b) => b.textContent === wanted,
     );
-    const last = block?.lastChild;
+    // The last text node (a v3 block holds its text in spans).
+    const walker = document.createTreeWalker(block as Node, NodeFilter.SHOW_TEXT);
+    let last: Node | null = null;
+    for (let node = walker.nextNode(); node; node = walker.nextNode()) last = node;
     if (last) getSelection()?.collapse(last, last.textContent?.length ?? 0);
   }, text);
 }
@@ -126,6 +129,16 @@ function layout(page: Page): Promise<PageLayout[]> {
   );
 }
 
+const PT = 96 / 72;
+/**
+ * Word's space between two blocks of these documents (0.1.0 documents, migrated by
+ * `migrateToV3`): 11 pt after a paragraph, 12 pt before and 6 pt after a heading. The flow adds
+ * them (no collapsing, as in Word) and drops the space before at the top of a page the text
+ * flowed onto, so the gap a block would need on the page before is not in its margins.
+ */
+const gapBetween = (above: { heading: boolean }, below: { heading: boolean }) =>
+  (above.heading ? 6 : 11) * PT + (below.heading ? 12 : 0) * PT;
+
 /**
  * The page-flow invariants: every page holds at least one element and keeps its A4 height;
  * nothing ends below the content box; and no page could have taken more of the next page,
@@ -150,7 +163,7 @@ function expectValidFlow(pagesLayout: PageLayout[]): void {
     /** What a page needs to take the start of `block` after `above` (with the rules). */
     const start = (above: PageLayout["blocks"][number], block: PageLayout["blocks"][number]) => {
       const count = Math.round((block.bottom - block.top) / block.lineHeight);
-      const gap = Math.max(above.marginBottom, block.marginTop);
+      const gap = gapBetween(above, block);
       // A split first fragment could have given up to its last two lines; else whole, or two.
       if (block.fragment === 0) return gap + Math.min(count, 2) * block.lineHeight;
       return count >= 4
@@ -162,8 +175,7 @@ function expectValidFlow(pagesLayout: PageLayout[]): void {
       // Kept with its next block: the heading and the start of that block would have to fit.
       const after = pagesLayout[i + 1]?.blocks[1];
       if (!after) return;
-      needed =
-        Math.max(last.marginBottom, next.marginTop) + (next.bottom - next.top) + start(next, after);
+      needed = gapBetween(last, next) + (next.bottom - next.top) + start(next, after);
     } else if (next.fragment > 0) {
       if (lines <= 2) return; // moving a line back would leave a widow
       needed = next.lineHeight;
@@ -592,8 +604,9 @@ test("a page break at the end of a paragraph starts the next block on a new page
   ]);
   await caretAtEnd(page, "one");
   await page.keyboard.press(`${MOD}+Enter`);
-  // The break's line ends page 1; the paragraph's empty last line and "two" are on page 2.
-  await expect.poll(() => pageContents(page)).toEqual([["p#0:one"], ["p#1:", "p:two"]]);
+  // The break's line ends page 1, the paragraph mark staying on it (as in Word); "two" is on
+  // page 2.
+  await expect.poll(() => pageContents(page)).toEqual([["p:one"], ["p:two"]]);
   expectValidFlow(await layout(page));
 });
 
@@ -657,13 +670,13 @@ test("a split paragraph leaves at least two lines on each page", async ({ page }
 test("split blocks are left alone while nothing changes (no re-flow every frame)", async ({
   page,
 }) => {
-  // One paragraph of 80 hard-broken lines over two pages: its fragments add up to its height
+  // One paragraph of 60 hard-broken lines over two pages: its fragments add up to its height
   // only within a pixel per split, and the zoom scale must be exact (a rounded one is 0.05% off,
   // about a pixel here) or each frame would find it resized and render it again.
   await openDoc(page, [
     {
       type: "paragraph",
-      content: Array.from({ length: 80 }, (_, i) => [
+      content: Array.from({ length: 60 }, (_, i) => [
         ...(i ? [{ type: "hardBreak" }] : []),
         { type: "text", text: `line${i}` },
       ]).flat(),
@@ -692,7 +705,11 @@ test("a CSS change that resizes blocks re-flows the pages without an edit", asyn
   await openLong(page, 60);
   const before = await pages(page).count();
   // Measurements are cached by node; the ResizeObserver notices the blocks grew.
-  await page.addStyleTag({ content: ".foli-page p { font-size: 20px; }" });
+  // Word's run sizes are inline on the text: only an important rule overrides them.
+  await page.addStyleTag({
+    content:
+      ".foli-page p, .foli-page p span { font-size: 24px !important; line-height: 40px !important; }",
+  });
   await expect.poll(() => pages(page).count()).toBeGreaterThan(before);
   expectValidFlow(await layout(page));
   expect(await texts(page)).toEqual(["Pages", ...Array.from({ length: 60 }, (_, i) => line(i))]);

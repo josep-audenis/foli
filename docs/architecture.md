@@ -518,7 +518,10 @@ non-editable number, the same model position, so Right at the end of the paragra
 Left at a numbered paragraph's start step over the boundary themselves.
 
 Not yet on v3 (8.7d): sections with other page setups, headers and footers, a final (changes
-accepted) editing view, Ctrl+click on links. Each render resolves the list numbers and open comment
+accepted) editing view, a horizontal rule button (a rule is a paragraph's bottom border). Links
+are drawn as `<a>` where `isSafeHref` takes the target (schema v3 keeps any), inheriting the
+run's own color and underline (Word shows a link without the Hyperlink style plain), so Ctrl+click
+opens them as on v2 (8.7d1). Each render resolves the list numbers and open comment
 ranges of every paragraph and writes the gaps of every block (O(document); measured before
 8.7d). Whether Word keeps the mark's run properties (`markFormat`) on the paragraph after a
 heading, and a tracked formatting change on both halves of a split, is not checked against
@@ -688,8 +691,9 @@ prop: feeding the whole document back on every keystroke defeats incremental ren
 The view owns its DOM subtree; React never renders children into it. Built in 6.1 (API not
 stable before 1.0):
 
-- `useFoliEditor({ initialContent, plugins })`: a headless `Editor` created on the first render
-  and kept for the component's lifetime (later options are ignored; StrictMode's extra
+- `useFoliEditor({ initialContent, plugins })`: a headless `Editor` of a schema v3 document
+  (8.7d1: `initialContent` of any version goes through `parseDocumentV3`, which migrates 0.1.0
+  and 0.2.0 documents) created on the first render and kept for the component's lifetime (later options are ignored; StrictMode's extra
   initializer call only creates a discarded editor, which has no side effects).
 - `FoliEditorProvider` / `useCurrentEditor()`: the editor for a subtree (throws outside one).
 - `FoliCanvas`: the editable pages for an editor (prop or context): creates the `EditorView` in
@@ -705,7 +709,8 @@ stable before 1.0):
   can load a document (`setDocument`) or run commands. `onChange(change)` fires after
   transactions that change the content (not
   selection-only ones, nor `setDocument`) with `{ editor, transactions, document }`.
-  `document` is the document right after that change (the change keeps the immutable state),
+  `document` is the v3 document right after that change (the change keeps the immutable state:
+  its content and the envelope in its word plugin state),
   serialized on first read, so an app that saves later (the playground: after a 300 ms pause)
   pays nothing per keystroke.
 - **Replacing the document (6.3):** `editor.setDocument(doc)` (e.g. through `FoliEditor`'s

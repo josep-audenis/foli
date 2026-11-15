@@ -1,4 +1,4 @@
-import { expect, type Page, test } from "@playwright/test";
+import { expect, type Locator, type Page, test } from "@playwright/test";
 
 const STORAGE_KEY = "foli-playground-document";
 const MOD = "ControlOrMeta";
@@ -14,6 +14,19 @@ interface Block {
 }
 
 const editor = (page: Page) => page.getByRole("textbox", { name: "Document" });
+
+/**
+ * The text a locator shows in `css` (Word's run formatting is inline CSS on the text's spans:
+ * `font-weight: 700`, `font-style: italic`).
+ */
+const styledText = (locator: Locator, css: string) =>
+  locator.evaluate(
+    (element, wanted) =>
+      [...element.querySelectorAll(`span[style*="${wanted}"]`)]
+        .map((span) => span.textContent)
+        .join(""),
+    css,
+  );
 
 /** Each rendered block as its text (the view renders synchronously after every change). */
 const texts = (page: Page) => editor(page).locator(":scope > .foli-page > *").allTextContents();
@@ -108,7 +121,7 @@ test("Mod-b toggles bold for the next typed text and on a selection", async ({ p
         ],
       },
     ]);
-  await expect(editor(page).locator("strong")).toHaveText("b");
+  await expect.poll(() => styledText(editor(page), "font-weight: 700")).toBe("b");
 
   await page.keyboard.press("Shift+Home");
   await page.keyboard.press(`${MOD}+b`);
