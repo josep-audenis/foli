@@ -9,6 +9,7 @@ import {
   type ResolvedPos,
   Slice,
 } from "../model/index.js";
+import { isSafeLink } from "../schema.js";
 import { attempt } from "./attempt.js";
 import { redo, undo } from "./history.js";
 import { openLinkEditor } from "./links.js";
@@ -173,8 +174,8 @@ export function deleteForward(unit: DeleteUnit = "char"): Command {
 }
 
 /**
- * At the start of a textblock: merges it into the previous textblock, or deletes a previous leaf
- * block. Does nothing at the start of the first block.
+ * At the start of a textblock: merges it into the previous textblock, or selects a previous
+ * opaque block (a table), as Word does. Does nothing at the start of the first block.
  */
 export const joinBackward: Command = (state, dispatch) => {
   const $pos = caret(state);
@@ -193,50 +194,21 @@ export const joinBackward: Command = (state, dispatch) => {
     dispatch?.(state.tr.setSelection(selectionAt(state, boundary - before.nodeSize)));
     return true;
   }
-  if (before.isLeaf)
-    return attempt(state, dispatch, (tr) => tr.delete(boundary - before.nodeSize, boundary));
-  // After a container (a list): into its last textblock, at any depth.
-  let levels = 1;
-  let target: Node | null = before;
-  while (target && !target.isTextblock && !target.isLeaf) {
-    target = target.lastChild;
-    levels++;
-  }
-  if (target?.isLeaf) {
-    // A container ending in a leaf block (a rule): delete the leaf.
-    const end = boundary - (levels - 1);
-    const leaf = target;
-    return attempt(state, dispatch, (tr) => tr.delete(end - leaf.nodeSize, end));
-  }
-  if (!target?.isTextblock) return false;
-  const parent = $pos.node($pos.depth - 1);
-  if (!parent.canReplace(index, index + 1)) return false;
-  const joinAt = boundary - levels;
-  const content = $pos.parent.content;
-  return attempt(state, dispatch, (tr) => {
-    tr.insert(joinAt, content);
-    const start = tr.mapping.map(boundary);
-    tr.delete(start, start + $pos.parent.nodeSize);
-    tr.setSelection(TextSelection.create(tr.doc, joinAt));
-  });
+  return false;
 };
 
 /**
- * At the end of a textblock: merges the next textblock into it, or deletes a next leaf block. At
- * the end of a container's last block (a list item), what follows the container comes in.
+ * At the end of a textblock: merges the next textblock into it, or selects a next opaque block.
  */
 export const joinForward: Command = (state, dispatch) => {
   const $pos = caret(state);
   if (!$pos?.parent.isTextblock || $pos.parentOffset < $pos.parent.content.size || $pos.depth < 1) {
     return false;
   }
-  // The innermost container in which something follows the caret's block.
-  let base = $pos.depth - 1;
-  while (base > 0 && $pos.index(base) === $pos.node(base).childCount - 1) base--;
-  const after = $pos.node(base).maybeChild($pos.index(base) + 1);
+  const after = $pos.node($pos.depth - 1).maybeChild($pos.index($pos.depth - 1) + 1);
   if (!after) return false;
-  const boundary = $pos.after(base + 1);
-  if (after.isTextblock && base === $pos.depth - 1) {
+  const boundary = $pos.after();
+  if (after.isTextblock) {
     return attempt(state, dispatch, (tr) => {
       tr.join(boundary);
       keepLastMark(tr, $pos.before(), after);
@@ -246,36 +218,7 @@ export const joinForward: Command = (state, dispatch) => {
     dispatch?.(state.tr.setSelection(selectionAt(state, boundary)));
     return true;
   }
-  if (after.isLeaf) {
-    return attempt(state, dispatch, (tr) => tr.delete(boundary, boundary + after.nodeSize));
-  }
-  // Before a container (a list): its first textblock joins this one; the containers it leaves
-  // empty go too (a list item, a list). Not when its container must keep it (a list item that
-  // goes on with a nested list): that needs a lift first.
-  let levels = 1;
-  let target: Node | null = after;
-  while (target && !target.isTextblock && !target.isLeaf) {
-    target = target.firstChild;
-    levels++;
-  }
-  if (!target?.isTextblock) return false;
-  const $target = state.doc.resolve(boundary + levels);
-  let depth = $target.depth;
-  while (depth > base + 1) {
-    const holder = $target.node(depth - 1);
-    const at = $target.index(depth - 1);
-    if (holder.canReplace(at, at + 1)) break;
-    if (holder.childCount !== 1) return false;
-    depth--;
-  }
-  const from = $target.before(depth);
-  const to = $target.after(depth);
-  const content = target.content;
-  return attempt(state, dispatch, (tr) => {
-    tr.delete(from, to);
-    tr.insert($pos.pos, content);
-    tr.setSelection(TextSelection.create(tr.doc, $pos.pos));
-  });
+  return false;
 };
 
 /**
@@ -508,6 +451,8 @@ export function toggleMark(type: string | MarkType, attrs?: Attrs | null): Comma
 
 /** The mark, or null when `attrs` are invalid for it (e.g. a link with an unsafe href). */
 function createMark(type: MarkType, attrs?: Attrs | null): Mark | null {
+  // Schema v3 keeps any link target a file has (`file:`…); a command adds only safe ones.
+  if (type.name === "link" && !isSafeLink(attrs)) return null;
   try {
     return type.create(attrs);
   } catch (error) {
@@ -534,25 +479,18 @@ export function isMarkActive(state: EditorState, type: string | MarkType): boole
 }
 
 /**
- * Changes the textblocks in the selection to `type` (e.g. heading level 2, or paragraph),
- * keeping attributes both types have (alignment). Does not apply when nothing would change.
+ * Gives the selected paragraphs a block type as Word does: `heading` (with its `level`) is
+ * Word's heading style of that level, `paragraph` the document's default paragraph style.
  */
 export function setBlockType(type: string | NodeType, attrs: Attrs | null = null): Command {
   return (state, dispatch) => {
     const word = wordContext(state);
-    if (word) {
-      // Schema v3: headings are paragraphs in Word's heading styles.
-      const name = typeof type === "string" ? type : type.name;
-      if (name === "heading")
-        return setStyleNamed(`heading ${String(attrs?.level ?? 1)}`)(state, dispatch);
-      const style = name === "paragraph" ? defaultParagraphStyleOf(word) : null;
-      return style !== null && setParagraphStyle(style)(state, dispatch);
-    }
-    const nodeType = typeof type === "string" ? state.schema.nodes[type] : type;
-    if (!nodeType?.isTextblock) return false;
-    const { from, to } = state.selection;
-    // A transaction with no step (every block already like that) does not apply.
-    return attempt(state, dispatch, (tr) => tr.setBlockType(from, to, nodeType, attrs));
+    if (!word) return false;
+    const name = typeof type === "string" ? type : type.name;
+    if (name === "heading")
+      return setStyleNamed(`heading ${String(attrs?.level ?? 1)}`)(state, dispatch);
+    const style = name === "paragraph" ? defaultParagraphStyleOf(word) : null;
+    return style !== null && setParagraphStyle(style)(state, dispatch);
   };
 }
 
@@ -567,7 +505,7 @@ export function baseKeymap(): Plugin {
       Enter: splitBlock,
       "Shift-Enter": insertHardBreak,
       "Mod-Enter": insertPageBreak,
-      // Schema v3 types a tab (a list's Tab runs first); v2 has none, so Tab leaves the editor.
+      // Types a tab (a list's Tab runs first); Escape then Tab leaves the editor (the view).
       Tab: insertTab,
       Backspace: deleteBackward(),
       Delete: deleteForward(),

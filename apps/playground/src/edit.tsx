@@ -66,7 +66,7 @@ export const SAMPLE: FoliDocumentV3 = {
 };
 
 const host = document.getElementById("editor") as HTMLElement;
-let editor: Editor<FoliDocumentV3> = createEditor({ document: SAMPLE });
+let editor: Editor = createEditor({ document: SAMPLE });
 let view = new EditorView(host, editor);
 const toolbar = createRoot(document.getElementById("toolbar") as HTMLElement);
 /** The formatting toolbar for the current editor; a click puts the focus back in the document. */
@@ -115,7 +115,7 @@ declare global {
   interface Window {
     /** For the e2e tests: the editor, and loading a document into it. */
     foliEdit: {
-      readonly editor: Editor<FoliDocumentV3>;
+      readonly editor: Editor;
       load(document: FoliDocumentV3): void;
       sample: FoliDocumentV3;
       /** Whether the editor's document passes validation (throws the error if not). */

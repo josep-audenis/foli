@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-import { createDocument } from "../document.js";
 import type { MarkJSON, NodeJSON } from "../model/index.js";
 import type { FoliDocumentV3, StyleJSON } from "../v3/document.js";
 import { createEditor } from "./editor.js";
@@ -527,8 +526,6 @@ describe("lists as Word's numbering", () => {
     many.select(1, 5);
     many.handleKey("Tab");
     expect(attrsOf(many)).toEqual([{ numbering: { id: 1, level: 1 } }, { indent: { left: 720 } }]);
-    // A plain schema v2 editor takes no Tab.
-    expect(createEditor({ document: createDocument() }).handleKey("Tab")).toBe(false);
   });
 
   it("Enter in an empty list paragraph ends the list; Backspace at its start removes the number", () => {
@@ -625,23 +622,6 @@ describe("links on a v3 document", () => {
     editor.select(3, 23);
     editor.commands.removeLink();
     expect(blocks(editor)[0]).toEqual(p({}, text("abhttps://example.com/")));
-  });
-});
-
-describe("Word formatting on a schema v2 editor", () => {
-  it("does not apply", () => {
-    const editor = createEditor();
-    for (const command of [
-      setParagraphStyle("Normal"),
-      setFontFamily("Arial"),
-      setFontSize(12),
-      setLineSpacing(2),
-      setParagraphSpacing({ before: 1 }),
-      changeIndent(1),
-    ])
-      expect(editor.run(command)).toBe(false);
-    expect(paragraphStyles(editor.state)).toEqual([]);
-    expect(fontSizeAt(editor.state)).toBeNull();
   });
 });
 

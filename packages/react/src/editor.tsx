@@ -1,12 +1,9 @@
 import {
-  createDocument,
   createEditor,
   type Editor,
   type EditorDocument,
   type EditorState,
-  type FoliDocumentV3,
   type Plugin,
-  parseDocumentV3,
 } from "@folijs/core";
 import {
   createContext,
@@ -27,9 +24,6 @@ import {
 export const useIsomorphicLayoutEffect =
   typeof document === "undefined" ? useEffect : useLayoutEffect;
 
-/** An editor of either schema: what the components take (`useFoliEditor` makes v3 ones). */
-export type AnyEditor = Editor<EditorDocument>;
-
 export interface UseFoliEditorOptions {
   /**
    * Read once, when the editor is created: a document of any version (0.1.0 and 0.2.0 documents
@@ -45,43 +39,37 @@ export interface UseFoliEditorOptions {
  * A headless `Editor` (state, commands, history) of a schema v3 document, owned by the calling
  * component: created on the first render and kept for its lifetime. Later changes to `options`
  * are ignored. Throws FoliDocumentError when `initialContent` is not a valid document.
- * `setDocument` migrates an older document too.
  */
-export function useFoliEditor(options: UseFoliEditorOptions = {}): Editor<FoliDocumentV3> {
+export function useFoliEditor(options: UseFoliEditorOptions = {}): Editor {
   const [editor] = useState(() => {
-    const { initialContent, plugins } = options;
-    const document = parseDocumentV3(initialContent ?? createDocument());
-    const editor = createEditor({ document, ...(plugins && { plugins }) });
-    // An older document (from JavaScript, or a cast) would make it a schema v2 editor.
-    const { setDocument } = editor;
-    editor.setDocument = (next) => setDocument(parseDocumentV3(next));
-    return editor;
+    const { initialContent: document, plugins } = options;
+    return createEditor({ ...(document && { document }), ...(plugins && { plugins }) });
   });
   return editor;
 }
 
-const EditorContext = createContext<AnyEditor | null>(null);
+const EditorContext = createContext<Editor | null>(null);
 
 /** Makes `editor` the one `useCurrentEditor`, `useEditorState` and `FoliCanvas` use below it. */
 export function FoliEditorProvider({
   editor,
   children,
 }: {
-  editor: AnyEditor;
+  editor: Editor;
   children?: ReactNode | undefined;
 }) {
   return <EditorContext.Provider value={editor}>{children}</EditorContext.Provider>;
 }
 
 /** The editor of the nearest `FoliEditorProvider` (or `FoliEditor`). Throws outside one. */
-export function useCurrentEditor(): AnyEditor {
+export function useCurrentEditor(): Editor {
   const editor = useContext(EditorContext);
   if (!editor) throw new Error("useCurrentEditor: no FoliEditorProvider or FoliEditor above");
   return editor;
 }
 
 /** `editor` if given, else the context's. */
-export function useEditorOrContext(editor: AnyEditor | undefined, caller: string): AnyEditor {
+export function useEditorOrContext(editor: Editor | undefined, caller: string): Editor {
   const context = useContext(EditorContext);
   const found = editor ?? context;
   if (!found) throw new Error(`${caller}: pass an editor or render inside a FoliEditorProvider`);
@@ -90,7 +78,7 @@ export function useEditorOrContext(editor: AnyEditor | undefined, caller: string
 
 export interface UseEditorStateOptions<T> {
   /** Default: the context's editor. */
-  editor?: AnyEditor | undefined;
+  editor?: Editor | undefined;
   /** When the selected value equals the previous one, the component does not re-render (default `Object.is`). */
   isEqual?: ((a: T, b: T) => boolean) | undefined;
 }
@@ -101,7 +89,7 @@ export interface UseEditorStateOptions<T> {
  * every transaction: keep it cheap.
  */
 export function useEditorState<T>(
-  selector: (state: EditorState, editor: AnyEditor) => T,
+  selector: (state: EditorState, editor: Editor) => T,
   { editor: given, isEqual = Object.is }: UseEditorStateOptions<T> = {},
 ): T {
   const editor = useEditorOrContext(given, "useEditorState");

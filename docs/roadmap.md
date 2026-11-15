@@ -685,16 +685,34 @@ Each task is a PR on `phase-8/word-model`, the build green after each.
     paragraph ids dropped); HTML paste as Word's styles and lists; the caret over a list
     number in one press; T3 and T4 on v3 (the editing page; real Firefox's clipboard by
     hand). Pasted comments stay after undo, unlike Word (Phase 9).
-  - [ ] 8.7d The switch, in three parts:
-    - [ ] 8.7d1 React and the playground on v3: `FoliEditor` and `useFoliEditor` take a
-      document of any version (0.1.0 and 0.2.0 documents migrated on load) and edit and report
-      it as v3; the playground's main page on v3; its editing tests (T1–T5 and the rest) on v3
-      in three engines.
-    - [ ] 8.7d2 v2 removed: `SCHEMA_VERSION` 3, the editor always on v3, v2's editing commands,
-      blocks and tests gone (v2 kept only to read and migrate old documents), the `V3` names
-      renamed; budgets set again.
-    - [ ] 8.7d3 Sections with their own page setups in the editable view.
+  - [ ] 8.7d The switch, in four parts:
+    - [x] 8.7d1 React and the playground on v3 (#56): `FoliEditor` and `useFoliEditor` take a
+      document of any version (0.1.0 and 0.2.0 documents migrated on load, and by
+      `setDocument`) and edit and report it as v3; the playground's main page on v3; its editing
+      tests (T1–T5 and the rest) on v3 in three engines. The bench page keeps a v2 editor.
+      `FoliEditor` loses v2's H1–H3 and rule buttons (the style box replaces them).
+    - [ ] 8.7d2 v2 editing removed: the editor always on v3 (older documents migrated when
+      loaded), v2's editing commands, blocks, toolbar and tests gone (behaviour they covered
+      that v3 tests do not is tested on v3; v2 kept only to read and migrate old documents and
+      to read pasted HTML); budgets set again; the bench page measures v3 (its font swap must
+      override the runs' inline fonts).
+    - [ ] 8.7d3 The names: `SCHEMA_VERSION` 3, `createDocument` makes a v3 document, the `V3`
+      names renamed (`FoliDocumentV3` → `FoliDocument`, `parseDocumentV3` → `parseDocument`…),
+      v2's types kept for migration only.
+    - [ ] 8.7d4 Sections with their own page setups in the editable view.
 - [ ] 8.8 Close: docs, gate G5 numbers, 0.3.0 (changeset, version PR, publish after approval).
+  The changeset lists the breaks:
+  - Documents persist as v3 (0.2.0 cannot read them); `FoliChange.document`, `getDocument()` and
+    `useFoliEditor` are v3; `Editor` and `EditorOptions` are not generic (`createEditor` and
+    `setDocument` migrate any version); `EditorView` takes `Editor`.
+  - Lists: `toggleList(kind)` and `wrapInList(kind)` take no attrs; `splitListItem`,
+    `sinkListItem`, `liftListItem` and `liftListItemAtStart` are commands, not factories.
+  - Removed: `insertHorizontalRule` (and `commands.insertHorizontalRule`), `listTypeAt`, the
+    H1–H3 and rule buttons, the CSS variables `--foli-font-family`, `--foli-font-size`,
+    `--foli-line-height`, `--foli-link-color`, `--foli-marker-color`, `--foli-rule-color`,
+    `--foli-rule-thickness`.
+  - On a state without a v3 envelope, `setBlockType` and the list and format commands do not
+    apply; `toggleMark("link")` refuses an unsafe href.
 
 ## Phase 9 — Review: tracked changes & comments · XL → 0.4.0
 

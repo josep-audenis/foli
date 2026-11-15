@@ -72,10 +72,14 @@ for (const { sections, lists } of CASES) {
     const typed = await keys(() => page.keyboard.type(TYPED[typedChars++] ?? ""), TYPED.length);
     const enters = await keys(() => page.keyboard.press("Enter"), ENTERS);
 
-    const reflows: { ms: number; pages: number }[] = [];
+    const reflows: { ms: number; pages: number; font: string }[] = [];
     for (let i = 0; i < REFLOWS; i++) {
       reflows.push(await page.evaluate(() => window.foliBench.reflow()));
     }
+    // The text really changed font each time (else the re-flow measures nothing).
+    expect(reflows.map((reflow) => reflow.font.includes("sans-serif"))).toEqual(
+      reflows.map((_, i) => i % 2 === 0),
+    );
 
     const paint = (samples: { paintMs: number }[]) => samples.map((sample) => sample.paintMs);
     const handler = (samples: { handlerMs: number }[]) => samples.map((s) => s.handlerMs);

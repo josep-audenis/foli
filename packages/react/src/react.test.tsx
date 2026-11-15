@@ -1,9 +1,14 @@
 // @vitest-environment jsdom
-import { createDocument, createEditor, parseDocumentV3, sectionSettings } from "@folijs/core";
+import {
+  createDocument,
+  createEditor,
+  type Editor,
+  parseDocumentV3,
+  sectionSettings,
+} from "@folijs/core";
 import { act, cleanup, render, screen } from "@testing-library/react";
 import { StrictMode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { AnyEditor } from "./editor.js";
 import {
   FoliCanvas,
   type FoliChange,
@@ -31,7 +36,7 @@ function type(text: string, host = screen.getByRole("textbox")) {
   });
 }
 
-let grabbed: AnyEditor | undefined;
+let grabbed: Editor | undefined;
 function Grab() {
   grabbed = useCurrentEditor();
   return null;
@@ -47,7 +52,7 @@ function renderEditor(props: FoliEditorProps = {}) {
     </FoliEditor>,
   );
   // Assigned during render, which TypeScript cannot see.
-  const editor = grabbed as AnyEditor | undefined;
+  const editor = grabbed as Editor | undefined;
   if (!editor) throw new Error("no editor");
   return { ...result, editor };
 }
@@ -71,7 +76,7 @@ function ComposedApp() {
   );
 }
 
-const probed: AnyEditor[] = [];
+const probed: Editor[] = [];
 function Probe({ text }: { text: string }) {
   probed.push(useFoliEditor({ initialContent: paragraph(text) }));
   return null;

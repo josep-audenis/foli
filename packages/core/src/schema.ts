@@ -41,6 +41,18 @@ export function isSafeHref(href: unknown): href is string {
   return (SAFE_LINK_PROTOCOLS as readonly string[]).includes(`${scheme[1]?.toLowerCase()}:`);
 }
 
+/**
+ * Whether a link's attributes may come in from outside the document (a command, a paste from
+ * elsewhere): a safe `href`, or none with a bookmark (`anchor`, schema v3: Word's table of
+ * contents and cross-references).
+ */
+export function isSafeLink(
+  attrs: { href?: unknown; anchor?: unknown } | null | undefined,
+): boolean {
+  if (attrs?.href === null || attrs?.href === undefined) return typeof attrs?.anchor === "string";
+  return isSafeHref(attrs.href);
+}
+
 /** Whether `color` is a canonical color value: `#rrggbb`, lowercase. */
 export function isColor(color: unknown): color is string {
   return typeof color === "string" && /^#[0-9a-f]{6}$/.test(color);

@@ -119,41 +119,32 @@ Foli's own (see `THIRD_PARTY_NOTICES.md`).
 - **Commands** have the shape `(state, dispatch?) => boolean`:
   - Editing: insertText, deleteBackward/Forward (by grapheme or word), deleteSelection,
     joinBackward/Forward, insertHardBreak, insertPageBreak (Mod-Enter).
-  - splitBlock: Enter at the end of a heading starts a paragraph, and formatting carries over.
+  - splitBlock: Enter, formatting carrying over (on a v3 paragraph as Word splits it, below).
   - Formatting and selection: toggleMark, setBlockType, selectAll, undo, redo, plus `isMarkActive`.
   - `baseKeymap()` binds them to key names (`Mod-b`, `Enter`…).
-  - Formatting (7.7, `state/format.ts`): `setAlign` (`Transform.setBlockAttrs`: the attribute
-    on every textblock whose type declares it, one step), `setTextColor` / `setHighlight`
-    (a color mark, replacing the one there; `null` removes; stored marks at a caret),
-    `alignAt` / `colorAt` for the toolbar, `insertHorizontalRule` (before a textblock at its
-    start, after it at its end with a new paragraph, splitting it in the middle).
-  - Rules have no caret stop: `arrowAcrossLeaf(dir, from)` selects a rule from a caret at
-    the edge of the textblock beside it (Left/Right in `baseKeymap`; Up/Down when the view
-    finds the caret on the block's first or last line, from the caret's and the lines' client
-    rects) and leaves a selected rule to the text beside it, crossing container boundaries.
+  - Formatting (`state/format.ts`): `setAlign`, `setTextColor` / `setHighlight` (lowercase
+    `#rrggbb`, else not applied) and `alignAt` / `colorAt` for the toolbar, Word's formatting
+    (`state/wordformat.ts`, below).
+  - Opaque blocks (a table) have no caret stop: `arrowAcrossLeaf(dir, from)` selects one from a
+    caret at the edge of the paragraph beside it (Left/Right in `baseKeymap`; Up/Down when the
+    view finds the caret on the block's first or last line, from the caret's and the lines'
+    client rects) and leaves a selected one to the text beside it. Backspace and Delete next to
+    one select it first; joining paragraphs never deletes it.
   - Links (7.6, `state/links.ts`): `setLink`, `removeLink`, `insertLink`, `linkAt`, with
-    `normalizeHref` before `isSafeHref` at every entry (command, dialog, paste); a caret at a
-    link's edge edits that link. Mod-K is `openLinkEditor`: core has no UI, so it dispatches
-    an empty transaction with `linkEditorRequest` metadata, and `FoliToolbar` (subscribed to
-    the editor) opens its dialog. The link button runs the same command, so both paths meet.
-  - Lists (7.5, `state/lists.ts`): `toggleList`, `wrapInList`, `splitListItem` (Enter; on an
-    empty item, lift it), `sinkListItem` (Tab: into a sublist of the item before, joining one
-    that ends it), `liftListItem` (Shift+Tab: into the outer list, or out of a top-level list,
-    splitting it; a numbered list after the lifted items goes on counting),
-    `liftListItemAtStart` (Backspace at an item's start). A selection that runs past the list
-    around its start is cut at that list's end. `toggleList` off lifts the items of the
-    innermost list of its type the selection touches, again until none is left (items of an
-    outer list that are not selected stay). Enter over a range across items deletes it, then
-    splits. `listKeymap()` binds them before `baseKeymap()`; Tab outside a list is not taken.
-    Each list change closes the history event before it (own undo step). `joinBackward` after
-    a list joins into its last textblock (or deletes a rule ending it); `joinForward` before
-    one, or at the end of an item's last block (the next item, or what follows the list),
-    pulls the next first textblock in (removing the item, and the list, it leaves empty),
-    unless that item goes on with more blocks.
+    `normalizeHref` before `isSafeHref` at every entry (command, dialog, pasted URL); a link mark
+    from `toggleMark` or a paste from elsewhere must be safe as it is (`isSafeLink`: a safe href,
+    or a bookmark of the document without one). A caret at a link's edge edits that link. Mod-K is `openLinkEditor`: core has no UI, so it
+    dispatches an empty transaction with `linkEditorRequest` metadata, and `FoliToolbar`
+    (subscribed to the editor) opens its dialog. The link button runs the same command, so both
+    paths meet.
+  - Lists (`state/lists.ts`): Word's numbering (`wordformat.ts`, below) under the list command
+    names: `toggleList(kind)`, `wrapInList(kind)`, `splitListItem` (Enter in an empty list
+    paragraph), `sinkListItem` (Tab), `liftListItem` (Shift+Tab), `liftListItemAtStart`
+    (Backspace at a list paragraph's start); `listKeymap()` binds them before `baseKeymap()`.
 - **Headless editor**: `createEditor({ document })` returns `commands.*`, `run`, `can`,
   `handleKey`, `select`, `getDocument`, `setDocument` and `subscribe`.
-- **Editing schema v3** (8.7a, `state/word.ts`; beside v2 until 8.7d): an editor given a v3
-  document keeps its envelope (styles, numbering, defaults, theme, sections) in a plugin state
+- **Editing schema v3** (8.7a, `state/word.ts`; the only one since 8.7d2, older documents
+  migrated when loaded): the editor keeps the document's envelope (styles, numbering, defaults, theme, sections) in a plugin state
   field with its `Resolver`, and the generic commands consult it (`wordContext(state)`).
   - Enter: the paragraph mark carries the section break, its tracked change and the paragraph's
     own attributes (`w14:paraId`), so a split leaves them on the second paragraph, which keeps
@@ -203,8 +194,9 @@ Known limits:
 
 ## Editor view (`@folijs/view`)
 
-`packages/view/src/view.ts`, design per ADR-0003: one `contenteditable` host holding real pages;
-nested blocks per ADR-0004 (7.3).
+`packages/view/src/view.ts`, design per ADR-0003: one `contenteditable` host holding real pages.
+Since 8.7d2 a document's blocks are a flat list (schema v3 has no containers: a list is numbered
+paragraphs), so ADR-0004's containers per page are gone with v2.
 Built in Phase 5 (gate G4 passed provisionally): blocks flow from page to page (5.1) and split
 across pages at a line (5.2), with pagination rules (5.3), incremental reflow (5.4), print (5.6)
 and benchmarks (5.7, [benchmarks.md](benchmarks.md)); overview in [pagination.md](pagination.md).
@@ -213,33 +205,24 @@ and benchmarks (5.7, [benchmarks.md](benchmarks.md)); overview in [pagination.md
   `Editor` into `host` and subscribes to it. Edits go through `editor.dispatch`, so history,
   plugins and subscribers see every change. `setOptions()` changes the options; `destroy()`
   detaches the view and removes every attribute it added.
-- **Blocks are the leaf blocks at any depth** (paragraphs, headings, rules), in document order,
-  each with its position and the chain of containers around it (lists, list items). The flow,
-  the measurement cache and the line measurement see only these blocks (ADR-0004).
-  - **Containers per page:** `place` puts each block fragment into its page inside `ul`/`ol`/`li`
-    elements for its containers (`data-foli-wrapper`; the view tracks the elements it created,
-    so a pasted or foreign element with the attribute is stray DOM, not a container), reusing the container elements already
-    at the same place on the page (same tag, in order), so typing in a list moves no DOM. A list
-    continued on the next page gets new containers there; an item continued from the previous
-    page shows no marker (`list-style-type: none` inline); ordered list items carry their number
-    (`value`), so numbering continues. Containers get block margins and paddings of 0 inline:
-    the blocks' margins then collapse through them as between siblings, which the flow assumes.
-  - **Block leaves** (`<hr>`) have no leaves or lines: never split, moved whole. A click on one
-    selects it as a `NodeSelection`, shown as a DOM range around the element plus the class
+- **Blocks are the document's children** (paragraphs and opaque blocks), in document order,
+  each with its position. `place` puts each block fragment into its page; anything else in the
+  host or a page is stray DOM and removed. They are drawn by the Word renderer
+  (`word/edit.ts`, below).
+  - **Opaque blocks** have no leaves or lines: never split, moved whole. A click on one selects
+    it as a `NodeSelection`, shown as a DOM range around the element plus the class
     `foli-selected-node`, and read back as a node selection.
-  - **Marks with attributes:** a link is an `<a href>` (validated by the schema) that does not
-    navigate on click (Ctrl/Cmd+click opens the model's href in a new tab, `noopener`); text color and highlight are spans with `color` / `background-color`.
-    Alignment is `text-align` on the block (`start` is the default and is not written).
-  - Copy renders the same structures (`renderTree`: real nested lists, `start` on ordered
-    lists, without the view's attributes).
+  - **Links** are `<a href>` only for a safe target and do not navigate on click
+    (Ctrl/Cmd+click opens the model's href in a new tab, `noopener`, again only a safe one).
 - **Descriptors:** one per block (model node, its elements, leaves) and one per inline leaf
   (text node or hard break with its offset in the block). A block split across pages has one
   element per page (`fragments`, with `splits` = the content offsets where each later one
   starts); a text node crossing a split is two leaves. `posFromDOM` / `domFromPos` map through
   them; the DOM is never parsed for content.
   - An element point maps to the start of the first leaf at or after it, else the block end.
-    A point in a page or container (between blocks) maps to the start of the next block
-    fragment; a position between blocks maps to the start of the next block (before a rule).
+    A point in a page (between blocks) maps to the start of the next block
+    fragment; a position between blocks maps to the start of the next block (before an opaque
+    block).
   - At a mark boundary the caret is placed in the text before it, matching the marks typed text
     gets.
   - Empty blocks and blocks ending in a hard break get an extra `<br>` without a descriptor.
@@ -517,11 +500,12 @@ The view moves the caret over a list number in one press: browsers stop before a
 non-editable number, the same model position, so Right at the end of the paragraph before and
 Left at a numbered paragraph's start step over the boundary themselves.
 
-Not yet on v3 (8.7d): sections with other page setups, headers and footers, a final (changes
-accepted) editing view, a horizontal rule button (a rule is a paragraph's bottom border). Links
-are drawn as `<a>` where `isSafeHref` takes the target (schema v3 keeps any), inheriting the
-run's own color and underline (Word shows a link without the Hyperlink style plain), so Ctrl+click
-opens them as on v2 (8.7d1). Each render resolves the list numbers and open comment
+Not yet in the editor: sections with other page setups (8.7d4), headers and footers, a final
+(changes accepted) editing view, a horizontal rule button (a rule is a paragraph's bottom
+border). Links are drawn as `<a>` where `isSafeHref` takes the target (schema v3 keeps any),
+inheriting the run's own color and underline (Word shows a link without the Hyperlink style
+plain), so Ctrl+click opens them (8.7d1). A link from another source (a paste without the
+document's id, a command) must have a safe target; the document's own keep theirs. Each render resolves the list numbers and open comment
 ranges of every paragraph and writes the gaps of every block (O(document); measured before
 8.7d). Whether Word keeps the mark's run properties (`markFormat`) on the paragraph after a
 heading, and a tracked formatting change on both halves of a split, is not checked against
@@ -691,9 +675,8 @@ prop: feeding the whole document back on every keystroke defeats incremental ren
 The view owns its DOM subtree; React never renders children into it. Built in 6.1 (API not
 stable before 1.0):
 
-- `useFoliEditor({ initialContent, plugins })`: a headless `Editor` of a schema v3 document
-  (8.7d1: `initialContent` of any version goes through `parseDocumentV3`, which migrates 0.1.0
-  and 0.2.0 documents) created on the first render and kept for the component's lifetime (later options are ignored; StrictMode's extra
+- `useFoliEditor({ initialContent, plugins })`: a headless `Editor` (`initialContent` of any
+  version, migrated by `createEditor`) created on the first render and kept for the component's lifetime (later options are ignored; StrictMode's extra
   initializer call only creates a discarded editor, which has no side effects).
 - `FoliEditorProvider` / `useCurrentEditor()`: the editor for a subtree (throws outside one).
 - `FoliCanvas`: the editable pages for an editor (prop or context): creates the `EditorView` in

@@ -374,6 +374,31 @@ describe("fitPaste", () => {
     expect(own.doc.toJSON().content?.[0]?.attrs?.style).toBe("Nope");
   });
 
+  it("keeps a link's text but not an unsafe target, unless the copy is the document's own", () => {
+    const editor = editorOf([p({}, text("x"))]);
+    const link = (href: string) => ({ type: "link", attrs: { href } });
+    // A bookmark link (Word's table of contents) has no href: it is kept.
+    const toc = { type: "link", attrs: { anchor: "_Toc1" } };
+    const content = docOf(
+      p(
+        {},
+        text("bad", [link("javascript:alert(1)")]),
+        text("ok", [link("https://a.test")]),
+        text("toc", [toc]),
+      ),
+    );
+    const empty = { styles: [], numbering: { abstracts: [], instances: [] }, comments: [] };
+    const blocks = (definitions?: unknown) =>
+      fitPaste(editor.state, content, definitions).doc.toJSON().content;
+    const cleaned = [p({}, text("bad"), text("ok", [link("https://a.test")]), text("toc", [toc]))];
+    expect(blocks({ ...empty, document: "another" })).toEqual(cleaned);
+    // Without definitions it cannot be told to be this document's own.
+    expect(blocks()).toEqual(cleaned);
+    // This document's own keeps any target (Word's `file:` links...).
+    const own = { ...empty, document: (wordContext(editor.state) as WordContext).id };
+    expect(blocks(own)).toEqual(content.content);
+  });
+
   it("maps the paragraph mark's character style, and drops one the copy does not define", () => {
     const editor = editorOf([p({}, text("x"))]);
     const mark = (id: string) => ({ type: "characterStyle", attrs: { id } });

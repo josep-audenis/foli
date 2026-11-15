@@ -8,39 +8,33 @@ import "@folijs/react/styles.css";
 ```
 
 Without it the editor still works, but pages have no background, shadow or gap and the toolbar
-is unstyled. The page size and margins come from the document settings, set inline by the view;
-CSS does not change them.
+is unstyled. The page size and margins come from the document's section, set inline by the view;
+CSS does not change them. The text's look (fonts, sizes, spacing, colors) is the document's own:
+Word's styles and direct formatting, written inline on each paragraph and run.
 
 ## CSS variables
 
 The defaults live on `:root` (and `:host`, for a shadow root). Set a variable on any ancestor of
 the editor, or on `.foli-canvas` and `.foli-toolbar` themselves, to override it there.
 
-| Variable                    | Default                                                    | Applies to                    |
-| --------------------------- | ---------------------------------------------------------- | ----------------------------- |
-| `--foli-canvas-background`  | `#f3f3f1`                                                  | area around the pages         |
-| `--foli-page-background`    | `#ffffff`                                                  | pages                         |
-| `--foli-page-shadow`        | `0 1px 2px rgb(0 0 0 / 0.08), 0 2px 8px rgb(0 0 0 / 0.06)` | pages                         |
-| `--foli-page-gap`           | `24px`                                                     | space between pages           |
-| `--foli-text-color`         | `#1d1d1b`                                                  | document text                 |
-| `--foli-font-family`        | `Georgia, "Times New Roman", serif`                        | document text                 |
-| `--foli-font-size`          | `11pt`                                                     | document text                 |
-| `--foli-line-height`        | `1.5`                                                      | document text                 |
-| `--foli-selection-color`    | `rgb(35 103 220 / 0.22)`                                   | selected text                 |
-| `--foli-border-color`       | `#e2e2df`                                                  | toolbar border and separators |
-| `--foli-toolbar-background` | `#ffffff`                                                  | toolbar                       |
-| `--foli-toolbar-color`      | `#1d1d1b`                                                  | toolbar text                  |
-| `--foli-toolbar-hover`      | `#f0f0ee`                                                  | hovered button                |
-| `--foli-toolbar-pressed`    | `#dfe8f8`                                                  | pressed (active) toggle       |
-| `--foli-focus-ring`         | `#2367dc`                                                  | focus outline, pressed border |
-| `--foli-error-color`        | `#b3261e`                                                  | link dialog: invalid URL      |
-| `--foli-link-color`         | `#1f5fbf`                                                  | links in the document         |
-| `--foli-marker-color`       | `currentColor`                                             | list bullets and numbers      |
-| `--foli-rule-color`         | `#8c8c87`                                                  | horizontal rules              |
-| `--foli-rule-thickness`     | `1px`                                                      | horizontal rules              |
+| Variable                    | Default                                                    | Applies to                      |
+| --------------------------- | ---------------------------------------------------------- | ------------------------------- |
+| `--foli-canvas-background`  | `#f3f3f1`                                                  | area around the pages           |
+| `--foli-page-background`    | `#ffffff`                                                  | pages                           |
+| `--foli-page-shadow`        | `0 1px 2px rgb(0 0 0 / 0.08), 0 2px 8px rgb(0 0 0 / 0.06)` | pages                           |
+| `--foli-page-gap`           | `24px`                                                     | space between pages             |
+| `--foli-text-color`         | `#1d1d1b`                                                  | text without a color of its own |
+| `--foli-selection-color`    | `rgb(35 103 220 / 0.22)`                                   | selected text                   |
+| `--foli-border-color`       | `#e2e2df`                                                  | toolbar border and separators   |
+| `--foli-toolbar-background` | `#ffffff`                                                  | toolbar                         |
+| `--foli-toolbar-color`      | `#1d1d1b`                                                  | toolbar text                    |
+| `--foli-toolbar-hover`      | `#f0f0ee`                                                  | hovered button                  |
+| `--foli-toolbar-pressed`    | `#dfe8f8`                                                  | pressed (active) toggle         |
+| `--foli-focus-ring`         | `#2367dc`                                                  | focus outline, pressed border   |
+| `--foli-error-color`        | `#b3261e`                                                  | link dialog: invalid URL        |
 
-Page breaks follow the text's real line boxes: a font, size or line-height change re-flows the
-pages. The document's fonts must be available (loaded web fonts or installed ones); the view
+Page breaks follow the text's real line boxes: a font, size or line-height change (the
+document's, or CSS over it) re-flows the pages. The document's fonts must be available (loaded web fonts or installed ones); the view
 re-flows when a web font finishes loading.
 
 ## Dark theme
@@ -73,32 +67,25 @@ pages should print white.
 
 ## Elements and classes
 
-| Selector                             | What                                                                                                                                           |
-| ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| `.foli-canvas`                       | `FoliCanvas`'s outer element (`className` is added here)                                                                                       |
-| `.foli-content`                      | the editable host (`role="textbox"`); `FoliCanvas` adds the class, with `EditorView` add it yourself                                           |
-| `.foli-page`                         | one page (`<section>`), size and padding inline                                                                                                |
-| `p`, `h1`–`h6` inside `.foli-page`   | paragraphs and headings (alignment as inline `text-align`)                                                                                     |
-| `ul`, `ol`, `li` inside `.foli-page` | lists and list items (`data-foli-wrapper`); one set per page a list is on                                                                      |
-| `hr` inside `.foli-page`             | a horizontal rule: a 12px box (easy to click) with the line in its middle (`::after`); `.foli-selected-node` while it is selected              |
-| `a`                                  | a link (a click places the caret; Ctrl/Cmd+click opens it in a new tab)                                                                        |
-| `strong`, `em`, `u`, `s`             | bold, italic, underline, strikethrough; text color and highlight are spans with inline colors                                                  |
-| `.foli-toolbar`                      | `FoliToolbar` (`className` is added here)                                                                                                      |
-| `.foli-toolbar-button`               | each button, plus `.foli-toolbar-<key>` (`bold`, `h1`, `undo`, `pageBreak`…)                                                                   |
-| `.foli-toolbar-separator`            | between button groups                                                                                                                          |
-| `.foli-toolbar-menu`, `.foli-menu`   | a color menu button's wrapper, its menu (`.foli-menu-item`, `.foli-menu-swatch`); `.foli-toolbar-swatch` shows the current color on the button |
-| `.foli-link-dialog`                  | the link dialog under the toolbar; `.foli-link-error` its message for an invalid URL                                                           |
+| Selector                           | What                                                                                                                                           |
+| ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `.foli-canvas`                     | `FoliCanvas`'s outer element (`className` is added here)                                                                                       |
+| `.foli-content`                    | the editable host (`role="textbox"`); `FoliCanvas` adds the class, with `EditorView` add it yourself                                           |
+| `.foli-page`                       | one page (`<section>`), size and padding inline                                                                                                |
+| `p`, `h1`–`h6` inside `.foli-page` | paragraphs, and paragraphs in Word's heading styles; their formatting inline                                                                   |
+| `span` inside a paragraph          | a run of text, its formatting inline (bold is `font-weight: 700`); a list number is a `[data-foli-marker]` span, not editable                  |
+| `.foli-selected-node`              | an opaque block (a table) while it is selected                                                                                                 |
+| `a`                                | a link with a safe target, in the run's own color (a click places the caret; Ctrl/Cmd+click opens it in a new tab)                             |
+| `.foli-toolbar`                    | `FoliToolbar` (`className` is added here)                                                                                                      |
+| `.foli-toolbar-button`             | each button, plus `.foli-toolbar-<key>` (`bold`, `bulletList`, `undo`, `pageBreak`…)                                                           |
+| `.foli-toolbar-separator`          | between button groups                                                                                                                          |
+| `.foli-toolbar-menu`, `.foli-menu` | a color menu button's wrapper, its menu (`.foli-menu-item`, `.foli-menu-swatch`); `.foli-toolbar-swatch` shows the current color on the button |
+| `.foli-link-dialog`                | the link dialog under the toolbar; `.foli-link-error` its message for an invalid URL                                                           |
 
-You can style headings and paragraphs (`.foli-page h1 { font-size: 20pt }`). Margins and
-padding on blocks are measured, so pagination follows them. List elements must take no
-vertical space of their own (the view sets their block margins and paddings to 0 inline; do not
-add vertical borders, or margins with `!important`): pagination treats the blocks inside lists
-as siblings. Also avoid `list-style-position: inside` (it adds a line box of its own) and
-anything that makes a list a block formatting context (`display: flow-root`, `overflow`
-other than `visible`, `float`): margins would stop collapsing through it. Indent lists
-horizontally (`padding-inline-start`) as you like. A paragraph split across two pages
-is two elements: its padding and border repeat on each part. Avoid negative margins on blocks
-and `vertical-align` on inline text; pagination does not model them.
+CSS over the document's own formatting needs `!important` (it is inline), and pagination
+follows it: margins and padding on blocks are measured. A paragraph split across two pages is
+two elements: its padding and border repeat on each part. Avoid negative margins on blocks and
+`vertical-align` on inline text; pagination does not model them.
 
 ## Print
 

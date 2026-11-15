@@ -1,9 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { createDocument, parseDocument } from "../document.js";
+import { createDocument } from "../document.js";
 import type { NodeJSON } from "../model/index.js";
 import { Slice } from "../model/index.js";
 import type { BlockJSON, DocJSON } from "../schema.js";
 import { testSchema } from "../testing/index.js";
+import { parseDocumentV3 } from "../v3/index.js";
 import {
   createEditor,
   deleteBackward,
@@ -26,9 +27,20 @@ const para = (...content: (string | NodeJSON)[]): NodeJSON => ({
   type: "paragraph",
   ...(content.length ? { content: content.map((c) => (typeof c === "string" ? text(c) : c)) } : {}),
 });
+/** A schema v2 heading (documents are written as 0.2.0 ones: the editor migrates them). */
 const heading = (level: number, ...content: string[]): NodeJSON => ({
   type: "heading",
   attrs: { level },
+  ...(content.length ? { content: content.map((c) => text(c)) } : {}),
+});
+const normal = (...content: (string | NodeJSON)[]): NodeJSON => ({
+  ...para(...content),
+  attrs: { style: "Normal" },
+});
+/** A heading as the editor holds it: a paragraph in Word's heading style. */
+const styled = (level: number, ...content: string[]): NodeJSON => ({
+  type: "paragraph",
+  attrs: { style: `Heading${level}` },
   ...(content.length ? { content: content.map((c) => text(c)) } : {}),
 });
 const docJSON = (...blocks: NodeJSON[]) => ({ type: "doc", content: blocks }) as DocJSON;
@@ -69,12 +81,13 @@ describe("T1: type and format several paragraphs (headless)", () => {
     type(editor, "line");
     expect(content(editor)).toEqual(
       docJSON(
-        heading(1, "Title"),
-        para("Plain ", text("bold", "bold"), " end"),
-        para("Second", { type: "hardBreak" }, "line"),
+        styled(1, "Title"),
+        // After a heading, its style's next one (Normal); the paragraph split from it keeps it.
+        normal("Plain ", text("bold", "bold"), " end"),
+        normal("Second", { type: "hardBreak" }, "line"),
       ),
     );
-    expect(parseDocument(JSON.parse(JSON.stringify(editor.getDocument())))).toEqual(
+    expect(parseDocumentV3(JSON.parse(JSON.stringify(editor.getDocument())))).toEqual(
       editor.getDocument(),
     );
   });
@@ -173,11 +186,13 @@ describe("history", () => {
 
   it("exposes the document settings, also after setDocument", () => {
     const editor = createEditor();
-    expect(editor.settings.pageSize.width).toBe(210);
+    // A4 in whole twips (11906): 210.01 mm.
+    expect(editor.settings.pageSize.width).toBeCloseTo(210, 1);
     editor.setDocument(
-      createDocument(undefined, { margins: { top: 1, right: 2, bottom: 3, left: 4 } }),
+      createDocument(undefined, { margins: { top: 10, right: 20, bottom: 30, left: 40 } }),
     );
-    expect(editor.settings.margins).toEqual({ top: 1, right: 2, bottom: 3, left: 4 });
+    const { top, right, bottom, left } = editor.settings.margins;
+    expect([top, right, bottom, left].map(Math.round)).toEqual([10, 20, 30, 40]);
   });
 
   it("setDocument resets history", () => {
@@ -210,7 +225,7 @@ describe("commands", () => {
     const editor = editorWith(heading(2, "Head"), para("body"));
     editor.select(7);
     editor.handleKey("Backspace");
-    expect(content(editor)).toEqual(docJSON(heading(2, "Headbody")));
+    expect(content(editor)).toEqual(docJSON(styled(2, "Headbody")));
     expect(editor.state.selection.head).toBe(5);
     editor.select(1);
     expect(editor.handleKey("Backspace")).toBe(false);
@@ -221,16 +236,6 @@ describe("commands", () => {
     editor.select(3);
     editor.handleKey("Delete");
     expect(content(editor)).toEqual(docJSON(para("abcd")));
-  });
-
-  it("Enter at the end of a heading starts a paragraph; in the middle it splits the heading", () => {
-    const editor = editorWith(heading(1, "Title"));
-    editor.select(4);
-    editor.handleKey("Enter");
-    expect(content(editor)).toEqual(docJSON(heading(1, "Tit"), heading(1, "le")));
-    editor.select(9);
-    editor.handleKey("Enter");
-    expect(content(editor)).toEqual(docJSON(heading(1, "Tit"), heading(1, "le"), para()));
   });
 
   it("Enter keeps the formatting for the next paragraph", () => {
@@ -263,7 +268,7 @@ describe("commands", () => {
     const editor = editorWith(para("ab"));
     const state = editor.state;
     editor.select(1);
-    expect(editor.can(editor.state.plugins[1]?.spec.keymap?.Backspace as never)).toBe(false);
+    expect(editor.can(deleteBackward())).toBe(false);
     expect(editor.state.doc).toBe(state.doc);
   });
 
@@ -352,7 +357,7 @@ describe("review regressions (PR #4)", () => {
     editor.commands.setBlockType("heading", { level: 1 });
     unrecorded(editor, (tr) => tr.delete(3, 6)); // deletes the changed block
     expect(editor.commands.undo()).toBe(false);
-    expect(content(editor)).toEqual(docJSON(para("a"), heading(2, "c")));
+    expect(content(editor)).toEqual(docJSON(para("a"), styled(2, "c")));
   });
 
   it("a plugin reacting to undo cannot trap the history", () => {
@@ -560,7 +565,7 @@ describe("setBlockType over many blocks", () => {
     const elapsed = performance.now() - start;
     expect(editor.state.doc.childCount).toBe(4000);
     editor.state.doc.forEach((node) => {
-      expect(node.type.name).toBe("heading");
+      expect(node.attrs.style).toBe("Heading1");
     });
     expect(editor.state.selection.from).toBe(0);
     expect(editor.state.selection.to).toBe(before.content.size);
@@ -572,42 +577,7 @@ describe("setBlockType over many blocks", () => {
   });
 });
 
-describe("schema v2 commands (PR #34 review)", () => {
-  it("setBlockType does not apply when every block is already like that", () => {
-    const editor = editorWith(para("ab"), heading(2, "cd"));
-    editor.select(2);
-    expect(editor.commands.setBlockType("paragraph")).toBe(false);
-    expect(editor.commands.undo()).toBe(false); // nothing recorded
-    editor.select(6);
-    expect(editor.commands.setBlockType("heading", { level: 2 })).toBe(false);
-  });
-
-  it("setBlockType keeps alignment across block types, and changes only what it is given", () => {
-    const editor = editorWith({
-      type: "paragraph",
-      attrs: { align: "center" },
-      content: [text("ab")],
-    });
-    editor.select(2);
-    expect(editor.commands.setBlockType("heading", { level: 1 })).toBe(true);
-    expect(content(editor).content[0]).toMatchObject({ attrs: { level: 1, align: "center" } });
-    expect(editor.commands.setBlockType("heading", { level: 3 })).toBe(true);
-    expect(content(editor).content[0]).toMatchObject({ attrs: { level: 3, align: "center" } });
-    expect(editor.commands.setBlockType("paragraph")).toBe(true);
-    expect(content(editor).content[0]).toEqual({
-      type: "paragraph",
-      attrs: { align: "center" },
-      content: [{ type: "text", text: "ab" }],
-    });
-  });
-
-  it("setBlockType with invalid attributes does not apply (no exception)", () => {
-    const editor = editorWith(para("ab"));
-    editor.select(2);
-    expect(editor.commands.setBlockType("heading", { level: 9 })).toBe(false);
-    expect(editor.commands.setBlockType("heading")).toBe(false); // level is required
-  });
-
+describe("links through toggleMark (PR #34 review)", () => {
   it("toggleMark with an unsafe or missing href does not apply; removing a link needs no href", () => {
     const editor = editorWith(para("abcd"));
     editor.select(1, 3);
@@ -619,5 +589,11 @@ describe("schema v2 commands (PR #34 review)", () => {
     expect(editor.isMarkActive("link")).toBe(false);
     editor.select(2); // a caret: stored marks
     expect(editor.commands.toggleMark("link", { href: "data:x" })).toBe(false);
+    // A link to a bookmark of the document (no href) applies.
+    editor.select(1, 3);
+    expect(editor.commands.toggleMark("link", { anchor: "_Toc1" })).toBe(true);
+    expect(editor.commands.toggleMark("link", { anchor: "" })).toBe(true); // removes it
+    expect(editor.isMarkActive("link")).toBe(false);
+    expect(editor.commands.toggleMark("link", { anchor: "" })).toBe(false);
   });
 });

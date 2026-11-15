@@ -9,7 +9,6 @@ import {
   type Editor,
   insertLink,
   linkAt,
-  NodeSelection,
   normalizeHref,
   requestsLinkEditor,
   type Transaction,
@@ -22,16 +21,20 @@ const p = (...content: NodeJSON[]): NodeJSON => ({
   type: "paragraph",
   ...(content.length ? { content } : {}),
 });
-const h1 = (...content: NodeJSON[]): NodeJSON => ({
-  type: "heading",
-  attrs: { level: 1 },
-  content,
-});
 
 function editorWith(...blocks: NodeJSON[]): Editor {
   return createEditor({ document: createDocument({ type: "doc", content: blocks } as DocJSON) });
 }
-const json = (editor: Editor) => editor.getDocument().content.content;
+/**
+ * The blocks, without Word's Hyperlink character style (newly linked text gets it; Word
+ * formatting tests check it).
+ */
+const json = (editor: Editor): NodeJSON[] =>
+  JSON.parse(JSON.stringify(editor.getDocument().content.content), (key, value) => {
+    if (key !== "marks") return value;
+    const marks = (value as { type: string }[]).filter((m) => m.type !== "characterStyle");
+    return marks.length ? marks : undefined;
+  });
 
 /** Runs `act`, checks the result, then undo restores the exact document and selection. */
 function expectUndoable(editor: Editor, act: () => boolean, after: NodeJSON[]): void {
@@ -186,18 +189,14 @@ describe("link commands", () => {
     expect(linkAt(editor.state)).toBeNull();
   });
 
-  it("links work in headings and over several blocks; not on a rule", () => {
-    const editor = editorWith(h1(t("title")), p(t("body")));
+  it("links work over several blocks", () => {
+    const editor = editorWith(p(t("title")), p(t("body")));
     editor.commands.selectAll();
     expect(editor.commands.setLink("https://a.com")).toBe(true);
     expect(json(editor)).toEqual([
-      h1(t("title", link("https://a.com"))),
+      p(t("title", link("https://a.com"))),
       p(t("body", link("https://a.com"))),
     ]);
-    const rule = editorWith(p(t("a")), { type: "horizontalRule" });
-    rule.dispatch(rule.state.tr.setSelection(NodeSelection.create(rule.state.doc, 3)));
-    expect(rule.commands.setLink("https://a.com")).toBe(false);
-    expect(rule.handleKey("Mod-k")).toBe(false);
   });
 
   it("Mod-K asks the UI for its link editor with a transaction that changes nothing", () => {

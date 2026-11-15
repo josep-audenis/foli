@@ -337,8 +337,8 @@ function applyUnrecorded(editor: Editor, o: UnrecordedOp): void {
     } else if (o.kind === "delete") tr.delete(from, to);
     else if (o.kind === "split") tr.split(caret);
     else if (o.kind === "bold" && from < to) tr.addMark(from, to, tr.doc.type.schema.mark("bold"));
-    else if (o.kind === "heading")
-      tr.setBlockType(from, to, tr.doc.type.schema.nodes.heading as never, { level: 2 });
+    // A heading is a paragraph in a heading style (the editor holds schema v3).
+    else if (o.kind === "heading") tr.setBlockAttrs(from, to, { style: "Heading2" });
   } catch (error) {
     if (!(error instanceof TransformError)) throw error;
   }

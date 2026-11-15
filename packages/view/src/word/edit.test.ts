@@ -354,7 +354,12 @@ describe("EditorView on a schema v3 document", () => {
       p({}, text("z")),
     );
     const { doc } = editor.state;
-    expect(serializeRange(doc, 0, doc.content.size, document).text).toBe("a\tb7\nc1\nc2\nz");
+    expect(
+      serializeRange(doc, 0, doc.content.size, document, {
+        context: wordContext(editor.state) as WordContext,
+        ratio: () => 1.2,
+      }).text,
+    ).toBe("a\tb7\nc1\nc2\nz");
   });
 
   it("copies HTML without turned-off properties or unsafe links", () => {
@@ -415,7 +420,9 @@ describe("EditorView on a schema v3 document", () => {
   it("copies tabs into the HTML too", () => {
     const { editor } = mount(p({}, text("a"), { type: "tab" }, bookmark, text("b")));
     const { doc } = editor.state;
-    expect(serializeRange(doc, 0, doc.content.size, document).html).toContain("a\tb<");
+    const word = { context: wordContext(editor.state) as WordContext, ratio: () => 1.2 };
+    // Each run is a span: the tab is its own.
+    expect(serializeRange(doc, 0, doc.content.size, document, word).html).toContain(">\t</span>");
   });
 
   it("renders a new document from scratch", () => {

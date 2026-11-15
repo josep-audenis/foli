@@ -20,7 +20,7 @@
  */
 import { DEFAULT_SETTINGS } from "../document.js";
 import type { MarkJSON, Node, NodeJSON } from "../model/index.js";
-import type { DocJSON } from "../schema.js";
+import { type DocJSON, isSafeLink } from "../schema.js";
 import {
   type AbstractNumberingJSON,
   type CommentJSON,
@@ -187,6 +187,16 @@ export function fitPastedV2(
 const equal = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
 const PARAGRAPH_IDS = ["w14:paraId", "w14:textId"];
 
+/** `json` without the link marks that are not safe (`isSafeLink`; the text stays). */
+function safeLinks(json: NodeJSON): NodeJSON {
+  const marks = json.marks?.filter((m) => m.type !== "link" || isSafeLink(m.attrs));
+  return {
+    ...json,
+    ...(marks && { marks }),
+    ...(json.content && { content: json.content.map(safeLinks) }),
+  };
+}
+
 /**
  * Fits pasted v3 `content` (untrusted) to the document in `state`: `definitions` are the ones
  * the copy carried (`copiedDefinitions`, untrusted), or none for content of this document (plain
@@ -200,8 +210,9 @@ export function fitPaste(
 ): { doc: Node; envelope: WordEnvelope } {
   const context = wordContext(state) as WordContext;
   const target = context.envelope;
+  // Taken as this document's own, but it cannot be told to be: no unsafe link comes in.
   if (definitions === undefined || definitions === null)
-    return fit(state, target, parseContentV3(content).toJSON(), true);
+    return fit(state, target, safeLinks(parseContentV3(content).toJSON()), true);
   const { document, styles, numbering, comments } = definitions as Partial<WordDefinitions>;
   // Validated as a document's envelope: types, ranges, no style based on itself.
   const checked = parseDocumentV3({
@@ -317,6 +328,8 @@ function fit(
 
   const runMarks = (marks: readonly MarkJSON[]) =>
     marks.flatMap((m) => {
+      // A document keeps any link target its file has; another source gives only safe ones.
+      if (m.type === "link") return same || isSafeLink(m.attrs) ? [m] : [];
       if (m.type !== "characterStyle") return [m];
       const id = mapStyle(String(m.attrs?.id));
       return id ? [{ ...m, attrs: { id } }] : [];

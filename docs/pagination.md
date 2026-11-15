@@ -2,8 +2,9 @@
 
 > Status: **built (Phase 5); gate G4 passed provisionally** (2026-11-07, on automated evidence;
 > the page-break manual checks are open risks in
-> [ADR-0003](decisions/ADR-0003-rendering-and-input.md)); nested blocks (lists, rules) paginate
-> since 0.2.0 ([ADR-0004](decisions/ADR-0004-nested-blocks-on-pages.md)). This page describes what is built and
+> [ADR-0003](decisions/ADR-0003-rendering-and-input.md)); since 8.7d2 the editor lays out
+> schema v3's flat blocks with Word's paragraph spacing and keep rules (nested blocks, ADR-0004,
+> went with v2's editing). This page describes what is built and
 > why; the implementation details are in "Editor view" in [architecture.md](architecture.md),
 > the numbers in [benchmarks.md](benchmarks.md).
 
@@ -81,14 +82,9 @@ editor state ──► measure the blocks without a cached measurement (DOM read
   every block again). A block resized without an edit (CSS, a font, a container; seen by a
   `ResizeObserver`) and web fonts loading re-flow in the next animation frame, at most once per
   frame, never during a composition.
-- **Lists and other nested blocks** (7.3, 7.4, ADR-0004): the flow sees the leaf blocks at any
-  depth (paragraphs, headings, rules), so a list item's paragraph splits at a line and the rules
-  above apply inside lists as anywhere. Each page rebuilds the `ul`/`ol`/`li` elements around the
-  blocks it holds: a list on several pages is a list per page, an item continued from the
-  previous page shows no second marker, ordered items carry their number (`value`), so numbering
-  continues. List elements take no vertical space of their own (block margins and paddings 0),
-  so the blocks' margins collapse through them exactly as between siblings. A rule is a block
-  without lines: never split, moved whole.
+- **Lists** are numbered paragraphs (schema v3): they split and flow as any paragraph, and
+  their numbers come from the document's numbering, so they continue across pages. Until 8.7d2
+  (schema v2) lists were nested blocks rebuilt on each page (ADR-0004).
 - **Justified text** keeps its last line justified on every fragment but the block's last
   (`text-align-last: justify`): a fragment's last line is not the paragraph's.
 - **Print:** the view writes a print stylesheet from the settings: `@page` of the page size
@@ -124,9 +120,9 @@ All in Playwright on Chromium, Firefox and WebKit (Windows 11), plus unit and pr
 
 ## Known limits
 
-- Layout works on leaf blocks (paragraphs, headings, rules) at any depth; lists are rebuilt
-  around them on each page (ADR-0004). A list split across pages is two lists in the DOM.
-  Tables and images (Phase 10) are not laid out yet.
+- Layout works on the document's blocks (paragraphs and opaque blocks). A table is one opaque
+  block: never split across pages in the editor (the read-only Word pages split it). Images
+  (Phase 10) are not laid out yet.
 - No page chrome: headers, footers and page numbers arrive in Phase 11.
 - Line measurement assumes left-to-right text without vertical-align offsets. A split block's
   padding and border repeat on every fragment. Negative block margins are not modelled.
