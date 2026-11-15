@@ -686,15 +686,20 @@ Each task is a PR on `phase-8/word-model`, the build green after each.
     number in one press; T3 and T4 on v3 (the editing page; real Firefox's clipboard by
     hand). Pasted comments stay after undo, unlike Word (Phase 9).
   - [ ] 8.7d The switch, in three parts:
-    - [ ] 8.7d1 React and the playground on v3: `FoliEditor` and `useFoliEditor` take a
-      document of any version (0.1.0 and 0.2.0 documents migrated on load) and edit and report
-      it as v3; the playground's main page on v3; its editing tests (T1–T5 and the rest) on v3
-      in three engines.
+    - [x] 8.7d1 React and the playground on v3 (#56): `FoliEditor` and `useFoliEditor` take a
+      document of any version (0.1.0 and 0.2.0 documents migrated on load, and by
+      `setDocument`) and edit and report it as v3; the playground's main page on v3; its editing
+      tests (T1–T5 and the rest) on v3 in three engines. The bench page keeps a v2 editor.
+      `FoliEditor` loses v2's H1–H3 and rule buttons (the style box replaces them).
     - [ ] 8.7d2 v2 removed: `SCHEMA_VERSION` 3, the editor always on v3, v2's editing commands,
       blocks and tests gone (v2 kept only to read and migrate old documents), the `V3` names
-      renamed; budgets set again.
+      renamed; budgets set again; the bench page measures v3 (its font swap must override the
+      runs' inline fonts).
     - [ ] 8.7d3 Sections with their own page setups in the editable view.
 - [ ] 8.8 Close: docs, gate G5 numbers, 0.3.0 (changeset, version PR, publish after approval).
+  The changeset lists the React breaks: `FoliChange.document` and `useFoliEditor` are v3,
+  `useCurrentEditor` and `useEditorState` take `AnyEditor`, documents persist as v3 (0.2.0
+  cannot read them).
 
 ## Phase 9 — Review: tracked changes & comments · XL → 0.4.0
 
