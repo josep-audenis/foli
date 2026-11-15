@@ -57,6 +57,19 @@ describe("replacing the document (setDocument)", () => {
     expect(changes).toHaveLength(2);
     expect(changes[1]?.document.section.pageSize).toEqual({ width: 12240, height: 15840 });
   });
+
+  it("migrates an older document (from JavaScript): changes are still schema v3", () => {
+    const ref = createRef<FoliEditorHandle>();
+    const changes: FoliChange[] = [];
+    render(<FoliEditor ref={ref} onChange={(c) => changes.push(c)} />);
+    const editor = ref.current?.editor;
+    if (!editor) throw new Error("no editor");
+    act(() => editor.setDocument(text("Old") as never));
+    type("x");
+    expect(screen.getByRole("textbox").textContent).toBe("xOld");
+    expect(changes[0]?.document).toMatchObject({ schemaVersion: 3, section: {} });
+    expect(() => parseDocumentV3(changes[0]?.document)).not.toThrow();
+  });
 });
 
 describe("server rendering and hydration", () => {

@@ -2,8 +2,9 @@
  * The benchmark page (`/bench.html`, dev server only): mounts the editor on demand and times it
  * from inside the page. Driven by `apps/playground/bench/`; see docs/benchmarks.md.
  */
-import { parseDocument } from "@folijs/core";
-import { type FoliChange, FoliEditor } from "@folijs/react";
+import { createEditor, type FoliDocument, parseDocument } from "@folijs/core";
+import { FoliCanvas, FoliEditorProvider, FoliToolbar } from "@folijs/react";
+import { useLayoutEffect, useState } from "react";
 import { flushSync } from "react-dom";
 import { createRoot, type Root } from "react-dom/client";
 import "@folijs/react/styles.css";
@@ -53,9 +54,27 @@ addEventListener(
   { capture: true },
 );
 
-// Every change reads the document back, as an app that saves on each change does (the
-// playground saves after a pause instead): the whole document is serialized per keystroke.
-const readBack = (change: FoliChange) => change.document;
+/**
+ * `FoliEditor`'s parts on a schema v2 editor (`FoliEditor` migrates to v3; 8.7d2 measures v3).
+ * Every change reads the document back, as an app that saves on each change does (the
+ * playground saves after a pause instead): the whole document is serialized per keystroke.
+ */
+function Bench({ document }: { document: FoliDocument }) {
+  const [editor] = useState(() => createEditor({ document }));
+  useLayoutEffect(
+    () =>
+      editor.subscribe((_, transactions) => {
+        if (transactions.some((tr) => tr.docChanged)) editor.getDocument();
+      }),
+    [editor],
+  );
+  return (
+    <FoliEditorProvider editor={editor}>
+      <FoliToolbar editor={editor} />
+      <FoliCanvas editor={editor} />
+    </FoliEditorProvider>
+  );
+}
 let swapped = false;
 
 const bench = {
@@ -65,7 +84,7 @@ const bench = {
     root?.unmount();
     root = createRoot(container);
     const start = performance.now();
-    flushSync(() => root?.render(<FoliEditor initialContent={document} onChange={readBack} />));
+    flushSync(() => root?.render(<Bench document={document} />));
     const layoutMs = performance.now() - start;
     await painted();
     return { layoutMs, paintMs: performance.now() - start, pages: pages() };

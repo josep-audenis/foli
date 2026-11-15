@@ -399,3 +399,18 @@ test("an opaque block: the arrows select it and go past it, a click selects it, 
     paragraph(text(">second")),
   ]);
 });
+
+test("Up from the second line of a paragraph moves in the text, not onto the opaque block", async ({
+  page,
+}) => {
+  const long = "long words ".repeat(40).trim();
+  await open(page, [table, paragraph(text(long))]);
+  // The caret is on the paragraph's last line: Up moves to the line above.
+  await page.keyboard.press(`${MOD}+End`);
+  await page.keyboard.press("ArrowUp");
+  await expect(selected(page)).toHaveCount(0);
+  await page.keyboard.type("!");
+  const [, after] = await content(page);
+  expect(after).not.toEqual(paragraph(text(`${long}!`)));
+  expect((await content(page))[0]).toEqual(table);
+});

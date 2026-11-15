@@ -79,8 +79,9 @@ generous 250 ms bound.
 **Run:** `pnpm bench:layout` (Playwright, `playwright.bench.config.ts`, one worker; about 3
 minutes for all three engines). Each test prints a `BENCH {…}` line. Not part of `pnpm check` or
 `pnpm test:e2e`. Source: `apps/playground/bench/pagination.bench.ts`, driving the dev-only page
-`apps/playground/bench.html` (`src/bench.tsx`), which mounts `FoliEditor` and times it from
-inside the page.
+`apps/playground/bench.html` (`src/bench.tsx`), which mounts `FoliEditor`'s parts (toolbar and
+canvas) and times them from inside the page. Since 8.7d1 `FoliEditor` edits schema v3; the bench
+page keeps a schema v2 editor, the one measured here, until 8.7d2 measures v3.
 
 **Fixtures:** `benchDocument(sections)` in `apps/playground/e2e/fixtures.ts`: per section a level-2
 heading and thirteen paragraphs of one to five lines (synthetic words, no marks), A4 with 25.4 mm

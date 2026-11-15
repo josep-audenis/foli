@@ -539,8 +539,6 @@ export function FoliToolbar({
   label = "Formatting",
   className,
 }: FoliToolbarProps) {
-  // shortcut: the hooks take a schema v2 editor's type; both editors have the same members
-  // they use (8.7d makes v3 the only one).
   const editor = useEditorOrContext(given, "FoliToolbar");
   const word = useEditorState((state) => wordContext(state) !== null, { editor });
   const groups = word ? WORD_GROUPS : GROUPS;

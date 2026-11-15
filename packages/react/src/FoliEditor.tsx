@@ -81,9 +81,8 @@ export const FoliEditor = forwardRef<FoliEditorHandle, FoliEditorProps>(function
           editor,
           transactions,
           get document() {
-            const envelope = wordContext(state)?.envelope;
             document ??= {
-              ...(structuredClone(envelope) as Omit<FoliDocumentV3, "content">),
+              ...(structuredClone(wordContext(state)?.envelope) as Omit<FoliDocumentV3, "content">),
               content: state.doc.toJSON(),
             };
             return document;

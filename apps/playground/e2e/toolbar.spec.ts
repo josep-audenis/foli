@@ -45,7 +45,8 @@ test("a click formats the selection and leaves focus and selection in the docume
 
   await button(page, "Italic").click();
   await expect(editor(page)).toBeFocused();
-  await expect.poll(() => styledText(paragraph, "font-style: italic")).toMatch(/^Edited/);
+  // The sample's own italic text follows.
+  await expect.poll(() => styledText(paragraph, "font-style: italic")).toBe("EditedCtrl/Cmd+I");
   await expect(button(page, "Italic")).toHaveAttribute("aria-pressed", "true");
   expect(await page.evaluate(() => String(getSelection()))).toBe("Edited");
 
@@ -98,7 +99,7 @@ test("a click while the document is not focused focuses it and shows the change"
   await page.getByRole("checkbox", { name: "Read-only" }).focus();
   await button(page, "Bold").click();
   await expect(editor(page)).toBeFocused();
-  await expect.poll(() => styledText(paragraph, "font-weight: 700")).toMatch(/^Edited/);
+  await expect.poll(() => styledText(paragraph, "font-weight: 700")).toBe("EditedCtrl/Cmd+B");
   expect(await page.evaluate(() => String(getSelection()))).toBe("Edited");
 });
 
@@ -114,7 +115,7 @@ test("keyboard activation over a selected range: Tab back and typing replaces th
   // Style, font and size boxes, Bold, then Italic.
   for (let i = 0; i < 4; i++) await page.keyboard.press("ArrowRight");
   await page.keyboard.press("Enter");
-  await expect.poll(() => styledText(paragraph, "font-style: italic")).toMatch(/^Edited/);
+  await expect.poll(() => styledText(paragraph, "font-style: italic")).toBe("EditedCtrl/Cmd+I");
   await page.keyboard.press("Tab");
   await expect(editor(page)).toBeFocused();
   expect(await page.evaluate(() => String(getSelection()))).toBe("Edited");

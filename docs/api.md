@@ -34,7 +34,8 @@ model, with Word's toolbar): a 0.1.0 or 0.2.0 document given to it is migrated
 | `children`       | `ReactNode`                    | —            | Rendered between the toolbar and the pages, inside the editor's context.                          |
 
 `ref` → `FoliEditorHandle`: `{ editor: Editor<FoliDocumentV3>; focus(): void }`
-(`editor.setDocument` takes a v3 document: `parseDocumentV3` migrates an older one).
+(`editor.setDocument` is typed for a v3 document; given an older one, from JavaScript or a cast,
+it migrates it with `parseDocumentV3`, so the editor stays on v3).
 
 `FoliChange`:
 

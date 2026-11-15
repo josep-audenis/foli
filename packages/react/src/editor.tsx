@@ -45,12 +45,17 @@ export interface UseFoliEditorOptions {
  * A headless `Editor` (state, commands, history) of a schema v3 document, owned by the calling
  * component: created on the first render and kept for its lifetime. Later changes to `options`
  * are ignored. Throws FoliDocumentError when `initialContent` is not a valid document.
+ * `setDocument` migrates an older document too.
  */
 export function useFoliEditor(options: UseFoliEditorOptions = {}): Editor<FoliDocumentV3> {
   const [editor] = useState(() => {
     const { initialContent, plugins } = options;
     const document = parseDocumentV3(initialContent ?? createDocument());
-    return createEditor({ document, ...(plugins && { plugins }) });
+    const editor = createEditor({ document, ...(plugins && { plugins }) });
+    // An older document (from JavaScript, or a cast) would make it a schema v2 editor.
+    const { setDocument } = editor;
+    editor.setDocument = (next) => setDocument(parseDocumentV3(next));
+    return editor;
   });
   return editor;
 }

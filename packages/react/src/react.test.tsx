@@ -208,8 +208,12 @@ describe("FoliEditor", () => {
     expect(host.getAttribute("aria-readonly")).toBe("true");
     expect(host.getAttribute("aria-placeholder")).toBe("Write…");
     expect(host.querySelector("[data-foli-placeholder]")).toBeTruthy();
+    // The toolbar follows: no command while read-only.
+    const bold = () => screen.getByRole("button", { name: "Bold" });
+    expect(bold().getAttribute("aria-disabled")).toBe("true");
 
     rerender(<FoliEditor placeholder="" label="Notes" />);
+    expect(bold().getAttribute("aria-disabled")).not.toBe("true");
     expect(host.getAttribute("contenteditable")).toBe("true");
     expect(host.hasAttribute("aria-readonly")).toBe(false);
     expect(host.querySelector("[data-foli-placeholder]")).toBeNull();
