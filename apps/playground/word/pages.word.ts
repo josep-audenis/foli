@@ -1,5 +1,5 @@
 /**
- * Page agreement with Word (8.6b): every corpus document laid out by `renderDocumentV3` with
+ * Page agreement with Word (8.6b): every corpus document laid out by `renderDocument` with
  * tracked changes accepted (as Word's reference data is measured), and each paragraph outside
  * tables compared with the page Word starts it on (`corpus/reference/word/`). Paragraphs are
  * matched by their text, in order. Run with `pnpm corpus:pages`; numbers in corpus/README.md.

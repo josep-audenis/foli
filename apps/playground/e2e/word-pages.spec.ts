@@ -1,5 +1,5 @@
 /**
- * Schema v3 on pages (8.6b, `renderDocumentV3`): page geometry by section, splitting with
+ * Schema v3 on pages (8.6b, `renderDocument`): page geometry by section, splitting with
  * widow and orphan control, keep with next, Word's paragraph spacing at page tops, explicit
  * breaks, repeated table headers, line numbers, and the final view of tracked changes. Lines
  * are exactly 20 px (`exact` line spacing) in the bundled test font, so every engine lays the

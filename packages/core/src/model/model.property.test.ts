@@ -1,7 +1,7 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
-import { createDocument, parseDocument } from "../document.js";
-import { schema } from "../schema.js";
+import { createDocumentV2, parseDocumentV2 } from "../document.js";
+import { schemaV2 } from "../schema.js";
 import { docJSON, testSchema } from "../testing/index.js";
 import { Mark, type Node, ReplaceError } from "./index.js";
 
@@ -61,12 +61,12 @@ describe("model properties (10k runs each)", () => {
     () => {
       fc.assert(
         fc.property(docJSON({ rich: false }), (content) => {
-          const loaded = parseDocument(
-            JSON.parse(JSON.stringify(createDocument(content as never))),
+          const loaded = parseDocumentV2(
+            JSON.parse(JSON.stringify(createDocumentV2(content as never))),
           );
-          expect(parseDocument(loaded)).toEqual(loaded);
-          expect(schema.nodeFromJSON(loaded.content).textContent).toBe(
-            schema.nodeFromJSON(content).textContent,
+          expect(parseDocumentV2(loaded)).toEqual(loaded);
+          expect(schemaV2.nodeFromJSON(loaded.content).textContent).toBe(
+            schemaV2.nodeFromJSON(content).textContent,
           );
         }),
         RUNS,

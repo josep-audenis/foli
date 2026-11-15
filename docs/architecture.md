@@ -480,7 +480,7 @@ the target's of that id; comments are copied with new ids (as Word duplicates th
 whose comment was not copied becoming a comment of its own, an anchor without its comment left
 out; a bookmark whose name the document uses outside the replaced selection is left out, others
 get new ids; paragraph ids (`w14:paraId`, `w14:textId`) are left for export to make. The definitions are
-validated as a document's envelope first (`parseDocumentV3`): invalid ones fall through to the
+validated as a document's envelope first (`parseDocument`): invalid ones fall through to the
 HTML. HTML is read as schema v2 (`htmlToDoc`) and structured by `migrateToV3` (`fitPastedV2`),
 with Word's built-in heading, List Paragraph and Hyperlink styles where the document lacks
 them, the list levels the list buttons make, each list a new one, and without bold, italic,
@@ -513,7 +513,7 @@ Word yet: Foli keeps neither on the new paragraph.
 
 ### Word pages (`packages/view/src/word/`, 8.6b)
 
-`renderDocumentV3(document, container, { review })` shows a schema v3 document on pages, as
+`renderDocument(document, container, { review })` shows a schema v3 document on pages, as
 Word lays it out; read-only until the editor moves to v3 (8.7).
 
 - **Blocks** (`blocks.ts`): each paragraph's and run's formatting from core's `Resolver` as

@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { createDocument, type FoliDocument, PAGE_SIZES, parseDocumentV3 } from "@folijs/core";
+import { createDocument, PAGE_SIZES, parseDocument, type SectionJSON } from "@folijs/core";
 import { act, cleanup, render, screen } from "@testing-library/react";
 import { createRef, useLayoutEffect } from "react";
 import { hydrateRoot, type Root } from "react-dom/client";
@@ -8,10 +8,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { useIsomorphicLayoutEffect } from "./editor.js";
 import { type FoliChange, FoliEditor, type FoliEditorHandle } from "./index.js";
 
-const text = (value: string, settings?: Partial<FoliDocument["settings"]>) =>
+const text = (value: string, section?: SectionJSON) =>
   createDocument(
     { type: "doc", content: [{ type: "paragraph", content: [{ type: "text", text: value }] }] },
-    settings,
+    section,
   );
 
 function type(value: string) {
@@ -38,7 +38,11 @@ describe("replacing the document (setDocument)", () => {
     const editor = ref.current?.editor;
     if (!editor) throw new Error("no editor");
 
-    act(() => editor.setDocument(parseDocumentV3(text("Second", { pageSize: PAGE_SIZES.Letter }))));
+    act(() =>
+      editor.setDocument(
+        parseDocument(text("Second", { pageSize: { width: 12240, height: 15840 } })),
+      ),
+    );
     expect(screen.getByRole("textbox").textContent).toBe("Second");
     expect(container.querySelector<HTMLElement>(".foli-page")?.style.width).toBe("215.9mm");
     expect(editor.settings.pageSize).toEqual(PAGE_SIZES.Letter);
@@ -68,7 +72,7 @@ describe("replacing the document (setDocument)", () => {
     type("x");
     expect(screen.getByRole("textbox").textContent).toBe("xOld");
     expect(changes[0]?.document).toMatchObject({ schemaVersion: 3, section: {} });
-    expect(() => parseDocumentV3(changes[0]?.document)).not.toThrow();
+    expect(() => parseDocument(changes[0]?.document)).not.toThrow();
   });
 });
 

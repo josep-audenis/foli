@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { createDocument } from "../document.js";
+import { createDocumentV2 } from "../document.js";
 import type { NodeJSON } from "../model/index.js";
 import type { DocJSON } from "../schema.js";
-import { schemaV3 } from "../v3/index.js";
+import { schema } from "../v3/index.js";
 import {
   alignAt,
   colorAt,
@@ -23,7 +23,7 @@ const t = (text: string, ...marks: object[]): NodeJSON =>
 const p = (text: string): NodeJSON => ({ type: "paragraph", content: [t(text)] }) as NodeJSON;
 
 function editorWith(...blocks: NodeJSON[]): Editor {
-  return createEditor({ document: createDocument({ type: "doc", content: blocks } as DocJSON) });
+  return createEditor({ document: createDocumentV2({ type: "doc", content: blocks } as DocJSON) });
 }
 const json = (editor: Editor) => editor.getDocument().content.content;
 
@@ -55,7 +55,7 @@ describe("text color and highlight", () => {
 
 describe("on a state without a schema v3 envelope (no editor)", () => {
   it("the list, format and block type commands do not apply", () => {
-    const doc = schemaV3.nodeFromJSON({ type: "doc", content: [p("ab")] });
+    const doc = schema.nodeFromJSON({ type: "doc", content: [p("ab")] });
     const state = EditorState.create({ doc });
     for (const command of [
       toggleList("bulletList"),

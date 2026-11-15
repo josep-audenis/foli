@@ -5,7 +5,7 @@
  * createElement/textContent only (never innerHTML); the page layout is in `pages.ts`.
  */
 import {
-  type FoliDocumentV3,
+  type FoliDocument,
   type ListMarker,
   type MarkJSON,
   type NodeJSON,
@@ -271,7 +271,7 @@ export function parseOpaque(xml: string, doc: Document): Element | null {
  * the next one, as accepting the deletion does.
  */
 export function renderBlocks(
-  document: FoliDocumentV3,
+  document: FoliDocument,
   doc: Document,
   options: BlockOptions = {},
 ): WordBlock[] {

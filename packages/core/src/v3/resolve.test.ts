@@ -2,14 +2,14 @@ import { describe, expect, it } from "vitest";
 import type { MarkJSON } from "../model/index.js";
 import type {
   AbstractNumberingJSON,
-  FoliDocumentV3,
+  FoliDocument,
   NumberingLevelJSON,
   StyleJSON,
 } from "./document.js";
 import { formatNumber, Resolver } from "./resolve.js";
-import { schemaV3 } from "./schema.js";
+import { schema } from "./schema.js";
 
-type Envelope = Pick<FoliDocumentV3, "defaults" | "styles" | "numbering" | "theme">;
+type Envelope = Pick<FoliDocument, "defaults" | "styles" | "numbering" | "theme">;
 
 const envelope = (over: Partial<Envelope> = {}): Envelope => ({
   defaults: {},
@@ -171,7 +171,7 @@ describe("Resolver: paragraphs", () => {
         ],
       }),
     );
-    const attrs = schemaV3.nodeFromJSON({ type: "paragraph" }).attrs as Record<string, unknown>;
+    const attrs = schema.nodeFromJSON({ type: "paragraph" }).attrs as Record<string, unknown>;
     expect(Object.values(attrs)).toContain(null);
     const { paragraph } = live.paragraph(attrs);
     expect(paragraph).toMatchObject({
@@ -423,7 +423,7 @@ describe("Resolver: list markers", () => {
   };
   const numbering = (
     abstracts: AbstractNumberingJSON[],
-    instances: FoliDocumentV3["numbering"]["instances"],
+    instances: FoliDocument["numbering"]["instances"],
   ) => ({
     abstracts,
     instances,

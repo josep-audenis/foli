@@ -12,7 +12,7 @@ import {
   TransformError,
 } from "../index.js";
 import type { MarkType, NodeJSON, NodeType } from "../model/index.js";
-import { schema } from "../schema.js";
+import { schemaV2 } from "../schema.js";
 import { testSchema } from "../testing/index.js";
 
 const text = (t: string, ...marks: string[]): NodeJSON =>
@@ -23,8 +23,8 @@ const para = (...content: (string | NodeJSON)[]): NodeJSON => ({
   type: "paragraph",
   ...(content.length ? { content: content.map((c) => (typeof c === "string" ? text(c) : c)) } : {}),
 });
-const nodeType = (name: string) => schema.nodes[name] as NodeType;
-const doc = (...blocks: NodeJSON[]) => schema.nodeFromJSON({ type: "doc", content: blocks });
+const nodeType = (name: string) => schemaV2.nodes[name] as NodeType;
+const doc = (...blocks: NodeJSON[]) => schemaV2.nodeFromJSON({ type: "doc", content: blocks });
 
 /** Applies every step's inverse in reverse order and checks the original comes back. */
 function expectInvertible(tr: Transform): void {
@@ -74,7 +74,7 @@ describe("StepMap", () => {
 describe("steps", () => {
   it("replace inserts, maps and inverts", () => {
     const before = doc(para("abc"));
-    const step = new ReplaceStep(2, 3, new Slice(Fragment.from(schema.text("XY")), 0, 0));
+    const step = new ReplaceStep(2, 3, new Slice(Fragment.from(schemaV2.text("XY")), 0, 0));
     const after = step.apply(before).doc;
     expect(after?.toJSON()).toEqual(doc(para("aXYc")).toJSON());
     expect(step.getMap().map(3)).toBe(4);
@@ -88,7 +88,7 @@ describe("steps", () => {
 
   it("fails instead of breaking the schema, leaving the transform untouched", () => {
     const tr = new Transform(doc(para("abc")));
-    expect(() => tr.insert(0, schema.text("x"))).toThrow(TransformError);
+    expect(() => tr.insert(0, schemaV2.text("x"))).toThrow(TransformError);
     expect(tr.steps).toHaveLength(0);
     expect(tr.doc.eq(tr.before)).toBe(true);
   });
@@ -121,7 +121,7 @@ describe("steps", () => {
 
   it("mark steps change only inline content and invert", () => {
     const before = doc(para("ab"), para("cd"));
-    const step = new AddMarkStep(2, 6, schema.mark("bold"));
+    const step = new AddMarkStep(2, 6, schemaV2.mark("bold"));
     const after = step.apply(before).doc;
     expect(after?.toJSON()).toEqual(
       doc(para("a", text("b", "bold")), para(text("c", "bold"), "d")).toJSON(),
@@ -132,14 +132,14 @@ describe("steps", () => {
         .apply(after as typeof before)
         .doc?.eq(before),
     ).toBe(true);
-    expect(new AddMarkStep(3, 3, schema.mark("bold")).apply(before).failed).toBeTruthy();
+    expect(new AddMarkStep(3, 3, schemaV2.mark("bold")).apply(before).failed).toBeTruthy();
   });
 });
 
 describe("Transform helpers", () => {
   it("addMark skips text that already has the mark, so it inverts exactly", () => {
     const tr = new Transform(doc(para("a", text("b", "bold"), "c")));
-    tr.addMark(1, 4, schema.mark("bold"));
+    tr.addMark(1, 4, schemaV2.mark("bold"));
     expect(tr.doc.toJSON()).toEqual(doc(para(text("abc", "bold"))).toJSON());
     expect(tr.steps).toHaveLength(2);
     expectInvertible(tr);
@@ -157,7 +157,7 @@ describe("Transform helpers", () => {
 
   it("removeMark by type across nodes", () => {
     const tr = new Transform(doc(para(text("ab", "bold"), text("cd", "bold", "italic"))));
-    tr.removeMark(1, 5, schema.marks.bold as MarkType);
+    tr.removeMark(1, 5, schemaV2.marks.bold as MarkType);
     expect(tr.doc.toJSON()).toEqual(doc(para("ab", text("cd", "italic"))).toJSON());
     expectInvertible(tr);
   });
@@ -172,7 +172,7 @@ describe("Transform helpers", () => {
 
   it("split can start a different block type", () => {
     const tr = new Transform(
-      schema.nodeFromJSON({
+      schemaV2.nodeFromJSON({
         type: "doc",
         content: [{ type: "heading", attrs: { level: 1 }, content: [text("T")] }],
       }),
@@ -230,8 +230,8 @@ describe("review regressions (PR #4)", () => {
     const typedB = new ReplaceStep(2, 3, Slice.empty); // inverse of typing "b" at 2
     const typedA = new ReplaceStep(1, 2, Slice.empty); // inverse of typing "a" at 1
     expect(typedB.merge(typedA)).toMatchObject({ from: 1, to: 3 });
-    const a = new Slice(Fragment.from(schema.text("a")), 0, 0);
-    const b = new Slice(Fragment.from(schema.text("b")), 0, 0);
+    const a = new Slice(Fragment.from(schemaV2.text("a")), 0, 0);
+    const b = new Slice(Fragment.from(schemaV2.text("b")), 0, 0);
     const merged = new ReplaceStep(1, 1, a).merge(new ReplaceStep(2, 2, b));
     expect(merged?.apply(doc(para("xy"))).doc?.toJSON()).toEqual(doc(para("abxy")).toJSON());
     expect(new ReplaceStep(1, 1, a).merge(new ReplaceStep(5, 5, b))).toBeNull();

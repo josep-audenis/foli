@@ -1,7 +1,7 @@
 import { test } from "vitest";
-import { createDocument } from "../document.js";
+import { createDocumentV2 } from "../document.js";
 import type { NodeType } from "../model/index.js";
-import { type BlockJSON, schema } from "../schema.js";
+import { type BlockJSON, schemaV2 } from "../schema.js";
 import { createEditor } from "../state/index.js";
 import { Transform } from "./transform.js";
 
@@ -10,9 +10,9 @@ const blocks: BlockJSON[] = Array.from({ length: 4000 }, (_, i) => ({
   type: "paragraph",
   content: [{ type: "text", text: `paragraph ${i} lorem ipsum dolor sit amet` }],
 }));
-const document = createDocument({ type: "doc", content: blocks });
-const doc = schema.nodeFromJSON(document.content);
-const heading = schema.nodes.heading as NodeType;
+const document = createDocumentV2({ type: "doc", content: blocks });
+const doc = schemaV2.nodeFromJSON(document.content);
+const heading = schemaV2.nodes.heading as NodeType;
 
 test("setBlockType over 4,000 paragraphs", async ({ bench }) => {
   const editor = createEditor({ document });

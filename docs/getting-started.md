@@ -14,7 +14,7 @@ npm install @folijs/react @folijs/core react react-dom
 ```
 
 `@folijs/react` works with React 18.2+ and 19. `@folijs/core` holds the document functions
-(`createDocument`, `parseDocumentV3`); import it directly rather than relying on it being a
+(`createDocument`, `parseDocument`); import it directly rather than relying on it being a
 dependency of `@folijs/react`. Keep all `@folijs/*` packages on the same version (upgrade them
 together), so the app has one copy of the engine.
 
@@ -36,13 +36,13 @@ default theme; see [styling.md](styling.md) to change it.
 
 ## Load and save
 
-A saved document is a schema v3 document (`FoliDocumentV3`, Word's model): its content tree
+A saved document is a schema v3 document (`FoliDocument`, Word's model): its content tree
 with the styles, numbering, comments and page setup beside it
 ([document-model.md](document-model.md)). Store it as JSON. Documents saved by 0.1.0 and 0.2.0
-(`FoliDocument`, schema v1 and v2) still load: `parseDocumentV3` and `FoliEditor` migrate them.
+(`FoliDocumentV2`, schema v1 and v2) still load: `parseDocument` and `FoliEditor` migrate them.
 
 ```tsx
-import { createDocument, type EditorDocument, parseDocumentV3 } from "@folijs/core";
+import { createDocument, type EditorDocument, parseDocument } from "@folijs/core";
 import { type FoliChange, FoliEditor } from "@folijs/react";
 import "@folijs/react/styles.css";
 
@@ -52,7 +52,7 @@ const KEY = "my-document";
 function load(): EditorDocument {
   const saved = localStorage.getItem(KEY);
   try {
-    if (saved) return parseDocumentV3(JSON.parse(saved));
+    if (saved) return parseDocument(JSON.parse(saved));
   } catch (error) {
     console.warn("Ignoring the saved document:", error);
   }
@@ -83,12 +83,12 @@ export function App() {
 This runs in the browser only (module-level `localStorage` and `addEventListener`). With server
 rendering, see [Next.js](#server-rendering-nextjs-and-others).
 
-- `parseDocumentV3` is the trust boundary: it validates input (content, styles, numbering,
+- `parseDocument` is the trust boundary: it validates input (content, styles, numbering,
   comments and page setup; an older document before it is migrated) and throws
   `FoliDocumentError`, whose message names where the problem is
   (`content.content[2]...`), instead of dropping content it does not understand.
 - Save `change.document`, never `change` itself: `JSON.stringify(change)` gives
-  `{ editor, transactions, document }`, which `parseDocumentV3` rejects.
+  `{ editor, transactions, document }`, which `parseDocument` rejects.
 - `onChange` runs after every change to the content (typing, commands, undo), not for selection
   changes. Read `change.document` when you save, not on every keystroke: it serializes the
   whole document.
@@ -100,14 +100,14 @@ rendering, see [Next.js](#server-rendering-nextjs-and-others).
 A `ref` on `FoliEditor` gives its `editor` and `focus()`:
 
 ```tsx
-import { parseDocumentV3 } from "@folijs/core";
+import { parseDocument } from "@folijs/core";
 import { FoliEditor, type FoliEditorHandle } from "@folijs/react";
 import { useRef } from "react";
 
 export function App() {
   const ref = useRef<FoliEditorHandle>(null);
   async function open(file: File) {
-    const doc = parseDocumentV3(JSON.parse(await file.text()));
+    const doc = parseDocument(JSON.parse(await file.text()));
     ref.current?.editor.setDocument(doc); // replaces the document and clears undo history
     ref.current?.focus();
   }
@@ -242,7 +242,7 @@ layout:
 ```jsx
 // app/Editor.jsx
 "use client";
-import { createDocument, parseDocumentV3 } from "@folijs/core";
+import { createDocument, parseDocument } from "@folijs/core";
 import { FoliEditor } from "@folijs/react";
 import { useState } from "react";
 
@@ -253,7 +253,7 @@ function load() {
   // `window`, not `localStorage`: recent Node versions have a server-side `localStorage`.
   const saved = typeof window === "undefined" ? null : window.localStorage.getItem(KEY);
   try {
-    if (saved) return parseDocumentV3(JSON.parse(saved));
+    if (saved) return parseDocument(JSON.parse(saved));
   } catch (error) {
     console.warn("Ignoring the saved document:", error);
   }

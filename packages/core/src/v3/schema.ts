@@ -191,7 +191,7 @@ export const checkRunProperties: Check = (v) => {
     }
   }
   try {
-    schemaV3.nodeFromJSON({ type: "text", text: "x", marks: v });
+    schema.nodeFromJSON({ type: "text", text: "x", marks: v });
     return undefined;
   } catch (error) {
     return (error as Error).message;
@@ -310,7 +310,7 @@ const themeFont = markAttr(nullable(oneOf(THEME_FONTS)), null);
 const hexByte = (v: unknown) =>
   typeof v === "string" && /^[0-9A-Fa-f]{2}$/.test(v) ? undefined : "must be a hex byte";
 
-export const schemaV3 = new Schema({
+export const schema = new Schema({
   nodes: {
     doc: { content: "block+" },
     paragraph: {

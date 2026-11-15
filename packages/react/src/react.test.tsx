@@ -3,7 +3,7 @@ import {
   createDocument,
   createEditor,
   type Editor,
-  parseDocumentV3,
+  parseDocument,
   sectionSettings,
 } from "@folijs/core";
 import { act, cleanup, render, screen } from "@testing-library/react";
@@ -173,7 +173,7 @@ describe("FoliEditor", () => {
     const { editor } = renderEditor({ onChange: (change) => changes.push(change) });
     type("a");
     type("b");
-    act(() => editor.setDocument(parseDocumentV3(hello)));
+    act(() => editor.setDocument(parseDocument(hello)));
     const text = (change: FoliChange | undefined) =>
       JSON.stringify(change?.document.content).match(/"text":"(\w*)"/)?.[1];
     expect(text(changes[0])).toBe("a");

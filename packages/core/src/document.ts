@@ -1,18 +1,18 @@
 import { FoliDocumentError, type Node } from "./model/index.js";
-import { type DocJSON, schema } from "./schema.js";
+import { type DocJSON, schemaV2 } from "./schema.js";
 
 /**
- * Bump when the persisted envelope or content schema changes; add a migration from the previous
- * version to MIGRATIONS. A published version never changes in place: documents saved with it
- * exist (v1: 0.1.0).
+ * Schema v2 (0.2.0) and v1 (0.1.0): kept to read documents saved with them, which
+ * `parseDocument` migrates to the current schema (v3). A published version never changes in
+ * place: documents saved with it exist.
  */
-export const SCHEMA_VERSION = 2;
+const VERSION = 2;
 
 type Envelope = Record<string, unknown>;
 
 /**
- * `MIGRATIONS[n]` turns a version-n envelope into version n + 1; `parseDocument` runs them in
- * order, then validates against the current schema. Migrations never drop content.
+ * `MIGRATIONS[n]` turns a version-n envelope into version n + 1; `parseDocumentV2` runs them in
+ * order, then validates against schema v2. Migrations never drop content.
  */
 const MIGRATIONS: Readonly<Record<number, (doc: Envelope) => Envelope>> = {
   // v2 adds lists, horizontal rules, links, text color, highlight and alignment. Every v1
@@ -38,9 +38,9 @@ export interface DocumentSettings {
   margins: PageMargins;
 }
 
-/** The persisted document: a versioned envelope around the content tree. */
-export interface FoliDocument {
-  schemaVersion: typeof SCHEMA_VERSION;
+/** A document saved by 0.2.0 (schema v2): what `parseDocument` reads and migrates. */
+export interface FoliDocumentV2 {
+  schemaVersion: 2;
   settings: DocumentSettings;
   content: DocJSON;
 }
@@ -55,45 +55,45 @@ export const DEFAULT_SETTINGS: DocumentSettings = {
   margins: { top: 25.4, right: 25.4, bottom: 25.4, left: 25.4 },
 };
 
-export function createDocument(
+/** A schema v2 document, for tests of migration and of editing migrated documents. */
+export function createDocumentV2(
   content: DocJSON = { type: "doc", content: [{ type: "paragraph" }] },
   settings: Partial<DocumentSettings> = {},
-): FoliDocument {
-  return { schemaVersion: SCHEMA_VERSION, settings: { ...DEFAULT_SETTINGS, ...settings }, content };
+): FoliDocumentV2 {
+  return { schemaVersion: VERSION, settings: { ...DEFAULT_SETTINGS, ...settings }, content };
 }
 
 /**
- * Validates untrusted input (e.g. JSON loaded from storage) against the schema and returns a
- * FoliDocument with content in canonical form (see docs/document-model.md, "Normalization").
- * Throws FoliDocumentError instead of silently dropping invalid content.
+ * Validates a schema v1 or v2 document against schema v2 and returns it as v2, content in
+ * canonical form. Throws FoliDocumentError instead of silently dropping invalid content.
  */
-export function parseDocument(input: unknown): FoliDocument {
+export function parseDocumentV2(input: unknown): FoliDocumentV2 {
   if (!isRecord(input)) throw new FoliDocumentError("Document must be an object");
   const version = input.schemaVersion;
   if (!Number.isInteger(version) || (version as number) < 1) {
     throw new FoliDocumentError(`Unsupported schemaVersion: ${String(version)}`);
   }
-  if ((version as number) > SCHEMA_VERSION) {
+  if ((version as number) > VERSION) {
     throw new FoliDocumentError(
       `Unsupported schemaVersion: ${version} (this version of @folijs/core reads 1 to ` +
-        `${SCHEMA_VERSION}; the document was saved by a newer one)`,
+        `${VERSION}; the document was saved by a newer one)`,
     );
   }
   let doc: Envelope = input;
-  for (let v = version as number; v < SCHEMA_VERSION; v++) {
+  for (let v = version as number; v < VERSION; v++) {
     const migrate = MIGRATIONS[v];
     if (!migrate) throw new FoliDocumentError(`No migration from schemaVersion ${v}`);
     doc = migrate(doc);
   }
   const settings = parseSettings(doc.settings);
-  const content = parseContent(doc.content).toJSON() as DocJSON;
-  return { schemaVersion: SCHEMA_VERSION, settings, content };
+  const content = parseContentV2(doc.content).toJSON() as DocJSON;
+  return { schemaVersion: VERSION, settings, content };
 }
 
-/** Parses untrusted content JSON into a `doc` node of the current schema (v2). */
-export function parseContent(value: unknown, path = "content"): Node {
-  const doc = schema.nodeFromJSON(value, path);
-  if (doc.type !== schema.topNodeType) {
+/** Parses untrusted content JSON into a `doc` node of schema v2. */
+export function parseContentV2(value: unknown, path = "content"): Node {
+  const doc = schemaV2.nodeFromJSON(value, path);
+  if (doc.type !== schemaV2.topNodeType) {
     throw new FoliDocumentError(`${path}: root node must be of type "doc"`);
   }
   // The root has no parent to check its marks against.

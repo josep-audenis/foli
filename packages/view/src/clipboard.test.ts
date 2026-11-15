@@ -1,6 +1,12 @@
 // @vitest-environment jsdom
 /// <reference types="vite/client" />
-import { createDocument, createEditor, type DocJSON, parseContent } from "@folijs/core";
+import {
+  createEditor,
+  DEFAULT_SETTINGS,
+  type DocJSON,
+  type FoliDocumentV2,
+  parseContentV2,
+} from "@folijs/core";
 import { afterEach, describe, expect, it } from "vitest";
 import googleDocs from "../fixtures/clipboard/google-docs.html?raw";
 import googleDocsLists from "../fixtures/clipboard/google-docs-lists.html?raw";
@@ -12,9 +18,16 @@ import { FOLI_MIME, htmlToDoc, parseColor, textToDoc } from "./clipboard.js";
 import { EditorView } from "./view.js";
 
 /** The parsed HTML after schema validation and normalization (what paste inserts). */
+/** A schema v2 (0.2.0) document: the editor migrates it when loaded. */
+const v2 = (content: DocJSON): FoliDocumentV2 => ({
+  schemaVersion: 2,
+  settings: DEFAULT_SETTINGS,
+  content,
+});
+
 const parsed = (html: string) => {
   const doc = htmlToDoc(html);
-  return doc ? (parseContent(doc).toJSON() as DocJSON).content : null;
+  return doc ? (parseContentV2(doc).toJSON() as DocJSON).content : null;
 };
 
 const p = (...content: unknown[]) => ({
@@ -381,7 +394,7 @@ describe("EditorView clipboard", () => {
   function mount(content: DocJSON) {
     const host = document.createElement("div");
     document.body.append(host);
-    const editor = createEditor({ document: createDocument(content) });
+    const editor = createEditor({ document: v2(content) });
     view = new EditorView(host, editor);
     view.focus();
     return { host, editor, view };

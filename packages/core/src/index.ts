@@ -1,14 +1,11 @@
 export {
-  createDocument,
   DEFAULT_SETTINGS,
   type DocumentSettings,
-  type FoliDocument,
+  type FoliDocumentV2,
   PAGE_SIZES,
   type PageMargins,
   type PageSize,
-  parseContent,
-  parseDocument,
-  SCHEMA_VERSION,
+  parseContentV2,
 } from "./document.js";
 export * from "./model/index.js";
 export {
@@ -38,7 +35,6 @@ export {
   SIMPLE_MARK_TYPES,
   type SimpleMarkJSON,
   type SimpleMarkName,
-  schema,
   type TextJSON,
 } from "./schema.js";
 export * from "./state/index.js";

@@ -1,6 +1,6 @@
 import fc from "fast-check";
 import { afterAll, beforeAll, describe, it, vi } from "vitest";
-import { createDocument } from "../document.js";
+import { createDocumentV2 } from "../document.js";
 import {
   canJoin,
   canSplit,
@@ -252,7 +252,7 @@ describe("editor history properties (10k runs)", () => {
           fc.array(command, { minLength: 1, maxLength: 8 }),
           (json, cmds) => {
             const editor = createEditor({
-              document: { ...createDocument(), content: json as DocJSON },
+              document: { ...createDocumentV2(), content: json as DocJSON },
             });
             const initial = editor.state.doc;
             let firstSelection: Selection | null = null;
@@ -386,7 +386,7 @@ describe("history with changes kept out of it (10k runs)", () => {
   });
 
   const editorFor = (json: unknown) =>
-    createEditor({ document: { ...createDocument(), content: json as DocJSON } });
+    createEditor({ document: { ...createDocumentV2(), content: json as DocJSON } });
   const blockText = (doc: Node) => doc.textBetween(0, doc.content.size, "\n", "␤");
 
   it(
@@ -466,7 +466,7 @@ describe("history with changes kept out of it (10k runs)", () => {
           fc.array(step, { minLength: 1, maxLength: 10 }),
           (json, steps) => {
             const editor = createEditor({
-              document: { ...createDocument(), content: json as DocJSON },
+              document: { ...createDocumentV2(), content: json as DocJSON },
               plugins: [react],
             });
             const initial = blockText(editor.state.doc);

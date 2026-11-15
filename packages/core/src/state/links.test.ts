@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createDocument } from "../document.js";
+import { createDocumentV2 } from "../document.js";
 import type { NodeJSON } from "../model/index.js";
 import type { DocJSON } from "../schema.js";
 import { isSafeHref } from "../schema.js";
@@ -23,7 +23,7 @@ const p = (...content: NodeJSON[]): NodeJSON => ({
 });
 
 function editorWith(...blocks: NodeJSON[]): Editor {
-  return createEditor({ document: createDocument({ type: "doc", content: blocks } as DocJSON) });
+  return createEditor({ document: createDocumentV2({ type: "doc", content: blocks } as DocJSON) });
 }
 /**
  * The blocks, without Word's Hyperlink character style (newly linked text gets it; Word

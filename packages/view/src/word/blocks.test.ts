@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import type { FoliDocumentV3, MarkJSON, NodeJSON, StyleJSON } from "@folijs/core";
+import type { FoliDocument, MarkJSON, NodeJSON, StyleJSON } from "@folijs/core";
 import { describe, expect, it } from "vitest";
 import { fontStack, parseOpaque, renderBlocks, WORD_PAGE_BREAK_ATTR } from "./blocks.js";
 
@@ -39,7 +39,7 @@ const STYLES: StyleJSON[] = [
   },
 ];
 
-function documentOf(content: NodeJSON[], over: Partial<FoliDocumentV3> = {}): FoliDocumentV3 {
+function documentOf(content: NodeJSON[], over: Partial<FoliDocument> = {}): FoliDocument {
   return {
     schemaVersion: 3,
     section: {},

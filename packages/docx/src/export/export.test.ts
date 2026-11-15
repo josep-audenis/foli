@@ -1,10 +1,11 @@
 import { readdirSync, readFileSync } from "node:fs";
 import {
-  createDocument,
-  type FoliDocumentV3,
+  DEFAULT_SETTINGS,
+  type FoliDocument,
+  type FoliDocumentV2,
   type MarkJSON,
   type NodeJSON,
-  parseDocumentV3,
+  parseDocument,
 } from "@folijs/core";
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
@@ -34,7 +35,7 @@ function values(json: unknown): unknown {
   });
 }
 
-const paragraphs = (d: FoliDocumentV3) =>
+const paragraphs = (d: FoliDocument) =>
   (d.content.content ?? []).filter((b) => b.type === "paragraph");
 
 describe("exporting the corpus without edits", () => {
@@ -148,7 +149,7 @@ describe("exporting edited documents", () => {
     run.text = `${run.text} edited`;
     const bytes = await exportDocx(edited, pkg);
     const again = await importDocx(bytes);
-    expect(values(again.document)).toEqual(values(parseDocumentV3(edited)));
+    expect(values(again.document)).toEqual(values(parseDocument(edited)));
     // The first paragraph's original pPr children the model does not own are still there.
     const before = String(first.attrs?.ext ?? "");
     const after = String(paragraphs(again.document)[0]?.attrs?.ext ?? "");
@@ -201,7 +202,7 @@ describe("exporting edited documents", () => {
       ),
     ).toHaveLength(2);
     const again = await importDocx(bytes);
-    expect(values(again.document)).toEqual(values(parseDocumentV3(edited)));
+    expect(values(again.document)).toEqual(values(parseDocument(edited)));
   });
 
   it("removes deleted styles and adds new ones, keeping latent styles", async () => {
@@ -227,7 +228,7 @@ describe("exporting edited documents", () => {
     expect(styles).toContain("<w:latentStyles");
     expect(styles).not.toContain('w:styleId="Title"');
     const again = await importDocx(bytes);
-    expect(values(again.document.styles)).toEqual(values(parseDocumentV3(edited).styles));
+    expect(values(again.document.styles)).toEqual(values(parseDocument(edited).styles));
   });
 
   it("rewrites comment threads when a comment is resolved", async () => {
@@ -332,37 +333,41 @@ describe("exporting what changed, and only that", () => {
 
 describe("exporting without a package", () => {
   it("makes a new package from a v2 document", async () => {
-    const v2 = createDocument({
-      type: "doc",
-      content: [
-        { type: "heading", attrs: { level: 1 }, content: [{ type: "text", text: "Title" }] },
-        {
-          type: "orderedList",
-          content: [
-            {
-              type: "listItem",
-              content: [
-                {
-                  type: "paragraph",
-                  content: [
-                    {
-                      type: "text",
-                      text: "one",
-                      marks: [{ type: "link", attrs: { href: "https://example.com" } }],
-                    },
-                  ],
-                },
-              ],
-            },
-          ],
-        },
-        {
-          type: "paragraph",
-          content: [{ type: "text", text: "a" }, { type: "hardBreak" }, { type: "pageBreak" }],
-        },
-      ],
-    } as never);
-    const document = parseDocumentV3(v2);
+    const v2: FoliDocumentV2 = {
+      schemaVersion: 2,
+      settings: DEFAULT_SETTINGS,
+      content: {
+        type: "doc",
+        content: [
+          { type: "heading", attrs: { level: 1 }, content: [{ type: "text", text: "Title" }] },
+          {
+            type: "orderedList",
+            content: [
+              {
+                type: "listItem",
+                content: [
+                  {
+                    type: "paragraph",
+                    content: [
+                      {
+                        type: "text",
+                        text: "one",
+                        marks: [{ type: "link", attrs: { href: "https://example.com" } }],
+                      },
+                    ],
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            type: "paragraph",
+            content: [{ type: "text", text: "a" }, { type: "hardBreak" }, { type: "pageBreak" }],
+          },
+        ],
+      } as never,
+    };
+    const document = parseDocument(v2);
     const bytes = await exportDocx(document);
     const again = await importDocx(bytes);
     expect(again.report.opaque).toEqual({});
@@ -428,7 +433,7 @@ describe("exporting without a package", () => {
       }));
     await fc.assert(
       fc.asyncProperty(fc.array(paragraph, { minLength: 1, maxLength: 4 }), async (blocks) => {
-        const document = parseDocumentV3({
+        const document = parseDocument({
           schemaVersion: 3,
           section: { pageSize: { width: 11906, height: 16838 } },
           defaults: {},

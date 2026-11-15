@@ -4,7 +4,7 @@
  * back as a .docx. The editing tests on schema v3 drive it (`e2e/word-editing.spec.ts`,
  * `e2e/word-format.spec.ts`).
  */
-import { createEditor, type Editor, type FoliDocumentV3, parseDocumentV3 } from "@folijs/core";
+import { createEditor, type Editor, type FoliDocument, parseDocument } from "@folijs/core";
 import { type DocxPackage, exportDocx, importDocx } from "@folijs/docx";
 import { FoliToolbar } from "@folijs/react";
 import "@folijs/react/styles.css";
@@ -12,7 +12,7 @@ import { EditorView } from "@folijs/view";
 import { createRoot } from "react-dom/client";
 
 /** A short A4 document with Word's Normal and Heading 1 styles. */
-export const SAMPLE: FoliDocumentV3 = {
+export const SAMPLE: FoliDocument = {
   schemaVersion: 3,
   section: {
     pageSize: { width: 11906, height: 16838 },
@@ -77,9 +77,9 @@ showToolbar();
 let original: DocxPackage | undefined;
 
 /** Shows a v3 document in a new editor (and view), with a fresh history. */
-function load(document: FoliDocumentV3, from?: DocxPackage): void {
+function load(document: FoliDocument, from?: DocxPackage): void {
   view.destroy();
-  editor = createEditor({ document: parseDocumentV3(document) });
+  editor = createEditor({ document: parseDocument(document) });
   view = new EditorView(host, editor);
   original = from;
   showToolbar();
@@ -116,8 +116,8 @@ declare global {
     /** For the e2e tests: the editor, and loading a document into it. */
     foliEdit: {
       readonly editor: Editor;
-      load(document: FoliDocumentV3): void;
-      sample: FoliDocumentV3;
+      load(document: FoliDocument): void;
+      sample: FoliDocument;
       /** Whether the editor's document passes validation (throws the error if not). */
       validate(): true;
     };
@@ -131,7 +131,7 @@ window.foliEdit = {
   load: (document) => load(document),
   sample: SAMPLE,
   validate: () => {
-    parseDocumentV3(editor.getDocument());
+    parseDocument(editor.getDocument());
     return true;
   },
 };

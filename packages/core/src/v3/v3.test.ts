@@ -1,11 +1,17 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
-import { createDocument, type FoliDocument, parseDocument } from "../document.js";
+import { createDocumentV2, type FoliDocumentV2, parseDocumentV2 } from "../document.js";
 import type { MarkJSON, NodeJSON } from "../model/index.js";
 import type { DocJSON } from "../schema.js";
-import { type FoliDocumentV3, parseContentV3, parseDocumentV3 } from "./document.js";
+import {
+  createDocument,
+  type FoliDocument,
+  parseContent,
+  parseDocument,
+  SCHEMA_VERSION,
+} from "./document.js";
 import { migrateToV3 } from "./migrate.js";
-import { schemaV3 } from "./schema.js";
+import { schema } from "./schema.js";
 import { mmToTwips, twipsToMm } from "./units.js";
 
 const paragraph = (attrs: Record<string, unknown>, content?: NodeJSON[]): NodeJSON => ({
@@ -14,7 +20,7 @@ const paragraph = (attrs: Record<string, unknown>, content?: NodeJSON[]): NodeJS
   ...(content ? { content } : {}),
 });
 const doc = (...content: NodeJSON[]): NodeJSON => ({ type: "doc", content });
-const parse = (json: NodeJSON) => parseContentV3(json).toJSON();
+const parse = (json: NodeJSON) => parseContent(json).toJSON();
 const withMark = (mark: unknown) =>
   doc(paragraph({}, [{ type: "text", text: "x", marks: [mark as MarkJSON] }]));
 
@@ -86,7 +92,7 @@ describe("schema v3 content", () => {
       { formatChange: { id: 1, author: "", previous: {} } },
     ];
     for (const attrs of accepted) {
-      expect(() => parseContentV3(doc(paragraph(attrs))), JSON.stringify(attrs)).not.toThrow();
+      expect(() => parseContent(doc(paragraph(attrs))), JSON.stringify(attrs)).not.toThrow();
     }
     const marks: unknown[] = [
       // Any target the file has: whether it may be opened is decided where it is opened.
@@ -98,7 +104,7 @@ describe("schema v3 content", () => {
       { type: "insertion", attrs: { id: 1, author: "", move: "move1" } },
     ];
     for (const mark of marks) {
-      expect(() => parseContentV3(withMark(mark)), JSON.stringify(mark)).not.toThrow();
+      expect(() => parseContent(withMark(mark)), JSON.stringify(mark)).not.toThrow();
     }
   });
 
@@ -136,7 +142,7 @@ describe("schema v3 content", () => {
       [{ outline: 1 }, /unknown attribute/],
     ];
     for (const [attrs, message] of bad) {
-      expect(() => parseContentV3(doc(paragraph(attrs))), JSON.stringify(attrs)).toThrow(message);
+      expect(() => parseContent(doc(paragraph(attrs))), JSON.stringify(attrs)).toThrow(message);
     }
   });
 
@@ -154,13 +160,13 @@ describe("schema v3 content", () => {
       ],
     ];
     for (const [attrs, message] of cases) {
-      expect(() => parseContentV3(doc(paragraph(JSON.parse(attrs)))), attrs).toThrow(message);
+      expect(() => parseContent(doc(paragraph(JSON.parse(attrs)))), attrs).toThrow(message);
     }
     const style = JSON.parse(
       '{"id":"A","type":"paragraph","paragraph":{"__proto__":{"polluted":1}}}',
     );
-    expect(() => parseDocumentV3(v3({ styles: [style] }))).toThrow(/unknown key __proto__/);
-    expect(() => parseDocumentV3(v3({ defaults: JSON.parse('{"constructor":1}') }))).toThrow(
+    expect(() => parseDocument(v3({ styles: [style] }))).toThrow(/unknown key __proto__/);
+    expect(() => parseDocument(v3({ defaults: JSON.parse('{"constructor":1}') }))).toThrow(
       /unknown key constructor/,
     );
   });
@@ -223,7 +229,7 @@ describe("schema v3 content", () => {
       [{ type: "bold", attrs: { value: "yes" } }, /value: must be true or false/],
     ];
     for (const [mark, message] of bad) {
-      expect(() => parseContentV3(withMark(mark)), JSON.stringify(mark)).toThrow(message);
+      expect(() => parseContent(withMark(mark)), JSON.stringify(mark)).toThrow(message);
     }
   });
 
@@ -246,12 +252,12 @@ describe("schema v3 content", () => {
       { type: "opaqueBlock", attrs: { xml: "<w:tbl/>" } },
     );
     expect(parse(json)).toEqual(json);
-    expect(() => parseContentV3(doc({ type: "opaqueBlock" }))).toThrow(
+    expect(() => parseContent(doc({ type: "opaqueBlock" }))).toThrow(
       /xml: required attribute is missing/,
     );
-    expect(() => parseContentV3(doc({ type: "heading", attrs: { level: 1 } }))).toThrow(/unknown/i);
-    expect(schemaV3.nodes.heading).toBeUndefined();
-    expect(schemaV3.nodes.bulletList).toBeUndefined();
+    expect(() => parseContent(doc({ type: "heading", attrs: { level: 1 } }))).toThrow(/unknown/i);
+    expect(schema.nodes.heading).toBeUndefined();
+    expect(schema.nodes.bulletList).toBeUndefined();
   });
 });
 
@@ -318,11 +324,11 @@ describe("schema v3 envelope", () => {
         },
       ],
     });
-    const parsed = parseDocumentV3(input);
+    const parsed = parseDocument(input);
     expect(parsed.styles).toEqual(input.styles);
     // Comment content is canonical too.
     expect(parsed.comments[1]?.content).toEqual([{ type: "paragraph" }]);
-    expect(parseDocumentV3(parsed)).toEqual(parsed);
+    expect(parseDocument(parsed)).toEqual(parsed);
   });
 
   it("accepts the inconsistencies Word opens", () => {
@@ -353,7 +359,7 @@ describe("schema v3 envelope", () => {
       { section: {} },
     ];
     for (const overrides of accepted) {
-      expect(() => parseDocumentV3(v3(overrides)), JSON.stringify(overrides)).not.toThrow();
+      expect(() => parseDocument(v3(overrides)), JSON.stringify(overrides)).not.toThrow();
     }
   });
 
@@ -420,12 +426,20 @@ describe("schema v3 envelope", () => {
         /comments\[0\]\.content/,
       ],
       [{ content: { type: "paragraph" } }, /root node must be of type "doc"/],
-      [{ schemaVersion: 4 }, /Unsupported schemaVersion: 4/],
+      [
+        { schemaVersion: 4 },
+        /Unsupported schemaVersion: 4 \(.*reads 1 to 3; .*saved by a newer one\)/,
+      ],
+      [
+        { schemaVersion: 0 },
+        /Unsupported schemaVersion: 0 \(this version of @folijs\/core reads 1 to 3\)$/,
+      ],
+      [{ schemaVersion: 3.5 }, /reads 1 to 3\)$/],
     ];
     for (const [overrides, message] of bad) {
-      expect(() => parseDocumentV3(v3(overrides)), JSON.stringify(overrides)).toThrow(message);
+      expect(() => parseDocument(v3(overrides)), JSON.stringify(overrides)).toThrow(message);
     }
-    expect(() => parseDocumentV3(null)).toThrow(/must be an object/);
+    expect(() => parseDocument(null)).toThrow(/must be an object/);
   });
 
   it("checks long style chains in linear time", () => {
@@ -435,7 +449,7 @@ describe("schema v3 envelope", () => {
       ...(i ? { basedOn: `S${i - 1}` } : {}),
     }));
     const started = performance.now();
-    parseDocumentV3(v3({ styles }));
+    parseDocument(v3({ styles }));
     // Quadratic took seconds at 10 000; linear takes milliseconds.
     expect(performance.now() - started).toBeLessThan(1500);
     const cycle = [
@@ -443,14 +457,14 @@ describe("schema v3 envelope", () => {
       { id: "X", type: "paragraph", basedOn: "Y" },
       { id: "Y", type: "paragraph", basedOn: "X" },
     ];
-    expect(() => parseDocumentV3(v3({ styles: cycle }))).toThrow(/based on itself/);
+    expect(() => parseDocument(v3({ styles: cycle }))).toThrow(/based on itself/);
   });
 
   it("returns a document that shares nothing with its input", () => {
     const input = v3({
       styles: [{ id: "A", type: "paragraph", paragraph: { indent: { left: 1 } } }],
     });
-    const parsed = parseDocumentV3(input);
+    const parsed = parseDocument(input);
     (input.section as { pageSize: { width: unknown } }).pageSize.width = "evil";
     (input.styles as { id: string }[])[0]!.id = "changed";
     expect(parsed.section.pageSize?.width).toBe(11906);
@@ -458,8 +472,44 @@ describe("schema v3 envelope", () => {
   });
 });
 
+describe("createDocument", () => {
+  it("makes a valid schema v3 document on A4 with the editor's styles", () => {
+    const made = createDocument();
+    expect(SCHEMA_VERSION).toBe(3);
+    expect(made.schemaVersion).toBe(3);
+    expect(parseDocument(made)).toEqual(made);
+    expect(made.content).toEqual(doc(paragraph({})));
+    expect(made.section.pageSize).toEqual({ width: 11906, height: 16838 });
+    expect(made.styles.map((s) => s.id)).toEqual(
+      expect.arrayContaining(["Normal", "Heading1", "ListParagraph", "Hyperlink"]),
+    );
+    expect(made.numbering.abstracts).toHaveLength(2);
+    expect(made.numbering.instances).toEqual([]);
+    // What the editor loads by default: the look a migrated 0.2.0 document has.
+    expect({ ...made, content: undefined }).toEqual({
+      ...parseDocument(createDocumentV2()),
+      content: undefined,
+    });
+  });
+
+  it("takes the content and the section", () => {
+    const content = doc(paragraph({ style: "Heading1" }, [{ type: "text", text: "Title" }]));
+    const section = { pageSize: { width: 12240, height: 15840 } };
+    const made = createDocument(content, section);
+    expect(made.content).toBe(content);
+    expect(made.section).toBe(section);
+    expect(parseDocument(made).content).toEqual(content);
+  });
+
+  it("shares no definitions between documents", () => {
+    const a = createDocument();
+    (a.styles[0] as { name?: string }).name = "changed";
+    expect(createDocument().styles[0]?.name).toBe("Normal");
+  });
+});
+
 describe("v2 → v3 migration", () => {
-  const v2: FoliDocument = {
+  const v2: FoliDocumentV2 = {
     schemaVersion: 2,
     settings: {
       pageSize: { width: 297, height: 210 },
@@ -540,7 +590,7 @@ describe("v2 → v3 migration", () => {
   };
 
   it("turns headings, lists and rules into Word's paragraphs", () => {
-    const migrated = parseDocumentV3(v2);
+    const migrated = parseDocument(v2);
     const rule = { bottom: { style: "single", size: 6, space: 1, color: "auto" } };
     expect(migrated.content).toEqual(
       doc(
@@ -637,8 +687,8 @@ describe("v2 → v3 migration", () => {
     content: [{ type: "paragraph", content: [{ type: "text", text }] }, ...rest],
   });
   const migrate = (content: NodeJSON[]) =>
-    parseDocumentV3(createDocument({ type: "doc", content } as DocJSON));
-  const numbering = (d: FoliDocumentV3) => d.content.content?.map((p) => p.attrs?.numbering);
+    parseDocument(createDocumentV2({ type: "doc", content } as DocJSON));
+  const numbering = (d: FoliDocument) => d.content.content?.map((p) => p.attrs?.numbering);
 
   it("gives a nested list with its own start its own numbering", () => {
     const migrated = migrate([
@@ -692,8 +742,8 @@ describe("v2 → v3 migration", () => {
   });
 
   it("keeps pages Word cannot have within its limits", () => {
-    const migrated = parseDocumentV3(
-      createDocument(undefined, {
+    const migrated = parseDocument(
+      createDocumentV2(undefined, {
         pageSize: { width: 600, height: 841 },
         margins: { top: 10, right: 10, bottom: 10, left: 10 },
       }),
@@ -716,7 +766,7 @@ describe("v2 → v3 migration", () => {
         ],
       },
     };
-    const migrated = parseDocumentV3(savedBy010);
+    const migrated = parseDocument(savedBy010);
     expect(migrated.schemaVersion).toBe(3);
     expect(migrated.section.pageSize).toEqual({ width: 12240, height: 15840 });
     expect(migrated.content).toEqual(
@@ -726,7 +776,7 @@ describe("v2 → v3 migration", () => {
 
   it("validates a v1 or v2 document before migrating it", () => {
     expect(() =>
-      parseDocumentV3({ ...v2, content: { type: "doc", content: [{ type: "heading" }] } }),
+      parseDocument({ ...v2, content: { type: "doc", content: [{ type: "heading" }] } }),
     ).toThrow(/required attribute is missing/);
   });
 
@@ -832,7 +882,7 @@ describe("v2 → v3 migration", () => {
       return out;
     };
     /** The same, numbering v3's paragraphs as Word does: a counter per instance and level. */
-    const flattenV3 = (d: FoliDocumentV3): string[] => {
+    const flattenV3 = (d: FoliDocument): string[] => {
       const out: string[] = [];
       const counters = new Map<number, number[]>();
       const abstracts = new Map(d.numbering.abstracts.map((a) => [a.id, a]));
@@ -865,8 +915,8 @@ describe("v2 → v3 migration", () => {
 
     fc.assert(
       fc.property(fc.array(block, { minLength: 1, maxLength: 4 }), (content) => {
-        const before = parseDocument(createDocument({ type: "doc", content } as DocJSON));
-        const after = parseDocumentV3(before);
+        const before = parseDocumentV2(createDocumentV2({ type: "doc", content } as DocJSON));
+        const after = parseDocument(before);
         // The same characters with the same marks, breaks and paragraphs, in order, and every
         // ordered item numbered as v2 numbered it.
         expect(flattenV3(after)).toEqual(flattenV2(before.content.content as NodeJSON[]));
@@ -877,11 +927,11 @@ describe("v2 → v3 migration", () => {
 
   it("migrates without changing its input, sharing nothing between documents", () => {
     const copy = structuredClone(v2);
-    const first = migrateToV3(parseDocument(copy));
+    const first = migrateToV3(parseDocumentV2(copy));
     expect(copy).toEqual(v2);
     first.styles.push({ id: "Mine", type: "paragraph" });
     (first.numbering.abstracts[0]?.levels[0] as { text?: string }).text = "changed";
-    const second = migrateToV3(parseDocument(copy));
+    const second = migrateToV3(parseDocumentV2(copy));
     expect(second.styles.map((s) => s.id)).not.toContain("Mine");
     expect(second.numbering.abstracts[0]?.levels[0]?.text).toBe("\u2022");
     expect(JSON.parse(JSON.stringify(second))).toStrictEqual(second);
@@ -889,7 +939,7 @@ describe("v2 → v3 migration", () => {
 
   it("writes no undefined values", () => {
     const plain = migrateToV3(
-      createDocument({
+      createDocumentV2({
         type: "doc",
         content: [{ type: "paragraph", attrs: { align: "start" } }],
       } as DocJSON),

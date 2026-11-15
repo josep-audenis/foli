@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { MarkJSON, NodeJSON } from "../model/index.js";
-import type { FoliDocumentV3, StyleJSON } from "../v3/document.js";
+import type { FoliDocument, StyleJSON } from "../v3/document.js";
 import { createEditor } from "./editor.js";
 import { alignAt, colorAt } from "./format.js";
 import { linkAt } from "./links.js";
@@ -48,7 +48,7 @@ const p = (attrs: Record<string, unknown>, ...content: NodeJSON[]): NodeJSON => 
   ...(content.length ? { content } : {}),
 });
 
-function documentOf(blocks: NodeJSON[], over: Partial<FoliDocumentV3> = {}): FoliDocumentV3 {
+function documentOf(blocks: NodeJSON[], over: Partial<FoliDocument> = {}): FoliDocument {
   return {
     schemaVersion: 3,
     section: {},
@@ -409,7 +409,7 @@ describe("alignment, line spacing, space before and after", () => {
 });
 
 /** A one-level bullet list definition, instance 1. */
-const BULLETS: FoliDocumentV3["numbering"] = {
+const BULLETS: FoliDocument["numbering"] = {
   abstracts: [
     {
       id: 0,
@@ -626,7 +626,7 @@ describe("links on a v3 document", () => {
 });
 
 describe("Word formatting edge cases", () => {
-  const numbering = (format: string, extra: Partial<FoliDocumentV3> = {}) => ({
+  const numbering = (format: string, extra: Partial<FoliDocument> = {}) => ({
     numbering: {
       abstracts: [
         { id: 0, levels: Array.from({ length: 9 }, (_, level) => ({ level, format, text: "-" })) },

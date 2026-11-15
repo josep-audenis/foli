@@ -1,5 +1,5 @@
 import { readdirSync, readFileSync } from "node:fs";
-import { type FoliDocumentV3, type NodeJSON, parseDocumentV3 } from "@folijs/core";
+import { type FoliDocument, type NodeJSON, parseDocument } from "@folijs/core";
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import { exportDocx, importDocx, readPackage } from "../index.js";
@@ -11,7 +11,7 @@ const names = readdirSync(CORPUS).filter((n) => n.endsWith(".docx"));
 const load = (name: string) => importDocx(new Uint8Array(readFileSync(new URL(name, CORPUS))));
 const W_NS = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
 const source = (bytes: Uint8Array) => readPackage(bytes).then((p) => p.text("/word/document.xml"));
-const paragraphs = (d: FoliDocumentV3) =>
+const paragraphs = (d: FoliDocument) =>
   (d.content.content ?? []).filter((b) => b.type === "paragraph");
 
 describe("a new package", () => {
@@ -46,7 +46,7 @@ describe("a new package", () => {
 
 describe("characters", () => {
   const doc = (text: string) =>
-    parseDocumentV3({
+    parseDocument({
       schemaVersion: 3,
       section: {},
       defaults: {},
@@ -120,7 +120,7 @@ describe("recorded formatting changes in rewritten properties", () => {
 });
 
 describe("comment threads", () => {
-  const thread = (doc: FoliDocumentV3): FoliDocumentV3 => {
+  const thread = (doc: FoliDocument): FoliDocument => {
     const edited = structuredClone(doc);
     const content = [{ type: "paragraph", content: [{ type: "text", text: "Note" }] }];
     edited.comments = [
@@ -129,7 +129,7 @@ describe("comment threads", () => {
     ];
     return edited;
   };
-  const states = (d: FoliDocumentV3) => d.comments.map((c) => [c.id, c.parent, c.done]);
+  const states = (d: FoliDocument) => d.comments.map((c) => [c.id, c.parent, c.done]);
 
   it("keeps replies and resolved state of comments made in the editor", async () => {
     const { document, package: pkg } = await load("05-business-letter.docx");
@@ -142,7 +142,7 @@ describe("comment threads", () => {
   });
 
   it("and in a new package", async () => {
-    const fresh = parseDocumentV3({
+    const fresh = parseDocument({
       schemaVersion: 3,
       section: {},
       defaults: {},
@@ -162,7 +162,7 @@ describe("comment threads", () => {
 
 describe("verbatim content must fit the part", () => {
   const plain = (content: NodeJSON[]) =>
-    parseDocumentV3({
+    parseDocument({
       schemaVersion: 3,
       section: {},
       defaults: {},
@@ -332,7 +332,7 @@ describe("edits keep everything else", () => {
             { type: "bold", attrs: { value: false } },
           ];
         const again = await importDocx(await exportDocx(edited, pkg));
-        const before = paragraphs(parseDocumentV3(edited));
+        const before = paragraphs(parseDocument(edited));
         const after = paragraphs(again.document);
         expect(after.length).toBe(before.length);
         before.forEach((b, i) => {

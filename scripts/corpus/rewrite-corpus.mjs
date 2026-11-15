@@ -16,7 +16,7 @@
 
 import { mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { createDocument, parseDocumentV3 } from "../../packages/core/dist/index.js";
+import { DEFAULT_SETTINGS, parseDocument } from "../../packages/core/dist/index.js";
 import { exportDocx, importDocx, readPackage } from "../../packages/docx/dist/index.js";
 
 const [out, input = join(import.meta.dirname, "..", "..", "corpus", "word")] =
@@ -94,67 +94,71 @@ for (const file of readdirSync(input).filter((name) => name.endsWith(".docx"))) 
   console.log(`${file}: written`);
 }
 
-const v2 = createDocument({
-  type: "doc",
-  content: [
-    {
-      type: "heading",
-      attrs: { level: 1 },
-      content: [{ type: "text", text: "A document from schema v2" }],
-    },
-    {
-      type: "paragraph",
-      attrs: { align: "justify" },
-      content: [
-        { type: "text", text: "Bold", marks: [{ type: "bold" }] },
-        { type: "text", text: " and a " },
-        {
-          type: "text",
-          text: "link",
-          marks: [{ type: "link", attrs: { href: "https://example.com" } }],
-        },
-        {
-          type: "text",
-          text: "; highlighted",
-          marks: [{ type: "highlight", attrs: { color: "#fff2cc" } }],
-        },
-      ],
-    },
-    {
-      type: "orderedList",
-      attrs: { start: 3 },
-      content: [
-        {
-          type: "listItem",
-          content: [{ type: "paragraph", content: [{ type: "text", text: "Third" }] }],
-        },
-        {
-          type: "listItem",
-          content: [
-            { type: "paragraph", content: [{ type: "text", text: "Fourth" }] },
-            {
-              type: "bulletList",
-              content: [
-                {
-                  type: "listItem",
-                  content: [{ type: "paragraph", content: [{ type: "text", text: "A point" }] }],
-                },
-              ],
-            },
-          ],
-        },
-      ],
-    },
-    { type: "horizontalRule" },
-    {
-      type: "paragraph",
-      content: [
-        { type: "text", text: "After the rule" },
-        { type: "pageBreak" },
-        { type: "text", text: "Next page" },
-      ],
-    },
-  ],
-});
-writeFileSync(join(out, "new-from-v2.docx"), await exportDocx(parseDocumentV3(v2)));
+const v2 = {
+  schemaVersion: 2,
+  settings: DEFAULT_SETTINGS,
+  content: {
+    type: "doc",
+    content: [
+      {
+        type: "heading",
+        attrs: { level: 1 },
+        content: [{ type: "text", text: "A document from schema v2" }],
+      },
+      {
+        type: "paragraph",
+        attrs: { align: "justify" },
+        content: [
+          { type: "text", text: "Bold", marks: [{ type: "bold" }] },
+          { type: "text", text: " and a " },
+          {
+            type: "text",
+            text: "link",
+            marks: [{ type: "link", attrs: { href: "https://example.com" } }],
+          },
+          {
+            type: "text",
+            text: "; highlighted",
+            marks: [{ type: "highlight", attrs: { color: "#fff2cc" } }],
+          },
+        ],
+      },
+      {
+        type: "orderedList",
+        attrs: { start: 3 },
+        content: [
+          {
+            type: "listItem",
+            content: [{ type: "paragraph", content: [{ type: "text", text: "Third" }] }],
+          },
+          {
+            type: "listItem",
+            content: [
+              { type: "paragraph", content: [{ type: "text", text: "Fourth" }] },
+              {
+                type: "bulletList",
+                content: [
+                  {
+                    type: "listItem",
+                    content: [{ type: "paragraph", content: [{ type: "text", text: "A point" }] }],
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+      { type: "horizontalRule" },
+      {
+        type: "paragraph",
+        content: [
+          { type: "text", text: "After the rule" },
+          { type: "pageBreak" },
+          { type: "text", text: "Next page" },
+        ],
+      },
+    ],
+  },
+};
+writeFileSync(join(out, "new-from-v2.docx"), await exportDocx(parseDocument(v2)));
 console.log("new-from-v2.docx: written");

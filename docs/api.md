@@ -19,7 +19,7 @@ Peer dependencies: `react` and `react-dom` 18.2+ or 19. Stylesheet: `@folijs/rea
 An editable document on pages, with a toolbar. Creates its own editor and provides it to its
 `children`. Uncontrolled: the editor owns the document. Since 8.7d1 it edits schema v3 (Word's
 model, with Word's toolbar): a 0.1.0 or 0.2.0 document given to it is migrated
-(`parseDocumentV3`), and what it reports is v3.
+(`parseDocument`), and what it reports is v3.
 
 | Prop             | Type                           | Default      | Notes                                                                                             |
 | ---------------- | ------------------------------ | ------------ | ------------------------------------------------------------------------------------------------- |
@@ -41,10 +41,10 @@ a document of any version too).
 - `editor: Editor`
 - `transactions: readonly Transaction[]`: this change's transactions (several when plugins
   append their own).
-- `document: FoliDocumentV3`: the document right after this change (content, styles,
+- `document: FoliDocument`: the document right after this change (content, styles,
   numbering, comments, page setup), serialized on first read. Read it when you save, not on
   every change. Save `change.document`, never `change`: `JSON.stringify(change)` gives
-  `{ editor, transactions, document }`, which `parseDocumentV3` rejects.
+  `{ editor, transactions, document }`, which `parseDocument` rejects.
 
 ### `<FoliCanvas>`
 
@@ -105,26 +105,31 @@ No DOM: runs in Node, workers and the browser.
 
 ### Documents
 
-- `createDocument(content?, settings?): FoliDocument`: a new document (default: one empty
-  paragraph, A4 with 25.4 mm margins). Neither argument is validated, and `settings` is merged
-  shallowly: pass a whole `margins` object, not part of one.
+Documents are schema v3, Word's model ([document-model.md](document-model.md)).
+
+- `createDocument(content?, section?): FoliDocument`: a new document: `content` (default: one
+  empty paragraph) on `section` (default: A4 with 25.4 mm margins), with Normal, Heading 1–6,
+  List Paragraph and Hyperlink styles, bullet and number definitions, in 11 pt Georgia with 1.5
+  lines (the look a migrated 0.2.0 document has). Not validated.
 - `parseDocument(input: unknown): FoliDocument`: validates untrusted input (e.g. parsed JSON)
-  and returns it in canonical form: content against the schema, settings (positive page size,
-  margins that leave a content area). Throws `FoliDocumentError`, whose message names the place
-  (`content.content[2].marks[0].type: …`); never drops content silently.
-- `FoliDocument`: `{ schemaVersion, settings: { pageSize, margins }, content }`; sizes in
-  millimetres. Format: [document-model.md](document-model.md).
-- `SCHEMA_VERSION` (2), `PAGE_SIZES` (`A4`, `Letter`), `DEFAULT_SETTINGS`, `schema`,
-  `MARK_TYPES` (`link`, `bold`, `italic`, `underline`, `strike`, `textColor`, `highlight`),
-  `SIMPLE_MARK_TYPES` (those without attributes), `HEADING_LEVELS` (1–6), `ALIGNMENTS`,
-  `isSafeHref(href)` and `isColor(color)` (the rules links and colors must follow), and the
-  JSON types
-  (`DocJSON`, `ParagraphJSON`, `HeadingJSON`, `TextJSON`…).
+  and returns a copy in canonical form; a document saved by 0.1.0 or 0.2.0 is validated as
+  such and migrated (`migrateToV3`). Throws `FoliDocumentError`, whose message names the place
+  (`content.content[2].marks[0].type: …`) and says when a newer Foli saved the document; never
+  drops content silently. `parseContent(json)` parses content alone into a `doc` node.
+- `FoliDocument`: `{ schemaVersion: 3, section, defaults, styles, numbering, theme?, comments,
+  content }` and its parts (`SectionJSON`, `StyleJSON`…), in Word's units (twips).
+- `SCHEMA_VERSION` (3), `schema` (the content schema), `checkSection`, `RUN_PROPERTY_MARKS`,
+  `HIGHLIGHT_COLORS`, `JUSTIFICATIONS`, the unit conversions (`twipsToMm`, `mmToTwips`…).
+- `isSafeHref(href)` and `isColor(color)`: the rules links and colors from outside a document
+  must follow.
+- `PAGE_SIZES` (`A4`, `Letter`), `DEFAULT_SETTINGS` and `DocumentSettings`: page geometry in
+  millimetres, what `editor.settings` gives.
+- Schema v2, kept to read 0.2.0 documents and pasted HTML: `FoliDocumentV2`, `parseContentV2`,
+  `migrateToV3(document)`, and its JSON types (`DocJSON`, `ParagraphJSON`, `HeadingJSON`,
+  `TextJSON`…, with `MARK_TYPES`, `SIMPLE_MARK_TYPES`, `HEADING_LEVELS`, `ALIGNMENTS`).
 
-### Schema v3 (the Word model; the editor moves to it in 0.3.0)
+### Formatting
 
-- `parseDocumentV3(input)`, `migrateToV3(document)`, `schemaV3`, `FoliDocumentV3` and its parts:
-  [document-model.md](document-model.md#schema-v3-the-word-model-83-alongside-v2).
 - `new Resolver(document)`: a document's effective formatting, as Word computes it.
   `paragraph(attrs)` gives a paragraph's properties (`ParagraphFormat`) and the formatting of its
   text (`RunFormat`); `run(paragraphRun, marks)` a run's; `markers(paragraphs)` the list markers
@@ -135,8 +140,9 @@ No DOM: runs in Node, workers and the browser.
 
 `createEditor({ document?, plugins? }): Editor`: a headless editor (state, commands, undo
 history, change notifications) of a schema v3 document (Word's model). The document is
-validated and, when saved by 0.1.0 or 0.2.0, migrated (`parseDocumentV3`; default: an empty
-one); `setDocument` behaves the same way. The editor keeps its styles, numbering and sections,
+validated and, when saved by 0.1.0 or 0.2.0, migrated (`parseDocument`; default:
+`createDocument()`); `setDocument` behaves the same way. `EditorDocument` is what both take:
+`FoliDocument | FoliDocumentV2`. The editor keeps its styles, numbering and sections,
 `getDocument()` returns a v3 document (a copy) and `settings` are its last section's page (`sectionSettings(section)`; Word's Letter page with
 inch margins where the section leaves them out). The commands edit as Word does: Enter
 leaves the section break and the paragraph's own attributes on the second paragraph, and at the
@@ -197,7 +203,7 @@ definitions (the Word 2013 to 2019 template's) the first time they are applied, 
 | `run(command)`, `can(command)` | Run any `Command`, or dry-run it. `can` builds the whole transaction: not per keystroke.                                                                                                                                                                                                                                      |
 | `handleKey(key)`               | Runs the first bound command for a key name such as `"Mod-b"`.                                                                                                                                                                                                                                                                |
 | `dispatch(tr)`                 | Applies a transaction (`state.tr`).                                                                                                                                                                                                                                                                                           |
-| `getDocument()`                | The current document (`FoliDocumentV3`).                                                                                                                                                                                                                                                                                      |
+| `getDocument()`                | The current document (`FoliDocument`).                                                                                                                                                                                                                                                                                        |
 | `setDocument(doc)`             | Replaces the document and settings, clears undo history. Listeners get an empty transaction list.                                                                                                                                                                                                                             |
 | `subscribe(listener)`          | `(state, transactions) => void` after every change (selection included); returns unsubscribe. `transactions.some(tr => tr.docChanged)` tells content changes apart.                                                                                                                                                           |
 
@@ -251,7 +257,7 @@ const view = new EditorView(host, editor, { editable: true, placeholder: "" });
   editor's state into it as `section.foli-page` elements sized from the document settings.
   Removes the host's children. Give the host an accessible name yourself.
 - An editor holding a schema v3 document is shown as Word formats it (the blocks of
-  `renderDocumentV3`, list numbers, tracked changes as markup, opaque content shown and not
+  `renderDocument`, list numbers, tracked changes as markup, opaque content shown and not
   editable) and laid out with Word's paragraph spacing and keep rules, on its last section's
   page. Copy writes the HTML as Word formats it (resolved formatting inline, headings, list
   numbers Word reads back) and Foli JSON with the styles, numbering and comments the content
@@ -275,8 +281,8 @@ const view = new EditorView(host, editor, { editable: true, placeholder: "" });
   on Apple platforms) opens the link's href, read from the document, in a new tab with
   `noopener,noreferrer`.
 - `keyName(event)`: the key name `handleKey` expects (`"Mod-b"`, `"Shift-Enter"`).
-- `renderDocumentV3(document, container, { review? }): DocumentPages` (read-only preview of
-  the Word model, until the editor moves to it in 0.3.0): lays a schema v3 document out on
+- `renderDocument(document, container, { review? }): DocumentPages` (a read-only view, no
+  editor): lays a schema v3 document out on
   pages (`.foli-word-page`, `WORD_PAGE_CLASS`) appended to `container`, formatted as Word
   formats it. `review`: `"markup"` (default: insertions underlined, deletions struck through)
   or `"final"` (as if accepted). `DocumentPages`: `pages`, `pageOf(index)` and `lineOf(index)`

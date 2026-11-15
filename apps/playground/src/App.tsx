@@ -1,135 +1,149 @@
-import { createDocument, type Editor, type EditorDocument, parseDocumentV3 } from "@folijs/core";
+import {
+  DEFAULT_SETTINGS,
+  type Editor,
+  type EditorDocument,
+  type FoliDocumentV2,
+  parseDocument,
+} from "@folijs/core";
 import { FoliEditor, type FoliEditorHandle } from "@folijs/react";
 import { type ChangeEvent, useRef, useState } from "react";
 
 const STORAGE_KEY = "foli-playground-document";
 
 // Written as a 0.2.0 document: it is migrated to schema v3 when loaded, as saved ones are.
-const sample = createDocument({
-  type: "doc",
-  content: [
-    { type: "heading", attrs: { level: 1 }, content: [{ type: "text", text: "Foli Playground" }] },
-    {
-      type: "paragraph",
-      content: [
-        { type: "text", text: "Edited by Foli's own view and engine. Try " },
-        { type: "text", text: "Ctrl/Cmd+B", marks: [{ type: "bold" }] },
-        { type: "text", text: ", " },
-        { type: "text", text: "Ctrl/Cmd+I", marks: [{ type: "italic" }] },
-        { type: "text", text: ", Enter, Backspace and undo. Changes are saved in this browser." },
-      ],
-    },
-    {
-      type: "paragraph",
-      content: [
-        { type: "text", text: "Marks: " },
-        { type: "text", text: "bold", marks: [{ type: "bold" }] },
-        { type: "text", text: ", " },
-        { type: "text", text: "italic", marks: [{ type: "italic" }] },
-        { type: "text", text: ", " },
-        { type: "text", text: "underline", marks: [{ type: "underline" }] },
-        { type: "text", text: ", " },
-        { type: "text", text: "strike", marks: [{ type: "strike" }] },
-        { type: "hardBreak" },
-        { type: "text", text: "after a hard break." },
-      ],
-    },
-    // Schema v2 (0.2.0): every feature once, so the playground shows them all.
-    { type: "heading", attrs: { level: 2 }, content: [{ type: "text", text: "Rich content" }] },
-    {
-      type: "paragraph",
-      content: [
-        { type: "text", text: "A " },
-        {
-          type: "text",
-          text: "link",
-          marks: [{ type: "link", attrs: { href: "https://github.com/josep-audenis/foli" } }],
-        },
-        { type: "text", text: " (Ctrl/Cmd+K edits it, Ctrl/Cmd+click opens it), " },
-        {
-          type: "text",
-          text: "red text",
-          marks: [{ type: "textColor", attrs: { color: "#c00000" } }],
-        },
-        { type: "text", text: " and a " },
-        {
-          type: "text",
-          text: "highlight",
-          marks: [{ type: "highlight", attrs: { color: "#fff59d" } }],
-        },
-        { type: "text", text: "." },
-      ],
-    },
-    {
-      type: "bulletList",
-      content: [
-        {
-          type: "listItem",
-          content: [
-            {
-              type: "paragraph",
-              content: [{ type: "text", text: "A bulleted list (Ctrl/Cmd+Shift+8)." }],
-            },
-          ],
-        },
-        {
-          type: "listItem",
-          content: [
-            {
-              type: "paragraph",
-              content: [{ type: "text", text: "Tab nests an item, Shift+Tab lifts it:" }],
-            },
-            {
-              type: "orderedList",
-              attrs: { start: 3 },
-              content: [
-                {
-                  type: "listItem",
-                  content: [
-                    {
-                      type: "paragraph",
-                      content: [{ type: "text", text: "a numbered list (Ctrl/Cmd+Shift+7)" }],
-                    },
-                  ],
-                },
-                {
-                  type: "listItem",
-                  content: [
-                    {
-                      type: "paragraph",
-                      content: [{ type: "text", text: "starting at 3" }],
-                    },
-                  ],
-                },
-              ],
-            },
-          ],
-        },
-      ],
-    },
-    { type: "horizontalRule" },
-    {
-      type: "paragraph",
-      attrs: { align: "center" },
-      content: [{ type: "text", text: "Centered, after a horizontal rule." }],
-    },
-    {
-      type: "paragraph",
-      attrs: { align: "end" },
-      content: [{ type: "text", text: "Aligned to the end." }],
-    },
-    {
-      type: "paragraph",
-      attrs: { align: "justify" },
-      content: [
-        {
-          type: "text",
-          text: "Justified text spreads its words to fill every line but the last, so both edges of the paragraph line up, as in a printed book or a newspaper column.",
-        },
-      ],
-    },
-  ],
-});
+const sample: FoliDocumentV2 = {
+  schemaVersion: 2,
+  settings: DEFAULT_SETTINGS,
+  content: {
+    type: "doc",
+    content: [
+      {
+        type: "heading",
+        attrs: { level: 1 },
+        content: [{ type: "text", text: "Foli Playground" }],
+      },
+      {
+        type: "paragraph",
+        content: [
+          { type: "text", text: "Edited by Foli's own view and engine. Try " },
+          { type: "text", text: "Ctrl/Cmd+B", marks: [{ type: "bold" }] },
+          { type: "text", text: ", " },
+          { type: "text", text: "Ctrl/Cmd+I", marks: [{ type: "italic" }] },
+          { type: "text", text: ", Enter, Backspace and undo. Changes are saved in this browser." },
+        ],
+      },
+      {
+        type: "paragraph",
+        content: [
+          { type: "text", text: "Marks: " },
+          { type: "text", text: "bold", marks: [{ type: "bold" }] },
+          { type: "text", text: ", " },
+          { type: "text", text: "italic", marks: [{ type: "italic" }] },
+          { type: "text", text: ", " },
+          { type: "text", text: "underline", marks: [{ type: "underline" }] },
+          { type: "text", text: ", " },
+          { type: "text", text: "strike", marks: [{ type: "strike" }] },
+          { type: "hardBreak" },
+          { type: "text", text: "after a hard break." },
+        ],
+      },
+      // Schema v2 (0.2.0): every feature once, so the playground shows them all.
+      { type: "heading", attrs: { level: 2 }, content: [{ type: "text", text: "Rich content" }] },
+      {
+        type: "paragraph",
+        content: [
+          { type: "text", text: "A " },
+          {
+            type: "text",
+            text: "link",
+            marks: [{ type: "link", attrs: { href: "https://github.com/josep-audenis/foli" } }],
+          },
+          { type: "text", text: " (Ctrl/Cmd+K edits it, Ctrl/Cmd+click opens it), " },
+          {
+            type: "text",
+            text: "red text",
+            marks: [{ type: "textColor", attrs: { color: "#c00000" } }],
+          },
+          { type: "text", text: " and a " },
+          {
+            type: "text",
+            text: "highlight",
+            marks: [{ type: "highlight", attrs: { color: "#fff59d" } }],
+          },
+          { type: "text", text: "." },
+        ],
+      },
+      {
+        type: "bulletList",
+        content: [
+          {
+            type: "listItem",
+            content: [
+              {
+                type: "paragraph",
+                content: [{ type: "text", text: "A bulleted list (Ctrl/Cmd+Shift+8)." }],
+              },
+            ],
+          },
+          {
+            type: "listItem",
+            content: [
+              {
+                type: "paragraph",
+                content: [{ type: "text", text: "Tab nests an item, Shift+Tab lifts it:" }],
+              },
+              {
+                type: "orderedList",
+                attrs: { start: 3 },
+                content: [
+                  {
+                    type: "listItem",
+                    content: [
+                      {
+                        type: "paragraph",
+                        content: [{ type: "text", text: "a numbered list (Ctrl/Cmd+Shift+7)" }],
+                      },
+                    ],
+                  },
+                  {
+                    type: "listItem",
+                    content: [
+                      {
+                        type: "paragraph",
+                        content: [{ type: "text", text: "starting at 3" }],
+                      },
+                    ],
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+      { type: "horizontalRule" },
+      {
+        type: "paragraph",
+        attrs: { align: "center" },
+        content: [{ type: "text", text: "Centered, after a horizontal rule." }],
+      },
+      {
+        type: "paragraph",
+        attrs: { align: "end" },
+        content: [{ type: "text", text: "Aligned to the end." }],
+      },
+      {
+        type: "paragraph",
+        attrs: { align: "justify" },
+        content: [
+          {
+            type: "text",
+            text: "Justified text spreads its words to fill every line but the last, so both edges of the paragraph line up, as in a printed book or a newspaper column.",
+          },
+        ],
+      },
+    ],
+  },
+};
 
 /**
  * The saved document (of any version: one saved by 0.2.0 is migrated), or the sample if there is
@@ -138,7 +152,7 @@ const sample = createDocument({
 function load(): EditorDocument {
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) return parseDocumentV3(JSON.parse(saved));
+    if (saved) return parseDocument(JSON.parse(saved));
   } catch (error) {
     console.warn("Ignoring the saved playground document:", error);
   }
@@ -191,7 +205,7 @@ export function App() {
     const editor = editorRef.current?.editor;
     if (!file || !editor) return;
     try {
-      editor.setDocument(parseDocumentV3(JSON.parse(await file.text())));
+      editor.setDocument(parseDocument(JSON.parse(await file.text())));
     } catch (error) {
       alert(`Could not open ${file.name}: ${error instanceof Error ? error.message : error}`);
       return;

@@ -1,7 +1,7 @@
 import {
   type Editor,
   type EditorDocument,
-  type FoliDocumentV3,
+  type FoliDocument,
   type Plugin,
   type Transaction,
   wordContext,
@@ -23,7 +23,7 @@ export interface FoliChange {
    * The whole document right after this change, serialized on first read (keep reads out of
    * the hot path of typing: a debounced save reads only the last change's). Schema v3.
    */
-  readonly document: FoliDocumentV3;
+  readonly document: FoliDocument;
 }
 
 export interface FoliEditorProps extends Omit<FoliCanvasProps, "editor"> {
@@ -76,13 +76,13 @@ export const FoliEditor = forwardRef<FoliEditorHandle, FoliEditorProps>(function
         const listener = onChangeRef.current;
         if (!listener || !transactions.some((tr) => tr.docChanged)) return;
         // The state is immutable: keeping it makes a later read give this change's document.
-        let document: FoliDocumentV3 | undefined;
+        let document: FoliDocument | undefined;
         listener({
           editor,
           transactions,
           get document() {
             document ??= {
-              ...(structuredClone(wordContext(state)?.envelope) as Omit<FoliDocumentV3, "content">),
+              ...(structuredClone(wordContext(state)?.envelope) as Omit<FoliDocument, "content">),
               content: state.doc.toJSON(),
             };
             return document;

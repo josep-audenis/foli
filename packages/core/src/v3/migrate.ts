@@ -1,9 +1,9 @@
-import type { FoliDocument } from "../document.js";
+import type { FoliDocumentV2 } from "../document.js";
 import type { MarkJSON, NodeJSON } from "../model/index.js";
 import type { BlockJSON, InlineJSON, MarkNameJSON } from "../schema.js";
 import type {
   AbstractNumberingJSON,
-  FoliDocumentV3,
+  FoliDocument,
   NumberingInstanceJSON,
   SectionJSON,
   StyleJSON,
@@ -25,7 +25,7 @@ import { mmToTwips } from "./units.js";
  * - `settings` becomes the section, in twips (rounded to the twip: under 0.02 mm).
  * The styles and numbering definitions the result references are added.
  */
-export function migrateToV3(doc: FoliDocument): FoliDocumentV3 {
+export function migrateToV3(doc: FoliDocumentV2): FoliDocument {
   const instances: NumberingInstanceJSON[] = [];
   const content = blocks(doc.content.content, { instances });
   return {
@@ -62,7 +62,7 @@ function twips(mm: number): number {
   return Math.min(mmToTwips(mm), 31_680);
 }
 
-function section(settings: FoliDocument["settings"]): SectionJSON {
+function section(settings: FoliDocumentV2["settings"]): SectionJSON {
   const { width, height } = settings.pageSize;
   const { top, right, bottom, left } = settings.margins;
   return {

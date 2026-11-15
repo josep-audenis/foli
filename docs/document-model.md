@@ -1,10 +1,10 @@
 # Document model
 
-> Status: envelope, schema v2 (with the v1 → v2 migration) and the document model (schema from
-> specs, immutable nodes, positions, slices, JSON in/out) are implemented in `@folijs/core`
-> (`packages/core/src/document.ts`, `packages/core/src/schema.ts`, `packages/core/src/model/`).
-> The view renders and edits all of v2 (0.2.0). Schema v3, the Word model, is defined and
-> validated beside it (`packages/core/src/v3/`, 8.3); the editor moves to it in 8.6–8.7. Steps, transactions, history and
+> Status: schema v3, the Word model (`packages/core/src/v3/`), is the current schema
+> (`SCHEMA_VERSION` 3): the editor and view edit it. Schema v2 (0.2.0, `packages/core/src/document.ts`,
+> `packages/core/src/schema.ts`) and v1 (0.1.0) are kept to read and migrate documents saved
+> with them, and v2 to read pasted HTML. The document model (schema from specs, immutable nodes,
+> positions, slices, JSON in/out) is `packages/core/src/model/`. Steps, transactions, history and
 > commands (Phase 3) are described in [architecture.md](architecture.md#editing-engine-folicore).
 
 ## Canonical form
@@ -13,14 +13,18 @@ A persisted Foli document is a versioned **envelope** around a JSON content tree
 
 ```ts
 interface FoliDocument {
-  schemaVersion: 2; // 1: documents saved by 0.1.0, migrated on load
-  settings: {
-    pageSize: { width: number; height: number }; // mm
-    margins: { top: number; right: number; bottom: number; left: number }; // mm
-  };
-  content: DocJSON; // root node of type "doc"
+  schemaVersion: 3; // 1 and 2: documents saved by 0.1.0 and 0.2.0, migrated on load
+  section: SectionJSON; // page setup, in twips
+  defaults: { paragraph?: ParagraphPropertiesJSON; run?: MarkJSON[] };
+  styles: StyleJSON[];
+  numbering: { abstracts: AbstractNumberingJSON[]; instances: NumberingInstanceJSON[] };
+  theme?: ThemeJSON;
+  comments: CommentJSON[];
+  content: NodeJSON; // root node of type "doc"
 }
 ```
+
+The parts are described under [Schema v3](#schema-v3-the-word-model).
 
 Rules:
 
@@ -54,7 +58,10 @@ Input may be loose; output is canonical, so equal documents serialize to identic
 
 `parseDocument` returns the normalized form; normalizing twice changes nothing (property-tested).
 
-## Schema v2
+## Schema v2 (0.2.0: read and migrated)
+
+The 0.2.0 format, kept to read documents saved with it (`FoliDocumentV2`, `parseContentV2`,
+`schemaV2`) and pasted HTML (read as v2, then fitted to the document).
 
 | Node             | Group  | Content                                       | Attrs                                                  |
 | ---------------- | ------ | --------------------------------------------- | ------------------------------------------------------ |
@@ -114,14 +121,12 @@ the next page, as a trailing hard break does; the next block follows it.
 The schema is defined in `packages/core/src/schema.ts` through the same spec API extensions
 will use.
 
-### Schema v3: the Word model (8.3, alongside v2)
+## Schema v3: the Word model
 
 [ADR-0005](decisions/ADR-0005-word-compatible-model.md)'s model, in
-`packages/core/src/v3/`: `schemaV3`, the envelope `FoliDocumentV3`, `parseDocumentV3` (also
-reads v1 and v2, validating then migrating them) and `migrateToV3`. The editor still runs on
-v2: rendering (8.6) and editing (8.7) move to v3, and then `SCHEMA_VERSION` becomes 3, v3's
-names lose their `V3` suffix and v2's types go. Until then v3 is a format and its validation,
-not something the view shows.
+`packages/core/src/v3/`: `schema`, the envelope `FoliDocument`, `parseDocument` (also reads v1
+and v2, validating then migrating them), `migrateToV3` and `createDocument`. It is the current
+schema (`SCHEMA_VERSION` 3, since 0.3.0): the editor and the view work on it.
 
 The shape follows Word, in Word's units (twips = 1/20 pt for geometry, indentation, spacing
 and tab stops; half-points for font sizes; eighths of a point for borders: `units.ts` converts),
@@ -169,7 +174,7 @@ properties may hold only the marks that describe how text looks (`RUN_PROPERTY_M
   picture bullets) are written back from the original package, which import keeps (8.4).
 
 ```ts
-interface FoliDocumentV3 {
+interface FoliDocument {
   schemaVersion: 3;
   section: SectionJSON; // page size, orientation, margins (twips), headers/footers by relationship id
   defaults: { paragraph?: ParagraphPropertiesJSON; run?: MarkJSON[] }; // w:docDefaults
@@ -181,7 +186,7 @@ interface FoliDocumentV3 {
 }
 ```
 
-**Validation** (`parseDocumentV3`) is the trust boundary: it accepts what Word opens and
+**Validation** (`parseDocument`) is the trust boundary: it accepts what Word opens and
 rejects only what the engine cannot work with. Accepted: duplicate ids (the first wins, as in
 Word), a numbering instance or a reply whose target is missing, references to styles that do
 not exist, empty authors and initials, a paragraph mark both inserted and deleted, `firstLine`
@@ -249,7 +254,7 @@ sample yet: start overrides, `restart`, legal levels, numbering styles, the numb
 indent precedence, run formatting, theme colors and fonts. Rendering (8.6b) compares pages
 with Word.
 
-### Schema v1 (0.1.0)
+## Schema v1 (0.1.0: read and migrated)
 
 v1 had `doc`, `paragraph` and `heading` (without `align`), `text`, `hardBreak`, `pageBreak` and
 the marks `bold`, `italic`, `underline`, `strike`. Every v1 document is a valid v2 document.
@@ -320,8 +325,8 @@ structurally compatible slices, and general fitting arrives with paste in Phase 
   incomplete content only in their open nodes.
 - `node.toJSON()`, `mark.toJSON()` and `slice.toJSON()` emit canonical JSON
   (`SliceJSON = { content, openStart, openEnd }`).
-- `parseContent(json)` parses current (v2) content into a `doc` node; `parseDocument`
-  migrates the envelope first, then uses it.
+- `parseContent(json)` parses schema v3 content into a `doc` node (`parseContentV2`: v2
+  content); `parseDocument` migrates an older envelope first, then validates.
 
 ### Testing
 
@@ -342,7 +347,9 @@ contradicts the numbers. Orientation is derived (`width > height` = landscape).
 
 ## Units
 
-Canonical unit: **millimetres** for all page geometry.
+Schema v3 stores Word's units (twips for geometry; [Schema v3](#schema-v3-the-word-model)).
+Page geometry outside the document (`editor.settings`, `PAGE_SIZES`, v2's `settings`) is in
+**millimetres**:
 
 | Target               | Conversion                                                                              |
 | -------------------- | --------------------------------------------------------------------------------------- |
@@ -358,15 +365,16 @@ Font sizes inside content use points (pt), matching word processors.
 
 `schemaVersion` is bumped whenever the envelope or the content schema changes (new types
 included: an older Foli cannot read them). `parseDocument` accepts every version from 1 to the
-current one: it runs the migrations `vN → vN+1` in order (`MIGRATIONS` in
-`packages/core/src/document.ts`), then validates against the current schema. A document from a
+current one: a v1 or v2 document is validated as v2 (v1 → v2 by `MIGRATIONS` in
+`packages/core/src/document.ts`), migrated to v3 (`migrateToV3`), then validated as v3. A document from a
 newer Foli is rejected with a message saying so; versions below 1 or not integers are invalid.
 Migrations never drop content. A published version never changes in place.
 
 | Version | Released in | Migration to the next                                                           |
 | ------- | ----------- | ------------------------------------------------------------------------------- |
 | 1       | 0.1.0       | v1 → v2: only the version changes (v2 only adds types and defaulted attributes) |
-| 2       | 0.2.0       | v2 → v3 (`migrateToV3`, 8.3): Word's model; becomes the current version in 8.7  |
+| 2       | 0.2.0       | v2 → v3 (`migrateToV3`, 8.3): Word's model                                      |
+| 3       | 0.3.0       | —                                                                               |
 
 0.1.0 reads only version 1: it rejects documents saved by 0.2.0 ("Unsupported schemaVersion: 2").
 Tests load a document exactly as 0.1.0 saved it (`document.test.ts`); in the browser, the

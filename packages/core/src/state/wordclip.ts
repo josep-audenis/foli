@@ -27,8 +27,8 @@ import {
   type NumberingInstanceJSON,
   type NumberingLevelJSON,
   type ParagraphPropertiesJSON,
-  parseContentV3,
-  parseDocumentV3,
+  parseContent,
+  parseDocument,
   type StyleJSON,
 } from "../v3/document.js";
 import { migrateToV3 } from "../v3/migrate.js";
@@ -181,7 +181,7 @@ export function fitPastedV2(
       else delete child.marks;
     }
   }
-  return { doc: parseContentV3(json), envelope: fitted.envelope };
+  return { doc: parseContent(json), envelope: fitted.envelope };
 }
 
 const equal = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
@@ -212,10 +212,10 @@ export function fitPaste(
   const target = context.envelope;
   // Taken as this document's own, but it cannot be told to be: no unsafe link comes in.
   if (definitions === undefined || definitions === null)
-    return fit(state, target, safeLinks(parseContentV3(content).toJSON()), true);
+    return fit(state, target, safeLinks(parseContent(content).toJSON()), true);
   const { document, styles, numbering, comments } = definitions as Partial<WordDefinitions>;
   // Validated as a document's envelope: types, ranges, no style based on itself.
-  const checked = parseDocumentV3({
+  const checked = parseDocument({
     schemaVersion: 3,
     section: target.section,
     defaults: {},
@@ -412,7 +412,7 @@ function fit(
     } as NodeJSON;
   };
 
-  const doc = parseContentV3(mapNode(json));
+  const doc = parseContent(mapNode(json));
   let comments = target.comments;
   const copiedComments = source.comments.filter((c) => commentIds.has(c.id));
   if (copiedComments.length) {

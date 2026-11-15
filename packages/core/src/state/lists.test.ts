@@ -1,6 +1,6 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
-import { createDocument } from "../document.js";
+import { createDocumentV2 } from "../document.js";
 import type { NodeJSON } from "../model/index.js";
 import type { DocJSON } from "../schema.js";
 import { createEditor, type Editor, listKindAt } from "./index.js";
@@ -12,7 +12,7 @@ const item = (...content: NodeJSON[]): NodeJSON => ({ type: "listItem", content 
 const ul = (...items: NodeJSON[]): NodeJSON => ({ type: "bulletList", content: items });
 
 const editorWith = (...blocks: NodeJSON[]): Editor =>
-  createEditor({ document: createDocument({ type: "doc", content: blocks } as DocJSON) });
+  createEditor({ document: createDocumentV2({ type: "doc", content: blocks } as DocJSON) });
 /** The list level of each paragraph (null: not numbered). */
 const levels = (editor: Editor) =>
   (editor.getDocument().content.content ?? []).map(

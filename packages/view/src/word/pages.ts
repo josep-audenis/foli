@@ -4,7 +4,7 @@
  * Word's spacing, keep rules, widow and orphan control and explicit breaks. Editing moves to
  * v3 in 8.7.
  */
-import type { FoliDocumentV3, SectionJSON } from "@folijs/core";
+import type { FoliDocument, SectionJSON } from "@folijs/core";
 import { type BlockBox, flow } from "../layout/flow.js";
 import {
   type BlockOptions,
@@ -181,8 +181,8 @@ function breakLines(element: HTMLElement, bottoms: readonly number[]): number[] 
  * content are not laid out yet (Phase 11); tables are shown from their verbatim XML until
  * Phase 10.
  */
-export function renderDocumentV3(
-  document: FoliDocumentV3,
+export function renderDocument(
+  document: FoliDocument,
   container: HTMLElement,
   options: Omit<BlockOptions, "lineRatio"> = {},
 ): DocumentPages {

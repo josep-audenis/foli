@@ -71,7 +71,7 @@ const color = {
     isColor(value) ? undefined : "color must be a lowercase #rrggbb value",
 };
 
-export const schema = new Schema({
+export const schemaV2 = new Schema({
   nodes: {
     doc: { content: "block+" },
     paragraph: { group: "block", content: "inline*", attrs: { align } },
