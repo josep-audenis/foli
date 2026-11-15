@@ -9,7 +9,7 @@ import {
   type ResolvedPos,
   Slice,
 } from "../model/index.js";
-import { isSafeHref } from "../schema.js";
+import { isSafeLink } from "../schema.js";
 import { attempt } from "./attempt.js";
 import { redo, undo } from "./history.js";
 import { openLinkEditor } from "./links.js";
@@ -452,7 +452,7 @@ export function toggleMark(type: string | MarkType, attrs?: Attrs | null): Comma
 /** The mark, or null when `attrs` are invalid for it (e.g. a link with an unsafe href). */
 function createMark(type: MarkType, attrs?: Attrs | null): Mark | null {
   // Schema v3 keeps any link target a file has (`file:`…); a command adds only safe ones.
-  if (type.name === "link" && !isSafeHref(attrs?.href)) return null;
+  if (type.name === "link" && !isSafeLink(attrs)) return null;
   try {
     return type.create(attrs);
   } catch (error) {

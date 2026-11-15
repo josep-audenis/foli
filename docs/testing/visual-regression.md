@@ -20,7 +20,7 @@ with Times New Roman. Foli itself ships no font.
 | `lists`               | Lists across pages (7.4): an item split at a line, a nested list across a break, a justified paragraph split, a rule, a centered heading |
 
 `openFixture(page, fixture)` stores the fixture as the playground document, reloads, serves
-the font (intercepted requests to `/__foli-test-font/`), applies it with `--foli-font-family`,
+the font (intercepted requests to `/__foli-test-font/`), applies it over Word's inline fonts (an `!important` rule),
 waits for the faces to load, and waits until the layout stops changing between frames.
 `pageBreaks(page)` lists each page's blocks (paragraphs, headings, rules, at any depth) as
 `[>…] <block>[.<fragment>] (<characters>) <start>`, with one `>` per list item around the

@@ -10,9 +10,6 @@
   --foli-border-color: #e2e2df;
   --foli-text-color: #1d1d1b;
   --foli-selection-color: rgb(35 103 220 / 0.22);
-  --foli-font-family: Georgia, "Times New Roman", serif;
-  --foli-font-size: 11pt;
-  --foli-line-height: 1.5;
   --foli-page-gap: 24px;
   --foli-toolbar-background: #ffffff;
   --foli-toolbar-color: #1d1d1b;
@@ -20,10 +17,6 @@
   --foli-toolbar-hover: #f0f0ee;
   --foli-focus-ring: #2367dc;
   --foli-error-color: #b3261e;
-  --foli-link-color: #1f5fbf;
-  --foli-marker-color: currentColor;
-  --foli-rule-color: #8c8c87;
-  --foli-rule-thickness: 1px;
 }
 
 .foli-canvas {
@@ -37,9 +30,6 @@
   background: var(--foli-page-background);
   box-shadow: var(--foli-page-shadow);
   color: var(--foli-text-color);
-  font-family: var(--foli-font-family);
-  font-size: var(--foli-font-size);
-  line-height: var(--foli-line-height);
 }
 
 .foli-page + .foli-page {
@@ -54,35 +44,7 @@
   background: var(--foli-selection-color);
 }
 
-/* Links and list markers in the document. */
-.foli-page a {
-  color: var(--foli-link-color);
-}
-
-.foli-page li::marker {
-  color: var(--foli-marker-color);
-}
-
-/*
- * A horizontal rule: a line in the middle of a taller box, so it is easy to click (a click
- * selects it). Drawn with a border, which prints (backgrounds may not).
- */
-.foli-page hr {
-  position: relative;
-  height: 12px;
-  margin: 6px 0;
-  border: 0;
-  overflow: visible;
-}
-
-.foli-page hr::after {
-  content: "";
-  position: absolute;
-  inset: 50% 0 auto;
-  border-top: var(--foli-rule-thickness) solid var(--foli-rule-color);
-}
-
-/* A node-selected block (a horizontal rule): the view adds the class. */
+/* A node-selected block (an opaque block, a table): the view adds the class. */
 .foli-content .foli-selected-node {
   outline: 2px solid var(--foli-focus-ring);
   outline-offset: 2px;

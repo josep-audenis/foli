@@ -131,8 +131,9 @@ Foli's own (see `THIRD_PARTY_NOTICES.md`).
     client rects) and leaves a selected one to the text beside it. Backspace and Delete next to
     one select it first; joining paragraphs never deletes it.
   - Links (7.6, `state/links.ts`): `setLink`, `removeLink`, `insertLink`, `linkAt`, with
-    `normalizeHref` before `isSafeHref` at every entry (command, dialog, paste, `toggleMark`); a
-    caret at a link's edge edits that link. Mod-K is `openLinkEditor`: core has no UI, so it
+    `normalizeHref` before `isSafeHref` at every entry (command, dialog, pasted URL); a link mark
+    from `toggleMark` or a paste from elsewhere must be safe as it is (`isSafeLink`: a safe href,
+    or a bookmark of the document without one). A caret at a link's edge edits that link. Mod-K is `openLinkEditor`: core has no UI, so it
     dispatches an empty transaction with `linkEditorRequest` metadata, and `FoliToolbar`
     (subscribed to the editor) opens its dialog. The link button runs the same command, so both
     paths meet.

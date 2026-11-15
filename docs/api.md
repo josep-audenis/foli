@@ -181,7 +181,8 @@ definitions (the Word 2013 to 2019 template's) the first time they are applied, 
 - Clipboard (the view uses these): `copiedDefinitions(context, content)` gives the styles,
   numbering and comments copied content references, with the document's id
   (`wordContext(state).id`, which tells a copy inside the document from one from another); `fitPaste(state, content, definitions?)`
-  validates pasted v3 content and definitions (none: the document's own) and returns
+  validates pasted v3 content and definitions (none: the document's own, but unsafe links are
+  dropped) and returns
   `{ doc, envelope }`, the content fitted to the document and its envelope with what it added;
   `fitPastedV2(state, content)` does the same for schema v2 content (pasted HTML). Apply the
   envelope with `withEnvelope(tr, envelope)`; `wordContext(state)` gives the current one.

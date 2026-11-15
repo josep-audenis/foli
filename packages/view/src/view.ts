@@ -1429,7 +1429,7 @@ export class EditorView {
         ? fitPastedV2(state, parseContent(found.content))
         : fitPaste(state, found.content, found.word),
     );
-    // One empty textblock: nothing to paste (a lone rule is something).
+    // One empty paragraph: nothing to paste (a lone opaque block is something).
     const only = pasted?.doc.childCount === 1 ? pasted.doc.firstChild : null;
     if (!pasted || (only?.isTextblock && !only.content.size)) return false;
     const { doc, open, envelope } = pasted;

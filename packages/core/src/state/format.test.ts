@@ -2,7 +2,21 @@ import { describe, expect, it } from "vitest";
 import { createDocument } from "../document.js";
 import type { NodeJSON } from "../model/index.js";
 import type { DocJSON } from "../schema.js";
-import { colorAt, createEditor, type Editor } from "./index.js";
+import { schemaV3 } from "../v3/index.js";
+import {
+  alignAt,
+  colorAt,
+  createEditor,
+  type Editor,
+  EditorState,
+  listKindAt,
+  setAlign,
+  setBlockType,
+  setHighlight,
+  setTextColor,
+  toggleList,
+  wrapInList,
+} from "./index.js";
 
 const t = (text: string, ...marks: object[]): NodeJSON =>
   (marks.length ? { type: "text", text, marks } : { type: "text", text }) as NodeJSON;
@@ -36,5 +50,25 @@ describe("text color and highlight", () => {
         content: [t("a"), t("x", { type: "color", attrs: { value: "C00000" } }), t("b")],
       },
     ]);
+  });
+});
+
+describe("on a state without a schema v3 envelope (no editor)", () => {
+  it("the list, format and block type commands do not apply", () => {
+    const doc = schemaV3.nodeFromJSON({ type: "doc", content: [p("ab")] });
+    const state = EditorState.create({ doc });
+    for (const command of [
+      toggleList("bulletList"),
+      wrapInList("orderedList"),
+      setAlign("center"),
+      setTextColor("#c00000"),
+      setHighlight("#ffff00"),
+      setBlockType("heading", { level: 1 }),
+      setBlockType("paragraph"),
+    ])
+      expect(command(state)).toBe(false);
+    expect(listKindAt(state)).toBeNull();
+    expect(alignAt(state)).toBeNull();
+    expect(colorAt(state, "textColor")).toBeNull();
   });
 });

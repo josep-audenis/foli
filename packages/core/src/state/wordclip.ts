@@ -20,7 +20,7 @@
  */
 import { DEFAULT_SETTINGS } from "../document.js";
 import type { MarkJSON, Node, NodeJSON } from "../model/index.js";
-import { type DocJSON, isSafeHref } from "../schema.js";
+import { type DocJSON, isSafeLink } from "../schema.js";
 import {
   type AbstractNumberingJSON,
   type CommentJSON,
@@ -187,9 +187,9 @@ export function fitPastedV2(
 const equal = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
 const PARAGRAPH_IDS = ["w14:paraId", "w14:textId"];
 
-/** `json` without the link marks whose target is not safe (the text stays). */
+/** `json` without the link marks that are not safe (`isSafeLink`; the text stays). */
 function safeLinks(json: NodeJSON): NodeJSON {
-  const marks = json.marks?.filter((m) => m.type !== "link" || isSafeHref(m.attrs?.href));
+  const marks = json.marks?.filter((m) => m.type !== "link" || isSafeLink(m.attrs));
   return {
     ...json,
     ...(marks && { marks }),
@@ -329,7 +329,7 @@ function fit(
   const runMarks = (marks: readonly MarkJSON[]) =>
     marks.flatMap((m) => {
       // A document keeps any link target its file has; another source gives only safe ones.
-      if (m.type === "link") return same || isSafeHref(m.attrs?.href) ? [m] : [];
+      if (m.type === "link") return same || isSafeLink(m.attrs) ? [m] : [];
       if (m.type !== "characterStyle") return [m];
       const id = mapStyle(String(m.attrs?.id));
       return id ? [{ ...m, attrs: { id } }] : [];

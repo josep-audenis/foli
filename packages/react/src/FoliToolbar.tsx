@@ -50,11 +50,7 @@ import {
 import { useEditorOrContext, useEditorState } from "./editor.js";
 
 export interface FoliToolbarProps {
-  /**
-   * Default: the editor of the nearest `FoliEditorProvider`. An editor of a schema v3 document
-   * (Word's model) gets Word's controls: paragraph style, font, size, line spacing, Word's
-   * highlight colors; no heading buttons or horizontal rule.
-   */
+  /** Default: the editor of the nearest `FoliEditorProvider`. */
   editor?: Editor | undefined;
   /**
    * Every button is disabled. Pass it whenever the canvas is `readOnly`: commands run through
@@ -83,8 +79,8 @@ interface Item {
   /** Whether the button shows as pressed (toggle buttons only). */
   pressed?: (state: EditorState, editor: Editor) => boolean;
   /**
-   * Whether the command can run now (default: always; in schema v1 every selection is in
-   * textblocks, which take every mark, block type and page break). A cheap check, not a dry
+   * Whether the command can run now (default: always; a paragraph takes every mark and a page
+   * break). A cheap check, not a dry
    * run: it runs after every transaction, and a dry run builds the whole transaction (for a
    * block type over a large selection, quadratic in the number of blocks).
    */

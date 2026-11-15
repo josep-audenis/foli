@@ -589,5 +589,11 @@ describe("links through toggleMark (PR #34 review)", () => {
     expect(editor.isMarkActive("link")).toBe(false);
     editor.select(2); // a caret: stored marks
     expect(editor.commands.toggleMark("link", { href: "data:x" })).toBe(false);
+    // A link to a bookmark of the document (no href) applies.
+    editor.select(1, 3);
+    expect(editor.commands.toggleMark("link", { anchor: "_Toc1" })).toBe(true);
+    expect(editor.commands.toggleMark("link", { anchor: "" })).toBe(true); // removes it
+    expect(editor.isMarkActive("link")).toBe(false);
+    expect(editor.commands.toggleMark("link", { anchor: "" })).toBe(false);
   });
 });

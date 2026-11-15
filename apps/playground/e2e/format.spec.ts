@@ -1,7 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, type Page, test } from "@playwright/test";
 
-/** Alignment, colors and horizontal rules (task 7.7). */
+/** Alignment and colors (task 7.7, on schema v3). */
 
 const MOD = "ControlOrMeta";
 const editor = (page: Page) => page.getByRole("textbox", { name: "Document" });

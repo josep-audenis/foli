@@ -701,9 +701,18 @@ Each task is a PR on `phase-8/word-model`, the build green after each.
       v2's types kept for migration only.
     - [ ] 8.7d4 Sections with their own page setups in the editable view.
 - [ ] 8.8 Close: docs, gate G5 numbers, 0.3.0 (changeset, version PR, publish after approval).
-  The changeset lists the React breaks: `FoliChange.document` and `useFoliEditor` are v3,
-  `useCurrentEditor` and `useEditorState` take `AnyEditor`, documents persist as v3 (0.2.0
-  cannot read them).
+  The changeset lists the breaks:
+  - Documents persist as v3 (0.2.0 cannot read them); `FoliChange.document`, `getDocument()` and
+    `useFoliEditor` are v3; `Editor` and `EditorOptions` are not generic (`createEditor` and
+    `setDocument` migrate any version); `EditorView` takes `Editor`.
+  - Lists: `toggleList(kind)` and `wrapInList(kind)` take no attrs; `splitListItem`,
+    `sinkListItem`, `liftListItem` and `liftListItemAtStart` are commands, not factories.
+  - Removed: `insertHorizontalRule` (and `commands.insertHorizontalRule`), `listTypeAt`, the
+    H1–H3 and rule buttons, the CSS variables `--foli-font-family`, `--foli-font-size`,
+    `--foli-line-height`, `--foli-link-color`, `--foli-marker-color`, `--foli-rule-color`,
+    `--foli-rule-thickness`.
+  - On a state without a v3 envelope, `setBlockType` and the list and format commands do not
+    apply; `toggleMark("link")` refuses an unsafe href.
 
 ## Phase 9 — Review: tracked changes & comments · XL → 0.4.0
 
