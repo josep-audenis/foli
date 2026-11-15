@@ -55,7 +55,7 @@ export interface Editor {
   readonly state: EditorState;
   /**
    * Page size and margins of the current document. For a schema v3 document, its last
-   * section's (shortcut: one page setup for every section until the view lays out sections).
+   * section's (the view lays each section out with its own).
    */
   readonly settings: DocumentSettings;
   dispatch(tr: Transaction): void;

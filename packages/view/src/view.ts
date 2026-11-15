@@ -99,29 +99,29 @@ let viewCount = 0;
 
 /**
  * Print rules for the page settings of the view whose host has `VIEW_ATTR` = `id`: one sheet of
- * the document's size per page, without margins (the page's padding holds them). A page is
- * exactly as tall as a sheet (the flow keeps content inside it; the exact height absorbs its
+ * its section's size per page (the last section's where named pages are not supported), without
+ * margins (the page's padding holds them). A page is exactly as tall as a sheet (the flow keeps content inside it; the exact height absorbs its
  * half-pixel slack), with no gap after it. Content taller than a page (a line taller than a
  * page) is not cut: it prints over the next sheet.
  * shortcut: `@page` is per document: with several editors of different page sizes on one web page, the last one's sheet size wins (each keeps its own page rules); print one editor per document until that is needed.
  */
-function printStyles({ pageSize }: DocumentSettings, sheets: readonly Sheet[], id: string): string {
-  const { width, height } = pageSize;
+function printStyles(settings: DocumentSettings, sheets: readonly Sheet[], id: string): string {
+  const { width, height } = settings.pageSize;
+  const last = sheetOf(settings, 0).css;
   const pages = `[${VIEW_ATTR}="${id}"]>.foli-page`;
   // Sections with other page setups: a named page each (engines without named pages print
   // every sheet at the last section's size).
-  const named =
-    sheets.length < 2
-      ? ""
-      : sheets
-          .map(({ settings: { pageSize: size }, index }) => {
-            const name = `foli-${id}-${index}`;
-            return (
-              `@page ${name}{size:${size.width}mm ${size.height}mm;margin:0}` +
-              `${pages}[${SHEET_ATTR}="${index}"]{page:${name};height:${size.height}mm!important}`
-            );
-          })
-          .join("");
+  const named = sheets.every((sheet) => sheet.css === last)
+    ? ""
+    : sheets
+        .map(({ settings: { pageSize: size }, index }) => {
+          const name = `foli-${id}-${index}`;
+          return (
+            `@page ${name}{size:${size.width}mm ${size.height}mm;margin:0}` +
+            `${pages}[${SHEET_ATTR}="${index}"]{page:${name};height:${size.height}mm!important}`
+          );
+        })
+        .join("");
   return (
     `@media print{@page{size:${width}mm ${height}mm;margin:0}` +
     `${pages}{height:${height}mm!important;margin-block:0!important;` +
@@ -188,7 +188,8 @@ function sectionLayouts(doc: ModelNode, last: SectionJSON): BlockLayout[] {
   sections.forEach(sheet);
   return sections.map((own, i) => {
     const next = sections[i + 1];
-    const ends = !!next && next !== own;
+    // By position, as `renderDocument`: two paragraphs may end sections with one object.
+    const ends = !!next && !!doc.child(i).attrs.section;
     const breakAfter = ends && !(next.type === "continuous" && sheet(next).css === sheet(own).css);
     return { sheet: sheet(own), breakAfter };
   });

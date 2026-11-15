@@ -505,7 +505,7 @@ The view moves the caret over a list number in one press: browsers stop before a
 non-editable number, the same model position, so Right at the end of the paragraph before and
 Left at a numbered paragraph's start step over the boundary themselves.
 
-Not yet in the editor: sections with other page setups (8.7d4), headers and footers, a final
+Not yet in the editor: editing page setups or inserting section breaks, headers and footers, a final
 (changes accepted) editing view, a horizontal rule button (a rule is a paragraph's bottom
 border). Links are drawn as `<a>` where `isSafeHref` takes the target (schema v3 keeps any),
 inheriting the run's own color and underline (Word shows a link without the Hyperlink style

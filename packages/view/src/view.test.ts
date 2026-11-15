@@ -1008,6 +1008,40 @@ describe("EditorView sections", () => {
     const styles = [...document.head.querySelectorAll("style[data-foli-print]")];
     const own = styles.map((s) => s.textContent ?? "").find((t) => t.includes(`="${single}"`));
     expect(own).not.toContain("@page foli-");
+    // One setup that is not the envelope's (the last paragraph ends a section): a named page.
+    const other = mountSections([para("a"), para("b", LANDSCAPE)]).host;
+    const otherId = other.getAttribute("data-foli-view");
+    const all = [...document.head.querySelectorAll("style[data-foli-print]")];
+    expect(all.map((s) => s.textContent ?? "").find((t) => t.includes(`="${otherId}"`))).toContain(
+      `@page foli-${otherId}-0{size:279.4mm 215.9mm;margin:0}`,
+    );
+  });
+
+  it("ends a section at each paragraph with a section, one object or not", () => {
+    tall();
+    expect(mountSections([para("a", PORTRAIT), para("b"), para("c", PORTRAIT)]).texts()).toEqual([
+      ["a"],
+      ["b", "c"],
+    ]);
+  });
+
+  it("lays a section out again when a section break is inserted", () => {
+    tall();
+    const { editor, texts } = mountSections(["a", "b", "c", "d"].map((t) => para(t)));
+    expect(texts()).toEqual([
+      ["a", "b"],
+      ["c", "d"],
+    ]);
+    let pos = 0;
+    editor.state.doc.forEach((node, offset) => {
+      if (node.textContent === "b") pos = offset;
+    });
+    const node = editor.state.doc.nodeAt(pos);
+    if (!node) throw new Error("no b");
+    editor.dispatch(
+      editor.state.tr.setNodeMarkup(pos, node.type, { ...node.attrs, section: LANDSCAPE }),
+    );
+    expect(texts()).toEqual([["a"], ["b"], ["c", "d"]]);
   });
 
   it("flows a section again when a section break after it changes", () => {
