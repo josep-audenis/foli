@@ -911,6 +911,125 @@ describe("EditorView pages", () => {
   });
 });
 
+describe("EditorView sections", () => {
+  /** jsdom lays nothing out: every block is 400px tall. */
+  function tall() {
+    return vi.spyOn(Element.prototype, "getBoundingClientRect").mockImplementation(function (
+      this: Element,
+    ) {
+      const height = this.parentElement?.classList.contains("foli-page") ? 400 : 0;
+      return { height, width: 0, top: 0, left: 0, bottom: height, right: 0 } as DOMRect;
+    });
+  }
+  afterEach(() => vi.restoreAllMocks());
+  const inch = { top: 1440, right: 1440, bottom: 1440, left: 1440 };
+  // Letter landscape with inch margins: a content box of 624px, one 400px block per page.
+  const LANDSCAPE = {
+    pageSize: { width: 15840, height: 12240, orientation: "landscape" as const },
+    margins: inch,
+  };
+  // Letter portrait (the envelope's): 864px, two blocks per page.
+  const PORTRAIT = { pageSize: { width: 12240, height: 15840 }, margins: inch };
+  const para = (text: string, section?: object) => ({
+    type: "paragraph",
+    ...(section ? { attrs: { section } } : {}),
+    content: [{ type: "text", text }],
+  });
+  function mountSections(blocks: object[], last: object = PORTRAIT) {
+    const host = document.createElement("div");
+    document.body.append(host);
+    const editor = createEditor({
+      document: { ...createDocument({ type: "doc", content: blocks as never }), section: last },
+    });
+    const view = new EditorView(host, editor);
+    views.push(view);
+    const pages = () => [...host.querySelectorAll<HTMLElement>(".foli-page")];
+    const texts = () => pages().map((page) => [...page.children].map((b) => b.textContent));
+    return { host, editor, pages, texts };
+  }
+
+  it("lays each section out on pages of its own setup, starting a new page", () => {
+    tall();
+    const { pages, texts } = mountSections([
+      para("a"),
+      para("b", LANDSCAPE),
+      para("c"),
+      para("d"),
+      para("e"),
+    ]);
+    expect(texts()).toEqual([["a"], ["b"], ["c", "d"], ["e"]]);
+    expect(pages().map((page) => page.style.width)).toEqual([
+      "279.4mm",
+      "279.4mm",
+      "215.9mm",
+      "215.9mm",
+    ]);
+    expect(pages().map((page) => page.style.minHeight)).toEqual([
+      "215.9mm",
+      "215.9mm",
+      "279.4mm",
+      "279.4mm",
+    ]);
+    expect(pages().map((page) => page.getAttribute("data-foli-sheet"))).toEqual([
+      "0",
+      "0",
+      "1",
+      "1",
+    ]);
+  });
+
+  it("starts a section on a new page unless it is continuous with the same setup", () => {
+    tall();
+    expect(mountSections([para("a", PORTRAIT), para("b")]).texts()).toEqual([["a"], ["b"]]);
+    const continuous = { ...PORTRAIT, type: "continuous" };
+    expect(mountSections([para("a", PORTRAIT), para("b")], continuous).texts()).toEqual([
+      ["a", "b"],
+    ]);
+    // Continuous with another setup: a new page all the same.
+    expect(mountSections([para("a", LANDSCAPE), para("b")], continuous).texts()).toEqual([
+      ["a"],
+      ["b"],
+    ]);
+  });
+
+  it("prints each section's pages on sheets of its size", () => {
+    tall();
+    const { host } = mountSections([para("a", LANDSCAPE), para("b")]);
+    const id = host.getAttribute("data-foli-view");
+    const css = document.head.querySelector("style[data-foli-print]")?.textContent ?? "";
+    // The last section's size by default, a named page per setup.
+    expect(css).toContain("@page{size:215.9mm 279.4mm;margin:0}");
+    expect(css).toContain(`@page foli-${id}-0{size:279.4mm 215.9mm;margin:0}`);
+    expect(css).toContain(
+      `[data-foli-view="${id}"]>.foli-page[data-foli-sheet="1"]{page:foli-${id}-1;height:279.4mm!important}`,
+    );
+    // One setup: no named pages.
+    const single = mountSections([para("a")]).host.getAttribute("data-foli-view");
+    const styles = [...document.head.querySelectorAll("style[data-foli-print]")];
+    const own = styles.map((s) => s.textContent ?? "").find((t) => t.includes(`="${single}"`));
+    expect(own).not.toContain("@page foli-");
+  });
+
+  it("flows a section again when a section break after it changes", () => {
+    tall();
+    const blocks = ["a", "b", "c", "d", "e"].map((t) => para(t));
+    const { editor, texts } = mountSections([...blocks, para("f", LANDSCAPE), para("g")]);
+    expect(texts()).toEqual([["a"], ["b"], ["c"], ["d"], ["e"], ["f"], ["g"]]);
+    // The break before "g" goes: one portrait section, two blocks per page. The blocks before
+    // "f" are unchanged nodes, laid out again all the same.
+    let pos = 0;
+    editor.state.doc.forEach((node, offset) => {
+      if (node.textContent === "f") pos = offset;
+    });
+    const node = editor.state.doc.nodeAt(pos);
+    if (!node) throw new Error("no f");
+    editor.dispatch(
+      editor.state.tr.setNodeMarkup(pos, node.type, { ...node.attrs, section: null }),
+    );
+    expect(texts()).toEqual([["a", "b"], ["c", "d"], ["e", "f"], ["g"]]);
+  });
+});
+
 describe("EditorView split blocks", () => {
   const paragraphs = (...texts: string[]): DocJSON => ({
     type: "doc",

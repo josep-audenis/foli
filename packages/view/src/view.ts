@@ -21,8 +21,10 @@ import {
   NodeSelection,
   parseContentV2,
   redo,
+  type SectionJSON,
   Selection,
   Slice,
+  sectionSettings,
   setLink,
   splitBlock,
   TextSelection,
@@ -103,13 +105,115 @@ let viewCount = 0;
  * page) is not cut: it prints over the next sheet.
  * shortcut: `@page` is per document: with several editors of different page sizes on one web page, the last one's sheet size wins (each keeps its own page rules); print one editor per document until that is needed.
  */
-function printStyles({ pageSize }: DocumentSettings, id: string): string {
+function printStyles({ pageSize }: DocumentSettings, sheets: readonly Sheet[], id: string): string {
   const { width, height } = pageSize;
   const pages = `[${VIEW_ATTR}="${id}"]>.foli-page`;
+  // Sections with other page setups: a named page each (engines without named pages print
+  // every sheet at the last section's size).
+  const named =
+    sheets.length < 2
+      ? ""
+      : sheets
+          .map(({ settings: { pageSize: size }, index }) => {
+            const name = `foli-${id}-${index}`;
+            return (
+              `@page ${name}{size:${size.width}mm ${size.height}mm;margin:0}` +
+              `${pages}[${SHEET_ATTR}="${index}"]{page:${name};height:${size.height}mm!important}`
+            );
+          })
+          .join("");
   return (
     `@media print{@page{size:${width}mm ${height}mm;margin:0}` +
     `${pages}{height:${height}mm!important;margin-block:0!important;` +
-    `break-after:page;break-inside:avoid}${pages}:last-child{break-after:auto}}`
+    `break-after:page;break-inside:avoid}${pages}:last-child{break-after:auto}${named}}`
+  );
+}
+
+/** The attribute naming a page's page setup (its index among the document's) for print. */
+const SHEET_ATTR = "data-foli-sheet";
+
+/** A page setup: its settings (mm), the page style it gives, its index among the document's. */
+interface Sheet {
+  readonly settings: DocumentSettings;
+  readonly css: string;
+  readonly index: number;
+}
+
+function sheetOf(settings: DocumentSettings, index: number): Sheet {
+  const { pageSize, margins } = settings;
+  const css =
+    `box-sizing: border-box; width: ${pageSize.width}mm; min-height: ${pageSize.height}mm; ` +
+    `padding: ${margins.top}mm ${margins.right}mm ${margins.bottom}mm ${margins.left}mm;`;
+  return { settings, css, index };
+}
+
+/** The style each page element was last given (its `cssText` reads back normalized). */
+const pageSheets = new WeakMap<HTMLElement, string>();
+
+/** A block's section: its page setup, and whether the next block starts a new page. */
+interface BlockLayout {
+  readonly sheet: Sheet;
+  readonly breakAfter: boolean;
+}
+
+/**
+ * The section of each top-level block (the section a paragraph's `section` ends; the
+ * envelope's for the blocks after the last such paragraph). A section starts a new page,
+ * unless it is continuous with the same page setup as the one before (shortcut: a continuous
+ * section with another page setup starts a new page; Word's even and odd page sections do not
+ * add a blank page), as `renderDocument` lays sections out.
+ */
+function sectionLayouts(doc: ModelNode, last: SectionJSON): BlockLayout[] {
+  const sheets = new Map<string, Sheet>();
+  const bySection = new Map<SectionJSON, Sheet>();
+  const sheet = (section: SectionJSON) => {
+    let found = bySection.get(section);
+    if (!found) {
+      const settings = sectionSettings(section);
+      const css = sheetOf(settings, 0).css;
+      found = sheets.get(css) ?? sheetOf(settings, sheets.size);
+      sheets.set(css, found);
+      bySection.set(section, found);
+    }
+    return found;
+  };
+  const sections: SectionJSON[] = [];
+  let section = last;
+  for (let i = doc.childCount - 1; i >= 0; i--) {
+    const own = doc.child(i).attrs.section as SectionJSON | null | undefined;
+    if (own) section = own;
+    sections[i] = section;
+  }
+  // Indexes in document order: the first page setup is 0.
+  sections.forEach(sheet);
+  return sections.map((own, i) => {
+    const next = sections[i + 1];
+    const ends = !!next && next !== own;
+    const breakAfter = ends && !(next.type === "continuous" && sheet(next).css === sheet(own).css);
+    return { sheet: sheet(own), breakAfter };
+  });
+}
+
+/**
+ * Initial pages (before a flow), moved where needed so that each page holds blocks of one
+ * page setup: a block is measured in a page of its own section's width.
+ */
+function separateSheets(
+  pages: readonly (readonly number[])[],
+  layout: readonly BlockLayout[],
+): number[][] {
+  const css: string[] = [];
+  let floor = 0;
+  return pages.map((list, i) =>
+    list.map((p) => {
+      const want = (layout[i] as BlockLayout).sheet.css;
+      let page = Math.max(p, floor);
+      // Only the last page used so far has a setup: the next one is free.
+      if (css[page] !== undefined && css[page] !== want) page++;
+      css[page] ??= want;
+      floor = page;
+      return page;
+    }),
   );
 }
 
@@ -140,7 +244,16 @@ export class EditorView {
   private owner = new Map<Node, BlockDesc>();
   /** The page elements, in order; the host's only children. */
   private pages: HTMLElement[] = [];
-  private pageStyle = "";
+  /** The page setup of each page (its section's), parallel to `pages`. */
+  private sheets: Sheet[] = [];
+  /** The page setups the print rules were written for. */
+  private printKey = "";
+  /**
+   * Each block's page setup and whether a section break follows it, as last rendered: a block
+   * whose layout changed (a section break inserted or removed around it) is measured and
+   * flowed again.
+   */
+  private layoutKeys = new WeakMap<ModelNode, string>();
   /** Marks the host for this view's print rules (`printStyles`). */
   private readonly id = String(++viewCount);
   /**
@@ -383,6 +496,14 @@ export class EditorView {
       this.invalidateLayout();
     }
     word.prepare(doc);
+    const layout = sectionLayouts(doc, context.envelope.section);
+    doc.forEach((node, _, i) => {
+      const { sheet, breakAfter } = layout[i] as BlockLayout;
+      const key = `${sheet.css}${breakAfter ? "|break" : ""}`;
+      const before = this.layoutKeys.get(node);
+      if (before !== undefined && before !== key) this.stale.add(node);
+      this.layoutKeys.set(node, key);
+    });
     const previous = new Map(
       this.blocks.filter((desc) => !this.dirty.has(desc)).map((desc) => [desc.node, desc]),
     );
@@ -412,18 +533,19 @@ export class EditorView {
     });
     for (const stale of previous.values())
       for (const fragment of stale.fragments) fragment.remove();
-    this.applyGeometry();
+    this.applyPrintStyles(layout);
     let last = 0;
     let pages = blocks.map((desc) => {
       const before = previousPages.get(desc);
       return desc.fragments.map((_, f) => (last = Math.max(last, before?.[f] ?? last)));
     });
-    this.place(blocks, pages);
+    pages = separateSheets(pages, layout);
+    this.place(blocks, pages, layout);
     if (!this.composing) {
       // DOM reads only for blocks without a valid measurement (new, changed or stale ones).
       let scale: number | undefined;
       const layoutPx = () => {
-        scale ??= layoutScale(this.pages[0] as HTMLElement, this.editor.settings);
+        scale ??= layoutScale(this.pages[0] as HTMLElement, (this.sheets[0] as Sheet).settings);
         return scale;
       };
       if (dropLines)
@@ -448,11 +570,10 @@ export class EditorView {
         found.lines ??= measureLines(desc, layoutPx());
         return found.lines;
       };
-      const pageHeight = contentHeight(this.editor.settings);
       const boxes = blocks.map((desc, i) =>
-        wordBox(blocks, i, measureOf(desc), () => lines(desc), pageHeight),
+        wordBox(blocks, i, measureOf(desc), () => lines(desc), layout[i] as BlockLayout),
       );
-      const result = flowFrom(boxes, pageHeight, WORD_RULES, reuse);
+      const result = flowFrom(boxes, contentHeight(this.editor.settings), WORD_RULES, reuse);
       this.flowed = { nodes, result };
       this.stale.clear();
       const flowed = result.fragments;
@@ -470,7 +591,7 @@ export class EditorView {
       });
       pages = flowed.map((fragments) => fragments.map((fragment) => fragment.page));
       applyGaps(blocks, pages, boxes);
-      this.place(blocks, pages);
+      this.place(blocks, pages, layout);
     }
     this.blocks = blocks;
     this.starts = starts;
@@ -502,16 +623,38 @@ export class EditorView {
 
   /**
    * Puts each fragment of each block into its page (pages are non-decreasing in document
-   * order), creating and removing pages as needed. Anything else in the host or a page (stray
-   * DOM) is removed.
+   * order), creating and removing pages as needed, and gives each page the page setup of its
+   * blocks' section (one per page: `separateSheets`, section breaks). Anything else in the host
+   * or a page (stray DOM) is removed.
    */
-  private place(blocks: readonly BlockDesc[], pages: readonly (readonly number[])[]): void {
+  private place(
+    blocks: readonly BlockDesc[],
+    pages: readonly (readonly number[])[],
+    layout: readonly BlockLayout[],
+  ): void {
     const { host } = this;
     const items = blocks.flatMap((desc, i) =>
       desc.fragments.map((dom, f) => ({ dom, page: pages[i]?.[f] ?? 0 })),
     );
     const count = (items[items.length - 1]?.page ?? 0) + 1;
+    const sheets: Sheet[] = [];
+    pages.forEach((list, i) => {
+      for (const p of list) sheets[p] ??= (layout[i] as BlockLayout).sheet;
+    });
+    // A page no block starts on (none yet) takes the setup of the page before it.
+    for (let p = 0; p < count; p++)
+      sheets[p] ??=
+        sheets[p - 1] ?? (layout[0] as BlockLayout | undefined)?.sheet ?? this.lastSheet();
+    this.sheets = sheets.slice(0, count);
     while (this.pages.length < count) this.pages.push(this.createPage());
+    this.sheets.forEach((sheet, p) => {
+      const page = this.pages[p] as HTMLElement;
+      const key = `${sheet.index} ${sheet.css}`;
+      if (pageSheets.get(page) === key) return;
+      pageSheets.set(page, key);
+      page.style.cssText = sheet.css;
+      page.setAttribute(SHEET_ATTR, String(sheet.index));
+    });
     // Pages first, in order; anything else in the host ends up after them.
     let cursor = host.firstChild;
     for (const page of this.pages.slice(0, count)) {
@@ -547,19 +690,20 @@ export class EditorView {
   private createPage(): HTMLElement {
     const page = this.host.ownerDocument.createElement("section");
     page.className = "foli-page";
-    page.style.cssText = this.pageStyle;
     return page;
   }
 
-  /** Page size and margins from the document settings, applied to every page when they change. */
-  private applyGeometry(): void {
-    const { pageSize, margins } = this.editor.settings;
-    const style =
-      `box-sizing: border-box; width: ${pageSize.width}mm; min-height: ${pageSize.height}mm; ` +
-      `padding: ${margins.top}mm ${margins.right}mm ${margins.bottom}mm ${margins.left}mm;`;
-    if (style === this.pageStyle) return;
-    this.pageStyle = style;
-    for (const page of this.pages) page.style.cssText = style;
+  /** The last section's page setup (the envelope's), for an empty document. */
+  private lastSheet(): Sheet {
+    return sheetOf(this.editor.settings, 0);
+  }
+
+  /** The print rules for the document's page setups, written when they change. */
+  private applyPrintStyles(layout: readonly BlockLayout[]): void {
+    const sheets = [...new Set(layout.map((block) => block.sheet))];
+    const key = [this.lastSheet(), ...sheets].map((sheet) => sheet.css).join("\n");
+    if (key === this.printKey) return;
+    this.printKey = key;
     // shortcut: written when the page settings change; a host moved to another document or shadow root keeps them where they were until then.
     for (const style of this.printStyles) style.remove();
     const doc = this.host.ownerDocument;
@@ -569,11 +713,10 @@ export class EditorView {
     this.printStyles = parents.map((parent) => {
       const style = doc.createElement("style");
       style.setAttribute("data-foli-print", "");
-      style.textContent = printStyles(this.editor.settings, this.id);
+      style.textContent = printStyles(this.editor.settings, sheets, this.id);
       parent.append(style);
       return style;
     });
-    this.invalidateLayout();
   }
 
   /** Forgets every measurement: the next flow measures the whole document again. */
@@ -618,7 +761,7 @@ export class EditorView {
       if (!desc || !measured || this.stale.has(desc.node)) continue;
       // A hidden host (display: none) reports every block as 0x0: nothing to re-flow.
       if (!entry.contentRect.width) continue;
-      scale ??= layoutScale(this.pages[0] as HTMLElement, this.editor.settings);
+      scale ??= layoutScale(this.pages[0] as HTMLElement, (this.sheets[0] as Sheet).settings);
       let height = 0;
       for (const fragment of desc.fragments) height += fragment.getBoundingClientRect().height;
       // A block is measured whole; each fragment of a split one keeps its padding and border,
@@ -1545,8 +1688,9 @@ function wordBox(
   i: number,
   measure: Measure,
   lines: () => Lines,
-  pageHeight: number,
+  layout: BlockLayout,
 ): BlockBox {
+  const pageHeight = contentHeight(layout.sheet.settings);
   const desc = blocks[i] as WordBlockDesc;
   const next = blocks[i + 1];
   const { before, after } = spacing(blocks[i - 1]?.word, desc.word, next?.word);
@@ -1562,6 +1706,7 @@ function wordBox(
     marginTop: before,
     marginBottom: after,
     keepWithNext: desc.word.keepNext,
+    pageHeight,
     lines: bottoms,
     breaksAfter: () => {
       // The line holding each break: the last one starting at or before it.
@@ -1571,7 +1716,7 @@ function wordBox(
         while (line > 0 && (starts[line] as number) > leaf.offset) line--;
         return line;
       });
-      if (next?.word.pageBreakBefore) breaks.push(bottoms().length - 1);
+      if (next?.word.pageBreakBefore || layout.breakAfter) breaks.push(bottoms().length - 1);
       return breaks;
     },
   };

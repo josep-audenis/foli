@@ -257,12 +257,12 @@ const view = new EditorView(host, editor, { editable: true, placeholder: "" });
 ```
 
 - Makes `host` a `contenteditable` textbox (`role="textbox"`, `aria-multiline`) and renders the
-  editor's state into it as `section.foli-page` elements sized from the document settings.
+  editor's state into it as `section.foli-page` elements sized from their section's page setup.
   Removes the host's children. Give the host an accessible name yourself.
 - An editor holding a schema v3 document is shown as Word formats it (the blocks of
   `renderDocument`, list numbers, tracked changes as markup, opaque content shown and not
-  editable) and laid out with Word's paragraph spacing and keep rules, on its last section's
-  page. Copy writes the HTML as Word formats it (resolved formatting inline, headings, list
+  editable) and laid out with Word's paragraph spacing and keep rules, each section on pages
+  of its own setup (a section starts a new page unless it is continuous with the same setup). Copy writes the HTML as Word formats it (resolved formatting inline, headings, list
   numbers Word reads back) and Foli JSON with the styles, numbering and comments the content
   uses; paste fits Foli JSON, HTML and text to the document (`fitPaste`, `fitPastedV2`: its own
   styles by name, others added, lists of another document as lists of their own, comments

@@ -89,8 +89,8 @@ two elements: its padding and border repeat on each part. Avoid negative margins
 
 ## Print
 
-The view adds print rules for each editor: one sheet per page at the document's page size, no
-gap. The stylesheet removes the canvas padding, page shadows and toolbar in print.
+The view adds print rules for each editor: one sheet per page at its section's page size
+(named pages; an engine without them prints every sheet at the last section's size), no gap. The stylesheet removes the canvas padding, page shadows and toolbar in print.
 
 Everything else on your web page prints too, and anything before the pages adds sheets. Hide
 it:

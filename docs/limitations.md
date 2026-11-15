@@ -31,8 +31,9 @@ checklist in [testing/ime.md](testing/ime.md)):
   everything else Word has (tables, fields, content controls...) is kept as opaque content,
   selected and deleted whole. Documents saved by 0.1.0 and 0.2.0 are migrated when loaded.
   No tracked changes or comments editing (Phase 9), no tables or images editing (Phase 10), no
-  headers, footers or page numbers (Phase 11); sections with other page setups show the last
-  one's page (8.7d4).
+  headers, footers or page numbers (Phase 11). Sections are laid out with their own page
+  setups; a continuous section with another page setup starts a new page, and an even or odd
+  page section gets no blank page before it. The page setup itself is not editable yet.
 - No horizontal rule button (Word's rule is a paragraph's bottom border, kept and shown).
 - On Android, Backspace at a list paragraph's start may join it into the paragraph before
   instead of removing its number (untested on a device).

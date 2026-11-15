@@ -452,8 +452,13 @@ when they change (`key`), not only when its node does. What is shown but is not 
 (`contenteditable="false"`: list numbers, opaque content) is skipped by the read-back. The flow
 uses Word's spacing (`spacing: "word"`, contextual spacing between paragraphs of one style,
 keep with next, keep lines together, page break before); the space above each block is written
-as its top margin after the flow (none at the top of a page the text flowed onto). The page is
-the last section's (`editor.settings`). Fonts' line height ratios are measured once per family
+as its top margin after the flow (none at the top of a page the text flowed onto). Each block
+belongs to a section (the one a paragraph's `section` ends, else the envelope's): its pages get
+that section's size and margins, its box the section's page height (`BlockBox.pageHeight`), and a
+section end breaks the page unless the next section is continuous with the same setup (as
+`renderDocument` does). Before a flow, blocks are placed so that a page holds one section's
+blocks, so each is measured in its own page's width; a block whose section or break changed is
+measured and flowed again. Print gives each page setup a named `@page`. Fonts' line height ratios are measured once per family
 outside the host and measured again after web fonts load (every block is drawn again).
 
 Copy from a v3 document: plain text has tabs as tabs, opaque content as its text (a table's

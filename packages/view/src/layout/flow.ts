@@ -20,6 +20,12 @@ export interface BlockBox {
   breaksAfter?(): readonly number[];
   /** Height shown again at the top of each fragment after the first (a table's header rows). */
   repeat?: number;
+  /**
+   * Content height of the pages this block goes on, when not the flow's (a section's page). A
+   * block with another page height than the one before it must start a page (an explicit
+   * break before it): a page has one height.
+   */
+  pageHeight?: number;
 }
 
 /** The lines `[fromLine, toLine)` of a block, placed on one page (`toLine` Infinity: to the end). */
@@ -122,7 +128,7 @@ export interface Reuse {
  */
 export function flowFrom(
   boxes: readonly BlockBox[],
-  pageHeight: number,
+  flowHeight: number,
   rules: FlowRules = DEFAULT_RULES,
   reuse?: Reuse,
 ): FlowResult {
@@ -146,6 +152,7 @@ export function flowFrom(
   };
 
   const place = (box: BlockBox, index: number): Fragment[] => {
+    const pageHeight = box.pageHeight ?? flowHeight;
     if ((state.breakPending || breakBefore.has(index)) && state.onPage) newPage(state.breakPending);
     state.breakPending = false;
     const above = state.previousMargin;

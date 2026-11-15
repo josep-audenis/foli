@@ -703,7 +703,9 @@ Each task is a PR on `phase-8/word-model`, the build green after each.
       styles and lists, a twips section merged over A4); v2 exports only `FoliDocumentV2` and
       `parseContentV2` (old documents and pasted HTML); `parseDocument` says when a newer Foli
       saved a document.
-    - [ ] 8.7d4 Sections with their own page setups in the editable view.
+    - [ ] 8.7d4 Sections with their own page setups in the editable view: each section's pages
+      have its size and margins and its blocks are measured and split in its width; a section
+      starts a new page unless continuous with the same setup; a named print page per setup.
 - [ ] 8.8 Close: docs, gate G5 numbers, 0.3.0 (changeset, version PR, publish after approval).
   The changeset lists the breaks:
   - Documents persist as v3 (0.2.0 cannot read them); `FoliChange.document`, `getDocument()` and
