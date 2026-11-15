@@ -603,6 +603,10 @@ describe("v2 → v3 migration", () => {
       margins: { top: 1134, right: 1440, bottom: 1134, left: 1440 },
     });
     expect(migrated.defaults.run?.map((m) => m.type)).toEqual(["font", "fontSize"]);
+    // The default stylesheet's 1.5 lines and 1em between paragraphs.
+    expect(migrated.defaults.paragraph).toEqual({
+      spacing: { after: 220, line: 360, lineRule: "auto" },
+    });
     expect(migrated.styles.map((s) => s.id)).toEqual([
       "Normal",
       "Heading1",

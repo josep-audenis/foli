@@ -352,3 +352,50 @@ test("T5 on v3: a selection across the page break is replaced and undone exactly
   expect(await content(page)).toEqual(original);
   expect(await selection(page)).toEqual(before);
 });
+
+/** A table Foli keeps opaque: a block leaf, selected whole. */
+const table: Json = {
+  type: "opaqueBlock",
+  attrs: { xml: "<w:tbl><w:tr><w:tc><w:p><w:r><w:t>cell</w:t></w:r></w:p></w:tc></w:tr></w:tbl>" },
+};
+const selected = (page: Page) => editor(page).locator(".foli-selected-node");
+
+test("an opaque block: the arrows select it and go past it, a click selects it, typing replaces it", async ({
+  page,
+}) => {
+  await open(page, [paragraph(text("first")), table, paragraph(text("second"))]);
+  await page.keyboard.press(`${MOD}+End`);
+  // Up from the first line of the text after it selects it; Up again goes past it.
+  await page.keyboard.press("ArrowUp");
+  await expect(selected(page)).toHaveText("cell");
+  await page.keyboard.press("ArrowUp");
+  await expect(selected(page)).toHaveCount(0);
+  await page.keyboard.press("End");
+  await page.keyboard.type("!");
+  // Down from the last line before it, and on into the text after it.
+  await page.keyboard.press("ArrowDown");
+  await expect(selected(page)).toHaveText("cell");
+  await page.keyboard.press("ArrowDown");
+  await page.keyboard.press("Home");
+  await page.keyboard.type(">");
+  expect(await content(page)).toEqual([
+    paragraph(text("first!")),
+    table,
+    paragraph(text(">second")),
+  ]);
+  // Left from the start of the text after it, Right back.
+  await page.keyboard.press("Home");
+  await page.keyboard.press("ArrowLeft");
+  await expect(selected(page)).toHaveText("cell");
+  await page.keyboard.press("ArrowRight");
+  await expect(selected(page)).toHaveCount(0);
+  // A click on it selects it; typing replaces it with the text.
+  await editor(page).getByText("cell").click();
+  await expect(selected(page)).toHaveText("cell");
+  await page.keyboard.type("x");
+  expect(await content(page)).toEqual([
+    paragraph(text("first!")),
+    paragraph(text("x")),
+    paragraph(text(">second")),
+  ]);
+});

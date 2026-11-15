@@ -1,7 +1,10 @@
 import { expect, type Page, test } from "@playwright/test";
 import { FIXTURES, openFixture } from "./fixtures.js";
 
-/** Nested blocks on pages (task 7.3, ADR-0004): lists, list items, a rule, a link. */
+/**
+ * Lists on pages, in Word's model (8.7d1): a 0.2.0 document's nested lists migrate to numbered
+ * paragraphs (Word's numbering), which number on across pages; list editing with the keys.
+ */
 
 const STORAGE_KEY = "foli-playground-document";
 const editor = (page: Page) => page.getByRole("textbox", { name: "Document" });
@@ -59,33 +62,55 @@ async function openDoc(page: Page, blocks: unknown[]): Promise<void> {
   await expect(editor(page).locator(".foli-page").first()).toBeVisible();
 }
 
-/** Per page: its leaf blocks (text, bottom, margin) and its content box bottom, in viewport px. */
+/**
+ * Per page: its blocks (text without the list number, bottom), its numbered paragraphs (the
+ * number shown and the text), and its content box bottom, in viewport px.
+ */
 function pageBlocks(page: Page) {
   return page.evaluate((contentHeight) => {
+    /** A block's text without what is shown but not text (its list number). */
+    const own = (el: Element) => {
+      const copy = el.cloneNode(true) as Element;
+      for (const shown of copy.querySelectorAll("[contenteditable=false]")) shown.remove();
+      return copy.textContent ?? "";
+    };
     return [...document.querySelectorAll(".foli-content > .foli-page")].map((section) => {
       const rect = section.getBoundingClientRect();
       const top = rect.top + Number.parseFloat(getComputedStyle(section).paddingTop);
+      const blocks = [...section.children];
       return {
         contentBottom: top + contentHeight,
         top,
-        blocks: [...section.querySelectorAll("p, h1, h2, h3, h4, h5, h6, hr")].map((el) => ({
-          text: el.textContent ?? "",
-          tag: el.tagName,
-          top: el.getBoundingClientRect().top,
+        blocks: blocks.map((el) => ({
+          text: own(el),
           bottom: el.getBoundingClientRect().bottom,
           marginBottom: Number.parseFloat(getComputedStyle(el).marginBottom),
         })),
-        items: [...section.querySelectorAll("ol > li")].map((li) => ({
-          value: li.getAttribute("value"),
-          marker: getComputedStyle(li).listStyleType,
-          text: li.querySelector("p")?.textContent ?? "",
-        })),
+        items: blocks.flatMap((el) => {
+          const marker = el.querySelector(":scope > [contenteditable=false]");
+          return marker ? [{ marker: (marker.textContent ?? "").trim(), text: own(el) }] : [];
+        }),
       };
     });
   }, CONTENT_HEIGHT);
 }
 
-test("a list across pages: every page holds its own list, numbering continues, nothing overflows", async ({
+/** Each saved paragraph as `level:text` (level "-" when not numbered). Saving is debounced. */
+async function levels(page: Page): Promise<string[]> {
+  const raw = await page.evaluate((key) => localStorage.getItem(key) ?? "", STORAGE_KEY);
+  if (!raw) return [];
+  const blocks: {
+    attrs?: { numbering?: { id?: number; level?: number } | null };
+    content?: { text?: string }[];
+  }[] = JSON.parse(raw).content.content;
+  return blocks.map((b) => {
+    const n = b.attrs?.numbering;
+    const text = (b.content ?? []).map((i) => i.text ?? "").join("");
+    return `${n?.id ? (n.level ?? 0) : "-"}:${text}`;
+  });
+}
+
+test("a list across pages: numbering goes on from page to page, nothing overflows", async ({
   page,
 }) => {
   await openDoc(page, longList);
@@ -100,136 +125,123 @@ test("a list across pages: every page holds its own list, numbering continues, n
     }
   }
   // Numbers follow the items across pages: item k (from 0) shows start + k.
-  const numbered = pages.flatMap((p) => p.items).filter((it) => it.text.startsWith("Item "));
+  const items = pages.flatMap((p) => p.items);
+  const numbered = items.filter((it) => it.text.startsWith("Item "));
+  expect(numbered).toHaveLength(70);
   for (const it of numbered) {
     const k = Number(/^Item (\d+)/.exec(it.text)?.[1]) - 1;
-    expect(it.value, it.text.slice(0, 12)).toBe(String(5 + k));
+    expect(it.marker, it.text.slice(0, 12)).toBe(`${5 + k}.`);
   }
-  // The second page starts inside the list: its first block is in an <ol>.
-  const secondFirst = await page.evaluate(() => {
-    const second = document.querySelectorAll(".foli-content > .foli-page")[1];
-    return second?.firstElementChild?.tagName;
-  });
-  expect(secondFirst).toBe("OL");
-  // The nested list is a real nested list inside its item.
-  await expect(
-    editor(page).locator("ol > li > ul > li > p", { hasText: "nested two" }),
-  ).toHaveCount(1);
+  // The second page starts inside the list.
+  expect(pages[1]?.items[0]?.text).toBe(pages[1]?.blocks[0]?.text);
+  // The nested list is a list of its own one level down: bullets.
+  expect(items.filter((it) => it.text.startsWith("nested")).map((it) => it.marker)).toEqual([
+    "\u25e6",
+    "\u25e6",
+  ]);
 });
 
 test("typing in a list item on the second page edits that item", async ({ page }) => {
   await openDoc(page, longList);
-  const target = editor(page).locator(".foli-page").nth(1).locator("ol > li > p").first();
-  const before = (await target.textContent()) ?? "";
-  await target.click();
+  const second = (await pageBlocks(page))[1];
+  const before = second?.items[0]?.text ?? "";
+  expect(before).toMatch(/^Item /);
+  await editor(page).locator(".foli-page").nth(1).getByText(before).click();
   await page.keyboard.press("End");
   await page.keyboard.type("!");
-  await expect(target).toHaveText(`${before}!`);
+  await expect.poll(async () => (await pageBlocks(page))[1]?.items[0]?.text).toBe(`${before}!`);
   // Saved: the same item holds the new text.
   await expect
     .poll(() => page.evaluate((key) => localStorage.getItem(key) ?? "", STORAGE_KEY))
     .toContain(`${before}!`);
 });
 
-test("a click on a rule selects it; a click on a link does not navigate", async ({ page }) => {
+test("a click on a link does not navigate", async ({ page }) => {
   await openDoc(page, longList);
-  const hr = editor(page).locator("hr");
-  await hr.scrollIntoViewIfNeeded();
-  await hr.click();
-  await expect(hr).toHaveClass(/foli-selected-node/);
+  const link = editor(page).getByRole("link", { name: "a link" });
+  await link.scrollIntoViewIfNeeded();
   const url = page.url();
-  await editor(page).getByText("a link").click();
-  await expect(hr).not.toHaveClass(/foli-selected-node/);
+  await link.click();
   expect(page.url()).toBe(url);
 });
 
-test("an item split across pages shows its marker once; a split justified paragraph stays justified", async ({
+test("an item split across pages shows its number once; a split justified paragraph stays justified", async ({
   page,
 }) => {
   const fixture = FIXTURES.find((f) => f.name === "lists");
   if (!fixture) throw new Error("no lists fixture");
   await openFixture(page, fixture);
   const styles = await page.evaluate(() => {
-    const split = [...document.querySelectorAll('.foli-page li > p[data-fragment="1"]')];
-    const firsts = [...document.querySelectorAll('.foli-page li > p[data-fragment="0"]')];
-    const justified = [...document.querySelectorAll(".foli-page > p[data-fragment]")];
-    const marker = (p: Element) => getComputedStyle(p.parentElement as Element).listStyleType;
+    const fragments = [...document.querySelectorAll(".foli-page > p[data-fragment]")];
+    const marker = (p: Element) => p.querySelector(":scope > [contenteditable=false]") !== null;
+    const numbered = fragments.filter((p) => p.getAttribute("data-fragment") === "0" && marker(p));
+    const justified = fragments.filter((p) => getComputedStyle(p).textAlign === "justify");
     return {
-      continued: split.map(marker),
-      started: firsts.map(marker),
+      // Whether each continued fragment (on a later page) shows a number.
+      continued: fragments.filter((p) => p.getAttribute("data-fragment") !== "0").map(marker),
+      started: numbered.length,
       alignLast: justified.map((p) => getComputedStyle(p).textAlignLast),
     };
   });
+  expect(styles.started).toBeGreaterThan(0);
   expect(styles.continued.length).toBeGreaterThan(0);
-  expect(styles.started.length).toBeGreaterThan(0);
+  expect(styles.continued.every((shown) => !shown)).toBe(true);
   expect(styles.alignLast.length).toBeGreaterThanOrEqual(2); // the paragraph is split
-  expect(styles.continued.every((type) => type === "none")).toBe(true);
-  expect(styles.started.every((type) => type === "decimal")).toBe(true);
   // Every fragment but the last justifies its last line.
   expect(styles.alignLast.slice(0, -1).every((value) => value === "justify")).toBe(true);
   expect(styles.alignLast.at(-1)).not.toBe("justify");
 });
 
-/** The document's structure as compact text: lists as `ul[…]`/`ol[…]`, items as `li[…]`. */
-function shape(page: Page): Promise<string> {
-  return editor(page).evaluate((host) => {
-    const walk = (el: Element): string => {
-      const tag = el.tagName.toLowerCase();
-      if (tag === "p" || /^h\d$/.test(tag)) return JSON.stringify(el.textContent ?? "");
-      return `${tag}[${[...el.children].map(walk).join(",")}]`;
-    };
-    // Pages are one document: join the top-level blocks of every page.
-    return [...host.querySelectorAll(":scope > .foli-page > *")].map(walk).join(",");
-  });
-}
-
-test("list editing with the keyboard, then undo back to the start", async ({ page }) => {
+test("list editing with the keyboard, as in Word, then undo back to the start", async ({
+  page,
+}) => {
   await openDoc(page, [p("start")]);
   await editor(page).getByText("start").click();
   await page.keyboard.press("End");
   await page.keyboard.press("ControlOrMeta+Shift+Digit8");
-  expect(await shape(page)).toBe('ul[li["start"]]');
+  await expect.poll(() => levels(page)).toEqual(["0:start"]);
+  // Tab at the start of a list paragraph goes a level deeper.
   await page.keyboard.press("Enter");
-  await page.keyboard.type("two");
   await page.keyboard.press("Tab");
-  expect(await shape(page)).toBe('ul[li["start",ul[li["two"]]]]');
+  await page.keyboard.type("two");
+  await expect.poll(() => levels(page)).toEqual(["0:start", "1:two"]);
   await page.keyboard.press("Enter");
-  await page.keyboard.type("three");
   await page.keyboard.press("Shift+Tab");
-  expect(await shape(page)).toBe('ul[li["start",ul[li["two"]]],li["three"]]');
+  await page.keyboard.type("three");
+  await expect.poll(() => levels(page)).toEqual(["0:start", "1:two", "0:three"]);
+  // Enter on an empty item at the top level ends the list.
   await page.keyboard.press("Enter");
-  await page.keyboard.press("Enter"); // on the empty item: leaves the list
+  await page.keyboard.press("Enter");
   await page.keyboard.type("after");
-  expect(await shape(page)).toBe('ul[li["start",ul[li["two"]]],li["three"]],"after"');
+  await expect.poll(() => levels(page)).toEqual(["0:start", "1:two", "0:three", "-:after"]);
+  // Backspace at the start of "three" takes its number away.
   await page.keyboard.press("ArrowUp");
   await page.keyboard.press("Home");
-  await page.keyboard.press("Backspace"); // at the start of "three": lifts it out of the list
-  expect(await shape(page)).toBe('ul[li["start",ul[li["two"]]]],"three","after"');
+  await page.keyboard.press("Backspace");
+  await expect.poll(() => levels(page)).toEqual(["0:start", "1:two", "-:three", "-:after"]);
   for (let i = 0; i < 30; i++) await page.keyboard.press("ControlOrMeta+z");
-  expect(await shape(page)).toBe('"start"');
+  await expect.poll(() => levels(page)).toEqual(["-:start"]);
 });
 
-test("the toolbar makes a numbered list; Tab outside a list leaves the editor", async ({
+test("the toolbar makes a numbered list; Escape then Shift+Tab leaves the editor", async ({
   page,
 }) => {
   await openDoc(page, [p("one"), p("two")]);
   await editor(page).getByText("one").click();
   await page.keyboard.press("ControlOrMeta+a");
-  await page.getByRole("button", { name: "Numbered list" }).click();
-  expect(await shape(page)).toBe('ol[li["one","two"]]');
-  await expect(page.getByRole("button", { name: "Numbered list" })).toHaveAttribute(
-    "aria-pressed",
-    "true",
-  );
-  await page.getByRole("button", { name: "Numbered list" }).click();
-  expect(await shape(page)).toBe('"one","two"');
-  // Outside a list, Tab and Shift+Tab are the browser's: Shift+Tab goes back to the toolbar
-  // (Tab would go on to whatever follows the editor; the playground has nothing after it).
+  const numbered = page.getByRole("button", { name: "Numbered list" });
+  await numbered.click();
+  await expect.poll(() => levels(page)).toEqual(["0:one", "0:two"]);
+  await expect(numbered).toHaveAttribute("aria-pressed", "true");
+  await numbered.click();
+  await expect.poll(() => levels(page)).toEqual(["-:one", "-:two"]);
+  // Tab types a tab (as in Word); after Escape, Shift+Tab goes back to the toolbar.
   await editor(page).getByText("two").click();
+  await page.keyboard.press("Escape");
   await page.keyboard.press("Shift+Tab");
   await expect(editor(page)).not.toBeFocused();
   await expect
     .poll(() => page.evaluate(() => document.activeElement?.closest('[role="toolbar"]') !== null))
     .toBe(true);
-  expect(await shape(page)).toBe('"one","two"');
+  await expect.poll(() => levels(page)).toEqual(["-:one", "-:two"]);
 });

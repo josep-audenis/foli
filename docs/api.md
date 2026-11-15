@@ -17,11 +17,13 @@ Peer dependencies: `react` and `react-dom` 18.2+ or 19. Stylesheet: `@folijs/rea
 ### `<FoliEditor>`
 
 An editable document on pages, with a toolbar. Creates its own editor and provides it to its
-`children`. Uncontrolled: the editor owns the document.
+`children`. Uncontrolled: the editor owns the document. Since 8.7d1 it edits schema v3 (Word's
+model, with Word's toolbar): a 0.1.0 or 0.2.0 document given to it is migrated
+(`parseDocumentV3`), and what it reports is v3.
 
 | Prop             | Type                           | Default      | Notes                                                                                             |
 | ---------------- | ------------------------------ | ------------ | ------------------------------------------------------------------------------------------------- |
-| `initialContent` | `FoliDocument`                 | empty A4     | Read once, on mount. Later: `editor.setDocument()` or a new `key`.                                |
+| `initialContent` | `EditorDocument`               | empty A4     | Read once, on mount; any version (migrated). Later: `editor.setDocument()` or a new `key`.        |
 | `plugins`        | `readonly Plugin[]`            | `[]`         | Read once, on mount. Unstable API.                                                                |
 | `onChange`       | `(change: FoliChange) => void` | —            | After every content change made through transactions. Not for selection changes or `setDocument`. |
 | `toolbar`        | `boolean`                      | `true`       | Show `FoliToolbar` above the pages.                                                               |
@@ -31,17 +33,18 @@ An editable document on pages, with a toolbar. Creates its own editor and provid
 | `className`      | `string`                       | —            | Added to the `.foli-canvas` element.                                                              |
 | `children`       | `ReactNode`                    | —            | Rendered between the toolbar and the pages, inside the editor's context.                          |
 
-`ref` → `FoliEditorHandle`: `{ editor: Editor; focus(): void }`.
+`ref` → `FoliEditorHandle`: `{ editor: Editor<FoliDocumentV3>; focus(): void }`
+(`editor.setDocument` takes a v3 document: `parseDocumentV3` migrates an older one).
 
 `FoliChange`:
 
-- `editor: Editor`
+- `editor: Editor<FoliDocumentV3>`
 - `transactions: readonly Transaction[]`: this change's transactions (several when plugins
   append their own).
-- `document: FoliDocument`: the document right after this change, serialized on first read.
-  Read it when you save, not on every change. Save `change.document`, never `change`:
-  `JSON.stringify(change)` gives `{ editor, transactions, document }`, which `parseDocument`
-  rejects.
+- `document: FoliDocumentV3`: the document right after this change (content, styles,
+  numbering, comments, page setup), serialized on first read. Read it when you save, not on
+  every change. Save `change.document`, never `change`: `JSON.stringify(change)` gives
+  `{ editor, transactions, document }`, which `parseDocumentV3` rejects.
 
 ### `<FoliCanvas>`
 
@@ -59,7 +62,8 @@ half-inch stops; no heading buttons or horizontal rule. A pointer pick in a box 
 `onClickCommand`, like a button click. Up and Down on a closed box apply each value they pass
 (Chrome and Firefox on Windows), one undo step each.
 
-The default toolbar: bold, italic, underline, strikethrough, link, text color, highlight ·
+Given a schema v2 editor (`createEditor` with a 0.2.0 document; gone in 8.7d2), the v2
+toolbar: bold, italic, underline, strikethrough, link, text color, highlight ·
 paragraph, H1–H3 · align left, center, align right, justify · bulleted list, numbered list
 (pressed inside one), decrease and increase indent · undo, redo · horizontal rule, page break.
 Text color and highlight are menu buttons (WAI-ARIA menu, `menuitemradio` items) with a fixed
@@ -80,7 +84,7 @@ Mod-K needs a `FoliToolbar` for the editor; none opens while it is `disabled`.
 
 | Prop             | Type         | Default        | Notes                                                               |
 | ---------------- | ------------ | -------------- | ------------------------------------------------------------------- |
-| `editor`         | `Editor`     | context        |                                                                     |
+| `editor`         | `AnyEditor`  | context        | An editor of either schema (`Editor<EditorDocument>`).              |
 | `disabled`       | `boolean`    | `false`        | Pass it whenever the canvas is `readOnly`.                          |
 | `onClickCommand` | `() => void` | —              | After a click ran a command (`FoliEditor` focuses its canvas here). |
 | `label`          | `string`     | `"Formatting"` | Accessible name.                                                    |
@@ -88,12 +92,14 @@ Mod-K needs a `FoliToolbar` for the editor; none opens while it is `disabled`.
 
 ### Hooks and provider
 
-- `useFoliEditor({ initialContent?, plugins? }): Editor`: creates an editor on the first render
-  and keeps it for the component's lifetime. Later option changes are ignored.
+- `useFoliEditor({ initialContent?, plugins? }): Editor<FoliDocumentV3>`: creates an editor of
+  a schema v3 document on the first render (`initialContent` of any version, migrated; default
+  an empty document) and keeps it for the component's lifetime. Later option changes are
+  ignored. Throws `FoliDocumentError` for invalid content.
 - `<FoliEditorProvider editor={editor}>`: makes `editor` the one the components and hooks
   below it use.
-- `useCurrentEditor(): Editor`: the nearest provider's (or `FoliEditor`'s) editor. Throws
-  outside one.
+- `useCurrentEditor(): AnyEditor`: the nearest provider's (or `FoliEditor`'s) editor. Throws
+  outside one. The components and hooks take an editor of either schema (`AnyEditor`).
 - `useEditorState(selector, { editor?, isEqual? })`: a slice of the state; the component
   re-renders only when it changes (`isEqual`, default `Object.is`). The selector
   `(state, editor) => T` runs after every transaction: keep it cheap.

@@ -1,4 +1,4 @@
-import { type CDPSession, expect, type Page, test } from "@playwright/test";
+import { type CDPSession, expect, type Locator, type Page, test } from "@playwright/test";
 
 // Real IME and dead keys need real platforms: see docs/testing/ime.md. This drives Chromium's
 // IME emulation (CDP), which mutates the DOM like a composition does, and checks the read-back.
@@ -6,6 +6,19 @@ test.skip(({ browserName }) => browserName !== "chromium", "CDP IME emulation is
 
 const MOD = "ControlOrMeta";
 const editor = (page: Page) => page.getByRole("textbox", { name: "Document" });
+
+/**
+ * The text a locator shows in `css` (Word's run formatting is inline CSS on the text's spans:
+ * `font-weight: 700`, `font-style: italic`).
+ */
+const styledText = (locator: Locator, css: string) =>
+  locator.evaluate(
+    (element, wanted) =>
+      [...element.querySelectorAll(`span[style*="${wanted}"]`)]
+        .map((span) => span.textContent)
+        .join(""),
+    css,
+  );
 const texts = (page: Page) => editor(page).locator(":scope > .foli-page > *").allTextContents();
 
 /** Opens an empty document; returns a CDP session and the console warnings seen so far. */
@@ -58,7 +71,7 @@ test("a dead-key style composition in the middle of bold text keeps the mark", a
   await page.keyboard.press("ArrowLeft");
   await compose(cdp, ["´"], "é");
   await expect.poll(() => texts(page)).toEqual(["café!"]);
-  await expect(editor(page).locator("strong")).toHaveText("café!");
+  await expect.poll(() => styledText(editor(page), "font-weight: 700")).toBe("café!");
 
   await page.keyboard.type("s");
   await expect.poll(() => texts(page)).toEqual(["cafés!"]);

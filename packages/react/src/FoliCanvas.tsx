@@ -1,11 +1,11 @@
-import type { Editor } from "@folijs/core";
 import { EditorView } from "@folijs/view";
 import { forwardRef, useImperativeHandle, useRef } from "react";
+import type { AnyEditor } from "./editor.js";
 import { useEditorOrContext, useIsomorphicLayoutEffect } from "./editor.js";
 
 export interface FoliCanvasProps {
   /** Default: the editor of the nearest `FoliEditorProvider`. */
-  editor?: Editor | undefined;
+  editor?: AnyEditor | undefined;
   /** The user can read, select and copy, but not change the document. */
   readOnly?: boolean | undefined;
   /** Shown while the document is empty. */

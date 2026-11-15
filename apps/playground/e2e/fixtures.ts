@@ -205,6 +205,9 @@ export async function loadTestFont(page: Page, extraCss = ""): Promise<void> {
           `@font-face { font-family: "${FONT_FAMILY}"; src: url("${FONT_PATH}${fontFile(face)}") format("woff2"); font-weight: ${face.weight}; font-style: ${face.style}; font-display: block; }`,
       ),
       `.foli-canvas.foli-canvas { --foli-font-family: "${FONT_FAMILY}"; }`,
+      // Word's fonts are inline on the blocks and the text (schema v3): the test font overrides
+      // them. Line heights are ratios of the size, so the layout stays the same on every run.
+      `.foli-canvas .foli-page :is(p, h1, h2, h3, h4, h5, h6, span) { font-family: "${FONT_FAMILY}" !important; }`,
       extraCss,
     ].join("\n"),
   });

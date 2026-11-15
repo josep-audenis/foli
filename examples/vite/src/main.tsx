@@ -1,4 +1,4 @@
-import { createDocument, type FoliDocument, parseDocument } from "@folijs/core";
+import { createDocument, type EditorDocument, parseDocumentV3 } from "@folijs/core";
 import { type FoliChange, FoliEditor } from "@folijs/react";
 import "@folijs/react/styles.css";
 import { StrictMode } from "react";
@@ -7,10 +7,10 @@ import { createRoot } from "react-dom/client";
 const KEY = "foli-example";
 
 /** The saved document, or a new one (also when the saved one no longer parses). */
-function load(): FoliDocument {
+function load(): EditorDocument {
   const saved = localStorage.getItem(KEY);
   try {
-    if (saved) return parseDocument(JSON.parse(saved));
+    if (saved) return parseDocumentV3(JSON.parse(saved));
   } catch (error) {
     console.warn("Ignoring the saved document:", error);
   }

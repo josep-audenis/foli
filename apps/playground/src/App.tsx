@@ -1,9 +1,16 @@
-import { createDocument, type Editor, type FoliDocument, parseDocument } from "@folijs/core";
+import {
+  createDocument,
+  type Editor,
+  type EditorDocument,
+  type FoliDocumentV3,
+  parseDocumentV3,
+} from "@folijs/core";
 import { FoliEditor, type FoliEditorHandle } from "@folijs/react";
 import { type ChangeEvent, useRef, useState } from "react";
 
 const STORAGE_KEY = "foli-playground-document";
 
+// Written as a 0.2.0 document: it is migrated to schema v3 when loaded, as saved ones are.
 const sample = createDocument({
   type: "doc",
   content: [
@@ -130,11 +137,14 @@ const sample = createDocument({
   ],
 });
 
-/** The saved document, or the sample if there is none or it no longer parses. */
-function load(): FoliDocument {
+/**
+ * The saved document (of any version: one saved by 0.2.0 is migrated), or the sample if there is
+ * none or it no longer parses.
+ */
+function load(): EditorDocument {
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) return parseDocument(JSON.parse(saved));
+    if (saved) return parseDocumentV3(JSON.parse(saved));
   } catch (error) {
     console.warn("Ignoring the saved playground document:", error);
   }
@@ -142,7 +152,7 @@ function load(): FoliDocument {
 }
 
 // The editor with unsaved changes: its document is serialized when saving, not per keystroke.
-let pending: Editor | null = null;
+let pending: Editor<FoliDocumentV3> | null = null;
 let timer: ReturnType<typeof setTimeout> | undefined;
 
 function flush(): void {
@@ -156,7 +166,7 @@ function flush(): void {
 }
 
 /** Saves once changes pause for 300 ms; leaving the page saves anything still pending. */
-function save({ editor }: { editor: Editor }): void {
+function save({ editor }: { editor: Editor<FoliDocumentV3> }): void {
   pending = editor;
   clearTimeout(timer);
   timer = setTimeout(flush, 300);
@@ -180,14 +190,14 @@ export function App() {
   const editorRef = useRef<FoliEditorHandle>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  /** Loads a saved FoliDocument (JSON) into the editor, replacing the document and its history. */
+  /** Loads a saved Foli document (JSON, any version) into the editor, replacing it and its history. */
   async function open(event: ChangeEvent<HTMLInputElement>): Promise<void> {
     const file = event.target.files?.[0];
     event.target.value = "";
     const editor = editorRef.current?.editor;
     if (!file || !editor) return;
     try {
-      editor.setDocument(parseDocument(JSON.parse(await file.text())));
+      editor.setDocument(parseDocumentV3(JSON.parse(await file.text())));
     } catch (error) {
       alert(`Could not open ${file.name}: ${error instanceof Error ? error.message : error}`);
       return;

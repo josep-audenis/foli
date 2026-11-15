@@ -1,9 +1,22 @@
 import { readFileSync } from "node:fs";
-import { expect, type Page, test } from "@playwright/test";
+import { expect, type Locator, type Page, test } from "@playwright/test";
 
 const STORAGE_KEY = "foli-playground-document";
 const MOD = "ControlOrMeta";
 const editor = (page: Page) => page.getByRole("textbox", { name: "Document" });
+
+/**
+ * The text a locator shows in `css` (Word's run formatting is inline CSS on the text's spans:
+ * `font-weight: 700`, `font-style: italic`).
+ */
+const styledText = (locator: Locator, css: string) =>
+  locator.evaluate(
+    (element, wanted) =>
+      [...element.querySelectorAll(`span[style*="${wanted}"]`)]
+        .map((span) => span.textContent)
+        .join(""),
+    css,
+  );
 const texts = (page: Page) => editor(page).locator(":scope > .foli-page > *").allTextContents();
 
 async function saved(page: Page): Promise<unknown[] | null> {
@@ -86,11 +99,14 @@ test("pasting Word HTML maps it to the schema", async ({ page }) => {
       "Quarterly report",
       "Revenue grew twelve percent and margins held.",
       "",
-      "First point",
+      // A list paragraph: its bullet is shown before the text.
+      "\u2022First point",
       "Line oneline two  end",
     ]);
   await expect(editor(page).locator("h1")).toHaveText("Quarterly report");
-  await expect(editor(page).locator("strong")).toHaveText("twelve percent");
+  // In the body text (the heading is bold by its style).
+  const body = editor(page).locator(".foli-page > p").first();
+  await expect.poll(() => styledText(body, "font-weight: 700")).toBe("twelve percent");
 
   await page.keyboard.press(`${MOD}+z`);
   await expect.poll(() => texts(page)).toEqual([""]);
@@ -121,13 +137,26 @@ test("pasting Google Docs lists keeps nesting, numbering, links, colors, rules a
   const html = readFileSync("packages/view/fixtures/clipboard/google-docs-lists.html", "utf8");
   await paste(page, { "text/html": html, "text/plain": "Alpha" });
   const content = editor(page);
-  await expect(content.locator("ul > li")).toHaveCount(3);
-  await expect(content.locator("ul ul a")).toHaveAttribute("href", "https://example.com/x");
-  // The view numbers ordered items with `value` (numbering continues across pages).
-  await expect(content.locator("ol > li")).toHaveText("Two");
-  await expect(content.locator("ol > li")).toHaveAttribute("value", "2");
-  await expect(content.locator("hr")).toHaveCount(1);
-  await expect(content.locator("li p").filter({ hasText: "Beta" })).toHaveCSS(
+  // Word's lists: numbered paragraphs, each showing its bullet or number.
+  const markers = () =>
+    content.evaluate((host) =>
+      [...host.querySelectorAll(".foli-page > p")].map((p) => {
+        const shown = p.querySelector(":scope > [contenteditable=false]");
+        return shown
+          ? `${(shown.textContent ?? "").trim()} ${p.textContent?.slice(shown.textContent?.length ?? 0)}`
+          : null;
+      }),
+    );
+  const numbered = (await markers()).filter((m): m is string => m !== null);
+  expect(numbered.map((m) => m.split(" ")[0])).toEqual(["\u2022", "o", "\u2022", "2."]);
+  expect(numbered[3]).toBe("2. Two");
+  await expect(content.getByRole("link", { name: "a link" })).toHaveAttribute(
+    "href",
+    "https://example.com/x",
+  );
+  // The rule: an empty paragraph with a bottom border, as in Word.
+  await expect(content.locator('.foli-page > p[style*="border-bottom"]')).toHaveCount(1);
+  await expect(content.locator(".foli-page > p").filter({ hasText: "Beta" })).toHaveCSS(
     "text-align",
     "center",
   );

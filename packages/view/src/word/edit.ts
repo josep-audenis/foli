@@ -272,11 +272,14 @@ export class WordRenderer {
       outer.style.textDecorationLine = inserted ? "underline" : "line-through";
       outer.append(element);
     }
-    // Schema v3 keeps any target (`file:`…): only a safe one is a link on the clipboard.
-    const href = this.#clipboard && marks.find((m) => m.type.name === "link")?.attrs.href;
+    // Schema v3 keeps any target (`file:`…): only a safe one is a link in the page or on the
+    // clipboard. It looks as its run says (Word shows a link without the Hyperlink style plain).
+    const href = marks.find((m) => m.type.name === "link")?.attrs.href;
     if (typeof href !== "string" || !isSafeHref(href)) return outer;
     const a = this.#doc.createElement("a");
     a.setAttribute("href", href);
+    a.style.color = "inherit";
+    a.style.textDecoration = "none";
     a.append(outer);
     return a;
   }

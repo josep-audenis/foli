@@ -1,10 +1,10 @@
 import {
-  createDocument,
-  type DocJSON,
   type Editor,
-  type FoliDocument,
+  type EditorDocument,
+  type FoliDocumentV3,
   type Plugin,
   type Transaction,
+  wordContext,
 } from "@folijs/core";
 import { forwardRef, type ReactNode, useImperativeHandle, useRef } from "react";
 import { FoliEditorProvider, useFoliEditor, useIsomorphicLayoutEffect } from "./editor.js";
@@ -16,19 +16,22 @@ import { FoliToolbar } from "./FoliToolbar.js";
  * spreading the object or `JSON.stringify(change)` serializes the document (and walks `editor`).
  */
 export interface FoliChange {
-  readonly editor: Editor;
+  readonly editor: Editor<FoliDocumentV3>;
   /** The transactions of this change (several when plugins append their own). */
   readonly transactions: readonly Transaction[];
   /**
    * The whole document right after this change, serialized on first read (keep reads out of
-   * the hot path of typing: a debounced save reads only the last change's).
+   * the hot path of typing: a debounced save reads only the last change's). Schema v3.
    */
-  readonly document: FoliDocument;
+  readonly document: FoliDocumentV3;
 }
 
 export interface FoliEditorProps extends Omit<FoliCanvasProps, "editor"> {
-  /** Read once on mount. To load another document later: `editor.setDocument()` or a new `key`. */
-  initialContent?: FoliDocument | undefined;
+  /**
+   * Read once on mount: a document of any version (0.1.0 and 0.2.0 documents are migrated to
+   * schema v3). To load another document later: `editor.setDocument()` or a new `key`.
+   */
+  initialContent?: EditorDocument | undefined;
   /** Read once on mount. */
   plugins?: readonly Plugin[] | undefined;
   /**
@@ -45,7 +48,7 @@ export interface FoliEditorProps extends Omit<FoliCanvasProps, "editor"> {
 
 /** What a `ref` on `FoliEditor` gives: its editor (commands, `setDocument`…) and focus. */
 export interface FoliEditorHandle extends FoliCanvasHandle {
-  readonly editor: Editor;
+  readonly editor: Editor<FoliDocumentV3>;
 }
 
 /**
@@ -73,13 +76,16 @@ export const FoliEditor = forwardRef<FoliEditorHandle, FoliEditorProps>(function
         const listener = onChangeRef.current;
         if (!listener || !transactions.some((tr) => tr.docChanged)) return;
         // The state is immutable: keeping it makes a later read give this change's document.
-        const { settings } = editor;
-        let document: FoliDocument | undefined;
+        let document: FoliDocumentV3 | undefined;
         listener({
           editor,
           transactions,
           get document() {
-            document ??= createDocument(state.doc.toJSON() as DocJSON, settings);
+            const envelope = wordContext(state)?.envelope;
+            document ??= {
+              ...(structuredClone(envelope) as Omit<FoliDocumentV3, "content">),
+              content: state.doc.toJSON(),
+            };
             return document;
           },
         });
