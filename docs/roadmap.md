@@ -9,18 +9,19 @@ leaves `main` green with a working playground.
 **Update this table in the same PR that starts, advances or finishes a phase.** It is the only
 place that says what is in progress; check it before starting work.
 
-| Phase                    | Status                   | Branch               | Notes                                                                                      |
-| ------------------------ | ------------------------ | -------------------- | ------------------------------------------------------------------------------------------ |
-| 0 Foundation             | ✅ Done                  | —                    |                                                                                            |
-| 1 Architecture spike     | ✅ Done (G1 provisional) | —                    | Merged in #1; ADR-0003 accepted provisionally; IME, dead-key and screen-reader checks open |
-| 2 Document model         | ✅ Done                  | —                    | Merged in #2                                                                               |
-| 3 Transactions & history | ✅ Done                  | —                    | Merged in #4; gate G2 passed                                                               |
-| 4 Editor view            | ✅ Done (G3 provisional) | —                    | Merged in #8–#13; manual checks (4.6) deferred, open risks in ADR-0003                     |
-| 5 Native pagination      | ✅ Done (G4 provisional) | —                    | Merged in #15–#22; page-break manual checks open, risks in ADR-0003                        |
-| 6 React API & 0.1.0      | ✅ Done                  | —                    | Merged in #23–#31; 0.1.0 on npm; manual checks shipped as known risks (ADR-0003)           |
-| 7 Rich content           | ✅ Done                  | —                    | Merged in #33–#41; 0.2.0 on npm; list-document benchmark misses accepted (known limit)     |
-| 8 Word model & DOCX      | In review                | `phase-8/word-model` | Merged in #44–#61; 0.3.0 versioned, publish awaits the owner's approval                    |
-| 9–12                     | Not started              |                      |                                                                                            |
+| Phase                    | Status                   | Branch | Notes                                                                                      |
+| ------------------------ | ------------------------ | ------ | ------------------------------------------------------------------------------------------ |
+| 0 Foundation             | ✅ Done                  | —      |                                                                                            |
+| 1 Architecture spike     | ✅ Done (G1 provisional) | —      | Merged in #1; ADR-0003 accepted provisionally; IME, dead-key and screen-reader checks open |
+| 2 Document model         | ✅ Done                  | —      | Merged in #2                                                                               |
+| 3 Transactions & history | ✅ Done                  | —      | Merged in #4; gate G2 passed                                                               |
+| 4 Editor view            | ✅ Done (G3 provisional) | —      | Merged in #8–#13; manual checks (4.6) deferred, open risks in ADR-0003                     |
+| 5 Native pagination      | ✅ Done (G4 provisional) | —      | Merged in #15–#22; page-break manual checks open, risks in ADR-0003                        |
+| 6 React API & 0.1.0      | ✅ Done                  | —      | Merged in #23–#31; 0.1.0 on npm; manual checks shipped as known risks (ADR-0003)           |
+| 7 Rich content           | ✅ Done                  | —      | Merged in #33–#41; 0.2.0 on npm; list-document benchmark misses accepted (known limit)     |
+| 8 Word model & DOCX      | ✅ Done                  | —      | Merged in #44–#61; 0.3.0 on npm (`@folijs/docx` first released); gate G5 passed            |
+| 9 Review                 | Ready                    |        | Tracked changes and comments (depends on Phase 8)                                          |
+| 10–12                    | Not started              |        |                                                                                            |
 
 Status values: `Ready` (dependencies met, nobody on it) · `In progress` · `In review` (PR open) ·
 `✅ Done` (merged, acceptance criteria met) · `Blocked by …`.
@@ -616,7 +617,8 @@ packages open without a repair prompt, the 15 without edits with Word's referenc
 round trip without edits equals the original under the canonical comparison (unit tests);
 106 of 106 paragraphs start on Word's page, 103 on Word's line, pages against Word's PDF 0.544;
 opaque nodes per document in corpus/README.md; T1–T5 on v3 in Chromium, Firefox and WebKit;
-0.1.0 and 0.2.0 documents migrate with every character, break and mark (property test).)
+0.1.0 and 0.2.0 documents migrate with every character, break and mark (property test); 0.3.0
+published 2026-11-16. Gate G5 passed.)
 
 ### Tasks
 
@@ -712,8 +714,8 @@ Each task is a PR on `phase-8/word-model`, the build green after each.
       pages have its size and margins and its blocks are measured and split in its width; a
       section starts a new page unless continuous with the same setup; a named print page per
       setup. Page setups are not editable yet, nor section breaks insertable.
-- [ ] 8.8 Close: docs, gate G5 numbers and the 0.3.0 changeset (#60), the version PR (#61), publish
-  after the owner's approval.
+- [x] 8.8 Close: docs, gate G5 numbers and the 0.3.0 changeset (#60), the version PR (#61); 0.3.0
+  published 2026-11-16 with the owner's approval.
   The changeset lists the breaks:
   - Documents persist as v3 (0.2.0 cannot read them); `FoliChange.document`, `getDocument()` and
     `useFoliEditor` are v3; `createEditor`, `setDocument` and `initialContent` migrate any
