@@ -8,7 +8,6 @@ import { createEditor, type Editor, type FoliDocument, parseDocument } from "@fo
 import { type DocxPackage, exportDocx, importDocx } from "@folijs/docx";
 import { FoliComments, FoliToolbar } from "@folijs/react";
 import "@folijs/react/styles.css";
-import "@folijs/react/styles.css";
 import { EditorView } from "@folijs/view";
 import { createRoot } from "react-dom/client";
 
@@ -76,7 +75,7 @@ const commentsPane = createRoot(document.getElementById("comments") as HTMLEleme
  * and the comments pane.
  */
 const showToolbar = () => {
-  toolbar.render(<FoliToolbar editor={editor} onClickCommand={() => view.focus()} />);
+  toolbar.render(<FoliToolbar editor={editor} comments onClickCommand={() => view.focus()} />);
   commentsPane.render(<FoliComments editor={editor} />);
 };
 showToolbar();

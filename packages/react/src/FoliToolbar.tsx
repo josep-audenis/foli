@@ -75,6 +75,11 @@ export interface FoliToolbarProps {
   onClickCommand?: (() => void) | undefined;
   /** Accessible name of the toolbar (default "Formatting"). */
   label?: string | undefined;
+  /**
+   * Show "New comment": only where a comments pane (`FoliComments`) lets the comment be written
+   * (`FoliEditor` passes it). Default false.
+   */
+  comments?: boolean | undefined;
   className?: string | undefined;
 }
 
@@ -459,6 +464,9 @@ const GROUPS: Item[][] = [
 ];
 
 const ITEMS = GROUPS.flat();
+/** Without "New comment": where no comments pane lets a comment be written. */
+const GROUPS_NO_COMMENT = GROUPS.map((group) => group.filter((i) => i.key !== "newComment"));
+const ITEMS_NO_COMMENT = GROUPS_NO_COMMENT.flat();
 
 interface LinkDialogState {
   /** The link at the selection when the dialog opened ("" for none). */
@@ -495,6 +503,7 @@ const statesOf =
       value: item.menu?.value(state) ?? item.select?.value(state),
     }));
 const selectStates = statesOf(ITEMS);
+const selectStatesNoComment = statesOf(ITEMS_NO_COMMENT);
 
 /**
  * Word's formatting controls for an editor: paragraph style, font and size boxes, marks, link (a
@@ -510,11 +519,15 @@ export function FoliToolbar({
   onClickCommand,
   label = "Formatting",
   className,
+  comments = false,
 }: FoliToolbarProps) {
   const editor = useEditorOrContext(given, "FoliToolbar");
-  const groups = GROUPS;
-  const items = ITEMS;
-  const states = useEditorState(selectStates, { editor, isEqual: sameStates });
+  const groups = comments ? GROUPS : GROUPS_NO_COMMENT;
+  const items = comments ? ITEMS : ITEMS_NO_COMMENT;
+  const states = useEditorState(comments ? selectStates : selectStatesNoComment, {
+    editor,
+    isEqual: sameStates,
+  });
   const [active, setActive] = useState(0);
   const buttons = useRef<(HTMLButtonElement | HTMLSelectElement | null)[]>([]);
   // Whether a select box was last used with the pointer (its pick then goes back to the document).

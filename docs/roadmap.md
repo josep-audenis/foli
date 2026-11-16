@@ -858,8 +858,13 @@ Each task is a PR on `phase-9/review`, the build green after each.
   New comment) opens for writing, one left empty goes. `FoliEditor` shows it beside the pages
   (`comments`: "auto" while there are comments). Keyboard: Escape then Tab from the document
   into the pane, native buttons and text fields; not printed. Comments are edited as plain text
-  (a paragraph per line): a comment with formatting is not editable in the pane (its content
-  would be lost), only replied to, resolved or deleted. Playwright in three engines (made from
+  (a paragraph per line, in the comment's paragraph style: Word's CommentText comments are
+  editable); a comment with other formatting is not editable in the pane (it would be lost), only
+  replied to, resolved or deleted. Reply and Delete are offered only where they can apply (a
+  comment anchored in a table stays: 9.6); focus goes to the thread after an action, to the next
+  thread or the document after a delete. Only comments made while the pane shows open for
+  writing, and only those go when cancelled empty; the toolbar's New comment is shown only with a
+  pane (`FoliToolbar` `comments`). Playwright in three engines (made from
   the toolbar and aligned with its text, reply, resolve, delete, undo, keyboard path, axe,
   print); the editing page shows the pane.
 - [ ] 9.8 Word round trip in the harness: `word-reference.ps1` also reports revisions (type,

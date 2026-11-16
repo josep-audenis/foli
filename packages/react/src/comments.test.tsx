@@ -65,10 +65,9 @@ describe("FoliComments in FoliEditor", () => {
     fireEvent.click(within(pane()).getByRole("button", { name: "Reopen" }));
     expect(editor.getDocument().comments[0]?.done).toBeUndefined();
 
-    const [, reply] = within(pane()).getAllByRole("button", { name: "Delete" });
-    fireEvent.click(reply as HTMLElement);
+    fireEvent.click(within(pane()).getByRole("button", { name: "Delete reply by Me" }));
     expect(editor.getDocument().comments).toHaveLength(1);
-    fireEvent.click(within(pane()).getByRole("button", { name: "Delete" }));
+    fireEvent.click(within(pane()).getByRole("button", { name: "Delete comment by Ana" }));
     expect(editor.getDocument().comments).toEqual([]);
     // No comments left: the pane goes ("auto").
     expect(screen.queryByRole("complementary", { name: "Comments" })).toBeNull();
@@ -76,7 +75,7 @@ describe("FoliComments in FoliEditor", () => {
 
   it("edits a comment's text", () => {
     const editor = setup([{ id: 0, author: "Ana", content: note("Old") }]);
-    fireEvent.click(within(pane()).getByRole("button", { name: "Edit" }));
+    fireEvent.click(within(pane()).getByRole("button", { name: "Edit comment by Ana" }));
     fireEvent.change(within(pane()).getByRole("textbox", { name: "Comment" }), {
       target: { value: "New\nlines" },
     });
@@ -104,6 +103,56 @@ describe("FoliComments in FoliEditor", () => {
     expect(editor.getDocument().comments.map((c) => [c.author, c.content])).toEqual([
       ["Me", note("Noted")],
     ]);
+  });
+
+  it("does not open or delete an empty comment the document came with", () => {
+    const empty = [{ type: "paragraph", attrs: { style: "CommentText" } }];
+    const editor = setup([{ id: 0, author: "Ana", content: empty }]);
+    expect(within(pane()).queryByRole("textbox")).toBeNull();
+    fireEvent.click(within(pane()).getByRole("button", { name: "Edit comment by Ana" }));
+    fireEvent.keyDown(within(pane()).getByRole("textbox", { name: "Comment" }), { key: "Escape" });
+    expect(editor.getDocument().comments).toHaveLength(1);
+  });
+
+  it("edits a Word comment (CommentText style) keeping its style, and refocuses", () => {
+    const styled = [
+      {
+        type: "paragraph",
+        attrs: { style: "CommentText" },
+        content: [{ type: "text", text: "Old" }],
+      },
+    ];
+    const editor = setup([{ id: 0, author: "Ana", content: styled }]);
+    fireEvent.click(within(pane()).getByRole("button", { name: "Edit comment by Ana" }));
+    fireEvent.change(within(pane()).getByRole("textbox", { name: "Comment" }), {
+      target: { value: "New" },
+    });
+    fireEvent.click(within(pane()).getByRole("button", { name: "Save" }));
+    expect(editor.getDocument().comments[0]?.content).toEqual([
+      {
+        type: "paragraph",
+        attrs: { style: "CommentText" },
+        content: [{ type: "text", text: "New" }],
+      },
+    ]);
+    expect(document.activeElement?.closest("article")).not.toBeNull();
+  });
+
+  it("offers no reply where one cannot be anchored", () => {
+    const editor = setup([
+      { id: 0, author: "Ana", content: note("anchored") },
+      { id: 7, author: "Ben", content: note("no anchors") },
+    ]);
+    const thread = within(pane()).getByRole("article", { name: "Comment by Ben" });
+    expect(within(thread).queryByRole("button", { name: "Reply" })).toBeNull();
+    expect(editor.getDocument().comments).toHaveLength(2);
+  });
+
+  it("moves the focus to the next thread after a delete", () => {
+    setup([{ id: 0, author: "Ana", content: note("one") }]);
+    fireEvent.click(within(pane()).getByRole("button", { name: "Delete comment by Ana" }));
+    // No thread left, the pane hidden ("auto"): back to the document.
+    expect(document.activeElement?.getAttribute("role")).toBe("textbox");
   });
 
   it("shows no actions when read-only", () => {

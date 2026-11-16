@@ -131,14 +131,20 @@ export const FoliEditor = forwardRef<FoliEditorHandle, FoliEditorProps>(function
         <FoliToolbar
           editor={editor}
           disabled={canvas.readOnly}
+          comments={comments !== false}
           onClickCommand={() => canvasRef.current?.focus()}
         />
       )}
       {children}
       <div className="foli-editor-body">
         <FoliCanvas ref={canvasRef} editor={editor} {...canvas} />
-        {(comments === true || (comments === "auto" && hasComments)) && (
-          <FoliComments editor={editor} readOnly={canvas.readOnly} />
+        {/* "auto": mounted while hidden, so a comment made from the toolbar opens for writing. */}
+        {comments !== false && (
+          <FoliComments
+            editor={editor}
+            readOnly={canvas.readOnly}
+            hidden={comments === "auto" && !hasComments}
+          />
         )}
       </div>
     </FoliEditorProvider>
