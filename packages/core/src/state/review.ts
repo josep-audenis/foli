@@ -98,7 +98,7 @@ export function trackedChanges(doc: Node): Change[] {
   return changes.sort((a, b) => a.from - b.from || a.to - b.to);
 }
 
-/** A paragraph's change: its mark (the closing token), or its whole for its formatting. */
+/** A paragraph's change: its mark (the closing token), or its content for its formatting. */
 function paragraphChange(
   kind: ChangeKind,
   revision: Revision,
@@ -111,20 +111,41 @@ function paragraphChange(
     id: revision.id,
     author: revision.author,
     date: revision.date ?? null,
-    from: kind === "paragraphFormatting" ? offset : end - 1,
-    to: end,
+    from: kind === "paragraphFormatting" ? offset + 1 : end - 1,
+    to: kind === "paragraphFormatting" ? end - 1 : end,
     move: null,
   };
 }
-/** The changes `from..to` touches (at a caret: the ones around it), with their moves' other ends. */
+const INLINE: ReadonlySet<ChangeKind> = new Set(["insertion", "deletion", "formatting"]);
+/** Inline nodes no change marks: they stay when the text around them goes. */
+const MARKERS = new Set(["bookmarkStart", "bookmarkEnd", "commentStart", "commentEnd"]);
+
+/**
+ * The changes `from..to` touches, with their moves' other ends. At a caret: the ones around it,
+ * the paragraph's formatting only when nothing else is. In a selection, changes to content only
+ * as far as the selection goes (Word accepts the selected part).
+ */
 function changesIn(doc: Node, from: number, to: number, filter: ChangeFilter = {}): Change[] {
   const all = trackedChanges(doc).filter((c) => !filter.author || c.author === filter.author);
-  const picked =
-    from === to
-      ? all.filter((c) => c.from <= from && from <= c.to)
-      : all.filter((c) => c.from < to && from < c.to);
+  let picked: Change[];
+  if (from === to) {
+    const around = all.filter((c) => c.from <= from && from <= c.to);
+    const own = around.filter((c) => c.kind !== "paragraphFormatting");
+    picked = own.length ? own : around;
+  } else
+    picked = all
+      .filter((c) => c.from < to && from < c.to)
+      .map((c) =>
+        INLINE.has(c.kind) ? { ...c, from: Math.max(c.from, from), to: Math.min(c.to, to) } : c,
+      );
   const moves = new Set(picked.map((c) => c.move).filter((m) => m !== null));
-  return all.filter((c) => picked.includes(c) || (c.move !== null && moves.has(c.move)));
+  const partners = all.filter(
+    (c) =>
+      c.move !== null &&
+      moves.has(c.move) &&
+      !picked.some((p) => p.id === c.id && p.kind === c.kind),
+  );
+  return [...picked, ...partners];
 }
 
 /** Applies accepting (or rejecting) `changes` to `tr`. */
@@ -162,7 +183,8 @@ function resolve(tr: Transaction, changes: readonly Change[], accept: boolean): 
         break;
       }
       case "paragraphFormatting": {
-        const node = tr.doc.nodeAt(from);
+        const start = tr.doc.resolve(from).before();
+        const node = tr.doc.nodeAt(start);
         if (!node?.isTextblock) break;
         const attrs: Attrs = { ...node.attrs, formatChange: null };
         if (!accept) {
@@ -170,7 +192,7 @@ function resolve(tr: Transaction, changes: readonly Change[], accept: boolean): 
           for (const key of RECORDED)
             (attrs as Record<string, unknown>)[key] = previous[key] ?? null;
         }
-        tr.setNodeMarkup(from, node.type, attrs);
+        tr.setNodeMarkup(start, node.type, attrs);
         break;
       }
       case "paragraphInsertion":
@@ -185,8 +207,10 @@ function resolve(tr: Transaction, changes: readonly Change[], accept: boolean): 
         tr.setNodeMarkup(start, node.type, { ...node.attrs, revision: next });
         // The mark goes: the paragraph joins the next one, when there is one to join.
         const end = start + node.nodeSize;
+        // A paragraph whose text goes too is removed whole: the next one stays as it is.
+        const emptied = covered(node, start + 1, removed);
         if (goes && tr.doc.resolve(end).nodeAfter?.isTextblock)
-          joins.push({ pos: end, keepFirst: accept });
+          joins.push({ pos: end, keepFirst: accept && !emptied });
         break;
       }
     }
@@ -197,6 +221,17 @@ function resolve(tr: Transaction, changes: readonly Change[], accept: boolean): 
     ...joins.map(({ pos, keepFirst }) => ({ at: pos - 1, run: () => join(tr, pos, keepFirst) })),
   ].sort((a, b) => b.at - a.at);
   for (const op of ops) op.run();
+}
+
+/** Whether every child of `node` (content at `start`) but markers lies in `removed`. */
+function covered(node: Node, start: number, removed: readonly [number, number][]): boolean {
+  let all = true;
+  node.forEach((child, offset) => {
+    const pos = start + offset;
+    if (MARKERS.has(child.type.name)) return;
+    if (!removed.some(([s, e]) => s <= pos && pos + child.nodeSize <= e)) all = false;
+  });
+  return all;
 }
 
 /** Removes `type`'s mark with `id` from `from..to`. */
@@ -211,8 +246,9 @@ function removeMarkOf(tr: Transaction, from: number, to: number, type: string, i
 
 /**
  * Joins the paragraph ending at `pos` with the next one. Accepting a deleted mark keeps the first
- * one's properties and the last one's mark (as an untracked join); rejecting an inserted mark
- * keeps the last one whole: its mark is the original's.
+ * one's properties and the last one's mark (as an untracked join), unless the first one is left
+ * with nothing (then it is gone); rejecting an inserted mark keeps the last one whole: its mark
+ * is the original's.
  */
 function join(tr: Transaction, pos: number, keepFirst: boolean): void {
   const $pos = tr.doc.resolve(pos);
@@ -269,11 +305,10 @@ function goTo(forward: boolean): Command {
   return (state, dispatch) => {
     const changes = trackedChanges(state.doc);
     const { from, to } = state.selection;
+    // In document order (by start, then end), the first one after (before) the selection.
     const target = forward
-      ? (changes.find((c) => c.from >= to && !(c.from === from && c.to === to)) ??
-        changes.find((c) => c.from > from))
-      : ([...changes].reverse().find((c) => c.to <= from && !(c.from === from && c.to === to)) ??
-        [...changes].reverse().find((c) => c.from < from));
+      ? changes.find((c) => c.from > from || (c.from === from && c.to > to))
+      : [...changes].reverse().find((c) => c.from < from || (c.from === from && c.to < to));
     if (!target) return false;
     if (dispatch) {
       // A paragraph mark: the caret at the end of its paragraph.

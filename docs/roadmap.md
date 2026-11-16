@@ -812,8 +812,11 @@ Each task is a PR on `phase-9/review`, the build green after each.
   not the paragraph accepting makes. Imported `w:rPrChange` properties are kept in canonical form. Changes exported and imported back (unit test).
 - [x] 9.4 Accept and reject (`state/review.ts`): commands for the change at the caret, the changes
   in the selection, all, and all by an author; next and previous change (selects it);
-  `trackedChanges(doc)` lists them. A deleted paragraph mark accepted joins the paragraph with the
-  next keeping the first one's properties (as untracked); an inserted one rejected joins them
+  `trackedChanges(doc)` lists them; at a caret the changes there (the paragraph's recorded
+  formatting only when none other), in a selection the selected part of each. A deleted paragraph
+  mark accepted joins the paragraph with the next keeping the first one's properties (as
+  untracked), or removes it whole when nothing of it is left (as Word: the next one keeps its
+  properties; untracked joins and deletions from a paragraph's start now do the same); an inserted one rejected joins them
   keeping the last one's (the original mark's); a move's two ends go together; formatting changes
   restore or drop `previous`. Accept and reject are untracked and undoable. The redlined corpus
   document accepted gives Word's text with changes accepted (reference data); rejected, no

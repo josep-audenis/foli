@@ -145,6 +145,53 @@ describe("accepting and rejecting changes", () => {
     expect(blocks(editor)).toEqual([p({}, text("a")), p({}, text("bx"))]);
   });
 
+  it("removes a paragraph deleted whole, leaving the next one as it is", () => {
+    const editor = editorOf(
+      p({ style: "Heading1", revision: { deletion: by(3) } }, text("Head", [del(2)])),
+      p({ justification: "right" }, text("body")),
+    );
+    editor.commands.acceptAllChanges();
+    expect(blocks(editor)).toEqual([p({ justification: "right" }, text("body"))]);
+  });
+
+  it("goes to changes inside a paragraph with recorded formatting, at the caret those first", () => {
+    const fc = { ...by(9), previous: { justification: "left" } };
+    const editor = editorOf(
+      p({}, text("start")),
+      p({ justification: "center", formatChange: fc }, text("ab"), text("X", [ins(1)]), text("cd")),
+      p({}, text("e"), text("Y", [ins(2)])),
+    );
+    editor.select(1);
+    const stops: number[][] = [];
+    while (editor.commands.nextChange())
+      stops.push([editor.state.selection.from, editor.state.selection.to]);
+    expect(stops).toEqual([
+      [8, 13],
+      [10, 11],
+      [16, 17],
+    ]);
+    // At the caret in the insertion: the insertion, not the paragraph's formatting.
+    editor.select(10);
+    editor.commands.rejectChange();
+    expect(blocks(editor)[1]).toEqual(
+      p({ justification: "center", formatChange: fc }, text("abcd")),
+    );
+  });
+
+  it("accepts only the selected part of a change", () => {
+    const editor = editorOf(p({}, text("XXXXXX", [ins(1)])));
+    editor.select(3, 5);
+    editor.commands.acceptChange();
+    expect(blocks(editor)).toEqual([p({}, text("XX", [ins(1)]), text("XX"), text("XX", [ins(1)]))]);
+  });
+
+  it("keeps a table after a paragraph whose deleted mark is accepted", () => {
+    const table: NodeJSON = { type: "opaqueBlock", attrs: { xml: "<w:tbl/>" } };
+    const editor = editorOf(p({ revision: { deletion: by(3) } }, text("a")), table);
+    editor.commands.acceptAllChanges();
+    expect(blocks(editor)).toEqual([p({}, text("a")), table]);
+  });
+
   it("records nothing while tracking, and undo takes it back", () => {
     const editor = createEditor({
       document: {

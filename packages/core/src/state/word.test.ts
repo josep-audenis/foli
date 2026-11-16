@@ -388,12 +388,17 @@ describe("Backspace and Delete on a v3 document", () => {
     expect(blocks(del)).toEqual(joined);
     // A range across paragraphs: the merged one ends with the last one's mark.
     const range = start();
-    range.select(1, 5);
+    range.select(2, 5);
     range.commands.deleteSelection();
     expect(blocks(range)).toEqual([
-      p({ justification: "center", section, ...own }),
+      p({ justification: "center", section, ...own }, text("a")),
       p({}, text("c")),
     ]);
+    range.commands.undo();
+    // From the first one's start: it is gone, the last one stays whole (as Word removes it).
+    range.select(1, 5);
+    range.commands.deleteSelection();
+    expect(blocks(range)).toEqual([p({ section, ...own }), p({}, text("c"))]);
     range.commands.undo();
     expect(blocks(range)).toEqual(blocks(start()));
     // Into a paragraph that ends a section: deleting its mark merges the section into the next.

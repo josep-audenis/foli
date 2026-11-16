@@ -155,7 +155,8 @@ end of a paragraph whose style names a next style (a heading: Normal) starts tha
 small caps and hidden act on what the text shows (turning bold off in a bold heading writes
 "not bold"); Backspace and Delete step over bookmarks and comment ranges, and select a field,
 content control or table before deleting it; joining paragraphs keeps the second one's section
-break; typed text never takes a tracked-change mark (except its own `insertion` when tracking).
+break, and a paragraph left with nothing by a join or a deletion from its start is removed whole
+(the next one keeps its properties, as in Word); typed text never takes a tracked-change mark (except its own `insertion` when tracking).
 
 Tracked changes: `createEditor({ author?, trackChanges? })` (author default "Author"; tracking
 off by default; a `.docx`'s setting is `DocxImport.trackRevisions`). With tracking on, every
@@ -174,15 +175,15 @@ be recorded is not made. `editor.commands.setTrackChanges(on, author?)` (the
 `setTrackChanges` command), `editor.trackingChanges`, `trackState(state)` (`{ on, author }`).
 
 Accepting and rejecting (not tracked themselves; undo takes them back):
-`editor.commands.acceptChange()` / `rejectChange()` (the change at the caret, or the changes in
-the selection), `acceptAllChanges(author?)` / `rejectAllChanges(author?)`, `nextChange()` /
+`editor.commands.acceptChange()` / `rejectChange()` (the changes at the caret, the paragraph's
+recorded formatting only when no other is there; in a selection, the selected part of each), `acceptAllChanges(author?)` / `rejectAllChanges(author?)`, `nextChange()` /
 `previousChange()` (select the change after or before the selection); the same as commands
 (`acceptChange`, `rejectChange`, `acceptAllChanges(author?)`, `rejectAllChanges(author?)`,
 `nextChange`, `previousChange`). `trackedChanges(doc)` lists the changes (`Change`: `kind`,
 `id`, `author`, `date`, `from`, `to`, `move`) in document order: runs with one change mark,
 paragraph marks inserted or deleted (their closing token), paragraphs' recorded formatting.
 Accepting removes deleted content (a deleted paragraph mark joins the paragraph with the next,
-keeping the first one's properties) and drops records; rejecting removes inserted content (an
+keeping the first one's properties, or removes it whole when nothing of it is left) and drops records; rejecting removes inserted content (an
 inserted paragraph mark joins it with the next, which keeps its own properties: the original
 mark's), drops deletion records and restores recorded formatting. Both ends of a move go together.
 
