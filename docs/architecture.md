@@ -693,6 +693,17 @@ moved (`setColumnWidth`, one undo step); a press without a move changes nothing.
 button let go outside the page or the window losing the focus cancel. Not yet: the borders of a
 nested table, and a keyboard way to set a column's width (the table menu's).
 
+Pictures in the views (10.8b, `pictureElement` in `word/blocks.ts`): an inline picture is drawn
+in its line at its size (EMU / 9525 px) as an `img` with its alt text (empty when decorative),
+from the URL `imageSource` gives for its resource: the app's (`EditorViewOptions.resource`,
+`BlockOptions.resource`; `packageImages` in `@folijs/docx` makes object URLs for a package's
+parts), else the resource's own image `data:` URL or web or `blob:` URL (nothing else: a
+`javascript:` URL is no image); with none, a box of its size with the alt text as its label
+(`role="img"`). In the editable view it sits in a `contenteditable="false"` span, one position
+like opaque content (no browser resize handles), and one without alt text and not decorative
+has a dashed outline (`data-foli-no-alt`). The line takes the picture's height, so the page
+flow measures it as any line; its size is set before the image loads (no reflow on load).
+
 Review in the editable view (9.5): `EditorView` draws tracked changes as the editor's state says
 (`trackState(state).view`, `setReviewView`), every block again when it changes. `markup`:
 `ins`/`del` in the author's color (eight colors, picked by the author's name), titled with the

@@ -364,7 +364,13 @@ const view = new EditorView(host, editor, { editable: true, placeholder: "" });
   uses; paste fits Foli JSON, HTML and text to the document (`fitPaste`, `fitPastedV2`: its own
   styles by name, others added, lists of another document as lists of their own, comments
   copied, bookmarks whose names it has left out).
-- `view.setOptions({ editable?, placeholder? })`: changes the given options.
+- `view.setOptions({ editable?, placeholder?, resource? })`: changes the given options.
+  `resource(key, resource)`: the URL to show a picture's image from (`key` in the document's
+  `resources`); undefined for a key: the resource's own image `data:` URL or web/`blob:` URL,
+  else a box of the picture's size with its alt text. A new resolver draws every picture again.
+- Pictures are drawn in their line at their size (96 px per inch), as `img` (with their alt
+  text; a decorative one an empty alt) inside a non-editable span, one position in the text;
+  one without alt text and not decorative is marked (`data-foli-no-alt`, a dashed outline).
 - `view.focus()`: focuses the host, shows the editor's selection, scrolls it into view.
 - `view.destroy()`: removes listeners, injected styles and the attributes it added; empties the
   host.
@@ -382,7 +388,7 @@ const view = new EditorView(host, editor, { editable: true, placeholder: "" });
   on Apple platforms) opens the link's href, read from the document, in a new tab with
   `noopener,noreferrer`.
 - `keyName(event)`: the key name `handleKey` expects (`"Mod-b"`, `"Shift-Enter"`).
-- `renderDocument(document, container, { review? }): DocumentPages` (a read-only view, no
+- `renderDocument(document, container, { review?, resource? }): DocumentPages` (a read-only view, no
   editor): lays a schema v3 document out on
   pages (`.foli-word-page`, `WORD_PAGE_CLASS`) appended to `container`, formatted as Word
   formats it. `review`: `"markup"` (default: insertions underlined, deletions struck through,
@@ -412,6 +418,9 @@ Details (what import keeps, what export writes, limits): the
   tracks changes in the file; left out, as the package has it), `resource(key, resource)` (the
   bytes of a picture's image the package does not hold and no `data:` URL gives: an app's
   upload; without them the export fails).
+- `packageImages(pkg): PackageImages`: object URLs for the pictures' images in a package
+  (`url(key, resource?)`, made once each; `revoke()` frees them): `EditorView`'s `resource`
+  option for a document imported from that package.
 - `readPackage(bytes, options?): Promise<DocxPackage>`: the zip, parts, content types and
   relationships (`ReadPackageOptions`: the zip limits `maxEntries` and `maxSize`, and
   `maxDepth`).

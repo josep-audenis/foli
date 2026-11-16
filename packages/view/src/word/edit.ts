@@ -24,6 +24,8 @@ import {
   CHANGE_BAR,
   changeElement,
   fontStack,
+  type ImageSource,
+  imageSource,
   latin,
   lineHeight,
   markerElement,
@@ -31,6 +33,7 @@ import {
   opaqueText,
   PX_PER_TWIP,
   parseOpaque,
+  pictureElement,
   type ReviewView,
   styleParagraph,
   styleRun,
@@ -82,6 +85,8 @@ export class WordRenderer {
   readonly #clipboard: boolean;
   /** How tracked changes show. */
   readonly #review: ReviewView;
+  /** Where pictures' images are shown from. */
+  readonly #image: ImageSource | undefined;
   #markers: (ListMarker | null)[] = [];
   /** Comment ranges open at the start of each block. */
   #comments: number[][] = [];
@@ -92,12 +97,14 @@ export class WordRenderer {
     ratio: (family: string) => number,
     clipboard = false,
     review: ReviewView = "markup",
+    image?: ImageSource,
   ) {
     this.#context = context;
     this.#doc = doc;
     this.#ratio = ratio;
     this.#clipboard = clipboard;
     this.#review = review;
+    this.#image = image ?? imageSource(context.envelope.resources);
   }
 
   get context(): WordContext {
@@ -210,6 +217,14 @@ export class WordRenderer {
           span.append(tab);
           leaves.push({ dom: tab, offset, size: 1 });
           fragmentAt(offset).append(this.#wrap(span, child.marks, comments));
+          return;
+        }
+        case "picture": {
+          // Not editable inside (no browser resize handles); one position, like opaque content.
+          const span = doc.createElement("span");
+          span.setAttribute("contenteditable", "false");
+          span.append(pictureElement(child.attrs, doc, this.#image));
+          leafElement(span);
           return;
         }
         case "opaqueInline": {
@@ -331,7 +346,14 @@ export class WordRenderer {
 
   /** An opaque block, shown from its XML: a block leaf, not editable inside. */
   #opaque(node: ModelNode, index: number): WordBlockDesc {
-    const shown = opaqueBlock(node.toJSON(), index, this.#context.resolver, this.#doc, this.#ratio);
+    const shown = opaqueBlock(
+      node.toJSON(),
+      index,
+      this.#context.resolver,
+      this.#doc,
+      this.#ratio,
+      this.#image,
+    );
     const dom = shown.element;
     dom.setAttribute("contenteditable", "false");
     return {
