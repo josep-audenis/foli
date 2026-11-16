@@ -61,3 +61,10 @@ text is duplicated or lost. In DevTools, `__spike.state()` shows the model and
 | NVDA / Chrome           | same; arrow down across the page boundary announces the next line |        |       |
 | VoiceOver / Safari      | same                                                              |        |       |
 | Any                     | is the split paragraph announced as one paragraph or two?         |        |       |
+
+## Tables across pages (Phase 10.1)
+
+`tables.html` is a static page: a table split across two pages in one editable host, its header
+row repeated as non-editable content and one row split at a line. `e2e/tables.spec.ts` records
+what Chromium, Firefox and WebKit do with caret movement, selection, clicks and Enter there; the
+results and what follows from them are in [ADR-0006](../../docs/decisions/ADR-0006-tables-and-pictures.md).

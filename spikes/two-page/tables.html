@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Foli spike: a table across two pages</title>
+    <!-- Phase 10.1 throwaway spike (ADR-0006): one editable host, a table split across two pages
+         with its header row repeated (not editable) and one row split at a line. Static DOM:
+         the experiments record what browsers do natively. -->
+    <style>
+      body { margin: 0; background: #e9e9e6; font: 16px/24px Georgia, "Times New Roman", serif; }
+      #editor { display: flex; flex-direction: column; align-items: center; gap: 24px; padding: 24px 0; outline: none; }
+      .page { box-sizing: border-box; width: 160mm; height: 100mm; padding: 10mm; background: #fff; }
+      table { border-collapse: collapse; width: 100%; table-layout: fixed; }
+      td, th { border: 1px solid #555; padding: 2px 6px; vertical-align: top; text-align: start; }
+      th { background: #eee; }
+      p { margin: 0; }
+    </style>
+  </head>
+  <body>
+    <div id="editor" contenteditable="true">
+      <section class="page">
+        <p id="before">Text before the table.</p>
+        <table>
+          <thead><tr><th><p>Item</p></th><th><p>Price</p></th></tr></thead>
+          <tbody>
+            <tr><td><p id="a1">Apples</p></td><td><p id="b1">10</p></td></tr>
+            <tr><td><p id="a2">Bananas</p></td><td><p id="b2">20</p></td></tr>
+            <!-- A row split at a line: its first lines here, the rest on the next page. -->
+            <tr><td><p id="a3">Cherries from the</p></td><td><p id="b3">30</p></td></tr>
+          </tbody>
+        </table>
+      </section>
+      <section class="page">
+        <table>
+          <!-- The header row again: shown, not editable, not document text. -->
+          <thead contenteditable="false"><tr><th><p>Item</p></th><th><p>Price</p></th></tr></thead>
+          <tbody>
+            <tr><td><p id="a3b">north orchard</p></td><td><p id="b3b"></p></td></tr>
+            <tr><td><p id="a4">Dates</p></td><td><p id="b4">40</p></td></tr>
+          </tbody>
+        </table>
+        <p id="after">Text after the table.</p>
+      </section>
+    </div>
+  </body>
+</html>
