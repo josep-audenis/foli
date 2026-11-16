@@ -1,5 +1,7 @@
 import {
   type Alignment,
+  acceptAllChanges,
+  acceptChange,
   alignAt,
   type Command,
   canOutdent,
@@ -14,12 +16,17 @@ import {
   lineSpacingAt,
   linkAt,
   listKindAt,
+  nextChange,
   normalizeHref,
   openLinkEditor,
   paragraphStyleAt,
   paragraphStyles,
+  previousChange,
+  type ReviewView,
   redo,
   redoDepth,
+  rejectAllChanges,
+  rejectChange,
   removeLink,
   requestsLinkEditor,
   setAlign,
@@ -29,9 +36,12 @@ import {
   setLineSpacing,
   setLink,
   setParagraphStyle,
+  setReviewView,
   setTextColor,
+  setTrackChanges,
   toggleList,
   toggleMark,
+  trackState,
   undo,
   undoDepth,
   wordContext,
@@ -186,6 +196,11 @@ const FONTS = [
 ];
 const SIZES = [8, 9, 10, 10.5, 11, 12, 14, 16, 18, 20, 22, 24, 26, 28, 36, 48, 72];
 const LINE_SPACINGS = [1, 1.15, 1.5, 2, 2.5, 3];
+const REVIEW_VIEWS = [
+  { value: "markup", label: "All markup" },
+  { value: "simple", label: "Simple markup" },
+  { value: "final", label: "No markup" },
+];
 
 /** Word's controls. */
 const GROUPS: Item[][] = [
@@ -349,6 +364,71 @@ const GROUPS: Item[][] = [
       symbol: true,
       enabled: hasTextblock,
       command: () => changeIndent(1),
+    },
+  ],
+  [
+    {
+      key: "trackChanges",
+      label: "Track changes",
+      text: "Track changes",
+      pressed: (state) => trackState(state)?.on === true,
+      enabled: (state) => trackState(state) !== null,
+      command: (state) => setTrackChanges(!trackState(state)?.on),
+    },
+    {
+      key: "reviewView",
+      label: "Show changes as",
+      text: "Show",
+      enabled: (state) => trackState(state) !== null,
+      select: {
+        options: () => REVIEW_VIEWS,
+        value: (state) => trackState(state)?.view ?? "markup",
+        pick: (view) => setReviewView(view as ReviewView),
+      },
+    },
+    // Enabled while tracking can be used: whether there is a change to go to or resolve would
+    // walk the whole document after every transaction.
+    {
+      key: "previousChange",
+      label: "Previous change",
+      text: "Previous change",
+      enabled: (state) => trackState(state) !== null,
+      command: () => previousChange,
+    },
+    {
+      key: "nextChange",
+      label: "Next change",
+      text: "Next change",
+      enabled: (state) => trackState(state) !== null,
+      command: () => nextChange,
+    },
+    {
+      key: "acceptChange",
+      label: "Accept the change here, or the changes selected",
+      text: "Accept",
+      enabled: (state) => trackState(state) !== null,
+      command: () => acceptChange,
+    },
+    {
+      key: "rejectChange",
+      label: "Reject the change here, or the changes selected",
+      text: "Reject",
+      enabled: (state) => trackState(state) !== null,
+      command: () => rejectChange,
+    },
+    {
+      key: "acceptAll",
+      label: "Accept all changes",
+      text: "Accept all",
+      enabled: (state) => trackState(state) !== null,
+      command: () => acceptAllChanges(),
+    },
+    {
+      key: "rejectAll",
+      label: "Reject all changes",
+      text: "Reject all",
+      enabled: (state) => trackState(state) !== null,
+      command: () => rejectAllChanges(),
     },
   ],
   [

@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { createEditor, type FoliDocument } from "@folijs/core";
+import { createEditor, type FoliDocument, trackState } from "@folijs/core";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { FoliToolbar } from "./index.js";
@@ -43,6 +43,7 @@ describe("FoliToolbar on a schema v3 document", () => {
       "Font",
       "Font size",
       "Line spacing",
+      "Show changes as",
     ]);
     const names = screen
       .getAllByRole("button")
@@ -65,6 +66,31 @@ describe("FoliToolbar on a schema v3 document", () => {
     expect(stops.filter((e) => e.tabIndex === 0)).toHaveLength(1);
   });
 
+  it("tracks changes, shows them, goes to them, accepts and rejects them", () => {
+    const editor = setup();
+    const button = (name: string) => screen.getByRole("button", { name });
+    const content = () => JSON.stringify(editor.getDocument().content);
+    expect(button("Track changes").getAttribute("aria-pressed")).toBe("false");
+    fireEvent.click(button("Track changes"));
+    expect(editor.trackingChanges).toBe(true);
+    expect(button("Track changes").getAttribute("aria-pressed")).toBe("true");
+    act(() => {
+      editor.select(1);
+      editor.commands.insertText("New ");
+    });
+    expect(content()).toContain('"insertion"');
+    fireEvent.change(select("Show changes as"), { target: { value: "final" } });
+    expect(trackState(editor.state)?.view).toBe("final");
+    act(() => editor.select(0));
+    fireEvent.click(button("Next change"));
+    expect(editor.state.selection.empty).toBe(false);
+    fireEvent.click(button("Reject"));
+    expect(content()).not.toContain('"insertion"');
+    fireEvent.click(button("Undo"));
+    fireEvent.click(button("Accept all"));
+    expect(content()).not.toMatch(/"insertion"|"deletion"/);
+    expect(content()).toContain("New ");
+  });
   it("applies what is picked and follows the selection", () => {
     const editor = setup();
     act(() => editor.select(1));

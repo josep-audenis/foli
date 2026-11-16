@@ -20,6 +20,7 @@ import {
   marksAt,
   NodeSelection,
   parseContentV2,
+  type ReviewView,
   redo,
   type SectionJSON,
   Selection,
@@ -32,6 +33,7 @@ import {
   type Transaction,
   TransformError,
   toggleMark,
+  trackState,
   typedMarks,
   undo,
   type WordContext,
@@ -50,6 +52,7 @@ import {
   type Reuse,
 } from "./layout/flow.js";
 import { type BlockDesc, PAGE_BREAK_ATTR } from "./render.js";
+
 import { spacing, type WordBlockDesc, WordRenderer } from "./word/edit.js";
 import { measureLineRatio } from "./word/pages.js";
 
@@ -128,6 +131,13 @@ function printStyles(settings: DocumentSettings, sheets: readonly Sheet[], id: s
     `${pages}{height:${height}mm!important;margin-block:0!important;` +
     `break-after:page;break-inside:avoid}${pages}:last-child{break-after:auto}${named}}`
   );
+}
+
+/** Whether `node` is inside an element of `stop` that is not displayed (hidden deleted text). */
+function hiddenIn(node: Node, stop: Node): boolean {
+  for (let el = node.parentElement; el && el !== stop; el = el.parentElement)
+    if (el.style.display === "none") return true;
+  return false;
 }
 
 /** The attribute naming a page's page setup (its index among the document's) for print. */
@@ -306,6 +316,8 @@ export class EditorView {
   private readonly addedTabIndex: boolean;
   /** Renders the document's blocks; made by the first render. */
   private word: WordRenderer | null = null;
+  /** How tracked changes show. */
+  private review: ReviewView = "markup";
   /** Fonts' normal line height ratios, measured once per family (Word's single spacing). */
   private readonly ratios = new Map<string, number>();
   /** Web fonts loaded since the v3 blocks were drawn: the next render draws them again. */
@@ -326,6 +338,7 @@ export class EditorView {
     host.style.whiteSpace = "pre-wrap";
     host.style.overflowWrap = "break-word";
     host.replaceChildren();
+    this.review = trackState(this.state)?.view ?? "markup";
     this.resizeObserver =
       typeof ResizeObserver === "undefined" ? null : new ResizeObserver(this.onResize);
     this.observer = new MutationObserver(this.onMutations);
@@ -407,6 +420,7 @@ export class EditorView {
       this.editable = options.editable;
     }
     if (options.placeholder !== undefined) this.placeholder = options.placeholder;
+
     // Read-only: no caret and no browser editing; the text stays selectable and copyable.
     host.setAttribute("contenteditable", String(this.editable));
     if (this.editable) host.removeAttribute("aria-readonly");
@@ -437,7 +451,14 @@ export class EditorView {
   // ---------- rendering ----------
 
   private update(state: EditorState): void {
-    const docChanged = state.doc !== this.state.doc;
+    const review = trackState(state)?.view ?? "markup";
+    // Another review view (`setReviewView`): every block drawn again, by a new renderer.
+    const reviewChanged = review !== this.review;
+    if (reviewChanged) {
+      this.review = review;
+      this.word = null;
+    }
+    const docChanged = state.doc !== this.state.doc || reviewChanged;
     const selectionChanged = !state.selection.eq(this.state.selection);
     this.state = state;
     if (docChanged) this.render();
@@ -494,7 +515,13 @@ export class EditorView {
     if (renewed) this.fontsChanged = false;
     let word = this.word as WordRenderer;
     if (renewed) {
-      word = this.word = new WordRenderer(context, ownerDocument, this.lineRatio);
+      word = this.word = new WordRenderer(
+        context,
+        ownerDocument,
+        this.lineRatio,
+        false,
+        this.review,
+      );
       this.invalidateLayout();
     }
     word.prepare(doc);
@@ -886,7 +913,9 @@ export class EditorView {
     // browser shows it at the start of the next line at a soft wrap.
     const split = desc.splits.indexOf(offset);
     if (split >= 0) return fragmentStart(desc, split + 1);
-    for (const leaf of desc.leaves) {
+    // Deleted text hidden by the review view takes no caret: the shown text next to it does.
+    const shown = desc.leaves.filter((leaf) => !hiddenIn(leaf.dom, desc.dom));
+    for (const leaf of shown) {
       if (
         leaf.dom.nodeType === Node.TEXT_NODE &&
         leaf.offset <= offset &&
@@ -894,10 +923,15 @@ export class EditorView {
       )
         return { node: leaf.dom, offset: offset - leaf.offset };
     }
-    const next = desc.leaves.find((leaf) => leaf.offset >= offset);
-    if (next) return before(next.dom);
-    const last = desc.leaves[desc.leaves.length - 1];
+    const next = shown.find((leaf) => leaf.offset >= offset);
+    if (next) {
+      if (next.dom.nodeType === Node.TEXT_NODE) return { node: next.dom, offset: 0 };
+      return before(next.dom);
+    }
+    const last = shown[shown.length - 1];
     if (last) {
+      if (last.dom.nodeType === Node.TEXT_NODE)
+        return { node: last.dom, offset: (last.dom as Text).length };
       const point = before(last.dom);
       return { node: point.node, offset: point.offset + 1 };
     }

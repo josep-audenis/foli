@@ -22,6 +22,7 @@ import {
   Plugin,
   type Transaction,
 } from "./state.js";
+import { trackState } from "./track.js";
 import {
   isMarker,
   isOpaque,
@@ -130,6 +131,18 @@ function forwardExtent($pos: ResolvedPos, unit: DeleteUnit, textOnly = false): n
   return length + (segments.shift()?.segment.length ?? 0);
 }
 
+/**
+ * Whether Backspace and Delete step over deleted text: while tracking, and wherever the review
+ * view hides it.
+ */
+function skipsDeleted(state: EditorState): boolean {
+  const track = trackState(state);
+  return track?.on === true || (track?.view ?? "markup") !== "markup";
+}
+
+/** Content a tracked change deleted (still in the document until accepted). */
+const isDeleted = (node: Node) => node.marks.some((m) => m.type.name === "deletion");
+
 /** Backspace: deletes the selection, else the previous character or word, else joins with the previous block. */
 export function deleteBackward(unit: DeleteUnit = "char"): Command {
   return (state, dispatch) => {
@@ -137,10 +150,17 @@ export function deleteBackward(unit: DeleteUnit = "char"): Command {
     const found = caret(state);
     if (!found) return false;
     // Invisible markers (a bookmark, a comment's range) stay: the character before them goes.
+    // While tracking, so does text already deleted: Backspace deletes what is before it.
     const word = wordContext(state);
+    const tracking = skipsDeleted(state);
     let $pos = found;
-    while ($pos.parentOffset > 0 && isMarker(word, $pos.nodeBefore))
-      $pos = state.doc.resolve($pos.pos - 1);
+    while ($pos.parentOffset > 0) {
+      const before = $pos.nodeBefore;
+      if (isMarker(word, before)) $pos = state.doc.resolve($pos.pos - 1);
+      else if (tracking && before && isDeleted(before))
+        $pos = state.doc.resolve($pos.pos - before.nodeSize);
+      else break;
+    }
     if ($pos.parentOffset === 0) return joinBackward(at(state, $pos.pos), dispatch);
     if (isOpaque(word, $pos.nodeBefore)) {
       const node = $pos.nodeBefore as Node;
@@ -159,9 +179,15 @@ export function deleteForward(unit: DeleteUnit = "char"): Command {
     const found = caret(state);
     if (!found) return false;
     const word = wordContext(state);
+    const tracking = skipsDeleted(state);
     let $pos = found;
-    while ($pos.parentOffset < $pos.parent.content.size && isMarker(word, $pos.nodeAfter))
-      $pos = state.doc.resolve($pos.pos + 1);
+    while ($pos.parentOffset < $pos.parent.content.size) {
+      const after = $pos.nodeAfter;
+      if (isMarker(word, after)) $pos = state.doc.resolve($pos.pos + 1);
+      else if (tracking && after && isDeleted(after))
+        $pos = state.doc.resolve($pos.pos + after.nodeSize);
+      else break;
+    }
     if ($pos.parentOffset === $pos.parent.content.size)
       return joinForward(at(state, $pos.pos), dispatch);
     if (isOpaque(word, $pos.nodeAfter)) {

@@ -823,13 +823,20 @@ Each task is a PR on `phase-9/review`, the build green after each.
   inserted text and the deleted text back (Word's reject is compared in 9.8). The property test
   accepts and rejects everything for real: accept all = the edits untracked, reject all = the
   original (text, style, bold, alignment).
-- [ ] 9.5 Review in the editable view and React: `markup`, `simple` (changes shown by a bar in
-  the margin) and `final` while editing (deleted text hidden but kept; selection and mapping
-  across it), author colors, author and date on hover and to screen readers (`ins`/`del`
-  semantics); Backspace, Delete and the arrows step over deleted text where it is hidden;
-  toolbar group: Track changes (pressed state), accept, reject (with menus for
-  selection, all, by author), previous and next, view switch. Playwright in three engines:
-  tracked typing and deletion, accept/reject, undo; axe on the toolbar and pages with changes.
+- [x] 9.5 Review in the editable view and React (#67): the review view in the editor's state
+  (`setReviewView`, `createEditor({ reviewView })`): `markup` (author colors, underline and
+  strike), `simple` (a bar beside changed paragraphs) and `final` while editing (deleted text
+  hidden, kept in the DOM: selection and mapping go through it); `ins`/`del` titled with the
+  author and date for hover and screen readers; while tracking, Backspace and Delete step over
+  deleted text (the arrows skip hidden text natively). `FoliEditor` props `author`,
+  `trackChanges`, `reviewView`; toolbar group: Track changes (pressed state), Show changes as,
+  previous and next change, Accept and Reject (at the caret or the selection), Accept all and
+  Reject all (by author: through the API only); accept and reject are their own undo steps.
+  The editing page reads and writes the `.docx`'s tracking setting. Playwright in three engines:
+  tracked typing and deletion, the three views while editing, going to, accepting and rejecting
+  from the toolbar, undo; axe on the toolbar and pages with changes. Not yet: a deleted
+  paragraph mark is not shown joined in `final`/`simple` while editing (the read-only renderer
+  does join).
 - [ ] 9.6 Comments in the engine: commands to add a comment on the selection (anchors and
   reference placed as Word places them), reply, edit a comment's text, resolve and reopen,
   delete a comment (its anchors and its replies) and delete all; anchors kept through edits

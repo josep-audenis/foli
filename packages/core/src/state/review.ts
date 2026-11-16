@@ -11,10 +11,11 @@
  */
 import type { Attrs, Mark, Node } from "../model/index.js";
 import { RUN_PROPERTY_MARKS } from "../v3/schema.js";
+import { closeHistory } from "./history.js";
 import { MARK_ATTRS } from "./mark.js";
 import { TextSelection } from "./selection.js";
 import type { Command, EditorState, Transaction } from "./state.js";
-import { RECORDED, untracked } from "./track.js";
+import { RECORDED, trackState, untracked } from "./track.js";
 
 export type ChangeKind =
   | "insertion"
@@ -275,7 +276,8 @@ function command(
     const changes = changesIn(state.doc, r[0], r[1], filter);
     if (!changes.length) return false;
     if (dispatch) {
-      const tr = state.tr.setMeta(untracked, true);
+      // Its own undo step, never merged with the typing before it.
+      const tr = state.tr.setMeta(untracked, true).setMeta(closeHistory, true);
       resolve(tr, changes, accept);
       dispatch(tr);
     }
@@ -303,7 +305,11 @@ export const rejectAllChanges = (author?: string): Command =>
 /** Selects the next (or previous) change after (before) the selection. */
 function goTo(forward: boolean): Command {
   return (state, dispatch) => {
-    const changes = trackedChanges(state.doc);
+    // Where the review view hides deleted content, only what it shows.
+    const hidden = (trackState(state)?.view ?? "markup") !== "markup";
+    const changes = trackedChanges(state.doc).filter(
+      (c) => !hidden || (c.kind !== "deletion" && c.kind !== "paragraphDeletion"),
+    );
     const { from, to } = state.selection;
     // In document order (by start, then end), the first one after (before) the selection.
     const target = forward

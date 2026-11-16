@@ -22,10 +22,60 @@ export const WORD_PAGE_BREAK_ATTR = "data-page-break";
 export const PX_PER_TWIP = 96 / 1440;
 
 /** Which version of tracked changes to show. */
-export type ReviewView = "markup" | "final";
+/** How tracked changes show (`@folijs/core`'s, for `renderDocument` too). */
+export type { ReviewView } from "@folijs/core";
+
+import type { ReviewView } from "@folijs/core";
+
+/** Colors for the authors of changes (contrast 4.5:1 or more on white), picked by name. */
+const AUTHOR_COLORS = [
+  "#B5082E",
+  "#1F5FAD",
+  "#2E7D32",
+  "#8E24AA",
+  "#A64B00",
+  "#00737F",
+  "#AD1457",
+  "#5D4037",
+];
+
+/** The color of `author`'s changes: always the same for a name. */
+export function authorColor(author: string): string {
+  let hash = 0;
+  for (const c of author) hash = (hash * 31 + (c.codePointAt(0) ?? 0)) >>> 0;
+  return AUTHOR_COLORS[hash % AUTHOR_COLORS.length] as string;
+}
+
+/** The bar beside a paragraph with changes (`markup` and `simple`), drawn in the margin. */
+export const CHANGE_BAR = "-4px 0 0 0 #6B6B6B";
+
+/**
+ * The element around an inserted or deleted run: `ins` or `del` (named for screen readers by
+ * its title), styled for `review`. Deleted text not shown is hidden, not left out: the editable
+ * view maps positions through it.
+ */
+export function changeElement(
+  doc: Document,
+  inserted: boolean,
+  author: string,
+  date: string | null,
+  review: ReviewView,
+): HTMLElement {
+  const element = doc.createElement(inserted ? "ins" : "del");
+  const when = date ? `, ${date.slice(0, 10)}` : "";
+  element.title = `${inserted ? "Inserted" : "Deleted"} by ${author || "an unknown author"}${when}`;
+  if (review === "markup") {
+    element.style.color = authorColor(author);
+    element.style.textDecorationLine = inserted ? "underline" : "line-through";
+  } else {
+    element.style.textDecorationLine = "none";
+    if (!inserted) element.style.display = "none";
+  }
+  return element;
+}
 
 export interface BlockOptions {
-  /** `markup` (the default): insertions underlined, deletions struck through. `final`: as if accepted. */
+  /** `markup` (the default): insertions underlined, deletions struck through; `simple`, `final`: as if accepted. */
   review?: ReviewView;
   /**
    * The ratio of a font's normal line height to its size (`fontFamily`: a CSS font-family
@@ -288,13 +338,13 @@ export function renderBlocks(
   const resolver = new Resolver(document);
   const content = document.content.content ?? [];
   const attrsOf = (node: NodeJSON) => (node.attrs ?? {}) as Record<string, unknown>;
-  // In the final view a paragraph whose mark was deleted joins the next paragraph (not a
-  // table, and the document's last mark cannot be deleted).
+  // In the final and simple views a paragraph whose mark was deleted joins the next paragraph
+  // (not a table, and the document's last mark cannot be deleted).
   const joins = (index: number) => {
     const node = content[index];
     const revision = node && (attrsOf(node).revision as { deletion?: unknown } | null | undefined);
     return (
-      review === "final" &&
+      review !== "markup" &&
       node?.type === "paragraph" &&
       !!revision?.deletion &&
       content[index + 1]?.type === "paragraph"
@@ -467,7 +517,7 @@ function renderInline(
     const marks = (node.marks ?? []) as MarkJSON[];
     const inserted = marks.some((m) => m.type === "insertion");
     const deleted = marks.some((m) => m.type === "deletion");
-    if (deleted && review === "final") continue;
+    if (deleted && review !== "markup") continue;
     const attrs = (node.attrs ?? {}) as Record<string, unknown>;
     switch (node.type) {
       case "commentStart":
@@ -525,12 +575,11 @@ function renderInline(
         element.style.backgroundColor = "rgba(255, 213, 79, 0.35)";
     }
     if (review === "markup" && (inserted || deleted)) {
-      const wrapper = doc.createElement(inserted ? "ins" : "del");
-      const author = marks.find((m) => m.type === (inserted ? "insertion" : "deletion"))?.attrs
-        ?.author;
-      if (author) wrapper.title = String(author);
-      wrapper.style.color = "#B5082E";
-      wrapper.style.textDecorationLine = inserted ? "underline" : "line-through";
+      // Inserted, then deleted: shown as deleted, in the deleting author's color.
+      const change = marks.find((m) => m.type === (deleted ? "deletion" : "insertion"))?.attrs;
+      const author = String(change?.author ?? "");
+      const date = (change?.date as string | null | undefined) ?? null;
+      const wrapper = changeElement(doc, !deleted, author, date, review);
       wrapper.append(element);
       element = wrapper;
     }
