@@ -1,0 +1,857 @@
+{
+    "document":  "02-services-agreement-redlined.docx",
+    "word":  "16.0.20527",
+    "opened":  true,
+    "error":  null,
+    "revisions":  [
+                      {
+                          "type":  3,
+                          "author":  "Alice Martin",
+                          "text":  "with reasonable skill and care"
+                      },
+                      {
+                          "type":  1,
+                          "author":  "Alice Martin",
+                          "text":  "forty-five (45) days"
+                      },
+                      {
+                          "type":  2,
+                          "author":  "Alice Martin",
+                          "text":  "thirty (30) days"
+                      },
+                      {
+                          "type":  1,
+                          "author":  "Bob Chen",
+                          "text":  "twenty-four (24) months"
+                      },
+                      {
+                          "type":  2,
+                          "author":  "Bob Chen",
+                          "text":  "twelve (12) months"
+                      },
+                      {
+                          "type":  2,
+                          "author":  "Alice Martin",
+                          "text":  "Neither Party is liable for indirect or consequential loss."
+                      },
+                      {
+                          "type":  1,
+                          "author":  "Alice Martin",
+                          "text":  "The Supplier may suspend the Services if any invoice remains unpaid for more than sixty (60) days after its due date."
+                      }
+                  ],
+    "comments":  [
+                     {
+                         "text":  "Our standard terms are 45 days; 30 days does not work with our billing cycle.",
+                         "author":  "Alice Martin",
+                         "initials":  "AM",
+                         "parent":  -1,
+                         "done":  false
+                     },
+                     {
+                         "text":  "We can accept 45 days if the late-payment suspension right is removed.",
+                         "author":  "Bob Chen",
+                         "initials":  "BC",
+                         "parent":  0,
+                         "done":  false
+                     },
+                     {
+                         "text":  "Please confirm the amounts are exclusive of VAT.",
+                         "author":  "Bob Chen",
+                         "initials":  "BC",
+                         "parent":  -1,
+                         "done":  true
+                     },
+                     {
+                         "text":  "Confirmed: all amounts exclude VAT.",
+                         "author":  "Alice Martin",
+                         "initials":  "AM",
+                         "parent":  2,
+                         "done":  true
+                     }
+                 ],
+    "accepted":  [
+                     {
+                         "text":  "MASTER SERVICES AGREEMENT",
+                         "inTable":  false
+                     },
+                     {
+                         "text":  "Between Northwind Traders Limited (the \"Customer\") and Fabrikam Consulting LLP (the \"Supplier\").",
+                         "inTable":  false
+                     },
+                     {
+                         "text":  "SERVICES",
+                         "inTable":  false
+                     },
+                     {
+                         "text":  "The Supplier shall provide the following services (the \"Services\"):",
+                         "inTable":  false
+                     },
+                     {
+                         "text":  "design and implementation of the Customer\u0027s data platform;",
+                         "inTable":  false
+                     },
+                     {
+                         "text":  "training of up to twenty (20) members of the Customer\u0027s staff;",
+                         "inTable":  false
+                     },
+                     {
+                         "text":  "second-line support during business hours.",
+                         "inTable":  false
+                     },
+                     {
+                         "text":  "The Supplier shall perform the Services with reasonable skill and care and in accordance with good industry practice.",
+                         "inTable":  false
+                     },
+                     {
+                         "text":  "FEES AND PAYMENT",
+                         "inTable":  false
+                     },
+                     {
+                         "text":  "The Customer shall pay the fees set out in the table below. Invoices are payable within forty-five (45) days of receipt.",
+                         "inTable":  false
+                     },
+                     {
+                         "text":  "Fee schedule",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Milestone",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Due",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Amount (EUR)",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Platform design",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "On signature",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "40,000",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Implementation",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "On acceptance",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "85,000",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Support and training, January 2026",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "End of month",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "6,500",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Support and training, February 2026",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "End of month",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "6,500",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Support and training, March 2026",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "End of month",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "6,500",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Support and training, April 2026",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "End of month",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "6,500",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Support and training, May 2026",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "End of month",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "6,500",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Support and training, June 2026",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "End of month",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "6,500",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Support and training, July 2026",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "End of month",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "6,500",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Support and training, August 2026",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "End of month",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "6,500",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Support and training, September 2026",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "End of month",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "6,500",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Support and training, October 2026",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "End of month",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "6,500",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Support and training, November 2026",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "End of month",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "6,500",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Support and training, December 2026",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "End of month",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "6,500",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Support and training, January 2027",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "End of month",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "6,500",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Support and training, February 2027",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "End of month",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "6,500",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Support and training, March 2027",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "End of month",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "6,500",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Support and training, April 2027",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "End of month",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "6,500",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Support and training, May 2027",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "End of month",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "6,500",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Support and training, June 2027",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "End of month",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "6,500",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Support and training, July 2027",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "End of month",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "6,500",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Support and training, August 2027",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "End of month",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "6,500",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Support and training, September 2027",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "End of month",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "6,500",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Support and training, October 2027",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "End of month",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "6,500",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Support and training, November 2027",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "End of month",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "6,500",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Support and training, December 2027",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "End of month",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "6,500",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "",
+                         "inTable":  false
+                     },
+                     {
+                         "text":  "LIABILITY",
+                         "inTable":  false
+                     },
+                     {
+                         "text":  "Each Party\u0027s total liability under this Agreement is limited to the fees paid in the twenty-four (24) months before the claim. ",
+                         "inTable":  false
+                     },
+                     {
+                         "text":  "TERMINATION",
+                         "inTable":  false
+                     },
+                     {
+                         "text":  "Either Party may terminate this Agreement on ninety (90) days\u0027 written notice.",
+                         "inTable":  false
+                     },
+                     {
+                         "text":  "The Supplier may suspend the Services if any invoice remains unpaid for more than sixty (60) days after its due date.",
+                         "inTable":  false
+                     }
+                 ],
+    "rejected":  [
+                     {
+                         "text":  "MASTER SERVICES AGREEMENT",
+                         "inTable":  false
+                     },
+                     {
+                         "text":  "Between Northwind Traders Limited (the \"Customer\") and Fabrikam Consulting LLP (the \"Supplier\").",
+                         "inTable":  false
+                     },
+                     {
+                         "text":  "SERVICES",
+                         "inTable":  false
+                     },
+                     {
+                         "text":  "The Supplier shall provide the following services (the \"Services\"):",
+                         "inTable":  false
+                     },
+                     {
+                         "text":  "design and implementation of the Customer\u0027s data platform;",
+                         "inTable":  false
+                     },
+                     {
+                         "text":  "training of up to twenty (20) members of the Customer\u0027s staff;",
+                         "inTable":  false
+                     },
+                     {
+                         "text":  "second-line support during business hours.",
+                         "inTable":  false
+                     },
+                     {
+                         "text":  "The Supplier shall perform the Services with reasonable skill and care and in accordance with good industry practice.",
+                         "inTable":  false
+                     },
+                     {
+                         "text":  "FEES AND PAYMENT",
+                         "inTable":  false
+                     },
+                     {
+                         "text":  "The Customer shall pay the fees set out in the table below. Invoices are payable within thirty (30) days of receipt.",
+                         "inTable":  false
+                     },
+                     {
+                         "text":  "Fee schedule",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Milestone",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Due",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Amount (EUR)",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Platform design",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "On signature",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "40,000",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Implementation",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "On acceptance",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "85,000",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Support and training, January 2026",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "End of month",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "6,500",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Support and training, February 2026",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "End of month",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "6,500",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Support and training, March 2026",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "End of month",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "6,500",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Support and training, April 2026",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "End of month",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "6,500",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Support and training, May 2026",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "End of month",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "6,500",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Support and training, June 2026",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "End of month",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "6,500",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Support and training, July 2026",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "End of month",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "6,500",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Support and training, August 2026",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "End of month",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "6,500",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Support and training, September 2026",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "End of month",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "6,500",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Support and training, October 2026",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "End of month",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "6,500",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Support and training, November 2026",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "End of month",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "6,500",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Support and training, December 2026",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "End of month",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "6,500",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Support and training, January 2027",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "End of month",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "6,500",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Support and training, February 2027",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "End of month",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "6,500",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Support and training, March 2027",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "End of month",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "6,500",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Support and training, April 2027",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "End of month",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "6,500",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Support and training, May 2027",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "End of month",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "6,500",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Support and training, June 2027",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "End of month",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "6,500",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Support and training, July 2027",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "End of month",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "6,500",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Support and training, August 2027",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "End of month",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "6,500",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Support and training, September 2027",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "End of month",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "6,500",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Support and training, October 2027",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "End of month",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "6,500",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Support and training, November 2027",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "End of month",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "6,500",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Support and training, December 2027",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "End of month",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "6,500",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "",
+                         "inTable":  false
+                     },
+                     {
+                         "text":  "LIABILITY",
+                         "inTable":  false
+                     },
+                     {
+                         "text":  "Each Party\u0027s total liability under this Agreement is limited to the fees paid in the twelve (12) months before the claim. Neither Party is liable for indirect or consequential loss.",
+                         "inTable":  false
+                     },
+                     {
+                         "text":  "TERMINATION",
+                         "inTable":  false
+                     },
+                     {
+                         "text":  "Either Party may terminate this Agreement on ninety (90) days\u0027 written notice.",
+                         "inTable":  false
+                     }
+                 ]
+}

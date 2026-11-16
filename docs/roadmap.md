@@ -867,11 +867,18 @@ Each task is a PR on `phase-9/review`, the build green after each.
   pane (`FoliToolbar` `comments`). Playwright in three engines (made from
   the toolbar and aligned with its text, reply, resolve, delete, undo, keyboard path, axe,
   print); the editing page shows the pane.
-- [ ] 9.8 Word round trip in the harness: `word-reference.ps1` also reports revisions (type,
-  author, text) and comments (text, author, parent, done) without accepting them; a script makes
-  changes and comments in Foli on corpus documents, exports them, and checks Word opens them
-  without repair with the same revisions and comments; Word edits a Foli-made file (automation)
-  and Foli imports Word's changes and replies. Numbers in corpus/README.md.
+- [x] 9.8 Word round trip in the harness (#70): `scripts/corpus/word-review.ps1` reports, as Word reads
+  them, revisions (type, author, text), comments (text, author, initials, parent, done) and the
+  text with every change accepted and rejected (a separate script: `word-reference.ps1`'s data
+  stay as they were); its corpus run is the reference in `corpus/reference/review/`, which
+  `review-word.test.ts` compares Foli with (kinds of changes by author, comments, threads,
+  resolved state; accept-all and reject-all text). `scripts/corpus/review-roundtrip.mjs` makes changes and comments in Foli on
+  every corpus document, exports them, and checks Word opens them without repair with Foli's
+  revisions (insertion, deletion, run and paragraph formatting, by author, with text), comment,
+  reply and resolved state, and Word's accepted and rejected text equal to Foli's paragraph by
+  paragraph (fields aside; 03, a content control around paragraphs, not compared); Word edits each
+  Foli-made file (automation: a tracked insertion, a reply) and Foli reads both back. 5 of 5
+  pass (corpus/README.md). Known: Foli writes dates in UTC where Word writes local time.
 - [ ] 9.9 Close: docs (architecture, model, docx README, known limitations), acceptance checked,
   the 0.4.0 changeset; publish with the owner's approval.
 

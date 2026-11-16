@@ -1,0 +1,136 @@
+{
+    "document":  "03-offer-letter-template.docx",
+    "word":  "16.0.20527",
+    "opened":  true,
+    "error":  null,
+    "revisions":  [
+
+                  ],
+    "comments":  [
+
+                 ],
+    "accepted":  [
+                     {
+                         "text":  "PRIVATE AND CONFIDENTIAL",
+                         "inTable":  false
+                     },
+                     {
+                         "text":  "Date: Click or tap to enter a date.",
+                         "inTable":  false
+                     },
+                     {
+                         "text":  "Dear «CandidateFirstName»,",
+                         "inTable":  false
+                     },
+                     {
+                         "text":  "We are pleased to offer you the position below, on the terms set out in this letter and in the enclosed contract of employment.",
+                         "inTable":  false
+                     },
+                     {
+                         "text":  "Position: Choose an item.",
+                         "inTable":  false
+                     },
+                     {
+                         "text":  "Annual salary (EUR): Click or tap here to enter text.",
+                         "inTable":  false
+                     },
+                     {
+                         "text":  "Start date: «StartDate»",
+                         "inTable":  false
+                     },
+                     {
+                         "text":  "☐ Remote working eligible",
+                         "inTable":  false
+                     },
+                     {
+                         "text":  "Benefits:",
+                         "inTable":  false
+                     },
+                     {
+                         "text":  "Private health insurance; 25 days\u0027 annual leave; pension contribution of 5%.",
+                         "inTable":  false
+                     },
+                     {
+                         "text":  "This offer is conditional on satisfactory references and proof of your right to work. Please sign and return a copy of this letter by the date stated in the enclosed contract.",
+                         "inTable":  false
+                     },
+                     {
+                         "text":  "Yours sincerely,",
+                         "inTable":  false
+                     },
+                     {
+                         "text":  "",
+                         "inTable":  false
+                     },
+                     {
+                         "text":  "Maria Lopez",
+                         "inTable":  false
+                     },
+                     {
+                         "text":  "Head of People",
+                         "inTable":  false
+                     }
+                 ],
+    "rejected":  [
+                     {
+                         "text":  "PRIVATE AND CONFIDENTIAL",
+                         "inTable":  false
+                     },
+                     {
+                         "text":  "Date: Click or tap to enter a date.",
+                         "inTable":  false
+                     },
+                     {
+                         "text":  "Dear «CandidateFirstName»,",
+                         "inTable":  false
+                     },
+                     {
+                         "text":  "We are pleased to offer you the position below, on the terms set out in this letter and in the enclosed contract of employment.",
+                         "inTable":  false
+                     },
+                     {
+                         "text":  "Position: Choose an item.",
+                         "inTable":  false
+                     },
+                     {
+                         "text":  "Annual salary (EUR): Click or tap here to enter text.",
+                         "inTable":  false
+                     },
+                     {
+                         "text":  "Start date: «StartDate»",
+                         "inTable":  false
+                     },
+                     {
+                         "text":  "☐ Remote working eligible",
+                         "inTable":  false
+                     },
+                     {
+                         "text":  "Benefits:",
+                         "inTable":  false
+                     },
+                     {
+                         "text":  "Private health insurance; 25 days\u0027 annual leave; pension contribution of 5%.",
+                         "inTable":  false
+                     },
+                     {
+                         "text":  "This offer is conditional on satisfactory references and proof of your right to work. Please sign and return a copy of this letter by the date stated in the enclosed contract.",
+                         "inTable":  false
+                     },
+                     {
+                         "text":  "Yours sincerely,",
+                         "inTable":  false
+                     },
+                     {
+                         "text":  "",
+                         "inTable":  false
+                     },
+                     {
+                         "text":  "Maria Lopez",
+                         "inTable":  false
+                     },
+                     {
+                         "text":  "Head of People",
+                         "inTable":  false
+                     }
+                 ]
+}
