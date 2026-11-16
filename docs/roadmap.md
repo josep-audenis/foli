@@ -891,7 +891,7 @@ Each task is a PR on `phase-9/review`, the build green after each.
 - [ ] 9.9 Close: docs (README, document model, docx README, known limitations as of 0.4.0;
   architecture and api brought up to date with the final code of each task), acceptance checked
   (above), the 0.4.0
-  changeset (with the changed behaviours, #71), the version PR (#); publish after the
+  changeset (with the changed behaviours, #71), the version PR (#72); publish after the
   owner's approval.
 
 ## Phase 10 — Tables & images · XL → 0.5.0
