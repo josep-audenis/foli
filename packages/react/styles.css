@@ -185,7 +185,9 @@
 }
 
 .foli-menu-item[role="menuitemcheckbox"][aria-checked="true"]::before {
-  /* No accessible name of its own: the item's checked state says it. */
+  /* No accessible name of its own: the item's checked state says it (the first line for
+     browsers without alt text in `content`). */
+  content: "\2713";
   content: "\2713" / "";
 }
 
