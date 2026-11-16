@@ -33,6 +33,7 @@ import {
   Selection,
   Slice,
   sectionSettings,
+  setColumnWidth,
   setComments,
   setLink,
   splitBlock,
@@ -419,6 +420,7 @@ export class EditorView {
     host.addEventListener("compositionend", this.onCompositionEnd);
     host.addEventListener("blur", this.onBlur);
     host.addEventListener("mousedown", this.onMouseDown);
+    host.addEventListener("mousemove", this.onMouseMove);
     host.addEventListener("copy", this.onCopy);
     host.addEventListener("cut", this.onCut);
     host.addEventListener("paste", this.onPaste);
@@ -445,6 +447,8 @@ export class EditorView {
     host.removeEventListener("compositionend", this.onCompositionEnd);
     host.removeEventListener("blur", this.onBlur);
     host.removeEventListener("mousedown", this.onMouseDown);
+    host.removeEventListener("mousemove", this.onMouseMove);
+    this.endDrag();
     host.removeEventListener("copy", this.onCopy);
     host.removeEventListener("cut", this.onCut);
     host.removeEventListener("paste", this.onPaste);
@@ -1528,6 +1532,164 @@ export class EditorView {
     });
   }
 
+  // ---------- column borders (10.7c) ----------
+
+  /** A column border being dragged: its table and column, the column's width, the press, the guide. */
+  private drag: {
+    table: ModelNode;
+    column: number;
+    width: number;
+    startX: number;
+    perTwip: number;
+    guide: HTMLElement;
+  } | null = null;
+  /** Whether this view set the host's cursor (an embedder's own cursor is left alone). */
+  private resizeCursor = false;
+
+  /**
+   * The column border of a top-level table near the pointer (within 4 px): an edge of the cell
+   * under it (a grid line through a merged cell is no border), or the table's right edge from
+   * outside; as the grid column left of it, with the table's px per twip. None in read-only
+   * mode, during a composition, or while tracking (column widths do not change then).
+   */
+  private columnBorder(
+    event: MouseEvent,
+  ): { table: ModelNode; column: number; perTwip: number; rect: DOMRect } | null {
+    if (!this.editable || this.composing || trackState(this.state)?.on) return null;
+    const target = event.target as Element | null;
+    const wrapper = target?.closest?.(`[${FRAME_ATTR}="table"]`);
+    const element = wrapper?.querySelector(`:scope > table[${FRAME_ATTR}]`);
+    if (!wrapper || !element || !this.host.contains(wrapper)) return null;
+    let table: ModelNode | undefined;
+    for (const [node, frame] of this.frames)
+      if (frame.wrappers.includes(wrapper as HTMLElement)) table = node;
+    const grid = (table?.attrs.grid as number[] | undefined) ?? [];
+    const total = grid.reduce((a, b) => a + b, 0);
+    if (!table || !total) return null;
+    const rect = element.getBoundingClientRect();
+    const perTwip = rect.width / total;
+    const edges: number[] = [];
+    let x = rect.left;
+    for (const width of grid) {
+      x += width * perTwip;
+      edges.push(x);
+    }
+    const near = (column: number) => Math.abs(event.clientX - (edges[column] as number)) <= 4;
+    // The grid lines that are borders here: the cell's own edges, the table's right edge from
+    // outside it, any line on the table's own border area (none in a row's empty places).
+    const cell = target?.closest("td");
+    let columns: number[];
+    if (cell && element.contains(cell)) {
+      const box = cell.getBoundingClientRect();
+      const at = (line: number) => edges.findIndex((edge) => Math.abs(edge - line) <= 3);
+      columns = [at(box.left), at(box.right)].filter((c) => c >= 0);
+    } else if (target === element) columns = grid.map((_w, i) => i);
+    else if (element.contains(target)) columns = [];
+    else columns = [grid.length - 1];
+    const column = columns.find(near);
+    return column === undefined ? null : { table, column, perTwip, rect };
+  }
+
+  /** The pointer over a column border shows that it can be dragged. */
+  private onMouseMove = (event: MouseEvent): void => {
+    if (this.drag) return;
+    const near = event.buttons === 0 && this.columnBorder(event) !== null;
+    if (near === this.resizeCursor) return;
+    this.resizeCursor = near;
+    this.host.style.cursor = near ? "col-resize" : "";
+  };
+
+  /**
+   * A press on a column border (no Shift: Shift-click extends the selection) starts dragging it:
+   * a guide line follows the pointer and the release moves the border by as much as the pointer
+   * moved (`setColumnWidth`); a press without a move changes nothing; Escape, the button let go
+   * elsewhere or the window losing the focus cancel.
+   */
+  private startColumnDrag(event: MouseEvent): boolean {
+    this.endDrag();
+    if (event.shiftKey) return false;
+    const border = this.columnBorder(event);
+    if (!border) return false;
+    // No caret or text selection from this press. Focus taken by it keeps the selection the
+    // model has (the press places none).
+    event.preventDefault();
+    if (!this.hasFocus()) {
+      this.host.focus({ preventScroll: true });
+      this.writeSelection(true);
+    }
+    const doc = this.host.ownerDocument;
+    const guide = doc.createElement("div");
+    guide.setAttribute("aria-hidden", "true");
+    Object.assign(guide.style, {
+      position: "fixed",
+      top: `${border.rect.top}px`,
+      height: `${border.rect.height}px`,
+      left: `${event.clientX}px`,
+      width: "0",
+      borderLeft: "1px dashed GrayText",
+      pointerEvents: "none",
+      zIndex: "2147483647",
+    });
+    doc.body.append(guide);
+    const width = (border.table.attrs.grid as number[])[border.column] as number;
+    this.drag = { ...border, width, startX: event.clientX, guide };
+    doc.addEventListener("mousemove", this.onDragMove);
+    doc.addEventListener("mouseup", this.onDragEnd);
+    doc.addEventListener("keydown", this.onDragKey, true);
+    doc.defaultView?.addEventListener("blur", this.onDragBlur);
+    return true;
+  }
+
+  private onDragMove = (event: MouseEvent): void => {
+    if (!this.drag) return;
+    // The button let go where no mouseup reached the page (another window, a menu): cancelled.
+    if ((event.buttons & 1) === 0) this.endDrag();
+    else this.drag.guide.style.left = `${event.clientX}px`;
+  };
+
+  private onDragEnd = (event: MouseEvent): void => {
+    const drag = this.endDrag();
+    if (!drag) return;
+    const moved = event.clientX - drag.startX;
+    // A click on a border (no real move) is no resize.
+    if (Math.abs(moved) < 2) return;
+    // The table's position: a top-level block's.
+    let pos = -1;
+    this.state.doc.forEach((node, offset) => {
+      if (node === drag.table) pos = offset;
+    });
+    if (pos >= 0) this.run(setColumnWidth(pos, drag.column, drag.width + moved / drag.perTwip));
+  };
+
+  private onDragKey = (event: KeyboardEvent): void => {
+    if (event.key !== "Escape") return;
+    event.preventDefault();
+    event.stopPropagation();
+    this.endDrag();
+  };
+
+  private onDragBlur = (): void => {
+    this.endDrag();
+  };
+
+  /** Ends a drag (its guide and listeners gone) and returns it. */
+  private endDrag(): NonNullable<EditorView["drag"]> | null {
+    const { drag } = this;
+    if (!drag) return null;
+    this.drag = null;
+    drag.guide.remove();
+    const doc = this.host.ownerDocument;
+    doc.removeEventListener("mousemove", this.onDragMove);
+    doc.removeEventListener("mouseup", this.onDragEnd);
+    doc.removeEventListener("keydown", this.onDragKey, true);
+    doc.defaultView?.removeEventListener("blur", this.onDragBlur);
+    if (this.resizeCursor) {
+      this.resizeCursor = false;
+      this.host.style.cursor = "";
+    }
+    return drag;
+  }
+
   /**
    * Triple-click selects the clicked block's content. Chromium and WebKit natively extend the
    * selection to the start of the next block, so typing over it would merge the two blocks.
@@ -1538,6 +1700,7 @@ export class EditorView {
     // focuses nothing (prevented, middle button) must not skip the next keyboard focus.
     if (this.pointerFocus) setTimeout(() => (this.pointerFocus = false));
     if (event.button !== 0) return;
+    if (this.startColumnDrag(event)) return;
     // A click puts a caret where it lands, even on the one a cell selection wrote.
     if (!event.shiftKey) this.cellCaret = null;
     // A header row drawn again is not document content: the caret goes below it.

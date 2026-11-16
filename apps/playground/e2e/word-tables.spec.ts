@@ -415,3 +415,94 @@ test("T5 in a table: cells selected across the page break are emptied and undone
   await page.keyboard.press(`${MOD}+z`);
   await expect.poll(() => docJSON(page)).toBe(original);
 });
+
+// ---------- column borders (10.7c) ----------
+
+/** The first top-level table's grid, and its first column's right border on the screen. */
+const firstBorder = (page: Page) =>
+  page.evaluate(() => {
+    let grid: number[] = [];
+    window.foliEdit.editor.state.doc.forEach((node) => {
+      if (!grid.length && node.type.name === "table") grid = node.attrs.grid as number[];
+    });
+    const table = document.querySelector("section.foli-page table[data-foli-frame]") as HTMLElement;
+    const rect = table.getBoundingClientRect();
+    const perTwip = rect.width / grid.reduce((a, b) => a + b, 0);
+    return {
+      grid,
+      perTwip,
+      x: rect.left + (grid[0] ?? 0) * perTwip,
+      y: rect.top + Math.min(rect.height / 2, 60),
+    };
+  });
+
+test("dragging a column border sets the column's width; the next column gives it", async ({
+  page,
+}) => {
+  await open(page, "06-price-schedule.docx");
+  const before = await firstBorder(page);
+  await page.mouse.move(before.x, before.y);
+  await expect
+    .poll(() => editor(page).evaluate((host) => (host as HTMLElement).style.cursor))
+    .toBe("col-resize");
+  await page.mouse.down();
+  await page.mouse.move(before.x + 40, before.y, { steps: 4 });
+  await expect(page.locator("body > div[aria-hidden=true]")).toHaveCount(1);
+  await page.mouse.up();
+  await expect(page.locator("body > div[aria-hidden=true]")).toHaveCount(0);
+  const after = await firstBorder(page);
+  const moved = (after.grid[0] ?? 0) - (before.grid[0] ?? 0);
+  // 40 px, in twips (within rounding).
+  expect(Math.abs(moved - 40 / before.perTwip)).toBeLessThan(30);
+  expect((after.grid[1] ?? 0) - (before.grid[1] ?? 0)).toBe(-moved);
+  expect(await page.evaluate(() => window.foliEdit.validate())).toBe(true);
+  await page.keyboard.press(`${MOD}+z`);
+  await expect.poll(async () => (await firstBorder(page)).grid).toEqual(before.grid);
+});
+
+test("Escape cancels a column border drag", async ({ page }) => {
+  await open(page, "06-price-schedule.docx");
+  const before = await firstBorder(page);
+  await page.mouse.move(before.x, before.y);
+  await page.mouse.down();
+  await page.mouse.move(before.x + 40, before.y, { steps: 4 });
+  await page.keyboard.press("Escape");
+  await page.mouse.up();
+  expect((await firstBorder(page)).grid).toEqual(before.grid);
+});
+
+test("a click on a column border changes nothing; a grid line through a spanning cell is no border", async ({
+  page,
+}) => {
+  await open(page, "06-price-schedule.docx");
+  const original = await docJSON(page);
+  const before = await firstBorder(page);
+  await page.mouse.move(before.x, before.y);
+  await page.mouse.down();
+  await page.mouse.up();
+  expect(await docJSON(page)).toBe(original);
+  // A cell spanning columns: the grid lines inside it are not borders.
+  const inside = await page.evaluate(() => {
+    const td = document.querySelector("section.foli-page table[data-foli-frame] td[colspan]");
+    if (!td) return null;
+    const box = td.getBoundingClientRect();
+    let grid: number[] = [];
+    window.foliEdit.editor.state.doc.forEach((node) => {
+      if (!grid.length && node.type.name === "table") grid = node.attrs.grid as number[];
+    });
+    const table = td.closest("table") as HTMLElement;
+    const rect = table.getBoundingClientRect();
+    const perTwip = rect.width / grid.reduce((a, b) => a + b, 0);
+    let x = rect.left;
+    for (const width of grid) {
+      x += width * perTwip;
+      if (x > box.left + 6 && x < box.right - 6) return { x, y: box.top + box.height / 2 };
+    }
+    return null;
+  });
+  expect(inside).not.toBe(null);
+  if (!inside) return;
+  await page.mouse.move(inside.x, inside.y);
+  await page.waitForTimeout(100);
+  expect(await editor(page).evaluate((host) => (host as HTMLElement).style.cursor)).toBe("");
+});
