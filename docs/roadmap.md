@@ -871,11 +871,12 @@ Each task is a PR on `phase-9/review`, the build green after each.
   them, revisions (type, author, text), comments (text, author, initials, parent, done) and the
   text with every change accepted and rejected (a separate script: `word-reference.ps1`'s data
   stay as they were); its corpus run is the reference in `corpus/reference/review/`, which
-  `review-word.test.ts` compares Foli with (comments, threads, resolved state; accept-all and
-  reject-all text). `scripts/corpus/review-roundtrip.mjs` makes changes and comments in Foli on
+  `review-word.test.ts` compares Foli with (kinds of changes by author, comments, threads,
+  resolved state; accept-all and reject-all text). `scripts/corpus/review-roundtrip.mjs` makes changes and comments in Foli on
   every corpus document, exports them, and checks Word opens them without repair with Foli's
   revisions (insertion, deletion, run and paragraph formatting, by author, with text), comment,
-  reply and resolved state, and Word's accepted and rejected text equal to Foli's; Word edits each
+  reply and resolved state, and Word's accepted and rejected text equal to Foli's paragraph by
+  paragraph (fields aside; 03, a content control around paragraphs, not compared); Word edits each
   Foli-made file (automation: a tracked insertion, a reply) and Foli reads both back. 5 of 5
   pass (corpus/README.md). Known: Foli writes dates in UTC where Word writes local time.
 - [ ] 9.9 Close: docs (architecture, model, docx README, known limitations), acceptance checked,

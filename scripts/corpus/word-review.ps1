@@ -17,9 +17,10 @@
 # <name>-word.docx: tracked changes on, "Word edit. " typed at the start of the first paragraph,
 # and a reply ("Word reply.") to the first comment, if any. The author is Word's user name.
 #
-# Read only for -In: documents are opened read-only, macros disabled, and closed without saving;
-# Word's settings are not changed. Windows with desktop Word only. The JSON holds the
-# documents' text: -Out outside the repository for private documents.
+# Read only for -In: documents are opened read-only (edited copies too: saved as new files, never
+# over an existing one), macros disabled, closed without saving; Word's settings are not changed.
+# Windows with desktop Word only. Documents other than the corpus: -Out and -Edit outside the
+# repository (the JSON holds their text); -Edit never -In or inside it.
 
 param(
   [Parameter(Mandatory = $true)][string]$In,
@@ -28,19 +29,43 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+$root = [string](Split-Path -Parent (Split-Path -Parent $PSScriptRoot))
+$corpus = [string](Resolve-Path (Join-Path $root "corpus\word"))
 $In = [string](Resolve-Path $In)
-$Out = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($Out).TrimEnd("\")
-New-Item -ItemType Directory -Force $Out | Out-Null
-if ($Edit) {
-  New-Item -ItemType Directory -Force $Edit | Out-Null
-  $Edit = [string](Resolve-Path $Edit)
+$isCorpus = $In -eq $corpus
+$full = { param($path) $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($path).TrimEnd("\") }
+$inside = { param($path, $folder) ($path + "\").StartsWith($folder + "\", [StringComparison]::OrdinalIgnoreCase) }
+$Out = & $full $Out
+# The JSON holds the documents' text, the edited copies the documents: other documents' data
+# never lands in the repository.
+if (-not $isCorpus -and (& $inside $Out $root)) {
+  throw "-Out must be outside the repository for documents other than the corpus (the JSON holds their text)"
 }
+if ($Edit) {
+  $Edit = & $full $Edit
+  if (-not $isCorpus -and (& $inside $Edit $root)) {
+    throw "-Edit must be outside the repository for documents other than the corpus"
+  }
+  # Copies never go next to the documents: nothing there is overwritten or read again.
+  if (& $inside $Edit $In) { throw "-Edit must not be -In or a folder inside it" }
+}
+New-Item -ItemType Directory -Force $Out | Out-Null
+if ($Edit) { New-Item -ItemType Directory -Force $Edit | Out-Null }
 $utf8 = New-Object System.Text.UTF8Encoding $false
 $INFO_IN_TABLE = 12
 
 function Clean([string]$text) {
   $text = $text.Replace([string][char]0x0B, "`n").Replace([string][char]0x1E, [string][char]0x2011)
   return ($text -replace "[\x00-\x08\x0C-\x1F]", "").TrimEnd("`r", "`n")
+}
+
+function Scrub([string]$message, $file) {
+  # Word's messages name the file with its full path (a user folder): keep only the message.
+  foreach ($path in @($file.FullName, $file.DirectoryName, $In, $Edit)) {
+    if ($path) { $message = $message -replace [regex]::Escape($path), "" }
+  }
+  $message = $message -replace '(?:[A-Za-z]:|\\\\)\\[^\s)]*', "" -replace '\(\s*\)', ""
+  return ($message -replace '\s+', ' ').Trim()
 }
 
 function Paragraphs($doc) {
@@ -115,7 +140,7 @@ try {
       $doc.Revisions.RejectAll()
       $result.rejected = Paragraphs $doc
     } catch {
-      $result.error = ($_.Exception.Message -replace [regex]::Escape($file.FullName), "").Trim()
+      $result.error = Scrub $_.Exception.Message $file
     } finally {
       if ($doc) { try { $doc.Close(0) } catch {} }
     }
@@ -131,8 +156,11 @@ try {
 
     if ($Edit -and $result.opened) {
       $copy = $null
+      $target = [string](Join-Path $Edit ($file.BaseName + "-word.docx"))
       try {
-        $copy = Open $word ([string]$file.FullName) $false
+        if (Test-Path -LiteralPath $target) { throw "$($file.BaseName)-word.docx already exists in -Edit: not overwritten" }
+        # Read-only: the document itself is never changed; the edit is saved as a new file.
+        $copy = Open $word ([string]$file.FullName) $true
         $copy.TrackRevisions = $true
         $first = $copy.Paragraphs.First.Range
         $first.Collapse(1)   # wdCollapseStart
@@ -142,11 +170,11 @@ try {
           $topic.Replies.Add($topic.Scope, "Word reply.") | Out-Null
         }
         # FileName, FileFormat (wdFormatXMLDocument)
-        $copy.SaveAs2([string](Join-Path $Edit ($file.BaseName + "-word.docx")), 12)
+        $copy.SaveAs2($target, 12)
         Write-Output "$($file.Name): edited by Word"
       } catch {
         $failed++
-        Write-Output "$($file.Name): Word edit FAILED: $($_.Exception.Message)"
+        Write-Output "$($file.Name): Word edit FAILED: $(Scrub $_.Exception.Message $file)"
       } finally {
         if ($copy) { try { $copy.Close(0) } catch {} }
       }

@@ -87,8 +87,11 @@ powershell -ExecutionPolicy Bypass -File scripts/corpus/word-reference.ps1 -In <
 author, text), its comments (text, author, initials, the comment answered, resolved) and its
 paragraphs with every change accepted and with every change rejected, as Word reads them. Run on
 the corpus, it is the reference `packages/docx/src/review-word.test.ts` compares Foli with: the
-same comments, threads and resolved state, and, for the documents without content Foli keeps
-verbatim, Foli's accept-all and reject-all text equal to Word's (02 and 05).
+same kinds of changes by the same authors, the same comments, threads and resolved state, and
+Foli's accept-all and reject-all text equal to Word's paragraph by paragraph (those with fields
+or content controls aside: Foli keeps them verbatim, without text; 03 is not compared, its content
+control around paragraphs is one block in Foli). Documents other than the corpus: `-Out` and
+`-Edit` outside the repository; `-Edit` copies are saved as new files, never over one.
 
 `scripts/corpus/review-roundtrip.mjs` checks both directions. `make` opens every document in
 Foli with tracking on and, as "Foli Reviewer", inserts, deletes, formats text and a paragraph,
@@ -97,9 +100,9 @@ export, and the copy Word edited (a tracked insertion and a reply to the first c
 user), back in Foli. 2026-11-16, Word 16.0.20527: all 5 open without a repair prompt; in each,
 Word finds Foli's insertion, deletion, formatting and paragraph formatting by their author with
 their text, the comment with its initials, the reply in its thread and both resolved; Word's
-accepted and rejected text equals Foli's for 02 and 05 (01, 03 and 04 hold fields or content
-controls, whose text Foli keeps verbatim); Foli reads back Word's tracked insertion and reply in
-all 5.
+accepted and rejected text equals Foli's in 01, 02, 04 and 05 (paragraphs with fields aside;
+03 has a content control around paragraphs); Foli reads back Word's tracked insertion and reply
+in all 5.
 
 ```bash
 pnpm build

@@ -12,8 +12,8 @@
 // `check` compares, for each, what Word read (word-review.ps1): it opened; Foli's changes are
 // there (insertions, deletions, formatting, paragraph formatting, by their author, with their
 // text); the comment, the reply and the resolved state are; Word's text with every change
-// accepted, and rejected, is Foli's (paragraphs outside tables; not for a document with content
-// Foli keeps verbatim, which has no text in Foli). Then, in the copy Word edited
+// accepted, and rejected, is Foli's (paragraphs outside tables, those with content Foli keeps
+// verbatim aside: they have no text in Foli). Then, in the copy Word edited
 // (<dir>/edited), Foli reads Word's tracked insertion and its reply to the first comment.
 // Prints one line per document; exits 1 on any difference.
 
@@ -54,6 +54,9 @@ function textParagraphs(doc) {
 
 /** Word's paragraphs outside tables. */
 const plain = (list) => list.filter((p) => !p.inTable).map((p) => p.text);
+/** A paragraph's text, or null for one with content Foli keeps verbatim (no text in Foli). */
+const shownText = (p) =>
+  (p.content ?? []).some((n) => n.type === "opaqueInline") ? null : textOf(p);
 
 if (mode === "make") {
   const out = join(dir, "foli");
@@ -93,14 +96,10 @@ if (mode === "make") {
     accept.commands.acceptAllChanges();
     const reject = createEditor({ document });
     reject.commands.rejectAllChanges();
-    // Content Foli keeps verbatim (content controls, fields) has no text in Foli: such a
-    // document's text is not compared.
-    const opaque = JSON.stringify(document.content).includes('"type":"opaqueInline"');
     const expected = {
       deleted: word,
-      comparable: !opaque,
-      accepted: paragraphs(accept.getDocument()).map(textOf),
-      rejected: paragraphs(reject.getDocument()).map(textOf),
+      accepted: paragraphs(accept.getDocument()).map(shownText),
+      rejected: paragraphs(reject.getDocument()).map(shownText),
     };
     writeFileSync(join(out, `${name}.expected.json`), `${JSON.stringify(expected, null, 2)}\n`);
     console.log(`${name}.docx: made`);
@@ -151,28 +150,41 @@ if (mode === "make") {
       if (!reply || reply.author !== REPLIER || reply.parent !== comment || !reply.done)
         fail(name, `reply: ${JSON.stringify(reply)}`);
     }
-    // Case aside: Word's Range.Text applies the heading styles' all caps.
-    const same = (a, b) => JSON.stringify(a).toLowerCase() === JSON.stringify(b).toLowerCase();
-    if (expected.comparable && !same(plain(word.accepted), expected.accepted))
-      fail(name, "accepted text differs from Foli's");
-    if (expected.comparable && !same(plain(word.rejected), expected.rejected))
-      fail(name, "rejected text differs from Foli's");
+    // Paragraph by paragraph, those with verbatim content aside (null in Foli's), case aside
+    // (Word's Range.Text applies the heading styles' all caps). Not when Word has another number
+    // of paragraphs (a content control around paragraphs is one block in Foli).
+    let compared = "accept/reject text compared";
+    for (const kind of ["accepted", "rejected"]) {
+      const theirs = plain(word[kind]);
+      const own = expected[kind];
+      if (theirs.length !== own.length) {
+        compared = `text not compared (${own.length} paragraphs in Foli, ${theirs.length} in Word)`;
+        continue;
+      }
+      const differs = own.findIndex(
+        (text, i) => text !== null && text.toLowerCase() !== theirs[i]?.toLowerCase(),
+      );
+      if (differs >= 0) fail(name, `${kind} paragraph ${differs} differs from Foli's`);
+    }
 
     // Word's own edits to the file Foli made, read back by Foli.
     const edited = join(dir, "edited", `${name}-word.docx`);
     const back = await importDocx(new Uint8Array(readFileSync(edited)));
-    const json = JSON.stringify(back.document.content);
-    const insertion =
-      /"text":"Word edit\. ","marks":\[[^\]]*"type":"insertion","attrs":\{[^}]*"author":"([^"]*)"/.exec(
-        json,
-      );
-    if (!insertion || insertion[1] === AUTHOR) fail(name, "Word's tracked insertion not read back");
+    const authors = [];
+    const walk = (node) => {
+      if (node.type === "text" && node.text?.includes("Word edit."))
+        for (const m of node.marks ?? []) if (m.type === "insertion") authors.push(m.attrs.author);
+      for (const child of node.content ?? []) walk(child);
+    };
+    walk(back.document.content);
+    if (!authors.length || authors.includes(AUTHOR))
+      fail(name, "Word's tracked insertion not read back");
     const words = back.document.comments;
-    const first = words[0];
-    const theirs = words.find((c) => textOf(c.content[0] ?? {}) === "Word reply.");
-    if (first && (!theirs || theirs.parent !== first.id)) fail(name, "Word's reply not read back");
-    const text = expected.comparable ? "accept/reject text compared" : "text not compared (opaque)";
-    console.log(`${name}: checked (${ours.length} revisions by ${AUTHOR}, ${text})`);
+    const answer = words.find((c) => textOf(c.content[0] ?? {}) === "Word reply.");
+    const roots = new Set(words.filter((c) => c.parent === undefined).map((c) => c.id));
+    if (words.length && (!answer || !roots.has(answer.parent)))
+      fail(name, "Word's reply not read back");
+    console.log(`${name}: checked (${ours.length} revisions by ${AUTHOR}, ${compared})`);
   }
   if (failures) process.exit(1);
 }
