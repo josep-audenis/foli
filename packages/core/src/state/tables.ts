@@ -750,6 +750,11 @@ export function pasteCells(tr: Transaction, table: Node): boolean {
     Math.max(...filled.map((c) => c.row + c.rowSpan - 1)),
     Math.max(...filled.map((c) => c.column + c.span - 1)),
   );
-  if (first && last) tr.setSelection(CellSelection.create(tr.doc, first.pos, last.pos));
+  // A corner no cell covers (a shorter row): the first and last cells filled instead.
+  const one = filled[0] as GridCell;
+  const end = filled[filled.length - 1] as GridCell;
+  const from = first ?? coveringAt(after, one.row, one.column);
+  const to = last ?? coveringAt(after, end.row, end.column);
+  if (from && to) tr.setSelection(CellSelection.create(tr.doc, from.pos, to.pos));
   return true;
 }
