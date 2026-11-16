@@ -230,7 +230,9 @@ function findEnd(view: DataView): number {
 /** The entry's data, decompressed, checked against its size and CRC-32. */
 export async function inflateEntry(entry: ZipEntry): Promise<Uint8Array> {
   const data =
-    entry.method === 0 ? entry.raw.slice() : await inflateRaw(entry.raw, entry.size, entry.name);
+    entry.method === 0
+      ? new Uint8Array(entry.raw)
+      : await inflateRaw(entry.raw, entry.size, entry.name);
   if (data.length !== entry.size) throw new ZipError(`Damaged zip: wrong size for ${entry.name}`);
   if (crc32(data) !== entry.crc32)
     throw new ZipError(`Damaged zip: CRC mismatch for ${entry.name}`);
@@ -302,7 +304,8 @@ export function writeZip(entries: readonly ZipEntry[]): Uint8Array {
   for (const entry of entries) {
     if (entry.stored) {
       const { local, descriptor } = entry.stored;
-      const central = entry.stored.central.slice();
+      // A copy (a Node Buffer's `slice` is a view: the offset would be written into the input).
+      const central = new Uint8Array(entry.stored.central);
       new DataView(central.buffer).setUint32(42, offset, true);
       parts.push(local, entry.raw, descriptor);
       directory.push(central);

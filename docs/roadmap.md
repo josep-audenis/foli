@@ -715,8 +715,10 @@ Each task is a PR on `phase-8/word-model`, the build green after each.
 - [ ] 8.8 Close: docs, gate G5 numbers, 0.3.0 (changeset, version PR, publish after approval).
   The changeset lists the breaks:
   - Documents persist as v3 (0.2.0 cannot read them); `FoliChange.document`, `getDocument()` and
-    `useFoliEditor` are v3; `Editor` and `EditorOptions` are not generic (`createEditor` and
-    `setDocument` migrate any version); `EditorView` takes `Editor`.
+    `useFoliEditor` are v3; `createEditor`, `setDocument` and `initialContent` migrate any
+    version. Marks follow Word (`color`, `highlight` with Word's names); `parseDocument` keeps
+    any link target (check `isSafeHref` before making HTML); Tab types a tab outside lists.
+    (The full list is in the 0.3.0 changeset.)
   - Lists: `toggleList(kind)` and `wrapInList(kind)` take no attrs; `splitListItem`,
     `sinkListItem`, `liftListItem` and `liftListItemAtStart` are commands, not factories.
   - Removed: `insertHorizontalRule` (and `commands.insertHorizontalRule`), `listTypeAt`, the

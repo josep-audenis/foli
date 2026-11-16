@@ -82,6 +82,17 @@ describe("readZip / writeZip", () => {
     expect(writeZip(readZip(zip))).toEqual(zip);
   });
 
+  it("never writes into the bytes it read, a Node Buffer included", async () => {
+    // A Buffer's `slice` is a view on the same memory, unlike a Uint8Array's.
+    const zip = Buffer.from(await sample());
+    const before = new Uint8Array(zip);
+    const [first, ...rest] = readZip(zip) as [ZipEntry, ...ZipEntry[]];
+    const out = writeZip([await deflateEntry("a.xml", encode("changed"), first), ...rest]);
+    expect(readZip(out).map((e) => e.name)).toEqual(["a.xml", "media/b.bin", "empty.txt"]);
+    (await inflateEntry(rest[0] as ZipEntry)).fill(9);
+    expect(new Uint8Array(zip)).toEqual(before);
+  });
+
   it("keeps a read entry's headers when other entries change", async () => {
     const zip = await sample();
     const [first, ...rest] = readZip(zip) as [ZipEntry, ...ZipEntry[]];

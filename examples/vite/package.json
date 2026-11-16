@@ -6,10 +6,12 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
-    "ssr-check": "node ssr-check.mjs"
+    "ssr-check": "node ssr-check.mjs",
+    "docx-check": "node docx-check.mjs"
   },
   "dependencies": {
     "@folijs/core": "file:../../.packs/folijs-core.tgz",
+    "@folijs/docx": "file:../../.packs/folijs-docx.tgz",
     "@folijs/react": "file:../../.packs/folijs-react.tgz",
     "@folijs/view": "file:../../.packs/folijs-view.tgz",
     "react": "18.3.1",

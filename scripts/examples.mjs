@@ -25,7 +25,7 @@ const run = (command, cwd = root) => {
 run("pnpm build");
 rmSync(packs, { recursive: true, force: true });
 mkdirSync(packs);
-for (const name of ["core", "view", "react"]) {
+for (const name of ["core", "view", "react", "docx"]) {
   run(`pnpm pack --pack-destination "${packs}"`, `${root}packages/${name}`);
 }
 // Stable names, so the examples' package.json files need no version.
@@ -41,3 +41,4 @@ for (const example of ["vite", "next"]) {
   run("npm run build", dir);
 }
 run("npm run ssr-check", `${root}examples/vite`);
+run("npm run docx-check", `${root}examples/vite`);

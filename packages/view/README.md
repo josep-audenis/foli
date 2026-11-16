@@ -22,8 +22,9 @@ const view = new EditorView(host, editor, { placeholder: "Start writing…" });
 // later: view.destroy();
 ```
 
-The view gives each section's pages that section's page size and margins; the page look
-(background, shadow, gap, fonts) comes from your CSS or a copy of
+The view gives each section's pages that section's page size and margins, and the text the
+document's own styles and fonts; the page look (background, shadow, gap) comes from your CSS or
+a copy of
 [`@folijs/react`'s `styles.css`](https://github.com/josep-audenis/foli/blob/main/packages/react/styles.css).
 
 - [Getting started](https://github.com/josep-audenis/foli/blob/main/docs/getting-started.md#using-the-view-without-react)
