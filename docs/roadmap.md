@@ -9,19 +9,19 @@ leaves `main` green with a working playground.
 **Update this table in the same PR that starts, advances or finishes a phase.** It is the only
 place that says what is in progress; check it before starting work.
 
-| Phase                    | Status                   | Branch | Notes                                                                                      |
-| ------------------------ | ------------------------ | ------ | ------------------------------------------------------------------------------------------ |
-| 0 Foundation             | ✅ Done                  | —      |                                                                                            |
-| 1 Architecture spike     | ✅ Done (G1 provisional) | —      | Merged in #1; ADR-0003 accepted provisionally; IME, dead-key and screen-reader checks open |
-| 2 Document model         | ✅ Done                  | —      | Merged in #2                                                                               |
-| 3 Transactions & history | ✅ Done                  | —      | Merged in #4; gate G2 passed                                                               |
-| 4 Editor view            | ✅ Done (G3 provisional) | —      | Merged in #8–#13; manual checks (4.6) deferred, open risks in ADR-0003                     |
-| 5 Native pagination      | ✅ Done (G4 provisional) | —      | Merged in #15–#22; page-break manual checks open, risks in ADR-0003                        |
-| 6 React API & 0.1.0      | ✅ Done                  | —      | Merged in #23–#31; 0.1.0 on npm; manual checks shipped as known risks (ADR-0003)           |
-| 7 Rich content           | ✅ Done                  | —      | Merged in #33–#41; 0.2.0 on npm; list-document benchmark misses accepted (known limit)     |
-| 8 Word model & DOCX      | ✅ Done                  | —      | Merged in #44–#61; 0.3.0 on npm (`@folijs/docx` first released); gate G5 passed            |
-| 9 Review                 | Ready                    |        | Tracked changes and comments (depends on Phase 8)                                          |
-| 10–12                    | Not started              |        |                                                                                            |
+| Phase                    | Status                   | Branch           | Notes                                                                                      |
+| ------------------------ | ------------------------ | ---------------- | ------------------------------------------------------------------------------------------ |
+| 0 Foundation             | ✅ Done                  | —                |                                                                                            |
+| 1 Architecture spike     | ✅ Done (G1 provisional) | —                | Merged in #1; ADR-0003 accepted provisionally; IME, dead-key and screen-reader checks open |
+| 2 Document model         | ✅ Done                  | —                | Merged in #2                                                                               |
+| 3 Transactions & history | ✅ Done                  | —                | Merged in #4; gate G2 passed                                                               |
+| 4 Editor view            | ✅ Done (G3 provisional) | —                | Merged in #8–#13; manual checks (4.6) deferred, open risks in ADR-0003                     |
+| 5 Native pagination      | ✅ Done (G4 provisional) | —                | Merged in #15–#22; page-break manual checks open, risks in ADR-0003                        |
+| 6 React API & 0.1.0      | ✅ Done                  | —                | Merged in #23–#31; 0.1.0 on npm; manual checks shipped as known risks (ADR-0003)           |
+| 7 Rich content           | ✅ Done                  | —                | Merged in #33–#41; 0.2.0 on npm; list-document benchmark misses accepted (known limit)     |
+| 8 Word model & DOCX      | ✅ Done                  | —                | Merged in #44–#61; 0.3.0 on npm (`@folijs/docx` first released); gate G5 passed            |
+| 9 Review                 | In progress              | `phase-9/review` | Tracked changes and comments; plan below                                                   |
+| 10–12                    | Not started              |                  |                                                                                            |
 
 Status values: `Ready` (dependencies met, nobody on it) · `In progress` · `In review` (PR open) ·
 `✅ Done` (merged, acceptance criteria met) · `Blocked by …`.
@@ -749,6 +749,74 @@ The owner's documents (contracts) live in review: this comes right after the mod
   kept through edits.
 - Round trip with Word: changes and comments made in Foli show in Word and back, checked by the
   harness.
+
+**Starts from (Phase 8):** schema v3 already carries review content: `insertion` and `deletion`
+marks (id, author, date, `move`), the paragraph mark's `revision`, `formatChange` on runs and
+paragraphs (the previous properties), `commentStart`/`commentEnd`/`commentReference` anchors and
+`comments` (threads, resolved) in the envelope. `@folijs/docx` imports and exports all of it and
+writes comments made in the editor; the view renders `markup` or `final`. Missing: recording,
+accept/reject, editing comments, and undo for envelope changes (`withEnvelope` is outside
+history: pasted comments stay after undo, 8.7c), and `w:trackRevisions` (`settings.xml` is not
+read).
+
+**Acceptance:** with tracking on, any sequence of edits followed by "accept all" gives the
+document the same edits make with tracking off, and "reject all" gives the original back
+(property test, headless); undo restores comments and changes exactly; the redlined corpus
+documents give Word's text after accept all and after reject all; changes and comments made in
+Foli open in Word without repair with the same changes (type, author, text) and comments
+(text, replies, resolved state) Word reports, and Word's edits to such a file come back; review
+UI keyboard-only and axe-clean in three engines; 0.4.0 published.
+
+### Tasks
+
+Each task is a PR on `phase-9/review`, the build green after each.
+
+- [x] Claim phase, branch `phase-9/review`
+- [ ] 9.1 Envelope changes in history: a step (or recorded inverse) for envelope edits, so a
+  transaction's comment additions and removals undo and redo with it; styles and numbering added on first use keep
+  Word's behaviour (they stay after undo). Pasted comments go with undo (closes 8.7c's note).
+- [ ] 9.2 Recording insertions and deletions (`@folijs/core`, headless): track changes on/off in
+  editor state, author (and initials) from editor options, date per change; `w:trackRevisions`
+  read from and written to `settings.xml` (the part kept verbatim otherwise). Typing, paste,
+  Enter and hard breaks recorded as `insertion` (adjacent typing by the same author joins one
+  change); Backspace/Delete and replacing a selection mark text `deletion` instead of removing
+  it, while deleting one's own insertion removes it; joining paragraphs marks the paragraph mark
+  deleted (`revision`); comment anchors, opaque content and list markers handled as Word does;
+  ids unique in the document. Caret movement and word deletion skip deleted text in `final`.
+  Property test: accept all = untracked edits, reject all = original.
+- [ ] 9.3 Recording formatting changes: run formatting (bold, font, style…) records
+  `formatChange` with the properties before the first change, paragraph properties (style,
+  alignment, indentation, spacing, numbering) record the paragraph's `formatChange`; formatting
+  inserted text records nothing (it is already an insertion). Same property test with
+  formatting commands.
+- [ ] 9.4 Accept and reject: commands for the change at the caret, the changes in the selection,
+  all, and all by an author; next and previous change (selects it); paragraph mark revisions
+  merge or keep paragraphs; a move's two ends accepted or rejected together; formatting changes
+  restore or drop `previous`. Tested on the redlined corpus documents against Word's text after
+  accept all and reject all (from the harness's reference data).
+- [ ] 9.5 Review in the editable view and React: `markup`, `simple` (changes shown by a bar in
+  the margin) and `final` while editing (deleted text hidden but kept; selection and mapping
+  across it), author colors, author and date on hover and to screen readers (`ins`/`del`
+  semantics); toolbar group: Track changes (pressed state), accept, reject (with menus for
+  selection, all, by author), previous and next, view switch. Playwright in three engines:
+  tracked typing and deletion, accept/reject, undo; axe on the toolbar and pages with changes.
+- [ ] 9.6 Comments in the engine: commands to add a comment on the selection (anchors and
+  reference placed as Word places them), reply, edit a comment's text, resolve and reopen,
+  delete a comment (its anchors and its replies) and delete all; anchors kept through edits
+  (a range whose text is deleted keeps collapsed anchors, as Word does); copy and paste
+  (8.7c's rules) with undo. Headless tests.
+- [ ] 9.7 Comments pane (`@folijs/view` and React): threads beside the pages aligned with their
+  anchors (pushed down when they overlap), the anchor highlighted when its comment has focus and
+  the reverse; reply, edit, resolve, delete from the pane; comment text edited as v3 paragraphs
+  in a small editor; resolved comments shown dimmed or hidden; keyboard-only use and focus order
+  between document and pane; print without the pane. Playwright in three engines; axe.
+- [ ] 9.8 Word round trip in the harness: `word-reference.ps1` also reports revisions (type,
+  author, text) and comments (text, author, parent, done) without accepting them; a script makes
+  changes and comments in Foli on corpus documents, exports them, and checks Word opens them
+  without repair with the same revisions and comments; Word edits a Foli-made file (automation)
+  and Foli imports Word's changes and replies. Numbers in corpus/README.md.
+- [ ] 9.9 Close: docs (architecture, model, docx README, known limitations), acceptance checked,
+  the 0.4.0 changeset; publish with the owner's approval.
 
 ## Phase 10 — Tables & images · XL → 0.5.0
 
