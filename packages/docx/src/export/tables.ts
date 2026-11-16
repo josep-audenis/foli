@@ -364,6 +364,16 @@ export const rowPropertiesXml = (attrs: Json, ns: Namespaces) =>
 export const cellPropertiesXml = (attrs: Json, ns: Namespaces) =>
   propertiesXml(CELL, attrs, ns, false);
 
+/** A new table style's `w:tblPr`, `w:trPr` and `w:tcPr` (empty for a part it does not set). */
+export const stylePartsXml = (
+  style: { table?: unknown; row?: unknown; cell?: unknown },
+  ns: Namespaces,
+) => ({
+  tblPr: style.table ? propertiesXml(TABLE, style.table as Json, ns, false) : "",
+  trPr: style.row ? propertiesXml(ROW, style.row as Json, ns, false) : "",
+  tcPr: style.cell ? propertiesXml(CELL, style.cell as Json, ns, false) : "",
+});
+
 /** `w:tblGrid`: as read while the widths are the same, else written from them. */
 export function gridXml(attrs: Json, ns: Namespaces): string {
   const widths = (attrs.grid ?? []) as number[];

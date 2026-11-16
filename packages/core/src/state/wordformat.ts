@@ -166,6 +166,28 @@ export function builtinStyle(context: HasEnvelope, name: string): StyleJSON | nu
       ...based,
       paragraph: { indent: { left: 720 }, contextualSpacing: true },
     };
+  if (name === "Table Grid") {
+    // Word's: single borders all round and between cells, no space after paragraphs.
+    const line = { style: "single", size: 4, space: 0, color: "auto" };
+    const plain = styleNamed(context, "Normal Table", "table");
+    return {
+      id: "TableGrid",
+      type: "table",
+      name,
+      ...(plain ? { basedOn: plain } : {}),
+      paragraph: { spacing: { after: 0, line: 240, lineRule: "auto" } },
+      table: {
+        borders: {
+          top: line,
+          left: line,
+          bottom: line,
+          right: line,
+          insideH: line,
+          insideV: line,
+        },
+      },
+    };
+  }
   if (name === "Hyperlink") {
     const font = defaultParagraphStyleOf(context, "character");
     return {
@@ -186,7 +208,7 @@ export function builtinStyle(context: HasEnvelope, name: string): StyleJSON | nu
  * The id of the document's style named `name`, adding Word's built-in definition when the
  * document does not have it yet (with the envelope that has it; unchanged if it was there).
  */
-function ensureStyle(
+export function ensureStyle(
   context: HasEnvelope,
   name: string,
   type: StyleJSON["type"] = "paragraph",
