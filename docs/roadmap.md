@@ -754,7 +754,8 @@ The owner's documents (contracts) live in review: this comes right after the mod
 marks (id, author, date, `move`), the paragraph mark's `revision`, `formatChange` on runs and
 paragraphs (the previous properties), `commentStart`/`commentEnd`/`commentReference` anchors and
 `comments` (threads, resolved) in the envelope. `@folijs/docx` imports and exports all of it and
-writes comments made in the editor; the view renders `markup` or `final`. Missing: recording,
+writes comments made in the editor; the view renders `markup` or `final`. Missing when the
+phase started: recording,
 accept/reject, editing comments, and undo for envelope changes (`withEnvelope` is outside
 history: pasted comments stay after undo, 8.7c), and `w:trackRevisions` (`settings.xml` is not
 read).
@@ -772,7 +773,7 @@ UI keyboard-only and axe-clean in three engines; 0.4.0 published.
 Each task is a PR on `phase-9/review`, the build green after each.
 
 - [x] Claim phase, branch `phase-9/review`
-- [x] 9.1 Comments in history: `CommentStep` adds, changes or removes one comment of the
+- [x] 9.1 Comments in history (#63): `CommentStep` adds, changes or removes one comment of the
   envelope and leaves the tree as it is, so a transaction's comment changes undo and redo with
   it (`setComments` makes the steps; `withEnvelope` ignores comments); styles and numbering
   added on first use keep Word's behaviour (they stay after undo). Pasted comments go with undo

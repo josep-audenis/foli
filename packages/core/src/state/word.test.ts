@@ -558,6 +558,22 @@ describe("comments in history", () => {
     expect(blocks(editor)).toEqual([p({}, text("ba"))]);
   });
 
+  it("leaves a comment changed outside history since", () => {
+    const editor = editorOf(p({}));
+    editor.dispatch(setComments(editor.state.tr, [], [comment(1, "x")]));
+    editor.dispatch(
+      setComments(editor.state.tr, [comment(1, "x")], []).setMeta("addToHistory", false),
+    );
+    // Undoing the addition finds nothing to remove; redo does not bring it back over a newer one.
+    editor.commands.undo();
+    expect(editor.getDocument().comments).toEqual([]);
+    editor.dispatch(
+      setComments(editor.state.tr, [], [comment(1, "new")]).setMeta("addToHistory", false),
+    );
+    editor.commands.redo();
+    expect(editor.getDocument().comments).toEqual([comment(1, "new")]);
+  });
+
   it("changes nothing when the comments are the same", () => {
     const editor = editorOf(p({}));
     const start = [comment(1, "x")];

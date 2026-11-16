@@ -70,6 +70,8 @@ export function applyCommentSteps(
   for (const step of steps) {
     if (!(step instanceof CommentStep)) continue;
     const at = next.findIndex((c) => c.id === step.id);
+    // A change made since (outside history) wins: undo does not bring back or overwrite it.
+    if ((step.previous === null) !== at < 0) continue;
     const rest = at < 0 ? next : [...next.slice(0, at), ...next.slice(at + 1)];
     if (!step.comment) next = rest;
     else {
@@ -82,7 +84,8 @@ export function applyCommentSteps(
 
 /**
  * Makes `tr` change the comments from `from` (the state's) to `to`, one `CommentStep` per
- * comment added, changed or removed, after any comment steps `tr` already has.
+ * comment added, changed or removed, after any comment steps `tr` already has. Comments kept
+ * keep their order (a new one goes at its index in `to`).
  */
 export function setComments(
   tr: Transaction,
