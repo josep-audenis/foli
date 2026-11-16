@@ -88,6 +88,23 @@ describe("tracked changes", () => {
     expect(blocks(editor)).toEqual([p(text("a"), text("bcde", [mine]), text("f"))]);
   });
 
+  it("steps over deleted text the view hides, tracking or not", () => {
+    const theirs: MarkJSON = {
+      type: "deletion",
+      attrs: { id: 5, author: "B", date: "2026-01-02T03:04:05Z" },
+    };
+    const editor = createEditor({ document: documentOf(p(text("ab"), text("cd", [theirs]))) });
+    editor.commands.setReviewView("final");
+    editor.select(5);
+    editor.commands.deleteBackward();
+    expect(blocks(editor)).toEqual([p(text("a"), text("cd", [theirs]))]);
+    // In markup, deleted text shown is deleted for real when not tracking.
+    editor.commands.setReviewView("markup");
+    editor.select(3);
+    editor.commands.deleteBackward();
+    expect(blocks(editor)).toEqual([p(text("a"), text("d", [theirs]))]);
+  });
+
   it("keeps the review view in the editor's state", () => {
     const editor = tracked(p(text("ab")));
     expect(trackState(editor.state)?.view).toBe("markup");

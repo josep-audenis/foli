@@ -15,7 +15,7 @@ import { closeHistory } from "./history.js";
 import { MARK_ATTRS } from "./mark.js";
 import { TextSelection } from "./selection.js";
 import type { Command, EditorState, Transaction } from "./state.js";
-import { RECORDED, untracked } from "./track.js";
+import { RECORDED, trackState, untracked } from "./track.js";
 
 export type ChangeKind =
   | "insertion"
@@ -305,7 +305,11 @@ export const rejectAllChanges = (author?: string): Command =>
 /** Selects the next (or previous) change after (before) the selection. */
 function goTo(forward: boolean): Command {
   return (state, dispatch) => {
-    const changes = trackedChanges(state.doc);
+    // Where the review view hides deleted content, only what it shows.
+    const hidden = (trackState(state)?.view ?? "markup") !== "markup";
+    const changes = trackedChanges(state.doc).filter(
+      (c) => !hidden || (c.kind !== "deletion" && c.kind !== "paragraphDeletion"),
+    );
     const { from, to } = state.selection;
     // In document order (by start, then end), the first one after (before) the selection.
     const target = forward

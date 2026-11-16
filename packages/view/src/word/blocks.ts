@@ -575,10 +575,11 @@ function renderInline(
         element.style.backgroundColor = "rgba(255, 213, 79, 0.35)";
     }
     if (review === "markup" && (inserted || deleted)) {
-      const change = marks.find((m) => m.type === (inserted ? "insertion" : "deletion"))?.attrs;
+      // Inserted, then deleted: shown as deleted, in the deleting author's color.
+      const change = marks.find((m) => m.type === (deleted ? "deletion" : "insertion"))?.attrs;
       const author = String(change?.author ?? "");
       const date = (change?.date as string | null | undefined) ?? null;
-      const wrapper = changeElement(doc, inserted, author, date, review);
+      const wrapper = changeElement(doc, !deleted, author, date, review);
       wrapper.append(element);
       element = wrapper;
     }

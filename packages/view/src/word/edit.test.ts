@@ -319,6 +319,19 @@ describe("EditorView on a schema v3 document", () => {
     expect((blocks(host)[0] as HTMLElement).style.boxShadow).not.toBe("");
   });
 
+  it("never puts the DOM caret inside hidden deleted text", () => {
+    const { host, editor, view } = mount(p({}, text("abc")));
+    editor.commands.setTrackChanges(true, "A");
+    editor.commands.setReviewView("final");
+    view.focus();
+    editor.select(1);
+    editor.commands.deleteForward();
+    expect(editor.state.selection.head).toBe(2);
+    const focus = document.getSelection()?.focusNode as Node;
+    expect(focus.parentElement?.closest("del")).toBeNull();
+    expect(host.contains(focus)).toBe(true);
+  });
+
   it("shows changes as simple markup or final text, keeping positions", () => {
     const change = { id: 1, author: "A" };
     const { host, editor } = mount(

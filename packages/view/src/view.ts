@@ -133,6 +133,13 @@ function printStyles(settings: DocumentSettings, sheets: readonly Sheet[], id: s
   );
 }
 
+/** Whether `node` is inside an element of `stop` that is not displayed (hidden deleted text). */
+function hiddenIn(node: Node, stop: Node): boolean {
+  for (let el = node.parentElement; el && el !== stop; el = el.parentElement)
+    if (el.style.display === "none") return true;
+  return false;
+}
+
 /** The attribute naming a page's page setup (its index among the document's) for print. */
 const SHEET_ATTR = "data-foli-sheet";
 
@@ -906,7 +913,9 @@ export class EditorView {
     // browser shows it at the start of the next line at a soft wrap.
     const split = desc.splits.indexOf(offset);
     if (split >= 0) return fragmentStart(desc, split + 1);
-    for (const leaf of desc.leaves) {
+    // Deleted text hidden by the review view takes no caret: the shown text next to it does.
+    const shown = desc.leaves.filter((leaf) => !hiddenIn(leaf.dom, desc.dom));
+    for (const leaf of shown) {
       if (
         leaf.dom.nodeType === Node.TEXT_NODE &&
         leaf.offset <= offset &&
@@ -914,10 +923,15 @@ export class EditorView {
       )
         return { node: leaf.dom, offset: offset - leaf.offset };
     }
-    const next = desc.leaves.find((leaf) => leaf.offset >= offset);
-    if (next) return before(next.dom);
-    const last = desc.leaves[desc.leaves.length - 1];
+    const next = shown.find((leaf) => leaf.offset >= offset);
+    if (next) {
+      if (next.dom.nodeType === Node.TEXT_NODE) return { node: next.dom, offset: 0 };
+      return before(next.dom);
+    }
+    const last = shown[shown.length - 1];
     if (last) {
+      if (last.dom.nodeType === Node.TEXT_NODE)
+        return { node: last.dom, offset: (last.dom as Text).length };
       const point = before(last.dom);
       return { node: point.node, offset: point.offset + 1 };
     }

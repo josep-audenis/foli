@@ -178,6 +178,15 @@ describe("accepting and rejecting changes", () => {
     );
   });
 
+  it("does not go to deleted content the view hides", () => {
+    const editor = redline();
+    editor.commands.setReviewView("final");
+    editor.select(0);
+    expect(editor.commands.nextChange()).toBe(true);
+    expect([editor.state.selection.from, editor.state.selection.to]).toEqual([2, 3]);
+    expect(editor.commands.nextChange()).toBe(false);
+  });
+
   it("accepts only the selected part of a change", () => {
     const editor = editorOf(p({}, text("XXXXXX", [ins(1)])));
     editor.select(3, 5);

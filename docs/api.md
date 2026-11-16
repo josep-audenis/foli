@@ -184,8 +184,10 @@ Review view: how the editor's views show changes, kept in its state (`createEdit
 reviewView })`, `editor.commands.setReviewView(view)`, `setReviewView`, `trackState(state).view`):
 `ReviewView` is `"markup"` (inserted text underlined, deleted text struck through, in the
 author's color, a bar beside changed paragraphs), `"simple"` (the text as if accepted, with the
-bar) or `"final"` (as if accepted). Deleted text is hidden, not removed, so positions and
-editing are unchanged. While tracking, Backspace and Delete step over deleted text.
+bar, in the editor's view; `renderDocument` draws none) or `"final"` (as if accepted). Deleted
+text is hidden, not removed, so positions and editing are unchanged; the caret never goes into
+it, next and previous change skip it. While tracking, and wherever it is hidden, Backspace and
+Delete step over deleted text.
 
 Accepting and rejecting (not tracked themselves; each its own undo step; undo takes them back):
 `editor.commands.acceptChange()` / `rejectChange()` (the changes at the caret, the paragraph's

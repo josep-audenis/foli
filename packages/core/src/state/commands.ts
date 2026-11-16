@@ -131,6 +131,15 @@ function forwardExtent($pos: ResolvedPos, unit: DeleteUnit, textOnly = false): n
   return length + (segments.shift()?.segment.length ?? 0);
 }
 
+/**
+ * Whether Backspace and Delete step over deleted text: while tracking, and wherever the review
+ * view hides it.
+ */
+function skipsDeleted(state: EditorState): boolean {
+  const track = trackState(state);
+  return track?.on === true || (track?.view ?? "markup") !== "markup";
+}
+
 /** Content a tracked change deleted (still in the document until accepted). */
 const isDeleted = (node: Node) => node.marks.some((m) => m.type.name === "deletion");
 
@@ -143,7 +152,7 @@ export function deleteBackward(unit: DeleteUnit = "char"): Command {
     // Invisible markers (a bookmark, a comment's range) stay: the character before them goes.
     // While tracking, so does text already deleted: Backspace deletes what is before it.
     const word = wordContext(state);
-    const tracking = trackState(state)?.on === true;
+    const tracking = skipsDeleted(state);
     let $pos = found;
     while ($pos.parentOffset > 0) {
       const before = $pos.nodeBefore;
@@ -170,7 +179,7 @@ export function deleteForward(unit: DeleteUnit = "char"): Command {
     const found = caret(state);
     if (!found) return false;
     const word = wordContext(state);
-    const tracking = trackState(state)?.on === true;
+    const tracking = skipsDeleted(state);
     let $pos = found;
     while ($pos.parentOffset < $pos.parent.content.size) {
       const after = $pos.nodeAfter;

@@ -311,6 +311,13 @@ describe("renderBlocks: review", () => {
     expect(del.style.textDecorationLine).toBe("line-through");
   });
 
+  it("shows text inserted, then deleted, as deleted", () => {
+    const [block] = render([p({}, text("x", [insertion, deletion]))]);
+    expect(block?.element.querySelector("ins")).toBeNull();
+    const del = block?.element.querySelector("del") as HTMLElement;
+    expect(del.title).toMatch(/^Deleted by Ben/);
+  });
+
   it("shows the final text: deletions gone, a deleted paragraph mark merged into the next", () => {
     const blocks = render(
       [
