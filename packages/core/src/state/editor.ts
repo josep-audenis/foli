@@ -51,6 +51,7 @@ import {
 } from "./review.js";
 import { TextSelection } from "./selection.js";
 import { type Command, EditorState, type Plugin, type Transaction } from "./state.js";
+import { tableKeymap } from "./tables.js";
 import {
   type ReviewView,
   setReviewView,
@@ -226,6 +227,7 @@ export function createEditor({
     wordPlugin(envelope),
     trackPlugin(track),
     commentsPlugin(),
+    tableKeymap(),
     listKeymap(),
     baseKeymap(),
   ];

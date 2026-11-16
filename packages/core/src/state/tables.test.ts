@@ -4,6 +4,7 @@ import type { FoliDocument } from "../v3/document.js";
 import { parseContent } from "../v3/document.js";
 import { createEditor } from "./editor.js";
 import { TextSelection } from "./selection.js";
+import { goToCellVertically } from "./tables.js";
 
 /** Editing across a table's edges (10.6, ADR-0006). */
 
@@ -372,5 +373,53 @@ describe("an inserted paragraph that is a cell's only one", () => {
     expect(editor.commands.rejectAllChanges()).toBe(true);
     valid(editor);
     expect(editor.state.doc.child(1).child(0).child(0).childCount).toBe(1);
+  });
+});
+
+describe("moving between cells", () => {
+  const selected = (editor: Editor) =>
+    editor.state.doc.textBetween(editor.state.selection.from, editor.state.selection.to);
+
+  it("Tab and Shift+Tab go to the next and previous cell, its content selected", () => {
+    const editor = editorOf([p("x"), TABLE, p("y")]);
+    select(editor, inside(editor, "a1", 1));
+    expect(editor.handleKey("Tab")).toBe(true);
+    expect(selected(editor)).toBe("b1");
+    editor.handleKey("Tab");
+    expect(selected(editor)).toBe("a2");
+    editor.handleKey("Shift-Tab");
+    expect(selected(editor)).toBe("b1");
+    // Outside a table Tab types a tab.
+    select(editor, inside(editor, "x", 1));
+    editor.handleKey("Tab");
+    // "x" then the tab.
+    expect(editor.state.doc.child(0).childCount).toBe(2);
+  });
+
+  it("Tab in the last cell adds a row like the last one, with empty cells", () => {
+    const editor = editorOf([p("x"), TABLE, p("y")]);
+    select(editor, inside(editor, "b3", 2));
+    editor.handleKey("Tab");
+    expect(shape(editor)[1]).toEqual([
+      ["a1", "b1"],
+      ["a2", "b2"],
+      ["a3", "b3"],
+      ["", ""],
+    ]);
+    const $head = editor.state.selection.$head;
+    expect($head.index($head.depth - 3)).toBe(3);
+    valid(editor);
+  });
+
+  it("Up and Down from a cell's edge go to the cell above or below, and out of the table", () => {
+    const editor = editorOf([p("x"), TABLE, p("y")]);
+    select(editor, inside(editor, "b2", 1));
+    expect(editor.run(goToCellVertically(-1))).toBe(true);
+    expect(editor.state.selection.from).toBe(inside(editor, "b1", 2));
+    editor.run(goToCellVertically(-1));
+    expect(editor.state.selection.from).toBe(inside(editor, "x", 1));
+    select(editor, inside(editor, "a3", 0));
+    editor.run(goToCellVertically(1));
+    expect(editor.state.selection.from).toBe(inside(editor, "y"));
   });
 });

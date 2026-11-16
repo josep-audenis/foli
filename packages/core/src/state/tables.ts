@@ -5,7 +5,9 @@
  * across cells of a table empties those cells. Nothing is joined across a table's edge.
  */
 import { Fragment, type Node, type ResolvedPos, Slice } from "../model/index.js";
-import type { Transaction } from "./state.js";
+import { attempt as attemptTr } from "./attempt.js";
+import { Selection, TextSelection } from "./selection.js";
+import { type Command, type EditorState, Plugin, type Transaction } from "./state.js";
 
 const isTable = (node: Node) => node.type.name === "table";
 
@@ -167,4 +169,168 @@ export function keepTablesApart(tr: Transaction): void {
   };
   visit(tr.doc, 0);
   for (const at of inserts.reverse()) tr.insert(at, paragraph.create());
+}
+
+// ---- Moving between cells (10.6b) --------------------------------------------------------------
+
+/** The innermost cell around the selection head: its depth, or -1. */
+function headCell(state: EditorState): { $pos: ResolvedPos; depth: number } | null {
+  const $pos = state.selection.$head;
+  const depth = cellDepth($pos);
+  return depth < 0 ? null : { $pos, depth };
+}
+
+/** The positions of every cell of `table` (at `start`), row by row. */
+function cellsOf(table: Node, start: number): number[] {
+  const out: number[] = [];
+  let rowPos = start + 1;
+  table.forEach((row) => {
+    let cellPos = rowPos + 1;
+    row.forEach((cell) => {
+      out.push(cellPos);
+      cellPos += cell.nodeSize;
+    });
+    rowPos += row.nodeSize;
+  });
+  return out;
+}
+
+/** Selects a cell's content (Word's Tab does), or puts the caret in an empty one. */
+function selectCell(tr: Transaction, cellPos: number): void {
+  const cell = tr.doc.nodeAt(cellPos) as Node;
+  const from = Selection.near(tr.doc.resolve(cellPos + 1), 1).from;
+  const to = Selection.near(tr.doc.resolve(cellPos + cell.nodeSize - 1), -1).to;
+  tr.setSelection(TextSelection.create(tr.doc, from, Math.max(from, to)));
+}
+
+/**
+ * Tab (`dir` 1) and Shift+Tab (-1) in a table: the next or previous cell, its content selected,
+ * as Word does. Tab in the last cell adds a row like the last one (its cells empty, no merge).
+ * Does not apply outside a table.
+ */
+export function goToCell(dir: 1 | -1): Command {
+  return (state, dispatch) => {
+    const found = headCell(state);
+    if (!found) return false;
+    const { $pos, depth } = found;
+    const tableDepth = depth - 2;
+    const table = $pos.node(tableDepth);
+    const tableStart = $pos.before(tableDepth);
+    const cells = cellsOf(table, tableStart);
+    const at = cells.indexOf($pos.before(depth));
+    const next = cells[at + dir];
+    if (next !== undefined) {
+      if (dispatch) {
+        const tr = state.tr;
+        selectCell(tr, next);
+        dispatch(tr);
+      }
+      return true;
+    }
+    if (dir < 0) return true; // the first cell: Word stays
+    // The last cell: a new row after the table's last one.
+    const last = table.lastChild as Node;
+    const { schema } = state;
+    const paragraph = schema.nodes.paragraph;
+    if (!paragraph) return false;
+    const rowAttrs = { ...last.attrs, revision: null, header: null };
+    const cellsJSON: Node[] = [];
+    last.forEach((cell) => {
+      const attrs = { ...cell.attrs, vMerge: null };
+      cellsJSON.push(
+        cell.type.create(
+          attrs,
+          paragraph.create(cell.firstChild?.type === paragraph ? cell.firstChild.attrs : null),
+        ),
+      );
+    });
+    const row = last.type.create(rowAttrs, cellsJSON);
+    const insertAt = tableStart + table.nodeSize - 1;
+    return attemptTr(state, dispatch, (tr) => {
+      tr.insert(insertAt, row);
+      tr.setSelection(TextSelection.create(tr.doc, insertAt + 3));
+    });
+  };
+}
+
+/**
+ * Up (`dir` -1) and Down (1) from the first or last line of a cell (the view says when): the
+ * cell above or below that covers the same grid column (a merge's first cell), its last or first
+ * line; from the table's first or last row, out of the table.
+ */
+export function goToCellVertically(dir: 1 | -1): Command {
+  return (state, dispatch) => {
+    const found = headCell(state);
+    if (!found) return false;
+    const { $pos, depth } = found;
+    // A selection inside one cell (Tab selects a cell's content) moves as its head; one across
+    // cells is not this command's.
+    const $anchor = state.selection.$anchor;
+    if (
+      !state.selection.empty &&
+      ($anchor.depth < depth || $anchor.before(depth) !== $pos.before(depth))
+    )
+      return false;
+    // Only from the cell's first (last) paragraph.
+    const index = $pos.index(depth);
+    const cell = $pos.node(depth);
+    if (dir < 0 ? index > 0 : index < cell.childCount - 1) return false;
+    const rowDepth = depth - 1;
+    const tableDepth = depth - 2;
+    const table = $pos.node(tableDepth);
+    const tableStart = $pos.before(tableDepth);
+    const rowIndex = $pos.index(tableDepth);
+    const column = columnOf($pos.node(rowDepth), $pos.index(rowDepth));
+    let target: number | null = null;
+    for (let r = rowIndex + dir; r >= 0 && r < table.childCount; r += dir) {
+      const cellPos = cellAtColumn(table, tableStart, r, column);
+      if (cellPos === null) continue;
+      const node = state.doc.nodeAt(cellPos) as Node;
+      // A covered cell is part of the merge above it: going up, the merge's first cell.
+      if (node.attrs.vMerge === "continue") continue;
+      target = cellPos;
+      break;
+    }
+    if (!dispatch) return true;
+    const tr = state.tr;
+    if (target === null) {
+      // Out of the table: before or after it.
+      const pos = dir < 0 ? tableStart : tableStart + table.nodeSize;
+      tr.setSelection(Selection.near(tr.doc.resolve(pos), dir));
+    } else {
+      const node = tr.doc.nodeAt(target) as Node;
+      const pos = dir < 0 ? target + node.nodeSize - 1 : target + 1;
+      tr.setSelection(Selection.near(tr.doc.resolve(pos), dir < 0 ? -1 : 1));
+    }
+    dispatch(tr);
+    return true;
+  };
+}
+
+/** The first grid column of a row's cell at `index` (`gridBefore` counted). */
+function columnOf(row: Node, index: number): number {
+  let column = (row.attrs.gridBefore as number | null) ?? 0;
+  for (let i = 0; i < index; i++) column += (row.child(i).attrs.gridSpan as number | null) ?? 1;
+  return column;
+}
+
+/** The position of the cell of row `r` covering grid column `column`, if any. */
+function cellAtColumn(table: Node, tableStart: number, r: number, column: number): number | null {
+  let rowPos = tableStart + 1;
+  for (let i = 0; i < r; i++) rowPos += table.child(i).nodeSize;
+  const row = table.child(r);
+  let at = (row.attrs.gridBefore as number | null) ?? 0;
+  let cellPos = rowPos + 1;
+  for (let i = 0; i < row.childCount; i++) {
+    const cell = row.child(i);
+    const span = (cell.attrs.gridSpan as number | null) ?? 1;
+    if (column >= at && column < at + span) return cellPos;
+    at += span;
+    cellPos += cell.nodeSize;
+  }
+  return null;
+}
+/** Tab and Shift+Tab between cells: before the lists' Tab (in a cell Word moves, numbered or not). */
+export function tableKeymap(): Plugin {
+  return new Plugin({ keymap: { Tab: goToCell(1), "Shift-Tab": goToCell(-1) } });
 }

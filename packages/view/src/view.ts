@@ -12,6 +12,7 @@ import {
   type EditorState,
   fitPaste,
   fitPastedV2,
+  goToCellVertically,
   insertHardBreak,
   insertLink,
   insertText,
@@ -1560,6 +1561,15 @@ export class EditorView {
     // Up/Down on a textblock's first/last line next to a rule select it (only the view knows
     // lines; measured only when a rule is beside the block); else the browser moves the caret.
     const vertical = name === "ArrowUp" ? -1 : name === "ArrowDown" ? 1 : 0;
+    // In a table, from a cell's first or last line: the cell above or below, or out of the
+    // table (browsers go to the next cell in the DOM, or across pages to the wrong row).
+    const cells = vertical ? goToCellVertically(vertical as -1 | 1) : null;
+    // (A selection inside one cell, Tab's, moves as a whole: no line to measure.)
+    const onEdge = () => !this.state.selection.empty || this.caretOnEdgeLine(vertical as -1 | 1);
+    if (cells?.(this.state) && onEdge() && this.run(cells)) {
+      event.preventDefault();
+      return;
+    }
     const across = vertical ? arrowAcrossLeaf(vertical, "line") : null;
     if (across?.(this.state) && this.caretOnEdgeLine(vertical as -1 | 1) && this.run(across)) {
       event.preventDefault();
