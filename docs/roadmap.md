@@ -823,7 +823,7 @@ Each task is a PR on `phase-9/review`, the build green after each.
   inserted text and the deleted text back (Word's reject is compared in 9.8). The property test
   accepts and rejects everything for real: accept all = the edits untracked, reject all = the
   original (text, style, bold, alignment).
-- [x] 9.5 Review in the editable view and React: the review view in the editor's state
+- [x] 9.5 Review in the editable view and React (#67): the review view in the editor's state
   (`setReviewView`, `createEditor({ reviewView })`): `markup` (author colors, underline and
   strike), `simple` (a bar beside changed paragraphs) and `final` while editing (deleted text
   hidden, kept in the DOM: selection and mapping go through it); `ins`/`del` titled with the
