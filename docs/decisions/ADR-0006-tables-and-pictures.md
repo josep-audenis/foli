@@ -1,6 +1,6 @@
 # ADR-0006: Tables and pictures in the model and on pages
 
-- **Status:** Proposed (2026-11-16), task 10.1. Accepted by the owner before 10.2 starts.
+- **Status:** Accepted (owner, 2026-11-16), task 10.1.
 - **Context:** schema v3 ([ADR-0005](ADR-0005-word-compatible-model.md)) keeps a table as one
   `opaqueBlock` (its `w:tbl` XML: exported byte for byte, shown read-only from the XML, selected
   and deleted whole, refused while tracking) and a drawing as an `opaqueInline` (shown as

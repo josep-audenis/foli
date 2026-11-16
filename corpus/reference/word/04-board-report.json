@@ -478,5 +478,19 @@
                            "listString":  "",
                            "inTable":  false
                        }
-                   ]
+                   ],
+    "pictures":  [
+                     {
+                         "float":  true,
+                         "page":  3,
+                         "left":  -999996,
+                         "top":  0.3,
+                         "width":  200,
+                         "height":  210,
+                         "alt":  "Bar chart of monthly revenue, October to March",
+                         "wrap":  0,
+                         "horizontalTo":  0,
+                         "verticalTo":  2
+                     }
+                 ]
 }

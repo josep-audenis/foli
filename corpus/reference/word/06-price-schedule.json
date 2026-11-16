@@ -1,0 +1,1357 @@
+{
+    "document":  "06-price-schedule.docx",
+    "word":  "16.0.20527",
+    "opened":  true,
+    "error":  null,
+    "revisionsAccepted":  0,
+    "pages":  2,
+    "paragraphs":  [
+                       {
+                           "text":  "PRICE SCHEDULE",
+                           "page":  1,
+                           "line":  1,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  false
+                       },
+                       {
+                           "text":  "Schedule 2 to the Supply Agreement. Prices are in EUR and exclude VAT.",
+                           "page":  1,
+                           "line":  2,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  false
+                       },
+                       {
+                           "text":  "Category",
+                           "page":  1,
+                           "line":  3,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "Item",
+                           "page":  1,
+                           "line":  3,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "Unit",
+                           "page":  1,
+                           "line":  3,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "Qty",
+                           "page":  1,
+                           "line":  3,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "Price",
+                           "page":  1,
+                           "line":  3,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "Hardware",
+                           "page":  1,
+                           "line":  4,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "Hardware item 1",
+                           "page":  1,
+                           "line":  4,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "each",
+                           "page":  1,
+                           "line":  4,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "2",
+                           "page":  1,
+                           "line":  4,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "37,50",
+                           "page":  1,
+                           "line":  4,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "10+",
+                           "page":  1,
+                           "line":  5,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "33.00",
+                           "page":  1,
+                           "line":  5,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "Volume prices:",
+                           "page":  1,
+                           "line":  6,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "",
+                           "page":  1,
+                           "line":  5,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "each",
+                           "page":  1,
+                           "line":  5,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "4",
+                           "page":  1,
+                           "line":  5,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "75,00",
+                           "page":  1,
+                           "line":  5,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "Hardware item 3",
+                           "page":  1,
+                           "line":  8,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "each",
+                           "page":  1,
+                           "line":  8,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "6",
+                           "page":  1,
+                           "line":  8,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "112,50",
+                           "page":  1,
+                           "line":  8,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "Hardware item 4",
+                           "page":  1,
+                           "line":  9,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "each",
+                           "page":  1,
+                           "line":  9,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "8",
+                           "page":  1,
+                           "line":  9,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "150,00",
+                           "page":  1,
+                           "line":  9,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "Hardware item 5",
+                           "page":  1,
+                           "line":  10,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "each",
+                           "page":  1,
+                           "line":  10,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "10",
+                           "page":  1,
+                           "line":  10,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "187,50",
+                           "page":  1,
+                           "line":  10,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "Hardware item 6",
+                           "page":  1,
+                           "line":  11,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "each",
+                           "page":  1,
+                           "line":  11,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "12",
+                           "page":  1,
+                           "line":  11,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "225,00",
+                           "page":  1,
+                           "line":  11,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "Hardware item 7",
+                           "page":  1,
+                           "line":  12,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "each",
+                           "page":  1,
+                           "line":  12,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "14",
+                           "page":  1,
+                           "line":  12,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "262,50",
+                           "page":  1,
+                           "line":  12,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "Hardware item 8",
+                           "page":  1,
+                           "line":  13,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "each",
+                           "page":  1,
+                           "line":  13,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "16",
+                           "page":  1,
+                           "line":  13,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "300,00",
+                           "page":  1,
+                           "line":  13,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "Hardware item 9",
+                           "page":  1,
+                           "line":  14,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "each",
+                           "page":  1,
+                           "line":  14,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "18",
+                           "page":  1,
+                           "line":  14,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "337,50",
+                           "page":  1,
+                           "line":  14,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "Subtotal Hardware",
+                           "page":  1,
+                           "line":  17,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "1.200,00",
+                           "page":  1,
+                           "line":  17,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "Software",
+                           "page":  1,
+                           "line":  18,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "Software item 10",
+                           "page":  1,
+                           "line":  18,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "each",
+                           "page":  1,
+                           "line":  18,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "2",
+                           "page":  1,
+                           "line":  18,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "375,00",
+                           "page":  1,
+                           "line":  18,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "Software item 11 with a longer description: installation on every workstation, licence keys for three years, and the vendor\u0027s onboarding pack, delivered in one visit.",
+                           "page":  1,
+                           "line":  19,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "each",
+                           "page":  1,
+                           "line":  19,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "4",
+                           "page":  1,
+                           "line":  19,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "412,50",
+                           "page":  1,
+                           "line":  19,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "Software item 12",
+                           "page":  1,
+                           "line":  25,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "each",
+                           "page":  1,
+                           "line":  25,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "6",
+                           "page":  1,
+                           "line":  25,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "450,00",
+                           "page":  1,
+                           "line":  25,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "Software item 13",
+                           "page":  1,
+                           "line":  26,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "each",
+                           "page":  1,
+                           "line":  26,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "8",
+                           "page":  1,
+                           "line":  26,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "487,50",
+                           "page":  1,
+                           "line":  26,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "Software item 14",
+                           "page":  1,
+                           "line":  27,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "each",
+                           "page":  1,
+                           "line":  27,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "10",
+                           "page":  1,
+                           "line":  27,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "525,00",
+                           "page":  1,
+                           "line":  27,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "Software item 15",
+                           "page":  1,
+                           "line":  28,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "each",
+                           "page":  1,
+                           "line":  28,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "12",
+                           "page":  1,
+                           "line":  28,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "562,50",
+                           "page":  1,
+                           "line":  28,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "Software item 16",
+                           "page":  1,
+                           "line":  29,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "each",
+                           "page":  1,
+                           "line":  29,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "14",
+                           "page":  1,
+                           "line":  29,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "600,00",
+                           "page":  1,
+                           "line":  29,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "Software item 17",
+                           "page":  1,
+                           "line":  30,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "each",
+                           "page":  1,
+                           "line":  30,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "16",
+                           "page":  1,
+                           "line":  30,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "637,50",
+                           "page":  1,
+                           "line":  30,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "Software item 18",
+                           "page":  1,
+                           "line":  31,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "each",
+                           "page":  1,
+                           "line":  31,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "18",
+                           "page":  1,
+                           "line":  31,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "675,00",
+                           "page":  1,
+                           "line":  31,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "Subtotal Software",
+                           "page":  1,
+                           "line":  37,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "2.280,00",
+                           "page":  1,
+                           "line":  37,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "Services",
+                           "page":  1,
+                           "line":  38,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "Services item 19",
+                           "page":  1,
+                           "line":  38,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "each",
+                           "page":  1,
+                           "line":  38,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "2",
+                           "page":  1,
+                           "line":  38,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "712,50",
+                           "page":  1,
+                           "line":  38,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "Services item 20",
+                           "page":  1,
+                           "line":  39,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "each",
+                           "page":  1,
+                           "line":  39,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "4",
+                           "page":  1,
+                           "line":  39,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "750,00",
+                           "page":  1,
+                           "line":  39,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "Services item 21",
+                           "page":  1,
+                           "line":  40,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "each",
+                           "page":  1,
+                           "line":  40,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "6",
+                           "page":  1,
+                           "line":  40,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "787,50",
+                           "page":  1,
+                           "line":  40,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "Services item 22",
+                           "page":  1,
+                           "line":  41,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "each",
+                           "page":  1,
+                           "line":  41,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "8",
+                           "page":  1,
+                           "line":  41,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "825,00",
+                           "page":  1,
+                           "line":  41,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "Services item 23",
+                           "page":  1,
+                           "line":  42,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "each",
+                           "page":  1,
+                           "line":  42,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "10",
+                           "page":  1,
+                           "line":  42,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "862,50",
+                           "page":  1,
+                           "line":  42,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "Services item 24",
+                           "page":  1,
+                           "line":  43,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "each",
+                           "page":  1,
+                           "line":  43,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "12",
+                           "page":  1,
+                           "line":  43,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "900,00",
+                           "page":  1,
+                           "line":  43,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "Services item 25",
+                           "page":  1,
+                           "line":  44,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "each",
+                           "page":  1,
+                           "line":  44,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "14",
+                           "page":  1,
+                           "line":  44,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "937,50",
+                           "page":  1,
+                           "line":  44,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "Services item 26",
+                           "page":  1,
+                           "line":  45,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "each",
+                           "page":  1,
+                           "line":  45,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "16",
+                           "page":  1,
+                           "line":  45,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "975,00",
+                           "page":  1,
+                           "line":  45,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "Services item 27",
+                           "page":  1,
+                           "line":  46,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "each",
+                           "page":  1,
+                           "line":  46,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "18",
+                           "page":  1,
+                           "line":  46,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "1.012,50",
+                           "page":  1,
+                           "line":  46,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "Subtotal Services",
+                           "page":  1,
+                           "line":  47,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "3.360,00",
+                           "page":  1,
+                           "line":  47,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "Support",
+                           "page":  1,
+                           "line":  48,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "Support item 28",
+                           "page":  1,
+                           "line":  48,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "each",
+                           "page":  1,
+                           "line":  48,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "2",
+                           "page":  1,
+                           "line":  48,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "1.050,00",
+                           "page":  1,
+                           "line":  48,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "Support item 29",
+                           "page":  1,
+                           "line":  49,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "each",
+                           "page":  1,
+                           "line":  49,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "4",
+                           "page":  1,
+                           "line":  49,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "1.087,50",
+                           "page":  1,
+                           "line":  49,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "Support item 30",
+                           "page":  1,
+                           "line":  50,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "each",
+                           "page":  1,
+                           "line":  50,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "6",
+                           "page":  1,
+                           "line":  50,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "1.125,00",
+                           "page":  1,
+                           "line":  50,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "Support item 31",
+                           "page":  1,
+                           "line":  51,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "each",
+                           "page":  1,
+                           "line":  51,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "8",
+                           "page":  1,
+                           "line":  51,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "1.162,50",
+                           "page":  1,
+                           "line":  51,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "Support item 32",
+                           "page":  1,
+                           "line":  52,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "each",
+                           "page":  1,
+                           "line":  52,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "10",
+                           "page":  1,
+                           "line":  52,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "1.200,00",
+                           "page":  1,
+                           "line":  52,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "Support item 33",
+                           "page":  1,
+                           "line":  53,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "each",
+                           "page":  1,
+                           "line":  53,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "12",
+                           "page":  1,
+                           "line":  53,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "1.237,50",
+                           "page":  1,
+                           "line":  53,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "Support item 34",
+                           "page":  1,
+                           "line":  54,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "each",
+                           "page":  1,
+                           "line":  54,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "14",
+                           "page":  1,
+                           "line":  54,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "1.275,00",
+                           "page":  1,
+                           "line":  54,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "Support item 35",
+                           "page":  1,
+                           "line":  55,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "each",
+                           "page":  1,
+                           "line":  55,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "16",
+                           "page":  1,
+                           "line":  55,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "1.312,50",
+                           "page":  1,
+                           "line":  55,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "Support item 36",
+                           "page":  2,
+                           "line":  1,
+                           "endPage":  2,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "each",
+                           "page":  2,
+                           "line":  1,
+                           "endPage":  2,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "18",
+                           "page":  2,
+                           "line":  1,
+                           "endPage":  2,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "1.350,00",
+                           "page":  2,
+                           "line":  1,
+                           "endPage":  2,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "Subtotal Support",
+                           "page":  2,
+                           "line":  2,
+                           "endPage":  2,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "4.440,00",
+                           "page":  2,
+                           "line":  2,
+                           "endPage":  2,
+                           "listString":  "",
+                           "inTable":  true
+                       },
+                       {
+                           "text":  "",
+                           "page":  2,
+                           "line":  3,
+                           "endPage":  2,
+                           "listString":  "",
+                           "inTable":  false
+                       },
+                       {
+                           "text":  "The Supplier may revise these prices once a year with three months\u0027 notice.",
+                           "page":  2,
+                           "line":  4,
+                           "endPage":  2,
+                           "listString":  "",
+                           "inTable":  false
+                       }
+                   ],
+    "pictures":  [
+
+                 ]
+}

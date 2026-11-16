@@ -10,6 +10,9 @@
 #   - revisionsAccepted: tracked changes in the document. All are accepted (in memory) before
 #     measuring, so the numbers describe the final text whatever the user's markup view;
 #   - pages: Word's page count;
+#   - pictures: each picture (inline, then floating ones): page, position and size in points (an
+#     inline one from the page's corner; a floating one from what it is relative to, recorded),
+#     alt text, and a floating one's wrapping (WdWrapType);
 #   - paragraphs: for every paragraph of the main text, in Word's order (table cells included,
 #     end-of-row marks not): its text, the page and the line on that page where it starts, the
 #     page where it ends, its list number as Word shows it ("1.1", "(a)"), and whether it is in a
@@ -90,6 +93,7 @@ try {
       revisionsAccepted = $null
       pages = $null
       paragraphs = @()
+      pictures = @()
     }
     $doc = $null
     try {
@@ -120,6 +124,40 @@ try {
           })
       }
       $result.paragraphs = $list.ToArray()
+      # Pictures: inline ones from the page's top-left corner (wdHorizontal/VerticalPosition-
+      # RelativeToPage: 5, 6); floating ones as Word places them, from what they are relative to
+      # (WdRelativeHorizontalPosition and WdRelativeVerticalPosition: 0 margin, 1 page, 2 column
+      # or paragraph...), with the page of their anchor. Points.
+      $pictures = New-Object System.Collections.Generic.List[object]
+      foreach ($s in $doc.InlineShapes) {
+        $pictures.Add([ordered]@{
+            float = $false
+            page = [int]$s.Range.Information($INFO_PAGE)
+            left = [math]::Round([double]$s.Range.Information(5), 1)
+            top = [math]::Round([double]$s.Range.Information(6), 1)
+            width = [math]::Round([double]$s.Width, 1)
+            height = [math]::Round([double]$s.Height, 1)
+            alt = [string]$s.AlternativeText
+            wrap = $null
+          })
+      }
+      foreach ($s in $doc.Shapes) {
+        # Pictures only (msoPicture 13, msoLinkedPicture 11): other shapes stay out of the record.
+        if ($s.Type -ne 13 -and $s.Type -ne 11) { continue }
+        $pictures.Add([ordered]@{
+            float = $true
+            page = [int]$s.Anchor.Information($INFO_PAGE)
+            left = [math]::Round([double]$s.Left, 1)
+            top = [math]::Round([double]$s.Top, 1)
+            width = [math]::Round([double]$s.Width, 1)
+            height = [math]::Round([double]$s.Height, 1)
+            alt = [string]$s.AlternativeText
+            wrap = [int]$s.WrapFormat.Type
+            horizontalTo = [int]$s.RelativeHorizontalPosition
+            verticalTo = [int]$s.RelativeVerticalPosition
+          })
+      }
+      $result.pictures = $pictures.ToArray()
       if ($PdfDir) { $doc.ExportAsFixedFormat([string](Join-Path $PdfDir ($file.BaseName + ".pdf")), $PDF) }
     } catch {
       $result.error = Scrub $_.Exception.Message $file

@@ -925,7 +925,7 @@ UI is keyboard-usable and axe-clean in three engines; 0.5.0 published.
 Each task is a PR on `phase-10/tables-images`, the build green after each.
 
 - [x] Claim phase, branch `phase-10/tables-images`
-- [ ] 10.1 ADR-0006, tables and pictures in the model and on pages: the node shapes (table, row,
+- [x] 10.1 ADR-0006, tables and pictures in the model and on pages: the node shapes (table, row,
   cell holding blocks; properties as Word's `w:tblPr`/`w:trPr`/`w:tcPr`, the grid, merges as
   `gridSpan` and `vMerge`), pictures as inline nodes (inline and anchored) with a resource
   reference and the envelope's resources (content type, size; bytes kept by the app or the
@@ -933,11 +933,11 @@ Each task is a PR on `phase-10/tables-images`, the build green after each.
   flow, a row split at a line where Word allows it, header rows repeated, `cantSplit`), position
   mapping and selection (`CellSelection`), how tracking and comments reach cells, schema v4 and
   its migration. Spike evidence for rows across pages and caret movement between cells in three
-  engines. The owner accepts it before 10.2. (Proposed: spike and ADR in the 10.1 PR.)
-- [ ] 10.2 Corpus: Word-authored documents for tables (a price schedule over pages with repeated
+  engines. The owner accepts it before 10.2. (Done: #73; accepted by the owner 2026-11-16.)
+- [x] 10.2 Corpus: Word-authored documents for tables (a price schedule over pages with repeated
   header rows, merged cells both ways, banded table style, a nested table) and pictures (inline,
   floating square and top-and-bottom, behind text, with and without alt text) added to the
-  generator, with Word's reference data (pages, paragraphs in cells, picture positions).
+  generator, with Word's reference data (pages, paragraphs in cells, picture positions). (Done: documents 06 and 07, `-Only` switch on the generator.)
 - [ ] 10.3 Schema v4 in `@folijs/core`: table, row and cell nodes and their properties, the
   table style's conditional formatting (first and last row and column, bands) resolved as Word
   does (`Resolver`), picture nodes and the envelope's resources; validation, the v3 → v4

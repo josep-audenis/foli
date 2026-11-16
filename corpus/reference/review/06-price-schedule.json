@@ -1,0 +1,1360 @@
+{
+    "document":  "06-price-schedule.docx",
+    "word":  "16.0.20527",
+    "opened":  true,
+    "error":  null,
+    "revisions":  [
+
+                  ],
+    "comments":  [
+
+                 ],
+    "accepted":  [
+                     {
+                         "text":  "PRICE SCHEDULE",
+                         "inTable":  false
+                     },
+                     {
+                         "text":  "Schedule 2 to the Supply Agreement. Prices are in EUR and exclude VAT.",
+                         "inTable":  false
+                     },
+                     {
+                         "text":  "Category",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Item",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Unit",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Qty",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Price",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Hardware",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Hardware item 1",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "each",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "2",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "37,50",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "10+",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "33.00",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Volume prices:",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "each",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "4",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "75,00",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Hardware item 3",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "each",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "6",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "112,50",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Hardware item 4",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "each",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "8",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "150,00",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Hardware item 5",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "each",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "10",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "187,50",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Hardware item 6",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "each",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "12",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "225,00",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Hardware item 7",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "each",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "14",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "262,50",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Hardware item 8",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "each",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "16",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "300,00",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Hardware item 9",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "each",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "18",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "337,50",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Subtotal Hardware",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "1.200,00",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Software",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Software item 10",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "each",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "2",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "375,00",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Software item 11 with a longer description: installation on every workstation, licence keys for three years, and the vendor\u0027s onboarding pack, delivered in one visit.",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "each",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "4",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "412,50",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Software item 12",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "each",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "6",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "450,00",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Software item 13",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "each",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "8",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "487,50",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Software item 14",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "each",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "10",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "525,00",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Software item 15",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "each",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "12",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "562,50",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Software item 16",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "each",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "14",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "600,00",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Software item 17",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "each",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "16",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "637,50",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Software item 18",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "each",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "18",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "675,00",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Subtotal Software",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "2.280,00",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Services",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Services item 19",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "each",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "2",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "712,50",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Services item 20",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "each",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "4",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "750,00",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Services item 21",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "each",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "6",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "787,50",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Services item 22",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "each",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "8",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "825,00",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Services item 23",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "each",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "10",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "862,50",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Services item 24",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "each",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "12",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "900,00",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Services item 25",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "each",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "14",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "937,50",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Services item 26",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "each",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "16",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "975,00",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Services item 27",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "each",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "18",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "1.012,50",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Subtotal Services",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "3.360,00",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Support",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Support item 28",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "each",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "2",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "1.050,00",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Support item 29",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "each",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "4",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "1.087,50",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Support item 30",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "each",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "6",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "1.125,00",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Support item 31",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "each",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "8",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "1.162,50",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Support item 32",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "each",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "10",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "1.200,00",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Support item 33",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "each",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "12",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "1.237,50",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Support item 34",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "each",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "14",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "1.275,00",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Support item 35",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "each",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "16",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "1.312,50",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Support item 36",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "each",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "18",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "1.350,00",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Subtotal Support",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "4.440,00",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "",
+                         "inTable":  false
+                     },
+                     {
+                         "text":  "The Supplier may revise these prices once a year with three months\u0027 notice.",
+                         "inTable":  false
+                     }
+                 ],
+    "rejected":  [
+                     {
+                         "text":  "PRICE SCHEDULE",
+                         "inTable":  false
+                     },
+                     {
+                         "text":  "Schedule 2 to the Supply Agreement. Prices are in EUR and exclude VAT.",
+                         "inTable":  false
+                     },
+                     {
+                         "text":  "Category",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Item",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Unit",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Qty",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Price",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Hardware",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Hardware item 1",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "each",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "2",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "37,50",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "10+",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "33.00",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Volume prices:",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "each",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "4",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "75,00",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Hardware item 3",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "each",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "6",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "112,50",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Hardware item 4",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "each",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "8",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "150,00",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Hardware item 5",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "each",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "10",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "187,50",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Hardware item 6",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "each",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "12",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "225,00",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Hardware item 7",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "each",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "14",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "262,50",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Hardware item 8",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "each",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "16",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "300,00",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Hardware item 9",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "each",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "18",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "337,50",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Subtotal Hardware",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "1.200,00",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Software",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Software item 10",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "each",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "2",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "375,00",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Software item 11 with a longer description: installation on every workstation, licence keys for three years, and the vendor\u0027s onboarding pack, delivered in one visit.",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "each",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "4",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "412,50",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Software item 12",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "each",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "6",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "450,00",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Software item 13",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "each",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "8",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "487,50",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Software item 14",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "each",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "10",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "525,00",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Software item 15",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "each",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "12",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "562,50",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Software item 16",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "each",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "14",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "600,00",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Software item 17",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "each",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "16",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "637,50",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Software item 18",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "each",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "18",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "675,00",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Subtotal Software",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "2.280,00",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Services",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Services item 19",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "each",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "2",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "712,50",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Services item 20",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "each",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "4",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "750,00",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Services item 21",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "each",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "6",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "787,50",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Services item 22",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "each",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "8",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "825,00",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Services item 23",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "each",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "10",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "862,50",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Services item 24",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "each",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "12",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "900,00",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Services item 25",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "each",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "14",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "937,50",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Services item 26",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "each",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "16",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "975,00",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Services item 27",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "each",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "18",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "1.012,50",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Subtotal Services",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "3.360,00",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Support",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Support item 28",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "each",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "2",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "1.050,00",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Support item 29",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "each",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "4",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "1.087,50",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Support item 30",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "each",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "6",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "1.125,00",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Support item 31",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "each",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "8",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "1.162,50",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Support item 32",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "each",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "10",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "1.200,00",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Support item 33",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "each",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "12",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "1.237,50",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Support item 34",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "each",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "14",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "1.275,00",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Support item 35",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "each",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "16",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "1.312,50",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Support item 36",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "each",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "18",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "1.350,00",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "Subtotal Support",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "4.440,00",
+                         "inTable":  true
+                     },
+                     {
+                         "text":  "",
+                         "inTable":  false
+                     },
+                     {
+                         "text":  "The Supplier may revise these prices once a year with three months\u0027 notice.",
+                         "inTable":  false
+                     }
+                 ]
+}

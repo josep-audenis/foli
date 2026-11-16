@@ -16,7 +16,8 @@ const paragraphs = (d: FoliDocument) =>
 
 describe("a new package", () => {
   it("refuses a document that refers to parts of its original package", async () => {
-    for (const name of names) {
+    // 06 refers to none (no header, footer, picture or linked content): a new package holds it.
+    for (const name of names.filter((n) => !n.startsWith("06-"))) {
       const { document } = await load(name);
       await expect(exportDocx(document), name).rejects.toMatchObject({
         name: "DocxError",

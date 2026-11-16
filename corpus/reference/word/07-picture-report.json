@@ -1,0 +1,124 @@
+{
+    "document":  "07-picture-report.docx",
+    "word":  "16.0.20527",
+    "opened":  true,
+    "error":  null,
+    "revisionsAccepted":  0,
+    "pages":  2,
+    "paragraphs":  [
+                       {
+                           "text":  "Site inspection report",
+                           "page":  1,
+                           "line":  1,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  false
+                       },
+                       {
+                           "text":  "/The chart below shows the monthly readings: ",
+                           "page":  1,
+                           "line":  2,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  false
+                       },
+                       {
+                           "text":  "/A second copy of the chart, as received, without a description:",
+                           "page":  1,
+                           "line":  4,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  false
+                       },
+                       {
+                           "text":  "The inspection covered the north and south wings, the plant room and the roof. Readings were taken at the same hour each day and logged by the site manager, who also recorded the weather, the occupancy of the building and any maintenance carried out during the period. The inspection covered the north and south wings, the plant room and the roof. Readings were taken at the same hour each day and logged by the site manager, who also recorded the weather, the occupancy of the building and any maintenance carried out during the period. The inspection covered the north and south wings, the plant room and the roof. Readings were taken at the same hour each day and logged by the site manager, who also recorded the weather, the occupancy of the building and any maintenance carried out during the period. ",
+                           "page":  2,
+                           "line":  1,
+                           "endPage":  2,
+                           "listString":  "",
+                           "inTable":  false
+                       },
+                       {
+                           "text":  "The inspection covered the north and south wings, the plant room and the roof. Readings were taken at the same hour each day and logged by the site manager, who also recorded the weather, the occupancy of the building and any maintenance carried out during the period. The inspection covered the north and south wings, the plant room and the roof. Readings were taken at the same hour each day and logged by the site manager, who also recorded the weather, the occupancy of the building and any maintenance carried out during the period. ",
+                           "page":  2,
+                           "line":  10,
+                           "endPage":  2,
+                           "listString":  "",
+                           "inTable":  false
+                       },
+                       {
+                           "text":  "The inspection covered the north and south wings, the plant room and the roof. Readings were taken at the same hour each day and logged by the site manager, who also recorded the weather, the occupancy of the building and any maintenance carried out during the period. The inspection covered the north and south wings, the plant room and the roof. Readings were taken at the same hour each day and logged by the site manager, who also recorded the weather, the occupancy of the building and any maintenance carried out during the period. ",
+                           "page":  2,
+                           "line":  16,
+                           "endPage":  2,
+                           "listString":  "",
+                           "inTable":  false
+                       },
+                       {
+                           "text":  "End of report.",
+                           "page":  2,
+                           "line":  22,
+                           "endPage":  2,
+                           "listString":  "",
+                           "inTable":  false
+                       }
+                   ],
+    "pictures":  [
+                     {
+                         "float":  false,
+                         "page":  1,
+                         "left":  72,
+                         "top":  270.8,
+                         "width":  360,
+                         "height":  210,
+                         "alt":  "Bar chart of monthly readings rising from 120 to 240",
+                         "wrap":  null
+                     },
+                     {
+                         "float":  false,
+                         "page":  1,
+                         "left":  72,
+                         "top":  507,
+                         "width":  360,
+                         "height":  210,
+                         "alt":  "",
+                         "wrap":  null
+                     },
+                     {
+                         "float":  true,
+                         "page":  2,
+                         "left":  99.8,
+                         "top":  9.8,
+                         "width":  240,
+                         "height":  60,
+                         "alt":  "Northwind logo as a watermark",
+                         "wrap":  5,
+                         "horizontalTo":  2,
+                         "verticalTo":  2
+                     },
+                     {
+                         "float":  true,
+                         "page":  1,
+                         "left":  300,
+                         "top":  0,
+                         "width":  160,
+                         "height":  40,
+                         "alt":  "Northwind logo",
+                         "wrap":  0,
+                         "horizontalTo":  2,
+                         "verticalTo":  2
+                     },
+                     {
+                         "float":  true,
+                         "page":  1,
+                         "left":  0,
+                         "top":  20.2,
+                         "width":  240,
+                         "height":  140,
+                         "alt":  "Chart of readings, placed between paragraphs",
+                         "wrap":  4,
+                         "horizontalTo":  2,
+                         "verticalTo":  2
+                     }
+                 ]
+}

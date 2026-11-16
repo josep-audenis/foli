@@ -23,6 +23,8 @@ function text(paragraph: NodeJSON): string {
     .map((n) => {
       if ((n.marks ?? []).some((m) => m.type === "deletion")) return "";
       if (n.type === "text") return n.text;
+      // Word's Range.Text shows an inline picture as "/" (a floating one as nothing).
+      if (n.type === "opaqueInline" && String(n.attrs?.xml).includes("<wp:inline")) return "/";
       return n.type === "tab" ? "\t" : n.type === "hardBreak" ? "\n" : "";
     })
     .join("");
