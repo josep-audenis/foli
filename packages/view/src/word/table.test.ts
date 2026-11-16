@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import {
+  CellSelection,
   createDocument,
   createEditor,
   type NodeJSON,
@@ -10,7 +11,7 @@ import {
   wordContext,
 } from "@folijs/core";
 import { afterEach, describe, expect, it } from "vitest";
-import { EditorView } from "../index.js";
+import { EditorView, FOLI_MIME } from "../index.js";
 import type { BlockDesc } from "../render.js";
 import { breaksOf, cutTable, type Lines, type Measure } from "../view.js";
 import type { WordBlockDesc } from "./edit.js";
@@ -312,5 +313,107 @@ describe("a composition in a cell", () => {
     expect(startOf(editor, "Applesé")).toBeGreaterThan(0);
     expect(startOf(editor, "Pears!")).toBeGreaterThan(0);
     expect(startOf(editor, "Fruit")).toBeGreaterThan(0);
+  });
+});
+
+describe("copying and pasting cells", () => {
+  const PLAIN: NodeJSON = {
+    type: "table",
+    attrs: { grid: [2000, 2000] },
+    content: [row([cell("a1"), cell("b1")]), row([cell("a2"), cell("b2")])],
+  };
+  /** Copies the cells from the one holding `from` to the one holding `to`. */
+  function copyCells(from: string, to: string) {
+    const { host, editor } = mount([p("Before"), PLAIN, p("After")]);
+    const cellBefore = (value: string) => startOf(editor, value) - 2;
+    editor.dispatch(
+      editor.state.tr.setSelection(
+        CellSelection.create(editor.state.doc, cellBefore(from), cellBefore(to)),
+      ),
+    );
+    const store = new Map<string, string>();
+    const event = new Event("copy", { cancelable: true }) as ClipboardEvent;
+    Object.defineProperty(event, "clipboardData", {
+      value: { setData: (k: string, v: string) => store.set(k, v), getData: () => "" },
+    });
+    host.dispatchEvent(event);
+    return { getData: (type: string) => store.get(type) ?? "" };
+  }
+  const tables = (editor: ReturnType<typeof createEditor>) => {
+    const out: string[][][] = [];
+    editor.state.doc.descendants((node) => {
+      if (node.type.name !== "table") return true;
+      const rows: string[][] = [];
+      node.forEach((r) => {
+        const cells: string[] = [];
+        r.forEach((c) => {
+          cells.push(c.textContent);
+        });
+        rows.push(cells);
+      });
+      out.push(rows);
+      return false;
+    });
+    return out;
+  };
+
+  it("copies selected cells as a table: text with tabs, HTML and Foli JSON", () => {
+    const data = copyCells("a1", "b2");
+    expect(data.getData("text/plain")).toBe("a1\tb1\na2\tb2");
+    const html = document.createElement("div");
+    html.innerHTML = data.getData("text/html");
+    expect(html.querySelectorAll("td")).toHaveLength(4);
+    const json = JSON.parse(data.getData(FOLI_MIME));
+    expect(json.open).toBe(false);
+    expect(json.content.content[0].type).toBe("table");
+  });
+
+  it("pastes copied cells into a cell of another table, filling from there", () => {
+    const data = copyCells("a1", "a2");
+    const { editor, view } = mount([p("x"), PLAIN, p("y")]);
+    editor.dispatch(
+      editor.state.tr.setSelection(TextSelection.create(editor.state.doc, startOf(editor, "b1"))),
+    );
+    expect(view.paste(data)).toBe(true);
+    expect(tables(editor)).toEqual([
+      [
+        ["a1", "a1"],
+        ["a2", "a2"],
+      ],
+    ]);
+  });
+
+  it("pastes copied cells into text as a table, splitting the paragraph", () => {
+    const data = copyCells("b1", "b2");
+    const { editor, view } = mount([p("before after"), p("end")]);
+    editor.dispatch(
+      editor.state.tr.setSelection(
+        TextSelection.create(editor.state.doc, startOf(editor, "before after") + 6),
+      ),
+    );
+    expect(view.paste(data)).toBe(true);
+    const blocks: string[] = [];
+    editor.state.doc.forEach((node) => {
+      blocks.push(node.type.name === "table" ? "table" : node.textContent);
+    });
+    expect(blocks).toEqual(["before", "table", " after", "end"]);
+    expect(tables(editor)).toEqual([[["b1"], ["b2"]]]);
+  });
+
+  it("puts a paragraph after cells pasted into the document's last, empty paragraph", () => {
+    const data = copyCells("a1", "a1");
+    const { editor, view } = mount([p("x"), p()]);
+    editor.dispatch(
+      editor.state.tr.setSelection(
+        TextSelection.create(editor.state.doc, startOf(editor, "x") + 3),
+      ),
+    );
+    expect(view.paste(data)).toBe(true);
+    const names: string[] = [];
+    editor.state.doc.forEach((node) => {
+      names.push(node.type.name);
+    });
+    expect(names).toEqual(["paragraph", "table", "paragraph"]);
+    expect(() => parseDocument(editor.getDocument())).not.toThrow();
   });
 });

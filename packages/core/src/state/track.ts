@@ -607,6 +607,9 @@ function rebuild(
     out.setSelection(NodeSelection.create(out.doc, anchor));
   else if (selection instanceof TextSelection)
     out.setSelection(TextSelection.create(out.doc, anchor, head));
+  // Cells stay selected (`Selection.fromJSON` falls back to a caret when they are not cells).
+  else if (selection.toJSON().type === "cell")
+    out.setSelection(Selection.fromJSON(out.doc, { type: "cell", anchor, head }));
   else out.setSelection(Selection.near(out.doc.resolve(head)));
   if (tr.storedMarks)
     out.setStoredMarks(tr.storedMarks.filter((m) => m.type !== insertion && m.type !== deletion));

@@ -105,7 +105,15 @@ export {
   type PluginSpec,
   Transaction,
 } from "./state.js";
-export { CellSelection, extendCellSelection, goToCell, goToCellVertically } from "./tables.js";
+export {
+  CellSelection,
+  cellsAsTable,
+  extendCellSelection,
+  goToCell,
+  goToCellVertically,
+  keepTablesApart,
+  pasteCells,
+} from "./tables.js";
 export {
   type ReviewView,
   setReviewView,

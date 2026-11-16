@@ -609,8 +609,27 @@ table (a drag) as one, and Firefox's one range per cell too; it marks the cells 
 and keeps the native caret in the head cell (the browser's own highlight, in DOM order, is
 hidden while cells are selected). `Selection.ranges` gives one range per selected cell, so
 marks, links, paragraph and run formatting, and accepting or rejecting changes act on those
-cells only. Pasting over cells pastes into the anchor cell; copy gives plain text (a tab
-between cells, a line per row). Not yet: copying cells as a table, pasting into several cells.
+cells only.
+
+Copy, cut and paste of cells (10.6d, ADR-0006): selected cells copy as a table of their own
+(`cellsAsTable`: the rows the rectangle covers, each cut to its columns, the grid's widths of
+those columns), as Foli JSON, the HTML the Word renderer draws, and text with a tab between
+cells and a line per row; cut copies, then empties them. Pasted content that is a table alone
+fills the cells from the selected cell (a cell selection's first cell, or the cell holding the
+caret) when pasted into a table (`pasteCells`): each pasted cell's content replaces the cell at
+the same place (a target cell a merge covers takes only the first pasted cell it covers), rows
+like the last one are added as needed in one step (tracked as inserted rows when tracking),
+cells past the table's last column are dropped (not yet reported), and the rectangle of the
+filled cells ends up selected. A copy is new rows: not their identity (`w14:paraId`) nor their
+row revision (tracked text in them keeps its marks); a table's style and a row's exceptions'
+style travel with it (`copiedDefinitions`, mapped by name as paragraph styles are). Not yet: a
+copied row with no cell in the copied columns is left out (the rows after it paste one row
+higher), and pictures pasted from another document lose their resources (10.8). Pasted into text, it is a table between the paragraph's two halves.
+Other content over selected cells goes into the anchor cell. Clipboard JSON is validated as
+schema 4 content to paste (`parseContent(…, fragment)`: a table may end it); after a paste a
+paragraph is put after a table that would end the body or touch another (`keepTablesApart`).
+HTML tables from other applications still paste as paragraphs. Known: in Firefox, Shift+Home
+right after typing in a cell does not extend the selection (Shift+arrows do).
 
 Up and Down from a cell's first or last line (or with a cell's content
 selected) go to the cell above or below covering the same grid column (a merge's first cell),

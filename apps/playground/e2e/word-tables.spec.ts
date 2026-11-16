@@ -198,3 +198,220 @@ test("a paste over selected cells goes into the anchor cell; the table stays", a
   await expect(page.locator("td", { hasText: /^Hardware item 4$/ })).toHaveCount(1);
   expect(await page.evaluate(() => window.foliEdit.validate())).toBe(true);
 });
+
+// ---------- copy, cut and paste of cells; T1–T5 in cells (10.6d) ----------
+
+const MOD = process.platform === "darwin" ? "Meta" : "Control";
+const cellOf = (page: Page, value: string) =>
+  page.locator("td", { hasText: new RegExp(`^${value}$`) }).first();
+/** The document's content JSON. */
+const docJSON = (page: Page) =>
+  page.evaluate(() => JSON.stringify(window.foliEdit.editor.state.doc.toJSON()));
+const modelSelection = (page: Page) =>
+  page.evaluate(() => window.foliEdit.editor.state.selection.toJSON());
+/** The texts of the paragraphs of the cell holding the selection's head. */
+const headCell = (page: Page) =>
+  page.evaluate(() => {
+    const { selection } = window.foliEdit.editor.state;
+    const $pos = selection.$head;
+    for (let d = $pos.depth; d > 0; d--)
+      if ($pos.node(d).type.name === "tableCell") {
+        const out: string[] = [];
+        $pos.node(d).forEach((p) => {
+          out.push(p.textContent);
+        });
+        return out;
+      }
+    return null;
+  });
+const count = (page: Page, value: string) =>
+  page.evaluate((v) => {
+    let n = 0;
+    window.foliEdit.editor.state.doc.descendants((node) => {
+      if (node.isTextblock && node.textContent === v) n++;
+    });
+    return n;
+  }, value);
+
+/** Selects the cell holding `from` and the one below it (Shift+Down from its last line). */
+async function selectDown(page: Page, from: string): Promise<void> {
+  await cellOf(page, from).click();
+  await page.keyboard.press("End");
+  await page.keyboard.press("Shift+ArrowDown");
+  await expect.poll(async () => (await modelSelection(page)).type).toBe("cell");
+}
+
+/** Copies (or cuts) through a dispatched event, as the browser would; returns the data set. */
+const clipboard = (page: Page, type: "copy" | "cut") =>
+  editor(page).evaluate((host, kind) => {
+    const store: Record<string, string> = {};
+    const event = new Event(kind, { bubbles: true, cancelable: true });
+    Object.defineProperty(event, "clipboardData", {
+      value: { setData: (k: string, v: string) => (store[k] = v), getData: () => "" },
+    });
+    host.dispatchEvent(event);
+    return store;
+  }, type);
+const paste = (page: Page, data: Record<string, string>) =>
+  editor(page).evaluate((host, types) => {
+    const event = new Event("paste", { bubbles: true, cancelable: true });
+    Object.defineProperty(event, "clipboardData", {
+      value: { getData: (type: string) => types[type] ?? "", types: Object.keys(types) },
+    });
+    host.dispatchEvent(event);
+  }, data);
+
+test("cells copied and pasted into another cell fill the cells from there; undo restores", async ({
+  page,
+}) => {
+  await open(page, "06-price-schedule.docx");
+  const original = await docJSON(page);
+  await selectDown(page, "Hardware item 3");
+  const data = await clipboard(page, "copy");
+  expect(data["text/plain"]).toBe("Hardware item 3\nHardware item 4");
+  await cellOf(page, "Support item 33").click();
+  await paste(page, data);
+  await expect.poll(() => count(page, "Hardware item 3")).toBe(2);
+  expect(await count(page, "Support item 33")).toBe(0);
+  expect(await count(page, "Hardware item 4")).toBe(2);
+  expect(await page.evaluate(() => window.foliEdit.validate())).toBe(true);
+  await page.keyboard.press(`${MOD}+z`);
+  await expect.poll(() => docJSON(page)).toBe(original);
+});
+
+test("cut empties the selected cells and keeps their text on the clipboard", async ({ page }) => {
+  await open(page, "06-price-schedule.docx");
+  await selectDown(page, "Hardware item 3");
+  const data = await clipboard(page, "cut");
+  expect(data["text/plain"]).toBe("Hardware item 3\nHardware item 4");
+  await expect.poll(() => count(page, "Hardware item 3")).toBe(0);
+  expect(await count(page, "Hardware item 4")).toBe(0);
+  expect(await page.evaluate(() => window.foliEdit.validate())).toBe(true);
+});
+
+test("Ctrl+C and Ctrl+V of cells through the system clipboard", async ({ page, browserName }) => {
+  // Playwright's Firefox and WebKit drop Foli's own clipboard type (see word-input.spec.ts).
+  test.skip(browserName !== "chromium", "no Foli clipboard type in Playwright WebKit or Firefox");
+  await open(page, "06-price-schedule.docx");
+  await selectDown(page, "Hardware item 3");
+  await page.keyboard.press(`${MOD}+c`);
+  await cellOf(page, "Support item 33").click();
+  await page.keyboard.press(`${MOD}+v`);
+  await expect.poll(() => count(page, "Hardware item 3")).toBe(2);
+  expect(await page.evaluate(() => window.foliEdit.validate())).toBe(true);
+});
+
+test("T1 in a cell: typing and formatting keep a valid document after every keystroke", async ({
+  page,
+}) => {
+  await open(page, "06-price-schedule.docx");
+  await cellOf(page, "Hardware item 3").click();
+  await page.keyboard.press("End");
+  const steps = [" x", `${MOD}+b`, "bold", `${MOD}+b`, "Enter", "next", "Backspace", "Backspace"];
+  const keys = new Set(["Enter", "Backspace"]);
+  for (const step of steps) {
+    const presses = keys.has(step) || step.startsWith(MOD) ? [step] : [...step];
+    for (const press of presses) {
+      if (press.length === 1) await page.keyboard.type(press);
+      else await page.keyboard.press(press);
+      expect(await page.evaluate(() => window.foliEdit.validate()), `after ${press}`).toBe(true);
+    }
+  }
+  await expect.poll(() => headCell(page)).toEqual(["Hardware item 3 xbold", "ne"]);
+  // "bold" is bold, in the cell's first paragraph.
+  const marks = await page.evaluate(() => {
+    const out: string[] = [];
+    window.foliEdit.editor.state.doc.descendants((node) => {
+      if (node.isText && node.text === "bold") out.push(...node.marks.map((m) => m.type.name));
+    });
+    return out;
+  });
+  expect(marks).toContain("bold");
+});
+
+test("T2 in a cell: a selection across mixed formatting is replaced, then undone exactly", async ({
+  page,
+}) => {
+  await open(page, "06-price-schedule.docx");
+  await cellOf(page, "Hardware item 3").click();
+  await page.keyboard.press("End");
+  await page.keyboard.press(`${MOD}+b`);
+  await page.keyboard.type("B");
+  await page.keyboard.press(`${MOD}+b`);
+  await page.waitForTimeout(600); // close the typing history group
+  // " 3B": plain text and the bold B (Firefox's Shift+Home after typing in a cell does not
+  // extend; recorded in docs/architecture.md).
+  // Firefox stops twice at the edge between two runs: pressed until three characters are in.
+  const length = async () => {
+    const { anchor, head } = await modelSelection(page);
+    return anchor - head;
+  };
+  for (let i = 0; i < 6 && (await length()) < 3; i++) {
+    await page.keyboard.press("Shift+ArrowLeft");
+    await page.waitForTimeout(50);
+  }
+  expect(await length()).toBe(3);
+  const before = { doc: await docJSON(page), selection: await modelSelection(page) };
+  await page.keyboard.type("Z");
+  await expect.poll(() => headCell(page)).toEqual(["Hardware itemZ"]);
+  await page.keyboard.press(`${MOD}+z`);
+  await expect.poll(() => docJSON(page)).toBe(before.doc);
+  expect(await modelSelection(page)).toEqual(before.selection);
+});
+
+test("T3 in a cell: pasted HTML goes into the cell, never out of the table", async ({ page }) => {
+  await open(page, "06-price-schedule.docx");
+  await cellOf(page, "Hardware item 3").click();
+  await page.keyboard.press("End");
+  await paste(page, {
+    "text/html": "<p>one <b>two</b></p><p>three</p><script>window.hacked = 1</script>",
+    "text/plain": "one two\nthree",
+  });
+  await expect.poll(() => headCell(page)).toEqual(["Hardware item 3one two", "three"]);
+  expect(await page.evaluate(() => (window as unknown as { hacked?: number }).hacked)).toBe(
+    undefined,
+  );
+  expect(await page.evaluate(() => window.foliEdit.validate())).toBe(true);
+});
+
+test("T4 in a cell: an IME composition is committed and undone in one step", async ({
+  page,
+  browserName,
+}) => {
+  test.skip(browserName !== "chromium", "CDP IME emulation is Chromium-only");
+  await open(page, "06-price-schedule.docx");
+  await cellOf(page, "Hardware item 3").click();
+  await page.keyboard.press("End");
+  await page.waitForTimeout(600);
+  const original = await docJSON(page);
+  const cdp = await page.context().newCDPSession(page);
+  for (const value of ["に", "にほ", "にほん"])
+    await cdp.send("Input.imeSetComposition", {
+      text: value,
+      selectionStart: value.length,
+      selectionEnd: value.length,
+    });
+  await cdp.send("Input.insertText", { text: "日本" });
+  await expect.poll(() => headCell(page)).toEqual(["Hardware item 3日本"]);
+  await page.keyboard.press(`${MOD}+z`);
+  await expect.poll(() => docJSON(page)).toBe(original);
+});
+
+test("T5 in a table: cells selected across the page break are emptied and undone exactly", async ({
+  page,
+}) => {
+  await open(page, "06-price-schedule.docx");
+  const original = await docJSON(page);
+  // Row 37 ends page 1; Shift+Down selects its cell and the one below it, on page 2.
+  await selectDown(page, "Support item 33");
+  const marked = await page.evaluate(() =>
+    [...document.querySelectorAll("td.foli-selected-cell")].map((td) =>
+      [...document.querySelectorAll("section.foli-page")].findIndex((s) => s.contains(td)),
+    ),
+  );
+  expect(marked).toEqual([0, 1]);
+  await page.keyboard.press("Delete");
+  await expect.poll(() => count(page, "Support item 33")).toBe(0);
+  await page.keyboard.press(`${MOD}+z`);
+  await expect.poll(() => docJSON(page)).toBe(original);
+});

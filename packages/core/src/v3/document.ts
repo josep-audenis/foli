@@ -447,18 +447,19 @@ export function parseDocument(input: unknown): FoliDocument {
 
 /**
  * Parses untrusted schema v4 content into a `doc` node, with Word's rules the content
- * expressions do not say: a table is never followed by a table (Word would merge them) nor ends
+ * expressions do not say (`fragment`: content to paste, which a table may end): a table is never
+ * followed by a table (Word would merge them) nor ends
  * the document, and a paragraph in a cell ends no section and holds no page or column break.
  */
-export function parseContent(value: unknown, path = "content"): Node {
+export function parseContent(value: unknown, path = "content", fragment = false): Node {
   const doc = schema.nodeFromJSON(value, path);
   if (doc.type !== schema.topNodeType) fail(path, 'root node must be of type "doc"');
   if (doc.marks.length) fail(`${path}.marks`, "doc cannot have marks");
-  wordRules(doc, path, false);
+  wordRules(doc, path, false, fragment);
   return doc;
 }
 
-function wordRules(parent: Node, path: string, inCell: boolean): void {
+function wordRules(parent: Node, path: string, inCell: boolean, fragment = false): void {
   parent.forEach((node, _offset, index) => {
     const at = `${path}.content[${index}]`;
     if (node.type.name === "table") {
@@ -466,7 +467,7 @@ function wordRules(parent: Node, path: string, inCell: boolean): void {
       if (next?.type.name === "table") {
         fail(at, "a table cannot follow a table (Word would merge them): a paragraph goes between");
       }
-      if (!next && parent.type.name === "doc") {
+      if (!next && parent.type.name === "doc" && !fragment) {
         fail(at, "a table cannot end the document: a paragraph follows it, as in Word");
       }
       node.forEach((row, _r, r) => {

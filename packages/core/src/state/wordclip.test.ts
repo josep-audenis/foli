@@ -719,3 +719,33 @@ describe("fitPastedV2", () => {
     expect(abstracts.map((a) => a.levels[0]?.format)).toEqual(["bullet", "decimal"]);
   });
 });
+
+describe("fitPaste with tables", () => {
+  const cell = (value: string): NodeJSON => ({ type: "tableCell", content: [p({}, text(value))] });
+  const table = (style: string): NodeJSON => ({
+    type: "table",
+    attrs: { style },
+    content: [
+      {
+        type: "tableRow",
+        attrs: { attributes: { "w14:paraId": "0000000B" } },
+        content: [cell("a")],
+      },
+    ],
+  });
+
+  it("maps a table's style from another document, never takes the target's of that id", () => {
+    const red: StyleJSON = { id: "Grid1", type: "table", name: "Target red table" };
+    const blue: StyleJSON = { id: "Grid1", type: "table", name: "Source blue table" };
+    const source = editorOf([table("Grid1"), p({})], { styles: [...STYLES, blue] });
+    const definitions = copiedDefinitions(contextOf(source), source.state.doc);
+    expect(definitions.styles.map((style) => style.name)).toContain("Source blue table");
+    const target = editorOf([p({}, text("x"))], { styles: [...STYLES, red] });
+    const fitted = fitPaste(target.state, docOf(table("Grid1")), definitions);
+    const pasted = fitted.doc.firstChild;
+    const style = fitted.envelope.styles.find((s) => s.id === pasted?.attrs.style);
+    expect(style?.name).toBe("Source blue table");
+    // A copied row is a new row: not its identity.
+    expect(pasted?.firstChild?.attrs.attributes).toBe(null);
+  });
+});
