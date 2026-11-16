@@ -1,7 +1,7 @@
 # @folijs/docx
 
 DOCX for [Foli](https://github.com/josep-audenis/foli): imports a `.docx` into Foli's Word model
-(schema v3 of `@folijs/core`), exports it back losslessly (`exportDocx`), and reads its package
+(schema v4 of `@folijs/core`), exports it back losslessly (`exportDocx`), and reads its package
 (zip, parts, content types, relationships) and XML keeping every byte it does not change. No DOM:
 runs in the browser, workers and Node 20.12+. Depends only on `@folijs/core`.
 
@@ -15,9 +15,9 @@ const {
   package: pkg,
   report,
 } = await importDocx(new Uint8Array(await file.arrayBuffer()));
-document.content; // schema v3: paragraphs with Word's properties, runs as text with marks
+document.content; // paragraphs with Word's properties, runs as text with marks, tables
 document.styles; // with basedOn, run and paragraph properties
-report.opaque; // { "w:tbl": 1, "w:drawing": 1 }: kept verbatim, not editable yet
+report.opaque; // { "w:drawing": 1 }: kept verbatim, not editable yet
 ```
 
 **Import** (`importDocx`, `importPackage`) reads the main document, styles (with the document
@@ -30,11 +30,21 @@ from `commentsExtended`) and sections:
   (`w14:paraId`…). **Runs** become text, tabs and breaks with their properties as marks; tracked
   insertions, deletions and moves, hyperlinks (target from the relationship, or a bookmark),
   bookmarks, comment ranges and references are modeled.
+- **Tables** (10.4) become `table`, `tableRow` and `tableCell` nodes: the table's, rows' and
+  cells' properties (`w:tblPr`, `w:tblGrid`, `w:tblPrEx`, `w:trPr`, `w:tcPr`) as attributes,
+  merges as Word writes them (`gridSpan`, `vMerge`), a row inserted or deleted as a tracked
+  change, the cells' paragraphs and nested tables; a table style's parts and conditional
+  formats go to its `StyleJSON`. A table the model cannot hold as it is stays opaque, reported:
+  rows or cells inside a content control or custom XML, markers between rows, elements out of
+  Word's order, a cell not ending with a paragraph, tables nested more than 64 deep, a table
+  right after a table (Word merges the two) or ending the body. A page or column break or a
+  section break in a cell is removed and reported, as Word does not keep them there. A table
+  style's `wholeTable` conditional format stays in its `ext`, reported.
 - **Lossless:** every properties element is kept verbatim (`ext` on paragraphs, sections,
   styles, numbering levels and definitions, the document defaults; `runExt` on runs; a comment's
   start tag), and unknown attributes of modeled elements go to attribute bags (paragraphs,
   links, tracked changes, bookmarks and comment anchors: `w16du:dateUtc`, `w14:paraId`…). Every
-  element Foli does not model yet (tables, content controls, pictures, fields' structure,
+  element Foli does not model yet (content controls, pictures, fields' structure,
   footnote references, equations…) becomes an opaque node holding its source, and so does an
   element the model rejects as a whole (a tracked change with an id past Word's range, a link in
   a link, a run with an unknown attribute): never stripped to plain text. Export (8.5) writes all
@@ -97,12 +107,18 @@ included). Within the parts it writes:
   namespaces. A document that refers to parts of its original package (headers, footers,
   pictures, content kept verbatim with relationship ids) needs that package: exporting it
   without one is a `DocxError`.
+- Tables are written from the model: each properties element as paragraphs' are (verbatim
+  while unchanged, else child by child), the grid as read while its widths are, rows and cells
+  in order; Word reads every corpus table back with Foli's text, unchanged and edited
+  (`scripts/corpus/table-roundtrip.mjs`). A changed table style is refused (`DocxError`) until
+  table styles are written.
 - Not written: the theme (read-only in the model: the original part is kept; a new package has
   none, so Word's default applies). Page margins Word requires but the document leaves out are
   written with Word's defaults. A part read as UTF-16 is written as UTF-8, declared so.
 
 Checked: the corpus exported without edits equals the original under the canonical comparison
-(`src/testing/canonical.ts`), with every other part, and every unchanged element, byte for byte;
+(`src/testing/canonical.ts`), with every other part, and every unchanged element, byte for byte
+(tables as written, but for what import drops everywhere);
 re-imported, it is the same document; random edits leave every other paragraph identical and
 the edited one's unknown properties in place; Word opens the exports (unchanged, edited, and new
 packages) and finds the reference numbers in the unchanged ones

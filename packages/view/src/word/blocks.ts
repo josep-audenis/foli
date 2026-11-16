@@ -604,9 +604,10 @@ export function opaqueBlock(
   element.dataset.foliOpaque = String(attrs.label ?? "");
   element.style.margin = "0";
   element.style.display = "flow-root";
-  const xml = parseOpaque(String(attrs.xml ?? ""), doc);
+  const xml = node.type === "table" ? null : parseOpaque(String(attrs.xml ?? ""), doc);
   let after = 0;
-  if (xml?.localName === "tbl") element.append(opaqueTable(xml, resolver, doc, ratio));
+  if (node.type === "table") element.append(modelTable(node, resolver, doc, ratio));
+  else if (xml?.localName === "tbl") element.append(opaqueTable(xml, resolver, doc, ratio));
   else if (xml) {
     const paragraphs = outermost(xml, PARAGRAPHS);
     paragraphs.forEach((p, i) => {
@@ -816,6 +817,99 @@ function opaqueTable(
     }
     body.append(row);
   }
+  table.append(body);
+  return table;
+}
+
+/** A border of the model (`BorderJSON`) as CSS; undefined when it says none. */
+function borderJsonCss(border: { style?: string; size?: number; color?: string } | undefined) {
+  if (!border) return undefined;
+  if (border.style === "nil" || border.style === "none") return "none";
+  const width = Math.max(((border.size ?? 4) / 8) * (96 / 72), 0.5);
+  const color = border.color && border.color !== "auto" ? `#${border.color}` : "#000";
+  return `${width}px ${BORDER_STYLES[border.style ?? "single"] ?? "solid"} ${color}`;
+}
+
+/**
+ * A table of the model (schema v4), read-only, as opaque tables are shown: rows, cells with
+ * their table style's formatting (`Resolver.cell`), their paragraphs and nested tables.
+ *
+ * shortcut: a stopgap until tables are laid out on pages and edited (10.5, 10.6): one block,
+ * not split across pages; a cell merged into the one above is shown empty, as opaque tables are.
+ */
+function modelTable(
+  node: NodeJSON,
+  resolver: Resolver,
+  doc: Document,
+  ratio: (family: string) => number,
+): HTMLElement {
+  const attrs = (node.attrs ?? {}) as Record<string, unknown>;
+  const table = doc.createElement("table");
+  table.style.borderCollapse = "collapse";
+  table.style.tableLayout = "fixed";
+  const grid = (attrs.grid as number[] | undefined) ?? [];
+  const total = grid.reduce((a, b) => a + b, 0);
+  if (total) table.style.width = `${total * PX_PER_TWIP}px`;
+  const colgroup = doc.createElement("colgroup");
+  for (const width of grid) {
+    const col = doc.createElement("col");
+    col.style.width = `${width * PX_PER_TWIP}px`;
+    colgroup.append(col);
+  }
+  table.append(colgroup);
+  const body = doc.createElement("tbody");
+  const rows = node.content ?? [];
+  const context = { resolver, doc, review: "markup" as const, comments: new Set<number>(), ratio };
+  rows.forEach((rowNode, r) => {
+    const rowAttrs = (rowNode.attrs ?? {}) as Record<string, unknown>;
+    const row = doc.createElement("tr");
+    if (rowAttrs.header) row.dataset.foliHeader = "";
+    const cells = rowNode.content ?? [];
+    cells.forEach((cellNode, c) => {
+      const cellAttrs = (cellNode.attrs ?? {}) as Record<string, unknown>;
+      const format = resolver.cell(attrs, rowAttrs, cellAttrs, {
+        row: r,
+        rows: rows.length,
+        cell: c,
+        cells: cells.length,
+      });
+      const cell = doc.createElement("td");
+      const span = cellAttrs.gridSpan as number | undefined;
+      if (span && span > 1) cell.colSpan = span;
+      if (format.shading) cell.style.backgroundColor = `#${format.shading}`;
+      const m = format.margins;
+      cell.style.padding = `${m.top * PX_PER_TWIP}px ${m.right * PX_PER_TWIP}px ${m.bottom * PX_PER_TWIP}px ${m.left * PX_PER_TWIP}px`;
+      cell.style.verticalAlign =
+        format.verticalAlign === "center" ? "middle" : format.verticalAlign;
+      for (const side of ["top", "left", "bottom", "right"] as const) {
+        const css = borderJsonCss(format.borders[side]);
+        if (css) cell.style.setProperty(`border-${side}`, css);
+      }
+      row.append(cell);
+      if (cellAttrs.vMerge === "continue") return;
+      for (const block of cellNode.content ?? []) {
+        if (block.type === "table") {
+          cell.append(modelTable(block, resolver, doc, ratio));
+          continue;
+        }
+        if (block.type !== "paragraph") {
+          cell.append(opaqueBlock(block, 0, resolver, doc, ratio).element);
+          continue;
+        }
+        const { paragraph, run } = resolver.paragraph(block.attrs ?? {}, format);
+        const element = doc.createElement(tagOf(paragraph));
+        styleParagraph(element, paragraph);
+        styleRun(element, run, lineHeight(paragraph, run, ratio(fontStack(latin(run)))));
+        renderInline(element, block.content ?? [], run, paragraph, context);
+        if (!element.textContent) element.append(doc.createElement("br"));
+        element.style.marginTop = `${paragraph.spacing.before * PX_PER_TWIP}px`;
+        // Word counts the space after a cell's last paragraph in the row's height too.
+        element.style.marginBottom = `${paragraph.spacing.after * PX_PER_TWIP}px`;
+        cell.append(element);
+      }
+    });
+    body.append(row);
+  });
   table.append(body);
   return table;
 }

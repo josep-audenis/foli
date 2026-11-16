@@ -176,22 +176,7 @@ describe("verbatim content must fit the part", () => {
       content: { type: "doc", content },
     });
   const cases: [NodeJSON[], RegExp][] = [
-    // Schema 4 content export does not write yet: refused, never dropped.
-    [
-      [
-        {
-          type: "table",
-          content: [
-            {
-              type: "tableRow",
-              content: [{ type: "tableCell", content: [{ type: "paragraph" }] }],
-            },
-          ],
-        },
-        { type: "paragraph" },
-      ],
-      /A table cannot be exported to .docx yet/,
-    ],
+    // Pictures are not exported yet (10.8): refused, never dropped.
     [
       [
         {

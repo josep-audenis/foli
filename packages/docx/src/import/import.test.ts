@@ -36,17 +36,24 @@ describe("importing the Word corpus", () => {
   });
 
   for (const name of names) {
-    it(`${name}: has Word's text in every paragraph outside tables`, async () => {
+    it(`${name}: has Word's text in every paragraph, table cells included`, async () => {
       const { document } = await load(name);
       const reference = JSON.parse(
         readFileSync(new URL(name.replace(".docx", ".json"), REFERENCE), "utf8"),
       );
-      const expected = (reference.paragraphs as { text: string; inTable: boolean }[])
-        .filter((p) => !p.inTable)
-        .map((p) => p.text.toLowerCase());
-      const imported = (document.content.content ?? [])
-        .filter((b) => b.type === "paragraph")
-        .map((p) => text(p).toLowerCase());
+      const expected = (reference.paragraphs as { text: string }[]).map((p) =>
+        p.text.toLowerCase(),
+      );
+      // In Word's order: depth first, row by row, nested tables inside their cell. A cell a
+      // vertical merge covers (`vMerge` continue) is part of the merged cell: Word lists none of
+      // its paragraphs.
+      const imported: string[] = [];
+      const walk = (node: NodeJSON) => {
+        if (node.type === "paragraph") imported.push(text(node).toLowerCase());
+        else if (node.type === "tableCell" && node.attrs?.vMerge === "continue") return;
+        else for (const child of node.content ?? []) walk(child);
+      };
+      walk(document.content);
       if (name.startsWith("03-")) {
         // Content controls are opaque until Phase 11: the paragraphs without one match.
         const plain = imported.filter(
@@ -103,7 +110,9 @@ describe("importing the Word corpus", () => {
     expect(document.section.pageSize).toEqual({ width: 11906, height: 16838 });
     expect(document.section.titlePage).toBe(true);
     // A cross-reference field: its structure opaque, its result editable text.
-    expect(report.opaque).toEqual({ "w:fldChar": 3, "w:instrText": 1, "w:tbl": 1 });
+    expect(report.opaque).toEqual({ "w:fldChar": 3, "w:instrText": 1 });
+    // The signature table is a table (schema v4).
+    expect((document.content.content ?? []).filter((b) => b.type === "table").length).toBe(1);
     const bookmarks = (document.content.content ?? []).flatMap((p) =>
       (p.content ?? []).filter((n) => n.type === "bookmarkStart"),
     );
@@ -166,11 +175,9 @@ describe("importing the Word corpus", () => {
     expect(landscape.sort()).toEqual(["landscape", undefined].sort());
     expect(report.opaque["w:drawing"]).toBe(1);
     expect(report.opaque["w:footnoteReference"]).toBe(2);
-    expect(
-      (document.content.content ?? [])
-        .filter((b) => b.type === "opaqueBlock")
-        .map((b) => b.attrs?.label),
-    ).toEqual(["table"]);
+    const blocks = document.content.content ?? [];
+    expect(blocks.filter((b) => b.type === "opaqueBlock")).toEqual([]);
+    expect(blocks.filter((b) => b.type === "table").length).toBe(1);
   });
 
   it("reads character formatting, tabs and indents (business letter)", async () => {
@@ -300,7 +307,7 @@ describe("importing WordprocessingML", () => {
 
   it("keeps unknown block and inline content as opaque nodes", async () => {
     const { blocks, report } = await blocksOf(
-      `<w:tbl><w:tr><w:tc><w:p/></w:tc></w:tr></w:tbl><w:bookmarkEnd w:id="9"/><x:custom/><w:p><w:smartTag><w:r><w:t>a</w:t></w:r></w:smartTag><w:fldSimple w:instr=" PAGE "><w:r><w:t>3</w:t></w:r></w:fldSimple><w:r><w:drawing/><w:sym w:font="Wingdings" w:char="F0FC"/></w:r></w:p><w:sectPr><w:pgSz w:w="12240" w:h="15840"/></w:sectPr>`,
+      `<w:tbl><w:sdt><w:sdtContent><w:tr><w:tc><w:p/></w:tc></w:tr></w:sdtContent></w:sdt></w:tbl><w:bookmarkEnd w:id="9"/><x:custom/><w:p><w:smartTag><w:r><w:t>a</w:t></w:r></w:smartTag><w:fldSimple w:instr=" PAGE "><w:r><w:t>3</w:t></w:r></w:fldSimple><w:r><w:drawing/><w:sym w:font="Wingdings" w:char="F0FC"/></w:r></w:p><w:sectPr><w:pgSz w:w="12240" w:h="15840"/></w:sectPr>`,
     );
     expect(blocks.map((b) => [b.type, b.attrs?.label])).toEqual([
       ["opaqueBlock", "table"],
@@ -308,7 +315,10 @@ describe("importing WordprocessingML", () => {
       ["opaqueBlock", "custom"],
       ["paragraph", undefined],
     ]);
-    expect(blocks[0]?.attrs?.xml).toBe("<w:tbl><w:tr><w:tc><w:p/></w:tc></w:tr></w:tbl>");
+    // Rows inside a content control: the model cannot hold the table, kept verbatim.
+    expect(blocks[0]?.attrs?.xml).toBe(
+      "<w:tbl><w:sdt><w:sdtContent><w:tr><w:tc><w:p/></w:tc></w:tr></w:sdtContent></w:sdt></w:tbl>",
+    );
     expect(blocks[3]?.content?.map((n) => n.attrs?.label)).toEqual([
       "smartTag",
       "3",

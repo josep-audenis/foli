@@ -947,10 +947,16 @@ Each task is a PR on `phase-10/tables-images`, the build green after each.
   view shows a placeholder until 10.4–10.8; banding, the Normal-style precedence and a
   conditional format's `insideH`/`insideV` cell borders are checked against Word's pages in
   10.5; 10.4 must not write a table next to an opaque `w:tbl`, which Word would merge.)
-- [ ] 10.4 DOCX tables: import `w:tbl` into the model (nested tables too; what the model cannot
+- [x] 10.4 DOCX tables: import `w:tbl` into the model (nested tables too; what the model cannot
   hold stays verbatim, reported), export losslessly (unchanged tables byte for byte, changed
   ones rewritten child by child), tracked changes and comments inside tables, row insertion and
   deletion revisions; harness: round trip, opens in Word, edited exports too.
+  (Done: every corpus cell paragraph has Word's text; unchanged tables come back as written but
+  for what import drops everywhere (run `rsid`s); `scripts/corpus/table-roundtrip.mjs` has Word
+  read 4 unchanged and 4 edited exports. Until 10.5/10.6 the view shows a table read-only as one
+  block (not split across pages) and the editor treats it as opaque (selected, then deleted, as
+  a whole). A table style's `wholeTable` part stays in `ext`; changed table styles are refused
+  on export.)
 - [ ] 10.5 Tables on pages in the view: tables rendered from the model, column widths (fixed and
   autofit), borders as Word resolves conflicts, shading; rows flowed across pages (header rows
   repeated, `cantSplit` kept whole, other rows split at a line), position mapping and read-back

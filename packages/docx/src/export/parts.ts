@@ -24,6 +24,7 @@ import {
   usableStyle,
 } from "../import/parts.js";
 import { Recorder } from "../import/report.js";
+import { DocxError } from "../package.js";
 import type { XmlElement, XmlNode } from "../xml.js";
 import { blocksXml, type WriteContext } from "./content.js";
 import { paragraphPropertiesXml, runPropertiesXml, same } from "./properties.js";
@@ -187,6 +188,14 @@ function styleXml(style: StyleJSON, ns: Namespaces): string {
     if (reread && same(normalizeStyle(style), normalizeStyle(reread))) return style.ext as string;
   }
   const reread = o ? styleOf(o.element, reading(o.source)) : undefined;
+  // A table style's parts are written as read (`w:tblPr`… kept): a change would be lost.
+  for (const key of ["table", "row", "cell", "conditions"] as const) {
+    if (!same(style[key], reread?.[key])) {
+      throw new DocxError(
+        `Style ${style.id}: a changed table style (${key}) cannot be exported yet`,
+      );
+    }
+  }
   const generated = new Map<string, string>([
     ["name", val("name", style.name)],
     ["basedOn", val("basedOn", style.basedOn)],

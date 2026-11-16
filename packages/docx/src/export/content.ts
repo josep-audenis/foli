@@ -6,6 +6,13 @@
 import type { MarkJSON, NodeJSON } from "@folijs/core";
 import { DocxError } from "../package.js";
 import { paragraphPropertiesXml, runPropertiesXml, same } from "./properties.js";
+import {
+  cellPropertiesXml,
+  exceptionsXml,
+  gridXml,
+  rowPropertiesXml,
+  tablePropertiesXml,
+} from "./tables.js";
 import { bagXml, el, escapeText, fragment, type Namespaces } from "./xmlout.js";
 
 export interface WriteContext {
@@ -31,12 +38,30 @@ export function blocksXml(blocks: readonly NodeJSON[], context: WriteContext): s
   for (const block of blocks) {
     if (block.type === "paragraph") out += paragraphXml(block, context);
     else if (block.type === "opaqueBlock") out += verbatim(block.attrs?.xml, context);
+    else if (block.type === "table") out += tableXml(block, context);
     else notYet(block);
   }
   return out;
 }
 
-/** Content export does not write yet (tables: 10.4; pictures: 10.8): refused, never dropped. */
+/** A table: its properties, its grid, then each row's exceptions, properties and cells. */
+function tableXml(table: NodeJSON, context: WriteContext): string {
+  const ns = context.namespaces;
+  const attrs = (table.attrs ?? {}) as Json;
+  let out = `<w:tbl>${tablePropertiesXml(attrs, ns)}${gridXml(attrs, ns)}`;
+  for (const row of table.content ?? []) {
+    const r = (row.attrs ?? {}) as Json;
+    out += `<w:tr${bagXml(r.attributes, ns)}>${exceptionsXml(r.exceptions, ns)}${rowPropertiesXml(r, ns)}`;
+    for (const cell of row.content ?? []) {
+      const c = (cell.attrs ?? {}) as Json;
+      out += `<w:tc>${cellPropertiesXml(c, ns)}${blocksXml(cell.content ?? [], context)}</w:tc>`;
+    }
+    out += "</w:tr>";
+  }
+  return `${out}</w:tbl>`;
+}
+
+/** Content export does not write yet (pictures: 10.8): refused, never dropped. */
 function notYet(node: NodeJSON): never {
   throw new DocxError(`A ${node.type} cannot be exported to .docx yet`);
 }
@@ -44,7 +69,9 @@ function notYet(node: NodeJSON): never {
 export function paragraphXml(p: NodeJSON, context: WriteContext): string {
   const attrs = (p.attrs ?? {}) as Json;
   const own = bagXml(attrs.attributes, context.namespaces);
-  return `<w:p${own}>${paragraphPropertiesXml(attrs, context.namespaces)}${inlinesXml(p.content ?? [], context)}</w:p>`;
+  const inner = `${paragraphPropertiesXml(attrs, context.namespaces)}${inlinesXml(p.content ?? [], context)}`;
+  // An empty paragraph as Word writes it.
+  return inner ? `<w:p${own}>${inner}</w:p>` : `<w:p${own}/>`;
 }
 
 const markOf = (node: NodeJSON, type: string) => node.marks?.find((m) => m.type === type);
