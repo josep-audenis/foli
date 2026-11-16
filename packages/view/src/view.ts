@@ -300,7 +300,9 @@ export class EditorView {
   /** The table each wrapper element draws (part of). */
   private frameOf = new Map<Node, Frame>();
   /** Each table as last rendered, by its index among the top-level items. */
-  private frameAt: (FrameState | undefined)[] = [];
+  private frameAt: ({ node: ModelNode; state: FrameState } | undefined)[] = [];
+  /** Elements the view itself removed: the read-back does not take them for input. */
+  private viewRemoved = new WeakSet<Node>();
   /** The block each fragment element belongs to. */
   private owner = new Map<Node, BlockDesc>();
   /** The page elements, in order; the host's only children. */
@@ -618,6 +620,10 @@ export class EditorView {
       for (let u = frame.first; u < frame.end; u++) remeasureUnit[u] = true;
     }
     let blocks: WordBlockDesc[] = [];
+    // Nodes still in the document: an old block or table at an index is only taken over (during
+    // a composition) when its node is gone, never when an insertion moved it along.
+    const present = new Set<ModelNode>(units.map((unit) => unit.node));
+    for (const item of items) if (item.frame) present.add(item.frame.node);
     units.forEach((unit, i) => {
       const { node } = unit;
       let reused = reusable[i];
@@ -636,18 +642,25 @@ export class EditorView {
       const old = reused
         ? undefined
         : (previous.get(node) ??
-          (this.composing && atIndex && previous.get(atIndex.node) === atIndex
+          (this.composing &&
+          atIndex &&
+          !present.has(atIndex.node) &&
+          previous.get(atIndex.node) === atIndex
             ? atIndex
             : undefined));
       const first = old?.fragments[0];
       if (old && first?.isConnected && first.parentElement?.closest(`[${FRAME_ATTR}]`)) {
         first.replaceWith(...desc.fragments);
         for (const fragment of old.fragments.slice(1)) fragment.remove();
+        for (const fragment of old.fragments) this.viewRemoved.add(fragment);
         previous.delete(old.node);
       }
     });
     for (const stale of previous.values())
-      for (const fragment of stale.fragments) fragment.remove();
+      for (const fragment of stale.fragments) {
+        fragment.remove();
+        this.viewRemoved.add(fragment);
+      }
     this.applyPrintStyles(layout);
     const doc_ = this.host.ownerDocument;
     const frames = new Map<ModelNode, FrameState>();
@@ -673,10 +686,11 @@ export class EditorView {
         let state = previousFrames.get(node);
         // During a composition nothing moves: a table that changed keeps the wrappers drawn at
         // its place (its redrawn blocks took their old ones' places above).
-        if (!state && this.composing) state = this.frameAt[i];
+        const at = this.frameAt[i];
+        if (!state && this.composing && at && !present.has(at.node)) state = at.state;
         if (!state || (this.stale.has(node) && !this.composing)) state = whole(item.frame);
         frames.set(node, state);
-        const pagesBefore = before ?? (state === this.frameAt[i] ? state.pages : undefined);
+        const pagesBefore = before ?? (state === at?.state ? state.pages : undefined);
         return state.wrappers.map((_, f) => (last = Math.max(last, pagesBefore?.[f] ?? last)));
       }
       const desc = blocks[item.unit] as WordBlockDesc;
@@ -842,7 +856,10 @@ export class EditorView {
     }
     // (Wrappers no longer drawn are not in a page: `place` removed them.)
     this.frames = frames;
-    this.frameAt = items.map((item, i) => (item.frame ? frames.get(doc.child(i)) : undefined));
+    this.frameAt = items.map((item, i) => {
+      const state = item.frame && frames.get(doc.child(i));
+      return state ? { node: doc.child(i), state } : undefined;
+    });
     this.frameOf = new Map();
     items.forEach((item, i) => {
       if (!item.frame) return;
@@ -930,6 +947,7 @@ export class EditorView {
       while (at) {
         const next: ChildNode | null = at.nextSibling;
         at.remove();
+        this.viewRemoved.add(at);
         at = next;
       }
     }
@@ -1762,7 +1780,9 @@ export class EditorView {
     // A block whose elements the browser removed (merging it into another) has no text there.
     // One missing without a recorded removal was never placed (drawn during a composition):
     // its text counts as unchanged, never as deleted.
-    const removed = new Set(records.flatMap((record) => [...record.removedNodes]));
+    const removed = new Set(
+      records.flatMap((record) => [...record.removedNodes]).filter((n) => !this.viewRemoved.has(n)),
+    );
     const removedByInput = (node: Node) => {
       for (let at: Node | null = node; at; at = at.parentNode) if (removed.has(at)) return true;
       return false;

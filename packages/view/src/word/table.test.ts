@@ -266,6 +266,29 @@ describe("cutting a table across pages", () => {
   });
 });
 
+describe("a composition in a cell, with a paragraph inserted before it", () => {
+  it("loses no text when the blocks after the insertion move along", () => {
+    const { host, editor, view } = mount();
+    view.focus();
+    const apples = startOf(editor, "Apples");
+    editor.dispatch(
+      editor.state.tr.setSelection(TextSelection.create(editor.state.doc, apples + 6)),
+    );
+    const composed = view.domFromPos(apples + 6).node as Text;
+    host.dispatchEvent(new CompositionEvent("compositionstart"));
+    // A paragraph inserted at the start of the "Fruit" cell (before every later block).
+    const fruit = startOf(editor, "Fruit");
+    const schema = editor.state.schema;
+    const added = schema.nodes.paragraph?.create(null, schema.text("New")) as never;
+    editor.dispatch(editor.state.tr.insert(fruit - 1, added));
+    composed.data = "Applesé";
+    document.getSelection()?.collapse(composed, 7);
+    host.dispatchEvent(new CompositionEvent("compositionend"));
+    for (const value of ["New", "Fruit", "Applesé", "10", "Pears", "Before", "After"])
+      expect(startOf(editor, value), value).toBeGreaterThan(0);
+  });
+});
+
 describe("a composition in a cell", () => {
   it("keeps the cell's element in place when another cell changes, and loses no text", () => {
     const { host, editor, view } = mount();
