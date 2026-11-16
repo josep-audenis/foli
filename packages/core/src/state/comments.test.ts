@@ -50,8 +50,9 @@ describe("comments", () => {
     editor.commands.addComment("one\ntwo");
     expect(comments(editor)[0]?.content).toEqual([p(text("one")), p(text("two"))]);
     expect(editor.commands.replyToComment(0, "reply", { author: "You" })).toBe(true);
+    // As Word writes a thread: the starts together, then each end with its reference.
     expect(blocks(editor)).toEqual([
-      p(start(0), start(1), text("ab"), end(0), end(1), ref(0), ref(1)),
+      p(start(0), start(1), text("ab"), end(0), ref(0), end(1), ref(1)),
     ]);
     // A reply to a reply answers the thread's comment.
     editor.commands.replyToComment(1, "again");
@@ -62,10 +63,11 @@ describe("comments", () => {
     ]);
     editor.commands.editComment(1, "changed");
     expect(comments(editor)[1]?.content).toEqual(note("changed"));
+    // The whole thread, as Word marks it.
     editor.commands.resolveComment(2);
-    expect(comments(editor)[0]?.done).toBe(true);
+    expect(comments(editor).map((c) => c.done)).toEqual([true, true, true]);
     editor.commands.resolveComment(0, false);
-    expect(comments(editor)[0]?.done).toBeUndefined();
+    expect(comments(editor).map((c) => c.done)).toEqual([undefined, undefined, undefined]);
   });
 
   it("deletes a comment with its replies and anchors; deletes all", () => {
@@ -133,6 +135,50 @@ describe("comments", () => {
     editor.commands.acceptAllChanges();
     expect(comments(editor)).toEqual([]);
     expect(blocks(editor)).toEqual([p(text("c"))]);
+  });
+
+  it("keeps the selection on the commented text: typing over it keeps the comment", () => {
+    const editor = editorOf([p(text("Hello world"))]);
+    editor.select(7, 12);
+    editor.commands.addComment("x", { initials: "ABCDEFGHIJK" });
+    expect(comments(editor)[0]?.initials).toBe("ABCDEFGHI");
+    expect([editor.state.selection.from, editor.state.selection.to]).toEqual([8, 13]);
+    editor.commands.insertText("Z");
+    expect(blocks(editor)).toEqual([p(text("Hello "), start(0), text("Z"), end(0), ref(0))]);
+    expect(comments(editor)).toHaveLength(1);
+    // The comment was a step of its own: undo takes the typing back, not the comment.
+    editor.commands.undo();
+    expect(comments(editor)).toHaveLength(1);
+    expect(blocks(editor)).toEqual([p(text("Hello "), start(0), text("world"), end(0), ref(0))]);
+  });
+
+  it("comments everything selected", () => {
+    const editor = editorOf([p(text("a")), p(text("b"))]);
+    editor.commands.selectAll();
+    expect(editor.commands.addComment("all")).toBe(true);
+    expect(blocks(editor)).toEqual([p(start(0), text("a")), p(text("b"), end(0), ref(0))]);
+  });
+
+  it("keeps comments anchored in verbatim content, and does not reuse their ids", () => {
+    const table: NodeJSON = {
+      type: "opaqueBlock",
+      attrs: {
+        xml: '<w:tbl><w:tr><w:tc><w:p><w:commentRangeStart w:id="5"/><w:r><w:t>x</w:t></w:r><w:commentRangeEnd w:id="5"/><w:r><w:commentReference w:id="5"/></w:r></w:p></w:tc></w:tr></w:tbl>',
+      },
+    };
+    const editor = editorOf(
+      [table, p(start(1), text("a"), end(1), ref(1))],
+      [
+        { id: 5, author: "A", content: note("in the table") },
+        { id: 1, author: "A", content: note("outside") },
+      ],
+    );
+    expect(editor.commands.deleteComment(5)).toBe(false);
+    editor.commands.deleteAllComments();
+    expect(comments(editor).map((c) => c.id)).toEqual([5]);
+    editor.select(3);
+    editor.commands.addComment("new");
+    expect(comments(editor).map((c) => c.id)).toEqual([5, 6]);
   });
 
   it("keeps a comment that had no reference mark to begin with", () => {

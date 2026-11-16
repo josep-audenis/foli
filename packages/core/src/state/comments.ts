@@ -10,8 +10,9 @@
 import type { Node, NodeJSON } from "../model/index.js";
 import type { CommentJSON } from "../v3/document.js";
 import { closeHistory } from "./history.js";
+import { AllSelection, Selection, TextSelection } from "./selection.js";
 import { type Command, type EditorState, Plugin, PluginKey, type Transaction } from "./state.js";
-import { trackState, untracked } from "./track.js";
+import { now, trackState, untracked } from "./track.js";
 import { setComments, wordContext } from "./word.js";
 
 const ANCHORS = new Set(["commentStart", "commentEnd", "commentReference"]);
@@ -35,10 +36,26 @@ function contentOf(content: CommentContent): NodeJSON[] {
     );
 }
 
-/** Word's date: UTC, to the second. */
-const now = () => new Date().toISOString().replace(/\.\d+Z$/, "Z");
+/** Word's limit on a comment's initials. */
+const INITIALS = 9;
+const initialsOf = (options: CommentOptions) =>
+  options.initials !== undefined ? { initials: options.initials.slice(0, INITIALS) } : {};
 
-/** The next free comment id: above every comment and every comment anchor. */
+/** Comment anchors inside content Foli keeps verbatim (a table): their ids. */
+function opaqueCommentIds(doc: Node): Set<number> {
+  const ids = new Set<number>();
+  doc.descendants((node) => {
+    if (node.type.name === "opaqueBlock" || node.type.name === "opaqueInline")
+      for (const [, id] of String(node.attrs.xml).matchAll(
+        /<\w+:comment(?:RangeStart|RangeEnd|Reference)\b[^>]*?\b\w+:id="(\d+)"/g,
+      ))
+        ids.add(Number(id));
+    return node.isBlock;
+  });
+  return ids;
+}
+
+/** The next free comment id: above every comment and every comment anchor, verbatim ones too. */
 function nextCommentId(doc: Node, comments: readonly CommentJSON[]): number {
   let max = -1;
   for (const c of comments) max = Math.max(max, c.id);
@@ -46,7 +63,20 @@ function nextCommentId(doc: Node, comments: readonly CommentJSON[]): number {
     if (ANCHORS.has(node.type.name)) max = Math.max(max, node.attrs.id as number);
     return node.isBlock;
   });
+  for (const id of opaqueCommentIds(doc)) max = Math.max(max, id);
   return max + 1;
+}
+
+/** The comment a thread starts with (`id`'s, following `parent`). */
+function rootOf(comments: readonly CommentJSON[], id: number): CommentJSON | undefined {
+  let root = comments.find((c) => c.id === id);
+  const seen = new Set<number>();
+  while (root?.parent !== undefined && !seen.has(root.id)) {
+    seen.add(root.id);
+    const up = root.parent;
+    root = comments.find((c) => c.id === up);
+  }
+  return root;
 }
 
 /** Where each comment's anchors are: start, end (after which the reference goes) and reference. */
@@ -88,7 +118,10 @@ export function addComment(content: CommentContent, options: CommentOptions = {}
       reference: schema.nodes.commentReference,
     };
     if (!context || !types.start || !types.end || !types.reference) return false;
-    const { $from, $to } = state.selection;
+    // Select-all comments the whole text: from the first textblock to the last.
+    const all = state.selection instanceof AllSelection;
+    const $from = all ? Selection.atStart(state.doc).$from : state.selection.$from;
+    const $to = all ? Selection.atEnd(state.doc).$to : state.selection.$to;
     if (!$from.parent.inlineContent || !$to.parent.inlineContent) return false;
     if (dispatch) {
       const comments = context.envelope.comments;
@@ -97,10 +130,13 @@ export function addComment(content: CommentContent, options: CommentOptions = {}
       // From the end, so the start's position stays.
       tr.insert($to.pos, [types.end.create({ id }), types.reference.create({ id })]);
       tr.insert($from.pos, types.start.create({ id }));
+      // The selection stays on the commented text, not on the anchors after it: typing over
+      // it must not delete the comment's reference.
+      tr.setSelection(TextSelection.create(tr.doc, $from.pos + 1, $to.pos + 1));
       const comment: CommentJSON = {
         id,
         author: authorOf(state, options),
-        ...(options.initials !== undefined ? { initials: options.initials } : {}),
+        ...initialsOf(options),
         date: now(),
         content: contentOf(content),
       };
@@ -121,31 +157,29 @@ export function replyToComment(
     const context = wordContext(state);
     const { schema } = state;
     const comments = context?.envelope.comments ?? [];
-    let root = comments.find((c) => c.id === parent);
-    while (root?.parent !== undefined) {
-      const up = root.parent;
-      root = comments.find((c) => c.id === up);
-    }
-    const anchors = root && commentAnchors(state.doc).get(root.id);
+    const root = rootOf(comments, parent);
+    const all = commentAnchors(state.doc);
+    const anchors = root && all.get(root.id);
     const { commentStart, commentEnd, commentReference } = schema.nodes;
     if (!context || !root || !anchors || !commentStart || !commentEnd || !commentReference)
       return false;
     if (dispatch) {
       const id = nextCommentId(state.doc, comments);
       const tr = commentTr(state);
-      // Its anchors right after the comment's (from the end, so earlier positions stay).
-      const at: { pos: number; node: Node }[] = [];
-      if (anchors.start !== undefined)
-        at.push({ pos: anchors.start + 1, node: commentStart.create({ id }) });
-      if (anchors.end !== undefined)
-        at.push({ pos: anchors.end + 1, node: commentEnd.create({ id }) });
-      if (anchors.reference !== undefined)
-        at.push({ pos: anchors.reference + 1, node: commentReference.create({ id }) });
-      for (const { pos, node } of at.sort((a, b) => b.pos - a.pos)) tr.insert(pos, node);
+      // As Word writes a thread: the starts together (this one after the thread's last), then
+      // each end with its reference (this pair after the thread's last reference).
+      const ids = thread(comments, root.id);
+      const last = (key: "start" | "reference") =>
+        Math.max(...[...ids].map((i) => all.get(i)?.[key] ?? -1));
+      const lastStart = last("start");
+      const lastReference = last("reference");
+      if (lastReference >= 0)
+        tr.insert(lastReference + 1, [commentEnd.create({ id }), commentReference.create({ id })]);
+      if (lastStart >= 0) tr.insert(lastStart + 1, commentStart.create({ id }));
       const reply: CommentJSON = {
         id,
         author: authorOf(state, options),
-        ...(options.initials !== undefined ? { initials: options.initials } : {}),
+        ...initialsOf(options),
         date: now(),
         content: contentOf(content),
         parent: root.id,
@@ -178,20 +212,22 @@ function changeComment(
 export const editComment = (id: number, content: CommentContent): Command =>
   changeComment(id, (c) => [{ ...c, content: contentOf(content) }]);
 
-/** Resolves (or reopens) comment `id`'s thread: Word marks its comment done. */
+/** Resolves (or reopens) comment `id`'s thread: every comment of it, as Word marks them. */
 export function resolveComment(id: number, done = true): Command {
   return (state, dispatch) => {
     const comments = wordContext(state)?.envelope.comments ?? [];
-    let root = comments.find((c) => c.id === id);
-    while (root?.parent !== undefined) {
-      const up = root.parent;
-      root = comments.find((c) => c.id === up);
-    }
+    const root = rootOf(comments, id);
     if (!root) return false;
-    return changeComment(root.id, (c) => {
-      const { done: _, ...rest } = c;
-      return [done ? { ...rest, done: true } : rest];
-    })(state, dispatch);
+    if (dispatch) {
+      const ids = thread(comments, root.id);
+      const next = comments.map((c) => {
+        if (!ids.has(c.id)) return c;
+        const { done: _, ...rest } = c;
+        return done ? { ...rest, done: true } : rest;
+      });
+      dispatch(setComments(commentTr(state), comments, next));
+    }
+    return true;
   };
 }
 
@@ -228,23 +264,35 @@ function removeComments(tr: Transaction, comments: readonly CommentJSON[], ids: 
 export function deleteComment(id: number): Command {
   return (state, dispatch) => {
     const comments = wordContext(state)?.envelope.comments ?? [];
-    if (!comments.some((c) => c.id === id)) return false;
+    const ids = thread(comments, id);
+    // shortcut: a comment anchored in content Foli keeps verbatim (a table) stays, its anchors
+    // there cannot be removed; Phase 10 models tables.
+    const verbatim = opaqueCommentIds(state.doc);
+    if (!comments.some((c) => c.id === id) || [...ids].some((i) => verbatim.has(i))) return false;
     if (dispatch) {
       const tr = commentTr(state);
-      removeComments(tr, comments, thread(comments, id));
+      removeComments(tr, comments, ids);
       dispatch(tr);
     }
     return true;
   };
 }
 
-/** Deletes every comment and its anchors. */
+/** Deletes every comment and its anchors (not the threads anchored in verbatim content). */
 export const deleteAllComments: Command = (state, dispatch) => {
   const comments = wordContext(state)?.envelope.comments ?? [];
-  if (!comments.length) return false;
+  const verbatim = opaqueCommentIds(state.doc);
+  const kept = new Set<number>();
+  for (const c of comments) {
+    const root = rootOf(comments, c.id);
+    if (root && verbatim.has(root.id)) for (const i of thread(comments, root.id)) kept.add(i);
+    if (verbatim.has(c.id)) kept.add(c.id);
+  }
+  const gone = new Set(comments.map((c) => c.id).filter((i) => !kept.has(i)));
+  if (!gone.size) return false;
   if (dispatch) {
     const tr = commentTr(state);
-    removeComments(tr, comments, new Set(comments.map((c) => c.id)));
+    removeComments(tr, comments, gone);
     dispatch(tr);
   }
   return true;

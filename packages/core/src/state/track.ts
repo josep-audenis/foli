@@ -122,8 +122,8 @@ export function setReviewView(view: ReviewView): Command {
   };
 }
 
-/** Word's date: UTC, to the second. */
-function now(): string {
+/** @internal Word's date: UTC, to the second. */
+export function now(): string {
   return new Date().toISOString().replace(/\.\d+Z$/, "Z");
 }
 

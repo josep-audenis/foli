@@ -839,9 +839,12 @@ Each task is a PR on `phase-9/review`, the build green after each.
   does join).
 - [x] 9.6 Comments in the engine (`state/comments.ts`): `addComment` on the selection (its range
   around it, the reference mark after it, as Word places them; at a caret, a point), replies
-  (`replyToComment`: anchors next to the comment's, a reply to a reply answers the thread),
-  `editComment`, `resolveComment` (and reopen), `deleteComment` (its replies and anchors),
-  `deleteAllComments`; content as text lines or v3 blocks; the author from the editor. Not
+  (`replyToComment`: the starts together, then each end with its reference, as Word writes a
+  thread; a reply to a reply answers the thread), `editComment`, `resolveComment` (and reopen:
+  every comment of the thread, as Word), `deleteComment` (its replies and anchors),
+  `deleteAllComments` (comments anchored in verbatim content, a table, stay until Phase 10);
+  select-all comments the whole text; the selection stays on the commented text; initials cut to
+  Word's 9 characters; ids above those in verbatim content too; content as text lines or v3 blocks; the author from the editor. Not
   tracked changes, each its own undo step. Anchors stay through edits (a range whose text is
   deleted keeps collapsed anchors); a comment whose reference mark an edit removes goes with its
   replies, in the same undo step (a tracked deletion keeps it until accepted; a comment without
