@@ -473,7 +473,7 @@ export class CellSelection extends Selection {
 }
 
 /** The grid cell covering the cell at `pos` of `table` (at `start`): a merge's, for a covered one. */
-function coveringCell(
+export function coveringCell(
   table: Node,
   start: number,
   grid: readonly GridCell[],

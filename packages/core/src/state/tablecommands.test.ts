@@ -144,8 +144,25 @@ describe("insertTable", () => {
     const table = editor.state.doc.child(1);
     expect(table.child(0).attrs.revision).toMatchObject({ insertion: { author: "Me" } });
     editor.commands.rejectAllChanges();
-    expect(shape(editor).some((block) => Array.isArray(block))).toBe(false);
+    expect(shape(editor)).toEqual(["ab"]);
     valid(editor);
+  });
+
+  it("gives the first half a new paragraph mark, the second the original one", () => {
+    const marked = {
+      type: "paragraph",
+      attrs: { section: {}, attributes: { "w14:paraId": "1234ABCD" } },
+      content: [text("abcd")],
+    } as NodeJSON;
+    const editor = editorOf([marked, p("z")]);
+    select(editor, 3);
+    editor.run(insertTable(1, 1));
+    const first = editor.state.doc.child(0);
+    const second = editor.state.doc.child(2);
+    expect(first.attrs.section).toBe(null);
+    expect(first.attrs.attributes).toBe(null);
+    expect(second.attrs.section).toEqual({});
+    expect(second.attrs.attributes).toEqual({ "w14:paraId": "1234ABCD" });
   });
 });
 
@@ -164,6 +181,24 @@ describe("rows", () => {
       ["a3", "b3"],
     ]);
     valid(editor);
+  });
+
+  it("apply from a cell a merge covers, as from the merge", () => {
+    const merged = table(row(restart("m"), cell("b1")), row(covered(), cell("b2")));
+    const editor = editorOf([p("x"), merged, p("y")]);
+    // The covered cell's empty paragraph.
+    const coveredPos = inside(editor, "b1") + 8;
+    expect(editor.state.doc.resolve(coveredPos).node(-1).attrs.vMerge).toBe("continue");
+    select(editor, coveredPos);
+    expect(editor.run(insertRow(1))).toBe(true);
+    expect(editor.state.doc.child(1).childCount).toBe(3);
+  });
+
+  it("keep the caret in the table after deleting its last row", () => {
+    const editor = editorOf([p("x"), TABLE, p("y")]);
+    select(editor, inside(editor, "a3"));
+    editor.run(deleteRows);
+    expect(caret(editor)).toBe("a2");
   });
 
   it("continue a vertical merge the new row is inside", () => {
@@ -270,6 +305,18 @@ describe("columns", () => {
     select(editor, inside(editor, "b2"));
     editor.run(deleteColumns);
     expect(shape(editor)).toEqual(["x", "y"]);
+  });
+
+  it("stop at Word's 63 columns; a table without a grid keeps none", () => {
+    const many = table(row(...Array.from({ length: 63 }, (_v, i) => cell(`c${i}`))));
+    const editor = editorOf([p("x"), many, p("y")]);
+    select(editor, inside(editor, "c0"));
+    expect(editor.run(insertColumn(1))).toBe(false);
+    const gridless = editorOf([p("x"), TABLE, p("y")]);
+    select(gridless, inside(gridless, "a1"));
+    gridless.run(insertColumn(1));
+    expect(gridless.state.doc.child(1).attrs.grid).toEqual([]);
+    valid(gridless);
   });
 
   it("do not apply while tracking", () => {

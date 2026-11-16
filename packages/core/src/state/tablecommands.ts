@@ -13,13 +13,14 @@ import type { Command, EditorState, Transaction } from "./state.js";
 import {
   CellSelection,
   cellDepth,
+  coveringCell,
   emptyRowLike,
   type GridCell,
   gridOf,
   keepTablesApart,
 } from "./tables.js";
 import { trackState } from "./track.js";
-import { withEnvelope, wordContext } from "./word.js";
+import { splitAttrs, withEnvelope, wordContext } from "./word.js";
 import { ensureStyle } from "./wordformat.js";
 
 /** Word's limits: 63 columns; rows are bounded here to keep a table insert reasonable. */
@@ -62,6 +63,9 @@ function around(state: EditorState): Around | null {
   const pos = $cell.before(tableDepth);
   const grid = gridOf(table, pos);
   const chosen = grid.filter((c) => cells.includes(c.pos));
+  // A caret in a cell a merge covers: the merge's cell.
+  const covering = chosen.length ? undefined : coveringCell(table, pos, grid, cells[0] as number);
+  if (covering) chosen.push(covering);
   if (!chosen.length) return null;
   return {
     table,
@@ -136,9 +140,14 @@ export function insertTable(rows: number, columns: number): Command {
       if (!$pos.parent.isTextblock) throw new RangeError("No paragraph at the caret");
       let at: number;
       if ($pos.parentOffset === 0) at = $pos.before();
-      else if ($pos.parentOffset === $pos.parent.content.size) at = $pos.after();
+      // While tracking, after the paragraph: a tracked split would stay when the table is
+      // rejected.
+      else if ($pos.parentOffset === $pos.parent.content.size || tracking(state)) at = $pos.after();
       else {
-        tr.split($pos.pos);
+        // As Enter splits: the first half gets a new paragraph mark, the second keeps it.
+        const { before, after } = splitAttrs(context, $pos.parent, false);
+        tr.split($pos.pos, 1, [{ type: $pos.parent.type, attrs: after }]);
+        if (before) tr.setNodeMarkup($pos.before(), $pos.parent.type, before);
         at = $pos.pos + 1;
       }
       // A paragraph after it where nothing follows (a cell's last block, the body's end).
@@ -225,14 +234,18 @@ export const deleteRows: Command = (state, dispatch) => {
       }
       for (const { pos: at, from: start } of starts.reverse()) {
         const cell = tr.doc.nodeAt(at) as Node;
-        const content = (state.doc.nodeAt(start.pos) as Node).content;
-        tr.setNodeMarkup(at, cell.type, { ...cell.attrs, vMerge: "restart" });
+        const first = state.doc.nodeAt(start.pos) as Node;
+        // The merge's cell as it was (its properties, its text, then any text the covered
+        // cell held, which Word does not show).
+        const content = cell.textContent ? first.content.append(cell.content) : first.content;
+        tr.setNodeMarkup(at, cell.type, { ...first.attrs, vMerge: "restart" });
         tr.replace(at + 1, at + cell.nodeSize - 1, new Slice(content, 0, 0));
       }
     }
     tr.delete(from, to);
-    const $row = tr.doc.resolve(Math.min(tr.mapping.map(from), tr.doc.content.size));
-    caretIn(tr, $row.pos + 1);
+    // The row after the deleted ones, or the one before when they were the last.
+    const last = bottom === table.childCount - 1;
+    caretIn(tr, last ? rowPos(table, pos, top - 1) + 1 : tr.mapping.map(from) + 1);
   });
 };
 
@@ -304,8 +317,12 @@ export function insertColumn(dir: -1 | 1): Command {
     const { table, pos, top } = found;
     const at = dir < 0 ? found.left : found.right + 1;
     const oldGrid = table.attrs.grid as number[];
+    const columns = Math.max(oldGrid.length, ...found.grid.map((c) => c.column + c.span));
+    if (columns >= MAX_COLUMNS) return false;
+    // A table without a grid (widths left to Word) keeps none.
     const width = oldGrid[dir < 0 ? found.left : found.right] ?? 0;
-    const grid = [...oldGrid.slice(0, at), width, ...oldGrid.slice(at)];
+    const grid =
+      oldGrid.length >= columns ? [...oldGrid.slice(0, at), width, ...oldGrid.slice(at)] : oldGrid;
     const next = rebuild(table, { ...table.attrs, grid, gridExt: null }, (row) => {
       const cells = placed(row);
       const before = (row.attrs.gridBefore as number | null) ?? 0;
@@ -315,10 +332,8 @@ export function insertColumn(dir: -1 | 1): Command {
         : before;
       if (at < before)
         return row.type.create({ ...row.attrs, gridBefore: before + 1 }, row.content);
-      if (at > end) {
-        const after = (row.attrs.gridAfter as number | null) ?? 0;
-        return row.type.create({ ...row.attrs, gridAfter: after + 1 }, row.content);
-      }
+      // A row ending before the new column: as it is (Word leaves short rows short).
+      if (at > end) return row;
       const out: Node[] = [];
       // The neighbour on the selection's side: the cell starting at the boundary (left) or
       // ending at it (right).

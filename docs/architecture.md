@@ -648,16 +648,22 @@ Table commands (10.7a, `packages/core/src/state/tablecommands.ts`) act on the ta
 selection, on the rows and columns of a cell selection's rectangle or the caret's cell:
 `insertTable(rows, columns)` (up to Word's 63 columns, 1000 rows) inserts empty cells sharing
 the section's text width with Word's "Table Grid" style (added from `builtinStyle` when the
-document lacks it), before the caret's paragraph at its start, after it at its end, else
-between its halves, with a paragraph after it where nothing follows; `insertRow(dir)` adds an
+document lacks it), before the caret's paragraph at its start, after it at its end (and,
+while tracking, after it from its middle: a tracked split would stay when the table is
+rejected), else between its halves as Enter splits (the first half gets a new paragraph mark),
+with a paragraph after it where nothing follows; `insertRow(dir)` adds an
 empty row like the first or last selected one, a vertical merge running across it going on;
 `deleteRows` deletes the selected rows (a merge starting in one restarts in the first kept row,
-with its text), the table when they are all of them; `insertColumn(dir)` adds a column as wide
-as its neighbour (a cell spanning its place widens, the new cells take their neighbour's
-properties, `gridBefore` and `gridAfter` grow where a row has no cell there); `deleteColumns`
+with its cell's properties and text; while tracking the rows stay as deletions, and accepting
+them leaves the merge's covered cells without its start: not yet fixed up), the table when they
+are all of them; `insertColumn(dir)` adds a column (up to 63) as wide as its neighbour (a cell spanning its place widens, the new cells take their neighbour's
+properties, `gridBefore` grows where a row starts after its place, a row ending before it stays
+short, a table without a grid keeps none); `deleteColumns`
 removes cells and narrows spanning ones (a row left with no cell goes); `deleteTable`. Rows
 inserted and deleted while tracking are tracked (the rebuild records them); column commands do
-not apply while tracking. Cell widths in twips follow the grid. Export writes a new table style
+not apply while tracking. A caret in a cell a merge covers acts as from the merge's cell. Cell
+widths in twips follow the grid. `insertTable` takes the text width of the document's last
+section, not the caret's. Export writes a new table style
 (Table Grid) from the model; a table style read from a file and then changed is still refused.
 
 Review in the editable view (9.5): `EditorView` draws tracked changes as the editor's state says
