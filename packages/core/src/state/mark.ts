@@ -13,6 +13,9 @@ import type { Transform } from "../transform/transform.js";
  */
 export const MARK_ATTRS = ["section", "revision", "formatChange", "attributes"] as const;
 
+/** Inline nodes that stand between runs: bookmarks and comment ranges. */
+const MARKERS = new Set(["bookmarkStart", "bookmarkEnd", "commentStart", "commentEnd"]);
+
 /**
  * After a join, or a deletion across paragraphs, the merged paragraph at `pos` ends with the
  * last paragraph's mark, as in Word: it takes that paragraph's mark attributes (deleting a
@@ -24,7 +27,13 @@ export const MARK_ATTRS = ["section", "revision", "formatChange", "attributes"] 
 export function keepLastMark(tr: Transform, pos: number, last: Node, tail = 0): void {
   const merged = tr.doc.nodeAt(pos);
   if (!merged?.isTextblock || !Object.hasOwn(merged.attrs, "revision")) return;
-  if (merged.content.size === last.content.size - tail) {
+  // What the first paragraph left, bookmarks and comment ranges aside (headings often start
+  // with a bookmark).
+  let left = false;
+  merged.content.cut(0, merged.content.size - (last.content.size - tail)).forEach((child) => {
+    if (!MARKERS.has(child.type.name)) left = true;
+  });
+  if (!left) {
     if (merged.type !== last.type || JSON.stringify(merged.attrs) !== JSON.stringify(last.attrs))
       tr.setNodeMarkup(pos, last.type, last.attrs);
     return;

@@ -796,7 +796,7 @@ Each task is a PR on `phase-9/review`, the build green after each.
   `w:trackRevisions` (`DocxImport.trackRevisions`, `exportDocx(…, { trackRevisions })`).
   Property test: accept all = the same edits untracked, reject all = the original, undo all =
   exact. Changes made by Foli exported and imported back unchanged (unit test; Word in 9.8).
-- [x] 9.3 Recording formatting changes: run formatting (bold, font, character style…) records a
+- [x] 9.3 Recording formatting changes (#65): run formatting (bold, font, character style…) records a
   `formatChange` mark with the run properties before the first change, paragraph properties
   (style, alignment, indentation, spacing, numbering) the paragraph's `formatChange`; later
   changes keep the record; one's own inserted text and paragraphs record nothing. A join that
@@ -810,7 +810,7 @@ Each task is a PR on `phase-9/review`, the build green after each.
   reject all = the original's text, style, bold and alignment, headings included (6000 runs
   locally). Known: Enter in a paragraph next to a deleted mark splits that paragraph as it is,
   not the paragraph accepting makes. Imported `w:rPrChange` properties are kept in canonical form. Changes exported and imported back (unit test).
-- [x] 9.4 Accept and reject (`state/review.ts`): commands for the change at the caret, the changes
+- [x] 9.4 Accept and reject (#66, `state/review.ts`): commands for the change at the caret, the changes
   in the selection, all, and all by an author; next and previous change (selects it);
   `trackedChanges(doc)` lists them; at a caret the changes there (the paragraph's recorded
   formatting only when none other), in a selection the selected part of each. A deleted paragraph

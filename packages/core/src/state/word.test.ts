@@ -399,6 +399,18 @@ describe("Backspace and Delete on a v3 document", () => {
     range.select(1, 5);
     range.commands.deleteSelection();
     expect(blocks(range)).toEqual([p({ section, ...own }), p({}, text("c"))]);
+    // A bookmark the first one starts with is not something it keeps.
+    const marked = editorOf(
+      p(
+        { style: "Heading1" },
+        { type: "bookmarkStart", attrs: { id: 1, name: "_Toc1" } },
+        text("a"),
+      ),
+      p({}, text("b")),
+    );
+    marked.select(2, 6);
+    marked.commands.deleteSelection();
+    expect(blocks(marked)[0]?.attrs?.style ?? null).toBe(null);
     range.commands.undo();
     expect(blocks(range)).toEqual(blocks(start()));
     // Into a paragraph that ends a section: deleting its mark merges the section into the next.
