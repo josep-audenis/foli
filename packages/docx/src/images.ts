@@ -12,27 +12,40 @@ export interface PackageImages {
   revoke(): void;
 }
 
+/** Image types browsers show in an `img`; EMF, WMF and TIFF parts are shown as a box. */
+const RASTER = new Set(["image/png", "image/jpeg", "image/gif", "image/webp", "image/bmp"]);
+
 /**
- * Object URLs (`blob:`) for the pictures' images that live in `pkg` (`word/media/…`): the view
- * cannot show a package part otherwise. Where there are no object URLs (no DOM), none.
+ * URLs for the pictures' images that live in `pkg` (`word/media/…`): the view cannot show a
+ * package part otherwise. Raster images get object URLs (`blob:`); an SVG gets a `data:` URL,
+ * never a `blob:` one (opened on its own, a `blob:` SVG would run its scripts as the app's
+ * origin; a `data:` document has none). Types browsers cannot show, and where there are no
+ * object URLs (no DOM), none.
  */
 export function packageImages(pkg: DocxPackage): PackageImages {
   const urls = new Map<string, string>();
+  const blobs: string[] = [];
   return {
     url(key, resource) {
       const known = urls.get(key);
       if (known) return known;
-      const part = pkg.part(`/${resource?.part ?? key}`);
-      if (!part?.contentType.startsWith("image/") || typeof URL.createObjectURL !== "function")
-        return undefined;
-      const url = URL.createObjectURL(
-        new Blob([part.data as BlobPart], { type: part.contentType }),
-      );
+      const part = resource?.part ? pkg.part(`/${resource.part}`) : undefined;
+      if (!part) return undefined;
+      let url: string;
+      if (part.contentType === "image/svg+xml") {
+        let binary = "";
+        for (const byte of part.data) binary += String.fromCharCode(byte);
+        url = `data:image/svg+xml;base64,${btoa(binary)}`;
+      } else if (RASTER.has(part.contentType) && typeof URL.createObjectURL === "function") {
+        url = URL.createObjectURL(new Blob([part.data as BlobPart], { type: part.contentType }));
+        blobs.push(url);
+      } else return undefined;
       urls.set(key, url);
       return url;
     },
     revoke() {
-      for (const url of urls.values()) URL.revokeObjectURL(url);
+      for (const url of blobs) URL.revokeObjectURL(url);
+      blobs.length = 0;
       urls.clear();
     },
   };

@@ -2,7 +2,7 @@
 import { createDocument, createEditor, type NodeJSON, parseDocument } from "@folijs/core";
 import { afterEach, describe, expect, it } from "vitest";
 import { EditorView } from "../index.js";
-import { imageSource, ownImageUrl, PICTURE_ATTR, pictureElement } from "./blocks.js";
+import { imageSource, NO_ALT_LABEL, ownImageUrl, PICTURE_ATTR, pictureElement } from "./blocks.js";
 
 /** Pictures in the view (10.8b). */
 
@@ -34,6 +34,17 @@ describe("a picture's element", () => {
     expect(element.getAttribute("aria-label")).toBe("A dot");
     const unnamed = pictureElement(picture({}).attrs ?? {}, document, () => undefined);
     expect(unnamed.hasAttribute("data-foli-no-alt")).toBe(true);
+    // Not silent: a screen reader says a picture is there, without its alt text.
+    expect(unnamed.getAttribute("aria-label")).toBe(NO_ALT_LABEL);
+    const shown = pictureElement(picture({}).attrs ?? {}, document, () => DOT) as HTMLImageElement;
+    expect(shown.alt).toBe(NO_ALT_LABEL);
+    expect(shown.referrerPolicy).toBe("no-referrer");
+    // In the line whatever the app's CSS says of images.
+    expect([shown.style.display, shown.style.verticalAlign, shown.style.maxWidth]).toEqual([
+      "inline",
+      "baseline",
+      "none",
+    ]);
     const decorative = pictureElement(picture({ decorative: true }).attrs ?? {}, document);
     expect(decorative.hasAttribute("data-foli-no-alt")).toBe(false);
   });
@@ -51,6 +62,12 @@ describe("a picture's element", () => {
       () => "blob:x",
     );
     expect(image("img")).toBe("blob:x");
+    // The app's refusal stands: the box, not the resource's own web URL.
+    const refused = imageSource(
+      { img: { contentType: "image/png", url: "https://x.test/a.png" } },
+      () => null,
+    );
+    expect(refused("img")).toBeUndefined();
   });
 });
 
@@ -90,8 +107,13 @@ describe("pictures in the editable view", () => {
     // The position after the picture maps to the text after it.
     const b = [...host.querySelectorAll("span")].find((s) => s.textContent === "b");
     expect(view.posFromDOM(b?.firstChild as Node, 0)).toBe(3);
-    // Another resolver draws every picture again from it.
+    // Another resolver draws every picture again from it, the selection kept.
+    editor.select(3);
+    view.focus();
     view.setOptions({ resource: () => "blob:other" });
+    expect(editor.state.selection.head).toBe(3);
+    const sel = document.getSelection() as globalThis.Selection;
+    expect(view.posFromDOM(sel.focusNode as Node, sel.focusOffset)).toBe(3);
     expect((host.querySelector(`img[${PICTURE_ATTR}]`) as HTMLImageElement).src).toBe("blob:other");
   });
 });

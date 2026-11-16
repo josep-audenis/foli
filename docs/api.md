@@ -367,10 +367,14 @@ const view = new EditorView(host, editor, { editable: true, placeholder: "" });
 - `view.setOptions({ editable?, placeholder?, resource? })`: changes the given options.
   `resource(key, resource)`: the URL to show a picture's image from (`key` in the document's
   `resources`); undefined for a key: the resource's own image `data:` URL or web/`blob:` URL,
-  else a box of the picture's size with its alt text. A new resolver draws every picture again.
+  else a box of the picture's size with its alt text; `null` (or "") for a key: that box. A web
+  URL in a JSON document is fetched as soon as it is shown (with no referrer): an app that
+  must not fetch them returns `null` for such resources. A new resolver draws every picture
+  again (after a running composition, the selection kept); `resource: null` clears it.
 - Pictures are drawn in their line at their size (96 px per inch), as `img` (with their alt
   text; a decorative one an empty alt) inside a non-editable span, one position in the text;
-  one without alt text and not decorative is marked (`data-foli-no-alt`, a dashed outline).
+  one without alt text and not decorative is named "Picture without alt text" (`NO_ALT_LABEL`)
+  and marked (`data-foli-no-alt`, a dashed outline, not printed).
 - `view.focus()`: focuses the host, shows the editor's selection, scrolls it into view.
 - `view.destroy()`: removes listeners, injected styles and the attributes it added; empties the
   host.
@@ -418,9 +422,11 @@ Details (what import keeps, what export writes, limits): the
   tracks changes in the file; left out, as the package has it), `resource(key, resource)` (the
   bytes of a picture's image the package does not hold and no `data:` URL gives: an app's
   upload; without them the export fails).
-- `packageImages(pkg): PackageImages`: object URLs for the pictures' images in a package
+- `packageImages(pkg): PackageImages`: URLs for the pictures' images in a package
   (`url(key, resource?)`, made once each; `revoke()` frees them): `EditorView`'s `resource`
-  option for a document imported from that package.
+  option for a document imported from that package. Raster images (PNG, JPEG, GIF, WebP, BMP)
+  get object URLs; an SVG a `data:` URL (a `blob:` SVG opened on its own would run its scripts
+  as the app's origin); EMF, WMF and TIFF none (their box is shown).
 - `readPackage(bytes, options?): Promise<DocxPackage>`: the zip, parts, content types and
   relationships (`ReadPackageOptions`: the zip limits `maxEntries` and `maxSize`, and
   `maxDepth`).

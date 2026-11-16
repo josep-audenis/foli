@@ -132,16 +132,17 @@ export interface EditorViewOptions {
   /**
    * The URL to show a picture's image from (`key` in the document's `resources`): an image in
    * the .docx package it came from has none of its own (`packageImages` in `@folijs/docx` gives
-   * object URLs). Undefined for a key: the resource's own `data:` or web URL, else a box of the
-   * picture's size.
+   * object URLs). Undefined for a key: the resource's own image `data:` URL or web URL (fetched
+   * as it is shown), else a box of the picture's size; `null` (or "") for a key: that box (an
+   * app that does not fetch web URLs found in documents says so here). `null` clears it.
    */
-  resource?: (key: string, resource: ResourceJSON) => string | undefined;
+  resource?: ((key: string, resource: ResourceJSON) => string | null | undefined) | null;
 }
 
 const PLACEHOLDER_ATTR = "data-foli-placeholder";
 // Generated content is not document text: no caret stops inside it, a zero-height float keeps
 // the caret at the line start, and the empty alt text keeps screen readers on aria-placeholder.
-const STYLES = `.${CELL_CLASS}{box-shadow:inset 0 0 0 9999px rgba(0,120,215,.22)}[${CELLS_ATTR}] ::selection{background:transparent}[data-foli-no-alt]{outline:2px dashed #b45309;outline-offset:-2px}[${PLACEHOLDER_ATTR}]::before{content:attr(${PLACEHOLDER_ATTR});content:attr(${PLACEHOLDER_ATTR}) / "";float:inline-start;height:0;pointer-events:none;color:GrayText}`;
+const STYLES = `.${CELL_CLASS}{box-shadow:inset 0 0 0 9999px rgba(0,120,215,.22)}[${CELLS_ATTR}] ::selection{background:transparent}[data-foli-no-alt]{outline:2px dashed #b45309;outline-offset:-2px}@media print{[data-foli-no-alt]{outline:none}}[${PLACEHOLDER_ATTR}]::before{content:attr(${PLACEHOLDER_ATTR});content:attr(${PLACEHOLDER_ATTR}) / "";float:inline-start;height:0;pointer-events:none;color:GrayText}`;
 
 /**
  * Adds the view's stylesheet once per document or shadow root, when a placeholder is first shown
@@ -501,11 +502,14 @@ export class EditorView {
     }
     if (options.placeholder !== undefined) this.placeholder = options.placeholder;
     if (options.resource !== undefined && options.resource !== this.resource) {
-      this.resource = options.resource;
-      // Every picture again, from the new URLs.
+      this.resource = options.resource ?? undefined;
+      // Every picture again, from the new URLs: after a running composition, keeping the
+      // selection.
       if (this.word) {
+        if (this.composing) this.onCompositionEnd();
         this.word = null;
         this.render();
+        this.writeSelection(false);
       }
     }
 
@@ -596,8 +600,6 @@ export class EditorView {
     // A new document (envelope) gets its renderer; nothing rendered before is reused then. An
     // editor's state always has one (`createEditor`).
     const context = wordContext(this.state) as WordContext;
-    // A document with pictures: the mark of one without alt text is the view's stylesheet's.
-    if (context.envelope.resources) injectStyles(this.host);
     // Fonts loaded: a new renderer (new line heights), but not while a composition runs in a
     // block it would redraw.
     const renewed =
@@ -605,13 +607,15 @@ export class EditorView {
     if (renewed) this.fontsChanged = false;
     let word = this.word as WordRenderer;
     if (renewed) {
+      // A document with pictures: the mark of one without alt text is the view's stylesheet's.
+      if (context.envelope.resources) injectStyles(this.host);
       word = this.word = new WordRenderer(
         context,
         ownerDocument,
         this.lineRatio,
         false,
         this.review,
-        imageSource(context.envelope.resources, this.resource),
+        imageSource(context.envelope.resources, this.resource ?? undefined),
       );
       this.invalidateLayout();
     }

@@ -30,6 +30,9 @@ export type ImageSource = (key: string) => string | undefined;
 /** Marks a picture's element (its resource key). */
 export const PICTURE_ATTR = "data-foli-picture";
 
+/** The accessible name of a picture with no alt text that is not decorative. */
+export const NO_ALT_LABEL = "Picture without alt text";
+
 /**
  * The URL a resource gives on its own: an image `data:` URL, or a web or `blob:` URL; none for
  * an image in a package part (the app's resolver gives one) or anything else.
@@ -55,7 +58,9 @@ export function pictureElement(
   const width = `${Number(attrs.width) / EMU_PER_PX}px`;
   const height = `${Number(attrs.height) / EMU_PER_PX}px`;
   const decorative = attrs.decorative === true;
-  const alt = decorative ? "" : String(attrs.alt ?? "");
+  const own = String(attrs.alt ?? "");
+  // Only a decorative picture is silent; one missing its alt text says so.
+  const alt = decorative ? "" : own || NO_ALT_LABEL;
   const src = image?.(key);
   let element: HTMLElement;
   if (src) {
@@ -63,22 +68,28 @@ export function pictureElement(
     img.src = src;
     img.alt = alt;
     img.draggable = false;
+    // A web URL in a document is fetched as it is shown: no referrer to go with it.
+    img.referrerPolicy = "no-referrer";
     element = img;
   } else {
     element = doc.createElement("span");
     element.setAttribute("role", "img");
     if (alt) element.setAttribute("aria-label", alt);
     else element.setAttribute("aria-hidden", "true");
-    element.style.display = "inline-block";
     element.style.boxSizing = "border-box";
     element.style.border = "1px dashed GrayText";
-    element.style.verticalAlign = "bottom";
   }
   element.setAttribute(PICTURE_ATTR, key);
-  if (!alt && !decorative) element.dataset.foliNoAlt = "";
+  if (!own && !decorative) element.dataset.foliNoAlt = "";
   if (attrs.title) element.title = String(attrs.title);
-  element.style.width = width;
-  element.style.height = height;
+  // In the line at its size, whatever the app's CSS says of images (`display: block`…).
+  const style = element.style;
+  style.display = src ? "inline" : "inline-block";
+  style.verticalAlign = "baseline";
+  style.maxWidth = "none";
+  style.maxHeight = "none";
+  style.width = width;
+  style.height = height;
   return element;
 }
 
@@ -146,20 +157,23 @@ export interface BlockOptions {
   lineRatio?: (fontFamily: string) => number;
   /**
    * The URL to show a picture's image from (`key` in `resources`): the app's (a package part's
-   * object URL…). Left out, or undefined for a key: the resource's own `data:` or web URL.
+   * object URL…); `null` (or "") shows the picture's box. Left out, or undefined for a key: the
+   * resource's own image `data:` URL or web URL (fetched as it is shown).
    */
-  resource?: (key: string, resource: ResourceJSON) => string | undefined;
+  resource?: (key: string, resource: ResourceJSON) => string | null | undefined;
 }
 
 /** The source for a document's pictures: the app's URL, else the resource's own. */
 export function imageSource(
   resources: Readonly<Record<string, ResourceJSON>> | undefined,
-  resolve?: (key: string, resource: ResourceJSON) => string | undefined,
+  resolve?: (key: string, resource: ResourceJSON) => string | null | undefined,
 ): ImageSource {
   return (key) => {
     const resource = resources?.[key];
     if (!resource) return undefined;
-    return resolve?.(key, resource) ?? ownImageUrl(resource);
+    const url = resolve?.(key, resource);
+    // The app's answer stands, a refusal (null, "") included.
+    return url === undefined ? ownImageUrl(resource) : url || undefined;
   };
 }
 
