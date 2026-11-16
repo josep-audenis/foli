@@ -19,7 +19,7 @@ place that says what is in progress; check it before starting work.
 | 5 Native pagination      | ✅ Done (G4 provisional) | —                    | Merged in #15–#22; page-break manual checks open, risks in ADR-0003                        |
 | 6 React API & 0.1.0      | ✅ Done                  | —                    | Merged in #23–#31; 0.1.0 on npm; manual checks shipped as known risks (ADR-0003)           |
 | 7 Rich content           | ✅ Done                  | —                    | Merged in #33–#41; 0.2.0 on npm; list-document benchmark misses accepted (known limit)     |
-| 8 Word model & DOCX      | In review                | `phase-8/word-model` | Merged in #44–#59; 8.8 close (G5 numbers, docs, 0.3.0) in review                           |
+| 8 Word model & DOCX      | In review                | `phase-8/word-model` | Merged in #44–#61; 0.3.0 versioned, publish awaits the owner's approval                    |
 | 9–12                     | Not started              |                      |                                                                                            |
 
 Status values: `Ready` (dependencies met, nobody on it) · `In progress` · `In review` (PR open) ·
@@ -712,7 +712,8 @@ Each task is a PR on `phase-8/word-model`, the build green after each.
       pages have its size and margins and its blocks are measured and split in its width; a
       section starts a new page unless continuous with the same setup; a named print page per
       setup. Page setups are not editable yet, nor section breaks insertable.
-- [ ] 8.8 Close: docs, gate G5 numbers, 0.3.0 (changeset, version PR, publish after approval).
+- [ ] 8.8 Close: docs, gate G5 numbers and the 0.3.0 changeset (#60), the version PR (#61), publish
+  after the owner's approval.
   The changeset lists the breaks:
   - Documents persist as v3 (0.2.0 cannot read them); `FoliChange.document`, `getDocument()` and
     `useFoliEditor` are v3; `createEditor`, `setDocument` and `initialContent` migrate any
