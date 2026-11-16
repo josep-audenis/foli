@@ -938,10 +938,14 @@ Each task is a PR on `phase-10/tables-images`, the build green after each.
   header rows, merged cells both ways, banded table style, a nested table) and pictures (inline,
   floating square and top-and-bottom, behind text, with and without alt text) added to the
   generator, with Word's reference data (pages, paragraphs in cells, picture positions). (Done: documents 06 and 07, `-Only` switch on the generator.)
-- [ ] 10.3 Schema v4 in `@folijs/core`: table, row and cell nodes and their properties, the
+- [x] 10.3 Schema v4 in `@folijs/core`: table, row and cell nodes and their properties, the
   table style's conditional formatting (first and last row and column, bands) resolved as Word
   does (`Resolver`), picture nodes and the envelope's resources; validation, the v3 → v4
   migration (a version change: tables stay opaque until imported again), `SCHEMA_VERSION` 4.
+  (Done: Word's rules as "no table after a table or ending the body", which lets a table be
+  followed by opaque content as Word does; `.docx` export refuses tables and pictures and the
+  view shows a placeholder until 10.4–10.8; banding and the Normal-style precedence are checked
+  against Word's pages in 10.5.)
 - [ ] 10.4 DOCX tables: import `w:tbl` into the model (nested tables too; what the model cannot
   hold stays verbatim, reported), export losslessly (unchanged tables byte for byte, changed
   ones rewritten child by child), tracked changes and comments inside tables, row insertion and

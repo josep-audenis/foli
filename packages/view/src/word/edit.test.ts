@@ -48,7 +48,7 @@ const numbered = { numbering: { id: 1, level: 0 } };
 
 function documentOf(...blocks: NodeJSON[]): FoliDocument {
   return {
-    schemaVersion: 3,
+    schemaVersion: 4,
     section: {},
     defaults: {},
     styles: STYLES,

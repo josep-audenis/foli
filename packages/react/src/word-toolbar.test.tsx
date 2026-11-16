@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { FoliToolbar } from "./index.js";
 
 const document3: FoliDocument = {
-  schemaVersion: 3,
+  schemaVersion: 4,
   section: {},
   defaults: { run: [{ type: "fontSize", attrs: { value: 22 } }] },
   styles: [

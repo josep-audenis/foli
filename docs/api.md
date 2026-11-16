@@ -127,9 +127,9 @@ No DOM: runs in Node, workers and the browser.
 
 ### Documents
 
-Documents are schema v3, Word's model ([document-model.md](document-model.md)).
+Documents are schema v4, Word's model with tables and pictures ([document-model.md](document-model.md)).
 
-- `createDocument(content?, section?): FoliDocument`: a new document: `content` (schema v3;
+- `createDocument(content?, section?): FoliDocument`: a new document: `content` (schema v4;
   default: one empty paragraph) on A4 with 25.4 mm margins, with Normal, Heading 1–6, List
   Paragraph and Hyperlink styles, bullet and number definitions, in 11 pt Georgia with 1.5
   lines (the look a migrated 0.2.0 document has). `section` is in twips (`mmToTwips(mm)`) and
@@ -137,14 +137,19 @@ Documents are schema v3, Word's model ([document-model.md](document-model.md)).
   v2 content and millimetre settings; to start from those, pass
   `{ schemaVersion: 2, settings, content }` to `parseDocument` or the editor.)
 - `parseDocument(input: unknown): FoliDocument`: validates untrusted input (e.g. parsed JSON)
-  and returns a copy in canonical form; a document saved by 0.1.0 or 0.2.0 is validated as
-  such and migrated (`migrateToV3`). Throws `FoliDocumentError`, whose message names the place
-  (`content.content[2].marks[0].type: …`) and says when a newer Foli saved the document; never
-  drops content silently. `parseContent(json)` parses content alone into a `doc` node.
-- `FoliDocument`: `{ schemaVersion: 3, section, defaults, styles, numbering, theme?, comments,
-  content }` and its parts (`SectionJSON`, `StyleJSON`…), in Word's units (twips).
-- `SCHEMA_VERSION` (3), `schema` (the content schema), `checkSection`, `RUN_PROPERTY_MARKS`,
-  `HIGHLIGHT_COLORS`, `JUSTIFICATIONS`, the unit conversions (`twipsToMm`, `mmToTwips`…).
+  and returns a copy in canonical form; a document saved by 0.1.0 to 0.4.0 is validated as
+  such and migrated (`migrateToV3`, `migrateToV4`). Throws `FoliDocumentError`, whose message
+  names the place (`content.content[2].marks[0].type: …`) and says when a newer Foli saved the
+  document; never drops content silently. `parseContent(json)` parses content alone into a
+  `doc` node, with Word's table rules.
+- `FoliDocument`: `{ schemaVersion: 4, section, defaults, styles, numbering, theme?, comments,
+  resources?, content }` and its parts (`SectionJSON`, `StyleJSON`, `TablePropertiesJSON`,
+  `RowPropertiesJSON`, `CellPropertiesJSON`, `TableConditionJSON`, `MeasureJSON`,
+  `ResourceJSON`…), in Word's units (twips; EMU for pictures). `FoliDocumentV3`: a schema 3
+  document.
+- `SCHEMA_VERSION` (4), `schema` (the content schema), `checkSection`, `RUN_PROPERTY_MARKS`,
+  `HIGHLIGHT_COLORS`, `JUSTIFICATIONS`, `TABLE_CONDITIONS`, the unit conversions (`twipsToMm`,
+  `mmToTwips`…).
 - `isSafeHref(href)` and `isColor(color)`: the rules links and colors from outside a document
   must follow.
 - `PAGE_SIZES` (`A4`, `Letter`), `DEFAULT_SETTINGS` and `DocumentSettings`: page geometry in
@@ -159,6 +164,11 @@ Documents are schema v3, Word's model ([document-model.md](document-model.md)).
   `paragraph(attrs)` gives a paragraph's properties (`ParagraphFormat`) and the formatting of its
   text (`RunFormat`); `run(paragraphRun, marks)` a run's; `markers(paragraphs)` the list markers
   (`ListMarker`: text, suffix, formatting) of a document's paragraphs in order.
+  `table(attrs)` gives a table's properties over its style's (`TableFormat`);
+  `cell(table, row, cell, place)` a cell's (`CellFormat`: the table style's parts that apply,
+  shading, borders, margins, vertical alignment; `place` is a `CellPlace`), and
+  `paragraph(attrs, cellFormat)` a paragraph's in that cell. `tableConditions(look, place)`
+  lists the table style's parts that apply to a cell.
   `formatNumber(n, format)` writes a number in a Word number format.
 
 ### Editor

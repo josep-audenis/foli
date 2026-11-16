@@ -35,7 +35,7 @@ const p = (attrs: Record<string, unknown>, ...content: NodeJSON[]): NodeJSON => 
 
 function documentOf(...blocks: NodeJSON[]): FoliDocument {
   return {
-    schemaVersion: 3,
+    schemaVersion: 4,
     section: { pageSize: { width: 11906, height: 16838 }, margins: { top: 1440, left: 1800 } },
     defaults: {},
     styles: STYLES,
@@ -54,7 +54,7 @@ describe("an editor on a schema v3 document", () => {
   it("keeps the envelope and gives page settings from the last section", () => {
     const editor = editorOf(p({}, text("Hello")));
     const document = editor.getDocument();
-    expect(document.schemaVersion).toBe(3);
+    expect(document.schemaVersion).toBe(4);
     expect(document.styles).toEqual(STYLES);
     expect(document.section).toEqual(documentOf().section);
     // A4 in twips; unset margins are Word's inch.

@@ -4,6 +4,7 @@
  */
 
 import type { MarkJSON, NodeJSON } from "@folijs/core";
+import { DocxError } from "../package.js";
 import { paragraphPropertiesXml, runPropertiesXml, same } from "./properties.js";
 import { bagXml, el, escapeText, fragment, type Namespaces } from "./xmlout.js";
 
@@ -30,8 +31,14 @@ export function blocksXml(blocks: readonly NodeJSON[], context: WriteContext): s
   for (const block of blocks) {
     if (block.type === "paragraph") out += paragraphXml(block, context);
     else if (block.type === "opaqueBlock") out += verbatim(block.attrs?.xml, context);
+    else notYet(block);
   }
   return out;
+}
+
+/** Content export does not write yet (tables: 10.4; pictures: 10.8): refused, never dropped. */
+function notYet(node: NodeJSON): never {
+  throw new DocxError(`A ${node.type} cannot be exported to .docx yet`);
 }
 
 export function paragraphXml(p: NodeJSON, context: WriteContext): string {
@@ -179,7 +186,7 @@ function markerXml(node: NodeJSON, context: WriteContext): string {
     case "opaqueInline":
       return verbatim(a.xml, context);
     default:
-      return "";
+      return notYet(node);
   }
 }
 
