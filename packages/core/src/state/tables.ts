@@ -5,9 +5,10 @@
  * across cells of a table empties those cells. Nothing is joined across a table's edge.
  */
 import { Fragment, type Node, type ResolvedPos, Slice } from "../model/index.js";
+import type { Mappable } from "../transform/stepmap.js";
 import { attempt as attemptTr } from "./attempt.js";
 import { MARK_ATTRS } from "./mark.js";
-import { Selection, TextSelection } from "./selection.js";
+import { Selection, type SelectionJSON, TextSelection } from "./selection.js";
 import { type Command, type EditorState, Plugin, type Transaction } from "./state.js";
 
 const isTable = (node: Node) => node.type.name === "table";
@@ -123,7 +124,21 @@ function clearCells(tr: Transaction, from: number, to: number, start: number, en
     if (pos < to && pos + node.nodeSize > from) cells.push({ pos, node });
     return false;
   });
-  for (const { pos, node } of cells.reverse()) {
+  emptyCells(
+    tr,
+    cells.map((c) => c.pos),
+  );
+}
+
+/**
+ * Empties the cells at positions (positions before them, any order): their text deleted
+ * (paragraphs in a cell joined), so a tracked clear can be rejected; a cell holding other blocks
+ * (a nested table) gets one empty paragraph instead.
+ */
+export function emptyCells(tr: Transaction, positions: readonly number[]): void {
+  for (const pos of [...positions].sort((a, b) => b - a)) {
+    const node = tr.doc.nodeAt(pos);
+    if (node?.type.name !== "tableCell") continue;
     let paragraphs = true;
     node.forEach((child) => {
       if (child.type.name !== "paragraph") paragraphs = false;
@@ -344,4 +359,204 @@ function cellAtColumn(table: Node, tableStart: number, r: number, column: number
 /** Tab and Shift+Tab between cells: before the lists' Tab (in a cell Word moves, numbered or not). */
 export function tableKeymap(): Plugin {
   return new Plugin({ keymap: { Tab: goToCell(1), "Shift-Tab": goToCell(-1) } });
+}
+
+// ---- Cell selections (10.6c) ---------------------------------------------------------------------
+
+/** A cell where a table's grid has it: its position and the rows and grid columns it covers. */
+interface GridCell {
+  pos: number;
+  row: number;
+  rowSpan: number;
+  column: number;
+  span: number;
+}
+
+/** A table's cells on its grid (a merge's first cell spans the rows its merge covers). */
+function gridOf(table: Node, start: number): GridCell[] {
+  const out: GridCell[] = [];
+  const open = new Map<number, GridCell>();
+  let rowPos = start + 1;
+  table.forEach((row, _o, r) => {
+    let column = (row.attrs.gridBefore as number | null) ?? 0;
+    let cellPos = rowPos + 1;
+    row.forEach((cell) => {
+      const span = (cell.attrs.gridSpan as number | null) ?? 1;
+      const above = open.get(column);
+      if (cell.attrs.vMerge === "continue" && above) above.rowSpan++;
+      else {
+        const entry = { pos: cellPos, row: r, rowSpan: 1, column, span };
+        out.push(entry);
+        if (cell.attrs.vMerge === "restart") open.set(column, entry);
+        else open.delete(column);
+      }
+      if (cell.attrs.vMerge !== "continue" && cell.attrs.vMerge !== "restart") open.delete(column);
+      column += span;
+      cellPos += cell.nodeSize;
+    });
+    rowPos += row.nodeSize;
+  });
+  return out;
+}
+
+/**
+ * Cells selected as a rectangle (ADR-0006): `anchor` and `head` are the positions before two
+ * cells of one table; the selection is every cell in the rectangle between them, widened until
+ * no merged cell sticks out. `from` and `to` are the rectangle's first and last cell's edges.
+ */
+export class CellSelection extends Selection {
+  /** The positions of the selected cells, in document order. */
+  readonly cells: readonly number[];
+
+  constructor($anchorCell: ResolvedPos, $headCell: ResolvedPos) {
+    super($anchorCell, $headCell);
+    this.cells = rectangle($anchorCell, $headCell);
+  }
+
+  /** A cell selection from the cell at `anchor` to the one at `head` (positions before them). */
+  static create(doc: Node, anchor: number, head = anchor): CellSelection {
+    return new CellSelection(doc.resolve(anchor), doc.resolve(head));
+  }
+
+  /** Whether `pos` is the position before a cell, and `other` before a cell of the same table. */
+  static valid(doc: Node, anchor: number, head: number): boolean {
+    const a = doc.resolve(anchor);
+    const h = doc.resolve(head);
+    return (
+      a.nodeAfter?.type.name === "tableCell" &&
+      h.nodeAfter?.type.name === "tableCell" &&
+      a.depth === h.depth &&
+      a.before(a.depth - 1) === h.before(h.depth - 1)
+    );
+  }
+
+  override get from(): number {
+    return this.cells[0] ?? this.anchor;
+  }
+
+  override get to(): number {
+    const last = this.cells[this.cells.length - 1] ?? this.head;
+    return last + ((this.$head.doc.nodeAt(last)?.nodeSize as number | undefined) ?? 0);
+  }
+
+  override get empty(): boolean {
+    return false;
+  }
+
+  /** Still these cells when both survive the mapping; a text selection near the head otherwise. */
+  map(doc: Node, mapping: Mappable): Selection {
+    const anchor = mapping.mapResult(this.anchor, 1);
+    const head = mapping.mapResult(this.head, 1);
+    if (!anchor.deleted && !head.deleted && CellSelection.valid(doc, anchor.pos, head.pos))
+      return CellSelection.create(doc, anchor.pos, head.pos);
+    return Selection.near(doc.resolve(Math.min(head.pos, doc.content.size)));
+  }
+
+  toJSON(): SelectionJSON {
+    return { type: "cell", anchor: this.anchor, head: this.head };
+  }
+}
+
+/** The cells (positions) of the rectangle between two cells of a table, merges widening it. */
+function rectangle($anchor: ResolvedPos, $head: ResolvedPos): number[] {
+  const tableDepth = $anchor.depth - 1;
+  const table = $anchor.node(tableDepth);
+  const grid = gridOf(table, $anchor.before(tableDepth));
+  const cellAt = (pos: number) => grid.find((c) => c.pos === pos);
+  const a = cellAt($anchor.pos);
+  const h = cellAt($head.pos);
+  if (!a || !h) return [$anchor.pos];
+  let top = Math.min(a.row, h.row);
+  let bottom = Math.max(a.row + a.rowSpan, h.row + h.rowSpan) - 1;
+  let left = Math.min(a.column, h.column);
+  let right = Math.max(a.column + a.span, h.column + h.span) - 1;
+  const inside = (c: GridCell) =>
+    c.row <= bottom &&
+    c.row + c.rowSpan - 1 >= top &&
+    c.column <= right &&
+    c.column + c.span - 1 >= left;
+  for (let changed = true; changed; ) {
+    changed = false;
+    for (const c of grid) {
+      if (!inside(c)) continue;
+      const next = [
+        Math.min(top, c.row),
+        Math.max(bottom, c.row + c.rowSpan - 1),
+        Math.min(left, c.column),
+        Math.max(right, c.column + c.span - 1),
+      ];
+      if (next[0] !== top || next[1] !== bottom || next[2] !== left || next[3] !== right) {
+        [top, bottom, left, right] = next as [number, number, number, number];
+        changed = true;
+      }
+    }
+  }
+  return grid.filter(inside).map((c) => c.pos);
+}
+
+Selection.kinds.set("cell", (doc, json) => {
+  const clamp = (pos: number) => Math.max(0, Math.min(pos, doc.content.size));
+  const anchor = clamp(json.anchor);
+  const head = clamp(json.head);
+  return CellSelection.valid(doc, anchor, head)
+    ? CellSelection.create(doc, anchor, head)
+    : Selection.near(doc.resolve(head));
+});
+/**
+ * Shift+arrows across cells: a cell selection's head moves to the cell beside it (`axis`
+ * "row": the cell above or below; "column": left or right); from a caret or text selection in
+ * a cell (the view says it leaves the cell) a cell selection starts, from that cell to the next.
+ * Does not apply where there is no cell that way.
+ */
+export function extendCellSelection(axis: "row" | "column", dir: 1 | -1): Command {
+  return (state, dispatch) => {
+    const { selection } = state;
+    let anchor: number;
+    let head: number;
+    if (selection instanceof CellSelection) {
+      anchor = selection.anchor;
+      head = selection.head;
+    } else {
+      const found = headCell(state);
+      if (!found) return false;
+      head = found.$pos.before(found.depth);
+      const $a = selection.$anchor;
+      const a = cellDepth($a);
+      // A selection that started outside this cell's table is not a cell selection's.
+      anchor =
+        a === found.depth && $a.before(a - 2) === found.$pos.before(found.depth - 2)
+          ? $a.before(a)
+          : head;
+    }
+    const $head = state.doc.resolve(head);
+    const tableDepth = $head.depth - 1;
+    const table = $head.node(tableDepth);
+    const tableStart = $head.before(tableDepth);
+    const grid = gridOf(table, tableStart);
+    const at = grid.find((c) => c.pos === head);
+    if (!at) return false;
+    let next: GridCell | undefined;
+    if (axis === "row") {
+      const row = dir > 0 ? at.row + at.rowSpan : at.row - 1;
+      next = grid.find(
+        (c) =>
+          c.row <= row &&
+          row < c.row + c.rowSpan &&
+          c.column <= at.column &&
+          at.column < c.column + c.span,
+      );
+    } else {
+      const column = dir > 0 ? at.column + at.span : at.column - 1;
+      next = grid.find(
+        (c) =>
+          c.row <= at.row &&
+          at.row < c.row + c.rowSpan &&
+          c.column <= column &&
+          column < c.column + c.span,
+      );
+    }
+    if (!next) return false;
+    dispatch?.(state.tr.setSelection(CellSelection.create(state.doc, anchor, next.pos)));
+    return true;
+  };
 }

@@ -2,6 +2,7 @@ import {
   AllSelection,
   arrowAcrossLeaf,
   autolinkHref,
+  CellSelection,
   type Command,
   closeHistory,
   type DocumentSettings,
@@ -10,6 +11,7 @@ import {
   deleteSelection,
   type Editor,
   type EditorState,
+  extendCellSelection,
   fitPaste,
   fitPastedV2,
   goToCellVertically,
@@ -105,6 +107,8 @@ const WORD_RULES: FlowRules = { ...DEFAULT_RULES, spacing: "word" };
 
 /** Class of the element of a node-selected block (a rule). */
 const SELECTED_CLASS = "foli-selected-node";
+/** Marks a cell of a cell selection. */
+const CELL_CLASS = "foli-selected-cell";
 
 interface DomPoint {
   node: Node;
@@ -121,7 +125,7 @@ export interface EditorViewOptions {
 const PLACEHOLDER_ATTR = "data-foli-placeholder";
 // Generated content is not document text: no caret stops inside it, a zero-height float keeps
 // the caret at the line start, and the empty alt text keeps screen readers on aria-placeholder.
-const STYLES = `[${PLACEHOLDER_ATTR}]::before{content:attr(${PLACEHOLDER_ATTR});content:attr(${PLACEHOLDER_ATTR}) / "";float:inline-start;height:0;pointer-events:none;color:GrayText}`;
+const STYLES = `.${CELL_CLASS}{box-shadow:inset 0 0 0 9999px rgba(0,120,215,.22)}[${PLACEHOLDER_ATTR}]::before{content:attr(${PLACEHOLDER_ATTR});content:attr(${PLACEHOLDER_ATTR}) / "";float:inline-start;height:0;pointer-events:none;color:GrayText}`;
 
 /**
  * Adds the view's stylesheet once per document or shadow root, when a placeholder is first shown
@@ -294,6 +298,9 @@ export class EditorView {
   private indexOf = new Map<BlockDesc, number>();
   /** The element that shows a node selection, if any. */
   private selectedDom: HTMLElement | null = null;
+  /** The cells a cell selection marks, and the caret written in its head cell. */
+  private selectedCells: HTMLElement[] = [];
+  private cellCaret: number | null = null;
   /** The pages of each top-level item (a paragraph's fragments, a table's wrappers), by node. */
   private itemPages = new Map<ModelNode, readonly number[]>();
   /** Each table as last rendered, by node. */
@@ -1267,10 +1274,28 @@ export class EditorView {
       if (owner && !owner.node.isTextblock && NodeSelection.isSelectable(owner.node))
         return NodeSelection.create(this.state.doc, this.starts[index] as number);
     }
-    const anchor = this.posFromDOM(sel.anchorNode, sel.anchorOffset);
-    const head = this.posFromDOM(sel.focusNode, sel.focusOffset);
+    // Several ranges (Firefox selects table cells so, one range per cell): from the first cell
+    // to the last (a range's start is in its cell; its end is after it).
+    const many = sel.rangeCount > 1;
+    const first = many ? sel.getRangeAt(0) : null;
+    const lastRange = many ? sel.getRangeAt(sel.rangeCount - 1) : null;
+    const anchor = first
+      ? this.posFromDOM(first.startContainer, first.startOffset)
+      : this.posFromDOM(sel.anchorNode, sel.anchorOffset);
+    const head = lastRange
+      ? this.posFromDOM(lastRange.startContainer, lastRange.startOffset)
+      : this.posFromDOM(sel.focusNode, sel.focusOffset);
     if (anchor === null || head === null) return null;
     const { doc } = this.state;
+    // The caret the view wrote for a cell selection (in its head cell): that selection.
+    const current = this.state.selection;
+    if (current instanceof CellSelection && anchor === head && anchor === this.cellCaret)
+      return current;
+    // Ends in two cells of one table: the cells between them.
+    const a = cellAround(doc, anchor);
+    const h = cellAround(doc, head);
+    if (a && h && a.cell !== h.cell && a.table === h.table)
+      return CellSelection.create(doc, a.cell, h.cell);
     // Exactly around a selectable block leaf (a rule): the node selection that wrote it.
     const from = Math.min(anchor, head);
     const node = doc.nodeAt(from);
@@ -1293,6 +1318,26 @@ export class EditorView {
     return desc && this.starts[this.indexOf.get(desc) ?? -1] === selection.from ? desc : null;
   }
 
+  /** Marks the cells of a cell selection (their table cell elements, on every page). */
+  private showSelectedCells(): void {
+    const { selection } = this.state;
+    const cells: HTMLElement[] = [];
+    if (selection instanceof CellSelection) {
+      for (const pos of selection.cells) {
+        const caret = Selection.near(this.state.doc.resolve(pos + 1), 1).from;
+        const { node } = this.domFromPos(caret);
+        const element =
+          node.nodeType === Node.ELEMENT_NODE ? (node as Element) : node.parentElement;
+        const td = element?.closest("td");
+        if (td instanceof HTMLElement) cells.push(td);
+      }
+    }
+    for (const td of this.selectedCells) if (!cells.includes(td)) td.classList.remove(CELL_CLASS);
+    for (const td of cells) td.classList.add(CELL_CLASS);
+    this.selectedCells = cells;
+    if (cells.length) injectStyles(this.host);
+  }
+
   /** The first wrapper of a node-selected table, if a table is selected. */
   private selectedTable(): HTMLElement | null {
     const { selection } = this.state;
@@ -1302,6 +1347,7 @@ export class EditorView {
 
   /** Marks the element of a node-selected block, for styling (the DOM selection is around it). */
   private showSelectedNode(): void {
+    this.showSelectedCells();
     const dom = this.selectedBlock()?.dom ?? this.selectedTable();
     if (dom === this.selectedDom) return;
     this.selectedDom?.classList.remove(SELECTED_CLASS);
@@ -1352,6 +1398,14 @@ export class EditorView {
     if (selected) {
       const point = before(selected);
       sel.setBaseAndExtent(point.node, point.offset, point.node, point.offset + 1);
+      return;
+    }
+    // Cells: drawn by their class; the native caret stays in the head cell (ADR-0006).
+    if (selection instanceof CellSelection) {
+      const caret = Selection.near(doc.resolve(selection.head + 1), 1).from;
+      this.cellCaret = caret;
+      const point = this.domFromPos(caret);
+      sel.collapse(point.node, point.offset);
       return;
     }
     // Never show a caret inside a grapheme cluster (the core snaps only out of surrogate pairs).
@@ -1560,6 +1614,26 @@ export class EditorView {
     }
     // Up/Down on a textblock's first/last line next to a rule select it (only the view knows
     // lines; measured only when a rule is beside the block); else the browser moves the caret.
+    // Shift+arrows in a table: cells selected grow by a cell; from text in a cell, Shift+Up or
+    // Down starts a cell selection once the head is on the cell's first or last line.
+    const shift: Record<string, ["row" | "column", -1 | 1]> = {
+      "Shift-ArrowUp": ["row", -1],
+      "Shift-ArrowDown": ["row", 1],
+      "Shift-ArrowLeft": ["column", -1],
+      "Shift-ArrowRight": ["column", 1],
+    };
+    const growing = Object.hasOwn(shift, name) ? shift[name] : undefined;
+    if (growing) {
+      const [axis, dir] = growing;
+      const grow = extendCellSelection(axis, dir);
+      const leaving =
+        this.state.selection instanceof CellSelection ||
+        (axis === "row" && this.caretOnEdgeLine(dir, true));
+      if (leaving && grow(this.state) && this.run(grow)) {
+        event.preventDefault();
+        return;
+      }
+    }
     const vertical = name === "ArrowUp" ? -1 : name === "ArrowDown" ? 1 : 0;
     // In a table, from a cell's first or last line: the cell above or below, or out of the
     // table (browsers go to the next cell in the DOM, or across pages to the wrong row).
@@ -1580,16 +1654,20 @@ export class EditorView {
    * Whether the caret is on the first (`dir` -1) or last (1) line of its textblock, in the
    * block's first or last fragment (a block split across pages has several).
    */
-  private caretOnEdgeLine(dir: -1 | 1): boolean {
+  private caretOnEdgeLine(dir: -1 | 1, focusOnly = false): boolean {
     const sel = this.host.ownerDocument.getSelection();
-    if (!sel?.rangeCount || !sel.isCollapsed || !sel.focusNode) return false;
+    // `focusOnly`: a range's head (Shift+arrows), else only a caret.
+    if (!sel?.rangeCount || (!focusOnly && !sel.isCollapsed) || !sel.focusNode) return false;
     const element = this.blockElement(sel.focusNode);
     const desc = element ? this.owner.get(element) : undefined;
     if (!desc?.node.isTextblock) return false;
     const fragment = desc.fragments[dir < 0 ? 0 : desc.fragments.length - 1];
     if (!fragment || element !== fragment) return false;
     if (!desc.node.content.size) return true;
-    const caret = sel.getRangeAt(0).getClientRects()[0];
+    const at = this.host.ownerDocument.createRange();
+    at.setStart(sel.focusNode, sel.focusOffset);
+    at.collapse(true);
+    const caret = at.getClientRects()[0];
     const lines = this.host.ownerDocument.createRange();
     lines.selectNodeContents(fragment);
     const rects = lines.getClientRects();
@@ -2053,6 +2131,15 @@ export interface Measure {
   lines?: Lines;
   /** A table's rows and blocks. */
   table?: TableMeasure;
+}
+
+/** The innermost cell around pos (the position before it) and its table's, or null. */
+function cellAround(doc: ModelNode, pos: number): { cell: number; table: number } | null {
+  const $pos = doc.resolve(pos);
+  for (let d = $pos.depth; d > 2; d--)
+    if ($pos.node(d).type.name === "tableCell")
+      return { cell: $pos.before(d), table: $pos.before(d - 2) };
+  return null;
 }
 
 /** A block's text as the read-back compares it: a tab "\t", other inline leaves one character. */

@@ -23,7 +23,7 @@ import {
   Plugin,
   type Transaction,
 } from "./state.js";
-import { deleteAcrossTables, keepTablesApart } from "./tables.js";
+import { CellSelection, deleteAcrossTables, emptyCells, keepTablesApart } from "./tables.js";
 import { trackState } from "./track.js";
 import {
   isMarker,
@@ -69,8 +69,16 @@ export const deleteSelection: Command = (state, dispatch) => {
  * Deletes `tr`'s selection; across a table's edge it takes whole rows (or empties cells), never
  * joining text across the edge (`deleteAcrossTables`), and Word's table rules hold after it.
  */
-function deleteSelectionKeepingTables(tr: Transaction): void {
-  const { from, to } = tr.selection;
+function deleteSelectionKeepingTables(tr: Transaction, onlyAnchorCell = false): void {
+  const selection = tr.selection;
+  if (selection instanceof CellSelection) {
+    // Selected cells are emptied (typing empties the anchor cell only), the caret in the anchor.
+    const anchor = selection.anchor;
+    emptyCells(tr, onlyAnchorCell ? [anchor] : selection.cells);
+    tr.setSelection(Selection.near(tr.doc.resolve(tr.mapping.map(anchor, 1) + 1), 1));
+    return;
+  }
+  const { from, to } = selection;
   if (!deleteAcrossTables(tr, from, to)) tr.deleteSelection();
   else tr.setSelection(Selection.near(tr.doc.resolve(tr.mapping.map(from, -1)), 1));
   keepTablesApart(tr);
@@ -89,13 +97,18 @@ export function insertText(text: string): Command {
         state.schema.text(text, state.storedMarks ?? []),
       );
     }
-    if (!(selection instanceof AllSelection) && !selection.$from.parent.inlineContent) return false;
+    if (
+      !(selection instanceof AllSelection) &&
+      !(selection instanceof CellSelection) &&
+      !selection.$from.parent.inlineContent
+    )
+      return false;
     return attempt(state, dispatch, (tr) => {
       const $from = selection.$from;
       const marks =
         state.storedMarks ??
         (selection.empty ? marksAt($from) : ($from.nodeAfter?.marks ?? marksAt($from)));
-      if (!selection.empty) deleteSelectionKeepingTables(tr);
+      if (!selection.empty) deleteSelectionKeepingTables(tr, true);
       const $pos = tr.selection.$from;
       if (!$pos.parent.inlineContent) throw new TransformError("No text where the selection was");
       const allowed = typedMarks(marks).filter((mark) =>

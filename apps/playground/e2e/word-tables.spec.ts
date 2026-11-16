@@ -15,6 +15,9 @@ async function open(page: Page, name: string): Promise<void> {
   const base64 = readFileSync(new URL(name, CORPUS)).toString("base64");
   await page.evaluate((data) => window.foliEdit.loadDocx(data), base64);
   await page.waitForFunction(() => document.querySelectorAll("section.foli-page").length >= 2);
+  // Settled: fonts loaded and the relayout they cause drawn.
+  await page.evaluate(() => document.fonts.ready);
+  await page.waitForTimeout(300);
 }
 
 /** Per page: the rows of the table it shows, and the repeated header rows among them. */
@@ -111,4 +114,59 @@ test("Up from the header row leaves the table, to the paragraph above it", async
     .click();
   await page.keyboard.press("ArrowUp");
   expect((await where(page)).row).toBe(-1);
+});
+
+/** The model selection's kind and, for cells, how many and the cells marked in the DOM. */
+const selected = (page: Page) =>
+  page.evaluate(() => {
+    const json = window.foliEdit.editor.state.selection.toJSON();
+    const cells = (window.foliEdit.editor.state.selection as unknown as { cells?: number[] }).cells;
+    return {
+      type: json.type,
+      cells: cells?.length ?? 0,
+      marked: document.querySelectorAll("td.foli-selected-cell").length,
+    };
+  });
+
+test("a drag across cells selects them; Delete empties them", async ({ page }) => {
+  await open(page, "06-price-schedule.docx");
+  const from = page.locator("td", { hasText: /^Hardware item 4$/ }).first();
+  const to = page.locator("td", { hasText: /^Hardware item 5$/ }).first();
+  await from.scrollIntoViewIfNeeded();
+  const a = await from.boundingBox();
+  const b = await to.boundingBox();
+  if (!a || !b) throw new Error("no cells");
+  // Inside each cell's text (a cell's edge can belong to the merged category cell beside it).
+  await page.mouse.move(a.x + a.width / 3, a.y + a.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(b.x + b.width / 3, b.y + b.height / 2, { steps: 6 });
+  await page.mouse.up();
+  // `selectionchange` is asynchronous: the view reads the drag when it arrives.
+  await expect.poll(() => selected(page)).toEqual({ type: "cell", cells: 2, marked: 2 });
+  await page.keyboard.press("Delete");
+  const texts = await page.evaluate(() => {
+    const out: string[] = [];
+    window.foliEdit.editor.state.doc.descendants((node) => {
+      if (node.isTextblock && /^Hardware item [45]$/.test(node.textContent))
+        out.push(node.textContent);
+    });
+    return out;
+  });
+  expect(texts).toEqual([]);
+  expect(await page.evaluate(() => window.foliEdit.validate())).toBe(true);
+});
+
+test("Shift+Down from a cell's last line selects cells; Shift+Right widens them", async ({
+  page,
+}) => {
+  await open(page, "06-price-schedule.docx");
+  await page
+    .locator("td", { hasText: /^Hardware item 3$/ })
+    .first()
+    .click();
+  await page.keyboard.press("End");
+  await page.keyboard.press("Shift+ArrowDown");
+  expect(await selected(page)).toEqual({ type: "cell", cells: 2, marked: 2 });
+  await page.keyboard.press("Shift+ArrowRight");
+  expect(await selected(page)).toEqual({ type: "cell", cells: 4, marked: 4 });
 });

@@ -3,8 +3,8 @@ import type { NodeJSON } from "../model/index.js";
 import type { FoliDocument } from "../v3/document.js";
 import { parseContent } from "../v3/document.js";
 import { createEditor } from "./editor.js";
-import { TextSelection } from "./selection.js";
-import { goToCellVertically } from "./tables.js";
+import { Selection, TextSelection } from "./selection.js";
+import { CellSelection, extendCellSelection, goToCellVertically } from "./tables.js";
 
 /** Editing across a table's edges (10.6, ADR-0006). */
 
@@ -482,5 +482,96 @@ describe("moving between cells: merges and edges", () => {
     // The whole content selected (Tab's): it moves as the cell.
     select(editor, inside(editor, "a1", 0), inside(editor, "a1", 2));
     expect(editor.run(goToCellVertically(1))).toBe(true);
+  });
+});
+
+describe("cell selections", () => {
+  const cellPos = (editor: Editor, value: string) => inside(editor, value) - 2;
+
+  it("cover the rectangle between two cells, widened by a merge, and round-trip as JSON", () => {
+    const merged = table(
+      row(
+        cell("a1"),
+        { type: "tableCell", attrs: { vMerge: "restart" }, content: [p("m")] },
+        cell("c1"),
+      ),
+      row(
+        cell("a2"),
+        { type: "tableCell", attrs: { vMerge: "continue" }, content: [p()] },
+        cell("c2"),
+      ),
+      row(cell("a3"), cell("b3"), cell("c3")),
+    );
+    const editor = editorOf([p("x"), merged, p("y")]);
+    // From c2 to b3: the merged cell (rows 1-2) widens the rectangle to row 1.
+    const selection = CellSelection.create(
+      editor.state.doc,
+      cellPos(editor, "c2"),
+      cellPos(editor, "b3"),
+    );
+    const texts = selection.cells.map((pos) => editor.state.doc.nodeAt(pos)?.textContent);
+    expect(texts).toEqual(["m", "c1", "c2", "b3", "c3"]);
+    const json = selection.toJSON();
+    expect(json.type).toBe("cell");
+    expect(Selection.fromJSON(editor.state.doc, json)).toBeInstanceOf(CellSelection);
+  });
+
+  it("map through edits elsewhere and fall back to text when a cell goes", () => {
+    const editor = editorOf([p("x"), TABLE, p("y")]);
+    editor.dispatch(
+      editor.state.tr.setSelection(
+        CellSelection.create(editor.state.doc, cellPos(editor, "a1"), cellPos(editor, "b2")),
+      ),
+    );
+    editor.dispatch(editor.state.tr.insertText("more ", 1));
+    expect(editor.state.selection).toBeInstanceOf(CellSelection);
+    expect((editor.state.selection as CellSelection).cells).toHaveLength(4);
+  });
+
+  it("Delete empties the selected cells; typing replaces the anchor cell's content", () => {
+    const editor = editorOf([p("x"), TABLE, p("y")]);
+    const select4 = () =>
+      editor.dispatch(
+        editor.state.tr.setSelection(
+          CellSelection.create(editor.state.doc, cellPos(editor, "a1"), cellPos(editor, "b2")),
+        ),
+      );
+    select4();
+    editor.commands.deleteSelection();
+    expect(shape(editor)[1]).toEqual([
+      ["", ""],
+      ["", ""],
+      ["a3", "b3"],
+    ]);
+    valid(editor);
+    const typing = editorOf([p("x"), TABLE, p("y")]);
+    typing.dispatch(
+      typing.state.tr.setSelection(
+        CellSelection.create(typing.state.doc, cellPos(typing, "a2"), cellPos(typing, "b3")),
+      ),
+    );
+    typing.commands.insertText("Z");
+    expect(shape(typing)[1]).toEqual([
+      ["a1", "b1"],
+      ["Z", "b2"],
+      ["a3", "b3"],
+    ]);
+  });
+
+  it("grow with Shift+arrows from a caret leaving its cell, then from the head", () => {
+    const editor = editorOf([p("x"), TABLE, p("y")]);
+    select(editor, inside(editor, "a1", 1));
+    expect(editor.run(extendCellSelection("row", 1))).toBe(true);
+    let selection = editor.state.selection as CellSelection;
+    expect(selection.cells.map((pos) => editor.state.doc.nodeAt(pos)?.textContent)).toEqual([
+      "a1",
+      "a2",
+    ]);
+    editor.run(extendCellSelection("column", 1));
+    selection = editor.state.selection as CellSelection;
+    expect(selection.cells).toHaveLength(4);
+    // No row above the first: not taken.
+    select(editor, inside(editor, "b1", 1));
+    expect(editor.run(extendCellSelection("row", -1))).toBe(false);
   });
 });

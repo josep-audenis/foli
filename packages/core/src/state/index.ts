@@ -104,7 +104,7 @@ export {
   type PluginSpec,
   Transaction,
 } from "./state.js";
-export { goToCell, goToCellVertically } from "./tables.js";
+export { CellSelection, extendCellSelection, goToCell, goToCellVertically } from "./tables.js";
 export {
   type ReviewView,
   setReviewView,

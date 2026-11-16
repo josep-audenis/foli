@@ -2,7 +2,8 @@ import { Mark, type Node, type ResolvedPos } from "../model/index.js";
 import type { Mappable } from "../transform/stepmap.js";
 
 export interface SelectionJSON {
-  type: "text" | "node" | "all";
+  /** `cell`: a `CellSelection` (anchor and head are the positions before two cells). */
+  type: "text" | "node" | "all" | "cell";
   anchor: number;
   head: number;
 }
@@ -74,9 +75,14 @@ export abstract class Selection {
     return Selection.near(doc.resolve(doc.content.size), -1);
   }
 
+  /** Selection kinds defined elsewhere (`cell`: tables), by their JSON `type`. */
+  static readonly kinds = new Map<string, (doc: Node, json: SelectionJSON) => Selection>();
+
   /** Restores a selection, clamping positions into the document. */
   static fromJSON(doc: Node, json: SelectionJSON): Selection {
     if (json.type === "all") return new AllSelection(doc);
+    const kind = Selection.kinds.get(json.type);
+    if (kind) return kind(doc, json);
     const clamp = (pos: number) => Math.max(0, Math.min(pos, doc.content.size));
     if (json.type === "node") {
       const $pos = doc.resolve(clamp(json.anchor));
