@@ -252,3 +252,108 @@ describe("tracked changes in tables", () => {
     valid(editor);
   });
 });
+
+describe("review findings", () => {
+  const nested = table(row(cell("in1"), cell("in2")));
+  const outer = (): NodeJSON =>
+    table(
+      row(
+        { type: "tableCell", content: [p("A"), nested, p("A2")] },
+        { type: "tableCell", content: [p("B")] },
+      ),
+    );
+
+  it("across cells of a table holding a nested one: only those cells are emptied", () => {
+    const editor = editorOf([p("before"), outer(), p("after")]);
+    select(editor, inside(editor, "in2", 1), inside(editor, "B", 1));
+    editor.commands.deleteSelection();
+    valid(editor);
+    const json = JSON.stringify(editor.state.doc.toJSON());
+    expect(json).toContain('"after"');
+    // Still one row of two cells.
+    expect(editor.state.doc.child(1).child(0).childCount).toBe(2);
+    const other = editorOf([p("before"), outer(), p("after")]);
+    select(other, inside(other, "A", 1), inside(other, "B", 1));
+    other.commands.deleteSelection();
+    valid(other);
+    expect(other.state.doc.child(1).child(0).childCount).toBe(2);
+    expect(JSON.stringify(other.state.doc.toJSON())).toContain('"after"');
+  });
+
+  it("a row inserted while tracking is the row's insertion; rejecting it removes it", () => {
+    const editor = editorOf([p("x"), TABLE, p("y")], true);
+    const schema = editor.state.schema;
+    const first = editor.state.doc.child(1).child(0);
+    const at = editor.state.doc.child(0).nodeSize + 1 + first.nodeSize;
+    editor.dispatch(editor.state.tr.insert(at, first.copy(first.content)));
+    const rows = editor.state.doc.child(1);
+    expect(rows.childCount).toBe(4);
+    expect(rows.child(1).attrs.revision).toMatchObject({ insertion: { author: "Me" } });
+    expect(schema).toBeDefined();
+    editor.commands.rejectAllChanges();
+    expect(editor.state.doc.child(1).childCount).toBe(3);
+    valid(editor);
+  });
+
+  it("deleting a table of one's own inserted rows removes it", () => {
+    const editor = editorOf([p("x"), p("y")], true);
+    const t = editor.state.schema.nodeFromJSON(table(row(cell("n"))));
+    editor.dispatch(editor.state.tr.insert(editor.state.doc.child(0).nodeSize, t));
+    expect(editor.state.doc.childCount).toBe(3);
+    select(editor, inside(editor, "x", 1), inside(editor, "y"));
+    editor.commands.deleteSelection();
+    expect(editor.state.doc.child(1).type.name).not.toBe("table");
+    valid(editor);
+  });
+
+  it("rejecting a tracked clear of cells gives them back", () => {
+    const editor = editorOf([p("x"), TABLE, p("y")], true);
+    select(editor, inside(editor, "a1", 1), inside(editor, "a2", 1));
+    editor.commands.deleteSelection();
+    editor.commands.rejectAllChanges();
+    expect(shape(editor)[1]).toEqual([
+      ["a1", "b1"],
+      ["a2", "b2"],
+      ["a3", "b3"],
+    ]);
+  });
+
+  it("rejecting a tracked delete between two tables leaves the document as it was", () => {
+    const second = table(row(cell("c1")));
+    const editor = editorOf([p("x"), TABLE, p("mid"), second, p("y")], true);
+    select(editor, inside(editor, "b3", 2), inside(editor, "mid", 3));
+    editor.commands.deleteSelection();
+    editor.commands.rejectAllChanges();
+    valid(editor);
+    expect(shape(editor)).toEqual([
+      "x",
+      [
+        ["a1", "b1"],
+        ["a2", "b2"],
+        ["a3", "b3"],
+      ],
+      "mid",
+      [["c1"]],
+      "y",
+    ]);
+  });
+});
+describe("cells of a nested table", () => {
+  it("a selection across them empties those cells only", () => {
+    const nested = table(row(cell("in1"), cell("in2")));
+    const editor = editorOf([
+      p("before"),
+      table(row({ type: "tableCell", content: [p("A"), nested, p("A2")] }, cell("B"))),
+      p("after"),
+    ]);
+    select(editor, inside(editor, "in1", 1), inside(editor, "in2", 1));
+    editor.commands.deleteSelection();
+    valid(editor);
+    const json = JSON.stringify(editor.state.doc.toJSON());
+    for (const kept of ['"A"', '"A2"', '"B"', '"after"']) expect(json).toContain(kept);
+    // Both nested cells emptied, the outer table's cells kept.
+    expect(json).not.toContain("in1");
+    expect(json).not.toContain("n2");
+    expect(editor.state.doc.child(1).child(0).childCount).toBe(2);
+  });
+});

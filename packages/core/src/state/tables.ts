@@ -15,14 +15,12 @@ function cellDepth($pos: ResolvedPos): number {
   return -1;
 }
 
-/** The depth of the outermost table around `$pos` that does not hold `other`, or -1. */
-function outerTable($pos: ResolvedPos, other: number): number {
-  for (let d = 1; d <= $pos.depth; d++) {
-    if (!isTable($pos.node(d))) continue;
-    const start = $pos.before(d);
-    if (other < start || other > start + $pos.node(d).nodeSize) return d;
-  }
-  return -1;
+/**
+ * The depth of the table around `$pos` just below the depth the two ends share (`shared`), or
+ * -1: only that table is cut (a table nested deeper goes with the rows or blocks around it).
+ */
+function tableBelow($pos: ResolvedPos, shared: number): number {
+  return $pos.depth > shared && isTable($pos.node(shared + 1)) ? shared + 1 : -1;
 }
 
 /**
@@ -37,12 +35,16 @@ export function deleteAcrossTables(tr: Transaction, from: number, to: number): b
   const toCell = cellDepth($to);
   if (fromCell < 0 && toCell < 0) return false;
   if (fromCell >= 0 && toCell >= 0 && $from.before(fromCell) === $to.before(toCell)) return false;
-  const tableTo = outerTable($to, from);
-  const tableFrom = outerTable($from, to);
-  if (tableTo < 0 && tableFrom < 0) {
-    clearCells(tr, from, to);
+  // Ends in different cells of one table (or of one row): those cells are emptied.
+  const shared = $from.sharedDepth(to);
+  const common = $from.node(shared).type.name;
+  if (common === "table" || common === "tableRow") {
+    clearCells(tr, from, to, $from.before(shared + 1), $to.after(shared + 1));
     return true;
   }
+  const tableTo = tableBelow($to, shared);
+  const tableFrom = tableBelow($from, shared);
+  if (tableTo < 0 && tableFrom < 0) return false;
   // From the end backward, so earlier positions stay valid.
   let middleEnd = to;
   if (tableTo >= 0) {
@@ -100,26 +102,38 @@ function deleteBetween(tr: Transaction, a: number, b: number): void {
   for (const [s, e] of ranges.sort((x, y) => y[0] - x[0])) if (s < e) tr.delete(s, e);
 }
 
-/** Empties the cells from the one holding `from` to the one holding `to` (in document order). */
-function clearCells(tr: Transaction, from: number, to: number): void {
+/**
+ * Empties the cells of one table (or row) from the one holding `from` to the one holding `to`,
+ * in document order (`start..end`: the table's or row's children there). Their text is deleted
+ * (paragraphs in a cell joined), so a tracked clear can be rejected; a cell holding other
+ * blocks (a nested table) gets one empty paragraph instead.
+ *
+ * shortcut: the cells in document order, not Word's rectangle (`CellSelection` will give that).
+ */
+function clearCells(tr: Transaction, from: number, to: number, start: number, end: number): void {
   const cells: { pos: number; node: Node }[] = [];
-  tr.doc.nodesBetween(from, to, (node, pos) => {
-    if (node.type.name !== "tableCell") return true;
-    cells.push({ pos, node });
-    return true;
+  tr.doc.nodesBetween(start, end, (node, pos) => {
+    const within = pos >= start && pos + node.nodeSize <= end;
+    // A cell around the table the ends share (it is nested): go on into it.
+    if (node.type.name !== "tableCell" || !within) return true;
+    // A cell of the table or row the ends share (a nested table's are not entered).
+    if (pos < to && pos + node.nodeSize > from) cells.push({ pos, node });
+    return false;
   });
-  // Innermost cells only (a nested table's cells, not the outer cell holding them whole).
-  const inner = cells.filter(
-    (c) => !cells.some((o) => o !== c && o.pos > c.pos && o.pos < c.pos + c.node.nodeSize),
-  );
-  for (const { pos, node } of inner.reverse()) {
-    const first = node.firstChild;
-    const paragraph =
-      first?.type.name === "paragraph"
-        ? first.type.create(first.attrs)
-        : node.type.schema.nodes.paragraph?.create();
-    if (!paragraph) continue;
-    tr.replace(pos + 1, pos + node.nodeSize - 1, new Slice(Fragment.from(paragraph), 0, 0));
+  for (const { pos, node } of cells.reverse()) {
+    let paragraphs = true;
+    node.forEach((child) => {
+      if (child.type.name !== "paragraph") paragraphs = false;
+    });
+    if (paragraphs) {
+      const textStart = pos + 2;
+      const textEnd = pos + node.nodeSize - 2;
+      if (textStart < textEnd) tr.delete(textStart, textEnd);
+      continue;
+    }
+    const paragraph = node.type.schema.nodes.paragraph?.create();
+    if (paragraph)
+      tr.replace(pos + 1, pos + node.nodeSize - 1, new Slice(Fragment.from(paragraph), 0, 0));
   }
 }
 

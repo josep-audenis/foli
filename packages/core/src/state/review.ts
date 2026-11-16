@@ -179,6 +179,8 @@ function resolve(tr: Transaction, changes: readonly Change[], accept: boolean): 
   const joins: { pos: number; keepFirst: boolean }[] = [];
   /** Rows that go, by their table (its position): a table losing every row goes whole. */
   const rowsGoing = new Map<number, [number, number][]>();
+  /** Whether whole rows or paragraphs go: what lies inside them must not be removed again. */
+  let wholes = false;
   for (const change of changes) {
     const { kind, from, to } = change;
     const markType = schema.marks[kind === "formatting" ? "formatChange" : kind];
@@ -252,6 +254,12 @@ function resolve(tr: Transaction, changes: readonly Change[], accept: boolean): 
         const emptied = covered(node, start + 1, removed);
         if (goes && tr.doc.resolve(end).nodeAfter?.isTextblock)
           joins.push({ pos: end, keepFirst: accept && !emptied });
+        // Nothing to join with (a table follows, or a cell ends): an inserted paragraph left
+        // empty goes whole when rejected (Word's rules are restored after: `keepTablesApart`).
+        else if (goes && !accept && (!node.content.size || emptied)) {
+          removed.push([start, end]);
+          wholes = true;
+        }
         break;
       }
     }
@@ -262,16 +270,20 @@ function resolve(tr: Transaction, changes: readonly Change[], accept: boolean): 
     if (node && rows.length === node.childCount) removed.push([table, table + node.nodeSize]);
     else removed.push(...rows);
   }
-  const outer = removed.filter(
-    ([s, e]) => !removed.some(([s2, e2]) => (s2 < s && e <= e2) || (s2 <= s && e < e2)),
-  );
-  removed.length = 0;
-  removed.push(...outer);
+  if (rowsGoing.size || wholes) {
+    const outer = removed.filter(
+      ([s, e]) => !removed.some(([s2, e2]) => (s2 < s && e <= e2) || (s2 <= s && e < e2)),
+    );
+    removed.length = 0;
+    removed.push(...outer);
+  }
   // Content removed and paragraphs joined, from the end so earlier positions stay.
   const ops = [
     ...removed.map(([s, e]) => ({ at: s, run: () => tr.delete(s, e) })),
     ...joins
-      .filter(({ pos }) => !removed.some(([s, e]) => s < pos && pos < e))
+      .filter(
+        ({ pos }) => !(rowsGoing.size || wholes) || !removed.some(([s, e]) => s < pos && pos < e),
+      )
       .map(({ pos, keepFirst }) => ({ at: pos - 1, run: () => join(tr, pos, keepFirst) })),
   ].sort((a, b) => b.at - a.at);
   for (const op of ops) op.run();

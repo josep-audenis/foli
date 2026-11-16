@@ -296,6 +296,8 @@ function rebuild(
     const marked: [number, number][] = [];
     /** Whole rows deleted: recorded as the rows' deletion. */
     const rows: { pos: number; node: Node }[] = [];
+    /** One's own inserted rows deleted, by table: they go (the table, when they are all its rows). */
+    const ownRows = new Map<number, [number, number][]>();
     // Paragraphs joined for real (one's own inserted mark removed) become one, which starts
     // where the first starts and ends with the last one's mark (`keepLastMark`), as an
     // untracked join does.
@@ -340,9 +342,10 @@ function rebuild(
       // it; one's own inserted row goes for real.
       if (node.type.name === "tableRow" && from <= pos && to >= pos + node.nodeSize) {
         const revision = node.attrs.revision as ParagraphRevision | null;
-        if (revision?.insertion?.author === author && !revision.deletion)
-          real.push([pos, pos + node.nodeSize]);
-        else if (!revision?.deletion) rows.push({ pos, node });
+        if (revision?.insertion?.author === author && !revision.deletion) {
+          const table = doc.resolve(pos).before();
+          ownRows.set(table, [...(ownRows.get(table) ?? []), [pos, pos + node.nodeSize]]);
+        } else if (!revision?.deletion) rows.push({ pos, node });
         return false;
       }
       // Tables, rows and cells partly covered: the text in them, cell by cell.
@@ -358,6 +361,11 @@ function rebuild(
       (own && own.attrs.author === author ? real : marked).push([s, e]);
       return false;
     });
+    for (const [table, list] of ownRows) {
+      const node = doc.nodeAt(table);
+      if (node && list.length === node.childCount) real.push([table, table + node.nodeSize]);
+      else real.push(...list);
+    }
     for (const [s, e] of joined(marked)) out.addMark(s, e, markOf());
     for (const { pos, node } of rows) {
       const revision = (node.attrs.revision as ParagraphRevision | null) ?? {};
@@ -637,9 +645,11 @@ function markFragment(
       return;
     }
     // A paragraph keeps its revision: an open end's is the original mark's, and the marks
-    // inserted get theirs afterwards.
-    if (!node.isTextblock)
-      throw new TransformError("A table cannot be inserted as a tracked change");
+    // inserted get theirs afterwards. Tables, rows and cells: their content marked (whole rows
+    // get their insertion afterwards too).
+    const container = ["table", "tableRow", "tableCell"].includes(node.type.name);
+    if (!node.isTextblock && !container)
+      throw new TransformError("This content cannot be inserted as a tracked change");
     nodes.push(node.copy(markFragment(node.content, mark, insertion, deletion)));
   });
   return Fragment.fromArray(nodes);
