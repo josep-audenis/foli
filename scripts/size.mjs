@@ -52,12 +52,14 @@ writeFileSync(appEntry, `export { FoliEditor } from "${dist("react")}";\n`);
  * 69.3 kB): reading and writing tables and table styles; the view's read-only table from the
  * model (with core's table style resolution). View and React raised in 10.5 (53.7 and 72.3 kB):
  * tables on pages in the editor (cell paragraphs as blocks, frames per page, rows cut across pages).
+ * Core, view and React raised in 10.6a (45.9, 55.2 and 74.2 kB): editing across a table's edges,
+ * row revisions tracked, reviewed in cells.
  */
 const BUNDLES = [
-  { name: "@folijs/core", entry: dist("core"), budget: 45_000 },
-  { name: "@folijs/view", entry: dist("view"), budget: 55_000 },
-  { name: "@folijs/react", entry: dist("react"), budget: 74_000 },
-  { name: "FoliEditor only", entry: appEntry, budget: 74_000 },
+  { name: "@folijs/core", entry: dist("core"), budget: 47_000 },
+  { name: "@folijs/view", entry: dist("view"), budget: 56_500 },
+  { name: "@folijs/react", entry: dist("react"), budget: 76_000 },
+  { name: "FoliEditor only", entry: appEntry, budget: 76_000 },
   { name: "@folijs/docx", entry: dist("docx"), budget: 42_000 },
 ];
 
