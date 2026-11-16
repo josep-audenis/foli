@@ -253,7 +253,8 @@ export function drawingXml(
     const blip = descendants(element, (e) => e.ns === A && e.local === "blip")[0];
     const current = attrOf(blip, "embed", R)?.value;
     // Read against this part: its image id still points to its image here.
-    const here = current !== undefined && relations.target(current) === part;
+    const here =
+      current !== undefined && relations.target(current)?.toLowerCase() === part.toLowerCase();
     const others = descendants(element, () => true).some((e) =>
       e.attributes.some((a) => a.ns === R && !(e === blip && a.local === "embed")),
     );

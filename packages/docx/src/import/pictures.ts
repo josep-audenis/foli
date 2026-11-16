@@ -89,7 +89,7 @@ export function pictureAttrs(
     height,
     // An empty description is kept as it is (it is not Word's missing one).
     ...(alt !== undefined ? { alt } : {}),
-    ...(title ? { title } : {}),
+    ...(title !== undefined ? { title } : {}),
     ...(decorative === "1" || decorative === "true" ? { decorative: true } : {}),
     ext: sourceOf(context, drawing),
   };
