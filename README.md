@@ -4,7 +4,7 @@ An open-source document-editing engine for the web, built from the ground up: it
 model, transactions, view and layout, designed around native pagination, with first-class React
 integration.
 
-> **Status: 0.3.0 ([npm](https://www.npmjs.com/package/@folijs/react)).** Foli edits documents
+> **Status: 0.4.0 ([npm](https://www.npmjs.com/package/@folijs/react)).** Foli edits documents
 > with its own model, engine and view (no ProseMirror/Tiptap/Lexical) on real pages: paragraphs
 > split across pages at a line, explicit page breaks, widow/orphan, keep-with-next and
 > keep-lines-together rules, incremental reflow, print with one sheet per page. Documents use
@@ -14,7 +14,7 @@ integration.
 > highlight; alignment; undo/redo; IME; copy/cut/paste (HTML from Word, Google Docs and web
 > pages mapped to the model). Each section is laid out with its own page size and margins.
 > `.docx` import and lossless export (`@folijs/docx`): what the editor does not model yet is
-> kept and written back. Review as in Word (0.4.0, on `main`, not published yet): tracked
+> kept and written back. Review as in Word (0.4.0): tracked
 > changes recorded while you type (insertions, deletions, formatting), shown as all markup, simple
 > markup or no markup, accepted and rejected one by one, by selection, by author or all; comments
 > with replies and resolved state in a pane beside the pages; both round-trip with Word. React

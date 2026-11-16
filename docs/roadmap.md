@@ -9,19 +9,20 @@ leaves `main` green with a working playground.
 **Update this table in the same PR that starts, advances or finishes a phase.** It is the only
 place that says what is in progress; check it before starting work.
 
-| Phase                    | Status                   | Branch           | Notes                                                                                      |
-| ------------------------ | ------------------------ | ---------------- | ------------------------------------------------------------------------------------------ |
-| 0 Foundation             | ✅ Done                  | —                |                                                                                            |
-| 1 Architecture spike     | ✅ Done (G1 provisional) | —                | Merged in #1; ADR-0003 accepted provisionally; IME, dead-key and screen-reader checks open |
-| 2 Document model         | ✅ Done                  | —                | Merged in #2                                                                               |
-| 3 Transactions & history | ✅ Done                  | —                | Merged in #4; gate G2 passed                                                               |
-| 4 Editor view            | ✅ Done (G3 provisional) | —                | Merged in #8–#13; manual checks (4.6) deferred, open risks in ADR-0003                     |
-| 5 Native pagination      | ✅ Done (G4 provisional) | —                | Merged in #15–#22; page-break manual checks open, risks in ADR-0003                        |
-| 6 React API & 0.1.0      | ✅ Done                  | —                | Merged in #23–#31; 0.1.0 on npm; manual checks shipped as known risks (ADR-0003)           |
-| 7 Rich content           | ✅ Done                  | —                | Merged in #33–#41; 0.2.0 on npm; list-document benchmark misses accepted (known limit)     |
-| 8 Word model & DOCX      | ✅ Done                  | —                | Merged in #44–#61; 0.3.0 on npm (`@folijs/docx` first released); gate G5 passed            |
-| 9 Review                 | In review                | `phase-9/review` | Merged in #63–#72; 0.4.0 versioned, publish awaits the owner's approval                    |
-| 10–12                    | Not started              |                  |                                                                                            |
+| Phase                    | Status                   | Branch                   | Notes                                                                                      |
+| ------------------------ | ------------------------ | ------------------------ | ------------------------------------------------------------------------------------------ |
+| 0 Foundation             | ✅ Done                  | —                        |                                                                                            |
+| 1 Architecture spike     | ✅ Done (G1 provisional) | —                        | Merged in #1; ADR-0003 accepted provisionally; IME, dead-key and screen-reader checks open |
+| 2 Document model         | ✅ Done                  | —                        | Merged in #2                                                                               |
+| 3 Transactions & history | ✅ Done                  | —                        | Merged in #4; gate G2 passed                                                               |
+| 4 Editor view            | ✅ Done (G3 provisional) | —                        | Merged in #8–#13; manual checks (4.6) deferred, open risks in ADR-0003                     |
+| 5 Native pagination      | ✅ Done (G4 provisional) | —                        | Merged in #15–#22; page-break manual checks open, risks in ADR-0003                        |
+| 6 React API & 0.1.0      | ✅ Done                  | —                        | Merged in #23–#31; 0.1.0 on npm; manual checks shipped as known risks (ADR-0003)           |
+| 7 Rich content           | ✅ Done                  | —                        | Merged in #33–#41; 0.2.0 on npm; list-document benchmark misses accepted (known limit)     |
+| 8 Word model & DOCX      | ✅ Done                  | —                        | Merged in #44–#61; 0.3.0 on npm (`@folijs/docx` first released); gate G5 passed            |
+| 9 Review                 | ✅ Done                  | —                        | Merged in #63–#72; 0.4.0 on npm                                                            |
+| 10 Tables & images       | In progress              | `phase-10/tables-images` | Plan below; schema v4 (ADR-0006 first)                                                     |
+| 11–12                    | Not started              |                          |                                                                                            |
 
 Status values: `Ready` (dependencies met, nobody on it) · `In progress` · `In review` (PR open) ·
 `✅ Done` (merged, acceptance criteria met) · `Blocked by …`.
@@ -775,7 +776,7 @@ aside; tables, fields and content controls aside; 03 not compared); files with
 changes and comments made in Foli open in Word without repair with those changes (type, author,
 text) and comments (text, replies, resolved state), and Word's edits come back (5 of 5,
 corpus/README.md); the review toolbar, views and comments pane are used by keyboard and pass axe
-in Chromium, Firefox and WebKit. 0.4.0 waits for the owner's approval to publish.)
+in Chromium, Firefox and WebKit. 0.4.0 published 2026-11-16.)
 
 ### Tasks
 
@@ -888,11 +889,10 @@ Each task is a PR on `phase-9/review`, the build green after each.
   paragraph (fields aside; 03, a content control around paragraphs, not compared); Word edits each
   Foli-made file (automation: a tracked insertion, a reply) and Foli reads both back. 5 of 5
   pass (corpus/README.md). Known: Foli writes dates in UTC where Word writes local time.
-- [ ] 9.9 Close: docs (README, document model, docx README, known limitations as of 0.4.0;
+- [x] 9.9 Close: docs (README, document model, docx README, known limitations as of 0.4.0;
   architecture and api brought up to date with the final code of each task), acceptance checked
-  (above), the 0.4.0
-  changeset (with the changed behaviours, #71), the version PR (#72); publish after the
-  owner's approval.
+  (above), the 0.4.0 changeset (with the changed behaviours, #71), the version PR (#72); 0.4.0
+  published 2026-11-16 with the owner's approval.
 
 ## Phase 10 — Tables & images · XL → 0.5.0
 
@@ -901,6 +901,76 @@ Each task is a PR on `phase-9/review`, the build green after each.
   pages with repeated header rows; cell selection, table commands, keyboard navigation.
 - Images: inline and floating (anchored, text wrapping) drawings, kept as resources in the
   package (no inline base64 by default); upload hook API, resize, required alt text.
+
+**Starts from (Phase 9):** a table is one `opaqueBlock` (its `w:tbl` XML): imported, exported
+byte for byte, shown read-only by the view from its XML (grid, spans, borders, shading, header
+rows), selected and deleted whole, refused while tracking. A drawing is an `opaqueInline` in its
+run, shown as nothing (`renderDocument` places none). Blocks in schema v3 are flat: nested blocks
+on pages (ADR-0004) went with v2. Tables and pictures need new node types: a format change
+(schema v4 with a v3 → v4 migration), so 0.4.0 will not read documents with them.
+
+**Acceptance:** the corpus (with new Word-authored documents: a schedule whose table runs over
+pages with repeated header rows and merged cells, a report with inline and floating pictures)
+imports with its tables and pictures modeled (what stays opaque reported, per document); every
+document round-trips with no part or element lost (canonical comparison) and opens in Word
+without repair, edited too; per-paragraph page agreement with Word, cell paragraphs included,
+at least the 0.3.0 baseline, and rows break across pages where Word breaks them; T1–T5 inside
+table cells in three engines; tracked changes inside tables (and row insertion and deletion) are
+recorded, accepted, rejected and round-trip with Word; every picture keeps its resource, and a
+picture without alt text is reported; v3 documents migrate without loss; the table and picture
+UI is keyboard-usable and axe-clean in three engines; 0.5.0 published.
+
+### Tasks
+
+Each task is a PR on `phase-10/tables-images`, the build green after each.
+
+- [x] Claim phase, branch `phase-10/tables-images`
+- [ ] 10.1 ADR-0006, tables and pictures in the model and on pages: the node shapes (table, row,
+  cell holding blocks; properties as Word's `w:tblPr`/`w:trPr`/`w:tcPr`, the grid, merges as
+  `gridSpan` and `vMerge`), pictures as inline nodes (inline and anchored) with a resource
+  reference and the envelope's resources (content type, size; bytes kept by the app or the
+  package, no base64 in the JSON by default; an upload hook), layout (rows as the units of the
+  flow, a row split at a line where Word allows it, header rows repeated, `cantSplit`), position
+  mapping and selection (`CellSelection`), how tracking and comments reach cells, schema v4 and
+  its migration. Spike evidence for rows across pages and caret movement between cells in three
+  engines. The owner accepts it before 10.2.
+- [ ] 10.2 Corpus: Word-authored documents for tables (a price schedule over pages with repeated
+  header rows, merged cells both ways, banded table style, a nested table) and pictures (inline,
+  floating square and top-and-bottom, behind text, with and without alt text) added to the
+  generator, with Word's reference data (pages, paragraphs in cells, picture positions).
+- [ ] 10.3 Schema v4 in `@folijs/core`: table, row and cell nodes and their properties, the
+  table style's conditional formatting (first and last row and column, bands) resolved as Word
+  does (`Resolver`), picture nodes and the envelope's resources; validation, the v3 → v4
+  migration (a version change: tables stay opaque until imported again), `SCHEMA_VERSION` 4.
+- [ ] 10.4 DOCX tables: import `w:tbl` into the model (nested tables too; what the model cannot
+  hold stays verbatim, reported), export losslessly (unchanged tables byte for byte, changed
+  ones rewritten child by child), tracked changes and comments inside tables, row insertion and
+  deletion revisions; harness: round trip, opens in Word, edited exports too.
+- [ ] 10.5 Tables on pages in the view: tables rendered from the model, column widths (fixed and
+  autofit), borders as Word resolves conflicts, shading; rows flowed across pages (header rows
+  repeated, `cantSplit` kept whole, other rows split at a line), position mapping and read-back
+  inside cells, composition in cells; per-paragraph page agreement with Word including cell
+  paragraphs (`pnpm corpus:pages`).
+- [ ] 10.6 Editing in tables: typing, Enter, Backspace and Delete in cells (a cell never loses its
+  last paragraph), Tab and Shift+Tab between cells (Tab in the last cell adds a row), arrows
+  across cells and out of the table, `CellSelection` (drag, Shift+arrows) with copy, cut, paste
+  of cells and delete of their content, undo; tracked changes in cells; T1–T5 in cells.
+- [ ] 10.7 Table commands and UI: insert a table (rows × columns), insert and delete rows and
+  columns, merge and split cells, header row, column width by dragging a border, table style and
+  cell shading; row insertion and deletion tracked as Word records them; a table menu in the
+  toolbar (React), keyboard-usable; axe in three engines.
+- [ ] 10.8 Inline pictures: import and export `wp:inline` drawings (`a:blip` resources kept in the
+  package), shown in the line at their size, laid out on pages; insert from a file, paste or
+  drop through the upload hook; resize with the aspect ratio kept; alt text required to insert
+  and editable; tracked insertion and deletion of a picture.
+- [ ] 10.9 Floating pictures: `wp:anchor` positions (relative to page, margin, column or
+  paragraph), wrapping square and top-and-bottom with text flowing around them, behind and in
+  front of text; other wrappings shown as square (reported); moved with their paragraph;
+  position agreement with Word measured on the corpus.
+- [ ] 10.10 Close: docs (ADR-0006 outcome, architecture, document model, pagination, docx README,
+  limitations), size budgets, the acceptance above checked with the harness, the 0.5.0
+  changeset (schema v4: 0.4.0 cannot read documents saved by 0.5.0), the version PR; publish
+  with the owner's approval.
 
 ## Phase 11 — Sections, fields, templates & PDF · L → 0.6.0
 
