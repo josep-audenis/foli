@@ -953,7 +953,8 @@ Each task is a PR on `phase-10/tables-images`, the build green after each.
   deletion revisions; harness: round trip, opens in Word, edited exports too.
   (Done: every corpus cell paragraph has Word's text; unchanged tables come back as written but
   for what import drops everywhere (run `rsid`s); `scripts/corpus/table-roundtrip.mjs` has Word
-  read 4 unchanged and 4 edited exports. Until 10.5/10.6 the view shows a table read-only as one
+  read 4 unchanged and 4 edited exports and 2 tables made in the model; a table with a page,
+  column or section break in a cell stays opaque rather than losing it. Until 10.5/10.6 the view shows a table read-only as one
   block (not split across pages) and the editor treats it as opaque (selected, then deleted, as
   a whole). A table style's `wholeTable` part stays in `ext`; changed table styles are refused
   on export.)

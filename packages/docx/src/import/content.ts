@@ -196,6 +196,13 @@ function rowOf(tr: XmlElement, context: ContentContext): NodeJSON | undefined {
   const attrs: Record<string, unknown> = rowProperties(trPr, context, true);
   if (tblPrEx) {
     const exceptions = tableProperties(tblPrEx, context, true);
+    // Not a row's to override (CT_TblPrEx): left in the element, not modeled.
+    for (const key of ["style", "rowBandSize", "columnBandSize"]) {
+      if (key in exceptions) {
+        context.report.unmodeled(tblPrEx.name, `${key} is not an exception (kept in the element)`);
+        delete exceptions[key];
+      }
+    }
     const error = ROW_ATTRS.exceptions?.validate?.(exceptions);
     // Its values are checked one by one: only a too-large element can fail here.
     if (error) return undefined;
@@ -213,27 +220,20 @@ function cellOf(tc: XmlElement, context: ContentContext): NodeJSON | undefined {
   const content = blocks(
     tc.children.filter((c) => c !== tcPr),
     context,
-  ).map((block) => (block.type === "paragraph" ? inCell(block, context) : block));
-  if (content.at(-1)?.type !== "paragraph") return undefined;
+  );
+  if (content.at(-1)?.type !== "paragraph" || !content.every(allowedInCell)) return undefined;
   const attrs = cellProperties(tcPr, context, true);
   return { type: "tableCell", ...(Object.keys(attrs).length ? { attrs } : {}), content };
 }
 
-/** A paragraph in a cell, without what Word does not allow there (removed, reported). */
-function inCell(p: NodeJSON, context: ContentContext): NodeJSON {
-  let out = p;
-  if (p.attrs?.section) {
-    context.report.unmodeled("w:sectPr", "a section break in a table cell (removed)");
-    const { section: _, ...attrs } = p.attrs;
-    out = { ...out, attrs };
-  }
-  const content = out.content?.filter((n) => n.type !== "pageBreak" && n.type !== "columnBreak");
-  if (content && content.length !== out.content?.length) {
-    context.report.unmodeled("w:br", "a page or column break in a table cell (removed)");
-    const { content: _, ...rest } = out;
-    out = content.length ? { ...rest, content } : rest;
-  }
-  return out;
+/**
+ * Whether a cell's block is one the model allows there: not a paragraph that ends a section or
+ * holds a page or column break. A table with one stays verbatim (lossless) instead.
+ */
+function allowedInCell(block: NodeJSON): boolean {
+  if (block.type !== "paragraph") return true;
+  if (block.attrs?.section) return false;
+  return !block.content?.some((n) => n.type === "pageBreak" || n.type === "columnBreak");
 }
 
 function withLabel(attrs: Record<string, unknown>, value: string | null): Record<string, unknown> {

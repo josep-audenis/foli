@@ -37,9 +37,11 @@ from `commentsExtended`) and sections:
   formats go to its `StyleJSON`. A table the model cannot hold as it is stays opaque, reported:
   rows or cells inside a content control or custom XML, markers between rows, elements out of
   Word's order, a cell not ending with a paragraph, tables nested more than 64 deep, a table
-  right after a table (Word merges the two) or ending the body. A page or column break or a
-  section break in a cell is removed and reported, as Word does not keep them there. A table
-  style's `wholeTable` conditional format stays in its `ext`, reported.
+  right after a table (Word merges the two) or ending the body, and a page, column or section
+  break in a cell (the model has none there). A row's `w:tblPrEx` keeps what a row may not
+  override (a style, band sizes) in its `ext`, and a table style's `wholeTable` conditional
+  format stays in its `ext`, both reported. A table made in the model is written as Word
+  requires (properties, grid, rows); Word opens it, with or without a grid.
 - **Lossless:** every properties element is kept verbatim (`ext` on paragraphs, sections,
   styles, numbering levels and definitions, the document defaults; `runExt` on runs; a comment's
   start tag), and unknown attributes of modeled elements go to attribute bags (paragraphs,

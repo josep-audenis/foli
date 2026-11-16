@@ -183,13 +183,28 @@ describe("what the model cannot hold as a table", () => {
     expect(blocks.map((b) => b.type)).toEqual(["table", "opaqueBlock", "paragraph", "opaqueBlock"]);
   });
 
-  it("removes a page break or section break in a cell, and says so", async () => {
-    const { blocks, report } = await blocksOf(
-      `${table('<w:tr><w:tc><w:p><w:r><w:t>a</w:t><w:br w:type="page"/></w:r></w:p></w:tc></w:tr>')}<w:p/>`,
-    );
-    const p = blocks[0]?.content?.[0]?.content?.[0]?.content?.[0];
-    expect(p?.content?.map((n) => n.type)).toEqual(["text"]);
-    expect(report.unmodeled.join("\n")).toMatch(/page or column break in a table cell/);
+  it("keeps a table with a page, column or section break in a cell verbatim", async () => {
+    for (const inside of [
+      '<w:r><w:t>a</w:t><w:br w:type="page"/></w:r>',
+      '<w:r><w:br w:type="column"/></w:r>',
+      '<w:pPr><w:sectPr><w:pgSz w:w="12240" w:h="15840"/></w:sectPr></w:pPr>',
+    ]) {
+      const { blocks } = await blocksOf(
+        `${table(`<w:tr><w:tc><w:p>${inside}</w:p></w:tc></w:tr>`)}<w:p/>`,
+      );
+      expect(blocks[0]?.type, inside).toBe("opaqueBlock");
+      expect(String(blocks[0]?.attrs?.xml)).toContain(inside);
+    }
+  });
+
+  it("leaves what a row may not override out of its exceptions, in the element", async () => {
+    const row = `<w:tr><w:tblPrEx><w:tblStyle w:val="X"/><w:jc w:val="center"/></w:tblPrEx>${cell}</w:tr>`;
+    const { blocks, report } = await blocksOf(`${table(row)}<w:p/>`);
+    const exceptions = blocks[0]?.content?.[0]?.attrs?.exceptions as Record<string, unknown>;
+    expect(exceptions.justification).toBe("center");
+    expect(exceptions.style).toBeUndefined();
+    expect(String(exceptions.ext)).toContain("w:tblStyle");
+    expect(report.unmodeled.join("\n")).toMatch(/style is not an exception/);
   });
 
   it("reads Word 2007's tblLook bit mask and a Strict percentage", async () => {
@@ -205,6 +220,58 @@ describe("what the model cannot hold as a table", () => {
       noHBand: false,
       noVBand: true,
     });
+  });
+});
+
+describe("a table made in the model", () => {
+  it("is written as Word requires and read back the same", async () => {
+    const cellOf = (text: string, attrs?: Record<string, unknown>): NodeJSON => ({
+      type: "tableCell",
+      ...(attrs ? { attrs } : {}),
+      content: [{ type: "paragraph", ...(text ? { content: [{ type: "text", text }] } : {}) }],
+    });
+    const doc = parseDocument({
+      schemaVersion: 4,
+      section: {},
+      defaults: {},
+      styles: [],
+      numbering: { abstracts: [], instances: [] },
+      comments: [],
+      content: {
+        type: "doc",
+        content: [
+          {
+            type: "table",
+            attrs: {
+              grid: [3000, 3000],
+              width: { value: 0, type: "auto" },
+              borders: { top: { style: "single", size: 4 }, insideH: { style: "single", size: 4 } },
+              look: { firstRow: true, noVBand: true },
+            },
+            content: [
+              {
+                type: "tableRow",
+                attrs: { header: true },
+                content: [cellOf("a", { vMerge: "restart" }), cellOf("b", { gridSpan: 1 })],
+              },
+              { type: "tableRow", content: [cellOf("", { vMerge: "continue" }), cellOf("c")] },
+            ],
+          },
+          { type: "paragraph" },
+        ],
+      },
+    });
+    const xml = (await readPackage(await exportDocx(doc))).text("/word/document.xml");
+    expect(xml).toContain(
+      '<w:tbl><w:tblPr><w:tblW w:w="0" w:type="auto"/><w:tblBorders><w:top w:val="single" w:sz="4"/><w:insideH w:val="single" w:sz="4"/></w:tblBorders><w:tblLook w:val="0420" w:firstRow="1" w:noVBand="1"/></w:tblPr><w:tblGrid><w:gridCol w:w="3000"/><w:gridCol w:w="3000"/></w:tblGrid><w:tr><w:trPr><w:tblHeader/></w:trPr><w:tc><w:tcPr><w:vMerge w:val="restart"/></w:tcPr>',
+    );
+    expect(xml).toContain("<w:tc><w:tcPr><w:vMerge/></w:tcPr><w:p/></w:tc>");
+    const again = await importDocx(await exportDocx(doc));
+    const strip = (json: unknown) =>
+      JSON.parse(JSON.stringify(json), (key, value) =>
+        key === "ext" || key === "gridExt" ? undefined : value,
+      );
+    expect(strip(again.document.content)).toEqual(strip(doc.content));
   });
 });
 

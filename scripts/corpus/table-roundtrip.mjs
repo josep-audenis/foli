@@ -8,14 +8,15 @@
 // `make` exports every corpus document with tables twice to <dir>/foli: as imported
 // (<name>.docx) and edited (<name>-edited.docx: in the first table, "Foli edit" typed into the
 // first cell of the second row, that row kept from breaking across pages, the last cell shaded,
-// and the third row deleted as a tracked change by "Foli Reviewer"). `check` reads what Word
+// and the third row deleted as a tracked change by "Foli Reviewer"), and a table made in the
+// model in a new package, with its grid and without (00-new-table*). `check` reads what Word
 // made of them (word-reference.ps1 accepts every change before measuring): each opened, as many
 // pages as Word gives the original, and every paragraph, table cells included, with Foli's text
 // in Foli's order (the deleted row gone). Prints one line per document; exits 1 on any difference.
 
 import { mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { parseDocument } from "../../packages/core/dist/index.js";
+import { createDocument, parseDocument } from "../../packages/core/dist/index.js";
 import { exportDocx, importDocx } from "../../packages/docx/dist/index.js";
 
 const [mode, dir] = process.argv.slice(2);
@@ -87,6 +88,42 @@ if (mode === "make") {
       JSON.stringify({ plain: texts(document.content), edited: texts(edited.content) }),
     );
   }
+  // A table made in the model, in a new package: with its grid, and without one.
+  for (const [base, grid] of [
+    ["00-new-table", [3000, 3000]],
+    ["00-new-table-no-grid", []],
+  ]) {
+    const cell = (text, attrs) => ({
+      type: "tableCell",
+      ...(attrs ? { attrs } : {}),
+      content: [{ type: "paragraph", ...(text ? { content: [{ type: "text", text }] } : {}) }],
+    });
+    const content = {
+      type: "doc",
+      content: [
+        { type: "paragraph", content: [{ type: "text", text: "Before" }] },
+        {
+          type: "table",
+          attrs: { grid, borders: { insideH: { style: "single", size: 4 } } },
+          content: [
+            {
+              type: "tableRow",
+              attrs: { header: true },
+              content: [cell("a", { vMerge: "restart" }), cell("b")],
+            },
+            { type: "tableRow", content: [cell("", { vMerge: "continue" }), cell("c")] },
+          ],
+        },
+        { type: "paragraph", content: [{ type: "text", text: "After" }] },
+      ],
+    };
+    const document = parseDocument({ ...createDocument(), content });
+    writeFileSync(join(dir, "foli", `${base}.docx`), await exportDocx(document));
+    writeFileSync(
+      join(dir, "foli", `${base}.expected.json`),
+      JSON.stringify({ plain: texts(content) }),
+    );
+  }
   console.log(
     `made ${readdirSync(join(dir, "foli")).filter((n) => n.endsWith(".docx")).length} documents`,
   );
@@ -95,16 +132,20 @@ if (mode === "make") {
   for (const file of readdirSync(join(dir, "foli")).filter((n) => n.endsWith(".expected.json"))) {
     const base = file.replace(".expected.json", "");
     const expected = JSON.parse(readFileSync(join(dir, "foli", file), "utf8"));
-    const original = JSON.parse(readFileSync(join(reference, `${base}.json`), "utf8"));
+    // A table made in the model has no Word original: no page count to compare.
+    const made = base.startsWith("00-");
+    const original = made
+      ? null
+      : JSON.parse(readFileSync(join(reference, `${base}.json`), "utf8"));
     for (const [suffix, want] of [
       ["", expected.plain],
-      ["-edited", expected.edited],
+      ...(made ? [] : [["-edited", expected.edited]]),
     ]) {
       const word = JSON.parse(readFileSync(join(dir, "word", `${base}${suffix}.json`), "utf8"));
       const got = word.paragraphs.map((p) => p.text.toLowerCase());
       const problems = [];
       if (!word.opened) problems.push(`not opened: ${word.error}`);
-      if (suffix === "" && word.pages !== original.pages)
+      if (original && suffix === "" && word.pages !== original.pages)
         problems.push(`${word.pages} pages, Word gives the original ${original.pages}`);
       const at = got.findIndex((t, i) => t !== want[i]);
       if (got.length !== want.length || at >= 0)

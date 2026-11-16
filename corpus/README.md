@@ -146,7 +146,8 @@ Word's list: 06 counts 32 of them).
 `scripts/corpus/table-roundtrip.mjs` (10.4) has Word read Foli's tables back: every corpus
 document with a table exported unchanged and edited (a cell's text, a row kept from breaking, a
 cell shaded, a row deleted as a tracked change), then `word-reference.ps1` on them; `check`
-compares Word's pages and paragraphs, table cells included, with Foli's. All 8 pass (2026-11-16).
+compares Word's pages and paragraphs, table cells included, with Foli's; it also has Word open a
+table made in the model, with and without a grid. All 10 pass (2026-11-16).
 ## Page agreement with Word
 
 `pnpm corpus:pages` (Playwright, Chromium) lays each document out with `renderDocument`
