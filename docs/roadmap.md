@@ -951,7 +951,9 @@ Each task is a PR on `phase-10/tables-images`, the build green after each.
   repeated, `cantSplit` kept whole, other rows split at a line), position mapping and read-back
   inside cells, composition in cells; per-paragraph page agreement with Word including cell
   paragraphs (`pnpm corpus:pages`).
-- [ ] 10.6 Editing in tables: typing, Enter, Backspace and Delete in cells (a cell never loses its
+- [ ] 10.6 Editing in tables: core's table-aware editing first (cells isolate; a range delete of
+  whole rows across a table's edges; Backspace and Delete next to a table; paste of rows; tracked
+  row deletion and insertion as row revisions), then the view: typing, Enter, Backspace and Delete in cells (a cell never loses its
   last paragraph), Tab and Shift+Tab between cells (Tab in the last cell adds a row), arrows
   across cells and out of the table, `CellSelection` (drag, Shift+arrows) with copy, cut, paste
   of cells and delete of their content, undo; tracked changes in cells; T1–T5 in cells.
@@ -963,7 +965,8 @@ Each task is a PR on `phase-10/tables-images`, the build green after each.
   package), shown in the line at their size, laid out on pages; insert from a file, paste or
   drop through the upload hook; resize with the aspect ratio kept; alt text required to insert
   and editable; tracked insertion and deletion of a picture.
-- [ ] 10.9 Floating pictures: `wp:anchor` positions (relative to page, margin, column or
+- [ ] 10.9 Floating pictures, starting with a spike (lines laid out around an exclusion inside
+  the editable host, three engines: ADR-0006's open risk): `wp:anchor` positions (relative to page, margin, column or
   paragraph), wrapping square and top-and-bottom with text flowing around them, behind and in
   front of text; other wrappings shown as square (reported); moved with their paragraph;
   position agreement with Word measured on the corpus.

@@ -6,18 +6,31 @@
  */
 import { expect, type Page, test } from "@playwright/test";
 
-/** Where the selection's focus is: the id of the paragraph holding it, and the offset. */
+/** Where the selection's focus is: the id of the paragraph holding it (or "header" inside a
+ * repeated header row), and the offset. */
 const focus = (page: Page) =>
   page.evaluate(() => {
     const sel = getSelection();
     const node = sel?.focusNode;
     const element = node?.nodeType === Node.TEXT_NODE ? node.parentElement : (node as Element);
+    const header = !!element?.closest("thead[contenteditable=false]");
     return {
-      id: element?.closest("p")?.id || element?.nodeName || null,
+      id: header ? "header" : element?.closest("p")?.id || element?.nodeName || null,
       offset: sel?.focusOffset ?? -1,
       ranges: sel?.rangeCount ?? 0,
     };
   });
+
+/** Presses `key` `times` times, recording where the focus is after each press. */
+async function presses(page: Page, key: string, times: number) {
+  const out: string[] = [];
+  for (let i = 0; i < times; i++) {
+    await page.keyboard.press(key);
+    const at = await focus(page);
+    out.push(`${at.id}:${at.offset}${at.ranges > 1 ? `(${at.ranges} ranges)` : ""}`);
+  }
+  return out.join(" -> ");
+}
 
 async function caretAt(page: Page, id: string, offset: number | "end") {
   await page.evaluate(
@@ -45,22 +58,15 @@ test("ArrowRight at the end of a cell's text goes to the next cell", async ({ pa
   expect(at.id).toBe("b1");
 });
 
-test("ArrowDown from the last row on a page lands below the repeated header", async ({
-  page,
-}, info) => {
+test("ArrowDown from the last row on page 1, press by press", async ({ page }, info) => {
   await caretAt(page, "a3", 3);
-  await page.keyboard.press("ArrowDown");
-  await page.keyboard.press("ArrowDown");
-  const at = await focus(page);
-  info.annotations.push({ type: "observed", description: JSON.stringify(at) });
-  // Recorded, not asserted: whether native movement skips the non-editable header differs.
+  info.annotations.push({ type: "observed", description: await presses(page, "ArrowDown", 3) });
+  // Recorded, not asserted: native vertical movement differs between engines.
 });
 
-test("ArrowUp from the first row on page 2", async ({ page }, info) => {
+test("ArrowUp from the first row on page 2, press by press", async ({ page }, info) => {
   await caretAt(page, "a3b", 2);
-  await page.keyboard.press("ArrowUp");
-  const at = await focus(page);
-  info.annotations.push({ type: "observed", description: JSON.stringify(at) });
+  info.annotations.push({ type: "observed", description: await presses(page, "ArrowUp", 2) });
 });
 
 test("typing in a cell on the second page stays in that cell's paragraph", async ({ page }) => {
@@ -69,16 +75,27 @@ test("typing in a cell on the second page stays in that cell's paragraph", async
   await expect(page.locator("#a4")).toHaveText("Dates!");
 });
 
-test("Shift+ArrowDown across cells: one range or several", async ({ page }, info) => {
+test("Shift+ArrowDown from a cell, press by press", async ({ page }, info) => {
   await caretAt(page, "a1", 2);
-  await page.keyboard.press("Shift+ArrowDown");
-  await page.keyboard.press("Shift+ArrowRight");
-  const at = await focus(page);
-  info.annotations.push({ type: "observed", description: JSON.stringify(at) });
-  // Recorded: Firefox may select cells as one range each.
+  info.annotations.push({
+    type: "observed",
+    description: await presses(page, "Shift+ArrowDown", 2),
+  });
 });
 
-test("a click in the repeated header puts no caret in it", async ({ page }, info) => {
+test("a mouse drag across cells: one range or several", async ({ page }, info) => {
+  const from = await page.locator("#a1").boundingBox();
+  const to = await page.locator("#b2").boundingBox();
+  if (!from || !to) throw new Error("no boxes");
+  await page.mouse.move(from.x + 2, from.y + from.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(to.x + to.width - 2, to.y + to.height / 2, { steps: 8 });
+  await page.mouse.up();
+  const ranges = await page.evaluate(() => getSelection()?.rangeCount ?? 0);
+  info.annotations.push({ type: "observed", description: `${ranges} range(s)` });
+});
+
+test("a click in the repeated header: where the caret goes", async ({ page }, info) => {
   await page.locator("section:nth-of-type(2) thead th").first().click();
   const at = await focus(page);
   info.annotations.push({ type: "observed", description: JSON.stringify(at) });
