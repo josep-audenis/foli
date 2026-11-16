@@ -34,6 +34,14 @@
                            "text":  "The inspection covered the north and south wings, the plant room and the roof. Readings were taken at the same hour each day and logged by the site manager, who also recorded the weather, the occupancy of the building and any maintenance carried out during the period. The inspection covered the north and south wings, the plant room and the roof. Readings were taken at the same hour each day and logged by the site manager, who also recorded the weather, the occupancy of the building and any maintenance carried out during the period. The inspection covered the north and south wings, the plant room and the roof. Readings were taken at the same hour each day and logged by the site manager, who also recorded the weather, the occupancy of the building and any maintenance carried out during the period. ",
                            "page":  1,
                            "line":  6,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  false
+                       },
+                       {
+                           "text":  "The inspection covered the north and south wings, the plant room and the roof. Readings were taken at the same hour each day and logged by the site manager, who also recorded the weather, the occupancy of the building and any maintenance carried out during the period. The inspection covered the north and south wings, the plant room and the roof. Readings were taken at the same hour each day and logged by the site manager, who also recorded the weather, the occupancy of the building and any maintenance carried out during the period. ",
+                           "page":  2,
+                           "line":  1,
                            "endPage":  2,
                            "listString":  "",
                            "inTable":  false
@@ -41,15 +49,7 @@
                        {
                            "text":  "The inspection covered the north and south wings, the plant room and the roof. Readings were taken at the same hour each day and logged by the site manager, who also recorded the weather, the occupancy of the building and any maintenance carried out during the period. The inspection covered the north and south wings, the plant room and the roof. Readings were taken at the same hour each day and logged by the site manager, who also recorded the weather, the occupancy of the building and any maintenance carried out during the period. ",
                            "page":  2,
-                           "line":  8,
-                           "endPage":  2,
-                           "listString":  "",
-                           "inTable":  false
-                       },
-                       {
-                           "text":  "The inspection covered the north and south wings, the plant room and the roof. Readings were taken at the same hour each day and logged by the site manager, who also recorded the weather, the occupancy of the building and any maintenance carried out during the period. The inspection covered the north and south wings, the plant room and the roof. Readings were taken at the same hour each day and logged by the site manager, who also recorded the weather, the occupancy of the building and any maintenance carried out during the period. ",
-                           "page":  2,
-                           "line":  14,
+                           "line":  7,
                            "endPage":  2,
                            "listString":  "",
                            "inTable":  false
@@ -57,7 +57,7 @@
                        {
                            "text":  "End of report.",
                            "page":  2,
-                           "line":  20,
+                           "line":  13,
                            "endPage":  2,
                            "listString":  "",
                            "inTable":  false
@@ -68,7 +68,7 @@
                          "float":  false,
                          "page":  1,
                          "left":  72,
-                         "top":  285,
+                         "top":  124.5,
                          "width":  360,
                          "height":  210,
                          "alt":  "Bar chart of monthly readings rising from 120 to 240",
@@ -78,7 +78,7 @@
                          "float":  false,
                          "page":  1,
                          "left":  72,
-                         "top":  518.2,
+                         "top":  357.8,
                          "width":  360,
                          "height":  210,
                          "alt":  "",
@@ -87,8 +87,9 @@
                      {
                          "float":  true,
                          "page":  2,
-                         "left":  99.8,
-                         "top":  9.8,
+                         "paragraph":  6,
+                         "left":  100,
+                         "top":  10,
                          "horizontalAlign":  null,
                          "verticalAlign":  null,
                          "width":  240,
@@ -101,6 +102,7 @@
                      {
                          "float":  true,
                          "page":  1,
+                         "paragraph":  4,
                          "left":  300,
                          "top":  0,
                          "horizontalAlign":  null,
@@ -114,9 +116,10 @@
                      },
                      {
                          "float":  true,
-                         "page":  1,
+                         "page":  2,
+                         "paragraph":  5,
                          "left":  0,
-                         "top":  20.2,
+                         "top":  20,
                          "horizontalAlign":  null,
                          "verticalAlign":  null,
                          "width":  240,

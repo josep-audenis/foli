@@ -697,17 +697,31 @@ try {
   $shape = $doc.InlineShapes.AddPicture($chart, $false, $true, (At-End 2))
   $shape.AlternativeText = "Bar chart of monthly readings rising from 120 to 240"
   $doc.InlineShapes.AddPicture($chart, $false, $true, (At-End 3)) | Out-Null
-  # WdWrapType: 0 square, 4 top and bottom, 5 behind text. Positions in points from the column
-  # (horizontally) and the anchor paragraph (vertically): AddPicture's defaults.
-  $square = $doc.Shapes.AddPicture($logo, $false, $true, 300, 0, 160, 40, $doc.Paragraphs.Item(4).Range)
-  $square.WrapFormat.Type = 0
-  $square.AlternativeText = "Northwind logo"
-  $band = $doc.Shapes.AddPicture($chart, $false, $true, 0, 20, 240, 140, $doc.Paragraphs.Item(5).Range)
-  $band.WrapFormat.Type = 4
-  $band.AlternativeText = "Chart of readings, placed between paragraphs"
-  $behind = $doc.Shapes.AddPicture($logo, $false, $true, 100, 10, 240, 60, $doc.Paragraphs.Item(6).Range)
-  $behind.WrapFormat.Type = 5
-  $behind.AlternativeText = "Northwind logo as a watermark"
+  # Floating pictures: inserted inline at their paragraph's start and converted, the anchor locked
+  # (Shapes.AddPicture re-anchors to whatever paragraph is near the position). WdWrapType: 0
+  # square, 4 top and bottom, 5 behind text. Positions in points from the column (horizontally)
+  # and the anchor paragraph (vertically).
+  function Add-Float($n, $file, $left, $top, $width, $height, $wrap, $alt) {
+    $at = $doc.Paragraphs.Item($n).Range
+    $at.Collapse(1)   # wdCollapseStart
+    $s = $doc.InlineShapes.AddPicture($file, $false, $true, $at).ConvertToShape()
+    $s.LockAnchor = $true
+    $s.WrapFormat.Type = $wrap
+    $s.RelativeHorizontalPosition = 2   # wdRelativeHorizontalPositionColumn
+    $s.RelativeVerticalPosition = 2     # wdRelativeVerticalPositionParagraph
+    $s.Width = $width; $s.Height = $height; $s.Left = $left; $s.Top = $top
+    $s.AlternativeText = $alt
+  }
+  Add-Float 4 $logo 300 0 160 40 0 "Northwind logo"
+  Add-Float 5 $chart 0 20 240 140 4 "Chart of readings, placed between paragraphs"
+  Add-Float 6 $logo 100 10 240 60 5 "Northwind logo as a watermark"
+  # Word must have kept each where it was put.
+  $expected = @{ "Northwind logo" = 4; "Chart of readings, placed between paragraphs" = 5; "Northwind logo as a watermark" = 6 }
+  foreach ($s in $doc.Shapes) {
+    $paragraph = $doc.Range(0, $s.Anchor.Start).Paragraphs.Count
+    if ($s.Anchor.Start -eq $doc.Paragraphs.Item($paragraph).Range.End) { $paragraph++ }
+    if ($paragraph -ne $expected[$s.AlternativeText]) { throw "07: '$($s.AlternativeText)' is anchored in paragraph $paragraph, not $($expected[$s.AlternativeText])" }
+  }
   Save-Doc $doc "07-picture-report.docx"
   }
 }

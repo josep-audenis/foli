@@ -483,6 +483,7 @@
                      {
                          "float":  true,
                          "page":  3,
+                         "paragraph":  23,
                          "left":  null,
                          "top":  0.3,
                          "horizontalAlign":  "right",

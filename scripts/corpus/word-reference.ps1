@@ -150,9 +150,13 @@ try {
         # An aligned picture's Left or Top is one of Word's constants (wdShapeRight -999996…), not
         # a position: recorded as the alignment, the position then null.
         $left = [double]$s.Left; $top = [double]$s.Top
+        # The anchor's paragraph, numbered from 1 as Word numbers the main text's paragraphs.
+        $anchorParagraph = $doc.Range(0, $s.Anchor.Start).Paragraphs.Count
+        if ($s.Anchor.Start -eq $doc.Paragraphs.Item($anchorParagraph).Range.End) { $anchorParagraph++ }
         $pictures.Add([ordered]@{
             float = $true
             page = [int]$s.Anchor.Information($INFO_PAGE)
+            paragraph = $anchorParagraph
             left = if ($ALIGNED.ContainsKey([int]$left)) { $null } else { [math]::Round($left, 1) }
             top = if ($ALIGNED.ContainsKey([int]$top)) { $null } else { [math]::Round($top, 1) }
             horizontalAlign = $ALIGNED[[int]$left]
