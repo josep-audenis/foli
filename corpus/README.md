@@ -73,7 +73,8 @@ from the corpus.
 `@folijs/docx`: the package unchanged and with its main part replaced (8.2), imported and
 exported without edits and with edits (8.5), and a new package from a schema v2 document. The
 harness then checks that Word opens every one, and finds the reference numbers in those
-without edits (2026-11-13: all 21 open; the 15 without edits match their reference exactly):
+without edits (2026-11-13, and again for 0.3.0 on 2026-11-16: all 21 open without a repair
+prompt; the 15 without edits match their reference exactly):
 
 ```bash
 node scripts/corpus/rewrite-corpus.mjs <folder>
@@ -85,7 +86,7 @@ powershell -ExecutionPolicy Bypass -File scripts/corpus/word-reference.ps1 -In <
 `scripts/corpus/import-report.mjs` (after `pnpm build`) imports each document and prints what
 became editable and what stayed opaque; counts and element names only, never text, so it runs
 on a private folder too (`node scripts/corpus/import-report.mjs <folder>`). On the corpus
-(2026-11-11):
+(2026-11-11; the same for 0.3.0 on 2026-11-16):
 
 | Document                       | Paragraphs | Opaque                                                        | Unmodeled values |
 | ------------------------------ | ---------: | ------------------------------------------------------------- | ---------------: |
@@ -113,7 +114,8 @@ page from Office's font cache when one exists (`FOLI_FONT_DIR`, default the Wind
 families in `FOLI_FONTS`, default `Aptos,Aptos Display`). The font files are read in place for
 that run only: never copied or committed.
 
-Baseline (2026-11-13, Word 16.0.20527, Chromium; of 106 paragraphs compared):
+Baseline (2026-11-13, Word 16.0.20527, Chromium; of 106 paragraphs compared; the same for 0.3.0
+on 2026-11-16, with and without Aptos):
 
 | Document                       | Compared | On Word's page | On Word's line | Within a line | Without Aptos: page / line |
 | ------------------------------ | -------: | -------------: | -------------: | ------------: | -------------------------: |
@@ -155,17 +157,17 @@ out headers, footers and page numbers, which Foli does not lay out yet. Document
 PDF are listed in the results (`pdf.missing`). Overlays go to `test-results/word-pdf/`: black
 where both have ink, red Word only, blue Foli only.
 
-Baseline (2026-11-14, Word 16.0.20527, Chromium, with Aptos; mean of the pages; the same on
-a second run):
+Baseline (2026-11-16, for 0.3.0: Word 16.0.20527, Chromium, with Aptos; mean of the pages; on
+2026-11-14 0.540 and 0.556, 02 and 04 a little lower):
 
 | Document                       | Pages | Page score | Inside the margins | Per page (inside the margins) |
 | ------------------------------ | ----: | ---------: | -----------------: | ----------------------------- |
 | 01-mutual-nda                  |     2 |      0.420 |              0.428 | 0.410, 0.446                  |
-| 02-services-agreement-redlined |     3 |      0.523 |              0.528 | 0.427, 0.598, 0.560           |
+| 02-services-agreement-redlined |     3 |      0.530 |              0.535 | 0.448, 0.598, 0.560           |
 | 03-offer-letter-template       |     1 |      0.164 |              0.191 | 0.191                         |
-| 04-board-report                |     4 |      0.514 |              0.527 | 1.000, 0.663, 0.184, 0.261    |
+| 04-board-report                |     4 |      0.519 |              0.532 | 1.000, 0.663, 0.203, 0.261    |
 | 05-business-letter             |     2 |      0.927 |              0.968 | 0.936, 1.000                  |
-| **All 12 pages**               |       |  **0.540** |          **0.556** |                               |
+| **All 12 pages**               |       |  **0.544** |          **0.560** |                               |
 
 The number is strict where the page and line numbers are not: in 01 every paragraph starts on
 Word's line, yet the numbered clauses drift down the page (Foli's lines there are taller than

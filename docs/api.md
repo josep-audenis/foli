@@ -1,13 +1,14 @@
 # API reference
 
-The public API of the three packages, as of 0.2.0. Not stable before 1.0: anything may change
+The public API of the four packages, as of 0.3.0. Not stable before 1.0: anything may change
 in a minor version until then (changes are listed in each package's changelog). Exports not
 listed here (model classes, steps, `Transform`, `Plugin`, `Transaction` metadata, mapping) are
 public for advanced use but are not a stable API yet.
 
-- [`@folijs/react`](#folireact): components and hooks
-- [`@folijs/core`](#folicore): documents, the headless editor, commands
-- [`@folijs/view`](#foliview): the editable DOM view without React
+- [`@folijs/react`](#folijsreact): components and hooks
+- [`@folijs/core`](#folijscore): documents, the headless editor, commands
+- [`@folijs/view`](#folijsview): the editable DOM view without React
+- [`@folijs/docx`](#folijsdocx): `.docx` import and export
 
 ## `@folijs/react`
 
@@ -199,7 +200,7 @@ definitions (the Word 2013 to 2019 template's) the first time they are applied, 
 | Member                         | Notes                                                                                                                                                                                                                                                                                                                         |
 | ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `state`                        | Current immutable `EditorState` (`state.doc`, `state.selection`).                                                                                                                                                                                                                                                             |
-| `settings`                     | Page size and margins of the current document.                                                                                                                                                                                                                                                                                |
+| `settings`                     | Page size and margins (mm) of the current document's last section (the view lays each section out with its own).                                                                                                                                                                                                              |
 | `commands.*`                   | Run a command, return whether it applied: `insertText(text)`, `deleteSelection()`, `deleteBackward(unit?)`, `deleteForward(unit?)`, `joinBackward()`, `joinForward()`, `splitBlock()`, `insertHardBreak()`, `insertPageBreak()`, `toggleMark(type, attrs?)`, `setBlockType(type, attrs?)`, `selectAll()`, `undo()`, `redo()`. |
 | `isMarkActive(type)`           | Whether the mark is active at the selection (or stored for the next typed text).                                                                                                                                                                                                                                              |
 | `select(anchor, head?)`        | Places a text selection (positions clamped into the document).                                                                                                                                                                                                                                                                |
@@ -272,10 +273,11 @@ const view = new EditorView(host, editor, { editable: true, placeholder: "" });
 - `view.destroy()`: removes listeners, injected styles and the attributes it added; empties the
   host.
 - Clipboard: copy writes Foli JSON (`FOLI_MIME`), HTML and plain text; paste prefers Foli JSON,
-  then HTML (`htmlToDoc`, mapped to the schema, never `innerHTML`: lists at any depth, Word
-  and Google Docs lists, rules, safe links, colors, alignment), then text (`textToDoc`). Lists
-  and rules the slice cannot fit at the caret go in as whole blocks (a list pasted into a list
-  item joins it).
+  then HTML (`htmlToDoc`, read as schema v2 `DocJSON`, never `innerHTML`: lists at any depth,
+  Word and Google Docs lists, rules, safe links, colors, alignment; fitted with `fitPastedV2`),
+  then text (`textToDoc`: one paragraph per line, fitted with `fitPaste`). Content with an
+  opaque block at either end goes in as whole blocks at the caret (or replaces an empty
+  paragraph).
   Plain text that is one URL (`autolinkHref`) becomes a link: over selected text inside one
   block that text is linked, otherwise the URL is inserted as linked text; not on paste as
   plain text (Ctrl/Cmd+Shift+V), nor when the clipboard holds Foli JSON.
@@ -293,3 +295,26 @@ const view = new EditorView(host, editor, { editable: true, placeholder: "" });
   1-based), `destroy()`. Measures as it is called: render after the document's fonts have
   loaded (`document.fonts.ready`), into a container that is laid out and not scaled. See
   [architecture.md](architecture.md#word-pages-packagesviewsrcword-86b).
+
+## `@folijs/docx`
+
+`.docx` import and lossless export. No DOM: runs in the browser, workers and Node 20.12+.
+Details (what import keeps, what export writes, limits): the
+[package README](../packages/docx/README.md).
+
+- `importDocx(bytes, options?): Promise<DocxImport>`: reads a `.docx` (`Uint8Array`) into a
+  schema v3 document. `DocxImport`: `{ document, package, report }`, the validated document,
+  the package it was read from (keep it with the document for export) and `ImportReport`
+  (`opaque`, `dropped`, `unmodeled`, `unmodeledCount`). `options` are `readPackage`'s.
+- `importPackage(pkg): DocxImport`: the same from a package already read.
+- `exportDocx(document, package?): Promise<Uint8Array>`: the document as a `.docx`. With the
+  package it was imported from, the parts Foli does not edit come back byte for byte and
+  unchanged elements verbatim; without one, a new package is made (a document that refers to
+  parts of its original package then fails).
+- `readPackage(bytes, options?): Promise<DocxPackage>`: the zip, parts, content types and
+  relationships (`ReadPackageOptions`: the zip limits `maxEntries` and `maxSize`, and
+  `maxDepth`).
+- `parseXml(source, options?): XmlDocument`: the XML reader that keeps every node's offsets in
+  the source.
+- Errors: `DocxError` (not a WordprocessingML document, Strict Open XML, content export cannot
+  write), `ZipError` (the container), `XmlError` (with the `offset`).

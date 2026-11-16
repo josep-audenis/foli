@@ -43,7 +43,7 @@ Browser-only as written; for server rendering (Next.js) and saving on page close
 document appears on hydration.
 
 - [Getting started](https://github.com/josep-audenis/foli/blob/main/docs/getting-started.md): loading and saving, read-only, Next.js, your own toolbar
-- [API reference](https://github.com/josep-audenis/foli/blob/main/docs/api.md#folireact)
+- [API reference](https://github.com/josep-audenis/foli/blob/main/docs/api.md#folijsreact)
 - [Styling](https://github.com/josep-audenis/foli/blob/main/docs/styling.md): CSS variables, dark theme, print
 - [Known limitations](https://github.com/josep-audenis/foli/blob/main/docs/limitations.md)
 

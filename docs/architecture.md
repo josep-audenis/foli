@@ -34,7 +34,7 @@ This document describes **what exists** and **what is decided**. Planned parts a
 | Document model      | Schema, immutable tree, marks, positions, JSON, validation                     | ✅ (Phase 2); schema v3 (Word model) current (8.3–8.7), v2 read and migrated                                                                |
 | Editing engine      | Steps, position mapping, selection, state, history, commands                   | ✅ headless (Phase 3)                                                                                                                       |
 | View                | Render state to DOM, DOM ↔ model mapping, `beforeinput`, IME, clipboard, focus | ✅ (G3 provisional; manual IME/SR checks open)                                                                                              |
-| Layout              | Measurement, line breaking, page flow, fragments, incremental reflow, print    | Phase 5 (inside `@folijs/view` until the seam is proven)                                                                                    |
+| Layout              | Measurement, line breaking, page flow, fragments, incremental reflow, print    | ✅ (Phase 5); sections with their own page setups (8.7d4); inside `@folijs/view` until the seam is proven                                   |
 | React integration   | Components, hooks, toolbar                                                     | Hooks, provider, canvas, `FoliEditor` ✅ (6.1); toolbar ✅ (6.2)                                                                            |
 | Document processing | DOCX import/export with lossless round trip (`@folijs/docx`)                   | Package and XML reading ✅ (8.2), import to v3 ✅ (8.4), lossless export ✅ (8.5) ([ADR-0005](decisions/ADR-0005-word-compatible-model.md)) |
 
@@ -87,11 +87,11 @@ Foli's own (see `THIRD_PARTY_NOTICES.md`).
   `defaultType` answer which nodes fit where.
 - **State**: an immutable `EditorState` holds the doc, selection, stored marks and plugin fields.
   A `Transaction` adds selection tracking, stored marks and metadata (`addToHistory`, time).
-  Selections are `TextSelection`, `NodeSelection` (one selectable node, e.g. a rule) and
-  `AllSelection`. Deleting a node-selected block that its parent cannot lose (its only child)
-  leaves an empty paragraph where the parent takes one; otherwise the delete does not apply
-  (e.g. the only item of a list). Typing over a node-selected block replaces it with a
-  paragraph of the text; Enter adds a paragraph after it.
+  Selections are `TextSelection`, `NodeSelection` (one selectable node; in schema v3 an opaque
+  block such as a table) and `AllSelection`. Deleting a node-selected block that its parent
+  cannot lose (its only child) leaves an empty paragraph where the parent takes one; otherwise
+  the delete does not apply. Typing over a node-selected block replaces it with a paragraph of
+  the text; Enter adds a paragraph after it.
 - **Plugins** (internal API, used by history and keymaps): state fields, `filterTransaction`,
   `appendTransaction`, `keymap`.
 - **History**: undo/redo of inverted steps.
@@ -169,7 +169,8 @@ Foli's own (see `THIRD_PARTY_NOTICES.md`).
 
 Known limits:
 - No general slice fitting: paste joins open content, replaces an empty textblock with whole
-  blocks, and fits lists and rules as whole blocks at the caret (7.8); see Clipboard below.
+  blocks, and inserts whole blocks at the caret only when an opaque block is at an end of the
+  pasted content; see Clipboard below.
 - Each unrecorded change (and each plugin reaction to undo/redo) rebases the stored history.
   This costs O(n²) in the number of stored steps (not events), and every step is re-applied to the
   document, which also scales with document size.
@@ -228,9 +229,10 @@ and benchmarks (5.7, [benchmarks.md](benchmarks.md)); overview in [pagination.md
   - Empty blocks and blocks ending in a hard break get an extra `<br>` without a descriptor.
 - **Rendering:** blocks whose model node is unchanged (same identity) keep their DOM; changed
   blocks are rebuilt; stray DOM is removed. Built with `createElement`/`textContent` only.
-- **Pages:** the host's only children are `section.foli-page` elements. Each gets the
-  document's page size (`width`, `min-height`) and margins (`padding`) inline in mm, from
-  `editor.settings`; the theme adds the background, shadow and gap. Blocks are page children.
+- **Pages:** the host's only children are `section.foli-page` elements. Each gets its
+  section's page size (`width`, `min-height`) and margins (`padding`) inline in mm (an empty
+  document's page: the last section's, `editor.settings`); the theme adds the background,
+  shadow and gap. Blocks are page children.
   - Every render places blocks where they were (a new block joins the page of the block
     before it), measures the blocks it has no measurement for (border-box height and vertical
     margins, in place), and flows them with the pure `flow` (`src/layout/flow.ts`): CSS margin collapsing between
@@ -253,14 +255,18 @@ and benchmarks (5.7, [benchmarks.md](benchmarks.md)); overview in [pagination.md
   - Rules (`flow`): a line holding a `pageBreak` (rendered as `<br data-page-break>`) is the
     last on its page; a split leaves at least 2 lines on each page (widows and orphans,
     `DEFAULT_RULES`; a block too short for both moves whole; not applied across a page break,
-    nor where only an empty page could hold the lines); headings keep with the next block (a
-    heading, or a chain of them, moves to the next page when the block after it would start
-    there, unless it already starts its page; the flow restarts from a snapshot before it).
+    nor where only an empty page could hold the lines); a paragraph with Word's keep with next
+    (headings through their style) keeps with the next block (it, or a chain of them, moves to
+    the next page when the block after it would start there, unless it already starts its
+    page; the flow restarts from a snapshot before it); keep lines together moves a paragraph
+    that fits on a page whole; page break before starts a paragraph on a new page.
   - No reflow or re-split during a composition (moving the DOM the browser composes in would
     break the IME); the next render after it flows.
   - **Print (5.6):** the view keeps a `<style data-foli-print>` in the document's head (and
-    in the shadow root holding the host, if any) with the page settings: `@page` of the page
-    size without margins (the page's padding holds them); for this view's pages only (the
+    in the shadow root holding the host, if any) with the page settings: `@page` of the last
+    section's page size without margins (the page's padding holds them), and a named `@page`
+    for each section's setup when they differ (engines without named pages print every sheet
+    at the last section's size); for this view's pages only (the
     host's `data-foli-view`), each page exactly one sheet tall, no gap between pages,
     `break-after: page` but after the last. Content taller than a page is not cut (it prints
     over the next sheet). A print lays out the screen's pagination: print-only CSS that
@@ -417,13 +423,12 @@ Known limits:
 
 ### Word formatting on schema v3 (`packages/core/src/state/wordformat.ts`, 8.7b)
 
-The generic commands branch to it on a v3 document (`setAlign`, `setTextColor`, `setHighlight`,
-`toggleList`, `wrapInList`, `sinkListItem`, `liftListItem`, list Enter and Backspace,
-`setBlockType`, links); styles, fonts, sizes, line spacing and space before and after are v3
-only. Run properties, alignment and line spacing are written directly only where the resolved
-formatting without them differs (picking a heading's own size, color or alignment leaves no
-direct value; "Automatic" color and "no highlight" write `auto` and `none` where a style gives
-one); space before and after and indents are always written. Paragraph changes are one
+The generic commands branch to it (`setAlign`, `setTextColor`, `setHighlight`, `toggleList`,
+`wrapInList`, `sinkListItem`, `liftListItem`, list Enter and Backspace, `setBlockType`, links):
+schema v3 is the only editing schema. Run properties, alignment and line spacing are written
+directly only where the resolved formatting without them differs (picking a heading's own size,
+color or alignment leaves no direct value; "Automatic" color and "no highlight" write `auto` and
+`none` where a style gives one); space before and after and indents are always written. Paragraph changes are one
 `NodeMarkupBatchStep`. A transaction can replace the document's envelope (`withEnvelope`,
 plugin state): a new list's numbering definition, and a built-in style the document has not
 used yet (headings, List Paragraph, Hyperlink, with the Word 2013 to 2019 template's
@@ -562,14 +567,17 @@ must have loaded, and the container must not be scaled (`transform`, `zoom`).
 
 - **Copy and cut** come from the model, never from the DOM (ADR-0003 finding 5). The selected
   range is written as `text/plain` (blocks, hard and page breaks as line feeds), `text/html`
-  (rendered by the view's own renderer, with `white-space: pre-wrap` so spaces survive in other
-  apps, and page breaks as `<br data-page-break style="page-break-before: always; …">`) and
-  `application/x-foli+json`: `{ open, content }`, the copied blocks as `DocJSON` and whether the
-  copy was inside one block. Cut is copy plus `deleteSelection`, as its own undo step.
+  (Word's HTML, see "Copy from a v3 document" above; page breaks as
+  `<br data-page-break style="page-break-before: always; …">`) and `application/x-foli+json`:
+  `{ open, content, word }`, the copied blocks as JSON, whether the copy was inside one block,
+  and the definitions they reference (`copiedDefinitions`). Cut is copy plus
+  `deleteSelection`, as its own undo step.
 - **Paste** reads, in order: Foli JSON, then HTML, then plain text (Ctrl/Cmd+Shift+V: plain
-  text only). Each candidate goes through `parseContent` (HTML: `parseContentV2`), the same validation as loading a
-  document; one that fails falls through to the next. Plain text becomes one paragraph per
-  line, with the marks typing would get. A paste during a composition is ignored.
+  text only). Foli JSON and plain text are fitted to the document by `fitPaste(state, content,
+  word)`, HTML (read as schema v2) by `fitPastedV2` (see "Paste on v3" above), both validating
+  as loading a document does; one that fails falls through to the next. Plain text becomes one
+  paragraph per line, with the marks typing would get. A paste during a composition is
+  ignored.
   - Content is **open** when no block boundary was copied: plain text, HTML without block
     elements, Foli JSON copied from inside one block. It always joins the text around the
     selection, so the target block keeps its type (text pasted into an empty heading stays a
@@ -577,12 +585,9 @@ must have loaded, and the container must not be scaled (`transform`, `zoom`).
   - **Closed** content (whole blocks) pasted into an empty textblock replaces it, so a pasted
     heading stays a heading. Elsewhere its first and last blocks join the text around the
     selection; text after the selection then ends up in the last pasted block (ProseMirror's
-    open-slice behaviour). Where the schema refuses that slice (a list pasted into a
-    paragraph), the blocks go in whole (`insertBlocks`): a single list pasted into a list item
-    joins that list (its items replace an empty item, or go before, after or between the
-    item's halves); other blocks go before or after the caret's textblock, or replace it when
-    empty, where its parent takes them (a list item's first paragraph stays first), else
-    between its two halves.
+    open-slice behaviour). An opaque block at either end has no inside to join, so then the
+    blocks go in whole (`insertBlocks`): before or after the caret's paragraph, else between
+    its two halves.
   - A paste starts a new undo step; typing right after it (within the 500 ms grouping window)
     joins that step.
 - **HTML reader** (`htmlToDoc`): the HTML is parsed with `DOMParser` into an inert document and
@@ -608,8 +613,10 @@ must have loaded, and the container must not be scaled (`transform`, `zoom`).
   layout, except in `pre` and `white-space: pre*`; non-breaking spaces become spaces. Hidden
   text (`display: none`, `hidden`, Word's `mso-hide: all`), scripts, styles, images, media, form
   controls, Word's list markers and empty `<o:p>` are dropped; everything else keeps only its
-  text. Copy writes the same structures (lists with `start`, links, colors, alignment, rules),
-  so Foli's HTML reads back as the same document. Fixtures: `packages/view/fixtures/clipboard/`.
+  text. Foli's own HTML (Word's, from copy) reads back with its headings, lists, links, colors
+  and alignment; fonts, sizes and spacing are not read, and a rule (a paragraph's bottom
+  border) does not read back as a rule. Between Foli editors the Foli JSON is read first.
+  Fixtures: `packages/view/fixtures/clipboard/`.
 
 ## Packages
 
@@ -620,21 +627,22 @@ foli/
 │   ├── core/  @folijs/core   Envelope, schema, immutable model, positions, slices. Pure TS, no DOM.
 │   ├── view/  @folijs/view   Editable DOM view (EditorView). Framework-agnostic.
 │   ├── react/ @folijs/react  React components + default stylesheet.
-│   └── docx/  @folijs/docx   DOCX import to schema v3; package (zip, parts, relationships), XML keeping source text. No DOM.
+│   └── docx/  @folijs/docx   DOCX import to schema v3 and lossless export; package (zip, parts, relationships), XML keeping source text. No DOM.
+├── spikes/two-page/     Phase 1 spike; throwaway, never published.
+├── examples/            Vite and Next.js apps installing the packed packages (6.4); never published.
 └── docs/
 ```
 
-Dependency direction: `playground → react → view → core`, and `docx → core`. Never the reverse.
+Dependency direction: `playground → react → view → core`, `docx → core`, and
+`playground → docx`. Never the reverse.
 
 Planned, created only when needed:
 
 | Package / folder           | When                                                                            |
 | -------------------------- | ------------------------------------------------------------------------------- |
-| `spikes/two-page/`         | Phase 1, throwaway, never published                                             |
 | `@folijs/layout`           | Split out of `@folijs/view` once the layout/view boundary is stable             |
 | `@folijs/ui`               | Only if a non-React UI appears; until then the toolbar lives in `@folijs/react` |
 | `crates/*`, `@folijs/wasm` | Only for a measured need                                                        |
-| `examples/`                | Phase 6 (Vite and Next.js install tests)                                        |
 
 ## Dependency policy
 
@@ -666,8 +674,8 @@ Planned, created only when needed:
 - `pnpm check` also runs `publint --strict` on every package (exports, `files`, types) and
   `pnpm size`: each package's published entry bundled as an app would (fully minified, its
   Foli dependencies included, React external), and an app importing only `FoliEditor`, against
-  gzip budgets (6.4: core 14.1 kB, view 19.9 kB, react 25.3 kB; budgets about 15% above, in
-  `scripts/size.mjs`).
+  gzip budgets in `scripts/size.mjs` (core 36.0 kB, view 47.6 kB, react 57.9 kB, docx 36.9 kB;
+  each raise and its reason is recorded there).
 - `pnpm examples` installs the packed tarballs into `examples/vite` (React 18, strict
   TypeScript) and `examples/next` (React 19, server rendering) with npm, builds them, and runs
   the success criterion in Playwright; see [examples/README.md](../examples/README.md).
@@ -713,13 +721,15 @@ stable before 1.0):
   hydration, with no hydration mismatch (tested with `hydrateRoot`). Layout effects go through
   `useIsomorphicLayoutEffect` (`useEffect` where there is no `document`), so React 18 does not
   warn during server rendering; React 18 itself is exercised by the 6.4 example apps.
-- `FoliToolbar` (6.2): bold, italic, underline, strikethrough; paragraph and heading levels
-  1-3 (a pressed heading turns back into a paragraph); undo, redo; page break. Its state is one
+- `FoliToolbar` (6.2; Word's controls since 8.7b): paragraph style, font and font size boxes;
+  bold, italic, underline, strikethrough; link (a dialog, also on Mod-K in the document); text
+  color and highlight menus; align left, center, right, justify; line spacing; bulleted and
+  numbered lists, decrease and increase indent; undo, redo; page break. Its state is one
   module-level `useEditorState` selector, compared item by item so typing does not re-render it:
-  `aria-pressed` from the marks and block types of the selection (O(selection)), `aria-disabled`
-  from cheap checks (undo/redo depth; marks, block types and page breaks always apply in schema
-  v1), not command dry runs: `editor.can` builds the whole transaction, and a block-type dry run
-  over a select-all costs O(blocks) per keystroke.
+  `aria-pressed` and the boxes' values from the marks, alignment, list and formatting at the
+  selection (O(selection)), `aria-disabled` from cheap checks (undo/redo depth, a paragraph in
+  the selection, whether it can be outdented), not command dry runs: `editor.can` builds the
+  whole transaction, which over a select-all costs O(blocks) per keystroke.
   One tab stop (`role="toolbar"`, roving `tabindex`: arrows, Home, End, wrapping; with Alt, Ctrl
   or Meta the keys are the browser's; the last button reached by keyboard keeps the stop);
   disabled buttons stay focusable (`aria-disabled`, not `disabled`). `mousedown` is prevented,
@@ -727,19 +737,20 @@ stable before 1.0):
   not focused focuses it (`onClickCommand`, which `FoliEditor` sets), so the change is visible.
   Keyboard activation keeps the focus on the button, and Tab returns to the document at its
   selection; meanwhile a selected range is not highlighted (the view writes the DOM selection
-  only into a focused host). The paragraph and heading buttons are toggle buttons; pressing a
-  pressed paragraph button does nothing. `FoliToolbar` has no read-only state of its own:
-  composed with `<FoliCanvas readOnly />` it needs `disabled` too (commands run through the
-  editor, which code may always change). Buttons with a symbol (B, I, U, S, ¶) are named by `aria-label`; the others
-  by their visible text (H1, Undo), so speech input matches what is on screen; every button has
-  a `title`. Axe (scoped to the toolbar, editable and read-only) and keyboard-only flows run in
+  only into a focused host). `FoliToolbar` has no read-only state of its own: composed with
+  `<FoliCanvas readOnly />` it needs `disabled` too (commands run through the editor, which
+  code may always change). Buttons with a symbol (B, I, U, S, the color, alignment and list
+  buttons) are named by `aria-label`; the others by their visible text (Link, Undo), so speech
+  input matches what is on screen; the boxes are named by `aria-label`; every button has a
+  `title`. Axe (scoped to the toolbar, editable and read-only) and keyboard-only flows run in
   Playwright in all three engines.
 
 ## Styling
 
-Plain CSS with custom properties (`--foli-*`) on `.foli-canvas` and `.foli-toolbar` (toolbar
-colors and `--foli-focus-ring`). Page geometry is applied in `mm` straight from document
-settings. In print the canvas chrome and the toolbar are hidden. No CSS framework.
+Plain CSS with custom properties (`--foli-*`) declared on `:root` and `:host` (page, canvas
+and toolbar colors, `--foli-focus-ring`; [styling.md](styling.md)). Page geometry is applied in
+`mm` from each section's page setup. In print the canvas chrome and the toolbar are hidden. No
+CSS framework.
 
 ## Risk register
 

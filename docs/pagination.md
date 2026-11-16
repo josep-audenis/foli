@@ -13,8 +13,10 @@
 One continuous logical document. Pages are a **presentation** computed by the view. Selection,
 undo history, keyboard navigation and copy/paste behave as if the document were not paginated.
 A paragraph spanning two pages is still one node; nothing about pages is stored in the
-document except its page settings (`DocumentSettings`: page size and margins in mm) and
-explicit `pageBreak` nodes.
+document except its sections' page setups (in twips: the envelope's `section` for the last
+section, a paragraph's `section` attribute for each one it ends), the paragraphs' keep with
+next, keep lines together and page break before, and explicit `pageBreak` and `columnBreak`
+nodes (Foli lays out one column: a column break ends the line).
 
 ## Why owning the engine changes the design
 
@@ -44,11 +46,12 @@ editor state ──► measure the blocks without a cached measurement (DOM read
              ──► descriptors map every fragment and text node to model positions
 ```
 
-- **Geometry:** each page gets the settings' size (`width`, `min-height`) and margins
-  (`padding`) inline in mm; the content box is `height − top − bottom` by
-  `width − left − right`. A scaled ancestor (`transform`, `zoom`) is divided out of every
-  measurement. The React theme (`@folijs/react/styles.css`) adds background, shadow and the gap
-  between pages; a bare `@folijs/view` host gets none of them.
+- **Geometry:** each page gets its section's size (`width`, `min-height`) and margins
+  (`padding`) inline in mm; a section starts a new page unless it is continuous with the same
+  page setup. The content box is `height − top − bottom` by `width − left − right`. A scaled
+  ancestor (`transform`, `zoom`) is divided out of every measurement. The React theme
+  (`@folijs/react/styles.css`) adds background, shadow and the gap between pages; a bare
+  `@folijs/view` host gets none of them.
 - **Measuring:** each block's border-box height and vertical margins, read from the rendered
   block. Lines only for blocks that cross a page end or hold a page break: per-character `Range` rects, a binary
   search per line, splits snapped to grapheme clusters. The browser shapes the text; Foli only
@@ -60,7 +63,9 @@ editor state ──► measure the blocks without a cached measurement (DOM read
   - widows and orphans: at least 2 lines of a split block on each page (`FlowRules`; a block too
     short for both moves whole; not applied across a page break, nor where only an empty page
     could hold the lines);
-  - headings keep with the next block (chains too);
+  - a paragraph with keep with next (headings through their style) keeps with the next block
+    (chains too); keep lines together moves a paragraph that fits on a page whole; page break
+    before starts a paragraph on a new page;
   - only a single line taller than a page makes its page grow.
 - **Fragments:** each fragment is the same element type with its slice of the content and
   marks; the split edges drop their margins, so the fragments together take the block's
@@ -87,9 +92,10 @@ editor state ──► measure the blocks without a cached measurement (DOM read
   (schema v2) lists were nested blocks rebuilt on each page (ADR-0004).
 - **Justified text** keeps its last line justified on every fragment but the block's last
   (`text-align-last: justify`): a fragment's last line is not the paragraph's.
-- **Print:** the view writes a print stylesheet from the settings: `@page` of the page size
-  without margins, each page exactly one sheet tall with `break-after: page`. A print shows the
-  screen's pagination; it does not re-flow.
+- **Print:** the view writes a print stylesheet from the page setups: `@page` of the last
+  section's page size without margins, a named `@page` for each other setup (engines without
+  named pages print every sheet at the last section's size), each page exactly one sheet tall
+  with `break-after: page`. A print shows the screen's pagination; it does not re-flow.
 
 ## Evidence
 

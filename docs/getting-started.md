@@ -324,7 +324,7 @@ editor.subscribe((_state, transactions) => {
 The view makes `host` a `contenteditable` textbox and renders `.foli-page` sections into it.
 It does not name the textbox: set `aria-label` (or `aria-labelledby`) yourself. The default
 theme ships in `@folijs/react` (which lists `react` as a peer dependency); without React, copy its
-`styles.css` into your project instead. See [api.md](api.md#foliview).
+`styles.css` into your project instead. See [api.md](api.md#folijsview).
 
 ## Next
 

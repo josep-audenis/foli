@@ -19,7 +19,7 @@ place that says what is in progress; check it before starting work.
 | 5 Native pagination      | ✅ Done (G4 provisional) | —                    | Merged in #15–#22; page-break manual checks open, risks in ADR-0003                        |
 | 6 React API & 0.1.0      | ✅ Done                  | —                    | Merged in #23–#31; 0.1.0 on npm; manual checks shipped as known risks (ADR-0003)           |
 | 7 Rich content           | ✅ Done                  | —                    | Merged in #33–#41; 0.2.0 on npm; list-document benchmark misses accepted (known limit)     |
-| 8 Word model & DOCX      | In progress              | `phase-8/word-model` | [ADR-0005](decisions/ADR-0005-word-compatible-model.md); tasks below (8.1 corpus first)    |
+| 8 Word model & DOCX      | In review                | `phase-8/word-model` | Merged in #44–#59; 8.8 close (G5 numbers, docs, 0.3.0) in review                           |
 | 9–12                     | Not started              |                      |                                                                                            |
 
 Status values: `Ready` (dependencies met, nobody on it) · `In progress` · `In review` (PR open) ·
@@ -611,7 +611,12 @@ it, and saves it back without losing anything ([ADR-0005](decisions/ADR-0005-wor
 (canonical comparison) and opens in Word without a repair prompt; per-paragraph page agreement
 with Word measured and published as a baseline; opaque nodes per document reported; T1–T5 pass
 on schema v3 in three engines; documents saved by 0.1.0 and 0.2.0 migrate without content loss;
-0.3.0 published.
+0.3.0 published. (Measured 2026-11-16, Word 16.0.20527: all 21 rewritten and exported corpus
+packages open without a repair prompt, the 15 without edits with Word's reference numbers; the
+round trip without edits equals the original under the canonical comparison (unit tests);
+106 of 106 paragraphs start on Word's page, 103 on Word's line, pages against Word's PDF 0.544;
+opaque nodes per document in corpus/README.md; T1–T5 on v3 in Chromium, Firefox and WebKit;
+0.1.0 and 0.2.0 documents migrate with every character, break and mark (property test).)
 
 ### Tasks
 

@@ -1,12 +1,11 @@
 # @folijs/docx
 
 DOCX for [Foli](https://github.com/josep-audenis/foli): imports a `.docx` into Foli's Word model
-(schema v3 of `@folijs/core`), and reads its package (zip, parts, content types, relationships)
-and XML keeping every byte it does not change. No DOM: runs in the browser, workers and Node
-20.12+. Depends only on `@folijs/core`.
+(schema v3 of `@folijs/core`), exports it back losslessly (`exportDocx`), and reads its package
+(zip, parts, content types, relationships) and XML keeping every byte it does not change. No DOM:
+runs in the browser, workers and Node 20.12+. Depends only on `@folijs/core`.
 
-> In development (Phase 8): import, export, the package and XML layer are here. Not published
-> yet.
+> Early release: the API may change in any 0.x minor version (changes in `CHANGELOG.md`).
 
 ```ts
 import { importDocx } from "@folijs/docx";

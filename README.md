@@ -4,18 +4,21 @@ An open-source document-editing engine for the web, built from the ground up: it
 model, transactions, view and layout, designed around native pagination, with first-class React
 integration.
 
-> **Status: 0.2.0 ([npm](https://www.npmjs.com/package/@folijs/react)).** Foli edits documents
+> **Status: 0.3.0 ([npm](https://www.npmjs.com/package/@folijs/react)).** Foli edits documents
 > with its own model, engine and view (no ProseMirror/Tiptap/Lexical) on real pages: paragraphs
-> and list items split across pages at a line, explicit page breaks, widow/orphan and
-> keep-with-next rules, incremental reflow, print with one sheet per page. Paragraphs, headings,
-> bulleted and numbered lists (nested), horizontal rules; bold, italic, underline,
-> strikethrough, links, text color, highlight; alignment; undo/redo; IME; copy/cut/paste (HTML
-> from Word, Google Docs and web pages mapped to the schema). React components with a toolbar
-> and server rendering. Documents saved by 0.1.0 load unchanged. The API may change in any 0.x
-> version. Manual IME, screen-reader and real-paste checks are not run yet: read the
-> [known limitations](docs/limitations.md). Next: real Word documents, a Word-shaped model
-> with lossless `.docx` round trip (Phase 8, [ADR-0005](docs/decisions/ADR-0005-word-compatible-model.md),
-> [roadmap](docs/roadmap.md)).
+> split across pages at a line, explicit page breaks, widow/orphan, keep-with-next and
+> keep-lines-together rules, incremental reflow, print with one sheet per page. Documents use
+> Word's model ([ADR-0005](docs/decisions/ADR-0005-word-compatible-model.md)): paragraph styles
+> (headings are Word's heading styles), lists as Word's numbering, fonts, sizes, line and
+> paragraph spacing, indents; bold, italic, underline, strikethrough, links, text color,
+> highlight; alignment; undo/redo; IME; copy/cut/paste (HTML from Word, Google Docs and web
+> pages mapped to the model). Each section is laid out with its own page size and margins.
+> `.docx` import and lossless export (`@folijs/docx`): what the editor does not model yet is
+> kept and written back. React components with a toolbar and server rendering. Documents saved
+> by 0.1.0 and 0.2.0 are migrated on load; 0.2.0 cannot read documents saved by 0.3.0. The API
+> may change in any 0.x version. Manual IME, screen-reader and real-paste checks are not run
+> yet: read the [known limitations](docs/limitations.md). Next: review, tracked changes and
+> comments compatible with Word (Phase 9, [roadmap](docs/roadmap.md)).
 
 ## Usage
 
@@ -56,6 +59,7 @@ toolbar, Next.js and using the view without React. Before using Foli, read the
 | [`@folijs/core`](packages/core)      | Document model and headless editing engine: schema, nodes, steps, history, commands. No DOM. |
 | [`@folijs/view`](packages/view)      | Framework-agnostic editable DOM view (`EditorView`): rendering, input, selection.            |
 | [`@folijs/react`](packages/react)    | React components and default stylesheet.                                                     |
+| [`@folijs/docx`](packages/docx)      | `.docx` import to Foli's Word model and lossless export. No DOM.                             |
 | [`apps/playground`](apps/playground) | Demo app; consumes the packages like a third party would.                                    |
 
 ## Documentation
@@ -72,7 +76,7 @@ Design and development:
 - [Roadmap](docs/roadmap.md) — phases, gates, acceptance criteria
 - [Architecture](docs/architecture.md) — subsystems, packages, dependency policy, risks
 - [ADR-0002: Foli owns its editing engine](docs/decisions/ADR-0002-own-editing-engine.md)
-- [Document model](docs/document-model.md) — persisted format, schema v1, units, migrations
+- [Document model](docs/document-model.md) — persisted format, schema v3 (Word's model), units, migrations from v1 and v2
 - [Benchmarks](docs/benchmarks.md) — model build/serialize and pagination (layout, keystroke, re-flow) timings, bundle sizes, with method
 - [Examples](examples/README.md) — Vite + React 18 and Next.js + React 19 apps installing the packed packages
 - [Pagination](docs/pagination.md) — native multi-page editing: design and what is built (Phase 5)
