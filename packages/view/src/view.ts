@@ -1564,7 +1564,7 @@ export class EditorView {
     // In a table, from a cell's first or last line: the cell above or below, or out of the
     // table (browsers go to the next cell in the DOM, or across pages to the wrong row).
     const cells = vertical ? goToCellVertically(vertical as -1 | 1) : null;
-    // (A selection inside one cell, Tab's, moves as a whole: no line to measure.)
+    // (A selection of a cell's whole content, Tab's, moves as the cell: no line to measure.)
     const onEdge = () => !this.state.selection.empty || this.caretOnEdgeLine(vertical as -1 | 1);
     if (cells?.(this.state) && onEdge() && this.run(cells)) {
       event.preventDefault();

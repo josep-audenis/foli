@@ -6,6 +6,7 @@
  */
 import { Fragment, type Node, type ResolvedPos, Slice } from "../model/index.js";
 import { attempt as attemptTr } from "./attempt.js";
+import { MARK_ATTRS } from "./mark.js";
 import { Selection, TextSelection } from "./selection.js";
 import { type Command, type EditorState, Plugin, type Transaction } from "./state.js";
 
@@ -180,14 +181,14 @@ function headCell(state: EditorState): { $pos: ResolvedPos; depth: number } | nu
   return depth < 0 ? null : { $pos, depth };
 }
 
-/** The positions of every cell of `table` (at `start`), row by row. */
+/** The positions of the cells of `table` (at `start`) one can go to, row by row (not those a merge covers). */
 function cellsOf(table: Node, start: number): number[] {
   const out: number[] = [];
   let rowPos = start + 1;
   table.forEach((row) => {
     let cellPos = rowPos + 1;
     row.forEach((cell) => {
-      out.push(cellPos);
+      if (cell.attrs.vMerge !== "continue") out.push(cellPos);
       cellPos += cell.nodeSize;
     });
     rowPos += row.nodeSize;
@@ -233,18 +234,18 @@ export function goToCell(dir: 1 | -1): Command {
     const { schema } = state;
     const paragraph = schema.nodes.paragraph;
     if (!paragraph) return false;
-    const rowAttrs = { ...last.attrs, revision: null, header: null };
-    const cellsJSON: Node[] = [];
+    // A new row: the last one's properties, not its identity (`w14:paraId`…) or revisions; its
+    // paragraphs the first ones' properties, without what only one paragraph has.
+    const rowAttrs = { ...last.attrs, revision: null, header: null, attributes: null };
+    const markOnly = Object.fromEntries(MARK_ATTRS.map((key) => [key, null]));
+    const newCells: Node[] = [];
     last.forEach((cell) => {
       const attrs = { ...cell.attrs, vMerge: null };
-      cellsJSON.push(
-        cell.type.create(
-          attrs,
-          paragraph.create(cell.firstChild?.type === paragraph ? cell.firstChild.attrs : null),
-        ),
-      );
+      const first = cell.firstChild;
+      const own = first?.type === paragraph ? { ...first.attrs, ...markOnly } : null;
+      newCells.push(cell.type.create(attrs, paragraph.create(own)));
     });
-    const row = last.type.create(rowAttrs, cellsJSON);
+    const row = last.type.create(rowAttrs, newCells);
     const insertAt = tableStart + table.nodeSize - 1;
     return attemptTr(state, dispatch, (tr) => {
       tr.insert(insertAt, row);
@@ -263,14 +264,15 @@ export function goToCellVertically(dir: 1 | -1): Command {
     const found = headCell(state);
     if (!found) return false;
     const { $pos, depth } = found;
-    // A selection inside one cell (Tab selects a cell's content) moves as its head; one across
-    // cells is not this command's.
-    const $anchor = state.selection.$anchor;
-    if (
-      !state.selection.empty &&
-      ($anchor.depth < depth || $anchor.before(depth) !== $pos.before(depth))
-    )
-      return false;
+    // A selection of a cell's whole content (Tab's) moves as the cell; any other selection is
+    // the browser's (a word selected on a line moves by line).
+    if (!state.selection.empty) {
+      const start = $pos.before(depth);
+      const node = $pos.node(depth);
+      const first = Selection.near(state.doc.resolve(start + 1), 1).from;
+      const last = Selection.near(state.doc.resolve(start + node.nodeSize - 1), -1).to;
+      if (state.selection.from > first || state.selection.to < last) return false;
+    }
     // Only from the cell's first (last) paragraph.
     const index = $pos.index(depth);
     const cell = $pos.node(depth);
@@ -291,13 +293,22 @@ export function goToCellVertically(dir: 1 | -1): Command {
       target = cellPos;
       break;
     }
+    // Out of the table: before or after it. Nothing there (the document's start or end, or a
+    // nested table at its cell's edge): the browser's move.
+    let out: Selection | null = null;
+    if (target === null) {
+      const pos = dir < 0 ? tableStart : tableStart + table.nodeSize;
+      out = Selection.near(state.doc.resolve(pos), dir);
+      const end = tableStart + table.nodeSize;
+      if (out.from > tableStart && out.from < end) return false;
+      const outer = cellDepth(state.doc.resolve(tableStart));
+      if (outer >= 0 && out.$head.before(outer) !== state.doc.resolve(tableStart).before(outer))
+        return false;
+    }
     if (!dispatch) return true;
     const tr = state.tr;
-    if (target === null) {
-      // Out of the table: before or after it.
-      const pos = dir < 0 ? tableStart : tableStart + table.nodeSize;
-      tr.setSelection(Selection.near(tr.doc.resolve(pos), dir));
-    } else {
+    if (out) tr.setSelection(out);
+    else if (target !== null) {
       const node = tr.doc.nodeAt(target) as Node;
       const pos = dir < 0 ? target + node.nodeSize - 1 : target + 1;
       tr.setSelection(Selection.near(tr.doc.resolve(pos), dir < 0 ? -1 : 1));

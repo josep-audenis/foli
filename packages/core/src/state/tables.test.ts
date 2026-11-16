@@ -423,3 +423,64 @@ describe("moving between cells", () => {
     expect(editor.state.selection.from).toBe(inside(editor, "y"));
   });
 });
+
+describe("moving between cells: merges and edges", () => {
+  const merged = table(
+    row(cell("a1"), { type: "tableCell", attrs: { vMerge: "restart" }, content: [p("m")] }),
+    row(cell("a2"), { type: "tableCell", attrs: { vMerge: "continue" }, content: [p()] }),
+    row(cell("a3"), cell("b3")),
+  );
+  const selected = (editor: Editor) =>
+    editor.state.doc.textBetween(editor.state.selection.from, editor.state.selection.to);
+
+  it("Tab skips a cell a merge covers", () => {
+    const editor = editorOf([p("x"), merged, p("y")]);
+    select(editor, inside(editor, "a2", 1));
+    editor.handleKey("Tab");
+    expect(selected(editor)).toBe("a3");
+  });
+
+  it("the row Tab adds has none of the last row's ids or revisions", () => {
+    const withIds = table(row(cell("a1")), {
+      type: "tableRow",
+      attrs: { attributes: { "w14:paraId": "1A2B3C4D" } },
+      content: [
+        {
+          type: "tableCell",
+          content: [
+            {
+              type: "paragraph",
+              attrs: {
+                attributes: { "w14:paraId": "5E6F7A8B" },
+                revision: { insertion: { id: 3, author: "Other" } },
+                justification: "center",
+              },
+              content: [text("z")],
+            },
+          ],
+        },
+      ],
+    });
+    const editor = editorOf([p("x"), withIds, p("y")]);
+    select(editor, inside(editor, "z", 1));
+    editor.handleKey("Tab");
+    const added = editor.state.doc.child(1).child(2);
+    expect(added.attrs.attributes).toBeNull();
+    const para = added.child(0).child(0);
+    expect(para.attrs.attributes).toBeNull();
+    expect(para.attrs.revision).toBeNull();
+    // Its properties are kept.
+    expect(para.attrs.justification).toBe("center");
+  });
+
+  it("Up from a table that starts the document, and Down with a word selected, are the browser's", () => {
+    const editor = editorOf([TABLE, p("y")]);
+    select(editor, inside(editor, "a1", 1));
+    expect(editor.run(goToCellVertically(-1))).toBe(false);
+    select(editor, inside(editor, "a1", 0), inside(editor, "a1", 1));
+    expect(editor.run(goToCellVertically(1))).toBe(false);
+    // The whole content selected (Tab's): it moves as the cell.
+    select(editor, inside(editor, "a1", 0), inside(editor, "a1", 2));
+    expect(editor.run(goToCellVertically(1))).toBe(true);
+  });
+});
