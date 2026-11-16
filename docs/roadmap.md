@@ -20,7 +20,7 @@ place that says what is in progress; check it before starting work.
 | 6 React API & 0.1.0      | ✅ Done                  | —                | Merged in #23–#31; 0.1.0 on npm; manual checks shipped as known risks (ADR-0003)           |
 | 7 Rich content           | ✅ Done                  | —                | Merged in #33–#41; 0.2.0 on npm; list-document benchmark misses accepted (known limit)     |
 | 8 Word model & DOCX      | ✅ Done                  | —                | Merged in #44–#61; 0.3.0 on npm (`@folijs/docx` first released); gate G5 passed            |
-| 9 Review                 | In review                | `phase-9/review` | Merged in #63–#71; 0.4.0 versioned, publish awaits the owner's approval                    |
+| 9 Review                 | In review                | `phase-9/review` | Merged in #63–#72; 0.4.0 versioned, publish awaits the owner's approval                    |
 | 10–12                    | Not started              |                  |                                                                                            |
 
 Status values: `Ready` (dependencies met, nobody on it) · `In progress` · `In review` (PR open) ·
