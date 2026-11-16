@@ -494,3 +494,134 @@ describe("table properties", () => {
     valid(editor);
   });
 });
+
+describe("cell commands: review findings", () => {
+  const nested = table(row(cell("in")));
+  it("merge and split cells starting with a nested table", () => {
+    const editor = editorOf([
+      p("x"),
+      table(
+        row(cell("a1"), cell("b1")),
+        row({ type: "tableCell", content: [nested, p("after")] }, cell("b2")),
+      ),
+      p("y"),
+    ]);
+    const $after = editor.state.doc.resolve(inside(editor, "after"));
+    editor.dispatch(
+      editor.state.tr.setSelection(
+        CellSelection.create(
+          editor.state.doc,
+          cellPos(editor, "a1"),
+          $after.before($after.depth - 1),
+        ),
+      ),
+    );
+    expect(editor.run(mergeCells)).toBe(true);
+    valid(editor);
+    const wide = editorOf([
+      p("x"),
+      table(
+        row({ type: "tableCell", attrs: { gridSpan: 2 }, content: [nested, p("after")] }),
+        row(cell("a2"), cell("b2")),
+      ),
+      p("y"),
+    ]);
+    select(wide, inside(wide, "after"));
+    expect(wide.run(splitCell)).toBe(true);
+    valid(wide);
+  });
+
+  it("give split cells empty paragraphs without the paragraph's identity or revision", () => {
+    const marked = {
+      type: "paragraph",
+      attrs: {
+        attributes: { "w14:paraId": "1234ABCD" },
+        revision: { insertion: { id: 7, author: "A", date: null } },
+      },
+      content: [text("w")],
+    } as NodeJSON;
+    const editor = editorOf([
+      p("x"),
+      table(
+        row({ type: "tableCell", attrs: { gridSpan: 2 }, content: [marked] }),
+        row(cell("a2"), cell("b2")),
+      ),
+      p("y"),
+    ]);
+    select(editor, inside(editor, "w"));
+    editor.run(splitCell);
+    const fresh = editor.state.doc.child(1).child(0).child(1).firstChild;
+    expect(fresh?.attrs.attributes).toBe(null);
+    expect(fresh?.attrs.revision).toBe(null);
+  });
+
+  it("keep the text a covered cell holds when merging", () => {
+    const editor = editorOf([
+      p("x"),
+      table(
+        row(restart("a1"), cell("b1")),
+        row(
+          { type: "tableCell", attrs: { vMerge: "continue" }, content: [p("hidden")] },
+          cell("b2"),
+        ),
+      ),
+      p("y"),
+    ]);
+    selectCells(editor, "a1", "b2");
+    editor.run(mergeCells);
+    const texts: string[] = [];
+    editor.state.doc
+      .child(1)
+      .child(0)
+      .child(0)
+      .forEach((block) => {
+        texts.push(block.textContent);
+      });
+    expect(texts).toEqual(["a1", "b1", "hidden", "b2"]);
+  });
+
+  it("refuse column widths a grid cannot take; never narrow a column asked to widen", () => {
+    const tiny = editorOf([p("x"), { ...TABLE, attrs: { grid: [0, 0] } } as NodeJSON, p("y")]);
+    const at = tiny.state.doc.child(0).nodeSize;
+    expect(tiny.run(setColumnWidth(at, 0, 500))).toBe(false);
+    const small = editorOf([p("x"), { ...TABLE, attrs: { grid: [100, 50] } } as NodeJSON, p("y")]);
+    expect(small.run(setColumnWidth(at, 0, 500))).toBe(false);
+    const last = editorOf([
+      p("x"),
+      { ...TABLE, attrs: { grid: [1000, 1000] } } as NodeJSON,
+      p("y"),
+    ]);
+    expect(last.run(setColumnWidth(at, 1, 50_000))).toBe(true);
+    expect(last.state.doc.child(1).attrs.grid).toEqual([1000, 31_680]);
+  });
+
+  it("shade every cell of a vertical merge", () => {
+    const editor = editorOf([
+      p("x"),
+      table(row(restart("m"), cell("b1")), row(covered(), cell("b2"))),
+      p("y"),
+    ]);
+    select(editor, inside(editor, "m"));
+    editor.run(setCellShading("ff0000"));
+    const rows = editor.state.doc.child(1);
+    expect((rows.child(0).child(0).attrs.shading as { fill: string }).fill).toBe("FF0000");
+    expect((rows.child(1).child(0).attrs.shading as { fill: string }).fill).toBe("FF0000");
+    expect(rows.child(0).child(1).attrs.shading).toBe(null);
+  });
+
+  it("refuse a built-in style of another type as a table style", () => {
+    const editor = editorOf([p("x"), TABLE, p("y")]);
+    select(editor, inside(editor, "a1"));
+    expect(editor.run(setTableStyle("heading 1"))).toBe(false);
+    expect(editor.getDocument().styles.some((s) => s.id === "Heading1")).toBe(false);
+  });
+
+  it("are each their own undo step", () => {
+    const editor = editorOf([p("x"), TABLE, p("y")]);
+    selectCells(editor, "a1", "b1");
+    editor.run(mergeCells);
+    editor.run(splitCell);
+    editor.commands.undo();
+    expect(editor.state.doc.child(1).child(0).childCount).toBe(1);
+  });
+});

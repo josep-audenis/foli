@@ -668,16 +668,19 @@ section, not the caret's.
 Cells and properties (10.7b, same file): `mergeCells` merges a cell selection's rectangle (when
 every grid place of it has a cell) into its first cell, spanning its columns and, over several
 rows, starting a vertical merge the rows below continue; it holds every selected cell's blocks
-in order (empty cells left out). `splitCell` splits the selected merged cells back into their
+row by row (a covered cell's own text too; empty cells left out). `splitCell` splits the selected merged cells back into their
 grid's cells, the text in the first (not Word's split into n columns of an unmerged cell).
 `toggleHeaderRow` makes the selection's rows header rows with every row above them (Word
 repeats only a run from the top), or, when they all are, makes them and the header rows below
 ordinary (`isHeaderRow`). `setTableStyle(name)` gives the table a table style by name (Word's
 Table Grid added when missing; `tableStyles`, `tableStyleAt`). `setCellShading(fill)` sets or
-removes the selected cells' shading (`clear` pattern). `setColumnWidth(pos, column, twips)` is
+removes the selected cells' shading (`clear` pattern), on every cell of a vertical merge (Word
+paints each row's part from its own properties). `setColumnWidth(pos, column, twips)` is
 a border drag: the next column gives or takes the difference, neither under 0.1 inch; the last
-column's border widens the table; cell widths in twips follow, and the selection stays. None of
-them applies while tracking. Export writes a new table style
+column's border widens the table (and its width in twips); cell widths in twips follow (up to 22
+inches), and the selection stays. None of them applies while tracking. New empty paragraphs
+take a cell's last paragraph's properties without its identity or revision. Every table
+command (10.7a and b) is its own undo step. Export writes a new table style
 (Table Grid) from the model; a table style read from a file and then changed is still refused.
 
 Review in the editable view (9.5): `EditorView` draws tracked changes as the editor's state says

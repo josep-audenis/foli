@@ -5,9 +5,11 @@
  * while tracking (the rebuild records them, 10.6a); column changes are not tracked by Foli yet,
  * so they do not apply while tracking.
  */
-import { Fragment, type Node, Slice } from "../model/index.js";
+import { FoliDocumentError, Fragment, type Node, type NodeType, Slice } from "../model/index.js";
 import { attempt } from "./attempt.js";
 import { deleteSelectionKeepingTables } from "./commands.js";
+import { closeHistory } from "./history.js";
+import { MARK_ATTRS } from "./mark.js";
 import { Selection } from "./selection.js";
 import type { Command, EditorState, Transaction } from "./state.js";
 import {
@@ -32,6 +34,30 @@ const PAGE_WIDTH = 12_240;
 const MARGIN = 1_440;
 
 const tracking = (state: EditorState) => trackState(state)?.on === true;
+/** Word's largest measure in twips (22 inches). */
+const MAX_TWIPS = 31_680;
+
+/** `attempt`, as its own undo step (never joined with the typing or command before it). */
+const apply = (
+  state: EditorState,
+  dispatch: ((tr: Transaction) => void) | undefined,
+  build: (tr: Transaction) => void,
+) =>
+  attempt(state, dispatch, (tr) => {
+    tr.setMeta(closeHistory, true);
+    build(tr);
+  });
+
+/**
+ * An empty paragraph like a cell's last one (a cell always ends with a paragraph): its
+ * properties, not what only that paragraph has (its identity, revisions, section).
+ */
+function emptyLike(cell: Node, paragraph: NodeType): Node {
+  const last = cell.lastChild;
+  if (last?.type !== paragraph) return paragraph.create();
+  const own = Object.fromEntries(MARK_ATTRS.map((key) => [key, null]));
+  return paragraph.create({ ...last.attrs, ...own, attributes: null });
+}
 
 /** The table around the selection and the rectangle of grid rows and columns it covers. */
 interface Around {
@@ -135,7 +161,7 @@ export function insertTable(rows: number, columns: number): Command {
       { style: style?.id ?? null, grid: Array.from({ length: columns }, () => each) },
       Array.from({ length: rows }, () => row),
     );
-    return attempt(state, dispatch, (tr) => {
+    return apply(state, dispatch, (tr) => {
       if (!tr.selection.empty) deleteSelectionKeepingTables(tr);
       const $pos = tr.selection.$from;
       if (!$pos.parent.isTextblock) throw new RangeError("No paragraph at the caret");
@@ -195,7 +221,7 @@ export function insertRow(dir: -1 | 1): Command {
     });
     const row = plain.type.create(plain.attrs, cells);
     const at = dir < 0 ? rowPos(table, pos, index) : rowPos(table, pos, index + 1);
-    return attempt(state, dispatch, (tr) => {
+    return apply(state, dispatch, (tr) => {
       tr.insert(at, row);
       caretIn(tr, at + 1);
     });
@@ -214,7 +240,7 @@ export const deleteRows: Command = (state, dispatch) => {
   if (top === 0 && bottom === table.childCount - 1) return deleteTable(state, dispatch);
   const from = rowPos(table, pos, top);
   const to = rowPos(table, pos, bottom + 1);
-  return attempt(state, dispatch, (tr) => {
+  return apply(state, dispatch, (tr) => {
     const next = table.maybeChild(bottom + 1);
     if (next && !tracking(state)) {
       // Merges cut at their start: the first kept row's covered cell starts them again.
@@ -255,7 +281,7 @@ export const deleteTable: Command = (state, dispatch) => {
   const found = around(state);
   if (!found) return false;
   const { table, pos } = found;
-  return attempt(state, dispatch, (tr) => {
+  return apply(state, dispatch, (tr) => {
     tr.delete(pos, pos + table.nodeSize);
     keepTablesApart(tr);
     tr.setSelection(Selection.near(tr.doc.resolve(tr.mapping.map(pos)), 1));
@@ -279,9 +305,9 @@ function rebuild(
 /** A cell's `width` in twips set to the grid columns it spans, when it gives one in twips. */
 function widthFor(attrs: Node["attrs"], grid: readonly number[], column: number, span: number) {
   const width = attrs.width as { value: number; type: string } | null;
-  if (width?.type !== "dxa") return attrs;
+  if (width?.type !== "dxa" || grid.length < column + span) return attrs;
   const value = grid.slice(column, column + span).reduce((a, b) => a + b, 0);
-  return { ...attrs, width: { value: Math.max(value, 0), type: "dxa" } };
+  return { ...attrs, width: { value: Math.min(Math.max(value, 0), MAX_TWIPS), type: "dxa" } };
 }
 
 /** Replaces the table at `pos` with `next` and puts the caret in its cell at `row`, `column`. */
@@ -373,7 +399,7 @@ export function insertColumn(dir: -1 | 1): Command {
       return row.type.create(row.attrs, out);
     });
     if (!next) return false;
-    return attempt(state, dispatch, (tr) => replaceTable(tr, pos, table, next, top, at));
+    return apply(state, dispatch, (tr) => replaceTable(tr, pos, table, next, top, at));
   };
 }
 
@@ -422,7 +448,7 @@ export const deleteColumns: Command = (state, dispatch) => {
     );
   });
   if (!next) return deleteTable(state, dispatch);
-  return attempt(state, dispatch, (tr) =>
+  return apply(state, dispatch, (tr) =>
     replaceTable(tr, pos, table, next, top, Math.min(left, width - removed - 1)),
   );
 };
@@ -453,14 +479,14 @@ export const mergeCells: Command = (state, dispatch) => {
   // Every grid place of the rectangle has a cell (no row starts or ends inside it).
   const area = inside.reduce((sum, c) => sum + c.span * c.rowSpan, 0);
   if (area !== width * (bottom - top + 1)) return false;
+  // Every cell's blocks, row by row (a covered cell's own text too: nothing is dropped).
   const content: Node[] = [];
-  for (const c of inside) {
-    const cell = table.nodeAt(c.pos - pos - 1) as Node;
-    if (!blank(cell))
-      cell.forEach((block) => {
-        content.push(block);
-      });
-  }
+  for (let r = top; r <= bottom; r++)
+    for (const c of placed(table.child(r)))
+      if (c.column >= left && c.column <= right && !blank(c.cell))
+        c.cell.forEach((block) => {
+          content.push(block);
+        });
   if (!content.length || !content[content.length - 1]?.isTextblock)
     content.push(paragraph.create());
   const tableGrid = table.attrs.grid as number[];
@@ -488,14 +514,14 @@ export const mergeCells: Command = (state, dispatch) => {
       cells.push(
         c.cell.type.create(
           attrs,
-          r === top ? Fragment.from(content) : paragraph.create(c.cell.firstChild?.attrs),
+          r === top ? Fragment.from(content) : emptyLike(c.cell, paragraph),
         ),
       );
     }
     return row.type.create(row.attrs, cells);
   });
   if (!next) return false;
-  return attempt(state, dispatch, (tr) => replaceTable(tr, pos, table, next, top, left));
+  return apply(state, dispatch, (tr) => replaceTable(tr, pos, table, next, top, left));
 };
 
 /**
@@ -538,19 +564,16 @@ export const splitCell: Command = (state, dispatch) => {
           c.column + i,
           1,
         );
-        const keep = i === 0 && r === owner.row;
-        cells.push(
-          c.cell.type.create(
-            attrs,
-            keep ? c.cell.content : paragraph.create(c.cell.firstChild?.attrs),
-          ),
-        );
+        // The merge's text stays in its first cell; a covered cell's own text (which Word does
+        // not show) stays in its cell.
+        const keep = i === 0 && (r === owner.row || !blank(c.cell));
+        cells.push(c.cell.type.create(attrs, keep ? c.cell.content : emptyLike(c.cell, paragraph)));
       }
     }
     return row.type.create(row.attrs, cells);
   });
   if (!next) return false;
-  return attempt(state, dispatch, (tr) => replaceTable(tr, pos, table, next, top, left));
+  return apply(state, dispatch, (tr) => replaceTable(tr, pos, table, next, top, left));
 };
 
 /** Whether the selection's rows are all header rows (repeated on each page). */
@@ -573,7 +596,7 @@ export const toggleHeaderRow: Command = (state, dispatch) => {
   if (!found) return false;
   const { table, pos, top, bottom } = found;
   const on = !isHeaderRow(state);
-  return attempt(state, dispatch, (tr) => {
+  return apply(state, dispatch, (tr) => {
     for (let r = 0; r < table.childCount; r++) {
       const row = table.child(r);
       const header = row.attrs.header === true;
@@ -614,8 +637,11 @@ export function setTableStyle(name: string | null): Command {
     if (!found || !context) return false;
     const style = name === null ? null : ensureStyle(context, name, "table");
     if (name !== null && !style) return false;
+    // A built-in of another type (a heading's) is not a table style.
+    if (style && style.envelope.styles.find((s) => s.id === style.id)?.type !== "table")
+      return false;
     const { table, pos } = found;
-    return attempt(state, dispatch, (tr) => {
+    return apply(state, dispatch, (tr) => {
       tr.setNodeMarkup(pos, table.type, { ...table.attrs, style: style?.id ?? null });
       if (style && style.envelope !== context.envelope) withEnvelope(tr, style.envelope);
     });
@@ -632,14 +658,19 @@ export function setCellShading(fill: string | null): Command {
     if (fill !== null && !/^[0-9A-Fa-f]{6}$/.test(fill)) return false;
     const found = around(state);
     if (!found) return false;
-    const { table, pos, grid, top, bottom, left, right } = found;
+    const { table, pos, top, bottom, left, right } = found;
     const shading =
       fill === null ? null : { pattern: "clear", color: "auto", fill: fill.toUpperCase() };
-    return attempt(state, dispatch, (tr) => {
-      for (const c of grid) {
-        if (c.row < top || c.row > bottom || c.column < left || c.column > right) continue;
-        const cell = table.nodeAt(c.pos - pos - 1) as Node;
-        tr.setNodeMarkup(c.pos, cell.type, { ...cell.attrs, shading });
+    return apply(state, dispatch, (tr) => {
+      // Every cell of the rectangle, the ones a merge covers too: Word paints each row's part of
+      // a merged cell from its own properties.
+      for (let r = top; r <= bottom; r++) {
+        let at = rowPos(table, pos, r) + 1;
+        for (const c of placed(table.child(r))) {
+          if (c.column >= left && c.column <= right)
+            tr.setNodeMarkup(at, c.cell.type, { ...c.cell.attrs, shading });
+          at += c.cell.nodeSize;
+        }
       }
     });
   };
@@ -662,22 +693,37 @@ export function setColumnWidth(pos: number, column: number, width: number): Comm
     const grid = [...(table.attrs.grid as number[])];
     const old = grid[column];
     if (old === undefined) return false;
-    let next = Math.max(Math.round(width), MIN_COLUMN);
     const after = grid[column + 1];
+    // Two columns too narrow to give each other anything.
+    if (after !== undefined && old + after < 2 * MIN_COLUMN) return false;
+    let next = Math.min(Math.max(Math.round(width), MIN_COLUMN), MAX_TWIPS);
     if (after !== undefined) next = Math.min(next, old + after - MIN_COLUMN);
     if (next === old) return false;
     if (after !== undefined) grid[column + 1] = after - (next - old);
     grid[column] = next;
-    const rebuilt = rebuild(table, { ...table.attrs, grid, gridExt: null }, (row) =>
-      row.type.create(
-        row.attrs,
-        placed(row).map((c) =>
-          c.cell.type.create(widthFor(c.cell.attrs, grid, c.column, c.span), c.cell.content),
+    // The last column's border: a table width in twips grows or shrinks with it.
+    const tableWidth = table.attrs.width as { value: number; type: string } | null;
+    const widthAttr =
+      after === undefined && tableWidth?.type === "dxa"
+        ? { value: Math.min(Math.max(tableWidth.value + next - old, 0), MAX_TWIPS), type: "dxa" }
+        : tableWidth;
+    let rebuilt: Node | null;
+    try {
+      rebuilt = rebuild(table, { ...table.attrs, grid, gridExt: null, width: widthAttr }, (row) =>
+        row.type.create(
+          row.attrs,
+          placed(row).map((c) =>
+            c.cell.type.create(widthFor(c.cell.attrs, grid, c.column, c.span), c.cell.content),
+          ),
         ),
-      ),
-    );
+      );
+    } catch (error) {
+      // A grid the schema does not take (a width out of its range): the drag does not apply.
+      if (error instanceof FoliDocumentError) return false;
+      throw error;
+    }
     if (!rebuilt) return false;
-    return attempt(state, dispatch, (tr) => {
+    return apply(state, dispatch, (tr) => {
       const selection = tr.selection.toJSON();
       tr.replace(pos, pos + table.nodeSize, new Slice(Fragment.from(rebuilt), 0, 0));
       // The same shape: the selection stays where it was.
