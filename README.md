@@ -14,11 +14,15 @@ integration.
 > highlight; alignment; undo/redo; IME; copy/cut/paste (HTML from Word, Google Docs and web
 > pages mapped to the model). Each section is laid out with its own page size and margins.
 > `.docx` import and lossless export (`@folijs/docx`): what the editor does not model yet is
-> kept and written back. React components with a toolbar and server rendering. Documents saved
+> kept and written back. Review as in Word (0.4.0, on `main`, not published yet): tracked
+> changes recorded while you type (insertions, deletions, formatting), shown as all markup, simple
+> markup or no markup, accepted and rejected one by one, by selection, by author or all; comments
+> with replies and resolved state in a pane beside the pages; both round-trip with Word. React
+> components with a toolbar and server rendering. Documents saved
 > by 0.1.0 and 0.2.0 are migrated on load; 0.2.0 cannot read documents saved by 0.3.0. The API
 > may change in any 0.x version. Manual IME, screen-reader and real-paste checks are not run
-> yet: read the [known limitations](docs/limitations.md). Next: review, tracked changes and
-> comments compatible with Word (Phase 9, [roadmap](docs/roadmap.md)).
+> yet: read the [known limitations](docs/limitations.md). Next: tables and images as Word models
+> them (Phase 10, [roadmap](docs/roadmap.md)).
 
 ## Usage
 

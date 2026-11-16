@@ -547,8 +547,8 @@ The view moves the caret over a list number in one press: browsers stop before a
 non-editable number, the same model position, so Right at the end of the paragraph before and
 Left at a numbered paragraph's start step over the boundary themselves.
 
-Not yet in the editor: editing page setups or inserting section breaks, headers and footers, a final
-(changes accepted) editing view, a horizontal rule button (a rule is a paragraph's bottom
+Not yet in the editor: editing page setups or inserting section breaks, headers and footers, a
+horizontal rule button (a rule is a paragraph's bottom
 border). Links are drawn as `<a>` where `isSafeHref` takes the target (schema v3 keeps any),
 inheriting the run's own color and underline (Word shows a link without the Hyperlink style
 plain), so Ctrl+click opens them (8.7d1). A link from another source (a paste without the
@@ -557,6 +557,22 @@ ranges of every paragraph and writes the gaps of every block (O(document); measu
 8.7d). Whether Word keeps the mark's run properties (`markFormat`) on the paragraph after a
 heading, and a tracked formatting change on both halves of a split, is not checked against
 Word yet: Foli keeps neither on the new paragraph.
+
+Review in the editable view (9.5): `EditorView` draws tracked changes as the editor's state says
+(`trackState(state).view`, `setReviewView`), every block again when it changes. `markup`:
+`ins`/`del` in the author's color (eight colors, picked by the author's name), titled with the
+author and date, and a bar (a `box-shadow`) beside paragraphs with changes; `simple`: the text
+as accepted, with the bar; `final`: the text as accepted. Deleted text is hidden (`display:
+none`), not left out, so positions map through it; the caret is never written into it (the shown
+text next to it takes it), and Backspace and Delete step over it wherever it is hidden or while
+tracking. A paragraph whose mark is deleted is not drawn joined with the next while editing.
+Commented text carries `data-foli-comments` (the ids of the comments whose range holds it).
+
+The comments pane (9.7) is React's `FoliComments`: it reads the comments from the editor's state,
+orders the threads by their anchors (`commentAnchors`), finds each thread's text through
+`data-foli-comments` in the nearest ancestor holding the pages, and places each thread level with
+it, below the one before, measuring after every change and on resize. It edits through the
+comment commands only. `FoliEditor` puts it beside the canvas in `.foli-editor-body`.
 
 ### Word pages (`packages/view/src/word/`, 8.6b)
 
@@ -570,7 +586,7 @@ Word lays it out, read-only and without an editor (`EditorView` edits on the sam
   Times New Roman, Liberation Serif; Courier New, Liberation Mono; Georgia, Gelasio); Foli
   ships no font. Word's line spacing is a multiple of the font's own line height, measured in
   the page (`line-height: normal` of each font) and set per run. Tracked changes show as
-  `ins`/`del` (`markup`) or are applied (`final`: deletions left out, a paragraph whose mark was
+  `ins`/`del` (`markup`: in the author's color, titled "Inserted/Deleted by …, date") or are applied (`simple` and `final`: deletions left out, a paragraph whose mark was
   deleted merged into the next, numbered once; not into a table). Commented text is shaded. Content the model keeps opaque is
   read from its XML with the browser's XML parser (an inert document; text, table structure,
   paragraph style and alignment, and basic run properties are read): a table as a table (grid,

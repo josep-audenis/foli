@@ -80,7 +80,11 @@ included). Within the parts it writes:
   editor removed are left out; new ones are added where Word expects them; a part the document
   now needs (numbering, comments, comment threads) is added with its content type and
   relationship. Comments made in the editor that are in a thread get a `w14:paraId`, so their
-  replies and resolved state are written.
+  replies and resolved state are written. Tracked changes and comments the editor records (0.4.0: insertions,
+  deletions, run and paragraph formatting changes, comments, replies, resolved threads) are
+  written as Word writes them; Word reads them back with their authors and text, and Foli reads
+  Word's own changes and replies (checked with Word on the corpus: `corpus/README.md`). A run's
+  recorded formatting (`w:rPrChange`) is imported in canonical form, as the editor records it.
 - Runs are regrouped from the model: hyperlinks outermost, then insertions (or move
   destinations), deletions (or move sources) with `w:delText`, then runs of equal properties.
   Line ends and vertical tabs in text become breaks, a tab character `w:tab` (read back as a

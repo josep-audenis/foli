@@ -163,7 +163,7 @@ Documents are schema v3, Word's model ([document-model.md](document-model.md)).
 
 ### Editor
 
-`createEditor({ document?, plugins?, author?, trackChanges? }): Editor`: a headless editor (state, commands, undo
+`createEditor({ document?, plugins?, author?, trackChanges?, reviewView? }): Editor`: a headless editor (state, commands, undo
 history, change notifications) of a schema v3 document (Word's model). The document is
 validated and, when saved by 0.1.0 or 0.2.0, migrated (`parseDocument`; default:
 `createDocument()`); `setDocument` behaves the same way. `EditorDocument` is what both take:
@@ -179,7 +179,7 @@ content control or table before deleting it; joining paragraphs keeps the second
 break, and a paragraph left with nothing by a join or a deletion from its start is removed whole
 (the next one keeps its properties, as in Word); typed text never takes a tracked-change mark (except its own `insertion` when tracking).
 
-Tracked changes: `createEditor({ author?, trackChanges? })` (author default "Author"; tracking
+Tracked changes: `createEditor({ author?, trackChanges?, reviewView? })` (author default "Author"; tracking
 off by default; a `.docx`'s setting is `DocxImport.trackRevisions`). With tracking on, every
 edit the editor dispatches is rebuilt as Word records it (`trackTransaction(state, tr)`): what it
 removes stays with a `deletion` mark and what it adds gets an `insertion` mark (author, date,
@@ -193,7 +193,7 @@ keep that record, and one's own insertions record none. An edit that would delet
 or insert a block Foli does not model (a table) is not made while tracking (Phase 10). Undo and redo, transactions with
 `addToHistory: false` and those with the `untracked` meta are not tracked; an edit that cannot
 be recorded is not made. `editor.commands.setTrackChanges(on, author?)` (the
-`setTrackChanges` command), `editor.trackingChanges`, `trackState(state)` (`{ on, author }`).
+`setTrackChanges` command), `editor.trackingChanges`, `trackState(state)` (`{ on, author, view }`).
 
 Review view: how the editor's views show changes, kept in its state (`createEditor({
 reviewView })`, `editor.commands.setReviewView(view)`, `setReviewView`, `trackState(state).view`):
@@ -209,7 +209,8 @@ Comments (not tracked changes; each its own undo step): `editor.commands.addComm
 it; at a caret, a point; select-all, the whole text), `replyToComment(id, content, options?)`
 (a reply to a reply answers the thread), `editComment(id, content)`, `resolveComment(id, done =
 true)` (the whole thread), `deleteComment(id)`
-(its replies and anchors too), `deleteAllComments()`; the same as commands. `content` is text
+(its replies and anchors too; false for a comment anchored in a table, which stays until Phase
+10), `deleteAllComments()` (threads anchored in a table kept); the same as commands. `content` is text
 (a paragraph per line) or schema v3 blocks; the author defaults to the editor's. A comment whose
 reference mark an edit removes goes too, with its replies (a tracked deletion keeps it until
 accepted). `commentAnchors(doc)` gives each comment's range and reference positions.
@@ -361,8 +362,9 @@ const view = new EditorView(host, editor, { editable: true, placeholder: "" });
 - `renderDocument(document, container, { review? }): DocumentPages` (a read-only view, no
   editor): lays a schema v3 document out on
   pages (`.foli-word-page`, `WORD_PAGE_CLASS`) appended to `container`, formatted as Word
-  formats it. `review`: `"markup"` (default: insertions underlined, deletions struck through)
-  or `"final"` (as if accepted). `DocumentPages`: `pages`, `pageOf(index)` and `lineOf(index)`
+  formats it. `review`: `"markup"` (default: insertions underlined, deletions struck through,
+  in the author's color, titled "Inserted/Deleted by …, date"), `"simple"` or `"final"` (as if
+  accepted; no change bar here: the editor's view draws it). `DocumentPages`: `pages`, `pageOf(index)` and `lineOf(index)`
   (where the top-level node at `index` starts: the page, 0-based, and the line on that page,
   1-based), `destroy()`. Measures as it is called: render after the document's fonts have
   loaded (`document.fonts.ready`), into a container that is laid out and not scaled. See
