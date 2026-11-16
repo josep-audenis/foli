@@ -5,7 +5,7 @@
  * byte for byte. Without a package, a new one is made.
  */
 
-import { type FoliDocument, parseDocument } from "@folijs/core";
+import { type FoliDocument, parseDocument, type ResourceJSON } from "@folijs/core";
 import { child, REL } from "../import/ooxml.js";
 import { DocxError, type DocxPackage, type NewPart } from "../package.js";
 import { newSettingsXml, withTrackRevisions } from "../settings.js";
@@ -18,6 +18,7 @@ import {
   type OriginalPart,
   stylesXml,
 } from "./parts.js";
+import { drawingXml, Media, pictureBytes } from "./pictures.js";
 import { sectionXml } from "./properties.js";
 import {
   DEFAULT_NAMESPACES,
@@ -45,15 +46,49 @@ class Relationships {
   readonly added: { id: string; type: string; target: string; external: boolean }[] = [];
   readonly #ids: Set<string>;
   readonly #byTarget = new Map<string, string>();
-  readonly #existing: ReadonlyMap<string, { type: string; target: string; external: boolean }>;
+  readonly #existing: ReadonlyMap<
+    string,
+    { type: string; target: string; external: boolean; partName?: string }
+  >;
+  /** The part each internal relationship points to (resolved, as the package resolves it). */
+  readonly #parts = new Map<string, string>();
 
   constructor(
-    existing: readonly { id: string; type: string; target: string; external: boolean }[],
+    existing: readonly {
+      id: string;
+      type: string;
+      target: string;
+      external: boolean;
+      partName?: string;
+    }[],
   ) {
     this.#existing = new Map(existing.map((r) => [r.id, r]));
+    for (const r of existing) if (!r.external && r.partName) this.#parts.set(r.id, r.partName);
     this.#ids = new Set(existing.map((r) => r.id));
     for (const r of existing)
       if (r.type === REL.hyperlink && r.external) this.#byTarget.set(r.target, r.id);
+  }
+
+  /** The part relationship `id` points to (one it had, or one added), if internal. */
+  target(id: string): string | undefined {
+    return this.#parts.get(id);
+  }
+
+  /**
+   * The relationship to image part `part` (absolute; `target` as this part refers to it):
+   * `current` when it is one, else a known or new one. Compared by part, not by the target's
+   * text (`/word/media/x.png`, `./media/x.png` and `media/x.png` are one part).
+   */
+  image(part: string, target: string, current: string | undefined): string {
+    const isImage = (id: string) => {
+      const r = this.#existing.get(id) ?? this.added.find((a) => a.id === id);
+      return r?.type === REL_IMAGE && this.#parts.get(id)?.toLowerCase() === part.toLowerCase();
+    };
+    if (current !== undefined && isImage(current)) return current;
+    for (const id of this.#parts.keys()) if (isImage(id)) return id;
+    const id = this.add(REL_IMAGE, target, false);
+    this.#parts.set(id, part);
+    return id;
   }
 
   hyperlink(href: string, id: string | undefined): string {
@@ -91,8 +126,28 @@ class Relationships {
   }
 }
 
-function contextFor(namespaces: Namespaces, relationships: Relationships): WriteContext {
-  return { namespaces, hyperlink: (href, id) => relationships.hyperlink(href, id) };
+const REL_IMAGE = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image";
+
+function contextFor(
+  namespaces: Namespaces,
+  relationships: Relationships,
+  media: Media,
+  source: string,
+): WriteContext {
+  return {
+    namespaces,
+    hyperlink: (href, id) => relationships.hyperlink(href, id),
+    picture: (attrs) =>
+      drawingXml(
+        attrs,
+        {
+          image: (part, current) => relationships.image(part, relative(source, part), current),
+          target: (id) => relationships.target(id),
+        },
+        namespaces,
+        media,
+      ),
+  };
 }
 
 /** `/word/_rels/document.xml.rels` for `/word/document.xml`. */
@@ -113,6 +168,14 @@ export interface ExportOptions {
    * original package has it (off in a new one).
    */
   trackRevisions?: boolean;
+  /**
+   * The bytes of a picture's image the package does not hold and its resource gives no `data:`
+   * URL for (an app's upload, by its URL). Undefined: the export fails, never drops it.
+   */
+  resource?: (
+    key: string,
+    resource: ResourceJSON,
+  ) => Promise<Uint8Array | undefined> | Uint8Array | undefined;
 }
 
 /**
@@ -125,7 +188,26 @@ export async function exportDocx(
   options: ExportOptions = {},
 ): Promise<Uint8Array> {
   const doc = withThreadIds(parseDocument(document), original);
-  return original ? intoPackage(doc, original, options) : newPackage(doc, options);
+  // Before the app is asked for any picture's bytes.
+  const reference = original ? undefined : packageReference(doc);
+  if (reference) {
+    throw new DocxError(
+      `The document refers to a part of its original package (${reference}): export it with that package`,
+    );
+  }
+  // The parts written from the model: their drawings are the document's own.
+  const rewritten = original
+    ? [
+        original.mainDocument,
+        ...original
+          .relationships(original.mainDocument)
+          .filter((r) => r.type === REL.comments && r.partName)
+          .map((r) => r.partName as string),
+      ]
+    : [];
+  const bytes = await pictureBytes(doc, original, options.resource);
+  const media = new Media(doc, original, bytes, rewritten);
+  return original ? intoPackage(doc, original, options, media) : newPackage(doc, options, media);
 }
 
 const PARA_ID = "w14:paraId";
@@ -192,6 +274,7 @@ async function intoPackage(
   doc: FoliDocument,
   pkg: DocxPackage,
   options: ExportOptions,
+  media: Media,
 ): Promise<Uint8Array> {
   const mainName = pkg.mainDocument;
   const main = pkg.xml(mainName);
@@ -199,7 +282,7 @@ async function intoPackage(
   if (!body) throw new DocxError(`${mainName}: no w:body`);
   const namespaces = namespacesOf(main.root, main.source);
   const rels = new Relationships(pkg.relationships(mainName));
-  const context = contextFor(namespaces, rels);
+  const context = contextFor(namespaces, rels, media, mainName);
 
   const content = blocksXml(doc.content.content ?? [], context) + bodySection(doc, namespaces);
   const documentXml =
@@ -277,7 +360,8 @@ async function intoPackage(
     REL.comments,
     "/word/comments.xml",
     CT.comments,
-    (o, ns) => commentsXml(doc, o, contextFor(ns, commentRels)),
+    (o, ns) =>
+      commentsXml(doc, o, contextFor(ns, commentRels, media, commentsName ?? "/word/comments.xml")),
     doc.comments.length > 0,
   );
   if (comments && commentRels.added.length) writeRelationships(comments, commentRels);
@@ -304,6 +388,7 @@ async function intoPackage(
   }
 
   if (rels.added.length) writeRelationships(mainName, rels);
+  add.push(...media.added);
   return pkg.write(replace, add);
 
   function writeRelationships(source: string, relationships: Relationships): void {
@@ -352,15 +437,13 @@ function changedThreads(doc: FoliDocument, pkg: DocxPackage): boolean {
 }
 
 /** A new package: content types, relationships, the document and the parts it needs. */
-async function newPackage(doc: FoliDocument, options: ExportOptions): Promise<Uint8Array> {
-  const reference = packageReference(doc);
-  if (reference) {
-    throw new DocxError(
-      `The document refers to a part of its original package (${reference}): export it with that package`,
-    );
-  }
+async function newPackage(
+  doc: FoliDocument,
+  options: ExportOptions,
+  media: Media,
+): Promise<Uint8Array> {
   const rels = new Relationships([]);
-  const context = contextFor(DEFAULT_NAMESPACES, rels);
+  const context = contextFor(DEFAULT_NAMESPACES, rels, media, "/word/document.xml");
   const main = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\r\n<w:document ${NEW_ROOT_ATTRIBUTES}><w:body>${blocksXml(doc.content.content ?? [], context)}${bodySection(doc, DEFAULT_NAMESPACES)}</w:body></w:document>`;
   const parts: { name: string; text: string; contentType: string }[] = [
     { name: "/word/document.xml", text: main, contentType: CT.main },
@@ -384,7 +467,11 @@ async function newPackage(doc: FoliDocument, options: ExportOptions): Promise<Ui
       "/word/comments.xml",
       REL.comments,
       CT.comments,
-      commentsXml(doc, undefined, contextFor(DEFAULT_NAMESPACES, commentRels)),
+      commentsXml(
+        doc,
+        undefined,
+        contextFor(DEFAULT_NAMESPACES, commentRels, media, "/word/comments.xml"),
+      ),
     );
     if (commentRels.added.length)
       parts.push({
@@ -408,7 +495,7 @@ async function newPackage(doc: FoliDocument, options: ExportOptions): Promise<Ui
     text: rels.xml(undefined),
     contentType: CT.rels,
   });
-  const overrides = parts
+  const overrides = [...parts, ...media.added]
     .filter((p) => p.contentType !== CT.rels)
     .map((p) => `<Override PartName="${p.name}" ContentType="${p.contentType}"/>`)
     .join("");
@@ -425,6 +512,7 @@ async function newPackage(doc: FoliDocument, options: ExportOptions): Promise<Ui
   ];
   const entries = [];
   for (const [name, text] of files) entries.push(await deflateEntry(name, encoder.encode(text)));
+  for (const part of media.added) entries.push(await deflateEntry(part.name.slice(1), part.data));
   return writeZip(entries);
 }
 
