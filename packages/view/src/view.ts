@@ -91,7 +91,7 @@ interface FrameState {
 }
 
 /** A table's measurement, in layout px from the table's top (drawn whole). */
-interface TableMeasure {
+export interface TableMeasure {
   rows: { top: number; bottom: number }[];
   /** The top of each of its units (by index into the units), null for one not shown (covered). */
   tops: Map<number, number | null>;
@@ -299,6 +299,8 @@ export class EditorView {
   private frames = new Map<ModelNode, FrameState>();
   /** The table each wrapper element draws (part of). */
   private frameOf = new Map<Node, Frame>();
+  /** Each table as last rendered, by its index among the top-level items. */
+  private frameAt: (FrameState | undefined)[] = [];
   /** The block each fragment element belongs to. */
   private owner = new Map<Node, BlockDesc>();
   /** The page elements, in order; the host's only children. */
@@ -625,7 +627,24 @@ export class EditorView {
         remeasureUnit[i] || dropLines || !this.measures.has(node) || this.stale.has(node);
       if (reused && reused.fragments.length > 1 && remeasure && !this.composing) reused = undefined;
       if (reused) previous.delete(node);
-      blocks.push(reused ?? word.render(node, i, [], unit.cell));
+      const desc = reused ?? word.render(node, i, [], unit.cell);
+      blocks.push(desc);
+      // Drawn again in a table cell: the new block takes the old one's place there, so a table
+      // kept as it is (during a composition, which moves nothing) still holds it. During a
+      // composition a block whose node changed takes the place of the block drawn at its index.
+      const atIndex = this.blocks[i];
+      const old = reused
+        ? undefined
+        : (previous.get(node) ??
+          (this.composing && atIndex && previous.get(atIndex.node) === atIndex
+            ? atIndex
+            : undefined));
+      const first = old?.fragments[0];
+      if (old && first?.isConnected && first.parentElement?.closest(`[${FRAME_ATTR}]`)) {
+        first.replaceWith(...desc.fragments);
+        for (const fragment of old.fragments.slice(1)) fragment.remove();
+        previous.delete(old.node);
+      }
     });
     for (const stale of previous.values())
       for (const fragment of stale.fragments) fragment.remove();
@@ -652,9 +671,13 @@ export class EditorView {
       const before = previousPages.get(node);
       if (item.frame) {
         let state = previousFrames.get(node);
+        // During a composition nothing moves: a table that changed keeps the wrappers drawn at
+        // its place (its redrawn blocks took their old ones' places above).
+        if (!state && this.composing) state = this.frameAt[i];
         if (!state || (this.stale.has(node) && !this.composing)) state = whole(item.frame);
         frames.set(node, state);
-        return state.wrappers.map((_, f) => (last = Math.max(last, before?.[f] ?? last)));
+        const pagesBefore = before ?? (state === this.frameAt[i] ? state.pages : undefined);
+        return state.wrappers.map((_, f) => (last = Math.max(last, pagesBefore?.[f] ?? last)));
       }
       const desc = blocks[item.unit] as WordBlockDesc;
       return desc.fragments.map((_, f) => (last = Math.max(last, before?.[f] ?? last)));
@@ -819,6 +842,7 @@ export class EditorView {
     }
     // (Wrappers no longer drawn are not in a page: `place` removed them.)
     this.frames = frames;
+    this.frameAt = items.map((item, i) => (item.frame ? frames.get(doc.child(i)) : undefined));
     this.frameOf = new Map();
     items.forEach((item, i) => {
       if (!item.frame) return;
@@ -1115,12 +1139,24 @@ export class EditorView {
       // where a continuation starts), else the document end.
       const range = host.ownerDocument.createRange();
       range.setStart(node, offset);
+      const posOf = (i: number, f: number) =>
+        f === 0
+          ? (this.starts[i] as number)
+          : (this.starts[i] as number) +
+            1 +
+            ((this.blocks[i] as BlockDesc).splits[f - 1] as number);
+      // Without tables, blocks are in DOM order: the first one after the point. In a row split
+      // across pages, a cell's continuation comes after the next cell: the earliest in the DOM.
+      let best: { i: number; f: number; dom: HTMLElement } | null = null;
       for (const [i, desc] of this.blocks.entries()) {
         const f = desc.fragments.findIndex((fragment) => range.comparePoint(fragment, 0) >= 0);
-        if (f === 0) return this.starts[i] as number;
-        if (f > 0) return (this.starts[i] as number) + 1 + (desc.splits[f - 1] as number);
+        if (f < 0) continue;
+        const dom = desc.fragments[f] as HTMLElement;
+        if (!this.frames.size) return posOf(i, f);
+        if (!best || dom.compareDocumentPosition(best.dom) & Node.DOCUMENT_POSITION_FOLLOWING)
+          best = { i, f, dom };
       }
-      return this.state.doc.content.size;
+      return best ? posOf(best.i, best.f) : this.state.doc.content.size;
     }
     const element = this.blockElement(node);
     const owner = element ? this.owner.get(element) : undefined;
@@ -1724,9 +1760,22 @@ export class EditorView {
     // Each block's fragments are one text, blocks in document order (a row split across pages
     // has its cells' fragments on two pages).
     // A block whose elements the browser removed (merging it into another) has no text there.
+    // One missing without a recorded removal was never placed (drawn during a composition):
+    // its text counts as unchanged, never as deleted.
+    const removed = new Set(records.flatMap((record) => [...record.removedNodes]));
+    const removedByInput = (node: Node) => {
+      for (let at: Node | null = node; at; at = at.parentNode) if (removed.has(at)) return true;
+      return false;
+    };
     let first = true;
     for (const desc of this.blocks) {
       const shown = desc.fragments.filter((fragment) => this.host.contains(fragment));
+      if (!shown.length && !desc.fragments.some(removedByInput)) {
+        if (!first) domText += BLOCK_SEPARATOR;
+        first = false;
+        domText += textOfBlock(desc.node);
+        continue;
+      }
       if (!shown.length) continue;
       if (!first) domText += BLOCK_SEPARATOR;
       first = false;
@@ -1739,14 +1788,7 @@ export class EditorView {
     this.blocks.forEach(({ node: block }, i) => {
       if (i > 0) modelText += BLOCK_SEPARATOR;
       lineStarts.push(modelText.length);
-      block.forEach((child) => {
-        // A tab is text in the DOM (a "\t" text node).
-        modelText += child.isText
-          ? (child.text ?? "")
-          : child.type.name === "tab"
-            ? "\t"
-            : HARD_BREAK;
-      });
+      modelText += textOfBlock(block);
     });
     /** Model position of an offset in `modelText`. */
     const posAt = (offset: number): number => {
@@ -1972,7 +2014,7 @@ function layoutScale(page: HTMLElement, settings: DocumentSettings): number {
 }
 
 /** A block's measurement: border-box height across its fragments (layout px), margins, lines. */
-interface Measure {
+export interface Measure {
   height: number;
   marginTop: number;
   marginBottom: number;
@@ -1981,6 +2023,16 @@ interface Measure {
   lines?: Lines;
   /** A table's rows and blocks. */
   table?: TableMeasure;
+}
+
+/** A block's text as the read-back compares it: a tab "\t", other inline leaves one character. */
+function textOfBlock(block: ModelNode): string {
+  let text = "";
+  block.forEach((child) => {
+    // A tab is text in the DOM (a "\t" text node).
+    text += child.isText ? (child.text ?? "") : child.type.name === "tab" ? "\t" : HARD_BREAK;
+  });
+  return text;
 }
 
 /** Whether a table's wrappers hold every element of its blocks (none was drawn anew). */
@@ -2025,7 +2077,7 @@ function measureTable(
  * page), is part of a vertical merge or holds a nested table (shortcut: those split only
  * between rows; a nested table stays whole within its row).
  */
-function breaksOf(
+export function breaksOf(
   frame: Frame,
   measure: Measure,
   blocks: readonly WordBlockDesc[],
@@ -2074,6 +2126,8 @@ function tableBox(
     marginBottom: 0,
     pageHeight,
     repeat: header,
+    // Word keeps no lines together across a table's rows (a cell's paragraph splits anywhere).
+    anyLine: true,
     lines: breaks,
     breaksAfter: () => (breakAfter ? [breaks().length - 1] : []),
   };
@@ -2084,7 +2138,7 @@ function tableBox(
  * both), the header rows drawn again above a continuation, the fragment of the table each
  * block's fragments go in, and where a block of a split row splits (content offsets).
  */
-function cutTable(
+export function cutTable(
   frame: Frame,
   measure: Measure,
   fragments: readonly { fromLine: number; toLine: number }[],
@@ -2281,7 +2335,7 @@ function reuseOf(
   };
 }
 
-interface Lines {
+export interface Lines {
   /** Content offset where each line starts. */
   starts: number[];
   /** Bottom of each line box, in layout px from the block's top, as if it were not split. */

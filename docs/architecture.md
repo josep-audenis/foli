@@ -577,7 +577,11 @@ moves whole, and a row in a vertical merge or holding a nested table splits only
 across pages is in both, each cell's paragraphs split at their own lines (the paragraph
 fragments above). The leading header rows are drawn again above a continuation, not editable
 and not read back; a click there puts the caret in the first row below. Backspace and Delete
-next to a table still select it whole (10.6 edits across a table's edges). Not yet: column
+next to a table still select it whole (10.6 edits across a table's edges). A table's breaks
+have no widow and orphan control (`BlockBox.anyLine`): Word keeps no lines together across
+rows. During a composition nothing moves: a table keeps its wrappers (the ones at its place,
+if its node changed), and a cell paragraph drawn again takes its old element's place; the
+read-back counts a block it finds nowhere, with no recorded removal, as unchanged. Not yet: column
 widths are the grid Word saved (an autofit table is not recomputed), an exact row height is
 drawn as at least, contextual spacing between paragraphs in a cell.
 

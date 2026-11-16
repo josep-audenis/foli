@@ -11,6 +11,9 @@ import {
 } from "@folijs/core";
 import { afterEach, describe, expect, it } from "vitest";
 import { EditorView } from "../index.js";
+import type { BlockDesc } from "../render.js";
+import { breaksOf, cutTable, type Lines, type Measure } from "../view.js";
+import type { WordBlockDesc } from "./edit.js";
 import { collect, FRAME_ATTR, frameElement, REPEATED_ATTR } from "./table.js";
 
 /** Tables in the editable view (10.5): cell paragraphs are blocks with positions of their own. */
@@ -159,5 +162,132 @@ describe("a table's fragment on a later page", () => {
         .length,
     ).toBe(3);
     expect(rows[2]?.children.length ?? 0).toBe(2);
+  });
+});
+
+describe("cutting a table across pages", () => {
+  // A header row; a row whose first cell has two lines and second one; a last row.
+  const SPLIT: NodeJSON = {
+    type: "table",
+    attrs: { grid: [2000, 2000] },
+    content: [
+      row([cell("H1"), cell("H2")], { header: true }),
+      row([cell("long text"), cell("short")]),
+      row([cell("x"), cell("")]),
+    ],
+  };
+  const setup = () => {
+    const editor = createEditor({
+      document: parseDocument(createDocument({ type: "doc", content: [SPLIT, p()] })),
+    });
+    const word = wordContext(editor.state) as WordContext;
+    const { items, units } = collect(editor.state.doc, word.resolver);
+    const frame = items[0]?.frame;
+    if (!frame) throw new Error("no table");
+    // Units: H1 0, H2 1, long text 2, short 3, x 4, empty 5. Fake blocks: lines by index.
+    const blocks = units.map((_, u) => ({ u }) as unknown as WordBlockDesc);
+    const LINES: Record<number, Lines> = {
+      0: { starts: [0], bottoms: [20] },
+      1: { starts: [0], bottoms: [20] },
+      2: { starts: [0, 5], bottoms: [20, 40] },
+      3: { starts: [0], bottoms: [20] },
+      4: { starts: [0], bottoms: [20] },
+      // An empty paragraph measured with no line.
+      5: { starts: [], bottoms: [] },
+    };
+    const lines = (desc: BlockDesc) => LINES[(desc as unknown as { u: number }).u] as Lines;
+    const measure: Measure = {
+      height: 100,
+      marginTop: 0,
+      marginBottom: 0,
+      box: 0,
+      table: {
+        rows: [
+          { top: 0, bottom: 20 },
+          { top: 20, bottom: 60 },
+          { top: 60, bottom: 80 },
+        ],
+        tops: new Map([
+          [0, 0],
+          [1, 0],
+          [2, 20],
+          [3, 20],
+          [4, 60],
+          [5, 60],
+        ]),
+      },
+    };
+    return { frame, blocks, lines, measure };
+  };
+
+  it("breaks after rows and at the line ends inside a row that may split", () => {
+    const { frame, blocks, lines, measure } = setup();
+    // 40: the end of the first cell's first line and the second cell's only one; the table's
+    // last break is its height.
+    expect(breaksOf(frame, measure, blocks, 500, lines)).toEqual([20, 40, 60, 100]);
+  });
+
+  it("splits a row's cells at their own lines and repeats the header on the next page", () => {
+    const { frame, blocks, lines, measure } = setup();
+    breaksOf(frame, measure, blocks, 500, lines);
+    const cut = cutTable(
+      frame,
+      measure,
+      [
+        { fromLine: 0, toLine: 2 },
+        { fromLine: 2, toLine: Number.POSITIVE_INFINITY },
+      ],
+      blocks,
+      lines,
+    );
+    expect(cut.parts).toEqual([
+      { rows: [0, 1], headers: [] },
+      { rows: [1, 2], headers: [0] },
+    ]);
+    // "long text": its first line here, its second on the next page, split after it.
+    expect(cut.partOf.get(2)).toEqual([0, 1]);
+    expect(cut.splits.get(2)).toEqual([5]);
+    // "short" fits whole on the first page; the empty paragraph goes with its row.
+    expect(cut.partOf.get(3)).toEqual([0]);
+    expect(cut.splits.has(3)).toBe(false);
+    expect(cut.partOf.get(5)).toEqual([1]);
+  });
+
+  it("does not split a row that may not split", () => {
+    const { frame, blocks, lines, measure } = setup();
+    const kept = {
+      ...frame,
+      rows: frame.rows.map((r, i) => (i === 1 ? { ...r, cantSplit: true } : r)),
+    };
+    expect(breaksOf(kept, measure, blocks, 500, lines)).toEqual([20, 60, 100]);
+    // Unless it is taller than a page.
+    const { breaks: _, ...table } = measure.table as NonNullable<Measure["table"]>;
+    expect(breaksOf(kept, { ...measure, table }, blocks, 30, lines)).toEqual([20, 40, 60, 100]);
+  });
+});
+
+describe("a composition in a cell", () => {
+  it("keeps the cell's element in place when another cell changes, and loses no text", () => {
+    const { host, editor, view } = mount();
+    view.focus();
+    const apples = startOf(editor, "Apples");
+    editor.dispatch(
+      editor.state.tr.setSelection(TextSelection.create(editor.state.doc, apples + 6)),
+    );
+    const before = view.domFromPos(apples + 6).node as Text;
+    const td = before.parentElement?.closest("td");
+    host.dispatchEvent(new CompositionEvent("compositionstart"));
+    // Another cell changes while the IME composes (a programmatic edit).
+    const pears = startOf(editor, "Pears");
+    editor.dispatch(editor.state.tr.insertText("!", pears + 5));
+    expect(before.isConnected).toBe(true);
+    expect(before.parentElement?.closest("td")).toBe(td);
+    // The composed text, then the end of the composition.
+    before.data = "Applesé";
+    document.getSelection()?.collapse(before, 7);
+    host.dispatchEvent(new CompositionEvent("compositionend"));
+    expect(startOf(editor, "Applesé")).toBeGreaterThan(0);
+    expect(startOf(editor, "Pears!")).toBeGreaterThan(0);
+    expect(startOf(editor, "Fruit")).toBeGreaterThan(0);
   });
 });

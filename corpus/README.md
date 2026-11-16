@@ -153,8 +153,9 @@ table made in the model, with and without a grid. All 10 pass (2026-11-16).
 `pnpm corpus:pages` (Playwright, Chromium) lays each document out with `renderDocument`
 (`@folijs/view`, read-only, tracked changes accepted as in the reference data) and compares
 every paragraph outside tables with Word's reference: the page it starts on, and the line of
-that page; and every paragraph in table cells: the page it starts on (`cellParagraphs`). Paragraphs are matched by text, in order; those Foli does not show as paragraphs
-(inside content controls) are left out. Results go to `test-results/word-pages.json`.
+that page; and every paragraph in table cells: the page it starts on (`cellParagraphs`).
+Paragraphs are matched by text, in order; those Foli does not show as paragraphs (inside
+content controls) are left out. Results go to `test-results/word-pages.json`.
 
 The numbers depend on the fonts. Chromium uses the installed ones; Word's default since 2023,
 Aptos, is an Office cloud font that is not installed system-wide, so the run serves it to the

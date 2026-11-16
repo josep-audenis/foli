@@ -285,6 +285,8 @@ export function renderDocument(
         marginTop: block.before,
         marginBottom: block.after,
         repeat,
+        // A table splits at any line: no widow and orphan control across its rows.
+        anyLine: !!block.element.querySelector(":scope > table"),
         keepWithNext: block.keepNext,
         lines: () => (kept ? [height] : linesOf(block)),
         breaksAfter: () => {
