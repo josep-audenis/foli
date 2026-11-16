@@ -10,9 +10,10 @@
 #   - revisionsAccepted: tracked changes in the document. All are accepted (in memory) before
 #     measuring, so the numbers describe the final text whatever the user's markup view;
 #   - pages: Word's page count;
-#   - pictures: each picture (inline, then floating ones): page, position and size in points (an
-#     inline one from the page's corner; a floating one from what it is relative to, recorded),
-#     alt text, and a floating one's wrapping (WdWrapType);
+#   - pictures: each picture of the main text (inline, then floating ones): page, position and
+#     size in points (an inline one from the page's corner; a floating one from what it is
+#     relative to, recorded, or its alignment when aligned), alt text, and a floating one's
+#     wrapping (WdWrapType);
 #   - paragraphs: for every paragraph of the main text, in Word's order (table cells included,
 #     end-of-row marks not): its text, the page and the line on that page where it starts, the
 #     page where it ends, its list number as Word shows it ("1.1", "(a)"), and whether it is in a
@@ -58,6 +59,8 @@ $INFO_PAGE = 3          # wdActiveEndPageNumber (physical page, not the displaye
 $INFO_LINE = 10         # wdFirstCharacterLineNumber
 $INFO_IN_TABLE = 12     # wdWithInTable
 $PDF = 17               # wdExportFormatPDF
+# WdShapePosition: what a floating shape's Left or Top holds when it is aligned.
+$ALIGNED = @{ -999998 = "left"; -999999 = "top"; -999995 = "center"; -999996 = "right"; -999997 = "bottom"; -999994 = "inside"; -999993 = "outside" }
 $utf8 = New-Object System.Text.UTF8Encoding $false
 
 function Clean([string]$text) {
@@ -144,11 +147,16 @@ try {
       foreach ($s in $doc.Shapes) {
         # Pictures only (msoPicture 13, msoLinkedPicture 11): other shapes stay out of the record.
         if ($s.Type -ne 13 -and $s.Type -ne 11) { continue }
+        # An aligned picture's Left or Top is one of Word's constants (wdShapeRight -999996…), not
+        # a position: recorded as the alignment, the position then null.
+        $left = [double]$s.Left; $top = [double]$s.Top
         $pictures.Add([ordered]@{
             float = $true
             page = [int]$s.Anchor.Information($INFO_PAGE)
-            left = [math]::Round([double]$s.Left, 1)
-            top = [math]::Round([double]$s.Top, 1)
+            left = if ($ALIGNED.ContainsKey([int]$left)) { $null } else { [math]::Round($left, 1) }
+            top = if ($ALIGNED.ContainsKey([int]$top)) { $null } else { [math]::Round($top, 1) }
+            horizontalAlign = $ALIGNED[[int]$left]
+            verticalAlign = $ALIGNED[[int]$top]
             width = [math]::Round([double]$s.Width, 1)
             height = [math]::Round([double]$s.Height, 1)
             alt = [string]$s.AlternativeText

@@ -483,8 +483,10 @@
                      {
                          "float":  true,
                          "page":  3,
-                         "left":  -999996,
+                         "left":  null,
                          "top":  0.3,
+                         "horizontalAlign":  "right",
+                         "verticalAlign":  null,
                          "width":  200,
                          "height":  210,
                          "alt":  "Bar chart of monthly revenue, October to March",

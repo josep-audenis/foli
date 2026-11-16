@@ -14,7 +14,11 @@ param([string]$PdfDir = "", [string]$Only = "")
 
 # Only the documents whose numbers are in -Only ("06", "07"…), when given: the others are left as
 # they are, so their reference data stays valid.
-$wanted = @($Only -split "," | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+$wanted = @($Only -split "[,\s]+" | Where-Object { $_ })
+$known = @("01", "02", "03", "04", "05", "06", "07")
+foreach ($number in $wanted) {
+  if ($known -notcontains $number) { throw "-Only: no document $number (the documents are $($known -join ', '))" }
+}
 function Want([string]$number) { return $wanted.Count -eq 0 -or $wanted -contains $number }
 
 $ErrorActionPreference = "Stop"
@@ -622,17 +626,22 @@ try {
   Add-Para $doc "Schedule 2 to the Supply Agreement. Prices are in EUR and exclude VAT." | Out-Null
   Add-Para $doc "" | Out-Null
   $categories = @("Hardware", "Software", "Services", "Support")
+  # Amounts in the invariant culture: the same text whatever the generating machine's locale.
+  $invariant = [Globalization.CultureInfo]::InvariantCulture
+  $money = { param($value) $value.ToString("N2", $invariant) }
   $rows = @(, @("Category", "Item", "Unit", "Qty", "Price"))
   $n = 1
   foreach ($category in $categories) {
+    $total = 0
     for ($i = 1; $i -le 9; $i++) {
-      $rows += , @($category, "$category item $n", "each", [string]($i * 2), ("{0:N2}" -f ($n * 37.5)))
+      $rows += , @($category, "$category item $n", "each", [string]($i * 2), (& $money ($n * 37.5)))
+      $total += $i * 2 * $n * 37.5
       $n++
     }
-    $rows += , @("Subtotal $category", "", "", "", ("{0:N2}" -f ($n * 120)))
+    $rows += , @("Subtotal $category", "", "", "", (& $money $total))
   }
   $table = $doc.Tables.Add($doc.Paragraphs.Last.Range, $rows.Count, 5)
-  # Word's "Light Grid - Accent 1" built-in table style (wdStyleTableLightGridAccent1), banded.
+  # A banded built-in table style (WdBuiltinStyle -178: Word names it Medium List 1 - Accent 1).
   try { $table.Style = $doc.Styles.Item(-178) } catch { $table.Borders.Enable = $true }
   $table.ApplyStyleHeadingRows = $true
   $table.ApplyStyleRowBands = $true
@@ -642,18 +651,18 @@ try {
   $widths = @(70, 170, 50, 40, 70)
   for ($col = 1; $col -le 5; $col++) { $table.Columns.Item($col).Width = $widths[$col - 1] }
   # Rows can be addressed only before cells are merged down.
-  # A tall row that may not break across pages.
-  $tall = $table.Rows.Item(13)
-  $tall.AllowBreakAcrossPages = 0
-  $table.Cell(13, 2).Range.Text = "Software item 11 with a longer description: installation on every workstation, licence keys for three years, and the vendor's onboarding pack, delivered in one visit."
-  # A nested table in a cell: unit prices by volume.
+  # A tall row near the end of page 1 that may not break across pages: Word moves it whole.
+  $tallRow = 38
+  $table.Rows.Item($tallRow).AllowBreakAcrossPages = 0
+  $table.Cell($tallRow, 2).Range.Text = $rows[$tallRow - 1][1] + " with a longer description: installation on every workstation in the north and south wings, licence keys for three years, the vendor's onboarding pack, two training sessions for the site staff, and a review visit after the first month of use, all delivered by the same engineer."
+  # A nested table in a cell, after its caption paragraph: unit prices by volume.
+  # (Tables.Add in a cell loses a row and lands before the caption: converted text does not.)
   $cell = $table.Cell(3, 2).Range
-  $cell.Text = "Volume prices:"
-  $cell.InsertParagraphAfter()
-  $inner = $doc.Tables.Add($table.Cell(3, 2).Range.Paragraphs.Last.Range, 2, 2)
+  $cell.Text = "Volume prices:" + [char]13 + "1-9`t37.50" + [char]13 + "10+`t33.00"
+  $cell = $table.Cell(3, 2).Range
+  $prices = $doc.Range($cell.Paragraphs.Item(2).Range.Start, $cell.Paragraphs.Item(3).Range.End - 1)
+  $inner = $prices.ConvertToTable(1, 2, 2)   # wdSeparateByTabs
   $inner.Borders.Enable = $true
-  $inner.Cell(1, 1).Range.Text = "1-9"; $inner.Cell(1, 2).Range.Text = "37.50"
-  $inner.Cell(2, 1).Range.Text = "10+"; $inner.Cell(2, 2).Range.Text = "33.00"
   # Bottom-up so earlier row numbers stay valid: subtotal rows merged across, categories down.
   for ($row = $rows.Count; $row -ge 2; $row--) {
     if ($rows[$row - 1][0] -like "Subtotal*") { $table.Cell($row, 1).Merge($table.Cell($row, 4)) }
@@ -673,27 +682,32 @@ try {
   # wrapped square and top-and-bottom, and one behind the text.
   if (Want "07") {
   $doc = New-Doc
-  Add-Para $doc "Site inspection report" $S_TITLE | Out-Null
-  $p = Add-Para $doc "The chart below shows the monthly readings: "
-  $shape = $doc.InlineShapes.AddPicture($chart, $false, $true, $doc.Paragraphs.Last.Range)
-  $shape.AlternativeText = "Bar chart of monthly readings rising from 120 to 240"
-  Add-Para $doc "A second copy of the chart, as received, without a description:" | Out-Null
-  $doc.InlineShapes.AddPicture($chart, $false, $true, $doc.Paragraphs.Last.Range) | Out-Null
+  # The paragraphs first, then the pictures by paragraph number: a range kept from Add-Para moves
+  # as later paragraphs are added.
   $long = "The inspection covered the north and south wings, the plant room and the roof. Readings were taken at the same hour each day and logged by the site manager, who also recorded the weather, the occupancy of the building and any maintenance carried out during the period. "
-  $anchor = Add-Para $doc ($long * 3)
-  # WdWrapType: 0 square, 4 top and bottom, 5 behind text. Positions relative to the margin.
-  $square = $doc.Shapes.AddPicture($logo, $false, $true, 300, 0, 160, 40, $anchor)
+  Add-Para $doc "Site inspection report" $S_TITLE | Out-Null                                  # 1
+  Add-Para $doc "The chart below shows the monthly readings: " | Out-Null                     # 2
+  Add-Para $doc "A second copy of the chart, as received, without a description: " | Out-Null # 3
+  Add-Para $doc ($long * 3) | Out-Null                                                        # 4
+  Add-Para $doc ($long * 2) | Out-Null                                                        # 5
+  Add-Para $doc ($long * 2) | Out-Null                                                        # 6
+  Add-Para $doc "End of report." | Out-Null                                                   # 7
+  # Inline pictures at the end of their paragraph's text (before its mark).
+  function At-End($n) { $r = $doc.Paragraphs.Item($n).Range; $r.MoveEnd(1, -1) | Out-Null; $r.Collapse(0); return $r }
+  $shape = $doc.InlineShapes.AddPicture($chart, $false, $true, (At-End 2))
+  $shape.AlternativeText = "Bar chart of monthly readings rising from 120 to 240"
+  $doc.InlineShapes.AddPicture($chart, $false, $true, (At-End 3)) | Out-Null
+  # WdWrapType: 0 square, 4 top and bottom, 5 behind text. Positions in points from the column
+  # (horizontally) and the anchor paragraph (vertically): AddPicture's defaults.
+  $square = $doc.Shapes.AddPicture($logo, $false, $true, 300, 0, 160, 40, $doc.Paragraphs.Item(4).Range)
   $square.WrapFormat.Type = 0
   $square.AlternativeText = "Northwind logo"
-  $anchor = Add-Para $doc ($long * 2)
-  $band = $doc.Shapes.AddPicture($chart, $false, $true, 0, 20, 240, 140, $anchor)
+  $band = $doc.Shapes.AddPicture($chart, $false, $true, 0, 20, 240, 140, $doc.Paragraphs.Item(5).Range)
   $band.WrapFormat.Type = 4
   $band.AlternativeText = "Chart of readings, placed between paragraphs"
-  $anchor = Add-Para $doc ($long * 2)
-  $behind = $doc.Shapes.AddPicture($logo, $false, $true, 100, 10, 240, 60, $anchor)
+  $behind = $doc.Shapes.AddPicture($logo, $false, $true, 100, 10, 240, 60, $doc.Paragraphs.Item(6).Range)
   $behind.WrapFormat.Type = 5
   $behind.AlternativeText = "Northwind logo as a watermark"
-  Add-Para $doc "End of report." | Out-Null
   Save-Doc $doc "07-picture-report.docx"
   }
 }

@@ -16,13 +16,16 @@ const paragraphs = (d: FoliDocument) =>
 
 describe("a new package", () => {
   it("refuses a document that refers to parts of its original package", async () => {
-    // 06 refers to none (no header, footer, picture or linked content): a new package holds it.
-    for (const name of names.filter((n) => !n.startsWith("06-"))) {
+    for (const name of names) {
       const { document } = await load(name);
-      await expect(exportDocx(document), name).rejects.toMatchObject({
-        name: "DocxError",
-        message: expect.stringMatching(/refers to a part of its original package/),
-      });
+      const exported = exportDocx(document);
+      // 06 refers to none (no header, footer, picture or linked content): a new package holds it.
+      if (name.startsWith("06-")) await expect(exported, name).resolves.toBeInstanceOf(Uint8Array);
+      else
+        await expect(exported, name).rejects.toMatchObject({
+          name: "DocxError",
+          message: expect.stringMatching(/refers to a part of its original package/),
+        });
     }
   });
 
