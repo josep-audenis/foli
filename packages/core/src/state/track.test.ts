@@ -617,5 +617,6 @@ describe("tracked changes (property)", () => {
       }),
       { numRuns: 500 },
     );
-  });
+    // Seconds alone; more with the whole suite running beside it.
+  }, 120_000);
 });

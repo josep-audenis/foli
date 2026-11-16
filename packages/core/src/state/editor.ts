@@ -26,6 +26,17 @@ import {
   splitBlock,
   toggleMark,
 } from "./commands.js";
+import {
+  addComment,
+  type CommentContent,
+  type CommentOptions,
+  commentsPlugin,
+  deleteAllComments,
+  deleteComment,
+  editComment,
+  replyToComment,
+  resolveComment,
+} from "./comments.js";
 import { setAlign, setHighlight, setTextColor } from "./format.js";
 import { history, redo, undo } from "./history.js";
 import { removeLink, setLink } from "./links.js";
@@ -145,6 +156,18 @@ export interface Editor {
     nextChange(): boolean;
     /** Selects the previous change before the selection. */
     previousChange(): boolean;
+    /** Comments the selection (at a caret, the point there). */
+    addComment(content: CommentContent, options?: CommentOptions): boolean;
+    /** Replies to a comment's thread. */
+    replyToComment(id: number, content: CommentContent, options?: CommentOptions): boolean;
+    /** Replaces a comment's content. */
+    editComment(id: number, content: CommentContent): boolean;
+    /** Resolves (`done` false: reopens) a comment's thread. */
+    resolveComment(id: number, done?: boolean): boolean;
+    /** Deletes a comment, its replies and their anchors. */
+    deleteComment(id: number): boolean;
+    /** Deletes every comment. */
+    deleteAllComments(): boolean;
   };
   /** Whether edits are recorded as tracked changes. */
   readonly trackingChanges: boolean;
@@ -202,6 +225,7 @@ export function createEditor({
     history(),
     wordPlugin(envelope),
     trackPlugin(track),
+    commentsPlugin(),
     listKeymap(),
     baseKeymap(),
   ];
@@ -274,6 +298,12 @@ export function createEditor({
       rejectAllChanges: (name) => run(rejectAllChanges(name)),
       nextChange: () => run(nextChange),
       previousChange: () => run(previousChange),
+      addComment: (content, options) => run(addComment(content, options)),
+      replyToComment: (id, content, options) => run(replyToComment(id, content, options)),
+      editComment: (id, content) => run(editComment(id, content)),
+      resolveComment: (id, done) => run(resolveComment(id, done)),
+      deleteComment: (id) => run(deleteComment(id)),
+      deleteAllComments: () => run(deleteAllComments),
     },
     get trackingChanges() {
       return trackState(state)?.on ?? false;
