@@ -589,7 +589,19 @@ back between two tables that became adjacent and after a table that ends the bod
 (`keepTablesApart`). While tracking, text in cells is tracked as everywhere, a whole row
 deleted is the row's deletion (one's own inserted row goes) and a whole row inserted the row's
 insertion; review lists the changes in cells and the rows' revisions, and accepting a deleted
-row (rejecting an inserted one) removes it, the table with its last row. A table's breaks
+row (rejecting an inserted one) removes it, the table with its last row.
+
+Moving in tables (10.6b): Tab and Shift+Tab go to the next and previous cell, selecting its
+content (`goToCell`, bound before the lists' Tab: in a cell Word moves, numbered or not); Tab in
+the last cell adds a row like the last one (empty cells, no merge; its paragraphs keep the
+properties but not the ids, revisions or section of the last row's), recorded as an inserted row
+while tracking. Cells a merge covers are skipped. Not yet: Ctrl+Tab for a tab character, and a
+list's level changed by Tab, in a cell. Up and Down from a cell's first or last line (or with a cell's content
+selected) go to the cell above or below covering the same grid column (a merge's first cell),
+or out of the table from its first or last row (`goToCellVertically`, run by the view, which
+knows the lines): browsers go to the next cell in the DOM, or to the wrong row across pages. Left,
+Right and typing stay native. Enter and inline insertions over a selection that crosses a
+table's edge delete it as `deleteSelection` does. A table's breaks
 have no widow and orphan control (`BlockBox.anyLine`): Word keeps no lines together across
 rows. During a composition nothing moves: a table keeps its wrappers (the ones at its place,
 if its node changed), and a cell paragraph drawn again takes its old element's place; the

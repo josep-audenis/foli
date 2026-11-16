@@ -74,3 +74,41 @@ test("a click on the repeated header row puts the caret in the first row below i
   // Row 38 (index 37): the first row on page 2.
   expect(row).toBe(37);
 });
+
+/** The table row (index) and cell (index) the caret is in. */
+const where = (page: Page) =>
+  page.evaluate(() => {
+    const { selection, doc } = window.foliEdit.editor.state;
+    const $pos = doc.resolve(selection.head);
+    for (let d = $pos.depth; d > 0; d--)
+      if ($pos.node(d).type.name === "tableCell")
+        return { row: $pos.index(d - 2), cell: $pos.index(d - 1), text: $pos.parent.textContent };
+    return { row: -1, cell: -1, text: $pos.parent.textContent };
+  });
+
+test("Tab goes to the next cell; Down from the last row on page 1 goes to the first on page 2", async ({
+  page,
+}) => {
+  await open(page, "06-price-schedule.docx");
+  await page
+    .locator("td", { hasText: /^Support item 33$/ })
+    .first()
+    .click();
+  await page.keyboard.press("Tab");
+  expect(await where(page)).toMatchObject({ row: 36, cell: 2, text: "each" });
+  await page.keyboard.press("ArrowDown");
+  // Row 38 starts page 2 (under the repeated header).
+  expect(await where(page)).toMatchObject({ row: 37, cell: 2 });
+  await page.keyboard.press("Shift+Tab");
+  expect((await where(page)).cell).toBe(1);
+});
+
+test("Up from the header row leaves the table, to the paragraph above it", async ({ page }) => {
+  await open(page, "06-price-schedule.docx");
+  await page
+    .locator("td", { hasText: /^Unit$/ })
+    .first()
+    .click();
+  await page.keyboard.press("ArrowUp");
+  expect((await where(page)).row).toBe(-1);
+});

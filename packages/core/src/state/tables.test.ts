@@ -4,6 +4,7 @@ import type { FoliDocument } from "../v3/document.js";
 import { parseContent } from "../v3/document.js";
 import { createEditor } from "./editor.js";
 import { TextSelection } from "./selection.js";
+import { goToCellVertically } from "./tables.js";
 
 /** Editing across a table's edges (10.6, ADR-0006). */
 
@@ -372,5 +373,114 @@ describe("an inserted paragraph that is a cell's only one", () => {
     expect(editor.commands.rejectAllChanges()).toBe(true);
     valid(editor);
     expect(editor.state.doc.child(1).child(0).child(0).childCount).toBe(1);
+  });
+});
+
+describe("moving between cells", () => {
+  const selected = (editor: Editor) =>
+    editor.state.doc.textBetween(editor.state.selection.from, editor.state.selection.to);
+
+  it("Tab and Shift+Tab go to the next and previous cell, its content selected", () => {
+    const editor = editorOf([p("x"), TABLE, p("y")]);
+    select(editor, inside(editor, "a1", 1));
+    expect(editor.handleKey("Tab")).toBe(true);
+    expect(selected(editor)).toBe("b1");
+    editor.handleKey("Tab");
+    expect(selected(editor)).toBe("a2");
+    editor.handleKey("Shift-Tab");
+    expect(selected(editor)).toBe("b1");
+    // Outside a table Tab types a tab.
+    select(editor, inside(editor, "x", 1));
+    editor.handleKey("Tab");
+    // "x" then the tab.
+    expect(editor.state.doc.child(0).childCount).toBe(2);
+  });
+
+  it("Tab in the last cell adds a row like the last one, with empty cells", () => {
+    const editor = editorOf([p("x"), TABLE, p("y")]);
+    select(editor, inside(editor, "b3", 2));
+    editor.handleKey("Tab");
+    expect(shape(editor)[1]).toEqual([
+      ["a1", "b1"],
+      ["a2", "b2"],
+      ["a3", "b3"],
+      ["", ""],
+    ]);
+    const $head = editor.state.selection.$head;
+    expect($head.index($head.depth - 3)).toBe(3);
+    valid(editor);
+  });
+
+  it("Up and Down from a cell's edge go to the cell above or below, and out of the table", () => {
+    const editor = editorOf([p("x"), TABLE, p("y")]);
+    select(editor, inside(editor, "b2", 1));
+    expect(editor.run(goToCellVertically(-1))).toBe(true);
+    expect(editor.state.selection.from).toBe(inside(editor, "b1", 2));
+    editor.run(goToCellVertically(-1));
+    expect(editor.state.selection.from).toBe(inside(editor, "x", 1));
+    select(editor, inside(editor, "a3", 0));
+    editor.run(goToCellVertically(1));
+    expect(editor.state.selection.from).toBe(inside(editor, "y"));
+  });
+});
+
+describe("moving between cells: merges and edges", () => {
+  const merged = table(
+    row(cell("a1"), { type: "tableCell", attrs: { vMerge: "restart" }, content: [p("m")] }),
+    row(cell("a2"), { type: "tableCell", attrs: { vMerge: "continue" }, content: [p()] }),
+    row(cell("a3"), cell("b3")),
+  );
+  const selected = (editor: Editor) =>
+    editor.state.doc.textBetween(editor.state.selection.from, editor.state.selection.to);
+
+  it("Tab skips a cell a merge covers", () => {
+    const editor = editorOf([p("x"), merged, p("y")]);
+    select(editor, inside(editor, "a2", 1));
+    editor.handleKey("Tab");
+    expect(selected(editor)).toBe("a3");
+  });
+
+  it("the row Tab adds has none of the last row's ids or revisions", () => {
+    const withIds = table(row(cell("a1")), {
+      type: "tableRow",
+      attrs: { attributes: { "w14:paraId": "1A2B3C4D" } },
+      content: [
+        {
+          type: "tableCell",
+          content: [
+            {
+              type: "paragraph",
+              attrs: {
+                attributes: { "w14:paraId": "5E6F7A8B" },
+                revision: { insertion: { id: 3, author: "Other" } },
+                justification: "center",
+              },
+              content: [text("z")],
+            },
+          ],
+        },
+      ],
+    });
+    const editor = editorOf([p("x"), withIds, p("y")]);
+    select(editor, inside(editor, "z", 1));
+    editor.handleKey("Tab");
+    const added = editor.state.doc.child(1).child(2);
+    expect(added.attrs.attributes).toBeNull();
+    const para = added.child(0).child(0);
+    expect(para.attrs.attributes).toBeNull();
+    expect(para.attrs.revision).toBeNull();
+    // Its properties are kept.
+    expect(para.attrs.justification).toBe("center");
+  });
+
+  it("Up from a table that starts the document, and Down with a word selected, are the browser's", () => {
+    const editor = editorOf([TABLE, p("y")]);
+    select(editor, inside(editor, "a1", 1));
+    expect(editor.run(goToCellVertically(-1))).toBe(false);
+    select(editor, inside(editor, "a1", 0), inside(editor, "a1", 1));
+    expect(editor.run(goToCellVertically(1))).toBe(false);
+    // The whole content selected (Tab's): it moves as the cell.
+    select(editor, inside(editor, "a1", 0), inside(editor, "a1", 2));
+    expect(editor.run(goToCellVertically(1))).toBe(true);
   });
 });

@@ -288,7 +288,9 @@ export const splitBlock: Command = (state, dispatch) => {
   if (!(selection instanceof AllSelection) && !selection.$from.parent.isTextblock) return false;
   return attempt(state, dispatch, (tr) => {
     const marks = state.storedMarks ?? marksAt(selection.$from);
-    tr.deleteSelection();
+    if (!selection.empty) deleteSelectionKeepingTables(tr);
+    if (!tr.selection.$from.parent.inlineContent)
+      throw new TransformError("No text where the selection was");
     const $pos = tr.selection.$from;
     const atEnd = $pos.parentOffset === $pos.parent.content.size;
     const word = wordContext(state);
@@ -409,7 +411,9 @@ function insertLeaf(name: string, ...[state, dispatch]: Parameters<Command>): bo
   }
   return attempt(state, dispatch, (tr) => {
     const marks = state.storedMarks ?? marksAt(selection.$from);
-    tr.deleteSelection();
+    if (!selection.empty) deleteSelectionKeepingTables(tr);
+    if (!tr.selection.$from.parent.inlineContent)
+      throw new TransformError("No text where the selection was");
     const pos = tr.selection.from;
     tr.insert(
       pos,
