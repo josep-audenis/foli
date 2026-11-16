@@ -54,6 +54,11 @@ export interface SchemaSpec {
 }
 
 const NODE_KEYS = ["type", "attrs", "content", "text", "marks"];
+/**
+ * How deep parsed JSON may nest: far beyond real documents (a table in a cell is three levels;
+ * Word nests tables a few dozen deep at most), well within the call stack.
+ */
+export const MAX_NODE_DEPTH = 300;
 const MARK_KEYS = ["type", "attrs"];
 const SLICE_KEYS = ["content", "openStart", "openEnd"];
 
@@ -329,8 +334,18 @@ export class Schema {
     return new Slice(Fragment.fromArray(children), openStart, openEnd);
   }
 
-  /** `openStart`/`openEnd`: how many levels, starting with this node, are cut open. */
-  private parseNode(value: unknown, path: string, openStart: number, openEnd: number): Node {
+  /**
+   * `openStart`/`openEnd`: how many levels, starting with this node, are cut open. `depth`: how
+   * deep the node is; past `MAX_NODE_DEPTH` the input is refused instead of overflowing the stack.
+   */
+  private parseNode(
+    value: unknown,
+    path: string,
+    openStart: number,
+    openEnd: number,
+    depth = 0,
+  ): Node {
+    if (depth > MAX_NODE_DEPTH) fail(path, `nodes nested deeper than ${MAX_NODE_DEPTH} levels`);
     const json = expectObject(value, path, NODE_KEYS);
     const type = typeof json.type === "string" ? this.nodes[json.type] : undefined;
     if (!type) return fail(`${path}.type`, `unknown node type ${JSON.stringify(json.type)}`);
@@ -366,6 +381,7 @@ export class Schema {
           `${path}.content[${i}]`,
           i === 0 ? Math.max(openStart - 1, 0) : 0,
           i === items.length - 1 ? Math.max(openEnd - 1, 0) : 0,
+          depth + 1,
         ),
       );
     }

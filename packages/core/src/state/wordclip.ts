@@ -24,6 +24,7 @@ import { type DocJSON, isSafeLink } from "../schema.js";
 import {
   type AbstractNumberingJSON,
   type CommentJSON,
+  migrateToV4,
   type NumberingInstanceJSON,
   type NumberingLevelJSON,
   type ParagraphPropertiesJSON,
@@ -140,11 +141,13 @@ export function fitPastedV2(
   state: EditorState,
   content: Node,
 ): { doc: Node; envelope: WordEnvelope } {
-  const migrated = migrateToV3({
-    schemaVersion: 2,
-    settings: DEFAULT_SETTINGS,
-    content: content.toJSON() as DocJSON,
-  });
+  const migrated = migrateToV4(
+    migrateToV3({
+      schemaVersion: 2,
+      settings: DEFAULT_SETTINGS,
+      content: content.toJSON() as DocJSON,
+    }),
+  );
   const definitions: WordDefinitions = {
     styles: migrated.styles.map((style) => {
       // Based on the paste's Normal, which is the target's by name.

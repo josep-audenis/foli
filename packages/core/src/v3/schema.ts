@@ -126,6 +126,11 @@ const border = shape(
 
 const shading = shape({ pattern: token, color, fill: color, themeFill: token }, ["pattern"]);
 
+const nullableAttr = (check: Check): AttributeSpec => ({
+  default: null,
+  validate: nullable(check),
+});
+
 /** Who made a tracked change or comment, and when (ids are Word's `w:id`; authors may be empty). */
 const ID = int(0, 2_147_483_647);
 const revisionFields = { id: ID, author: str(), date: nullable(date) };
@@ -160,6 +165,131 @@ export const checkSection: Check = shape(
   },
   [],
   true,
+);
+
+/**
+ * A table measure (`w:tblW`, `w:tcW`, `w:tblInd`, cell margins): `value` in twips (`dxa`) or
+ * fiftieths of a percent (`pct`, 5000 = 100 %); `auto` and `nil` carry 0.
+ */
+const measure = shape({ value: twips, type: oneOf(["auto", "dxa", "pct", "nil"]) }, [
+  "value",
+  "type",
+]);
+const sides = (check: Check, extra: readonly string[] = []) =>
+  shape(
+    Object.fromEntries(
+      ["top", "left", "bottom", "right", "start", "end", ...extra].map((side) => [side, check]),
+    ),
+  );
+/** Word's limit: 63 columns. Files beyond it stay valid up to this bound. */
+const MAX_COLUMNS = 1000;
+
+/** Table properties (`w:tblPr`), also a row's exceptions (`w:tblPrEx`) and a table style's. */
+const tableProperties: Record<string, AttributeSpec> = {
+  style: nullableAttr(text()),
+  width: nullableAttr(measure),
+  justification: nullableAttr(oneOf(["left", "center", "right", "start", "end"])),
+  indent: nullableAttr(measure),
+  layout: nullableAttr(oneOf(["fixed", "autofit"])),
+  borders: nullableAttr(sides(border, ["insideH", "insideV"])),
+  cellMargins: nullableAttr(sides(measure)),
+  cellSpacing: nullableAttr(measure),
+  shading: nullableAttr(shading),
+  /** `w:tblLook`: which of the table style's conditional formats apply. */
+  look: nullableAttr(
+    shape({
+      firstRow: bool,
+      lastRow: bool,
+      firstColumn: bool,
+      lastColumn: bool,
+      noHBand: bool,
+      noVBand: bool,
+    }),
+  ),
+  /** Rows and columns per band of the table style's banding (`w:tblStyleRowBandSize`…). */
+  rowBandSize: nullableAttr(int(1, MAX_COLUMNS)),
+  columnBandSize: nullableAttr(int(1, MAX_COLUMNS)),
+  /** The element these properties were read from, verbatim. */
+  ext: nullableAttr(xml),
+};
+
+/** Row properties (`w:trPr`) as a row's attributes or a table style's. */
+const rowProperties: Record<string, AttributeSpec> = {
+  /** In twips; `auto` lets the content decide (Word's default). */
+  height: nullableAttr(
+    shape({ value: positiveTwips, rule: oneOf(["auto", "exact", "atLeast"]) }, ["value"]),
+  ),
+  /** The row is never split across pages. */
+  cantSplit: nullableAttr(bool),
+  /** A header row: repeated at the top of each page the table continues on. */
+  header: nullableAttr(bool),
+  /** Grid columns left empty before the first cell and after the last, and their widths. */
+  gridBefore: nullableAttr(int(1, MAX_COLUMNS)),
+  widthBefore: nullableAttr(measure),
+  gridAfter: nullableAttr(int(1, MAX_COLUMNS)),
+  widthAfter: nullableAttr(measure),
+  ext: nullableAttr(xml),
+};
+
+/** Cell properties (`w:tcPr`) as a cell's attributes or a table style's. */
+const cellProperties: Record<string, AttributeSpec> = {
+  width: nullableAttr(measure),
+  /** Grid columns the cell spans (null: one). */
+  gridSpan: nullableAttr(int(1, MAX_COLUMNS)),
+  /**
+   * A vertical merge: `restart` starts one, `continue` is covered by the cell above. Kept as
+   * Word writes it (a merged cell is present in every row it covers); layout derives the span.
+   */
+  vMerge: nullableAttr(oneOf(["restart", "continue"])),
+  borders: nullableAttr(sides(border, ["insideH", "insideV", "tl2br", "tr2bl"])),
+  shading: nullableAttr(shading),
+  margins: nullableAttr(sides(measure)),
+  verticalAlign: nullableAttr(oneOf(["top", "center", "bottom", "both"])),
+  textDirection: nullableAttr(token),
+  noWrap: nullableAttr(bool),
+  ext: nullableAttr(xml),
+};
+
+const propertiesCheck =
+  (specs: Record<string, AttributeSpec>): Check =>
+  (v) => {
+    if (!isRecord(v)) return "must be an object";
+    for (const [key, value] of Object.entries(v)) {
+      if (!Object.hasOwn(specs, key)) return `unknown key ${key}`;
+      const error =
+        value === null
+          ? "must not be null (leave it out)"
+          : (specs[key] as AttributeSpec).validate?.(value);
+      if (error) return `${key} ${error}`;
+    }
+    return undefined;
+  };
+
+/** Table, row and cell properties as a table style or a row's exceptions give them. */
+export const checkTableProperties: Check = propertiesCheck(tableProperties);
+export const checkRowProperties: Check = propertiesCheck(rowProperties);
+export const checkCellProperties: Check = propertiesCheck(cellProperties);
+
+/** EMU (English Metric Units: 914 400 per inch), as DrawingML measures pictures. */
+const emu = int(0, 2_147_483_647);
+const offset = int(-2_147_483_648, 2_147_483_647);
+
+/** Where a floating picture is (`wp:anchor`): null for an inline picture. */
+const checkFloat: Check = shape(
+  {
+    /** `relativeFrom` (page, margin, column, paragraph, character…) and an offset or alignment. */
+    horizontal: shape({ relativeTo: token, offset, align: token }, ["relativeTo"]),
+    vertical: shape({ relativeTo: token, offset, align: token }, ["relativeTo"]),
+    /** How text goes around it; `behind` and `inFront` are no wrapping. */
+    wrap: oneOf(["square", "tight", "through", "topAndBottom", "behind", "inFront"]),
+    /** Which sides text goes on (`w:wrapText`). */
+    side: oneOf(["bothSides", "left", "right", "largest"]),
+    /** Distance from the text, in EMU. */
+    distance: shape({ top: emu, bottom: emu, left: emu, right: emu }),
+    allowOverlap: bool,
+    layoutInCell: bool,
+  },
+  ["horizontal", "vertical", "wrap"],
 );
 
 /** Marks that describe how text looks: what a style, a paragraph mark or a recorded change holds. */
@@ -197,11 +327,6 @@ export const checkRunProperties: Check = (v) => {
     return (error as Error).message;
   }
 };
-
-const nullableAttr = (check: Check): AttributeSpec => ({
-  default: null,
-  validate: nullable(check),
-});
 
 /**
  * Paragraph properties (`w:pPr`). The same attributes describe a style's, a numbering level's
@@ -337,7 +462,40 @@ export const schema = new Schema({
         attributes: nullableAttr(attributes),
       },
     },
-    /** Block content Foli does not model yet (tables until Phase 10…), kept verbatim. */
+    /**
+     * A table (`w:tbl`, schema v4): rows of cells holding blocks. Word's rules beyond the
+     * content expressions (no table right after a table, none ending the body or a cell, no
+     * section or page break in a cell) are checked by `parseContent`.
+     */
+    table: {
+      group: "block",
+      content: "tableRow+",
+      attrs: {
+        ...tableProperties,
+        /** The grid's column widths in twips (`w:tblGrid`). */
+        grid: { default: [], validate: listOf(positiveTwips, MAX_COLUMNS) },
+        /** The `w:tblGrid` the grid was read from, verbatim. */
+        gridExt: nullableAttr(xml),
+      },
+    },
+    tableRow: {
+      content: "tableCell+",
+      attrs: {
+        ...rowProperties,
+        /** The row inserted or deleted as a tracked change (`w:trPr/w:ins`, `w:del`). */
+        revision: nullableAttr(shape({ insertion: revision, deletion: revision })),
+        /** The row's table property exceptions (`w:tblPrEx`). */
+        exceptions: nullableAttr(checkTableProperties),
+        /** `w:tr`'s own unknown attributes (`w14:paraId`, revision save ids…). */
+        attributes: nullableAttr(attributes),
+      },
+    },
+    tableCell: {
+      // As Word requires, a cell ends with a paragraph.
+      content: "block* paragraph",
+      attrs: cellProperties,
+    },
+    /** Block content Foli does not model yet (a table inside a content control…), kept verbatim. */
     opaqueBlock: {
       group: "block",
       attrs: { xml: { validate: xml }, label: nullableAttr(text()) },
@@ -383,7 +541,29 @@ export const schema = new Schema({
       inline: true,
       attrs: { id: { validate: ID }, ...markerAttributes },
     },
-    /** Inline content Foli does not model yet (fields, drawings, symbols…), kept verbatim. */
+    /**
+     * A picture (`w:drawing` holding `pic:pic`, schema v4), inline or floating. Its bytes are
+     * the envelope's `resources[resource]`.
+     */
+    picture: {
+      group: "inline",
+      inline: true,
+      attrs: {
+        resource: { validate: text() },
+        /** In EMU. */
+        width: { validate: emu },
+        height: { validate: emu },
+        /** Alt text (`wp:docPr/@descr`): allowed to be missing, as Word allows it. */
+        alt: nullableAttr(str(65_535)),
+        title: nullableAttr(str(65_535)),
+        /** Marked decorative: no alt text needed. */
+        decorative: nullableAttr(bool),
+        float: nullableAttr(checkFloat),
+        /** The `w:drawing` it was read from, verbatim (cropping, effects…). */
+        ext: nullableAttr(xml),
+      },
+    },
+    /** Inline content Foli does not model yet (fields, charts, shapes, symbols…), kept verbatim. */
     opaqueInline: {
       group: "inline",
       inline: true,

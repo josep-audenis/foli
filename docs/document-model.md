@@ -1,7 +1,10 @@
 # Document model
 
-> Status: schema v3, the Word model (`packages/core/src/v3/`), is the current schema
-> (`SCHEMA_VERSION` 3): the editor and view edit it. Schema v2 (0.2.0, `packages/core/src/document.ts`,
+> Status: the Word model (`packages/core/src/v3/`) is the current schema (`SCHEMA_VERSION` 4:
+> schema v3 plus tables, pictures and `resources`, ADR-0006; Phase 10, not released yet): the
+> editor and view edit it. Tables and pictures are in the model and validated; import, export,
+> rendering and editing of them come in 10.4–10.9 (until then export refuses them and the view
+> shows a placeholder). Schema v2 (0.2.0, `packages/core/src/document.ts`,
 > `packages/core/src/schema.ts`) and v1 (0.1.0) are kept to read and migrate documents saved
 > with them, and v2 to read pasted HTML. The document model (schema from specs, immutable nodes,
 > positions, slices, JSON in/out) is `packages/core/src/model/`. Steps, transactions, history and
@@ -13,13 +16,14 @@ A persisted Foli document is a versioned **envelope** around a JSON content tree
 
 ```ts
 interface FoliDocument {
-  schemaVersion: 3; // 1 and 2: documents saved by 0.1.0 and 0.2.0, migrated on load
+  schemaVersion: 4; // 1 to 3: documents saved by 0.1.0 to 0.4.0, migrated on load
   section: SectionJSON; // page setup, in twips
   defaults: { paragraph?: ParagraphPropertiesJSON; run?: MarkJSON[] };
   styles: StyleJSON[];
   numbering: { abstracts: AbstractNumberingJSON[]; instances: NumberingInstanceJSON[] };
   theme?: ThemeJSON;
   comments: CommentJSON[];
+  resources?: Record<string, ResourceJSON>; // pictures' bytes, by key
   content: NodeJSON; // root node of type "doc"
 }
 ```
@@ -139,11 +143,15 @@ JSON: the style, then the defaults, decide (`Resolver` in `v3/resolve.ts`, 8.6).
 | ---------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `doc`                                                            | one or more blocks                                                                                                                                                                                                                                                                                                               |
 | `paragraph`                                                      | inline\*; Word's paragraph properties: `style`, `justification`, `indent`, `spacing`, `keepNext`, `keepLines`, `widowControl`, `pageBreakBefore`, `contextualSpacing`, `outlineLevel`, `numbering` (`id` and/or `level`), `tabs`, `borders`, `shading`, `markFormat`, `ext`; `section`, `revision`, `formatChange`, `attributes` |
-| `opaqueBlock`                                                    | `xml` (verbatim), `label`: block content Foli does not model yet (tables until Phase 10)                                                                                                                                                                                                                                         |
+| `table` (v4)                                                     | `tableRow`+; Word's table properties (`w:tblPr`): `style`, `width`, `justification`, `indent`, `layout`, `borders` (with `insideH`/`insideV`), `cellMargins`, `cellSpacing`, `shading`, `look`, `rowBandSize`, `columnBandSize`, `ext`; `grid` (column widths, twips), `gridExt`                                                 |
+| `tableRow` (v4)                                                  | `tableCell`+; `height` (`value`, `rule`), `cantSplit`, `header`, `gridBefore`/`widthBefore`, `gridAfter`/`widthAfter`, `ext`; `revision` (row inserted/deleted), `exceptions` (`w:tblPrEx`: table properties), `attributes`                                                                                                      |
+| `tableCell` (v4)                                                 | blocks ending with a paragraph; `width`, `gridSpan`, `vMerge` (`restart`/`continue`: a merged cell is present in every row it covers, as Word writes it), `borders`, `shading`, `margins`, `verticalAlign`, `textDirection`, `noWrap`, `ext`                                                                                     |
+| `opaqueBlock`                                                    | `xml` (verbatim), `label`: block content Foli does not model (a table inside a content control…)                                                                                                                                                                                                                                 |
 | `text`, `tab`, `hardBreak` (`clear`), `pageBreak`, `columnBreak` | inline                                                                                                                                                                                                                                                                                                                           |
 | `bookmarkStart` (`id`, `name`), `bookmarkEnd` (`id`)             | a bookmark's ends: what cross-references and internal links point at                                                                                                                                                                                                                                                             |
 | `commentStart`, `commentEnd`, `commentReference`                 | `id`: a comment's range and its reference mark, as Word places them (ranges overlap freely, so they are points, not marks)                                                                                                                                                                                                       |
-| `opaqueInline`                                                   | `xml`, `label`, `run` (content of a run, written back inside one): fields, drawings, symbols… until modeled                                                                                                                                                                                                                      |
+| `picture` (v4)                                                   | inline; `resource` (a key of the envelope's `resources`), `width`, `height` (EMU), `alt` (optional, as Word allows), `title`, `decorative`, `float` (null inline; else `horizontal`/`vertical` (`relativeTo`, `offset` or `align`), `wrap`, `side`, `distance`, `allowOverlap`, `layoutInCell`), `ext` (the `w:drawing`)         |
+| `opaqueInline`                                                   | `xml`, `label`, `run` (content of a run, written back inside one): fields, charts, shapes, symbols… until modeled                                                                                                                                                                                                                |
 
 Marks, in canonical order: `link` (`href` as the file has it, `anchor`, `tooltip`,
 `attributes`), `insertion` and `deletion` (`id`, `author`, `date`, `move`: tracked changes and
@@ -175,16 +183,33 @@ properties may hold only the marks that describe how text looks (`RUN_PROPERTY_M
   The parts of `styles.xml` and `numbering.xml` the envelope does not hold (latent styles,
   picture bullets) are written back from the original package, which import keeps (8.4).
 
+- **Tables** (v4, ADR-0006): rows of cells holding blocks, Word's properties as attributes and
+  `ext`. Beyond the content expressions, `parseContent` keeps Word's rules: a table never
+  follows a table (Word would merge them) and never ends the document; a paragraph in a cell
+  ends no section and holds no page or column break. A table Foli cannot hold (rows inside a
+  content control) stays an `opaqueBlock`.
+- **Pictures** (v4): a `picture` refers to `resources[key]`: `contentType` (an `image/` type),
+  `size`, and where the bytes are, at least one of `part` (the package's media part), `url`
+  (the app's: relative, `http(s):` or `blob:`, never a scheme that runs code) or `data` (a
+  `data:image/…` URL, when the app opts into it). No base64 in the JSON by default. A key with
+  no resource is allowed (the picture shows as missing); code looks keys up with `Object.hasOwn`
+  (`resources.constructor` is not a resource), and `__proto__` is refused as a key.
+- **Depth:** parsed JSON nests at most `MAX_NODE_DEPTH` (300) levels, about a hundred tables
+  inside each other: deeper input is refused with its path rather than overflowing the stack.
+
 ```ts
 interface FoliDocument {
-  schemaVersion: 3;
+  schemaVersion: 4;
   section: SectionJSON; // page size, orientation, margins (twips), headers/footers by relationship id
   defaults: { paragraph?: ParagraphPropertiesJSON; run?: MarkJSON[] }; // w:docDefaults
-  styles: StyleJSON[]; // id, type, name, basedOn, next, link, isDefault, paragraph, run, ext
+  // id, type, name, basedOn, next, link, isDefault, paragraph, run, ext; a table style's
+  // table, row, cell and conditions (w:tblStylePr: firstRow, band1Horz… with the same parts)
+  styles: StyleJSON[];
   numbering: { abstracts: AbstractNumberingJSON[]; instances: NumberingInstanceJSON[] };
   theme?: ThemeJSON; // major/minor fonts, theme colors (read-only: export keeps the original part)
-  comments: CommentJSON[]; // id, author, initials, date, content (v3 blocks), parent, done
-  content: NodeJSON; // a v3 doc
+  comments: CommentJSON[]; // id, author, initials, date, content (blocks), parent, done
+  resources?: Record<string, ResourceJSON>; // contentType, size, part | url | data
+  content: NodeJSON; // a doc
 }
 ```
 
@@ -248,6 +273,16 @@ describes it:
   Word's `aa` up to 30 letters, ordinal, none; others as decimal), all decimal in a legal
   level; bullets are their text as written. A marker's formatting is the paragraph's, then its
   mark's, then the level's.
+- Tables (v4): `table(attrs)` gives a table's properties over its style's (`basedOn` chain; the
+  default table style when none is named); `cell(table, row, cell, place)` gives a cell's
+  shading, borders (its own edges: the table's outer borders on the table's edges, `insideH`
+  and `insideV` inside; conflicts between neighbours are the view's), margins (twips) and
+  vertical alignment from the table style's parts that apply where it is (`tableConditions`,
+  as `look` turns them on, in Word's order: whole table, banded columns, banded rows, first and
+  last column, first and last row, corners; the first and last row and column are left out of
+  banding), then the row's exceptions and the cell's own properties. `paragraph(attrs, cell)`
+  puts the table style's paragraph and run properties between the defaults and the paragraph
+  style (ECMA-376 17.7.2). Unit-tested; checked against Word's pages in 10.5.
 
 Checked against Word: every list number outside tables in the corpus is the one Word shows
 (`packages/docx/src/import/resolve.test.ts`: 41 numbered paragraphs, legal `1.`/`1.1`/`(a)`/
@@ -328,7 +363,7 @@ an end).
   incomplete content only in their open nodes.
 - `node.toJSON()`, `mark.toJSON()` and `slice.toJSON()` emit canonical JSON
   (`SliceJSON = { content, openStart, openEnd }`).
-- `parseContent(json)` parses schema v3 content into a `doc` node (`parseContentV2`: v2
+- `parseContent(json)` parses current-schema content into a `doc` node (`parseContentV2`: v2
   content); `parseDocument` migrates an older envelope first, then validates.
 
 ### Testing
@@ -371,15 +406,17 @@ takes points.
 `schemaVersion` is bumped whenever the envelope or the content schema changes (new types
 included: an older Foli cannot read them). `parseDocument` accepts every version from 1 to the
 current one: a v1 or v2 document is validated as v2 (v1 → v2 by `MIGRATIONS` in
-`packages/core/src/document.ts`), migrated to v3 (`migrateToV3`), then validated as v3. A document from a
+`packages/core/src/document.ts`), migrated to v3 (`migrateToV3`) and v4 (`migrateToV4`), then
+validated as v4; a v3 document is validated as v4 holding no v4 node and no `resources`. A document from a
 newer Foli is rejected with a message saying so; versions below 1 or not integers are invalid.
 Migrations never drop content. A published version never changes in place.
 
-| Version | Released in | Migration to the next                                                           |
-| ------- | ----------- | ------------------------------------------------------------------------------- |
-| 1       | 0.1.0       | v1 → v2: only the version changes (v2 only adds types and defaulted attributes) |
-| 2       | 0.2.0       | v2 → v3 (`migrateToV3`, 8.3): Word's model                                      |
-| 3       | 0.3.0       | — (the current version)                                                         |
+| Version | Released in | Migration to the next                                                                                                |
+| ------- | ----------- | -------------------------------------------------------------------------------------------------------------------- |
+| 1       | 0.1.0       | v1 → v2: only the version changes (v2 only adds types and defaulted attributes)                                      |
+| 2       | 0.2.0       | v2 → v3 (`migrateToV3`, 8.3): Word's model                                                                           |
+| 3       | 0.3.0       | v3 → v4 (`migrateToV4`): only the version changes (a table kept opaque stays so until its `.docx` is imported again) |
+| 4       | (0.5.0)     | — (the current version: tables, pictures, `resources`)                                                               |
 
 0.1.0 reads only version 1: it rejects documents saved by 0.2.0 ("Unsupported schemaVersion: 2").
 0.2.0 reads versions 1 and 2: it rejects documents saved by 0.3.0.
@@ -387,7 +424,7 @@ Migrations never drop content. A published version never changes in place.
 same schema 3: it writes the marks and attributes 0.3.0 already reads (`insertion`, `deletion`,
 `formatChange`, a paragraph's `revision` and `formatChange`, comment anchors and `comments`), so
 0.3.0 and 0.4.0 read each other's documents. Whether tracking is on is not in the document: the
-editor option and a `.docx`'s `w:trackRevisions` carry it.
+editor option and a `.docx`'s `w:trackRevisions` carry it. 0.4.0 cannot read schema 4.
 Tests load a document exactly as 0.1.0 saved it (`document.test.ts`); in the browser, the
 page-break e2e (`pages.spec.ts`) and the examples' smoke test load v1 documents through the
 migration.
@@ -397,8 +434,6 @@ migration.
 Each added only when a feature needs it, with a migration:
 
 - `metadata` (title, author, timestamps, app-defined fields).
-- `resources` (images by id, no inline binary) — Phase 10. The original DOCX package stays
-  beside the document, not in it (`DocxImport.package`, Phase 8).
 - `headers` / `footers` as separate content trees — Phase 11.
 - Extension-owned data under a namespaced key.
 

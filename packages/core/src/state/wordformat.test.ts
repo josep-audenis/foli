@@ -50,7 +50,7 @@ const p = (attrs: Record<string, unknown>, ...content: NodeJSON[]): NodeJSON => 
 
 function documentOf(blocks: NodeJSON[], over: Partial<FoliDocument> = {}): FoliDocument {
   return {
-    schemaVersion: 3,
+    schemaVersion: 4,
     section: {},
     defaults: { run: [{ type: "fontSize", attrs: { value: 22 } }] },
     styles: STYLES,

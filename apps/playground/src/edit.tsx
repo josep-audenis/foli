@@ -13,7 +13,7 @@ import { createRoot } from "react-dom/client";
 
 /** A short A4 document with Word's Normal and Heading 1 styles. */
 export const SAMPLE: FoliDocument = {
-  schemaVersion: 3,
+  schemaVersion: 4,
   section: {
     pageSize: { width: 11906, height: 16838 },
     margins: { top: 1440, right: 1440, bottom: 1440, left: 1440 },

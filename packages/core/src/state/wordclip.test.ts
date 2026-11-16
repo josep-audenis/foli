@@ -57,7 +57,7 @@ const comment = (id: number, extra: Partial<CommentJSON> = {}): CommentJSON => (
 function editorOf(blocks: NodeJSON[], over: Partial<FoliDocument> = {}) {
   return createEditor({
     document: {
-      schemaVersion: 3,
+      schemaVersion: 4,
       section: {},
       defaults: {},
       styles: STYLES,

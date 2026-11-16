@@ -427,14 +427,14 @@ describe("schema v3 envelope", () => {
       ],
       [{ content: { type: "paragraph" } }, /root node must be of type "doc"/],
       [
-        { schemaVersion: 4 },
-        /Unsupported schemaVersion: 4 \(.*reads 1 to 3; .*saved by a newer one\)/,
+        { schemaVersion: 5 },
+        /Unsupported schemaVersion: 5 \(.*reads 1 to 4; .*saved by a newer one\)/,
       ],
       [
         { schemaVersion: 0 },
-        /Unsupported schemaVersion: 0 \(this version of @folijs\/core reads 1 to 3\)$/,
+        /Unsupported schemaVersion: 0 \(this version of @folijs\/core reads 1 to 4\)$/,
       ],
-      [{ schemaVersion: 3.5 }, /reads 1 to 3\)$/],
+      [{ schemaVersion: 3.5 }, /reads 1 to 4\)$/],
     ];
     for (const [overrides, message] of bad) {
       expect(() => parseDocument(v3(overrides)), JSON.stringify(overrides)).toThrow(message);
@@ -473,10 +473,10 @@ describe("schema v3 envelope", () => {
 });
 
 describe("createDocument", () => {
-  it("makes a valid schema v3 document on A4 with the editor's styles", () => {
+  it("makes a valid current-schema document on A4 with the editor's styles", () => {
     const made = createDocument();
-    expect(SCHEMA_VERSION).toBe(3);
-    expect(made.schemaVersion).toBe(3);
+    expect(SCHEMA_VERSION).toBe(4);
+    expect(made.schemaVersion).toBe(4);
     expect(parseDocument(made)).toEqual(made);
     expect(made.content).toEqual(doc(paragraph({})));
     expect(made.section.pageSize).toEqual({ width: 11906, height: 16838 });
@@ -793,7 +793,7 @@ describe("v2 → v3 migration", () => {
       },
     };
     const migrated = parseDocument(savedBy010);
-    expect(migrated.schemaVersion).toBe(3);
+    expect(migrated.schemaVersion).toBe(4);
     expect(migrated.section.pageSize).toEqual({ width: 12240, height: 15840 });
     expect(migrated.content).toEqual(
       doc(paragraph({ style: "Heading1" }, [{ type: "text", text: "T" }]), { type: "paragraph" }),

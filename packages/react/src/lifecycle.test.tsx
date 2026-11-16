@@ -62,7 +62,7 @@ describe("replacing the document (setDocument)", () => {
     expect(changes[1]?.document.section.pageSize).toEqual({ width: 12240, height: 15840 });
   });
 
-  it("migrates an older document (from JavaScript): changes are still schema v3", () => {
+  it("migrates an older document (from JavaScript): changes are the current schema", () => {
     const ref = createRef<FoliEditorHandle>();
     const changes: FoliChange[] = [];
     render(<FoliEditor ref={ref} onChange={(c) => changes.push(c)} />);
@@ -71,7 +71,7 @@ describe("replacing the document (setDocument)", () => {
     act(() => editor.setDocument(text("Old") as never));
     type("x");
     expect(screen.getByRole("textbox").textContent).toBe("xOld");
-    expect(changes[0]?.document).toMatchObject({ schemaVersion: 3, section: {} });
+    expect(changes[0]?.document).toMatchObject({ schemaVersion: 4, section: {} });
     expect(() => parseDocument(changes[0]?.document)).not.toThrow();
   });
 });

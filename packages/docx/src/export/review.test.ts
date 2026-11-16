@@ -167,7 +167,7 @@ describe("comment threads", () => {
 describe("verbatim content must fit the part", () => {
   const plain = (content: NodeJSON[]) =>
     parseDocument({
-      schemaVersion: 3,
+      schemaVersion: 4,
       section: {},
       defaults: {},
       styles: [],
@@ -176,6 +176,31 @@ describe("verbatim content must fit the part", () => {
       content: { type: "doc", content },
     });
   const cases: [NodeJSON[], RegExp][] = [
+    // Schema 4 content export does not write yet: refused, never dropped.
+    [
+      [
+        {
+          type: "table",
+          content: [
+            {
+              type: "tableRow",
+              content: [{ type: "tableCell", content: [{ type: "paragraph" }] }],
+            },
+          ],
+        },
+        { type: "paragraph" },
+      ],
+      /A table cannot be exported to .docx yet/,
+    ],
+    [
+      [
+        {
+          type: "paragraph",
+          content: [{ type: "picture", attrs: { resource: "r", width: 1, height: 1 } }],
+        },
+      ],
+      /A picture cannot be exported to .docx yet/,
+    ],
     [[{ type: "opaqueBlock", attrs: { xml: "<w:p>" } }], /does not fit the part/],
     [[{ type: "opaqueBlock", attrs: { xml: "<w:p/><w:p/>" } }], /exactly one element/],
     [[{ type: "paragraph", attrs: { ext: "<w:rPr/>" } }], /must be a w:pPr, not w:rPr/],

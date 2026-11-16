@@ -7,11 +7,16 @@
 import type { MarkJSON } from "../model/index.js";
 import type {
   AbstractNumberingJSON,
+  BorderJSON,
+  CellPropertiesJSON,
   FoliDocument,
+  MeasureJSON,
   NumberingInstanceJSON,
   NumberingLevelJSON,
   ParagraphPropertiesJSON,
   StyleJSON,
+  TableCondition,
+  TablePropertiesJSON,
   ThemeJSON,
 } from "./document.js";
 
@@ -411,6 +416,122 @@ function ordinal(n: number): string {
   return `${n}${suffix}`;
 }
 
+/** A table's effective properties: its style's (the default table style's when it names none), then its own. */
+export type TableFormat = Omit<TablePropertiesJSON, "style" | "ext"> & {
+  /** The table style that applies. */
+  style: string | null;
+};
+
+/** Where a cell is: its row among the table's rows, and its index among the row's cells. */
+export interface CellPlace {
+  row: number;
+  rows: number;
+  cell: number;
+  cells: number;
+}
+
+type Side = "top" | "bottom" | "left" | "right";
+
+/** A cell's effective formatting from the table style's parts that apply to it and its own properties. */
+export interface CellFormat {
+  /** The table style that applies. */
+  style: string | null;
+  /** The table style's parts that apply, in the order they apply (later wins). */
+  conditions: TableCondition[];
+  /** Fill `RRGGBB`; null for none. */
+  shading: string | null;
+  /** The cell's own edges before conflicts with its neighbours are resolved (left-to-right text). */
+  borders: Partial<Record<Side, BorderJSON>>;
+  /** Twips. */
+  margins: Record<Side, number>;
+  verticalAlign: "top" | "center" | "bottom" | "both";
+}
+
+/** A table style's parts for a set of conditions, flattened in the order they apply. */
+interface TableLayer {
+  key: string;
+  paragraph: ParagraphPropertiesJSON[];
+  run: MarkJSON[][];
+  cell: CellPropertiesJSON[];
+}
+
+const TABLE_KEYS = new Set([
+  "width",
+  "justification",
+  "indent",
+  "layout",
+  "borders",
+  "cellMargins",
+  "cellSpacing",
+  "shading",
+  "look",
+  "rowBandSize",
+  "columnBandSize",
+]);
+const PER_SIDE = new Set(["borders", "cellMargins", "look"]);
+
+/** Table properties merged in order, later winning (borders and margins side by side). */
+function mergeTable(target: Json, props: Json | undefined | null): void {
+  if (!props) return;
+  for (const [key, value] of Object.entries(props)) {
+    if (value == null || !TABLE_KEYS.has(key)) continue;
+    target[key] = PER_SIDE.has(key) ? { ...(target[key] as Json), ...(value as Json) } : value;
+  }
+}
+
+/** A cell margin in twips: Word measures margins in `dxa` (other types count as none). */
+function twipsOf(measure: MeasureJSON | undefined): number | undefined {
+  if (!measure) return undefined;
+  return measure.type === "dxa" ? measure.value : 0;
+}
+
+/** The last value `pick` gives among `layers` (later layers win). */
+function last<T, V>(layers: readonly T[], pick: (layer: T) => V | undefined | null): V | undefined {
+  for (let i = layers.length - 1; i >= 0; i--) {
+    const value = pick(layers[i] as T);
+    if (value != null) return value;
+  }
+  return undefined;
+}
+
+/**
+ * The table style's parts that apply to a cell, in Word's order: the whole table, banded
+ * columns, banded rows, first and last column, first and last row, then the corners. The first
+ * and last row and column (when `look` turns them on) are left out of banding.
+ *
+ * shortcut: banding counts cells (not grid columns) and leaves out only the first and last
+ * row; check against Word on the corpus's banded table (06) when tables reach the pages (10.5).
+ */
+export function tableConditions(
+  look: NonNullable<TablePropertiesJSON["look"]>,
+  place: CellPlace,
+  rowBand = 1,
+  columnBand = 1,
+): TableCondition[] {
+  const out: TableCondition[] = ["wholeTable"];
+  const firstRow = !!look.firstRow && place.row === 0;
+  const lastRow = !!look.lastRow && place.row === place.rows - 1;
+  const firstCol = !!look.firstColumn && place.cell === 0;
+  const lastCol = !!look.lastColumn && place.cell === place.cells - 1;
+  if (!look.noVBand && !firstCol && !lastCol) {
+    const i = place.cell - (look.firstColumn ? 1 : 0);
+    out.push(Math.floor(i / columnBand) % 2 === 0 ? "band1Vert" : "band2Vert");
+  }
+  if (!look.noHBand && !firstRow && !lastRow) {
+    const i = place.row - (look.firstRow ? 1 : 0);
+    out.push(Math.floor(i / rowBand) % 2 === 0 ? "band1Horz" : "band2Horz");
+  }
+  if (firstCol) out.push("firstCol");
+  if (lastCol) out.push("lastCol");
+  if (firstRow) out.push("firstRow");
+  if (lastRow) out.push("lastRow");
+  if (firstRow && firstCol) out.push("nwCell");
+  if (firstRow && lastCol) out.push("neCell");
+  if (lastRow && firstCol) out.push("swCell");
+  if (lastRow && lastCol) out.push("seCell");
+  return out;
+}
+
 type Envelope = Pick<FoliDocument, "defaults" | "styles" | "numbering" | "theme">;
 
 interface Level {
@@ -435,14 +556,18 @@ export class Resolver {
   readonly #characterStyles = new Map<string, MarkJSON[][]>();
   readonly #instances = new Map<number, NumberingInstanceJSON>();
   readonly #abstracts = new Map<number, AbstractNumberingJSON>();
+  #defaultTableStyle: string | undefined;
+  readonly #layers = new Map<string, TableLayer>();
 
   constructor(envelope: Envelope) {
     this.#envelope = envelope;
     // With duplicate ids, the first wins, as in Word.
     for (const s of envelope.styles) if (!this.#styles.has(s.id)) this.#styles.set(s.id, s);
-    // With several default paragraph styles, the last one applies (ECMA-376 17.7.4.17).
-    for (const s of envelope.styles)
+    // With several default styles of a type, the last one applies (ECMA-376 17.7.4.17).
+    for (const s of envelope.styles) {
       if (s.type === "paragraph" && s.isDefault) this.#defaultParagraphStyle = s.id;
+      if (s.type === "table" && s.isDefault) this.#defaultTableStyle = s.id;
+    }
     for (const n of envelope.numbering.instances)
       if (!this.#instances.has(n.id)) this.#instances.set(n.id, n);
     for (const a of envelope.numbering.abstracts)
@@ -463,16 +588,120 @@ export class Resolver {
     return out;
   }
 
-  /** A paragraph style's formatting over the defaults, memoized. */
-  #paragraphStyle(id: string | undefined) {
-    const key = id ?? "";
+  /** A table style and those it is based on (the default table style for a missing one). */
+  #tableChain(id: string | null | undefined): StyleJSON[] {
+    const chain = id ? this.#chain(id, "table") : [];
+    return chain.length ? chain : this.#chain(this.#defaultTableStyle, "table");
+  }
+
+  /** The table style's parts for `conditions`, memoized. */
+  #layer(style: string | null, conditions: readonly TableCondition[]): TableLayer {
+    // JSON: no two style ids and condition lists give the same key.
+    const key = JSON.stringify([style, conditions]);
+    const known = this.#layers.get(key);
+    if (known) return known;
+    const layer: TableLayer = { key, paragraph: [], run: [], cell: [] };
+    const chain = this.#tableChain(style);
+    for (const condition of conditions) {
+      for (const s of chain) {
+        const part =
+          condition === "wholeTable" ? s : s.conditions?.find((c) => c.type === condition);
+        if (part?.paragraph) layer.paragraph.push(part.paragraph);
+        if (part?.run) layer.run.push(part.run);
+        if (part?.cell) layer.cell.push(part.cell);
+      }
+    }
+    this.#layers.set(key, layer);
+    return layer;
+  }
+
+  /** A table's effective properties (`attrs`: the table node's attributes); the caller's to change. */
+  table(attrs: Json): TableFormat {
+    const chain = this.#tableChain(attrs.style as string | null | undefined);
+    const out: Json = {};
+    for (const s of chain) mergeTable(out, s.table as Json | undefined);
+    mergeTable(out, attrs);
+    // A copy: the merged values are the styles' and the node's own objects.
+    return structuredClone({
+      ...(out as Omit<TableFormat, "style">),
+      style: chain.at(-1)?.id ?? null,
+    });
+  }
+
+  /**
+   * A cell's effective formatting (ECMA-376 17.7.6): the table style's parts that apply where
+   * the cell is (`tableConditions`), the row's exceptions over the table's properties, and the
+   * cell's own properties (`table`, `row`, `cell`: the nodes' attributes). Pass the result to
+   * `paragraph` for the paragraphs in the cell. The result is the caller's to change.
+   */
+  cell(table: Json, row: Json, cell: Json, place: CellPlace): CellFormat {
+    const props = this.table(table) as Json;
+    mergeTable(props, row.exceptions as Json | null | undefined);
+    const format = props as TableFormat;
+    const conditions = tableConditions(
+      format.look ?? {},
+      place,
+      format.rowBandSize,
+      format.columnBandSize,
+    );
+    const layers = [...this.#layer(format.style, conditions).cell, cell as CellPropertiesJSON];
+    const fill = last(layers, (l) => l.shading)?.fill ?? format.shading?.fill;
+    const tableBorders = format.borders ?? {};
+    const edge = (
+      side: Side,
+      start: "start" | "end" | null,
+      inside: BorderJSON | undefined,
+      outer: boolean,
+    ) =>
+      last(layers, (l) => l.borders?.[side] ?? (start ? l.borders?.[start] : undefined)) ??
+      (outer ? (tableBorders[side] ?? (start ? tableBorders[start] : undefined)) : inside);
+    const borders: Partial<Record<Side, BorderJSON>> = {};
+    const sides: [Side, "start" | "end" | null, BorderJSON | undefined, boolean][] = [
+      ["top", null, tableBorders.insideH, place.row === 0],
+      ["bottom", null, tableBorders.insideH, place.row === place.rows - 1],
+      ["left", "start", tableBorders.insideV, place.cell === 0],
+      ["right", "end", tableBorders.insideV, place.cell === place.cells - 1],
+    ];
+    for (const [side, start, inside, outer] of sides) {
+      const border = edge(side, start, inside, outer);
+      // A copy: the border may be a style's or the node's own object.
+      if (border) borders[side] = { ...border };
+    }
+    const margin = (side: Side, start: "start" | "end" | null) =>
+      twipsOf(
+        last(layers, (l) => l.margins?.[side] ?? (start ? l.margins?.[start] : undefined)) ??
+          format.cellMargins?.[side] ??
+          (start ? format.cellMargins?.[start] : undefined),
+      ) ?? 0;
+    return {
+      style: format.style,
+      conditions,
+      shading: fill === undefined || fill === "auto" ? null : fill.toUpperCase(),
+      borders,
+      margins: {
+        top: margin("top", null),
+        bottom: margin("bottom", null),
+        left: margin("left", "start"),
+        right: margin("right", "end"),
+      },
+      verticalAlign: last(layers, (l) => l.verticalAlign) ?? "top",
+    };
+  }
+
+  /**
+   * A paragraph style's formatting over the defaults (and, in a table, the table style's parts
+   * for the cell, which come between them as ECMA-376 17.7.2 orders them), memoized.
+   *
+   * shortcut: Word lets a table style's properties win over the default paragraph style's
+   * (Normal) in some cases; not modeled until the corpus's tables are measured on pages (10.5).
+   */
+  #paragraphStyle(id: string | undefined, layer?: TableLayer) {
+    const key = JSON.stringify([layer?.key ?? null, id ?? null]);
     const known = this.#paragraphStyles.get(key);
     if (known) return known;
-    const { defaults } = this.#envelope;
     const paragraph = cloneParagraph(DEFAULT_PARAGRAPH);
     const run = cloneRun(DEFAULT_RUN);
-    mergeParagraph(paragraph, defaults.paragraph);
-    applyDirect(run, defaults.run, this.#envelope.theme);
+    this.#base(paragraph, run, layer);
     // A style that does not exist (or is not a paragraph style) is the default paragraph style.
     let chain = id === undefined ? [] : this.#chain(id, "paragraph");
     if (!chain.length) chain = this.#chain(this.#defaultParagraphStyle, "paragraph");
@@ -488,19 +717,34 @@ export class Resolver {
     return result;
   }
 
+  /** The document defaults, then a table style's parts for a cell. */
+  #base(paragraph: Merging, run: RunFormat | null, layer: TableLayer | undefined): void {
+    const { defaults, theme } = this.#envelope;
+    mergeParagraph(paragraph, defaults.paragraph);
+    if (run) applyDirect(run, defaults.run, theme);
+    for (const p of layer?.paragraph ?? []) mergeParagraph(paragraph, p);
+    // The table style's run properties are set, as the defaults are (not toggled).
+    if (run) for (const r of layer?.run ?? []) applyDirect(run, r, theme);
+  }
+
   /**
    * A paragraph's effective properties, and the formatting of its text before a run's own marks
-   * (`attrs`: the paragraph node's attributes, as JSON or a live node has them). The results are
-   * the caller's: changing them changes nothing else.
+   * (`attrs`: the paragraph node's attributes, as JSON or a live node has them; `cell`: the
+   * format of the table cell it is in, from `cell`). The results are the caller's: changing
+   * them changes nothing else.
    */
-  paragraph(attrs: Json): { paragraph: ParagraphFormat; run: RunFormat } {
-    const { paragraph, run } = this.#resolve(attrs);
+  paragraph(attrs: Json, cell?: CellFormat): { paragraph: ParagraphFormat; run: RunFormat } {
+    const { paragraph, run } = this.#resolve(attrs, cell);
     return { paragraph, run };
   }
 
-  #resolve(attrs: Json): { paragraph: ParagraphFormat; run: RunFormat; level: Level | undefined } {
+  #resolve(
+    attrs: Json,
+    cell?: CellFormat,
+  ): { paragraph: ParagraphFormat; run: RunFormat; level: Level | undefined } {
     const props = attrs as ParagraphPropertiesJSON;
-    const base = this.#paragraphStyle(props.style ?? undefined);
+    const layer = cell ? this.#layer(cell.style, cell.conditions) : undefined;
+    const base = this.#paragraphStyle(props.style ?? undefined, layer);
     let paragraph = cloneParagraph(base.paragraph);
     const directNumbering = props.numbering?.id != null;
     if (props.numbering) mergeParagraph(paragraph, { numbering: props.numbering });
@@ -512,7 +756,7 @@ export class Resolver {
       } else {
         // Numbering given by the style: the style's own indents win over the level's.
         const stacked = cloneParagraph(DEFAULT_PARAGRAPH);
-        mergeParagraph(stacked, this.#envelope.defaults.paragraph);
+        this.#base(stacked, null, layer);
         mergeParagraph(stacked, level.level.paragraph);
         for (const style of base.chain) mergeParagraph(stacked, style.paragraph);
         stacked.style = paragraph.style;
