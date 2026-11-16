@@ -20,7 +20,7 @@ place that says what is in progress; check it before starting work.
 | 6 React API & 0.1.0      | ✅ Done                  | —                | Merged in #23–#31; 0.1.0 on npm; manual checks shipped as known risks (ADR-0003)           |
 | 7 Rich content           | ✅ Done                  | —                | Merged in #33–#41; 0.2.0 on npm; list-document benchmark misses accepted (known limit)     |
 | 8 Word model & DOCX      | ✅ Done                  | —                | Merged in #44–#61; 0.3.0 on npm (`@folijs/docx` first released); gate G5 passed            |
-| 9 Review                 | In progress              | `phase-9/review` | Tracked changes and comments; plan below                                                   |
+| 9 Review                 | In review                | `phase-9/review` | Merged in #63–#70; 0.4.0 changeset ready, publish waits for the owner's approval           |
 | 10–12                    | Not started              |                  |                                                                                            |
 
 Status values: `Ready` (dependencies met, nobody on it) · `In progress` · `In review` (PR open) ·
@@ -766,7 +766,15 @@ document the same edits make with tracking off, and "reject all" gives the origi
 documents give Word's text after accept all and after reject all; changes and comments made in
 Foli open in Word without repair with the same changes (type, author, text) and comments
 (text, replies, resolved state) Word reports, and Word's edits to such a file come back; review
-UI keyboard-only and axe-clean in three engines; 0.4.0 published.
+UI keyboard-only and axe-clean in three engines; 0.4.0 published. (Checked 2026-11-16: the
+property test passes with accept-all equal to the edits untracked and reject-all to the original,
+text, styles, bold and alignment included, the cases where accepting removes a paragraph whole
+listed; undo restores comments and changes exactly (tests); the redlined document gives Word's
+text after accept all and reject all, and so do 01, 04 and 05 paragraph by paragraph; files with
+changes and comments made in Foli open in Word without repair with those changes (type, author,
+text) and comments (text, replies, resolved state), and Word's edits come back (5 of 5,
+corpus/README.md); the review toolbar, views and comments pane are used by keyboard and pass axe
+in Chromium, Firefox and WebKit. 0.4.0 waits for the owner's approval to publish.)
 
 ### Tasks
 
@@ -879,8 +887,10 @@ Each task is a PR on `phase-9/review`, the build green after each.
   paragraph (fields aside; 03, a content control around paragraphs, not compared); Word edits each
   Foli-made file (automation: a tracked insertion, a reply) and Foli reads both back. 5 of 5
   pass (corpus/README.md). Known: Foli writes dates in UTC where Word writes local time.
-- [ ] 9.9 Close: docs (architecture, model, docx README, known limitations), acceptance checked,
-  the 0.4.0 changeset; publish with the owner's approval.
+- [ ] 9.9 Close: docs (README, document model, docx README, known limitations as of 0.4.0;
+  architecture and api kept current in each task), acceptance checked (above), the 0.4.0
+  changeset (with the changed behaviours) — done; the version PR and publishing wait for the
+  owner's approval.
 
 ## Phase 10 — Tables & images · XL → 0.5.0
 

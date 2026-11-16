@@ -1,6 +1,6 @@
 # Known limitations
 
-What Foli does not do yet, or does with caveats, as of 0.3.0. Read it before you ship. Details
+What Foli does not do yet, or does with caveats, as of 0.4.0. Read it before you ship. Details
 and the reasons are in [architecture.md](architecture.md), [pagination.md](pagination.md) and
 [ADR-0003](decisions/ADR-0003-rendering-and-input.md); what comes next is in the
 [roadmap](roadmap.md).
@@ -30,7 +30,7 @@ checklist in [testing/ime.md](testing/ime.md)):
   heading styles), lists as Word's numbering, run formatting, line and page breaks, links;
   everything else Word has (tables, fields, content controls...) is kept as opaque content,
   selected and deleted whole. Documents saved by 0.1.0 and 0.2.0 are migrated when loaded.
-  No tracked changes or comments editing (Phase 9), no tables or images editing (Phase 10), no
+  No tables or images editing (Phase 10), no
   headers, footers or page numbers (Phase 11). Sections are laid out with their own page
   setups; a continuous section with another page setup starts a new page, and an even or odd
   page section gets no blank page before it. Page setups and section breaks are not editable
@@ -71,6 +71,24 @@ checklist in [testing/ime.md](testing/ime.md)):
   discarded with a `Foli:` console warning.
 - Documents in `schemaVersion: 1` load in later versions: they migrate without dropping
   content.
+
+## Tracked changes and comments
+
+- While tracking, an edit that would delete or insert a table (any block Foli keeps verbatim) is
+  not made (Phase 10 tracks tables). Moves are kept and shown from imported files but not
+  recorded: moving text records a deletion and an insertion.
+- Accepting removes a paragraph whose text and mark are both deleted whole, as Word does; the
+  same edits made untracked, one after another, may have kept its properties on the joined
+  paragraph. Enter in a paragraph next to a deleted paragraph mark splits that paragraph as it
+  is, not the paragraph accepting would make.
+- In the simple and no-markup views, a paragraph whose mark is deleted is not shown joined with
+  the next while editing (`renderDocument` joins it).
+- Changes' and comments' dates are written in UTC; Word writes local time there, so Word shows
+  Foli's times shifted by the time zone.
+- Comments: the pane (`FoliComments`) is React only (the view marks commented text); a comment
+  with formatting other than its paragraph style is not editable there, only replied to,
+  resolved or deleted. A comment anchored in a table stays (it cannot be deleted until Phase 10).
+- Revisions carry no initials (Word has none); comments do.
 
 ## .docx (`@folijs/docx`)
 

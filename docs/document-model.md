@@ -383,6 +383,11 @@ Migrations never drop content. A published version never changes in place.
 
 0.1.0 reads only version 1: it rejects documents saved by 0.2.0 ("Unsupported schemaVersion: 2").
 0.2.0 reads versions 1 and 2: it rejects documents saved by 0.3.0.
+0.4.0 (Phase 9: recording, accepting and rejecting tracked changes, editing comments) uses the
+same schema 3: it writes the marks and attributes 0.3.0 already reads (`insertion`, `deletion`,
+`formatChange`, a paragraph's `revision` and `formatChange`, comment anchors and `comments`), so
+0.3.0 and 0.4.0 read each other's documents. Whether tracking is on is not in the document: the
+editor option and a `.docx`'s `w:trackRevisions` carry it.
 Tests load a document exactly as 0.1.0 saved it (`document.test.ts`); in the browser, the
 page-break e2e (`pages.spec.ts`) and the examples' smoke test load v1 documents through the
 migration.
