@@ -112,6 +112,15 @@ export {
   insertColumn,
   insertRow,
   insertTable,
+  isHeaderRow,
+  mergeCells,
+  setCellShading,
+  setColumnWidth,
+  setTableStyle,
+  splitCell,
+  tableStyleAt,
+  tableStyles,
+  toggleHeaderRow,
 } from "./tablecommands.js";
 export {
   CellSelection,

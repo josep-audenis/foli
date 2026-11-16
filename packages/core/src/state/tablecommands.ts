@@ -5,14 +5,17 @@
  * while tracking (the rebuild records them, 10.6a); column changes are not tracked by Foli yet,
  * so they do not apply while tracking.
  */
-import { Fragment, type Node, Slice } from "../model/index.js";
+import { FoliDocumentError, Fragment, type Node, type NodeType, Slice } from "../model/index.js";
 import { attempt } from "./attempt.js";
 import { deleteSelectionKeepingTables } from "./commands.js";
+import { closeHistory } from "./history.js";
+import { MARK_ATTRS } from "./mark.js";
 import { Selection } from "./selection.js";
 import type { Command, EditorState, Transaction } from "./state.js";
 import {
   CellSelection,
   cellDepth,
+  coveringAt,
   coveringCell,
   emptyRowLike,
   type GridCell,
@@ -31,6 +34,30 @@ const PAGE_WIDTH = 12_240;
 const MARGIN = 1_440;
 
 const tracking = (state: EditorState) => trackState(state)?.on === true;
+/** Word's largest measure in twips (22 inches). */
+const MAX_TWIPS = 31_680;
+
+/** `attempt`, as its own undo step (never joined with the typing or command before it). */
+const apply = (
+  state: EditorState,
+  dispatch: ((tr: Transaction) => void) | undefined,
+  build: (tr: Transaction) => void,
+) =>
+  attempt(state, dispatch, (tr) => {
+    tr.setMeta(closeHistory, true);
+    build(tr);
+  });
+
+/**
+ * An empty paragraph like a cell's last one (a cell always ends with a paragraph): its
+ * properties, not what only that paragraph has (its identity, revisions, section).
+ */
+function emptyLike(cell: Node, paragraph: NodeType): Node {
+  const last = cell.lastChild;
+  if (last?.type !== paragraph) return paragraph.create();
+  const own = Object.fromEntries(MARK_ATTRS.map((key) => [key, null]));
+  return paragraph.create({ ...last.attrs, ...own, attributes: null });
+}
 
 /** The table around the selection and the rectangle of grid rows and columns it covers. */
 interface Around {
@@ -134,7 +161,7 @@ export function insertTable(rows: number, columns: number): Command {
       { style: style?.id ?? null, grid: Array.from({ length: columns }, () => each) },
       Array.from({ length: rows }, () => row),
     );
-    return attempt(state, dispatch, (tr) => {
+    return apply(state, dispatch, (tr) => {
       if (!tr.selection.empty) deleteSelectionKeepingTables(tr);
       const $pos = tr.selection.$from;
       if (!$pos.parent.isTextblock) throw new RangeError("No paragraph at the caret");
@@ -194,7 +221,7 @@ export function insertRow(dir: -1 | 1): Command {
     });
     const row = plain.type.create(plain.attrs, cells);
     const at = dir < 0 ? rowPos(table, pos, index) : rowPos(table, pos, index + 1);
-    return attempt(state, dispatch, (tr) => {
+    return apply(state, dispatch, (tr) => {
       tr.insert(at, row);
       caretIn(tr, at + 1);
     });
@@ -213,7 +240,7 @@ export const deleteRows: Command = (state, dispatch) => {
   if (top === 0 && bottom === table.childCount - 1) return deleteTable(state, dispatch);
   const from = rowPos(table, pos, top);
   const to = rowPos(table, pos, bottom + 1);
-  return attempt(state, dispatch, (tr) => {
+  return apply(state, dispatch, (tr) => {
     const next = table.maybeChild(bottom + 1);
     if (next && !tracking(state)) {
       // Merges cut at their start: the first kept row's covered cell starts them again.
@@ -254,7 +281,7 @@ export const deleteTable: Command = (state, dispatch) => {
   const found = around(state);
   if (!found) return false;
   const { table, pos } = found;
-  return attempt(state, dispatch, (tr) => {
+  return apply(state, dispatch, (tr) => {
     tr.delete(pos, pos + table.nodeSize);
     keepTablesApart(tr);
     tr.setSelection(Selection.near(tr.doc.resolve(tr.mapping.map(pos)), 1));
@@ -278,9 +305,9 @@ function rebuild(
 /** A cell's `width` in twips set to the grid columns it spans, when it gives one in twips. */
 function widthFor(attrs: Node["attrs"], grid: readonly number[], column: number, span: number) {
   const width = attrs.width as { value: number; type: string } | null;
-  if (width?.type !== "dxa") return attrs;
+  if (width?.type !== "dxa" || grid.length < column + span) return attrs;
   const value = grid.slice(column, column + span).reduce((a, b) => a + b, 0);
-  return { ...attrs, width: { value: Math.max(value, 0), type: "dxa" } };
+  return { ...attrs, width: { value: Math.min(Math.max(value, 0), MAX_TWIPS), type: "dxa" } };
 }
 
 /** Replaces the table at `pos` with `next` and puts the caret in its cell at `row`, `column`. */
@@ -372,7 +399,7 @@ export function insertColumn(dir: -1 | 1): Command {
       return row.type.create(row.attrs, out);
     });
     if (!next) return false;
-    return attempt(state, dispatch, (tr) => replaceTable(tr, pos, table, next, top, at));
+    return apply(state, dispatch, (tr) => replaceTable(tr, pos, table, next, top, at));
   };
 }
 
@@ -421,7 +448,286 @@ export const deleteColumns: Command = (state, dispatch) => {
     );
   });
   if (!next) return deleteTable(state, dispatch);
-  return attempt(state, dispatch, (tr) =>
+  return apply(state, dispatch, (tr) =>
     replaceTable(tr, pos, table, next, top, Math.min(left, width - removed - 1)),
   );
 };
+
+// ---- Cells and properties (10.7b) --------------------------------------------------------------
+
+/** A cell holding only one empty paragraph. */
+const blank = (cell: Node) =>
+  cell.childCount === 1 && !!cell.firstChild?.isTextblock && !cell.firstChild.content.size;
+
+/**
+ * Merges the selected cells into one, as Word does: the rectangle's first cell spans its columns
+ * (`gridSpan`) and, over several rows, starts a vertical merge the rows below continue; it holds
+ * the text of every selected cell in order. Applies to a cell selection whose rectangle cells
+ * fill. Not while tracking.
+ */
+export const mergeCells: Command = (state, dispatch) => {
+  if (tracking(state) || !(state.selection instanceof CellSelection)) return false;
+  const found = around(state);
+  const paragraph = state.schema.nodes.paragraph;
+  if (!found || !paragraph) return false;
+  const { table, pos, grid, top, bottom, left, right } = found;
+  const width = right - left + 1;
+  const inside = grid.filter(
+    (c) => c.row >= top && c.row <= bottom && c.column >= left && c.column <= right,
+  );
+  if (inside.length < 2) return false;
+  // Every grid place of the rectangle has a cell (no row starts or ends inside it).
+  const area = inside.reduce((sum, c) => sum + c.span * c.rowSpan, 0);
+  if (area !== width * (bottom - top + 1)) return false;
+  // Every cell's blocks, row by row (a covered cell's own text too: nothing is dropped).
+  const content: Node[] = [];
+  for (let r = top; r <= bottom; r++)
+    for (const c of placed(table.child(r)))
+      if (c.column >= left && c.column <= right && !blank(c.cell))
+        c.cell.forEach((block) => {
+          content.push(block);
+        });
+  if (!content.length || !content[content.length - 1]?.isTextblock)
+    content.push(paragraph.create());
+  const tableGrid = table.attrs.grid as number[];
+  const next = rebuild(table, table.attrs, (row, r) => {
+    if (r < top || r > bottom) return row;
+    const cells: Node[] = [];
+    let merged = false;
+    for (const c of placed(row)) {
+      if (c.column < left || c.column > right) {
+        cells.push(c.cell);
+        continue;
+      }
+      if (merged) continue;
+      merged = true;
+      const attrs = widthFor(
+        {
+          ...c.cell.attrs,
+          gridSpan: width > 1 ? width : null,
+          vMerge: bottom > top ? (r === top ? "restart" : "continue") : null,
+        },
+        tableGrid,
+        left,
+        width,
+      );
+      cells.push(
+        c.cell.type.create(
+          attrs,
+          r === top ? Fragment.from(content) : emptyLike(c.cell, paragraph),
+        ),
+      );
+    }
+    return row.type.create(row.attrs, cells);
+  });
+  if (!next) return false;
+  return apply(state, dispatch, (tr) => replaceTable(tr, pos, table, next, top, left));
+};
+
+/**
+ * Splits the selected merged cells back into their grid's cells (a horizontal span into one
+ * cell per column, a vertical merge into one cell per row); the text stays in the first.
+ * Applies where a selected cell is merged. Not while tracking.
+ */
+export const splitCell: Command = (state, dispatch) => {
+  if (tracking(state)) return false;
+  const found = around(state);
+  const paragraph = state.schema.nodes.paragraph;
+  if (!found || !paragraph) return false;
+  const { table, pos, grid, top, bottom, left, right } = found;
+  const split = new Set(
+    grid
+      .filter(
+        (c) =>
+          (c.span > 1 || c.rowSpan > 1) &&
+          c.row >= top &&
+          c.row <= bottom &&
+          c.column >= left &&
+          c.column <= right,
+      )
+      .map((c) => c.pos),
+  );
+  if (!split.size) return false;
+  const tableGrid = table.attrs.grid as number[];
+  const next = rebuild(table, table.attrs, (row, r) => {
+    const cells: Node[] = [];
+    for (const c of placed(row)) {
+      const owner = coveringAt(grid, r, c.column);
+      if (!owner || !split.has(owner.pos)) {
+        cells.push(c.cell);
+        continue;
+      }
+      for (let i = 0; i < c.span; i++) {
+        const attrs = widthFor(
+          { ...c.cell.attrs, gridSpan: null, vMerge: null },
+          tableGrid,
+          c.column + i,
+          1,
+        );
+        // The merge's text stays in its first cell; a covered cell's own text (which Word does
+        // not show) stays in its cell.
+        const keep = i === 0 && (r === owner.row || !blank(c.cell));
+        cells.push(c.cell.type.create(attrs, keep ? c.cell.content : emptyLike(c.cell, paragraph)));
+      }
+    }
+    return row.type.create(row.attrs, cells);
+  });
+  if (!next) return false;
+  return apply(state, dispatch, (tr) => replaceTable(tr, pos, table, next, top, left));
+};
+
+/** Whether the selection's rows are all header rows (repeated on each page). */
+export function isHeaderRow(state: EditorState): boolean {
+  const found = around(state);
+  if (!found) return false;
+  for (let r = found.top; r <= found.bottom; r++)
+    if (found.table.child(r).attrs.header !== true) return false;
+  return true;
+}
+
+/**
+ * Makes the selection's rows header rows, with every row above them (Word repeats only a run of
+ * rows from the table's top), or, when they all are, makes them and the header rows below them
+ * ordinary rows. Not while tracking.
+ */
+export const toggleHeaderRow: Command = (state, dispatch) => {
+  if (tracking(state)) return false;
+  const found = around(state);
+  if (!found) return false;
+  const { table, pos, top, bottom } = found;
+  const on = !isHeaderRow(state);
+  return apply(state, dispatch, (tr) => {
+    for (let r = 0; r < table.childCount; r++) {
+      const row = table.child(r);
+      const header = row.attrs.header === true;
+      const value = on ? (r <= bottom ? true : header) : r >= top ? false : header;
+      if (value !== header)
+        tr.setNodeMarkup(rowPos(table, pos, r), row.type, {
+          ...row.attrs,
+          header: value || null,
+        });
+    }
+  });
+};
+
+/** The table styles one can pick: the document's, with Word's Table Grid where it lacks it. */
+export function tableStyles(state: EditorState): string[] {
+  const styles = wordContext(state)?.envelope.styles ?? [];
+  const names = styles.filter((s) => s.type === "table" && s.name).map((s) => s.name as string);
+  return names.some((n) => n.toLowerCase() === "table grid") ? names : [...names, "Table Grid"];
+}
+
+/** The name of the style of the table around the selection (null: none, or no table). */
+export function tableStyleAt(state: EditorState): string | null {
+  const found = around(state);
+  const id = found?.table.attrs.style as string | null | undefined;
+  if (!id) return null;
+  return wordContext(state)?.envelope.styles.find((s) => s.id === id)?.name ?? null;
+}
+
+/**
+ * Gives the table around the selection the table style named `name` (Word's Table Grid is
+ * added when missing; any other must exist), or none. Not while tracking.
+ */
+export function setTableStyle(name: string | null): Command {
+  return (state, dispatch) => {
+    if (tracking(state)) return false;
+    const found = around(state);
+    const context = wordContext(state);
+    if (!found || !context) return false;
+    const style = name === null ? null : ensureStyle(context, name, "table");
+    if (name !== null && !style) return false;
+    // A built-in of another type (a heading's) is not a table style.
+    if (style && style.envelope.styles.find((s) => s.id === style.id)?.type !== "table")
+      return false;
+    const { table, pos } = found;
+    return apply(state, dispatch, (tr) => {
+      tr.setNodeMarkup(pos, table.type, { ...table.attrs, style: style?.id ?? null });
+      if (style && style.envelope !== context.envelope) withEnvelope(tr, style.envelope);
+    });
+  };
+}
+
+/**
+ * Shades the selected cells with `fill` (`RRGGBB`), or takes their shading off (null). Not
+ * while tracking.
+ */
+export function setCellShading(fill: string | null): Command {
+  return (state, dispatch) => {
+    if (tracking(state)) return false;
+    if (fill !== null && !/^[0-9A-Fa-f]{6}$/.test(fill)) return false;
+    const found = around(state);
+    if (!found) return false;
+    const { table, pos, top, bottom, left, right } = found;
+    const shading =
+      fill === null ? null : { pattern: "clear", color: "auto", fill: fill.toUpperCase() };
+    return apply(state, dispatch, (tr) => {
+      // Every cell of the rectangle, the ones a merge covers too: Word paints each row's part of
+      // a merged cell from its own properties.
+      for (let r = top; r <= bottom; r++) {
+        let at = rowPos(table, pos, r) + 1;
+        for (const c of placed(table.child(r))) {
+          if (c.column >= left && c.column <= right)
+            tr.setNodeMarkup(at, c.cell.type, { ...c.cell.attrs, shading });
+          at += c.cell.nodeSize;
+        }
+      }
+    });
+  };
+}
+
+/** The narrowest a column gets by dragging its border, in twips (0.1 inch). */
+const MIN_COLUMN = 144;
+
+/**
+ * Sets grid column `column` of the table at `pos` to `width` twips, as dragging its right border
+ * does in Word: the column after it gives or takes the difference (the table keeps its width),
+ * neither narrower than 0.1 inch; the last column's border widens or narrows the table. The
+ * widths in twips of the cells over those columns follow. Not while tracking.
+ */
+export function setColumnWidth(pos: number, column: number, width: number): Command {
+  return (state, dispatch) => {
+    if (tracking(state)) return false;
+    const table = state.doc.nodeAt(pos);
+    if (table?.type.name !== "table" || !Number.isFinite(width)) return false;
+    const grid = [...(table.attrs.grid as number[])];
+    const old = grid[column];
+    if (old === undefined) return false;
+    const after = grid[column + 1];
+    // Two columns too narrow to give each other anything.
+    if (after !== undefined && old + after < 2 * MIN_COLUMN) return false;
+    let next = Math.min(Math.max(Math.round(width), MIN_COLUMN), MAX_TWIPS);
+    if (after !== undefined) next = Math.min(next, old + after - MIN_COLUMN);
+    if (next === old) return false;
+    if (after !== undefined) grid[column + 1] = after - (next - old);
+    grid[column] = next;
+    // The last column's border: a table width in twips grows or shrinks with it.
+    const tableWidth = table.attrs.width as { value: number; type: string } | null;
+    const widthAttr =
+      after === undefined && tableWidth?.type === "dxa"
+        ? { value: Math.min(Math.max(tableWidth.value + next - old, 0), MAX_TWIPS), type: "dxa" }
+        : tableWidth;
+    let rebuilt: Node | null;
+    try {
+      rebuilt = rebuild(table, { ...table.attrs, grid, gridExt: null, width: widthAttr }, (row) =>
+        row.type.create(
+          row.attrs,
+          placed(row).map((c) =>
+            c.cell.type.create(widthFor(c.cell.attrs, grid, c.column, c.span), c.cell.content),
+          ),
+        ),
+      );
+    } catch (error) {
+      // A grid the schema does not take (a width out of its range): the drag does not apply.
+      if (error instanceof FoliDocumentError) return false;
+      throw error;
+    }
+    if (!rebuilt) return false;
+    return apply(state, dispatch, (tr) => {
+      const selection = tr.selection.toJSON();
+      tr.replace(pos, pos + table.nodeSize, new Slice(Fragment.from(rebuilt), 0, 0));
+      // The same shape: the selection stays where it was.
+      tr.setSelection(Selection.fromJSON(tr.doc, selection));
+    });
+  };
+}
