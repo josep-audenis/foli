@@ -663,7 +663,21 @@ removes cells and narrows spanning ones (a row left with no cell goes); `deleteT
 inserted and deleted while tracking are tracked (the rebuild records them); column commands do
 not apply while tracking. A caret in a cell a merge covers acts as from the merge's cell. Cell
 widths in twips follow the grid. `insertTable` takes the text width of the document's last
-section, not the caret's. Export writes a new table style
+section, not the caret's.
+
+Cells and properties (10.7b, same file): `mergeCells` merges a cell selection's rectangle (when
+every grid place of it has a cell) into its first cell, spanning its columns and, over several
+rows, starting a vertical merge the rows below continue; it holds every selected cell's blocks
+in order (empty cells left out). `splitCell` splits the selected merged cells back into their
+grid's cells, the text in the first (not Word's split into n columns of an unmerged cell).
+`toggleHeaderRow` makes the selection's rows header rows with every row above them (Word
+repeats only a run from the top), or, when they all are, makes them and the header rows below
+ordinary (`isHeaderRow`). `setTableStyle(name)` gives the table a table style by name (Word's
+Table Grid added when missing; `tableStyles`, `tableStyleAt`). `setCellShading(fill)` sets or
+removes the selected cells' shading (`clear` pattern). `setColumnWidth(pos, column, twips)` is
+a border drag: the next column gives or takes the difference, neither under 0.1 inch; the last
+column's border widens the table; cell widths in twips follow, and the selection stays. None of
+them applies while tracking. Export writes a new table style
 (Table Grid) from the model; a table style read from a file and then changed is still refused.
 
 Review in the editable view (9.5): `EditorView` draws tracked changes as the editor's state says

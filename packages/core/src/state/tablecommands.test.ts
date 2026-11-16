@@ -11,6 +11,15 @@ import {
   insertColumn,
   insertRow,
   insertTable,
+  isHeaderRow,
+  mergeCells,
+  setCellShading,
+  setColumnWidth,
+  setTableStyle,
+  splitCell,
+  tableStyleAt,
+  tableStyles,
+  toggleHeaderRow,
 } from "./tablecommands.js";
 import { CellSelection } from "./tables.js";
 
@@ -335,5 +344,153 @@ describe("deleteTable", () => {
     expect(shape(editor)).toEqual(["x", "y"]);
     expect(caret(editor)).toBe("y");
     expect(editor.run(deleteTable)).toBe(false);
+  });
+});
+
+describe("merging and splitting cells", () => {
+  it("merge a rectangle into its first cell, spanning and merging down, with all its text", () => {
+    const editor = editorOf([
+      p("x"),
+      { ...TABLE, attrs: { grid: [1000, 2000] } } as NodeJSON,
+      p("y"),
+    ]);
+    selectCells(editor, "a1", "b2");
+    expect(editor.run(mergeCells)).toBe(true);
+    const rows = editor.state.doc.child(1);
+    const first = rows.child(0).child(0);
+    expect(first.attrs.gridSpan).toBe(2);
+    expect(first.attrs.vMerge).toBe("restart");
+    expect(rows.child(1).child(0).attrs.vMerge).toBe("continue");
+    expect(rows.child(0).childCount).toBe(1);
+    const texts: string[] = [];
+    first.forEach((block) => {
+      texts.push(block.textContent);
+    });
+    expect(texts).toEqual(["a1", "b1", "a2", "b2"]);
+    expect(caret(editor)).toBe("a1");
+    valid(editor);
+  });
+
+  it("split a merged cell back into its grid's cells, its text in the first", () => {
+    const editor = editorOf([
+      p("x"),
+      { ...TABLE, attrs: { grid: [1000, 2000] } } as NodeJSON,
+      p("y"),
+    ]);
+    selectCells(editor, "a1", "b2");
+    editor.run(mergeCells);
+    expect(editor.run(splitCell)).toBe(true);
+    const rows = editor.state.doc.child(1);
+    expect(rows.child(0).childCount).toBe(2);
+    expect(rows.child(1).childCount).toBe(2);
+    expect(rows.child(1).child(0).attrs.vMerge).toBe(null);
+    expect(rows.child(0).child(0).childCount).toBe(4);
+    expect(shape(editor)[1]).toEqual([
+      ["a1b1a2b2", ""],
+      ["", ""],
+      ["a3", "b3"],
+    ]);
+    valid(editor);
+    expect(editor.run(splitCell)).toBe(false);
+  });
+
+  it("do not merge a single cell, a ragged rectangle, or while tracking", () => {
+    const editor = editorOf([p("x"), TABLE, p("y")]);
+    selectCells(editor, "a1", "a1");
+    expect(editor.run(mergeCells)).toBe(false);
+    const ragged = editorOf([
+      p("x"),
+      table(row(cell("p"), cell("q")), {
+        type: "tableRow",
+        attrs: { gridAfter: 1 },
+        content: [cell("r")],
+      }),
+      p("y"),
+    ]);
+    selectCells(ragged, "q", "r");
+    // The rectangle reaches q's column, where the second row has no cell.
+    expect(ragged.run(mergeCells)).toBe(false);
+    const tracked = editorOf([p("x"), TABLE, p("y")], true);
+    selectCells(tracked, "a1", "b1");
+    expect(tracked.run(mergeCells)).toBe(false);
+  });
+});
+
+describe("table properties", () => {
+  it("make header rows from the top, and take them off", () => {
+    const editor = editorOf([p("x"), TABLE, p("y")]);
+    select(editor, inside(editor, "a2"));
+    editor.run(toggleHeaderRow);
+    const headers = () => {
+      const out: boolean[] = [];
+      editor.state.doc.child(1).forEach((r) => {
+        out.push(r.attrs.header === true);
+      });
+      return out;
+    };
+    expect(headers()).toEqual([true, true, false]);
+    expect(isHeaderRow(editor.state)).toBe(true);
+    select(editor, inside(editor, "a2"));
+    editor.run(toggleHeaderRow);
+    expect(headers()).toEqual([true, false, false]);
+    valid(editor);
+  });
+
+  it("set a table style by name, adding Word's Table Grid, or none", () => {
+    const editor = editorOf([p("x"), TABLE, p("y")]);
+    expect(tableStyles(editor.state)).toContain("Table Grid");
+    select(editor, inside(editor, "a1"));
+    expect(editor.run(setTableStyle("Table Grid"))).toBe(true);
+    expect(tableStyleAt(editor.state)).toBe("Table Grid");
+    expect(editor.run(setTableStyle("No Such Style"))).toBe(false);
+    editor.run(setTableStyle(null));
+    expect(tableStyleAt(editor.state)).toBe(null);
+  });
+
+  it("shade the selected cells and take it off", () => {
+    const editor = editorOf([p("x"), TABLE, p("y")]);
+    selectCells(editor, "a1", "a2");
+    expect(editor.run(setCellShading("ffcc00"))).toBe(true);
+    const fills = () => {
+      const out: (string | null)[] = [];
+      editor.state.doc.child(1).forEach((r) => {
+        out.push((r.child(0).attrs.shading as { fill?: string } | null)?.fill ?? null);
+      });
+      return out;
+    };
+    expect(fills()).toEqual(["FFCC00", "FFCC00", null]);
+    expect(editor.run(setCellShading("red"))).toBe(false);
+    editor.run(setCellShading(null));
+    expect(fills()).toEqual([null, null, null]);
+    valid(editor);
+  });
+
+  it("move a column border: the next column gives the difference, cell widths follow", () => {
+    const sized: NodeJSON = {
+      type: "table",
+      attrs: { grid: [2000, 2000] },
+      content: [
+        row(
+          { type: "tableCell", attrs: { width: { value: 2000, type: "dxa" } }, content: [p("a")] },
+          { type: "tableCell", attrs: { width: { value: 2000, type: "dxa" } }, content: [p("b")] },
+        ),
+      ],
+    };
+    const editor = editorOf([p("x"), sized, p("y")]);
+    select(editor, inside(editor, "b", 1));
+    const tablePos = editor.state.doc.child(0).nodeSize;
+    expect(editor.run(setColumnWidth(tablePos, 0, 2500))).toBe(true);
+    const rows = editor.state.doc.child(1);
+    expect(rows.attrs.grid).toEqual([2500, 1500]);
+    expect(rows.child(0).child(1).attrs.width).toEqual({ value: 1500, type: "dxa" });
+    // The selection stays.
+    expect(editor.state.selection.head).toBe(inside(editor, "b", 1));
+    // Not narrower than 0.1 inch on either side.
+    editor.run(setColumnWidth(tablePos, 0, 99999));
+    expect(editor.state.doc.child(1).attrs.grid).toEqual([3856, 144]);
+    // The last column's border widens the table.
+    editor.run(setColumnWidth(tablePos, 1, 3000));
+    expect(editor.state.doc.child(1).attrs.grid).toEqual([3856, 3000]);
+    valid(editor);
   });
 });
