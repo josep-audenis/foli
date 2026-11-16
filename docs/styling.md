@@ -46,7 +46,9 @@ Pages are paper: the default keeps them white. To darken everything:
   /* On the editor's elements, not :root: the stylesheet's own :root defaults would win
      whenever it loads after this rule. */
   .foli-canvas,
-  .foli-toolbar {
+  .foli-toolbar,
+  .foli-editor-body,
+  .foli-comments {
     --foli-canvas-background: #1b1b1a;
     --foli-page-background: #2a2a28;
     --foli-page-shadow: 0 0 0 1px #3a3a37;
@@ -67,20 +69,23 @@ pages should print white.
 
 ## Elements and classes
 
-| Selector                           | What                                                                                                                                           |
-| ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| `.foli-canvas`                     | `FoliCanvas`'s outer element (`className` is added here)                                                                                       |
-| `.foli-content`                    | the editable host (`role="textbox"`); `FoliCanvas` adds the class, with `EditorView` add it yourself                                           |
-| `.foli-page`                       | one page (`<section>`), size and padding inline                                                                                                |
-| `p`, `h1`–`h6` inside `.foli-page` | paragraphs, and paragraphs in Word's heading styles; their formatting inline                                                                   |
-| `span` inside a paragraph          | a run of text, its formatting inline (bold is `font-weight: 700`); a list number is a `[data-foli-marker]` span, not editable                  |
-| `.foli-selected-node`              | an opaque block (a table) while it is selected                                                                                                 |
-| `a`                                | a link with a safe target, in the run's own color (a click places the caret; Ctrl/Cmd+click opens it in a new tab)                             |
-| `.foli-toolbar`                    | `FoliToolbar` (`className` is added here)                                                                                                      |
-| `.foli-toolbar-button`             | each button, plus `.foli-toolbar-<key>` (`bold`, `bulletList`, `undo`, `pageBreak`…)                                                           |
-| `.foli-toolbar-separator`          | between button groups                                                                                                                          |
-| `.foli-toolbar-menu`, `.foli-menu` | a color menu button's wrapper, its menu (`.foli-menu-item`, `.foli-menu-swatch`); `.foli-toolbar-swatch` shows the current color on the button |
-| `.foli-link-dialog`                | the link dialog under the toolbar; `.foli-link-error` its message for an invalid URL                                                           |
+| Selector                           | What                                                                                                                                                    |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `.foli-canvas`                     | `FoliCanvas`'s outer element (`className` is added here)                                                                                                |
+| `.foli-content`                    | the editable host (`role="textbox"`); `FoliCanvas` adds the class, with `EditorView` add it yourself                                                    |
+| `.foli-page`                       | one page (`<section>`), size and padding inline                                                                                                         |
+| `p`, `h1`–`h6` inside `.foli-page` | paragraphs, and paragraphs in Word's heading styles; their formatting inline                                                                            |
+| `span` inside a paragraph          | a run of text, its formatting inline (bold is `font-weight: 700`); a list number is a `[data-foli-marker]` span, not editable                           |
+| `.foli-selected-node`              | an opaque block (a table) while it is selected                                                                                                          |
+| `a`                                | a link with a safe target, in the run's own color (a click places the caret; Ctrl/Cmd+click opens it in a new tab)                                      |
+| `.foli-toolbar`                    | `FoliToolbar` (`className` is added here)                                                                                                               |
+| `.foli-toolbar-button`             | each button, plus `.foli-toolbar-<key>` (`bold`, `bulletList`, `undo`, `pageBreak`…)                                                                    |
+| `.foli-toolbar-separator`          | between button groups                                                                                                                                   |
+| `.foli-toolbar-menu`, `.foli-menu` | a color menu button's wrapper, its menu (`.foli-menu-item`, `.foli-menu-swatch`); `.foli-toolbar-swatch` shows the current color on the button          |
+| `.foli-link-dialog`                | the link dialog under the toolbar; `.foli-link-error` its message for an invalid URL                                                                    |
+| `.foli-editor-body`                | `FoliEditor`'s row of pages and comments pane (make it, or a parent, the scroller: the pane scrolls with the pages)                                     |
+| `.foli-comments`                   | `FoliComments`, the pane (`className` is added here); `.foli-comment-thread` each thread (`[data-active]`, `[data-done]`), `.foli-comment` each comment |
+| `.foli-comment-active`             | text of the comment whose thread has the focus (in the document)                                                                                        |
 
 CSS over the document's own formatting needs `!important` (it is inline), and pagination
 follows it: margins and padding on blocks are measured. A paragraph split across two pages is

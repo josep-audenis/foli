@@ -7,6 +7,7 @@ export {
   useFoliEditor,
 } from "./editor.js";
 export { FoliCanvas, type FoliCanvasHandle, type FoliCanvasProps } from "./FoliCanvas.js";
+export { FoliComments, type FoliCommentsProps } from "./FoliComments.js";
 export {
   type FoliChange,
   FoliEditor,

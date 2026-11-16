@@ -260,6 +260,104 @@
   background: var(--foli-border-color);
 }
 
+/* The pages and the comments pane (FoliEditor) side by side. */
+.foli-editor-body {
+  display: flex;
+  align-items: flex-start;
+  background: var(--foli-canvas-background);
+}
+
+.foli-editor-body > .foli-canvas {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* Comments pane (FoliComments): threads beside their text. */
+.foli-comments {
+  position: relative;
+  flex: 0 0 18rem;
+  margin: 32px 16px 32px 0;
+  color: var(--foli-text-color);
+  font:
+    13px / 1.4 system-ui,
+    sans-serif;
+}
+
+.foli-comments-empty {
+  margin: 0;
+  opacity: 0.7;
+}
+
+.foli-comment-thread {
+  position: absolute;
+  inset-inline: 0;
+  padding: 8px;
+  border: 1px solid var(--foli-border-color);
+  border-radius: 6px;
+  background: var(--foli-page-background);
+  box-shadow: var(--foli-page-shadow);
+}
+
+.foli-comment-thread[data-active],
+.foli-comment-thread:focus-within {
+  border-color: var(--foli-focus-ring);
+}
+
+.foli-comment-thread[data-done] {
+  opacity: 0.7;
+}
+
+.foli-comment + .foli-comment {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--foli-border-color);
+}
+
+.foli-comment-meta,
+.foli-comment-text p {
+  margin: 0;
+}
+
+.foli-comment-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.foli-comment-actions button {
+  height: 28px;
+  padding: 0 8px;
+  border: 1px solid var(--foli-border-color);
+  border-radius: 4px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.foli-comment-form label {
+  display: block;
+  margin-top: 6px;
+}
+
+.foli-comment-form textarea {
+  box-sizing: border-box;
+  width: 100%;
+  font: inherit;
+}
+
+.foli-comments :focus-visible {
+  outline: 2px solid var(--foli-focus-ring);
+  outline-offset: 1px;
+}
+
+/* The text of the comment that has the focus. */
+.foli-content .foli-comment-active {
+  outline: 2px solid var(--foli-focus-ring);
+  outline-offset: 1px;
+}
+
 /*
  * The view prints one sheet per page (size from the document settings); this drops the chrome.
  * Hide the rest of your page in print: anything printed before the pages adds sheets.
@@ -273,7 +371,12 @@
     box-shadow: none;
   }
   .foli-toolbar,
-  .foli-link-dialog {
+  .foli-link-dialog,
+  .foli-comments {
     display: none;
+  }
+  .foli-editor-body {
+    display: block;
+    background: none;
   }
 }

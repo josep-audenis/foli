@@ -6,7 +6,7 @@
  */
 import { createEditor, type Editor, type FoliDocument, parseDocument } from "@folijs/core";
 import { type DocxPackage, exportDocx, importDocx } from "@folijs/docx";
-import { FoliToolbar } from "@folijs/react";
+import { FoliComments, FoliToolbar } from "@folijs/react";
 import "@folijs/react/styles.css";
 import { EditorView } from "@folijs/view";
 import { createRoot } from "react-dom/client";
@@ -69,9 +69,15 @@ const host = document.getElementById("editor") as HTMLElement;
 let editor: Editor = createEditor({ document: SAMPLE, author: "Foli user" });
 let view = new EditorView(host, editor);
 const toolbar = createRoot(document.getElementById("toolbar") as HTMLElement);
-/** The formatting toolbar for the current editor; a click puts the focus back in the document. */
-const showToolbar = () =>
-  toolbar.render(<FoliToolbar editor={editor} onClickCommand={() => view.focus()} />);
+const commentsPane = createRoot(document.getElementById("comments") as HTMLElement);
+/**
+ * The formatting toolbar for the current editor (a click puts the focus back in the document)
+ * and the comments pane.
+ */
+const showToolbar = () => {
+  toolbar.render(<FoliToolbar editor={editor} comments onClickCommand={() => view.focus()} />);
+  commentsPane.render(<FoliComments editor={editor} />);
+};
 showToolbar();
 /** The package the document came from: export writes what Foli does not edit back from it. */
 let original: DocxPackage | undefined;
