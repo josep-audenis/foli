@@ -191,6 +191,11 @@ describe("the envelope's resources", () => {
       [{ r: { contentType: "image/png", data: "data:text/html,<p>" } }, /data: URL of an image/],
       [{ r: { contentType: "image/png", url: "javascript:alert(1)" } }, /relative, http\(s\)/],
       [{ r: { contentType: "image/png", url: "file:///c:/x.png" } }, /relative, http\(s\)/],
+      // As a browser reads them: leading spaces and controls dropped, tabs removed.
+      [{ r: { contentType: "image/png", url: " javascript:alert(1)" } }, /relative, http\(s\)/],
+      [{ r: { contentType: "image/png", url: "java\tscript:alert(1)" } }, /relative, http\(s\)/],
+      [{ r: { contentType: "image/png", url: "\u0001javascript:x" } }, /relative, http\(s\)/],
+      [{ r: { contentType: "image/png", url: "http://[" } }, /relative, http\(s\)/],
       [{ r: { contentType: "image/png", part: "x", extra: 1 } }, /unknown key extra/],
       [
         JSON.parse('{"__proto__": {"contentType": "image/png", "part": "x"}}'),

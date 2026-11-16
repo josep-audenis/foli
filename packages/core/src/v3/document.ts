@@ -593,6 +593,17 @@ const checkStyle: Check = shape(
   ["id", "type"],
 );
 
+const SAFE_PROTOCOLS = new Set(["http:", "https:", "blob:"]);
+
+/** A URL's scheme as a browser resolves it (a relative URL is the base's, https). */
+function protocolOf(url: string): string {
+  try {
+    return new URL(url, "https://base.invalid/").protocol;
+  } catch {
+    return "";
+  }
+}
+
 /** Pictures only: `image/png`, `image/svg+xml`… */
 const IMAGE_TYPE = /^image\/[A-Za-z0-9][\w.+-]{0,126}$/;
 
@@ -604,11 +615,12 @@ const checkResource: Check = (v) => {
       size: int(0, Number.MAX_SAFE_INTEGER),
       part: text(1024),
       // Relative, or http(s) or blob: no scheme that runs code (`javascript:`) where it is shown.
+      // Read as browsers read it (leading spaces, controls and inner tabs dropped).
       url: (u) =>
         text(8192)(u) ??
-        (/^[A-Za-z][A-Za-z0-9+.-]*:/.test(u as string) && !/^(https?|blob):/i.test(u as string)
-          ? "must be relative, http(s) or blob"
-          : undefined),
+        (SAFE_PROTOCOLS.has(protocolOf(u as string))
+          ? undefined
+          : "must be relative, http(s) or blob"),
       data: (d) =>
         typeof d === "string" && /^data:image\/[\w.+-]+[;,]/i.test(d) && d.length <= 67_108_864
           ? undefined
