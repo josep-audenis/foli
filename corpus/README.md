@@ -81,6 +81,37 @@ node scripts/corpus/rewrite-corpus.mjs <folder>
 powershell -ExecutionPolicy Bypass -File scripts/corpus/word-reference.ps1 -In <folder> -Out <folder>
 ```
 
+## Review content with Word (`reference/review/`)
+
+`scripts/corpus/word-review.ps1` records, for each document, its tracked changes (Word's type,
+author, text), its comments (text, author, initials, the comment answered, resolved) and its
+paragraphs with every change accepted and with every change rejected, as Word reads them. Run on
+the corpus, it is the reference `packages/docx/src/review-word.test.ts` compares Foli with: the
+same comments, threads and resolved state, and, for the documents without content Foli keeps
+verbatim, Foli's accept-all and reject-all text equal to Word's (02 and 05).
+
+`scripts/corpus/review-roundtrip.mjs` checks both directions. `make` opens every document in
+Foli with tracking on and, as "Foli Reviewer", inserts, deletes, formats text and a paragraph,
+comments, replies (as "Foli Replier") and resolves; `check` then reads what Word made of each
+export, and the copy Word edited (a tracked insertion and a reply to the first comment, by Word's
+user), back in Foli. 2026-11-16, Word 16.0.20527: all 5 open without a repair prompt; in each,
+Word finds Foli's insertion, deletion, formatting and paragraph formatting by their author with
+their text, the comment with its initials, the reply in its thread and both resolved; Word's
+accepted and rejected text equals Foli's for 02 and 05 (01, 03 and 04 hold fields or content
+controls, whose text Foli keeps verbatim); Foli reads back Word's tracked insertion and reply in
+all 5.
+
+```bash
+pnpm build
+powershell -ExecutionPolicy Bypass -File scripts/corpus/word-review.ps1 -In corpus/word -Out corpus/reference/review
+node scripts/corpus/review-roundtrip.mjs make <folder>
+powershell -ExecutionPolicy Bypass -File scripts/corpus/word-review.ps1 -In <folder>/foli -Out <folder>/word -Edit <folder>/edited
+node scripts/corpus/review-roundtrip.mjs check <folder>
+```
+
+Dates: Foli writes changes' and comments' dates in UTC (`w:date`, `Z`); Word writes local time
+there (and UTC in `w16du:dateUtc`), so Word shows Foli's times shifted by the time zone.
+
 ## Import coverage
 
 `scripts/corpus/import-report.mjs` (after `pnpm build`) imports each document and prints what

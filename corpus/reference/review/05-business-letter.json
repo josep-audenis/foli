@@ -1,0 +1,152 @@
+{
+    "document":  "05-business-letter.docx",
+    "word":  "16.0.20527",
+    "opened":  true,
+    "error":  null,
+    "revisions":  [
+
+                  ],
+    "comments":  [
+
+                 ],
+    "accepted":  [
+                     {
+                         "text":  "Northwind Traders Limited",
+                         "inTable":  false
+                     },
+                     {
+                         "text":  "Our ref: NT/SALES/2026/041\t12 February 2026",
+                         "inTable":  false
+                     },
+                     {
+                         "text":  "Ms Laura Petit, Purchasing Director, Litware SAS, 22 rue de la Paix, 75002 Paris, France",
+                         "inTable":  false
+                     },
+                     {
+                         "text":  "Re: Price list for the 2026 season",
+                         "inTable":  false
+                     },
+                     {
+                         "text":  "Dear Ms Petit,",
+                         "inTable":  false
+                     },
+                     {
+                         "text":  "Thank you for your enquiry of 4 February. We are delighted to confirm our prices for the 2026 season, which remain unchanged for all products ordered before 31 March 2026. Orders placed after that date will be charged at the new rates shown below.",
+                         "inTable":  false
+                     },
+                     {
+                         "text":  "Organic green tea, 250 g\tEUR 8.40",
+                         "inTable":  false
+                     },
+                     {
+                         "text":  "Darjeeling first flush, 100 g\tEUR 12.90",
+                         "inTable":  false
+                     },
+                     {
+                         "text":  "Ceramic teapot, 1 l\tEUR 34.00",
+                         "inTable":  false
+                     },
+                     {
+                         "text":  "Delivery is free for orders above EUR 500. Our 2nd delivery window opens on 1 May.",
+                         "inTable":  false
+                     },
+                     {
+                         "text":  "Payment terms. Payment is due within thirty days of the invoice date; late payments bear interest at the statutory rate. Please quote our reference on all correspondence.",
+                         "inTable":  false
+                     },
+                     {
+                         "text":  "We look forward to working with you again this year.",
+                         "inTable":  false
+                     },
+                     {
+                         "text":  "",
+                         "inTable":  false
+                     },
+                     {
+                         "text":  "",
+                         "inTable":  false
+                     },
+                     {
+                         "text":  "Enclosure: general terms and conditions of sale (2 pages).",
+                         "inTable":  false
+                     },
+                     {
+                         "text":  "Yours sincerely,",
+                         "inTable":  false
+                     },
+                     {
+                         "text":  "Tom Becker, Sales Director",
+                         "inTable":  false
+                     }
+                 ],
+    "rejected":  [
+                     {
+                         "text":  "Northwind Traders Limited",
+                         "inTable":  false
+                     },
+                     {
+                         "text":  "Our ref: NT/SALES/2026/041\t12 February 2026",
+                         "inTable":  false
+                     },
+                     {
+                         "text":  "Ms Laura Petit, Purchasing Director, Litware SAS, 22 rue de la Paix, 75002 Paris, France",
+                         "inTable":  false
+                     },
+                     {
+                         "text":  "Re: Price list for the 2026 season",
+                         "inTable":  false
+                     },
+                     {
+                         "text":  "Dear Ms Petit,",
+                         "inTable":  false
+                     },
+                     {
+                         "text":  "Thank you for your enquiry of 4 February. We are delighted to confirm our prices for the 2026 season, which remain unchanged for all products ordered before 31 March 2026. Orders placed after that date will be charged at the new rates shown below.",
+                         "inTable":  false
+                     },
+                     {
+                         "text":  "Organic green tea, 250 g\tEUR 8.40",
+                         "inTable":  false
+                     },
+                     {
+                         "text":  "Darjeeling first flush, 100 g\tEUR 12.90",
+                         "inTable":  false
+                     },
+                     {
+                         "text":  "Ceramic teapot, 1 l\tEUR 34.00",
+                         "inTable":  false
+                     },
+                     {
+                         "text":  "Delivery is free for orders above EUR 500. Our 2nd delivery window opens on 1 May.",
+                         "inTable":  false
+                     },
+                     {
+                         "text":  "Payment terms. Payment is due within thirty days of the invoice date; late payments bear interest at the statutory rate. Please quote our reference on all correspondence.",
+                         "inTable":  false
+                     },
+                     {
+                         "text":  "We look forward to working with you again this year.",
+                         "inTable":  false
+                     },
+                     {
+                         "text":  "",
+                         "inTable":  false
+                     },
+                     {
+                         "text":  "",
+                         "inTable":  false
+                     },
+                     {
+                         "text":  "Enclosure: general terms and conditions of sale (2 pages).",
+                         "inTable":  false
+                     },
+                     {
+                         "text":  "Yours sincerely,",
+                         "inTable":  false
+                     },
+                     {
+                         "text":  "Tom Becker, Sales Director",
+                         "inTable":  false
+                     }
+                 ]
+}
