@@ -124,7 +124,11 @@ declare global {
     /** For the e2e tests: the editor, and loading a document into it. */
     foliEdit: {
       readonly editor: Editor;
+      /** The view, for tests that map DOM points (`posFromDOM`). */
+      readonly view: EditorView;
       load(document: FoliDocument): void;
+      /** Opens a .docx (base64), as the file input does. */
+      loadDocx(base64: string): Promise<void>;
       sample: FoliDocument;
       /** Whether the editor's document passes validation (throws the error if not). */
       validate(): true;
@@ -136,7 +140,15 @@ window.foliEdit = {
   get editor() {
     return editor;
   },
+  get view() {
+    return view;
+  },
   load: (document) => load(document),
+  loadDocx: async (base64) => {
+    const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
+    const imported = await importDocx(bytes);
+    load(imported.document, imported.package, imported.trackRevisions);
+  },
   sample: SAMPLE,
   validate: () => {
     parseDocument(editor.getDocument());

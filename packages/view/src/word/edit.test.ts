@@ -482,7 +482,7 @@ describe("WordRenderer", () => {
     const editor = createEditor({ document: documentOf(...content) });
     const context = wordContext(editor.state) as WordContext;
     const renderer = new WordRenderer(context, document, () => 1.2);
-    renderer.prepare(editor.state.doc);
+    renderer.prepare(editor.state.doc.content.content);
     return { renderer, doc: editor.state.doc };
   }
 

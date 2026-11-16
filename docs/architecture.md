@@ -558,6 +558,29 @@ ranges of every paragraph and writes the gaps of every block (O(document); measu
 heading, and a tracked formatting change on both halves of a split, is not checked against
 Word yet: Foli keeps neither on the new paragraph.
 
+Tables in the editable view (10.5, `word/table.ts`, ADR-0006): the view's blocks are every
+paragraph and opaque block in document order, those in table cells (nested tables' included)
+too, each with its own position, leaves and fragments, so position mapping, splitting and the
+read-back work in cells as they do in top-level paragraphs. The page flow's items are the
+top-level blocks and tables. A table is drawn from the model (`collect`, `frameElement`): a
+wrapper per page with its table, the grid's columns, the rows that page holds, and cells with
+the table style's formatting (`Resolver.cell`: shading, borders, margins, vertical alignment;
+`border-collapse` resolves conflicts); a cell's paragraphs get its paragraph and run formatting
+(`Resolver.paragraph(attrs, cell)`) and their spacing as margins. A merged-down cell spans the
+rows it covers on a page (`rowspan`); one continued from the page before gets a cell of its
+own; a covered cell's paragraph stays in the DOM, in document order, in a cell the table does
+not lay out (`display: none`). A changed table is drawn whole and measured (its rows, where each
+block starts); its break points are the ends of its rows and, inside a row that may split, its
+cells' line ends (`breaksOf`): a row that may not split (`cantSplit`, unless taller than a page)
+moves whole, and a row in a vertical merge or holding a nested table splits only between rows
+(shortcut). After the flow (`cutTable`) each page's wrapper shows the rows it holds; a row split
+across pages is in both, each cell's paragraphs split at their own lines (the paragraph
+fragments above). The leading header rows are drawn again above a continuation, not editable
+and not read back; a click there puts the caret in the first row below. Backspace and Delete
+next to a table still select it whole (10.6 edits across a table's edges). Not yet: column
+widths are the grid Word saved (an autofit table is not recomputed), an exact row height is
+drawn as at least, contextual spacing between paragraphs in a cell.
+
 Review in the editable view (9.5): `EditorView` draws tracked changes as the editor's state says
 (`trackState(state).view`, `setReviewView`), every block again when it changes. `markup`:
 `ins`/`del` in the author's color (eight colors, picked by the author's name), titled with the
@@ -602,8 +625,11 @@ Word lays it out, read-only and without an editor (`EditorView` edits on the sam
   on a page may hang below it. Keep with next, keep lines together (not for a paragraph taller
   than a page, or one with a page break in it), page break before, explicit page breaks, widow
   and orphan control (two lines) apply; a table's header rows are repeated
-  at the top of each page it continues on (`BlockBox.repeat`). A block split across pages is
-  shown as a clip of the whole block per page.
+  at the top of each page it continues on (`BlockBox.repeat`), and a row that may not split
+  (`cantSplit`) has no break inside it. A block split across pages is
+  shown as a clip of the whole block per page. A table of the model (schema v4) is drawn from it
+  read-only, with its table style's formatting per cell.
+- `cellParagraphs()` gives the page of every paragraph in table cells, in document order.
 - `pageOf(index)` and `lineOf(index)` give where a top-level node starts (the page, and the
   line on it as Word numbers lines); the corpus harness compares them with Word's, and each
   page's ink with Word's PDF of it (`pnpm corpus:pages`, numbers in corpus/README.md).
@@ -727,7 +753,7 @@ Planned, created only when needed:
 - `pnpm check` also runs `publint --strict` on every package (exports, `files`, types) and
   `pnpm size`: each package's published entry bundled as an app would (fully minified, its
   Foli dependencies included, React external), and an app importing only `FoliEditor`, against
-  gzip budgets in `scripts/size.mjs` (core 43.9 kB, view 50.8 kB, react 69.3 kB, docx 41.0 kB;
+  gzip budgets in `scripts/size.mjs` (core 43.9 kB, view 53.7 kB, react 72.3 kB, docx 41.0 kB;
   each raise and its reason is recorded there).
 - `pnpm examples` installs the packed tarballs into `examples/vite` (React 18, strict
   TypeScript) and `examples/next` (React 19, server rendering) with npm, builds them, and runs
