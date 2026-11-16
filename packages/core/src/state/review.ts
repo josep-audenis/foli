@@ -10,6 +10,7 @@
  * together. These edits are not tracked themselves, and undo takes them back.
  */
 import type { Attrs, Mark, Node } from "../model/index.js";
+import { TransformError } from "../transform/transform.js";
 import { RUN_PROPERTY_MARKS } from "../v3/schema.js";
 import { closeHistory } from "./history.js";
 import { MARK_ATTRS } from "./mark.js";
@@ -256,7 +257,13 @@ function resolve(tr: Transaction, changes: readonly Change[], accept: boolean): 
           joins.push({ pos: end, keepFirst: accept && !emptied });
         // Nothing to join with (a table follows, or a cell ends): an inserted paragraph left
         // empty goes whole when rejected (Word's rules are restored after: `keepTablesApart`).
-        else if (goes && !accept && (!node.content.size || emptied)) {
+        // (Never a cell's only paragraph: a cell ends with one.)
+        else if (
+          goes &&
+          !accept &&
+          (!node.content.size || emptied) &&
+          tr.doc.resolve(start).parent.childCount > 1
+        ) {
           removed.push([start, end]);
           wholes = true;
         }
@@ -344,7 +351,14 @@ function command(
     if (dispatch) {
       // Its own undo step, never merged with the typing before it.
       const tr = state.tr.setMeta(untracked, true).setMeta(closeHistory, true);
-      resolve(tr, changes, accept);
+      // A document the result would not fit (a structure Word allows and Foli cannot change
+      // yet): nothing is changed.
+      try {
+        resolve(tr, changes, accept);
+      } catch (error) {
+        if (error instanceof TransformError) return false;
+        throw error;
+      }
       dispatch(tr);
     }
     return true;

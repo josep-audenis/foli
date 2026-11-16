@@ -357,3 +357,20 @@ describe("cells of a nested table", () => {
     expect(editor.state.doc.child(1).child(0).childCount).toBe(2);
   });
 });
+
+describe("an inserted paragraph that is a cell's only one", () => {
+  it("rejecting its insertion keeps it (a cell ends with a paragraph)", () => {
+    const marked: NodeJSON = {
+      type: "paragraph",
+      attrs: { revision: { insertion: { id: 90, author: "Other" } } },
+    };
+    const editor = editorOf([
+      p("x"),
+      table(row({ type: "tableCell", content: [marked] }, cell("b"))),
+      p("y"),
+    ]);
+    expect(editor.commands.rejectAllChanges()).toBe(true);
+    valid(editor);
+    expect(editor.state.doc.child(1).child(0).child(0).childCount).toBe(1);
+  });
+});
