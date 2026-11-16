@@ -19,7 +19,7 @@ place that says what is in progress; check it before starting work.
 | 5 Native pagination      | ✅ Done (G4 provisional) | —                    | Merged in #15–#22; page-break manual checks open, risks in ADR-0003                        |
 | 6 React API & 0.1.0      | ✅ Done                  | —                    | Merged in #23–#31; 0.1.0 on npm; manual checks shipped as known risks (ADR-0003)           |
 | 7 Rich content           | ✅ Done                  | —                    | Merged in #33–#41; 0.2.0 on npm; list-document benchmark misses accepted (known limit)     |
-| 8 Word model & DOCX      | In progress              | `phase-8/word-model` | [ADR-0005](decisions/ADR-0005-word-compatible-model.md); tasks below (8.1 corpus first)    |
+| 8 Word model & DOCX      | In review                | `phase-8/word-model` | Merged in #44–#59; 8.8 close (G5 numbers, docs, 0.3.0) in review                           |
 | 9–12                     | Not started              |                      |                                                                                            |
 
 Status values: `Ready` (dependencies met, nobody on it) · `In progress` · `In review` (PR open) ·
@@ -611,7 +611,12 @@ it, and saves it back without losing anything ([ADR-0005](decisions/ADR-0005-wor
 (canonical comparison) and opens in Word without a repair prompt; per-paragraph page agreement
 with Word measured and published as a baseline; opaque nodes per document reported; T1–T5 pass
 on schema v3 in three engines; documents saved by 0.1.0 and 0.2.0 migrate without content loss;
-0.3.0 published.
+0.3.0 published. (Measured 2026-11-16, Word 16.0.20527: all 21 rewritten and exported corpus
+packages open without a repair prompt, the 15 without edits with Word's reference numbers; the
+round trip without edits equals the original under the canonical comparison (unit tests);
+106 of 106 paragraphs start on Word's page, 103 on Word's line, pages against Word's PDF 0.544;
+opaque nodes per document in corpus/README.md; T1–T5 on v3 in Chromium, Firefox and WebKit;
+0.1.0 and 0.2.0 documents migrate with every character, break and mark (property test).)
 
 ### Tasks
 
@@ -663,7 +668,7 @@ Each task is a PR on `phase-8/word-model`, the build green after each.
     Word's PDF of it by ink (pdf.js, pixel by pixel within 2 px), a score per page and
     inside the margins, overlays to look at (`FOLI_WORD_PDF=<folder> pnpm corpus:pages`;
     baseline in corpus/README.md).
-- [ ] 8.7 Editing on v3, in four parts (each lands with the v2 editor still working; v2 goes in
+- [x] 8.7 Editing on v3, in four parts (each lands with the v2 editor still working; v2 goes in
   8.7d):
   - [x] 8.7a The editor and view on a v3 document (#53): `createEditor` takes a v3 document (envelope
     kept, page from its last section), `EditorView` renders it with Word's blocks and spacing
@@ -685,7 +690,7 @@ Each task is a PR on `phase-8/word-model`, the build green after each.
     paragraph ids dropped); HTML paste as Word's styles and lists; the caret over a list
     number in one press; T3 and T4 on v3 (the editing page; real Firefox's clipboard by
     hand). Pasted comments stay after undo, unlike Word (Phase 9).
-  - [ ] 8.7d The switch, in four parts:
+  - [x] 8.7d The switch, in four parts:
     - [x] 8.7d1 React and the playground on v3 (#56): `FoliEditor` and `useFoliEditor` take a
       document of any version (0.1.0 and 0.2.0 documents migrated on load, and by
       `setDocument`) and edit and report it as v3; the playground's main page on v3; its editing
@@ -703,14 +708,17 @@ Each task is a PR on `phase-8/word-model`, the build green after each.
       styles and lists, a twips section merged over A4); v2 exports only `FoliDocumentV2` and
       `parseContentV2` (old documents and pasted HTML); `parseDocument` says when a newer Foli
       saved a document.
-    - [ ] 8.7d4 Sections with their own page setups in the editable view: each section's pages
-      have its size and margins and its blocks are measured and split in its width; a section
-      starts a new page unless continuous with the same setup; a named print page per setup.
+    - [x] 8.7d4 Sections with their own page setups in the editable view (#59): each section's
+      pages have its size and margins and its blocks are measured and split in its width; a
+      section starts a new page unless continuous with the same setup; a named print page per
+      setup. Page setups are not editable yet, nor section breaks insertable.
 - [ ] 8.8 Close: docs, gate G5 numbers, 0.3.0 (changeset, version PR, publish after approval).
   The changeset lists the breaks:
   - Documents persist as v3 (0.2.0 cannot read them); `FoliChange.document`, `getDocument()` and
-    `useFoliEditor` are v3; `Editor` and `EditorOptions` are not generic (`createEditor` and
-    `setDocument` migrate any version); `EditorView` takes `Editor`.
+    `useFoliEditor` are v3; `createEditor`, `setDocument` and `initialContent` migrate any
+    version. Marks follow Word (`color`, `highlight` with Word's names); `parseDocument` keeps
+    any link target (check `isSafeHref` before making HTML); Tab types a tab outside lists.
+    (The full list is in the 0.3.0 changeset.)
   - Lists: `toggleList(kind)` and `wrapInList(kind)` take no attrs; `splitListItem`,
     `sinkListItem`, `liftListItem` and `liftListItemAtStart` are commands, not factories.
   - Removed: `insertHorizontalRule` (and `commands.insertHorizontalRule`), `listTypeAt`, the

@@ -447,5 +447,6 @@ describe("exporting without a package", () => {
       }),
       { numRuns: 100 },
     );
-  });
+    // 100 zip round trips: about half a second alone, past 5s beside the whole suite.
+  }, 20_000);
 });

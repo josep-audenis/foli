@@ -29,7 +29,7 @@ To show and edit a document in the browser, use [`@folijs/react`](https://www.np
 or [`@folijs/view`](https://www.npmjs.com/package/@folijs/view).
 
 - [Document format](https://github.com/josep-audenis/foli/blob/main/docs/document-model.md)
-- [API reference](https://github.com/josep-audenis/foli/blob/main/docs/api.md#folicore)
+- [API reference](https://github.com/josep-audenis/foli/blob/main/docs/api.md#folijscore)
 - [Known limitations](https://github.com/josep-audenis/foli/blob/main/docs/limitations.md)
 
 MIT

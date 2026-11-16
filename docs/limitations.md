@@ -1,6 +1,6 @@
 # Known limitations
 
-What Foli does not do yet, or does with caveats, as of 0.2.0. Read it before you ship. Details
+What Foli does not do yet, or does with caveats, as of 0.3.0. Read it before you ship. Details
 and the reasons are in [architecture.md](architecture.md), [pagination.md](pagination.md) and
 [ADR-0003](decisions/ADR-0003-rendering-and-input.md); what comes next is in the
 [roadmap](roadmap.md).
@@ -33,7 +33,11 @@ checklist in [testing/ime.md](testing/ime.md)):
   No tracked changes or comments editing (Phase 9), no tables or images editing (Phase 10), no
   headers, footers or page numbers (Phase 11). Sections are laid out with their own page
   setups; a continuous section with another page setup starts a new page, and an even or odd
-  page section gets no blank page before it. The page setup itself is not editable yet.
+  page section gets no blank page before it. Page setups and section breaks are not editable
+  yet.
+- Imported headers, footers, footnotes and floating pictures are kept and exported, but the
+  editor does not show or lay them out. A table is one opaque block: not editable, and never
+  split across pages in the editor (one taller than a page makes its page grow).
 - No horizontal rule button (Word's rule is a paragraph's bottom border, kept and shown).
 - On Android, Backspace at a list paragraph's start may join it into the paragraph before
   instead of removing its number (untested on a device).
@@ -68,6 +72,27 @@ checklist in [testing/ime.md](testing/ime.md)):
 - Documents in `schemaVersion: 1` load in later versions: they migrate without dropping
   content.
 
+## .docx (`@folijs/docx`)
+
+Details in the [package README](../packages/docx/README.md).
+
+- Strict Open XML documents are refused (`DocxError`) until a real file needs them. Encrypted
+  zip entries, ZIP64 and compression methods other than stored and deflate are refused too.
+- Keep the imported `package` with the document: a document that refers to parts of its
+  original package (headers, footers, pictures, content kept verbatim with relationship ids)
+  cannot be exported without it (`DocxError`).
+- The theme is read-only: export keeps the original part; a new package has none, so Word's
+  default theme applies.
+- Elements Foli does not model (tables, content controls, pictures, fields, equations...) are
+  kept verbatim and exported, but are not editable. A value the model cannot hold (out of
+  range, a unit such as `1.5cm`) stays in its element and is exported, but is not editable
+  (`report.unmodeled`).
+- Import does not keep exactly what Word reads as the same: run boundaries (adjacent runs with
+  the same properties become one), `w:cr` (read as a line break), non-breaking and soft hyphens
+  (read as U+2011 and U+00AD), XML comments, processing instructions and whitespace between
+  elements. Spelling marks, rendered page breaks, editing session ids and runs with no content
+  are not imported (Word recomputes them or they show nothing).
+
 ## Pages
 
 - Page breaks depend on the fonts the browser has: the same document can paginate differently
@@ -81,10 +106,12 @@ checklist in [testing/ime.md](testing/ime.md)):
 - No virtualization: every page is in the DOM and measured on load. Fine up to a few hundred
   pages ([benchmarks.md](benchmarks.md): 100 pages lay out in about 40–85 ms, a keystroke
   paints within 8–19 ms at p95 in Chromium and Firefox).
-- Long documents made of lists are slower: in a 114-page list document, Enter near the top
-  takes about 9-24 ms to handle (p50) and up to ~65 ms to paint (p95), and the first layout
-  ~85-95 ms, about twice a paragraph document (two runs, [benchmarks.md](benchmarks.md)). An edit there moves the last item of every later page to
-  the next one; every render also walks every block.
+- Long documents made of lists were slower in 0.2.0 (schema v2, where lists were nested
+  blocks; not measured on schema v3 yet): in a 114-page list document, Enter near the top took
+  about 9-24 ms to handle (p50) and up to ~65 ms to paint (p95), and the first layout ~85-95 ms,
+  about twice a paragraph document (two runs, [benchmarks.md](benchmarks.md)). An edit there
+  moved the last item of every later page to the next one; every render also walks every
+  block.
 - Formatting thousands of paragraphs at once is slow: bold over 4,000 paragraphs takes about
   0.6 s, the next edit about 0.7 s, its undo about 0.5 s.
 - Undo history keeps the last 100 undo steps (a run of typing is one step).
@@ -93,6 +120,8 @@ checklist in [testing/ime.md](testing/ime.md)):
 
 - One `@page` size per web page: with several editors of different page sizes, the last one's
   sheet size wins.
+- Sections with different page setups print on sheets of their own size through named pages;
+  engines without named pages print every sheet at the last section's size.
 - Print-only CSS must not change text metrics. PDF output is checked in Chromium only.
 - Your page's other content prints too; hide it ([styling.md](styling.md#print)).
 

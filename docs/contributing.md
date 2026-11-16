@@ -48,9 +48,9 @@ is not installed when `core.hooksPath` is set or a foreign `pre-push` hook exist
 
 ## Releasing
 
-`@folijs/core`, `@folijs/view` and `@folijs/react` always share one version (a Changesets
-`fixed` group, [`.changeset/config.json`](../.changeset/config.json)); the playground, spike and
-examples are never published.
+`@folijs/core`, `@folijs/view`, `@folijs/react` and `@folijs/docx` always share one version (a
+Changesets `fixed` group, [`.changeset/config.json`](../.changeset/config.json)); the
+playground, spike and examples are never published.
 
 1. **With each change to a published package**, run `pnpm changeset`: pick the bump (before
    1.0: `minor` for breaking changes and features, `patch` for fixes) and write the changelog

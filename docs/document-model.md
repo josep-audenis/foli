@@ -128,12 +128,12 @@ will use.
 [ADR-0005](decisions/ADR-0005-word-compatible-model.md)'s model, in
 `packages/core/src/v3/`: `schema`, the envelope `FoliDocument`, `parseDocument` (also reads v1
 and v2, validating then migrating them), `migrateToV3` and `createDocument`. It is the current
-schema (`SCHEMA_VERSION` 3, to be released in 0.3.0): the editor and the view work on it.
+schema (`SCHEMA_VERSION` 3, released in 0.3.0): the editor and the view work on it.
 
 The shape follows Word, in Word's units (twips = 1/20 pt for geometry, indentation, spacing
 and tab stops; half-points for font sizes; eighths of a point for borders: `units.ts` converts),
 so values survive a DOCX round trip exactly. An unset property is `null` and omitted from the
-JSON: the style, then the defaults, decide (resolution comes with rendering, 8.6).
+JSON: the style, then the defaults, decide (`Resolver` in `v3/resolve.ts`, 8.6).
 
 | Node                                                             | Content / attrs                                                                                                                                                                                                                                                                                                                  |
 | ---------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -316,8 +316,9 @@ chain are cut open. `doc.slice(from, to)` returns one (`slice.size === to - from
 `doc.replace(from, to, slice)` inserts it, joining open nodes with the nodes cut at `from` and
 `to`, and validates every rebuilt node (throws `ReplaceError` otherwise). Both ends must sit at
 consistent depths (`$from.depth - openStart === $to.depth - openEnd`); fitting arbitrary slices
-(closing and opening nodes as needed) is not implemented: Phase 3 transforms only use
-structurally compatible slices, and general fitting arrives with paste in Phase 4.
+(closing and opening nodes as needed) is not implemented: transforms only use structurally
+compatible slices, and paste inserts whole blocks where a slice cannot fit (an opaque block at
+an end).
 `ReplaceStep` builds on `replace`.
 
 ### JSON in/out
@@ -362,7 +363,8 @@ Page geometry outside the document (`editor.settings`, `PAGE_SIZES`, v2's `setti
 | DOCX drawings (EMU)  | `emu = mm × 36000`                                                                      |
 | PDF (points)         | `pt = mm × 72 / 25.4`                                                                   |
 
-Font sizes inside content use points (pt), matching word processors.
+Font sizes inside content are half-points, as in DOCX (`fontSize`: 24 = 12 pt); `setFontSize`
+takes points.
 
 ## Versioning and migrations
 
@@ -377,9 +379,10 @@ Migrations never drop content. A published version never changes in place.
 | ------- | ----------- | ------------------------------------------------------------------------------- |
 | 1       | 0.1.0       | v1 → v2: only the version changes (v2 only adds types and defaulted attributes) |
 | 2       | 0.2.0       | v2 → v3 (`migrateToV3`, 8.3): Word's model                                      |
-| 3       | 0.3.0       | — (the current version; not released yet)                                       |
+| 3       | 0.3.0       | — (the current version)                                                         |
 
 0.1.0 reads only version 1: it rejects documents saved by 0.2.0 ("Unsupported schemaVersion: 2").
+0.2.0 reads versions 1 and 2: it rejects documents saved by 0.3.0.
 Tests load a document exactly as 0.1.0 saved it (`document.test.ts`); in the browser, the
 page-break e2e (`pages.spec.ts`) and the examples' smoke test load v1 documents through the
 migration.
@@ -389,7 +392,8 @@ migration.
 Each added only when a feature needs it, with a migration:
 
 - `metadata` (title, author, timestamps, app-defined fields).
-- `resources` (the original DOCX package's parts, images by id, no inline binary) — Phases 8 and 10.
+- `resources` (images by id, no inline binary) — Phase 10. The original DOCX package stays
+  beside the document, not in it (`DocxImport.package`, Phase 8).
 - `headers` / `footers` as separate content trees — Phase 11.
 - Extension-owned data under a namespaced key.
 
@@ -398,5 +402,5 @@ Each added only when a feature needs it, with a migration:
 - Generate a JSON Schema from the TypeScript schema so Rust and other consumers validate the
   same format (when a non-TypeScript consumer appears).
 - Positions count UTF-16 code units, so a position can fall between the two halves of a
-  surrogate pair. Deletion commands move by grapheme (`Intl.Segmenter`); the view (Phase 4)
-  must do the same for caret movement. The model does not prevent it.
+  surrogate pair. Deletion commands move by grapheme (`Intl.Segmenter`), and the view snaps
+  the caret and selection out of grapheme clusters. The model does not prevent it.
