@@ -40,7 +40,15 @@ import {
 } from "./review.js";
 import { TextSelection } from "./selection.js";
 import { type Command, EditorState, type Plugin, type Transaction } from "./state.js";
-import { setTrackChanges, trackPlugin, trackState, trackTransaction } from "./track.js";
+import {
+  type ReviewView,
+  setReviewView,
+  setTrackChanges,
+  type TrackState,
+  trackPlugin,
+  trackState,
+  trackTransaction,
+} from "./track.js";
 import { type WordEnvelope, wordContext, wordPlugin } from "./word.js";
 import type { ListKind } from "./wordformat.js";
 
@@ -62,6 +70,8 @@ export interface EditorOptions {
    * `DocxImport.trackRevisions`). Schema v3 only. Default false.
    */
   trackChanges?: boolean;
+  /** How the editor's views show tracked changes at first (default `markup`). */
+  reviewView?: ReviewView;
 }
 
 export type EditorListener = (state: EditorState, transactions: readonly Transaction[]) => void;
@@ -121,6 +131,8 @@ export interface Editor {
     setHighlight(color: string | null): boolean;
     /** Turns tracked changes on or off (`author` changes who makes them). */
     setTrackChanges(on: boolean, author?: string): boolean;
+    /** How the editor's views show tracked changes. */
+    setReviewView(view: ReviewView): boolean;
     /** Accepts the change at the caret, or the changes in the selection. */
     acceptChange(): boolean;
     /** Rejects the change at the caret, or the changes in the selection. */
@@ -181,9 +193,10 @@ export function createEditor({
   plugins = [],
   author = "Author",
   trackChanges = false,
+  reviewView = "markup",
 }: EditorOptions = {}): Editor {
   let loaded = load(document);
-  let track = { on: trackChanges, author };
+  let track: TrackState = { on: trackChanges, author, view: reviewView };
   const pluginsFor = ({ envelope }: Loaded) => [
     ...plugins,
     history(),
@@ -254,6 +267,7 @@ export function createEditor({
       setTextColor: (color) => run(setTextColor(color)),
       setHighlight: (color) => run(setHighlight(color)),
       setTrackChanges: (on, name) => run(setTrackChanges(on, name)),
+      setReviewView: (view) => run(setReviewView(view)),
       acceptChange: () => run(acceptChange),
       rejectChange: () => run(rejectChange),
       acceptAllChanges: (name) => run(acceptAllChanges(name)),

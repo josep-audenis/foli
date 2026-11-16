@@ -4,7 +4,8 @@
  * fragments at content offsets like the v2 blocks (`render.ts`), and what the page flow needs
  * of each: Word's paragraph spacing and keep rules. Built with createElement/textContent only.
  *
- * Tracked changes are shown as markup (inserted and deleted text both shown). Content the model
+ * Tracked changes show as the view's review mode says (deleted text hidden, not left out, in the
+ * simple and final views: positions map through it). Content the model
  * keeps opaque is shown from its XML and cannot be edited: an opaque block is a block leaf, an
  * opaque inline node a leaf element.
  */
@@ -19,6 +20,8 @@ import {
 } from "@folijs/core";
 import type { BlockDesc, LeafDesc } from "../render.js";
 import {
+  CHANGE_BAR,
+  changeElement,
   fontStack,
   latin,
   lineHeight,
@@ -27,11 +30,24 @@ import {
   opaqueText,
   PX_PER_TWIP,
   parseOpaque,
+  type ReviewView,
   styleParagraph,
   styleRun,
   tagOf,
   WORD_PAGE_BREAK_ATTR,
 } from "./blocks.js";
+
+const REVIEW_MARKS = new Set(["insertion", "deletion", "formatChange"]);
+
+/** Whether a paragraph has tracked changes: in its text, its mark or its formatting. */
+function hasChanges(node: ModelNode): boolean {
+  if (node.attrs.revision || node.attrs.formatChange) return true;
+  let found = false;
+  node.forEach((child) => {
+    if (child.marks.some((m) => REVIEW_MARKS.has(m.type.name))) found = true;
+  });
+  return found;
+}
 
 /** What the page flow needs to know about a v3 block. */
 export interface WordInfo {
@@ -63,6 +79,8 @@ export class WordRenderer {
   readonly #ratio: (family: string) => number;
   /** For the clipboard (`clipboardBlocks`): links as links, list numbers as Word's HTML has them. */
   readonly #clipboard: boolean;
+  /** How tracked changes show. */
+  readonly #review: ReviewView;
   #markers: (ListMarker | null)[] = [];
   /** Comment ranges open at the start of each block. */
   #comments: number[][] = [];
@@ -72,11 +90,13 @@ export class WordRenderer {
     doc: Document,
     ratio: (family: string) => number,
     clipboard = false,
+    review: ReviewView = "markup",
   ) {
     this.#context = context;
     this.#doc = doc;
     this.#ratio = ratio;
     this.#clipboard = clipboard;
+    this.#review = review;
   }
 
   get context(): WordContext {
@@ -117,6 +137,7 @@ export class WordRenderer {
     const { paragraph, run } = resolver.paragraph(node.attrs);
     const line = (r: RunFormat) => lineHeight(paragraph, r, this.#ratio(fontStack(latin(r))));
     const doc = this.#doc;
+    const changed = this.#review !== "final" && hasChanges(node);
     const fragments = [0, ...splits].map((_, i, all) => {
       const fragment = doc.createElement(tagOf(paragraph));
       styleParagraph(fragment, paragraph);
@@ -130,6 +151,7 @@ export class WordRenderer {
         if (i < all.length - 1 && fragment.style.textAlign === "justify")
           fragment.style.textAlignLast = "justify";
       }
+      if (changed && !this.#clipboard) fragment.style.boxShadow = CHANGE_BAR;
       return fragment;
     });
     const dom = fragments[0] as HTMLElement;
@@ -263,13 +285,14 @@ export class WordRenderer {
     if (commented && !this.#clipboard && !element.style.backgroundColor)
       element.style.backgroundColor = "rgba(255, 213, 79, 0.35)";
     let outer = element;
-    const change = marks.find((m) => m.type.name === "insertion" || m.type.name === "deletion");
+    // Text inserted, then deleted, shows as deleted (in the deleting author's color).
+    const change =
+      marks.find((m) => m.type.name === "deletion") ??
+      marks.find((m) => m.type.name === "insertion");
     if (change) {
+      const { author, date } = change.attrs as { author: string; date: string | null };
       const inserted = change.type.name === "insertion";
-      outer = this.#doc.createElement(inserted ? "ins" : "del");
-      if (change.attrs.author) outer.title = String(change.attrs.author);
-      outer.style.color = "#B5082E";
-      outer.style.textDecorationLine = inserted ? "underline" : "line-through";
+      outer = changeElement(this.#doc, inserted, author, date, this.#review);
       outer.append(element);
     }
     // Schema v3 keeps any target (`file:`…): only a safe one is a link in the page or on the

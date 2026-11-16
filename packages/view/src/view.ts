@@ -20,6 +20,7 @@ import {
   marksAt,
   NodeSelection,
   parseContentV2,
+  type ReviewView,
   redo,
   type SectionJSON,
   Selection,
@@ -32,6 +33,7 @@ import {
   type Transaction,
   TransformError,
   toggleMark,
+  trackState,
   typedMarks,
   undo,
   type WordContext,
@@ -50,6 +52,7 @@ import {
   type Reuse,
 } from "./layout/flow.js";
 import { type BlockDesc, PAGE_BREAK_ATTR } from "./render.js";
+
 import { spacing, type WordBlockDesc, WordRenderer } from "./word/edit.js";
 import { measureLineRatio } from "./word/pages.js";
 
@@ -306,6 +309,8 @@ export class EditorView {
   private readonly addedTabIndex: boolean;
   /** Renders the document's blocks; made by the first render. */
   private word: WordRenderer | null = null;
+  /** How tracked changes show. */
+  private review: ReviewView = "markup";
   /** Fonts' normal line height ratios, measured once per family (Word's single spacing). */
   private readonly ratios = new Map<string, number>();
   /** Web fonts loaded since the v3 blocks were drawn: the next render draws them again. */
@@ -326,6 +331,7 @@ export class EditorView {
     host.style.whiteSpace = "pre-wrap";
     host.style.overflowWrap = "break-word";
     host.replaceChildren();
+    this.review = trackState(this.state)?.view ?? "markup";
     this.resizeObserver =
       typeof ResizeObserver === "undefined" ? null : new ResizeObserver(this.onResize);
     this.observer = new MutationObserver(this.onMutations);
@@ -407,6 +413,7 @@ export class EditorView {
       this.editable = options.editable;
     }
     if (options.placeholder !== undefined) this.placeholder = options.placeholder;
+
     // Read-only: no caret and no browser editing; the text stays selectable and copyable.
     host.setAttribute("contenteditable", String(this.editable));
     if (this.editable) host.removeAttribute("aria-readonly");
@@ -437,7 +444,14 @@ export class EditorView {
   // ---------- rendering ----------
 
   private update(state: EditorState): void {
-    const docChanged = state.doc !== this.state.doc;
+    const review = trackState(state)?.view ?? "markup";
+    // Another review view (`setReviewView`): every block drawn again, by a new renderer.
+    const reviewChanged = review !== this.review;
+    if (reviewChanged) {
+      this.review = review;
+      this.word = null;
+    }
+    const docChanged = state.doc !== this.state.doc || reviewChanged;
     const selectionChanged = !state.selection.eq(this.state.selection);
     this.state = state;
     if (docChanged) this.render();
@@ -494,7 +508,13 @@ export class EditorView {
     if (renewed) this.fontsChanged = false;
     let word = this.word as WordRenderer;
     if (renewed) {
-      word = this.word = new WordRenderer(context, ownerDocument, this.lineRatio);
+      word = this.word = new WordRenderer(
+        context,
+        ownerDocument,
+        this.lineRatio,
+        false,
+        this.review,
+      );
       this.invalidateLayout();
     }
     word.prepare(doc);

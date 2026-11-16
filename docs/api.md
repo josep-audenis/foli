@@ -26,6 +26,9 @@ model, with Word's toolbar): a 0.1.0 or 0.2.0 document given to it is migrated
 | ---------------- | ------------------------------ | ------------ | ------------------------------------------------------------------------------------------------- |
 | `initialContent` | `EditorDocument`               | empty A4     | Read once, on mount; any version (migrated). Later: `editor.setDocument()` or a new `key`.        |
 | `plugins`        | `readonly Plugin[]`            | `[]`         | Read once, on mount. Unstable API.                                                                |
+| `author`         | `string`                       | `"Author"`   | Read once: who edits (tracked changes are made in this name).                                     |
+| `trackChanges`   | `boolean`                      | `false`      | Read once: record edits as tracked changes (the toolbar turns it on and off).                     |
+| `reviewView`     | `ReviewView`                   | `"markup"`   | Read once: how tracked changes show (the toolbar changes it).                                     |
 | `onChange`       | `(change: FoliChange) => void` | —            | After every content change made through transactions. Not for selection changes or `setDocument`. |
 | `toolbar`        | `boolean`                      | `true`       | Show `FoliToolbar` above the pages.                                                               |
 | `readOnly`       | `boolean`                      | `false`      | Read, select, copy; no editing. Disables the toolbar.                                             |
@@ -60,6 +63,9 @@ Word's controls: paragraph style (with Word's Heading 1 to 3 when the document h
 them yet), font and size boxes · bold, italic, underline, strikethrough, link, text color,
 highlight · align left, center, align right, justify, line spacing · bulleted list, numbered
 list (pressed inside one), decrease and increase indent (list levels, else half-inch stops) ·
+Track changes (pressed while on), Show changes as (All markup, Simple markup, No markup),
+previous and next change, Accept, Reject (the change at the caret or the selected ones),
+Accept all, Reject all ·
 undo, redo · page break. A pointer pick in a box calls `onClickCommand`, like a button click.
 Up and Down on a closed box apply each value they pass (Chrome and Firefox on Windows), one
 undo step each. Text color and highlight are menu buttons (WAI-ARIA menu, `menuitemradio`
@@ -174,7 +180,14 @@ or insert a block Foli does not model (a table) is not made while tracking (Phas
 be recorded is not made. `editor.commands.setTrackChanges(on, author?)` (the
 `setTrackChanges` command), `editor.trackingChanges`, `trackState(state)` (`{ on, author }`).
 
-Accepting and rejecting (not tracked themselves; undo takes them back):
+Review view: how the editor's views show changes, kept in its state (`createEditor({
+reviewView })`, `editor.commands.setReviewView(view)`, `setReviewView`, `trackState(state).view`):
+`ReviewView` is `"markup"` (inserted text underlined, deleted text struck through, in the
+author's color, a bar beside changed paragraphs), `"simple"` (the text as if accepted, with the
+bar) or `"final"` (as if accepted). Deleted text is hidden, not removed, so positions and
+editing are unchanged. While tracking, Backspace and Delete step over deleted text.
+
+Accepting and rejecting (not tracked themselves; each its own undo step; undo takes them back):
 `editor.commands.acceptChange()` / `rejectChange()` (the changes at the caret, the paragraph's
 recorded formatting only when no other is there; in a selection, the selected part of each), `acceptAllChanges(author?)` / `rejectAllChanges(author?)`, `nextChange()` /
 `previousChange()` (select the change after or before the selection); the same as commands

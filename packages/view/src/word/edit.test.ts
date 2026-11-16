@@ -314,7 +314,37 @@ describe("EditorView on a schema v3 document", () => {
     );
     expect(host.querySelector("ins")?.textContent).toBe("in");
     expect(host.querySelector("del")?.textContent).toBe("out");
-    expect(host.querySelector("ins")?.title).toBe("A");
+    expect(host.querySelector("ins")?.title).toBe("Inserted by A");
+    // A bar beside the changed paragraph.
+    expect((blocks(host)[0] as HTMLElement).style.boxShadow).not.toBe("");
+  });
+
+  it("shows changes as simple markup or final text, keeping positions", () => {
+    const change = { id: 1, author: "A" };
+    const { host, editor } = mount(
+      p(
+        {},
+        text("a"),
+        text("in", [{ type: "insertion", attrs: change }]),
+        text("out", [{ type: "deletion", attrs: change }]),
+        text("b"),
+      ),
+    );
+    const del = () => host.querySelector("del") as HTMLElement;
+    const ins = () => host.querySelector("ins") as HTMLElement;
+    expect(del().style.display).toBe("");
+    editor.commands.setReviewView("simple");
+    expect(del().style.display).toBe("none");
+    expect(del().textContent).toBe("out");
+    expect(ins().style.textDecorationLine).toBe("none");
+    expect((blocks(host)[0] as HTMLElement).style.boxShadow).not.toBe("");
+    editor.commands.setReviewView("final");
+    expect(del().style.display).toBe("none");
+    expect((blocks(host)[0] as HTMLElement).style.boxShadow).toBe("");
+    // Editing goes on at the same positions.
+    editor.select(9);
+    editor.commands.insertText("c");
+    expect(host.textContent).toContain("ainoutbc");
   });
 
   it("reads a composition back past list numbers and tabs", () => {

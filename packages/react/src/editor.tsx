@@ -4,6 +4,7 @@ import {
   type EditorDocument,
   type EditorState,
   type Plugin,
+  type ReviewView,
 } from "@folijs/core";
 import {
   createContext,
@@ -33,6 +34,12 @@ export interface UseFoliEditorOptions {
   initialContent?: EditorDocument | undefined;
   /** Read once, when the editor is created. */
   plugins?: readonly Plugin[] | undefined;
+  /** Read once: who edits (tracked changes are made in this name; `createEditor`'s `author`). */
+  author?: string | undefined;
+  /** Read once: record edits as tracked changes from the start (a `.docx`'s `trackRevisions`). */
+  trackChanges?: boolean | undefined;
+  /** Read once: how tracked changes show at first (default `markup`). */
+  reviewView?: ReviewView | undefined;
 }
 
 /**
@@ -42,8 +49,14 @@ export interface UseFoliEditorOptions {
  */
 export function useFoliEditor(options: UseFoliEditorOptions = {}): Editor {
   const [editor] = useState(() => {
-    const { initialContent: document, plugins } = options;
-    return createEditor({ ...(document && { document }), ...(plugins && { plugins }) });
+    const { initialContent: document, plugins, author, trackChanges, reviewView } = options;
+    return createEditor({
+      ...(document && { document }),
+      ...(plugins && { plugins }),
+      ...(author !== undefined && { author }),
+      ...(trackChanges !== undefined && { trackChanges }),
+      ...(reviewView !== undefined && { reviewView }),
+    });
   });
   return editor;
 }

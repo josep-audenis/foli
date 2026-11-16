@@ -305,9 +305,9 @@ describe("renderBlocks: review", () => {
     const ins = block?.element.querySelector("ins") as HTMLElement;
     const del = block?.element.querySelector("del") as HTMLElement;
     expect(ins.textContent).toBe("new");
-    expect(ins.title).toBe("Ana");
+    expect(ins.title).toMatch(/^Inserted by Ana/);
     expect(del.textContent).toBe("old");
-    expect(del.title).toBe("Ben");
+    expect(del.title).toMatch(/^Deleted by Ben/);
     expect(del.style.textDecorationLine).toBe("line-through");
   });
 

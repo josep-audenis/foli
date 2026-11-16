@@ -4,6 +4,7 @@ import type { MarkJSON, Node, NodeJSON } from "../model/index.js";
 import type { FoliDocument, StyleJSON } from "../v3/document.js";
 import { createEditor, type Editor } from "./editor.js";
 import { NodeSelection, TextSelection } from "./selection.js";
+import { trackState } from "./track.js";
 
 const STYLES: StyleJSON[] = [
   { id: "Normal", type: "paragraph", name: "Normal", isDefault: true, next: "Normal" },
@@ -71,6 +72,27 @@ describe("tracked changes", () => {
     editor.commands.deleteBackward();
     expect(blocks(editor)).toEqual([p(text("a"), text("bc", [del(0)]))]);
     expect(editor.state.selection.head).toBe(2);
+  });
+
+  it("steps over deleted text: Backspace and Delete delete what is beyond it", () => {
+    const mine: MarkJSON = {
+      type: "deletion",
+      attrs: { id: 5, author: "Me", date: "2026-01-02T03:04:05Z" },
+    };
+    const editor = tracked(p(text("ab"), text("cd", [mine]), text("ef")));
+    editor.select(5);
+    editor.commands.deleteBackward();
+    expect(blocks(editor)).toEqual([p(text("a"), text("bcd", [mine]), text("ef"))]);
+    editor.select(3);
+    editor.commands.deleteForward();
+    expect(blocks(editor)).toEqual([p(text("a"), text("bcde", [mine]), text("f"))]);
+  });
+
+  it("keeps the review view in the editor's state", () => {
+    const editor = tracked(p(text("ab")));
+    expect(trackState(editor.state)?.view).toBe("markup");
+    expect(editor.commands.setReviewView("final")).toBe(true);
+    expect(trackState(editor.state)).toEqual({ on: true, author: "Me", view: "final" });
   });
 
   it("puts the caret after what Delete deleted", () => {

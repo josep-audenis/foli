@@ -66,7 +66,7 @@ export const SAMPLE: FoliDocument = {
 };
 
 const host = document.getElementById("editor") as HTMLElement;
-let editor: Editor = createEditor({ document: SAMPLE });
+let editor: Editor = createEditor({ document: SAMPLE, author: "Foli user" });
 let view = new EditorView(host, editor);
 const toolbar = createRoot(document.getElementById("toolbar") as HTMLElement);
 /** The formatting toolbar for the current editor; a click puts the focus back in the document. */
@@ -77,9 +77,9 @@ showToolbar();
 let original: DocxPackage | undefined;
 
 /** Shows a v3 document in a new editor (and view), with a fresh history. */
-function load(document: FoliDocument, from?: DocxPackage): void {
+function load(document: FoliDocument, from?: DocxPackage, trackChanges = false): void {
   view.destroy();
-  editor = createEditor({ document: parseDocument(document) });
+  editor = createEditor({ document: parseDocument(document), author: "Foli user", trackChanges });
   view = new EditorView(host, editor);
   original = from;
   showToolbar();
@@ -90,14 +90,16 @@ function load(document: FoliDocument, from?: DocxPackage): void {
   if (!file) return;
   try {
     const imported = await importDocx(new Uint8Array(await file.arrayBuffer()));
-    load(imported.document, imported.package);
+    load(imported.document, imported.package, imported.trackRevisions);
   } catch (error) {
     alert(`Could not open ${file.name}: ${(error as Error).message}`);
   }
 });
 
 (document.getElementById("save") as HTMLButtonElement).addEventListener("click", async () => {
-  const bytes = await exportDocx(editor.getDocument(), original);
+  const bytes = await exportDocx(editor.getDocument(), original, {
+    trackRevisions: editor.trackingChanges,
+  });
   const url = URL.createObjectURL(
     new Blob([bytes as BlobPart], {
       type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",

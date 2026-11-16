@@ -37,11 +37,20 @@ import { NodeSelection, Selection, TextSelection } from "./selection.js";
 import { type Command, type EditorState, Plugin, PluginKey, type Transaction } from "./state.js";
 import { wordContext } from "./word.js";
 
+/**
+ * How tracked changes show: `markup` (inserted text underlined and deleted text struck through,
+ * in the author's color, with a bar beside changed paragraphs), `simple` (as if accepted, with
+ * the bar), `final` (as if accepted).
+ */
+export type ReviewView = "markup" | "simple" | "final";
+
 export interface TrackState {
   /** Whether edits are recorded as tracked changes. */
   readonly on: boolean;
   /** Who makes them. */
   readonly author: string;
+  /** How changes show in a view of the editor (default `markup`). */
+  readonly view?: ReviewView;
 }
 
 const key = new PluginKey<TrackState>("track");
@@ -98,7 +107,17 @@ export function setTrackChanges(on: boolean, author?: string): Command {
   return (state, dispatch) => {
     const current = key.getState(state);
     if (!current || !state.schema.marks.insertion) return false;
-    dispatch?.(state.tr.setMeta(key, { on, author: author ?? current.author }));
+    dispatch?.(state.tr.setMeta(key, { ...current, on, author: author ?? current.author }));
+    return true;
+  };
+}
+
+/** Shows tracked changes as `view` in the editor's views. Applies only to a schema v3 editor. */
+export function setReviewView(view: ReviewView): Command {
+  return (state, dispatch) => {
+    const current = key.getState(state);
+    if (!current || !state.schema.marks.insertion) return false;
+    dispatch?.(state.tr.setMeta(key, { ...current, view }));
     return true;
   };
 }

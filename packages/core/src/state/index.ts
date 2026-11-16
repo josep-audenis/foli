@@ -94,6 +94,8 @@ export {
   Transaction,
 } from "./state.js";
 export {
+  type ReviewView,
+  setReviewView,
   setTrackChanges,
   type TrackState,
   trackState,

@@ -3,6 +3,7 @@ import {
   type EditorDocument,
   type FoliDocument,
   type Plugin,
+  type ReviewView,
   type Transaction,
   wordContext,
 } from "@folijs/core";
@@ -34,6 +35,12 @@ export interface FoliEditorProps extends Omit<FoliCanvasProps, "editor"> {
   initialContent?: EditorDocument | undefined;
   /** Read once on mount. */
   plugins?: readonly Plugin[] | undefined;
+  /** Read once on mount: who edits (tracked changes are made in this name). */
+  author?: string | undefined;
+  /** Read once on mount: record edits as tracked changes (the toolbar turns it on and off). */
+  trackChanges?: boolean | undefined;
+  /** Read once on mount: how tracked changes show (the toolbar changes it). */
+  reviewView?: ReviewView | undefined;
   /**
    * Called after every change to the document's content made through transactions (typing,
    * commands, undo). Not for selection changes, and not for `editor.setDocument()`, whose
@@ -57,10 +64,20 @@ export interface FoliEditorHandle extends FoliCanvasHandle {
  * through `onChange`, a parent reaches it through a `ref`.
  */
 export const FoliEditor = forwardRef<FoliEditorHandle, FoliEditorProps>(function FoliEditor(
-  { initialContent, plugins, onChange, toolbar = true, children, ...canvas },
+  {
+    initialContent,
+    plugins,
+    author,
+    trackChanges,
+    reviewView,
+    onChange,
+    toolbar = true,
+    children,
+    ...canvas
+  },
   ref,
 ) {
-  const editor = useFoliEditor({ initialContent, plugins });
+  const editor = useFoliEditor({ initialContent, plugins, author, trackChanges, reviewView });
   const onChangeRef = useRef(onChange);
   const canvasRef = useRef<FoliCanvasHandle>(null);
 

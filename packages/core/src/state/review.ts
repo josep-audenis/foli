@@ -11,6 +11,7 @@
  */
 import type { Attrs, Mark, Node } from "../model/index.js";
 import { RUN_PROPERTY_MARKS } from "../v3/schema.js";
+import { closeHistory } from "./history.js";
 import { MARK_ATTRS } from "./mark.js";
 import { TextSelection } from "./selection.js";
 import type { Command, EditorState, Transaction } from "./state.js";
@@ -275,7 +276,8 @@ function command(
     const changes = changesIn(state.doc, r[0], r[1], filter);
     if (!changes.length) return false;
     if (dispatch) {
-      const tr = state.tr.setMeta(untracked, true);
+      // Its own undo step, never merged with the typing before it.
+      const tr = state.tr.setMeta(untracked, true).setMeta(closeHistory, true);
       resolve(tr, changes, accept);
       dispatch(tr);
     }
