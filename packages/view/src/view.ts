@@ -1576,14 +1576,15 @@ export class EditorView {
     }
     const near = (column: number) => Math.abs(event.clientX - (edges[column] as number)) <= 4;
     // The grid lines that are borders here: the cell's own edges, the table's right edge from
-    // outside it, any line on the table's own border area.
+    // outside it, any line on the table's own border area (none in a row's empty places).
     const cell = target?.closest("td");
     let columns: number[];
     if (cell && element.contains(cell)) {
       const box = cell.getBoundingClientRect();
       const at = (line: number) => edges.findIndex((edge) => Math.abs(edge - line) <= 3);
       columns = [at(box.left), at(box.right)].filter((c) => c >= 0);
-    } else if (element.contains(target)) columns = grid.map((_w, i) => i);
+    } else if (target === element) columns = grid.map((_w, i) => i);
+    else if (element.contains(target)) columns = [];
     else columns = [grid.length - 1];
     const column = columns.find(near);
     return column === undefined ? null : { table, column, perTwip, rect };
