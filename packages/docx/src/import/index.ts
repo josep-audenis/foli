@@ -131,7 +131,7 @@ export function importPackage(pkg: DocxPackage): DocxImport {
   try {
     trackRevisions = trackRevisionsOf(related(REL.settings)?.root);
   } catch (error) {
-    if (!(error instanceof Error && error.name === "XmlError")) throw error;
+    if (!(error instanceof DocxError)) throw error;
   }
   return { document, package: pkg, report: report.report(), trackRevisions };
 }

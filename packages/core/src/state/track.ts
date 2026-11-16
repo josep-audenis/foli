@@ -231,7 +231,7 @@ function rebuild(
   });
 
   /** Records `from..to` (current positions) as deleted; returns where the kept content ends. */
-  const deleteRange = (from: number, to: number): { start: At; end: At } => {
+  const deleteRange = (from: number, to: number, inserting: boolean): { start: At; end: At } => {
     const doc = out.doc;
     const startStep = out.steps.length;
     let mark: Mark | undefined;
@@ -250,7 +250,8 @@ function rebuild(
         const revision = node.attrs.revision as ParagraphRevision | null;
         // Its mark goes: the range runs into the next block, or covers this one whole.
         const crossed =
-          (from < end && to > end) || (from <= pos && to >= end && !!doc.resolve(end).nodeAfter);
+          (from < end && to > end) ||
+          (from <= pos && to >= end && (inserting || !!doc.resolve(end).nodeAfter));
         if (
           crossed &&
           !revision?.deletion &&
@@ -293,13 +294,7 @@ function rebuild(
   const ranges = changedRanges(tr);
   const records: { range: Range; start: At; end: At; inserted: At | null }[] = [];
   for (const range of [...ranges].reverse()) {
-    const { start, end } =
-      range.a < range.b
-        ? deleteRange(range.a, range.b)
-        : { start: here(range.a), end: here(range.a) };
-    let inserted: At | null = null;
     const slice = tr.doc.slice(range.c, range.d);
-    const pos = end.pos;
     const first = slice.content.firstChild;
     // Deleting everything leaves one empty paragraph: here, the last one, its text deleted.
     const emptyBlock =
@@ -308,8 +303,13 @@ function rebuild(
       !slice.openStart &&
       slice.content.childCount === 1 &&
       first?.isTextblock &&
-      !first.content.size &&
-      out.doc.resolve(pos).depth === 0;
+      !first.content.size;
+    const { start, end } =
+      range.a < range.b
+        ? deleteRange(range.a, range.b, slice.size > 0 && !emptyBlock)
+        : { start: here(range.a), end: here(range.a) };
+    let inserted: At | null = null;
+    const pos = end.pos;
     if (slice.size && !emptyBlock) {
       const mark = adjacent(insertion, pos, pos) ?? insertion.create({ id: newId(), author, date });
       const content = markFragment(slice.content, mark, insertion, deletion);

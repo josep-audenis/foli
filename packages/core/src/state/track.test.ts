@@ -181,6 +181,15 @@ describe("tracked changes", () => {
     expect(project(editor.state.doc, false)).toEqual(["", "cd"]);
   });
 
+  it("records the mark of an empty last paragraph pasted into", () => {
+    const editor = tracked(p(text("ab")), p());
+    const { schema } = editor.state;
+    const pasted = [p(text("Q")), p(text("R"))].map((b) => schema.nodeFromJSON(b));
+    editor.dispatch(editor.state.tr.delete(4, 6).insert(4, pasted));
+    expect(project(editor.state.doc, true)).toEqual(["ab", "Q", "R"]);
+    expect(project(editor.state.doc, false)).toEqual(["ab", ""]);
+  });
+
   it("gives a change an id no comment's change has", () => {
     const comment = {
       id: 0,

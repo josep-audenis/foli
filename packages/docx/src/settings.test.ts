@@ -83,6 +83,23 @@ describe("w:trackRevisions", () => {
     expect(again.document.content.content?.[0]).toEqual(editor.getDocument().content.content?.[0]);
   });
 
+  it("reads a settings part it cannot parse as tracking off, and keeps it", async () => {
+    const corpus = new URL("../../../corpus/word/", import.meta.url);
+    const pkg = await readPackage(
+      new Uint8Array(readFileSync(new URL("05-business-letter.docx", corpus))),
+    );
+    const broken = await pkg.write(
+      new Map([
+        ["/word/settings.xml", new TextEncoder().encode("<w:settings><oops></w:settings>")],
+      ]),
+      [],
+    );
+    const imported = await importDocx(broken);
+    expect(imported.trackRevisions).toBe(false);
+    const again = await readPackage(await exportDocx(imported.document, imported.package));
+    expect(again.text("/word/settings.xml")).toBe("<w:settings><oops></w:settings>");
+  });
+
   it("is written into a new package only when on", async () => {
     const document = createDocument();
     expect((await importDocx(await exportDocx(document))).trackRevisions).toBe(false);
