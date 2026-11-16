@@ -851,7 +851,7 @@ Each task is a PR on `phase-9/review`, the build green after each.
   a reference from the start stays). Copy and paste with undo from 9.1. Headless tests; comments
   made in the editor come back from a new and from a corpus package with replies and resolved
   state (unit tests; Word in 9.8).
-- [x] 9.7 Comments pane: `FoliComments` (React; the view marks commented text with
+- [x] 9.7 Comments pane (#69): `FoliComments` (React; the view marks commented text with
   `data-foli-comments`): threads beside the pages level with their text, pushed down when they
   overlap; the focused thread's text outlined, the thread of a caret in commented text marked;
   reply, edit, resolve, reopen, delete; resolved threads dimmed; a new empty comment (toolbar:
