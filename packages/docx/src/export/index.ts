@@ -46,31 +46,49 @@ class Relationships {
   readonly added: { id: string; type: string; target: string; external: boolean }[] = [];
   readonly #ids: Set<string>;
   readonly #byTarget = new Map<string, string>();
-  readonly #existing: ReadonlyMap<string, { type: string; target: string; external: boolean }>;
+  readonly #existing: ReadonlyMap<
+    string,
+    { type: string; target: string; external: boolean; partName?: string }
+  >;
+  /** The part each internal relationship points to (resolved, as the package resolves it). */
+  readonly #parts = new Map<string, string>();
 
   constructor(
-    existing: readonly { id: string; type: string; target: string; external: boolean }[],
+    existing: readonly {
+      id: string;
+      type: string;
+      target: string;
+      external: boolean;
+      partName?: string;
+    }[],
   ) {
     this.#existing = new Map(existing.map((r) => [r.id, r]));
+    for (const r of existing) if (!r.external && r.partName) this.#parts.set(r.id, r.partName);
     this.#ids = new Set(existing.map((r) => r.id));
     for (const r of existing)
       if (r.type === REL.hyperlink && r.external) this.#byTarget.set(r.target, r.id);
   }
 
-  /** Whether the part has a relationship `id` (one it had, or one added). */
-  has(id: string): boolean {
-    return this.#ids.has(id);
+  /** The part relationship `id` points to (one it had, or one added), if internal. */
+  target(id: string): string | undefined {
+    return this.#parts.get(id);
   }
 
-  /** The relationship to image part `target`: `current` when it is one, else a known or new one. */
-  image(target: string, current: string | undefined): string {
-    const own = current === undefined ? undefined : this.#existing.get(current);
-    if (own && own.type === REL_IMAGE && !own.external && own.target === target)
-      return current as string;
-    for (const [id, r] of this.#existing)
-      if (r.type === REL_IMAGE && !r.external && r.target === target) return id;
-    const added = this.added.find((r) => r.type === REL_IMAGE && r.target === target);
-    return added ? added.id : this.add(REL_IMAGE, target, false);
+  /**
+   * The relationship to image part `part` (absolute; `target` as this part refers to it):
+   * `current` when it is one, else a known or new one. Compared by part, not by the target's
+   * text (`/word/media/x.png`, `./media/x.png` and `media/x.png` are one part).
+   */
+  image(part: string, target: string, current: string | undefined): string {
+    const isImage = (id: string) => {
+      const r = this.#existing.get(id) ?? this.added.find((a) => a.id === id);
+      return r?.type === REL_IMAGE && this.#parts.get(id)?.toLowerCase() === part.toLowerCase();
+    };
+    if (current !== undefined && isImage(current)) return current;
+    for (const id of this.#parts.keys()) if (isImage(id)) return id;
+    const id = this.add(REL_IMAGE, target, false);
+    this.#parts.set(id, part);
+    return id;
   }
 
   hyperlink(href: string, id: string | undefined): string {
@@ -122,10 +140,11 @@ function contextFor(
     picture: (attrs) =>
       drawingXml(
         attrs,
-        (current) =>
-          relationships.image(relative(source, media.part(String(attrs.resource))), current),
+        {
+          image: (part, current) => relationships.image(part, relative(source, part), current),
+          target: (id) => relationships.target(id),
+        },
         namespaces,
-        (id) => relationships.has(id),
         media,
       ),
   };
@@ -169,7 +188,25 @@ export async function exportDocx(
   options: ExportOptions = {},
 ): Promise<Uint8Array> {
   const doc = withThreadIds(parseDocument(document), original);
-  const media = new Media(doc, original, await pictureBytes(doc, original, options.resource));
+  // Before the app is asked for any picture's bytes.
+  const reference = original ? undefined : packageReference(doc);
+  if (reference) {
+    throw new DocxError(
+      `The document refers to a part of its original package (${reference}): export it with that package`,
+    );
+  }
+  // The parts written from the model: their drawings are the document's own.
+  const rewritten = original
+    ? [
+        original.mainDocument,
+        ...original
+          .relationships(original.mainDocument)
+          .filter((r) => r.type === REL.comments && r.partName)
+          .map((r) => r.partName as string),
+      ]
+    : [];
+  const bytes = await pictureBytes(doc, original, options.resource);
+  const media = new Media(doc, original, bytes, rewritten);
   return original ? intoPackage(doc, original, options, media) : newPackage(doc, options, media);
 }
 
@@ -405,12 +442,6 @@ async function newPackage(
   options: ExportOptions,
   media: Media,
 ): Promise<Uint8Array> {
-  const reference = packageReference(doc);
-  if (reference) {
-    throw new DocxError(
-      `The document refers to a part of its original package (${reference}): export it with that package`,
-    );
-  }
   const rels = new Relationships([]);
   const context = contextFor(DEFAULT_NAMESPACES, rels, media, "/word/document.xml");
   const main = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\r\n<w:document ${NEW_ROOT_ATTRIBUTES}><w:body>${blocksXml(doc.content.content ?? [], context)}${bodySection(doc, DEFAULT_NAMESPACES)}</w:body></w:document>`;

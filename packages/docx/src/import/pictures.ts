@@ -22,8 +22,6 @@ export interface PictureContext extends Context {
   ) => { type: string; external: boolean; partName?: string } | undefined;
   /** A part of the package by name. */
   readonly partOf: (name: string) => { contentType: string; data: Uint8Array } | undefined;
-  /** The envelope's resources, filled as pictures are read. */
-  readonly resources: Map<string, ResourceJSON>;
 }
 
 const kid = (el: XmlElement | undefined, ns: string, local: string) =>
@@ -58,6 +56,8 @@ const emu = (value: string | undefined) => {
 export function pictureAttrs(
   drawing: XmlElement,
   context: PictureContext,
+  /** Filled with the image's resource key and entry. */
+  resource: [string?, ResourceJSON?] = [],
 ): Record<string, unknown> | undefined {
   const children = drawing.children.filter((c) => c.kind === "element");
   const inline = kid(drawing, WP, "inline");
@@ -77,12 +77,8 @@ export function pictureAttrs(
   const height = emu(plain(extent, "cy"));
   if (width === undefined || height === undefined) return undefined;
   const key = name.replace(/^\//, "");
-  if (!context.resources.has(key))
-    context.resources.set(key, {
-      contentType: part.contentType,
-      size: part.data.length,
-      part: key,
-    });
+  // Added by the caller once the node is valid (a drawing kept opaque has no resource).
+  resource.push(key, { contentType: part.contentType, size: part.data.length, part: key });
   const docPr = kid(inline, WP, "docPr");
   const alt = plain(docPr, "descr");
   const title = plain(docPr, "title");
@@ -91,7 +87,8 @@ export function pictureAttrs(
     resource: key,
     width,
     height,
-    ...(alt ? { alt } : {}),
+    // An empty description is kept as it is (it is not Word's missing one).
+    ...(alt !== undefined ? { alt } : {}),
     ...(title ? { title } : {}),
     ...(decorative === "1" || decorative === "true" ? { decorative: true } : {}),
     ext: sourceOf(context, drawing),

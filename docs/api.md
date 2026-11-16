@@ -400,7 +400,7 @@ Details (what import keeps, what export writes, limits): the
 [package README](../packages/docx/README.md).
 
 - `importDocx(bytes, options?): Promise<DocxImport>`: reads a `.docx` (`Uint8Array`) into a
-  schema v3 document. `DocxImport`: `{ document, package, report, trackRevisions }`, the
+  schema v4 document. `DocxImport`: `{ document, package, report, trackRevisions }`, the
   validated document, the package it was read from (keep it with the document for export),
   `ImportReport` (`opaque`, `dropped`, `unmodeled`, `unmodeledCount`, `picturesWithoutAlt`) and whether Word tracks
   changes in it (`w:trackRevisions`: the editor's `trackChanges`). `options` are `readPackage`'s.

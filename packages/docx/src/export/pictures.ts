@@ -40,12 +40,28 @@ function picturesOf(doc: FoliDocument): Json[] {
   return out;
 }
 
-/** A `data:` URL's bytes (base64 only), or undefined. */
-function dataBytes(url: string): Uint8Array | undefined {
-  const match = /^data:[^,;]*(?:;[^,;]*)*;base64,([A-Za-z0-9+/=\s]*)$/.exec(url);
-  if (!match) return undefined;
-  const binary = atob((match[1] as string).replace(/\s/g, ""));
-  return Uint8Array.from(binary, (c) => c.charCodeAt(0));
+/** A `data:` URL's bytes (base64 or percent-encoded), or undefined when it is not one. */
+function dataBytes(url: string, key: string): Uint8Array | undefined {
+  const comma = url.indexOf(",");
+  if (!url.startsWith("data:") || comma < 0) return undefined;
+  const base64 = /;base64$/i.test(url.slice(0, comma));
+  const body = url.slice(comma + 1);
+  try {
+    if (!base64) return new TextEncoder().encode(decodeURIComponent(body));
+    const binary = atob(body.replace(/\s/g, ""));
+    return Uint8Array.from(binary, (c) => c.charCodeAt(0));
+  } catch (error) {
+    throw new DocxError(`The picture ${key} has a data: URL that cannot be read`, { cause: error });
+  }
+}
+
+/**
+ * Whether the package's part is the resource's image: the part it names, an image of the size
+ * import recorded (a part of that name in another package is another image).
+ */
+function ownPart(resource: ResourceJSON, pkg: DocxPackage | undefined): boolean {
+  const part = resource.part ? pkg?.part(`/${resource.part}`) : undefined;
+  return !!part && part.contentType.startsWith("image/") && part.data.length === resource.size;
 }
 
 /** The bytes of each picture's image the package does not hold, before anything is written. */
@@ -66,9 +82,9 @@ export async function pictureBytes(
     const resource = doc.resources?.[key];
     if (!resource)
       throw new DocxError(`Picture resource ${key} is not in the document's resources`);
-    if (resource.part && pkg?.part(`/${resource.part}`)) continue;
+    if (ownPart(resource, pkg)) continue;
     const bytes =
-      (resource.data ? dataBytes(resource.data) : undefined) ?? (await ask?.(key, resource));
+      (resource.data ? dataBytes(resource.data, key) : undefined) ?? (await ask?.(key, resource));
     if (!bytes) {
       throw new DocxError(
         resource.part
@@ -81,23 +97,45 @@ export async function pictureBytes(
   return out;
 }
 
-/** The media parts pictures need, allocated as they are written (one per resource). */
+/** `wp:docPr` ids (any prefix) in XML text. */
+const docPrIds = (xml: string) =>
+  [...xml.matchAll(/<(?:[\w.-]+:)?docPr\b[^>]*?\bid="(\d+)"/g)].map((m) => Number(m[1]));
+
+/** The media parts pictures need, allocated as they are written, and the drawings' ids. */
 export class Media {
   readonly added: { name: string; data: Uint8Array; contentType: string }[] = [];
   readonly #parts = new Map<string, string>();
+  /** Ids drawings Foli does not write hold (opaque content, headers and footers). */
+  readonly #reserved = new Set<number>();
+  /** Ids the pictures written so far took. */
+  readonly #claimed = new Set<number>();
   #nextId: number;
 
   constructor(
     readonly doc: FoliDocument,
     readonly pkg: DocxPackage | undefined,
     readonly bytes: ReadonlyMap<string, Uint8Array>,
+    /** The parts rewritten from the model (their drawings are the document's). */
+    rewritten: readonly string[] = [],
   ) {
-    // `wp:docPr` ids are unique in a document: new ones above every one written already.
+    // `wp:docPr` ids are unique in a document, across its parts: new ones above all of them.
     let max = 0;
-    for (const attrs of picturesOf(doc)) {
-      for (const m of String(attrs.ext ?? "").matchAll(/<wp:docPr\b[^>]*?\bid="(\d+)"/g))
-        max = Math.max(max, Number(m[1]));
-    }
+    for (const attrs of picturesOf(doc))
+      for (const id of docPrIds(String(attrs.ext ?? ""))) max = Math.max(max, id);
+    const reserve = (xml: string) => {
+      for (const id of docPrIds(xml)) {
+        this.#reserved.add(id);
+        max = Math.max(max, id);
+      }
+    };
+    JSON.stringify([doc.content, doc.comments], (key, value) => {
+      if (key === "xml" && typeof value === "string") reserve(value);
+      return value;
+    });
+    const skip = new Set(rewritten.map((n) => n.toLowerCase()));
+    for (const part of pkg?.parts ?? [])
+      if (part.contentType.endsWith("+xml") && !skip.has(part.name.toLowerCase()))
+        reserve(new TextDecoder().decode(part.data));
     this.#nextId = max + 1;
   }
 
@@ -107,7 +145,7 @@ export class Media {
     if (known) return known;
     const resource = this.doc.resources?.[key] as ResourceJSON;
     let name: string;
-    if (resource.part && this.pkg?.part(`/${resource.part}`)) name = `/${resource.part}`;
+    if (ownPart(resource, this.pkg)) name = `/${resource.part}`;
     else {
       const extension = EXTENSIONS[resource.contentType] ?? "bin";
       const taken = (n: string) =>
@@ -125,10 +163,21 @@ export class Media {
     return name;
   }
 
+  /** Takes `id` for a drawing written as read; false when another drawing has it already. */
+  claim(id: number | undefined): boolean {
+    if (id === undefined || this.#reserved.has(id) || this.#claimed.has(id)) return false;
+    this.#claimed.add(id);
+    return true;
+  }
+
   freshId(): number {
+    while (this.#reserved.has(this.#nextId) || this.#claimed.has(this.#nextId)) this.#nextId++;
+    this.#claimed.add(this.#nextId);
     return this.#nextId++;
   }
 }
+
+const WP14 = "http://schemas.microsoft.com/office/word/2010/wordprocessingDrawing";
 
 const kid = (el: XmlElement | undefined, ns: string, local: string) =>
   el?.children.find(
@@ -147,7 +196,10 @@ function descendants(el: XmlElement, test: (e: XmlElement) => boolean, out: XmlE
 /** Edits to a source string: replace `[from, to)` with `text`. */
 type Edit = { from: number; to: number; text: string };
 
-/** The edits setting (or, undefined, removing) attribute `name` (`ns`: none for plain) of `el`. */
+const attrOf = (el: XmlElement | undefined, local: string, ns?: string) =>
+  el?.attributes.find((x) => x.local === local && (ns ? x.ns === ns : !x.prefix));
+
+/** The edits setting (or, undefined, removing) attribute `local` (`ns`: none for plain) of `el`. */
 function setAttr(
   source: string,
   el: XmlElement | undefined,
@@ -158,7 +210,7 @@ function setAttr(
   qualified = local,
 ): void {
   if (!el) return;
-  const a = el.attributes.find((x) => x.local === local && (ns ? x.ns === ns : !x.prefix));
+  const a = attrOf(el, local, ns);
   if (a) {
     if (value === undefined) edits.push({ from: a.start - 1, to: a.end, text: "" });
     else if (a.value !== value)
@@ -169,17 +221,25 @@ function setAttr(
   }
 }
 
+/** A part's relationships as a picture's drawing needs them. */
+export interface PictureRelations {
+  /** The id relating image part `part` (`current` when it already does). */
+  image(part: string, current: string | undefined): string;
+  /** The part relationship `id` points to, if any. */
+  target(id: string): string | undefined;
+}
+
 /**
- * The `w:drawing` for picture `attrs`, its image related as `embedFor` says (given the id the
- * drawing has, kept when it still points to that image). From its `ext` with the
- * model's values written in; fresh when it has none, or when the drawing refers to other
- * relationships the part does not have (an SVG's PNG fallback from another package).
+ * The `w:drawing` for picture `attrs`. From its `ext` with only what the model changed from
+ * it written in (size, alt text, title), its image's relationship, and a new id when another
+ * drawing of the document has its id; fresh when it has none, or when it was read in another
+ * part or package and refers to other relationships (an SVG's PNG fallback, a click link) that
+ * mean something else here.
  */
 export function drawingXml(
   attrs: Json,
-  embedFor: (current: string | undefined) => string,
+  relations: PictureRelations,
   namespaces: Namespaces,
-  known: (id: string) => boolean,
   media: Media,
 ): string {
   const width = String(attrs.width);
@@ -187,30 +247,48 @@ export function drawingXml(
   const alt = (attrs.alt as string | null | undefined) ?? undefined;
   const title = (attrs.title as string | null | undefined) ?? undefined;
   const ext = typeof attrs.ext === "string" ? attrs.ext : undefined;
+  const part = media.part(String(attrs.resource));
   if (ext) {
     const { element, source } = fragment(ext, namespaces);
     const blip = descendants(element, (e) => e.ns === A && e.local === "blip")[0];
-    const others = descendants(element, () => true)
-      .flatMap((e) => e.attributes.map((a) => ({ e, a })))
-      .filter(({ e, a }) => a.ns === R && !(e === blip && a.local === "embed"));
-    if (blip && others.every(({ a }) => known(a.value))) {
-      const embed = embedFor(blip.attributes.find((a) => a.ns === R && a.local === "embed")?.value);
+    const current = attrOf(blip, "embed", R)?.value;
+    // Read against this part: its image id still points to its image here.
+    const here = current !== undefined && relations.target(current) === part;
+    const others = descendants(element, () => true).some((e) =>
+      e.attributes.some((a) => a.ns === R && !(e === blip && a.local === "embed")),
+    );
+    if (blip && (here || !others)) {
       const edits: Edit[] = [];
       const inline = kid(element, WP, "inline");
-      setAttr(source, blip, "embed", embed, edits, R, "r:embed");
+      setAttr(source, blip, "embed", relations.image(part, current), edits, R, "r:embed");
       const extent = kid(inline, WP, "extent");
-      setAttr(source, extent, "cx", width, edits);
-      setAttr(source, extent, "cy", height, edits);
-      const spPr = descendants(element, (e) => e.ns === PIC && e.local === "spPr")[0];
-      const size = descendants(spPr ?? element, (e) => e.ns === A && e.local === "ext")[0];
-      if (spPr && size) {
+      // Only what the model changed: values the file holds twice may differ, and stay so.
+      if (attrOf(extent, "cx")?.value !== width || attrOf(extent, "cy")?.value !== height) {
+        setAttr(source, extent, "cx", width, edits);
+        setAttr(source, extent, "cy", height, edits);
+        const spPr = descendants(element, (e) => e.ns === PIC && e.local === "spPr")[0];
+        const size = kid(kid(spPr, A, "xfrm"), A, "ext");
         setAttr(source, size, "cx", width, edits);
         setAttr(source, size, "cy", height, edits);
       }
+      const docPr = kid(inline, WP, "docPr");
       const cNvPr = descendants(element, (e) => e.ns === PIC && e.local === "cNvPr")[0];
-      for (const target of [kid(inline, WP, "docPr"), cNvPr]) {
-        setAttr(source, target, "descr", alt, edits);
-        setAttr(source, target, "title", title, edits);
+      for (const [local, value] of [
+        ["descr", alt],
+        ["title", title],
+      ] as const) {
+        if (attrOf(docPr, local)?.value === value) continue;
+        setAttr(source, docPr, local, value, edits);
+        setAttr(source, cNvPr, local, value, edits);
+      }
+      const id = attrOf(docPr, "id")?.value;
+      if (!media.claim(id === undefined ? undefined : Number(id))) {
+        // A copy of a drawing (pasted twice): its own ids, Word's anchor ids left to Word.
+        const fresh = String(media.freshId());
+        setAttr(source, docPr, "id", fresh, edits);
+        setAttr(source, cNvPr, "id", fresh, edits);
+        setAttr(source, inline, "anchorId", undefined, edits, WP14);
+        setAttr(source, inline, "editId", undefined, edits, WP14);
       }
       let out = source;
       for (const edit of edits.sort((a, b) => b.from - a.from))
@@ -219,7 +297,7 @@ export function drawingXml(
       return out.slice(element.start, element.end + shift);
     }
   }
-  const embed = embedFor(undefined);
+  const embed = relations.image(part, undefined);
   const id = media.freshId();
   const descr = alt === undefined ? "" : ` descr="${escapeAttribute(alt)}"`;
   const titled = title === undefined ? "" : ` title="${escapeAttribute(title)}"`;

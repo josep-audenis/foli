@@ -500,13 +500,20 @@ function run(
         text("­");
         break;
       case "drawing": {
-        const attrs = pictureAttrs(el, { ...context, partOf: (name) => context.pkg.part(name) });
+        const image: [string?, ResourceJSON?] = [];
+        const attrs = pictureAttrs(
+          el,
+          { ...context, partOf: (name) => context.pkg.part(name) },
+          image,
+        );
         const leaf = attrs && valid(node("picture", marks, attrs), el, context);
         if (!leaf) {
           opaqueRun(el);
           break;
         }
         out.push(leaf);
+        const [key, entry] = image;
+        if (key && entry && !context.resources.has(key)) context.resources.set(key, entry);
         if (!attrs.alt && !attrs.decorative) context.report.withoutAlt();
         break;
       }
