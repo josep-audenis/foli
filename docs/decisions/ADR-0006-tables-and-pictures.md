@@ -22,20 +22,20 @@ as non-editable content (`thead contenteditable=false`), one row split at a line
 its rest a3b on page 2; b3 its second cell). Where the caret is after each press, in Chromium,
 Firefox and WebKit (Playwright, Windows), 2026-11-16:
 
-| Experiment                              | Chromium                | Firefox                         | WebKit                  |
-| --------------------------------------- | ----------------------- | ------------------------------- | ----------------------- |
-| ArrowRight at a cell's end              | next cell's start       | next cell's start               | next cell's start       |
-| ArrowDown ×3 from a3 (last row, page 1) | b3 → a3b → a4           | a3b → a4 → after the table      | b3 → a3b → a4           |
-| ArrowUp ×2 from a3b (first row, page 2) | b3 → a3                 | **repeated header** → before it | b3 → a3                 |
-| Shift+ArrowDown ×2 from a1              | b1 → a2                 | a2 → a3                         | b1 → a2                 |
-| A mouse drag from a1 to b2              | one range               | **four ranges** (one per cell)  | one range               |
-| A click in the repeated header          | **caret in the header** | **caret in the header**         | **caret in the header** |
-| Typing in a cell on page 2              | stays in the cell       | stays in the cell               | stays in the cell       |
-| Enter at a cell's end (not prevented)   | a paragraph in the cell | a paragraph in the cell         | a paragraph in the cell |
+| Experiment                              | Chromium                | Firefox                                                | WebKit                  |
+| --------------------------------------- | ----------------------- | ------------------------------------------------------ | ----------------------- |
+| ArrowRight at a cell's end              | next cell's start       | next cell's start                                      | next cell's start       |
+| ArrowDown ×3 from a3 (last row, page 1) | b3 → a3b → a4           | a3b → a4 → after the table                             | b3 → a3b → a4           |
+| ArrowUp ×2 from a3b (first row, page 2) | b3 → a3                 | **page 1's header row** (skips three rows) → before it | b3 → a3                 |
+| Shift+ArrowDown ×2 from a1              | b1 → a2                 | a2 → a3                                                | b1 → a2                 |
+| A mouse drag from a1 to b2              | one range               | **four ranges** (one per cell)                         | one range               |
+| A click in the repeated header          | **caret in the header** | **caret in the header**                                | **caret in the header** |
+| Typing in a cell on page 2              | stays in the cell       | stays in the cell                                      | stays in the cell       |
+| Enter at a cell's end (not prevented)   | a paragraph in the cell | a paragraph in the cell                                | a paragraph in the cell |
 
 Horizontal movement and typing inside cells work natively everywhere. Vertical movement is not
-Word's: Chromium and WebKit go to the next column first, Firefox walks into the repeated header
-going up and leaves the table going down. Every engine puts a click's caret into the repeated
+Word's: Chromium and WebKit go to the next column first, Firefox jumps to the table's first row
+going up (skipping rows) and leaves the table going down. Every engine puts a click's caret into the repeated
 header, and Firefox selects dragged cells as one range each. So the view owns vertical movement
 (with and without Shift) and redirects carets out of repeated rows, as it already owns Enter and
 Backspace, and reads a selection of several ranges back as a `CellSelection`.
@@ -170,9 +170,10 @@ Backspace, and reads a selection of several ranges back as a `CellSelection`.
   `w:trPr/w:ins`; text in partly covered cells is deleted per cell. Accept and reject act on
   row revisions (a deleted row accepted goes; an inserted row rejected goes). Deleting a whole
   table while tracking deletes its rows.
-- **Not tracked, refused while tracking** (as Word cannot record them on rows either): inserting
-  or deleting columns, merging and splitting cells, changing table, row or cell properties
-  (Word's `*PrChange` for those is kept when read, 9.3's paragraph and run records unchanged).
+- **Not tracked, refused while tracking** (Foli does not record them yet; Word records some, as
+  `w:tblPrChange`, `w:trPrChange`, `w:tcPrChange`, kept when read): inserting or deleting
+  columns, merging and splitting cells, changing table, row or cell properties (9.3's paragraph
+  and run records unchanged).
   The commands say so (they do not apply while tracking).
 - **Comments** anchor in cells as in paragraphs; deleting a row deletes the comments whose
   reference goes with it (9.6).

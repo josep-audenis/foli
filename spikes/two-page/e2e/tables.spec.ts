@@ -7,15 +7,20 @@
 import { expect, type Page, test } from "@playwright/test";
 
 /** Where the selection's focus is: the id of the paragraph holding it (or "header" inside a
- * repeated header row), and the offset. */
+ * repeated header row, "header-p1" in the table's own header row), and the offset. */
 const focus = (page: Page) =>
   page.evaluate(() => {
     const sel = getSelection();
     const node = sel?.focusNode;
     const element = node?.nodeType === Node.TEXT_NODE ? node.parentElement : (node as Element);
-    const header = !!element?.closest("thead[contenteditable=false]");
+    const repeated = !!element?.closest("thead[contenteditable=false]");
+    const own = !repeated && !!element?.closest("thead");
     return {
-      id: header ? "header" : element?.closest("p")?.id || element?.nodeName || null,
+      id: repeated
+        ? "header"
+        : own
+          ? "header-p1"
+          : element?.closest("p")?.id || element?.nodeName || null,
       offset: sel?.focusOffset ?? -1,
       ranges: sel?.rangeCount ?? 0,
     };
