@@ -252,7 +252,7 @@ export function wordToggleActive(
 ): boolean {
   const { selection } = state;
   if (caretMarks) return shows(context, selection.$from.parent, caretMarks, type);
-  const { judged } = inlineIn(state, selection.from, selection.to, type);
+  const judged = selection.ranges.flatMap((r) => inlineIn(state, r.from, r.to, type).judged);
   return judged.length > 0 && judged.every((f) => shows(context, f.parent, f.node.marks, type));
 }
 

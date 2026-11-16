@@ -4,6 +4,7 @@ import { TransformError } from "../transform/transform.js";
 import { attempt } from "./attempt.js";
 import { AllSelection, marksAt, TextSelection } from "./selection.js";
 import type { Command, EditorState, Transaction } from "./state.js";
+import { CellSelection } from "./tables.js";
 import { styleLink, unstyleLink } from "./wordformat.js";
 
 const EMAIL = /^[^\s@/:]+@[^\s@/:]+\.\p{L}{2,}$/iu;
@@ -78,10 +79,11 @@ function canLink(state: EditorState, type: MarkType): boolean {
     return parent.inlineContent && parent.type.allowsMarkType(type);
   }
   let found = false;
-  state.doc.nodesBetween(selection.from, selection.to, (node) => {
-    if (node.isTextblock && node.type.allowsMarkType(type)) found = true;
-    return !found;
-  });
+  for (const { from, to } of selection.ranges)
+    state.doc.nodesBetween(from, to, (node) => {
+      if (node.isTextblock && node.type.allowsMarkType(type)) found = true;
+      return !found;
+    });
   return found;
 }
 
@@ -97,13 +99,14 @@ export function linkAt(state: EditorState): string | null {
     return (linkAround(selection.$from, type)?.mark.attrs.href as string) ?? null;
   // undefined: no text seen yet; null: text without a link, or with another one.
   let href = undefined as string | null | undefined;
-  state.doc.nodesBetween(selection.from, selection.to, (node, _pos, parent) => {
-    if (href === null) return false;
-    if (!node.isInline || !parent?.type.allowsMarkType(type)) return undefined;
-    const value = (type.isInSet(node.marks)?.attrs.href as string | undefined) ?? null;
-    href = href === undefined || href === value ? value : null;
-    return false;
-  });
+  for (const { from, to } of selection.ranges)
+    state.doc.nodesBetween(from, to, (node, _pos, parent) => {
+      if (href === null) return false;
+      if (!node.isInline || !parent?.type.allowsMarkType(type)) return undefined;
+      const value = (type.isInSet(node.marks)?.attrs.href as string | undefined) ?? null;
+      href = href === undefined || href === value ? value : null;
+      return false;
+    });
   return href ?? null;
 }
 
@@ -118,6 +121,8 @@ export function insertLink(href: string, text?: string): Command {
     const label = text ?? normalized;
     const { selection } = state;
     if (!type || !label || !isSafeHref(normalized)) return false;
+    // Selected cells are linked by `setLink`, never replaced by one link.
+    if (selection instanceof CellSelection) return false;
     if (!(selection instanceof AllSelection) && !canLink(state, type)) return false;
     const link = type.create({ href: normalized });
     return attempt(state, dispatch, (tr) => {
@@ -150,8 +155,10 @@ export function setLink(href: string): Command {
     const { selection } = state;
     if (!selection.empty) {
       return attempt(state, dispatch, (tr) => {
-        tr.addMark(selection.from, selection.to, mark);
-        styleLink(tr, state, selection.from, selection.to);
+        for (const { from, to } of selection.ranges) {
+          tr.addMark(from, to, mark);
+          styleLink(tr, state, from, to);
+        }
       });
     }
     const around = linkAround(selection.$from, type);
@@ -165,11 +172,14 @@ export const removeLink: Command = (state, dispatch) => {
   const type = linkType(state);
   if (!type) return false;
   const { selection } = state;
-  const range = selection.empty ? linkAround(selection.$from, type) : selection;
-  if (!range) return false;
+  const around = selection.empty && linkAround(selection.$from, type);
+  const ranges = selection.empty ? (around ? [around] : []) : selection.ranges;
+  if (!ranges.length) return false;
   return attempt(state, dispatch, (tr) => {
-    tr.removeMark(range.from, range.to, type);
-    unstyleLink(tr, state, range.from, range.to);
+    for (const range of ranges) {
+      tr.removeMark(range.from, range.to, type);
+      unstyleLink(tr, state, range.from, range.to);
+    }
   });
 };
 

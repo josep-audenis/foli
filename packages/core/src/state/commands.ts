@@ -23,7 +23,7 @@ import {
   Plugin,
   type Transaction,
 } from "./state.js";
-import { deleteAcrossTables, keepTablesApart } from "./tables.js";
+import { CellSelection, deleteAcrossTables, emptyCells, keepTablesApart } from "./tables.js";
 import { trackState } from "./track.js";
 import {
   isMarker,
@@ -68,9 +68,19 @@ export const deleteSelection: Command = (state, dispatch) => {
 /**
  * Deletes `tr`'s selection; across a table's edge it takes whole rows (or empties cells), never
  * joining text across the edge (`deleteAcrossTables`), and Word's table rules hold after it.
+ * Selected cells are emptied (`onlyAnchorCell`: just the anchor cell, what typing or pasting
+ * over them does), the caret left in the anchor cell.
  */
-function deleteSelectionKeepingTables(tr: Transaction): void {
-  const { from, to } = tr.selection;
+export function deleteSelectionKeepingTables(tr: Transaction, onlyAnchorCell = false): void {
+  const selection = tr.selection;
+  if (selection instanceof CellSelection) {
+    // Selected cells are emptied (typing empties the anchor cell only), the caret in the anchor.
+    const anchor = selection.anchor;
+    emptyCells(tr, onlyAnchorCell ? [anchor] : selection.cells);
+    tr.setSelection(Selection.near(tr.doc.resolve(tr.mapping.map(anchor, 1) + 1), 1));
+    return;
+  }
+  const { from, to } = selection;
   if (!deleteAcrossTables(tr, from, to)) tr.deleteSelection();
   else tr.setSelection(Selection.near(tr.doc.resolve(tr.mapping.map(from, -1)), 1));
   keepTablesApart(tr);
@@ -89,13 +99,22 @@ export function insertText(text: string): Command {
         state.schema.text(text, state.storedMarks ?? []),
       );
     }
-    if (!(selection instanceof AllSelection) && !selection.$from.parent.inlineContent) return false;
+    if (
+      !(selection instanceof AllSelection) &&
+      !(selection instanceof CellSelection) &&
+      !selection.$from.parent.inlineContent
+    )
+      return false;
     return attempt(state, dispatch, (tr) => {
-      const $from = selection.$from;
+      // Over cells, the text typed into the anchor cell keeps that cell's first text's marks.
+      const $from =
+        selection instanceof CellSelection
+          ? Selection.near(state.doc.resolve(selection.anchor + 1), 1).$from
+          : selection.$from;
       const marks =
         state.storedMarks ??
         (selection.empty ? marksAt($from) : ($from.nodeAfter?.marks ?? marksAt($from)));
-      if (!selection.empty) deleteSelectionKeepingTables(tr);
+      if (!selection.empty) deleteSelectionKeepingTables(tr, true);
       const $pos = tr.selection.$from;
       if (!$pos.parent.inlineContent) throw new TransformError("No text where the selection was");
       const allowed = typedMarks(marks).filter((mark) =>
@@ -436,16 +455,17 @@ function markType(state: EditorState, type: string | MarkType): MarkType | undef
   return typeof type === "string" ? state.schema.marks[type] : type;
 }
 
-/** True if every inline node overlapping `from..to` (in parents that allow the mark) has it. */
-function rangeHasMark(state: EditorState, from: number, to: number, type: MarkType): boolean {
+/** True if every inline node in the selection's ranges (in parents that allow the mark) has it. */
+function rangeHasMark(state: EditorState, type: MarkType): boolean {
   let all = true;
   let any = false;
-  state.doc.nodesBetween(from, to, (node, _pos, parent) => {
-    if (!all || !node.isInline || !parent?.type.allowsMarkType(type)) return undefined;
-    any = true;
-    if (!type.isInSet(node.marks)) all = false;
-    return false;
-  });
+  for (const { from, to } of state.selection.ranges)
+    state.doc.nodesBetween(from, to, (node, _pos, parent) => {
+      if (!all || !node.isInline || !parent?.type.allowsMarkType(type)) return undefined;
+      any = true;
+      if (!type.isInSet(node.marks)) all = false;
+      return false;
+    });
   return any && all;
 }
 
@@ -477,28 +497,32 @@ export function toggleMark(type: string | MarkType, attrs?: Attrs | null): Comma
       );
       return true;
     }
+    const { ranges } = selection;
     let applicable = false;
-    state.doc.nodesBetween(selection.from, selection.to, (node) => {
-      if (node.isTextblock && node.type.allowsMarkType(mark)) applicable = true;
-      return !applicable;
-    });
+    for (const { from, to } of ranges)
+      state.doc.nodesBetween(from, to, (node) => {
+        if (node.isTextblock && node.type.allowsMarkType(mark)) applicable = true;
+        return !applicable;
+      });
     if (!applicable) return false;
     const word = wordContext(state);
     if (word && isWordToggle(word, mark)) {
       const on = !wordToggleActive(word, state, mark, null);
       return attempt(state, dispatch, (tr) => {
-        for (const range of toggleRanges(word, state, selection.from, selection.to, mark, on)) {
-          tr.removeMark(range.from, range.to, mark);
-          if (range.mark) tr.addMark(range.from, range.to, range.mark);
-        }
+        for (const { from, to } of ranges)
+          for (const range of toggleRanges(word, state, from, to, mark, on)) {
+            tr.removeMark(range.from, range.to, mark);
+            if (range.mark) tr.addMark(range.from, range.to, range.mark);
+          }
       });
     }
-    const remove = rangeHasMark(state, selection.from, selection.to, mark);
+    const remove = rangeHasMark(state, mark);
     const created = remove ? null : createMark(mark, attrs);
     if (!remove && !created) return false;
     return attempt(state, dispatch, (tr) => {
-      if (remove) tr.removeMark(selection.from, selection.to, mark);
-      else tr.addMark(selection.from, selection.to, created as Mark);
+      for (const { from, to } of ranges)
+        if (remove) tr.removeMark(from, to, mark);
+        else tr.addMark(from, to, created as Mark);
     });
   };
 }
@@ -529,7 +553,7 @@ export function isMarkActive(state: EditorState, type: string | MarkType): boole
       $caret ? (state.storedMarks ?? marksAt($caret)) : null,
     );
   if ($caret) return mark.isInSet(state.storedMarks ?? marksAt($caret)) !== undefined;
-  return rangeHasMark(state, state.selection.from, state.selection.to, mark);
+  return rangeHasMark(state, mark);
 }
 
 /**

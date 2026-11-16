@@ -339,14 +339,19 @@ function join(tr: Transaction, pos: number, keepFirst: boolean): void {
 
 function command(
   accept: boolean,
-  range: (state: EditorState) => [number, number] | null,
+  range: (state: EditorState) => readonly { from: number; to: number }[],
   filter?: ChangeFilter,
 ): Command {
   return (state, dispatch) => {
     if (!state.schema.marks.insertion) return false;
-    const r = range(state);
-    if (!r) return false;
-    const changes = changesIn(state.doc, r[0], r[1], filter);
+    // A change around several selected cells (a row revision, a move's partner) counts once.
+    const seen = new Set<string>();
+    const changes = range(state)
+      .flatMap((r) => changesIn(state.doc, r.from, r.to, filter))
+      .filter((c) => {
+        const key = `${c.kind} ${c.id} ${c.from} ${c.to}`;
+        return !seen.has(key) && !!seen.add(key);
+      });
     if (!changes.length) return false;
     if (dispatch) {
       // Its own undo step, never merged with the typing before it.
@@ -365,11 +370,8 @@ function command(
   };
 }
 
-const selected = (state: EditorState): [number, number] => [
-  state.selection.from,
-  state.selection.to,
-];
-const everything = (state: EditorState): [number, number] => [0, state.doc.content.size];
+const selected = (state: EditorState) => state.selection.ranges;
+const everything = (state: EditorState) => [{ from: 0, to: state.doc.content.size }];
 
 /** Accepts the change at the caret, or the changes in the selection. */
 export const acceptChange: Command = command(true, selected);

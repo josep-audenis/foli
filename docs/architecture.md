@@ -596,7 +596,23 @@ content (`goToCell`, bound before the lists' Tab: in a cell Word moves, numbered
 the last cell adds a row like the last one (empty cells, no merge; its paragraphs keep the
 properties but not the ids, revisions or section of the last row's), recorded as an inserted row
 while tracking. Cells a merge covers are skipped. Not yet: Ctrl+Tab for a tab character, and a
-list's level changed by Tab, in a cell. Up and Down from a cell's first or last line (or with a cell's content
+list's level changed by Tab, in a cell.
+
+Cell selections (10.6c, `CellSelection`): anchor and head are the positions before two cells
+of one table; the selection is the rectangle between them, widened until no merged cell sticks
+out (`cells`); its JSON is `{ type: "cell", anchor, head }` (`Selection.fromJSON` reads it
+through `Selection.kinds`); it maps by its cells and falls back to a caret when one goes.
+Delete and Backspace empty the selected cells; typing replaces the anchor cell's content.
+Shift+Up/Down from a cell's first or last line start one, Shift+arrows grow it
+(`extendCellSelection`). The view reads a native selection whose ends are in two cells of one
+table (a drag) as one, and Firefox's one range per cell too; it marks the cells with a class
+and keeps the native caret in the head cell (the browser's own highlight, in DOM order, is
+hidden while cells are selected). `Selection.ranges` gives one range per selected cell, so
+marks, links, paragraph and run formatting, and accepting or rejecting changes act on those
+cells only. Pasting over cells pastes into the anchor cell; copy gives plain text (a tab
+between cells, a line per row). Not yet: copying cells as a table, pasting into several cells.
+
+Up and Down from a cell's first or last line (or with a cell's content
 selected) go to the cell above or below covering the same grid column (a merge's first cell),
 or out of the table from its first or last row (`goToCellVertically`, run by the view, which
 knows the lines): browsers go to the next cell in the DOM, or to the wrong row across pages. Left,
@@ -781,7 +797,7 @@ Planned, created only when needed:
 - `pnpm check` also runs `publint --strict` on every package (exports, `files`, types) and
   `pnpm size`: each package's published entry bundled as an app would (fully minified, its
   Foli dependencies included, React external), and an app importing only `FoliEditor`, against
-  gzip budgets in `scripts/size.mjs` (core 45.9 kB, view 55.2 kB, react 74.2 kB, docx 41.0 kB;
+  gzip budgets in `scripts/size.mjs` (core 47.9 kB, view 57.1 kB, react 76.2 kB, docx 41.0 kB;
   each raise and its reason is recorded there).
 - `pnpm examples` installs the packed tarballs into `examples/vite` (React 18, strict
   TypeScript) and `examples/next` (React 19, server rendering) with npm, builds them, and runs

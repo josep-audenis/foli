@@ -36,12 +36,12 @@ const json = (value: unknown) => JSON.stringify(value ?? null);
 /** The paragraphs the selection touches, with their positions. */
 function paragraphsIn(state: EditorState): { node: Node; pos: number }[] {
   const found: { node: Node; pos: number }[] = [];
-  const { from, to } = state.selection;
-  state.doc.nodesBetween(from, to, (node, pos) => {
-    if (node.type.name !== "paragraph") return true;
-    found.push({ node, pos });
-    return false;
-  });
+  for (const { from, to } of state.selection.ranges)
+    state.doc.nodesBetween(from, to, (node, pos) => {
+      if (node.type.name !== "paragraph") return true;
+      found.push({ node, pos });
+      return false;
+    });
   return found;
 }
 
@@ -285,12 +285,12 @@ function applyStyle(
 function runsIn(state: EditorState, type: MarkType) {
   const context = wordContext(state);
   const found: { node: Node; pos: number; parent: Node }[] = [];
-  const { from, to } = state.selection;
-  state.doc.nodesBetween(from, to, (node, pos, parent) => {
-    if (!node.isInline || !parent?.type.allowsMarkType(type)) return undefined;
-    if (!isMarker(context, node)) found.push({ node, pos, parent });
-    return false;
-  });
+  for (const { from, to } of state.selection.ranges)
+    state.doc.nodesBetween(from, to, (node, pos, parent) => {
+      if (!node.isInline || !parent?.type.allowsMarkType(type)) return undefined;
+      if (!isMarker(context, node)) found.push({ node, pos, parent });
+      return false;
+    });
   return found;
 }
 
