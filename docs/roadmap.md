@@ -20,7 +20,7 @@ place that says what is in progress; check it before starting work.
 | 6 React API & 0.1.0      | ✅ Done                  | —                | Merged in #23–#31; 0.1.0 on npm; manual checks shipped as known risks (ADR-0003)           |
 | 7 Rich content           | ✅ Done                  | —                | Merged in #33–#41; 0.2.0 on npm; list-document benchmark misses accepted (known limit)     |
 | 8 Word model & DOCX      | ✅ Done                  | —                | Merged in #44–#61; 0.3.0 on npm (`@folijs/docx` first released); gate G5 passed            |
-| 9 Review                 | In review                | `phase-9/review` | Merged in #63–#71; 0.4.0 changeset ready, publish waits for the owner's approval           |
+| 9 Review                 | In review                | `phase-9/review` | Merged in #63–#71; 0.4.0 versioned, publish awaits the owner's approval                    |
 | 10–12                    | Not started              |                  |                                                                                            |
 
 Status values: `Ready` (dependencies met, nobody on it) · `In progress` · `In review` (PR open) ·
@@ -891,7 +891,7 @@ Each task is a PR on `phase-9/review`, the build green after each.
 - [ ] 9.9 Close: docs (README, document model, docx README, known limitations as of 0.4.0;
   architecture and api brought up to date with the final code of each task), acceptance checked
   (above), the 0.4.0
-  changeset (with the changed behaviours) — done; the version PR and publishing wait for the
+  changeset (with the changed behaviours, #71), the version PR (VERSION_PR); publish after the
   owner's approval.
 
 ## Phase 10 — Tables & images · XL → 0.5.0
