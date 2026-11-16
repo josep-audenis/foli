@@ -59,7 +59,8 @@ const RUN_MARKS = new Set<string>(RUN_PROPERTY_MARKS);
  */
 const UNRECORDED = new Set(["markFormat", "ext"]);
 
-const RECORDED = PARAGRAPH_PROPERTY_KEYS.filter((k) => !UNRECORDED.has(k));
+/** @internal Paragraph properties a formatting change records (`previous`). */
+export const RECORDED = PARAGRAPH_PROPERTY_KEYS.filter((k) => !UNRECORDED.has(k));
 /** A paragraph's recorded properties (a formatting change's `previous`): those it has. */
 const propertiesOf = (attrs: Attrs) =>
   Object.fromEntries(RECORDED.filter((k) => attrs[k] != null).map((k) => [k, attrs[k]]));
@@ -278,7 +279,9 @@ function rebuild(
     // where the first starts and ends with the last one's mark (`keepLastMark`), as an
     // untracked join does.
     let group: number | null = null;
-    const merged: { at: At; node: Node }[] = [];
+    /** Whether the group's first paragraph keeps content before the range (else it is gone). */
+    let groupLive = false;
+    const merged: { at: At; node: Node; live: boolean }[] = [];
     doc.nodesBetween(from, to, (node, pos) => {
       if (node.isTextblock) {
         const end = pos + node.nodeSize;
@@ -295,10 +298,17 @@ function rebuild(
           doc.resolve(end).nodeAfter?.isTextblock
         ) {
           real.push([end - 1, end + 1]);
+          if (group === null) {
+            groupLive = false;
+            node.forEach((child, offset) => {
+              const live = !MARKERS.has(child.type.name) && !deletion.isInSet(child.marks);
+              if (live && pos + 1 + offset < from) groupLive = true;
+            });
+          }
           group = start;
           return true;
         }
-        if (group !== null) merged.push({ at: here(group), node });
+        if (group !== null) merged.push({ at: here(group), node, live: groupLive });
         group = null;
         if (crossed) apart.push(here(start));
         if (crossed && !revision?.deletion)
@@ -317,10 +327,17 @@ function rebuild(
     });
     for (const [s, e] of joined(marked)) out.addMark(s, e, markOf());
     for (const [s, e] of joined(real).reverse()) out.delete(s, e);
-    for (const { at: where, node } of merged) {
+    for (const { at: where, node, live } of merged) {
       const pos = at(where, 1);
       const current = out.doc.nodeAt(pos);
       if (!current?.isTextblock) continue;
+      // The first paragraph left nothing (all of it deleted): it is gone, the last one stays
+      // whole (`keepLastMark`).
+      if (!live) {
+        out.step(new NodeMarkupStep(pos, node.type, node.attrs, current.marks));
+        rejoined.push(here(pos));
+        continue;
+      }
       const attrs = { ...current.attrs };
       for (const key of MARK_ATTRS) attrs[key] = node.attrs[key] ?? null;
       // The mark kept is the last paragraph's: taking the first one's properties is a change of

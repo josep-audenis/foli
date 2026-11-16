@@ -64,6 +64,18 @@ export {
 } from "./lists.js";
 export { typedMarks } from "./mark.js";
 export {
+  acceptAllChanges,
+  acceptChange,
+  type Change,
+  type ChangeFilter,
+  type ChangeKind,
+  nextChange,
+  previousChange,
+  rejectAllChanges,
+  rejectChange,
+  trackedChanges,
+} from "./review.js";
+export {
   AllSelection,
   marksAt,
   NodeSelection,

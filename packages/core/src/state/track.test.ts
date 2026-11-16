@@ -289,6 +289,18 @@ describe("tracked changes", () => {
     expect(second?.attrs?.formatChange).toMatchObject({ id: 0, previous: {} });
   });
 
+  it("records pasting paragraphs into the middle of one: rejecting gives it back", () => {
+    const heading = { type: "paragraph", attrs: { style: "Heading1" }, content: [text("abcd")] };
+    const editor = tracked(heading);
+    const before = editor.getDocument();
+    const { schema } = editor.state;
+    const pasted = schema.nodeFromJSON({ type: "doc", content: [p(text("X")), p(text("Y"))] });
+    editor.dispatch(editor.state.tr.replace(3, 3, pasted.slice(1, pasted.content.size - 1)));
+    expect(project(editor.state.doc, true)).toEqual(["(Heading1)abX", "Ycd"]);
+    editor.commands.rejectAllChanges();
+    expect(editor.getDocument()).toEqual(before);
+  });
+
   it("deletes everything as deleted text, keeping the last paragraph", () => {
     const editor = tracked(p(text("ab")), p(text("cd")));
     editor.commands.selectAll();
@@ -315,10 +327,16 @@ function project(doc: Node, accept: boolean): string[] {
   const out: string[] = [];
   let current = "";
   const gone = accept ? "deletion" : "insertion";
-  // Paragraphs a change joins: the first one of them.
+  // Paragraphs a change joins: the first one of them that keeps content (one left with nothing
+  // is gone, as in Word), else the last.
   let first: Node | null = null;
   doc.forEach((block) => {
-    first ??= block;
+    let live = false;
+    block.forEach((inline) => {
+      const marker = /^(bookmark|comment)(Start|End)$/.test(inline.type.name);
+      if (!marker && !inline.marks.some((m) => m.type.name === gone)) live = true;
+    });
+    if (live) first ??= block;
     block.forEach((inline) => {
       if (inline.marks.some((m) => m.type.name === gone)) return;
       const change = inline.marks.find((m) => m.type.name === "formatChange");
@@ -334,7 +352,7 @@ function project(doc: Node, accept: boolean): string[] {
     if (revision?.[gone]) return; // the paragraph mark is gone: the next paragraph continues it
     // Accepting keeps the first paragraph's properties, as an untracked join; rejecting restores
     // the original mark's paragraph, the last one.
-    const head = accept ? (first as Node) : block;
+    const head = accept ? (first ?? block) : block;
     const change = head.attrs.formatChange as { previous: Record<string, unknown> } | null;
     const { justification: just, style } = !accept && change ? change.previous : head.attrs;
     out.push((style ? `(${style})` : "") + (just ? `[${just}]` : "") + current);
@@ -426,11 +444,16 @@ function apply(editor: Editor, o: Op): void {
     // Typed as plain text: next to deleted text, typing takes that text's look (the commands'
     // scenarios above cover them), which the untracked mirror does not have.
     case "type":
-      editor.dispatch(editor.state.tr.insertText(o.text, left(k1), left(k1), []));
+      // After deleted text and deleted paragraph marks: where accepting shows the caret.
+      editor.dispatch(editor.state.tr.insertText(o.text, right(k1), right(k1), []));
       break;
     case "replace":
       if (k1 === k2 || right(k1) >= left(k2)) return;
-      editor.dispatch(editor.state.tr.insertText(o.text, right(k1), left(k2), []));
+      select(right(k1), left(k2));
+      editor.commands.deleteSelection();
+      editor.dispatch(
+        editor.state.tr.insertText(o.text, editor.state.selection.from, undefined, []),
+      );
       break;
     case "backspace":
       select(left(k1));
@@ -469,7 +492,16 @@ function apply(editor: Editor, o: Op): void {
         index--;
       let start = 1;
       for (let i = 0; i < index; i++) start += doc.child(i).nodeSize;
-      select(start, Math.max(start, left(k2)));
+      // To the last paragraph of the one accepting shows (all joined ones aligned alike).
+      let last = doc.resolve(Math.max(start, left(k2))).index(0);
+      while (
+        last < doc.childCount - 1 &&
+        (doc.child(last).attrs.revision as { deletion?: unknown } | null)?.deletion
+      )
+        last++;
+      let end = 0;
+      for (let i = 0; i <= last; i++) end += doc.child(i).nodeSize;
+      select(start, end - 1);
       editor.commands.setAlign(o.text === "x" ? "center" : "start");
       break;
     }
@@ -488,6 +520,24 @@ function knownDifference(doc: Node, o: Op): boolean {
   const deleted = (i: number) =>
     i >= 0 && !!(doc.child(i).attrs.revision as { deletion?: unknown } | null)?.deletion;
   return deleted(index - 1) || deleted(index);
+}
+
+/**
+ * Known: a paragraph whose text and mark are both deleted is removed whole on accepting (the
+ * next one keeps its properties, as Word does), while the same edits untracked, one after the
+ * other, may have kept its properties on the joined paragraph. Not compared with the mirror then.
+ */
+function removedWhole(doc: Node): boolean {
+  let found = false;
+  doc.forEach((block) => {
+    if (!(block.attrs.revision as { deletion?: unknown } | null)?.deletion) return;
+    let live = false;
+    block.forEach((inline) => {
+      if (!inline.marks.some((m) => m.type.name === "deletion")) live = true;
+    });
+    if (!live) found = true;
+  });
+  return found;
 }
 
 describe("tracked changes (property)", () => {
@@ -510,8 +560,18 @@ describe("tracked changes (property)", () => {
           });
           apply(editor, o);
           apply(mirror, o);
-          expect(project(editor.state.doc, true)).toEqual(project(mirror.state.doc, true));
+          if (!removedWhole(editor.state.doc))
+            expect(project(editor.state.doc, true)).toEqual(project(mirror.state.doc, true));
           expect(project(editor.state.doc, false)).toEqual(project(start, true));
+        }
+        // Accepting and rejecting everything for real gives what the projections say.
+        const REVIEW = /"type":"(insertion|deletion|formatChange)"|"revision":\{|"formatChange":\{/;
+        for (const accept of [true, false]) {
+          const copy = createEditor({ document: editor.getDocument() });
+          if (accept) copy.commands.acceptAllChanges();
+          else copy.commands.rejectAllChanges();
+          expect(JSON.stringify(copy.getDocument().content)).not.toMatch(REVIEW);
+          expect(project(copy.state.doc, true)).toEqual(project(editor.state.doc, accept));
         }
         while (editor.commands.undo()) {}
         expect(editor.getDocument()).toEqual(original);

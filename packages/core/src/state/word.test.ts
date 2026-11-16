@@ -388,12 +388,29 @@ describe("Backspace and Delete on a v3 document", () => {
     expect(blocks(del)).toEqual(joined);
     // A range across paragraphs: the merged one ends with the last one's mark.
     const range = start();
-    range.select(1, 5);
+    range.select(2, 5);
     range.commands.deleteSelection();
     expect(blocks(range)).toEqual([
-      p({ justification: "center", section, ...own }),
+      p({ justification: "center", section, ...own }, text("a")),
       p({}, text("c")),
     ]);
+    range.commands.undo();
+    // From the first one's start: it is gone, the last one stays whole (as Word removes it).
+    range.select(1, 5);
+    range.commands.deleteSelection();
+    expect(blocks(range)).toEqual([p({ section, ...own }), p({}, text("c"))]);
+    // A bookmark the first one starts with is not something it keeps.
+    const marked = editorOf(
+      p(
+        { style: "Heading1" },
+        { type: "bookmarkStart", attrs: { id: 1, name: "_Toc1" } },
+        text("a"),
+      ),
+      p({}, text("b")),
+    );
+    marked.select(2, 6);
+    marked.commands.deleteSelection();
+    expect(blocks(marked)[0]?.attrs?.style ?? null).toBe(null);
     range.commands.undo();
     expect(blocks(range)).toEqual(blocks(start()));
     // Into a paragraph that ends a section: deleting its mark merges the section into the next.

@@ -155,7 +155,7 @@ export class Transaction extends Transform {
         ? $to.parent
         : null;
     this.delete(selection.from, selection.to);
-    if (last) keepLastMark(this, $from.before(), last);
+    if (last) keepLastMark(this, $from.before(), last, $to.parentOffset);
     const caret = this.mapping.slice(start).map(selection.from, -1);
     return this.setSelection(TextSelection.create(this.doc, caret));
   }
