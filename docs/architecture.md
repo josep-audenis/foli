@@ -576,8 +576,20 @@ moves whole, and a row in a vertical merge or holding a nested table splits only
 (shortcut). After the flow (`cutTable`) each page's wrapper shows the rows it holds; a row split
 across pages is in both, each cell's paragraphs split at their own lines (the paragraph
 fragments above). The leading header rows are drawn again above a continuation, not editable
-and not read back; a click there puts the caret in the first row below. Backspace and Delete
-next to a table still select it whole (10.6 edits across a table's edges). A table's breaks
+and not read back; a click there puts the caret in the first row below.
+
+Editing in tables, core (10.6, `state/tables.ts`, ADR-0006): a cell's content is never joined
+with what is outside it (Backspace at a cell's start and Delete at its end do nothing; Enter
+splits the paragraph). Backspace at the start of the paragraph after a table moves the caret
+to the end of the table's last cell, Delete at the end of the one before to its first cell's
+start, as Word moves into a table. Deleting a selection that runs from outside a table into it
+takes the whole rows it touches (the table when it touches every row), with the text outside;
+one across cells of one table empties those cells (`deleteAcrossTables`); a paragraph is put
+back between two tables that became adjacent and after a table that ends the body
+(`keepTablesApart`). While tracking, text in cells is tracked as everywhere, a whole row
+deleted is the row's deletion (one's own inserted row goes) and a whole row inserted the row's
+insertion; review lists the changes in cells and the rows' revisions, and accepting a deleted
+row (rejecting an inserted one) removes it, the table with its last row. A table's breaks
 have no widow and orphan control (`BlockBox.anyLine`): Word keeps no lines together across
 rows. During a composition nothing moves: a table keeps its wrappers (the ones at its place,
 if its node changed), and a cell paragraph drawn again takes its old element's place; the
@@ -757,7 +769,7 @@ Planned, created only when needed:
 - `pnpm check` also runs `publint --strict` on every package (exports, `files`, types) and
   `pnpm size`: each package's published entry bundled as an app would (fully minified, its
   Foli dependencies included, React external), and an app importing only `FoliEditor`, against
-  gzip budgets in `scripts/size.mjs` (core 43.9 kB, view 53.7 kB, react 72.3 kB, docx 41.0 kB;
+  gzip budgets in `scripts/size.mjs` (core 45.9 kB, view 55.2 kB, react 74.2 kB, docx 41.0 kB;
   each raise and its reason is recorded there).
 - `pnpm examples` installs the packed tarballs into `examples/vite` (React 18, strict
   TypeScript) and `examples/next` (React 19, server rendering) with npm, builds them, and runs

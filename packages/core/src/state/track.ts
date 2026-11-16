@@ -294,6 +294,8 @@ function rebuild(
       (mark ??= adjacent(deletion, from, to) ?? deletion.create({ id: newId(), author, date }));
     const real: [number, number][] = [];
     const marked: [number, number][] = [];
+    /** Whole rows deleted: recorded as the rows' deletion. */
+    const rows: { pos: number; node: Node }[] = [];
     // Paragraphs joined for real (one's own inserted mark removed) become one, which starts
     // where the first starts and ends with the last one's mark (`keepLastMark`), as an
     // untracked join does.
@@ -334,9 +336,21 @@ function rebuild(
           pending.push({ at: here(start), kind: "deletion", revision: revisionOf(markOf()) });
         return true;
       }
-      // shortcut: blocks Foli does not model (tables…) cannot be recorded as changed, so such an
-      // edit is not made while tracking; Phase 10 models tables and tracks them.
-      if (!node.isInline) throw new TransformError("A table cannot be deleted as a tracked change");
+      // A whole row: its deletion is the row's (`w:trPr/w:del`), its content kept as Word keeps
+      // it; one's own inserted row goes for real.
+      if (node.type.name === "tableRow" && from <= pos && to >= pos + node.nodeSize) {
+        const revision = node.attrs.revision as ParagraphRevision | null;
+        if (revision?.insertion?.author === author && !revision.deletion)
+          real.push([pos, pos + node.nodeSize]);
+        else if (!revision?.deletion) rows.push({ pos, node });
+        return false;
+      }
+      // Tables, rows and cells partly covered: the text in them, cell by cell.
+      if (["table", "tableRow", "tableCell"].includes(node.type.name)) return true;
+      // shortcut: other blocks Foli does not model cannot be recorded as changed, so such an
+      // edit is not made while tracking.
+      if (!node.isInline)
+        throw new TransformError("This content cannot be deleted as a tracked change");
       const s = Math.max(pos, from);
       const e = Math.min(pos + node.nodeSize, to);
       if (s >= e || MARKERS.has(node.type.name) || deletion.isInSet(node.marks)) return false;
@@ -345,6 +359,18 @@ function rebuild(
       return false;
     });
     for (const [s, e] of joined(marked)) out.addMark(s, e, markOf());
+    for (const { pos, node } of rows) {
+      const revision = (node.attrs.revision as ParagraphRevision | null) ?? {};
+      const deleted = revisionOf(markOf());
+      out.step(
+        new NodeMarkupStep(
+          pos,
+          node.type,
+          { ...node.attrs, revision: { ...revision, deletion: deleted } },
+          node.marks,
+        ),
+      );
+    }
     for (const [s, e] of joined(real).reverse()) out.delete(s, e);
     for (const { at: where, node, live } of merged) {
       const pos = at(where, 1);
@@ -405,13 +431,31 @@ function rebuild(
       out.replace(pos, pos, new Slice(content, slice.openStart, slice.openEnd));
       inserted = here(pos);
       const size = slice.size;
+      // Whole rows inserted: the rows' insertion (`w:trPr/w:ins`), beside their text's marks.
+      const newRows: number[] = [];
       out.doc.nodesBetween(pos, pos + size, (node, p) => {
+        if (node.type.name === "tableRow" && p >= pos && p + node.nodeSize <= pos + size)
+          newRows.push(p);
         if (!node.isTextblock) return !node.isInline;
         const close = p + node.nodeSize - 1;
         if (close >= pos && close < pos + size)
           pending.push({ at: here(p), kind: "insertion", revision: revisionOf(mark) });
         return false;
       });
+      for (const p of newRows) {
+        const row = out.doc.nodeAt(p);
+        if (!row) continue;
+        const revision = (row.attrs.revision as ParagraphRevision | null) ?? {};
+        if (revision.insertion) continue;
+        out.step(
+          new NodeMarkupStep(
+            p,
+            row.type,
+            { ...row.attrs, revision: { ...revision, insertion: revisionOf(mark) } },
+            row.marks,
+          ),
+        );
+      }
       // An open end: the paragraph there keeps the original mark with the inserted content's
       // properties (Enter at the end of a heading: the next style), a change of its formatting.
       const $end = out.doc.resolve(pos + size);

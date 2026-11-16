@@ -10,6 +10,7 @@ import {
   Slice,
 } from "../model/index.js";
 import { isSafeLink } from "../schema.js";
+import { TransformError } from "../transform/index.js";
 import { attempt } from "./attempt.js";
 import { redo, undo } from "./history.js";
 import { openLinkEditor } from "./links.js";
@@ -22,6 +23,7 @@ import {
   Plugin,
   type Transaction,
 } from "./state.js";
+import { deleteAcrossTables, keepTablesApart } from "./tables.js";
 import { trackState } from "./track.js";
 import {
   isMarker,
@@ -60,8 +62,19 @@ function caret(state: EditorState): ResolvedPos | null {
 
 export const deleteSelection: Command = (state, dispatch) => {
   if (state.selection.empty) return false;
-  return attempt(state, dispatch, (tr) => tr.deleteSelection());
+  return attempt(state, dispatch, (tr) => deleteSelectionKeepingTables(tr));
 };
+
+/**
+ * Deletes `tr`'s selection; across a table's edge it takes whole rows (or empties cells), never
+ * joining text across the edge (`deleteAcrossTables`), and Word's table rules hold after it.
+ */
+function deleteSelectionKeepingTables(tr: Transaction): void {
+  const { from, to } = tr.selection;
+  if (!deleteAcrossTables(tr, from, to)) tr.deleteSelection();
+  else tr.setSelection(Selection.near(tr.doc.resolve(tr.mapping.map(from, -1)), 1));
+  keepTablesApart(tr);
+}
 
 /** Replaces the selection with text, using stored marks or the marks at the selection start. */
 export function insertText(text: string): Command {
@@ -82,8 +95,9 @@ export function insertText(text: string): Command {
       const marks =
         state.storedMarks ??
         (selection.empty ? marksAt($from) : ($from.nodeAfter?.marks ?? marksAt($from)));
-      tr.deleteSelection();
+      if (!selection.empty) deleteSelectionKeepingTables(tr);
       const $pos = tr.selection.$from;
+      if (!$pos.parent.inlineContent) throw new TransformError("No text where the selection was");
       const allowed = typedMarks(marks).filter((mark) =>
         $pos.parent.type.allowsMarkType(mark.type),
       );
@@ -216,7 +230,11 @@ export const joinBackward: Command = (state, dispatch) => {
       // The merged paragraph ends with this one's mark (schema v3: its section break).
       keepLastMark(tr, boundary - before.nodeSize, $pos.parent);
     });
-  // A block sibling: an opaque block or (until 10.6) a table.
+  // A table: the caret goes to the end of its last cell, as Word moves into it.
+  if (before.type.name === "table") {
+    dispatch?.(state.tr.setSelection(Selection.near(state.doc.resolve(boundary - 1), -1)));
+    return true;
+  }
   if (isOpaque(wordContext(state), before)) {
     dispatch?.(state.tr.setSelection(selectionAt(state, boundary - before.nodeSize)));
     return true;
@@ -240,6 +258,11 @@ export const joinForward: Command = (state, dispatch) => {
       tr.join(boundary);
       keepLastMark(tr, $pos.before(), after);
     });
+  }
+  // A table: the caret goes to the start of its first cell.
+  if (after.type.name === "table") {
+    dispatch?.(state.tr.setSelection(Selection.near(state.doc.resolve(boundary + 1), 1)));
+    return true;
   }
   if (isOpaque(wordContext(state), after)) {
     dispatch?.(state.tr.setSelection(selectionAt(state, boundary)));

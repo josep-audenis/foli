@@ -15,6 +15,7 @@ import { closeHistory } from "./history.js";
 import { MARK_ATTRS } from "./mark.js";
 import { TextSelection } from "./selection.js";
 import type { Command, EditorState, Transaction } from "./state.js";
+import { keepTablesApart } from "./tables.js";
 import { RECORDED, trackState, untracked } from "./track.js";
 
 export type ChangeKind =
@@ -23,7 +24,9 @@ export type ChangeKind =
   | "formatting"
   | "paragraphInsertion"
   | "paragraphDeletion"
-  | "paragraphFormatting";
+  | "paragraphFormatting"
+  | "rowInsertion"
+  | "rowDeletion";
 
 /** One tracked change of the document, where it is. */
 export interface Change {
@@ -71,8 +74,27 @@ export function trackedChanges(doc: Node): Change[] {
       move: (attrs.move as string | null | undefined) ?? null,
     });
   };
-  doc.forEach((block, offset) => {
-    if (!block.isTextblock) return;
+  // Every paragraph, those in table cells too; a table row's own insertion or deletion.
+  doc.descendants((block, offset) => {
+    if (block.type.name === "tableRow") {
+      const revision = block.attrs.revision as { insertion?: Revision; deletion?: Revision } | null;
+      for (const [kind, r] of [
+        ["rowInsertion", revision?.insertion],
+        ["rowDeletion", revision?.deletion],
+      ] as const)
+        if (r)
+          changes.push({
+            kind,
+            id: r.id,
+            author: r.author,
+            date: r.date ?? null,
+            from: offset,
+            to: offset + block.nodeSize,
+            move: null,
+          });
+      return true;
+    }
+    if (!block.isTextblock) return true;
     const change = block.attrs.formatChange as Revision | null;
     if (change) changes.push(paragraphChange("paragraphFormatting", change, offset, block));
     // Runs of content with the same change mark, extended while the next node has it too.
@@ -95,6 +117,7 @@ export function trackedChanges(doc: Node): Change[] {
       changes.push(paragraphChange("paragraphInsertion", revision.insertion, offset, block));
     if (revision?.deletion)
       changes.push(paragraphChange("paragraphDeletion", revision.deletion, offset, block));
+    return false;
   });
   return changes.sort((a, b) => a.from - b.from || a.to - b.to);
 }
@@ -154,6 +177,8 @@ function resolve(tr: Transaction, changes: readonly Change[], accept: boolean): 
   const schema = tr.doc.type.schema;
   const removed: [number, number][] = [];
   const joins: { pos: number; keepFirst: boolean }[] = [];
+  /** Rows that go, by their table (its position): a table losing every row goes whole. */
+  const rowsGoing = new Map<number, [number, number][]>();
   for (const change of changes) {
     const { kind, from, to } = change;
     const markType = schema.marks[kind === "formatting" ? "formatChange" : kind];
@@ -196,6 +221,21 @@ function resolve(tr: Transaction, changes: readonly Change[], accept: boolean): 
         tr.setNodeMarkup(start, node.type, attrs);
         break;
       }
+      case "rowInsertion":
+      case "rowDeletion": {
+        const row = tr.doc.nodeAt(from);
+        if (row?.type.name !== "tableRow") break;
+        if ((kind === "rowDeletion") === accept) {
+          const table = tr.doc.resolve(from).before();
+          rowsGoing.set(table, [...(rowsGoing.get(table) ?? []), [from, to]]);
+        } else {
+          const revision = { ...(row.attrs.revision as Record<string, unknown>) };
+          delete revision[kind === "rowInsertion" ? "insertion" : "deletion"];
+          const next = Object.keys(revision).length ? revision : null;
+          tr.setNodeMarkup(from, row.type, { ...row.attrs, revision: next });
+        }
+        break;
+      }
       case "paragraphInsertion":
       case "paragraphDeletion": {
         const start = tr.doc.resolve(from).before();
@@ -216,12 +256,26 @@ function resolve(tr: Transaction, changes: readonly Change[], accept: boolean): 
       }
     }
   }
+  // Rows that go, or their table when every row does; what lies inside them is not removed again.
+  for (const [table, rows] of rowsGoing) {
+    const node = tr.doc.nodeAt(table);
+    if (node && rows.length === node.childCount) removed.push([table, table + node.nodeSize]);
+    else removed.push(...rows);
+  }
+  const outer = removed.filter(
+    ([s, e]) => !removed.some(([s2, e2]) => (s2 < s && e <= e2) || (s2 <= s && e < e2)),
+  );
+  removed.length = 0;
+  removed.push(...outer);
   // Content removed and paragraphs joined, from the end so earlier positions stay.
   const ops = [
     ...removed.map(([s, e]) => ({ at: s, run: () => tr.delete(s, e) })),
-    ...joins.map(({ pos, keepFirst }) => ({ at: pos - 1, run: () => join(tr, pos, keepFirst) })),
+    ...joins
+      .filter(({ pos }) => !removed.some(([s, e]) => s < pos && pos < e))
+      .map(({ pos, keepFirst }) => ({ at: pos - 1, run: () => join(tr, pos, keepFirst) })),
   ].sort((a, b) => b.at - a.at);
   for (const op of ops) op.run();
+  keepTablesApart(tr);
 }
 
 /** Whether every child of `node` (content at `start`) but markers lies in `removed`. */

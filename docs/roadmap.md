@@ -974,6 +974,10 @@ Each task is a PR on `phase-10/tables-images`, the build green after each.
   last paragraph), Tab and Shift+Tab between cells (Tab in the last cell adds a row), arrows
   across cells and out of the table, `CellSelection` (drag, Shift+arrows) with copy, cut, paste
   of cells and delete of their content, undo; tracked changes in cells; T1–T5 in cells.
+  (In progress. 10.6a, core: cells isolate, Backspace and Delete next to a table move into it,
+  range deletes across a table's edges take whole rows (or empty cells), tracked text in cells,
+  row deletion and insertion as row revisions with accept and reject. Next: paste of rows and
+  the view's keyboard, `CellSelection`, T1–T5 in cells.)
 - [ ] 10.7 Table commands and UI: insert a table (rows × columns), insert and delete rows and
   columns, merge and split cells, header row, column width by dragging a border, table style and
   cell shading; row insertion and deletion tracked as Word records them; a table menu in the
