@@ -162,7 +162,7 @@
   cursor: pointer;
 }
 
-.foli-menu-item:hover,
+.foli-menu-item:not([aria-disabled="true"]):hover,
 .foli-menu-item:focus-visible {
   background: var(--foli-toolbar-hover);
 }
@@ -185,7 +185,8 @@
 }
 
 .foli-menu-item[role="menuitemcheckbox"][aria-checked="true"]::before {
-  content: "\2713";
+  /* No accessible name of its own: the item's checked state says it. */
+  content: "\2713" / "";
 }
 
 .foli-table-dialog input {

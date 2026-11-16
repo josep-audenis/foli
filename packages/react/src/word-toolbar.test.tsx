@@ -171,7 +171,11 @@ describe("FoliToolbar's table menu", () => {
     fireEvent.change(screen.getByLabelText("Columns"), { target: { value: "70" } });
     fireEvent.submit(dialog.querySelector("form") as HTMLFormElement);
     // 70 columns is past Word's limit: refused, said.
-    expect(screen.getByRole("alert").textContent).toContain("63 columns");
+    expect(screen.getByRole("alert").textContent).toContain("from 1 to 63");
+    // Only the field that is wrong is marked, and it has the focus.
+    expect(screen.getByLabelText("Columns").getAttribute("aria-invalid")).toBe("true");
+    expect(screen.getByLabelText("Rows").getAttribute("aria-invalid")).toBe(null);
+    expect(document.activeElement).toBe(screen.getByLabelText("Columns"));
     fireEvent.change(screen.getByLabelText("Columns"), { target: { value: "2" } });
     fireEvent.submit(dialog.querySelector("form") as HTMLFormElement);
     expect(screen.queryByRole("dialog")).toBe(null);
@@ -227,7 +231,41 @@ describe("FoliToolbar's table menu", () => {
     fireEvent.click(screen.getByRole("menuitemradio", { name: "Light blue" }));
     const cell = tableIn(editor)?.content?.[0]?.content?.[0];
     expect(cell?.attrs?.shading).toMatchObject({ fill: "DEEAF6" });
-    fireEvent.change(select("Table style"), { target: { value: "Table Grid" } });
-    expect(tableIn(editor)?.attrs?.style).toBe("TableGrid");
+  });
+
+  it("picks another table style from the box", () => {
+    const editor = createEditor({
+      document: {
+        ...document3,
+        styles: [...document3.styles, { id: "LightList", type: "table", name: "Light List" }],
+      },
+    });
+    render(<FoliToolbar editor={editor} />);
+    act(() => {
+      editor.select(6);
+      editor.run(insertTable(1, 2));
+    });
+    fireEvent.change(select("Table style"), { target: { value: "Light List" } });
+    expect(tableIn(editor)?.attrs?.style).toBe("LightList");
+    expect(select("Table style").value).toBe("Light List");
+  });
+
+  it("disables the style box and shading while tracking, and closes the dialog on a change", () => {
+    const editor = setup();
+    act(() => {
+      editor.select(6);
+      editor.run(insertTable(1, 2));
+      editor.commands.setTrackChanges(true, "Me");
+    });
+    expect(select("Table style").getAttribute("aria-disabled")).toBe("true");
+    expect(screen.getByRole("button", { name: "Shading" }).getAttribute("aria-disabled")).toBe(
+      "true",
+    );
+    act(() => editor.commands.setTrackChanges(false));
+    openMenu();
+    fireEvent.click(item("Insert table…"));
+    expect(screen.getByRole("dialog", { name: "Insert table" })).toBeTruthy();
+    act(() => editor.commands.insertText("x"));
+    expect(screen.queryByRole("dialog")).toBe(null);
   });
 });
