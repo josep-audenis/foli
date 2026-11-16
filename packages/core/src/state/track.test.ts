@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { MarkJSON, Node, NodeJSON } from "../model/index.js";
 import type { FoliDocument, StyleJSON } from "../v3/document.js";
 import { createEditor, type Editor } from "./editor.js";
-import { TextSelection } from "./selection.js";
+import { NodeSelection, TextSelection } from "./selection.js";
 
 const STYLES: StyleJSON[] = [
   { id: "Normal", type: "paragraph", name: "Normal", isDefault: true, next: "Normal" },
@@ -145,6 +145,56 @@ describe("tracked changes", () => {
     expect(editor.getDocument()).toEqual(before);
     editor.commands.redo();
     expect(blocks(editor)[1]).toEqual(p(text("d", [del(0)]), text("X", [ins(1)]), text("ef")));
+  });
+
+  it("inserts the paragraph Enter makes beside a selected table", () => {
+    const table: NodeJSON = { type: "opaqueBlock", attrs: { xml: "<w:tbl/>" } };
+    const editor = tracked(p(text("ab")), table, p(text("cd")));
+    editor.dispatch(editor.state.tr.setSelection(NodeSelection.create(editor.state.doc, 4)));
+    expect(editor.commands.splitBlock()).toBe(true);
+    const content = blocks(editor);
+    expect(content).toHaveLength(4);
+    expect(JSON.stringify(content)).not.toContain('"deletion"');
+    expect(editor.state.selection.$head.parent.isTextblock).toBe(true);
+    expect(editor.state.selection.empty).toBe(true);
+  });
+
+  it("does not delete or insert a table while tracking (Phase 10)", () => {
+    const table: NodeJSON = { type: "opaqueBlock", attrs: { xml: "<w:tbl/>" } };
+    const editor = tracked(p(text("ab")), table, p(text("cd")));
+    const before = editor.getDocument();
+    editor.select(2, 7);
+    editor.commands.deleteSelection();
+    expect(editor.getDocument()).toEqual(before);
+    const { schema } = editor.state;
+    editor.dispatch(editor.state.tr.insert(0, schema.nodeFromJSON(table)));
+    expect(editor.getDocument()).toEqual(before);
+  });
+
+  it("records the mark of a paragraph a range replaces whole", () => {
+    const editor = tracked(p(), p(text("cd")));
+    const { schema } = editor.state;
+    // The view's paste into an empty paragraph: the paragraph replaced by the pasted blocks.
+    const pasted = schema.nodeFromJSON(p(text("x")));
+    editor.dispatch(editor.state.tr.delete(0, 2).insert(0, pasted));
+    expect(project(editor.state.doc, true)).toEqual(["x", "cd"]);
+    expect(project(editor.state.doc, false)).toEqual(["", "cd"]);
+  });
+
+  it("gives a change an id no comment's change has", () => {
+    const comment = {
+      id: 0,
+      author: "A",
+      content: [p(text("n", [{ type: "insertion", attrs: { id: 9, author: "A" } }]))],
+    };
+    const editor = createEditor({
+      document: { ...documentOf(p(text("ab"))), comments: [comment] },
+      author: "Me",
+      trackChanges: true,
+    });
+    editor.select(2);
+    editor.commands.insertText("X");
+    expect(blocks(editor)).toEqual([p(text("a"), text("X", [ins(10)]), text("b"))]);
   });
 
   it("deletes everything as deleted text, keeping the last paragraph", () => {

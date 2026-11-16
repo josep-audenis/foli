@@ -164,8 +164,8 @@ removes stays with a `deletion` mark and what it adds gets an `insertion` mark (
 Word's next free id; typing on joins the change next to it); a paragraph mark removed or
 added is recorded on the paragraph (`revision.deletion` / `revision.insertion`); deleting one's
 own insertion removes it for real. The caret goes before what Backspace deleted, after what
-Delete deleted. Mark and attribute changes are not tracked yet (9.3); blocks Foli does not
-model (tables) are kept in a tracked deletion. Undo and redo, transactions with
+Delete deleted. Mark and attribute changes are not tracked yet (9.3). An edit that would delete
+or insert a block Foli does not model (a table) is not made while tracking (Phase 10). Undo and redo, transactions with
 `addToHistory: false` and those with the `untracked` meta are not tracked; an edit that cannot
 be recorded is not made. `editor.commands.setTrackChanges(on, author?)` (the
 `setTrackChanges` command), `editor.trackingChanges`, `trackState(state)` (`{ on, author }`).

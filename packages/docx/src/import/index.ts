@@ -126,7 +126,13 @@ export function importPackage(pkg: DocxPackage): DocxImport {
     // element over 16 MiB kept verbatim…). A DocxError like every other import failure.
     throw new DocxError(`Cannot import: ${(error as Error).message}`, { cause: error });
   }
-  const trackRevisions = trackRevisionsOf(related(REL.settings)?.root);
+  // A settings part Foli cannot read is kept as it is, and tracking taken as off.
+  let trackRevisions = false;
+  try {
+    trackRevisions = trackRevisionsOf(related(REL.settings)?.root);
+  } catch (error) {
+    if (!(error instanceof Error && error.name === "XmlError")) throw error;
+  }
   return { document, package: pkg, report: report.report(), trackRevisions };
 }
 

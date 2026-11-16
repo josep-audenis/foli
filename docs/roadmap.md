@@ -786,8 +786,12 @@ Each task is a PR on `phase-9/review`, the build green after each.
   replacing a selection mark text `deletion` (caret before what Backspace deleted, after what
   Delete deleted), while deleting one's own insertion removes it; paragraph marks removed or
   added recorded on the paragraph (`revision`), one's own inserted mark joined for real (the
-  last paragraph's mark kept); bookmarks and comment ranges not marked; blocks Foli does not
-  model kept in a tracked deletion (Phase 10); ids the document's next free one. Whether
+  last paragraph's mark kept), also for a paragraph a range replaces whole; bookmarks and
+  comment ranges not marked; an edit deleting or inserting a block Foli does not model (a table)
+  is not made while tracking (Phase 10); ids the next free one (comments' content included).
+  Revisions have no initials in Word (comments do: 9.6); list numbers follow from the recorded
+  paragraph properties (9.3). Known: accept-all of Enter over a selection across a heading and
+  a body paragraph gives the inserted mark the body's style (untracked keeps the heading's). Whether
   tracking is on stays out of the document format: `@folijs/docx` reads and writes
   `w:trackRevisions` (`DocxImport.trackRevisions`, `exportDocx(…, { trackRevisions })`).
   Property test: accept all = the same edits untracked, reject all = the original, undo all =

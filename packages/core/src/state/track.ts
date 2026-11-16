@@ -15,8 +15,10 @@ import { Fragment, type Mark, type MarkType, type Node, Slice } from "../model/i
 import { type Mappable, Mapping, type MapResult } from "../transform/stepmap.js";
 import { NodeMarkupBatchStep, NodeMarkupStep, type Step } from "../transform/steps.js";
 import { TransformError } from "../transform/transform.js";
+import type { CommentJSON } from "../v3/document.js";
 import { NodeSelection, Selection, TextSelection } from "./selection.js";
 import { type Command, type EditorState, Plugin, PluginKey, type Transaction } from "./state.js";
+import { wordContext } from "./word.js";
 
 export interface TrackState {
   /** Whether edits are recorded as tracked changes. */
@@ -74,8 +76,10 @@ function now(): string {
   return new Date().toISOString().replace(/\.\d+Z$/, "Z");
 }
 
-/** The largest change id in `doc` (marks and paragraph revisions), or -1. */
-function maxRevisionId(doc: Node): number {
+const REVIEW_MARKS = new Set(["insertion", "deletion", "formatChange"]);
+
+/** The largest change id in `doc` and the comments' content (marks, paragraph revisions), or -1. */
+function maxRevisionId(doc: Node, comments: readonly CommentJSON[]): number {
   let max = -1;
   const see = (value: unknown) => {
     const id = (value as { id?: unknown } | null | undefined)?.id;
@@ -84,7 +88,7 @@ function maxRevisionId(doc: Node): number {
   doc.descendants((node) => {
     for (const mark of node.marks) {
       const name = mark.type.name;
-      if (name === "insertion" || name === "deletion" || name === "formatChange") see(mark.attrs);
+      if (REVIEW_MARKS.has(name)) see(mark.attrs);
     }
     if (node.isTextblock) {
       const revision = node.attrs.revision as ParagraphRevision | null | undefined;
@@ -94,6 +98,22 @@ function maxRevisionId(doc: Node): number {
     }
     return true;
   });
+  // Comments hold paragraphs too, which can carry changes (JSON: walked as it is).
+  const walk = (value: unknown): void => {
+    if (Array.isArray(value)) value.forEach(walk);
+    else if (value && typeof value === "object") {
+      const json = value as Record<string, unknown>;
+      if (REVIEW_MARKS.has(json.type as string)) see(json.attrs);
+      if (json.type === "paragraph") see((json.attrs as { formatChange?: unknown })?.formatChange);
+      const revision = json.revision as ParagraphRevision | null | undefined;
+      if (revision && typeof revision === "object") {
+        see(revision.insertion);
+        see(revision.deletion);
+      }
+      Object.values(json).forEach(walk);
+    }
+  };
+  walk(comments.map((c) => c.content));
   return max;
 }
 
@@ -184,7 +204,8 @@ function rebuild(
   const date = now();
   let nextId = -1;
   const newId = () => {
-    if (nextId < 0) nextId = maxRevisionId(state.doc) + 1;
+    if (nextId < 0)
+      nextId = maxRevisionId(state.doc, wordContext(state)?.envelope.comments ?? []) + 1;
     return nextId++;
   };
   const at = (x: At, assoc: number) => out.mapping.slice(x.step).map(x.pos, assoc);
@@ -227,7 +248,9 @@ function rebuild(
         const end = pos + node.nodeSize;
         const start = group ?? pos;
         const revision = node.attrs.revision as ParagraphRevision | null;
-        const crossed = from < end && to > end;
+        // Its mark goes: the range runs into the next block, or covers this one whole.
+        const crossed =
+          (from < end && to > end) || (from <= pos && to >= end && !!doc.resolve(end).nodeAfter);
         if (
           crossed &&
           !revision?.deletion &&
@@ -245,8 +268,9 @@ function rebuild(
           pending.push({ at: here(start), kind: "deletion", revision: revisionOf(markOf()) });
         return true;
       }
-      // Blocks Foli does not model (tables…) are kept: Phase 10 tracks them.
-      if (!node.isInline) return false;
+      // shortcut: blocks Foli does not model (tables…) cannot be recorded as changed, so such an
+      // edit is not made while tracking; Phase 10 models tables and tracks them.
+      if (!node.isInline) throw new TransformError("A table cannot be deleted as a tracked change");
       const s = Math.max(pos, from);
       const e = Math.min(pos + node.nodeSize, to);
       if (s >= e || MARKERS.has(node.type.name) || deletion.isInSet(node.marks)) return false;
@@ -279,6 +303,8 @@ function rebuild(
     const first = slice.content.firstChild;
     // Deleting everything leaves one empty paragraph: here, the last one, its text deleted.
     const emptyBlock =
+      range.a === 0 &&
+      range.b === state.doc.content.size &&
       !slice.openStart &&
       slice.content.childCount === 1 &&
       first?.isTextblock &&
@@ -406,6 +432,8 @@ function markFragment(
     }
     // A paragraph keeps its revision: an open end's is the original mark's, and the marks
     // inserted get theirs afterwards.
+    if (!node.isTextblock)
+      throw new TransformError("A table cannot be inserted as a tracked change");
     nodes.push(node.copy(markFragment(node.content, mark, insertion, deletion)));
   });
   return Fragment.fromArray(nodes);
