@@ -933,7 +933,7 @@ Each task is a PR on `phase-10/tables-images`, the build green after each.
   flow, a row split at a line where Word allows it, header rows repeated, `cantSplit`), position
   mapping and selection (`CellSelection`), how tracking and comments reach cells, schema v4 and
   its migration. Spike evidence for rows across pages and caret movement between cells in three
-  engines. The owner accepts it before 10.2.
+  engines. The owner accepts it before 10.2. (Proposed: spike and ADR in the 10.1 PR.)
 - [ ] 10.2 Corpus: Word-authored documents for tables (a price schedule over pages with repeated
   header rows, merged cells both ways, banded table style, a nested table) and pictures (inline,
   floating square and top-and-bottom, behind text, with and without alt text) added to the
