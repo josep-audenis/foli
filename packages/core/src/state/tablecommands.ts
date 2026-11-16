@@ -619,8 +619,16 @@ export function tableStyles(state: EditorState): string[] {
 
 /** The name of the style of the table around the selection (null: none, or no table). */
 export function tableStyleAt(state: EditorState): string | null {
-  const found = around(state);
-  const id = found?.table.attrs.style as string | null | undefined;
+  // O(depth): the table above the selection's cell, not its grid (runs after every transaction).
+  const { selection } = state;
+  let table: Node | undefined;
+  if (selection instanceof CellSelection)
+    table = selection.$anchor.node(selection.$anchor.depth - 1);
+  else {
+    const depth = cellDepth(selection.$from);
+    if (depth >= 0) table = selection.$from.node(depth - 2);
+  }
+  const id = table?.attrs.style as string | null | undefined;
   if (!id) return null;
   return wordContext(state)?.envelope.styles.find((s) => s.id === id)?.name ?? null;
 }

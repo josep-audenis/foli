@@ -986,15 +986,17 @@ Each task is a PR on `phase-10/tables-images`, the build green after each.
   Chromium, Firefox and WebKit; T4 (CDP IME) and the system clipboard's Foli type in Chromium
   only, as for the rest of the editor. HTML tables from other applications paste as
   paragraphs.)
-- [ ] 10.7 Table commands and UI: insert a table (rows × columns), insert and delete rows and
+- [x] 10.7 Table commands and UI: insert a table (rows × columns), insert and delete rows and
   columns, merge and split cells, header row, column width by dragging a border, table style and
   cell shading; row insertion and deletion tracked as Word records them; a table menu in the
   toolbar (React), keyboard-usable; axe in three engines.
-  (In progress. 10.7a, core: insert a table, insert and delete rows and columns, delete a table;
+  (Done. 10.7a, core: insert a table, insert and delete rows and columns, delete a table;
   rows tracked, column commands refused while tracking; Word's Table Grid style added and
   exported. 10.7b, core: merge and split cells, header rows, table style, cell shading, column
-  width; none while tracking. 10.7c: column borders dragged in the view (three engines). Next:
-  the toolbar's table menu.)
+  width; none while tracking. 10.7c: column borders dragged in the view (three engines). 10.7d:
+  the toolbar's Table menu (keyboard-usable, with an insert table dialog), table style box and
+  cell shading menu; axe on the toolbar, menu, dialog and pages in Chromium, Firefox and WebKit.
+  Not yet: a keyboard way to set a column's width, nested tables' borders.)
 - [ ] 10.8 Inline pictures: import and export `wp:inline` drawings (`a:blip` resources kept in the
   package), shown in the line at their size, laid out on pages; insert from a file, paste or
   drop through the upload hook; resize with the aspect ratio kept; alt text required to insert

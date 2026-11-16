@@ -4,6 +4,7 @@
  * may not split moved whole), with its cells' text editable and read back.
  */
 import { readFileSync } from "node:fs";
+import AxeBuilder from "@axe-core/playwright";
 import { expect, type Page, test } from "@playwright/test";
 
 const CORPUS = new URL("../../../corpus/word/", import.meta.url);
@@ -505,4 +506,52 @@ test("a click on a column border changes nothing; a grid line through a spanning
   await page.mouse.move(inside.x, inside.y);
   await page.waitForTimeout(100);
   expect(await editor(page).evaluate((host) => (host as HTMLElement).style.cursor)).toBe("");
+});
+
+// ---------- the table menu (10.7d) ----------
+
+const rowCount = (page: Page) =>
+  page.evaluate(() => {
+    let rows = 0;
+    window.foliEdit.editor.state.doc.forEach((node) => {
+      if (!rows && node.type.name === "table") rows = node.childCount;
+    });
+    return rows;
+  });
+
+test("the table menu inserts a row from the keyboard; the menu, dialog and table pass axe", async ({
+  page,
+}) => {
+  test.slow(); // axe takes several seconds per run in Firefox
+  await open(page, "06-price-schedule.docx");
+  const rows = await rowCount(page);
+  await cellOf(page, "Hardware item 3").click();
+  const table = page.getByRole("button", { name: "Table", exact: true });
+  await table.focus();
+  await page.keyboard.press("ArrowDown");
+  const menu = page.getByRole("menu", { name: "Table" });
+  await expect(menu).toBeVisible();
+  const scan = async (selector: string) =>
+    (await new AxeBuilder({ page }).include(selector).analyze()).violations.map(
+      (v) => `${v.id}: ${v.nodes.map((n) => n.target).join(", ")}`,
+    );
+  expect(await scan(".foli-toolbar")).toEqual([]);
+  // "Insert row below": the third item.
+  await page.keyboard.press("ArrowDown");
+  await page.keyboard.press("ArrowDown");
+  await expect(page.getByRole("menuitem", { name: "Insert row below" })).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect.poll(() => rowCount(page)).toBe(rows + 1);
+  await expect(menu).toHaveCount(0);
+  await expect(table).toBeFocused();
+  // The insert table dialog.
+  await page.keyboard.press("ArrowDown");
+  await page.keyboard.press("Enter");
+  const dialog = page.getByRole("dialog", { name: "Insert table" });
+  await expect(dialog).toBeVisible();
+  expect(await scan(".foli-table-dialog")).toEqual([]);
+  await page.keyboard.press("Escape");
+  await expect(dialog).toHaveCount(0);
+  await expect(table).toBeFocused();
+  expect(await scan("#editor > .foli-page")).toEqual([]);
 });

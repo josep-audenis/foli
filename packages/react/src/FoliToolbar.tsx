@@ -8,15 +8,23 @@ import {
   canOutdent,
   changeIndent,
   colorAt,
+  deleteColumns,
+  deleteRows,
+  deleteTable,
   type Editor,
   type EditorState,
   fontFamilyAt,
   fontSizeAt,
+  insertColumn,
   insertPageBreak,
+  insertRow,
+  insertTable,
+  isHeaderRow,
   isSafeHref,
   lineSpacingAt,
   linkAt,
   listKindAt,
+  mergeCells,
   nextChange,
   normalizeHref,
   openLinkEditor,
@@ -31,6 +39,7 @@ import {
   removeLink,
   requestsLinkEditor,
   setAlign,
+  setCellShading,
   setFontFamily,
   setFontSize,
   setHighlight,
@@ -38,8 +47,13 @@ import {
   setLink,
   setParagraphStyle,
   setReviewView,
+  setTableStyle,
   setTextColor,
   setTrackChanges,
+  splitCell,
+  tableStyleAt,
+  tableStyles,
+  toggleHeaderRow,
   toggleList,
   toggleMark,
   trackState,
@@ -55,6 +69,7 @@ import {
   type ReactNode,
   useEffect,
   useId,
+  useMemo,
   useRef,
   useState,
 } from "react";
@@ -109,12 +124,24 @@ interface Item {
     value: (state: EditorState) => string | null;
     pick: (color: string | null) => Command;
   };
+  /** An action menu button (the table menu): its commands, in order. */
+  actions?: readonly Action[];
   /** A drop-down list (a `select`): its options, the current value, and what picking runs. */
   select?: {
     options: (state: EditorState) => readonly { value: string; label: string }[];
     value: (state: EditorState) => string | null;
     pick: (value: string) => Command;
   };
+}
+
+/** A command in an action menu (a menuitem, or a menuitemcheckbox when it has `checked`). */
+interface Action {
+  key: string;
+  label: string;
+  /** The command it runs; `insertTable` opens the dialog that asks for the size instead. */
+  command: Command;
+  dialog?: "insertTable";
+  checked?: (state: EditorState) => boolean;
 }
 
 interface ColorOption {
@@ -144,6 +171,48 @@ const HIGHLIGHTS: readonly ColorOption[] = [
   { name: "Turquoise", color: "#00ffff" },
   { name: "Pink", color: "#ff00ff" },
   { name: "Gray", color: "#c0c0c0" },
+];
+
+/** Cell shadings: light fills that keep text readable. */
+const SHADINGS: readonly ColorOption[] = [
+  { name: "None", color: null },
+  { name: "Light gray", color: "#d9d9d9" },
+  { name: "Light blue", color: "#deeaf6" },
+  { name: "Light green", color: "#e2efd9" },
+  { name: "Light yellow", color: "#fff2cc" },
+  { name: "Light orange", color: "#fbe4d5" },
+];
+
+/** The cell around the selection's start, if any (cheap: the start's ancestors). */
+function cellAt(state: EditorState) {
+  const { $from } = state.selection;
+  for (let d = $from.depth; d > 0; d--)
+    if ($from.node(d).type.name === "tableCell") return $from.node(d);
+  // A cell selection starts before its first cell.
+  const after = $from.nodeAfter;
+  return after?.type.name === "tableCell" ? after : null;
+}
+const inTable = (state: EditorState) => cellAt(state) !== null;
+/** Table and cell properties change only when not tracking (Foli does not record them yet). */
+const canFormatTable = (state: EditorState) => inTable(state) && trackState(state)?.on !== true;
+
+const TABLE_ACTIONS: readonly Action[] = [
+  { key: "insertTable", label: "Insert table…", command: insertTable(1, 1), dialog: "insertTable" },
+  { key: "rowAbove", label: "Insert row above", command: insertRow(-1) },
+  { key: "rowBelow", label: "Insert row below", command: insertRow(1) },
+  { key: "columnLeft", label: "Insert column left", command: insertColumn(-1) },
+  { key: "columnRight", label: "Insert column right", command: insertColumn(1) },
+  { key: "deleteRows", label: "Delete rows", command: deleteRows },
+  { key: "deleteColumns", label: "Delete columns", command: deleteColumns },
+  { key: "deleteTable", label: "Delete table", command: deleteTable },
+  { key: "mergeCells", label: "Merge cells", command: mergeCells },
+  { key: "splitCell", label: "Split cell", command: splitCell },
+  {
+    key: "headerRow",
+    label: "Repeat as header row",
+    command: toggleHeaderRow,
+    checked: isHeaderRow,
+  },
 ];
 
 /** Whether the selection holds a textblock (a caret's own block first; else it walks the range). */
@@ -460,6 +529,40 @@ const GROUPS: Item[][] = [
       command: () => redo,
     },
   ],
+  [
+    {
+      key: "table",
+      label: "Table",
+      text: "Table",
+      enabled: (state) => wordContext(state) !== null && "table" in state.schema.nodes,
+      actions: TABLE_ACTIONS,
+    },
+    {
+      key: "tableStyle",
+      label: "Table style",
+      text: "Table style",
+      enabled: canFormatTable,
+      select: {
+        options: (state) => tableStyles(state).map((name) => ({ value: name, label: name })),
+        value: (state) => (inTable(state) ? (tableStyleAt(state) ?? "") : null),
+        pick: (name) => setTableStyle(name),
+      },
+    },
+    {
+      key: "cellShading",
+      label: "Cell shading",
+      text: "Shading",
+      enabled: canFormatTable,
+      menu: {
+        options: SHADINGS,
+        value: (state) => {
+          const fill = (cellAt(state)?.attrs.shading as { fill?: string } | null)?.fill;
+          return fill && fill.toLowerCase() !== "auto" ? `#${fill.toLowerCase()}` : null;
+        },
+        pick: (color) => setCellShading(color ? color.slice(1).toUpperCase() : null),
+      },
+    },
+  ],
   [{ key: "pageBreak", label: "Page break", text: "Page break", command: () => insertPageBreak }],
 ];
 
@@ -508,7 +611,8 @@ const selectStatesNoComment = statesOf(ITEMS_NO_COMMENT);
 /**
  * Word's formatting controls for an editor: paragraph style, font and size boxes, marks, link (a
  * dialog, also on Mod-K in the document), text color and highlight menus, alignment and line
- * spacing, lists (bulleted, numbered, decrease and increase indent), undo, redo, page break.
+ * spacing, lists (bulleted, numbered, decrease and increase indent), undo, redo, tables (a Table
+ * menu with an insert table dialog, a table style box, a cell shading menu), page break.
  * One tab stop (arrow keys, Home and End move between buttons); toggles carry
  * `aria-pressed`; a button whose command cannot run now is `aria-disabled` (still focusable).
  * Clicks leave the focus and selection in the document.
@@ -541,7 +645,7 @@ export function FoliToolbar({
   const run = (index: number, event: MouseEvent) => {
     const item = items[index];
     if (!item || disabled || !states[index]?.enabled) return;
-    if (item.menu) {
+    if (item.menu || item.actions) {
       if (menu !== item.key) {
         setMenu(item.key);
         return;
@@ -568,6 +672,13 @@ export function FoliToolbar({
       editor.subscribe((state, transactions) => {
         if (disabled) return;
         if (!transactions.some(requestsLinkEditor)) {
+          // The insert table dialog is for the caret it opened on, as the link dialog is.
+          setTableDialog((current) =>
+            current &&
+            (transactions.some((tr) => tr.docChanged) || !state.selection.eq(current.selection))
+              ? null
+              : current,
+          );
           setDialog((current) =>
             current &&
             (transactions.some((tr) => tr.docChanged) || !state.selection.eq(current.selection))
@@ -577,6 +688,7 @@ export function FoliToolbar({
           return;
         }
         const active = typeof document === "undefined" ? null : document.activeElement;
+        setTableDialog(null);
         setDialog((current) =>
           current
             ? { ...current, request: current.request + 1 }
@@ -598,6 +710,15 @@ export function FoliToolbar({
     dialog?.restore?.focus();
     setDialog(null);
   };
+  // The insert table dialog (from the table menu): the focus goes back to the menu's button.
+  const [tableDialog, setTableDialog] = useState<{
+    restore: HTMLElement | null;
+    selection: EditorState["selection"];
+    request: number;
+  } | null>(null);
+  useEffect(() => {
+    if (disabled) setTableDialog(null);
+  }, [disabled]);
 
   const onKeyDown = (event: KeyboardEvent) => {
     // Alt+Left (back) and other shortcuts are the browser's.
@@ -689,8 +810,8 @@ export function FoliToolbar({
                   aria-label={item.symbol ? item.label : undefined}
                   title={item.label}
                   aria-pressed={item.pressed ? Boolean(state?.pressed) : undefined}
-                  aria-haspopup={item.menu ? "menu" : undefined}
-                  aria-expanded={item.menu ? menu === item.key : undefined}
+                  aria-haspopup={item.menu || item.actions ? "menu" : undefined}
+                  aria-expanded={item.menu || item.actions ? menu === item.key : undefined}
                   aria-disabled={off || undefined}
                   tabIndex={i === active ? 0 : -1}
                   // Keep the focus (and the selection) in the document on click.
@@ -699,7 +820,7 @@ export function FoliToolbar({
                   onClick={(event) => run(i, event)}
                   onKeyDown={(event) => {
                     // ArrowDown opens a menu (the WAI-ARIA menu button pattern).
-                    if (!item.menu || off || event.key !== "ArrowDown") return;
+                    if (!(item.menu || item.actions) || off || event.key !== "ArrowDown") return;
                     event.preventDefault();
                     setMenu(item.key);
                   }}
@@ -714,6 +835,40 @@ export function FoliToolbar({
                   )}
                 </button>
               );
+              if (item.actions) {
+                const { actions } = item;
+                return (
+                  <span key={item.key} className="foli-toolbar-menu">
+                    {button}
+                    {menu === item.key && !disabled && (
+                      <ActionMenu
+                        label={item.label}
+                        actions={actions}
+                        state={editor.state}
+                        onPick={(action, pointer) => {
+                          setMenu(null);
+                          if (action.dialog) {
+                            setDialog(null);
+                            setTableDialog((current) => ({
+                              restore: buttons.current[i] ?? null,
+                              selection: editor.state.selection,
+                              request: (current?.request ?? -1) + 1,
+                            }));
+                            return;
+                          }
+                          editor.run(action.command);
+                          if (pointer) onClickCommand?.();
+                          else buttons.current[i]?.focus();
+                        }}
+                        onClose={(refocus) => {
+                          setMenu(null);
+                          if (refocus) buttons.current[i]?.focus();
+                        }}
+                      />
+                    )}
+                  </span>
+                );
+              }
               const options = item.menu?.options;
               if (!options || !item.menu) return button;
               const { pick } = item.menu;
@@ -743,6 +898,18 @@ export function FoliToolbar({
           </Fragment>
         ))}
       </div>
+      {tableDialog && !disabled && (
+        <InsertTableDialog
+          editor={editor}
+          request={tableDialog.request}
+          onClose={(inserted) => {
+            const { restore } = tableDialog;
+            setTableDialog(null);
+            if (inserted && onClickCommand) onClickCommand();
+            else restore?.focus();
+          }}
+        />
+      )}
       {dialog && !disabled && (
         <LinkDialog
           editor={editor}
@@ -927,6 +1094,206 @@ function LinkDialog({
         {invalid && (
           <p id={`${id}-error`} className="foli-link-error" role="alert">
             Enter a web or email address, or a link starting with http, https, mailto or tel.
+          </p>
+        )}
+      </form>
+    </div>
+  );
+}
+
+/**
+ * An action menu (WAI-ARIA menu: menuitems, a menuitemcheckbox for a toggle): the first item
+ * focused on open; arrow keys, Home and End move; Enter or Space (or a click) runs an item;
+ * Escape closes it back to its button, Tab closes it and moves on; leaving it closes it. An item
+ * that cannot apply here is `aria-disabled` (still focusable, as in the toolbar).
+ */
+function ActionMenu({
+  label,
+  actions,
+  state,
+  onPick,
+  onClose,
+}: {
+  label: string;
+  actions: readonly Action[];
+  state: EditorState;
+  onPick: (action: Action, pointer: boolean) => void;
+  onClose: (refocus: boolean) => void;
+}) {
+  const items = useRef<(HTMLButtonElement | null)[]>([]);
+  // Dry runs, once per opening (not after every transaction).
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the actions are a constant list.
+  const enabled = useMemo(() => actions.map((action) => action.command(state)), [state]);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: focus once, on open.
+  useEffect(() => {
+    items.current[0]?.focus();
+  }, []);
+
+  const onKeyDown = (event: KeyboardEvent) => {
+    const count = actions.length;
+    const at = items.current.indexOf(event.target as HTMLButtonElement);
+    const moves: Record<string, number> = {
+      ArrowDown: (at + 1) % count,
+      ArrowUp: (at - 1 + count) % count,
+      Home: 0,
+      End: count - 1,
+    };
+    const next = moves[event.key];
+    event.stopPropagation();
+    if (next !== undefined) {
+      event.preventDefault();
+      items.current[next]?.focus();
+    } else if (event.key === "Escape") {
+      event.preventDefault();
+      onClose(true);
+    } else if (event.key === "Tab") onClose(true);
+  };
+
+  return (
+    <div
+      role="menu"
+      aria-label={label}
+      className="foli-menu"
+      onKeyDown={onKeyDown}
+      onBlur={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) onClose(false);
+      }}
+    >
+      {actions.map((action, i) => {
+        const props = {
+          ref: (element: HTMLButtonElement | null) => {
+            items.current[i] = element;
+          },
+          type: "button" as const,
+          "aria-disabled": enabled[i] ? undefined : true,
+          tabIndex: -1,
+          className: "foli-menu-item",
+          onMouseDown: (event: MouseEvent) => event.preventDefault(),
+          onClick: (event: MouseEvent) => {
+            if (enabled[i]) onPick(action, event.detail > 0);
+          },
+        };
+        return action.checked ? (
+          <button
+            key={action.key}
+            {...props}
+            role="menuitemcheckbox"
+            aria-checked={action.checked(state)}
+          >
+            {action.label}
+          </button>
+        ) : (
+          <button key={action.key} {...props} role="menuitem">
+            {action.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/** Word's limits for a new table. */
+const MAX_TABLE_ROWS = 1000;
+const MAX_TABLE_COLUMNS = 63;
+
+/**
+ * The insert table dialog: rows and columns (whole numbers within Word's limits; an invalid one
+ * is marked and announced), Insert and Cancel; Escape cancels.
+ */
+function InsertTableDialog({
+  editor,
+  request,
+  onClose,
+}: {
+  editor: Editor;
+  /** Counts the open requests: each one focuses the first field. */
+  request: number;
+  /** `inserted`: a table was inserted (the focus may go to the document). */
+  onClose: (inserted: boolean) => void;
+}) {
+  const [rows, setRows] = useState("2");
+  const [columns, setColumns] = useState("3");
+  // What is wrong: a field out of range, or the place (the caret is not in a paragraph).
+  const [error, setError] = useState<"rows" | "columns" | "place" | null>(null);
+  const rowsField = useRef<HTMLInputElement>(null);
+  const columnsField = useRef<HTMLInputElement>(null);
+  const id = useId();
+  // biome-ignore lint/correctness/useExhaustiveDependencies: each request focuses the field again.
+  useEffect(() => {
+    rowsField.current?.focus();
+    rowsField.current?.select();
+  }, [request]);
+
+  const parse = (value: string, max: number) => {
+    const n = Number(value);
+    return Number.isInteger(n) && n >= 1 && n <= max ? n : null;
+  };
+  const insert = (event: FormEvent) => {
+    event.preventDefault();
+    const r = parse(rows, MAX_TABLE_ROWS);
+    const c = parse(columns, MAX_TABLE_COLUMNS);
+    const wrong = r === null ? "rows" : c === null ? "columns" : null;
+    if (!wrong && editor.run(insertTable(r as number, c as number))) {
+      onClose(true);
+      return;
+    }
+    setError(wrong ?? "place");
+    (wrong === "columns" ? columnsField : rowsField).current?.focus();
+  };
+  const messages = {
+    rows: `Enter a number of rows from 1 to ${MAX_TABLE_ROWS}.`,
+    columns: `Enter a number of columns from 1 to ${MAX_TABLE_COLUMNS}.`,
+    place: "A table cannot be inserted here: put the caret in a paragraph.",
+  };
+  const field = (
+    name: "rows" | "columns",
+    label: string,
+    value: string,
+    set: (value: string) => void,
+    max: number,
+    ref: typeof rowsField,
+  ) => (
+    <>
+      <label htmlFor={`${id}-${name}`}>{label}</label>
+      <input
+        ref={ref}
+        id={`${id}-${name}`}
+        type="number"
+        min={1}
+        max={max}
+        step={1}
+        value={value}
+        aria-invalid={error === name || undefined}
+        aria-describedby={error === name ? `${id}-error` : undefined}
+        onChange={(event) => {
+          set(event.target.value);
+          setError(null);
+        }}
+      />
+    </>
+  );
+
+  return (
+    <div
+      role="dialog"
+      aria-label="Insert table"
+      className="foli-link-dialog foli-table-dialog"
+      onKeyDown={(event) => {
+        if (event.key !== "Escape") return;
+        event.preventDefault();
+        onClose(false);
+      }}
+    >
+      <form onSubmit={insert} noValidate>
+        {field("rows", "Rows", rows, setRows, MAX_TABLE_ROWS, rowsField)}
+        {field("columns", "Columns", columns, setColumns, MAX_TABLE_COLUMNS, columnsField)}
+        <button type="submit">Insert</button>
+        <button type="button" onClick={() => onClose(false)}>
+          Cancel
+        </button>
+        {error && (
+          <p id={`${id}-error`} className="foli-link-error" role="alert">
+            {messages[error]}
           </p>
         )}
       </form>

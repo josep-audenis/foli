@@ -162,7 +162,7 @@
   cursor: pointer;
 }
 
-.foli-menu-item:hover,
+.foli-menu-item:not([aria-disabled="true"]):hover,
 .foli-menu-item:focus-visible {
   background: var(--foli-toolbar-hover);
 }
@@ -170,6 +170,27 @@
 .foli-menu-item:focus-visible {
   outline: 2px solid var(--foli-focus-ring);
   outline-offset: -2px;
+}
+
+/* An item that cannot apply here (the table menu's): shown, focusable, dimmed. */
+.foli-menu-item[aria-disabled="true"] {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* The table menu's checkbox item: a check before it when on. */
+.foli-menu-item[role="menuitemcheckbox"]::before {
+  content: "";
+  width: 1em;
+}
+
+.foli-menu-item[role="menuitemcheckbox"][aria-checked="true"]::before {
+  /* No accessible name of its own: the item's checked state says it. */
+  content: "\2713" / "";
+}
+
+.foli-table-dialog input {
+  flex: 0 0 5em;
 }
 
 .foli-menu-swatch {

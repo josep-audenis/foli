@@ -81,7 +81,8 @@ list (pressed inside one), decrease and increase indent (list levels, else half-
 New comment (with `comments`: on the selection, written in the pane), Track changes (pressed while on), Show changes as (All markup, Simple markup, No markup),
 previous and next change, Accept, Reject (the change at the caret or the selected ones),
 Accept all, Reject all ·
-undo, redo · page break. A pointer pick in a box calls `onClickCommand`, like a button click.
+undo, redo · Table (a menu), Table style (a box of the document's table styles and Word's Table
+Grid), Shading (a menu of light cell fills; both in a table, not while tracking) · page break. A pointer pick in a box calls `onClickCommand`, like a button click.
 Up and Down on a closed box apply each value they pass (Chrome and Firefox on Windows), one
 undo step each. Text color and highlight are menu buttons (WAI-ARIA menu, `menuitemradio`
 items) with a fixed palette (Word's highlight colors), the current color checked; arrow keys,
@@ -98,6 +99,18 @@ The URL is normalized (`normalizeHref`) and validated: an unsafe one is not appl
 gets `aria-invalid` and an announced message. Closing returns the focus where it was (the
 document, or the button). The toolbar opens the dialog for any `openLinkEditor` request, so
 Mod-K needs a `FoliToolbar` for the editor; none opens while it is `disabled`.
+
+Table is a menu button (WAI-ARIA menu: `menuitem` items, "Repeat as header row" a
+`menuitemcheckbox` checked when the selection's rows are header rows): Insert table…, insert row
+above or below, insert column left or right, delete rows, columns or the table, merge cells,
+split cell. An item that cannot apply at the selection is `aria-disabled` (still focusable);
+arrow keys, Home and End move, Enter runs, Escape closes back to the button. Insert table… opens
+a dialog under the toolbar (`.foli-table-dialog`, `role="dialog"`, "Insert table"): Rows (1 to
+1000) and Columns (1 to 63), Insert (Enter), Cancel (Escape). A number out of range marks its
+field (`aria-invalid`) with an announced message, as does a caret where no table can go. Insert
+closes it and calls `onClickCommand` (the focus goes to the document, where the table is);
+Cancel returns the focus to the Table button. A change to the document or the selection closes
+it, and only one of the link and insert table dialogs is open at a time.
 
 | Prop             | Type         | Default        | Notes                                                               |
 | ---------------- | ------------ | -------------- | ------------------------------------------------------------------- |
