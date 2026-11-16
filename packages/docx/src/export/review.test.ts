@@ -176,7 +176,7 @@ describe("verbatim content must fit the part", () => {
       content: { type: "doc", content },
     });
   const cases: [NodeJSON[], RegExp][] = [
-    // Pictures are not exported yet (10.8): refused, never dropped.
+    // A picture whose image the document does not describe: refused, never dropped.
     [
       [
         {
@@ -184,7 +184,7 @@ describe("verbatim content must fit the part", () => {
           content: [{ type: "picture", attrs: { resource: "r", width: 1, height: 1 } }],
         },
       ],
-      /A picture cannot be exported to .docx yet/,
+      /not in the document's resources/,
     ],
     [[{ type: "opaqueBlock", attrs: { xml: "<w:p>" } }], /does not fit the part/],
     [[{ type: "opaqueBlock", attrs: { xml: "<w:p/><w:p/>" } }], /exactly one element/],

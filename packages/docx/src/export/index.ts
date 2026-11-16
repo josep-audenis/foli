@@ -5,7 +5,7 @@
  * byte for byte. Without a package, a new one is made.
  */
 
-import { type FoliDocument, parseDocument } from "@folijs/core";
+import { type FoliDocument, parseDocument, type ResourceJSON } from "@folijs/core";
 import { child, REL } from "../import/ooxml.js";
 import { DocxError, type DocxPackage, type NewPart } from "../package.js";
 import { newSettingsXml, withTrackRevisions } from "../settings.js";
@@ -18,6 +18,7 @@ import {
   type OriginalPart,
   stylesXml,
 } from "./parts.js";
+import { drawingXml, Media, pictureBytes } from "./pictures.js";
 import { sectionXml } from "./properties.js";
 import {
   DEFAULT_NAMESPACES,
@@ -56,6 +57,22 @@ class Relationships {
       if (r.type === REL.hyperlink && r.external) this.#byTarget.set(r.target, r.id);
   }
 
+  /** Whether the part has a relationship `id` (one it had, or one added). */
+  has(id: string): boolean {
+    return this.#ids.has(id);
+  }
+
+  /** The relationship to image part `target`: `current` when it is one, else a known or new one. */
+  image(target: string, current: string | undefined): string {
+    const own = current === undefined ? undefined : this.#existing.get(current);
+    if (own && own.type === REL_IMAGE && !own.external && own.target === target)
+      return current as string;
+    for (const [id, r] of this.#existing)
+      if (r.type === REL_IMAGE && !r.external && r.target === target) return id;
+    const added = this.added.find((r) => r.type === REL_IMAGE && r.target === target);
+    return added ? added.id : this.add(REL_IMAGE, target, false);
+  }
+
   hyperlink(href: string, id: string | undefined): string {
     const own = id === undefined ? undefined : this.#existing.get(id);
     if (own && own.type === REL.hyperlink && own.target === href) return id as string;
@@ -91,8 +108,27 @@ class Relationships {
   }
 }
 
-function contextFor(namespaces: Namespaces, relationships: Relationships): WriteContext {
-  return { namespaces, hyperlink: (href, id) => relationships.hyperlink(href, id) };
+const REL_IMAGE = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image";
+
+function contextFor(
+  namespaces: Namespaces,
+  relationships: Relationships,
+  media: Media,
+  source: string,
+): WriteContext {
+  return {
+    namespaces,
+    hyperlink: (href, id) => relationships.hyperlink(href, id),
+    picture: (attrs) =>
+      drawingXml(
+        attrs,
+        (current) =>
+          relationships.image(relative(source, media.part(String(attrs.resource))), current),
+        namespaces,
+        (id) => relationships.has(id),
+        media,
+      ),
+  };
 }
 
 /** `/word/_rels/document.xml.rels` for `/word/document.xml`. */
@@ -113,6 +149,14 @@ export interface ExportOptions {
    * original package has it (off in a new one).
    */
   trackRevisions?: boolean;
+  /**
+   * The bytes of a picture's image the package does not hold and its resource gives no `data:`
+   * URL for (an app's upload, by its URL). Undefined: the export fails, never drops it.
+   */
+  resource?: (
+    key: string,
+    resource: ResourceJSON,
+  ) => Promise<Uint8Array | undefined> | Uint8Array | undefined;
 }
 
 /**
@@ -125,7 +169,8 @@ export async function exportDocx(
   options: ExportOptions = {},
 ): Promise<Uint8Array> {
   const doc = withThreadIds(parseDocument(document), original);
-  return original ? intoPackage(doc, original, options) : newPackage(doc, options);
+  const media = new Media(doc, original, await pictureBytes(doc, original, options.resource));
+  return original ? intoPackage(doc, original, options, media) : newPackage(doc, options, media);
 }
 
 const PARA_ID = "w14:paraId";
@@ -192,6 +237,7 @@ async function intoPackage(
   doc: FoliDocument,
   pkg: DocxPackage,
   options: ExportOptions,
+  media: Media,
 ): Promise<Uint8Array> {
   const mainName = pkg.mainDocument;
   const main = pkg.xml(mainName);
@@ -199,7 +245,7 @@ async function intoPackage(
   if (!body) throw new DocxError(`${mainName}: no w:body`);
   const namespaces = namespacesOf(main.root, main.source);
   const rels = new Relationships(pkg.relationships(mainName));
-  const context = contextFor(namespaces, rels);
+  const context = contextFor(namespaces, rels, media, mainName);
 
   const content = blocksXml(doc.content.content ?? [], context) + bodySection(doc, namespaces);
   const documentXml =
@@ -277,7 +323,8 @@ async function intoPackage(
     REL.comments,
     "/word/comments.xml",
     CT.comments,
-    (o, ns) => commentsXml(doc, o, contextFor(ns, commentRels)),
+    (o, ns) =>
+      commentsXml(doc, o, contextFor(ns, commentRels, media, commentsName ?? "/word/comments.xml")),
     doc.comments.length > 0,
   );
   if (comments && commentRels.added.length) writeRelationships(comments, commentRels);
@@ -304,6 +351,7 @@ async function intoPackage(
   }
 
   if (rels.added.length) writeRelationships(mainName, rels);
+  add.push(...media.added);
   return pkg.write(replace, add);
 
   function writeRelationships(source: string, relationships: Relationships): void {
@@ -352,7 +400,11 @@ function changedThreads(doc: FoliDocument, pkg: DocxPackage): boolean {
 }
 
 /** A new package: content types, relationships, the document and the parts it needs. */
-async function newPackage(doc: FoliDocument, options: ExportOptions): Promise<Uint8Array> {
+async function newPackage(
+  doc: FoliDocument,
+  options: ExportOptions,
+  media: Media,
+): Promise<Uint8Array> {
   const reference = packageReference(doc);
   if (reference) {
     throw new DocxError(
@@ -360,7 +412,7 @@ async function newPackage(doc: FoliDocument, options: ExportOptions): Promise<Ui
     );
   }
   const rels = new Relationships([]);
-  const context = contextFor(DEFAULT_NAMESPACES, rels);
+  const context = contextFor(DEFAULT_NAMESPACES, rels, media, "/word/document.xml");
   const main = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\r\n<w:document ${NEW_ROOT_ATTRIBUTES}><w:body>${blocksXml(doc.content.content ?? [], context)}${bodySection(doc, DEFAULT_NAMESPACES)}</w:body></w:document>`;
   const parts: { name: string; text: string; contentType: string }[] = [
     { name: "/word/document.xml", text: main, contentType: CT.main },
@@ -384,7 +436,11 @@ async function newPackage(doc: FoliDocument, options: ExportOptions): Promise<Ui
       "/word/comments.xml",
       REL.comments,
       CT.comments,
-      commentsXml(doc, undefined, contextFor(DEFAULT_NAMESPACES, commentRels)),
+      commentsXml(
+        doc,
+        undefined,
+        contextFor(DEFAULT_NAMESPACES, commentRels, media, "/word/comments.xml"),
+      ),
     );
     if (commentRels.added.length)
       parts.push({
@@ -408,7 +464,7 @@ async function newPackage(doc: FoliDocument, options: ExportOptions): Promise<Ui
     text: rels.xml(undefined),
     contentType: CT.rels,
   });
-  const overrides = parts
+  const overrides = [...parts, ...media.added]
     .filter((p) => p.contentType !== CT.rels)
     .map((p) => `<Override PartName="${p.name}" ContentType="${p.contentType}"/>`)
     .join("");
@@ -425,6 +481,7 @@ async function newPackage(doc: FoliDocument, options: ExportOptions): Promise<Ui
   ];
   const entries = [];
   for (const [name, text] of files) entries.push(await deflateEntry(name, encoder.encode(text)));
+  for (const part of media.added) entries.push(await deflateEntry(part.name.slice(1), part.data));
   return writeZip(entries);
 }
 

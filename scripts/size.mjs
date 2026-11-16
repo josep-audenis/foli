@@ -60,13 +60,15 @@ writeFileSync(appEntry, `export { FoliEditor } from "${dist("react")}";\n`);
  * 10.7a (50.8 kB): table commands (insert a table, rows and columns) and Word's Table Grid style.
  * React raised in 10.7d (82.0 kB): the toolbar's table menu, insert table dialog, table style
  * box and shading menu, which bring core's table commands into an app with the toolbar.
+ * Docx raised in 10.8a (43.9 kB): inline pictures read and written (drawings patched in place,
+ * new drawings, media parts and their bytes).
  */
 const BUNDLES = [
   { name: "@folijs/core", entry: dist("core"), budget: 52_000 },
   { name: "@folijs/view", entry: dist("view"), budget: 60_000 },
   { name: "@folijs/react", entry: dist("react"), budget: 84_000 },
   { name: "FoliEditor only", entry: appEntry, budget: 84_000 },
-  { name: "@folijs/docx", entry: dist("docx"), budget: 42_000 },
+  { name: "@folijs/docx", entry: dist("docx"), budget: 45_000 },
 ];
 
 let failed = false;

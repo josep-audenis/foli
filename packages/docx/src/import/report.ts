@@ -15,6 +15,11 @@ export interface ImportReport {
    */
   readonly unmodeled: readonly string[];
   readonly unmodeledCount: number;
+  /**
+   * Pictures with no alt text that are not marked decorative: allowed (Word allows them), but a
+   * screen reader has nothing to say for them.
+   */
+  readonly picturesWithoutAlt: number;
 }
 
 export class Recorder {
@@ -23,6 +28,7 @@ export class Recorder {
   readonly #dropped = new Map<string, number>();
   readonly #unmodeled: string[] = [];
   #unmodeledCount = 0;
+  #withoutAlt = 0;
   /** The part being read, for messages. */
   part = "";
 
@@ -39,12 +45,17 @@ export class Recorder {
     if (this.#unmodeled.length < 100) this.#unmodeled.push(`${this.part}: ${element}: ${reason}`);
   }
 
+  withoutAlt(): void {
+    this.#withoutAlt++;
+  }
+
   report(): ImportReport {
     return {
       opaque: sorted(this.#opaque),
       dropped: sorted(this.#dropped),
       unmodeled: [...this.#unmodeled],
       unmodeledCount: this.#unmodeledCount,
+      picturesWithoutAlt: this.#withoutAlt,
     };
   }
 }

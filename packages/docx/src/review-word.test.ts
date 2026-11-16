@@ -28,7 +28,10 @@ const paragraphs = (d: FoliDocument) =>
   (d.content.content ?? [])
     .filter((b) => b.type === "paragraph")
     .map((p) =>
-      (p.content ?? []).some((n) => n.type === "opaqueInline") ? null : textOf(p).toLowerCase(),
+      // Word's text shows a picture as "/"; Foli's has none: such paragraphs are not compared.
+      (p.content ?? []).some((n) => n.type === "opaqueInline" || n.type === "picture")
+        ? null
+        : textOf(p).toLowerCase(),
     );
 
 /** Word's change types (WdRevisionType) of what Foli imported, with their authors. */

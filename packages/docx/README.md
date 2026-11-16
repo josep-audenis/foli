@@ -17,7 +17,7 @@ const {
 } = await importDocx(new Uint8Array(await file.arrayBuffer()));
 document.content; // paragraphs with Word's properties, runs as text with marks, tables
 document.styles; // with basedOn, run and paragraph properties
-report.opaque; // { "w:drawing": 1 }: kept verbatim, not editable yet
+report.opaque; // { "w:drawing": 1 }: a floating picture, kept verbatim, not editable yet
 ```
 
 **Import** (`importDocx`, `importPackage`) reads the main document, styles (with the document
@@ -114,6 +114,23 @@ included). Within the parts it writes:
   in order; Word reads every corpus table back with Foli's text, unchanged and edited
   (`scripts/corpus/table-roundtrip.mjs`). A changed table style is refused (`DocxError`) until
   table styles are written.
+- **Pictures** (10.8): a `w:drawing` holding one inline DrawingML picture (`wp:inline`,
+  `pic:pic`, its image an embedded `image/*` part) becomes a `picture` node: `resource` (the
+  image part's name, `word/media/image1.png`, a key of the envelope's `resources`, which give
+  its content type, size and part), its size in EMU (`wp:extent`), `alt` and `title`
+  (`wp:docPr`), `decorative` (Office's `adec:decorative`), and the drawing verbatim in `ext`
+  (cropping, effects, ids). A picture without alt text and not decorative is allowed and
+  counted (`report.picturesWithoutAlt`). Floating pictures (`wp:anchor`), linked images, charts,
+  shapes and other drawings stay opaque.
+- Pictures are written from their `ext` with only what the model changed written into it (the
+  extent and the picture's own size, alt text and title on `wp:docPr` and `pic:cNvPr`, the
+  image's relationship): an unchanged picture comes back byte for byte. One without `ext` (new)
+  is a fresh inline drawing with a new `wp:docPr` id. Its image is the package's part when the
+  resource names one there; otherwise a new media part (`word/media/foli-imageN.ext`, its
+  content type declared) with the bytes of the resource's `data:` URL or of
+  `ExportOptions.resource(key, resource)` (an app's upload); without bytes the export fails
+  (`DocxError`), never drops the picture. A drawing from another package that refers to other
+  relationships (an SVG's PNG fallback) is written fresh.
 - Not written: the theme (read-only in the model: the original part is kept; a new package has
   none, so Word's default applies). Page margins Word requires but the document leaves out are
   written with Word's defaults. A part read as UTF-16 is written as UTF-8, declared so.

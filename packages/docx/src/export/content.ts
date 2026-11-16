@@ -22,6 +22,8 @@ export interface WriteContext {
    * still has it with that target, otherwise a new one.
    */
   readonly hyperlink: (href: string, id: string | undefined) => string;
+  /** A picture's `w:drawing` (its image related to the part, its media part allocated). */
+  readonly picture: (attrs: Record<string, unknown>) => string;
 }
 
 type Json = Record<string, unknown>;
@@ -166,9 +168,15 @@ function hyperlinkXml(link: MarkJSON, inner: string, context: WriteContext): str
 /** Inline nodes that are a run's content (the rest stands between runs). */
 function inRun(node: NodeJSON): boolean {
   if (node.type === "opaqueInline") return node.attrs?.run === true;
-  return ["text", "tab", "hardBreak", "pageBreak", "columnBreak", "commentReference"].includes(
-    node.type,
-  );
+  return [
+    "text",
+    "tab",
+    "hardBreak",
+    "pageBreak",
+    "columnBreak",
+    "commentReference",
+    "picture",
+  ].includes(node.type);
 }
 
 const STRUCTURE = new Set(["link", "insertion", "deletion"]);
@@ -257,6 +265,8 @@ function runContentXml(node: NodeJSON, deleted: boolean, context: WriteContext):
       return `${el("w:commentReference", { "w:id": String(a.id) }).slice(0, -2)}${bagXml(a.attributes, context.namespaces, ["w:id"])}/>`;
     case "opaqueInline":
       return verbatim(a.xml, context);
+    case "picture":
+      return context.picture(a);
     default:
       return "";
   }

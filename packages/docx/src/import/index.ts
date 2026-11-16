@@ -1,4 +1,4 @@
-import { type FoliDocument, parseDocument, SCHEMA_VERSION } from "@folijs/core";
+import { type FoliDocument, parseDocument, type ResourceJSON, SCHEMA_VERSION } from "@folijs/core";
 import {
   DocxError,
   type DocxPackage,
@@ -56,6 +56,7 @@ export function importPackage(pkg: DocxPackage): DocxImport {
   const body = child(main.root, "body");
   if (!body) throw new DocxError(`${pkg.mainDocument}: no w:body`);
 
+  const resources = new Map<string, ResourceJSON>();
   const contextFor = (part: string, source: string): ContentContext => {
     report.part = part;
     // One lookup table per part: hyperlinks resolve in constant time.
@@ -64,7 +65,7 @@ export function importPackage(pkg: DocxPackage): DocxImport {
       byId ??= new Map(pkg.relationships(part).map((r) => [r.id, r]));
       return byId.get(id);
     };
-    return { source, report, pkg, part, moves: new Moves(), relationship };
+    return { source, report, pkg, part, moves: new Moves(), relationship, resources };
   };
   const related = (
     type: string,
@@ -119,6 +120,7 @@ export function importPackage(pkg: DocxPackage): DocxImport {
       numbering: numbered,
       ...(themed ? { theme: themed } : {}),
       comments: commented,
+      ...(resources.size ? { resources: Object.fromEntries(resources) } : {}),
       content: { type: "doc", content },
     });
   } catch (error) {

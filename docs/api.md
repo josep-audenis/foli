@@ -402,14 +402,16 @@ Details (what import keeps, what export writes, limits): the
 - `importDocx(bytes, options?): Promise<DocxImport>`: reads a `.docx` (`Uint8Array`) into a
   schema v3 document. `DocxImport`: `{ document, package, report, trackRevisions }`, the
   validated document, the package it was read from (keep it with the document for export),
-  `ImportReport` (`opaque`, `dropped`, `unmodeled`, `unmodeledCount`) and whether Word tracks
+  `ImportReport` (`opaque`, `dropped`, `unmodeled`, `unmodeledCount`, `picturesWithoutAlt`) and whether Word tracks
   changes in it (`w:trackRevisions`: the editor's `trackChanges`). `options` are `readPackage`'s.
 - `importPackage(pkg): DocxImport`: the same from a package already read.
 - `exportDocx(document, package?, options?): Promise<Uint8Array>`: the document as a `.docx`.
   With the package it was imported from, the parts Foli does not edit come back byte for byte
   and unchanged elements verbatim; without one, a new package is made (a document that refers
   to parts of its original package then fails). `ExportOptions`: `trackRevisions` (whether Word
-  tracks changes in the file; left out, as the package has it).
+  tracks changes in the file; left out, as the package has it), `resource(key, resource)` (the
+  bytes of a picture's image the package does not hold and no `data:` URL gives: an app's
+  upload; without them the export fails).
 - `readPackage(bytes, options?): Promise<DocxPackage>`: the zip, parts, content types and
   relationships (`ReadPackageOptions`: the zip limits `maxEntries` and `maxSize`, and
   `maxDepth`).

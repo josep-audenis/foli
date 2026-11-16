@@ -4,10 +4,11 @@
  * for markers that have nothing to show: field characters, range ends).
  */
 
-import { type MarkJSON, type NodeJSON, schema } from "@folijs/core";
+import { type MarkJSON, type NodeJSON, type ResourceJSON, schema } from "@folijs/core";
 import type { DocxPackage, Relationship } from "../package.js";
 import type { XmlElement, XmlNode } from "../xml.js";
 import { attr, child, deepText, integer, isW, R, REL, textOf, W } from "./ooxml.js";
+import { pictureAttrs } from "./pictures.js";
 import {
   attributeBag,
   type Context,
@@ -30,6 +31,8 @@ export interface ContentContext extends Context {
   readonly relationship: (id: string) => Relationship | undefined;
   /** How many tables the content is in. */
   readonly tableDepth?: number;
+  /** The envelope's resources (pictures' images), filled as content is read. */
+  readonly resources: Map<string, ResourceJSON>;
 }
 
 /** Tables nested deeper stay opaque: within the model's depth (three levels per table). */
@@ -496,6 +499,17 @@ function run(
       case "softHyphen":
         text("­");
         break;
+      case "drawing": {
+        const attrs = pictureAttrs(el, { ...context, partOf: (name) => context.pkg.part(name) });
+        const leaf = attrs && valid(node("picture", marks, attrs), el, context);
+        if (!leaf) {
+          opaqueRun(el);
+          break;
+        }
+        out.push(leaf);
+        if (!attrs.alt && !attrs.decorative) context.report.withoutAlt();
+        break;
+      }
       case "commentReference": {
         const bag = attributeBag(el, ["w:id"], context);
         const attrs: Record<string, unknown> = { id: integer(attr(el, "id")) };

@@ -1001,6 +1001,11 @@ Each task is a PR on `phase-10/tables-images`, the build green after each.
   package), shown in the line at their size, laid out on pages; insert from a file, paste or
   drop through the upload hook; resize with the aspect ratio kept; alt text required to insert
   and editable; tracked insertion and deletion of a picture.
+  (In progress. 10.8a, docx: inline pictures imported as `picture` nodes with their images as
+  resources (alt text missing counted), exported from their drawing with the model's changes
+  written in (unchanged: byte for byte), new ones as fresh drawings with media parts from the
+  package, a `data:` URL or the app. Next: the view draws them; inserting, pasting, resizing,
+  alt text.)
 - [ ] 10.9 Floating pictures, starting with a spike (lines laid out around an exclusion inside
   the editable host, three engines: ADR-0006's open risk): `wp:anchor` positions (relative to page, margin, column or
   paragraph), wrapping square and top-and-bottom with text flowing around them, behind and in
