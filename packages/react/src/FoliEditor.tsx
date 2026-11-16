@@ -8,8 +8,14 @@ import {
   wordContext,
 } from "@folijs/core";
 import { forwardRef, type ReactNode, useImperativeHandle, useRef } from "react";
-import { FoliEditorProvider, useFoliEditor, useIsomorphicLayoutEffect } from "./editor.js";
+import {
+  FoliEditorProvider,
+  useEditorState,
+  useFoliEditor,
+  useIsomorphicLayoutEffect,
+} from "./editor.js";
 import { FoliCanvas, type FoliCanvasHandle, type FoliCanvasProps } from "./FoliCanvas.js";
+import { FoliComments } from "./FoliComments.js";
 import { FoliToolbar } from "./FoliToolbar.js";
 
 /**
@@ -49,6 +55,11 @@ export interface FoliEditorProps extends Omit<FoliCanvasProps, "editor"> {
   onChange?: ((change: FoliChange) => void) | undefined;
   /** Show the default `FoliToolbar` above the pages (default true). */
   toolbar?: boolean | undefined;
+  /**
+   * Show the comments pane (`FoliComments`) beside the pages: `"auto"` (the default) while the
+   * document has comments, `true` always, `false` never.
+   */
+  comments?: boolean | "auto" | undefined;
   /** Rendered between the toolbar and the pages, inside the editor's context. */
   children?: ReactNode | undefined;
 }
@@ -72,12 +83,17 @@ export const FoliEditor = forwardRef<FoliEditorHandle, FoliEditorProps>(function
     reviewView,
     onChange,
     toolbar = true,
+    comments = "auto",
     children,
     ...canvas
   },
   ref,
 ) {
   const editor = useFoliEditor({ initialContent, plugins, author, trackChanges, reviewView });
+  const hasComments = useEditorState(
+    (state) => (wordContext(state)?.envelope.comments.length ?? 0) > 0,
+    { editor },
+  );
   const onChangeRef = useRef(onChange);
   const canvasRef = useRef<FoliCanvasHandle>(null);
 
@@ -119,7 +135,12 @@ export const FoliEditor = forwardRef<FoliEditorHandle, FoliEditorProps>(function
         />
       )}
       {children}
-      <FoliCanvas ref={canvasRef} editor={editor} {...canvas} />
+      <div className="foli-editor-body">
+        <FoliCanvas ref={canvasRef} editor={editor} {...canvas} />
+        {(comments === true || (comments === "auto" && hasComments)) && (
+          <FoliComments editor={editor} readOnly={canvas.readOnly} />
+        )}
+      </div>
     </FoliEditorProvider>
   );
 });

@@ -2,6 +2,7 @@ import {
   type Alignment,
   acceptAllChanges,
   acceptChange,
+  addComment,
   alignAt,
   type Command,
   canOutdent,
@@ -367,6 +368,13 @@ const GROUPS: Item[][] = [
     },
   ],
   [
+    {
+      key: "newComment",
+      label: "New comment on the selection",
+      text: "New comment",
+      enabled: (state) => wordContext(state) !== null && hasTextblock(state),
+      command: () => addComment(""),
+    },
     {
       key: "trackChanges",
       label: "Track changes",

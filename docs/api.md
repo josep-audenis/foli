@@ -31,6 +31,7 @@ model, with Word's toolbar): a 0.1.0 or 0.2.0 document given to it is migrated
 | `reviewView`     | `ReviewView`                   | `"markup"`   | Read once: how tracked changes show (the toolbar changes it).                                     |
 | `onChange`       | `(change: FoliChange) => void` | —            | After every content change made through transactions. Not for selection changes or `setDocument`. |
 | `toolbar`        | `boolean`                      | `true`       | Show `FoliToolbar` above the pages.                                                               |
+| `comments`       | `boolean \| "auto"`            | `"auto"`     | The comments pane beside the pages: while the document has comments (`"auto"`), always, never.    |
 | `readOnly`       | `boolean`                      | `false`      | Read, select, copy; no editing. Disables the toolbar.                                             |
 | `placeholder`    | `string`                       | `""`         | Shown while the document is empty.                                                                |
 | `label`          | `string`                       | `"Document"` | Accessible name of the editable area.                                                             |
@@ -57,13 +58,25 @@ The pages alone, for your own layout. Props: `editor` (default: the nearest
 `ref` → `FoliCanvasHandle`: `{ focus(): void }` (focuses the document, shows the editor's
 selection and scrolls it into view).
 
+### `<FoliComments>`
+
+The comments pane: the document's threads beside the pages, each level with its text and moved
+down below the one before when they would overlap; resolved threads dimmed. Reply, Edit (comments
+of plain text, a line per paragraph), Resolve/Reopen, Delete; a new empty comment (the toolbar's
+New comment) opens for writing (Ctrl/Cmd+Enter saves, Escape cancels; one left empty is
+deleted). Focusing a thread outlines its text; a caret in commented text marks its thread. Not
+printed. Props: `editor` (default: the nearest provider's), `readOnly` (no actions), `label`
+(default "Comments"), `className`. Render it beside the pages (`FoliEditor` does, in
+`.foli-editor-body`): it finds the commented text (`data-foli-comments` in the view) in the
+nearest ancestor that holds them.
+
 ### `<FoliToolbar>`
 
 Word's controls: paragraph style (with Word's Heading 1 to 3 when the document has not used
 them yet), font and size boxes · bold, italic, underline, strikethrough, link, text color,
 highlight · align left, center, align right, justify, line spacing · bulleted list, numbered
 list (pressed inside one), decrease and increase indent (list levels, else half-inch stops) ·
-Track changes (pressed while on), Show changes as (All markup, Simple markup, No markup),
+New comment (on the selection, written in the pane), Track changes (pressed while on), Show changes as (All markup, Simple markup, No markup),
 previous and next change, Accept, Reject (the change at the caret or the selected ones),
 Accept all, Reject all ·
 undo, redo · page break. A pointer pick in a box calls `onClickCommand`, like a button click.

@@ -44,13 +44,14 @@ writeFileSync(appEntry, `export { FoliEditor } from "${dist("react")}";\n`);
  * containers and toolbar removed. Core and React raised in 9.2 (36.2 and 57.3 kB): tracked
  * changes (the transaction rebuild, its plugin and commands). Raised again in 9.4 (38.2 and
  * 59.4 kB): formatting changes recorded (9.3), accepting and rejecting changes. Raised again in
- * 9.6 (40.0 and 61.9 kB): the review view and toolbar group (9.5), comment commands.
+ * 9.6 (40.0 and 61.9 kB): the review view and toolbar group (9.5), comment commands. React raised
+ * in 9.7 (63.7 kB): the comments pane.
  */
 const BUNDLES = [
   { name: "@folijs/core", entry: dist("core"), budget: 42_500 },
   { name: "@folijs/view", entry: dist("view"), budget: 47_600 },
-  { name: "@folijs/react", entry: dist("react"), budget: 65_000 },
-  { name: "FoliEditor only", entry: appEntry, budget: 65_000 },
+  { name: "@folijs/react", entry: dist("react"), budget: 68_000 },
+  { name: "FoliEditor only", entry: appEntry, budget: 68_000 },
   { name: "@folijs/docx", entry: dist("docx"), budget: 36_900 },
 ];
 

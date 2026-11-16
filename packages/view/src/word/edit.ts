@@ -177,7 +177,7 @@ export class WordRenderer {
       if (name === "commentEnd") comments.delete(child.attrs.id as number);
       const leafElement = (element: HTMLElement) => {
         leaves.push({ dom: element, offset, size: child.nodeSize });
-        fragmentAt(offset).append(this.#wrap(element, child.marks, comments.size > 0));
+        fragmentAt(offset).append(this.#wrap(element, child.marks, comments));
       };
       switch (name) {
         case "text":
@@ -198,7 +198,7 @@ export class WordRenderer {
           const tab = doc.createTextNode("\t");
           span.append(tab);
           leaves.push({ dom: tab, offset, size: 1 });
-          fragmentAt(offset).append(this.#wrap(span, child.marks, comments.size > 0));
+          fragmentAt(offset).append(this.#wrap(span, child.marks, comments));
           return;
         }
         case "opaqueInline": {
@@ -228,7 +228,7 @@ export class WordRenderer {
         leaves.push({ dom: leaf, offset: from, size: to - from });
         const span = this.#run(run, child.marks, line);
         span.append(leaf);
-        fragmentAt(from).append(this.#wrap(span, child.marks, comments.size > 0));
+        fragmentAt(from).append(this.#wrap(span, child.marks, comments));
         from = to;
       }
     });
@@ -281,9 +281,13 @@ export class WordRenderer {
   }
 
   /** Tracked changes and comment shading around a rendered run. */
-  #wrap(element: HTMLElement, marks: readonly Mark[], commented: boolean): HTMLElement {
-    if (commented && !this.#clipboard && !element.style.backgroundColor)
-      element.style.backgroundColor = "rgba(255, 213, 79, 0.35)";
+  #wrap(element: HTMLElement, marks: readonly Mark[], comments: ReadonlySet<number>): HTMLElement {
+    if (comments.size && !this.#clipboard) {
+      // The comments whose range holds this text: the comments pane finds and marks it.
+      element.dataset.foliComments = [...comments].join(" ");
+      if (!element.style.backgroundColor)
+        element.style.backgroundColor = "rgba(255, 213, 79, 0.35)";
+    }
     let outer = element;
     // Text inserted, then deleted, shows as deleted (in the deleting author's color).
     const change =

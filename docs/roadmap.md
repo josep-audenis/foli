@@ -851,11 +851,17 @@ Each task is a PR on `phase-9/review`, the build green after each.
   a reference from the start stays). Copy and paste with undo from 9.1. Headless tests; comments
   made in the editor come back from a new and from a corpus package with replies and resolved
   state (unit tests; Word in 9.8).
-- [ ] 9.7 Comments pane (`@folijs/view` and React): threads beside the pages aligned with their
-  anchors (pushed down when they overlap), the anchor highlighted when its comment has focus and
-  the reverse; reply, edit, resolve, delete from the pane; comment text edited as v3 paragraphs
-  in a small editor; resolved comments shown dimmed or hidden; keyboard-only use and focus order
-  between document and pane; print without the pane. Playwright in three engines; axe.
+- [x] 9.7 Comments pane: `FoliComments` (React; the view marks commented text with
+  `data-foli-comments`): threads beside the pages level with their text, pushed down when they
+  overlap; the focused thread's text outlined, the thread of a caret in commented text marked;
+  reply, edit, resolve, reopen, delete; resolved threads dimmed; a new empty comment (toolbar:
+  New comment) opens for writing, one left empty goes. `FoliEditor` shows it beside the pages
+  (`comments`: "auto" while there are comments). Keyboard: Escape then Tab from the document
+  into the pane, native buttons and text fields; not printed. Comments are edited as plain text
+  (a paragraph per line): a comment with formatting is not editable in the pane (its content
+  would be lost), only replied to, resolved or deleted. Playwright in three engines (made from
+  the toolbar and aligned with its text, reply, resolve, delete, undo, keyboard path, axe,
+  print); the editing page shows the pane.
 - [ ] 9.8 Word round trip in the harness: `word-reference.ps1` also reports revisions (type,
   author, text) and comments (text, author, parent, done) without accepting them; a script makes
   changes and comments in Foli on corpus documents, exports them, and checks Word opens them
