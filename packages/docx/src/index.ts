@@ -1,4 +1,4 @@
-export { exportDocx } from "./export/index.js";
+export { type ExportOptions, exportDocx } from "./export/index.js";
 export { type DocxImport, type ImportReport, importDocx, importPackage } from "./import/index.js";
 export {
   DocxError,

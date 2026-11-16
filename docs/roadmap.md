@@ -778,15 +778,20 @@ Each task is a PR on `phase-9/review`, the build green after each.
   it (`setComments` makes the steps; `withEnvelope` ignores comments); styles and numbering
   added on first use keep Word's behaviour (they stay after undo). Pasted comments go with undo
   (closes 8.7c's note).
-- [ ] 9.2 Recording insertions and deletions (`@folijs/core`, headless): track changes on/off in
-  editor state, author (and initials) from editor options, date per change; `w:trackRevisions`
-  read from and written to `settings.xml` (the part kept verbatim otherwise). Typing, paste,
-  Enter and hard breaks recorded as `insertion` (adjacent typing by the same author joins one
-  change); Backspace/Delete and replacing a selection mark text `deletion` instead of removing
-  it, while deleting one's own insertion removes it; joining paragraphs marks the paragraph mark
-  deleted (`revision`); comment anchors, opaque content and list markers handled as Word does;
-  ids unique in the document. Caret movement and word deletion skip deleted text in `final`.
-  Property test: accept all = untracked edits, reject all = original.
+- [x] 9.2 Recording insertions and deletions (`@folijs/core`, headless): tracking on/off and the
+  author in editor state (`createEditor({ author, trackChanges })`, `setTrackChanges`), a date
+  per change; the editor rebuilds each dispatched transaction from the ranges it replaced
+  (`trackTransaction`), so commands need no tracking code. Typing, paste, Enter and breaks
+  recorded as `insertion` (typing on joins the change next to it); Backspace/Delete and
+  replacing a selection mark text `deletion` (caret before what Backspace deleted, after what
+  Delete deleted), while deleting one's own insertion removes it; paragraph marks removed or
+  added recorded on the paragraph (`revision`), one's own inserted mark joined for real (the
+  last paragraph's mark kept); bookmarks and comment ranges not marked; blocks Foli does not
+  model kept in a tracked deletion (Phase 10); ids the document's next free one. Whether
+  tracking is on stays out of the document format: `@folijs/docx` reads and writes
+  `w:trackRevisions` (`DocxImport.trackRevisions`, `exportDocx(…, { trackRevisions })`).
+  Property test: accept all = the same edits untracked, reject all = the original, undo all =
+  exact. Changes made by Foli exported and imported back unchanged (unit test; Word in 9.8).
 - [ ] 9.3 Recording formatting changes: run formatting (bold, font, style…) records
   `formatChange` with the properties before the first change, paragraph properties (style,
   alignment, indentation, spacing, numbering) record the paragraph's `formatChange`; formatting
@@ -800,7 +805,8 @@ Each task is a PR on `phase-9/review`, the build green after each.
 - [ ] 9.5 Review in the editable view and React: `markup`, `simple` (changes shown by a bar in
   the margin) and `final` while editing (deleted text hidden but kept; selection and mapping
   across it), author colors, author and date on hover and to screen readers (`ins`/`del`
-  semantics); toolbar group: Track changes (pressed state), accept, reject (with menus for
+  semantics); Backspace, Delete and the arrows step over deleted text where it is hidden;
+  toolbar group: Track changes (pressed state), accept, reject (with menus for
   selection, all, by author), previous and next, view switch. Playwright in three engines:
   tracked typing and deletion, accept/reject, undo; axe on the toolbar and pages with changes.
 - [ ] 9.6 Comments in the engine: commands to add a comment on the selection (anchors and

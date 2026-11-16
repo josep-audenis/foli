@@ -32,6 +32,7 @@ import { removeLink, setLink } from "./links.js";
 import { liftListItem, listKeymap, sinkListItem, toggleList, wrapInList } from "./lists.js";
 import { TextSelection } from "./selection.js";
 import { type Command, EditorState, type Plugin, type Transaction } from "./state.js";
+import { setTrackChanges, trackPlugin, trackState, trackTransaction } from "./track.js";
 import { type WordEnvelope, wordContext, wordPlugin } from "./word.js";
 import type { ListKind } from "./wordformat.js";
 
@@ -46,6 +47,13 @@ export interface EditorOptions {
   document?: EditorDocument;
   /** Run before the built-in plugins, so their keymaps take precedence. */
   plugins?: readonly Plugin[];
+  /** Who edits: tracked changes are made in this name. Default "Author". */
+  author?: string;
+  /**
+   * Record edits as tracked changes from the start (a `.docx`'s `w:trackRevisions`:
+   * `DocxImport.trackRevisions`). Schema v3 only. Default false.
+   */
+  trackChanges?: boolean;
 }
 
 export type EditorListener = (state: EditorState, transactions: readonly Transaction[]) => void;
@@ -103,7 +111,11 @@ export interface Editor {
     setTextColor(color: string | null): boolean;
     /** Highlight (`#rrggbb`) of the selected or next typed text; null removes it. */
     setHighlight(color: string | null): boolean;
+    /** Turns tracked changes on or off (`author` changes who makes them). */
+    setTrackChanges(on: boolean, author?: string): boolean;
   };
+  /** Whether edits are recorded as tracked changes. */
+  readonly trackingChanges: boolean;
   isMarkActive(type: string): boolean;
   /** The current document (schema v3). */
   getDocument(): FoliDocument;
@@ -147,12 +159,16 @@ function load(document: EditorDocument): Loaded {
 export function createEditor({
   document = createDocument(),
   plugins = [],
+  author = "Author",
+  trackChanges = false,
 }: EditorOptions = {}): Editor {
   let loaded = load(document);
+  let track = { on: trackChanges, author };
   const pluginsFor = ({ envelope }: Loaded) => [
     ...plugins,
     history(),
     wordPlugin(envelope),
+    trackPlugin(track),
     listKeymap(),
     baseKeymap(),
   ];
@@ -163,7 +179,10 @@ export function createEditor({
     for (const listener of listeners) listener(state, transactions);
   };
   const dispatch = (tr: Transaction) => {
-    const result = state.applyTransaction(tr);
+    // With tracking on, the edit is rebuilt as tracked changes; one that cannot be is not made.
+    const tracked = trackTransaction(state, tr);
+    if (!tracked) return;
+    const result = state.applyTransaction(tracked);
     state = result.state;
     if (result.transactions.length) notify(result.transactions);
   };
@@ -214,6 +233,10 @@ export function createEditor({
       setAlign: (align) => run(setAlign(align)),
       setTextColor: (color) => run(setTextColor(color)),
       setHighlight: (color) => run(setHighlight(color)),
+      setTrackChanges: (on, name) => run(setTrackChanges(on, name)),
+    },
+    get trackingChanges() {
+      return trackState(state)?.on ?? false;
     },
     isMarkActive: (type) => isMarkActive(state, type),
     getDocument: () => ({
@@ -221,6 +244,7 @@ export function createEditor({
       content: state.doc.toJSON(),
     }),
     setDocument(next) {
+      track = trackState(state) ?? track;
       loaded = load(next);
       state = EditorState.create({ doc: loaded.doc, plugins: pluginsFor(loaded) });
       notify([]);

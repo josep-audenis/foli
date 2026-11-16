@@ -8,6 +8,7 @@
 import { type FoliDocument, parseDocument } from "@folijs/core";
 import { child, REL } from "../import/ooxml.js";
 import { DocxError, type DocxPackage, type NewPart } from "../package.js";
+import { newSettingsXml, withTrackRevisions } from "../settings.js";
 import { deflateEntry, writeZip } from "../zip.js";
 import { blocksXml, type WriteContext } from "./content.js";
 import {
@@ -33,6 +34,7 @@ const CT = {
   comments: "application/vnd.openxmlformats-officedocument.wordprocessingml.comments+xml",
   commentsExtended:
     "application/vnd.openxmlformats-officedocument.wordprocessingml.commentsExtended+xml",
+  settings: "application/vnd.openxmlformats-officedocument.wordprocessingml.settings+xml",
   rels: "application/vnd.openxmlformats-package.relationships+xml",
 };
 
@@ -105,6 +107,14 @@ function relative(from: string, to: string): string {
   return to.startsWith(folder) ? to.slice(folder.length) : to;
 }
 
+export interface ExportOptions {
+  /**
+   * Whether Word records edits as tracked changes (`w:trackRevisions`). Left out: as the
+   * original package has it (off in a new one).
+   */
+  trackRevisions?: boolean;
+}
+
 /**
  * The document as a `.docx`. With `original` (the package it was imported from), the parts
  * Foli does not edit come back byte for byte and unchanged elements verbatim.
@@ -112,9 +122,10 @@ function relative(from: string, to: string): string {
 export async function exportDocx(
   document: FoliDocument,
   original?: DocxPackage,
+  options: ExportOptions = {},
 ): Promise<Uint8Array> {
   const doc = withThreadIds(parseDocument(document), original);
-  return original ? intoPackage(doc, original) : newPackage(doc);
+  return original ? intoPackage(doc, original, options) : newPackage(doc, options);
 }
 
 const PARA_ID = "w14:paraId";
@@ -177,7 +188,11 @@ function withThreadIds(doc: FoliDocument, pkg: DocxPackage | undefined): FoliDoc
   return copy;
 }
 
-async function intoPackage(doc: FoliDocument, pkg: DocxPackage): Promise<Uint8Array> {
+async function intoPackage(
+  doc: FoliDocument,
+  pkg: DocxPackage,
+  options: ExportOptions,
+): Promise<Uint8Array> {
   const mainName = pkg.mainDocument;
   const main = pkg.xml(mainName);
   const body = child(main.root, "body");
@@ -277,6 +292,17 @@ async function intoPackage(doc: FoliDocument, pkg: DocxPackage): Promise<Uint8Ar
     );
   }
 
+  const { trackRevisions } = options;
+  if (trackRevisions !== undefined) {
+    part(
+      REL.settings,
+      "/word/settings.xml",
+      CT.settings,
+      (o) => (o ? withTrackRevisions(o.source, o.root, trackRevisions) : newSettingsXml()),
+      trackRevisions,
+    );
+  }
+
   if (rels.added.length) writeRelationships(mainName, rels);
   return pkg.write(replace, add);
 
@@ -326,7 +352,7 @@ function changedThreads(doc: FoliDocument, pkg: DocxPackage): boolean {
 }
 
 /** A new package: content types, relationships, the document and the parts it needs. */
-async function newPackage(doc: FoliDocument): Promise<Uint8Array> {
+async function newPackage(doc: FoliDocument, options: ExportOptions): Promise<Uint8Array> {
   const reference = packageReference(doc);
   if (reference) {
     throw new DocxError(
@@ -375,6 +401,8 @@ async function newPackage(doc: FoliDocument): Promise<Uint8Array> {
       );
     }
   }
+  if (options.trackRevisions)
+    add("/word/settings.xml", REL.settings, CT.settings, newSettingsXml());
   parts.push({
     name: "/word/_rels/document.xml.rels",
     text: rels.xml(undefined),

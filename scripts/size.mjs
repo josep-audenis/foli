@@ -41,13 +41,14 @@ writeFileSync(appEntry, `export { FoliEditor } from "${dist("react")}";\n`);
  * document, HTML through the v2 -> v3 migration). The view's share is mostly core's envelope
  * validation and migration, which `createEditor` already brings into an app. Set again in
  * 8.7d2 (33.8, 44.7 and 54.4 kB, about 4% headroom): v2's editing commands, renderer, list
- * containers and toolbar removed.
+ * containers and toolbar removed. Core and React raised in 9.2 (36.2 and 57.3 kB): tracked
+ * changes (the transaction rebuild, its plugin and commands).
  */
 const BUNDLES = [
-  { name: "@folijs/core", entry: dist("core"), budget: 36_000 },
+  { name: "@folijs/core", entry: dist("core"), budget: 38_000 },
   { name: "@folijs/view", entry: dist("view"), budget: 47_600 },
-  { name: "@folijs/react", entry: dist("react"), budget: 57_900 },
-  { name: "FoliEditor only", entry: appEntry, budget: 57_900 },
+  { name: "@folijs/react", entry: dist("react"), budget: 59_900 },
+  { name: "FoliEditor only", entry: appEntry, budget: 59_900 },
   { name: "@folijs/docx", entry: dist("docx"), budget: 36_900 },
 ];
 

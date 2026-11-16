@@ -17,6 +17,7 @@ export const REL = {
   comments: "http://schemas.openxmlformats.org/officeDocument/2006/relationships/comments",
   commentsExtended: "http://schemas.microsoft.com/office/2011/relationships/commentsExtended",
   hyperlink: "http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink",
+  settings: "http://schemas.openxmlformats.org/officeDocument/2006/relationships/settings",
 };
 
 /** Whether `node` is the WordprocessingML element `local`. */

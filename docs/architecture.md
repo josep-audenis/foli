@@ -438,6 +438,21 @@ unused (a choice; not checked against what Word does). Comments are not changed 
 removes one. It leaves the tree as it is, so history records it with the text it belongs to
 and undo and redo take it back.
 
+Tracked changes (9.2, `state/track.ts`) do not change the commands. With tracking on (a plugin
+state: on/off and the author), `createEditor`'s dispatch rebuilds each transaction from what
+it changed: the ranges its steps replaced, merged and compared before and after. Each range
+becomes a tracked deletion of the old content (a `deletion` mark on inline content, the
+paragraph's `revision.deletion` for a paragraph mark; one's own insertion removed for real,
+its paragraphs joined keeping the last one's mark) followed by the new content inserted with an
+`insertion` mark (inserted paragraph marks get `revision.insertion`). Steps that move nothing
+(marks, attributes, comments) are then replayed through a mapping from the transaction's
+document to the rebuilt one, except attribute changes of a paragraph the edit joined and the
+rebuilt document keeps apart. Paragraph revisions are set last, so a replayed attribute
+change does not drop them. History records the rebuilt steps; undo and redo are not tracked.
+A property test checks that "accept all" equals the same edits untracked and "reject all"
+the original. Whether tracking is on is not part of the document format: the editor option
+and the `.docx`'s `w:trackRevisions` (read and written by `@folijs/docx`) carry it.
+
 Lists: bullets reuse a plain definition of the document (not a numbering style's, nor one whose
 levels number headings) or add Word's (Symbol, Courier New, Wingdings bullets, half-inch levels);
 numbers start a new instance with a start override at 1, on a plain decimal definition or a new

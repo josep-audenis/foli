@@ -111,6 +111,13 @@ export class Transaction extends Transform {
     return this.meta.get(key);
   }
 
+  /** @internal Takes `other`'s metadata and time: a transaction rebuilt from it (tracking). */
+  copyMeta(other: Transaction): this {
+    for (const [key, value] of other.meta) this.meta.set(key, value);
+    this.time = other.time;
+    return this;
+  }
+
   get addToHistory(): boolean {
     return this.meta.get("addToHistory") !== false;
   }

@@ -57,10 +57,16 @@ from `commentsExtended`) and sections:
   between elements, and the empty paragraph given to an empty body or comment. Text is read as
   Word reads it: without `xml:space="preserve"`, whitespace at the ends of a `w:t` is not text.
 
-**Export** (`exportDocx(document, package?)`) writes the parts the editor owns (`document.xml`,
-`styles.xml`, `numbering.xml`, `comments.xml`, `commentsExtended.xml`, and relationships for new
-hyperlink targets) and copies every other part of the original package byte for byte (its
-compressed entry included). Within the parts it writes:
+**Settings.** Of `settings.xml` only `w:trackRevisions` is read (`DocxImport.trackRevisions`)
+and, when `exportDocx` is given `trackRevisions`, written: added in its place among the
+settings, or removed; the rest of the part is kept byte for byte. A new package gets a settings
+part only with tracking on.
+
+**Export** (`exportDocx(document, package?, options?)`) writes the parts the editor owns
+(`document.xml`, `styles.xml`, `numbering.xml`, `comments.xml`, `commentsExtended.xml`,
+relationships for new hyperlink targets, and `settings.xml` when `trackRevisions` changes it)
+and copies every other part of the original package byte for byte (its compressed entry
+included). Within the parts it writes:
 
 - An element read from the file comes back verbatim while its values are what import read from
   it (a paragraph's `w:pPr`, a run's `w:rPr`, a section, a style, a numbering level or
