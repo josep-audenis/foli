@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
 import type { MarkJSON, NodeJSON } from "../model/index.js";
-import type { FoliDocument, StyleJSON } from "../v3/document.js";
+import type { CommentJSON, FoliDocument, StyleJSON } from "../v3/document.js";
 import { createEditor } from "./editor.js";
 import { NodeSelection, TextSelection } from "./selection.js";
+import { CommentStep, setComments } from "./word.js";
 
 const STYLES: StyleJSON[] = [
   { id: "Normal", type: "paragraph", name: "Normal", isDefault: true, next: "Normal" },
@@ -497,5 +498,69 @@ describe("Backspace and Delete on a v3 document", () => {
     editor.commands.deleteForward();
     expect(blocks(editor)).toEqual([p({}, text("a")), p({}, text("b"))]);
     expect(editor.state.selection).toBeInstanceOf(TextSelection);
+  });
+});
+
+describe("comments in history", () => {
+  const comment = (id: number, value: string): CommentJSON => ({
+    id,
+    author: "A",
+    content: [p({}, text(value))],
+  });
+  const comments = (editor: ReturnType<typeof editorOf>) =>
+    editor.getDocument().comments.map((c) => [c.id, JSON.stringify(c.content)]);
+
+  it("adds, changes and removes comments as steps that undo and redo", () => {
+    const editor = createEditor({
+      document: { ...documentOf(p({}, text("a"))), comments: [comment(1, "x"), comment(3, "z")] },
+    });
+    const start = editor.getDocument().comments;
+    const target = [comment(2, "y"), comment(3, "z2"), comment(4, "w")];
+    const tr = setComments(editor.state.tr, start, target);
+    expect(tr.steps).toHaveLength(4);
+    expect(tr.steps.every((s) => s instanceof CommentStep)).toBe(true);
+    editor.dispatch(tr);
+    expect(editor.getDocument().comments).toEqual(target);
+    // The tree is the same: only the envelope changed.
+    expect(blocks(editor)).toEqual([p({}, text("a"))]);
+    editor.commands.undo();
+    expect(editor.getDocument().comments).toEqual(start);
+    editor.commands.redo();
+    expect(editor.getDocument().comments).toEqual(target);
+  });
+
+  it("puts a removed comment back in its place", () => {
+    const start = [comment(1, "x"), comment(2, "y"), comment(3, "z")];
+    const editor = createEditor({ document: { ...documentOf(p({})), comments: start } });
+    editor.dispatch(setComments(editor.state.tr, start, [start[0], start[2]] as CommentJSON[]));
+    expect(comments(editor).map(([id]) => id)).toEqual([1, 3]);
+    editor.commands.undo();
+    expect(editor.getDocument().comments).toEqual(start);
+  });
+
+  it("takes a comment out with the text typed in the same transaction", () => {
+    const editor = editorOf(p({}, text("a")));
+    editor.select(2);
+    const tr = editor.state.tr.insertText("b", 2);
+    editor.dispatch(setComments(tr, [], [comment(0, "note")]));
+    expect(comments(editor)).toHaveLength(1);
+    editor.commands.undo();
+    expect(blocks(editor)).toEqual([p({}, text("a"))]);
+    expect(editor.getDocument().comments).toEqual([]);
+  });
+
+  it("keeps a comment step when an unrecorded change comes between", () => {
+    const editor = editorOf(p({}, text("a")));
+    editor.dispatch(setComments(editor.state.tr, [], [comment(0, "note")]));
+    editor.dispatch(editor.state.tr.insertText("b", 1).setMeta("addToHistory", false));
+    editor.commands.undo();
+    expect(editor.getDocument().comments).toEqual([]);
+    expect(blocks(editor)).toEqual([p({}, text("ba"))]);
+  });
+
+  it("changes nothing when the comments are the same", () => {
+    const editor = editorOf(p({}));
+    const start = [comment(1, "x")];
+    expect(setComments(editor.state.tr, start, [comment(1, "x")]).steps).toHaveLength(0);
   });
 });

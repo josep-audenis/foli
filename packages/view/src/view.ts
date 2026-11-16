@@ -25,6 +25,7 @@ import {
   Selection,
   Slice,
   sectionSettings,
+  setComments,
   setLink,
   splitBlock,
   TextSelection,
@@ -1603,7 +1604,11 @@ export class EditorView {
       try {
         tr.deleteSelection();
         strategy(tr);
-        if (envelope && envelope !== wordContext(state)?.envelope) withEnvelope(tr, envelope);
+        const current = wordContext(state)?.envelope;
+        if (envelope && current && envelope !== current) {
+          withEnvelope(tr, envelope);
+          setComments(tr, current.comments, envelope.comments);
+        }
       } catch (error) {
         if (error instanceof TransformError) continue;
         throw error;

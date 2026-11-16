@@ -81,7 +81,14 @@ export {
   type PluginSpec,
   Transaction,
 } from "./state.js";
-export { type WordContext, type WordEnvelope, withEnvelope, wordContext } from "./word.js";
+export {
+  CommentStep,
+  setComments,
+  type WordContext,
+  type WordEnvelope,
+  withEnvelope,
+  wordContext,
+} from "./word.js";
 export {
   copiedDefinitions,
   fitPaste,

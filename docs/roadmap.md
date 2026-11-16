@@ -772,9 +772,11 @@ UI keyboard-only and axe-clean in three engines; 0.4.0 published.
 Each task is a PR on `phase-9/review`, the build green after each.
 
 - [x] Claim phase, branch `phase-9/review`
-- [ ] 9.1 Envelope changes in history: a step (or recorded inverse) for envelope edits, so a
-  transaction's comment additions and removals undo and redo with it; styles and numbering added on first use keep
-  Word's behaviour (they stay after undo). Pasted comments go with undo (closes 8.7c's note).
+- [x] 9.1 Comments in history: `CommentStep` adds, changes or removes one comment of the
+  envelope and leaves the tree as it is, so a transaction's comment changes undo and redo with
+  it (`setComments` makes the steps; `withEnvelope` ignores comments); styles and numbering
+  added on first use keep Word's behaviour (they stay after undo). Pasted comments go with undo
+  (closes 8.7c's note).
 - [ ] 9.2 Recording insertions and deletions (`@folijs/core`, headless): track changes on/off in
   editor state, author (and initials) from editor options, date per change; `w:trackRevisions`
   read from and written to `settings.xml` (the part kept verbatim otherwise). Typing, paste,

@@ -195,7 +195,10 @@ definitions (the Word 2013 to 2019 template's) the first time they are applied, 
   dropped) and returns
   `{ doc, envelope }`, the content fitted to the document and its envelope with what it added;
   `fitPastedV2(state, content)` does the same for schema v2 content (pasted HTML). Apply the
-  envelope with `withEnvelope(tr, envelope)`; `wordContext(state)` gives the current one.
+  envelope with `withEnvelope(tr, envelope)` and its comments with
+  `setComments(tr, current.comments, envelope.comments)` (`withEnvelope` ignores comments: they
+  change only through `CommentStep`s, which undo and redo take back); `wordContext(state)` gives
+  the current one.
 
 | Member                         | Notes                                                                                                                                                                                                                                                                                                                         |
 | ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
