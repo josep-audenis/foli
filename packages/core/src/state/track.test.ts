@@ -7,6 +7,7 @@ import { NodeSelection, TextSelection } from "./selection.js";
 
 const STYLES: StyleJSON[] = [
   { id: "Normal", type: "paragraph", name: "Normal", isDefault: true, next: "Normal" },
+  { id: "Heading1", type: "paragraph", name: "heading 1", basedOn: "Normal", next: "Normal" },
 ];
 
 const text = (value: string, marks?: MarkJSON[]): NodeJSON =>
@@ -260,6 +261,34 @@ describe("tracked changes", () => {
     ]);
   });
 
+  it("records Enter at the end of a heading so rejecting keeps the heading", () => {
+    const heading = { type: "paragraph", attrs: { style: "Heading1" }, content: [text("Head")] };
+    const editor = tracked(heading);
+    const before = editor.getDocument();
+    editor.select(5);
+    editor.commands.splitBlock();
+    // Enter then Backspace: the original, exactly.
+    editor.commands.deleteBackward();
+    expect(editor.getDocument()).toEqual(before);
+    editor.commands.splitBlock();
+    const [first, second] = blocks(editor);
+    expect(first?.attrs).toEqual({ style: "Heading1", revision: revision("insertion", 0) });
+    expect(second?.attrs).toMatchObject({
+      formatChange: { author: "Me", previous: { style: "Heading1" } },
+    });
+  });
+
+  it("leaves a paragraph's record on the mark when it is split", () => {
+    const editor = tracked(p(text("abcd")));
+    editor.select(2);
+    editor.commands.setAlign("center");
+    editor.select(3);
+    editor.commands.splitBlock();
+    const [first, second] = blocks(editor);
+    expect(first?.attrs?.formatChange ?? null).toBe(null);
+    expect(second?.attrs?.formatChange).toMatchObject({ id: 0, previous: {} });
+  });
+
   it("deletes everything as deleted text, keeping the last paragraph", () => {
     const editor = tracked(p(text("ab")), p(text("cd")));
     editor.commands.selectAll();
@@ -307,8 +336,8 @@ function project(doc: Node, accept: boolean): string[] {
     // the original mark's paragraph, the last one.
     const head = accept ? (first as Node) : block;
     const change = head.attrs.formatChange as { previous: Record<string, unknown> } | null;
-    const just = (!accept && change ? change.previous : head.attrs).justification;
-    out.push((just ? `[${just}]` : "") + current);
+    const { justification: just, style } = !accept && change ? change.previous : head.attrs;
+    out.push((style ? `(${style})` : "") + (just ? `[${just}]` : "") + current);
     current = "";
     first = null;
   });
@@ -318,13 +347,17 @@ function project(doc: Node, accept: boolean): string[] {
 
 /** A paragraph from `project`'s form. */
 function parse(line: string): NodeJSON {
-  const match = /^(?:\[(\w+)\])?(.*)$/.exec(line) as RegExpExecArray;
+  const match = /^(?:\((\w+)\))?(?:\[(\w+)\])?(.*)$/.exec(line) as RegExpExecArray;
   const content: NodeJSON[] = [];
-  for (const [, c, bold] of (match[2] ?? "").matchAll(/(.)(\*?)/gu))
+  for (const [, c, bold] of (match[3] ?? "").matchAll(/(.)(\*?)/gu))
     content.push(text(c as string, bold ? [{ type: "bold" }] : undefined));
+  const attrs = {
+    ...(match[1] ? { style: match[1] } : {}),
+    ...(match[2] ? { justification: match[2] } : {}),
+  };
   return {
     type: "paragraph",
-    ...(match[1] ? { attrs: { justification: match[1] } } : {}),
+    ...(Object.keys(attrs).length ? { attrs } : {}),
     ...(content.length ? { content } : {}),
   };
 }
@@ -408,7 +441,8 @@ function apply(editor: Editor, o: Op): void {
       editor.commands.deleteForward();
       break;
     case "enter":
-      select(left(k1));
+      // After deleted text: at the end of a paragraph whose text is deleted, as accepting shows it.
+      select(right(k1));
       editor.commands.splitBlock();
       break;
     case "bold":
@@ -443,15 +477,17 @@ function apply(editor: Editor, o: Op): void {
 }
 
 /**
- * Known: Enter in a paragraph after a deleted mark copies that paragraph's properties, not
- * those of the paragraph accepting makes (the first one's). Such an Enter is left out.
+ * Known: Enter in a paragraph next to a deleted mark (one that accepting joins) splits that
+ * paragraph as it is (its properties, its end), not the paragraph accepting makes. Such an
+ * Enter is left out.
  */
 function knownDifference(doc: Node, o: Op): boolean {
   if (o.kind !== "enter") return false;
   const k = Math.min(Math.round(o.a * units(doc)), Math.round(o.b * units(doc)));
-  const index = doc.resolve(leftmost(doc, k)).index(0);
-  const prev = index > 0 ? doc.child(index - 1) : null;
-  return !!(prev?.attrs.revision as { deletion?: unknown } | null)?.deletion;
+  const index = doc.resolve(rightmost(doc, k)).index(0);
+  const deleted = (i: number) =>
+    i >= 0 && !!(doc.child(i).attrs.revision as { deletion?: unknown } | null)?.deletion;
+  return deleted(index - 1) || deleted(index);
 }
 
 describe("tracked changes (property)", () => {
@@ -459,9 +495,14 @@ describe("tracked changes (property)", () => {
     const paragraphs = fc.array(fc.stringMatching(/^[a-d]{0,5}$/), { minLength: 1, maxLength: 4 });
     fc.assert(
       fc.property(paragraphs, fc.array(op, { minLength: 1, maxLength: 8 }), (texts, ops) => {
-        const content = texts.map((t) => (t ? p(text(t)) : p()));
+        // A paragraph with "a" first is a heading (its next style differs).
+        const content = texts.map((t) => ({
+          ...(t ? p(text(t)) : p()),
+          ...(t.startsWith("a") ? { attrs: { style: "Heading1" } } : {}),
+        }));
         const editor = tracked(...content);
         const original = editor.getDocument();
+        const start = editor.state.doc;
         for (const o of ops) {
           if (knownDifference(editor.state.doc, o)) continue;
           const mirror = createEditor({
@@ -470,7 +511,7 @@ describe("tracked changes (property)", () => {
           apply(editor, o);
           apply(mirror, o);
           expect(project(editor.state.doc, true)).toEqual(project(mirror.state.doc, true));
-          expect(project(editor.state.doc, false)).toEqual(texts);
+          expect(project(editor.state.doc, false)).toEqual(project(start, true));
         }
         while (editor.commands.undo()) {}
         expect(editor.getDocument()).toEqual(original);

@@ -89,12 +89,10 @@ describe("w:trackRevisions", () => {
     expect(again.document.content.content?.[0]?.attrs?.formatChange).toMatchObject({
       author: "Reviewer",
     });
-    // The same text and changes (the verbatim XML Foli keeps is the new file's).
+    // The same text and changes; only the verbatim XML Foli keeps is the new file's.
     const review = (d: { content: { content?: unknown[] } }) =>
-      JSON.stringify(
-        (d.content.content?.[0] as { content?: unknown[] } | undefined)?.content,
-        (key, value) =>
-          key === "attrs" && value?.xml ? undefined : key === "previous" ? value.length : value,
+      JSON.stringify(d.content.content?.[0], (key, value) =>
+        key === "ext" || (key === "attrs" && value?.xml) ? undefined : value,
       );
     expect(review(again.document)).toEqual(review(editor.getDocument()));
   });

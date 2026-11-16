@@ -801,11 +801,15 @@ Each task is a PR on `phase-9/review`, the build green after each.
   (style, alignment, indentation, spacing, numbering) the paragraph's `formatChange`; later
   changes keep the record; one's own inserted text and paragraphs record nothing. A join that
   removes one's own inserted mark keeps the first paragraph's properties (as untracked) and
-  records the last one's as its formatting change. The paragraph mark's look (`markFormat`) is
+  records the last one's as its formatting change (one's own record of properties back as they
+  were is dropped: Enter then Backspace leaves the original). A split's open end keeps the
+  original mark with the inserted paragraph's properties (the next style after a heading):
+  recorded as that paragraph's formatting change, so rejecting keeps the heading. The paragraph
+  mark's look (`markFormat`) is
   not recorded. The property test adds bold, unbold and alignment: accept all = untracked,
-  reject all = the original's text, bold and alignment (6000 runs locally). Known: Enter in a
-  paragraph after a deleted mark copies that paragraph's properties, not those accepting gives
-  the joined paragraph (the first one's). Changes exported and imported back (unit test).
+  reject all = the original's text, style, bold and alignment, headings included (6000 runs
+  locally). Known: Enter in a paragraph next to a deleted mark splits that paragraph as it is,
+  not the paragraph accepting makes. Imported `w:rPrChange` properties are kept in canonical form. Changes exported and imported back (unit test).
 - [ ] 9.4 Accept and reject: commands for the change at the caret, the changes in the selection,
   all, and all by an author; next and previous change (selects it); paragraph mark revisions
   merge or keep paragraphs; a move's two ends accepted or rejected together; formatting changes

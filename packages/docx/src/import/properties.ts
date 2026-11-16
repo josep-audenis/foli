@@ -252,7 +252,10 @@ export function runProperties(rPr: XmlElement | undefined, context: Context): Ma
         break;
       case "rPrChange": {
         const { id, author, date } = revisionOf(el);
-        const previous = runProperties(child(el, "rPr"), context);
+        // In canonical form, as the editor records it (attributes left at their defaults out).
+        const previous = runProperties(child(el, "rPr"), context).map((m) =>
+          schema.markFromJSON(m).toJSON(),
+        );
         const change = { type: "formatChange", attrs: { id, author, date, previous } };
         marks.push(
           mark(change, el.name, context) ??
