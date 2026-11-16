@@ -18,6 +18,7 @@ import {
   setParagraph,
   sourceOf,
 } from "./properties.js";
+import { cellProperties, grid, rowProperties, tableProperties } from "./tables.js";
 
 export interface ContentContext extends Context {
   readonly pkg: DocxPackage;
@@ -27,7 +28,12 @@ export interface ContentContext extends Context {
   readonly moves: Moves;
   /** The part's relationship with this id (hyperlink targets). */
   readonly relationship: (id: string) => Relationship | undefined;
+  /** How many tables the content is in. */
+  readonly tableDepth?: number;
 }
+
+/** Tables nested deeper stay opaque: within the model's depth (three levels per table). */
+const MAX_TABLE_DEPTH = 64;
 
 /** Labels of the opaque elements that show something; anything else unknown shows its name. */
 const BLOCK_LABELS: Record<string, string | null> = {
@@ -97,19 +103,137 @@ export function blocks(
   section?: XmlElement,
 ): NodeJSON[] {
   const out: NodeJSON[] = [];
+  const tables = new Map<NodeJSON, XmlElement>();
   for (const node of nodes) {
     if (node.kind !== "element" || node === section) continue;
     if (isW(node, "p")) out.push(paragraph(node, context));
-    else if (node.ns === W && DROPPED.has(node.local)) context.report.dropped(node.name);
-    else {
-      context.report.opaque(node.name);
-      out.push({
-        type: "opaqueBlock",
-        attrs: withLabel({ xml: sourceOf(context, node) }, label(BLOCK_LABELS, node)),
-      });
-    }
+    else if (isW(node, "tbl")) {
+      // A table right after a table is one table to Word (it merges them): kept verbatim.
+      const table = out.at(-1)?.type === "table" ? undefined : tableOf(node, context);
+      if (table) tables.set(table, node);
+      out.push(table ?? opaqueOf(node, context));
+    } else if (node.ns === W && DROPPED.has(node.local)) context.report.dropped(node.name);
+    else out.push(opaqueOf(node, context));
   }
+  // Content does not end with a table (Word always puts a paragraph after one).
+  const last = out.at(-1);
+  const source = last && tables.get(last);
+  if (source) out[out.length - 1] = opaqueOf(source, context);
   return out;
+}
+
+function opaqueOf(node: XmlElement, context: ContentContext): NodeJSON {
+  context.report.opaque(node.name);
+  return {
+    type: "opaqueBlock",
+    attrs: withLabel({ xml: sourceOf(context, node) }, label(BLOCK_LABELS, node)),
+  };
+}
+
+/**
+ * `w:tbl` as a table; undefined when the model cannot hold it as it is (rows or cells inside a
+ * content control or custom XML, markers between rows, elements out of Word's order, a cell
+ * not ending with a paragraph, tables nested too deep): the caller keeps it verbatim.
+ */
+function tableOf(tbl: XmlElement, context: ContentContext): NodeJSON | undefined {
+  const tableDepth = (context.tableDepth ?? 0) + 1;
+  if (tableDepth > MAX_TABLE_DEPTH || tbl.attributes.length) return undefined;
+  const inner: ContentContext = { ...context, tableDepth };
+  let tblPr: XmlElement | undefined;
+  let tblGrid: XmlElement | undefined;
+  const rows: NodeJSON[] = [];
+  let stage = 0; // 0: w:tblPr may come, 1: w:tblGrid may come, 2: rows
+  for (const c of tbl.children) {
+    if (c.kind !== "element") continue;
+    if (stage === 0 && isW(c, "tblPr")) {
+      tblPr = c;
+      stage = 1;
+    } else if (stage <= 1 && isW(c, "tblGrid")) {
+      tblGrid = c;
+      stage = 2;
+    } else if (isW(c, "tr")) {
+      stage = 2;
+      const row = rowOf(c, inner);
+      if (!row) return undefined;
+      rows.push(row);
+    } else return undefined;
+  }
+  if (!rows.length) return undefined;
+  return {
+    type: "table",
+    attrs: {
+      ...tableProperties(tblPr, context, true),
+      grid: grid(tblGrid, context),
+      ...(tblGrid ? { gridExt: sourceOf(context, tblGrid) } : {}),
+    },
+    content: rows,
+  };
+}
+
+const ROW_ATTRS = schema.nodes.tableRow?.spec.attrs ?? {};
+
+function rowOf(tr: XmlElement, context: ContentContext): NodeJSON | undefined {
+  let tblPrEx: XmlElement | undefined;
+  let trPr: XmlElement | undefined;
+  const cells: NodeJSON[] = [];
+  let stage = 0; // 0: w:tblPrEx, 1: w:trPr, 2: cells
+  for (const c of tr.children) {
+    if (c.kind !== "element") continue;
+    if (stage === 0 && isW(c, "tblPrEx")) {
+      tblPrEx = c;
+      stage = 1;
+    } else if (stage <= 1 && isW(c, "trPr")) {
+      trPr = c;
+      stage = 2;
+    } else if (isW(c, "tc")) {
+      stage = 2;
+      const cell = cellOf(c, context);
+      if (!cell) return undefined;
+      cells.push(cell);
+    } else return undefined;
+  }
+  if (!cells.length) return undefined;
+  const attrs: Record<string, unknown> = rowProperties(trPr, context, true);
+  if (tblPrEx) {
+    const exceptions = tableProperties(tblPrEx, context, true);
+    // Not a row's to override (CT_TblPrEx): left in the element, not modeled.
+    for (const key of ["style", "rowBandSize", "columnBandSize"]) {
+      if (key in exceptions) {
+        context.report.unmodeled(tblPrEx.name, `${key} is not an exception (kept in the element)`);
+        delete exceptions[key];
+      }
+    }
+    const error = ROW_ATTRS.exceptions?.validate?.(exceptions);
+    // Its values are checked one by one: only a too-large element can fail here.
+    if (error) return undefined;
+    attrs.exceptions = exceptions;
+  }
+  const bag = attributeBag(tr, [], context);
+  if (bag) attrs.attributes = bag;
+  return { type: "tableRow", ...(Object.keys(attrs).length ? { attrs } : {}), content: cells };
+}
+
+function cellOf(tc: XmlElement, context: ContentContext): NodeJSON | undefined {
+  if (tc.attributes.length) return undefined;
+  const first = tc.children.find((c): c is XmlElement => c.kind === "element");
+  const tcPr = first && isW(first, "tcPr") ? first : undefined;
+  const content = blocks(
+    tc.children.filter((c) => c !== tcPr),
+    context,
+  );
+  if (content.at(-1)?.type !== "paragraph" || !content.every(allowedInCell)) return undefined;
+  const attrs = cellProperties(tcPr, context, true);
+  return { type: "tableCell", ...(Object.keys(attrs).length ? { attrs } : {}), content };
+}
+
+/**
+ * Whether a cell's block is one the model allows there: not a paragraph that ends a section or
+ * holds a page or column break. A table with one stays verbatim (lossless) instead.
+ */
+function allowedInCell(block: NodeJSON): boolean {
+  if (block.type !== "paragraph") return true;
+  if (block.attrs?.section) return false;
+  return !block.content?.some((n) => n.type === "pageBreak" || n.type === "columnBreak");
 }
 
 function withLabel(attrs: Record<string, unknown>, value: string | null): Record<string, unknown> {

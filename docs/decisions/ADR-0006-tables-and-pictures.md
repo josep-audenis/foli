@@ -64,7 +64,8 @@ Backspace, and reads a selection of several ranges back as a `CellSelection`.
   a paragraph; a paragraph in a cell carries no section break and no page or column break (refused
   when parsing, removed with a report when importing). (10.3: checked as "no table right after
   a table, none ending the body": a table followed by opaque content is accepted, as Word opens
-  it, and a body ending with an opaque block stays valid, as in v3.)
+  it, and a body ending with an opaque block stays valid, as in v3. 10.4: a table whose cell
+  has such a break stays an opaque block on import instead, so nothing is removed.)
 - **Properties.** `table` attrs from `w:tblPr` (style, width, alignment, indent, layout fixed or
   autofit, borders, cell margins, shading, `tblLook`), `grid` (`w:tblGrid` widths), `ext` (the
   `w:tblPr` verbatim, as paragraphs keep theirs); `tableRow` from `w:trPr` (height and rule,

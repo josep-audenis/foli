@@ -516,6 +516,26 @@ describe("Backspace and Delete on a v3 document", () => {
     expect(blocks(editor)).toEqual([p({}, text("a")), p({}, text("b"))]);
     expect(editor.state.selection).toBeInstanceOf(TextSelection);
   });
+
+  it("select a table beside the paragraph too, until tables are edited (10.6)", () => {
+    const grid = {
+      type: "table",
+      content: [
+        { type: "tableRow", content: [{ type: "tableCell", content: [p({}, text("c"))] }] },
+      ],
+    };
+    const editor = editorOf(p({}, text("a")), grid, p({}, text("b")));
+    const after = editor.state.doc.child(0).nodeSize + editor.state.doc.child(1).nodeSize + 1;
+    editor.select(after);
+    editor.commands.deleteBackward();
+    expect(editor.state.selection).toBeInstanceOf(NodeSelection);
+    expect((editor.state.selection as NodeSelection).node.type.name).toBe("table");
+    editor.select(2);
+    editor.commands.deleteForward();
+    expect((editor.state.selection as NodeSelection).node.type.name).toBe("table");
+    editor.commands.deleteForward();
+    expect(blocks(editor)).toEqual([p({}, text("a")), p({}, text("b"))]);
+  });
 });
 
 describe("comments in history", () => {

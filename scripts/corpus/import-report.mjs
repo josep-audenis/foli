@@ -15,8 +15,13 @@ for (const file of readdirSync(folder)
   .sort()) {
   try {
     const { document, report } = await importDocx(new Uint8Array(readFileSync(join(folder, file))));
-    const blocks = document.content.content ?? [];
-    const paragraphs = blocks.filter((b) => b.type === "paragraph").length;
+    // Every block, table cells included.
+    const count = { paragraph: 0, table: 0, opaqueBlock: 0 };
+    const walk = (node) => {
+      if (node.type in count) count[node.type]++;
+      if (node.type !== "paragraph") for (const child of node.content ?? []) walk(child);
+    };
+    walk(document.content);
     const total = (counts) => Object.values(counts).reduce((sum, n) => sum + n, 0);
     const list = (counts) =>
       Object.entries(counts)
@@ -24,7 +29,7 @@ for (const file of readdirSync(folder)
         .join(", ") || "none";
     console.log(`${file}`);
     console.log(
-      `  ${paragraphs} paragraphs, ${blocks.length - paragraphs} opaque blocks, ${document.styles.length} styles, ${document.numbering.instances.length} lists, ${document.comments.length} comments`,
+      `  ${count.paragraph} paragraphs, ${count.table} tables, ${count.opaqueBlock} opaque blocks, ${document.styles.length} styles, ${document.numbering.instances.length} lists, ${document.comments.length} comments`,
     );
     console.log(`  opaque (${total(report.opaque)}): ${list(report.opaque)}`);
     console.log(`  dropped (${total(report.dropped)}): ${list(report.dropped)}`);

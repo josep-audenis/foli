@@ -126,22 +126,28 @@ there (and UTC in `w16du:dateUtc`), so Word shows Foli's times shifted by the ti
 `scripts/corpus/import-report.mjs` (after `pnpm build`) imports each document and prints what
 became editable and what stayed opaque; counts and element names only, never text, so it runs
 on a private folder too (`node scripts/corpus/import-report.mjs <folder>`). On the corpus
-(2026-11-11; the same for 0.3.0 on 2026-11-16; 06 and 07 added 2026-11-16):
+(2026-11-16, after 10.4: tables are tables; paragraphs count those in table cells):
 
-| Document                       | Paragraphs | Opaque                                                        | Unmodeled values |
-| ------------------------------ | ---------: | ------------------------------------------------------------- | ---------------: |
-| 01-mutual-nda                  |         29 | table 1; field structure 4                                    |                0 |
-| 02-services-agreement-redlined |         16 | table 1; comment reference marks 4                            |                0 |
-| 03-offer-letter-template       |         14 | content controls 5, merge field 1; field structure 4          |                0 |
-| 04-board-report                |         35 | table 1, picture 1, footnote references 2; field structure 36 |                0 |
-| 05-business-letter             |         17 | none                                                          |                0 |
-| 06-price-schedule              |          4 | table 1                                                       |                0 |
-| 07-picture-report              |          7 | pictures 5                                                    |                0 |
+| Document                       | Paragraphs | Tables | Opaque                                               | Unmodeled values |
+| ------------------------------ | ---------: | -----: | ---------------------------------------------------- | ---------------: |
+| 01-mutual-nda                  |         37 |      1 | field structure 4                                    |                0 |
+| 02-services-agreement-redlined |         98 |      1 | comment reference marks 4                            |                0 |
+| 03-offer-letter-template       |         14 |      0 | content controls 5, merge field 1; field structure 4 |                0 |
+| 04-board-report                |         59 |      1 | picture 1, footnote references 2; field structure 36 |                0 |
+| 05-business-letter             |         17 |      0 | none                                                 |                0 |
+| 06-price-schedule              |        202 |      2 | none                                                 |                0 |
+| 07-picture-report              |          7 |      0 | pictures 5                                           |                0 |
 
 Field structure (`w:fldChar`, `w:instrText`) and comment reference marks have nothing to show:
 the field's result stays editable text. The tests check every imported paragraph's text against
-Word's (`reference/word/`).
+Word's (`reference/word/`), table cells included (a cell a vertical merge covers has none in
+Word's list: 06 counts 32 of them).
 
+`scripts/corpus/table-roundtrip.mjs` (10.4) has Word read Foli's tables back: every corpus
+document with a table exported unchanged and edited (a cell's text, a row kept from breaking, a
+cell shaded, a row deleted as a tracked change), then `word-reference.ps1` on them; `check`
+compares Word's pages and paragraphs, table cells included, with Foli's; it also has Word open a
+table made in the model, with and without a grid. All 10 pass (2026-11-16).
 ## Page agreement with Word
 
 `pnpm corpus:pages` (Playwright, Chromium) lays each document out with `renderDocument`

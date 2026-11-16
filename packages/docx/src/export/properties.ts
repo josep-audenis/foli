@@ -605,4 +605,4 @@ export function sectionXml(section: Json, ns: Namespaces): string {
   return `<w:sectPr${attributesOf(original)}>${children}</w:sectPr>`;
 }
 
-export { wrap };
+export { child as keptOrFresh, reading, wrap };

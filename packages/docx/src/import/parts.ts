@@ -15,6 +15,7 @@ import type { XmlElement } from "../xml.js";
 import { blocks, type ContentContext } from "./content.js";
 import { A, attr, child, compact, elements, integer, isW, toggle, W14, W15 } from "./ooxml.js";
 import { type Context, onOff, paragraphProperties, runProperties, sourceOf } from "./properties.js";
+import { tableStyleParts } from "./tables.js";
 
 const STYLE_TYPES = ["paragraph", "character", "table", "numbering"];
 /** Word's ids (`w:numId`, `w:abstractNumId`, comment ids): what the model holds. */
@@ -110,6 +111,17 @@ export function styleOf(el: XmlElement, context: Context): StyleJSON | undefined
   const props = stylePPr ? paragraphProperties(stylePPr, context, false) : {};
   const marks = runList(child(el, "rPr"), context);
   const name = attr(child(el, "name"), "val");
+  // shortcut: a `wholeTable` conditional format is kept in `ext`, not applied; read it if a
+  // real document's table style uses one.
+  const table =
+    type === "table"
+      ? tableStyleParts(
+          el,
+          context,
+          (pPr) => paragraphProperties(pPr, context, false),
+          (rPr) => runList(rPr, context),
+        )
+      : {};
   return compact({
     id: styleId,
     type: type as StyleJSON["type"],
@@ -120,6 +132,7 @@ export function styleOf(el: XmlElement, context: Context): StyleJSON | undefined
     isDefault: onOff(el, "default", context),
     paragraph: Object.keys(props).length ? props : undefined,
     run: marks.length ? marks : undefined,
+    ...table,
     ext: sourceOf(context, el),
   }) as StyleJSON;
 }

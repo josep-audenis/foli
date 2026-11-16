@@ -48,14 +48,16 @@ writeFileSync(appEntry, `export { FoliEditor } from "${dist("react")}";\n`);
  * in 9.7 (63.7 kB): the comments pane. All raised in 10.3 (core 43.9, view 50.0, React 68.4,
  * docx 37.5 kB): schema v4 (table, row, cell and picture nodes and their property checks,
  * table styles, resources, Word's table rules) and the table style resolution; view, React and
- * docx carry core's schema and validation.
+ * docx carry core's schema and validation. Docx, view and React raised in 10.4 (41.0, 50.8 and
+ * 69.3 kB): reading and writing tables and table styles; the view's read-only table from the
+ * model (with core's table style resolution).
  */
 const BUNDLES = [
   { name: "@folijs/core", entry: dist("core"), budget: 45_000 },
-  { name: "@folijs/view", entry: dist("view"), budget: 51_200 },
-  { name: "@folijs/react", entry: dist("react"), budget: 70_000 },
-  { name: "FoliEditor only", entry: appEntry, budget: 70_000 },
-  { name: "@folijs/docx", entry: dist("docx"), budget: 38_400 },
+  { name: "@folijs/view", entry: dist("view"), budget: 52_000 },
+  { name: "@folijs/react", entry: dist("react"), budget: 71_000 },
+  { name: "FoliEditor only", entry: appEntry, budget: 71_000 },
+  { name: "@folijs/docx", entry: dist("docx"), budget: 42_000 },
 ];
 
 let failed = false;

@@ -216,7 +216,8 @@ export const joinBackward: Command = (state, dispatch) => {
       // The merged paragraph ends with this one's mark (schema v3: its section break).
       keepLastMark(tr, boundary - before.nodeSize, $pos.parent);
     });
-  if (before.isLeaf && isOpaque(wordContext(state), before)) {
+  // A block sibling: an opaque block or (until 10.6) a table.
+  if (isOpaque(wordContext(state), before)) {
     dispatch?.(state.tr.setSelection(selectionAt(state, boundary - before.nodeSize)));
     return true;
   }
@@ -240,7 +241,7 @@ export const joinForward: Command = (state, dispatch) => {
       keepLastMark(tr, $pos.before(), after);
     });
   }
-  if (after.isLeaf && isOpaque(wordContext(state), after)) {
+  if (isOpaque(wordContext(state), after)) {
     dispatch?.(state.tr.setSelection(selectionAt(state, boundary)));
     return true;
   }

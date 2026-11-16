@@ -312,12 +312,17 @@ export function isMarker(context: WordContext | null, node: Node | null | undefi
   return context !== null && !!node && MARKERS.has(node.type.name);
 }
 
-/** Opaque content: deleted only once selected, as Word selects a field before deleting it. */
+/**
+ * Opaque content: deleted only once selected, as Word selects a field before deleting it.
+ * shortcut: a table too, until table editing (10.6) lets the caret into its cells.
+ */
 export function isOpaque(context: WordContext | null, node: Node | null | undefined): boolean {
   return (
     context !== null &&
     !!node &&
-    (node.type.name === "opaqueInline" || node.type.name === "opaqueBlock")
+    (node.type.name === "opaqueInline" ||
+      node.type.name === "opaqueBlock" ||
+      node.type.name === "table")
   );
 }
 
