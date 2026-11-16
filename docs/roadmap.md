@@ -837,11 +837,20 @@ Each task is a PR on `phase-9/review`, the build green after each.
   from the toolbar, undo; axe on the toolbar and pages with changes. Not yet: a deleted
   paragraph mark is not shown joined in `final`/`simple` while editing (the read-only renderer
   does join).
-- [ ] 9.6 Comments in the engine: commands to add a comment on the selection (anchors and
-  reference placed as Word places them), reply, edit a comment's text, resolve and reopen,
-  delete a comment (its anchors and its replies) and delete all; anchors kept through edits
-  (a range whose text is deleted keeps collapsed anchors, as Word does); copy and paste
-  (8.7c's rules) with undo. Headless tests.
+- [x] 9.6 Comments in the engine (#68, `state/comments.ts`): `addComment` on the selection (its range
+  around it, the reference mark after it, as Word places them; at a caret, a point), replies
+  (`replyToComment`: the starts together, then each end with its reference, as Word writes a
+  thread; a reply to a reply answers the thread), `editComment`, `resolveComment` (and reopen:
+  every comment of the thread, as Word), `deleteComment` (its replies and anchors),
+  `deleteAllComments` (comments anchored in verbatim content, a table, stay until Phase 10);
+  select-all comments the whole text; the selection stays on the commented text; initials cut to
+  Word's 9 characters; ids above those in verbatim content too; content as text lines or v3 blocks; the author from the editor. Not
+  tracked changes, each its own undo step. Anchors stay through edits (a range whose text is
+  deleted keeps collapsed anchors); a comment whose reference mark an edit removes goes with its
+  replies, in the same undo step (a tracked deletion keeps it until accepted; a comment without
+  a reference from the start stays). Copy and paste with undo from 9.1. Headless tests; comments
+  made in the editor come back from a new and from a corpus package with replies and resolved
+  state (unit tests; Word in 9.8).
 - [ ] 9.7 Comments pane (`@folijs/view` and React): threads beside the pages aligned with their
   anchors (pushed down when they overlap), the anchor highlighted when its comment has focus and
   the reverse; reply, edit, resolve, delete from the pane; comment text edited as v3 paragraphs

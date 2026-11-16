@@ -18,6 +18,17 @@ export {
   toggleMark,
 } from "./commands.js";
 export {
+  addComment,
+  type CommentContent,
+  type CommentOptions,
+  commentAnchors,
+  deleteAllComments,
+  deleteComment,
+  editComment,
+  replyToComment,
+  resolveComment,
+} from "./comments.js";
+export {
   createEditor,
   type Editor,
   type EditorDocument,

@@ -465,6 +465,13 @@ Accepting and rejecting (9.4, `state/review.ts`) work on the list `trackedChange
 changes first, then removals and joins from the end of the document, so earlier positions stay.
 They carry the `untracked` meta, so tracking leaves them as they are.
 
+Comments (9.6, `state/comments.ts`) are anchors in the text (`commentStart`, `commentEnd`, then
+`commentReference`, as Word writes them) and `CommentStep`s for their content, in untracked
+transactions that are undo steps of their own (`closeHistory` now keeps what follows from
+joining them too). A plugin's `appendTransaction` removes a comment, with
+its replies and remaining anchors, when an edit removed its reference mark; it scans only the
+ranges the edit replaced.
+
 Lists: bullets reuse a plain definition of the document (not a numbering style's, nor one whose
 levels number headings) or add Word's (Symbol, Courier New, Wingdings bullets, half-inch levels);
 numbers start a new instance with a start override at 1, on a plain decimal definition or a new

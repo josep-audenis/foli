@@ -189,6 +189,15 @@ text is hidden, not removed, so positions and editing are unchanged; the caret n
 it, next and previous change skip it. While tracking, and wherever it is hidden, Backspace and
 Delete step over deleted text.
 
+Comments (not tracked changes; each its own undo step): `editor.commands.addComment(content,
+{ author?, initials? })` comments the selection (its range around it, the reference mark after
+it; at a caret, a point; select-all, the whole text), `replyToComment(id, content, options?)`
+(a reply to a reply answers the thread), `editComment(id, content)`, `resolveComment(id, done =
+true)` (the whole thread), `deleteComment(id)`
+(its replies and anchors too), `deleteAllComments()`; the same as commands. `content` is text
+(a paragraph per line) or schema v3 blocks; the author defaults to the editor's. A comment whose
+reference mark an edit removes goes too, with its replies (a tracked deletion keeps it until
+accepted). `commentAnchors(doc)` gives each comment's range and reference positions.
 Accepting and rejecting (not tracked themselves; each its own undo step; undo takes them back):
 `editor.commands.acceptChange()` / `rejectChange()` (the changes at the caret, the paragraph's
 recorded formatting only when no other is there; in a selection, the selected part of each), `acceptAllChanges(author?)` / `rejectAllChanges(author?)`, `nextChange()` /

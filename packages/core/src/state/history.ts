@@ -33,7 +33,7 @@ const historyKey = new PluginKey<HistoryState>("history");
 /** Meta set on undo/redo transactions: which operation produced them. */
 const historyOp = "historyOp";
 
-/** Set this meta on a transaction to stop it merging into the previous undo event. */
+/** Set this meta on a transaction to make it an undo step of its own (no merging either side). */
 export const closeHistory = "closeHistory";
 
 const EMPTY: HistoryState = { done: [], undone: [], prevTime: 0, prevRanges: null };
@@ -99,7 +99,8 @@ export function history({ newGroupDelay = 500, depth = 100 }: HistoryOptions = {
         return {
           done: done.slice(-depth),
           undone: [],
-          prevTime: root ? hist.prevTime : tr.time,
+          // A closed change is a step of its own on both sides: what follows does not join it.
+          prevTime: root ? hist.prevTime : tr.getMeta(closeHistory) ? 0 : tr.time,
           prevRanges: root ? mapRanges(hist.prevRanges, tr.mapping) : changedRanges(tr),
         };
       },
