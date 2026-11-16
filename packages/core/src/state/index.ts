@@ -82,6 +82,13 @@ export {
   Transaction,
 } from "./state.js";
 export {
+  setTrackChanges,
+  type TrackState,
+  trackState,
+  trackTransaction,
+  untracked,
+} from "./track.js";
+export {
   CommentStep,
   setComments,
   type WordContext,

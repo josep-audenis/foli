@@ -142,7 +142,7 @@ Documents are schema v3, Word's model ([document-model.md](document-model.md)).
 
 ### Editor
 
-`createEditor({ document?, plugins? }): Editor`: a headless editor (state, commands, undo
+`createEditor({ document?, plugins?, author?, trackChanges? }): Editor`: a headless editor (state, commands, undo
 history, change notifications) of a schema v3 document (Word's model). The document is
 validated and, when saved by 0.1.0 or 0.2.0, migrated (`parseDocument`; default:
 `createDocument()`); `setDocument` behaves the same way. `EditorDocument` is what both take:
@@ -155,7 +155,20 @@ end of a paragraph whose style names a next style (a heading: Normal) starts tha
 small caps and hidden act on what the text shows (turning bold off in a bold heading writes
 "not bold"); Backspace and Delete step over bookmarks and comment ranges, and select a field,
 content control or table before deleting it; joining paragraphs keeps the second one's section
-break; typed text never takes a tracked-change mark.
+break; typed text never takes a tracked-change mark (except its own `insertion` when tracking).
+
+Tracked changes: `createEditor({ author?, trackChanges? })` (author default "Author"; tracking
+off by default; a `.docx`'s setting is `DocxImport.trackRevisions`). With tracking on, every
+edit the editor dispatches is rebuilt as Word records it (`trackTransaction(state, tr)`): what it
+removes stays with a `deletion` mark and what it adds gets an `insertion` mark (author, date,
+Word's next free id; typing on joins the change next to it); a paragraph mark removed or
+added is recorded on the paragraph (`revision.deletion` / `revision.insertion`); deleting one's
+own insertion removes it for real. The caret goes before what Backspace deleted, after what
+Delete deleted. Mark and attribute changes are not tracked yet (9.3). An edit that would delete
+or insert a block Foli does not model (a table) is not made while tracking (Phase 10). Undo and redo, transactions with
+`addToHistory: false` and those with the `untracked` meta are not tracked; an edit that cannot
+be recorded is not made. `editor.commands.setTrackChanges(on, author?)` (the
+`setTrackChanges` command), `editor.trackingChanges`, `trackState(state)` (`{ on, author }`).
 
 Word formatting (these do not apply to a state without a v3 envelope). Run properties,
 alignment and line spacing are written directly only where the styles do not already give the
@@ -306,14 +319,16 @@ Details (what import keeps, what export writes, limits): the
 [package README](../packages/docx/README.md).
 
 - `importDocx(bytes, options?): Promise<DocxImport>`: reads a `.docx` (`Uint8Array`) into a
-  schema v3 document. `DocxImport`: `{ document, package, report }`, the validated document,
-  the package it was read from (keep it with the document for export) and `ImportReport`
-  (`opaque`, `dropped`, `unmodeled`, `unmodeledCount`). `options` are `readPackage`'s.
+  schema v3 document. `DocxImport`: `{ document, package, report, trackRevisions }`, the
+  validated document, the package it was read from (keep it with the document for export),
+  `ImportReport` (`opaque`, `dropped`, `unmodeled`, `unmodeledCount`) and whether Word tracks
+  changes in it (`w:trackRevisions`: the editor's `trackChanges`). `options` are `readPackage`'s.
 - `importPackage(pkg): DocxImport`: the same from a package already read.
-- `exportDocx(document, package?): Promise<Uint8Array>`: the document as a `.docx`. With the
-  package it was imported from, the parts Foli does not edit come back byte for byte and
-  unchanged elements verbatim; without one, a new package is made (a document that refers to
-  parts of its original package then fails).
+- `exportDocx(document, package?, options?): Promise<Uint8Array>`: the document as a `.docx`.
+  With the package it was imported from, the parts Foli does not edit come back byte for byte
+  and unchanged elements verbatim; without one, a new package is made (a document that refers
+  to parts of its original package then fails). `ExportOptions`: `trackRevisions` (whether Word
+  tracks changes in the file; left out, as the package has it).
 - `readPackage(bytes, options?): Promise<DocxPackage>`: the zip, parts, content types and
   relationships (`ReadPackageOptions`: the zip limits `maxEntries` and `maxSize`, and
   `maxDepth`).

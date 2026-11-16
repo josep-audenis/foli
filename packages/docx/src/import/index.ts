@@ -6,6 +6,7 @@ import {
   type Relationship,
   readPackage,
 } from "../package.js";
+import { trackRevisionsOf } from "../settings.js";
 import type { XmlElement } from "../xml.js";
 import { blocks, type ContentContext, Moves } from "./content.js";
 import { child, isW, REL, W_STRICT } from "./ooxml.js";
@@ -22,6 +23,11 @@ export interface DocxImport {
    */
   readonly package: DocxPackage;
   readonly report: ImportReport;
+  /**
+   * Whether Word records edits to it as tracked changes (`w:trackRevisions` in its settings):
+   * pass it to the editor (`trackChanges`), and back to `exportDocx` when it changes.
+   */
+  readonly trackRevisions: boolean;
 }
 
 /** Reads a `.docx` into schema v3, keeping its package for export. */
@@ -120,7 +126,14 @@ export function importPackage(pkg: DocxPackage): DocxImport {
     // element over 16 MiB kept verbatim…). A DocxError like every other import failure.
     throw new DocxError(`Cannot import: ${(error as Error).message}`, { cause: error });
   }
-  return { document, package: pkg, report: report.report() };
+  // A settings part Foli cannot read is kept as it is, and tracking taken as off.
+  let trackRevisions = false;
+  try {
+    trackRevisions = trackRevisionsOf(related(REL.settings)?.root);
+  } catch (error) {
+    if (!(error instanceof DocxError)) throw error;
+  }
+  return { document, package: pkg, report: report.report(), trackRevisions };
 }
 
 export type { ImportReport } from "./report.js";
