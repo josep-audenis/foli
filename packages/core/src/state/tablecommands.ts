@@ -332,8 +332,14 @@ export function insertColumn(dir: -1 | 1): Command {
         : before;
       if (at < before)
         return row.type.create({ ...row.attrs, gridBefore: before + 1 }, row.content);
-      // A row ending before the new column: as it is (Word leaves short rows short).
-      if (at > end) return row;
+      // Past the row's cells: its empty columns after them widen where they reach the new
+      // column's place; a row ending before it stays short (as Word leaves it).
+      if (at > end) {
+        const after = (row.attrs.gridAfter as number | null) ?? 0;
+        return at > end + after
+          ? row
+          : row.type.create({ ...row.attrs, gridAfter: after + 1 }, row.content);
+      }
       const out: Node[] = [];
       // The neighbour on the selection's side: the cell starting at the boundary (left) or
       // ending at it (right).
