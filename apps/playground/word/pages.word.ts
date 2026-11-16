@@ -114,6 +114,8 @@ interface Result {
   sameLine: number;
   /** On Word's page, at most one line from Word's. */
   nearLine: number;
+  /** Paragraphs in table cells: compared, and on Word's page. */
+  cells: [number, number];
   pages: [number, number];
   /** Against Word's PDF: each page's ink agreement, on the page and inside the margins. */
   pdf?: PdfResult;
@@ -249,6 +251,24 @@ for (const name of names) {
           `page ${foli} line ${line} (Word ${word.page}, ${word.line}): ${word.text.slice(0, 50)}`,
         );
     }
+    // Paragraphs in table cells: on Word's page (Word's line in a cell is not a page line).
+    const wordCells = reference.paragraphs.filter((p) => p.inTable);
+    const foliCells = shown.filter((s) => s.type === "cell");
+    let cellAt = 0;
+    let cellsCompared = 0;
+    let cellsAgreed = 0;
+    for (const word of wordCells) {
+      const found = foliCells.findIndex(
+        (p, i) => i >= cellAt && i < cellAt + 4 && normal(p.text) === normal(word.text),
+      );
+      if (found < 0) continue;
+      cellAt = found + 1;
+      cellsCompared++;
+      const foli = (foliCells[found]?.page ?? -1) + 1;
+      if (foli === word.page) cellsAgreed++;
+      else
+        disagreements.push(`cell on page ${foli} (Word ${word.page}): ${word.text.slice(0, 50)}`);
+    }
     const pages = await page.locator(".foli-word-page").count();
     results[name] = {
       paragraphs: expected.length,
@@ -256,10 +276,11 @@ for (const name of names) {
       agreed,
       sameLine,
       nearLine,
+      cells: [cellsCompared, cellsAgreed],
       pages: [pages, reference.pages],
     };
     console.log(
-      `${name}: of ${compared} paragraphs (${expected.length} outside tables), ${agreed} on Word's page, ${sameLine} on its line, ${nearLine} within a line; ${pages} pages (Word ${reference.pages})${faces.length ? "" : ", without Office cloud fonts"}`,
+      `${name}: of ${compared} paragraphs (${expected.length} outside tables), ${agreed} on Word's page, ${sameLine} on its line, ${nearLine} within a line; of ${cellsCompared} cell paragraphs (${wordCells.length} in Word), ${cellsAgreed} on Word's page; ${pages} pages (Word ${reference.pages})${faces.length ? "" : ", without Office cloud fonts"}`,
     );
     for (const line of disagreements) console.log(`  ${line}`);
     const pdf = PDF_DIR && join(PDF_DIR, name.replace(/\.docx$/, ".pdf"));
@@ -287,13 +308,15 @@ for (const name of names) {
 test.afterAll(() => {
   const out = new URL("test-results/", ROOT);
   mkdirSync(out, { recursive: true });
-  const total = { compared: 0, agreed: 0, sameLine: 0, nearLine: 0 };
+  const total = { compared: 0, agreed: 0, sameLine: 0, nearLine: 0, cells: 0, cellsAgreed: 0 };
   const pdfPages: { page: number; body: number }[] = [];
   for (const r of Object.values(results)) {
     total.compared += r.compared;
     total.agreed += r.agreed;
     total.sameLine += r.sameLine;
     total.nearLine += r.nearLine;
+    total.cells += r.cells[0];
+    total.cellsAgreed += r.cells[1];
     pdfPages.push(...(r.pdf?.pages ?? []));
   }
   // Every page of the corpus weighs the same.
@@ -310,7 +333,7 @@ test.afterAll(() => {
     `${JSON.stringify({ fonts: faces.map((f) => f.family), documents: results, total, pdf }, null, 2)}\n`,
   );
   console.log(
-    `Total: of ${total.compared} paragraphs, ${total.agreed} on Word's page, ${total.sameLine} on its line, ${total.nearLine} within a line`,
+    `Total: of ${total.compared} paragraphs, ${total.agreed} on Word's page, ${total.sameLine} on its line, ${total.nearLine} within a line; of ${total.cells} cell paragraphs, ${total.cellsAgreed} on Word's page`,
   );
   if (pdf)
     console.log(

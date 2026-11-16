@@ -153,8 +153,9 @@ table made in the model, with and without a grid. All 10 pass (2026-11-16).
 `pnpm corpus:pages` (Playwright, Chromium) lays each document out with `renderDocument`
 (`@folijs/view`, read-only, tracked changes accepted as in the reference data) and compares
 every paragraph outside tables with Word's reference: the page it starts on, and the line of
-that page. Paragraphs are matched by text, in order; those Foli does not show as paragraphs
-(inside content controls) are left out. Results go to `test-results/word-pages.json`.
+that page; and every paragraph in table cells: the page it starts on (`cellParagraphs`).
+Paragraphs are matched by text, in order; those Foli does not show as paragraphs (inside
+content controls) are left out. Results go to `test-results/word-pages.json`.
 
 The numbers depend on the fonts. Chromium uses the installed ones; Word's default since 2023,
 Aptos, is an Office cloud font that is not installed system-wide, so the run serves it to the
@@ -179,8 +180,14 @@ number alone says little: the line is the stricter measure, and it moves with th
 three lines that differ: the paragraph after the fee table in 02 (Word counts the header row it
 repeats on the second page as a line; Foli does not), and two empty paragraphs around the table
 of contents in 04 (a field Foli keeps opaque). Not laid out yet, so not measured: headers and
-footers (their space is Word's margin here), footnotes, floating pictures, and text inside
-tables.
+footers (their space is Word's margin here), footnotes and floating pictures (07: Foli
+shows one page where Word has two, so only 2 of its 5 paragraphs are on Word's page).
+
+Paragraphs in table cells (2026-11-16, after 10.5, with Aptos): 277 of 280 on Word's page: 01
+8 of 8, 02 79 of 82, 04 24 of 24, 06 166 of 166 (the header row repeated, the row that may not
+split moved whole to page 2, as in Word). The three that differ are one row of 02's fee table
+that Word moves to the next page and Foli keeps on the first. The editing view lays tables out
+the same way; `apps/playground/e2e/word-tables.spec.ts` checks 06 in it in three engines.
 
 ## Pages against Word's PDF
 

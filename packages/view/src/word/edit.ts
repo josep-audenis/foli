@@ -10,6 +10,7 @@
  * opaque inline node a leaf element.
  */
 import {
+  type CellFormat,
   isSafeHref,
   type ListMarker,
   type Mark,
@@ -103,12 +104,15 @@ export class WordRenderer {
     return this.#context;
   }
 
-  /** Numbering and comment state per top-level node of `doc`. */
-  prepare(doc: ModelNode): void {
+  /**
+   * Numbering and comment state for `blocks`, the blocks rendered, in document order (the
+   * paragraphs in table cells among them: Word numbers lists through tables).
+   */
+  prepare(blocks: readonly ModelNode[]): void {
     const attrs: Record<string, unknown>[] = [];
     const comments: number[][] = [];
     const open = new Set<number>();
-    doc.forEach((node) => {
+    for (const node of blocks) {
       attrs.push(node.type.name === "paragraph" ? node.attrs : { numbering: { id: 0 } });
       comments.push([...open]);
       node.forEach((child) => {
@@ -116,25 +120,32 @@ export class WordRenderer {
         if (child.type.name === "commentStart") open.add(id);
         else if (child.type.name === "commentEnd") open.delete(id);
       });
-    });
+    }
     this.#markers = this.#context.resolver.markers(attrs);
     this.#comments = comments;
   }
 
-  /** Whether the top-level block at `index` shows a list number. */
+  /** Whether the block at `index` (of those prepared) shows a list number. */
   hasMarker(index: number): boolean {
     return !!this.#markers[index];
   }
 
-  /** What a block's rendering depends on at `index`, besides its node. */
-  key(index: number): string {
-    return `${this.#markers[index]?.text ?? ""}|${(this.#comments[index] ?? []).join(" ")}`;
+  /** What a block's rendering depends on at `index`, besides its node (and its cell's format). */
+  key(index: number, cell?: CellFormat | null): string {
+    const inCell = cell ? `|${cell.style ?? ""}:${cell.conditions.join(",")}` : "";
+    return `${this.#markers[index]?.text ?? ""}|${(this.#comments[index] ?? []).join(" ")}${inCell}`;
   }
 
-  render(node: ModelNode, index: number, splits: readonly number[] = []): WordBlockDesc {
+  /** A block; `cell` is the format of the table cell it is in, if any. */
+  render(
+    node: ModelNode,
+    index: number,
+    splits: readonly number[] = [],
+    cell?: CellFormat | null,
+  ): WordBlockDesc {
     if (node.type.name !== "paragraph") return this.#opaque(node, index);
     const { resolver } = this.#context;
-    const { paragraph, run } = resolver.paragraph(node.attrs);
+    const { paragraph, run } = resolver.paragraph(node.attrs, cell ?? undefined);
     const line = (r: RunFormat) => lineHeight(paragraph, r, this.#ratio(fontStack(latin(r))));
     const doc = this.#doc;
     const changed = this.#review !== "final" && hasChanges(node);
@@ -253,6 +264,13 @@ export class WordRenderer {
       style: paragraph.style,
       contextual: paragraph.contextualSpacing,
     };
+    if (cell && !this.#clipboard) {
+      // In a cell its spacing is its margins (the page flow spaces top-level blocks); a
+      // fragment continued on the next page has none at the split.
+      // shortcut: contextual spacing between paragraphs in a cell is not applied.
+      dom.style.marginTop = `${word.before}px`;
+      (fragments[fragments.length - 1] as HTMLElement).style.marginBottom = `${word.after}px`;
+    }
     if (this.#clipboard) {
       // The flow places the spacing in the editor; elsewhere it is the paragraph's margins.
       dom.style.marginTop = `${word.before}px`;
@@ -264,7 +282,7 @@ export class WordRenderer {
         dom.setAttribute("style", `${styleOf(dom)}mso-list:${list}`);
       }
     }
-    return { node, dom, fragments, splits, leaves, word, key: this.key(index) };
+    return { node, dom, fragments, splits, leaves, word, key: this.key(index, cell) };
   }
 
   /** A span for text with `marks` over its paragraph's run formatting. */
@@ -356,7 +374,11 @@ export function clipboardBlocks(
   ratio: (family: string) => number,
 ): HTMLElement[] {
   const renderer = new WordRenderer(context, ownerDocument, ratio, true);
-  renderer.prepare(doc);
+  const top: ModelNode[] = [];
+  doc.forEach((node) => {
+    top.push(node);
+  });
+  renderer.prepare(top);
   return nodes.map((node, i) => {
     const { dom } = renderer.render(node, first < 0 ? -1 : first + i);
     for (const element of [dom, ...dom.querySelectorAll("*")])

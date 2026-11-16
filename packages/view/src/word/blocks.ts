@@ -822,7 +822,9 @@ function opaqueTable(
 }
 
 /** A border of the model (`BorderJSON`) as CSS; undefined when it says none. */
-function borderJsonCss(border: { style?: string; size?: number; color?: string } | undefined) {
+export function borderJsonCss(
+  border: { style?: string; size?: number; color?: string } | undefined,
+) {
   if (!border) return undefined;
   if (border.style === "nil" || border.style === "none") return "none";
   const width = Math.max(((border.size ?? 4) / 8) * (96 / 72), 0.5);
@@ -864,6 +866,7 @@ function modelTable(
     const rowAttrs = (rowNode.attrs ?? {}) as Record<string, unknown>;
     const row = doc.createElement("tr");
     if (rowAttrs.header) row.dataset.foliHeader = "";
+    if (rowAttrs.cantSplit) row.dataset.foliCantSplit = "";
     const cells = rowNode.content ?? [];
     cells.forEach((cellNode, c) => {
       const cellAttrs = (cellNode.attrs ?? {}) as Record<string, unknown>;
@@ -898,6 +901,8 @@ function modelTable(
         }
         const { paragraph, run } = resolver.paragraph(block.attrs ?? {}, format);
         const element = doc.createElement(tagOf(paragraph));
+        // A cell's paragraph: where it is on pages is measured too (`cellParagraphs`).
+        element.dataset.foliCell = "";
         styleParagraph(element, paragraph);
         styleRun(element, run, lineHeight(paragraph, run, ratio(fontStack(latin(run)))));
         renderInline(element, block.content ?? [], run, paragraph, context);

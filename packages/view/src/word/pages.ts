@@ -29,6 +29,11 @@ export interface DocumentPages {
    * where the top-level node at `index` starts, as Word numbers lines; undefined if not shown.
    */
   lineOf(index: number): number | undefined;
+  /**
+   * Every paragraph in table cells, in document order (nested tables' included; none for a cell
+   * a vertical merge covers, as Word lists none), with the page (0-based) it starts on.
+   */
+  cellParagraphs(): { page: number; text: string }[];
   /** Removes the pages. */
   destroy(): void;
 }
@@ -155,6 +160,23 @@ export function lineBottoms(element: HTMLElement): number[] {
   return bottoms;
 }
 
+/**
+ * A table block's line ends without those inside a row that may not split (`cantSplit`), unless
+ * the row is taller than a page.
+ */
+function keepRows(element: HTMLElement, bottoms: number[], pageHeight: number): number[] {
+  const rows = element.querySelectorAll(":scope > table > tbody > tr[data-foli-cant-split]");
+  if (!rows.length) return bottoms;
+  const top = element.getBoundingClientRect().top;
+  const kept = [...rows]
+    .map((row) => {
+      const box = row.getBoundingClientRect();
+      return [box.top - top, box.bottom - top] as const;
+    })
+    .filter(([from, to]) => to - from <= pageHeight);
+  return bottoms.filter((y) => !kept.some(([from, to]) => y > from + 0.5 && y < to - 0.5));
+}
+
 /** The height of a table's leading header rows (repeated on each page it continues on), or 0. */
 function headerHeight(element: HTMLElement): number {
   let bottom = 0;
@@ -214,6 +236,7 @@ export function renderDocument(
   const firstPage = new Map<number, number>();
   /** Every fragment placed, in order: its page and how many lines it shows (measured lazily). */
   const placements: { page: number; nodes: number[] | null; lines: () => number }[] = [];
+  const cellPages: { page: number; text: string }[] = [];
   for (const group of groups) {
     const g = group.geometry;
     // Measure in a page of the section's width, out of view.
@@ -224,16 +247,30 @@ export function renderDocument(
     container.append(measuring.page);
     for (const block of group.blocks) measuring.body.append(block.element);
     const lines = new Map<WordBlock, number[]>();
+    const pageHeight = g.height - g.top - g.bottom;
     const linesOf = (block: WordBlock) => {
       let value = lines.get(block);
       if (!value) {
-        value = lineBottoms(block.element);
+        value = keepRows(block.element, lineBottoms(block.element), pageHeight);
         lines.set(block, value);
       }
       return value;
     };
+    // Each cell paragraph's top in its block, measured while the blocks are laid out whole.
+    const cellTops = new Map<WordBlock, { top: number; text: string }[]>();
+    for (const block of group.blocks) {
+      const cells = block.element.querySelectorAll("[data-foli-cell]");
+      if (!cells.length) continue;
+      const top = block.element.getBoundingClientRect().top;
+      cellTops.set(
+        block,
+        [...cells].map((cell) => ({
+          top: cell.getBoundingClientRect().top - top,
+          text: cell.textContent ?? "",
+        })),
+      );
+    }
     const headers = new Map<WordBlock, number>();
-    const pageHeight = g.height - g.top - g.bottom;
     const boxes: BlockBox[] = group.blocks.map((block, i) => {
       const height = block.element.getBoundingClientRect().height;
       const repeat = block.element.querySelector("tr") ? headerHeight(block.element) : 0;
@@ -248,6 +285,8 @@ export function renderDocument(
         marginTop: block.before,
         marginBottom: block.after,
         repeat,
+        // A table splits at any line: no widow and orphan control across its rows.
+        anyLine: !!block.element.querySelector(":scope > table"),
         keepWithNext: block.keepNext,
         lines: () => (kept ? [height] : linesOf(block)),
         breaksAfter: () => {
@@ -337,6 +376,15 @@ export function renderDocument(
               : fragment.toLine) - fragment.fromLine,
         });
       });
+      // Its cell paragraphs: on the page of the fragment their top is in.
+      for (const cell of cellTops.get(block) ?? []) {
+        let at = placed[0]?.page ?? 0;
+        for (const fragment of placed) {
+          const start = fragment.fromLine ? (bottoms[fragment.fromLine - 1] ?? 0) : 0;
+          if (cell.top + 0.5 >= start) at = fragment.page;
+        }
+        cellPages.push({ page: pages.length + at, text: cell.text });
+      }
       const first = placed[0];
       if (first) for (const index of block.nodes) firstPage.set(index, pages.length + first.page);
     });
@@ -365,6 +413,7 @@ export function renderDocument(
       }
       return firstLine.get(index);
     },
+    cellParagraphs: () => cellPages,
     destroy: () => {
       for (const page of pages) page.remove();
     },

@@ -12,7 +12,7 @@ import { type Agreement, agreement, bodyRegion, inkPixels, overlay, samePage } f
 const container = document.getElementById("pages") as HTMLElement;
 let shown: DocumentPages | null = null;
 
-/** A top-level node as the harness compares it with Word. */
+/** A top-level node (or, `type` "cell", a paragraph in a table cell) as the harness compares it with Word. */
 interface Shown {
   type: string;
   /** The page (0-based) it starts on; null when not shown. */
@@ -45,12 +45,17 @@ function show(doc: FoliDocument, review: ReviewView): Shown[] {
   shown?.destroy();
   shown = renderDocument(doc, container, { review });
   const pages = shown;
-  return (doc.content.content ?? []).map((node, i) => ({
+  const blocks: Shown[] = (doc.content.content ?? []).map((node, i) => ({
     type: node.type,
     page: pages.pageOf(i) ?? null,
     line: pages.lineOf(i) ?? null,
     text: node.type === "paragraph" ? textOf(node) : "",
   }));
+  // Then the paragraphs in table cells, in document order: their page only.
+  const cells: Shown[] = pages
+    .cellParagraphs()
+    .map(({ page, text }) => ({ type: "cell", page, line: null, text }));
+  return [...blocks, ...cells];
 }
 
 /**

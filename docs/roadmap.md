@@ -958,11 +958,16 @@ Each task is a PR on `phase-10/tables-images`, the build green after each.
   block (not split across pages) and the editor treats it as opaque (selected, then deleted, as
   a whole). A table style's `wholeTable` part stays in `ext`; changed table styles are refused
   on export.)
-- [ ] 10.5 Tables on pages in the view: tables rendered from the model, column widths (fixed and
+- [x] 10.5 Tables on pages in the view: tables rendered from the model, column widths (fixed and
   autofit), borders as Word resolves conflicts, shading; rows flowed across pages (header rows
   repeated, `cantSplit` kept whole, other rows split at a line), position mapping and read-back
   inside cells, composition in cells; per-paragraph page agreement with Word including cell
   paragraphs (`pnpm corpus:pages`).
+  (Done: cell paragraphs are view blocks of their own; tables are flow items drawn per page
+  from the model; 277 of 280 corpus cell paragraphs on Word's page; e2e on 06 in three engines.
+  Shortcuts: autofit tables keep Word's saved grid; `border-collapse` resolves border conflicts;
+  rows in a vertical merge or holding a nested table split only between rows; composition is
+  the view's read-back (checked with DOM changes in cells; no IME run).)
 - [ ] 10.6 Editing in tables: core's table-aware editing first (cells isolate; a range delete of
   whole rows across a table's edges; Backspace and Delete next to a table; paste of rows; tracked
   row deletion and insertion as row revisions), then the view: typing, Enter, Backspace and Delete in cells (a cell never loses its

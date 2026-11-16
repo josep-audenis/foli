@@ -20,6 +20,8 @@ export interface BlockBox {
   breaksAfter?(): readonly number[];
   /** Height shown again at the top of each fragment after the first (a table's header rows). */
   repeat?: number;
+  /** Splits at any of its line ends, without widow and orphan control (a table's rows). */
+  anyLine?: boolean;
   /**
    * Content height of the pages this block goes on, when not the flow's (a section's page). A
    * block with another page height than the one before it must start a page (an explicit
@@ -188,7 +190,7 @@ export function flowFrom(
         if (state.used + spacing + bottom > pageHeight + SLACK) break;
         end++;
       }
-      if (end < segmentEnd && end > line) {
+      if (end < segmentEnd && end > line && !box.anyLine) {
         // A natural split: keep `widows` lines for the next page and `orphans` on this one.
         const kept = Math.min(end, segmentEnd - rules.widows);
         if (kept - line >= rules.orphans) end = kept;

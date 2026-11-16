@@ -53,8 +53,51 @@ import {
 } from "./layout/flow.js";
 import { type BlockDesc, PAGE_BREAK_ATTR } from "./render.js";
 
-import { spacing, type WordBlockDesc, WordRenderer } from "./word/edit.js";
+import { spacing, type WordBlockDesc, type WordInfo, WordRenderer } from "./word/edit.js";
 import { measureLineRatio } from "./word/pages.js";
+import {
+  collect,
+  type FlowItem,
+  FRAME_ATTR,
+  type Frame,
+  frameElement,
+  REPEATED_ATTR,
+  type Unit,
+} from "./word/table.js";
+
+/** What the flow needs of a table: no paragraph spacing or keep rules of its own. */
+const TABLE_WORD: WordInfo = {
+  before: 0,
+  after: 0,
+  keepNext: false,
+  keepLines: false,
+  pageBreakBefore: false,
+  style: null,
+  contextual: false,
+};
+
+/** Where a table's fragment is: the rows it shows, the header rows drawn again above them. */
+interface TablePart {
+  rows: number[];
+  headers: number[];
+}
+
+/** A table as last rendered: its wrappers (one per page it is on), their pages, how it was cut. */
+interface FrameState {
+  wrappers: HTMLElement[];
+  pages: number[];
+  /** The parts and the units' fragments in each, as a string: equal means the same DOM. */
+  key: string;
+}
+
+/** A table's measurement, in layout px from the table's top (drawn whole). */
+export interface TableMeasure {
+  rows: { top: number; bottom: number }[];
+  /** The top of each of its units (by index into the units), null for one not shown (covered). */
+  tops: Map<number, number | null>;
+  /** Where the table may break: inside rows that may split, and between rows (sorted). */
+  breaks?: number[];
+}
 
 /** Word's paragraph spacing for a schema v3 document (`flow`'s `word` spacing). */
 const WORD_RULES: FlowRules = { ...DEFAULT_RULES, spacing: "word" };
@@ -250,8 +293,16 @@ export class EditorView {
   private indexOf = new Map<BlockDesc, number>();
   /** The element that shows a node selection, if any. */
   private selectedDom: HTMLElement | null = null;
-  /** The page of each fragment of each block. */
-  private fragmentPages = new Map<BlockDesc, readonly number[]>();
+  /** The pages of each top-level item (a paragraph's fragments, a table's wrappers), by node. */
+  private itemPages = new Map<ModelNode, readonly number[]>();
+  /** Each table as last rendered, by node. */
+  private frames = new Map<ModelNode, FrameState>();
+  /** The table each wrapper element draws (part of). */
+  private frameOf = new Map<Node, Frame>();
+  /** Each table as last rendered, by its index among the top-level items. */
+  private frameAt: ({ node: ModelNode; state: FrameState } | undefined)[] = [];
+  /** Elements the view itself removed: the read-back does not take them for input. */
+  private viewRemoved = new WeakSet<Node>();
   /** The block each fragment element belongs to. */
   private owner = new Map<Node, BlockDesc>();
   /** The page elements, in order; the host's only children. */
@@ -524,7 +575,10 @@ export class EditorView {
       );
       this.invalidateLayout();
     }
-    word.prepare(doc);
+    // The blocks the view renders (paragraphs in table cells among them) and the page flow's
+    // items (top-level paragraphs and opaque blocks, and tables).
+    const { units, items } = collect(doc, context.resolver);
+    word.prepare(units.map((unit) => unit.node));
     const layout = sectionLayouts(doc, context.envelope.section);
     doc.forEach((node, _, i) => {
       const { sheet, breakAfter } = layout[i] as BlockLayout;
@@ -536,40 +590,122 @@ export class EditorView {
     const previous = new Map(
       this.blocks.filter((desc) => !this.dirty.has(desc)).map((desc) => [desc.node, desc]),
     );
-    const previousPages = this.fragmentPages;
+    const previousPages = this.itemPages;
+    const previousFrames = this.frames;
     this.dirty.clear();
     const dropLines = this.linesStale && !this.composing;
     if (dropLines) {
       this.linesStale = false;
       this.flowed = null;
     }
+    // What can be reused: a block whose list number, comment shading or cell formatting changed
+    // (an edit before it) is redrawn.
+    const reusable = units.map((unit, i) => {
+      const found = renewed ? undefined : previous.get(unit.node);
+      if (found && found.key === word.key(i, unit.cell)) return found;
+      if (found) this.stale.add(unit.node);
+      return undefined;
+    });
+    // A table is measured again (drawn whole first) when it changed, went stale, or one of its
+    // blocks is redrawn or stale; its blocks with it.
+    const remeasureUnit = units.map(() => false);
+    for (const item of items) {
+      const frame = item.frame;
+      if (!frame) continue;
+      let stale = dropLines || !this.measures.has(frame.node) || this.stale.has(frame.node);
+      for (let u = frame.first; !stale && u < frame.end; u++)
+        stale = !reusable[u] || this.stale.has((units[u] as Unit).node);
+      if (!stale) continue;
+      this.stale.add(frame.node);
+      for (let u = frame.first; u < frame.end; u++) remeasureUnit[u] = true;
+    }
     let blocks: WordBlockDesc[] = [];
-    const starts: number[] = [];
-    doc.forEach((node, pos) => {
-      let reused = renewed ? undefined : previous.get(node);
-      // A block whose list number or comment shading changed (an edit before it) is redrawn.
-      if (reused && reused.key !== word.key(blocks.length)) {
-        reused = undefined;
-        this.stale.add(node);
-      }
+    // Nodes still in the document: an old block or table at an index is only taken over (during
+    // a composition) when its node is gone, never when an insertion moved it along.
+    const present = new Set<ModelNode>(units.map((unit) => unit.node));
+    for (const item of items) if (item.frame) present.add(item.frame.node);
+    units.forEach((unit, i) => {
+      const { node } = unit;
+      let reused = reusable[i];
       // A split block about to be measured again (fonts, CSS) is rendered whole first: each
       // fragment's end breaks its line, so its lines would depend on where it was split before.
-      const remeasure = dropLines || !this.measures.has(node) || this.stale.has(node);
+      const remeasure =
+        remeasureUnit[i] || dropLines || !this.measures.has(node) || this.stale.has(node);
       if (reused && reused.fragments.length > 1 && remeasure && !this.composing) reused = undefined;
       if (reused) previous.delete(node);
-      blocks.push(reused ?? word.render(node, blocks.length));
-      starts.push(pos);
+      const desc = reused ?? word.render(node, i, [], unit.cell);
+      blocks.push(desc);
+      // Drawn again in a table cell: the new block takes the old one's place there, so a table
+      // kept as it is (during a composition, which moves nothing) still holds it. During a
+      // composition a block whose node changed takes the place of the block drawn at its index.
+      const atIndex = this.blocks[i];
+      const old = reused
+        ? undefined
+        : (previous.get(node) ??
+          (this.composing &&
+          atIndex &&
+          !present.has(atIndex.node) &&
+          previous.get(atIndex.node) === atIndex
+            ? atIndex
+            : undefined));
+      const first = old?.fragments[0];
+      if (old && first?.isConnected && first.parentElement?.closest(`[${FRAME_ATTR}]`)) {
+        first.replaceWith(...desc.fragments);
+        for (const fragment of old.fragments.slice(1)) fragment.remove();
+        for (const fragment of old.fragments) this.viewRemoved.add(fragment);
+        previous.delete(old.node);
+      }
     });
     for (const stale of previous.values())
-      for (const fragment of stale.fragments) fragment.remove();
+      for (const fragment of stale.fragments) {
+        fragment.remove();
+        this.viewRemoved.add(fragment);
+      }
     this.applyPrintStyles(layout);
+    const doc_ = this.host.ownerDocument;
+    const frames = new Map<ModelNode, FrameState>();
+    /** A table drawn whole, on one page: what is measured. */
+    const whole = (frame: Frame): FrameState => {
+      const rows = frame.rows.map((_, r) => r);
+      const wrapper = frameElement(
+        frame,
+        rows,
+        [],
+        (r, c) => this.cellContent(frame, r, c, blocks, () => true),
+        doc_,
+      );
+      return { wrappers: [wrapper], pages: [0], key: "" };
+    };
+    // Before the flow, each item where it was (a new one joins the page of the item before it);
+    // a table that changed is drawn whole on that page.
     let last = 0;
-    let pages = blocks.map((desc) => {
-      const before = previousPages.get(desc);
+    let pages = items.map((item, i) => {
+      const node = doc.child(i);
+      const before = previousPages.get(node);
+      if (item.frame) {
+        let state = previousFrames.get(node);
+        // During a composition nothing moves: a table that changed keeps the wrappers drawn at
+        // its place (its redrawn blocks took their old ones' places above).
+        const at = this.frameAt[i];
+        if (!state && this.composing && at && !present.has(at.node)) state = at.state;
+        if (!state || (this.stale.has(node) && !this.composing)) state = whole(item.frame);
+        frames.set(node, state);
+        const pagesBefore = before ?? (state === at?.state ? state.pages : undefined);
+        return state.wrappers.map((_, f) => (last = Math.max(last, pagesBefore?.[f] ?? last)));
+      }
+      const desc = blocks[item.unit] as WordBlockDesc;
       return desc.fragments.map((_, f) => (last = Math.max(last, before?.[f] ?? last)));
     });
     pages = separateSheets(pages, layout);
-    this.place(blocks, pages, layout);
+    const elementsOf = (item: FlowItem, i: number): readonly HTMLElement[] =>
+      item.frame
+        ? (frames.get(doc.child(i)) as FrameState).wrappers
+        : (blocks[item.unit] as WordBlockDesc).fragments;
+    this.place(
+      items.map((item, i) => elementsOf(item, i)),
+      pages,
+      layout,
+    );
     if (!this.composing) {
       // DOM reads only for blocks without a valid measurement (new, changed or stale ones).
       let scale: number | undefined;
@@ -582,7 +718,7 @@ export class EditorView {
           const measure = this.measures.get(desc.node);
           if (measure) delete measure.lines;
         }
-      const nodes = blocks.map((desc) => desc.node);
+      const nodes = items.map((_, i) => doc.child(i));
       // A block's spacing depends on its neighbours' styles: reuse stops a block earlier.
       const reuse = this.flowed ? reuseOf(this.flowed, nodes, this.stale, 1) : undefined;
       const measureOf = (desc: BlockDesc) => {
@@ -599,33 +735,141 @@ export class EditorView {
         found.lines ??= measureLines(desc, layoutPx());
         return found.lines;
       };
-      const boxes = blocks.map((desc, i) =>
-        wordBox(blocks, i, measureOf(desc), () => lines(desc), layout[i] as BlockLayout),
+      const tableOf = (frame: Frame, i: number) => {
+        let found = this.measures.get(frame.node);
+        if (!found?.table || this.stale.delete(frame.node)) {
+          const wrapper = (frames.get(doc.child(i)) as FrameState).wrappers[0] as HTMLElement;
+          // Its blocks are measured with it (their heights, for a resize later).
+          for (let u = frame.first; u < frame.end; u++) {
+            const desc = blocks[u] as WordBlockDesc;
+            this.stale.delete(desc.node);
+            this.measures.set(desc.node, measureBox(desc, layoutPx()));
+          }
+          found = measureTable(frame, wrapper, blocks, layoutPx());
+          this.measures.set(frame.node, found);
+        }
+        return found;
+      };
+      const words = items.map((item) =>
+        item.frame ? TABLE_WORD : (blocks[item.unit] as WordBlockDesc).word,
       );
+      const boxes = items.map((item, i) => {
+        const pageHeight = contentHeight((layout[i] as BlockLayout).sheet.settings);
+        if (item.frame) {
+          const frame = item.frame;
+          const measure = tableOf(frame, i);
+          // A section break after it, or a page break before the next paragraph, ends its page.
+          const breakAfter =
+            (layout[i] as BlockLayout).breakAfter || !!words[i + 1]?.pageBreakBefore;
+          return tableBox(frame, measure, pageHeight, breakAfter, () =>
+            breaksOf(frame, measure, blocks, pageHeight, lines),
+          );
+        }
+        const desc = blocks[item.unit] as WordBlockDesc;
+        return wordBox(
+          words,
+          i,
+          desc,
+          measureOf(desc),
+          () => lines(desc),
+          layout[i] as BlockLayout,
+        );
+      });
       const result = flowFrom(boxes, contentHeight(this.editor.settings), WORD_RULES, reuse);
       this.flowed = { nodes, result };
       this.stale.clear();
       const flowed = result.fragments;
-      blocks = blocks.map((desc, i) => {
+      // Paragraphs: split where their fragments start. Tables: the rows each fragment shows,
+      // and their blocks split where a row is.
+      const splitsOf = new Map<number, number[]>();
+      const parts = new Map<number, { parts: TablePart[]; partOf: Map<number, number[]> }>();
+      items.forEach((item, i) => {
         const fragments = flowed[i] ?? [];
-        const contentStart = (starts[i] as number) + 1;
-        const splits = fragments.slice(1).map((fragment) => {
-          const offset = lines(desc).starts[fragment.fromLine] as number;
-          // Never split a grapheme cluster across pages.
-          return clusterBoundary(doc, contentStart + offset, false) - contentStart;
-        });
+        if (item.unit !== undefined) {
+          const desc = blocks[item.unit] as WordBlockDesc;
+          const contentStart = ((units[item.unit] as Unit).pos as number) + 1;
+          splitsOf.set(
+            item.unit,
+            fragments.slice(1).map((fragment) => {
+              const offset = lines(desc).starts[fragment.fromLine] as number;
+              // Never split a grapheme cluster across pages.
+              return clusterBoundary(doc, contentStart + offset, false) - contentStart;
+            }),
+          );
+          return;
+        }
+        const frame = item.frame;
+        const measure = this.measures.get(frame.node) as Measure;
+        const cut = cutTable(frame, measure, fragments, blocks, lines);
+        parts.set(i, cut);
+        for (const [u, at] of cut.splits) {
+          const contentStart = (units[u] as Unit).pos + 1;
+          splitsOf.set(
+            u,
+            at.map((offset) => clusterBoundary(doc, contentStart + offset, false) - contentStart),
+          );
+        }
+      });
+      blocks = blocks.map((desc, u) => {
+        const splits = splitsOf.get(u) ?? [];
         const same =
           splits.length === desc.splits.length && splits.every((at, k) => at === desc.splits[k]);
-        return same ? desc : word.render(desc.node, i, splits);
+        return same ? desc : word.render(desc.node, u, splits, (units[u] as Unit).cell);
       });
-      pages = flowed.map((fragments) => fragments.map((fragment) => fragment.page));
-      applyGaps(blocks, pages, boxes);
-      this.place(blocks, pages, layout);
+      pages = items.map((item, i) => {
+        const fragments = flowed[i] ?? [];
+        if (!item.frame) return fragments.map((fragment) => fragment.page);
+        const node = doc.child(i);
+        const cut = parts.get(i) as { parts: TablePart[]; partOf: Map<number, number[]> };
+        const key = JSON.stringify([cut.parts, [...cut.partOf]]);
+        const kept = frames.get(node) as FrameState;
+        const pagesOf = fragments.map((fragment) => fragment.page);
+        // The same cut of the same table, its blocks' elements all in it: its wrappers stay.
+        if (kept.key === key && holdsAll(kept, item.frame, blocks)) {
+          frames.set(node, { ...kept, pages: pagesOf });
+          return pagesOf;
+        }
+        const wrappers = cut.parts.map((part, k) =>
+          frameElement(
+            item.frame,
+            part.rows,
+            part.headers,
+            (r, c) =>
+              this.cellContent(item.frame, r, c, blocks, (u, f) => cut.partOf.get(u)?.[f] === k),
+            doc_,
+          ),
+        );
+        frames.set(node, { wrappers, pages: pagesOf, key });
+        return pagesOf;
+      });
+      const firsts = items.map((item, i) =>
+        item.frame
+          ? ((frames.get(doc.child(i)) as FrameState).wrappers[0] as HTMLElement)
+          : (blocks[item.unit] as WordBlockDesc).dom,
+      );
+      applyGaps(firsts, pages, boxes);
+      this.place(
+        items.map((item, i) => elementsOf(item, i)),
+        pages,
+        layout,
+      );
     }
+    // (Wrappers no longer drawn are not in a page: `place` removed them.)
+    this.frames = frames;
+    this.frameAt = items.map((item, i) => {
+      const state = item.frame && frames.get(doc.child(i));
+      return state ? { node: doc.child(i), state } : undefined;
+    });
+    this.frameOf = new Map();
+    items.forEach((item, i) => {
+      if (!item.frame) return;
+      for (const wrapper of (frames.get(doc.child(i)) as FrameState).wrappers)
+        this.frameOf.set(wrapper, item.frame);
+    });
     this.blocks = blocks;
-    this.starts = starts;
+    this.starts = units.map((unit) => unit.pos);
     this.indexOf = new Map(blocks.map((desc, i) => [desc, i]));
-    this.fragmentPages = new Map(blocks.map((desc, i) => [desc, pages[i] ?? []]));
+    this.itemPages = new Map(items.map((_, i) => [doc.child(i), pages[i] ?? []]));
     this.owner = new Map(
       blocks.flatMap((desc) => desc.fragments.map((fragment) => [fragment, desc] as const)),
     );
@@ -657,13 +901,13 @@ export class EditorView {
    * or a page (stray DOM) is removed.
    */
   private place(
-    blocks: readonly BlockDesc[],
+    elements: readonly (readonly HTMLElement[])[],
     pages: readonly (readonly number[])[],
     layout: readonly BlockLayout[],
   ): void {
     const { host } = this;
-    const items = blocks.flatMap((desc, i) =>
-      desc.fragments.map((dom, f) => ({ dom, page: pages[i]?.[f] ?? 0 })),
+    const items = elements.flatMap((list, i) =>
+      list.map((dom, f) => ({ dom, page: pages[i]?.[f] ?? 0 })),
     );
     const count = (items[items.length - 1]?.page ?? 0) + 1;
     const sheets: Sheet[] = [];
@@ -703,6 +947,7 @@ export class EditorView {
       while (at) {
         const next: ChildNode | null = at.nextSibling;
         at.remove();
+        this.viewRemoved.add(at);
         at = next;
       }
     }
@@ -714,6 +959,40 @@ export class EditorView {
       rest = next;
     }
     this.pages.length = count;
+  }
+
+  /**
+   * What a table's cell shows in one of its fragments: its blocks' elements that `takes` puts
+   * there, and nested tables whole (where their first block goes).
+   */
+  private cellContent(
+    frame: Frame,
+    r: number,
+    c: number,
+    blocks: readonly WordBlockDesc[],
+    takes: (unit: number, fragment: number) => boolean,
+  ): Node[] {
+    const out: Node[] = [];
+    for (const item of frame.rows[r]?.cells[c]?.items ?? []) {
+      if ("frame" in item) {
+        const nested = item.frame;
+        if (!takes(nested.first, 0)) continue;
+        out.push(
+          frameElement(
+            nested,
+            nested.rows.map((_, i) => i),
+            [],
+            (rr, cc) => this.cellContent(nested, rr, cc, blocks, () => true),
+            this.host.ownerDocument,
+          ),
+        );
+        continue;
+      }
+      (blocks[item.unit] as WordBlockDesc).fragments.forEach((fragment, f) => {
+        if (takes(item.unit, f)) out.push(fragment);
+      });
+    }
+    return out;
   }
 
   private createPage(): HTMLElement {
@@ -837,9 +1116,18 @@ export class EditorView {
     return null;
   }
 
-  /** Whether `node` holds blocks rather than content: the host or a page. */
+  /**
+   * Whether `node` holds blocks rather than content: the host, a page, or a table's wrapper,
+   * table, rows and cells.
+   */
   private holdsBlocks(node: Node): boolean {
-    return node === this.host || this.pages.includes(node as HTMLElement);
+    return (
+      node === this.host ||
+      this.pages.includes(node as HTMLElement) ||
+      (node.nodeType === Node.ELEMENT_NODE &&
+        (node as Element).hasAttribute(FRAME_ATTR) &&
+        !(node as Element).closest(`[${REPEATED_ATTR}]`))
+    );
   }
 
   /** Index of the first block that starts at or after `pos` (the block count if none). */
@@ -857,17 +1145,36 @@ export class EditorView {
   /** Model position of a DOM point inside the host, or null if it is outside. */
   posFromDOM(node: Node, offset: number): number | null {
     const { host } = this;
+    // In a header row drawn again (not document content): the first position below it.
+    const at = node.nodeType === Node.ELEMENT_NODE ? (node as Element) : node.parentElement;
+    const repeated = at?.closest(`[${REPEATED_ATTR}]`);
+    if (repeated?.parentNode && host.contains(repeated)) {
+      const parent = repeated.parentNode;
+      return this.posFromDOM(parent, [...parent.childNodes].indexOf(repeated as ChildNode) + 1);
+    }
     if (this.holdsBlocks(node)) {
       // Between fragments: the start of the first one after the point (a block start, or
       // where a continuation starts), else the document end.
       const range = host.ownerDocument.createRange();
       range.setStart(node, offset);
+      const posOf = (i: number, f: number) =>
+        f === 0
+          ? (this.starts[i] as number)
+          : (this.starts[i] as number) +
+            1 +
+            ((this.blocks[i] as BlockDesc).splits[f - 1] as number);
+      // Without tables, blocks are in DOM order: the first one after the point. In a row split
+      // across pages, a cell's continuation comes after the next cell: the earliest in the DOM.
+      let best: { i: number; f: number; dom: HTMLElement } | null = null;
       for (const [i, desc] of this.blocks.entries()) {
         const f = desc.fragments.findIndex((fragment) => range.comparePoint(fragment, 0) >= 0);
-        if (f === 0) return this.starts[i] as number;
-        if (f > 0) return (this.starts[i] as number) + 1 + (desc.splits[f - 1] as number);
+        if (f < 0) continue;
+        const dom = desc.fragments[f] as HTMLElement;
+        if (!this.frames.size) return posOf(i, f);
+        if (!best || dom.compareDocumentPosition(best.dom) & Node.DOCUMENT_POSITION_FOLLOWING)
+          best = { i, f, dom };
       }
-      return this.state.doc.content.size;
+      return best ? posOf(best.i, best.f) : this.state.doc.content.size;
     }
     const element = this.blockElement(node);
     const owner = element ? this.owner.get(element) : undefined;
@@ -951,6 +1258,9 @@ export class EditorView {
     // (Its end, mapped alone, would be the start of the next block, not the end of the rule.)
     if (sel.anchorNode === sel.focusNode && Math.abs(sel.anchorOffset - sel.focusOffset) === 1) {
       const child = sel.anchorNode.childNodes[Math.min(sel.anchorOffset, sel.focusOffset)];
+      // Around a table's (first) wrapper: the table selected whole.
+      const table = child && this.frameOf.get(child);
+      if (table) return NodeSelection.create(this.state.doc, table.pos);
       const owner = child && this.owner.get(child);
       const index = owner ? (this.indexOf.get(owner) ?? -1) : -1;
       if (owner && !owner.node.isTextblock && NodeSelection.isSelectable(owner.node))
@@ -982,9 +1292,16 @@ export class EditorView {
     return desc && this.starts[this.indexOf.get(desc) ?? -1] === selection.from ? desc : null;
   }
 
+  /** The first wrapper of a node-selected table, if a table is selected. */
+  private selectedTable(): HTMLElement | null {
+    const { selection } = this.state;
+    if (!(selection instanceof NodeSelection) || selection.node.type.name !== "table") return null;
+    return this.frames.get(selection.node)?.wrappers[0] ?? null;
+  }
+
   /** Marks the element of a node-selected block, for styling (the DOM selection is around it). */
   private showSelectedNode(): void {
-    const dom = this.selectedBlock()?.dom ?? null;
+    const dom = this.selectedBlock()?.dom ?? this.selectedTable();
     if (dom === this.selectedDom) return;
     this.selectedDom?.classList.remove(SELECTED_CLASS);
     dom?.classList.add(SELECTED_CLASS);
@@ -1030,9 +1347,9 @@ export class EditorView {
       const current = this.readSelection();
       if (current && this.shows(current)) return;
     }
-    const selected = this.selectedBlock();
+    const selected = this.selectedBlock()?.dom ?? this.selectedTable();
     if (selected) {
-      const point = before(selected.dom);
+      const point = before(selected);
       sel.setBaseAndExtent(point.node, point.offset, point.node, point.offset + 1);
       return;
     }
@@ -1159,6 +1476,18 @@ export class EditorView {
     // focuses nothing (prevented, middle button) must not skip the next keyboard focus.
     if (this.pointerFocus) setTimeout(() => (this.pointerFocus = false));
     if (event.button !== 0) return;
+    // A header row drawn again is not document content: the caret goes below it.
+    const repeated = (event.target as Element | null)?.closest?.(`[${REPEATED_ATTR}]`);
+    if (repeated && this.host.contains(repeated) && !event.shiftKey) {
+      const pos = this.posFromDOM(repeated, 0);
+      if (pos !== null) {
+        event.preventDefault();
+        if (!this.hasFocus()) this.host.focus({ preventScroll: true });
+        const $pos = this.state.doc.resolve(pos);
+        this.dispatch(this.state.tr.setSelection(Selection.near($pos)));
+      }
+      return;
+    }
     const element = this.blockElement(event.target as Node | null);
     const owner = element ? this.owner.get(element) : undefined;
     const index = owner ? (this.indexOf.get(owner) ?? -1) : -1;
@@ -1426,26 +1755,51 @@ export class EditorView {
       else if ((node as Element).getAttribute?.("contenteditable") === "false") return;
       else node.childNodes.forEach(walk);
     };
-    let first = true;
-    // Block-level nodes in order: inside pages and containers, and anything else in the host.
-    const blockLevel: Node[] = [];
+    // Block-level nodes: inside pages and tables, and anything else in the host.
+    let stray = false;
     const collect = (parent: Node) => {
       for (const child of parent.childNodes) {
+        if (this.owner.has(child)) continue;
+        // Drawn, not document content (a repeated header row): no text of the model.
+        if ((child as Element).getAttribute?.("contenteditable") === "false") continue;
         if (this.holdsBlocks(child)) collect(child);
-        else blockLevel.push(child);
+        // Text outside every block (an element the browser added): a block the model does not
+        // have. An empty stray node (an extension's marker) holds none; the re-render removes it.
+        else if (child.textContent) stray = true;
       }
     };
     collect(this.host);
-    let previousOwner: BlockDesc | undefined;
-    for (const child of blockLevel) {
-      const owner = this.owner.get(child);
-      // An empty stray node (an extension's marker) holds no text; the re-render removes it.
-      if (!owner && !child.textContent) continue;
-      // The fragments of one block are one text; anything else starts a new block.
-      if (!first && !(owner && owner === previousOwner)) domText += BLOCK_SEPARATOR;
+    if (stray) {
+      // shortcut: a change that adds blocks cannot be read back yet; it is dropped.
+      console.warn("Foli: discarded a DOM change that adds blocks or line breaks");
+      this.rerender();
+      return;
+    }
+    // Each block's fragments are one text, blocks in document order (a row split across pages
+    // has its cells' fragments on two pages).
+    // A block whose elements the browser removed (merging it into another) has no text there.
+    // One missing without a recorded removal was never placed (drawn during a composition):
+    // its text counts as unchanged, never as deleted.
+    const removed = new Set(
+      records.flatMap((record) => [...record.removedNodes]).filter((n) => !this.viewRemoved.has(n)),
+    );
+    const removedByInput = (node: Node) => {
+      for (let at: Node | null = node; at; at = at.parentNode) if (removed.has(at)) return true;
+      return false;
+    };
+    let first = true;
+    for (const desc of this.blocks) {
+      const shown = desc.fragments.filter((fragment) => this.host.contains(fragment));
+      if (!shown.length && !desc.fragments.some(removedByInput)) {
+        if (!first) domText += BLOCK_SEPARATOR;
+        first = false;
+        domText += textOfBlock(desc.node);
+        continue;
+      }
+      if (!shown.length) continue;
+      if (!first) domText += BLOCK_SEPARATOR;
       first = false;
-      previousOwner = owner;
-      walk(child);
+      for (const fragment of shown) walk(fragment);
     }
 
     const { doc } = this.state;
@@ -1454,14 +1808,7 @@ export class EditorView {
     this.blocks.forEach(({ node: block }, i) => {
       if (i > 0) modelText += BLOCK_SEPARATOR;
       lineStarts.push(modelText.length);
-      block.forEach((child) => {
-        // A tab is text in the DOM (a "\t" text node).
-        modelText += child.isText
-          ? (child.text ?? "")
-          : child.type.name === "tab"
-            ? "\t"
-            : HARD_BREAK;
-      });
+      modelText += textOfBlock(block);
     });
     /** Model position of an offset in `modelText`. */
     const posAt = (offset: number): number => {
@@ -1687,13 +2034,192 @@ function layoutScale(page: HTMLElement, settings: DocumentSettings): number {
 }
 
 /** A block's measurement: border-box height across its fragments (layout px), margins, lines. */
-interface Measure {
+export interface Measure {
   height: number;
   marginTop: number;
   marginBottom: number;
   /** Vertical padding and border, which every fragment of a split block repeats. */
   box: number;
   lines?: Lines;
+  /** A table's rows and blocks. */
+  table?: TableMeasure;
+}
+
+/** A block's text as the read-back compares it: a tab "\t", other inline leaves one character. */
+function textOfBlock(block: ModelNode): string {
+  let text = "";
+  block.forEach((child) => {
+    // A tab is text in the DOM (a "\t" text node).
+    text += child.isText ? (child.text ?? "") : child.type.name === "tab" ? "\t" : HARD_BREAK;
+  });
+  return text;
+}
+
+/** Whether a table's wrappers hold every element of its blocks (none was drawn anew). */
+function holdsAll(state: FrameState, frame: Frame, blocks: readonly WordBlockDesc[]): boolean {
+  for (let u = frame.first; u < frame.end; u++)
+    for (const fragment of (blocks[u] as WordBlockDesc).fragments)
+      if (!state.wrappers.some((wrapper) => wrapper.contains(fragment))) return false;
+  return true;
+}
+
+/** Measures a table drawn whole: its height, its rows and where its blocks start. */
+function measureTable(
+  frame: Frame,
+  wrapper: HTMLElement,
+  blocks: readonly WordBlockDesc[],
+  scale: number,
+): Measure {
+  const box = wrapper.getBoundingClientRect();
+  const rows = [...wrapper.querySelectorAll(":scope > table > tbody > tr")].map((tr) => {
+    const rect = tr.getBoundingClientRect();
+    return { top: (rect.top - box.top) / scale, bottom: (rect.bottom - box.top) / scale };
+  });
+  const tops = new Map<number, number | null>();
+  for (let u = frame.first; u < frame.end; u++) {
+    const dom = (blocks[u] as WordBlockDesc).dom;
+    // A block of a cell a merge covers is not shown: it goes with its row.
+    const hidden = !!dom.closest(`[${FRAME_ATTR}="covered"]`);
+    tops.set(u, hidden ? null : (dom.getBoundingClientRect().top - box.top) / scale);
+  }
+  return {
+    height: box.height / scale,
+    marginTop: 0,
+    marginBottom: 0,
+    box: 0,
+    table: { rows, tops },
+  };
+}
+
+/**
+ * Where a table may break across pages (from its top, sorted): after each row, and inside a row
+ * at its cells' line ends, unless the row may not split (`cantSplit`, unless taller than a
+ * page), is part of a vertical merge or holds a nested table (shortcut: those split only
+ * between rows; a nested table stays whole within its row).
+ */
+export function breaksOf(
+  frame: Frame,
+  measure: Measure,
+  blocks: readonly WordBlockDesc[],
+  pageHeight: number,
+  lines: (desc: BlockDesc) => Lines,
+): number[] {
+  const t = measure.table as TableMeasure;
+  if (t.breaks) return t.breaks;
+  const out: number[] = [];
+  frame.rows.forEach((row, r) => {
+    const { top, bottom } = t.rows[r] ?? { top: 0, bottom: 0 };
+    const merged = row.cells.some((cell) => cell.vMerge !== null);
+    const nested = row.cells.some((cell) => cell.items.some((item) => "frame" in item));
+    const splits = (!row.cantSplit || bottom - top > pageHeight) && !merged && !nested;
+    if (splits)
+      for (const cell of row.cells)
+        for (const item of cell.items) {
+          if ("frame" in item) continue;
+          const unitTop = t.tops.get(item.unit);
+          if (unitTop === null || unitTop === undefined) continue;
+          for (const b of lines(blocks[item.unit] as WordBlockDesc).bottoms) {
+            const y = unitTop + b;
+            if (y > top + 0.5 && y < bottom - 0.5) out.push(y);
+          }
+        }
+    out.push(r === frame.rows.length - 1 ? Math.max(bottom, measure.height) : bottom);
+  });
+  out.sort((a, b) => a - b);
+  t.breaks = out.filter((y, k) => k === 0 || y - (out[k - 1] as number) > 0.5);
+  return t.breaks;
+}
+
+/** What the flow needs of a table: its height, where it may break, its header rows' height. */
+function tableBox(
+  frame: Frame,
+  measure: Measure,
+  pageHeight: number,
+  breakAfter: boolean,
+  breaks: () => number[],
+): BlockBox {
+  const t = measure.table as TableMeasure;
+  const header = frame.headers ? (t.rows[frame.headers - 1]?.bottom ?? 0) : 0;
+  return {
+    height: measure.height,
+    marginTop: 0,
+    marginBottom: 0,
+    pageHeight,
+    repeat: header,
+    // Word keeps no lines together across a table's rows (a cell's paragraph splits anywhere).
+    anyLine: true,
+    lines: breaks,
+    breaksAfter: () => (breakAfter ? [breaks().length - 1] : []),
+  };
+}
+
+/**
+ * A flowed table cut into its fragments: the rows each shows (a row split across pages in
+ * both), the header rows drawn again above a continuation, the fragment of the table each
+ * block's fragments go in, and where a block of a split row splits (content offsets).
+ */
+export function cutTable(
+  frame: Frame,
+  measure: Measure,
+  fragments: readonly { fromLine: number; toLine: number }[],
+  blocks: readonly WordBlockDesc[],
+  lines: (desc: BlockDesc) => Lines,
+): { parts: TablePart[]; partOf: Map<number, number[]>; splits: Map<number, number[]> } {
+  const t = measure.table as TableMeasure;
+  const all = frame.rows.map((_, r) => r);
+  const partOf = new Map<number, number[]>();
+  const splits = new Map<number, number[]>();
+  if (fragments.length <= 1 || !t.breaks) {
+    for (let u = frame.first; u < frame.end; u++) partOf.set(u, [0]);
+    return { parts: [{ rows: all, headers: [] }], partOf, splits };
+  }
+  const breaks = t.breaks;
+  const bounds = fragments.map((f) => [
+    f.fromLine ? (breaks[f.fromLine - 1] as number) : 0,
+    f.toLine === Number.POSITIVE_INFINITY ? measure.height : (breaks[f.toLine - 1] as number),
+  ]) as [number, number][];
+  const parts = bounds.map(([y0, y1], k): TablePart => {
+    const rows = all.filter((r) => {
+      const row = t.rows[r] ?? { top: 0, bottom: 0 };
+      return row.top < y1 - 0.5 && row.bottom > y0 + 0.5;
+    });
+    const repeat = k > 0 && frame.headers > 0 && (rows[0] ?? 0) >= frame.headers;
+    return { rows, headers: repeat ? all.slice(0, frame.headers) : [] };
+  });
+  frame.rows.forEach((row, r) => {
+    const ks = parts.flatMap((part, k) => (part.rows.includes(r) ? [k] : []));
+    const firstPart = ks[0] ?? 0;
+    for (const cell of row.cells)
+      for (const item of cell.items) {
+        if ("frame" in item) {
+          for (let u = item.frame.first; u < item.frame.end; u++) partOf.set(u, [firstPart]);
+          continue;
+        }
+        const u = item.unit;
+        const top = t.tops.get(u);
+        if (ks.length < 2 || top === null || top === undefined) {
+          partOf.set(u, [firstPart]);
+          continue;
+        }
+        // Each line on the page its bottom fits; consecutive lines on one page are a fragment.
+        const { starts, bottoms } = lines(blocks[u] as WordBlockDesc);
+        const runs: number[] = [];
+        const at: number[] = [];
+        bottoms.forEach((b, i) => {
+          const y = top + b;
+          const k =
+            ks.find((part) => y <= (bounds[part] as [number, number])[1] + 0.5) ??
+            (ks.at(-1) as number);
+          if (runs.at(-1) !== k) {
+            if (runs.length) at.push(starts[i] as number);
+            runs.push(k);
+          }
+        });
+        partOf.set(u, runs.length ? runs : [firstPart]);
+        if (at.length) splits.set(u, at);
+      }
+  });
+  return { parts, partOf, splits };
 }
 
 /** Reads a block's height (in layout px) and vertical margins from the DOM. */
@@ -1724,16 +2250,16 @@ function measureBox(desc: BlockDesc, scale: number): Measure {
  * and a page break before the next block ending this one's page.
  */
 function wordBox(
-  blocks: readonly WordBlockDesc[],
+  words: readonly WordInfo[],
   i: number,
+  desc: WordBlockDesc,
   measure: Measure,
   lines: () => Lines,
   layout: BlockLayout,
 ): BlockBox {
   const pageHeight = contentHeight(layout.sheet.settings);
-  const desc = blocks[i] as WordBlockDesc;
-  const next = blocks[i + 1];
-  const { before, after } = spacing(blocks[i - 1]?.word, desc.word, next?.word);
+  const next = words[i + 1] ? { word: words[i + 1] as WordInfo } : undefined;
+  const { before, after } = spacing(words[i - 1], desc.word, next?.word);
   const pageBreaks = desc.leaves.filter(
     (leaf) =>
       leaf.dom.nodeType !== Node.TEXT_NODE && (leaf.dom as Element).hasAttribute(PAGE_BREAK_ATTR),
@@ -1769,11 +2295,11 @@ function wordBox(
  * Written only when it changes.
  */
 function applyGaps(
-  blocks: readonly BlockDesc[],
+  firsts: readonly HTMLElement[],
   pages: readonly (readonly number[])[],
   boxes: readonly BlockBox[],
 ): void {
-  blocks.forEach((desc, i) => {
+  firsts.forEach((dom, i) => {
     const page = pages[i]?.[0] ?? 0;
     const above = pages[i - 1];
     const box = boxes[i] as BlockBox;
@@ -1787,9 +2313,9 @@ function applyGaps(
         page === 0 || (!!prior && breaks.length > 0 && breaks.includes(prior.lines().length - 1));
       gap = forced ? box.marginTop : 0;
     }
-    if (gaps.get(desc.dom) === gap) return;
-    gaps.set(desc.dom, gap);
-    desc.dom.style.marginTop = `${gap}px`;
+    if (gaps.get(dom) === gap) return;
+    gaps.set(dom, gap);
+    dom.style.marginTop = `${gap}px`;
   });
 }
 
@@ -1829,7 +2355,7 @@ function reuseOf(
   };
 }
 
-interface Lines {
+export interface Lines {
   /** Content offset where each line starts. */
   starts: number[];
   /** Bottom of each line box, in layout px from the block's top, as if it were not split. */
