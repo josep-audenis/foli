@@ -13,7 +13,15 @@ export interface PackageImages {
 }
 
 /** Image types browsers show in an `img`; EMF, WMF and TIFF parts are shown as a box. */
-const RASTER = new Set(["image/png", "image/jpeg", "image/gif", "image/webp", "image/bmp"]);
+// `image/jpg` as some producers write it.
+const RASTER = new Set([
+  "image/png",
+  "image/jpeg",
+  "image/jpg",
+  "image/gif",
+  "image/webp",
+  "image/bmp",
+]);
 
 /**
  * URLs for the pictures' images that live in `pkg` (`word/media/…`): the view cannot show a
