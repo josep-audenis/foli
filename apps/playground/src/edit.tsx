@@ -5,7 +5,13 @@
  * `e2e/word-format.spec.ts`).
  */
 import { createEditor, type Editor, type FoliDocument, parseDocument } from "@folijs/core";
-import { type DocxPackage, exportDocx, importDocx } from "@folijs/docx";
+import {
+  type DocxPackage,
+  exportDocx,
+  importDocx,
+  type PackageImages,
+  packageImages,
+} from "@folijs/docx";
 import { FoliComments, FoliToolbar } from "@folijs/react";
 import "@folijs/react/styles.css";
 import { EditorView } from "@folijs/view";
@@ -81,12 +87,16 @@ const showToolbar = () => {
 showToolbar();
 /** The package the document came from: export writes what Foli does not edit back from it. */
 let original: DocxPackage | undefined;
+/** Object URLs for its pictures' images. */
+let images: PackageImages | undefined;
 
 /** Shows a v3 document in a new editor (and view), with a fresh history. */
 function load(document: FoliDocument, from?: DocxPackage, trackChanges = false): void {
   view.destroy();
+  images?.revoke();
+  images = from ? packageImages(from) : undefined;
   editor = createEditor({ document: parseDocument(document), author: "Foli user", trackChanges });
-  view = new EditorView(host, editor);
+  view = new EditorView(host, editor, images ? { resource: images.url } : {});
   original = from;
   showToolbar();
 }

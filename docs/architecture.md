@@ -693,6 +693,23 @@ moved (`setColumnWidth`, one undo step); a press without a move changes nothing.
 button let go outside the page or the window losing the focus cancel. Not yet: the borders of a
 nested table, and a keyboard way to set a column's width (the table menu's).
 
+Pictures in the views (10.8b, `pictureElement` in `word/blocks.ts`): an inline picture is drawn
+in its line at its size (EMU / 9525 px) as an `img` with its alt text (empty when decorative),
+from the URL `imageSource` gives for its resource: the app's (`EditorViewOptions.resource`,
+`BlockOptions.resource`, its `null` showing the box; `packageImages` in `@folijs/docx` makes
+object URLs for a package's raster images and `data:` URLs for its SVGs, never same-origin
+`blob:` SVGs), else the resource's own image `data:` URL or web or `blob:` URL, fetched with no
+referrer (nothing else: a `javascript:` URL is no image); with none, a box of its size with the
+alt text as its label (`role="img"`). Its display, vertical alignment and maximum sizes are set
+inline, so an app's image CSS (`display: block`) cannot take it out of its line. In the
+editable view it sits in a `contenteditable="false"` span, one position like opaque content
+(no browser resize handles); one without alt text and not decorative is named "Picture without
+alt text" and has a dashed outline (`data-foli-no-alt`, not printed). The line takes the
+picture's height and its size is set before the image loads (no reflow on load).
+shortcut: a picture's line is measured from its span's box, not the image's, so a line holding
+only a picture can end a page a little early (never overflow); measure the image when it
+matters.
+
 Review in the editable view (9.5): `EditorView` draws tracked changes as the editor's state says
 (`trackState(state).view`, `setReviewView`), every block again when it changes. `markup`:
 `ins`/`del` in the author's color (eight colors, picked by the author's name), titled with the

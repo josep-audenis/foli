@@ -27,6 +27,7 @@ import {
   NodeSelection,
   parseContentV2,
   pasteCells,
+  type ResourceJSON,
   type ReviewView,
   redo,
   type SectionJSON,
@@ -61,6 +62,7 @@ import {
 } from "./layout/flow.js";
 import { type BlockDesc, PAGE_BREAK_ATTR } from "./render.js";
 
+import { imageSource } from "./word/blocks.js";
 import { spacing, type WordBlockDesc, type WordInfo, WordRenderer } from "./word/edit.js";
 import { measureLineRatio } from "./word/pages.js";
 import {
@@ -127,12 +129,20 @@ export interface EditorViewOptions {
   editable?: boolean;
   /** Shown while the document is one empty block (default: none). */
   placeholder?: string;
+  /**
+   * The URL to show a picture's image from (`key` in the document's `resources`): an image in
+   * the .docx package it came from has none of its own (`packageImages` in `@folijs/docx` gives
+   * object URLs). Undefined for a key: the resource's own image `data:` URL or web URL (fetched
+   * as it is shown), else a box of the picture's size; `null` (or "") for a key: that box (an
+   * app that does not fetch web URLs found in documents says so here). `null` clears it.
+   */
+  resource?: ((key: string, resource: ResourceJSON) => string | null | undefined) | null;
 }
 
 const PLACEHOLDER_ATTR = "data-foli-placeholder";
 // Generated content is not document text: no caret stops inside it, a zero-height float keeps
 // the caret at the line start, and the empty alt text keeps screen readers on aria-placeholder.
-const STYLES = `.${CELL_CLASS}{box-shadow:inset 0 0 0 9999px rgba(0,120,215,.22)}[${CELLS_ATTR}] ::selection{background:transparent}[${PLACEHOLDER_ATTR}]::before{content:attr(${PLACEHOLDER_ATTR});content:attr(${PLACEHOLDER_ATTR}) / "";float:inline-start;height:0;pointer-events:none;color:GrayText}`;
+const STYLES = `.${CELL_CLASS}{box-shadow:inset 0 0 0 9999px rgba(0,120,215,.22)}[${CELLS_ATTR}] ::selection{background:transparent}[data-foli-no-alt]{outline:2px dashed #b45309;outline-offset:-2px}@media print{[data-foli-no-alt]{outline:none}}[${PLACEHOLDER_ATTR}]::before{content:attr(${PLACEHOLDER_ATTR});content:attr(${PLACEHOLDER_ATTR}) / "";float:inline-start;height:0;pointer-events:none;color:GrayText}`;
 
 /**
  * Adds the view's stylesheet once per document or shadow root, when a placeholder is first shown
@@ -382,6 +392,8 @@ export class EditorView {
   private readonly addedTabIndex: boolean;
   /** Renders the document's blocks; made by the first render. */
   private word: WordRenderer | null = null;
+  /** The app's URLs for pictures' images (`EditorViewOptions.resource`). */
+  private resource: EditorViewOptions["resource"];
   /** How tracked changes show. */
   private review: ReviewView = "markup";
   /** Fonts' normal line height ratios, measured once per family (Word's single spacing). */
@@ -489,6 +501,17 @@ export class EditorView {
       this.editable = options.editable;
     }
     if (options.placeholder !== undefined) this.placeholder = options.placeholder;
+    if (options.resource !== undefined && options.resource !== this.resource) {
+      this.resource = options.resource ?? undefined;
+      // Every picture again, from the new URLs: after a running composition, keeping the
+      // selection.
+      if (this.word) {
+        if (this.composing) this.onCompositionEnd();
+        this.word = null;
+        this.render();
+        this.writeSelection(false);
+      }
+    }
 
     // Read-only: no caret and no browser editing; the text stays selectable and copyable.
     host.setAttribute("contenteditable", String(this.editable));
@@ -584,12 +607,15 @@ export class EditorView {
     if (renewed) this.fontsChanged = false;
     let word = this.word as WordRenderer;
     if (renewed) {
+      // A document with pictures: the mark of one without alt text is the view's stylesheet's.
+      if (context.envelope.resources) injectStyles(this.host);
       word = this.word = new WordRenderer(
         context,
         ownerDocument,
         this.lineRatio,
         false,
         this.review,
+        imageSource(context.envelope.resources, this.resource ?? undefined),
       );
       this.invalidateLayout();
     }

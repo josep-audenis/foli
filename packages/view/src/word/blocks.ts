@@ -11,6 +11,7 @@ import {
   type NodeJSON,
   type ParagraphFormat,
   Resolver,
+  type ResourceJSON,
   type RunFormat,
   type SectionJSON,
 } from "@folijs/core";
@@ -20,6 +21,77 @@ export const WORD_PAGE_BREAK_ATTR = "data-page-break";
 
 /** CSS px per twip (1/1440 inch; CSS: 96 px per inch). */
 export const PX_PER_TWIP = 96 / 1440;
+/** EMU (DrawingML's unit: 914 400 per inch) per CSS px. */
+export const EMU_PER_PX = 914_400 / 96;
+
+/** The URL to show a picture's image from (its resource key), if one is known. */
+export type ImageSource = (key: string) => string | undefined;
+
+/** Marks a picture's element (its resource key). */
+export const PICTURE_ATTR = "data-foli-picture";
+
+/** The accessible name of a picture with no alt text that is not decorative. */
+export const NO_ALT_LABEL = "Picture without alt text";
+
+/**
+ * The URL a resource gives on its own: an image `data:` URL, or a web or `blob:` URL; none for
+ * an image in a package part (the app's resolver gives one) or anything else.
+ */
+export function ownImageUrl(resource: ResourceJSON | undefined): string | undefined {
+  const data = resource?.data;
+  if (data && /^data:image\//i.test(data)) return data;
+  const url = resource?.url;
+  return url && /^(https?|blob):/i.test(url) ? url : undefined;
+}
+
+/**
+ * A picture as shown: its image at its size, or, when no URL is known for it, a box of that size
+ * with its alt text. A picture with no alt text that is not decorative is marked (`data-foli-
+ * no-alt`); a decorative one has an empty alt.
+ */
+export function pictureElement(
+  attrs: Record<string, unknown>,
+  doc: Document,
+  image?: ImageSource,
+): HTMLElement {
+  const key = String(attrs.resource ?? "");
+  const width = `${Number(attrs.width) / EMU_PER_PX}px`;
+  const height = `${Number(attrs.height) / EMU_PER_PX}px`;
+  const decorative = attrs.decorative === true;
+  const own = String(attrs.alt ?? "");
+  // Only a decorative picture is silent; one missing its alt text says so.
+  const alt = decorative ? "" : own || NO_ALT_LABEL;
+  const src = image?.(key);
+  let element: HTMLElement;
+  if (src) {
+    const img = doc.createElement("img");
+    img.src = src;
+    img.alt = alt;
+    img.draggable = false;
+    // A web URL in a document is fetched as it is shown: no referrer to go with it.
+    img.referrerPolicy = "no-referrer";
+    element = img;
+  } else {
+    element = doc.createElement("span");
+    element.setAttribute("role", "img");
+    if (alt) element.setAttribute("aria-label", alt);
+    else element.setAttribute("aria-hidden", "true");
+    element.style.boxSizing = "border-box";
+    element.style.border = "1px dashed GrayText";
+  }
+  element.setAttribute(PICTURE_ATTR, key);
+  if (!own && !decorative) element.dataset.foliNoAlt = "";
+  if (attrs.title) element.title = String(attrs.title);
+  // In the line at its size, whatever the app's CSS says of images (`display: block`…).
+  const style = element.style;
+  style.display = src ? "inline" : "inline-block";
+  style.verticalAlign = "baseline";
+  style.maxWidth = "none";
+  style.maxHeight = "none";
+  style.width = width;
+  style.height = height;
+  return element;
+}
 
 /** Which version of tracked changes to show. */
 /** How tracked changes show (`@folijs/core`'s, for `renderDocument` too). */
@@ -83,6 +155,26 @@ export interface BlockOptions {
    * Measured by the page layout; 1.2 when nothing measures (no layout engine).
    */
   lineRatio?: (fontFamily: string) => number;
+  /**
+   * The URL to show a picture's image from (`key` in `resources`): the app's (a package part's
+   * object URL…); `null` (or "") shows the picture's box. Left out, or undefined for a key: the
+   * resource's own image `data:` URL or web URL (fetched as it is shown).
+   */
+  resource?: (key: string, resource: ResourceJSON) => string | null | undefined;
+}
+
+/** The source for a document's pictures: the app's URL, else the resource's own. */
+export function imageSource(
+  resources: Readonly<Record<string, ResourceJSON>> | undefined,
+  resolve?: (key: string, resource: ResourceJSON) => string | null | undefined,
+): ImageSource {
+  return (key) => {
+    const resource = resources?.[key];
+    if (!resource) return undefined;
+    const url = resolve?.(key, resource);
+    // The app's answer stands, a refusal (null, "") included.
+    return url === undefined ? ownImageUrl(resource) : url || undefined;
+  };
 }
 
 /** A rendered block and what the page flow needs to know about it. */
@@ -336,6 +428,7 @@ export function renderBlocks(
     return value;
   };
   const resolver = new Resolver(document);
+  const image = imageSource(document.resources, options.resource);
   const content = document.content.content ?? [];
   const attrsOf = (node: NodeJSON) => (node.attrs ?? {}) as Record<string, unknown>;
   // In the final and simple views a paragraph whose mark was deleted joins the next paragraph
@@ -363,7 +456,7 @@ export function renderBlocks(
 
   content.forEach((node, index) => {
     if (node.type !== "paragraph") {
-      blocks.push(opaqueBlock(node, index, resolver, doc, ratio));
+      blocks.push(opaqueBlock(node, index, resolver, doc, ratio, image));
       return;
     }
     const attrs = attrsOf(node);
@@ -395,6 +488,7 @@ export function renderBlocks(
       review,
       comments,
       ratio,
+      image,
     });
     // An empty paragraph, or one ending in a line break, shows its last (empty) line; after a
     // page break the paragraph mark stays on the break's line, as in Word.
@@ -502,6 +596,7 @@ interface InlineContext {
   review: ReviewView;
   comments: Set<number>;
   ratio: (family: string) => number;
+  image?: ImageSource | undefined;
 }
 
 /** A paragraph's inline content: runs as spans, breaks, comment anchors, opaque inline content. */
@@ -512,7 +607,7 @@ function renderInline(
   paragraph: ParagraphFormat,
   context: InlineContext,
 ): void {
-  const { resolver, doc, review, comments, ratio } = context;
+  const { resolver, doc, review, comments, ratio, image } = context;
   for (const node of inline) {
     const marks = (node.marks ?? []) as MarkJSON[];
     const inserted = marks.some((m) => m.type === "insertion");
@@ -534,6 +629,9 @@ function renderInline(
       }
       case "bookmarkStart":
       case "bookmarkEnd":
+        continue;
+      case "picture":
+        parent.append(pictureElement(attrs, doc, image));
         continue;
       case "hardBreak":
       case "columnBreak":
@@ -598,6 +696,7 @@ export function opaqueBlock(
   resolver: Resolver,
   doc: Document,
   ratio: (family: string) => number,
+  image?: ImageSource,
 ): WordBlock {
   const attrs = (node.attrs ?? {}) as Record<string, unknown>;
   const element = doc.createElement("div");
@@ -606,7 +705,7 @@ export function opaqueBlock(
   element.style.display = "flow-root";
   const xml = node.type === "table" ? null : parseOpaque(String(attrs.xml ?? ""), doc);
   let after = 0;
-  if (node.type === "table") element.append(modelTable(node, resolver, doc, ratio));
+  if (node.type === "table") element.append(modelTable(node, resolver, doc, ratio, image));
   else if (xml?.localName === "tbl") element.append(opaqueTable(xml, resolver, doc, ratio));
   else if (xml) {
     const paragraphs = outermost(xml, PARAGRAPHS);
@@ -844,6 +943,7 @@ function modelTable(
   resolver: Resolver,
   doc: Document,
   ratio: (family: string) => number,
+  image?: ImageSource,
 ): HTMLElement {
   const attrs = (node.attrs ?? {}) as Record<string, unknown>;
   const table = doc.createElement("table");
@@ -861,7 +961,14 @@ function modelTable(
   table.append(colgroup);
   const body = doc.createElement("tbody");
   const rows = node.content ?? [];
-  const context = { resolver, doc, review: "markup" as const, comments: new Set<number>(), ratio };
+  const context = {
+    resolver,
+    doc,
+    review: "markup" as const,
+    comments: new Set<number>(),
+    ratio,
+    image,
+  };
   rows.forEach((rowNode, r) => {
     const rowAttrs = (rowNode.attrs ?? {}) as Record<string, unknown>;
     const row = doc.createElement("tr");
@@ -892,11 +999,11 @@ function modelTable(
       if (cellAttrs.vMerge === "continue") return;
       for (const block of cellNode.content ?? []) {
         if (block.type === "table") {
-          cell.append(modelTable(block, resolver, doc, ratio));
+          cell.append(modelTable(block, resolver, doc, ratio, image));
           continue;
         }
         if (block.type !== "paragraph") {
-          cell.append(opaqueBlock(block, 0, resolver, doc, ratio).element);
+          cell.append(opaqueBlock(block, 0, resolver, doc, ratio, image).element);
           continue;
         }
         const { paragraph, run } = resolver.paragraph(block.attrs ?? {}, format);
