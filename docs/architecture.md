@@ -680,7 +680,13 @@ a border drag: the next column gives or takes the difference, neither under 0.1 
 column's border widens the table (and its width in twips); cell widths in twips follow (up to 22
 inches), and the selection stays. None of them applies while tracking. New empty paragraphs
 take a cell's last paragraph's properties without its identity or revision. Every table
-command (10.7a and b) is its own undo step. Export writes a new table style
+command (10.7a and b) is its own undo step.
+
+Column borders in the editable view (10.7c): over a top-level table's column border (within 4 px
+of a grid column's right edge) the pointer shows `col-resize`; a press there starts a drag (no
+caret moves; the editor keeps the focus), a dashed guide follows the pointer, and the release
+sets the column's width through `setColumnWidth` (one undo step); Escape cancels. Not yet: the
+borders of a nested table, and a keyboard way to set a column's width (the table menu's). Export writes a new table style
 (Table Grid) from the model; a table style read from a file and then changed is still refused.
 
 Review in the editable view (9.5): `EditorView` draws tracked changes as the editor's state says

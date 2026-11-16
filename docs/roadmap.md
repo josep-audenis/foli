@@ -993,7 +993,8 @@ Each task is a PR on `phase-10/tables-images`, the build green after each.
   (In progress. 10.7a, core: insert a table, insert and delete rows and columns, delete a table;
   rows tracked, column commands refused while tracking; Word's Table Grid style added and
   exported. 10.7b, core: merge and split cells, header rows, table style, cell shading, column
-  width; none while tracking. Next: the border drag in the view; the toolbar's table menu.)
+  width; none while tracking. 10.7c: column borders dragged in the view (three engines). Next:
+  the toolbar's table menu.)
 - [ ] 10.8 Inline pictures: import and export `wp:inline` drawings (`a:blip` resources kept in the
   package), shown in the line at their size, laid out on pages; insert from a file, paste or
   drop through the upload hook; resize with the aspect ratio kept; alt text required to insert
