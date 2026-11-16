@@ -5,6 +5,7 @@ export {
   deleteBackward,
   deleteForward,
   deleteSelection,
+  deleteSelectionKeepingTables,
   insertHardBreak,
   insertPageBreak,
   insertTab,

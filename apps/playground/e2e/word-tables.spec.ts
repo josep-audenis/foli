@@ -170,3 +170,31 @@ test("Shift+Down from a cell's last line selects cells; Shift+Right widens them"
   await page.keyboard.press("Shift+ArrowRight");
   expect(await selected(page)).toEqual({ type: "cell", cells: 4, marked: 4 });
 });
+
+test("a paste over selected cells goes into the anchor cell; the table stays", async ({ page }) => {
+  await open(page, "06-price-schedule.docx");
+  await page
+    .locator("td", { hasText: /^Hardware item 3$/ })
+    .first()
+    .click();
+  await page.keyboard.press("End");
+  await page.keyboard.press("Shift+ArrowDown");
+  await page.keyboard.press("Shift+ArrowRight");
+  expect((await selected(page)).cells).toBe(4);
+  const tables = () =>
+    page.evaluate(() => {
+      let count = 0;
+      window.foliEdit.editor.state.doc.descendants((node) => {
+        if (node.type.name === "table") count++;
+      });
+      return count;
+    });
+  const before = await tables();
+  await page.evaluate(() =>
+    window.foliEdit.view.paste({ getData: (type: string) => (type === "text/plain" ? "Z" : "") }),
+  );
+  expect(await tables()).toBe(before);
+  await expect(page.locator("td", { hasText: /^Z$/ })).toHaveCount(1);
+  await expect(page.locator("td", { hasText: /^Hardware item 4$/ })).toHaveCount(1);
+  expect(await page.evaluate(() => window.foliEdit.validate())).toBe(true);
+});

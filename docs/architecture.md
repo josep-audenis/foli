@@ -606,7 +606,13 @@ Delete and Backspace empty the selected cells; typing replaces the anchor cell's
 Shift+Up/Down from a cell's first or last line start one, Shift+arrows grow it
 (`extendCellSelection`). The view reads a native selection whose ends are in two cells of one
 table (a drag) as one, and Firefox's one range per cell too; it marks the cells with a class
-and keeps the native caret in the head cell. Not yet: copy, cut and paste of cells and rows. Up and Down from a cell's first or last line (or with a cell's content
+and keeps the native caret in the head cell (the browser's own highlight, in DOM order, is
+hidden while cells are selected). `Selection.ranges` gives one range per selected cell, so
+marks, links, paragraph and run formatting, and accepting or rejecting changes act on those
+cells only. Pasting over cells pastes into the anchor cell; copy gives plain text (a tab
+between cells, a line per row). Not yet: copying cells as a table, pasting into several cells.
+
+Up and Down from a cell's first or last line (or with a cell's content
 selected) go to the cell above or below covering the same grid column (a merge's first cell),
 or out of the table from its first or last row (`goToCellVertically`, run by the view, which
 knows the lines): browsers go to the next cell in the DOM, or to the wrong row across pages. Left,

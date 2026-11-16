@@ -5,6 +5,7 @@ import { parseContent } from "../v3/document.js";
 import { createEditor } from "./editor.js";
 import { Selection, TextSelection } from "./selection.js";
 import { CellSelection, extendCellSelection, goToCellVertically } from "./tables.js";
+import { setWordAlign } from "./wordformat.js";
 
 /** Editing across a table's edges (10.6, ADR-0006). */
 
@@ -573,5 +574,79 @@ describe("cell selections", () => {
     // No row above the first: not taken.
     select(editor, inside(editor, "b1", 1));
     expect(editor.run(extendCellSelection("row", -1))).toBe(false);
+  });
+});
+
+describe("commands over a cell selection", () => {
+  const cellPos = (editor: Editor, value: string) => inside(editor, value) - 2;
+  /** a1..a3: one column, the cells of column b between them in document order. */
+  const column = () => {
+    const editor = editorOf([p("x"), TABLE, p("y")]);
+    editor.dispatch(
+      editor.state.tr.setSelection(
+        CellSelection.create(editor.state.doc, cellPos(editor, "a1"), cellPos(editor, "a3")),
+      ),
+    );
+    return editor;
+  };
+  /** The texts of the paragraphs `test` holds for. */
+  const where = (editor: Editor, test: (node: import("../model/index.js").Node) => boolean) => {
+    const found: string[] = [];
+    editor.state.doc.descendants((node) => {
+      if (node.type.name === "paragraph" && test(node)) found.push(node.textContent);
+    });
+    return found;
+  };
+
+  it("marks only the selected cells' text", () => {
+    const editor = column();
+    expect(editor.commands.toggleMark("bold")).toBe(true);
+    const bold = where(
+      editor,
+      (n) => n.firstChild?.marks.some((m) => m.type.name === "bold") ?? false,
+    );
+    expect(bold).toEqual(["a1", "a2", "a3"]);
+    editor.commands.toggleMark("bold");
+    expect(where(editor, (n) => n.firstChild?.marks.length !== 0 && !!n.firstChild)).toEqual([]);
+  });
+
+  it("formats only the selected cells' paragraphs", () => {
+    const editor = column();
+    expect(editor.run(setWordAlign("center"))).toBe(true);
+    expect(where(editor, (n) => n.attrs.justification === "center")).toEqual(["a1", "a2", "a3"]);
+  });
+
+  it("types into the anchor cell with its text's marks", () => {
+    const editor = column();
+    editor.commands.toggleMark("bold");
+    editor.commands.insertText("Z");
+    const z = where(editor, (n) => n.textContent === "Z");
+    expect(z).toEqual(["Z"]);
+    expect(
+      where(
+        editor,
+        (n) => n.textContent === "Z" && !!n.firstChild?.marks.some((m) => m.type.name === "bold"),
+      ),
+    ).toEqual(["Z"]);
+  });
+
+  it("do not extend a merge past a row that skips its column", () => {
+    // Row 2 starts after the first column (gridBefore): the restart above ends there.
+    const skipped = table(
+      row({ type: "tableCell", attrs: { vMerge: "restart" }, content: [p("m")] }, cell("b1")),
+      { type: "tableRow", attrs: { gridBefore: 1 }, content: [cell("b2")] },
+      row({ type: "tableCell", attrs: { vMerge: "continue" }, content: [p("c")] }, cell("b3")),
+    );
+    const editor = editorOf([p("x"), skipped, p("y")]);
+    const selection = CellSelection.create(
+      editor.state.doc,
+      cellPos(editor, "m"),
+      cellPos(editor, "b1"),
+    );
+    // A merge reaching row 2 would widen the rectangle to b2.
+    expect(selection.cells.map((pos) => editor.state.doc.nodeAt(pos)?.textContent)).toEqual([
+      "m",
+      "b1",
+    ]);
   });
 });

@@ -979,7 +979,7 @@ Each task is a PR on `phase-10/tables-images`, the build green after each.
   row deletion and insertion as row revisions with accept and reject. 10.6b: Tab and Shift+Tab
   between cells (Tab in the last cell adds a row), Up and Down across rows, pages and out of the
   table. 10.6c: `CellSelection` (drag, Shift+arrows), Delete empties cells, typing replaces the
-  anchor cell's content. Next: copy, cut and paste of cells and rows; T1–T5 in cells.)
+  anchor cell's content, formatting and review act on the selected cells only. Next: copy, cut and paste of cells and rows; T1–T5 in cells.)
 - [ ] 10.7 Table commands and UI: insert a table (rows × columns), insert and delete rows and
   columns, merge and split cells, header row, column width by dragging a border, table style and
   cell shading; row insertion and deletion tracked as Word records them; a table menu in the

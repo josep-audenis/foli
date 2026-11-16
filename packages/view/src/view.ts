@@ -9,6 +9,7 @@ import {
   deleteBackward,
   deleteForward,
   deleteSelection,
+  deleteSelectionKeepingTables,
   type Editor,
   type EditorState,
   extendCellSelection,
@@ -109,6 +110,8 @@ const WORD_RULES: FlowRules = { ...DEFAULT_RULES, spacing: "word" };
 const SELECTED_CLASS = "foli-selected-node";
 /** Marks a cell of a cell selection. */
 const CELL_CLASS = "foli-selected-cell";
+/** On the host while cells are selected: the browser's own highlight (in DOM order) is hidden. */
+const CELLS_ATTR = "data-foli-cells";
 
 interface DomPoint {
   node: Node;
@@ -125,7 +128,7 @@ export interface EditorViewOptions {
 const PLACEHOLDER_ATTR = "data-foli-placeholder";
 // Generated content is not document text: no caret stops inside it, a zero-height float keeps
 // the caret at the line start, and the empty alt text keeps screen readers on aria-placeholder.
-const STYLES = `.${CELL_CLASS}{box-shadow:inset 0 0 0 9999px rgba(0,120,215,.22)}[${PLACEHOLDER_ATTR}]::before{content:attr(${PLACEHOLDER_ATTR});content:attr(${PLACEHOLDER_ATTR}) / "";float:inline-start;height:0;pointer-events:none;color:GrayText}`;
+const STYLES = `.${CELL_CLASS}{box-shadow:inset 0 0 0 9999px rgba(0,120,215,.22)}[${CELLS_ATTR}] ::selection{background:transparent}[${PLACEHOLDER_ATTR}]::before{content:attr(${PLACEHOLDER_ATTR});content:attr(${PLACEHOLDER_ATTR}) / "";float:inline-start;height:0;pointer-events:none;color:GrayText}`;
 
 /**
  * Adds the view's stylesheet once per document or shadow root, when a placeholder is first shown
@@ -1335,6 +1338,7 @@ export class EditorView {
     for (const td of this.selectedCells) if (!cells.includes(td)) td.classList.remove(CELL_CLASS);
     for (const td of cells) td.classList.add(CELL_CLASS);
     this.selectedCells = cells;
+    this.host.toggleAttribute(CELLS_ATTR, cells.length > 0);
     if (cells.length) injectStyles(this.host);
   }
 
@@ -1531,6 +1535,8 @@ export class EditorView {
     // focuses nothing (prevented, middle button) must not skip the next keyboard focus.
     if (this.pointerFocus) setTimeout(() => (this.pointerFocus = false));
     if (event.button !== 0) return;
+    // A click puts a caret where it lands, even on the one a cell selection wrote.
+    if (!event.shiftKey) this.cellCaret = null;
     // A header row drawn again is not document content: the caret goes below it.
     const repeated = (event.target as Element | null)?.closest?.(`[${REPEATED_ATTR}]`);
     if (repeated && this.host.contains(repeated) && !event.shiftKey) {
@@ -1972,6 +1978,22 @@ export class EditorView {
     const { selection, doc } = this.state;
     if (selection.empty || !event.clipboardData) return;
     event.preventDefault();
+    if (selection instanceof CellSelection) {
+      // shortcut: selected cells copy as plain text (a tab between cells, a line per row, a
+      // cell's paragraphs joined by spaces); 10.6d copies them as a table.
+      const rows = new Map<number, string[]>();
+      for (const pos of selection.cells) {
+        const cell = doc.nodeAt(pos);
+        const row = doc.resolve(pos).before();
+        rows.set(row, [
+          ...(rows.get(row) ?? []),
+          cell ? cell.textBetween(0, cell.content.size, " ") : "",
+        ]);
+      }
+      const text = [...rows.values()].map((cells) => cells.join("\t")).join("\n");
+      event.clipboardData.setData("text/plain", text);
+      return;
+    }
     const context = wordContext(this.state) as WordContext;
     const { text, html, json } = serializeRange(
       doc,
@@ -2071,7 +2093,9 @@ export class EditorView {
     for (const strategy of strategies) {
       const tr = state.tr;
       try {
-        tr.deleteSelection();
+        // Over selected cells, into the anchor cell (filling cells is 10.6d's); across a
+        // table's edge, whole rows go (`deleteSelectionKeepingTables`).
+        if (!tr.selection.empty) deleteSelectionKeepingTables(tr, true);
         strategy(tr);
         const current = wordContext(state)?.envelope;
         if (envelope && current && envelope !== current) {

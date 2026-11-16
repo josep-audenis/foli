@@ -383,14 +383,15 @@ function gridOf(table: Node, start: number): GridCell[] {
     row.forEach((cell) => {
       const span = (cell.attrs.gridSpan as number | null) ?? 1;
       const above = open.get(column);
-      if (cell.attrs.vMerge === "continue" && above) above.rowSpan++;
+      // A merge continues only right below its last row (a row without that column ends it).
+      if (cell.attrs.vMerge === "continue" && above && above.row + above.rowSpan === r)
+        above.rowSpan++;
       else {
         const entry = { pos: cellPos, row: r, rowSpan: 1, column, span };
         out.push(entry);
         if (cell.attrs.vMerge === "restart") open.set(column, entry);
         else open.delete(column);
       }
-      if (cell.attrs.vMerge !== "continue" && cell.attrs.vMerge !== "restart") open.delete(column);
       column += span;
       cellPos += cell.nodeSize;
     });
@@ -441,6 +442,15 @@ export class CellSelection extends Selection {
 
   override get empty(): boolean {
     return false;
+  }
+
+  /** Each selected cell's content. */
+  override get ranges(): readonly { from: number; to: number }[] {
+    const doc = this.$head.doc;
+    return this.cells.map((pos) => ({
+      from: pos + 1,
+      to: pos + ((doc.nodeAt(pos)?.nodeSize as number | undefined) ?? 2) - 1,
+    }));
   }
 
   /** Still these cells when both survive the mapping; a text selection near the head otherwise. */
