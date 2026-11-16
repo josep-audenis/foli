@@ -472,12 +472,44 @@ export class CellSelection extends Selection {
   }
 }
 
+/** The grid cell covering the cell at `pos` of `table` (at `start`): a merge's, for a covered one. */
+function coveringCell(
+  table: Node,
+  start: number,
+  grid: readonly GridCell[],
+  pos: number,
+): GridCell | undefined {
+  let rowPos = start + 1;
+  for (let r = 0; r < table.childCount; r++) {
+    const row = table.child(r);
+    let column = (row.attrs.gridBefore as number | null) ?? 0;
+    let cellPos = rowPos + 1;
+    for (let i = 0; i < row.childCount; i++) {
+      const cell = row.child(i);
+      if (cellPos === pos) return coveringAt(grid, r, column);
+      column += (cell.attrs.gridSpan as number | null) ?? 1;
+      cellPos += cell.nodeSize;
+    }
+    rowPos += row.nodeSize;
+  }
+  return undefined;
+}
+
+/** The grid cell covering `row` and `column`. */
+const coveringAt = (grid: readonly GridCell[], row: number, column: number) =>
+  grid.find(
+    (c) =>
+      c.row <= row && row < c.row + c.rowSpan && c.column <= column && column < c.column + c.span,
+  );
+
 /** The cells (positions) of the rectangle between two cells of a table, merges widening it. */
 function rectangle($anchor: ResolvedPos, $head: ResolvedPos): number[] {
   const tableDepth = $anchor.depth - 1;
   const table = $anchor.node(tableDepth);
-  const grid = gridOf(table, $anchor.before(tableDepth));
-  const cellAt = (pos: number) => grid.find((c) => c.pos === pos);
+  const start = $anchor.before(tableDepth);
+  const grid = gridOf(table, start);
+  const cellAt = (pos: number) =>
+    grid.find((c) => c.pos === pos) ?? coveringCell(table, start, grid, pos);
   const a = cellAt($anchor.pos);
   const h = cellAt($head.pos);
   if (!a || !h) return [$anchor.pos];
@@ -610,6 +642,8 @@ export function cellsAsTable(selection: CellSelection): Node {
       }
       column += span;
     });
+    // shortcut: a row with no cell in these columns is left out, so the rows after it paste one
+    // row higher; keep a placeholder row once pasting can tell one apart.
     if (!cells.length) return;
     const before = first - left;
     const after = right + 1 - end;
@@ -617,7 +651,9 @@ export function cellsAsTable(selection: CellSelection): Node {
       row.type.create(
         {
           ...row.attrs,
+          // Not the row's identity (`w14:paraId`…) nor its revision: a copy is a new row.
           revision: null,
+          attributes: null,
           gridBefore: before || null,
           gridAfter: after || null,
           // The widths of the grid columns left empty, while they are the same columns.
@@ -641,57 +677,79 @@ export function cellsAsTable(selection: CellSelection): Node {
 /**
  * Pastes `table`'s rows into the table at `tr`'s selection (ADR-0006), from a cell selection's
  * first cell or the cell holding the selection: each pasted cell's content replaces that of the
- * cell at the same place from there, rows like the last one are added as needed, and cells past
- * the table's last column are dropped (a cell a pasted merge covers is skipped). The pasted cells
- * end up selected. Returns false, doing nothing, outside a table.
+ * cell at the same place from there, rows like the last one are added as needed, cells past the
+ * table's last column are dropped, and a cell of the target a merge covers takes only the first
+ * pasted cell it covers. The pasted cells end up selected. Returns false, doing nothing, when the
+ * selection is not in one cell (or cells) of a table or no pasted cell lands in the table.
  */
 export function pasteCells(tr: Transaction, table: Node): boolean {
   const { selection } = tr;
   let start: number;
   if (selection instanceof CellSelection) start = selection.cells[0] ?? selection.anchor;
   else {
-    const depth = cellDepth(selection.$from);
-    if (depth < 0) return false;
-    start = selection.$from.before(depth);
+    const { $from, $to } = selection;
+    const depth = cellDepth($from);
+    // A selection reaching out of its cell is not pasted into cells.
+    if (depth < 0 || cellDepth($to) !== depth || $from.before(depth) !== $to.before(depth))
+      return false;
+    start = $from.before(depth);
   }
   const $start = tr.doc.resolve(start);
   const tableDepth = $start.depth - 1;
   const tablePos = $start.before(tableDepth);
-  const origin = gridOf($start.node(tableDepth), tablePos).find((c) => c.pos === start);
+  let current = $start.node(tableDepth);
+  let grid = gridOf(current, tablePos);
+  const origin = grid.find((c) => c.pos === start);
   if (!origin) return false;
+  const width = Math.max(
+    (current.attrs.grid as number[]).length,
+    ...grid.map((c) => c.column + c.span),
+  );
   const targets: { row: number; column: number; cell: Node }[] = [];
   table.forEach((row, _o, i) => {
     let column = origin.column + ((row.attrs.gridBefore as number | null) ?? 0);
     row.forEach((cell) => {
-      if (cell.attrs.vMerge !== "continue") targets.push({ row: origin.row + i, column, cell });
+      if (cell.attrs.vMerge !== "continue" && column < width)
+        targets.push({ row: origin.row + i, column, cell });
       column += (cell.attrs.gridSpan as number | null) ?? 1;
     });
   });
-  const covering = (row: number, column: number) =>
-    gridOf(tr.doc.nodeAt(tablePos) as Node, tablePos).find(
-      (c) =>
-        c.row <= row && row < c.row + c.rowSpan && c.column <= column && column < c.column + c.span,
-    );
-  const filled: { row: number; column: number }[] = [];
-  const done = new Set<string>();
+  if (!targets.length) return false;
+  // The rows missing, added in one step.
+  const rows = Math.max(...targets.map((t) => t.row)) + 1;
+  if (current.childCount < rows) {
+    const added = emptyRowLike(current.lastChild as Node);
+    if (!added) return false;
+    const extra = Array.from({ length: rows - current.childCount }, () => added);
+    tr.insert(tablePos + current.nodeSize - 1, Fragment.from(extra));
+    current = tr.doc.nodeAt(tablePos) as Node;
+    grid = gridOf(current, tablePos);
+  }
+  // Each target cell once (the first pasted cell it covers), filled from the end so the
+  // positions found before stay valid.
+  const fills = new Map<number, { at: GridCell; cell: Node }>();
   for (const { row, column, cell } of targets) {
-    for (let current = tr.doc.nodeAt(tablePos) as Node; current.childCount <= row; ) {
-      const added = emptyRowLike(current.lastChild as Node);
-      if (!added) return false;
-      tr.insert(tablePos + current.nodeSize - 1, added);
-      current = tr.doc.nodeAt(tablePos) as Node;
-    }
-    const at = covering(row, column);
-    if (!at || done.has(`${at.row} ${at.column}`)) continue;
-    done.add(`${at.row} ${at.column}`);
-    filled.push(at);
+    const at = coveringAt(grid, row, column);
+    if (at && !fills.has(at.pos)) fills.set(at.pos, { at, cell });
+  }
+  if (!fills.size) return false;
+  for (const { at, cell } of [...fills.values()].sort((a, b) => b.at.pos - a.at.pos)) {
     const target = tr.doc.nodeAt(at.pos) as Node;
     tr.replace(at.pos + 1, at.pos + target.nodeSize - 1, new Slice(cell.content, 0, 0));
   }
-  const first = filled[0];
-  const last = filled[filled.length - 1];
-  const from = first && covering(first.row, first.column);
-  const to = last && covering(last.row, last.column);
-  if (from && to) tr.setSelection(CellSelection.create(tr.doc, from.pos, to.pos));
+  // The rectangle of the filled cells.
+  const filled = [...fills.values()].map((f) => f.at);
+  const after = gridOf(tr.doc.nodeAt(tablePos) as Node, tablePos);
+  const first = coveringAt(
+    after,
+    Math.min(...filled.map((c) => c.row)),
+    Math.min(...filled.map((c) => c.column)),
+  );
+  const last = coveringAt(
+    after,
+    Math.max(...filled.map((c) => c.row + c.rowSpan - 1)),
+    Math.max(...filled.map((c) => c.column + c.span - 1)),
+  );
+  if (first && last) tr.setSelection(CellSelection.create(tr.doc, first.pos, last.pos));
   return true;
 }

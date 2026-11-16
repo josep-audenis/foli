@@ -90,6 +90,9 @@ export function copiedDefinitions(context: WordContext, content: Node): WordDefi
       properties(attrs);
       properties(attrs.formatChange?.previous);
     }
+    // A table's style, and a row's exceptions' style.
+    if (node.type === "table") properties(attrs);
+    if (node.type === "tableRow") properties((attrs as { exceptions?: Properties }).exceptions);
     if (COMMENT_ANCHORS.has(node.type)) commentIds.add(attrs.id as number);
     marks(node.marks);
   };
@@ -395,6 +398,14 @@ function fit(
         if (Object.keys(rest).length) next.attributes = rest;
         else delete next.attributes;
       }
+    } else if (node.type === "table" && attrs?.style) {
+      next = { ...attrs, style: mapStyle(String(attrs.style)) };
+    } else if (node.type === "tableRow" && attrs) {
+      const exceptions = attrs.exceptions as Json | null | undefined;
+      // A copied row is a new row: not its identity (`w14:paraId`…).
+      next = { ...attrs, attributes: null };
+      if (exceptions?.style)
+        next.exceptions = { ...exceptions, style: mapStyle(String(exceptions.style)) };
     } else if (COMMENT_ANCHORS.has(node.type)) {
       const id = attrs?.id as number;
       if (!defined.has(id)) return null;
