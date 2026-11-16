@@ -810,11 +810,16 @@ Each task is a PR on `phase-9/review`, the build green after each.
   reject all = the original's text, style, bold and alignment, headings included (6000 runs
   locally). Known: Enter in a paragraph next to a deleted mark splits that paragraph as it is,
   not the paragraph accepting makes. Imported `w:rPrChange` properties are kept in canonical form. Changes exported and imported back (unit test).
-- [ ] 9.4 Accept and reject: commands for the change at the caret, the changes in the selection,
-  all, and all by an author; next and previous change (selects it); paragraph mark revisions
-  merge or keep paragraphs; a move's two ends accepted or rejected together; formatting changes
-  restore or drop `previous`. Tested on the redlined corpus documents against Word's text after
-  accept all and reject all (from the harness's reference data).
+- [x] 9.4 Accept and reject (`state/review.ts`): commands for the change at the caret, the changes
+  in the selection, all, and all by an author; next and previous change (selects it);
+  `trackedChanges(doc)` lists them. A deleted paragraph mark accepted joins the paragraph with the
+  next keeping the first one's properties (as untracked); an inserted one rejected joins them
+  keeping the last one's (the original mark's); a move's two ends go together; formatting changes
+  restore or drop `previous`. Accept and reject are untracked and undoable. The redlined corpus
+  document accepted gives Word's text with changes accepted (reference data); rejected, no
+  inserted text and the deleted text back (Word's reject is compared in 9.8). The property test
+  accepts and rejects everything for real: accept all = the edits untracked, reject all = the
+  original (text, style, bold, alignment).
 - [ ] 9.5 Review in the editable view and React: `markup`, `simple` (changes shown by a bar in
   the margin) and `final` while editing (deleted text hidden but kept; selection and mapping
   across it), author colors, author and date on hover and to screen readers (`ins`/`del`

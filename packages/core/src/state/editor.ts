@@ -30,6 +30,14 @@ import { setAlign, setHighlight, setTextColor } from "./format.js";
 import { history, redo, undo } from "./history.js";
 import { removeLink, setLink } from "./links.js";
 import { liftListItem, listKeymap, sinkListItem, toggleList, wrapInList } from "./lists.js";
+import {
+  acceptAllChanges,
+  acceptChange,
+  nextChange,
+  previousChange,
+  rejectAllChanges,
+  rejectChange,
+} from "./review.js";
 import { TextSelection } from "./selection.js";
 import { type Command, EditorState, type Plugin, type Transaction } from "./state.js";
 import { setTrackChanges, trackPlugin, trackState, trackTransaction } from "./track.js";
@@ -113,6 +121,18 @@ export interface Editor {
     setHighlight(color: string | null): boolean;
     /** Turns tracked changes on or off (`author` changes who makes them). */
     setTrackChanges(on: boolean, author?: string): boolean;
+    /** Accepts the change at the caret, or the changes in the selection. */
+    acceptChange(): boolean;
+    /** Rejects the change at the caret, or the changes in the selection. */
+    rejectChange(): boolean;
+    /** Accepts every change, or every change of `author`. */
+    acceptAllChanges(author?: string): boolean;
+    /** Rejects every change, or every change of `author`. */
+    rejectAllChanges(author?: string): boolean;
+    /** Selects the next change after the selection. */
+    nextChange(): boolean;
+    /** Selects the previous change before the selection. */
+    previousChange(): boolean;
   };
   /** Whether edits are recorded as tracked changes. */
   readonly trackingChanges: boolean;
@@ -234,6 +254,12 @@ export function createEditor({
       setTextColor: (color) => run(setTextColor(color)),
       setHighlight: (color) => run(setHighlight(color)),
       setTrackChanges: (on, name) => run(setTrackChanges(on, name)),
+      acceptChange: () => run(acceptChange),
+      rejectChange: () => run(rejectChange),
+      acceptAllChanges: (name) => run(acceptAllChanges(name)),
+      rejectAllChanges: (name) => run(rejectAllChanges(name)),
+      nextChange: () => run(nextChange),
+      previousChange: () => run(previousChange),
     },
     get trackingChanges() {
       return trackState(state)?.on ?? false;

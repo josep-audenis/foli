@@ -289,6 +289,18 @@ describe("tracked changes", () => {
     expect(second?.attrs?.formatChange).toMatchObject({ id: 0, previous: {} });
   });
 
+  it("records pasting paragraphs into the middle of one: rejecting gives it back", () => {
+    const heading = { type: "paragraph", attrs: { style: "Heading1" }, content: [text("abcd")] };
+    const editor = tracked(heading);
+    const before = editor.getDocument();
+    const { schema } = editor.state;
+    const pasted = schema.nodeFromJSON({ type: "doc", content: [p(text("X")), p(text("Y"))] });
+    editor.dispatch(editor.state.tr.replace(3, 3, pasted.slice(1, pasted.content.size - 1)));
+    expect(project(editor.state.doc, true)).toEqual(["(Heading1)abX", "Ycd"]);
+    editor.commands.rejectAllChanges();
+    expect(editor.getDocument()).toEqual(before);
+  });
+
   it("deletes everything as deleted text, keeping the last paragraph", () => {
     const editor = tracked(p(text("ab")), p(text("cd")));
     editor.commands.selectAll();
@@ -512,6 +524,15 @@ describe("tracked changes (property)", () => {
           apply(mirror, o);
           expect(project(editor.state.doc, true)).toEqual(project(mirror.state.doc, true));
           expect(project(editor.state.doc, false)).toEqual(project(start, true));
+        }
+        // Accepting and rejecting everything for real gives what the projections say.
+        const REVIEW = /"type":"(insertion|deletion|formatChange)"|"revision":\{|"formatChange":\{/;
+        for (const accept of [true, false]) {
+          const copy = createEditor({ document: editor.getDocument() });
+          if (accept) copy.commands.acceptAllChanges();
+          else copy.commands.rejectAllChanges();
+          expect(JSON.stringify(copy.getDocument().content)).not.toMatch(REVIEW);
+          expect(project(copy.state.doc, true)).toEqual(project(editor.state.doc, accept));
         }
         while (editor.commands.undo()) {}
         expect(editor.getDocument()).toEqual(original);

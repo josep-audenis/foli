@@ -460,6 +460,11 @@ that is recorded as the last one's formatting change, so rejecting restores it. 
 is on is not part of the document format: the editor option
 and the `.docx`'s `w:trackRevisions` (read and written by `@folijs/docx`) carry it.
 
+Accepting and rejecting (9.4, `state/review.ts`) work on the list `trackedChanges` makes
+(runs with one change mark, paragraph marks, paragraphs' recorded formatting): mark and attribute
+changes first, then removals and joins from the end of the document, so earlier positions stay.
+They carry the `untracked` meta, so tracking leaves them as they are.
+
 Lists: bullets reuse a plain definition of the document (not a numbering style's, nor one whose
 levels number headings) or add Word's (Symbol, Courier New, Wingdings bullets, half-inch levels);
 numbers start a new instance with a start override at 1, on a plain decimal definition or a new

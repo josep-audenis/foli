@@ -59,7 +59,8 @@ const RUN_MARKS = new Set<string>(RUN_PROPERTY_MARKS);
  */
 const UNRECORDED = new Set(["markFormat", "ext"]);
 
-const RECORDED = PARAGRAPH_PROPERTY_KEYS.filter((k) => !UNRECORDED.has(k));
+/** @internal Paragraph properties a formatting change records (`previous`). */
+export const RECORDED = PARAGRAPH_PROPERTY_KEYS.filter((k) => !UNRECORDED.has(k));
 /** A paragraph's recorded properties (a formatting change's `previous`): those it has. */
 const propertiesOf = (attrs: Attrs) =>
   Object.fromEntries(RECORDED.filter((k) => attrs[k] != null).map((k) => [k, attrs[k]]));

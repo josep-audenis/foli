@@ -173,6 +173,19 @@ or insert a block Foli does not model (a table) is not made while tracking (Phas
 be recorded is not made. `editor.commands.setTrackChanges(on, author?)` (the
 `setTrackChanges` command), `editor.trackingChanges`, `trackState(state)` (`{ on, author }`).
 
+Accepting and rejecting (not tracked themselves; undo takes them back):
+`editor.commands.acceptChange()` / `rejectChange()` (the change at the caret, or the changes in
+the selection), `acceptAllChanges(author?)` / `rejectAllChanges(author?)`, `nextChange()` /
+`previousChange()` (select the change after or before the selection); the same as commands
+(`acceptChange`, `rejectChange`, `acceptAllChanges(author?)`, `rejectAllChanges(author?)`,
+`nextChange`, `previousChange`). `trackedChanges(doc)` lists the changes (`Change`: `kind`,
+`id`, `author`, `date`, `from`, `to`, `move`) in document order: runs with one change mark,
+paragraph marks inserted or deleted (their closing token), paragraphs' recorded formatting.
+Accepting removes deleted content (a deleted paragraph mark joins the paragraph with the next,
+keeping the first one's properties) and drops records; rejecting removes inserted content (an
+inserted paragraph mark joins it with the next, which keeps its own properties: the original
+mark's), drops deletion records and restores recorded formatting. Both ends of a move go together.
+
 Word formatting (these do not apply to a state without a v3 envelope). Run properties,
 alignment and line spacing are written directly only where the styles do not already give the
 value; space before and after and indents are always written. Built-in styles the document has
