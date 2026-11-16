@@ -915,7 +915,12 @@ stable before 1.0):
 - `FoliToolbar` (6.2; Word's controls since 8.7b): paragraph style, font and font size boxes;
   bold, italic, underline, strikethrough; link (a dialog, also on Mod-K in the document); text
   color and highlight menus; align left, center, right, justify; line spacing; bulleted and
-  numbered lists, decrease and increase indent; undo, redo; page break. Its state is one
+  numbered lists, decrease and increase indent; undo, redo; the table group (10.7d: a Table menu
+  button whose WAI-ARIA menu runs Insert table… (a dialog for rows and columns, within Word's
+  limits), insert row above or below, insert column left or right, delete rows, columns or the
+  table, merge cells, split cell and the "Repeat as header row" checkbox item, each
+  `aria-disabled` where it cannot apply, from a dry run when the menu opens; a table style box;
+  a cell shading menu of light fills); page break. Its state is one
   module-level `useEditorState` selector, compared item by item so typing does not re-render it:
   `aria-pressed` and the boxes' values from the marks, alignment, list and formatting at the
   selection (O(selection)), `aria-disabled` from cheap checks (undo/redo depth, a paragraph in

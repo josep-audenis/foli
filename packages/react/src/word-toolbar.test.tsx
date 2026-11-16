@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { createEditor, type FoliDocument, trackState } from "@folijs/core";
+import { createEditor, type FoliDocument, insertTable, trackState } from "@folijs/core";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { FoliToolbar } from "./index.js";
@@ -44,6 +44,7 @@ describe("FoliToolbar on a schema v3 document", () => {
       "Font size",
       "Line spacing",
       "Show changes as",
+      "Table style",
     ]);
     const names = screen
       .getAllByRole("button")
@@ -147,5 +148,86 @@ describe("FoliToolbar on a schema v3 document", () => {
     fireEvent.keyDown(select("Paragraph style"), { key: "ArrowUp" });
     fireEvent.change(select("Paragraph style"), { target: { value: "Heading1" } });
     expect(back).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("FoliToolbar's table menu", () => {
+  afterEach(cleanup);
+  const tableIn = (editor: ReturnType<typeof setup>) =>
+    (editor.getDocument().content.content ?? []).find((b) => b.type === "table");
+  const openMenu = () => fireEvent.click(screen.getByRole("button", { name: "Table" }));
+  const item = (name: string) => screen.getByRole("menuitem", { name });
+
+  it("inserts a table of the size asked for, through a dialog", () => {
+    const editor = setup();
+    act(() => editor.select(6));
+    openMenu();
+    // Outside a table, only inserting applies.
+    expect(item("Insert row below").getAttribute("aria-disabled")).toBe("true");
+    expect(item("Insert table…").getAttribute("aria-disabled")).toBe(null);
+    fireEvent.click(item("Insert table…"));
+    const dialog = screen.getByRole("dialog", { name: "Insert table" });
+    fireEvent.change(screen.getByLabelText("Rows"), { target: { value: "3" } });
+    fireEvent.change(screen.getByLabelText("Columns"), { target: { value: "70" } });
+    fireEvent.submit(dialog.querySelector("form") as HTMLFormElement);
+    // 70 columns is past Word's limit: refused, said.
+    expect(screen.getByRole("alert").textContent).toContain("63 columns");
+    fireEvent.change(screen.getByLabelText("Columns"), { target: { value: "2" } });
+    fireEvent.submit(dialog.querySelector("form") as HTMLFormElement);
+    expect(screen.queryByRole("dialog")).toBe(null);
+    const table = tableIn(editor);
+    expect(table?.content).toHaveLength(3);
+    expect(table?.content?.[0]?.content).toHaveLength(2);
+  });
+
+  it("runs row and header commands in a table; shows the header row as checked", () => {
+    const editor = setup();
+    act(() => {
+      editor.select(6);
+      editor.run(insertTable(2, 2));
+    });
+    openMenu();
+    fireEvent.click(item("Insert row below"));
+    expect(tableIn(editor)?.content).toHaveLength(3);
+    openMenu();
+    const header = screen.getByRole("menuitemcheckbox", { name: "Repeat as header row" });
+    expect(header.getAttribute("aria-checked")).toBe("false");
+    fireEvent.click(header);
+    openMenu();
+    expect(
+      screen
+        .getByRole("menuitemcheckbox", { name: "Repeat as header row" })
+        .getAttribute("aria-checked"),
+    ).toBe("true");
+  });
+
+  it("is keyboard-usable: ArrowDown opens it, arrows move, Escape closes back to its button", () => {
+    setup();
+    const button = screen.getByRole("button", { name: "Table" });
+    fireEvent.keyDown(button, { key: "ArrowDown" });
+    expect(screen.getByRole("menu", { name: "Table" })).toBeTruthy();
+    expect(document.activeElement).toBe(item("Insert table…"));
+    fireEvent.keyDown(document.activeElement as Element, { key: "ArrowDown" });
+    expect(document.activeElement).toBe(item("Insert row above"));
+    fireEvent.keyDown(document.activeElement as Element, { key: "End" });
+    expect(document.activeElement?.textContent).toBe("Repeat as header row");
+    fireEvent.keyDown(document.activeElement as Element, { key: "Escape" });
+    expect(screen.queryByRole("menu")).toBe(null);
+    expect(document.activeElement).toBe(button);
+  });
+
+  it("sets the table style and the cells' shading", () => {
+    const editor = setup();
+    act(() => {
+      editor.select(6);
+      editor.run(insertTable(1, 2));
+    });
+    expect(select("Table style").value).toBe("Table Grid");
+    fireEvent.click(screen.getByRole("button", { name: "Shading" }));
+    fireEvent.click(screen.getByRole("menuitemradio", { name: "Light blue" }));
+    const cell = tableIn(editor)?.content?.[0]?.content?.[0];
+    expect(cell?.attrs?.shading).toMatchObject({ fill: "DEEAF6" });
+    fireEvent.change(select("Table style"), { target: { value: "Table Grid" } });
+    expect(tableIn(editor)?.attrs?.style).toBe("TableGrid");
   });
 });

@@ -58,12 +58,14 @@ writeFileSync(appEntry, `export { FoliEditor } from "${dist("react")}";\n`);
  * Raised in 10.6d (48.8, 58.6 and 77.6 kB): copying and pasting cells and rows (a selection's
  * cells as a table, filling cells from the selected one, table styles carried). Core raised in
  * 10.7a (50.8 kB): table commands (insert a table, rows and columns) and Word's Table Grid style.
+ * React raised in 10.7d (82.0 kB): the toolbar's table menu, insert table dialog, table style
+ * box and shading menu, which bring core's table commands into an app with the toolbar.
  */
 const BUNDLES = [
   { name: "@folijs/core", entry: dist("core"), budget: 52_000 },
   { name: "@folijs/view", entry: dist("view"), budget: 60_000 },
-  { name: "@folijs/react", entry: dist("react"), budget: 79_500 },
-  { name: "FoliEditor only", entry: appEntry, budget: 79_500 },
+  { name: "@folijs/react", entry: dist("react"), budget: 84_000 },
+  { name: "FoliEditor only", entry: appEntry, budget: 84_000 },
   { name: "@folijs/docx", entry: dist("docx"), budget: 42_000 },
 ];
 
