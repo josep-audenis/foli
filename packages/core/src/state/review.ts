@@ -344,7 +344,14 @@ function command(
 ): Command {
   return (state, dispatch) => {
     if (!state.schema.marks.insertion) return false;
-    const changes = range(state).flatMap((r) => changesIn(state.doc, r.from, r.to, filter));
+    // A change around several selected cells (a row revision, a move's partner) counts once.
+    const seen = new Set<string>();
+    const changes = range(state)
+      .flatMap((r) => changesIn(state.doc, r.from, r.to, filter))
+      .filter((c) => {
+        const key = `${c.kind} ${c.id} ${c.from} ${c.to}`;
+        return !seen.has(key) && !!seen.add(key);
+      });
     if (!changes.length) return false;
     if (dispatch) {
       // Its own undo step, never merged with the typing before it.

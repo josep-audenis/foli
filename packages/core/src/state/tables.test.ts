@@ -650,3 +650,30 @@ describe("commands over a cell selection", () => {
     ]);
   });
 });
+
+describe("review over a cell selection", () => {
+  const cellPos = (editor: Editor, value: string) => inside(editor, value) - 2;
+  for (const [name, revision, run] of [
+    ["rejecting", { insertion: { id: 7, author: "A", date: null } }, "rejectChange"],
+    ["accepting", { deletion: { id: 7, author: "A", date: null } }, "acceptChange"],
+  ] as const)
+    it(`${name} a row's revision from two of its cells removes that row only`, () => {
+      const tracked = table(
+        row(cell("a1"), cell("b1")),
+        { type: "tableRow", attrs: { revision }, content: [cell("a2"), cell("b2")] },
+        row(cell("a3"), cell("b3")),
+      );
+      const editor = editorOf([p("x"), tracked, p("y")]);
+      editor.dispatch(
+        editor.state.tr.setSelection(
+          CellSelection.create(editor.state.doc, cellPos(editor, "a2"), cellPos(editor, "b2")),
+        ),
+      );
+      expect(editor.commands[run]()).toBe(true);
+      expect(shape(editor)[1]).toEqual([
+        ["a1", "b1"],
+        ["a3", "b3"],
+      ]);
+      valid(editor);
+    });
+});
