@@ -10,13 +10,15 @@ carry what real Word files carry: full style sheets, numbering definitions, the 
 ids, settings, a glossary for content-control placeholders. The companies and people in them do
 not exist.
 
-| File                                  | Exercises                                                                                                                                                                                                                                               |
-| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `01-mutual-nda.docx`                  | Legal clause numbering linked to styles (1. / 1.1 / (a) / (i)), defined terms, a cross-reference to a clause (`REF`), a different first page, header from page 2, Page X of Y, a borderless signature table                                             |
-| `02-services-agreement-redlined.docx` | Tracked changes by two authors (replaced, deleted and inserted text, a new clause, a formatting change), comments with replies and a resolved one, a fee table across two pages with a merged and shaded header repeated on the second, a bulleted list |
-| `03-offer-letter-template.docx`       | Content controls (date, drop-down, plain text, check box, rich text) with placeholders, merge fields (`MERGEFIELD`), a letterhead with a picture in the header, footer small print                                                                      |
-| `04-board-report.docx`                | Cover page (different first page), table of contents (`TOC`, `PAGEREF`), headings 1-3, bulleted and numbered lists, footnotes, a floating picture with square wrapping, a landscape section, a table with a caption (`SEQ`)                             |
-| `05-business-letter.docx`             | Custom styles based on Normal, right tab stops with dot leaders, first-line and hanging indents, 1.15 line spacing, highlight, colored text, small caps, double underline, superscript, a manual page break, a page number in the header                |
+| File                                  | Exercises                                                                                                                                                                                                                                                                                                                                                   |
+| ------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `01-mutual-nda.docx`                  | Legal clause numbering linked to styles (1. / 1.1 / (a) / (i)), defined terms, a cross-reference to a clause (`REF`), a different first page, header from page 2, Page X of Y, a borderless signature table                                                                                                                                                 |
+| `02-services-agreement-redlined.docx` | Tracked changes by two authors (replaced, deleted and inserted text, a new clause, a formatting change), comments with replies and a resolved one, a fee table across two pages with a merged and shaded header repeated on the second, a bulleted list                                                                                                     |
+| `03-offer-letter-template.docx`       | Content controls (date, drop-down, plain text, check box, rich text) with placeholders, merge fields (`MERGEFIELD`), a letterhead with a picture in the header, footer small print                                                                                                                                                                          |
+| `04-board-report.docx`                | Cover page (different first page), table of contents (`TOC`, `PAGEREF`), headings 1-3, bulleted and numbered lists, footnotes, a floating picture with square wrapping, a landscape section, a table with a caption (`SEQ`)                                                                                                                                 |
+| `05-business-letter.docx`             | Custom styles based on Normal, right tab stops with dot leaders, first-line and hanging indents, 1.15 line spacing, highlight, colored text, small caps, double underline, superscript, a manual page break, a page number in the header                                                                                                                    |
+| `06-price-schedule.docx`              | Phase 10: a 41-row table over two pages with a repeated header row, a banded built-in table style (Medium List 1 - Accent 1), a category column merged down (`vMerge`), subtotal rows merged across (`gridSpan`), a tall row that may not break across pages (Word moves it to page 2 whole), a nested table in a cell after its caption, set column widths |
+| `07-picture-report.docx`              | Phase 10: inline pictures at the end of their paragraphs, with and without alt text; floating pictures wrapped square and top-and-bottom beside body text, one behind the text                                                                                                                                                                              |
 
 Page fields in headers and footers (`PAGE`, `NUMPAGES`) keep the result Word cached when it
 last updated them ("Page 1 of 1" in a 2-page document): Word computes them per page when it
@@ -29,6 +31,9 @@ result; Word stamps new revision ids and dates on every run:
 ```bash
 powershell -ExecutionPolicy Bypass -File scripts/corpus/build-word-corpus.ps1 -PdfDir <folder>
 ```
+
+`-Only 06,07` builds only those documents and leaves the others as they are (their reference
+data stays valid).
 
 `-PdfDir` also exports Word's own PDF of each document (Word's rendering, to look at and compare
 with; not committed). The script authors as fictional users and restores the Word user name and
@@ -49,13 +54,14 @@ powershell -ExecutionPolicy Bypass -File scripts/corpus/word-reference.ps1 [-In 
 
 One `<name>.json` per document:
 
-| Field               | Meaning                                                                                                                                                                             |
-| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `word`              | Word's build number                                                                                                                                                                 |
-| `opened`            | Word opened the file; if not, `error` says why (a damaged file, a password, a busy Word). Word refuses a damaged file under automation: checked with a `document.xml` cut short     |
-| `revisionsAccepted` | Tracked changes in the document. They are accepted in memory before measuring: the numbers below describe the final text, whatever markup view Word is set to                       |
-| `pages`             | Word's page count                                                                                                                                                                   |
-| `paragraphs`        | One per `w:p` of the main text, in order, table cells included: `text`, `page` and `line` where it starts, `endPage`, `listString` (the number Word shows: "1.1", "(a)"), `inTable` |
+| Field               | Meaning                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `word`              | Word's build number                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| `opened`            | Word opened the file; if not, `error` says why (a damaged file, a password, a busy Word). Word refuses a damaged file under automation: checked with a `document.xml` cut short                                                                                                                                                                                                                                                                                             |
+| `revisionsAccepted` | Tracked changes in the document. They are accepted in memory before measuring: the numbers below describe the final text, whatever markup view Word is set to                                                                                                                                                                                                                                                                                                               |
+| `pages`             | Word's page count                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| `paragraphs`        | One per `w:p` of the main text, in order, table cells included: `text`, `page` and `line` where it starts, `endPage`, `listString` (the number Word shows: "1.1", "(a)"), `inTable`                                                                                                                                                                                                                                                                                         |
+| `pictures`          | Each picture of the main text (inline ones first, then floating ones; headers' and footers' are left out): `page`, `left`/`top` (an inline one from the page's corner; a floating one from what it is `horizontalTo`/`verticalTo`, Word's WdRelative…Position; null when aligned, the alignment then in `horizontalAlign`/`verticalAlign`), `width`, `height` (points), `alt`, `wrap` (a floating one's WdWrapType), `paragraph` (a floating one's anchor, numbered from 1) |
 
 In `text` a manual line break is a newline; bullets in `listString` are the bullet font's code point
 (U+F0B7 for Symbol's bullet). Pages and lines depend on the Word build, the installed fonts and
@@ -120,7 +126,7 @@ there (and UTC in `w16du:dateUtc`), so Word shows Foli's times shifted by the ti
 `scripts/corpus/import-report.mjs` (after `pnpm build`) imports each document and prints what
 became editable and what stayed opaque; counts and element names only, never text, so it runs
 on a private folder too (`node scripts/corpus/import-report.mjs <folder>`). On the corpus
-(2026-11-11; the same for 0.3.0 on 2026-11-16):
+(2026-11-11; the same for 0.3.0 on 2026-11-16; 06 and 07 added 2026-11-16):
 
 | Document                       | Paragraphs | Opaque                                                        | Unmodeled values |
 | ------------------------------ | ---------: | ------------------------------------------------------------- | ---------------: |
@@ -129,6 +135,8 @@ on a private folder too (`node scripts/corpus/import-report.mjs <folder>`). On t
 | 03-offer-letter-template       |         14 | content controls 5, merge field 1; field structure 4          |                0 |
 | 04-board-report                |         35 | table 1, picture 1, footnote references 2; field structure 36 |                0 |
 | 05-business-letter             |         17 | none                                                          |                0 |
+| 06-price-schedule              |          4 | table 1                                                       |                0 |
+| 07-picture-report              |          7 | pictures 5                                                    |                0 |
 
 Field structure (`w:fldChar`, `w:instrText`) and comment reference marks have nothing to show:
 the field's result stays editable text. The tests check every imported paragraph's text against

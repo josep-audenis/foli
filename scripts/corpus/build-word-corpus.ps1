@@ -2,7 +2,7 @@
 # automation, so the files carry what real Word documents carry (full styles, numbering
 # definitions, theme, revision ids, settings). Windows with desktop Word only.
 #
-#   powershell -ExecutionPolicy Bypass -File scripts/corpus/build-word-corpus.ps1 [-PdfDir <folder>]
+#   powershell -ExecutionPolicy Bypass -File scripts/corpus/build-word-corpus.ps1 [-PdfDir <folder>] [-Only 06,07]
 #
 # -PdfDir also exports Word's own PDF of each document there (to look at, or compare with).
 #
@@ -10,7 +10,16 @@
 # style names ("Heading 1" is "Titulo 1" in a Spanish Word). Word's user name is changed to
 # author tracked changes and comments, and restored at the end.
 
-param([string]$PdfDir = "")
+param([string]$PdfDir = "", [string]$Only = "")
+
+# Only the documents whose numbers are in -Only ("06", "07"…), when given: the others are left as
+# they are, so their reference data stays valid.
+$wanted = @($Only -split "[,\s]+" | Where-Object { $_ })
+$known = @("01", "02", "03", "04", "05", "06", "07")
+foreach ($number in $wanted) {
+  if ($known -notcontains $number) { throw "-Only: no document $number (the documents are $($known -join ', '))" }
+}
+function Want([string]$number) { return $wanted.Count -eq 0 -or $wanted -contains $number }
 
 $ErrorActionPreference = "Stop"
 # Paths go to Word as [string]: PowerShell 5.1 passes a Join-Path result as a wrapped object,
@@ -240,6 +249,7 @@ try {
   # ---------------------------------------------------------------------------------------
   # 01: Mutual NDA. Legal clause numbering linked to styles, defined terms, a cross-reference,
   # a confidential header from page 2 (different first page), Page X of Y, a signature table.
+  if (Want "01") {
   $doc = New-Doc
   $template = Add-ClauseNumbering $doc
   $r = Add-Para $doc "MUTUAL NON-DISCLOSURE AGREEMENT" $S_TITLE
@@ -338,11 +348,13 @@ try {
   $first.Font.Size = 8
   $first.ParagraphFormat.Alignment = $ALIGN_CENTER
   Save-Doc $doc "01-mutual-nda.docx"
+  }
 
   # ---------------------------------------------------------------------------------------
   # 02: Services agreement under negotiation: a fee table (merged header, shading, repeated
   # header row), a bulleted list, then tracked changes by two authors (insertions, deletions,
   # a formatting change, a new clause) and comments with a reply and a resolved one.
+  if (Want "02") {
   $doc = New-Doc
   $template = Add-ClauseNumbering $doc
   $r = Add-Para $doc "MASTER SERVICES AGREEMENT" $S_TITLE
@@ -413,11 +425,13 @@ try {
   $c2.Replies.Add($c2.Scope, "Confirmed: all amounts exclude VAT.") | Out-Null
   $c2.Done = $true
   Save-Doc $doc "02-services-agreement-redlined.docx"
+  }
 
   # ---------------------------------------------------------------------------------------
   # 03: Offer letter template: letterhead with a logo, content controls (text, date,
   # drop-down, check box, rich text) and merge fields.
   Set-Author "HR Templates" "HR"
+  if (Want "03") {
   $doc = New-Doc
   $header = $doc.Sections.Item(1).Headers.Item($HF_PRIMARY).Range
   $header.InlineShapes.AddPicture($logo, $false, $true) | Out-Null
@@ -471,12 +485,14 @@ try {
   $footer.Font.Size = 7
   $footer.ParagraphFormat.Alignment = $ALIGN_CENTER
   Save-Doc $doc "03-offer-letter-template.docx"
+  }
 
   # ---------------------------------------------------------------------------------------
   # 04: Board report: cover page (different first page), table of contents, headings 1-3,
   # bulleted and numbered lists, footnotes, a floating chart with square wrapping, a
   # landscape section with a wide table, and a captioned appendix.
   Set-Author "Finance Team" "FT"
+  if (Want "04") {
   $doc = New-Doc
   $r = Add-Para $doc "Quarterly Board Report" $S_TITLE
   $r = Add-Para $doc "Q1 2026 - Northwind Traders Limited" $S_SUBTITLE
@@ -534,12 +550,14 @@ try {
   Add-PageXofY $doc
   $doc.TablesOfContents.Item(1).Update()
   Save-Doc $doc "04-board-report.docx"
+  }
 
   # ---------------------------------------------------------------------------------------
   # 05: Business letter with its own styles: tab stops with dot leaders, first-line and
   # hanging indents, line spacing, highlight, colored text, small caps, double underline,
   # superscript, a manual page break and a different first page.
   Set-Author "Sales Office" "SO"
+  if (Want "05") {
   $doc = New-Doc
   $body = $doc.Styles.Add("Letter Body", 1)
   $body.BaseStyle = $doc.Styles.Item($S_NORMAL).NameLocal
@@ -596,6 +614,116 @@ try {
   $hr.Collapse(0)
   $doc.Fields.Add($hr, $FIELD_EMPTY, "PAGE", $false) | Out-Null
   Save-Doc $doc "05-business-letter.docx"
+  }
+
+  # ---------------------------------------------------------------------------------------
+  # 06: Price schedule (Phase 10): a long table over pages with a repeated header row, a banded
+  # built-in table style, a category column merged down, a subtotal row merged across, a row
+  # that may not break across pages, a nested table in a cell, and different column widths.
+  if (Want "06") {
+  $doc = New-Doc
+  Add-Para $doc "PRICE SCHEDULE" $S_TITLE | Out-Null
+  Add-Para $doc "Schedule 2 to the Supply Agreement. Prices are in EUR and exclude VAT." | Out-Null
+  Add-Para $doc "" | Out-Null
+  $categories = @("Hardware", "Software", "Services", "Support")
+  # Amounts in the invariant culture: the same text whatever the generating machine's locale.
+  $invariant = [Globalization.CultureInfo]::InvariantCulture
+  $money = { param($value) $value.ToString("N2", $invariant) }
+  $rows = @(, @("Category", "Item", "Unit", "Qty", "Price"))
+  $n = 1
+  foreach ($category in $categories) {
+    $total = 0
+    for ($i = 1; $i -le 9; $i++) {
+      $rows += , @($category, "$category item $n", "each", [string]($i * 2), (& $money ($n * 37.5)))
+      $total += $i * 2 * $n * 37.5
+      $n++
+    }
+    $rows += , @("Subtotal $category", "", "", "", (& $money $total))
+  }
+  $table = $doc.Tables.Add($doc.Paragraphs.Last.Range, $rows.Count, 5)
+  # A banded built-in table style (WdBuiltinStyle -178: Word names it Medium List 1 - Accent 1).
+  try { $table.Style = $doc.Styles.Item(-178) } catch { $table.Borders.Enable = $true }
+  $table.ApplyStyleHeadingRows = $true
+  $table.ApplyStyleRowBands = $true
+  $table.ApplyStyleFirstColumn = $false
+  for ($row = 1; $row -le $rows.Count; $row++) { for ($col = 1; $col -le 5; $col++) { $table.Cell($row, $col).Range.Text = $rows[$row - 1][$col - 1] } }
+  $table.Rows.Item(1).HeadingFormat = -1
+  $widths = @(70, 170, 50, 40, 70)
+  for ($col = 1; $col -le 5; $col++) { $table.Columns.Item($col).Width = $widths[$col - 1] }
+  # Rows can be addressed only before cells are merged down.
+  # A tall row near the end of page 1 that may not break across pages: Word moves it whole.
+  $tallRow = 38
+  $table.Rows.Item($tallRow).AllowBreakAcrossPages = 0
+  $table.Cell($tallRow, 2).Range.Text = $rows[$tallRow - 1][1] + " with a longer description: installation on every workstation in the north and south wings, licence keys for three years, the vendor's onboarding pack, two training sessions for the site staff, and a review visit after the first month of use, all delivered by the same engineer."
+  # A nested table in a cell, after its caption paragraph: unit prices by volume.
+  # (Tables.Add in a cell loses a row and lands before the caption: converted text does not.)
+  $cell = $table.Cell(3, 2).Range
+  $cell.Text = "Volume prices:" + [char]13 + "1-9`t37.50" + [char]13 + "10+`t33.00"
+  $cell = $table.Cell(3, 2).Range
+  $prices = $doc.Range($cell.Paragraphs.Item(2).Range.Start, $cell.Paragraphs.Item(3).Range.End - 1)
+  $inner = $prices.ConvertToTable(1, 2, 2)   # wdSeparateByTabs
+  $inner.Borders.Enable = $true
+  # Bottom-up so earlier row numbers stay valid: subtotal rows merged across, categories down.
+  for ($row = $rows.Count; $row -ge 2; $row--) {
+    if ($rows[$row - 1][0] -like "Subtotal*") { $table.Cell($row, 1).Merge($table.Cell($row, 4)) }
+  }
+  $first = 2
+  foreach ($category in $categories) {
+    $table.Cell($first, 1).Merge($table.Cell($first + 8, 1))
+    $table.Cell($first, 1).Range.Text = $category
+    $first += 10
+  }
+  Add-Para $doc "The Supplier may revise these prices once a year with three months' notice." | Out-Null
+  Save-Doc $doc "06-price-schedule.docx"
+  }
+
+  # ---------------------------------------------------------------------------------------
+  # 07: Picture report (Phase 10): inline pictures with and without alt text, floating pictures
+  # wrapped square and top-and-bottom, and one behind the text.
+  if (Want "07") {
+  $doc = New-Doc
+  # The paragraphs first, then the pictures by paragraph number: a range kept from Add-Para moves
+  # as later paragraphs are added.
+  $long = "The inspection covered the north and south wings, the plant room and the roof. Readings were taken at the same hour each day and logged by the site manager, who also recorded the weather, the occupancy of the building and any maintenance carried out during the period. "
+  Add-Para $doc "Site inspection report" $S_TITLE | Out-Null                                  # 1
+  Add-Para $doc "The chart below shows the monthly readings: " | Out-Null                     # 2
+  Add-Para $doc "A second copy of the chart, as received, without a description: " | Out-Null # 3
+  Add-Para $doc ($long * 3) | Out-Null                                                        # 4
+  Add-Para $doc ($long * 2) | Out-Null                                                        # 5
+  Add-Para $doc ($long * 2) | Out-Null                                                        # 6
+  Add-Para $doc "End of report." | Out-Null                                                   # 7
+  # Inline pictures at the end of their paragraph's text (before its mark).
+  function At-End($n) { $r = $doc.Paragraphs.Item($n).Range; $r.MoveEnd(1, -1) | Out-Null; $r.Collapse(0); return $r }
+  $shape = $doc.InlineShapes.AddPicture($chart, $false, $true, (At-End 2))
+  $shape.AlternativeText = "Bar chart of monthly readings rising from 120 to 240"
+  $doc.InlineShapes.AddPicture($chart, $false, $true, (At-End 3)) | Out-Null
+  # Floating pictures: inserted inline at their paragraph's start and converted, the anchor locked
+  # (Shapes.AddPicture re-anchors to whatever paragraph is near the position). WdWrapType: 0
+  # square, 4 top and bottom, 5 behind text. Positions in points from the column (horizontally)
+  # and the anchor paragraph (vertically).
+  function Add-Float($n, $file, $left, $top, $width, $height, $wrap, $alt) {
+    $at = $doc.Paragraphs.Item($n).Range
+    $at.Collapse(1)   # wdCollapseStart
+    $s = $doc.InlineShapes.AddPicture($file, $false, $true, $at).ConvertToShape()
+    $s.LockAnchor = $true
+    $s.WrapFormat.Type = $wrap
+    $s.RelativeHorizontalPosition = 2   # wdRelativeHorizontalPositionColumn
+    $s.RelativeVerticalPosition = 2     # wdRelativeVerticalPositionParagraph
+    $s.Width = $width; $s.Height = $height; $s.Left = $left; $s.Top = $top
+    $s.AlternativeText = $alt
+  }
+  Add-Float 4 $logo 300 0 160 40 0 "Northwind logo"
+  Add-Float 5 $chart 0 20 240 140 4 "Chart of readings, placed between paragraphs"
+  Add-Float 6 $logo 100 10 240 60 5 "Northwind logo as a watermark"
+  # Word must have kept each where it was put.
+  $expected = @{ "Northwind logo" = 4; "Chart of readings, placed between paragraphs" = 5; "Northwind logo as a watermark" = 6 }
+  foreach ($s in $doc.Shapes) {
+    $paragraph = $doc.Range(0, $s.Anchor.Start).Paragraphs.Count
+    if ($s.Anchor.Start -eq $doc.Paragraphs.Item($paragraph).Range.End) { $paragraph++ }
+    if ($paragraph -ne $expected[$s.AlternativeText]) { throw "07: '$($s.AlternativeText)' is anchored in paragraph $paragraph, not $($expected[$s.AlternativeText])" }
+  }
+  Save-Doc $doc "07-picture-report.docx"
+  }
 }
 finally {
   # Each step on its own: one failing must not keep Word running or the others from running. The
