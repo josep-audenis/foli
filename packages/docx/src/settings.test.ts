@@ -72,6 +72,11 @@ describe("w:trackRevisions", () => {
     const first = editor.state.doc.firstChild as NonNullable<typeof editor.state.doc.firstChild>;
     editor.select(1, 1 + Math.min(3, first.content.size));
     editor.commands.insertText("New");
+    // A formatting change on original text, and on the paragraph.
+    // After the deleted "Nor" and the inserted "New": original text.
+    editor.select(1 + 6, 1 + 9);
+    editor.commands.toggleMark("bold");
+    editor.commands.setAlign("center");
     const exported = await exportDocx(editor.getDocument(), plain.package, {
       trackRevisions: editor.trackingChanges,
     });
@@ -80,7 +85,16 @@ describe("w:trackRevisions", () => {
     const marks = JSON.stringify(again.document.content.content?.[0]);
     expect(marks).toContain('"type":"insertion"');
     expect(marks).toContain('"author":"Reviewer"');
-    expect(again.document.content.content?.[0]).toEqual(editor.getDocument().content.content?.[0]);
+    expect(marks).toContain('"type":"formatChange"');
+    expect(again.document.content.content?.[0]?.attrs?.formatChange).toMatchObject({
+      author: "Reviewer",
+    });
+    // The same text and changes; only the verbatim XML Foli keeps is the new file's.
+    const review = (d: { content: { content?: unknown[] } }) =>
+      JSON.stringify(d.content.content?.[0], (key, value) =>
+        key === "ext" || (key === "attrs" && value?.xml) ? undefined : value,
+      );
+    expect(review(again.document)).toEqual(review(editor.getDocument()));
   });
 
   it("reads a settings part it cannot parse as tracking off, and keeps it", async () => {

@@ -778,7 +778,7 @@ Each task is a PR on `phase-9/review`, the build green after each.
   it (`setComments` makes the steps; `withEnvelope` ignores comments); styles and numbering
   added on first use keep Word's behaviour (they stay after undo). Pasted comments go with undo
   (closes 8.7c's note).
-- [x] 9.2 Recording insertions and deletions (`@folijs/core`, headless): tracking on/off and the
+- [x] 9.2 Recording insertions and deletions (#64, `@folijs/core`, headless): tracking on/off and the
   author in editor state (`createEditor({ author, trackChanges })`, `setTrackChanges`), a date
   per change; the editor rebuilds each dispatched transaction from the ranges it replaced
   (`trackTransaction`), so commands need no tracking code. Typing, paste, Enter and breaks
@@ -796,11 +796,20 @@ Each task is a PR on `phase-9/review`, the build green after each.
   `w:trackRevisions` (`DocxImport.trackRevisions`, `exportDocx(…, { trackRevisions })`).
   Property test: accept all = the same edits untracked, reject all = the original, undo all =
   exact. Changes made by Foli exported and imported back unchanged (unit test; Word in 9.8).
-- [ ] 9.3 Recording formatting changes: run formatting (bold, font, style…) records
-  `formatChange` with the properties before the first change, paragraph properties (style,
-  alignment, indentation, spacing, numbering) record the paragraph's `formatChange`; formatting
-  inserted text records nothing (it is already an insertion). Same property test with
-  formatting commands.
+- [x] 9.3 Recording formatting changes: run formatting (bold, font, character style…) records a
+  `formatChange` mark with the run properties before the first change, paragraph properties
+  (style, alignment, indentation, spacing, numbering) the paragraph's `formatChange`; later
+  changes keep the record; one's own inserted text and paragraphs record nothing. A join that
+  removes one's own inserted mark keeps the first paragraph's properties (as untracked) and
+  records the last one's as its formatting change (one's own record of properties back as they
+  were is dropped: Enter then Backspace leaves the original). A split's open end keeps the
+  original mark with the inserted paragraph's properties (the next style after a heading):
+  recorded as that paragraph's formatting change, so rejecting keeps the heading. The paragraph
+  mark's look (`markFormat`) is
+  not recorded. The property test adds bold, unbold and alignment: accept all = untracked,
+  reject all = the original's text, style, bold and alignment, headings included (6000 runs
+  locally). Known: Enter in a paragraph next to a deleted mark splits that paragraph as it is,
+  not the paragraph accepting makes. Imported `w:rPrChange` properties are kept in canonical form. Changes exported and imported back (unit test).
 - [ ] 9.4 Accept and reject: commands for the change at the caret, the changes in the selection,
   all, and all by an author; next and previous change (selects it); paragraph mark revisions
   merge or keep paragraphs; a move's two ends accepted or rejected together; formatting changes

@@ -11,11 +11,28 @@
  * replayed on top. Undo and redo, transactions kept out of history and those with the
  * `untracked` meta (accepting and rejecting changes) are not tracked.
  */
-import { Fragment, type Mark, type MarkType, type Node, Slice } from "../model/index.js";
+
+import { deepEqual } from "../model/attrs.js";
+import {
+  type Attrs,
+  Fragment,
+  type Mark,
+  type MarkType,
+  type Node,
+  Slice,
+} from "../model/index.js";
 import { type Mappable, Mapping, type MapResult } from "../transform/stepmap.js";
-import { NodeMarkupBatchStep, NodeMarkupStep, type Step } from "../transform/steps.js";
+import {
+  AddMarkStep,
+  NodeMarkupBatchStep,
+  NodeMarkupStep,
+  RemoveMarkStep,
+  type Step,
+} from "../transform/steps.js";
 import { TransformError } from "../transform/transform.js";
 import type { CommentJSON } from "../v3/document.js";
+import { PARAGRAPH_PROPERTY_KEYS, RUN_PROPERTY_MARKS } from "../v3/schema.js";
+import { MARK_ATTRS } from "./mark.js";
 import { NodeSelection, Selection, TextSelection } from "./selection.js";
 import { type Command, type EditorState, Plugin, PluginKey, type Transaction } from "./state.js";
 import { wordContext } from "./word.js";
@@ -34,6 +51,20 @@ export const untracked = "untracked";
 
 /** Inline nodes a tracked change does not mark: they stand between runs in Word. */
 const MARKERS = new Set(["bookmarkStart", "bookmarkEnd", "commentStart", "commentEnd"]);
+
+const RUN_MARKS = new Set<string>(RUN_PROPERTY_MARKS);
+/**
+ * Paragraph properties a formatting change does not record: the paragraph mark's look (Word
+ * records it on the mark) and the verbatim XML.
+ */
+const UNRECORDED = new Set(["markFormat", "ext"]);
+
+const RECORDED = PARAGRAPH_PROPERTY_KEYS.filter((k) => !UNRECORDED.has(k));
+/** A paragraph's recorded properties (a formatting change's `previous`): those it has. */
+const propertiesOf = (attrs: Attrs) =>
+  Object.fromEntries(RECORDED.filter((k) => attrs[k] != null).map((k) => [k, attrs[k]]));
+const sameProperties = (a: Attrs, b: Attrs) =>
+  RECORDED.every((k) => deepEqual(a[k] ?? null, b[k] ?? null));
 
 /** A tracked change's author and date, as the schema keeps them (`w:id`, `w:author`, `w:date`). */
 interface Revision {
@@ -213,6 +244,10 @@ function rebuild(
   const pending: { at: At; kind: "insertion" | "deletion"; revision: Revision }[] = [];
   /** Paragraphs whose mark `tr` removed and the rebuilt document keeps (deleted). */
   const apart: At[] = [];
+  /** Paragraphs joined for real (one's own inserted mark removed). */
+  const rejoined: At[] = [];
+  /** Paragraphs that keep a mark with another paragraph's properties, and that paragraph. */
+  const formats: { at: At; host: Node }[] = [];
 
   /** The mark of `type` by `author` next to `from..to`, to extend instead of starting a change. */
   const adjacent = (type: MarkType, from: number, to: number): Mark | undefined => {
@@ -240,7 +275,8 @@ function rebuild(
     const real: [number, number][] = [];
     const marked: [number, number][] = [];
     // Paragraphs joined for real (one's own inserted mark removed) become one, which starts
-    // where the first starts and ends with the last one's mark, as an untracked join does.
+    // where the first starts and ends with the last one's mark (`keepLastMark`), as an
+    // untracked join does.
     let group: number | null = null;
     const merged: { at: At; node: Node }[] = [];
     doc.nodesBetween(from, to, (node, pos) => {
@@ -284,8 +320,24 @@ function rebuild(
     for (const { at: where, node } of merged) {
       const pos = at(where, 1);
       const current = out.doc.nodeAt(pos);
-      if (current?.isTextblock)
-        out.step(new NodeMarkupStep(pos, node.type, node.attrs, current.marks));
+      if (!current?.isTextblock) continue;
+      const attrs = { ...current.attrs };
+      for (const key of MARK_ATTRS) attrs[key] = node.attrs[key] ?? null;
+      // The mark kept is the last paragraph's: taking the first one's properties is a change of
+      // its formatting, recorded unless that mark is one's own insertion or has a record.
+      const revision = node.attrs.revision as ParagraphRevision | null;
+      if (
+        !attrs.formatChange &&
+        revision?.insertion?.author !== author &&
+        !sameProperties(attrs, node.attrs)
+      )
+        attrs.formatChange = { id: newId(), author, date, previous: propertiesOf(node.attrs) };
+      // One's own record of what the paragraph is again (Enter, then Backspace) goes.
+      const record = attrs.formatChange as { author: string; previous: Attrs } | null;
+      if (record?.author === author && sameProperties(attrs, record.previous))
+        attrs.formatChange = null;
+      out.step(new NodeMarkupStep(pos, current.type, attrs, current.marks));
+      rejoined.push(here(pos));
     }
     const mapping = out.mapping.slice(startStep);
     return { start: here(mapping.map(from, -1)), end: here(mapping.map(to, 1)) };
@@ -311,6 +363,7 @@ function rebuild(
     let inserted: At | null = null;
     const pos = end.pos;
     if (slice.size && !emptyBlock) {
+      const host = out.doc.resolve(pos).parent;
       const mark = adjacent(insertion, pos, pos) ?? insertion.create({ id: newId(), author, date });
       const content = markFragment(slice.content, mark, insertion, deletion);
       out.replace(pos, pos, new Slice(content, slice.openStart, slice.openEnd));
@@ -323,6 +376,11 @@ function rebuild(
           pending.push({ at: here(p), kind: "insertion", revision: revisionOf(mark) });
         return false;
       });
+      // An open end: the paragraph there keeps the original mark with the inserted content's
+      // properties (Enter at the end of a heading: the next style), a change of its formatting.
+      const $end = out.doc.resolve(pos + size);
+      if (slice.openEnd && host.isTextblock && $end.parent.isTextblock && $end.depth > 0)
+        formats.push({ at: here($end.before()), host });
     }
     records.unshift({ range, start, end, inserted });
   }
@@ -342,6 +400,53 @@ function rebuild(
     return out.mapping.map(p - delta, assoc);
   };
 
+  // Formatting changes (9.3): what the formatting was before the first tracked change, kept on
+  // the run (`formatChange` mark) or the paragraph (`formatChange` attribute). One's own
+  // insertions record none: they are new.
+  const formatChange = state.schema.marks.formatChange;
+  const ownInsertion = (node: Node) => insertion.isInSet(node.marks)?.attrs.author === author;
+  const recordRun = (step: AddMarkStep | RemoveMarkStep) => {
+    if (!formatChange || !RUN_MARKS.has(step.mark.type.name)) return;
+    const segments: { from: number; to: number; previous: string }[] = [];
+    out.doc.nodesBetween(step.from, step.to, (node, pos) => {
+      if (!node.isInline) return true;
+      if (MARKERS.has(node.type.name) || formatChange.isInSet(node.marks) || ownInsertion(node))
+        return false;
+      const present = step.mark.isInSet(node.marks);
+      if (step instanceof AddMarkStep ? present : !present) return false;
+      const previous = JSON.stringify(
+        node.marks.filter((m) => RUN_MARKS.has(m.type.name)).map((m) => m.toJSON()),
+      );
+      const from = Math.max(pos, step.from);
+      const to = Math.min(pos + node.nodeSize, step.to);
+      const last = segments[segments.length - 1];
+      if (last && last.to === from && last.previous === previous) last.to = to;
+      else segments.push({ from, to, previous });
+      return false;
+    });
+    for (const { from, to, previous } of segments) {
+      const attrs = { id: newId(), author, date, previous: JSON.parse(previous) };
+      out.addMark(from, to, formatChange.create(attrs));
+    }
+  };
+  const recordParagraph = (step: NodeMarkupStep): NodeMarkupStep => {
+    const node = out.doc.nodeAt(step.pos);
+    const attrs = step.attrs;
+    if (!node?.isTextblock || !attrs || node.type !== step.type) return step;
+    // Only the mark's attributes change (a split moves them to the second paragraph): as is.
+    if (sameProperties(node.attrs, attrs)) return step;
+    // A record stays (the properties before the first change), whatever the step sets.
+    if (node.attrs.formatChange) {
+      if (deepEqual(attrs.formatChange ?? null, node.attrs.formatChange)) return step;
+      const kept = { ...attrs, formatChange: node.attrs.formatChange };
+      return new NodeMarkupStep(step.pos, step.type, kept, step.marks);
+    }
+    const revision = node.attrs.revision as ParagraphRevision | null;
+    if (revision?.insertion?.author === author) return step;
+    const formatChange = { id: newId(), author, date, previous: propertiesOf(node.attrs) };
+    return new NodeMarkupStep(step.pos, step.type, { ...attrs, formatChange }, step.marks);
+  };
+
   // Steps that move nothing (marks, attributes, comments), replayed on the rebuilt document.
   // An attribute change of a paragraph whose mark is now a tracked deletion (the merged
   // paragraph of a join) does not apply: the paragraphs stay apart.
@@ -356,14 +461,35 @@ function rebuild(
       },
     };
     let mapped: Step | null = step.map(mapping);
-    const joins = new Set(apart.map((x) => at(x, 1)));
+    // Paragraphs joined for real already have their attributes (`keepLastMark` and the record).
+    const joins = new Set([...apart, ...rejoined].map((x) => at(x, 1)));
     if (mapped instanceof NodeMarkupStep && joins.has(mapped.pos)) mapped = null;
     if (mapped instanceof NodeMarkupBatchStep) {
       const kept = mapped.steps.filter((s) => !joins.has(s.pos));
       mapped = kept.length ? new NodeMarkupBatchStep(kept) : null;
     }
+    if (mapped instanceof AddMarkStep || mapped instanceof RemoveMarkStep) recordRun(mapped);
+    if (mapped instanceof NodeMarkupStep) mapped = recordParagraph(mapped);
+    if (mapped instanceof NodeMarkupBatchStep)
+      mapped = new NodeMarkupBatchStep(mapped.steps.map(recordParagraph));
     if (mapped) out.step(mapped);
   });
+
+  // Paragraphs keeping the original mark with an inserted paragraph's properties.
+  for (const { at: where, host } of formats) {
+    const pos = at(where, 1);
+    const node = out.doc.nodeAt(pos);
+    const revision = node?.attrs.revision as ParagraphRevision | null | undefined;
+    if (
+      !node?.isTextblock ||
+      node.attrs.formatChange ||
+      revision?.insertion?.author === author ||
+      sameProperties(node.attrs, host.attrs)
+    )
+      continue;
+    const formatChange = { id: newId(), author, date, previous: propertiesOf(host.attrs) };
+    out.step(new NodeMarkupStep(pos, node.type, { ...node.attrs, formatChange }, node.marks));
+  }
 
   // Paragraph marks inserted or deleted, set last so attribute changes above do not undo them.
   const done = new Set<number>();
