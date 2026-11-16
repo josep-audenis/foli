@@ -837,7 +837,7 @@ Each task is a PR on `phase-9/review`, the build green after each.
   from the toolbar, undo; axe on the toolbar and pages with changes. Not yet: a deleted
   paragraph mark is not shown joined in `final`/`simple` while editing (the read-only renderer
   does join).
-- [x] 9.6 Comments in the engine (`state/comments.ts`): `addComment` on the selection (its range
+- [x] 9.6 Comments in the engine (#68, `state/comments.ts`): `addComment` on the selection (its range
   around it, the reference mark after it, as Word places them; at a caret, a point), replies
   (`replyToComment`: the starts together, then each end with its reference, as Word writes a
   thread; a reply to a reply answers the thread), `editComment`, `resolveComment` (and reopen:
