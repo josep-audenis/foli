@@ -644,6 +644,22 @@ read-back counts a block it finds nowhere, with no recorded removal, as unchange
 widths are the grid Word saved (an autofit table is not recomputed), an exact row height is
 drawn as at least, contextual spacing between paragraphs in a cell.
 
+Table commands (10.7a, `packages/core/src/state/tablecommands.ts`) act on the table around the
+selection, on the rows and columns of a cell selection's rectangle or the caret's cell:
+`insertTable(rows, columns)` (up to Word's 63 columns, 1000 rows) inserts empty cells sharing
+the section's text width with Word's "Table Grid" style (added from `builtinStyle` when the
+document lacks it), before the caret's paragraph at its start, after it at its end, else
+between its halves, with a paragraph after it where nothing follows; `insertRow(dir)` adds an
+empty row like the first or last selected one, a vertical merge running across it going on;
+`deleteRows` deletes the selected rows (a merge starting in one restarts in the first kept row,
+with its text), the table when they are all of them; `insertColumn(dir)` adds a column as wide
+as its neighbour (a cell spanning its place widens, the new cells take their neighbour's
+properties, `gridBefore` and `gridAfter` grow where a row has no cell there); `deleteColumns`
+removes cells and narrows spanning ones (a row left with no cell goes); `deleteTable`. Rows
+inserted and deleted while tracking are tracked (the rebuild records them); column commands do
+not apply while tracking. Cell widths in twips follow the grid. Export writes a new table style
+(Table Grid) from the model; a table style read from a file and then changed is still refused.
+
 Review in the editable view (9.5): `EditorView` draws tracked changes as the editor's state says
 (`trackState(state).view`, `setReviewView`), every block again when it changes. `markup`:
 `ins`/`del` in the author's color (eight colors, picked by the author's name), titled with the

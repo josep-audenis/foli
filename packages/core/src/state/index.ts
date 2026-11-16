@@ -106,6 +106,14 @@ export {
   Transaction,
 } from "./state.js";
 export {
+  deleteColumns,
+  deleteRows,
+  deleteTable,
+  insertColumn,
+  insertRow,
+  insertTable,
+} from "./tablecommands.js";
+export {
   CellSelection,
   cellsAsTable,
   extendCellSelection,

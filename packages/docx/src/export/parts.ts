@@ -28,6 +28,7 @@ import { DocxError } from "../package.js";
 import type { XmlElement, XmlNode } from "../xml.js";
 import { blocksXml, type WriteContext } from "./content.js";
 import { paragraphPropertiesXml, runPropertiesXml, same } from "./properties.js";
+import { stylePartsXml } from "./tables.js";
 import {
   attributesOf,
   el,
@@ -188,8 +189,12 @@ function styleXml(style: StyleJSON, ns: Namespaces): string {
     if (reread && same(normalizeStyle(style), normalizeStyle(reread))) return style.ext as string;
   }
   const reread = o ? styleOf(o.element, reading(o.source)) : undefined;
-  // A table style's parts are written as read (`w:tblPr`… kept): a change would be lost.
-  for (const key of ["table", "row", "cell", "conditions"] as const) {
+  // A table style read from the file has its parts written as read (`w:tblPr`… kept): a change
+  // would be lost. A new one (Word's Table Grid, added by a command) is written from the model,
+  // without conditional formats.
+  for (const key of o
+    ? (["table", "row", "cell", "conditions"] as const)
+    : (["conditions"] as const)) {
     if (!same(style[key], reread?.[key])) {
       throw new DocxError(
         `Style ${style.id}: a changed table style (${key}) cannot be exported yet`,
@@ -217,6 +222,7 @@ function styleXml(style: StyleJSON, ns: Namespaces): string {
       "rPr",
       runPropertiesXml(style.run ?? [], childSource(o, "rPr"), ns, "w:rPr", false, undefined, true),
     ],
+    ...(o ? [] : Object.entries(stylePartsXml(style, ns))),
   ]);
   const children = merged(STYLE_ORDER, new Set(generated.keys()), generated, o);
   const open =

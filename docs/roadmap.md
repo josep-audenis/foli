@@ -990,6 +990,10 @@ Each task is a PR on `phase-10/tables-images`, the build green after each.
   columns, merge and split cells, header row, column width by dragging a border, table style and
   cell shading; row insertion and deletion tracked as Word records them; a table menu in the
   toolbar (React), keyboard-usable; axe in three engines.
+  (In progress. 10.7a, core: insert a table, insert and delete rows and columns, delete a table;
+  rows tracked, column commands refused while tracking; Word's Table Grid style added and
+  exported. Next: merge and split, header row, table style and shading, column width; the
+  border drag in the view; the toolbar's table menu.)
 - [ ] 10.8 Inline pictures: import and export `wp:inline` drawings (`a:blip` resources kept in the
   package), shown in the line at their size, laid out on pages; insert from a file, paste or
   drop through the upload hook; resize with the aspect ratio kept; alt text required to insert

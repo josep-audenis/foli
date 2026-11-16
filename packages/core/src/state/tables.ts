@@ -14,7 +14,7 @@ import { type Command, type EditorState, Plugin, type Transaction } from "./stat
 const isTable = (node: Node) => node.type.name === "table";
 
 /** The depth of the innermost table cell around `$pos`, or -1. */
-function cellDepth($pos: ResolvedPos): number {
+export function cellDepth($pos: ResolvedPos): number {
   for (let d = $pos.depth; d > 0; d--) if ($pos.node(d).type.name === "tableCell") return d;
   return -1;
 }
@@ -260,7 +260,7 @@ export function goToCell(dir: 1 | -1): Command {
  * cells empty, unmerged, their paragraph with the first one's properties, without what only one
  * paragraph has. Null when the schema has no paragraph.
  */
-function emptyRowLike(last: Node): Node | null {
+export function emptyRowLike(last: Node): Node | null {
   const paragraph = last.type.schema.nodes.paragraph;
   if (!paragraph) return null;
   const rowAttrs = { ...last.attrs, revision: null, header: null, attributes: null };
@@ -369,7 +369,7 @@ export function tableKeymap(): Plugin {
 // ---- Cell selections (10.6c) ---------------------------------------------------------------------
 
 /** A cell where a table's grid has it: its position and the rows and grid columns it covers. */
-interface GridCell {
+export interface GridCell {
   pos: number;
   row: number;
   rowSpan: number;
@@ -378,7 +378,7 @@ interface GridCell {
 }
 
 /** A table's cells on its grid (a merge's first cell spans the rows its merge covers). */
-function gridOf(table: Node, start: number): GridCell[] {
+export function gridOf(table: Node, start: number): GridCell[] {
   const out: GridCell[] = [];
   const open = new Map<number, GridCell>();
   let rowPos = start + 1;
@@ -496,7 +496,7 @@ function coveringCell(
 }
 
 /** The grid cell covering `row` and `column`. */
-const coveringAt = (grid: readonly GridCell[], row: number, column: number) =>
+export const coveringAt = (grid: readonly GridCell[], row: number, column: number) =>
   grid.find(
     (c) =>
       c.row <= row && row < c.row + c.rowSpan && c.column <= column && column < c.column + c.span,

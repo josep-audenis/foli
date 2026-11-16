@@ -1,5 +1,12 @@
 import { readFileSync } from "node:fs";
-import { type FoliDocument, type NodeJSON, parseDocument } from "@folijs/core";
+import {
+  createDocument,
+  createEditor,
+  type FoliDocument,
+  insertTable,
+  type NodeJSON,
+  parseDocument,
+} from "@folijs/core";
 import { describe, expect, it } from "vitest";
 import { exportDocx, importDocx, readPackage } from "./index.js";
 import { docx } from "./testing/package.js";
@@ -155,6 +162,23 @@ describe("tables written back", () => {
     expect(tablesOf(again.document)[0]?.content?.[1]?.attrs?.revision).toEqual({
       deletion: { id: 6, author: "B" },
     });
+  });
+});
+
+describe("a table the editor inserts", () => {
+  it("is written with Word's Table Grid style and read back the same", async () => {
+    const editor = createEditor({
+      document: createDocument({ type: "doc", content: [{ type: "paragraph" }] }),
+    });
+    expect(editor.run(insertTable(2, 3))).toBe(true);
+    const document = editor.getDocument();
+    const again = (await importDocx(await exportDocx(document))).document;
+    const [table] = tablesOf(again);
+    expect(table?.content).toHaveLength(2);
+    expect(cells(table as NodeJSON)).toHaveLength(6);
+    const style = again.styles.find((s) => s.id === table?.attrs?.style);
+    expect(style?.name).toBe("Table Grid");
+    expect(style?.table?.borders?.insideH).toMatchObject({ style: "single", size: 4 });
   });
 });
 
