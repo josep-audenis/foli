@@ -150,20 +150,35 @@ export function FoliComments({
   const [writing, setWriting] = useState<{ id: number; reply: boolean } | null>(null);
   const [focused, setFocused] = useState<number | null>(null);
   /** The comments the pane has seen, per document: only ones made later open for writing. */
-  const known = useRef<{ document: string; ids: Set<number> } | null>(null);
+  const known = useRef<{
+    document: string;
+    objects: WeakSet<CommentJSON>;
+    ids: Set<number>;
+  } | null>(null);
   /** The comments the pane opened for writing: cancelled while empty, they go. */
   const created = useRef(new Set<number>());
   /** After a change, the element to focus (the next thread, the button that opened a form). */
   const refocus = useRef<(() => void) | null>(null);
 
   useEffect(() => {
-    const ids = new Set(comments.map((c) => c.id));
     const seen = known.current;
-    known.current = { document: documentId, ids };
-    // The first render, or another document: what is there was not made here.
-    if (!seen || seen.document !== documentId || readOnly) return;
-    const fresh = comments.find((c) => !seen.ids.has(c.id) && isEmpty(c) && plain(c));
-    if (fresh) {
+    const same = seen?.document === documentId;
+    const objects = same ? seen.objects : new WeakSet<CommentJSON>();
+    known.current = { document: documentId, objects, ids: new Set(comments.map((c) => c.id)) };
+    // New: an id that was not there, and an object never seen (not one undo brought back).
+    const fresh = same ? comments.find((c) => !seen.ids.has(c.id) && !objects.has(c)) : undefined;
+    for (const c of comments) objects.add(c);
+    // The first render, or another document: what is there was not made here, and nothing
+    // open for writing belongs to it.
+    if (!same) {
+      if (seen) {
+        created.current.clear();
+        setWriting(null);
+      }
+      return;
+    }
+    // A comment that comes back (undo) is the very object seen before: not new.
+    if (fresh && !readOnly && isEmpty(fresh) && plain(fresh)) {
       created.current.add(fresh.id);
       setWriting({ id: fresh.id, reply: false });
     }
@@ -264,6 +279,7 @@ export function FoliComments({
         const { comment } = thread;
         const active = head >= thread.pos && head <= thread.end + 1;
         const after = threads[i + 1] ?? threads[i - 1];
+        const canReply = !readOnly && editor.can(replyToComment(comment.id, "x"));
         return (
           <article
             key={comment.id}
@@ -285,8 +301,8 @@ export function FoliComments({
                 comment={c}
                 root={c === comment}
                 readOnly={readOnly}
-                canReply={editor.can(replyToComment(comment.id, "x"))}
-                canDelete={editor.can(deleteComment(c.id))}
+                canReply={canReply}
+                canDelete={!readOnly && editor.can(deleteComment(c.id))}
                 editing={writing?.id === c.id && !writing.reply}
                 onEdit={() => setWriting({ id: c.id, reply: false })}
                 onReply={() => setWriting({ id: comment.id, reply: true })}

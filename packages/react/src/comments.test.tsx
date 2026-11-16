@@ -138,6 +138,23 @@ describe("FoliComments in FoliEditor", () => {
     expect(document.activeElement?.closest("article")).not.toBeNull();
   });
 
+  it("closes what it was writing when the document changes; undo does not reopen", () => {
+    const editor = setup([]);
+    act(() => editor.select(2, 4));
+    fireEvent.click(screen.getByRole("button", { name: "New comment" }));
+    expect(within(pane()).getByRole("textbox", { name: "Comment" })).toBeTruthy();
+    const empty = [{ type: "paragraph", attrs: { style: "CommentText" } }];
+    act(() => editor.setDocument(document3([{ id: 0, author: "Ana", content: empty }])));
+    expect(within(pane()).queryByRole("textbox")).toBeNull();
+    // Deleting it, then undo: it comes back closed.
+    fireEvent.click(within(pane()).getByRole("button", { name: "Delete comment by Ana" }));
+    act(() => {
+      editor.commands.undo();
+    });
+    expect(editor.getDocument().comments).toHaveLength(1);
+    expect(within(pane()).queryByRole("textbox")).toBeNull();
+  });
+
   it("offers no reply where one cannot be anchored", () => {
     const editor = setup([
       { id: 0, author: "Ana", content: note("anchored") },
