@@ -867,7 +867,7 @@ Each task is a PR on `phase-9/review`, the build green after each.
   pane (`FoliToolbar` `comments`). Playwright in three engines (made from
   the toolbar and aligned with its text, reply, resolve, delete, undo, keyboard path, axe,
   print); the editing page shows the pane.
-- [x] 9.8 Word round trip in the harness: `scripts/corpus/word-review.ps1` reports, as Word reads
+- [x] 9.8 Word round trip in the harness (#70): `scripts/corpus/word-review.ps1` reports, as Word reads
   them, revisions (type, author, text), comments (text, author, initials, parent, done) and the
   text with every change accepted and rejected (a separate script: `word-reference.ps1`'s data
   stay as they were); its corpus run is the reference in `corpus/reference/review/`, which
