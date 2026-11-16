@@ -30,6 +30,7 @@ import {
   type ParagraphPropertiesJSON,
   parseContent,
   parseDocument,
+  SCHEMA_VERSION,
   type StyleJSON,
 } from "../v3/document.js";
 import { migrateToV3 } from "../v3/migrate.js";
@@ -215,19 +216,21 @@ export function fitPaste(
   const target = context.envelope;
   // Taken as this document's own, but it cannot be told to be: no unsafe link comes in.
   if (definitions === undefined || definitions === null)
-    return fit(state, target, safeLinks(parseContent(content).toJSON()), true);
+    return fit(state, target, safeLinks(parseContent(content, "content", true).toJSON()), true);
   const { document, styles, numbering, comments } = definitions as Partial<WordDefinitions>;
-  // Validated as a document's envelope: types, ranges, no style based on itself.
+  // Validated as a document's envelope: types, ranges, no style based on itself; the content
+  // as content to paste (a table may end it).
   const checked = parseDocument({
-    schemaVersion: 3,
+    schemaVersion: SCHEMA_VERSION,
     section: target.section,
     defaults: {},
     styles,
     numbering,
     comments,
-    content,
+    content: { type: "doc", content: [{ type: "paragraph" }] },
   });
-  return fit(state, checked, checked.content, document === context.id);
+  const json = parseContent(content, "content", true).toJSON();
+  return fit(state, checked, json, document === context.id);
 }
 
 /**
@@ -415,7 +418,7 @@ function fit(
     } as NodeJSON;
   };
 
-  const doc = parseContent(mapNode(json));
+  const doc = parseContent(mapNode(json), "content", true);
   let comments = target.comments;
   const copiedComments = source.comments.filter((c) => commentIds.has(c.id));
   if (copiedComments.length) {

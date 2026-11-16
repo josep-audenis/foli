@@ -245,28 +245,33 @@ export function goToCell(dir: 1 | -1): Command {
     }
     if (dir < 0) return true; // the first cell: Word stays
     // The last cell: a new row after the table's last one.
-    const last = table.lastChild as Node;
-    const { schema } = state;
-    const paragraph = schema.nodes.paragraph;
-    if (!paragraph) return false;
-    // A new row: the last one's properties, not its identity (`w14:paraId`…) or revisions; its
-    // paragraphs the first ones' properties, without what only one paragraph has.
-    const rowAttrs = { ...last.attrs, revision: null, header: null, attributes: null };
-    const markOnly = Object.fromEntries(MARK_ATTRS.map((key) => [key, null]));
-    const newCells: Node[] = [];
-    last.forEach((cell) => {
-      const attrs = { ...cell.attrs, vMerge: null };
-      const first = cell.firstChild;
-      const own = first?.type === paragraph ? { ...first.attrs, ...markOnly } : null;
-      newCells.push(cell.type.create(attrs, paragraph.create(own)));
-    });
-    const row = last.type.create(rowAttrs, newCells);
+    const row = emptyRowLike(table.lastChild as Node);
+    if (!row) return false;
     const insertAt = tableStart + table.nodeSize - 1;
     return attemptTr(state, dispatch, (tr) => {
       tr.insert(insertAt, row);
       tr.setSelection(TextSelection.create(tr.doc, insertAt + 3));
     });
   };
+}
+
+/**
+ * A new row like `last`: its properties, not its identity (`w14:paraId`…) or revisions; its
+ * cells empty, unmerged, their paragraph with the first one's properties, without what only one
+ * paragraph has. Null when the schema has no paragraph.
+ */
+function emptyRowLike(last: Node): Node | null {
+  const paragraph = last.type.schema.nodes.paragraph;
+  if (!paragraph) return null;
+  const rowAttrs = { ...last.attrs, revision: null, header: null, attributes: null };
+  const markOnly = Object.fromEntries(MARK_ATTRS.map((key) => [key, null]));
+  const cells: Node[] = [];
+  last.forEach((cell) => {
+    const first = cell.firstChild;
+    const own = first?.type === paragraph ? { ...first.attrs, ...markOnly } : null;
+    cells.push(cell.type.create({ ...cell.attrs, vMerge: null }, paragraph.create(own)));
+  });
+  return last.type.create(rowAttrs, cells);
 }
 
 /**
@@ -569,4 +574,124 @@ export function extendCellSelection(axis: "row" | "column", dir: 1 | -1): Comman
     dispatch?.(state.tr.setSelection(CellSelection.create(state.doc, anchor, next.pos)));
     return true;
   };
+}
+
+// ---- Copying and pasting cells (10.6d) ---------------------------------------------------------
+
+/**
+ * The selected cells as a table of their own, for the clipboard (ADR-0006): the rows the
+ * rectangle covers, each cut to its columns (with the cells a merge covers), and the grid's
+ * widths of those columns. A row with no cell in those columns is left out.
+ */
+export function cellsAsTable(selection: CellSelection): Node {
+  const $cell = selection.$anchor;
+  const tableDepth = $cell.depth - 1;
+  const table = $cell.node(tableDepth);
+  const chosen = gridOf(table, $cell.before(tableDepth)).filter((c) =>
+    selection.cells.includes(c.pos),
+  );
+  const top = Math.min(...chosen.map((c) => c.row));
+  const bottom = Math.max(...chosen.map((c) => c.row + c.rowSpan - 1));
+  const left = Math.min(...chosen.map((c) => c.column));
+  const right = Math.max(...chosen.map((c) => c.column + c.span - 1));
+  const rows: Node[] = [];
+  table.forEach((row, _o, r) => {
+    if (r < top || r > bottom) return;
+    let column = (row.attrs.gridBefore as number | null) ?? 0;
+    let first = -1;
+    let end = 0;
+    const cells: Node[] = [];
+    row.forEach((cell) => {
+      const span = (cell.attrs.gridSpan as number | null) ?? 1;
+      if (column >= left && column + span - 1 <= right) {
+        if (first < 0) first = column;
+        end = column + span;
+        cells.push(cell);
+      }
+      column += span;
+    });
+    if (!cells.length) return;
+    const before = first - left;
+    const after = right + 1 - end;
+    rows.push(
+      row.type.create(
+        {
+          ...row.attrs,
+          revision: null,
+          gridBefore: before || null,
+          gridAfter: after || null,
+          // The widths of the grid columns left empty, while they are the same columns.
+          widthBefore: before === (row.attrs.gridBefore ?? 0) ? row.attrs.widthBefore : null,
+          widthAfter: after === (row.attrs.gridAfter ?? 0) ? row.attrs.widthAfter : null,
+        },
+        cells,
+      ),
+    );
+  });
+  const grid = table.attrs.grid as number[];
+  const whole = left === 0 && right + 1 >= grid.length;
+  return table.type.create(
+    whole
+      ? table.attrs
+      : { ...table.attrs, grid: grid.slice(left, right + 1), gridExt: null, width: null },
+    rows,
+  );
+}
+
+/**
+ * Pastes `table`'s rows into the table at `tr`'s selection (ADR-0006), from a cell selection's
+ * first cell or the cell holding the selection: each pasted cell's content replaces that of the
+ * cell at the same place from there, rows like the last one are added as needed, and cells past
+ * the table's last column are dropped (a cell a pasted merge covers is skipped). The pasted cells
+ * end up selected. Returns false, doing nothing, outside a table.
+ */
+export function pasteCells(tr: Transaction, table: Node): boolean {
+  const { selection } = tr;
+  let start: number;
+  if (selection instanceof CellSelection) start = selection.cells[0] ?? selection.anchor;
+  else {
+    const depth = cellDepth(selection.$from);
+    if (depth < 0) return false;
+    start = selection.$from.before(depth);
+  }
+  const $start = tr.doc.resolve(start);
+  const tableDepth = $start.depth - 1;
+  const tablePos = $start.before(tableDepth);
+  const origin = gridOf($start.node(tableDepth), tablePos).find((c) => c.pos === start);
+  if (!origin) return false;
+  const targets: { row: number; column: number; cell: Node }[] = [];
+  table.forEach((row, _o, i) => {
+    let column = origin.column + ((row.attrs.gridBefore as number | null) ?? 0);
+    row.forEach((cell) => {
+      if (cell.attrs.vMerge !== "continue") targets.push({ row: origin.row + i, column, cell });
+      column += (cell.attrs.gridSpan as number | null) ?? 1;
+    });
+  });
+  const covering = (row: number, column: number) =>
+    gridOf(tr.doc.nodeAt(tablePos) as Node, tablePos).find(
+      (c) =>
+        c.row <= row && row < c.row + c.rowSpan && c.column <= column && column < c.column + c.span,
+    );
+  const filled: { row: number; column: number }[] = [];
+  const done = new Set<string>();
+  for (const { row, column, cell } of targets) {
+    for (let current = tr.doc.nodeAt(tablePos) as Node; current.childCount <= row; ) {
+      const added = emptyRowLike(current.lastChild as Node);
+      if (!added) return false;
+      tr.insert(tablePos + current.nodeSize - 1, added);
+      current = tr.doc.nodeAt(tablePos) as Node;
+    }
+    const at = covering(row, column);
+    if (!at || done.has(`${at.row} ${at.column}`)) continue;
+    done.add(`${at.row} ${at.column}`);
+    filled.push(at);
+    const target = tr.doc.nodeAt(at.pos) as Node;
+    tr.replace(at.pos + 1, at.pos + target.nodeSize - 1, new Slice(cell.content, 0, 0));
+  }
+  const first = filled[0];
+  const last = filled[filled.length - 1];
+  const from = first && covering(first.row, first.column);
+  const to = last && covering(last.row, last.column);
+  if (from && to) tr.setSelection(CellSelection.create(tr.doc, from.pos, to.pos));
+  return true;
 }

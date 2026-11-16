@@ -4,6 +4,7 @@ import {
   autolinkHref,
   CellSelection,
   type Command,
+  cellsAsTable,
   closeHistory,
   type DocumentSettings,
   deleteBackward,
@@ -20,10 +21,12 @@ import {
   insertLink,
   insertText,
   isSafeHref,
+  keepTablesApart,
   type Node as ModelNode,
   marksAt,
   NodeSelection,
   parseContentV2,
+  pasteCells,
   type ReviewView,
   redo,
   type SectionJSON,
@@ -1978,31 +1981,18 @@ export class EditorView {
     const { selection, doc } = this.state;
     if (selection.empty || !event.clipboardData) return;
     event.preventDefault();
-    if (selection instanceof CellSelection) {
-      // shortcut: selected cells copy as plain text (a tab between cells, a line per row, a
-      // cell's paragraphs joined by spaces); 10.6d copies them as a table.
-      const rows = new Map<number, string[]>();
-      for (const pos of selection.cells) {
-        const cell = doc.nodeAt(pos);
-        const row = doc.resolve(pos).before();
-        rows.set(row, [
-          ...(rows.get(row) ?? []),
-          cell ? cell.textBetween(0, cell.content.size, " ") : "",
-        ]);
-      }
-      const text = [...rows.values()].map((cells) => cells.join("\t")).join("\n");
-      event.clipboardData.setData("text/plain", text);
-      return;
-    }
     const context = wordContext(this.state) as WordContext;
+    // Selected cells are copied as a table of their own (ADR-0006).
+    const table = selection instanceof CellSelection ? cellsAsTable(selection) : null;
+    const source = table ? doc.type.create(null, table) : doc;
     const { text, html, json } = serializeRange(
-      doc,
-      selection.from,
-      selection.to,
+      source,
+      table ? 0 : selection.from,
+      table ? source.content.size : selection.to,
       this.host.ownerDocument,
       { context, ratio: this.lineRatio },
     );
-    event.clipboardData.setData("text/plain", text);
+    event.clipboardData.setData("text/plain", table ? cellsText(table) : text);
     event.clipboardData.setData("text/html", html);
     event.clipboardData.setData(FOLI_MIME, json);
   };
@@ -2089,14 +2079,21 @@ export class EditorView {
       if (open) throw new TransformError("Open content is pasted as a slice");
       insertBlocks(tr, doc);
     };
-    const strategies = [asSlice, asBlocks];
+    // Rows (a table alone) into a table fill its cells from the selected one (ADR-0006).
+    const intoCells = (tr: Transaction) => {
+      if (only?.type.name !== "table" || !pasteCells(tr, only))
+        throw new TransformError("Only rows are pasted into cells");
+    };
+    const strategies = [intoCells, asSlice, asBlocks];
     for (const strategy of strategies) {
       const tr = state.tr;
       try {
-        // Over selected cells, into the anchor cell (filling cells is 10.6d's); across a
-        // table's edge, whole rows go (`deleteSelectionKeepingTables`).
-        if (!tr.selection.empty) deleteSelectionKeepingTables(tr, true);
+        // Other content over selected cells goes into the anchor cell; across a table's edge,
+        // whole rows go (`deleteSelectionKeepingTables`).
+        if (strategy !== intoCells && !tr.selection.empty) deleteSelectionKeepingTables(tr, true);
         strategy(tr);
+        // A pasted table never ends the body nor touches another table (Word's rules).
+        keepTablesApart(tr);
         const current = wordContext(state)?.envelope;
         if (envelope && current && envelope !== current) {
           withEnvelope(tr, envelope);
@@ -2114,6 +2111,19 @@ export class EditorView {
   private onSelectionChange = (): void => {
     if (!this.composing && this.hasFocus()) this.syncSelection();
   };
+}
+
+/** Copied cells as text, as spreadsheets read it: a tab between cells, a line per row. */
+function cellsText(table: ModelNode): string {
+  const rows: string[] = [];
+  table.forEach((row) => {
+    const cells: string[] = [];
+    row.forEach((cell) => {
+      cells.push(cell.textBetween(0, cell.content.size, " "));
+    });
+    rows.push(cells.join("\t"));
+  });
+  return rows.join("\n");
 }
 
 /**

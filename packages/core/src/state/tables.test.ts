@@ -4,7 +4,13 @@ import type { FoliDocument } from "../v3/document.js";
 import { parseContent } from "../v3/document.js";
 import { createEditor } from "./editor.js";
 import { Selection, TextSelection } from "./selection.js";
-import { CellSelection, extendCellSelection, goToCellVertically } from "./tables.js";
+import {
+  CellSelection,
+  cellsAsTable,
+  extendCellSelection,
+  goToCellVertically,
+  pasteCells,
+} from "./tables.js";
 import { setWordAlign } from "./wordformat.js";
 
 /** Editing across a table's edges (10.6, ADR-0006). */
@@ -676,4 +682,81 @@ describe("review over a cell selection", () => {
       ]);
       valid(editor);
     });
+});
+
+describe("copying and pasting cells", () => {
+  const cellPos = (editor: Editor, value: string) => inside(editor, value) - 2;
+  const cellsOfTable = (editor: Editor, from: string, to: string) =>
+    CellSelection.create(editor.state.doc, cellPos(editor, from), cellPos(editor, to));
+  /** A table's rows as [cells' text…]. */
+  const rowsOf = (node: import("../model/index.js").Node) => {
+    const rows: string[][] = [];
+    node.forEach((r) => {
+      const cells: string[] = [];
+      r.forEach((c) => {
+        cells.push(c.textContent);
+      });
+      rows.push(cells);
+    });
+    return rows;
+  };
+
+  it("copy the rectangle as a table of its own, its grid cut to its columns", () => {
+    const wide = { ...TABLE, attrs: { grid: [1000, 2000] } };
+    const editor = editorOf([p("x"), wide, p("y")]);
+    const copied = cellsAsTable(cellsOfTable(editor, "b1", "b2"));
+    expect(rowsOf(copied)).toEqual([["b1"], ["b2"]]);
+    expect(copied.attrs.grid).toEqual([2000]);
+    const all = cellsAsTable(cellsOfTable(editor, "a1", "b3"));
+    expect(all.attrs.grid).toEqual([1000, 2000]);
+    expect(rowsOf(all)).toHaveLength(3);
+  });
+
+  it("paste rows into a cell: filled from there, rows added, extra columns dropped", () => {
+    const source = editorOf([p("x"), TABLE, p("y")]);
+    const copied = cellsAsTable(cellsOfTable(source, "a2", "b3"));
+    const editor = editorOf([p("x"), TABLE, p("y")]);
+    select(editor, inside(editor, "b3", 1));
+    const tr = editor.state.tr;
+    expect(pasteCells(tr, copied)).toBe(true);
+    editor.dispatch(tr);
+    // From b3: a2 → b3, b2 → past the last column (dropped); a3 → a new row's b cell.
+    expect(shape(editor)[1]).toEqual([
+      ["a1", "b1"],
+      ["a2", "b2"],
+      ["a3", "a2"],
+      ["", "a3"],
+    ]);
+    expect(editor.state.selection).toBeInstanceOf(CellSelection);
+    valid(editor);
+  });
+
+  it("paste rows over selected cells from their first cell, a tracked new row", () => {
+    const source = editorOf([p("x"), TABLE, p("y")]);
+    const copied = cellsAsTable(cellsOfTable(source, "a1", "b2"));
+    const editor = editorOf([p("x"), TABLE, p("y")], true);
+    editor.dispatch(editor.state.tr.setSelection(cellsOfTable(editor, "b3", "a3")));
+    const tr = editor.state.tr;
+    expect(pasteCells(tr, copied)).toBe(true);
+    editor.dispatch(tr);
+    const table = editor.state.doc.child(1);
+    expect(table.childCount).toBe(4);
+    expect(table.child(3).attrs.revision).toMatchObject({ insertion: { author: "Me" } });
+    expect(table.child(3).textContent).toBe("a2b2");
+    editor.commands.rejectAllChanges();
+    expect(shape(editor)[1]).toEqual([
+      ["a1", "b1"],
+      ["a2", "b2"],
+      ["a3", "b3"],
+    ]);
+    valid(editor);
+  });
+
+  it("do nothing outside a table", () => {
+    const source = editorOf([p("x"), TABLE, p("y")]);
+    const copied = cellsAsTable(cellsOfTable(source, "a1", "a1"));
+    const editor = editorOf([p("x"), TABLE, p("y")]);
+    select(editor, 1);
+    expect(pasteCells(editor.state.tr, copied)).toBe(false);
+  });
 });

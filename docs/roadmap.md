@@ -968,18 +968,24 @@ Each task is a PR on `phase-10/tables-images`, the build green after each.
   Shortcuts: autofit tables keep Word's saved grid; `border-collapse` resolves border conflicts;
   rows in a vertical merge or holding a nested table split only between rows; composition is
   the view's read-back (checked with DOM changes in cells; no IME run).)
-- [ ] 10.6 Editing in tables: core's table-aware editing first (cells isolate; a range delete of
+- [x] 10.6 Editing in tables: core's table-aware editing first (cells isolate; a range delete of
   whole rows across a table's edges; Backspace and Delete next to a table; paste of rows; tracked
   row deletion and insertion as row revisions), then the view: typing, Enter, Backspace and Delete in cells (a cell never loses its
   last paragraph), Tab and Shift+Tab between cells (Tab in the last cell adds a row), arrows
   across cells and out of the table, `CellSelection` (drag, Shift+arrows) with copy, cut, paste
   of cells and delete of their content, undo; tracked changes in cells; T1–T5 in cells.
-  (In progress. 10.6a, core: cells isolate, Backspace and Delete next to a table move into it,
+  (Done. 10.6a, core: cells isolate, Backspace and Delete next to a table move into it,
   range deletes across a table's edges take whole rows (or empty cells), tracked text in cells,
   row deletion and insertion as row revisions with accept and reject. 10.6b: Tab and Shift+Tab
   between cells (Tab in the last cell adds a row), Up and Down across rows, pages and out of the
   table. 10.6c: `CellSelection` (drag, Shift+arrows), Delete empties cells, typing replaces the
-  anchor cell's content, formatting and review act on the selected cells only. Next: copy, cut and paste of cells and rows; T1–T5 in cells.)
+  anchor cell's content, formatting and review act on the selected cells only. 10.6d: cells copy
+  and cut as a table (JSON, HTML, tab-separated text); rows pasted into a table fill its cells
+  from the selected one, adding rows (extra columns dropped, not yet reported); pasted into text,
+  a table. T1, T2, T3 (pasted HTML) and T5 (cells across a page break) in cells pass in
+  Chromium, Firefox and WebKit; T4 (CDP IME) and the system clipboard's Foli type in Chromium
+  only, as for the rest of the editor. HTML tables from other applications paste as
+  paragraphs.)
 - [ ] 10.7 Table commands and UI: insert a table (rows × columns), insert and delete rows and
   columns, merge and split cells, header row, column width by dragging a border, table style and
   cell shading; row insertion and deletion tracked as Word records them; a table menu in the
