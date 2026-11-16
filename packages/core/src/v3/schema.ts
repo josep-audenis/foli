@@ -262,6 +262,9 @@ const paragraphProperties: Record<string, AttributeSpec> = {
   ext: nullableAttr(xml),
 };
 
+/** The names of the paragraph properties (`w:pPr`) among a paragraph's attributes. */
+export const PARAGRAPH_PROPERTY_KEYS: readonly string[] = Object.keys(paragraphProperties);
+
 /** Paragraph properties as a style, a numbering level, the defaults or a recorded change give them. */
 export const checkParagraphProperties: Check = (v) => {
   if (!isRecord(v)) return "must be an object";

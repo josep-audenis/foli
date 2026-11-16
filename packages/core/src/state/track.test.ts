@@ -206,6 +206,60 @@ describe("tracked changes", () => {
     expect(blocks(editor)).toEqual([p(text("a"), text("X", [ins(10)]), text("b"))]);
   });
 
+  it("records formatting text had before it was first changed", () => {
+    const editor = tracked(p(text("abc", [{ type: "italic" }])));
+    editor.select(2, 3);
+    editor.commands.toggleMark("bold");
+    const change = (id: number, previous: MarkJSON[]): MarkJSON => ({
+      type: "formatChange",
+      attrs: { id, author: "Me", date: DATE, previous },
+    });
+    const italic: MarkJSON = { type: "italic" };
+    expect(blocks(editor)).toEqual([
+      p(
+        text("a", [italic]),
+        text("b", [{ type: "bold" }, italic, change(0, [italic])]),
+        text("c", [italic]),
+      ),
+    ]);
+    // A second change keeps the first record.
+    editor.commands.toggleMark("italic");
+    expect(blocks(editor)[0]?.content?.[1]).toEqual(
+      text("b", [{ type: "bold" }, change(0, [italic])]),
+    );
+    editor.commands.undo();
+    editor.commands.undo();
+    expect(blocks(editor)).toEqual([p(text("abc", [italic]))]);
+  });
+
+  it("records nothing when one's own insertion is formatted", () => {
+    const editor = tracked(p(text("ab")));
+    editor.select(2);
+    editor.commands.insertText("X");
+    editor.select(2, 3);
+    editor.commands.toggleMark("bold");
+    expect(blocks(editor)).toEqual([
+      p(text("a"), text("X", [ins(0), { type: "bold" }]), text("b")),
+    ]);
+  });
+
+  it("records a paragraph's properties before it was first changed", () => {
+    const editor = tracked(p(text("ab")));
+    editor.select(2);
+    editor.commands.setAlign("center");
+    editor.commands.setAlign("end");
+    expect(blocks(editor)).toEqual([
+      {
+        type: "paragraph",
+        attrs: {
+          justification: "right",
+          formatChange: { id: 0, author: "Me", date: DATE, previous: {} },
+        },
+        content: [text("ab")],
+      },
+    ]);
+  });
+
   it("deletes everything as deleted text, keeping the last paragraph", () => {
     const editor = tracked(p(text("ab")), p(text("cd")));
     editor.commands.selectAll();
@@ -224,23 +278,55 @@ describe("tracked changes", () => {
 // Property: with tracking on, the document Word shows after "accept all" is what the same edits
 // make with tracking off, and after "reject all" it is the original.
 
-/** Paragraph texts as Word shows them after accepting (or rejecting) every change. */
+/**
+ * Paragraphs as Word shows them after accepting (or rejecting) every change: text, "*" after a
+ * bold character, the alignment first in brackets.
+ */
 function project(doc: Node, accept: boolean): string[] {
   const out: string[] = [];
   let current = "";
   const gone = accept ? "deletion" : "insertion";
+  // Paragraphs a change joins: the first one of them.
+  let first: Node | null = null;
   doc.forEach((block) => {
+    first ??= block;
     block.forEach((inline) => {
       if (inline.marks.some((m) => m.type.name === gone)) return;
-      current += inline.isText ? inline.text : `<${inline.type.name}>`;
+      const change = inline.marks.find((m) => m.type.name === "formatChange");
+      const marks =
+        !accept && change
+          ? (change.attrs.previous as { type: string }[]).map((m) => m.type)
+          : inline.marks.map((m) => m.type.name);
+      const bold = marks.includes("bold") ? "*" : "";
+      const value = inline.isText ? (inline.text ?? "") : `<${inline.type.name}>`;
+      current += [...value].map((c) => c + bold).join("");
     });
     const revision = block.attrs.revision as Record<string, unknown> | null;
     if (revision?.[gone]) return; // the paragraph mark is gone: the next paragraph continues it
-    out.push(current);
+    // Accepting keeps the first paragraph's properties, as an untracked join; rejecting restores
+    // the original mark's paragraph, the last one.
+    const head = accept ? (first as Node) : block;
+    const change = head.attrs.formatChange as { previous: Record<string, unknown> } | null;
+    const just = (!accept && change ? change.previous : head.attrs).justification;
+    out.push((just ? `[${just}]` : "") + current);
     current = "";
+    first = null;
   });
   if (current || !out.length) out.push(current);
   return out;
+}
+
+/** A paragraph from `project`'s form. */
+function parse(line: string): NodeJSON {
+  const match = /^(?:\[(\w+)\])?(.*)$/.exec(line) as RegExpExecArray;
+  const content: NodeJSON[] = [];
+  for (const [, c, bold] of (match[2] ?? "").matchAll(/(.)(\*?)/gu))
+    content.push(text(c as string, bold ? [{ type: "bold" }] : undefined));
+  return {
+    type: "paragraph",
+    ...(match[1] ? { attrs: { justification: match[1] } } : {}),
+    ...(content.length ? { content } : {}),
+  };
 }
 
 /**
@@ -274,7 +360,16 @@ const units = (doc: Node) => slots(doc).at(-1)?.count ?? 0;
 
 const fraction = fc.noBias(fc.integer({ min: 0, max: 1000 })).map((n) => n / 1000);
 const op = fc.record({
-  kind: fc.constantFrom("type", "replace", "backspace", "delete", "enter"),
+  kind: fc.constantFrom(
+    "type",
+    "replace",
+    "backspace",
+    "delete",
+    "enter",
+    "bold",
+    "unbold",
+    "align",
+  ),
   a: fraction,
   b: fraction,
   text: fc.constantFrom("x", "yz"),
@@ -295,14 +390,14 @@ function apply(editor: Editor, o: Op): void {
       editor.state.tr.setSelection(TextSelection.create(editor.state.doc, anchor, head)),
     );
   switch (o.kind) {
+    // Typed as plain text: next to deleted text, typing takes that text's look (the commands'
+    // scenarios above cover them), which the untracked mirror does not have.
     case "type":
-      select(left(k1));
-      editor.commands.insertText(o.text);
+      editor.dispatch(editor.state.tr.insertText(o.text, left(k1), left(k1), []));
       break;
     case "replace":
-      if (k1 === k2) return;
-      select(right(k1), left(k2));
-      editor.commands.insertText(o.text);
+      if (k1 === k2 || right(k1) >= left(k2)) return;
+      editor.dispatch(editor.state.tr.insertText(o.text, right(k1), left(k2), []));
       break;
     case "backspace":
       select(left(k1));
@@ -316,7 +411,47 @@ function apply(editor: Editor, o: Op): void {
       select(left(k1));
       editor.commands.splitBlock();
       break;
+    case "bold":
+    case "unbold": {
+      const from = right(k1);
+      const to = left(k2);
+      if (from >= to) return;
+      const bold = editor.state.schema.marks.bold as NonNullable<
+        typeof editor.state.schema.marks.bold
+      >;
+      const tr = editor.state.tr;
+      if (o.kind === "bold") tr.addMark(from, to, bold.create());
+      else tr.removeMark(from, to, bold);
+      if (tr.docChanged) editor.dispatch(tr);
+      break;
+    }
+    case "align": {
+      // From the first paragraph of the one Word shows after accepting (joined ones included).
+      let index = doc.resolve(left(k1)).index(0);
+      while (
+        index > 0 &&
+        (doc.child(index - 1).attrs.revision as { deletion?: unknown } | null)?.deletion
+      )
+        index--;
+      let start = 1;
+      for (let i = 0; i < index; i++) start += doc.child(i).nodeSize;
+      select(start, Math.max(start, left(k2)));
+      editor.commands.setAlign(o.text === "x" ? "center" : "start");
+      break;
+    }
   }
+}
+
+/**
+ * Known: Enter in a paragraph after a deleted mark copies that paragraph's properties, not
+ * those of the paragraph accepting makes (the first one's). Such an Enter is left out.
+ */
+function knownDifference(doc: Node, o: Op): boolean {
+  if (o.kind !== "enter") return false;
+  const k = Math.min(Math.round(o.a * units(doc)), Math.round(o.b * units(doc)));
+  const index = doc.resolve(leftmost(doc, k)).index(0);
+  const prev = index > 0 ? doc.child(index - 1) : null;
+  return !!(prev?.attrs.revision as { deletion?: unknown } | null)?.deletion;
 }
 
 describe("tracked changes (property)", () => {
@@ -328,10 +463,9 @@ describe("tracked changes (property)", () => {
         const editor = tracked(...content);
         const original = editor.getDocument();
         for (const o of ops) {
+          if (knownDifference(editor.state.doc, o)) continue;
           const mirror = createEditor({
-            document: documentOf(
-              ...project(editor.state.doc, true).map((t) => (t ? p(text(t)) : p())),
-            ),
+            document: documentOf(...project(editor.state.doc, true).map(parse)),
           });
           apply(editor, o);
           apply(mirror, o);

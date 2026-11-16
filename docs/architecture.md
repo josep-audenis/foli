@@ -450,7 +450,14 @@ document to the rebuilt one, except attribute changes of a paragraph the edit jo
 rebuilt document keeps apart. Paragraph revisions are set last, so a replayed attribute
 change does not drop them. History records the rebuilt steps; undo and redo are not tracked.
 A property test checks that "accept all" equals the same edits untracked and "reject all"
-the original. Whether tracking is on is not part of the document format: the editor option
+the original. Formatting (9.3) is recorded on the replayed steps: before a mark step of a run
+property, the runs it changes get a `formatChange` mark with their run properties; a markup
+step that changes a paragraph's properties gets the paragraph's `formatChange` attribute. Text
+and paragraph marks of one's own insertion record nothing, and an existing record is kept (the
+properties before the first change). A join that removes one's own inserted mark keeps the first
+paragraph's properties, as untracked; when they differ from the last one's (whose mark stays),
+that is recorded as the last one's formatting change, so rejecting restores it. Whether tracking
+is on is not part of the document format: the editor option
 and the `.docx`'s `w:trackRevisions` (read and written by `@folijs/docx`) carry it.
 
 Lists: bullets reuse a plain definition of the document (not a numbering style's, nor one whose
