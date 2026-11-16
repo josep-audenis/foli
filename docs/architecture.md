@@ -433,7 +433,10 @@ color or alignment leaves no direct value; "Automatic" color and "no highlight" 
 plugin state): a new list's numbering definition, and a built-in style the document has not
 used yet (headings, List Paragraph, Hyperlink, with the Word 2013 to 2019 template's
 definitions, not checked against newer Word), are added that way. Undo keeps such a definition,
-unused (a choice; not checked against what Word does).
+unused (a choice; not checked against what Word does). Comments are not changed that way:
+`withEnvelope` ignores them, and a `CommentStep` (made by `setComments`) adds, changes or
+removes one. It leaves the tree as it is, so history records it with the text it belongs to
+and undo and redo take it back.
 
 Lists: bullets reuse a plain definition of the document (not a numbering style's, nor one whose
 levels number headings) or add Word's (Symbol, Courier New, Wingdings bullets, half-inch levels);
@@ -495,9 +498,9 @@ HTML. HTML is read as schema v2 (`htmlToDoc`) and structured by `migrateToV3` (`
 with Word's built-in heading, List Paragraph and Hyperlink styles where the document lacks
 them, the list levels the list buttons make, each list a new one, and without bold, italic,
 underline or strike the paragraph's style already gives (HTML writes a heading's bold on its
-text). What a paste adds to the envelope stays after undo: styles and list definitions as in
-Word, but also copied comments, which Word's undo removes (they stay without anchors and are
-exported; Phase 9 makes comments part of the history). Ids inside opaque content and
+text). What a paste adds to the envelope stays after undo, styles and list definitions, as in
+Word; copied comments are `CommentStep`s, which undo removes with the pasted text, as Word's
+undo does. Ids inside opaque content and
 tracked-change ids are pasted as they are (Word tolerates repeats of both). Pasted definitions
 keep their verbatim `ext` XML, which export writes back when it still matches the model: a
 page that sets Foli's clipboard type can put XML into `styles.xml` and `numbering.xml`, as

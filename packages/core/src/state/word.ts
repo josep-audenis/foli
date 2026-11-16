@@ -10,7 +10,8 @@
  * become the commands themselves.
  */
 import type { Attrs, Mark, MarkType, Node } from "../model/index.js";
-import type { FoliDocument } from "../v3/document.js";
+import { Step, StepResult } from "../transform/steps.js";
+import type { CommentJSON, FoliDocument } from "../v3/document.js";
 import { Resolver, type RunFormat } from "../v3/resolve.js";
 import { MARK_ATTRS } from "./mark.js";
 import { NodeSelection, TextSelection } from "./selection.js";
@@ -33,8 +34,84 @@ export interface WordContext {
 const key = new PluginKey<WordContext>("word");
 
 /**
+ * Sets, adds or removes the envelope's comment `id` (`comment` null removes it). A step, unlike
+ * `withEnvelope`, so undo and redo take comments with the text they annotate. It leaves the
+ * tree as it is; `index` is where an added comment goes in the list (a removed one's place).
+ */
+export class CommentStep extends Step {
+  constructor(
+    readonly id: number,
+    readonly comment: CommentJSON | null,
+    readonly previous: CommentJSON | null,
+    readonly index: number,
+  ) {
+    super();
+  }
+
+  apply(doc: Node): StepResult {
+    return StepResult.ok(doc);
+  }
+
+  invert(): Step {
+    return new CommentStep(this.id, this.previous, this.comment, this.index);
+  }
+
+  map(): Step {
+    return this;
+  }
+}
+
+/** `comments` after the comment steps among `steps`. */
+export function applyCommentSteps(
+  comments: readonly CommentJSON[],
+  steps: readonly Step[],
+): readonly CommentJSON[] {
+  let next = comments;
+  for (const step of steps) {
+    if (!(step instanceof CommentStep)) continue;
+    const at = next.findIndex((c) => c.id === step.id);
+    // A change made since (outside history) wins: undo does not bring back or overwrite it.
+    if ((step.previous === null) !== at < 0) continue;
+    const rest = at < 0 ? next : [...next.slice(0, at), ...next.slice(at + 1)];
+    if (!step.comment) next = rest;
+    else {
+      const index = at < 0 ? Math.min(step.index, rest.length) : at;
+      next = [...rest.slice(0, index), step.comment, ...rest.slice(index)];
+    }
+  }
+  return next;
+}
+
+/**
+ * Makes `tr` change the comments from `from` (the state's) to `to`, one `CommentStep` per
+ * comment added, changed or removed, after any comment steps `tr` already has. Comments kept
+ * keep their order (a new one goes at its index in `to`).
+ */
+export function setComments(
+  tr: Transaction,
+  from: readonly CommentJSON[],
+  to: readonly CommentJSON[],
+): Transaction {
+  let current = applyCommentSteps(from, tr.steps);
+  const wanted = new Map(to.map((c) => [c.id, c]));
+  for (const c of current)
+    if (!wanted.has(c.id)) {
+      tr.step(new CommentStep(c.id, null, c, current.indexOf(c)));
+      current = applyCommentSteps(current, tr.steps.slice(-1));
+    }
+  to.forEach((c, index) => {
+    const before = current.find((p) => p.id === c.id) ?? null;
+    if (before === c || (before && JSON.stringify(before) === JSON.stringify(c))) return;
+    tr.step(new CommentStep(c.id, c, before, index));
+    current = applyCommentSteps(current, tr.steps.slice(-1));
+  });
+  return tr;
+}
+
+/**
  * The plugin that gives commands a v3 document's envelope. A transaction changes it with
  * `withEnvelope` (a new list's numbering definition); undo leaves such additions, as Word does.
+ * Comments change only through `CommentStep`s, which undo takes back.
  */
 export function wordPlugin(envelope: WordEnvelope): Plugin<WordContext> {
   // Not a secret: only tells documents apart.
@@ -46,13 +123,21 @@ export function wordPlugin(envelope: WordEnvelope): Plugin<WordContext> {
       init: () => context,
       apply: (tr, value) => {
         const next = tr.getMeta(key) as WordEnvelope | undefined;
-        return next ? { envelope: next, resolver: new Resolver(next), id: value.id } : value;
+        const comments = applyCommentSteps(value.envelope.comments, tr.steps);
+        if (!next && comments === value.envelope.comments) return value;
+        const envelope = { ...(next ?? value.envelope), comments: comments as CommentJSON[] };
+        // Only comments changed: they do not affect formatting, the resolver stays.
+        const resolver = next ? new Resolver(envelope) : value.resolver;
+        return { envelope, resolver, id: value.id };
       },
     },
   });
 }
 
-/** Makes `tr` change the document's envelope to `envelope` (styles, numbering…). */
+/**
+ * Makes `tr` change the document's envelope to `envelope` (styles, numbering…). Its comments
+ * are ignored: those change through `setComments`, so undo takes them back.
+ */
 export function withEnvelope(tr: Transaction, envelope: WordEnvelope): Transaction {
   return tr.setMeta(key, envelope);
 }
