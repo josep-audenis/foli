@@ -596,7 +596,8 @@ export class Resolver {
 
   /** The table style's parts for `conditions`, memoized. */
   #layer(style: string | null, conditions: readonly TableCondition[]): TableLayer {
-    const key = `${style ?? ""}\u0000${conditions.join(",")}`;
+    // JSON: no two style ids and condition lists give the same key.
+    const key = JSON.stringify([style, conditions]);
     const known = this.#layers.get(key);
     if (known) return known;
     const layer: TableLayer = { key, paragraph: [], run: [], cell: [] };
@@ -614,20 +615,24 @@ export class Resolver {
     return layer;
   }
 
-  /** A table's effective properties (`attrs`: the table node's attributes). */
+  /** A table's effective properties (`attrs`: the table node's attributes); the caller's to change. */
   table(attrs: Json): TableFormat {
     const chain = this.#tableChain(attrs.style as string | null | undefined);
     const out: Json = {};
     for (const s of chain) mergeTable(out, s.table as Json | undefined);
     mergeTable(out, attrs);
-    return { ...(out as Omit<TableFormat, "style">), style: chain.at(-1)?.id ?? null };
+    // A copy: the merged values are the styles' and the node's own objects.
+    return structuredClone({
+      ...(out as Omit<TableFormat, "style">),
+      style: chain.at(-1)?.id ?? null,
+    });
   }
 
   /**
    * A cell's effective formatting (ECMA-376 17.7.6): the table style's parts that apply where
    * the cell is (`tableConditions`), the row's exceptions over the table's properties, and the
    * cell's own properties (`table`, `row`, `cell`: the nodes' attributes). Pass the result to
-   * `paragraph` for the paragraphs in the cell.
+   * `paragraph` for the paragraphs in the cell. The result is the caller's to change.
    */
   cell(table: Json, row: Json, cell: Json, place: CellPlace): CellFormat {
     const props = this.table(table) as Json;
@@ -659,7 +664,8 @@ export class Resolver {
     ];
     for (const [side, start, inside, outer] of sides) {
       const border = edge(side, start, inside, outer);
-      if (border) borders[side] = border;
+      // A copy: the border may be a style's or the node's own object.
+      if (border) borders[side] = { ...border };
     }
     const margin = (side: Side, start: "start" | "end" | null) =>
       twipsOf(
@@ -690,7 +696,7 @@ export class Resolver {
    * (Normal) in some cases; not modeled until the corpus's tables are measured on pages (10.5).
    */
   #paragraphStyle(id: string | undefined, layer?: TableLayer) {
-    const key = `${layer?.key ?? ""}\u0001${id ?? ""}`;
+    const key = JSON.stringify([layer?.key ?? null, id ?? null]);
     const known = this.#paragraphStyles.get(key);
     if (known) return known;
     const paragraph = cloneParagraph(DEFAULT_PARAGRAPH);

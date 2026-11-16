@@ -188,9 +188,14 @@ properties may hold only the marks that describe how text looks (`RUN_PROPERTY_M
   follows a table (Word would merge them) and never ends the document; a paragraph in a cell
   ends no section and holds no page or column break. A table Foli cannot hold (rows inside a
   content control) stays an `opaqueBlock`.
-- **Pictures** (v4): a `picture` refers to `resources[key]`: `contentType`, `size`, and where
-  the bytes are, at least one of `part` (the package's media part), `url` (the app's) or `data`
-  (a `data:` URL, when the app opts into it). No base64 in the JSON by default.
+- **Pictures** (v4): a `picture` refers to `resources[key]`: `contentType` (an `image/` type),
+  `size`, and where the bytes are, at least one of `part` (the package's media part), `url`
+  (the app's: relative, `http(s):` or `blob:`, never a scheme that runs code) or `data` (a
+  `data:image/…` URL, when the app opts into it). No base64 in the JSON by default. A key with
+  no resource is allowed (the picture shows as missing); code looks keys up with `Object.hasOwn`
+  (`resources.constructor` is not a resource), and `__proto__` is refused as a key.
+- **Depth:** parsed JSON nests at most `MAX_NODE_DEPTH` (300) levels, about a hundred tables
+  inside each other: deeper input is refused with its path rather than overflowing the stack.
 
 ```ts
 interface FoliDocument {

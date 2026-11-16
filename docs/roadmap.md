@@ -944,8 +944,9 @@ Each task is a PR on `phase-10/tables-images`, the build green after each.
   migration (a version change: tables stay opaque until imported again), `SCHEMA_VERSION` 4.
   (Done: Word's rules as "no table after a table or ending the body", which lets a table be
   followed by opaque content as Word does; `.docx` export refuses tables and pictures and the
-  view shows a placeholder until 10.4–10.8; banding and the Normal-style precedence are checked
-  against Word's pages in 10.5.)
+  view shows a placeholder until 10.4–10.8; banding, the Normal-style precedence and a
+  conditional format's `insideH`/`insideV` cell borders are checked against Word's pages in
+  10.5; 10.4 must not write a table next to an opaque `w:tbl`, which Word would merge.)
 - [ ] 10.4 DOCX tables: import `w:tbl` into the model (nested tables too; what the model cannot
   hold stays verbatim, reported), export losslessly (unchanged tables byte for byte, changed
   ones rewritten child by child), tracked changes and comments inside tables, row insertion and

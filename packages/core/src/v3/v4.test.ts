@@ -178,13 +178,19 @@ describe("the envelope's resources", () => {
       r1: { contentType: "image/png", part: "word/media/image1.png", size: 1024 },
       r2: { contentType: "image/svg+xml", url: "https://example.test/a.svg" },
       r3: { contentType: "image/png", data: "data:image/png;base64,AAAA" },
+      r4: { contentType: "image/jpeg", url: "media/photo.jpg" },
+      r5: { contentType: "image/jpeg", url: "blob:https://example.test/1234" },
     };
     expect(parseDocument(envelope({ resources })).resources).toEqual(resources);
     expect(parseDocument(envelope())).not.toHaveProperty("resources");
     const bad: [unknown, RegExp][] = [
       [{ r: { contentType: "image/png" } }, /needs part, url or data/],
-      [{ r: { contentType: "png", part: "x" } }, /media type/],
+      [{ r: { contentType: "png", part: "x" } }, /image media type/],
+      [{ r: { contentType: "text/html", part: "x" } }, /image media type/],
       [{ r: { contentType: "image/png", data: "https://x" } }, /data: URL/],
+      [{ r: { contentType: "image/png", data: "data:text/html,<p>" } }, /data: URL of an image/],
+      [{ r: { contentType: "image/png", url: "javascript:alert(1)" } }, /relative, http\(s\)/],
+      [{ r: { contentType: "image/png", url: "file:///c:/x.png" } }, /relative, http\(s\)/],
       [{ r: { contentType: "image/png", part: "x", extra: 1 } }, /unknown key extra/],
       [
         JSON.parse('{"__proto__": {"contentType": "image/png", "part": "x"}}'),
@@ -228,6 +234,27 @@ describe("schema v3 → v4", () => {
     expect(() => parseDocument(envelope({ schemaVersion: 3, resources: {} }))).toThrow(
       /resources: unknown key/,
     );
+    const tableStyle = { id: "T", type: "table", conditions: [{ type: "firstRow" }] };
+    expect(() => parseDocument(envelope({ schemaVersion: 3, styles: [tableStyle] }))).toThrow(
+      /styles\[0\]: unknown key conditions/,
+    );
+  });
+});
+
+describe("deep nesting", () => {
+  it("is refused with a path, not a stack overflow", () => {
+    let content: NodeJSON = p("x");
+    for (let i = 0; i < 2000; i++) content = table([row(cell([content]))]);
+    // Each level a table, a row and a cell; the innermost cell is never reached.
+    const nested = doc(table([row(cell([content, p()]))]), p());
+    expect(() => parseContent(nested)).toThrow(/nested deeper than 300 levels/);
+    expect(() => parseDocument(envelope({ content: nested }))).toThrow(/nested deeper/);
+    let inline: unknown = { type: "text", text: "x" };
+    for (let i = 0; i < 5000; i++) inline = { type: "paragraph", content: [inline] };
+    expect(() => parseContent(doc(inline as NodeJSON))).toThrow(/nested deeper/);
+    let ok: NodeJSON = p("x");
+    for (let i = 0; i < 50; i++) ok = table([row(cell([ok, p()]))]);
+    expect(() => parseContent(doc(ok, p()))).not.toThrow();
   });
 });
 
@@ -342,6 +369,15 @@ describe("table styles", () => {
     expect(resolver.cell({}, {}, {}, { row: 0, rows: 1, cell: 0, cells: 1 }).style).toBe(
       "TableNormal",
     );
+    // Results are the caller's: changing them changes neither the styles nor later results.
+    const before = structuredClone(styles);
+    const changed = resolver.cell(attrs, {}, {}, { row: 0, rows: 3, cell: 0, cells: 2 });
+    (changed.borders.top as { size?: number }).size = 99;
+    const props = resolver.table({ style: "Banded", borders: { left: { style: "single" } } });
+    (props.borders?.insideH as { size?: number }).size = 99;
+    (props.borders?.left as { style: string }).style = "dotted";
+    expect(styles).toEqual(before);
+    expect(resolver.cell(attrs, {}, {}, { row: 0, rows: 3, cell: 0, cells: 2 })).toEqual(header);
     expect(resolver.table({ style: "Banded", layout: "fixed" })).toMatchObject({
       style: "Banded",
       layout: "fixed",

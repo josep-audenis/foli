@@ -366,6 +366,12 @@ export function parseDocument(input: unknown): FoliDocument {
       const found = nodeOfV4(content);
       if (found) fail(path, `${found} is a schema 4 node (the document says schema 3)`);
     }
+    doc.styles.forEach((style, i) => {
+      for (const key of ["table", "row", "cell", "conditions"]) {
+        if (Object.hasOwn(style, key))
+          fail(`styles[${i}]`, `unknown key ${key} (schema 4 and later)`);
+      }
+    });
     return doc;
   }
   if (version !== SCHEMA_VERSION) {
@@ -587,20 +593,26 @@ const checkStyle: Check = shape(
   ["id", "type"],
 );
 
-const MIME = /^[A-Za-z0-9][\w.+-]{0,126}\/[A-Za-z0-9][\w.+-]{0,126}$/;
+/** Pictures only: `image/png`, `image/svg+xml`… */
+const IMAGE_TYPE = /^image\/[A-Za-z0-9][\w.+-]{0,126}$/;
 
 const checkResource: Check = (v) => {
   const error = shape(
     {
       contentType: (t) =>
-        typeof t === "string" && MIME.test(t) ? undefined : "must be a media type",
+        typeof t === "string" && IMAGE_TYPE.test(t) ? undefined : "must be an image media type",
       size: int(0, Number.MAX_SAFE_INTEGER),
       part: text(1024),
-      url: text(8192),
+      // Relative, or http(s) or blob: no scheme that runs code (`javascript:`) where it is shown.
+      url: (u) =>
+        text(8192)(u) ??
+        (/^[A-Za-z][A-Za-z0-9+.-]*:/.test(u as string) && !/^(https?|blob):/i.test(u as string)
+          ? "must be relative, http(s) or blob"
+          : undefined),
       data: (d) =>
-        typeof d === "string" && d.startsWith("data:") && d.length <= 67_108_864
+        typeof d === "string" && /^data:image\/[\w.+-]+[;,]/i.test(d) && d.length <= 67_108_864
           ? undefined
-          : "must be a data: URL",
+          : "must be a data: URL of an image",
     },
     ["contentType"],
   )(v);
