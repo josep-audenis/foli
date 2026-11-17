@@ -72,8 +72,16 @@ export const SAMPLE: FoliDocument = {
 };
 
 const host = document.getElementById("editor") as HTMLElement;
+/** Pasted and dropped images: kept in the document as data: URLs (the playground has no server). */
+const upload = (file: File) =>
+  new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
 let editor: Editor = createEditor({ document: SAMPLE, author: "Foli user" });
-let view = new EditorView(host, editor);
+let view = new EditorView(host, editor, { upload });
 const toolbar = createRoot(document.getElementById("toolbar") as HTMLElement);
 const commentsPane = createRoot(document.getElementById("comments") as HTMLElement);
 /**
@@ -96,7 +104,7 @@ function load(document: FoliDocument, from?: DocxPackage, trackChanges = false):
   images?.revoke();
   images = from ? packageImages(from) : undefined;
   editor = createEditor({ document: parseDocument(document), author: "Foli user", trackChanges });
-  view = new EditorView(host, editor, images ? { resource: images.url } : {});
+  view = new EditorView(host, editor, { upload, ...(images ? { resource: images.url } : {}) });
   original = from;
   showToolbar();
 }

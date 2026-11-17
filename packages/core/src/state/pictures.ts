@@ -47,18 +47,22 @@ const dataType = (data: string) => /^data:([^;,]*)/i.exec(data)?.[1]?.toLowerCas
 
 /**
  * Inserts `picture` at the selection (replacing it), its image added to the document's
- * resources under a new key. Does not apply without alt text (unless decorative), with an image
+ * resources under a new key. Does not apply without alt text (unless decorative, or
+ * `requireAlt` is false: a picture pasted or dropped, asked for later and marked), with an image
  * the document cannot hold (not an image type, no URL or `data:` URL, an unsafe URL), or where
  * the selection is not in text.
  */
-export function insertPicture(picture: NewPicture): Command {
+export function insertPicture(
+  picture: NewPicture,
+  { requireAlt = true }: { requireAlt?: boolean } = {},
+): Command {
   return (state, dispatch) => {
     const context = wordContext(state);
     const type = state.schema.nodes.picture;
     if (!context || !type) return false;
     if (!validText(picture.alt) || !validText(picture.title)) return false;
     const alt = picture.decorative ? "" : (picture.alt?.trim() ?? "");
-    if (!alt && !picture.decorative) return false;
+    if (!alt && !picture.decorative && requireAlt) return false;
     if (!validSize(picture.width) || !validSize(picture.height)) return false;
     // The bytes are of the type the document says (a part is named from it on export).
     if (

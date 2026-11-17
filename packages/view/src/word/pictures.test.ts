@@ -1,5 +1,11 @@
 // @vitest-environment jsdom
-import { createDocument, createEditor, type NodeJSON, parseDocument } from "@folijs/core";
+import {
+  createDocument,
+  createEditor,
+  type NodeJSON,
+  NodeSelection,
+  parseDocument,
+} from "@folijs/core";
 import { afterEach, describe, expect, it } from "vitest";
 import { EditorView } from "../index.js";
 import { imageSource, NO_ALT_LABEL, ownImageUrl, PICTURE_ATTR, pictureElement } from "./blocks.js";
@@ -115,5 +121,32 @@ describe("pictures in the editable view", () => {
     const sel = document.getSelection() as globalThis.Selection;
     expect(view.posFromDOM(sel.focusNode as Node, sel.focusOffset)).toBe(3);
     expect((host.querySelector(`img[${PICTURE_ATTR}]`) as HTMLImageElement).src).toBe("blob:other");
+  });
+
+  it("show a resize handle on the selected picture only while the document is editable", () => {
+    const host = document.createElement("div");
+    document.body.append(host);
+    const editor = createEditor({
+      document: parseDocument({
+        ...createDocument({
+          type: "doc",
+          content: [
+            { type: "paragraph", content: [{ type: "text", text: "a" }, picture({ alt: "Dot" })] },
+          ],
+        }),
+        resources: { img: { contentType: "image/png", data: DOT } },
+      }),
+    });
+    const view = new EditorView(host, editor);
+    views.push(view);
+    editor.dispatch(editor.state.tr.setSelection(NodeSelection.create(editor.state.doc, 2)));
+    expect(host.querySelectorAll("[data-foli-resize]")).toHaveLength(1);
+    view.setOptions({ editable: false });
+    expect(host.querySelectorAll("[data-foli-resize]")).toHaveLength(0);
+    view.setOptions({ editable: true });
+    expect(host.querySelectorAll("[data-foli-resize]")).toHaveLength(1);
+    // A caret elsewhere: no handle left behind.
+    editor.select(1);
+    expect(host.querySelectorAll("[data-foli-resize]")).toHaveLength(0);
   });
 });

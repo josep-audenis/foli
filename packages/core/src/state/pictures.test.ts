@@ -60,6 +60,19 @@ describe("insertPicture", () => {
     expect(picture?.attrs).toMatchObject({ decorative: true });
   });
 
+  it("inserts without alt text when not required (a pasted picture), still checking the rest", () => {
+    const editor = editorOf([p("ab")]);
+    caret(editor, 2);
+    expect(editor.run(insertPicture({ ...dot }, { requireAlt: false }))).toBe(true);
+    const picture = editor.getDocument().content.content?.[0]?.content?.[1];
+    expect(picture?.attrs?.alt).toBeUndefined();
+    const refused = { ...dot, contentType: "text/html" };
+    expect(editor.run(insertPicture(refused, { requireAlt: false }))).toBe(false);
+    expect(
+      editor.run(insertPicture({ ...dot, alt: "x".repeat(70_000) }, { requireAlt: false })),
+    ).toBe(false);
+  });
+
   it("refuses an image the document cannot hold", () => {
     const editor = editorOf([p("ab")]);
     caret(editor, 2);
