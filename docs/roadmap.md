@@ -21,7 +21,7 @@ place that says what is in progress; check it before starting work.
 | 7 Rich content           | ✅ Done                  | —                        | Merged in #33–#41; 0.2.0 on npm; list-document benchmark misses accepted (known limit)     |
 | 8 Word model & DOCX      | ✅ Done                  | —                        | Merged in #44–#61; 0.3.0 on npm (`@folijs/docx` first released); gate G5 passed            |
 | 9 Review                 | ✅ Done                  | —                        | Merged in #63–#72; 0.4.0 on npm                                                            |
-| 10 Tables & images       | In progress              | `phase-10/tables-images` | #73–#95 (#90 is the landing page); the 0.5.0 version PR next; publishing needs the owner   |
+| 10 Tables & images       | In progress              | `phase-10/tables-images` | #73–#96 (#90 is the landing page); 0.5.0 versioned, publishing needs the owner's approval  |
 | 11–12                    | Not started              |                          |                                                                                            |
 
 Status values: `Ready` (dependencies met, nobody on it) · `In progress` · `In review` (PR open) ·
@@ -1050,8 +1050,8 @@ Each task is a PR on `phase-10/tables-images`, the build green after each.
   limitations with table and picture sections, ADR-0006's outcome, docx and corpus READMEs);
   budgets as raised per task (core 52.7, view 63.5, React 87.9, docx 44.9 kB gzip), each with
   its reason; acceptance checked (above), `scripts/corpus/picture-roundtrip.mjs` added; the
-  0.5.0 changeset with the changed behaviours. The version PR follows; 0.5.0 is published with
-  the owner's approval.)
+  0.5.0 changeset with the changed behaviours (#95); the version PR (#96). 0.5.0 is not
+  published yet: it waits for the owner's approval.)
 
 ## Phase 11 — Sections, fields, templates & PDF · L → 0.6.0
 
