@@ -98,17 +98,28 @@ if (mode === "make") {
     );
   }
   console.log(
-    `made ${readdirSync(join(dir, "foli")).filter((n) => n.endsWith(".docx")).length} documents`,
+    `made ${readdirSync(join(dir, "foli")).filter((n) => n.endsWith(".expected.json")).length * 2} documents`,
   );
 } else {
   let failed = 0;
   const near = (a, b) => Math.abs((a ?? Number.NaN) - b) < 0.6;
-  /** Word's pictures sorted as Foli's are (alt text, then position), to compare in order. */
+  /** Pictures sorted by alt text, then floating or not, to compare Word's with Foli's in order. */
   const key = (p) => `${p.alt}|${p.float}`;
-  for (const file of readdirSync(join(dir, "foli")).filter((n) => n.endsWith(".expected.json"))) {
+  const files = readdirSync(join(dir, "foli")).filter((n) => n.endsWith(".expected.json"));
+  if (!files.length) {
+    console.error(`No documents in ${join(dir, "foli")}: run make first.`);
+    process.exit(1);
+  }
+  for (const file of files) {
     const base = file.replace(".expected.json", "");
     const { edited } = JSON.parse(readFileSync(join(dir, "foli", file), "utf8"));
-    const read = (name) => JSON.parse(readFileSync(name, "utf8").replace(/^﻿/, ""));
+    const read = (name) => {
+      try {
+        return JSON.parse(readFileSync(name, "utf8").replace(/^\uFEFF/, ""));
+      } catch (error) {
+        return { opened: false, error: `no Word data (${error.message})` };
+      }
+    };
     const original = read(join(reference, `${base}.json`));
     for (const suffix of ["", "-edited"]) {
       const word = read(join(dir, "word", `${base}${suffix}.json`));

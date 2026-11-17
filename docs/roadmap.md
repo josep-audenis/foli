@@ -21,7 +21,7 @@ place that says what is in progress; check it before starting work.
 | 7 Rich content           | ✅ Done                  | —                        | Merged in #33–#41; 0.2.0 on npm; list-document benchmark misses accepted (known limit)     |
 | 8 Word model & DOCX      | ✅ Done                  | —                        | Merged in #44–#61; 0.3.0 on npm (`@folijs/docx` first released); gate G5 passed            |
 | 9 Review                 | ✅ Done                  | —                        | Merged in #63–#72; 0.4.0 on npm                                                            |
-| 10 Tables & images       | Closing (0.5.0)          | `phase-10/tables-images` | Merged in #73–#95; 0.5.0 version PR next, published with the owner's approval              |
+| 10 Tables & images       | In progress              | `phase-10/tables-images` | #73–#95 (#90 is the landing page); the 0.5.0 version PR next; publishing needs the owner   |
 | 11–12                    | Not started              |                          |                                                                                            |
 
 Status values: `Ready` (dependencies met, nobody on it) · `In progress` · `In review` (PR open) ·
@@ -925,16 +925,17 @@ original after canonicalization, other parts byte for byte (`export.test.ts`); W
 corpus's tables (4 documents unchanged and edited, 2 made in the model) and pictures (04 and 07
 unchanged and edited: alt text, size, floats moved, a new picture) with Foli's content
 (`table-roundtrip.mjs`, `picture-roundtrip.mjs`); every paragraph outside tables on Word's page
-(115 of 115) and 277 of 280 cell paragraphs, rows broken where Word breaks them in 06; on Word's
-line 101 of 115: 04 has 25 of 35 (33 in 0.3.0) because Word's line numbers count the lines
-beside its floating chart as fewer than its own PDF shows (Foli lays them out as the PDF does),
-so the line baseline is met everywhere else; T1, T2, T3 and T5 in cells in three engines, T4 in
-Chromium (as everywhere); row insertion and deletion tracked, accepted, rejected and written as
-Word's `w:ins`/`w:del` in `w:trPr`, and Word reads a tracked row deletion back (table round
-trip); pictures keep their resources, `report.picturesWithoutAlt` counts the ones without alt
+(115 of 115) and 277 of 280 cell paragraphs, rows broken where Word breaks them in 06; T1, T2,
+T3 and T5 in cells in three engines; tracked text in cells and row insertion and deletion
+recorded, accepted and rejected, and Word reads Foli's tracked insertion in a cell and tracked
+row deletion back (table round trip, revisions counted); pictures keep their resources, `report.picturesWithoutAlt` counts the ones without alt
 text; v3 → v4 migration changes the version only (tests); the table menu, its dialog, the table
 style and shading boxes and the picture dialog are keyboard-usable and axe-clean in three
-engines. Publishing waits for the owner's approval.)
+engines. Two misses, for the owner to accept as known limits: on Word's line, 101 of 115
+paragraphs; 04 has 25 of 35, below 0.3.0's 33, because its floating chart is now laid out and
+Word's line numbers count the 9 lines beside it, which its own PDF shows as Foli does, as 5; and
+T4 (IME) in cells runs in Chromium only, as everywhere in the editor. Publishing waits for the
+owner's approval.)
 
 ### Tasks
 

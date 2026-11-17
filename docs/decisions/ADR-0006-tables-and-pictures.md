@@ -239,8 +239,8 @@ documents, which the 0.5.0 changeset says.
 - Corpus: every table and picture is modeled (`scripts/corpus/import-report.mjs`); 277 of 280
   cell paragraphs are on Word's page; Word reads Foli's tables and pictures back, unchanged and
   edited (`table-roundtrip.mjs`, `picture-roundtrip.mjs`).
-- Floating pictures are CSS floats in the editable host, as the 10.9 spike showed: the corpus's
-  three are on Word's page and paragraph at Word's offsets. Shortcuts taken (in
+- Floating pictures are CSS floats in the editable host, as the 10.9 spike showed: 07's three
+  are on Word's page and paragraph at Word's offsets. Shortcuts taken (in
   [limitations](../limitations.md#pictures)): tight and through shown as square, text on one side
   of a square picture, positions against the page drawn at the paragraph's top vertically,
   several floats in a paragraph stacked, a float past the page's text making the page taller,

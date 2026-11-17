@@ -21,7 +21,8 @@ integration.
 > and pictures as Word models them (0.5.0): tables split across pages by row with repeated
 > header rows, merged cells, table styles, cell selection, table commands and a table menu,
 > tracked row changes; inline and floating pictures (square, top and bottom, behind and in front
-> of text), resized, inserted through an upload hook, with alt text required. React components
+> of text), resized, inserted through an upload hook; alt text is required in the picture dialog,
+> and a picture pasted or dropped without it is marked. React components
 > with a toolbar and server rendering. Documents saved by 0.1.0 to 0.4.0 are migrated on load;
 > 0.4.0 cannot read documents saved by 0.5.0. The API may change in any 0.x version. Manual IME,
 > screen-reader and real-paste checks are not run yet: read the

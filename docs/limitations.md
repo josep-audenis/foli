@@ -82,11 +82,12 @@ checklist in [testing/ime.md](testing/ime.md)):
   dropped (not reported). Tables pasted from other applications become paragraphs.
 - No keyboard way to set a column's width (drag its border). Nested tables are drawn whole with
   their parent's row.
-- While tracking, only rows are tracked (inserted and deleted as Word records them): column
-  commands, merging and splitting cells, header rows, table styles, shading and column widths
-  are refused. A table style's own definition cannot be changed (a changed one is refused on
+- While tracking, text in cells is tracked as everywhere; of the table's structure only rows
+  are (inserted and deleted as Word records them): column commands, merging and splitting cells,
+  header rows, table styles, shading and column widths are refused. A table style's own definition cannot be changed (a changed one is refused on
   export).
-- A table with a page, column or section break in a cell stays opaque.
+- A table the model cannot hold stays opaque (a page, column or section break in a cell, and
+  the other cases in the [docx README](../packages/docx/README.md)).
 - IME in table cells is tested in Chromium only, as everywhere else.
 
 ## Pictures
@@ -94,7 +95,11 @@ checklist in [testing/ime.md](testing/ime.md)):
 - Pictures are inline or floating (wrapped square and top-and-bottom, behind and in front of
   text); tight and through wrapping are shown as square, and text goes on one side of a square
   picture only (the side with more room). Charts, shapes, text boxes and linked images stay
-  opaque.
+  opaque, and so do floating pictures positioned by `simplePos`, hidden, or sized relative to
+  the page.
+- A picture whose resource is a web `url` is fetched by the view as soon as it is shown (with
+  no referrer) unless the app's `resource` resolver returns `null` for it: for JSON documents
+  from untrusted sources, resolve or block such URLs.
 - A floating picture is laid out with its paragraph; a square or top-and-bottom picture placed
   against the page or its margins vertically is drawn at its paragraph's top, horizontal
   positions count the paragraph's indents, several floating pictures in a paragraph stack
@@ -103,8 +108,8 @@ checklist in [testing/ime.md](testing/ime.md)):
   picture's position or wrapping; one changed through the API is written as a new drawing,
   losing what only its original held (cropping, effects, z-order).
 - A picture behind text cannot be clicked where text covers it (select it with the keyboard).
-- No cropping, rotation or touch resizing; resizing is refused while tracking (Word does not
-  track it either; the size is not recorded). Alt text changes are not tracked.
+- No cropping, rotation or touch resizing; resizing is refused while tracking (Foli does not
+  record a size change yet). Alt text changes are not tracked.
 - Pictures copied to another document lose their images (their resources stay behind); Word's
   picture-and-text paste brings the text only. The clipboard writes a floating picture inline.
 - `renderDocument` measures blocks on one long page: the lines after a floating picture may

@@ -7,12 +7,12 @@
 //
 // `make` exports every corpus document with tables twice to <dir>/foli: as imported
 // (<name>.docx) and edited (<name>-edited.docx: in the first table, "Foli edit" typed into the
-// first cell of the second row, that row kept from breaking across pages, the last cell shaded,
-// and the third row deleted as a tracked change by "Foli Reviewer"), and a table made in the
+// first cell of the second row as a tracked insertion, that row kept from breaking across pages,
+// the last cell shaded, and the third row deleted as a tracked change by "Foli Reviewer"), and a table made in the
 // model in a new package, with its grid and without (00-new-table*). `check` reads what Word
 // made of them (word-reference.ps1 accepts every change before measuring): each opened, as many
-// pages as Word gives the original, and every paragraph, table cells included, with Foli's text
-// in Foli's order (the deleted row gone). Prints one line per document; exits 1 on any difference.
+// pages as Word gives the original, every paragraph, table cells included, with Foli's text
+// in Foli's order (the deleted row gone), and Word counting Foli's tracked changes (10.10). Prints one line per document; exits 1 on any difference.
 
 import { mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -68,12 +68,24 @@ if (mode === "make") {
     const rows = t.content;
     const second = rows[1] ?? rows[0];
     const first = second.content.find((c) => c.attrs?.vMerge !== "continue") ?? second.content[0];
-    first.content[0] = { ...first.content[0], content: [{ type: "text", text: "Foli edit" }] };
+    const by = { author: "Foli Reviewer", date: "2026-11-16T00:00:00Z" };
+    first.content[0] = {
+      ...first.content[0],
+      content: [
+        {
+          type: "text",
+          text: "Foli edit",
+          marks: [{ type: "insertion", attrs: { id: 9002, ...by } }],
+        },
+      ],
+    };
+    let revisions = 1;
     second.attrs = { ...second.attrs, cantSplit: true };
     const lastRow = rows.at(-1);
     const lastCell = lastRow.content.at(-1);
     lastCell.attrs = { ...lastCell.attrs, shading: { pattern: "clear", fill: "FFF2CC" } };
     if (rows.length > 3 && !rows[2].content.some((c) => c.attrs?.vMerge)) {
+      revisions++;
       rows[2].attrs = {
         ...rows[2].attrs,
         revision: { deletion: { id: 9001, author: "Foli Reviewer", date: "2026-11-16T00:00:00Z" } },
@@ -85,7 +97,7 @@ if (mode === "make") {
     );
     writeFileSync(
       join(dir, "foli", `${base}.expected.json`),
-      JSON.stringify({ plain: texts(document.content), edited: texts(edited.content) }),
+      JSON.stringify({ plain: texts(document.content), edited: texts(edited.content), revisions }),
     );
   }
   // A table made in the model, in a new package: with its grid, and without one.
@@ -147,6 +159,12 @@ if (mode === "make") {
       if (!word.opened) problems.push(`not opened: ${word.error}`);
       if (original && suffix === "" && word.pages !== original.pages)
         problems.push(`${word.pages} pages, Word gives the original ${original.pages}`);
+      // Word counts Foli's tracked changes beside the original's (a row may count once per cell).
+      const before = original?.revisionsAccepted ?? 0;
+      if (suffix === "-edited" && (word.revisionsAccepted ?? 0) < before + expected.revisions)
+        problems.push(
+          `${word.revisionsAccepted} revisions, the original ${before} and Foli's ${expected.revisions}`,
+        );
       const at = got.findIndex((t, i) => t !== want[i]);
       if (got.length !== want.length || at >= 0)
         problems.push(

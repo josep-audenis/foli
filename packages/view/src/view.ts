@@ -992,8 +992,9 @@ export class EditorView {
    * A floating picture reaches into the blocks after its paragraph (their lines go around it):
    * a block that changed (new, drawn again or stale) on a page holding one has the blocks after
    * it on that page and the next measured again. A new block counts on the page of the block
-   * before it, where `place` first puts it; only blocks that changed reach on, not the ones this
-   * marks, so an edit re-measures two pages at most.
+   * before it, where `place` first puts it, and the next (it may have been that page's first);
+   * only blocks that changed reach on, not the ones this marks, so an edit re-measures three
+   * pages at most.
    */
   private staleAroundFloats(
     doc: ModelNode,
@@ -1004,8 +1005,8 @@ export class EditorView {
     let last = 0;
     doc.forEach((node) => {
       const known = pagesOf.get(node);
-      const pages = known?.length ? known : [last];
-      last = pages[pages.length - 1] as number;
+      const pages = known?.length ? known : [last, last + 1];
+      last = known?.length ? (known[known.length - 1] as number) : last;
       blocks.push({ node, pages, changed: !known || redrawn.has(node) || this.stale.has(node) });
     });
     // The pages floats are on now, and were on before (a float deleted or made inline leaves
