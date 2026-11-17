@@ -23,6 +23,9 @@ import type { BlockDesc, LeafDesc } from "../render.js";
 import {
   CHANGE_BAR,
   changeElement,
+  type FloatGeometry,
+  floatElements,
+  floatGeometry,
   fontStack,
   type ImageSource,
   imageSource,
@@ -72,6 +75,12 @@ export interface WordBlockDesc extends BlockDesc {
   /** What the rendering depends on besides the node (its marker, open comments). */
   readonly key: string;
 }
+
+/**
+ * A floating picture's holder (drawn first in its paragraph, the view's own DOM) to its anchor:
+ * the empty, non-editable span at the picture's place in the text, which positions map to.
+ */
+export const FLOAT_ANCHORS = new WeakMap<Element, HTMLElement>();
 
 /**
  * Renders the blocks of one v3 document for the editable view. `prepare` runs before each
@@ -188,6 +197,9 @@ export class WordRenderer {
       return fragments[i] as HTMLElement;
     };
     const leaves: LeafDesc[] = [];
+    // Floating pictures go first in the fragment their anchor is in, in order.
+    const floats = new Map<HTMLElement, HTMLElement[]>();
+    let geometry: FloatGeometry | undefined;
     const comments = new Set(this.#comments[index] ?? []);
     node.forEach((child, offset) => {
       const name = child.type.name;
@@ -223,7 +235,16 @@ export class WordRenderer {
           // Not editable inside (no browser resize handles); one position, like opaque content.
           const span = doc.createElement("span");
           span.setAttribute("contenteditable", "false");
-          span.append(pictureElement(child.attrs, doc, this.#image));
+          if (child.attrs.float && !this.#clipboard) {
+            // Floating: drawn at the fragment's start (ADR-0006), its place in the text an
+            // empty anchor.
+            geometry ??= floatGeometry(this.#context.envelope.section);
+            const { nodes, holder } = floatElements(child.attrs, doc, this.#image, geometry);
+            for (const node of nodes) node.setAttribute("contenteditable", "false");
+            FLOAT_ANCHORS.set(holder, span);
+            const fragment = fragmentAt(offset);
+            floats.set(fragment, [...(floats.get(fragment) ?? []), ...nodes]);
+          } else span.append(pictureElement(child.attrs, doc, this.#image));
           leafElement(span);
           return;
         }
@@ -258,12 +279,17 @@ export class WordRenderer {
         from = to;
       }
     });
+    for (const [fragment, nodes] of floats) fragment.prepend(...nodes);
     // An empty paragraph, or one ending in a line break, shows its last line; after a page
     // break the paragraph mark stays on the break's line, as in Word.
     let last: ModelNode | null = null;
     for (let i = node.childCount - 1; i >= 0 && !last; i--) {
       const child = node.child(i);
-      if (!["bookmarkStart", "bookmarkEnd", "commentStart", "commentEnd"].includes(child.type.name))
+      // A floating picture is not in the line: a paragraph holding only one shows its empty line.
+      if (
+        !["bookmarkStart", "bookmarkEnd", "commentStart", "commentEnd"].includes(child.type.name) &&
+        !(child.type.name === "picture" && child.attrs.float)
+      )
         last = child;
     }
     if (!last || last.type.name === "hardBreak" || last.type.name === "columnBreak")
@@ -353,6 +379,7 @@ export class WordRenderer {
       this.#doc,
       this.#ratio,
       this.#image,
+      floatGeometry(this.#context.envelope.section),
     );
     const dom = shown.element;
     dom.setAttribute("contenteditable", "false");

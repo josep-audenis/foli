@@ -20,7 +20,9 @@ async function open(page: Page, name: string): Promise<void> {
   await page.waitForTimeout(300);
 }
 
-const pictures = (page: Page) => editor(page).locator("img[data-foli-picture]");
+// Inline pictures (floating ones are in word-floats.spec.ts).
+const pictures = (page: Page) =>
+  editor(page).locator("img[data-foli-picture]:not([data-foli-float] *)");
 
 test("pictures are drawn from the package's images at their size, with their alt text", async ({
   page,
