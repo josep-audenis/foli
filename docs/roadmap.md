@@ -9,20 +9,21 @@ leaves `main` green with a working playground.
 **Update this table in the same PR that starts, advances or finishes a phase.** It is the only
 place that says what is in progress; check it before starting work.
 
-| Phase                    | Status                   | Branch | Notes                                                                                      |
-| ------------------------ | ------------------------ | ------ | ------------------------------------------------------------------------------------------ |
-| 0 Foundation             | ✅ Done                  | —      |                                                                                            |
-| 1 Architecture spike     | ✅ Done (G1 provisional) | —      | Merged in #1; ADR-0003 accepted provisionally; IME, dead-key and screen-reader checks open |
-| 2 Document model         | ✅ Done                  | —      | Merged in #2                                                                               |
-| 3 Transactions & history | ✅ Done                  | —      | Merged in #4; gate G2 passed                                                               |
-| 4 Editor view            | ✅ Done (G3 provisional) | —      | Merged in #8–#13; manual checks (4.6) deferred, open risks in ADR-0003                     |
-| 5 Native pagination      | ✅ Done (G4 provisional) | —      | Merged in #15–#22; page-break manual checks open, risks in ADR-0003                        |
-| 6 React API & 0.1.0      | ✅ Done                  | —      | Merged in #23–#31; 0.1.0 on npm; manual checks shipped as known risks (ADR-0003)           |
-| 7 Rich content           | ✅ Done                  | —      | Merged in #33–#41; 0.2.0 on npm; list-document benchmark misses accepted (known limit)     |
-| 8 Word model & DOCX      | ✅ Done                  | —      | Merged in #44–#61; 0.3.0 on npm (`@folijs/docx` first released); gate G5 passed            |
-| 9 Review                 | ✅ Done                  | —      | Merged in #63–#72; 0.4.0 on npm                                                            |
-| 10 Tables & images       | ✅ Done                  | —      | Merged in #73–#97 (#90, the landing page, went to main); 0.5.0 on npm; two misses accepted |
-| 11–12                    | Not started              |        |                                                                                            |
+| Phase                    | Status                   | Branch                   | Notes                                                                                      |
+| ------------------------ | ------------------------ | ------------------------ | ------------------------------------------------------------------------------------------ |
+| 0 Foundation             | ✅ Done                  | —                        |                                                                                            |
+| 1 Architecture spike     | ✅ Done (G1 provisional) | —                        | Merged in #1; ADR-0003 accepted provisionally; IME, dead-key and screen-reader checks open |
+| 2 Document model         | ✅ Done                  | —                        | Merged in #2                                                                               |
+| 3 Transactions & history | ✅ Done                  | —                        | Merged in #4; gate G2 passed                                                               |
+| 4 Editor view            | ✅ Done (G3 provisional) | —                        | Merged in #8–#13; manual checks (4.6) deferred, open risks in ADR-0003                     |
+| 5 Native pagination      | ✅ Done (G4 provisional) | —                        | Merged in #15–#22; page-break manual checks open, risks in ADR-0003                        |
+| 6 React API & 0.1.0      | ✅ Done                  | —                        | Merged in #23–#31; 0.1.0 on npm; manual checks shipped as known risks (ADR-0003)           |
+| 7 Rich content           | ✅ Done                  | —                        | Merged in #33–#41; 0.2.0 on npm; list-document benchmark misses accepted (known limit)     |
+| 8 Word model & DOCX      | ✅ Done                  | —                        | Merged in #44–#61; 0.3.0 on npm (`@folijs/docx` first released); gate G5 passed            |
+| 9 Review                 | ✅ Done                  | —                        | Merged in #63–#72; 0.4.0 on npm                                                            |
+| 10 Tables & images       | ✅ Done                  | —                        | Merged in #73–#97 (#90, the landing page, went to main); 0.5.0 on npm; two misses accepted |
+| 11 Sections & templates  | In progress              | phase-11/sections-fields | Plan below; schema v5 (ADR-0007 first)                                                     |
+| 12 Ecosystem & 1.0       | Not started              |                          |                                                                                            |
 
 Status values: `Ready` (dependencies met, nobody on it) · `In progress` · `In review` (PR open) ·
 `✅ Done` (merged, acceptance criteria met) · `Blocked by …`.
@@ -1064,6 +1065,110 @@ Each task is a PR on `phase-10/tables-images`, the build green after each.
 - Footnotes and endnotes placed on their pages; bookmarks; document outline; find and replace.
 - PDF export: `exportPdf` with the editor's own layout (headless browser on a server, or the
   browser's print), checked against Word's PDF of the same document.
+
+**Starts from (Phase 10):** sections are read and laid out (each paragraph's `section` ends one;
+its page size, orientation and margins apply to its pages, printed through named pages), but
+their page setups and breaks are not editable, `nextColumn` and columns (`w:cols`) are not laid
+out, and a section's headers and footers are only relationship ids into the original package:
+their parts are exported verbatim, never shown. Footnote and endnote parts are kept the same
+way; a note reference is an `opaqueInline`. Fields keep their result as editable text with
+their structure (`w:fldChar`, `w:instrText`) opaque; simple fields, merge fields, content
+controls and bookmarks are opaque nodes. The corpus already has the Word content: 01 (`REF`,
+Page X of Y, first-page header), 03 (five content controls, `MERGEFIELD`, a picture in the
+header), 04 (`TOC`, `PAGEREF`, `SEQ`, footnotes, a landscape section), 05 (a page number in
+the header). Its page score against Word's PDFs (`pnpm corpus:pages`) leaves headers, footers
+and footnotes out. New node types and stories in the envelope are a format change (schema v5 with a v4 → v5
+migration), so 0.5.0 will not read documents with them.
+
+**Acceptance:** the corpus (with new Word-authored documents for what it lacks: several
+sections with columns, even and odd headers and footers, endnotes, bookmarks with
+cross-references) imports with its headers, footers, notes, fields, content controls and
+bookmarks modeled (what stays opaque reported, per document); every document round-trips with
+no part or element lost (canonical comparison) and opens in Word without repair, edited too
+(a header changed, a field updated, a content control filled, a note added, a section break
+inserted); per-paragraph page agreement with Word at least the 0.5.0 baseline, and headers,
+footers and footnotes on Word's pages (the page score measured over the whole page, not only
+inside the margins); page fields show each page's number and the page count; a table of
+contents updated in Foli lists Word's headings and page numbers; T1–T5 inside a header and a
+footnote in three engines; tracked changes in headers, footers and notes are recorded,
+accepted, rejected and round-trip with Word; content controls filled from the UI and through
+the API, and merge fields from data, export as Word reads them; find and replace reaches every
+story; `exportPdf` gives the editor's pages, scored against Word's PDF; v4 documents migrate
+without loss; the new UI (section setup, header and footer editing, fields, content controls,
+notes, outline, find and replace) is keyboard-usable and axe-clean in three engines; 0.6.0
+published.
+
+### Tasks
+
+Each task is a PR on `phase-11/sections-fields`, the build green after each.
+
+- [x] Claim phase, branch `phase-11/sections-fields`
+- [ ] 11.1 ADR-0007, stories, fields and content controls in the model and on pages: headers,
+  footers, footnotes and endnotes as stories (content trees of their own in the envelope,
+  referenced by id from sections and note references; one editor state per story or one state
+  with several roots, and what undo, selection, tracking and comments do across them); fields
+  (simple and complex, nested, a field spanning paragraphs such as `TOC`: instruction kept,
+  result as content, updated on demand from layout: `PAGE`, `NUMPAGES`, `PAGEREF`, `REF`,
+  `SEQ`, `DATE`, `TOC`), content controls (inline, block, row and cell; their properties,
+  placeholder and data binding kept), bookmarks (start and end marks); layout (a header or
+  footer taller than its margin pushes the text, first and even variants, linked to the
+  previous section; notes at the page's foot taking space from its text, continued on the next
+  page; columns and column breaks; continuous sections), editing in place (focus moves between
+  the body and a story, the body dimmed); `exportPdf`'s approach; schema v5 and its migration.
+  Spike evidence for a header edited in place and a footnote moving pages as its reference
+  does, in three engines. The owner accepts it before 11.2.
+- [ ] 11.2 Corpus: Word-authored documents for what 01–07 lack (several sections with two and
+  three columns, a column break, a continuous section, even and odd headers and footers, a
+  section with headers not linked to the previous, endnotes, bookmarks with `REF` and
+  `PAGEREF` to them, a date field) added to the generator, with Word's reference data (pages of
+  headers, footers and notes, field results) and PDFs; the page score measured over the whole
+  page.
+- [ ] 11.3 Schema v5 in `@folijs/core`: stories in the envelope, field, content control,
+  bookmark and note reference nodes and their properties, sections' header and footer
+  references to stories; validation, the v4 → v5 migration (a version change: what stays
+  opaque until imported again), `SCHEMA_VERSION` 5.
+- [ ] 11.4 DOCX stories: headers, footers, footnotes and endnotes imported as stories and
+  exported losslessly (unchanged parts byte for byte, changed ones rewritten, new ones with
+  their relationships and content types); pictures, tables, tracked changes and comments in
+  them; harness: round trip, opens in Word, edited exports too.
+- [ ] 11.5 DOCX fields, content controls and bookmarks: complex and simple fields (nested,
+  across runs and paragraphs), merge and form fields, content controls at every level (with
+  data binding and placeholders kept), bookmarks; what the model cannot hold stays verbatim,
+  reported; harness as in 11.4.
+- [ ] 11.6 Sections on pages and their editing: columns (equal and set widths, the line between
+  them, column breaks), continuous sections, even and odd page sections with Word's blank page;
+  insert and remove section breaks, page setup per section (size, orientation, margins,
+  columns) as commands and a keyboard-usable dialog; tracked as Word records them; page
+  agreement with Word (`pnpm corpus:pages`).
+- [ ] 11.7 Headers and footers: laid out in their margins on every page (first, even and
+  default variants, linked to the previous section, a taller one pushing the text), page
+  fields filled per page; edited in place (double-click or a command opens the story, Escape
+  returns) with typing, formatting, pictures, tables, undo and tracking; link to previous and
+  different first page and even pages as commands; T1–T5 in a header; on Word's pages.
+- [ ] 11.8 Fields: shown with their results (shaded when selected, as Word does), selected and
+  deleted whole, updated on demand (one field, all, before print and PDF): `PAGE`, `NUMPAGES`,
+  `SECTIONPAGES`, `DATE`, `REF`, `PAGEREF`, `SEQ`, `TOC` built from heading styles with their
+  pages; insert a page number, the date, a cross-reference and a table of contents; merge
+  fields filled from data through the API; field codes shown and hidden.
+- [ ] 11.9 Content controls: shown with their bounds, title and placeholder; plain and rich
+  text edited inside (and only inside when locked), drop-down and combo box lists, date picker,
+  check box, repeating sections kept; filled from the UI and through the API (by tag or id),
+  read back as data; keyboard-usable and axe-clean.
+- [ ] 11.10 Footnotes and endnotes: insert a note (numbered in Word's formats, restarting per
+  section or page where set), its text edited in place; footnotes laid out at their reference's
+  page foot (separator, continuation to the next page), endnotes at the end of the document or
+  section; deleted with their reference; tracked; T1–T5 in a note; on Word's pages.
+- [ ] 11.11 Navigation: bookmarks (insert, go to, used by cross-references), the document
+  outline (headings, moving to them; a React panel), find and replace across every story (case
+  and whole words, replace tracked while tracking, one undo step for replace all); keyboard
+  shortcuts as Word's; axe.
+- [ ] 11.12 PDF: `exportPdf` from the editor's own layout as decided in ADR-0007 (fields updated
+  first, links and the outline as PDF bookmarks where the engine gives them), the page score
+  against Word's PDF for every corpus document; print uses the same pages.
+- [ ] 11.13 Close: docs (ADR-0007 outcome, architecture, document model, pagination, api, docx
+  README, limitations), size budgets, the acceptance above checked with the harness, the 0.6.0
+  changeset (schema v5: 0.5.0 cannot read documents saved by 0.6.0), the version PR; publish
+  with the owner's approval.
 
 ## Phase 12 — Ecosystem & 1.0 · L
 
