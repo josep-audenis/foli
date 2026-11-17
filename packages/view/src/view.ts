@@ -1974,8 +1974,18 @@ export class EditorView {
     // The insertion point, mapped through every change until the pictures go in.
     let at = this.state.selection.from;
     const replace = !this.state.selection.empty;
-    const unsubscribe = this.editor.subscribe((_state, transactions) => {
-      for (const tr of transactions) at = tr.mapping.map(at);
+    // Another document (`setDocument` notifies with no transaction): the files are not for it.
+    let lost = false;
+    let mapped = this.state.doc;
+    // The user's own selection while a picture goes in, mapped, to give back after it.
+    let user: Selection | null = null;
+    const unsubscribe = this.editor.subscribe((state, transactions) => {
+      for (const tr of transactions) {
+        at = tr.mapping.map(at);
+        if (user) user = user.map(tr.doc, tr.mapping);
+      }
+      if (!transactions.length && state.doc !== mapped) lost = true;
+      mapped = state.doc;
     });
     let inserted = 0;
     try {
@@ -1996,7 +2006,7 @@ export class EditorView {
         if (typeof src !== "string" || !src) continue;
         // The browser owns the DOM during a composition: the picture goes in after it.
         while (this.composing && !this.destroyed) await new Promise((r) => setTimeout(r, 50));
-        if (this.destroyed || !this.editable) return inserted;
+        if (this.destroyed || !this.editable || lost) return inserted;
         const scale = Math.min(1, this.textWidthEmu() / (size.width * EMU_PER_PX));
         // A `data:` URL says its own type (an app may have converted the file).
         const type = /^data:([^;,]+)/i.exec(src)?.[1]?.toLowerCase() ?? file.type;
@@ -2011,9 +2021,14 @@ export class EditorView {
         const { doc, selection } = this.state;
         const pos = Math.min(at, doc.content.size);
         // The first picture replaces what was selected at the paste (still selected there).
-        if (!(replace && inserted === 0 && selection.from === pos))
-          this.dispatch(this.state.tr.setSelection(TextSelection.near(doc.resolve(pos))));
+        const here = replace && inserted === 0 && selection.from === pos;
+        // A caret the user moved elsewhere meanwhile stays there.
+        const elsewhere = !here && !(selection.empty && selection.from === pos);
+        user = elsewhere ? selection : null;
+        if (!here) this.dispatch(this.state.tr.setSelection(TextSelection.near(doc.resolve(pos))));
         if (this.run(insertPicture(picture, { requireAlt: false }))) inserted++;
+        if (user) this.dispatch(this.state.tr.setSelection(user));
+        user = null;
       }
       return inserted;
     } finally {

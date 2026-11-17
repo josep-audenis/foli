@@ -145,7 +145,7 @@ describe("pictures in the editable view", () => {
     expect(host.querySelectorAll("[data-foli-resize]")).toHaveLength(0);
     view.setOptions({ editable: true });
     expect(host.querySelectorAll("[data-foli-resize]")).toHaveLength(1);
-    // Typing elsewhere is still read back (the handle is not input).
+    // A caret elsewhere: no handle left behind.
     editor.select(1);
     expect(host.querySelectorAll("[data-foli-resize]")).toHaveLength(0);
   });

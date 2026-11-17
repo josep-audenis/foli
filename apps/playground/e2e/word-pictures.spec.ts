@@ -221,11 +221,42 @@ test("a picture goes where it was pasted, however the text changed during its up
     paragraph?.forEach((child, offset) => {
       if (child.type.name === "picture") at = offset;
     });
-    return { n, at, before: paragraph?.textBetween(0, Math.max(at, 0)), first };
+    return {
+      n,
+      at,
+      before: paragraph?.textBetween(0, Math.max(at, 0)),
+      first,
+      caret: editor.state.selection.head,
+    };
   });
   expect(result.n).toBe(1);
   // Two characters in, plus the three typed before them.
   expect(result.before).toBe(`XYZ${result.first.slice(0, 2)}`);
+  // The caret the user put at the start stays there.
+  expect(result.caret).toBe(1);
+});
+
+test("a picture pending upload never goes into a document opened meanwhile", async ({ page }) => {
+  await open(page, "07-picture-report.docx");
+  const result = await page.evaluate(async () => {
+    const base64 =
+      "iVBORw0KGgoAAAANSUhEUgAAAAIAAAABCAYAAAD0In+KAAAAEUlEQVR42mP8z8DwnwEJMAEAG/MCAeVKGkwAAAAASUVORK5CYII=";
+    const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
+    const { editor, view, sample } = window.foliEdit;
+    let done = (_src: string) => {};
+    view.setOptions({ upload: () => new Promise<string>((resolve) => (done = resolve)) });
+    const insert = view.insertFiles([new File([bytes], "dot.png", { type: "image/png" })]);
+    await new Promise((r) => setTimeout(r, 100));
+    editor.setDocument(sample);
+    done(`data:image/png;base64,${base64}`);
+    const n = await insert;
+    let pictures = 0;
+    editor.state.doc.descendants((node) => {
+      if (node.type.name === "picture") pictures++;
+    });
+    return { n, pictures };
+  });
+  expect(result).toEqual({ n: 0, pictures: 0 });
 });
 
 test("image files dropped become pictures where they are dropped", async ({
