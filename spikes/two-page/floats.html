@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Foli spike: floating pictures in the editable host</title>
+    <!-- Phase 10.9 throwaway spike (ADR-0006, "Floating pictures"): lines laid out around a
+         floating picture inside one contenteditable host, as CSS floats. A picture wrapped
+         square is a float at the start of its anchor paragraph, offset down by a zero-width
+         spacer float and across by its margin; top-and-bottom is a float as wide as the
+         column; behind text is absolutely positioned. Static DOM: the experiments record what
+         browsers do natively. -->
+    <style>
+      body { margin: 0; background: #e9e9e6; font: 16px/24px Georgia, "Times New Roman", serif; }
+      #editor { display: flex; flex-direction: column; align-items: center; gap: 24px; padding: 24px 0; outline: none; }
+      .page { position: relative; box-sizing: border-box; width: 160mm; height: 240mm; padding: 10mm; background: #fff; }
+      p { margin: 0 0 8px; }
+      .spacer { float: left; width: 0; }
+      .float { float: left; clear: left; display: block; }
+      .float.right { float: right; clear: right; }
+      .picture { display: block; background: #7aa7d9; }
+      .behind { position: absolute; z-index: 0; opacity: 0.5; }
+    </style>
+  </head>
+  <body>
+    <div id="editor" contenteditable="true">
+      <section class="page">
+        <p id="above">The paragraph above the picture is long enough to take two lines of text across the whole column.</p>
+        <!-- Square wrap: 24px down, 40px in from the column's left, 150 × 96. -->
+        <p id="anchor"><span class="spacer" contenteditable="false" style="height: 24px"></span><span class="float" id="square" contenteditable="false" style="margin: 0 12px 6px 40px"><span class="picture" style="width: 150px; height: 96px"></span></span>The anchor paragraph holds the picture. Its lines beside the picture are shorter, and the text goes on below it at the full width of the column, as Word lays a square-wrapped picture out on its page.</p>
+        <p id="below">The next paragraph starts beside the picture too when the picture reaches down into it: a float is not the paragraph's own, it belongs to the page's flow, as in Word.</p>
+        <!-- Top and bottom: as wide as the column, no line beside it. -->
+        <p id="tb"><span class="float" id="topbottom" contenteditable="false" style="width: 100%; margin: 0 0 6px"><span class="picture" style="width: 200px; height: 72px"></span></span>Text of a paragraph whose picture is wrapped top and bottom: no line goes beside it.</p>
+        <!-- Behind text: positioned on the page, no effect on lines. -->
+        <p id="behindp"><span class="behind" id="behind" contenteditable="false" style="left: 300px; top: 560px"><span class="picture" style="width: 120px; height: 80px"></span></span>Text over a picture behind it keeps its full line width; the picture is drawn under the text.</p>
+        <p id="last">The last paragraph.</p>
+      </section>
+    </div>
+  </body>
+</html>

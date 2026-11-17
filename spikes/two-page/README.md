@@ -68,3 +68,15 @@ text is duplicated or lost. In DevTools, `__spike.state()` shows the model and
 row repeated as non-editable content and one row split at a line. `e2e/tables.spec.ts` records
 what Chromium, Firefox and WebKit do with caret movement, selection, clicks and Enter there; the
 results and what follows from them are in [ADR-0006](../../docs/decisions/ADR-0006-tables-and-pictures.md).
+
+## Floating pictures (Phase 10.9)
+
+`floats.html` is a static page in one editable host: a picture wrapped square as a CSS float at
+the start of its anchor paragraph (offset down by a zero-width spacer float, across by its
+margin), a top-and-bottom picture as a float as wide as the column, and a picture behind text
+absolutely positioned. `e2e/floats.spec.ts` checks, in Chromium, Firefox and WebKit, that the
+lines beside a float are shortened (in its paragraph and the next), that ArrowDown walks those
+lines without entering the picture, that a click and Home beside it land on that line after
+it, that typing beside it leaves it in place, and that top-and-bottom and behind-text pictures
+leave the lines as Word does. All pass; the decision is in
+[ADR-0006](../../docs/decisions/ADR-0006-tables-and-pictures.md).

@@ -128,9 +128,18 @@ Backspace, and reads a selection of several ranges back as a `CellSelection`.
 - **Floating pictures.** Exclusion rectangles for the lines beside them (square and
   top-and-bottom first; other wrappings drawn as square, reported), anchored to their paragraph's
   page. An exclusion changes the lines of every paragraph it overlaps, so those paragraphs are
-  measured again when a picture moves. How the browser lays lines out around an exclusion inside
-  the editable host (CSS floats or `shape-outside`) has no spike evidence yet: 10.9 starts with
-  one, and this part of the decision is an open risk until then.
+  measured again when a picture moves. Lines are laid out around the exclusion by the browser,
+  as CSS floats in the editable host: a square-wrapped picture is a float at the start of its
+  anchor paragraph, offset down by a zero-width spacer float and across by its margin;
+  top-and-bottom a float as wide as the column; behind and in front of text absolutely
+  positioned on the page. The 10.9 spike (`spikes/two-page/floats.html`, its e2e in Chromium,
+  Firefox and WebKit) shows the lines beside a float shortened in its paragraph and the next,
+  ArrowDown walking those lines without entering the picture, a click and Home landing on the
+  line after it, and typing beside it leaving it in place (in Firefox a collapsed caret at a
+  soft break reports the previous line's end: the offset is right). `shape-outside` (tight,
+  through) is not needed for square and stays out. Not spiked, the implementation's risk: a
+  float in a paragraph split across pages, and an exclusion measured before its page is
+  known (positions relative to the page or margin).
 
 ### Positions, selection and keyboard
 
@@ -200,5 +209,5 @@ documents, which the 0.5.0 changeset says.
   Word is measured cell paragraph by cell paragraph (10.5).
 - Pictures add the first binary data the document refers to: apps that store documents as JSON
   store pictures beside them (the upload hook and resolver), or opt into `data:` URLs.
-- Floating pictures depend on a spike (10.9); until it passes, only inline pictures are a
-  commitment.
+- Floating pictures depended on a spike (10.9); it passed (CSS floats in the editable host, three
+  engines), so square, top-and-bottom, behind and in front of text are a commitment.
