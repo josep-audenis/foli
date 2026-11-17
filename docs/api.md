@@ -22,21 +22,23 @@ An editable document on pages, with a toolbar. Creates its own editor and provid
 model, with Word's toolbar): a 0.1.0 or 0.2.0 document given to it is migrated
 (`parseDocument`), and what it reports is v3.
 
-| Prop             | Type                           | Default      | Notes                                                                                             |
-| ---------------- | ------------------------------ | ------------ | ------------------------------------------------------------------------------------------------- |
-| `initialContent` | `EditorDocument`               | empty A4     | Read once, on mount; any version (migrated). Later: `editor.setDocument()` or a new `key`.        |
-| `plugins`        | `readonly Plugin[]`            | `[]`         | Read once, on mount. Unstable API.                                                                |
-| `author`         | `string`                       | `"Author"`   | Read once: who edits (tracked changes are made in this name).                                     |
-| `trackChanges`   | `boolean`                      | `false`      | Read once: record edits as tracked changes (the toolbar turns it on and off).                     |
-| `reviewView`     | `ReviewView`                   | `"markup"`   | Read once: how tracked changes show (the toolbar changes it).                                     |
-| `onChange`       | `(change: FoliChange) => void` | —            | After every content change made through transactions. Not for selection changes or `setDocument`. |
-| `toolbar`        | `boolean`                      | `true`       | Show `FoliToolbar` above the pages.                                                               |
-| `comments`       | `boolean \| "auto"`            | `"auto"`     | The comments pane beside the pages: while the document has comments (`"auto"`), always, never.    |
-| `readOnly`       | `boolean`                      | `false`      | Read, select, copy; no editing. Disables the toolbar.                                             |
-| `placeholder`    | `string`                       | `""`         | Shown while the document is empty.                                                                |
-| `label`          | `string`                       | `"Document"` | Accessible name of the editable area.                                                             |
-| `className`      | `string`                       | —            | Added to the `.foli-canvas` element.                                                              |
-| `children`       | `ReactNode`                    | —            | Rendered between the toolbar and the pages, inside the editor's context.                          |
+| Prop             | Type                           | Default      | Notes                                                                                               |
+| ---------------- | ------------------------------ | ------------ | --------------------------------------------------------------------------------------------------- |
+| `initialContent` | `EditorDocument`               | empty A4     | Read once, on mount; any version (migrated). Later: `editor.setDocument()` or a new `key`.          |
+| `plugins`        | `readonly Plugin[]`            | `[]`         | Read once, on mount. Unstable API.                                                                  |
+| `author`         | `string`                       | `"Author"`   | Read once: who edits (tracked changes are made in this name).                                       |
+| `trackChanges`   | `boolean`                      | `false`      | Read once: record edits as tracked changes (the toolbar turns it on and off).                       |
+| `reviewView`     | `ReviewView`                   | `"markup"`   | Read once: how tracked changes show (the toolbar changes it).                                       |
+| `onChange`       | `(change: FoliChange) => void` | —            | After every content change made through transactions. Not for selection changes or `setDocument`.   |
+| `toolbar`        | `boolean`                      | `true`       | Show `FoliToolbar` above the pages.                                                                 |
+| `comments`       | `boolean \| "auto"`            | `"auto"`     | The comments pane beside the pages: while the document has comments (`"auto"`), always, never.      |
+| `readOnly`       | `boolean`                      | `false`      | Read, select, copy; no editing. Disables the toolbar.                                               |
+| `placeholder`    | `string`                       | `""`         | Shown while the document is empty.                                                                  |
+| `label`          | `string`                       | `"Document"` | Accessible name of the editable area.                                                               |
+| `upload`         | `(file) => Promise<…>`         | —            | Where pasted, dropped and inserted image files go (the view's `upload`); the toolbar's Picture too. |
+| `resource`       | `(key, resource) => string`    | —            | The URL to show a picture's image from (`packageImages` for a .docx package).                       |
+| `className`      | `string`                       | —            | Added to the `.foli-canvas` element.                                                                |
+| `children`       | `ReactNode`                    | —            | Rendered between the toolbar and the pages, inside the editor's context.                            |
 
 `ref` → `FoliEditorHandle`: `{ editor: Editor; focus(): void }` (`editor.setDocument` takes
 a document of any version too).
@@ -99,6 +101,16 @@ The URL is normalized (`normalizeHref`) and validated: an unsafe one is not appl
 gets `aria-invalid` and an announced message. Closing returns the focus where it was (the
 document, or the button). The toolbar opens the dialog for any `openLinkEditor` request, so
 Mod-K needs a `FoliToolbar` for the editor; none opens while it is `disabled`.
+
+Picture… (`upload` prop: where the file goes; `FoliEditor` passes its own) opens a dialog under
+the toolbar (`.foli-picture-dialog`, `role="dialog"`). With nothing selected, "Insert picture":
+an image file, its alt text (required unless "Decorative (no alt text)" is checked), Insert
+and Cancel; the file is measured, uploaded and inserted at its natural size no wider than the
+page's text (without `upload`, the button is disabled). With a picture selected, "Edit
+picture": its alt text, decorative, and its width and height in px with "Keep proportions"
+(the size disabled while changes are tracked), Apply and Cancel. A field that is wrong is
+marked (`aria-invalid`) with an announced message; Escape cancels; a change to the document or
+the selection closes it. This is also the keyboard way to resize a picture.
 
 Table is a menu button (WAI-ARIA menu: `menuitem` items, "Repeat as header row" a
 `menuitemcheckbox` checked when the selection's rows are header rows): Insert table…, insert row

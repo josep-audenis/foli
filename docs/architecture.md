@@ -964,7 +964,9 @@ stable before 1.0):
   limits), insert row above or below, insert column left or right, delete rows, columns or the
   table, merge cells, split cell and the "Repeat as header row" checkbox item, each
   `aria-disabled` where it cannot apply, from a dry run when the menu opens; a table style box;
-  a cell shading menu of light fills); page break. Its state is one
+  a cell shading menu of light fills); Picture… (10.8e: a dialog inserting a picture from a
+  file through the `upload` prop, alt text required unless decorative, or editing the selected
+  picture's alt text and size, proportions kept); page break. Its state is one
   module-level `useEditorState` selector, compared item by item so typing does not re-render it:
   `aria-pressed` and the boxes' values from the marks, alignment, list and formatting at the
   selection (O(selection)), `aria-disabled` from cheap checks (undo/redo depth, a paragraph in

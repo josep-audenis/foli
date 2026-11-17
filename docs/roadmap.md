@@ -997,11 +997,11 @@ Each task is a PR on `phase-10/tables-images`, the build green after each.
   the toolbar's Table menu (keyboard-usable, with an insert table dialog), table style box and
   cell shading menu; axe on the toolbar, menu, dialog and pages in Chromium, Firefox and WebKit.
   Not yet: a keyboard way to set a column's width, nested tables' borders.)
-- [ ] 10.8 Inline pictures: import and export `wp:inline` drawings (`a:blip` resources kept in the
+- [x] 10.8 Inline pictures: import and export `wp:inline` drawings (`a:blip` resources kept in the
   package), shown in the line at their size, laid out on pages; insert from a file, paste or
   drop through the upload hook; resize with the aspect ratio kept; alt text required to insert
   and editable; tracked insertion and deletion of a picture.
-  (In progress. 10.8a, docx: inline pictures imported as `picture` nodes with their images as
+  (Done. 10.8a, docx: inline pictures imported as `picture` nodes with their images as
   resources (alt text missing counted), exported from their drawing with the model's changes
   written in (unchanged: byte for byte), new ones as fresh drawings with media parts from the
   package, a `data:` URL or the app. 10.8b: the views draw them in their lines at their size,
@@ -1011,8 +1011,10 @@ Each task is a PR on `phase-10/tables-images`, the build green after each.
   deletion, exported and read back. 10.8d: pictures selected by a click and resized by a handle
   with their aspect ratio (three engines); image files inserted through the upload hook where
   pasted or dropped (three engines; the paste and drop events themselves in Chromium only:
-  synthetic ones carry no files elsewhere), without alt text then, marked (ADR-0006). Next:
-  the toolbar's picture dialog (insert from a file with alt text, edit alt text and size).)
+  synthetic ones carry no files elsewhere), without alt text then, marked (ADR-0006). 10.8e:
+  the toolbar's Picture… dialog: insert from a file with alt text (required unless decorative),
+  edit a selected picture's alt text and size from the keyboard; axe on the dialog, three
+  engines. Not yet: touch resizing, Word's picture-plus-text paste, cropping.)
 - [ ] 10.9 Floating pictures, starting with a spike (lines laid out around an exclusion inside
   the editable host, three engines: ADR-0006's open risk): `wp:anchor` positions (relative to page, margin, column or
   paragraph), wrapping square and top-and-bottom with text flowing around them, behind and in

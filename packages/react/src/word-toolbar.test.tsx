@@ -1,5 +1,11 @@
 // @vitest-environment jsdom
-import { createEditor, type FoliDocument, insertTable, trackState } from "@folijs/core";
+import {
+  createEditor,
+  type FoliDocument,
+  insertTable,
+  NodeSelection,
+  trackState,
+} from "@folijs/core";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { FoliToolbar } from "./index.js";
@@ -267,5 +273,81 @@ describe("FoliToolbar's table menu", () => {
     expect(screen.getByRole("dialog", { name: "Insert table" })).toBeTruthy();
     act(() => editor.commands.insertText("x"));
     expect(screen.queryByRole("dialog")).toBe(null);
+  });
+});
+
+describe("FoliToolbar's picture dialog", () => {
+  afterEach(cleanup);
+  const DOT = "data:image/png;base64,iVBORw0KGgo=";
+  function withPicture(upload?: () => Promise<string>) {
+    const editor = createEditor({
+      document: {
+        ...document3,
+        resources: { img: { contentType: "image/png", data: DOT } },
+        content: {
+          type: "doc",
+          content: [
+            {
+              type: "paragraph",
+              content: [
+                { type: "text", text: "a" },
+                {
+                  type: "picture",
+                  attrs: { resource: "img", width: 9525 * 200, height: 9525 * 100, alt: "Dot" },
+                },
+              ],
+            },
+          ],
+        },
+      },
+    });
+    render(<FoliToolbar editor={editor} {...(upload ? { upload } : {})} />);
+    return editor;
+  }
+  const button = () => screen.getByRole("button", { name: "Picture…" });
+
+  it("inserts only with the app's upload; edits a selected picture without it", () => {
+    const editor = withPicture();
+    act(() => editor.select(1));
+    expect(button().getAttribute("aria-disabled")).toBe("true");
+    act(() =>
+      editor.dispatch(editor.state.tr.setSelection(NodeSelection.create(editor.state.doc, 2))),
+    );
+    expect(button().getAttribute("aria-disabled")).toBe(null);
+  });
+
+  it("edits the alt text and the size, its proportions kept", () => {
+    const editor = withPicture();
+    act(() =>
+      editor.dispatch(editor.state.tr.setSelection(NodeSelection.create(editor.state.doc, 2))),
+    );
+    fireEvent.click(button());
+    const dialog = screen.getByRole("dialog", { name: "Edit picture" });
+    expect((screen.getByLabelText("Alt text") as HTMLInputElement).value).toBe("Dot");
+    fireEvent.change(screen.getByLabelText("Alt text"), { target: { value: "A dot" } });
+    fireEvent.change(screen.getByLabelText("Width (px)"), { target: { value: "100" } });
+    expect((screen.getByLabelText("Height (px)") as HTMLInputElement).value).toBe("50");
+    fireEvent.submit(dialog.querySelector("form") as HTMLFormElement);
+    expect(screen.queryByRole("dialog")).toBe(null);
+    expect(editor.state.doc.nodeAt(2)?.attrs).toMatchObject({
+      alt: "A dot",
+      width: 9525 * 100,
+      height: 9525 * 50,
+    });
+  });
+
+  it("asks for alt text unless the picture is decorative", () => {
+    const editor = withPicture();
+    act(() =>
+      editor.dispatch(editor.state.tr.setSelection(NodeSelection.create(editor.state.doc, 2))),
+    );
+    fireEvent.click(button());
+    fireEvent.change(screen.getByLabelText("Alt text"), { target: { value: " " } });
+    fireEvent.submit(screen.getByRole("dialog").querySelector("form") as HTMLFormElement);
+    expect(screen.getByRole("alert").textContent).toContain("Describe the picture");
+    expect(screen.getByLabelText("Alt text").getAttribute("aria-invalid")).toBe("true");
+    fireEvent.click(screen.getByLabelText("Decorative (no alt text)"));
+    fireEvent.submit(screen.getByRole("dialog").querySelector("form") as HTMLFormElement);
+    expect(editor.state.doc.nodeAt(2)?.attrs).toMatchObject({ alt: null, decorative: true });
   });
 });

@@ -1901,20 +1901,8 @@ export class EditorView {
     return r;
   }
 
-  /**
-   * The text width of the document's (last) section in EMU (635 per twip; Word's Letter page
-   * and margins where it does not say).
-   * shortcut: the last section's, not the caret's section or table cell; use the caret's when
-   * documents mix page sizes.
-   */
   private textWidthEmu(): number {
-    const section = wordContext(this.state)?.envelope.section;
-    return (
-      ((section?.pageSize?.width ?? 12_240) -
-        (section?.margins?.left ?? 1440) -
-        (section?.margins?.right ?? 1440)) *
-      635
-    );
+    return textWidthEmu(this.state);
   }
 
   /** Image files in a transfer (paste or drop), when the app takes uploads. */
@@ -1991,7 +1979,7 @@ export class EditorView {
     try {
       for (const file of files) {
         if (!file.type.startsWith("image/")) continue;
-        const size = await localSize(file, this.host.ownerDocument);
+        const size = await measureImageFile(file, this.host.ownerDocument);
         if (this.destroyed) return inserted;
         if (!size) continue;
         let answer: Awaited<ReturnType<NonNullable<EditorViewOptions["upload"]>>>;
@@ -3210,8 +3198,24 @@ export function keyName(event: KeyboardEvent): string {
 }
 
 /** An image's natural size (CSS px), or null when it does not load. */
+/**
+ * The text width of a document's (last) section in EMU (635 per twip; Word's Letter page and
+ * margins where it does not say): the widest a picture is inserted or resized.
+ * shortcut: the last section's, not the caret's section or table cell; use the caret's when
+ * documents mix page sizes.
+ */
+export function textWidthEmu(state: EditorState): number {
+  const section = wordContext(state)?.envelope.section;
+  return (
+    ((section?.pageSize?.width ?? 12_240) -
+      (section?.margins?.left ?? 1440) -
+      (section?.margins?.right ?? 1440)) *
+    635
+  );
+}
+
 /** A file's image's natural size (CSS px) from a local object URL, before any upload. */
-async function localSize(
+export async function measureImageFile(
   file: File,
   doc: Document,
 ): Promise<{ width: number; height: number } | null> {

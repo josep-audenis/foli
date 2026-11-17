@@ -1,5 +1,5 @@
 import type { Editor } from "@folijs/core";
-import { EditorView } from "@folijs/view";
+import { EditorView, type EditorViewOptions } from "@folijs/view";
 import { forwardRef, useImperativeHandle, useRef } from "react";
 import { useEditorOrContext, useIsomorphicLayoutEffect } from "./editor.js";
 
@@ -12,6 +12,13 @@ export interface FoliCanvasProps {
   placeholder?: string | undefined;
   /** Accessible name of the editable area (default "Document"). */
   label?: string | undefined;
+  /**
+   * Where pasted, dropped and inserted image files go: the URL the app stores the file at (or a
+   * `data:` URL, opting in). Without it, pictures are not pasted, dropped or inserted.
+   */
+  upload?: EditorViewOptions["upload"] | undefined;
+  /** The URL to show a picture's image from (`packageImages` for a .docx package's images). */
+  resource?: EditorViewOptions["resource"] | undefined;
   className?: string | undefined;
 }
 
@@ -26,7 +33,15 @@ export interface FoliCanvasHandle {
  * owns the DOM inside it; React never renders children there.
  */
 export const FoliCanvas = forwardRef<FoliCanvasHandle, FoliCanvasProps>(function FoliCanvas(
-  { editor: given, readOnly = false, placeholder = "", label = "Document", className },
+  {
+    editor: given,
+    readOnly = false,
+    placeholder = "",
+    label = "Document",
+    className,
+    upload = null,
+    resource = null,
+  },
   ref,
 ) {
   const editor = useEditorOrContext(given, "FoliCanvas");
@@ -49,8 +64,8 @@ export const FoliCanvas = forwardRef<FoliCanvasHandle, FoliCanvasProps>(function
   // Runs after the view is created (effects run in order): for a new view, and when the props change.
   // biome-ignore lint/correctness/useExhaustiveDependencies: a new editor means a new view, which needs the options too.
   useIsomorphicLayoutEffect(() => {
-    viewRef.current?.setOptions({ editable: !readOnly, placeholder });
-  }, [editor, readOnly, placeholder]);
+    viewRef.current?.setOptions({ editable: !readOnly, placeholder, upload, resource });
+  }, [editor, readOnly, placeholder, upload, resource]);
 
   return (
     <div className={className ? `foli-canvas ${className}` : "foli-canvas"}>

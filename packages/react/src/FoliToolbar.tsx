@@ -17,6 +17,7 @@ import {
   fontSizeAt,
   insertColumn,
   insertPageBreak,
+  insertPicture,
   insertRow,
   insertTable,
   isHeaderRow,
@@ -38,6 +39,7 @@ import {
   rejectChange,
   removeLink,
   requestsLinkEditor,
+  selectedPicture,
   setAlign,
   setCellShading,
   setFontFamily,
@@ -46,6 +48,8 @@ import {
   setLineSpacing,
   setLink,
   setParagraphStyle,
+  setPictureAlt,
+  setPictureSize,
   setReviewView,
   setTableStyle,
   setTextColor,
@@ -61,6 +65,7 @@ import {
   undoDepth,
   wordContext,
 } from "@folijs/core";
+import { type EditorViewOptions, EMU_PER_PX, measureImageFile, textWidthEmu } from "@folijs/view";
 import {
   type FormEvent,
   Fragment,
@@ -95,6 +100,11 @@ export interface FoliToolbarProps {
    * (`FoliEditor` passes it). Default false.
    */
   comments?: boolean | undefined;
+  /**
+   * Where an inserted picture's image file goes (`EditorViewOptions.upload`): with it, "Picture"
+   * inserts one from a file; without it, it only edits a selected picture.
+   */
+  upload?: EditorViewOptions["upload"] | undefined;
   className?: string | undefined;
 }
 
@@ -126,6 +136,8 @@ interface Item {
   };
   /** An action menu button (the table menu): its commands, in order. */
   actions?: readonly Action[];
+  /** A button opening a dialog (the picture's). */
+  dialog?: "picture";
   /** A drop-down list (a `select`): its options, the current value, and what picking runs. */
   select?: {
     options: (state: EditorState) => readonly { value: string; label: string }[];
@@ -563,7 +575,18 @@ const GROUPS: Item[][] = [
       },
     },
   ],
-  [{ key: "pageBreak", label: "Page break", text: "Page break", command: () => insertPageBreak }],
+  [
+    {
+      key: "picture",
+      label: "Insert a picture, or edit the selected one",
+      text: "Picture…",
+      enabled: (state) =>
+        wordContext(state) !== null && (selectedPicture(state) !== null || hasTextblock(state)),
+      // With a picture selected the dialog edits it.
+      dialog: "picture",
+    },
+    { key: "pageBreak", label: "Page break", text: "Page break", command: () => insertPageBreak },
+  ],
 ];
 
 const ITEMS = GROUPS.flat();
@@ -603,7 +626,10 @@ const statesOf =
     items.map((item) => ({
       pressed: item.pressed?.(state, editor),
       enabled: item.enabled?.(state) ?? true,
-      value: item.menu?.value(state) ?? item.select?.value(state),
+      value:
+        item.menu?.value(state) ??
+        item.select?.value(state) ??
+        (item.dialog ? (selectedPicture(state) ? "edit" : "insert") : undefined),
     }));
 const selectStates = statesOf(ITEMS);
 const selectStatesNoComment = statesOf(ITEMS_NO_COMMENT);
@@ -624,6 +650,7 @@ export function FoliToolbar({
   label = "Formatting",
   className,
   comments = false,
+  upload,
 }: FoliToolbarProps) {
   const editor = useEditorOrContext(given, "FoliToolbar");
   const groups = comments ? GROUPS : GROUPS_NO_COMMENT;
@@ -645,6 +672,19 @@ export function FoliToolbar({
   const run = (index: number, event: MouseEvent) => {
     const item = items[index];
     if (!item || disabled || !states[index]?.enabled) return;
+    if (item.dialog === "picture") {
+      const selected = selectedPicture(editor.state);
+      // Inserting needs the app's upload; editing a selected picture does not.
+      if (!selected && !upload) return;
+      setDialog(null);
+      setTableDialog(null);
+      setPictureDialog({
+        pos: selected?.pos ?? null,
+        selection: editor.state.selection,
+        restore: buttons.current[index] ?? null,
+      });
+      return;
+    }
     if (item.menu || item.actions) {
       if (menu !== item.key) {
         setMenu(item.key);
@@ -672,6 +712,13 @@ export function FoliToolbar({
       editor.subscribe((state, transactions) => {
         if (disabled) return;
         if (!transactions.some(requestsLinkEditor)) {
+          // The picture dialog too: what it edits or inserts at may have gone.
+          setPictureDialog((current) =>
+            current &&
+            (transactions.some((tr) => tr.docChanged) || !state.selection.eq(current.selection))
+              ? null
+              : current,
+          );
           // The insert table dialog is for the caret it opened on, as the link dialog is.
           setTableDialog((current) =>
             current &&
@@ -689,6 +736,7 @@ export function FoliToolbar({
         }
         const active = typeof document === "undefined" ? null : document.activeElement;
         setTableDialog(null);
+        setPictureDialog(null);
         setDialog((current) =>
           current
             ? { ...current, request: current.request + 1 }
@@ -718,6 +766,15 @@ export function FoliToolbar({
   } | null>(null);
   useEffect(() => {
     if (disabled) setTableDialog(null);
+  }, [disabled]);
+  // The picture dialog: inserts at (or edits the picture at `pos`) the selection it opened on.
+  const [pictureDialog, setPictureDialog] = useState<{
+    pos: number | null;
+    selection: EditorState["selection"];
+    restore: HTMLElement | null;
+  } | null>(null);
+  useEffect(() => {
+    if (disabled) setPictureDialog(null);
   }, [disabled]);
 
   const onKeyDown = (event: KeyboardEvent) => {
@@ -752,7 +809,11 @@ export function FoliToolbar({
             {group.map((item) => {
               const i = index++;
               const state = states[i];
-              const off = disabled || !state?.enabled;
+              // Inserting a picture needs the app's upload; editing a selected one does not.
+              const off =
+                disabled ||
+                !state?.enabled ||
+                (item.dialog === "picture" && state?.value === "insert" && !upload);
               if (item.select) {
                 const { select } = item;
                 const value = state?.value ?? "";
@@ -898,6 +959,19 @@ export function FoliToolbar({
           </Fragment>
         ))}
       </div>
+      {pictureDialog && !disabled && (
+        <PictureDialog
+          editor={editor}
+          pos={pictureDialog.pos}
+          upload={upload}
+          onClose={(done) => {
+            const { restore } = pictureDialog;
+            setPictureDialog(null);
+            if (done && onClickCommand) onClickCommand();
+            else restore?.focus();
+          }}
+        />
+      )}
       {tableDialog && !disabled && (
         <InsertTableDialog
           editor={editor}
@@ -1288,6 +1362,238 @@ function InsertTableDialog({
         {field("rows", "Rows", rows, setRows, MAX_TABLE_ROWS, rowsField)}
         {field("columns", "Columns", columns, setColumns, MAX_TABLE_COLUMNS, columnsField)}
         <button type="submit">Insert</button>
+        <button type="button" onClick={() => onClose(false)}>
+          Cancel
+        </button>
+        {error && (
+          <p id={`${id}-error`} className="foli-link-error" role="alert">
+            {messages[error]}
+          </p>
+        )}
+      </form>
+    </div>
+  );
+}
+
+/**
+ * The picture dialog. Inserting (`pos` null): an image file, its alt text (required unless the
+ * picture is marked decorative), Insert and Cancel; the file goes through `upload`, the picture
+ * in at the file's natural size no wider than the page's text. Editing the picture at `pos`:
+ * its alt text, decorative, and its width and height in px (proportions kept unless unchecked;
+ * not while tracking changes), Apply and Cancel. Escape cancels; a field that is wrong is marked
+ * and announced.
+ */
+function PictureDialog({
+  editor,
+  pos,
+  upload,
+  onClose,
+}: {
+  editor: Editor;
+  pos: number | null;
+  upload: EditorViewOptions["upload"] | undefined;
+  /** `done`: a picture was inserted or changed (the focus may go to the document). */
+  onClose: (done: boolean) => void;
+}) {
+  const picture = pos === null ? null : editor.state.doc.nodeAt(pos);
+  const attrs = picture?.attrs ?? {};
+  const px = (emu: unknown) => String(Math.round(Number(emu) / EMU_PER_PX));
+  const [file, setFile] = useState<File | null>(null);
+  const [alt, setAlt] = useState(String(attrs.alt ?? ""));
+  const [decorative, setDecorative] = useState(attrs.decorative === true);
+  const [width, setWidth] = useState(picture ? px(attrs.width) : "");
+  const [height, setHeight] = useState(picture ? px(attrs.height) : "");
+  const [keep, setKeep] = useState(true);
+  const [error, setError] = useState<"file" | "alt" | "size" | "failed" | null>(null);
+  const [busy, setBusy] = useState(false);
+  const first = useRef<HTMLInputElement>(null);
+  const id = useId();
+  const tracking = trackState(editor.state)?.on === true;
+  const ratio = picture ? Number(attrs.height) / Number(attrs.width) : 1;
+  useEffect(() => {
+    first.current?.focus();
+  }, []);
+  // A dialog closed while an upload runs: what the upload finds then is not inserted.
+  const open = useRef(true);
+  useEffect(
+    () => () => {
+      open.current = false;
+    },
+    [],
+  );
+
+  const messages = {
+    file: "Choose an image file.",
+    alt: "Describe the picture, or mark it as decorative.",
+    size: "Enter a width and height in pixels, from 1.",
+    failed: "The picture could not be inserted: the file could not be read or uploaded here.",
+  };
+  const invalid = (field: string) => (error === field ? true : undefined);
+  const described = (field: string) => (error === field ? `${id}-error` : undefined);
+
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!decorative && !alt.trim()) {
+      setError("alt");
+      return;
+    }
+    if (pos !== null && picture) {
+      const w = Number(width);
+      const h = Number(height);
+      const sizeChanged = w !== Number(px(attrs.width)) || h !== Number(px(attrs.height));
+      if (
+        sizeChanged &&
+        !tracking &&
+        !(Number.isFinite(w) && Number.isFinite(h) && w >= 1 && h >= 1)
+      ) {
+        setError("size");
+        return;
+      }
+      editor.run(setPictureAlt(pos, alt, decorative));
+      if (sizeChanged && !tracking)
+        editor.run(setPictureSize(pos, Math.round(w * EMU_PER_PX), Math.round(h * EMU_PER_PX)));
+      onClose(true);
+      return;
+    }
+    if (!file || !upload) {
+      setError("file");
+      return;
+    }
+    setBusy(true);
+    try {
+      const size = await measureImageFile(file, document);
+      const answer = size ? await upload(file) : null;
+      const src = typeof answer === "string" ? answer : answer?.src;
+      if (!open.current) return;
+      if (!size || !src) throw new Error("no image");
+      const scale = Math.min(1, textWidthEmu(editor.state) / (size.width * EMU_PER_PX));
+      const type = /^data:([^;,]+)/i.exec(src)?.[1]?.toLowerCase() ?? file.type;
+      const done = editor.run(
+        insertPicture({
+          contentType: type,
+          ...(src.startsWith("data:") ? { data: src } : { url: src }),
+          width: Math.max(1, Math.round(size.width * EMU_PER_PX * scale)),
+          height: Math.max(1, Math.round(size.height * EMU_PER_PX * scale)),
+          ...(decorative ? { decorative: true } : { alt }),
+        }),
+      );
+      if (!done) throw new Error("not inserted");
+      onClose(true);
+    } catch {
+      if (!open.current) return;
+      setBusy(false);
+      setError("failed");
+    }
+  };
+
+  const changeWidth = (value: string) => {
+    setWidth(value);
+    setError(null);
+    if (keep && Number(value) > 0)
+      setHeight(String(Math.max(1, Math.round(Number(value) * ratio))));
+  };
+  const changeHeight = (value: string) => {
+    setHeight(value);
+    setError(null);
+    if (keep && Number(value) > 0) setWidth(String(Math.max(1, Math.round(Number(value) / ratio))));
+  };
+
+  return (
+    <div
+      role="dialog"
+      aria-label={pos === null ? "Insert picture" : "Edit picture"}
+      className="foli-link-dialog foli-picture-dialog"
+      aria-busy={busy || undefined}
+      onKeyDown={(event) => {
+        if (event.key !== "Escape") return;
+        event.preventDefault();
+        onClose(false);
+      }}
+    >
+      <form onSubmit={submit} noValidate>
+        {pos === null && (
+          <>
+            <label htmlFor={`${id}-file`}>Image</label>
+            <input
+              ref={first}
+              id={`${id}-file`}
+              type="file"
+              accept="image/*"
+              aria-invalid={invalid("file")}
+              aria-describedby={described("file")}
+              onChange={(event) => {
+                setFile(event.target.files?.[0] ?? null);
+                setError(null);
+              }}
+            />
+          </>
+        )}
+        <label htmlFor={`${id}-alt`}>Alt text</label>
+        <input
+          ref={pos === null ? undefined : first}
+          id={`${id}-alt`}
+          type="text"
+          value={decorative ? "" : alt}
+          disabled={decorative}
+          aria-invalid={invalid("alt")}
+          aria-describedby={described("alt")}
+          onChange={(event) => {
+            setAlt(event.target.value);
+            setError(null);
+          }}
+        />
+        <label>
+          <input
+            type="checkbox"
+            checked={decorative}
+            onChange={(event) => {
+              setDecorative(event.target.checked);
+              setError(null);
+            }}
+          />
+          Decorative (no alt text)
+        </label>
+        {pos !== null && (
+          <>
+            <label htmlFor={`${id}-width`}>Width (px)</label>
+            <input
+              id={`${id}-width`}
+              type="number"
+              min={1}
+              step={1}
+              value={width}
+              disabled={tracking}
+              aria-invalid={invalid("size")}
+              aria-describedby={described("size")}
+              onChange={(event) => changeWidth(event.target.value)}
+            />
+            <label htmlFor={`${id}-height`}>Height (px)</label>
+            <input
+              id={`${id}-height`}
+              type="number"
+              min={1}
+              step={1}
+              value={height}
+              disabled={tracking}
+              aria-invalid={invalid("size")}
+              aria-describedby={described("size")}
+              onChange={(event) => changeHeight(event.target.value)}
+            />
+            <label>
+              <input
+                type="checkbox"
+                checked={keep}
+                disabled={tracking}
+                onChange={(event) => setKeep(event.target.checked)}
+              />
+              Keep proportions
+            </label>
+            {tracking && <p>The size does not change while changes are tracked.</p>}
+          </>
+        )}
+        <button type="submit" disabled={busy}>
+          {pos === null ? "Insert" : "Apply"}
+        </button>
         <button type="button" onClick={() => onClose(false)}>
           Cancel
         </button>
