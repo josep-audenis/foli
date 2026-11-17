@@ -3,7 +3,7 @@ import { createDocument, type FoliDocument, type NodeJSON, parseDocument } from 
 import { describe, expect, it } from "vitest";
 import { exportDocx, importDocx, readPackage } from "./index.js";
 
-/** Inline pictures in .docx (10.8, ADR-0006). */
+/** Inline (10.8) and floating (10.9) pictures in .docx, ADR-0006. */
 
 const CORPUS = new URL("../../../corpus/word/", import.meta.url);
 const bytesOf = (name: string) => new Uint8Array(readFileSync(new URL(name, CORPUS)));
@@ -40,7 +40,7 @@ function withPictures(
 describe("the picture report (07)", () => {
   it("has its inline pictures as picture nodes, their images as resources", async () => {
     const { document, report } = await importDocx(bytesOf("07-picture-report.docx"));
-    const found = pictures(document);
+    const found = pictures(document).filter((p) => !p.attrs?.float);
     expect(found).toHaveLength(2);
     expect(found[0]?.attrs).toMatchObject({
       resource: "word/media/image1.png",
@@ -55,8 +55,42 @@ describe("the picture report (07)", () => {
     // The second has no alt text: allowed, reported.
     expect(found[1]?.attrs?.alt).toBeUndefined();
     expect(report.picturesWithoutAlt).toBe(1);
-    // Anchored (floating) pictures stay opaque until 10.9.
-    expect(report.opaque["wp:anchor"] ?? report.opaque["w:drawing"]).toBeGreaterThan(0);
+    expect(report.opaque).toEqual({});
+  });
+
+  it("has its floating pictures as picture nodes with their position and wrapping", async () => {
+    const { document } = await importDocx(bytesOf("07-picture-report.docx"));
+    const floats = Object.fromEntries(
+      pictures(document)
+        .filter((p) => p.attrs?.float)
+        .map((p) => [p.attrs?.alt, p.attrs?.float]),
+    );
+    const distance = { top: 0, bottom: 0, left: 114300, right: 114300 };
+    const flags = { allowOverlap: true, layoutInCell: true };
+    expect(floats).toEqual({
+      "Northwind logo": {
+        horizontal: { relativeTo: "column", offset: 3810000 },
+        vertical: { relativeTo: "paragraph", offset: 0 },
+        wrap: "square",
+        side: "bothSides",
+        distance,
+        ...flags,
+      },
+      "Chart of readings, placed between paragraphs": {
+        horizontal: { relativeTo: "column", offset: 0 },
+        vertical: { relativeTo: "paragraph", offset: 254000 },
+        wrap: "topAndBottom",
+        distance,
+        ...flags,
+      },
+      "Northwind logo as a watermark": {
+        horizontal: { relativeTo: "column", offset: 1270000 },
+        vertical: { relativeTo: "paragraph", offset: 127000 },
+        wrap: "behind",
+        distance,
+        ...flags,
+      },
+    });
   });
 
   it("writes unchanged pictures back byte for byte", async () => {
@@ -370,5 +404,138 @@ describe("tracked pictures", () => {
     const again = pictures((await importDocx(out)).document);
     expect(again.map((n) => n.marks?.[0]?.type)).toEqual(["insertion", "deletion"]);
     expect(again.map((n) => n.attrs?.alt)).toEqual(["In", "Out"]);
+  });
+});
+
+describe("floating pictures", () => {
+  it("read an alignment instead of an offset (board report)", async () => {
+    const { document } = await importDocx(bytesOf("04-board-report.docx"));
+    expect(pictures(document)[0]?.attrs?.float).toMatchObject({
+      horizontal: { relativeTo: "margin", align: "right" },
+      vertical: { relativeTo: "paragraph", offset: 3810 },
+      wrap: "square",
+    });
+  });
+
+  it("are written back byte for byte when unchanged, as wp:anchor", async () => {
+    const bytes = bytesOf("07-picture-report.docx");
+    const { document, package: pkg } = await importDocx(bytes);
+    const after = (await readPackage(await exportDocx(document, pkg))).text("/word/document.xml");
+    const anchored = drawings(after).filter((d) => d.includes("<wp:anchor"));
+    expect(anchored).toHaveLength(3);
+    expect(anchored).toEqual(
+      drawings(pkg.text("/word/document.xml")).filter((d) => d.includes("<wp:anchor")),
+    );
+  });
+
+  it("are written fresh with a changed position or wrapping, and read back so", async () => {
+    const { document, package: pkg } = await importDocx(bytesOf("07-picture-report.docx"));
+    const moved = {
+      horizontal: { relativeTo: "page", align: "center" },
+      vertical: { relativeTo: "margin", offset: -12700 },
+      wrap: "inFront",
+      distance: { top: 0, bottom: 0, left: 0, right: 0 },
+      allowOverlap: false,
+      layoutInCell: true,
+    };
+    const changed = withPictures(document, (attrs) =>
+      attrs.alt === "Northwind logo" ? { ...attrs, float: moved } : attrs,
+    );
+    const out = await exportDocx(changed, pkg);
+    const again = pictures((await importDocx(out)).document);
+    expect(again.find((p) => p.attrs?.alt === "Northwind logo")?.attrs?.float).toEqual(moved);
+    // The others as read; an inline picture made floating, and a floating one inline, too.
+    expect(again.filter((p) => p.attrs?.float)).toHaveLength(3);
+    const swapped = withPictures(document, (attrs, i) =>
+      i === 0
+        ? { ...attrs, float: moved }
+        : attrs.alt === "Northwind logo"
+          ? { ...attrs, float: null }
+          : attrs,
+    );
+    const back = pictures((await importDocx(await exportDocx(swapped, pkg))).document);
+    expect(back[0]?.attrs?.float).toEqual(moved);
+    expect(back.find((p) => p.attrs?.alt === "Northwind logo")?.attrs?.float).toBeUndefined();
+  });
+
+  it("are written new as wp:anchor, values Word cannot read replaced", async () => {
+    const float = (horizontal: unknown, wrap: string) =>
+      parseDocument({
+        ...createDocument({
+          type: "doc",
+          content: [
+            {
+              type: "paragraph",
+              content: [
+                {
+                  type: "picture",
+                  attrs: {
+                    resource: "img",
+                    width: 914400,
+                    height: 457200,
+                    alt: "A dot",
+                    float: { horizontal, vertical: { relativeTo: "paragraph" }, wrap },
+                  },
+                },
+              ],
+            },
+          ],
+        }),
+        resources: { img: { contentType: "image/png", data: `data:image/png;base64,${PNG}` } },
+      });
+    const read = async (document: FoliDocument) => {
+      const out = await exportDocx(document);
+      const xml = (await readPackage(out)).text("/word/document.xml");
+      const { document: again, report } = await importDocx(out);
+      expect(report.opaque).toEqual({});
+      return { xml, float: pictures(again)[0]?.attrs?.float };
+    };
+    const tight = await read(float({ relativeTo: "nowhere", align: "middle" }, "tight"));
+    expect(tight.xml).toContain("<wp:wrapPolygon");
+    expect(tight.float).toMatchObject({
+      horizontal: { relativeTo: "column", offset: 0 },
+      vertical: { relativeTo: "paragraph", offset: 0 },
+      wrap: "tight",
+      side: "bothSides",
+    });
+    const behind = await read(float({ relativeTo: "margin", align: "right" }, "behind"));
+    expect(behind.xml).toContain('behindDoc="1"');
+    expect(behind.float).toMatchObject({
+      horizontal: { relativeTo: "margin", align: "right" },
+      wrap: "behind",
+    });
+  });
+});
+
+describe("floating pictures the model cannot hold", () => {
+  const anchorOf = (attrs: string, inside: string) =>
+    `<w:drawing><wp:anchor distT="0" distB="0" distL="0" distR="0" simplePos="0" relativeHeight="1" behindDoc="0" locked="0" layoutInCell="1" allowOverlap="1" ${attrs}>${inside}<wp:extent cx="100" cy="50"/><wp:docPr id="7" name="P"/><a:graphic xmlns:a="${A_NS}"><a:graphicData uri="${PIC_NS}"><pic:pic xmlns:pic="${PIC_NS}"><pic:nvPicPr><pic:cNvPr id="7" name="P"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed="rId9"/></pic:blipFill><pic:spPr/></pic:pic></a:graphicData></a:graphic></wp:anchor></w:drawing>`;
+  const at = (h: string, v = "<wp:posOffset>0</wp:posOffset>") =>
+    `<wp:simplePos x="0" y="0"/><wp:positionH relativeFrom="column">${h}</wp:positionH><wp:positionV relativeFrom="paragraph">${v}</wp:positionV>`;
+  const square = '<wp:wrapSquare wrapText="bothSides"/>';
+  const offset = "<wp:posOffset>0</wp:posOffset>";
+
+  it("stay opaque and are written back as read", async () => {
+    const cases = [
+      anchorOf("", at(offset) + square).replace('simplePos="0"', 'simplePos="1"'),
+      anchorOf("", at(offset)),
+      anchorOf("", at("<wp:posOffset>1.5</wp:posOffset>") + square),
+      anchorOf("", at("<wp:align/>") + square),
+      anchorOf('hidden="1"', at(offset) + square),
+      anchorOf("", `${at(offset)}${square}`).replace(
+        "</a:graphic>",
+        '</a:graphic><wp14:sizeRelH relativeFrom="page"><wp14:pctWidth>50000</wp14:pctWidth></wp14:sizeRelH>',
+      ),
+    ];
+    // The control: one the model holds.
+    const control = await importDocx(await packageWith([anchorOf("", at(offset) + square)]));
+    expect(pictures(control.document)[0]?.attrs?.float).toMatchObject({ wrap: "square" });
+    for (const drawing of cases) {
+      const { document, report, package: pkg } = await importDocx(await packageWith([drawing]));
+      expect(pictures(document)).toEqual([]);
+      expect(report.opaque["w:drawing"]).toBe(1);
+      const out = (await readPackage(await exportDocx(document, pkg))).text("/word/document.xml");
+      expect(drawings(out)).toEqual([drawing]);
+    }
   });
 });

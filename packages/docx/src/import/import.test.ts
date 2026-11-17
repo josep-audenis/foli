@@ -24,7 +24,7 @@ function text(paragraph: NodeJSON): string {
       if ((n.marks ?? []).some((m) => m.type === "deletion")) return "";
       if (n.type === "text") return n.text;
       // Word's Range.Text shows an inline picture as "/" (a floating one as nothing).
-      if (n.type === "picture") return "/";
+      if (n.type === "picture") return n.attrs?.float ? "" : "/";
       if (n.type === "opaqueInline" && String(n.attrs?.xml).includes("<wp:inline")) return "/";
       return n.type === "tab" ? "\t" : n.type === "hardBreak" ? "\n" : "";
     })
@@ -174,7 +174,8 @@ describe("importing the Word corpus", () => {
       (s) => (s as { pageSize: { orientation?: string } }).pageSize.orientation,
     );
     expect(landscape.sort()).toEqual(["landscape", undefined].sort());
-    expect(report.opaque["w:drawing"]).toBe(1);
+    // Its one drawing, a floating picture, is a picture node.
+    expect(report.opaque["w:drawing"]).toBeUndefined();
     expect(report.opaque["w:footnoteReference"]).toBe(2);
     const blocks = document.content.content ?? [];
     expect(blocks.filter((b) => b.type === "opaqueBlock")).toEqual([]);

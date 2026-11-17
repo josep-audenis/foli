@@ -1021,7 +1021,8 @@ Each task is a PR on `phase-10/tables-images`, the build green after each.
   front of text; other wrappings shown as square (reported); moved with their paragraph;
   position agreement with Word measured on the corpus.
   (In progress. Spike passed: CSS floats in the editable host, in three engines; ADR-0006
-  updated. Next: anchored pictures imported, laid out on pages and exported.)
+  updated. `wp:anchor` read and written as `picture.float`. Next: floats laid out on pages;
+  until then the view shows a floating picture inline.)
 - [ ] 10.10 Close: docs (ADR-0006 outcome, architecture, document model, pagination, docx README,
   limitations), size budgets, the acceptance above checked with the harness, the 0.5.0
   changeset (schema v4: 0.4.0 cannot read documents saved by 0.5.0), the version PR; publish

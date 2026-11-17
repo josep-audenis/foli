@@ -110,6 +110,7 @@ test("ArrowDown walks every line beside the float, never into it", async ({ page
   const besideTops = [...(await lines(page, "anchor")), ...(await lines(page, "below"))]
     .filter((l) => overlapsVertically(l, float))
     .map((l) => l.top);
+  expect(besideTops.length).toBeGreaterThan(0);
   await caretAt(page, "above", 3);
   const seen: string[] = [];
   const tops: number[] = [];
@@ -224,11 +225,19 @@ for (const [name, id, picture] of [
     const hit = await page.evaluate(
       ([x, y]) => {
         const el = document.elementFromPoint(x as number, y as number);
-        return { picture: !!el?.closest(".behind, .front"), paragraph: el?.closest("p")?.id };
+        // Under the text but over the page's background (not hidden by it).
+        const stack = document.elementsFromPoint(x as number, y as number);
+        const picture = stack.findIndex((e) => e.closest(".behind, .front"));
+        return {
+          picture: !!el?.closest(".behind, .front"),
+          paragraph: el?.closest("p")?.id,
+          overPage: picture >= 0 && picture < stack.findIndex((e) => e.matches(".page")),
+        };
       },
       [(rect.left + rect.right) / 2, ((over[0] as Rect).top + (over[0] as Rect).bottom) / 2],
     );
-    if (name === "behind") expect(hit).toEqual({ picture: false, paragraph: id });
+    expect(hit.overPage).toBe(true);
+    if (name === "behind") expect(hit).toMatchObject({ picture: false, paragraph: id });
     else expect(hit.picture).toBe(true);
   });
 }
