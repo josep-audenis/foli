@@ -205,7 +205,7 @@
 
 <span class="k">const</span> { document, package: pkg, report } =
   <span class="k">await</span> <span class="f">importDocx</span>(bytes);
-report.opaque; <span class="c">// { "w:drawing": 1 }: kept as is</span>
+report.opaque; <span class="c">// { "w:sdt": 1 }: kept as is</span>
 
 <span class="c">// …edit…</span>
 <span class="k">const</span> doc = editor.<span class="f">getDocument</span>();
@@ -289,7 +289,7 @@ report.opaque; <span class="c">// { "w:drawing": 1 }: kept as is</span>
                 <strong>Under a frame.</strong> In Chromium, a keystroke painted in at most 13.2 ms
                 (p95) in documents up to 100 pages, with Enter moving every later page.
                 <a href="https://github.com/josep-audenis/foli/blob/main/docs/benchmarks.md#pagination-layout-keystrokes-and-re-flow-phase-5">Method and numbers</a>,
-                measured at 0.1.
+                measured in Phase 5, before schema v3.
               </p>
             </div>
             <figure class="stack" aria-label="Foli's packages">
@@ -299,7 +299,7 @@ report.opaque; <span class="c">// { "w:drawing": 1 }: kept as is</span>
                 <div class="pkg pkg-core"><code>@folijs/core</code><span>Model, steps, history, commands. No DOM.</span><em class="pkg-size">50.6 kB</em></div>
                 <div class="pkg pkg-docx"><code>@folijs/docx</code><span>Import and lossless export. No DOM.</span><em class="pkg-size">43.3 kB</em></div>
               </div>
-              <figcaption>Each package depends only on the ones below it. Sizes: minified and gzipped, with the Foli packages it pulls in, React excluded.</figcaption>
+              <figcaption>The view and React packages build on core; docx needs only core. Sizes: minified and gzipped with the Foli packages each pulls in, React excluded, measured on main after 0.4.0.</figcaption>
             </figure>
           </div>
           <footer class="folio">5</footer>

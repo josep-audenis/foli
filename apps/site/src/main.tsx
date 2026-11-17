@@ -38,14 +38,23 @@ function setSampleFont(handle: FoliEditorHandle | null) {
   editor.setDocument(editor.getDocument());
 }
 
+const SAMPLE_NAME = "On pages.docx";
+
 function Demo() {
   const host = useRef<HTMLDivElement>(null);
+  // The latest open or reset: an import that finishes after a newer one is dropped.
+  const request = useRef(0);
   const editorRef = useRef<FoliEditorHandle>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const [key, setKey] = useState(0);
-  const [name, setName] = useState("On pages.docx");
+  const [name, setName] = useState(SAMPLE_NAME);
   const [error, setError] = useState("");
   const [status, update] = useStatus(host);
+  // Stable, so FoliEditor's imperative handle is not rebuilt on every status update.
+  const attach = useCallback((handle: FoliEditorHandle | null) => {
+    editorRef.current = handle;
+    setSampleFont(handle);
+  }, []);
 
   // Pages appear after the first layout; web fonts loading later re-flow them.
   useEffect(() => {
@@ -59,21 +68,33 @@ function Demo() {
     const file = event.target.files?.[0];
     event.target.value = "";
     if (!file) return;
+    const id = ++request.current;
     setError("");
+    let importDocx: typeof import("@folijs/docx").importDocx;
     try {
-      const { importDocx } = await import("@folijs/docx");
+      ({ importDocx } = await import("@folijs/docx"));
+    } catch (cause) {
+      console.warn(cause);
+      if (id === request.current)
+        setError("Could not load the .docx reader. Check your connection and try again.");
+      return;
+    }
+    try {
       const imported = await importDocx(new Uint8Array(await file.arrayBuffer()));
+      if (id !== request.current) return;
       editorRef.current?.editor.setDocument(imported.document);
       setName(file.name);
       update();
     } catch (cause) {
       console.warn(cause);
-      setError(`Could not open ${file.name}: it is not a .docx Foli can read.`);
+      if (id === request.current)
+        setError(`Could not open ${file.name}: it is not a .docx Foli can read.`);
     }
   }
 
   function reset() {
-    setName("On pages.docx");
+    request.current++;
+    setName(SAMPLE_NAME);
     setError("");
     setKey((k) => k + 1);
     setTimeout(update, 400);
@@ -101,22 +122,21 @@ function Demo() {
       </div>
       <FoliEditor
         key={key}
-        ref={(handle) => {
-          editorRef.current = handle;
-          setSampleFont(handle);
-        }}
+        ref={attach}
         initialContent={sample}
         author="You"
         onChange={update}
         className="demo-canvas"
       />
-      <div className="demo-status" aria-live="polite">
+      <div className="demo-status">
         <span>
           {status.pages} {status.pages === 1 ? "page" : "pages"}
         </span>
         <span>{status.words} words</span>
-        <span className="demo-status-size">A6 · 105 × 148 mm</span>
-        {error && <span className="demo-error">{error}</span>}
+        {name === SAMPLE_NAME && <span className="demo-status-size">A6 · 105 × 148 mm</span>}
+        <span className="demo-error" role="alert">
+          {error}
+        </span>
       </div>
     </div>
   );

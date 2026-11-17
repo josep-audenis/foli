@@ -652,6 +652,10 @@ body::before {
   margin-left: auto;
 }
 
+.demo-error:empty {
+  display: none;
+}
+
 .demo-error {
   flex-basis: 100%;
   color: var(--strike);
