@@ -1126,8 +1126,9 @@ export function borderJsonCss(
  * A table of the model (schema v4), read-only, as opaque tables are shown: rows, cells with
  * their table style's formatting (`Resolver.cell`), their paragraphs and nested tables.
  *
- * shortcut: a stopgap until tables are laid out on pages and edited (10.5, 10.6): one block,
- * not split across pages; a cell merged into the one above is shown empty, as opaque tables are.
+ * shortcut: `renderDocument`'s tables (the editing view draws its own, `table.ts`): one block,
+ * split across pages as clips; a cell merged into the one above is shown empty, as opaque
+ * tables are.
  */
 function modelTable(
   node: NodeJSON,

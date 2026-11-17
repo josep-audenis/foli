@@ -500,7 +500,7 @@ function last<T, V>(layers: readonly T[], pick: (layer: T) => V | undefined | nu
  * and last row and column (when `look` turns them on) are left out of banding.
  *
  * shortcut: banding counts cells (not grid columns) and leaves out only the first and last
- * row; check against Word on the corpus's banded table (06) when tables reach the pages (10.5).
+ * row; not checked against Word's drawing of a banded table with merged cells.
  */
 export function tableConditions(
   look: NonNullable<TablePropertiesJSON["look"]>,
@@ -693,7 +693,7 @@ export class Resolver {
    * for the cell, which come between them as ECMA-376 17.7.2 orders them), memoized.
    *
    * shortcut: Word lets a table style's properties win over the default paragraph style's
-   * (Normal) in some cases; not modeled until the corpus's tables are measured on pages (10.5).
+   * (Normal) in some cases; not modeled (docs/limitations.md).
    */
   #paragraphStyle(id: string | undefined, layer?: TableLayer) {
     const key = JSON.stringify([layer?.key ?? null, id ?? null]);

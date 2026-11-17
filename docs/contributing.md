@@ -28,6 +28,18 @@ is not installed when `core.hooksPath` is set or a foreign `pre-push` hook exist
 | `pnpm changeset`                | Record a change to a published package (bump type and changelog line)                                                |
 | `pnpm examples`                 | Pack the packages, install them into `examples/` (Vite + React 18, Next.js + React 19), build, Playwright smoke test |
 
+## Known flaky tests
+
+Seen failing now and then on `main`, passing when run again; not hidden with retries. A failure
+of one of these alone is noise; anything else is a real failure.
+
+- `toolbar.spec.ts` "a click while the document is not focused focuses it and shows the change"
+  (Chromium, about 1 run in 6).
+- Under a full three-engine run's load (4 workers): `word-tables.spec.ts` "the table menu
+  inserts a row from the keyboard; the menu, dialog and table pass axe" (Chromium) and
+  `lists.spec.ts` "a click on a link does not navigate" (WebKit) failed once each on
+  2026-11-17; both passed 3 times in a row in every engine when rerun.
+
 ## Rules
 
 - TypeScript strict; no `any` without a comment explaining why.
