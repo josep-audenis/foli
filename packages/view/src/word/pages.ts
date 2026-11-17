@@ -78,6 +78,8 @@ function createPage(doc: Document, g: Geometry): { page: HTMLElement; body: HTML
   const { style } = page;
   style.boxSizing = "border-box";
   style.position = "relative";
+  // The stacking context pictures behind text are drawn in (over the page's background).
+  style.isolation = "isolate";
   style.width = `${g.width}px`;
   style.height = `${g.height}px`;
   style.padding = `${g.top}px ${g.right}px ${g.bottom}px ${g.left}px`;

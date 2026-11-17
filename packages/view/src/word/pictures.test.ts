@@ -8,7 +8,16 @@ import {
 } from "@folijs/core";
 import { afterEach, describe, expect, it } from "vitest";
 import { EditorView } from "../index.js";
-import { imageSource, NO_ALT_LABEL, ownImageUrl, PICTURE_ATTR, pictureElement } from "./blocks.js";
+import {
+  FLOAT_ATTR,
+  floatElements,
+  floatGeometry,
+  imageSource,
+  NO_ALT_LABEL,
+  ownImageUrl,
+  PICTURE_ATTR,
+  pictureElement,
+} from "./blocks.js";
 
 /** Pictures in the view (10.8b). */
 
@@ -148,5 +157,113 @@ describe("pictures in the editable view", () => {
     // A caret elsewhere: no handle left behind.
     editor.select(1);
     expect(host.querySelectorAll("[data-foli-resize]")).toHaveLength(0);
+  });
+});
+
+describe("a floating picture's elements (10.9)", () => {
+  // Letter, 1-inch margins: a 624 px column, 96 px margins.
+  const letter = floatGeometry(undefined);
+  const at = (float: Record<string, unknown>) =>
+    floatElements(picture({ alt: "A dot", float }).attrs ?? {}, document, undefined, letter);
+  const column = (offset: number) => ({ relativeTo: "column", offset: offset * 9525 });
+  const paragraph = (offset: number) => ({ relativeTo: "paragraph", offset: offset * 9525 });
+
+  it("float square on the side they are on, a spacer giving their offset down", () => {
+    const left = at({ horizontal: column(10), vertical: paragraph(24), wrap: "square" });
+    expect(left.nodes).toHaveLength(2);
+    const [spacer, holder] = left.nodes as [HTMLElement, HTMLElement];
+    expect(holder).toBe(left.holder);
+    expect(holder.getAttribute(FLOAT_ATTR)).toBe("square");
+    expect([spacer.style.float, spacer.style.height]).toEqual(["left", "24px"]);
+    expect([holder.style.float, holder.style.clear, holder.style.marginLeft]).toEqual([
+      "left",
+      "left",
+      "10px",
+    ]);
+    // 96 px wide at 500 px: on the right half, so floated right, its left edge at 500 px.
+    const right = at({
+      horizontal: column(500),
+      vertical: paragraph(0),
+      wrap: "tight",
+      distance: { left: 12 * 9525 },
+    });
+    expect([right.holder.style.float, right.holder.style.marginRight]).toEqual(["right", "28px"]);
+    expect(right.holder.style.marginLeft).toBe("12px");
+    // Against the page: the margin taken off; aligned right: at the column's right edge.
+    const page = at({
+      horizontal: { relativeTo: "page", offset: 146 * 9525 },
+      vertical: paragraph(0),
+      wrap: "square",
+    });
+    expect(page.holder.style.marginLeft).toBe("50px");
+    const aligned = at({
+      horizontal: { relativeTo: "margin", align: "right" },
+      vertical: paragraph(0),
+      wrap: "square",
+    });
+    expect([aligned.holder.style.float, aligned.holder.style.marginRight]).toEqual([
+      "right",
+      "0px",
+    ]);
+  });
+
+  it("take the paragraph's width top and bottom, the page's place behind and in front", () => {
+    const band = at({ horizontal: column(40), vertical: paragraph(0), wrap: "topAndBottom" });
+    expect([band.holder.style.width, band.holder.style.clear]).toEqual(["100%", "both"]);
+    expect((band.holder.firstChild as HTMLElement).style.marginLeft).toBe("40px");
+    const behind = at({ horizontal: column(40), vertical: paragraph(8), wrap: "behind" });
+    expect(behind.nodes).toEqual([behind.holder]);
+    expect(behind.holder.style.position).toBe("absolute");
+    expect([behind.holder.style.zIndex, behind.holder.style.left]).toEqual(["-1", "136px"]);
+    expect([behind.holder.style.top, behind.holder.style.marginTop]).toEqual(["", "8px"]);
+    const front = at({
+      horizontal: { relativeTo: "page", align: "center" },
+      vertical: { relativeTo: "margin", offset: 0 },
+      wrap: "inFront",
+    });
+    expect([front.holder.style.zIndex, front.holder.style.left, front.holder.style.top]).toEqual([
+      "1",
+      "360px",
+      "96px",
+    ]);
+  });
+
+  it("are drawn first in their paragraph in the editable view, an empty anchor in the text", () => {
+    const host = document.createElement("div");
+    document.body.append(host);
+    const editor = createEditor({
+      document: parseDocument(
+        createDocument({
+          type: "doc",
+          content: [
+            {
+              type: "paragraph",
+              content: [
+                { type: "text", text: "Some text " },
+                picture({
+                  alt: "A dot",
+                  float: { horizontal: column(0), vertical: paragraph(0), wrap: "square" },
+                }),
+                { type: "text", text: "after." },
+              ],
+            },
+          ],
+        }),
+      ),
+    });
+    const view = new EditorView(host, editor);
+    const p = host.querySelector(".foli-page > *") as HTMLElement;
+    const holder = p.querySelector(`[${FLOAT_ATTR}]`) as HTMLElement;
+    // Spacer, holder, then the text; the anchor (empty) where the picture is in the text.
+    expect(p.firstElementChild?.nextElementSibling).toBe(holder);
+    expect(holder.getAttribute("contenteditable")).toBe("false");
+    // No image known: its box, named by its alt text.
+    expect(holder.querySelector(`[${PICTURE_ATTR}]`)?.getAttribute("aria-label")).toBe("A dot");
+    expect(p.textContent).toBe("Some text after.");
+    // Selected: its holder is marked (outline and handle), not its anchor.
+    editor.dispatch(editor.state.tr.setSelection(NodeSelection.create(editor.state.doc, 11)));
+    expect(holder.querySelector("[data-foli-resize]")).not.toBeNull();
+    view.destroy();
+    host.remove();
   });
 });

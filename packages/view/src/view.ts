@@ -65,7 +65,13 @@ import {
 import { type BlockDesc, PAGE_BREAK_ATTR } from "./render.js";
 
 import { EMU_PER_PX, imageSource, PICTURE_ATTR } from "./word/blocks.js";
-import { spacing, type WordBlockDesc, type WordInfo, WordRenderer } from "./word/edit.js";
+import {
+  FLOAT_ANCHORS,
+  spacing,
+  type WordBlockDesc,
+  type WordInfo,
+  WordRenderer,
+} from "./word/edit.js";
 import { measureLineRatio } from "./word/pages.js";
 import {
   collect,
@@ -233,6 +239,7 @@ interface Sheet {
 function sheetOf(settings: DocumentSettings, index: number): Sheet {
   const { pageSize, margins } = settings;
   const css =
+    "position: relative; isolation: isolate; " +
     `box-sizing: border-box; width: ${pageSize.width}mm; min-height: ${pageSize.height}mm; ` +
     `padding: ${margins.top}mm ${margins.right}mm ${margins.bottom}mm ${margins.left}mm;`;
   return { settings, css, index };
@@ -697,6 +704,11 @@ export class EditorView {
       if (found) this.stale.add(unit.node);
       return undefined;
     });
+    this.staleAroundFloats(
+      doc,
+      previousPages,
+      new Set(units.filter((_, i) => !reusable[i]).map((unit) => unit.node)),
+    );
     // A table is measured again (drawn whole first) when it changed, went stale, or one of its
     // blocks is redrawn or stale; its blocks with it.
     const remeasureUnit = units.map(() => false);
@@ -972,6 +984,32 @@ export class EditorView {
     // changed before this render: the touched blocks are read back at compositionend.
     const records = this.observer.takeRecords();
     if (this.composing) this.pending.push(...records);
+  }
+
+  /**
+   * A floating picture reaches into the blocks after its paragraph (their lines go around it):
+   * a block drawn again or stale on a page holding one has the blocks after it on that page and
+   * the next measured again.
+   */
+  private staleAroundFloats(
+    doc: ModelNode,
+    pagesOf: ReadonlyMap<ModelNode, readonly number[]>,
+    redrawn: ReadonlySet<ModelNode>,
+  ): void {
+    const floatPages = new Set<number>();
+    doc.forEach((node) => {
+      if (holdsFloat(node)) for (const p of pagesOf.get(node) ?? []) floatPages.add(p);
+    });
+    if (!floatPages.size) return;
+    let reach = -1;
+    doc.forEach((node) => {
+      const pages = pagesOf.get(node) ?? [];
+      const first = pages[0];
+      if (first === undefined) return;
+      if (first <= reach) this.stale.add(node);
+      if ((redrawn.has(node) || this.stale.has(node)) && pages.some((p) => floatPages.has(p)))
+        reach = Math.max(reach, (pages[pages.length - 1] as number) + 1);
+    });
   }
 
   /** A font's normal line height ratio, measured outside the host (no input to read back). */
@@ -1405,7 +1443,8 @@ export class EditorView {
   private pictureSpan(pos: number): HTMLElement | null {
     for (const img of this.host.querySelectorAll(`[${PICTURE_ATTR}]`)) {
       const span = img.parentElement;
-      if (span && this.posFromDOM(span, 0) === pos) return span;
+      // A floating picture's place in the text is its anchor.
+      if (span && this.posFromDOM(FLOAT_ANCHORS.get(span) ?? span, 0) === pos) return span;
     }
     return null;
   }
@@ -1807,7 +1846,7 @@ export class EditorView {
     const target = event.target as Element | null;
     const span = target?.closest?.(`[${PICTURE_ATTR}], [data-foli-resize]`)?.parentElement ?? null;
     if (!span || !this.host.contains(span)) return false;
-    const pos = this.posFromDOM(span, 0);
+    const pos = this.posFromDOM(FLOAT_ANCHORS.get(span) ?? span, 0);
     if (pos === null) return false;
     event.preventDefault();
     if (!this.hasFocus()) this.host.focus({ preventScroll: true });
@@ -3247,6 +3286,21 @@ async function naturalSize(
   return img.naturalWidth && img.naturalHeight
     ? { width: img.naturalWidth, height: img.naturalHeight }
     : null;
+}
+
+/** Whether a block holds a floating picture (cached per node: nodes do not change). */
+const floats = new WeakMap<ModelNode, boolean>();
+function holdsFloat(node: ModelNode): boolean {
+  let found = floats.get(node);
+  if (found === undefined) {
+    found = false;
+    node.descendants((child) => {
+      if (child.type.name === "picture" && child.attrs.float) found = true;
+      return !found;
+    });
+    floats.set(node, found);
+  }
+  return found;
 }
 
 /** A change that only adds or removes a picture's resize handle (the view's own, not input). */

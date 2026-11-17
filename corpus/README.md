@@ -180,8 +180,14 @@ number alone says little: the line is the stricter measure, and it moves with th
 three lines that differ: the paragraph after the fee table in 02 (Word counts the header row it
 repeats on the second page as a line; Foli does not), and two empty paragraphs around the table
 of contents in 04 (a field Foli keeps opaque). Not laid out yet, so not measured: headers and
-footers (their space is Word's margin here), footnotes and floating pictures (07: Foli
-shows one page where Word has two, so only 2 of its 5 paragraphs are on Word's page).
+footers (their space is Word's margin here) and footnotes.
+
+Floating pictures (10.9, 2026-11-17, with Aptos): 07 has all 5 of its paragraphs on Word's page
+(2 pages, as Word), 4 on Word's line. 04 keeps its 35 on Word's page but has 25 on Word's line
+(33 before): its chart is now wrapped square and the 9 lines beside it, as Word's PDF shows them,
+push what follows down, while Word's line numbers (`Range.Information`) count that paragraph as
+5 lines. The line is no measure beside a floating picture; the editing view's floats are checked
+against Word's offsets instead (`apps/playground/e2e/word-floats.spec.ts`).
 
 Paragraphs in table cells (2026-11-16, after 10.5, with Aptos): 277 of 280 on Word's page: 01
 8 of 8, 02 79 of 82, 04 24 of 24, 06 166 of 166 (the header row repeated, the row that may not
@@ -227,8 +233,11 @@ Baseline (2026-11-16, for 0.3.0: Word 16.0.20527, Chromium, with Aptos; mean of 
 The number is strict where the page and line numbers are not: in 01 every paragraph starts on
 Word's line, yet the numbered clauses drift down the page (Foli's lines there are taller than
 Word's) and some wrap at a different word. In 03 the whole text sits higher than Word's, which
-moves it below a letterhead taller than the top margin. In 04 the footnotes and the floating
-chart are missing (Foli's text does not wrap around it), and the headings sit lower than Word's.
+moves it below a letterhead taller than the top margin. In 04 the footnotes are missing and the
+headings sit lower than Word's; since 10.9 the chart is drawn and the text wraps around it as in
+Word, but page 3 scores 0.177 (0.203 before): the text beside it, being lower, is further from
+Word's (the chart is drawn as a box here, so its ink does not count). 07 (10.9, not in the table
+above): 0.123 and 0.665, its pictures as boxes against Word's ink, its floats where Word's are.
 
 ## Private documents
 

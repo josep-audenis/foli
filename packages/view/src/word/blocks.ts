@@ -93,6 +93,151 @@ export function pictureElement(
   return element;
 }
 
+/** Marks the element holding a floating picture (its wrapping), drawn at its paragraph's start. */
+export const FLOAT_ATTR = "data-foli-float";
+
+/** A section's page, in CSS px: what a floating picture is positioned against. */
+export interface FloatGeometry {
+  readonly pageWidth: number;
+  readonly pageHeight: number;
+  readonly marginLeft: number;
+  readonly marginTop: number;
+  readonly textWidth: number;
+  readonly textHeight: number;
+}
+
+/** The page geometry of `section` (Word's Letter page and margins where it does not say). */
+export function floatGeometry(section: SectionJSON | undefined): FloatGeometry {
+  const m = section?.margins ?? {};
+  const width = section?.pageSize?.width ?? 12_240;
+  const height = section?.pageSize?.height ?? 15_840;
+  const left = (m.left ?? 1440) + (m.gutter ?? 0);
+  const top = Math.abs(m.top ?? 1440);
+  return {
+    pageWidth: width * PX_PER_TWIP,
+    pageHeight: height * PX_PER_TWIP,
+    marginLeft: left * PX_PER_TWIP,
+    marginTop: top * PX_PER_TWIP,
+    textWidth: (width - left - (m.right ?? 1440)) * PX_PER_TWIP,
+    textHeight: (height - top - Math.abs(m.bottom ?? 1440)) * PX_PER_TWIP,
+  };
+}
+
+type FloatPosition = { relativeTo: string; offset?: number; align?: string };
+/** Horizontal positions measured from the page's left edge (the others: the column's). */
+const FROM_PAGE_LEFT = new Set(["page", "leftMargin", "insideMargin", "outsideMargin"]);
+
+/** Where a float's left edge is, in px from the column's left edge. */
+function floatLeft(h: FloatPosition, width: number, g: FloatGeometry): number {
+  const page = FROM_PAGE_LEFT.has(h.relativeTo);
+  const box = page ? g.pageWidth : g.textWidth;
+  let x: number;
+  if (typeof h.offset === "number") x = h.offset / EMU_PER_PX;
+  else if (h.align === "right" || h.align === "outside") x = box - width;
+  else if (h.align === "center") x = (box - width) / 2;
+  else x = 0;
+  if (h.relativeTo === "rightMargin") return g.textWidth + x;
+  return page ? x - g.marginLeft : x;
+}
+
+/**
+ * Where a float's top edge is: from its paragraph's top (`paragraph`), or from the page's top
+ * (`page`) for a position against the page or its margins.
+ */
+function floatTop(
+  v: FloatPosition,
+  height: number,
+  g: FloatGeometry,
+): { paragraph?: number; page?: number } {
+  const offset = typeof v.offset === "number" ? v.offset / EMU_PER_PX : undefined;
+  if (v.relativeTo === "paragraph" || v.relativeTo === "line") return { paragraph: offset ?? 0 };
+  const [start, box] = v.relativeTo === "page" ? [0, g.pageHeight] : [g.marginTop, g.textHeight];
+  if (offset !== undefined) return { page: start + offset };
+  if (v.align === "bottom" || v.align === "outside") return { page: start + box - height };
+  if (v.align === "center") return { page: start + (box - height) / 2 };
+  return { page: start };
+}
+
+/**
+ * A floating picture (10.9, ADR-0006) as CSS floats lay it out, put first in its anchor
+ * paragraph: `holder` holds the picture (`FLOAT_ATTR`), `nodes` go in the paragraph (a
+ * zero-width spacer float before it gives its offset from the paragraph's top).
+ * - Square (tight and through shown as square): a float on the side the picture is on, its
+ *   distance from the text as its margin; text goes on the other side only.
+ * - Top and bottom: a float as wide as the paragraph, the picture in it at its position.
+ * - Behind and in front of text: absolutely positioned on the page (z-index -1 or 1; the page is
+ *   the containing block and its own stacking context).
+ * shortcut: a wrapping picture placed against the page or its margins vertically is drawn at
+ * its paragraph's top; horizontal positions are against the paragraph's box (its indents in);
+ * all against `geometry` (one section's page), not each page's.
+ */
+export function floatElements(
+  attrs: Record<string, unknown>,
+  doc: Document,
+  image: ImageSource | undefined,
+  geometry: FloatGeometry,
+): { nodes: HTMLElement[]; holder: HTMLElement } {
+  const float = attrs.float as {
+    horizontal: FloatPosition;
+    vertical: FloatPosition;
+    wrap: string;
+    side?: string;
+    distance?: { top?: number; bottom?: number; left?: number; right?: number };
+  };
+  const width = Number(attrs.width) / EMU_PER_PX;
+  const height = Number(attrs.height) / EMU_PER_PX;
+  const distance = (side: "bottom" | "left" | "right") =>
+    (float.distance?.[side] ?? 0) / EMU_PER_PX;
+  const picture = pictureElement(attrs, doc, image);
+  picture.style.display = "block";
+  const holder = doc.createElement("span");
+  holder.setAttribute(FLOAT_ATTR, float.wrap);
+  holder.append(picture);
+  const style = holder.style;
+  style.display = "block";
+  const x = floatLeft(float.horizontal, width, geometry);
+  const top = floatTop(float.vertical, height, geometry);
+  if (float.wrap === "behind" || float.wrap === "inFront") {
+    style.position = "absolute";
+    style.zIndex = float.wrap === "behind" ? "-1" : "1";
+    style.left = `${geometry.marginLeft + x}px`;
+    // Against the paragraph: where it would be (its static position), moved by its offset.
+    if (top.page !== undefined) style.top = `${top.page}px`;
+    else style.marginTop = `${top.paragraph}px`;
+    return { nodes: [holder], holder };
+  }
+  const down = top.paragraph ?? 0;
+  const spacer = doc.createElement("span");
+  spacer.setAttribute("aria-hidden", "true");
+  spacer.style.width = "0";
+  spacer.style.height = `${Math.max(0, down)}px`;
+  if (down < 0) style.marginTop = `${down}px`;
+  style.marginBottom = `${distance("bottom")}px`;
+  if (float.wrap === "topAndBottom") {
+    spacer.style.float = "left";
+    style.float = "left";
+    style.clear = "both";
+    style.width = "100%";
+    picture.style.marginLeft = `${x}px`;
+    return { nodes: [spacer, holder], holder };
+  }
+  // Text on the side with more room (or the side `side` names): the picture floats on the other.
+  const right =
+    float.side === "left" || (float.side !== "right" && x + width / 2 > geometry.textWidth / 2);
+  const side = right ? "right" : "left";
+  spacer.style.float = side;
+  style.float = side;
+  style.clear = side;
+  if (right) {
+    style.marginRight = `${geometry.textWidth - x - width}px`;
+    style.marginLeft = `${distance("left")}px`;
+  } else {
+    style.marginLeft = `${x}px`;
+    style.marginRight = `${distance("right")}px`;
+  }
+  return { nodes: [spacer, holder], holder };
+}
+
 /** Which version of tracked changes to show. */
 /** How tracked changes show (`@folijs/core`'s, for `renderDocument` too). */
 export type { ReviewView } from "@folijs/core";
@@ -429,6 +574,8 @@ export function renderBlocks(
   };
   const resolver = new Resolver(document);
   const image = imageSource(document.resources, options.resource);
+  // shortcut: floating pictures are placed against the last section's page.
+  const geometry = floatGeometry(document.section);
   const content = document.content.content ?? [];
   const attrsOf = (node: NodeJSON) => (node.attrs ?? {}) as Record<string, unknown>;
   // In the final and simple views a paragraph whose mark was deleted joins the next paragraph
@@ -489,6 +636,7 @@ export function renderBlocks(
       comments,
       ratio,
       image,
+      geometry,
     });
     // An empty paragraph, or one ending in a line break, shows its last (empty) line; after a
     // page break the paragraph mark stays on the break's line, as in Word.
@@ -597,6 +745,8 @@ interface InlineContext {
   comments: Set<number>;
   ratio: (family: string) => number;
   image?: ImageSource | undefined;
+  /** The page floating pictures are positioned against. */
+  geometry: FloatGeometry;
 }
 
 /** A paragraph's inline content: runs as spans, breaks, comment anchors, opaque inline content. */
@@ -608,6 +758,7 @@ function renderInline(
   context: InlineContext,
 ): void {
   const { resolver, doc, review, comments, ratio, image } = context;
+  const floats: HTMLElement[] = [];
   for (const node of inline) {
     const marks = (node.marks ?? []) as MarkJSON[];
     const inserted = marks.some((m) => m.type === "insertion");
@@ -631,7 +782,8 @@ function renderInline(
       case "bookmarkEnd":
         continue;
       case "picture":
-        parent.append(pictureElement(attrs, doc, image));
+        if (attrs.float) floats.push(...floatElements(attrs, doc, image, context.geometry).nodes);
+        else parent.append(pictureElement(attrs, doc, image));
         continue;
       case "hardBreak":
       case "columnBreak":
@@ -683,6 +835,8 @@ function renderInline(
     }
     parent.append(element);
   }
+  // Floating pictures first in the paragraph, in order: lines from its top go around them.
+  parent.prepend(...floats);
 }
 
 /**
@@ -968,6 +1122,8 @@ function modelTable(
     comments: new Set<number>(),
     ratio,
     image,
+    // shortcut: a floating picture in a cell is placed against a Letter page's text width.
+    geometry: floatGeometry(undefined),
   };
   rows.forEach((rowNode, r) => {
     const rowAttrs = (rowNode.attrs ?? {}) as Record<string, unknown>;
