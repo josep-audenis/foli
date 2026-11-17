@@ -21,7 +21,7 @@ place that says what is in progress; check it before starting work.
 | 7 Rich content           | ✅ Done                  | —      | Merged in #33–#41; 0.2.0 on npm; list-document benchmark misses accepted (known limit)     |
 | 8 Word model & DOCX      | ✅ Done                  | —      | Merged in #44–#61; 0.3.0 on npm (`@folijs/docx` first released); gate G5 passed            |
 | 9 Review                 | ✅ Done                  | —      | Merged in #63–#72; 0.4.0 on npm                                                            |
-| 10 Tables & images       | ✅ Done (misses open)    | —      | Merged in #73–#96 (not #90); 0.5.0 on npm; two misses for the owner to accept (below)      |
+| 10 Tables & images       | ✅ Done                  | —      | Merged in #73–#97 (#90, the landing page, went to main); 0.5.0 on npm; two misses accepted |
 | 11–12                    | Not started              |        |                                                                                            |
 
 Status values: `Ready` (dependencies met, nobody on it) · `In progress` · `In review` (PR open) ·
@@ -931,7 +931,7 @@ recorded, accepted and rejected, and Word reads Foli's tracked insertion in a ce
 row deletion back (table round trip, revisions counted); pictures keep their resources, `report.picturesWithoutAlt` counts the ones without alt
 text; v3 → v4 migration changes the version only (tests); the table menu, its dialog, the table
 style and shading boxes and the picture dialog are keyboard-usable and axe-clean in three
-engines. Two misses, for the owner to accept as known limits: on Word's line, 101 of 115
+engines. Two misses, accepted by the owner as known limits on 2026-11-17 (docs/limitations.md): on Word's line, 101 of 115
 paragraphs; 04 has 25 of 35, below 0.3.0's 33, because its floating chart is now laid out and
 Word's line numbers count the 9 lines beside it, which its own PDF shows as Foli does, as 5; and
 T4 (IME) in cells runs in Chromium only, as everywhere in the editor. 0.5.0 published
