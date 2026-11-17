@@ -107,7 +107,9 @@ Backspace, and reads a selection of several ranges back as a `CellSelection`.
   into another document carries its resource; one whose bytes the target cannot reach is pasted
   as a placeholder, reported.
 - **Alt text.** A picture without alt text is allowed (Word allows it) but reported by import
-  and marked in the UI; inserting one asks for it.
+  and marked in the UI; inserting one asks for it. (10.8d: a picture pasted or dropped goes in
+  without asking, as an imported one, marked, its alt text asked for later; inserting from a
+  file asks for it.)
 
 ### Layout
 

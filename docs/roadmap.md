@@ -1008,8 +1008,10 @@ Each task is a PR on `phase-10/tables-images`, the build green after each.
   from the app's URLs (`packageImages` for a package) or the resource's own, marked when alt
   text is missing; laid out on pages as lines (three engines, axe). 10.8c, core: inserting a
   picture (alt text required unless decorative), its size and alt text; tracked insertion and
-  deletion, exported and read back. 10.8d: pictures selected by a click, resized by a handle
-  with their aspect ratio, pasted and dropped through the upload hook (three engines). Next:
+  deletion, exported and read back. 10.8d: pictures selected by a click and resized by a handle
+  with their aspect ratio (three engines); image files inserted through the upload hook where
+  pasted or dropped (three engines; the paste and drop events themselves in Chromium only:
+  synthetic ones carry no files elsewhere), without alt text then, marked (ADR-0006). Next:
   the toolbar's picture dialog (insert from a file with alt text, edit alt text and size).)
 - [ ] 10.9 Floating pictures, starting with a spike (lines laid out around an exclusion inside
   the editable host, three engines: ADR-0006's open risk): `wp:anchor` positions (relative to page, margin, column or

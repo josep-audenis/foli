@@ -157,7 +157,7 @@ const PICTURE_SELECTED_ATTR = "data-foli-picture-selected";
 const MIN_PICTURE = 8;
 // Generated content is not document text: no caret stops inside it, a zero-height float keeps
 // the caret at the line start, and the empty alt text keeps screen readers on aria-placeholder.
-const STYLES = `.${CELL_CLASS}{box-shadow:inset 0 0 0 9999px rgba(0,120,215,.22)}[${CELLS_ATTR}] ::selection{background:transparent}[data-foli-no-alt]{outline:2px dashed #b45309;outline-offset:-2px}@media print{[data-foli-no-alt]{outline:none}}[${PICTURE_SELECTED_ATTR}]{position:relative;outline:2px solid Highlight}[${PICTURE_SELECTED_ATTR}] [data-foli-resize]{position:absolute;right:-5px;bottom:-5px;width:10px;height:10px;box-sizing:border-box;border:1px solid Canvas;background:Highlight;cursor:nwse-resize}@media print{[${PICTURE_SELECTED_ATTR}]{outline:none}[${PICTURE_SELECTED_ATTR}] [data-foli-resize]{display:none}}[${PLACEHOLDER_ATTR}]::before{content:attr(${PLACEHOLDER_ATTR});content:attr(${PLACEHOLDER_ATTR}) / "";float:inline-start;height:0;pointer-events:none;color:GrayText}`;
+const STYLES = `.${CELL_CLASS}{box-shadow:inset 0 0 0 9999px rgba(0,120,215,.22)}[${CELLS_ATTR}] ::selection{background:transparent}[data-foli-no-alt]{outline:2px dashed #b45309;outline-offset:-2px}@media print{[data-foli-no-alt]{outline:none}}[${PICTURE_SELECTED_ATTR}]{position:relative;outline:2px solid Highlight}[${PICTURE_SELECTED_ATTR}] [data-foli-resize]{position:absolute;right:-5px;bottom:-5px;width:10px;height:10px;box-sizing:border-box;border:1px solid Canvas;background:Highlight;cursor:nwse-resize;forced-color-adjust:none}@media print{[${PICTURE_SELECTED_ATTR}]{outline:none}[${PICTURE_SELECTED_ATTR}] [data-foli-resize]{display:none}}[${PLACEHOLDER_ATTR}]::before{content:attr(${PLACEHOLDER_ATTR});content:attr(${PLACEHOLDER_ATTR}) / "";float:inline-start;height:0;pointer-events:none;color:GrayText}`;
 
 /**
  * Adds the view's stylesheet once per document or shadow root, when a placeholder is first shown
@@ -418,6 +418,8 @@ export class EditorView {
     width: number;
     height: number;
     scale: number;
+    /** The widest it may get (layout px). */
+    max: number;
     x: number;
     y: number;
     style: string;
@@ -534,6 +536,9 @@ export class EditorView {
       // Finish a running composition while its text can still go into the model.
       if (!options.editable && this.composing) this.onCompositionEnd();
       this.editable = options.editable;
+      // A selected picture's handle only while it can be resized.
+      this.endResize();
+      this.showSelectedPicture();
     }
     if (options.placeholder !== undefined) this.placeholder = options.placeholder;
     if (options.upload !== undefined) this.upload = options.upload ?? undefined;
@@ -579,6 +584,8 @@ export class EditorView {
   // ---------- rendering ----------
 
   private update(state: EditorState): void {
+    // A resize is of the picture at its position when it started: the document changed, over.
+    if (state.doc !== this.state.doc) this.onResizeCancel();
     const review = trackState(state)?.view ?? "markup";
     // Another review view (`setReviewView`): every block drawn again, by a new renderer.
     const reviewChanged = review !== this.review;
@@ -1406,7 +1413,8 @@ export class EditorView {
       selection instanceof NodeSelection && selection.node.type.name === "picture"
         ? this.pictureSpan(selection.from)
         : null;
-    if (span === this.selectedPicture && span?.querySelector("[data-foli-resize]")) return;
+    const handled = !!span?.querySelector("[data-foli-resize]");
+    if (span === this.selectedPicture && (!span || handled === this.editable)) return;
     this.selectedPicture?.removeAttribute(PICTURE_SELECTED_ATTR);
     this.selectedPicture?.querySelector("[data-foli-resize]")?.remove();
     this.selectedPicture = span;
@@ -1783,10 +1791,6 @@ export class EditorView {
     return drag;
   }
 
-  /**
-   * Triple-click selects the clicked block's content. Chromium and WebKit natively extend the
-   * selection to the start of the next block, so typing over it would merge the two blocks.
-   */
   // ---------- pictures (10.8d) ----------
 
   /**
@@ -1805,16 +1809,21 @@ export class EditorView {
     if (!this.hasFocus()) this.host.focus({ preventScroll: true });
     if (!(this.state.selection instanceof NodeSelection && this.state.selection.from === pos))
       this.dispatch(this.state.tr.setSelection(NodeSelection.create(this.state.doc, pos)));
+    // Already selected: written again (the focus may have put a caret in the host).
+    else this.writeSelection(true);
     const img = span.querySelector(`[${PICTURE_ATTR}]`) as HTMLElement | null;
     if (!img || !target?.closest("[data-foli-resize]") || !this.editable) return true;
     const rect = img.getBoundingClientRect();
     const width = Number.parseFloat(img.style.width) || rect.width;
+    const scale = rect.width / width || 1;
     this.resize = {
       pos,
       img,
       width: rect.width,
       height: rect.height,
-      scale: rect.width / width || 1,
+      scale,
+      // No wider than the page's text (layout px).
+      max: Math.max(this.textWidthEmu() / EMU_PER_PX, MIN_PICTURE),
       x: event.clientX,
       y: event.clientY,
       style: img.getAttribute("style") ?? "",
@@ -1833,9 +1842,9 @@ export class EditorView {
     const ratio = r.height / r.width;
     const dx = event.clientX - r.x;
     const dy = (event.clientY - r.y) / ratio;
-    const width = Math.max(
-      (r.width + (Math.abs(dx) > Math.abs(dy) ? dx : dy)) / r.scale,
-      MIN_PICTURE,
+    const width = Math.min(
+      Math.max((r.width + (Math.abs(dx) > Math.abs(dy) ? dx : dy)) / r.scale, MIN_PICTURE),
+      r.max,
     );
     return { width, height: width * ratio };
   }
@@ -1856,12 +1865,14 @@ export class EditorView {
     const { width, height } = this.resizedTo(event);
     const r = this.endResize();
     if (!r) return;
-    // No real move: nothing changes.
-    if (Math.abs(event.clientX - r.x) < 2 && Math.abs(event.clientY - r.y) < 2) return;
-    const applied = this.run(
-      setPictureSize(r.pos, Math.round(width * EMU_PER_PX), Math.round(height * EMU_PER_PX)),
-    );
-    // Not applied (tracking, the picture gone): as it was.
+    // No real move: nothing changes (a jiggle drawn while moving goes back).
+    const moved = Math.abs(event.clientX - r.x) >= 2 || Math.abs(event.clientY - r.y) >= 2;
+    const applied =
+      moved &&
+      this.run(
+        setPictureSize(r.pos, Math.round(width * EMU_PER_PX), Math.round(height * EMU_PER_PX)),
+      );
+    // Not applied (no move, tracking, the picture gone): as it was.
     if (!applied) r.img.setAttribute("style", r.style);
   };
 
@@ -1890,6 +1901,22 @@ export class EditorView {
     return r;
   }
 
+  /**
+   * The text width of the document's (last) section in EMU (635 per twip; Word's Letter page
+   * and margins where it does not say).
+   * shortcut: the last section's, not the caret's section or table cell; use the caret's when
+   * documents mix page sizes.
+   */
+  private textWidthEmu(): number {
+    const section = wordContext(this.state)?.envelope.section;
+    return (
+      ((section?.pageSize?.width ?? 12_240) -
+        (section?.margins?.left ?? 1440) -
+        (section?.margins?.right ?? 1440)) *
+      635
+    );
+  }
+
   /** Image files in a transfer (paste or drop), when the app takes uploads. */
   private imageFiles(data: DataTransfer | null): File[] {
     if (!this.upload || !this.editable || !data) return [];
@@ -1897,18 +1924,25 @@ export class EditorView {
     return [...(data.files ?? [])].filter((file) => file.type.startsWith("image/"));
   }
 
+  /** Whether a drag carries files (from outside the page). */
+  private static carriesFiles = (event: DragEvent) =>
+    [...(event.dataTransfer?.types ?? [])].includes("Files");
+
   private onDragOver = (event: DragEvent): void => {
-    const types = [...(event.dataTransfer?.items ?? [])];
-    if (!this.upload || !this.editable || !types.some((i) => i.type.startsWith("image/"))) return;
+    if (!EditorView.carriesFiles(event)) return;
+    // Files dropped here never open in the page (unsaved work would be lost).
     event.preventDefault();
-    if (event.dataTransfer) event.dataTransfer.dropEffect = "copy";
+    const images = [...(event.dataTransfer?.items ?? [])].some((i) => i.type.startsWith("image/"));
+    if (event.dataTransfer)
+      event.dataTransfer.dropEffect = images && this.upload && this.editable ? "copy" : "none";
   };
 
   private onDrop = (event: DragEvent): void => {
+    if (!EditorView.carriesFiles(event)) return;
+    event.preventDefault();
     const files = this.imageFiles(event.dataTransfer);
     if (!files.length || this.composing) return;
-    event.preventDefault();
-    // The caret where the files were dropped.
+    // The place the files were dropped.
     const doc = this.host.ownerDocument as Document & {
       caretPositionFromPoint?: (
         x: number,
@@ -1927,42 +1961,70 @@ export class EditorView {
   };
 
   /**
-   * Inserts image files at the selection, one picture each: uploaded through the `upload`
-   * option, at their natural size (96 px per inch) no wider than the page's text. Resolves to
-   * the number inserted; none without `upload`.
+   * Inserts image files where the selection is now, one picture each, in order: each measured
+   * first (one the browser cannot show is skipped, not uploaded), then given to the `upload`
+   * option, then inserted at its natural size (96 px per inch) no wider than the page's text,
+   * where the selection was, however the document changed meanwhile (after a composition that
+   * runs then). A file whose upload fails is skipped (reported on the console). Resolves to
+   * the number inserted (none without `upload`); never rejects.
    */
   async insertFiles(files: readonly File[]): Promise<number> {
     const upload = this.upload;
     if (!upload || !this.editable) return 0;
+    // The insertion point, mapped through every change until the pictures go in.
+    let at = this.state.selection.from;
+    const replace = !this.state.selection.empty;
+    const unsubscribe = this.editor.subscribe((_state, transactions) => {
+      for (const tr of transactions) at = tr.mapping.map(at);
+    });
     let inserted = 0;
-    for (const file of files) {
-      if (!file.type.startsWith("image/")) continue;
-      const answer = await upload(file);
-      if (this.destroyed) return inserted;
-      const { src, alt, decorative } = typeof answer === "string" ? { src: answer } : answer;
-      const size = await naturalSize(src, this.host.ownerDocument);
-      if (this.destroyed || !size) continue;
-      const section = wordContext(this.state)?.envelope.section;
-      // 635 EMU per twip; Word's Letter page and margins when the section does not say.
-      const text =
-        ((section?.pageSize?.width ?? 12_240) -
-          (section?.margins?.left ?? 1440) -
-          (section?.margins?.right ?? 1440)) *
-        635;
-      const scale = Math.min(1, text / (size.width * EMU_PER_PX));
-      const picture = {
-        contentType: file.type,
-        ...(src.startsWith("data:") ? { data: src } : { url: src }),
-        width: Math.max(1, Math.round(size.width * EMU_PER_PX * scale)),
-        height: Math.max(1, Math.round(size.height * EMU_PER_PX * scale)),
-        ...(alt ? { alt } : {}),
-        ...(decorative ? { decorative } : {}),
-      };
-      if (this.run(insertPicture(picture, { requireAlt: false }))) inserted++;
+    try {
+      for (const file of files) {
+        if (!file.type.startsWith("image/")) continue;
+        const size = await localSize(file, this.host.ownerDocument);
+        if (this.destroyed) return inserted;
+        if (!size) continue;
+        let answer: Awaited<ReturnType<NonNullable<EditorViewOptions["upload"]>>>;
+        try {
+          answer = await upload(file);
+        } catch (error) {
+          console.warn(`Foli: the upload of ${file.name} failed`, error);
+          continue;
+        }
+        const { src, alt, decorative } =
+          typeof answer === "string" ? { src: answer } : (answer ?? { src: "" });
+        if (typeof src !== "string" || !src) continue;
+        // The browser owns the DOM during a composition: the picture goes in after it.
+        while (this.composing && !this.destroyed) await new Promise((r) => setTimeout(r, 50));
+        if (this.destroyed || !this.editable) return inserted;
+        const scale = Math.min(1, this.textWidthEmu() / (size.width * EMU_PER_PX));
+        // A `data:` URL says its own type (an app may have converted the file).
+        const type = /^data:([^;,]+)/i.exec(src)?.[1]?.toLowerCase() ?? file.type;
+        const picture = {
+          contentType: type,
+          ...(src.startsWith("data:") ? { data: src } : { url: src }),
+          width: Math.max(1, Math.round(size.width * EMU_PER_PX * scale)),
+          height: Math.max(1, Math.round(size.height * EMU_PER_PX * scale)),
+          ...(typeof alt === "string" && alt.trim() ? { alt } : {}),
+          ...(decorative === true ? { decorative } : {}),
+        };
+        const { doc, selection } = this.state;
+        const pos = Math.min(at, doc.content.size);
+        // The first picture replaces what was selected at the paste (still selected there).
+        if (!(replace && inserted === 0 && selection.from === pos))
+          this.dispatch(this.state.tr.setSelection(TextSelection.near(doc.resolve(pos))));
+        if (this.run(insertPicture(picture, { requireAlt: false }))) inserted++;
+      }
+      return inserted;
+    } finally {
+      unsubscribe();
     }
-    return inserted;
   }
 
+  /**
+   * Triple-click selects the clicked block's content. Chromium and WebKit natively extend the
+   * selection to the start of the next block, so typing over it would merge the two blocks.
+   */
   private onMouseDown = (event: MouseEvent): void => {
     this.pointerFocus = !this.hasFocus();
     // Focus from a mousedown happens in its default action, before this timer. A mousedown that
@@ -3133,6 +3195,20 @@ export function keyName(event: KeyboardEvent): string {
 }
 
 /** An image's natural size (CSS px), or null when it does not load. */
+/** A file's image's natural size (CSS px) from a local object URL, before any upload. */
+async function localSize(
+  file: File,
+  doc: Document,
+): Promise<{ width: number; height: number } | null> {
+  if (typeof URL.createObjectURL !== "function") return null;
+  const url = URL.createObjectURL(file);
+  try {
+    return await naturalSize(url, doc);
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
 async function naturalSize(
   src: string,
   doc: Document,

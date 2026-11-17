@@ -384,8 +384,10 @@ const view = new EditorView(host, editor, { editable: true, placeholder: "" });
   `upload(file)`: where pasted and dropped image files go (ADR-0006's upload hook), resolving to
   the URL the app stores the file at (or a `data:` URL, opting in) or `{ src, alt?, decorative? }`;
   without it image files are not pasted or dropped. `view.insertFiles(files)` inserts image files
-  at the selection through it, at their natural size no wider than the page's text, and
-  resolves to how many it inserted; a picture inserted without alt text is marked.
+  where the selection is now through it (that place mapped through changes made during the
+  upload), at their natural size no wider than the page's text, and resolves to how many it
+  inserted (never rejects: a failed upload is skipped, reported on the console); a picture
+  inserted without alt text is marked.
   `resource(key, resource)`: the URL to show a picture's image from (`key` in the document's
   `resources`); undefined for a key: the resource's own image `data:` URL or web/`blob:` URL,
   else a box of the picture's size with its alt text; `null` (or "") for a key: that box. A web

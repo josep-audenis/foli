@@ -722,13 +722,17 @@ Selecting, resizing and inserting pictures in the editable view (10.8d): a press
 selects it (a node selection; a native selection exactly around one reads back as one), its
 span outlined and given a resize handle (`data-foli-resize`, the view's own DOM: its changes
 are not read back as input). Dragging the handle resizes the picture live, keeping its aspect
-ratio (the larger of the two moves), down to 8 px; the release sets its size
+ratio (the larger of the two moves), from 8 px to the text's width; the release sets its size
 (`setPictureSize`, refused while tracking: the picture goes back), a press without a move
-changes nothing, and Escape, the button let go outside the page or the window losing the focus
-cancel. Image files pasted alone (no text, no Foli JSON) or dropped go to the app's `upload`
-hook (none, nothing happens), then in as pictures (`insertFiles`: the URL, or a `data:` URL the
-app chose; natural size measured from load events, no wider than the section's text; the
-caret at the drop point; no alt text unless the hook gave it, marked).
+changes nothing, and Escape, the window losing the focus or a document change cancel. In
+read-only mode the selected picture has no handle. Image files pasted alone (no text, no Foli
+JSON) or dropped go to the app's `upload` hook (none, nothing happens; a file drop never opens
+the file in the page), then in as pictures (`insertFiles`): each measured first from a local
+object URL (one the browser cannot show is not uploaded), then uploaded (a failure is reported
+on the console and skipped), then inserted at its natural size no wider than the last
+section's text, where the paste or drop was, mapped through every change made meanwhile and
+after any composition then running; the type a returned `data:` URL says; no alt text unless
+the hook gave it, marked.
 shortcut: a picture's line is measured from its span's box, not the image's, so a line holding
 only a picture can end a page a little early (never overflow); measure the image when it
 matters.

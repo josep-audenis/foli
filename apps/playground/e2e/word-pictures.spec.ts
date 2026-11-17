@@ -193,3 +193,73 @@ test("an image pasted alone becomes a picture", async ({ page, browserName }) =>
     )
     .toBe("picture");
 });
+
+test("a picture goes where it was pasted, however the text changed during its upload", async ({
+  page,
+}) => {
+  await open(page, "07-picture-report.docx");
+  const result = await page.evaluate(async () => {
+    const base64 =
+      "iVBORw0KGgoAAAANSUhEUgAAAAIAAAABCAYAAAD0In+KAAAAEUlEQVR42mP8z8DwnwEJMAEAG/MCAeVKGkwAAAAASUVORK5CYII=";
+    const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
+    const { editor, view } = window.foliEdit;
+    // A slow upload: resolved by hand.
+    let done = (_src: string) => {};
+    view.setOptions({ upload: () => new Promise<string>((resolve) => (done = resolve)) });
+    const first = editor.state.doc.firstChild?.textContent ?? "";
+    editor.select(3);
+    const insert = view.insertFiles([new File([bytes], "dot.png", { type: "image/png" })]);
+    // Meanwhile: text typed at the start, the caret moved away.
+    await new Promise((r) => setTimeout(r, 100));
+    editor.select(1);
+    editor.commands.insertText("XYZ");
+    editor.select(1);
+    done(`data:image/png;base64,${base64}`);
+    const n = await insert;
+    const paragraph = editor.state.doc.firstChild;
+    let at = -1;
+    paragraph?.forEach((child, offset) => {
+      if (child.type.name === "picture") at = offset;
+    });
+    return { n, at, before: paragraph?.textBetween(0, Math.max(at, 0)), first };
+  });
+  expect(result.n).toBe(1);
+  // Two characters in, plus the three typed before them.
+  expect(result.before).toBe(`XYZ${result.first.slice(0, 2)}`);
+});
+
+test("image files dropped become pictures where they are dropped", async ({
+  page,
+  browserName,
+}) => {
+  // A synthetic drop carries its files in Chromium only.
+  test.skip(browserName !== "chromium", "no files in a synthetic drop event");
+  await open(page, "07-picture-report.docx");
+  const first = editor(page).locator("section.foli-page p").first();
+  const box = await first.boundingBox();
+  if (!box) throw new Error("no paragraph");
+  await editor(page).evaluate(
+    (host, at) => {
+      const base64 =
+        "iVBORw0KGgoAAAANSUhEUgAAAAIAAAABCAYAAAD0In+KAAAAEUlEQVR42mP8z8DwnwEJMAEAG/MCAeVKGkwAAAAASUVORK5CYII=";
+      const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
+      const data = new DataTransfer();
+      data.items.add(new File([bytes], "dot.png", { type: "image/png" }));
+      const init = {
+        dataTransfer: data,
+        clientX: at.x,
+        clientY: at.y,
+        bubbles: true,
+        cancelable: true,
+      };
+      host.dispatchEvent(new DragEvent("dragover", init));
+      host.dispatchEvent(new DragEvent("drop", init));
+    },
+    { x: box.x + 2, y: box.y + box.height / 2 },
+  );
+  await expect
+    .poll(() =>
+      page.evaluate(() => window.foliEdit.editor.state.doc.firstChild?.firstChild?.type.name),
+    )
+    .toBe("picture");
+});
