@@ -61,7 +61,10 @@ export function insertPicture(picture: NewPicture): Command {
     if (!alt && !picture.decorative) return false;
     if (!validSize(picture.width) || !validSize(picture.height)) return false;
     // The bytes are of the type the document says (a part is named from it on export).
-    if (picture.data !== undefined && dataType(picture.data) !== picture.contentType.toLowerCase())
+    if (
+      picture.data !== undefined &&
+      dataType(String(picture.data)) !== String(picture.contentType).toLowerCase()
+    )
       return false;
     const resource: ResourceJSON = {
       contentType: picture.contentType,

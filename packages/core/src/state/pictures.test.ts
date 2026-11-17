@@ -205,6 +205,9 @@ describe("review findings", () => {
       });
     });
     expect(texts).toEqual(["", "b1", "a2", "b2"]);
+    expect(editor.state.doc.child(1).child(0).child(0).firstChild?.firstChild?.type.name).toBe(
+      "picture",
+    );
   });
 
   it("changes alt text only when it changes; a decorative picture has none", () => {
