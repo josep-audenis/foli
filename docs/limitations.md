@@ -80,8 +80,25 @@ checklist in [testing/ime.md](testing/ime.md)):
   table, moves whole to the next page.
 - Rows pasted into a table fill its cells from the selected one; columns beyond the table's are
   dropped (not reported). Tables pasted from other applications become paragraphs.
-- No keyboard way to set a column's width (drag its border). Nested tables are drawn whole with
-  their parent's row.
+- No keyboard way to set a column's width (drag its border); a nested table's column borders
+  cannot be dragged. Nested tables are drawn whole with their parent's row.
+- Table styles: banding, the first and last column and inside borders count cells, not grid
+  columns, so a table with merged cells or rows starting late (`gridBefore`) may be formatted
+  differently from Word; a style's whole-table conditional format (`wholeTable`) is kept
+  and exported but not applied; where Word lets a table style's paragraph properties win over
+  the Normal style's, Foli uses Normal's.
+- An exact row height is drawn as a minimum (a cell never clips its content), and contextual
+  spacing between paragraphs in a cell is not applied.
+- Copying cells: a row with no cell of its own in the selected columns (a gap Word leaves with
+  `gridBefore`/`gridAfter`) is left out of the copy, so pasted rows after it land one row
+  higher.
+- `renderDocument` (read-only) draws a vertically merged cell as an empty cell under the first
+  (with any inside border between them); the editing view draws it as one cell.
+- Page agreement in cells: 277 of the corpus's 280 cell paragraphs are on Word's page; the
+  three others are one row of 02's fee table that Word moves to the next page and Foli keeps on
+  the first.
+- A text range across cells deleted through the API (not a cell selection) empties the cells in
+  document order between its ends, not Word's rectangle.
 - While tracking, text in cells is tracked as everywhere; of the table's structure only rows
   are (inserted and deleted as Word records them): column commands, merging and splitting cells,
   header rows, table styles, shading and column widths are refused. A table style's own definition cannot be changed (a changed one is refused on
@@ -104,10 +121,25 @@ checklist in [testing/ime.md](testing/ime.md)):
   against the page or its margins vertically is drawn at its paragraph's top, horizontal
   positions count the paragraph's indents, several floating pictures in a paragraph stack
   instead of sitting side by side, and a picture reaching past the page's text makes the page
-  taller instead of moving to the next page. Positions are against the last section's page. There is no command to change a
+  taller instead of moving to the next page. Positions are against the last section's page; a
+  horizontal position against a character is drawn against the column. There is no command to change a
   picture's position or wrapping; one changed through the API is written as a new drawing,
   losing what only its original held (cropping, effects, z-order).
 - A picture behind text cannot be clicked where text covers it (select it with the keyboard).
+- A floating picture in a table cell is placed against the page, not its cell.
+- Screen readers meet a floating picture at the start of its paragraph (or of the part on that
+  page, for a paragraph split across pages), where it is drawn, not at its place in the text (not tried with a screen reader; see "Not verified by hand").
+- Pictures are inserted, and resized by dragging, no wider than the last section's text, not
+  the caret's section or table cell.
+- In the editing view a line holding only a picture is measured from its span's box, not the
+  image: such a line can end a page a little early. `renderDocument` measures text lines only: a
+  paragraph holding only a picture moves to the next page whole, and a page break may fall
+  inside a picture standing between text lines.
+- Pages settle after an edit near a floating picture (checked with one split across two
+  pages); a block that might move back and forth between two pages beside a float is not
+  tested.
+- Pasting and dropping image files is tested in Chromium only (synthetic events carry no files
+  in the other engines).
 - No cropping, rotation or touch resizing; resizing is refused while tracking (Foli does not
   record a size change yet). Alt text changes are not tracked.
 - Pictures copied to another document lose their images (their resources stay behind); Word's
@@ -115,7 +147,9 @@ checklist in [testing/ime.md](testing/ime.md)):
 - `renderDocument` measures blocks on one long page: the lines after a floating picture may
   wrap a little differently than on the editing view's pages.
 - Word's line numbers count the lines beside a floating picture differently from its own
-  layout: `pnpm corpus:pages` reports fewer paragraphs on Word's line there (04).
+  layout: `pnpm corpus:pages` reports fewer paragraphs on Word's line there (04: 25 of 35, 33
+  in 0.3.0 before the chart was laid out; 101 of 115 for the corpus). Accepted as a known
+  limit (2026-11-17).
 
 ## Tracked changes and comments
 

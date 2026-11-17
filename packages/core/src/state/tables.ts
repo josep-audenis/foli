@@ -112,7 +112,8 @@ function deleteBetween(tr: Transaction, a: number, b: number): void {
  * (paragraphs in a cell joined), so a tracked clear can be rejected; a cell holding other
  * blocks (a nested table) gets one empty paragraph instead.
  *
- * shortcut: the cells in document order, not Word's rectangle (`CellSelection` will give that).
+ * shortcut: the cells in document order between the range's ends, not Word's rectangle (a
+ * `CellSelection` deletes its own rectangle).
  */
 function clearCells(tr: Transaction, from: number, to: number, start: number, end: number): void {
   const cells: { pos: number; node: Node }[] = [];

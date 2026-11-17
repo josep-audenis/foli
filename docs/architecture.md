@@ -733,9 +733,10 @@ on the console and skipped), then inserted at its natural size no wider than the
 section's text, where the paste or drop was, mapped through every change made meanwhile and
 after any composition then running; the type a returned `data:` URL says; no alt text unless
 the hook gave it, marked.
-shortcut: a picture's line is measured from its span's box, not the image's, so a line holding
-only a picture can end a page a little early (never overflow); measure the image when it
-matters.
+shortcut: in the editing view a picture's line is measured from its span's box, not the
+image's, so a line holding only a picture can end a page a little early; `renderDocument`
+measures text lines only (a picture-only paragraph moves whole; a break may fall inside a
+picture between text lines); measure the image when it matters.
 
 Floating pictures (10.9, ADR-0006; `floatElements` in `word/blocks.ts`): a picture with `float`
 is drawn first in its paragraph (the fragment its place in the text is in, on a split
