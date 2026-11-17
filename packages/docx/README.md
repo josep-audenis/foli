@@ -126,8 +126,8 @@ included). Within the parts it writes:
   `wp:posOffset` as `offset` in EMU or `wp:align` as `align`), `wrap` (`square`, `tight`,
   `through`, `topAndBottom`; `wp:wrapNone` is `behind` or `inFront` by `behindDoc`), `side`
   (`wrapText`), `distance` (`distT`…`distR`), `allowOverlap` and `layoutInCell`; its z-order,
-  lock and wrap polygon stay in `ext`. A position given both an `offset` and an `align` (the
-  schema allows it) is written with the offset. One positioned by `simplePos`, hidden, sized relative to
+  lock and wrap polygon stay in `ext`. A position given both an `offset` and an `align` (Foli's
+  schema allows it; Word's holds one) is written with the offset. One positioned by `simplePos`, hidden, sized relative to
   the page (`wp14:sizeRelH`/`sizeRelV`), or with no position or wrapping the model reads, stays
   opaque, as linked images, charts, shapes and other drawings do.
 - Pictures are written from their `ext` with only what the model changed from it written in
