@@ -126,9 +126,9 @@ included). Within the parts it writes:
   `wp:posOffset` as `offset` in EMU or `wp:align` as `align`), `wrap` (`square`, `tight`,
   `through`, `topAndBottom`; `wp:wrapNone` is `behind` or `inFront` by `behindDoc`), `side`
   (`wrapText`), `distance` (`distT`…`distR`), `allowOverlap` and `layoutInCell`; its z-order,
-  lock and wrap polygon stay in `ext`. One positioned by `simplePos`, or with no position or
-  wrapping the model reads, stays opaque, as linked images, charts, shapes and other drawings
-  do.
+  lock and wrap polygon stay in `ext`. One positioned by `simplePos`, hidden, sized relative to
+  the page (`wp14:sizeRelH`/`sizeRelV`), or with no position or wrapping the model reads, stays
+  opaque, as linked images, charts, shapes and other drawings do.
 - Pictures are written from their `ext` with only what the model changed from it written in
   (the extent and the transform's size, alt text and title on `wp:docPr` and `pic:cNvPr`, the
   image's relationship): an unchanged picture comes back byte for byte, values the file holds
@@ -137,7 +137,8 @@ included). Within the parts it writes:
   a fresh drawing, inline or `wp:anchor` (a position Word cannot read written as `column` or
   `paragraph` at offset 0, tight and through wrapping with the picture's rectangle as the
   polygon); so is a floating picture whose `float` differs from its `ext`'s, and one made
-  floating or inline (cropping and effects in its `ext` are then lost: no command changes a
+  floating or inline: what only its `ext` held is then lost (cropping, effects, z-order, lock,
+  `hidden`, the wrap polygon, an SVG picture's SVG part, a click link; no command changes a
   float yet); new ids are above every drawing id in the document's parts. Its image
   is the package's part when the resource names one there of the size and an image type import
   recorded (a part of that name in another package is another image); otherwise a new media

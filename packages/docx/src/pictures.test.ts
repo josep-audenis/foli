@@ -506,3 +506,36 @@ describe("floating pictures", () => {
     });
   });
 });
+
+describe("floating pictures the model cannot hold", () => {
+  const anchorOf = (attrs: string, inside: string) =>
+    `<w:drawing><wp:anchor distT="0" distB="0" distL="0" distR="0" simplePos="0" relativeHeight="1" behindDoc="0" locked="0" layoutInCell="1" allowOverlap="1" ${attrs}>${inside}<wp:extent cx="100" cy="50"/><wp:docPr id="7" name="P"/><a:graphic xmlns:a="${A_NS}"><a:graphicData uri="${PIC_NS}"><pic:pic xmlns:pic="${PIC_NS}"><pic:nvPicPr><pic:cNvPr id="7" name="P"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed="rId9"/></pic:blipFill><pic:spPr/></pic:pic></a:graphicData></a:graphic></wp:anchor></w:drawing>`;
+  const at = (h: string, v = "<wp:posOffset>0</wp:posOffset>") =>
+    `<wp:simplePos x="0" y="0"/><wp:positionH relativeFrom="column">${h}</wp:positionH><wp:positionV relativeFrom="paragraph">${v}</wp:positionV>`;
+  const square = '<wp:wrapSquare wrapText="bothSides"/>';
+  const offset = "<wp:posOffset>0</wp:posOffset>";
+
+  it("stay opaque and are written back as read", async () => {
+    const cases = [
+      anchorOf("", at(offset) + square).replace('simplePos="0"', 'simplePos="1"'),
+      anchorOf("", at(offset)),
+      anchorOf("", at("<wp:posOffset>1.5</wp:posOffset>") + square),
+      anchorOf("", at("<wp:align/>") + square),
+      anchorOf('hidden="1"', at(offset) + square),
+      anchorOf("", `${at(offset)}${square}`).replace(
+        "</a:graphic>",
+        '</a:graphic><wp14:sizeRelH relativeFrom="page"><wp14:pctWidth>50000</wp14:pctWidth></wp14:sizeRelH>',
+      ),
+    ];
+    // The control: one the model holds.
+    const control = await importDocx(await packageWith([anchorOf("", at(offset) + square)]));
+    expect(pictures(control.document)[0]?.attrs?.float).toMatchObject({ wrap: "square" });
+    for (const drawing of cases) {
+      const { document, report, package: pkg } = await importDocx(await packageWith([drawing]));
+      expect(pictures(document)).toEqual([]);
+      expect(report.opaque["w:drawing"]).toBe(1);
+      const out = (await readPackage(await exportDocx(document, pkg))).text("/word/document.xml");
+      expect(drawings(out)).toEqual([drawing]);
+    }
+  });
+});

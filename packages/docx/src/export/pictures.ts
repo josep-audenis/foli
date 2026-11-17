@@ -322,8 +322,9 @@ export function drawingXml(
     const { element, source } = fragment(ext, namespaces);
     const anchor = kid(element, WP, "anchor");
     const inline = kid(element, WP, "inline") ?? anchor;
-    // shortcut: a float changed from the file's is written fresh (cropping and effects in `ext`
-    // are lost); edit `wp:positionH`/`wp:wrap*` in place once a command changes floats.
+    // shortcut: a float changed from the file's is written fresh, losing what only its `ext`
+    // holds (cropping, effects, z-order, lock, wrap polygon, an SVG part, a click link); edit
+    // `wp:positionH`/`wp:wrap*` in place once a command changes floats.
     const sameFloat = same(anchor ? (floatOf(anchor) ?? false) : undefined, float);
     const blip = descendants(element, (e) => e.ns === A && e.local === "blip")[0];
     const current = attrOf(blip, "embed", R)?.value;

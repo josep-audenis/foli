@@ -68,7 +68,8 @@ function position(el: XmlElement | undefined) {
   const offsetEl = kid(el, WP, "posOffset");
   const offset = offsetEl ? integer(textOf(offsetEl).trim()) : undefined;
   const align = kid(el, WP, "align");
-  if (offset !== undefined && Math.abs(offset) <= MAX_EMU) return { relativeTo, offset };
+  if (offset !== undefined && offset >= -MAX_EMU - 1 && offset <= MAX_EMU)
+    return { relativeTo, offset };
   if (align) return { relativeTo, align: textOf(align).trim() };
   return undefined;
 }
@@ -77,8 +78,24 @@ function position(el: XmlElement | undefined) {
 export function floatOf(anchor: XmlElement): Record<string, unknown> | undefined {
   const horizontal = position(kid(anchor, WP, "positionH"));
   const vertical = position(kid(anchor, WP, "positionV"));
-  // `simplePos`: a position from the page's corner, which Word itself ignores unless set.
-  if (!horizontal || !vertical || flag(plain(anchor, "simplePos")) === true) return undefined;
+  // Kept opaque: a position from the page's corner (`simplePos="1"`), a hidden picture, and a
+  // size relative to the page (`wp14:sizeRelH`/`sizeRelV`, which a new extent would not change).
+  if (
+    !horizontal ||
+    !vertical ||
+    flag(plain(anchor, "simplePos")) === true ||
+    flag(plain(anchor, "hidden")) === true ||
+    anchor.children.some(
+      (c) =>
+        c.kind === "element" &&
+        (c.local === "sizeRelH" || c.local === "sizeRelV") &&
+        // Word writes a percentage of 0 on every anchor: the size is its extent then.
+        c.children.some(
+          (p) => p.kind === "element" && /^pct/.test(p.local) && Number(textOf(p).trim()) !== 0,
+        ),
+    )
+  )
+    return undefined;
   const wrapEl = anchor.children.find(
     (c): c is XmlElement => c.kind === "element" && c.ns === WP && c.local.startsWith("wrap"),
   );
