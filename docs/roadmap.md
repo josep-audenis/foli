@@ -1006,8 +1006,10 @@ Each task is a PR on `phase-10/tables-images`, the build green after each.
   written in (unchanged: byte for byte), new ones as fresh drawings with media parts from the
   package, a `data:` URL or the app. 10.8b: the views draw them in their lines at their size,
   from the app's URLs (`packageImages` for a package) or the resource's own, marked when alt
-  text is missing; laid out on pages as lines (three engines, axe). Next: inserting, pasting,
-  resizing, alt text, tracking.)
+  text is missing; laid out on pages as lines (three engines, axe). 10.8c, core: inserting a
+  picture (alt text required unless decorative), its size and alt text; tracked insertion and
+  deletion, exported and read back. Next: selecting, resizing, pasting and dropping in the
+  view (upload hook); the toolbar's picture dialog.)
 - [ ] 10.9 Floating pictures, starting with a spike (lines laid out around an exclusion inside
   the editable host, three engines: ADR-0006's open risk): `wp:anchor` positions (relative to page, margin, column or
   paragraph), wrapping square and top-and-bottom with text flowing around them, behind and in

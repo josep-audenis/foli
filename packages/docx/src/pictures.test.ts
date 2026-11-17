@@ -346,3 +346,29 @@ describe("data: URLs", () => {
     });
   });
 });
+
+describe("tracked pictures", () => {
+  it("are written inside w:ins and w:del and read back as tracked", async () => {
+    const tracked = (type: "insertion" | "deletion", alt: string): NodeJSON => ({
+      type: "picture",
+      attrs: { resource: "img", width: 914400, height: 457200, alt },
+      marks: [{ type, attrs: { id: type === "insertion" ? 1 : 2, author: "Me" } }],
+    });
+    const document = parseDocument({
+      ...createDocument({
+        type: "doc",
+        content: [
+          { type: "paragraph", content: [tracked("insertion", "In"), tracked("deletion", "Out")] },
+        ],
+      }),
+      resources: { img: { contentType: "image/png", data: `data:image/png;base64,${PNG}` } },
+    });
+    const out = await exportDocx(document);
+    const xml = (await readPackage(out)).text("/word/document.xml");
+    expect(xml).toMatch(/<w:ins [^>]*><w:r>(<w:rPr\/>)?<w:drawing>/);
+    expect(xml).toMatch(/<w:del [^>]*><w:r>(<w:rPr\/>)?<w:drawing>/);
+    const again = pictures((await importDocx(out)).document);
+    expect(again.map((n) => n.marks?.[0]?.type)).toEqual(["insertion", "deletion"]);
+    expect(again.map((n) => n.attrs?.alt)).toEqual(["In", "Out"]);
+  });
+});

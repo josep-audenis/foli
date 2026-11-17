@@ -693,6 +693,14 @@ moved (`setColumnWidth`, one undo step); a press without a move changes nothing.
 button let go outside the page or the window losing the focus cancel. Not yet: the borders of a
 nested table, and a keyboard way to set a column's width (the table menu's).
 
+Picture commands (10.8c, `packages/core/src/state/pictures.ts`): `insertPicture` adds the image
+as a new resource (`foli-picture-N`, its `url` or opted-in `data:` URL checked as the envelope's
+resources are) and inserts the picture at the selection with the marks typing would get there,
+as one undo step; it needs alt text unless the picture is marked decorative. Inserting and
+deleting a picture is tracked as text is (insertion and deletion marks, exported as `w:ins` and
+`w:del` around its run). `setPictureSize` does not apply while tracking (Foli does not record
+the change yet); `setPictureAlt` does (Word does not track alt text either).
+
 Pictures in the views (10.8b, `pictureElement` in `word/blocks.ts`): an inline picture is drawn
 in its line at its size (EMU / 9525 px) as an `img` with its alt text (empty when decorative),
 from the URL `imageSource` gives for its resource: the app's (`EditorViewOptions.resource`,
