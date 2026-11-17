@@ -1,0 +1,354 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Foli — real pages for the web</title>
+    <meta
+      name="description"
+      content="Foli is an open-source document-editing engine for the web: native pagination, Word's document model, lossless .docx round-trips, tracked changes and comments. MIT licensed."
+    />
+    <meta name="theme-color" content="#f3f3f1" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Caladea:ital,wght@0,400;0,700;1,400;1,700&family=Carlito:ital,wght@0,400;0,700;1,400&family=Cousine:wght@400;700&display=swap"
+    />
+  </head>
+  <body>
+    <a class="skip" href="#main">Skip to content</a>
+
+    <header class="masthead">
+      <div class="wrap masthead-row">
+        <a class="brand" href="/" aria-label="Foli home">
+          <svg class="brand-mark" viewBox="0 0 28 32" aria-hidden="true">
+            <path class="brand-back" d="M7 1h15v24H7z" />
+            <path class="brand-front" d="M2 6h12l5 5v20H2z" />
+            <path class="brand-fold" d="M14 6v5h5" />
+          </svg>
+          <span class="brand-name">Foli</span>
+        </a>
+        <nav class="nav" aria-label="Main">
+          <a href="#pagination">Pages</a>
+          <a href="#docx">.docx</a>
+          <a href="#review">Review</a>
+          <a href="https://github.com/josep-audenis/foli/blob/main/docs/getting-started.md">Docs</a>
+          <a class="nav-gh" href="https://github.com/josep-audenis/foli">GitHub</a>
+        </nav>
+      </div>
+    </header>
+
+    <main id="main">
+      <section class="hero wrap-wide" aria-labelledby="hero-title">
+        <div class="hero-sheet">
+          <p class="eyebrow">Document engine for the web · MIT</p>
+          <h1 id="hero-title" class="hero-title">
+            Edit
+            <del class="change-del">rich text</del><br />
+            <ins class="change-ins">documents</ins><br />
+            in the browser.
+          </h1>
+          <div class="hero-lede">
+            <p>
+              Foli is an open-source editing engine with real pages, Word's document model and
+              lossless <code>.docx</code> round-trips. Its model, transactions, view and layout
+              are its own, so page breaks are computed by the engine as you type.
+            </p>
+            <div class="hero-actions">
+              <div class="install">
+                <span class="install-prompt" aria-hidden="true">$</span>
+                <code id="install-cmd">npm i @folijs/react @folijs/core</code>
+                <button type="button" class="copy" data-copy="install-cmd">Copy</button>
+              </div>
+              <a class="button button-primary" href="https://github.com/josep-audenis/foli/blob/main/docs/getting-started.md">Get started</a>
+              <a class="button" href="https://github.com/josep-audenis/foli">GitHub</a>
+            </div>
+            <p class="hero-meta">MIT · v0.4.0 · React or plain DOM · Chromium, Firefox, WebKit</p>
+            <ul class="hero-facts">
+              <li><span>Pages</span>A4, Letter or any size, per section; widows, orphans, keep with next</li>
+              <li><span>Model</span>Word's: paragraph styles, numbering, runs and their properties</li>
+              <li><span>.docx</span>In and out; parts Foli does not edit come back byte for byte</li>
+              <li><span>Review</span>Tracked changes and comments that round-trip with Word</li>
+            </ul>
+          </div>
+          <section class="demo" aria-label="Live editor">
+            <p class="demo-note">
+              <span class="demo-live">Live</span>
+              The real editor, running in this page.
+            </p>
+            <div class="ruler" aria-hidden="true"></div>
+            <div id="demo" class="demo-mount">
+              <noscript>The live editor needs JavaScript.</noscript>
+            </div>
+          </section>
+        </div>
+      </section>
+
+      <div class="sheets">
+        <!-- Pagination -->
+        <article class="sheet" id="pagination" aria-labelledby="pagination-title">
+          <header class="running-head"><span>Foli</span><span>Pagination</span></header>
+          <div class="sheet-grid">
+            <div class="sheet-copy">
+              <h2 id="pagination-title">The page is the unit of layout.</h2>
+              <p>
+                Most web editors draw page breaks over one long scroll. Foli lays text into pages:
+                it measures every line box, breaks paragraphs where they fit, and re-flows only what
+                an edit moved. In the editor above, the paragraph that starts "Every page here is
+                A6" breaks this way from page 1 to page 2.
+              </p>
+              <dl class="spec">
+                <div><dt>Split at a line</dt><dd>A paragraph continues on the next page from the line that did not fit.</dd></div>
+                <div><dt>Widows and orphans</dt><dd>No single line left alone at the top or bottom of a page.</dd></div>
+                <div><dt>Keep with next</dt><dd>A heading never ends a page without its paragraph.</dd></div>
+                <div><dt>Keep lines together</dt><dd>A paragraph moves whole instead of splitting.</dd></div>
+                <div><dt>Sections</dt><dd>Each section has its own page size and margins.</dd></div>
+                <div><dt>Print</dt><dd>One sheet per page, at the section's size.</dd></div>
+              </dl>
+            </div>
+            <figure class="spread" aria-label="Two pages with pagination rules marked">
+              <div class="spread-pages">
+                <div class="mini-page">
+                  <span class="ml ml-h"></span>
+                  <span class="ml"></span><span class="ml"></span><span class="ml"></span><span class="ml ml-end"></span>
+                  <span class="ml-gap"></span>
+                  <span class="ml"></span><span class="ml"></span><span class="ml"></span><span class="ml"></span><span class="ml ml-end"></span>
+                  <span class="ml-gap"></span>
+                  <span class="ml ml-split"></span><span class="ml ml-split"></span><span class="ml ml-split"></span><span class="ml ml-split"></span>
+                  <span class="pin pin-1">1</span>
+                  <span class="mini-folio">1</span>
+                </div>
+                <div class="mini-page">
+                  <span class="ml ml-split"></span><span class="ml ml-split ml-end"></span>
+                  <span class="pin pin-2">2</span>
+                  <span class="ml-gap"></span>
+                  <span class="ml ml-h ml-keep"></span>
+                  <span class="ml ml-keep"></span><span class="ml ml-keep"></span><span class="ml ml-keep"></span><span class="ml ml-keep ml-end"></span>
+                  <span class="pin pin-3">3</span>
+                  <span class="ml-gap"></span>
+                  <span class="ml"></span><span class="ml"></span><span class="ml"></span>
+                  <span class="mini-folio">2</span>
+                </div>
+              </div>
+              <ol class="legend">
+                <li><span class="pin">1</span>The paragraph breaks after the last line that fits.</li>
+                <li><span class="pin">2</span>At least two lines carry over: no widow.</li>
+                <li><span class="pin pin-keep">3</span>The heading stays with its paragraph.</li>
+              </ol>
+            </figure>
+          </div>
+          <footer class="folio">1</footer>
+        </article>
+
+        <!-- Start -->
+        <article class="sheet" id="start" aria-labelledby="start-title">
+          <header class="running-head"><span>Foli</span><span>Getting started</span></header>
+          <div class="sheet-grid sheet-grid-code">
+            <div class="sheet-copy">
+              <h2 id="start-title">One component, real pages.</h2>
+              <p>
+                <code>FoliEditor</code> brings the pages, a toolbar and a comments pane. Load a
+                saved document with <code>parseDocument</code>, which validates it and migrates
+                older versions. Save from <code>onChange</code>.
+              </p>
+              <p>
+                Prefer your own toolbar, or no React at all? The
+                <a href="https://github.com/josep-audenis/foli/blob/main/docs/getting-started.md">getting started guide</a>
+                covers both, plus Next.js and read-only mode.
+              </p>
+            </div>
+            <div class="code">
+              <div class="code-bar"><span>Editor.tsx</span><button type="button" class="copy" data-copy="code-start">Copy</button></div>
+<pre id="code-start"><span class="k">import</span> { createDocument, parseDocument } <span class="k">from</span> <span class="s">"@folijs/core"</span>;
+<span class="k">import</span> { type FoliChange, FoliEditor } <span class="k">from</span> <span class="s">"@folijs/react"</span>;
+<span class="k">import</span> <span class="s">"@folijs/react/styles.css"</span>;
+
+<span class="k">const</span> saved = localStorage.<span class="f">getItem</span>(<span class="s">"doc"</span>);
+<span class="k">const</span> initial = saved
+  ? <span class="f">parseDocument</span>(JSON.<span class="f">parse</span>(saved))
+  : <span class="f">createDocument</span>();
+
+<span class="k">const</span> <span class="f">save</span> = (c: FoliChange) =&gt;
+  localStorage.<span class="f">setItem</span>(<span class="s">"doc"</span>, JSON.<span class="f">stringify</span>(c.document));
+
+<span class="k">export function</span> <span class="f">Editor</span>() {
+  <span class="k">return</span> (
+    &lt;<span class="t">FoliEditor</span> initialContent={initial} onChange={save} /&gt;
+  );
+}</pre>
+            </div>
+          </div>
+          <footer class="folio">2</footer>
+        </article>
+
+        <!-- DOCX -->
+        <article class="sheet" id="docx" aria-labelledby="docx-title">
+          <header class="running-head"><span>Foli</span><span>.docx</span></header>
+          <div class="sheet-grid sheet-grid-even">
+            <div class="sheet-copy">
+              <h2 id="docx-title">Open a <code>.docx</code>. Save it back. Lose nothing.</h2>
+              <p>
+                <code>@folijs/docx</code> reads Word files into a model shaped like Word's own:
+                paragraph styles, numbering, runs with their properties, sections, comments and
+                tracked changes. On export, the parts Foli does not edit come back byte for byte,
+                and unchanged elements verbatim.
+              </p>
+              <p>
+                What the editor does not model yet stays in the document as a block it keeps and
+                writes back. The import report tells you what those are.
+              </p>
+              <div class="code">
+                <div class="code-bar"><span>open-and-save.ts</span><button type="button" class="copy" data-copy="code-docx">Copy</button></div>
+<pre id="code-docx"><span class="k">import</span> { importDocx, exportDocx } <span class="k">from</span> <span class="s">"@folijs/docx"</span>;
+
+<span class="k">const</span> { document, package: pkg, report } =
+  <span class="k">await</span> <span class="f">importDocx</span>(bytes);
+report.opaque; <span class="c">// { "w:sdt": 1 }: kept as is</span>
+
+<span class="c">// …edit…</span>
+<span class="k">const</span> doc = editor.<span class="f">getDocument</span>();
+<span class="k">const</span> out = <span class="k">await</span> <span class="f">exportDocx</span>(doc, pkg);</pre>
+              </div>
+            </div>
+            <figure class="xml" aria-label="Part of a document.xml after a round-trip">
+              <div class="xml-bar"><span>word/document.xml</span><span class="xml-legend"><i class="lg lg-edit"></i>edited <i class="lg lg-keep"></i>kept verbatim</span></div>
+<pre><span class="x-keep">&lt;w:p w14:paraId="1E2F0A3C"&gt;</span><span class="x-keep">  &lt;w:pPr&gt;&lt;w:pStyle w:val="Heading1"/&gt;&lt;/w:pPr&gt;</span><span class="x-keep">  &lt;w:r&gt;&lt;w:t&gt;Terms of service&lt;/w:t&gt;&lt;/w:r&gt;</span><span class="x-keep">&lt;/w:p&gt;</span><span class="x-edit">&lt;w:p&gt;</span><span class="x-edit">  &lt;w:r&gt;&lt;w:t xml:space="preserve"&gt;Payment is due in </span><span class="x-edit">  &lt;/w:t&gt;&lt;/w:r&gt;&lt;w:ins w:author="You"&gt;</span><span class="x-edit">    &lt;w:r&gt;&lt;w:t&gt;30&lt;/w:t&gt;&lt;/w:r&gt;&lt;/w:ins&gt;</span><span class="x-edit">  &lt;w:r&gt;&lt;w:t xml:space="preserve"&gt; days.&lt;/w:t&gt;&lt;/w:r&gt;</span><span class="x-edit">&lt;/w:p&gt;</span><span class="x-keep">&lt;w:sdt&gt;</span><span class="x-keep">  &lt;w:sdtPr&gt;&lt;w:alias w:val="Signature"/&gt;&lt;/w:sdtPr&gt;</span><span class="x-keep">  &lt;w:sdtContent&gt;…&lt;/w:sdtContent&gt;</span><span class="x-keep">&lt;/w:sdt&gt;</span></pre>
+              <figcaption>A content control Foli does not edit yet, written back as it came in.</figcaption>
+            </figure>
+          </div>
+          <footer class="folio">3</footer>
+        </article>
+
+        <!-- Review -->
+        <article class="sheet" id="review" aria-labelledby="review-title">
+          <header class="running-head"><span>Foli</span><span>Review</span></header>
+          <div class="sheet-grid">
+            <div class="sheet-copy">
+              <h2 id="review-title">Track changes and comments, the way Word does them.</h2>
+              <p>
+                Turn on tracking and every insertion, deletion and formatting change is recorded in
+                the author's name as they type. Show all markup, simple markup or none. Accept or
+                reject one change, a selection, one author's work, or everything.
+              </p>
+              <p>
+                Comments sit in a pane beside the pages, with replies and resolved state. Both
+                round-trip with Word: open a reviewed file, keep reviewing, send it back.
+              </p>
+            </div>
+            <figure class="review" aria-label="A page with tracked changes and a comment">
+              <div class="review-page">
+                <p class="r-h">4. Payment</p>
+                <p>
+                  The Client pays each invoice within
+                  <del class="r-del" data-author="Marta">fourteen (14)</del>
+                  <ins class="r-ins" data-author="You">thirty (30)</ins>
+                  days of receiving it. Late payments carry interest at the
+                  <span class="r-commented">statutory rate</span>.
+                </p>
+                <p>
+                  Invoices are sent <ins class="r-ins" data-author="You">by email </ins>at the end of
+                  each calendar month.
+                </p>
+              </div>
+              <div class="review-pane">
+                <div class="r-thread">
+                  <p class="r-who"><span class="r-avatar">M</span>Marta <span class="r-when">2 h</span></p>
+                  <p>Which statute? Name it, or legal will ask.</p>
+                  <p class="r-who r-reply"><span class="r-avatar r-avatar-you">Y</span>You <span class="r-when">now</span></p>
+                  <p>The Late Payment Directive. Naming it now.</p>
+                </div>
+                <div class="r-buttons" aria-hidden="true">
+                  <span>Accept</span><span>Reject</span><span>Resolve</span>
+                </div>
+              </div>
+              <figcaption>Drawn for this page. The editor above records the real thing: turn on Track changes and edit.</figcaption>
+            </figure>
+          </div>
+          <footer class="folio">4</footer>
+        </article>
+
+        <!-- Engine -->
+        <article class="sheet" id="engine" aria-labelledby="engine-title">
+          <header class="running-head"><span>Foli</span><span>Engine</span></header>
+          <div class="sheet-grid sheet-grid-even">
+            <div class="sheet-copy">
+              <h2 id="engine-title">An engine of its own, from model to layout.</h2>
+              <p>
+                No ProseMirror, Tiptap, Lexical or Slate underneath. Foli has its own immutable
+                document model, steps and transactions with undo, a view that maps the screen back
+                to document positions, and the layout that cuts it into pages. Pagination is part
+                of the engine, so the cursor, selection and undo all know where pages begin.
+              </p>
+              <p>
+                The model has no DOM: it runs in Node, workers and tests. The view works without
+                React. Documents are plain JSON you can store anywhere.
+              </p>
+              <p class="proof">
+                <strong>Under a frame.</strong> In Chromium, a keystroke painted in at most 13.2 ms
+                (p95) in documents up to 100 pages, with Enter moving every later page.
+                <a href="https://github.com/josep-audenis/foli/blob/main/docs/benchmarks.md#pagination-layout-keystrokes-and-re-flow-phase-5">Method and numbers</a>,
+                measured in Phase 5, before schema v3.
+              </p>
+            </div>
+            <figure class="stack" aria-label="Foli's packages">
+              <div class="pkg pkg-react"><code>@folijs/react</code><span>Editor, toolbar, comments pane, SSR</span><em class="pkg-size">81.9 kB</em></div>
+              <div class="pkg pkg-view"><code>@folijs/view</code><span>DOM view, input, IME, layout into pages</span><em class="pkg-size">59.1 kB</em></div>
+              <div class="pkg-row">
+                <div class="pkg pkg-core"><code>@folijs/core</code><span>Model, steps, history, commands. No DOM.</span><em class="pkg-size">50.6 kB</em></div>
+                <div class="pkg pkg-docx"><code>@folijs/docx</code><span>Import and lossless export. No DOM.</span><em class="pkg-size">43.3 kB</em></div>
+              </div>
+              <figcaption>The view and React packages build on core; docx needs only core. Sizes: minified and gzipped with the Foli packages each pulls in, React excluded, measured on main after 0.4.0.</figcaption>
+            </figure>
+          </div>
+          <footer class="folio">5</footer>
+        </article>
+
+        <!-- Status -->
+        <article class="sheet" id="status" aria-labelledby="status-title">
+          <header class="running-head"><span>Foli</span><span>Status</span></header>
+          <div class="sheet-grid">
+            <div class="sheet-copy">
+              <h2 id="status-title">Where it stands.</h2>
+              <p>
+                Foli is young and says so. The API may change in any 0.x release, and some checks
+                have not been done by hand yet: IME on real devices, screen readers, Safari on a
+                Mac. The <a href="https://github.com/josep-audenis/foli/blob/main/docs/limitations.md">known limitations</a>
+                list them all. Read it before you ship.
+              </p>
+            </div>
+            <ol class="toc" aria-label="Roadmap">
+              <li class="toc-done"><span class="toc-name">Engine, model, transactions, view</span><span class="toc-leader"></span><span class="toc-state">0.1</span></li>
+              <li class="toc-done"><span class="toc-name">Native pagination</span><span class="toc-leader"></span><span class="toc-state">0.1</span></li>
+              <li class="toc-done"><span class="toc-name">Lists, links, colors, paste</span><span class="toc-leader"></span><span class="toc-state">0.2</span></li>
+              <li class="toc-done"><span class="toc-name">Word's model, .docx import and export</span><span class="toc-leader"></span><span class="toc-state">0.3</span></li>
+              <li class="toc-done"><span class="toc-name">Tracked changes and comments</span><span class="toc-leader"></span><span class="toc-state">0.4</span></li>
+              <li class="toc-now"><span class="toc-name">Tables and images</span><span class="toc-leader"></span><span class="toc-state">in progress</span></li>
+              <li><span class="toc-name">Headers, footers, page numbers</span><span class="toc-leader"></span><span class="toc-state">next</span></li>
+            </ol>
+          </div>
+          <footer class="folio">6</footer>
+        </article>
+      </div>
+    </main>
+
+    <footer class="colophon wrap">
+      <p class="colophon-big">
+        <a href="https://github.com/josep-audenis/foli">Read the source</a>, try the
+        <a href="#demo">editor</a>, or install it:
+        <code>npm i @folijs/react @folijs/core</code>
+      </p>
+      <div class="colophon-row">
+        <p>
+          <strong>Colophon.</strong> Set in Caladea, Carlito and Cousine, metric twins of Cambria,
+          Calibri and Courier New. Matching widths are how a browser can break a Word document's
+          lines where Word did.
+        </p>
+        <p>MIT License · © 2026 Josep Audenis</p>
+      </div>
+    </footer>
+
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

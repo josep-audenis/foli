@@ -1,0 +1,1460 @@
+/*
+ * Foli site. Layout concept: the site is a document on Foli's own desk. Sections are sheets
+ * with running heads, folios and crop marks; type is set in the metric twins of Word's fonts.
+ * Tokens mirror @folijs/react's theme (desk = canvas, accent = focus ring), so the live editor
+ * and the page around it are one surface.
+ */
+:root {
+  --desk: #f3f3f1;
+  --desk-deep: #e9e9e5;
+  --paper: #ffffff;
+  --ink: #1d1d1b;
+  --ink-2: #5d5d57;
+  --ink-3: #6f6f69;
+  --rule: #e2e2df;
+  --accent: #2367dc;
+  --accent-ink: #1a4fa8;
+  --accent-wash: #dfe8f8;
+  --mark: #fff59d;
+  --mark-ink: #1d1d1b;
+  --strike: #b3261e;
+  --code-bg: #1d1d1b;
+  --code-ink: #e8e8e4;
+  --shadow: 0 1px 2px rgb(29 29 27 / 0.08), 0 2px 8px rgb(29 29 27 / 0.06);
+  --shadow-lift: 0 1px 2px rgb(29 29 27 / 0.06), 0 12px 32px -8px rgb(29 29 27 / 0.16);
+
+  --font-display: "Caladea", Cambria, Georgia, serif;
+  --font-text: "Carlito", Calibri, "Segoe UI", system-ui, sans-serif;
+  --font-mono: "Cousine", "Courier New", ui-monospace, monospace;
+
+  --step--1: 0.8125rem;
+  --step-0: 1.125rem;
+  --step-1: 1.375rem;
+  --step-2: clamp(1.75rem, 1.2rem + 2.2vw, 2.75rem);
+  --step-3: clamp(2.75rem, 1.6rem + 5.2vw, 5.75rem);
+
+  --gutter: max(16px, env(safe-area-inset-left, 0px));
+  --radius: 3px;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --desk: #161615;
+    --desk-deep: #10100f;
+    --paper: #20201e;
+    --ink: #ecece7;
+    --ink-2: #b0b0a8;
+    --ink-3: #8f8f88;
+    --rule: #34342f;
+    --accent: #7aa7ff;
+    --accent-ink: #a8c4ff;
+    --accent-wash: #22314d;
+    --mark: #f2e46b;
+    --mark-ink: #1d1d1b;
+    --strike: #ff8a80;
+    --code-bg: #0e0e0d;
+    --code-ink: #e8e8e4;
+    --shadow: 0 0 0 1px #2c2c28;
+    --shadow-lift: 0 0 0 1px #2c2c28, 0 12px 32px -8px rgb(0 0 0 / 0.6);
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme="dark"] {
+  --desk: #161615;
+  --desk-deep: #10100f;
+  --paper: #20201e;
+  --ink: #ecece7;
+  --ink-2: #b0b0a8;
+  --ink-3: #8f8f88;
+  --rule: #34342f;
+  --accent: #7aa7ff;
+  --accent-ink: #a8c4ff;
+  --accent-wash: #22314d;
+  --mark: #f2e46b;
+  --mark-ink: #1d1d1b;
+  --strike: #ff8a80;
+  --code-bg: #0e0e0d;
+  --code-ink: #e8e8e4;
+  --shadow: 0 0 0 1px #2c2c28;
+  --shadow-lift: 0 0 0 1px #2c2c28, 0 12px 32px -8px rgb(0 0 0 / 0.6);
+  color-scheme: dark;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--desk);
+  color: var(--ink);
+  font: 400 var(--step-0) / 1.55 var(--font-text);
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: var(--accent-ink);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.18em;
+}
+
+a:hover {
+  text-decoration-thickness: 2px;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+code {
+  font-family: var(--font-mono);
+  font-size: 0.86em;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-display);
+  font-weight: 700;
+  text-wrap: balance;
+  margin: 0;
+}
+
+p {
+  margin: 0;
+  /* A site about widows and orphans should not leave one-word last lines. */
+  text-wrap: pretty;
+}
+
+.wrap,
+.wrap-wide {
+  width: 100%;
+  margin-inline: auto;
+  padding-left: var(--gutter);
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+
+.wrap {
+  max-width: 1180px;
+}
+
+.wrap-wide {
+  max-width: 1320px;
+}
+
+.skip {
+  position: absolute;
+  left: -9999px;
+}
+
+.skip:focus {
+  left: 16px;
+  top: 16px;
+  z-index: 20;
+  padding: 8px 12px;
+  background: var(--paper);
+}
+
+/* Masthead */
+.masthead {
+  position: sticky;
+  top: env(safe-area-inset-top, 0px);
+  z-index: 10;
+  background: color-mix(in srgb, var(--desk) 88%, transparent);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid transparent;
+  transition: border-color 0.2s;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0 0 auto;
+  height: env(safe-area-inset-top, 0px);
+  z-index: 10;
+  background: var(--desk);
+}
+
+.masthead-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  height: 64px;
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.brand-mark {
+  width: 22px;
+  height: 26px;
+}
+
+.brand-back {
+  fill: var(--desk-deep);
+  stroke: var(--ink);
+  stroke-width: 1.5;
+}
+
+.brand-front {
+  fill: var(--paper);
+  stroke: var(--ink);
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+}
+
+.brand-fold {
+  fill: none;
+  stroke: var(--ink);
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+}
+
+.brand-name {
+  font: 700 1.5rem / 1 var(--font-display);
+  letter-spacing: -0.01em;
+}
+
+.nav {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 1rem;
+}
+
+.nav a {
+  padding: 6px 10px;
+  border-radius: var(--radius);
+  color: var(--ink-2);
+  text-decoration: none;
+}
+
+.nav a:hover {
+  color: var(--ink);
+  background: var(--desk-deep);
+}
+
+.nav .nav-gh {
+  color: var(--ink);
+  border: 1px solid var(--rule);
+  background: var(--paper);
+  margin-left: 6px;
+}
+
+/* Hero: the headline is a tracked change; the live editor sits beside the lede. */
+.hero {
+  overflow-x: clip;
+  padding-block: clamp(28px, 4vw, 56px) clamp(56px, 8vw, 112px);
+}
+
+.hero-sheet {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+  grid-template-rows: auto auto auto 1fr;
+  grid-template-areas:
+    "eyebrow demo"
+    "title demo"
+    "lede demo"
+    ". demo";
+  align-items: start;
+  column-gap: clamp(24px, 5vw, 80px);
+  row-gap: 28px;
+}
+
+.eyebrow {
+  grid-area: eyebrow;
+  font: 400 0.75rem / 1.4 var(--font-mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+}
+
+.hero-title {
+  grid-area: title;
+  font-size: clamp(2.75rem, 1.4rem + 3.8vw, 5rem);
+  line-height: 1;
+  letter-spacing: -0.025em;
+}
+
+.change-del {
+  color: var(--strike);
+  text-decoration: line-through;
+  text-decoration-thickness: 0.06em;
+  font-weight: 400;
+  font-style: italic;
+}
+
+.change-ins {
+  position: relative;
+  color: var(--accent);
+  text-decoration: underline;
+  text-decoration-thickness: 0.055em;
+  text-underline-offset: 0.12em;
+}
+
+.hero-lede {
+  grid-area: lede;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 24px;
+}
+
+.hero-lede .install {
+  flex: 1 1 100%;
+}
+
+.hero-lede > p:first-child {
+  max-width: 58ch;
+  font-size: var(--step-1);
+  line-height: 1.45;
+  color: var(--ink-2);
+}
+
+.hero-lede > p:first-child code {
+  color: var(--ink);
+}
+
+.hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.install {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  max-width: 100%;
+  padding: 0 4px 0 14px;
+  height: 44px;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  background: var(--paper);
+  box-shadow: var(--shadow);
+  font-size: 0.95rem;
+}
+
+.install code {
+  overflow-x: auto;
+  white-space: nowrap;
+  font-size: 0.9rem;
+}
+
+.install-prompt {
+  font-family: var(--font-mono);
+  color: var(--ink-3);
+}
+
+.copy {
+  flex: none;
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  background: none;
+  color: var(--ink-2);
+  font: 400 0.75rem / 1 var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+}
+
+.copy:hover {
+  color: var(--ink);
+  background: var(--desk);
+}
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  height: 44px;
+  padding: 0 18px;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  background: var(--paper);
+  color: var(--ink);
+  font-weight: 700;
+  text-decoration: none;
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.button:hover {
+  box-shadow: var(--shadow);
+  text-decoration: none;
+}
+
+.button:active {
+  transform: translateY(1px);
+}
+
+.button-primary {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--paper);
+}
+
+.hero-facts {
+  display: grid;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--rule);
+  font-size: 1rem;
+  line-height: 1.4;
+  color: var(--ink-2);
+}
+
+.hero-facts li {
+  display: grid;
+  grid-template-columns: 5.5em minmax(0, 1fr);
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--rule);
+}
+
+.hero-facts span {
+  font: 400 0.75rem / 1.9 var(--font-mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.hero-meta {
+  font: 400 var(--step--1) / 1.4 var(--font-mono);
+  color: var(--ink-3);
+}
+
+/* Live demo */
+.demo {
+  grid-area: demo;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
+  min-width: 0;
+}
+
+/* On wide screens the editor runs off the right edge of the viewport, like a sheet pushed
+   past the edge of the desk: the pages that do not fit are cut by the screen, not a frame. */
+@media (min-width: 901px) {
+  .demo {
+    --bleed: max(16px, (100vw - 1320px) / 2 + 16px);
+    margin-right: calc(-1 * var(--bleed));
+  }
+
+  /* Chrome stays on screen; only the pages run off. 100vw counts the scrollbar: allow 20px. */
+  .demo .demo-titlebar,
+  .demo .demo-status,
+  .demo .foli-toolbar {
+    padding-right: calc(var(--bleed) + 20px);
+  }
+
+  .demo .ruler,
+  .demo .demo-frame {
+    border-right: 0;
+    border-radius: 6px 0 0 6px;
+  }
+
+  .demo .ruler {
+    border-radius: 6px 0 0 0;
+  }
+
+  .demo .demo-frame {
+    border-radius: 0 0 0 6px;
+  }
+}
+
+.demo-note {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font: 400 var(--step--1) / 1.4 var(--font-mono);
+  color: var(--ink-2);
+}
+
+.demo-live {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 8px;
+  border-radius: 99px;
+  background: var(--accent-wash);
+  color: var(--accent-ink);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.7rem;
+}
+
+.demo-live::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: blink 1.6s steps(2, jump-none) infinite;
+}
+
+@keyframes blink {
+  50% {
+    opacity: 0.2;
+  }
+}
+
+/* A centimetre ruler along the top of the frame, like a word processor's. */
+.ruler {
+  height: 16px;
+  border: 1px solid var(--rule);
+  border-bottom: 0;
+  border-radius: 6px 6px 0 0;
+  background:
+    repeating-linear-gradient(to right, var(--ink-3) 0 1px, transparent 1px 37.8px) left bottom /
+    100% 9px no-repeat,
+    repeating-linear-gradient(to right, var(--ink-3) 0 1px, transparent 1px 18.9px) left bottom /
+    100% 5px no-repeat,
+    var(--paper);
+  opacity: 0.9;
+}
+
+.demo-mount {
+  min-width: 0;
+  min-height: 680px;
+}
+
+.demo-frame {
+  border: 1px solid var(--rule);
+  border-radius: 0 0 6px 6px;
+  overflow: hidden;
+  background: var(--paper);
+  box-shadow: var(--shadow-lift);
+}
+
+.demo-titlebar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--rule);
+  font: 400 var(--step--1) / 1.4 var(--font-mono);
+  color: var(--ink-2);
+}
+
+.demo-file {
+  color: var(--ink);
+  font-weight: 700;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.demo-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.demo-link {
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  background: none;
+  color: var(--accent-ink);
+  font: inherit;
+  cursor: pointer;
+}
+
+.demo-link:hover {
+  background: var(--accent-wash);
+}
+
+/* The editor inside the frame. Pages stay paper-white in both themes: they are paper. */
+.demo-frame .foli-toolbar {
+  --foli-toolbar-background: var(--paper);
+  --foli-toolbar-color: var(--ink);
+  --foli-border-color: var(--rule);
+  --foli-toolbar-hover: var(--desk);
+  --foli-toolbar-pressed: var(--accent-wash);
+  --foli-focus-ring: var(--accent);
+  font-family: var(--font-text);
+  font-size: 15px;
+}
+
+.demo-frame .foli-editor-body {
+  overflow-x: auto;
+  background: var(--desk-deep);
+  scrollbar-color: var(--ink-3) transparent;
+}
+
+.demo-frame .foli-canvas {
+  --foli-canvas-background: var(--desk-deep);
+  --foli-page-gap: 28px;
+  padding: 32px;
+  width: max-content;
+  min-width: 100%;
+}
+
+/* Pages side by side, as a spread, instead of stacked. */
+.demo-frame .foli-content {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--foli-page-gap);
+}
+
+.demo-frame .foli-page {
+  flex: none;
+  margin: 0;
+  box-shadow:
+    0 1px 2px rgb(0 0 0 / 0.1),
+    0 8px 24px -6px rgb(0 0 0 / 0.18);
+}
+
+.demo-frame .foli-page + .foli-page {
+  margin-top: 0;
+}
+
+.demo-status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 20px;
+  padding: 6px 12px;
+  border-top: 1px solid var(--rule);
+  background: var(--paper);
+  font: 400 0.75rem / 1.4 var(--font-mono);
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.demo-status-size {
+  margin-left: auto;
+}
+
+.demo-error:empty {
+  display: none;
+}
+
+.demo-error {
+  flex-basis: 100%;
+  color: var(--strike);
+}
+
+/* Sheets: each section is a page of the site's own document. */
+.sheets {
+  display: grid;
+  gap: clamp(48px, 6vw, 80px);
+  max-width: 1180px;
+  margin-inline: auto;
+  padding-left: calc(var(--gutter) + 20px);
+  padding-right: calc(max(16px, env(safe-area-inset-right, 0px)) + 20px);
+  padding-bottom: clamp(56px, 8vw, 112px);
+}
+
+.sheet {
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  gap: clamp(28px, 4vw, 48px);
+  padding: clamp(24px, 4vw, 40px) clamp(22px, 6vw, 80px);
+  background: var(--paper);
+  box-shadow: var(--shadow);
+  scroll-margin-top: 88px;
+}
+
+/* Crop marks just outside each corner. */
+.sheet::before {
+  content: "";
+  position: absolute;
+  inset: -20px;
+  z-index: -1;
+  pointer-events: none;
+  --c: var(--ink-3);
+  /* Each mark is 12px long, extends the sheet's edge, and stops 8px short of the corner. */
+  background:
+    linear-gradient(var(--c) 0 0) left 0 top 20px / 12px 1px no-repeat,
+    linear-gradient(var(--c) 0 0) left 20px top 0 / 1px 12px no-repeat,
+    linear-gradient(var(--c) 0 0) right 0 top 20px / 12px 1px no-repeat,
+    linear-gradient(var(--c) 0 0) right 20px top 0 / 1px 12px no-repeat,
+    linear-gradient(var(--c) 0 0) left 0 bottom 20px / 12px 1px no-repeat,
+    linear-gradient(var(--c) 0 0) left 20px bottom 0 / 1px 12px no-repeat,
+    linear-gradient(var(--c) 0 0) right 0 bottom 20px / 12px 1px no-repeat,
+    linear-gradient(var(--c) 0 0) right 20px bottom 0 / 1px 12px no-repeat;
+}
+
+.running-head {
+  display: flex;
+  justify-content: space-between;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--rule);
+  font: 400 0.75rem / 1 var(--font-mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+/* Folios sit in the outer corner: right on odd (recto) sheets, left on even (verso) ones. */
+.folio {
+  justify-self: end;
+  font: italic 400 1rem / 1 var(--font-display);
+  color: var(--ink-3);
+}
+
+.sheet-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
+  gap: clamp(32px, 5vw, 72px);
+  align-items: start;
+}
+
+.sheet-grid-even {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+
+.sheet-grid-code {
+  grid-template-columns: minmax(0, 4fr) minmax(0, 6fr);
+}
+
+/* Verso sheets mirror the recto ones, as facing pages do. */
+@media (min-width: 901px) {
+  .sheet:nth-child(even) .running-head {
+    flex-direction: row-reverse;
+  }
+
+  .sheet:nth-child(even) .folio {
+    justify-self: start;
+  }
+
+  .sheet:nth-child(even) .sheet-grid {
+    grid-template-columns: minmax(0, 6fr) minmax(0, 5fr);
+  }
+
+  .sheet:nth-child(even) .sheet-grid-even {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+
+  .sheet:nth-child(even) .sheet-grid > :last-child {
+    order: -1;
+  }
+}
+
+.sheet-copy {
+  display: grid;
+  gap: 18px;
+  min-width: 0;
+}
+
+.sheet-copy h2 {
+  font-size: var(--step-2);
+  line-height: 1.05;
+  letter-spacing: -0.015em;
+  margin-bottom: 4px;
+}
+
+.sheet-copy h2 code {
+  margin-left: -0.12em;
+  font-size: 0.8em;
+  letter-spacing: -0.02em;
+}
+
+.sheet-copy > p {
+  color: var(--ink-2);
+  max-width: 60ch;
+}
+
+/* Spec list */
+.spec {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px 28px;
+  margin: 8px 0 0;
+  padding-top: 18px;
+  border-top: 1px solid var(--rule);
+}
+
+.spec dt {
+  font-weight: 700;
+}
+
+.spec dd {
+  margin: 2px 0 0;
+  color: var(--ink-2);
+  font-size: 1rem;
+  line-height: 1.45;
+}
+
+/* Pagination figure: two mini pages, rules pinned and explained in a legend. */
+.spread {
+  display: grid;
+  gap: 20px;
+  margin: 0;
+  padding: clamp(18px, 3vw, 32px);
+  background: var(--desk);
+  border-radius: var(--radius);
+}
+
+.spread-pages {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: clamp(12px, 2.4vw, 24px);
+}
+
+.spread figcaption,
+.stack figcaption {
+  font: 400 var(--step--1) / 1.4 var(--font-mono);
+  color: var(--ink-3);
+}
+
+.mini-page {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: clamp(4px, 0.7vw, 7px);
+  aspect-ratio: 210 / 297;
+  padding: 15% 14% 12%;
+  background: var(--paper);
+  box-shadow: var(--shadow);
+}
+
+.ml {
+  flex: none;
+  height: clamp(3px, 0.45vw, 5px);
+  border-radius: 2px;
+  background: var(--rule);
+}
+
+.ml-end {
+  width: 62%;
+}
+
+.ml-h {
+  height: clamp(6px, 0.8vw, 9px);
+  width: 58%;
+  background: var(--ink-3);
+  margin-bottom: 2px;
+}
+
+.ml-gap {
+  flex: none;
+  height: clamp(3px, 0.5vw, 6px);
+}
+
+.ml-split {
+  background: color-mix(in srgb, var(--accent) 50%, var(--paper));
+}
+
+.ml-keep {
+  background: color-mix(in srgb, var(--mark) 75%, var(--rule));
+}
+
+.ml-h.ml-keep {
+  background: color-mix(in srgb, var(--mark) 45%, var(--ink-3));
+}
+
+.mini-folio {
+  position: absolute;
+  bottom: 4.5%;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font: italic 0.7rem / 1 var(--font-display);
+  color: var(--ink-3);
+}
+
+.pin {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--paper);
+  font: 700 0.7rem / 1 var(--font-mono);
+}
+
+.mini-page .pin {
+  position: absolute;
+  right: 5%;
+  box-shadow: 0 0 0 3px var(--paper);
+}
+
+.pin-1 {
+  bottom: 13%;
+}
+
+.pin-2 {
+  top: 12%;
+}
+
+.pin-3 {
+  top: 34%;
+}
+
+.pin-3,
+.pin-keep {
+  background: var(--mark);
+  color: var(--mark-ink);
+  outline: 1px solid color-mix(in srgb, var(--mark) 40%, var(--ink));
+}
+
+.legend {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.95rem;
+  line-height: 1.35;
+  color: var(--ink-2);
+}
+
+.legend li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* Code */
+.code,
+.xml {
+  min-width: 0;
+  margin: 0;
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--code-bg);
+  color: var(--code-ink);
+}
+
+.code-bar,
+.xml-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 14px;
+  border-bottom: 1px solid rgb(255 255 255 / 0.08);
+  font: 400 0.75rem / 1.4 var(--font-mono);
+  color: rgb(232 232 228 / 0.6);
+  min-height: 40px;
+}
+
+.code .copy {
+  color: rgb(232 232 228 / 0.7);
+}
+
+.code .copy:hover {
+  color: #fff;
+  background: rgb(255 255 255 / 0.08);
+}
+
+pre {
+  margin: 0;
+  padding: 16px 18px 20px;
+  overflow-x: auto;
+  font: 400 0.75rem / 1.7 var(--font-mono);
+  tab-size: 2;
+}
+
+.k {
+  color: #f4a7c3;
+}
+
+.s {
+  color: #b9e4a5;
+}
+
+.f {
+  color: #9cc4ff;
+}
+
+.t {
+  color: #ffd27a;
+}
+
+.c {
+  color: rgb(232 232 228 / 0.45);
+  font-style: italic;
+}
+
+.xml {
+  display: grid;
+}
+
+.xml pre {
+  padding-inline: 0;
+}
+
+.xml pre > span {
+  display: block;
+  padding-inline: 18px;
+}
+
+.x-keep {
+  color: rgb(232 232 228 / 0.82);
+}
+
+.x-edit {
+  color: #ffffff;
+  background: rgb(122 167 255 / 0.16);
+  box-shadow: inset 3px 0 0 #7aa7ff;
+}
+
+.xml-legend {
+  display: inline-flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 6px;
+}
+
+.lg {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  margin-left: 6px;
+}
+
+.lg-edit {
+  background: #7aa7ff;
+}
+
+.lg-keep {
+  background: rgb(232 232 228 / 0.3);
+}
+
+.xml figcaption {
+  padding: 0 18px 16px;
+  font: 400 var(--step--1) / 1.4 var(--font-mono);
+  color: rgb(232 232 228 / 0.55);
+}
+
+/* Review figure */
+.review {
+  display: grid;
+  align-items: start;
+  grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr);
+  gap: 0;
+  margin: 0;
+  background: var(--desk);
+  border-radius: var(--radius);
+  padding: clamp(18px, 3vw, 32px);
+  font-family: var(--font-text);
+}
+
+.review-page {
+  display: grid;
+  gap: 14px;
+  align-content: start;
+  padding: 28px 26px;
+  background: #ffffff;
+  color: #1d1d1b;
+  box-shadow: var(--shadow);
+  font-size: 1.05rem;
+  line-height: 1.6;
+}
+
+.r-h {
+  font: 700 1.1rem / 1.2 var(--font-display);
+}
+
+.r-del {
+  color: #b3261e;
+  text-decoration: line-through;
+}
+
+.r-ins {
+  color: #2367dc;
+  text-decoration: underline;
+}
+
+.r-commented {
+  background: #fdf0b5;
+  border-bottom: 2px solid #e2c34a;
+}
+
+.review-pane {
+  display: grid;
+  gap: 10px;
+  align-content: start;
+  margin-top: 58px;
+  margin-left: -8px;
+}
+
+.r-thread {
+  position: relative;
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px;
+  background: var(--paper);
+  border: 1px solid var(--rule);
+  border-left: 3px solid #e2c34a;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lift);
+  font-size: 0.92rem;
+  line-height: 1.4;
+  color: var(--ink);
+}
+
+.r-who {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+
+.r-reply {
+  margin-top: 8px;
+  padding-top: 10px;
+  border-top: 1px solid var(--rule);
+}
+
+.r-avatar {
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #e2c34a;
+  color: #1d1d1b;
+  font-size: 0.7rem;
+}
+
+.r-avatar-you {
+  background: var(--accent);
+  color: var(--paper);
+}
+
+.r-when {
+  margin-left: auto;
+  font: 400 0.7rem / 1 var(--font-mono);
+  color: var(--ink-3);
+}
+
+.r-buttons {
+  display: flex;
+  gap: 6px;
+  font: 400 0.7rem / 1 var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.r-buttons span {
+  padding: 6px 8px;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  background: var(--paper);
+  color: var(--ink-2);
+}
+
+.proof {
+  padding-top: 16px;
+  border-top: 1px solid var(--rule);
+  font-size: 1rem;
+  line-height: 1.5;
+  color: var(--ink-2);
+}
+
+.proof strong {
+  padding: 0 3px;
+  background: var(--mark);
+  color: var(--mark-ink);
+}
+
+.review figcaption {
+  grid-column: 1 / -1;
+  margin-top: 16px;
+  font: 400 var(--step--1) / 1.4 var(--font-mono);
+  color: var(--ink-3);
+}
+
+/* Package stack */
+.stack {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+}
+
+.pkg-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.pkg {
+  display: grid;
+  gap: 4px;
+  padding: 16px 18px;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  background: var(--desk);
+}
+
+.pkg code {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.pkg span {
+  font-size: 0.95rem;
+  line-height: 1.4;
+  color: var(--ink-2);
+}
+
+.pkg {
+  position: relative;
+}
+
+.pkg-size {
+  position: absolute;
+  top: 16px;
+  right: 18px;
+  font: 400 0.75rem / 1.4 var(--font-mono);
+  font-style: normal;
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.pkg-react {
+  background: var(--paper);
+  border-color: var(--ink);
+}
+
+.pkg-core {
+  background: var(--accent-wash);
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--rule));
+}
+
+/* Roadmap as a table of contents: leaders run to the release. */
+.toc {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: toc;
+}
+
+.toc li {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--rule);
+  counter-increment: toc;
+}
+
+.toc li::before {
+  content: counter(toc);
+  flex: none;
+  width: 1.5em;
+  font: italic 1rem / 1 var(--font-display);
+  color: var(--ink-3);
+}
+
+.toc-name {
+  min-width: 0;
+}
+
+.toc-leader {
+  flex: 1;
+  min-width: 24px;
+  border-bottom: 1px dotted var(--ink-3);
+  transform: translateY(-4px);
+}
+
+.toc-state {
+  flex: none;
+  font: 400 var(--step--1) / 1 var(--font-mono);
+  color: var(--ink-2);
+}
+
+.toc-done .toc-state::before {
+  content: "✓ ";
+  color: var(--accent);
+}
+
+.toc-now .toc-name {
+  font-weight: 700;
+}
+
+.toc-now .toc-state {
+  padding: 3px 7px;
+  background: var(--mark);
+  color: var(--mark-ink);
+  border-radius: 2px;
+}
+
+/* Colophon */
+.colophon {
+  display: grid;
+  gap: 40px;
+  padding-block: clamp(48px, 7vw, 96px) 48px;
+  border-top: 1px solid var(--rule);
+}
+
+.colophon-big {
+  font: 400 var(--step-2) / 1.2 var(--font-display);
+  max-width: 28ch;
+  text-wrap: balance;
+}
+
+.colophon-big code {
+  font-size: 0.6em;
+  padding: 2px 8px;
+  background: var(--paper);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  white-space: nowrap;
+}
+
+.colophon-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 16px 48px;
+  font-size: 0.95rem;
+  color: var(--ink-2);
+}
+
+.colophon-row p:first-child {
+  max-width: 64ch;
+}
+
+/* Entrance: the headline's tracked change plays once; the final state is the resting one. */
+@media (prefers-reduced-motion: no-preference) {
+  .change-del {
+    animation: strike-in 0.5s 0.5s both;
+  }
+
+  .change-ins {
+    animation: mark-in 0.6s 0.95s both;
+  }
+
+  @keyframes strike-in {
+    from {
+      text-decoration-color: transparent;
+      color: var(--ink);
+      font-style: normal;
+      font-weight: 700;
+      opacity: 1;
+    }
+  }
+
+  @keyframes mark-in {
+    from {
+      color: var(--ink);
+      text-decoration-color: transparent;
+    }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .demo-live::before {
+    animation: none;
+  }
+
+  html {
+    scroll-behavior: auto;
+  }
+}
+
+/* Narrow screens */
+@media (max-width: 900px) {
+  .hero-sheet {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "eyebrow" "title" "lede" "demo";
+  }
+
+  .hero-lede {
+    padding-top: 0;
+  }
+
+  .sheet-grid,
+  .sheet-grid-even {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .review {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .review-pane {
+    margin: -12px 12px 0;
+  }
+}
+
+@media (max-width: 640px) {
+  .nav a:not(.nav-gh) {
+    display: none;
+  }
+
+  .install {
+    height: auto;
+    padding-block: 8px;
+  }
+
+  .install code {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .spec {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .pkg-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .demo-status-size {
+    margin-left: 0;
+  }
+
+  .demo-frame .foli-canvas {
+    padding: 20px 16px;
+  }
+
+  /* One scrollable row instead of five wrapped ones. */
+  .demo-frame .foli-toolbar {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+  }
+
+  .demo-frame .foli-toolbar > * {
+    flex: none;
+  }
+}
+
+/* An A6 page (397px) is wider than a phone's frame: scale the pages, not the layout. The view
+   measures in the zoomed space, so pagination and re-flow are unchanged (checked at 375px). */
+@media (max-width: 460px) {
+  .demo-frame .foli-content {
+    zoom: 0.78;
+  }
+}
