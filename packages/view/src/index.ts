@@ -1,5 +1,12 @@
 export { FOLI_MIME, htmlToDoc, textToDoc } from "./clipboard.js";
-export { EditorView, type EditorViewOptions, keyName } from "./view.js";
+export {
+  EditorView,
+  type EditorViewOptions,
+  keyName,
+  measureImageFile,
+  textWidthEmu,
+} from "./view.js";
+export { EMU_PER_PX } from "./word/blocks.js";
 export {
   type DocumentPages,
   type ReviewView,

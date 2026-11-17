@@ -294,3 +294,32 @@ test("image files dropped become pictures where they are dropped", async ({
     )
     .toBe("picture");
 });
+
+test("the toolbar inserts a picture from a file with its alt text; the dialog passes axe", async ({
+  page,
+}) => {
+  test.slow(); // axe takes several seconds per run in Firefox
+  await open(page, "07-picture-report.docx");
+  await page.evaluate(() => window.foliEdit.editor.select(1));
+  await page.getByRole("button", { name: "Picture…" }).click();
+  const dialog = page.getByRole("dialog", { name: "Insert picture" });
+  await expect(dialog).toBeVisible();
+  const violations = (await new AxeBuilder({ page }).include(".foli-picture-dialog").analyze())
+    .violations;
+  expect(violations.map((v) => v.id)).toEqual([]);
+  const base64 =
+    "iVBORw0KGgoAAAANSUhEUgAAAAIAAAABCAYAAAD0In+KAAAAEUlEQVR42mP8z8DwnwEJMAEAG/MCAeVKGkwAAAAASUVORK5CYII=";
+  await page.getByLabel("Image").setInputFiles({
+    name: "dot.png",
+    mimeType: "image/png",
+    buffer: Buffer.from(base64, "base64"),
+  });
+  await page.getByLabel("Alt text", { exact: true }).fill("A red dot");
+  await dialog.getByRole("button", { name: "Insert" }).click();
+  await expect(dialog).toHaveCount(0);
+  const picture = await page.evaluate(() => {
+    const node = window.foliEdit.editor.state.doc.firstChild?.firstChild;
+    return { type: node?.type.name, alt: node?.attrs.alt, width: node?.attrs.width };
+  });
+  expect(picture).toEqual({ type: "picture", alt: "A red dot", width: 2 * 9525 });
+});

@@ -89,7 +89,9 @@ const commentsPane = createRoot(document.getElementById("comments") as HTMLEleme
  * and the comments pane.
  */
 const showToolbar = () => {
-  toolbar.render(<FoliToolbar editor={editor} comments onClickCommand={() => view.focus()} />);
+  toolbar.render(
+    <FoliToolbar editor={editor} comments upload={upload} onClickCommand={() => view.focus()} />,
+  );
   commentsPane.render(<FoliComments editor={editor} />);
 };
 showToolbar();

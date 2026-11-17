@@ -132,6 +132,7 @@ export const FoliEditor = forwardRef<FoliEditorHandle, FoliEditorProps>(function
           editor={editor}
           disabled={canvas.readOnly}
           comments={comments !== false}
+          upload={canvas.upload}
           onClickCommand={() => canvasRef.current?.focus()}
         />
       )}
