@@ -21,7 +21,7 @@ place that says what is in progress; check it before starting work.
 | 7 Rich content           | ✅ Done                  | —                        | Merged in #33–#41; 0.2.0 on npm; list-document benchmark misses accepted (known limit)     |
 | 8 Word model & DOCX      | ✅ Done                  | —                        | Merged in #44–#61; 0.3.0 on npm (`@folijs/docx` first released); gate G5 passed            |
 | 9 Review                 | ✅ Done                  | —                        | Merged in #63–#72; 0.4.0 on npm                                                            |
-| 10 Tables & images       | In progress              | `phase-10/tables-images` | Plan below; schema v4 (ADR-0006 first)                                                     |
+| 10 Tables & images       | In progress              | `phase-10/tables-images` | #73–#95 (#90 is the landing page); the 0.5.0 version PR next; publishing needs the owner   |
 | 11–12                    | Not started              |                          |                                                                                            |
 
 Status values: `Ready` (dependencies met, nobody on it) · `In progress` · `In review` (PR open) ·
@@ -918,7 +918,24 @@ at least the 0.3.0 baseline, and rows break across pages where Word breaks them;
 table cells in three engines; tracked changes inside tables (and row insertion and deletion) are
 recorded, accepted, rejected and round-trip with Word; every picture keeps its resource, and a
 picture without alt text is reported; v3 documents migrate without loss; the table and picture
-UI is keyboard-usable and axe-clean in three engines; 0.5.0 published.
+UI is keyboard-usable and axe-clean in three engines; 0.5.0 published. (Checked 2026-11-17: the
+corpus imports with every table and picture modeled, what stays opaque reported per document
+(fields, content controls, footnote references; corpus/README); every document equals its
+original after canonicalization, other parts byte for byte (`export.test.ts`); Word opens the
+corpus's tables (4 documents unchanged and edited, 2 made in the model) and pictures (04 and 07
+unchanged and edited: alt text, size, floats moved, a new picture) with Foli's content
+(`table-roundtrip.mjs`, `picture-roundtrip.mjs`); every paragraph outside tables on Word's page
+(115 of 115) and 277 of 280 cell paragraphs, rows broken where Word breaks them in 06; T1, T2,
+T3 and T5 in cells in three engines; tracked text in cells and row insertion and deletion
+recorded, accepted and rejected, and Word reads Foli's tracked insertion in a cell and tracked
+row deletion back (table round trip, revisions counted); pictures keep their resources, `report.picturesWithoutAlt` counts the ones without alt
+text; v3 → v4 migration changes the version only (tests); the table menu, its dialog, the table
+style and shading boxes and the picture dialog are keyboard-usable and axe-clean in three
+engines. Two misses, for the owner to accept as known limits: on Word's line, 101 of 115
+paragraphs; 04 has 25 of 35, below 0.3.0's 33, because its floating chart is now laid out and
+Word's line numbers count the 9 lines beside it, which its own PDF shows as Foli does, as 5; and
+T4 (IME) in cells runs in Chromium only, as everywhere in the editor. Publishing waits for the
+owner's approval.)
 
 ### Tasks
 
@@ -1026,10 +1043,15 @@ Each task is a PR on `phase-10/tables-images`, the build green after each.
   pictures"): a square or top-and-bottom picture placed against the page or its margins
   vertically is drawn at its paragraph's top; text goes on one side of a square picture; several
   floats in a paragraph stack; one reaching past its page's text makes the page taller.)
-- [ ] 10.10 Close: docs (ADR-0006 outcome, architecture, document model, pagination, docx README,
+- [x] 10.10 Close: docs (ADR-0006 outcome, architecture, document model, pagination, docx README,
   limitations), size budgets, the acceptance above checked with the harness, the 0.5.0
   changeset (schema v4: 0.4.0 cannot read documents saved by 0.5.0), the version PR; publish
-  with the owner's approval.
+  with the owner's approval. (Done: docs as of 0.5.0 (README, document model, pagination, api,
+  limitations with table and picture sections, ADR-0006's outcome, docx and corpus READMEs);
+  budgets as raised per task (core 52.7, view 63.5, React 87.9, docx 44.9 kB gzip), each with
+  its reason; acceptance checked (above), `scripts/corpus/picture-roundtrip.mjs` added; the
+  0.5.0 changeset with the changed behaviours. The version PR follows; 0.5.0 is published with
+  the owner's approval.)
 
 ## Phase 11 — Sections, fields, templates & PDF · L → 0.6.0
 

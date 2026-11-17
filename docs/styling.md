@@ -69,23 +69,28 @@ pages should print white.
 
 ## Elements and classes
 
-| Selector                           | What                                                                                                                                                    |
-| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `.foli-canvas`                     | `FoliCanvas`'s outer element (`className` is added here)                                                                                                |
-| `.foli-content`                    | the editable host (`role="textbox"`); `FoliCanvas` adds the class, with `EditorView` add it yourself                                                    |
-| `.foli-page`                       | one page (`<section>`), size and padding inline                                                                                                         |
-| `p`, `h1`–`h6` inside `.foli-page` | paragraphs, and paragraphs in Word's heading styles; their formatting inline                                                                            |
-| `span` inside a paragraph          | a run of text, its formatting inline (bold is `font-weight: 700`); a list number is a `[data-foli-marker]` span, not editable                           |
-| `.foli-selected-node`              | an opaque block (a table) while it is selected                                                                                                          |
-| `a`                                | a link with a safe target, in the run's own color (a click places the caret; Ctrl/Cmd+click opens it in a new tab)                                      |
-| `.foli-toolbar`                    | `FoliToolbar` (`className` is added here)                                                                                                               |
-| `.foli-toolbar-button`             | each button, plus `.foli-toolbar-<key>` (`bold`, `bulletList`, `undo`, `pageBreak`…)                                                                    |
-| `.foli-toolbar-separator`          | between button groups                                                                                                                                   |
-| `.foli-toolbar-menu`, `.foli-menu` | a color menu button's wrapper, its menu (`.foli-menu-item`, `.foli-menu-swatch`); `.foli-toolbar-swatch` shows the current color on the button          |
-| `.foli-link-dialog`                | the link dialog under the toolbar; `.foli-link-error` its message for an invalid URL                                                                    |
-| `.foli-editor-body`                | `FoliEditor`'s row of pages and comments pane (make it, or a parent, the scroller: the pane scrolls with the pages)                                     |
-| `.foli-comments`                   | `FoliComments`, the pane (`className` is added here); `.foli-comment-thread` each thread (`[data-active]`, `[data-done]`), `.foli-comment` each comment |
-| `.foli-comment-active`             | text of the comment whose thread has the focus (in the document)                                                                                        |
+| Selector                           | What                                                                                                                                                     |
+| ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `.foli-canvas`                     | `FoliCanvas`'s outer element (`className` is added here)                                                                                                 |
+| `.foli-content`                    | the editable host (`role="textbox"`); `FoliCanvas` adds the class, with `EditorView` add it yourself                                                     |
+| `.foli-page`                       | one page (`<section>`), size and padding inline                                                                                                          |
+| `p`, `h1`–`h6` inside `.foli-page` | paragraphs, and paragraphs in Word's heading styles; their formatting inline                                                                             |
+| `span` inside a paragraph          | a run of text, its formatting inline (bold is `font-weight: 700`); a list number is a `[data-foli-marker]` span, not editable                            |
+| `.foli-selected-node`              | an opaque block (content Foli keeps verbatim) while it is selected                                                                                       |
+| `[data-foli-picture-selected]`     | the selected picture's element (outlined; its resize handle is `[data-foli-resize]`); a picture without alt text is `[data-foli-no-alt]`                 |
+| `[data-foli-float]`                | a floating picture's element, first in its paragraph (its wrapping as the value); pages are `position: relative; isolation: isolate; display: flow-root` |
+| `.foli-selected-cell`              | each cell of a cell selection (`[data-foli-cells]` on the host while there is one)                                                                       |
+| `a`                                | a link with a safe target, in the run's own color (a click places the caret; Ctrl/Cmd+click opens it in a new tab)                                       |
+| `.foli-toolbar`                    | `FoliToolbar` (`className` is added here)                                                                                                                |
+| `.foli-toolbar-button`             | each button, plus `.foli-toolbar-<key>` (`bold`, `bulletList`, `undo`, `pageBreak`…)                                                                     |
+| `.foli-toolbar-separator`          | between button groups                                                                                                                                    |
+| `.foli-toolbar-menu`, `.foli-menu` | a color menu button's wrapper, its menu (`.foli-menu-item`, `.foli-menu-swatch`); `.foli-toolbar-swatch` shows the current color on the button           |
+| `.foli-link-dialog`                | the link dialog under the toolbar; `.foli-link-error` its message for an invalid URL                                                                     |
+| `.foli-table-dialog`               | the insert table dialog (also `.foli-link-dialog`)                                                                                                       |
+| `.foli-picture-dialog`             | the picture dialog (also `.foli-link-dialog`); `.foli-picture-status` its status line while a picture uploads                                            |
+| `.foli-editor-body`                | `FoliEditor`'s row of pages and comments pane (make it, or a parent, the scroller: the pane scrolls with the pages)                                      |
+| `.foli-comments`                   | `FoliComments`, the pane (`className` is added here); `.foli-comment-thread` each thread (`[data-active]`, `[data-done]`), `.foli-comment` each comment  |
+| `.foli-comment-active`             | text of the comment whose thread has the focus (in the document)                                                                                         |
 
 CSS over the document's own formatting needs `!important` (it is inline), and pagination
 follows it: margins and padding on blocks are measured. A paragraph split across two pages is

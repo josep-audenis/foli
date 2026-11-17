@@ -41,7 +41,7 @@ const INITIALS = 9;
 const initialsOf = (options: CommentOptions) =>
   options.initials !== undefined ? { initials: options.initials.slice(0, INITIALS) } : {};
 
-/** Comment anchors inside content Foli keeps verbatim (a table): their ids. */
+/** Comment anchors inside content Foli keeps verbatim (an opaque block): their ids. */
 function opaqueCommentIds(doc: Node): Set<number> {
   const ids = new Set<number>();
   doc.descendants((node) => {
@@ -265,8 +265,8 @@ export function deleteComment(id: number): Command {
   return (state, dispatch) => {
     const comments = wordContext(state)?.envelope.comments ?? [];
     const ids = thread(comments, id);
-    // shortcut: a comment anchored in content Foli keeps verbatim (a table) stays, its anchors
-    // there cannot be removed; Phase 10 models tables.
+    // shortcut: a comment anchored in content Foli keeps verbatim (an opaque block) stays, its
+    // anchors there cannot be removed; model that content to remove them.
     const verbatim = opaqueCommentIds(state.doc);
     if (!comments.some((c) => c.id === id) || [...ids].some((i) => verbatim.has(i))) return false;
     if (dispatch) {

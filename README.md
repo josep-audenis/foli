@@ -4,7 +4,7 @@ An open-source document-editing engine for the web, built from the ground up: it
 model, transactions, view and layout, designed around native pagination, with first-class React
 integration.
 
-> **Status: 0.4.0 ([npm](https://www.npmjs.com/package/@folijs/react)).** Foli edits documents
+> **Status: 0.5.0 (not published yet; 0.4.0 on [npm](https://www.npmjs.com/package/@folijs/react)).** Foli edits documents
 > with its own model, engine and view (no ProseMirror/Tiptap/Lexical) on real pages: paragraphs
 > split across pages at a line, explicit page breaks, widow/orphan, keep-with-next and
 > keep-lines-together rules, incremental reflow, print with one sheet per page. Documents use
@@ -17,12 +17,17 @@ integration.
 > kept and written back. Review as in Word (0.4.0): tracked
 > changes recorded while you type (insertions, deletions, formatting), shown as all markup, simple
 > markup or no markup, accepted and rejected one by one, by selection, by author or all; comments
-> with replies and resolved state in a pane beside the pages; both round-trip with Word. React
-> components with a toolbar and server rendering. Documents saved
-> by 0.1.0 and 0.2.0 are migrated on load; 0.2.0 cannot read documents saved by 0.3.0. The API
-> may change in any 0.x version. Manual IME, screen-reader and real-paste checks are not run
-> yet: read the [known limitations](docs/limitations.md). Next: tables and images as Word models
-> them (Phase 10, [roadmap](docs/roadmap.md)).
+> with replies and resolved state in a pane beside the pages; both round-trip with Word. Tables
+> and pictures as Word models them (0.5.0): tables split across pages by row with repeated
+> header rows, merged cells, table styles, cell selection, table commands and a table menu,
+> tracked row changes; inline and floating pictures (square, top and bottom, behind and in front
+> of text), resized, inserted through an upload hook; alt text is required in the picture dialog,
+> and a picture pasted or dropped without it is marked. React components
+> with a toolbar and server rendering. Documents saved by 0.1.0 to 0.4.0 are migrated on load;
+> 0.4.0 cannot read documents saved by 0.5.0. The API may change in any 0.x version. Manual IME,
+> screen-reader and real-paste checks are not run yet: read the
+> [known limitations](docs/limitations.md). Next: sections, headers and footers, fields,
+> templates and PDF (Phase 11, [roadmap](docs/roadmap.md)).
 
 ## Usage
 

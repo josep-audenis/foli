@@ -181,6 +181,26 @@ describe("comments", () => {
     expect(comments(editor).map((c) => c.id)).toEqual([5, 6]);
   });
 
+  it("deletes a comment anchored in a table's cell, its anchors with it", () => {
+    const table: NodeJSON = {
+      type: "table",
+      attrs: { grid: [2000] },
+      content: [
+        {
+          type: "tableRow",
+          content: [{ type: "tableCell", content: [p(start(5), text("x"), end(5), ref(5))] }],
+        },
+      ],
+    };
+    const editor = editorOf(
+      [table, p(text("a"))],
+      [{ id: 5, author: "A", content: note("in it") }],
+    );
+    expect(editor.commands.deleteComment(5)).toBe(true);
+    expect(comments(editor)).toEqual([]);
+    expect(JSON.stringify(blocks(editor))).not.toContain("comment");
+  });
+
   it("keeps a comment that had no reference mark to begin with", () => {
     const editor = editorOf(
       [p(start(0), text("ab"), end(0))],

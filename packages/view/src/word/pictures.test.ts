@@ -357,15 +357,49 @@ describe("floating pictures on pages (10.9)", () => {
       text("d"),
       text("e"),
       text("f"),
+      text("g"),
     ]);
-    expect(host.querySelectorAll(".foli-page")).toHaveLength(3);
+    expect(host.querySelectorAll(".foli-page")).toHaveLength(4);
     spy.mockClear();
     editor.select(3); // after "a"
     editor.commands.insertText("x");
     const read = new Set(spy.mock.contexts.map((el) => (el as Element).textContent));
-    // The edited block and those after it on its page and the next; not the last page.
+    // The edited block and those after it on its page and the next two (it is a new block,
+    // maybe the next page's first); not the last page.
     for (const t of ["ax", "b", "c", "d"]) expect(read.has(t)).toBe(true);
-    expect(read.has("e")).toBe(false);
+    expect(read.has("g")).toBe(false);
+    // The picture deleted: the blocks that went around it are measured again too.
+    spy.mockClear();
+    editor.dispatch(editor.state.tr.delete(1, 2));
+    expect(host.querySelector(`[${FLOAT_ATTR}]`)).toBeNull();
+    const after = new Set(spy.mock.contexts.map((el) => (el as Element).textContent));
+    for (const t of ["ax", "b", "c", "d"]) expect(after.has(t)).toBe(true);
+  });
+
+  it("have the blocks after a deleted one measured again when its paragraph starts a page", () => {
+    const spy = vi.spyOn(Element.prototype, "getBoundingClientRect").mockImplementation(function (
+      this: Element,
+    ) {
+      const height = this.parentElement?.classList.contains("foli-page") ? 400 : 0;
+      return { height, width: 0, top: 0, left: 0, bottom: height, right: 0 } as DOMRect;
+    });
+    const { host, editor } = mount([
+      text("a"),
+      text("b"),
+      { type: "paragraph", content: [picture({ alt: "Dot", float }), { type: "text", text: "c" }] },
+      text("d"),
+      text("e"),
+      text("f"),
+      text("g"),
+    ]);
+    expect(host.querySelectorAll(".foli-page")).toHaveLength(4);
+    spy.mockClear();
+    // The picture is the first thing in "c", the first block of page 2.
+    const at = editor.state.doc.child(0).nodeSize + editor.state.doc.child(1).nodeSize + 1;
+    editor.dispatch(editor.state.tr.delete(at, at + 1));
+    expect(host.querySelector(`[${FLOAT_ATTR}]`)).toBeNull();
+    const read = new Set(spy.mock.contexts.map((el) => (el as Element).textContent));
+    for (const t of ["c", "d"]) expect(read.has(t)).toBe(true);
   });
 
   it("are drawn first in their paragraph by renderBlocks, the text after them", () => {

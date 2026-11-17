@@ -22,23 +22,23 @@ An editable document on pages, with a toolbar. Creates its own editor and provid
 model, with Word's toolbar): a 0.1.0 or 0.2.0 document given to it is migrated
 (`parseDocument`), and what it reports is v3.
 
-| Prop             | Type                           | Default      | Notes                                                                                               |
-| ---------------- | ------------------------------ | ------------ | --------------------------------------------------------------------------------------------------- |
-| `initialContent` | `EditorDocument`               | empty A4     | Read once, on mount; any version (migrated). Later: `editor.setDocument()` or a new `key`.          |
-| `plugins`        | `readonly Plugin[]`            | `[]`         | Read once, on mount. Unstable API.                                                                  |
-| `author`         | `string`                       | `"Author"`   | Read once: who edits (tracked changes are made in this name).                                       |
-| `trackChanges`   | `boolean`                      | `false`      | Read once: record edits as tracked changes (the toolbar turns it on and off).                       |
-| `reviewView`     | `ReviewView`                   | `"markup"`   | Read once: how tracked changes show (the toolbar changes it).                                       |
-| `onChange`       | `(change: FoliChange) => void` | —            | After every content change made through transactions. Not for selection changes or `setDocument`.   |
-| `toolbar`        | `boolean`                      | `true`       | Show `FoliToolbar` above the pages.                                                                 |
-| `comments`       | `boolean \| "auto"`            | `"auto"`     | The comments pane beside the pages: while the document has comments (`"auto"`), always, never.      |
-| `readOnly`       | `boolean`                      | `false`      | Read, select, copy; no editing. Disables the toolbar.                                               |
-| `placeholder`    | `string`                       | `""`         | Shown while the document is empty.                                                                  |
-| `label`          | `string`                       | `"Document"` | Accessible name of the editable area.                                                               |
-| `upload`         | `(file) => Promise<…>`         | —            | Where pasted, dropped and inserted image files go (the view's `upload`); the toolbar's Picture too. |
-| `resource`       | `(key, resource) => string`    | —            | The URL to show a picture's image from (`packageImages` for a .docx package).                       |
-| `className`      | `string`                       | —            | Added to the `.foli-canvas` element.                                                                |
-| `children`       | `ReactNode`                    | —            | Rendered between the toolbar and the pages, inside the editor's context.                            |
+| Prop             | Type                                             | Default      | Notes                                                                                               |
+| ---------------- | ------------------------------------------------ | ------------ | --------------------------------------------------------------------------------------------------- |
+| `initialContent` | `EditorDocument`                                 | empty A4     | Read once, on mount; any version (migrated). Later: `editor.setDocument()` or a new `key`.          |
+| `plugins`        | `readonly Plugin[]`                              | `[]`         | Read once, on mount. Unstable API.                                                                  |
+| `author`         | `string`                                         | `"Author"`   | Read once: who edits (tracked changes are made in this name).                                       |
+| `trackChanges`   | `boolean`                                        | `false`      | Read once: record edits as tracked changes (the toolbar turns it on and off).                       |
+| `reviewView`     | `ReviewView`                                     | `"markup"`   | Read once: how tracked changes show (the toolbar changes it).                                       |
+| `onChange`       | `(change: FoliChange) => void`                   | —            | After every content change made through transactions. Not for selection changes or `setDocument`.   |
+| `toolbar`        | `boolean`                                        | `true`       | Show `FoliToolbar` above the pages.                                                                 |
+| `comments`       | `boolean \| "auto"`                              | `"auto"`     | The comments pane beside the pages: while the document has comments (`"auto"`), always, never.      |
+| `readOnly`       | `boolean`                                        | `false`      | Read, select, copy; no editing. Disables the toolbar.                                               |
+| `placeholder`    | `string`                                         | `""`         | Shown while the document is empty.                                                                  |
+| `label`          | `string`                                         | `"Document"` | Accessible name of the editable area.                                                               |
+| `upload`         | `(file) => Promise<…>`                           | —            | Where pasted, dropped and inserted image files go (the view's `upload`); the toolbar's Picture too. |
+| `resource`       | `(key, resource) => string \| null \| undefined` | —            | The URL to show a picture's image from (`packageImages` for a .docx package); `null` shows its box. |
+| `className`      | `string`                                         | —            | Added to the `.foli-canvas` element.                                                                |
+| `children`       | `ReactNode`                                      | —            | Rendered between the toolbar and the pages, inside the editor's context.                            |
 
 `ref` → `FoliEditorHandle`: `{ editor: Editor; focus(): void }` (`editor.setDocument` takes
 a document of any version too).
@@ -227,7 +227,8 @@ Delete deleted. Formatting is recorded as Word records it: a run's properties be
 tracked change on a `formatChange` mark (`previous`: run property marks), a paragraph's on its
 `formatChange` attribute (`previous`: its properties, without the mark's look); later changes
 keep that record, and one's own insertions record none. An edit that would delete
-or insert a block Foli does not model (a table) is not made while tracking (Phase 10). Undo and redo, transactions with
+or insert a block Foli does not model (an opaque block) is not made while tracking; tables are
+tracked row by row. Undo and redo, transactions with
 `addToHistory: false` and those with the `untracked` meta are not tracked; an edit that cannot
 be recorded is not made. `editor.commands.setTrackChanges(on, author?)` (the
 `setTrackChanges` command), `editor.trackingChanges`, `trackState(state)` (`{ on, author, view }`).
@@ -246,8 +247,8 @@ Comments (not tracked changes; each its own undo step): `editor.commands.addComm
 it; at a caret, a point; select-all, the whole text), `replyToComment(id, content, options?)`
 (a reply to a reply answers the thread), `editComment(id, content)`, `resolveComment(id, done =
 true)` (the whole thread), `deleteComment(id)`
-(its replies and anchors too; false for a comment anchored in a table, which stays until Phase
-10), `deleteAllComments()` (threads anchored in a table kept); the same as commands. `content` is text
+(its replies and anchors too; false for a comment anchored inside content kept verbatim, an
+opaque block, which stays), `deleteAllComments()` (threads anchored there kept); the same as commands. `content` is text
 (a paragraph per line) or schema v3 blocks; the author defaults to the editor's. A comment whose
 reference mark an edit removes goes too, with its replies (a tracked deletion keeps it until
 accepted). `commentAnchors(doc)` gives each comment's range and reference positions.
@@ -370,7 +371,8 @@ Rows inserted and deleted while tracking are tracked; column, merge, split, head
 shading and width commands do not apply while tracking.
 
 Pictures: `insertPicture({ contentType, url? | data?, width, height, alt?, title?,
-decorative? })` (size in EMU; alt text required unless `decorative`; the image becomes a new
+decorative? }, { requireAlt = true })` (size in EMU; alt text required unless `decorative` or
+`requireAlt: false`, which the view uses for pasted and dropped files; the image becomes a new
 resource of the document; tracked while tracking), `setPictureSize(pos, width, height)` (not
 while tracking), `setPictureAlt(pos, alt, decorative?)`, `selectedPicture(state)` (a node
 selection of a picture, and its position).
@@ -415,6 +417,11 @@ const view = new EditorView(host, editor, { editable: true, placeholder: "" });
   node selection, outlined); dragging the handle at its corner resizes it with its aspect ratio
   kept (`setPictureSize` on release; Escape cancels). An image pasted alone (no text: a
   screenshot) and image files dropped go in through `upload`.
+- A floating picture (`float`) is drawn first in its paragraph and the lines go around it: square
+  (tight and through as square) as a CSS float on its side, top and bottom as a float as wide as
+  the paragraph, behind and in front of text absolutely positioned on its page (pages are
+  `position: relative; isolation: isolate`). A click on it selects it at its place in the text
+  (an empty anchor there); its outline and handle are on the picture.
 - `view.focus()`: focuses the host, shows the editor's selection, scrolls it into view.
 - `view.destroy()`: removes listeners, injected styles and the attributes it added; empties the
   host.
