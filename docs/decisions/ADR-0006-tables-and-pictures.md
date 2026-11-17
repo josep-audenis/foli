@@ -177,7 +177,8 @@ Backspace, and reads a selection of several ranges back as a `CellSelection`.
   `w:tblPrChange`, `w:trPrChange`, `w:tcPrChange`, kept when read): inserting or deleting
   columns, merging and splitting cells, changing table, row or cell properties (9.3's paragraph
   and run records unchanged).
-  The commands say so (they do not apply while tracking).
+  The commands say so (they do not apply while tracking). A picture's size does not change while
+  tracking either; its alt text does, untracked (Word does not track it).
 - **Comments** anchor in cells as in paragraphs; deleting a row deletes the comments whose
   reference goes with it (9.6).
 

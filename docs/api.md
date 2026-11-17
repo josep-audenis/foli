@@ -345,6 +345,22 @@ selection, else null),
 `marksAt`. `baseKeymap()` is the default key binding plugin (keys in
 [getting-started.md](getting-started.md#keyboard)).
 
+Tables (on the table around the selection: a cell selection's rectangle, or the caret's cell):
+`insertTable(rows, columns)` (Word's Table Grid style, up to 1000 rows and 63 columns),
+`insertRow(dir)`, `deleteRows`, `insertColumn(dir)`, `deleteColumns`, `deleteTable`,
+`mergeCells`, `splitCell`, `toggleHeaderRow` (`isHeaderRow(state)`), `setTableStyle(name |
+null)` (`tableStyles(state)`, `tableStyleAt(state)`), `setCellShading(fill | null)` (`RRGGBB`),
+`setColumnWidth(tablePos, column, twips)`; `CellSelection`, `extendCellSelection(axis, dir)`,
+`goToCell(dir)`, `goToCellVertically(dir)`, `cellsAsTable(selection)`, `pasteCells(tr, table)`.
+Rows inserted and deleted while tracking are tracked; column, merge, split, header, style,
+shading and width commands do not apply while tracking.
+
+Pictures: `insertPicture({ contentType, url? | data?, width, height, alt?, title?,
+decorative? })` (size in EMU; alt text required unless `decorative`; the image becomes a new
+resource of the document; tracked while tracking), `setPictureSize(pos, width, height)` (not
+while tracking), `setPictureAlt(pos, alt, decorative?)`, `selectedPicture(state)` (a node
+selection of a picture, and its position).
+
 ## `@folijs/view`
 
 The editable view without a framework. Needs a browser DOM.

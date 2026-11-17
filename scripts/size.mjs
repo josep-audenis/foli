@@ -62,10 +62,11 @@ writeFileSync(appEntry, `export { FoliEditor } from "${dist("react")}";\n`);
  * box and shading menu, which bring core's table commands into an app with the toolbar.
  * Docx raised in 10.8a (43.9 kB): inline pictures read and written (drawings patched in place,
  * new drawings, media parts and their bytes). View raised in 10.8b (60.5 kB): pictures drawn
- * in their lines (their images' URLs, placeholders, the missing alt text mark).
+ * in their lines (their images' URLs, placeholders, the missing alt text mark). Core raised in
+ * 10.8c (52.7 kB): picture commands (insert with its resource, size, alt text).
  */
 const BUNDLES = [
-  { name: "@folijs/core", entry: dist("core"), budget: 52_000 },
+  { name: "@folijs/core", entry: dist("core"), budget: 54_000 },
   { name: "@folijs/view", entry: dist("view"), budget: 62_000 },
   { name: "@folijs/react", entry: dist("react"), budget: 84_000 },
   { name: "FoliEditor only", entry: appEntry, budget: 84_000 },

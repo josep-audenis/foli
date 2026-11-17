@@ -76,6 +76,13 @@ export {
 } from "./lists.js";
 export { typedMarks } from "./mark.js";
 export {
+  insertPicture,
+  type NewPicture,
+  selectedPicture,
+  setPictureAlt,
+  setPictureSize,
+} from "./pictures.js";
+export {
   acceptAllChanges,
   acceptChange,
   type Change,

@@ -608,7 +608,7 @@ function protocolOf(url: string): string {
 /** Pictures only: `image/png`, `image/svg+xml`… */
 const IMAGE_TYPE = /^image\/[A-Za-z0-9][\w.+-]{0,126}$/;
 
-const checkResource: Check = (v) => {
+export const checkResource: Check = (v) => {
   const error = shape(
     {
       contentType: (t) =>
