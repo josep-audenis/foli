@@ -717,6 +717,18 @@ editable view it sits in a `contenteditable="false"` span, one position like opa
 (no browser resize handles); one without alt text and not decorative is named "Picture without
 alt text" and has a dashed outline (`data-foli-no-alt`, not printed). The line takes the
 picture's height and its size is set before the image loads (no reflow on load).
+
+Selecting, resizing and inserting pictures in the editable view (10.8d): a press on a picture
+selects it (a node selection; a native selection exactly around one reads back as one), its
+span outlined and given a resize handle (`data-foli-resize`, the view's own DOM: its changes
+are not read back as input). Dragging the handle resizes the picture live, keeping its aspect
+ratio (the larger of the two moves), down to 8 px; the release sets its size
+(`setPictureSize`, refused while tracking: the picture goes back), a press without a move
+changes nothing, and Escape, the button let go outside the page or the window losing the focus
+cancel. Image files pasted alone (no text, no Foli JSON) or dropped go to the app's `upload`
+hook (none, nothing happens), then in as pictures (`insertFiles`: the URL, or a `data:` URL the
+app chose; natural size measured from load events, no wider than the section's text; the
+caret at the drop point; no alt text unless the hook gave it, marked).
 shortcut: a picture's line is measured from its span's box, not the image's, so a line holding
 only a picture can end a page a little early (never overflow); measure the image when it
 matters.

@@ -380,7 +380,12 @@ const view = new EditorView(host, editor, { editable: true, placeholder: "" });
   uses; paste fits Foli JSON, HTML and text to the document (`fitPaste`, `fitPastedV2`: its own
   styles by name, others added, lists of another document as lists of their own, comments
   copied, bookmarks whose names it has left out).
-- `view.setOptions({ editable?, placeholder?, resource? })`: changes the given options.
+- `view.setOptions({ editable?, placeholder?, resource?, upload? })`: changes the given options.
+  `upload(file)`: where pasted and dropped image files go (ADR-0006's upload hook), resolving to
+  the URL the app stores the file at (or a `data:` URL, opting in) or `{ src, alt?, decorative? }`;
+  without it image files are not pasted or dropped. `view.insertFiles(files)` inserts image files
+  at the selection through it, at their natural size no wider than the page's text, and
+  resolves to how many it inserted; a picture inserted without alt text is marked.
   `resource(key, resource)`: the URL to show a picture's image from (`key` in the document's
   `resources`); undefined for a key: the resource's own image `data:` URL or web/`blob:` URL,
   else a box of the picture's size with its alt text; `null` (or "") for a key: that box. A web
@@ -390,7 +395,10 @@ const view = new EditorView(host, editor, { editable: true, placeholder: "" });
 - Pictures are drawn in their line at their size (96 px per inch), as `img` (with their alt
   text; a decorative one an empty alt) inside a non-editable span, one position in the text;
   one without alt text and not decorative is named "Picture without alt text" (`NO_ALT_LABEL`)
-  and marked (`data-foli-no-alt`, a dashed outline, not printed).
+  and marked (`data-foli-no-alt`, a dashed outline, not printed). A click selects a picture (a
+  node selection, outlined); dragging the handle at its corner resizes it with its aspect ratio
+  kept (`setPictureSize` on release; Escape cancels). An image pasted alone (no text: a
+  screenshot) and image files dropped go in through `upload`.
 - `view.focus()`: focuses the host, shows the editor's selection, scrolls it into view.
 - `view.destroy()`: removes listeners, injected styles and the attributes it added; empties the
   host.

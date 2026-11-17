@@ -19,6 +19,7 @@ import {
   goToCellVertically,
   insertHardBreak,
   insertLink,
+  insertPicture,
   insertText,
   isSafeHref,
   keepTablesApart,
@@ -37,6 +38,7 @@ import {
   setColumnWidth,
   setComments,
   setLink,
+  setPictureSize,
   splitBlock,
   TextSelection,
   type Transaction,
@@ -62,7 +64,7 @@ import {
 } from "./layout/flow.js";
 import { type BlockDesc, PAGE_BREAK_ATTR } from "./render.js";
 
-import { imageSource } from "./word/blocks.js";
+import { EMU_PER_PX, imageSource, PICTURE_ATTR } from "./word/blocks.js";
 import { spacing, type WordBlockDesc, type WordInfo, WordRenderer } from "./word/edit.js";
 import { measureLineRatio } from "./word/pages.js";
 import {
@@ -137,12 +139,25 @@ export interface EditorViewOptions {
    * app that does not fetch web URLs found in documents says so here). `null` clears it.
    */
   resource?: ((key: string, resource: ResourceJSON) => string | null | undefined) | null;
+  /**
+   * Where pasted and dropped image files go (ADR-0006's upload hook): the URL the app stores the
+   * file at (or a `data:` URL, opting in), and the alt text if it has asked for it. Without it,
+   * image files are not pasted or dropped. A picture inserted without alt text is marked, as an
+   * imported one is.
+   */
+  upload?:
+    | ((file: File) => Promise<string | { src: string; alt?: string; decorative?: boolean }>)
+    | null;
 }
 
 const PLACEHOLDER_ATTR = "data-foli-placeholder";
+/** On the span of a selected picture (it holds the resize handle). */
+const PICTURE_SELECTED_ATTR = "data-foli-picture-selected";
+/** The smallest a picture gets by dragging its handle, in px. */
+const MIN_PICTURE = 8;
 // Generated content is not document text: no caret stops inside it, a zero-height float keeps
 // the caret at the line start, and the empty alt text keeps screen readers on aria-placeholder.
-const STYLES = `.${CELL_CLASS}{box-shadow:inset 0 0 0 9999px rgba(0,120,215,.22)}[${CELLS_ATTR}] ::selection{background:transparent}[data-foli-no-alt]{outline:2px dashed #b45309;outline-offset:-2px}@media print{[data-foli-no-alt]{outline:none}}[${PLACEHOLDER_ATTR}]::before{content:attr(${PLACEHOLDER_ATTR});content:attr(${PLACEHOLDER_ATTR}) / "";float:inline-start;height:0;pointer-events:none;color:GrayText}`;
+const STYLES = `.${CELL_CLASS}{box-shadow:inset 0 0 0 9999px rgba(0,120,215,.22)}[${CELLS_ATTR}] ::selection{background:transparent}[data-foli-no-alt]{outline:2px dashed #b45309;outline-offset:-2px}@media print{[data-foli-no-alt]{outline:none}}[${PICTURE_SELECTED_ATTR}]{position:relative;outline:2px solid Highlight}[${PICTURE_SELECTED_ATTR}] [data-foli-resize]{position:absolute;right:-5px;bottom:-5px;width:10px;height:10px;box-sizing:border-box;border:1px solid Canvas;background:Highlight;cursor:nwse-resize}@media print{[${PICTURE_SELECTED_ATTR}]{outline:none}[${PICTURE_SELECTED_ATTR}] [data-foli-resize]{display:none}}[${PLACEHOLDER_ATTR}]::before{content:attr(${PLACEHOLDER_ATTR});content:attr(${PLACEHOLDER_ATTR}) / "";float:inline-start;height:0;pointer-events:none;color:GrayText}`;
 
 /**
  * Adds the view's stylesheet once per document or shadow root, when a placeholder is first shown
@@ -392,6 +407,21 @@ export class EditorView {
   private readonly addedTabIndex: boolean;
   /** Renders the document's blocks; made by the first render. */
   private word: WordRenderer | null = null;
+  /** Where pasted and dropped image files go (`EditorViewOptions.upload`). */
+  private upload: EditorViewOptions["upload"];
+  /** The selected picture's span (with its resize handle). */
+  private selectedPicture: HTMLElement | null = null;
+  /** A picture being resized: its position, element, size at the press, scale, the press. */
+  private resize: {
+    pos: number;
+    img: HTMLElement;
+    width: number;
+    height: number;
+    scale: number;
+    x: number;
+    y: number;
+    style: string;
+  } | null = null;
   /** The app's URLs for pictures' images (`EditorViewOptions.resource`). */
   private resource: EditorViewOptions["resource"];
   /** How tracked changes show. */
@@ -436,6 +466,8 @@ export class EditorView {
     host.addEventListener("copy", this.onCopy);
     host.addEventListener("cut", this.onCut);
     host.addEventListener("paste", this.onPaste);
+    host.addEventListener("dragover", this.onDragOver);
+    host.addEventListener("drop", this.onDrop);
     host.addEventListener("click", this.onClick);
     host.addEventListener("auxclick", this.onClick);
     host.ownerDocument.addEventListener("selectionchange", this.onSelectionChange);
@@ -464,6 +496,9 @@ export class EditorView {
     host.removeEventListener("copy", this.onCopy);
     host.removeEventListener("cut", this.onCut);
     host.removeEventListener("paste", this.onPaste);
+    host.removeEventListener("dragover", this.onDragOver);
+    host.removeEventListener("drop", this.onDrop);
+    this.endResize();
     host.removeEventListener("click", this.onClick);
     host.removeEventListener("auxclick", this.onClick);
     host.ownerDocument.removeEventListener("selectionchange", this.onSelectionChange);
@@ -501,6 +536,7 @@ export class EditorView {
       this.editable = options.editable;
     }
     if (options.placeholder !== undefined) this.placeholder = options.placeholder;
+    if (options.upload !== undefined) this.upload = options.upload ?? undefined;
     if (options.resource !== undefined && options.resource !== this.resource) {
       this.resource = options.resource ?? undefined;
       // Every picture again, from the new URLs: after a running composition, keeping the
@@ -1337,7 +1373,7 @@ export class EditorView {
     const node = doc.nodeAt(from);
     if (
       node &&
-      node.isBlock &&
+      (node.isBlock || node.type.name === "picture") &&
       node.isAtom &&
       Math.max(anchor, head) === from + node.nodeSize &&
       NodeSelection.isSelectable(node)
@@ -1352,6 +1388,36 @@ export class EditorView {
     if (!(selection instanceof NodeSelection)) return null;
     const desc = this.blocks[this.blockFrom(selection.from)];
     return desc && this.starts[this.indexOf.get(desc) ?? -1] === selection.from ? desc : null;
+  }
+
+  /** The span of the picture a node selection selects, if it selects one. */
+  private pictureSpan(pos: number): HTMLElement | null {
+    for (const img of this.host.querySelectorAll(`[${PICTURE_ATTR}]`)) {
+      const span = img.parentElement;
+      if (span && this.posFromDOM(span, 0) === pos) return span;
+    }
+    return null;
+  }
+
+  /** Marks the selected picture and gives it a resize handle (when the document is editable). */
+  private showSelectedPicture(): void {
+    const { selection } = this.state;
+    const span =
+      selection instanceof NodeSelection && selection.node.type.name === "picture"
+        ? this.pictureSpan(selection.from)
+        : null;
+    if (span === this.selectedPicture && span?.querySelector("[data-foli-resize]")) return;
+    this.selectedPicture?.removeAttribute(PICTURE_SELECTED_ATTR);
+    this.selectedPicture?.querySelector("[data-foli-resize]")?.remove();
+    this.selectedPicture = span;
+    if (!span) return;
+    injectStyles(this.host);
+    span.setAttribute(PICTURE_SELECTED_ATTR, "");
+    if (!this.editable) return;
+    const handle = this.host.ownerDocument.createElement("span");
+    handle.setAttribute("data-foli-resize", "");
+    handle.setAttribute("aria-hidden", "true");
+    span.append(handle);
   }
 
   /** Marks the cells of a cell selection (their table cell elements, on every page). */
@@ -1385,6 +1451,7 @@ export class EditorView {
   /** Marks the element of a node-selected block, for styling (the DOM selection is around it). */
   private showSelectedNode(): void {
     this.showSelectedCells();
+    this.showSelectedPicture();
     const dom = this.selectedBlock()?.dom ?? this.selectedTable();
     if (dom === this.selectedDom) return;
     this.selectedDom?.classList.remove(SELECTED_CLASS);
@@ -1720,6 +1787,182 @@ export class EditorView {
    * Triple-click selects the clicked block's content. Chromium and WebKit natively extend the
    * selection to the start of the next block, so typing over it would merge the two blocks.
    */
+  // ---------- pictures (10.8d) ----------
+
+  /**
+   * A press on a picture selects it (a node selection); on the selected picture's handle it
+   * starts a resize that keeps its aspect ratio (`setPictureSize` on release, Escape cancels).
+   */
+  private pictureMouseDown(event: MouseEvent): boolean {
+    this.endResize();
+    if (event.shiftKey || this.composing) return false;
+    const target = event.target as Element | null;
+    const span = target?.closest?.(`[${PICTURE_ATTR}], [data-foli-resize]`)?.parentElement ?? null;
+    if (!span || !this.host.contains(span)) return false;
+    const pos = this.posFromDOM(span, 0);
+    if (pos === null) return false;
+    event.preventDefault();
+    if (!this.hasFocus()) this.host.focus({ preventScroll: true });
+    if (!(this.state.selection instanceof NodeSelection && this.state.selection.from === pos))
+      this.dispatch(this.state.tr.setSelection(NodeSelection.create(this.state.doc, pos)));
+    const img = span.querySelector(`[${PICTURE_ATTR}]`) as HTMLElement | null;
+    if (!img || !target?.closest("[data-foli-resize]") || !this.editable) return true;
+    const rect = img.getBoundingClientRect();
+    const width = Number.parseFloat(img.style.width) || rect.width;
+    this.resize = {
+      pos,
+      img,
+      width: rect.width,
+      height: rect.height,
+      scale: rect.width / width || 1,
+      x: event.clientX,
+      y: event.clientY,
+      style: img.getAttribute("style") ?? "",
+    };
+    const doc = this.host.ownerDocument;
+    doc.addEventListener("mousemove", this.onResizeMove);
+    doc.addEventListener("mouseup", this.onResizeEnd);
+    doc.addEventListener("keydown", this.onResizeKey, true);
+    doc.defaultView?.addEventListener("blur", this.onResizeCancel);
+    return true;
+  }
+
+  /** The size (layout px) a resize gives at the pointer: the larger move, the ratio kept. */
+  private resizedTo(event: MouseEvent): { width: number; height: number } {
+    const r = this.resize as NonNullable<EditorView["resize"]>;
+    const ratio = r.height / r.width;
+    const dx = event.clientX - r.x;
+    const dy = (event.clientY - r.y) / ratio;
+    const width = Math.max(
+      (r.width + (Math.abs(dx) > Math.abs(dy) ? dx : dy)) / r.scale,
+      MIN_PICTURE,
+    );
+    return { width, height: width * ratio };
+  }
+
+  private onResizeMove = (event: MouseEvent): void => {
+    if (!this.resize) return;
+    if ((event.buttons & 1) === 0) {
+      this.onResizeCancel();
+      return;
+    }
+    const { width, height } = this.resizedTo(event);
+    this.resize.img.style.width = `${width}px`;
+    this.resize.img.style.height = `${height}px`;
+  };
+
+  private onResizeEnd = (event: MouseEvent): void => {
+    if (!this.resize) return;
+    const { width, height } = this.resizedTo(event);
+    const r = this.endResize();
+    if (!r) return;
+    // No real move: nothing changes.
+    if (Math.abs(event.clientX - r.x) < 2 && Math.abs(event.clientY - r.y) < 2) return;
+    const applied = this.run(
+      setPictureSize(r.pos, Math.round(width * EMU_PER_PX), Math.round(height * EMU_PER_PX)),
+    );
+    // Not applied (tracking, the picture gone): as it was.
+    if (!applied) r.img.setAttribute("style", r.style);
+  };
+
+  private onResizeKey = (event: KeyboardEvent): void => {
+    if (event.key !== "Escape") return;
+    event.preventDefault();
+    event.stopPropagation();
+    this.onResizeCancel();
+  };
+
+  private onResizeCancel = (): void => {
+    const r = this.endResize();
+    if (r) r.img.setAttribute("style", r.style);
+  };
+
+  /** Ends a resize (its listeners gone) and returns it. */
+  private endResize(): NonNullable<EditorView["resize"]> | null {
+    const r = this.resize;
+    if (!r) return null;
+    this.resize = null;
+    const doc = this.host.ownerDocument;
+    doc.removeEventListener("mousemove", this.onResizeMove);
+    doc.removeEventListener("mouseup", this.onResizeEnd);
+    doc.removeEventListener("keydown", this.onResizeKey, true);
+    doc.defaultView?.removeEventListener("blur", this.onResizeCancel);
+    return r;
+  }
+
+  /** Image files in a transfer (paste or drop), when the app takes uploads. */
+  private imageFiles(data: DataTransfer | null): File[] {
+    if (!this.upload || !this.editable || !data) return [];
+    // A clipboard object from code may have no files.
+    return [...(data.files ?? [])].filter((file) => file.type.startsWith("image/"));
+  }
+
+  private onDragOver = (event: DragEvent): void => {
+    const types = [...(event.dataTransfer?.items ?? [])];
+    if (!this.upload || !this.editable || !types.some((i) => i.type.startsWith("image/"))) return;
+    event.preventDefault();
+    if (event.dataTransfer) event.dataTransfer.dropEffect = "copy";
+  };
+
+  private onDrop = (event: DragEvent): void => {
+    const files = this.imageFiles(event.dataTransfer);
+    if (!files.length || this.composing) return;
+    event.preventDefault();
+    // The caret where the files were dropped.
+    const doc = this.host.ownerDocument as Document & {
+      caretPositionFromPoint?: (
+        x: number,
+        y: number,
+      ) => { offsetNode: Node; offset: number } | null;
+      caretRangeFromPoint?: (x: number, y: number) => Range | null;
+    };
+    const point = doc.caretPositionFromPoint?.(event.clientX, event.clientY);
+    const range = point ? null : doc.caretRangeFromPoint?.(event.clientX, event.clientY);
+    const node = point?.offsetNode ?? range?.startContainer;
+    const offset = point?.offset ?? range?.startOffset ?? 0;
+    const pos = node ? this.posFromDOM(node, offset) : null;
+    if (pos !== null)
+      this.dispatch(this.state.tr.setSelection(TextSelection.near(this.state.doc.resolve(pos))));
+    void this.insertFiles(files);
+  };
+
+  /**
+   * Inserts image files at the selection, one picture each: uploaded through the `upload`
+   * option, at their natural size (96 px per inch) no wider than the page's text. Resolves to
+   * the number inserted; none without `upload`.
+   */
+  async insertFiles(files: readonly File[]): Promise<number> {
+    const upload = this.upload;
+    if (!upload || !this.editable) return 0;
+    let inserted = 0;
+    for (const file of files) {
+      if (!file.type.startsWith("image/")) continue;
+      const answer = await upload(file);
+      if (this.destroyed) return inserted;
+      const { src, alt, decorative } = typeof answer === "string" ? { src: answer } : answer;
+      const size = await naturalSize(src, this.host.ownerDocument);
+      if (this.destroyed || !size) continue;
+      const section = wordContext(this.state)?.envelope.section;
+      // 635 EMU per twip; Word's Letter page and margins when the section does not say.
+      const text =
+        ((section?.pageSize?.width ?? 12_240) -
+          (section?.margins?.left ?? 1440) -
+          (section?.margins?.right ?? 1440)) *
+        635;
+      const scale = Math.min(1, text / (size.width * EMU_PER_PX));
+      const picture = {
+        contentType: file.type,
+        ...(src.startsWith("data:") ? { data: src } : { url: src }),
+        width: Math.max(1, Math.round(size.width * EMU_PER_PX * scale)),
+        height: Math.max(1, Math.round(size.height * EMU_PER_PX * scale)),
+        ...(alt ? { alt } : {}),
+        ...(decorative ? { decorative } : {}),
+      };
+      if (this.run(insertPicture(picture, { requireAlt: false }))) inserted++;
+    }
+    return inserted;
+  }
+
   private onMouseDown = (event: MouseEvent): void => {
     this.pointerFocus = !this.hasFocus();
     // Focus from a mousedown happens in its default action, before this timer. A mousedown that
@@ -1727,6 +1970,7 @@ export class EditorView {
     if (this.pointerFocus) setTimeout(() => (this.pointerFocus = false));
     if (event.button !== 0) return;
     if (this.startColumnDrag(event)) return;
+    if (this.pictureMouseDown(event)) return;
     // A click puts a caret where it lands, even on the one a cell selection wrote.
     if (!event.shiftKey) this.cellCaret = null;
     // A header row drawn again is not document content: the caret goes below it.
@@ -1998,13 +2242,13 @@ export class EditorView {
   };
 
   private onMutations = (records: MutationRecord[]): void => {
-    this.pending.push(...records);
-    if (!this.composing) this.flush();
+    this.pending.push(...records.filter((r) => !handleOnly(r)));
+    if (!this.composing && this.pending.length) this.flush();
   };
 
   /** Reads back every DOM change recorded so far. */
   private flush(): void {
-    const records = [...this.pending, ...this.observer.takeRecords()];
+    const records = [...this.pending, ...this.observer.takeRecords().filter((r) => !handleOnly(r))];
     this.pending = [];
     if (records.length) this.readBack(records);
   }
@@ -2202,6 +2446,12 @@ export class EditorView {
     if (this.composing) return;
     this.syncSelection();
     const data = event.clipboardData;
+    // An image alone (a screenshot, an image copied from a page): a picture.
+    const files = plain ? [] : this.imageFiles(data);
+    if (files.length && !data.getData(FOLI_MIME) && !data.getData("text/plain").trim()) {
+      void this.insertFiles(files);
+      return;
+    }
     this.paste(
       plain ? { getData: (type) => (type === "text/plain" ? data.getData(type) : "") } : data,
       !plain,
@@ -2880,4 +3130,32 @@ export function keyName(event: KeyboardEvent): string {
   if (IS_MAC ? event.ctrlKey : event.metaKey) name = `${IS_MAC ? "Ctrl" : "Meta"}-${name}`;
   if (mod) name = `Mod-${name}`;
   return name;
+}
+
+/** An image's natural size (CSS px), or null when it does not load. */
+async function naturalSize(
+  src: string,
+  doc: Document,
+): Promise<{ width: number; height: number } | null> {
+  const img = doc.createElement("img");
+  // Load events, not decode(): WebKit rejects decode() for an image outside the document.
+  const loaded = new Promise<boolean>((resolve) => {
+    img.onload = () => resolve(true);
+    img.onerror = () => resolve(false);
+  });
+  img.src = src;
+  if (!(await loaded)) return null;
+  return img.naturalWidth && img.naturalHeight
+    ? { width: img.naturalWidth, height: img.naturalHeight }
+    : null;
+}
+
+/** A change that only adds or removes a picture's resize handle (the view's own, not input). */
+function handleOnly(record: MutationRecord): boolean {
+  const nodes = [...record.addedNodes, ...record.removedNodes];
+  return (
+    record.type === "childList" &&
+    nodes.length > 0 &&
+    nodes.every((n) => n.nodeType === 1 && (n as Element).hasAttribute("data-foli-resize"))
+  );
 }
