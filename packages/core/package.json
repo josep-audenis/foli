@@ -1,6 +1,6 @@
 {
   "name": "@folijs/core",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "Document model and headless editing engine of Foli: format, validation, schema, transactions, history, commands. No DOM.",
   "license": "MIT",
   "repository": {
