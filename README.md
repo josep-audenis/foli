@@ -65,6 +65,7 @@ toolbar, Next.js and using the view without React. Before using Foli, read the
 | [`@folijs/react`](packages/react)    | React components and default stylesheet.                                                     |
 | [`@folijs/docx`](packages/docx)      | `.docx` import to Foli's Word model and lossless export. No DOM.                             |
 | [`apps/playground`](apps/playground) | Demo app; consumes the packages like a third party would.                                    |
+| [`apps/site`](apps/site)             | The project's landing page, with the live editor; `pnpm --filter @folijs/site dev`.          |
 
 ## Documentation
 
