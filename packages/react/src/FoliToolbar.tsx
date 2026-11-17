@@ -1382,6 +1382,9 @@ function InsertTableDialog({
   );
 }
 
+/** The largest picture side the schema takes, in px (2^31 - 1 EMU). */
+const MAX_PICTURE_PX = Math.floor(2_147_483_647 / EMU_PER_PX);
+
 /**
  * The picture dialog. Inserting (`pos` null): an image file, its alt text (required unless the
  * picture is marked decorative), Insert and Cancel; the file goes through `upload`, the picture
@@ -1390,9 +1393,6 @@ function InsertTableDialog({
  * not while tracking changes), Apply and Cancel. Escape cancels; a field that is wrong is marked
  * and announced.
  */
-/** The largest picture side the schema takes, in px (2^31 - 1 EMU). */
-const MAX_PICTURE_PX = Math.floor(2_147_483_647 / EMU_PER_PX);
-
 function PictureDialog({
   editor,
   pos,

@@ -485,6 +485,13 @@ describe("FoliCanvas's pictures", () => {
       const box = container.querySelector("[data-foli-picture]");
       rerender(<FoliCanvas editor={editor} resource={refuse} placeholder="Type" />);
       expect(container.querySelector("[data-foli-picture]")).toBe(box);
+      // Without a resolver at all (the default), other props redraw nothing either.
+      const other = createEditor({ document: editor.getDocument() });
+      const plain = render(<FoliCanvas editor={other} />);
+      const first = plain.container.querySelector("[data-foli-picture]");
+      expect(first).not.toBe(null);
+      plain.rerender(<FoliCanvas editor={other} placeholder="Type" />);
+      expect(plain.container.querySelector("[data-foli-picture]")).toBe(first);
     } finally {
       if (descriptor) Object.defineProperty(HTMLImageElement.prototype, "src", descriptor);
     }
