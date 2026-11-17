@@ -453,6 +453,8 @@ export class EditorView {
       typeof ResizeObserver === "undefined" ? null : new ResizeObserver(this.onResize);
     this.observer = new MutationObserver(this.onMutations);
     this.observer.observe(host, { childList: true, characterData: true, subtree: true });
+    // The picture resolver before the first render: no image drawn from a URL the app refuses.
+    this.resource = options.resource ?? undefined;
     this.render();
     this.setOptions(options);
 
@@ -542,8 +544,10 @@ export class EditorView {
     }
     if (options.placeholder !== undefined) this.placeholder = options.placeholder;
     if (options.upload !== undefined) this.upload = options.upload ?? undefined;
-    if (options.resource !== undefined && options.resource !== this.resource) {
-      this.resource = options.resource ?? undefined;
+    // null clears the resolver (stored as none): the same as none is no change.
+    const resource = options.resource ?? undefined;
+    if (options.resource !== undefined && resource !== this.resource) {
+      this.resource = resource;
       // Every picture again, from the new URLs: after a running composition, keeping the
       // selection.
       if (this.word) {
@@ -3197,7 +3201,6 @@ export function keyName(event: KeyboardEvent): string {
   return name;
 }
 
-/** An image's natural size (CSS px), or null when it does not load. */
 /**
  * The text width of a document's (last) section in EMU (635 per twip; Word's Letter page and
  * margins where it does not say): the widest a picture is inserted or resized.
@@ -3228,6 +3231,7 @@ export async function measureImageFile(
   }
 }
 
+/** An image's natural size (CSS px), or null when it does not load. */
 async function naturalSize(
   src: string,
   doc: Document,

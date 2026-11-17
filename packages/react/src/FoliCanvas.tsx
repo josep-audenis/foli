@@ -50,10 +50,16 @@ export const FoliCanvas = forwardRef<FoliCanvasHandle, FoliCanvasProps>(function
 
   useImperativeHandle(ref, () => ({ focus: () => viewRef.current?.focus() }), []);
 
+  // The options at the moment the view is made: its first render already uses them (no web
+  // image fetched before the app's resolver is in place).
+  const options = { editable: !readOnly, placeholder, upload, resource };
+  const optionsRef = useRef(options);
+  optionsRef.current = options;
+
   useIsomorphicLayoutEffect(() => {
     const host = contentRef.current;
     if (!host) return;
-    const view = new EditorView(host, editor);
+    const view = new EditorView(host, editor, optionsRef.current);
     viewRef.current = view;
     return () => {
       view.destroy();

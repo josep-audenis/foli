@@ -712,17 +712,22 @@ export function FoliToolbar({
       editor.subscribe((state, transactions) => {
         if (disabled) return;
         if (!transactions.some(requestsLinkEditor)) {
-          // The picture dialog too: what it edits or inserts at may have gone.
+          // The picture dialog too: what it edits or inserts at may have gone (another
+          // document, set with no transaction, included).
           setPictureDialog((current) =>
             current &&
-            (transactions.some((tr) => tr.docChanged) || !state.selection.eq(current.selection))
+            (!transactions.length ||
+              transactions.some((tr) => tr.docChanged) ||
+              !state.selection.eq(current.selection))
               ? null
               : current,
           );
           // The insert table dialog is for the caret it opened on, as the link dialog is.
           setTableDialog((current) =>
             current &&
-            (transactions.some((tr) => tr.docChanged) || !state.selection.eq(current.selection))
+            (!transactions.length ||
+              transactions.some((tr) => tr.docChanged) ||
+              !state.selection.eq(current.selection))
               ? null
               : current,
           );
@@ -871,7 +876,9 @@ export function FoliToolbar({
                   aria-label={item.symbol ? item.label : undefined}
                   title={item.label}
                   aria-pressed={item.pressed ? Boolean(state?.pressed) : undefined}
-                  aria-haspopup={item.menu || item.actions ? "menu" : undefined}
+                  aria-haspopup={
+                    item.menu || item.actions ? "menu" : item.dialog ? "dialog" : undefined
+                  }
                   aria-expanded={item.menu || item.actions ? menu === item.key : undefined}
                   aria-disabled={off || undefined}
                   tabIndex={i === active ? 0 : -1}
@@ -1383,6 +1390,9 @@ function InsertTableDialog({
  * not while tracking changes), Apply and Cancel. Escape cancels; a field that is wrong is marked
  * and announced.
  */
+/** The largest picture side the schema takes, in px (2^31 - 1 EMU). */
+const MAX_PICTURE_PX = Math.floor(2_147_483_647 / EMU_PER_PX);
+
 function PictureDialog({
   editor,
   pos,
@@ -1406,47 +1416,72 @@ function PictureDialog({
   const [keep, setKeep] = useState(true);
   const [error, setError] = useState<"file" | "alt" | "size" | "failed" | null>(null);
   const [busy, setBusy] = useState(false);
-  const first = useRef<HTMLInputElement>(null);
+  const fileField = useRef<HTMLInputElement>(null);
+  const altField = useRef<HTMLInputElement>(null);
+  const decorativeField = useRef<HTMLInputElement>(null);
+  const widthField = useRef<HTMLInputElement>(null);
   const id = useId();
   const tracking = trackState(editor.state)?.on === true;
   const ratio = picture ? Number(attrs.height) / Number(attrs.width) : 1;
+  // The first field that can take the focus (a decorative picture's alt text cannot).
+  // biome-ignore lint/correctness/useExhaustiveDependencies: focus once, on open.
   useEffect(() => {
-    first.current?.focus();
+    (pos === null
+      ? fileField.current
+      : decorative
+        ? decorativeField.current
+        : altField.current
+    )?.focus();
   }, []);
-  // A dialog closed while an upload runs: what the upload finds then is not inserted.
+  // A dialog closed while an upload runs: what the upload finds then is not inserted. Set in
+  // the effect too: StrictMode runs effects twice (setup, cleanup, setup).
   const open = useRef(true);
-  useEffect(
-    () => () => {
+  useEffect(() => {
+    open.current = true;
+    return () => {
       open.current = false;
-    },
-    [],
-  );
+    };
+  }, []);
 
   const messages = {
     file: "Choose an image file.",
     alt: "Describe the picture, or mark it as decorative.",
-    size: "Enter a width and height in pixels, from 1.",
+    size: `Enter a width and height in pixels, from 1 to ${MAX_PICTURE_PX}.`,
     failed: "The picture could not be inserted: the file could not be read or uploaded here.",
   };
   const invalid = (field: string) => (error === field ? true : undefined);
   const described = (field: string) => (error === field ? `${id}-error` : undefined);
+  /** Marks `field` wrong and puts the focus on it. */
+  const fail = (field: NonNullable<typeof error>) => {
+    setError(field);
+    const target = {
+      file: fileField,
+      alt: altField,
+      size: widthField,
+      failed: fileField,
+    }[field].current;
+    target?.focus();
+  };
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
+    if (busy) return;
     if (!decorative && !alt.trim()) {
-      setError("alt");
+      fail("alt");
       return;
     }
-    if (pos !== null && picture) {
-      const w = Number(width);
-      const h = Number(height);
+    if (pos !== null) {
+      // The picture is gone (the dialog closes on a change; this is a guard).
+      if (!picture) {
+        onClose(false);
+        return;
+      }
+      const w = Math.round(Number(width));
+      const h = Math.round(Number(height));
       const sizeChanged = w !== Number(px(attrs.width)) || h !== Number(px(attrs.height));
-      if (
-        sizeChanged &&
-        !tracking &&
-        !(Number.isFinite(w) && Number.isFinite(h) && w >= 1 && h >= 1)
-      ) {
-        setError("size");
+      const valid = (n: number) => Number.isFinite(n) && n >= 1 && n <= MAX_PICTURE_PX;
+      if (sizeChanged && !tracking && !(valid(w) && valid(h))) {
+        fail("size");
         return;
       }
       editor.run(setPictureAlt(pos, alt, decorative));
@@ -1455,8 +1490,8 @@ function PictureDialog({
       onClose(true);
       return;
     }
-    if (!file || !upload) {
-      setError("file");
+    if (!file || !upload || !file.type.startsWith("image/")) {
+      fail("file");
       return;
     }
     setBusy(true);
@@ -1482,7 +1517,7 @@ function PictureDialog({
     } catch {
       if (!open.current) return;
       setBusy(false);
-      setError("failed");
+      fail("failed");
     }
   };
 
@@ -1497,6 +1532,8 @@ function PictureDialog({
     setError(null);
     if (keep && Number(value) > 0) setWidth(String(Math.max(1, Math.round(Number(value) / ratio))));
   };
+  const sizeNote = tracking ? `${id}-tracking` : undefined;
+  const sizeDescribed = [described("size"), sizeNote].filter(Boolean).join(" ") || undefined;
 
   return (
     <div
@@ -1515,10 +1552,11 @@ function PictureDialog({
           <>
             <label htmlFor={`${id}-file`}>Image</label>
             <input
-              ref={first}
+              ref={fileField}
               id={`${id}-file`}
               type="file"
               accept="image/*"
+              required
               aria-invalid={invalid("file")}
               aria-describedby={described("file")}
               onChange={(event) => {
@@ -1530,11 +1568,13 @@ function PictureDialog({
         )}
         <label htmlFor={`${id}-alt`}>Alt text</label>
         <input
-          ref={pos === null ? undefined : first}
+          ref={altField}
           id={`${id}-alt`}
           type="text"
+          maxLength={65_535}
           value={decorative ? "" : alt}
           disabled={decorative}
+          required={!decorative}
           aria-invalid={invalid("alt")}
           aria-describedby={described("alt")}
           onChange={(event) => {
@@ -1544,6 +1584,7 @@ function PictureDialog({
         />
         <label>
           <input
+            ref={decorativeField}
             type="checkbox"
             checked={decorative}
             onChange={(event) => {
@@ -1557,14 +1598,16 @@ function PictureDialog({
           <>
             <label htmlFor={`${id}-width`}>Width (px)</label>
             <input
+              ref={widthField}
               id={`${id}-width`}
               type="number"
               min={1}
+              max={MAX_PICTURE_PX}
               step={1}
               value={width}
               disabled={tracking}
               aria-invalid={invalid("size")}
-              aria-describedby={described("size")}
+              aria-describedby={sizeDescribed}
               onChange={(event) => changeWidth(event.target.value)}
             />
             <label htmlFor={`${id}-height`}>Height (px)</label>
@@ -1572,11 +1615,12 @@ function PictureDialog({
               id={`${id}-height`}
               type="number"
               min={1}
+              max={MAX_PICTURE_PX}
               step={1}
               value={height}
               disabled={tracking}
               aria-invalid={invalid("size")}
-              aria-describedby={described("size")}
+              aria-describedby={sizeDescribed}
               onChange={(event) => changeHeight(event.target.value)}
             />
             <label>
@@ -1584,19 +1628,24 @@ function PictureDialog({
                 type="checkbox"
                 checked={keep}
                 disabled={tracking}
+                aria-describedby={sizeNote}
                 onChange={(event) => setKeep(event.target.checked)}
               />
               Keep proportions
             </label>
-            {tracking && <p>The size does not change while changes are tracked.</p>}
+            {tracking && <p id={sizeNote}>The size does not change while changes are tracked.</p>}
           </>
         )}
-        <button type="submit" disabled={busy}>
+        {/* Not `disabled` while uploading: the focus stays on it (Escape still cancels). */}
+        <button type="submit" aria-disabled={busy || undefined}>
           {pos === null ? "Insert" : "Apply"}
         </button>
         <button type="button" onClick={() => onClose(false)}>
           Cancel
         </button>
+        <p role="status" className="foli-picture-status">
+          {busy ? "Inserting the picture…" : ""}
+        </p>
         {error && (
           <p id={`${id}-error`} className="foli-link-error" role="alert">
             {messages[error]}

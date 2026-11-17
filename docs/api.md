@@ -56,7 +56,9 @@ a document of any version too).
 ### `<FoliCanvas>`
 
 The pages alone, for your own layout. Props: `editor` (default: the nearest
-`FoliEditorProvider`'s), `readOnly`, `placeholder`, `label`, `className`, as above.
+`FoliEditorProvider`'s), `readOnly`, `placeholder`, `label`, `className`, `upload`, `resource`,
+as above (`upload` and `resource` are the view's options, in place from its first render; give
+`resource` a stable function: a new one draws every picture again).
 `ref` → `FoliCanvasHandle`: `{ focus(): void }` (focuses the document, shows the editor's
 selection and scrolls it into view).
 
@@ -84,7 +86,7 @@ New comment (with `comments`: on the selection, written in the pane), Track chan
 previous and next change, Accept, Reject (the change at the caret or the selected ones),
 Accept all, Reject all ·
 undo, redo · Table (a menu), Table style (a box of the document's table styles and Word's Table
-Grid), Shading (a menu of light cell fills; both in a table, not while tracking) · page break. A pointer pick in a box calls `onClickCommand`, like a button click.
+Grid), Shading (a menu of light cell fills; both in a table, not while tracking) · Picture… (a dialog) · page break. A pointer pick in a box calls `onClickCommand`, like a button click.
 Up and Down on a closed box apply each value they pass (Chrome and Firefox on Windows), one
 undo step each. Text color and highlight are menu buttons (WAI-ARIA menu, `menuitemradio`
 items) with a fixed palette (Word's highlight colors), the current color checked; arrow keys,
@@ -430,6 +432,10 @@ const view = new EditorView(host, editor, { editable: true, placeholder: "" });
   on Apple platforms) opens the link's href, read from the document, in a new tab with
   `noopener,noreferrer`.
 - `keyName(event)`: the key name `handleKey` expects (`"Mod-b"`, `"Shift-Enter"`).
+- `measureImageFile(file, doc)`: an image file's natural size in CSS px from a local object URL
+  (null when the browser cannot show it); `textWidthEmu(state)`: the widest a picture is
+  inserted, in EMU (the last section's text width: shortcut, not the caret's section);
+  `EMU_PER_PX` (9525). For an app's own picture insert, as the toolbar's dialog does it.
 - `renderDocument(document, container, { review?, resource? }): DocumentPages` (a read-only view, no
   editor): lays a schema v3 document out on
   pages (`.foli-word-page`, `WORD_PAGE_CLASS`) appended to `container`, formatted as Word

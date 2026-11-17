@@ -7,8 +7,9 @@ import {
   trackState,
 } from "@folijs/core";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
-import { FoliToolbar } from "./index.js";
+import { StrictMode } from "react";
+import { afterEach, describe, expect, it, onTestFinished, vi } from "vitest";
+import { FoliCanvas, FoliToolbar } from "./index.js";
 
 const document3: FoliDocument = {
   schemaVersion: 4,
@@ -349,5 +350,143 @@ describe("FoliToolbar's picture dialog", () => {
     fireEvent.click(screen.getByLabelText("Decorative (no alt text)"));
     fireEvent.submit(screen.getByRole("dialog").querySelector("form") as HTMLFormElement);
     expect(editor.state.doc.nodeAt(2)?.attrs).toMatchObject({ alt: null, decorative: true });
+  });
+});
+
+describe("FoliToolbar's picture dialog: review findings", () => {
+  afterEach(cleanup);
+  const docWith = (
+    resources: Record<string, unknown>,
+    url = "data:image/png;base64,iVBORw0KGgo=",
+  ) =>
+    createEditor({
+      document: {
+        ...document3,
+        resources: {
+          img: { contentType: "image/png", ...(url.startsWith("data:") ? { data: url } : { url }) },
+          ...resources,
+        },
+        content: {
+          type: "doc",
+          content: [
+            {
+              type: "paragraph",
+              content: [
+                { type: "text", text: "a" },
+                {
+                  type: "picture",
+                  attrs: { resource: "img", width: 9525 * 200, height: 9525 * 100, alt: "Dot" },
+                },
+              ],
+            },
+          ],
+        },
+      },
+    });
+
+  it("reports a file it cannot insert, under StrictMode too, the focus on the file field", async () => {
+    const editor = docWith({});
+    const upload = vi.fn(async () => "https://x.test/a.png");
+    // jsdom never loads an image: no object URLs, so the file cannot be read.
+    const createObjectURL = URL.createObjectURL;
+    Object.defineProperty(URL, "createObjectURL", { value: undefined, configurable: true });
+    onTestFinished(() => {
+      Object.defineProperty(URL, "createObjectURL", { value: createObjectURL, configurable: true });
+    });
+    render(
+      <StrictMode>
+        <FoliToolbar editor={editor} upload={upload} />
+      </StrictMode>,
+    );
+    act(() => editor.select(1));
+    fireEvent.click(screen.getByRole("button", { name: "Picture…" }));
+    const input = screen.getByLabelText("Image") as HTMLInputElement;
+    const file = new File([new Uint8Array([1])], "x.png", { type: "image/png" });
+    fireEvent.change(input, { target: { files: [file] } });
+    fireEvent.change(screen.getByLabelText("Alt text", { exact: true }), {
+      target: { value: "X" },
+    });
+    await act(async () => {
+      fireEvent.submit(screen.getByRole("dialog").querySelector("form") as HTMLFormElement);
+    });
+    // jsdom cannot read the image: the failure is shown, not a dialog stuck busy.
+    expect((await screen.findByRole("alert")).textContent).toContain("could not be inserted");
+    expect(document.activeElement).toBe(input);
+    expect(upload).not.toHaveBeenCalled();
+  });
+
+  it("refuses a size past the model's range, the focus on the width", () => {
+    const editor = docWith({});
+    render(<FoliToolbar editor={editor} />);
+    act(() =>
+      editor.dispatch(editor.state.tr.setSelection(NodeSelection.create(editor.state.doc, 2))),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Picture…" }));
+    fireEvent.change(screen.getByLabelText("Width (px)"), { target: { value: "300000" } });
+    fireEvent.submit(screen.getByRole("dialog").querySelector("form") as HTMLFormElement);
+    expect(screen.getByRole("alert").textContent).toContain("from 1 to");
+    expect(document.activeElement).toBe(screen.getByLabelText("Width (px)"));
+    expect(editor.state.doc.nodeAt(2)?.attrs.width).toBe(9525 * 200);
+  });
+
+  it("closes when another document is set", () => {
+    const editor = docWith({});
+    render(<FoliToolbar editor={editor} />);
+    act(() =>
+      editor.dispatch(editor.state.tr.setSelection(NodeSelection.create(editor.state.doc, 2))),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Picture…" }));
+    expect(screen.getByRole("dialog")).toBeTruthy();
+    act(() => editor.setDocument(document3));
+    expect(screen.queryByRole("dialog")).toBe(null);
+  });
+});
+
+describe("FoliCanvas's pictures", () => {
+  afterEach(cleanup);
+
+  it("fetches no web image before the app's resolver, and redraws none on other prop changes", () => {
+    const fetched: string[] = [];
+    const descriptor = Object.getOwnPropertyDescriptor(HTMLImageElement.prototype, "src");
+    Object.defineProperty(HTMLImageElement.prototype, "src", {
+      configurable: true,
+      set(value: string) {
+        fetched.push(value);
+        descriptor?.set?.call(this, value);
+      },
+      get() {
+        return descriptor?.get?.call(this);
+      },
+    });
+    try {
+      const editor = createEditor({
+        document: {
+          ...document3,
+          resources: { img: { contentType: "image/png", url: "https://tracker.test/a.png" } },
+          content: {
+            type: "doc",
+            content: [
+              {
+                type: "paragraph",
+                content: [
+                  {
+                    type: "picture",
+                    attrs: { resource: "img", width: 9525, height: 9525, alt: "x" },
+                  },
+                ],
+              },
+            ],
+          },
+        },
+      });
+      const refuse = () => null;
+      const { rerender, container } = render(<FoliCanvas editor={editor} resource={refuse} />);
+      expect(fetched).toEqual([]);
+      const box = container.querySelector("[data-foli-picture]");
+      rerender(<FoliCanvas editor={editor} resource={refuse} placeholder="Type" />);
+      expect(container.querySelector("[data-foli-picture]")).toBe(box);
+    } finally {
+      if (descriptor) Object.defineProperty(HTMLImageElement.prototype, "src", descriptor);
+    }
   });
 });
