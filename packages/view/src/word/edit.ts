@@ -23,6 +23,7 @@ import type { BlockDesc, LeafDesc } from "../render.js";
 import {
   CHANGE_BAR,
   changeElement,
+  type FloatGeometry,
   floatElements,
   floatGeometry,
   fontStack,
@@ -198,6 +199,7 @@ export class WordRenderer {
     const leaves: LeafDesc[] = [];
     // Floating pictures go first in the fragment their anchor is in, in order.
     const floats = new Map<HTMLElement, HTMLElement[]>();
+    let geometry: FloatGeometry | undefined;
     const comments = new Set(this.#comments[index] ?? []);
     node.forEach((child, offset) => {
       const name = child.type.name;
@@ -236,7 +238,7 @@ export class WordRenderer {
           if (child.attrs.float && !this.#clipboard) {
             // Floating: drawn at the fragment's start (ADR-0006), its place in the text an
             // empty anchor.
-            const geometry = floatGeometry(this.#context.envelope.section);
+            geometry ??= floatGeometry(this.#context.envelope.section);
             const { nodes, holder } = floatElements(child.attrs, doc, this.#image, geometry);
             for (const node of nodes) node.setAttribute("contenteditable", "false");
             FLOAT_ANCHORS.set(holder, span);
@@ -283,7 +285,11 @@ export class WordRenderer {
     let last: ModelNode | null = null;
     for (let i = node.childCount - 1; i >= 0 && !last; i--) {
       const child = node.child(i);
-      if (!["bookmarkStart", "bookmarkEnd", "commentStart", "commentEnd"].includes(child.type.name))
+      // A floating picture is not in the line: a paragraph holding only one shows its empty line.
+      if (
+        !["bookmarkStart", "bookmarkEnd", "commentStart", "commentEnd"].includes(child.type.name) &&
+        !(child.type.name === "picture" && child.attrs.float)
+      )
         last = child;
     }
     if (!last || last.type.name === "hardBreak" || last.type.name === "columnBreak")
@@ -373,6 +379,7 @@ export class WordRenderer {
       this.#doc,
       this.#ratio,
       this.#image,
+      floatGeometry(this.#context.envelope.section),
     );
     const dom = shown.element;
     dom.setAttribute("contenteditable", "false");

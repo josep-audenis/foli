@@ -6,7 +6,7 @@ import {
   NodeSelection,
   parseDocument,
 } from "@folijs/core";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { EditorView } from "../index.js";
 import {
   FLOAT_ATTR,
@@ -17,6 +17,7 @@ import {
   ownImageUrl,
   PICTURE_ATTR,
   pictureElement,
+  renderBlocks,
 } from "./blocks.js";
 
 /** Pictures in the view (10.8b). */
@@ -265,5 +266,123 @@ describe("a floating picture's elements (10.9)", () => {
     expect(holder.querySelector("[data-foli-resize]")).not.toBeNull();
     view.destroy();
     host.remove();
+  });
+});
+
+describe("floating pictures against the page's margins (10.9)", () => {
+  // Letter, 1-inch margins: 816 × 1056 px, 96 px margins.
+  const letter = floatGeometry(undefined);
+  const holder = (float: Record<string, unknown>) =>
+    floatElements(picture({ alt: "A dot", float }).attrs ?? {}, document, undefined, letter).holder
+      .style;
+  const behind = (horizontal: unknown, vertical: unknown) =>
+    holder({ horizontal, vertical, wrap: "behind" });
+
+  it("align in the margin they are against", () => {
+    // 96 × 48 px: in the left margin (0-96), the right margin (720-816).
+    const along = (relativeTo: string, align: string) =>
+      behind({ relativeTo, align }, { relativeTo: "page", offset: 0 }).left;
+    expect(along("leftMargin", "left")).toBe("0px");
+    expect(along("leftMargin", "right")).toBe("0px");
+    expect(along("rightMargin", "left")).toBe("720px");
+    expect(along("rightMargin", "right")).toBe("720px");
+    expect(along("margin", "center")).toBe("360px");
+    expect(along("page", "right")).toBe("720px");
+    const down = (relativeTo: string, align: string) =>
+      behind({ relativeTo: "page", offset: 0 }, { relativeTo, align }).top;
+    expect(down("topMargin", "top")).toBe("0px");
+    expect(down("topMargin", "bottom")).toBe("48px");
+    expect(down("bottomMargin", "top")).toBe("960px");
+    expect(down("bottomMargin", "bottom")).toBe("1008px");
+    expect(down("margin", "bottom")).toBe("912px");
+    expect(down("page", "center")).toBe("504px");
+  });
+
+  it("keep their distance from the text above them", () => {
+    const style = holder({
+      horizontal: { relativeTo: "column", offset: 0 },
+      vertical: { relativeTo: "paragraph", offset: 30 * 9525 },
+      wrap: "square",
+      distance: { top: 6 * 9525 },
+    });
+    expect(style.marginTop).toBe("6px");
+  });
+});
+
+describe("floating pictures on pages (10.9)", () => {
+  const views: EditorView[] = [];
+  afterEach(() => {
+    for (const view of views.splice(0)) view.destroy();
+    document.body.replaceChildren();
+    vi.restoreAllMocks();
+  });
+  const float = {
+    horizontal: { relativeTo: "column", offset: 0 },
+    vertical: { relativeTo: "paragraph", offset: 0 },
+    wrap: "square",
+  };
+  const text = (t: string): NodeJSON => ({
+    type: "paragraph",
+    content: [{ type: "text", text: t }],
+  });
+  const mount = (content: NodeJSON[]) => {
+    const host = document.createElement("div");
+    document.body.append(host);
+    const editor = createEditor({
+      document: parseDocument(createDocument({ type: "doc", content } as NodeJSON as never)),
+    });
+    const view = new EditorView(host, editor);
+    views.push(view);
+    return { host, editor };
+  };
+
+  it("show a paragraph holding only one as an empty line", () => {
+    const { host } = mount([{ type: "paragraph", content: [picture({ alt: "Dot", float })] }]);
+    const p = host.querySelector(".foli-page > *") as HTMLElement;
+    expect(p.lastElementChild?.localName).toBe("br");
+  });
+
+  it("have the blocks after an edited one on their page and the next measured again", () => {
+    // jsdom lays nothing out: every block is 400 px tall, two to a page.
+    const spy = vi.spyOn(Element.prototype, "getBoundingClientRect").mockImplementation(function (
+      this: Element,
+    ) {
+      const height = this.parentElement?.classList.contains("foli-page") ? 400 : 0;
+      return { height, width: 0, top: 0, left: 0, bottom: height, right: 0 } as DOMRect;
+    });
+    const { host, editor } = mount([
+      { type: "paragraph", content: [picture({ alt: "Dot", float }), { type: "text", text: "a" }] },
+      text("b"),
+      text("c"),
+      text("d"),
+      text("e"),
+      text("f"),
+    ]);
+    expect(host.querySelectorAll(".foli-page")).toHaveLength(3);
+    spy.mockClear();
+    editor.select(3); // after "a"
+    editor.commands.insertText("x");
+    const read = new Set(spy.mock.contexts.map((el) => (el as Element).textContent));
+    // The edited block and those after it on its page and the next; not the last page.
+    for (const t of ["ax", "b", "c", "d"]) expect(read.has(t)).toBe(true);
+    expect(read.has("e")).toBe(false);
+  });
+
+  it("are drawn first in their paragraph by renderBlocks, the text after them", () => {
+    const [block] = renderBlocks(
+      createDocument({
+        type: "doc",
+        content: [
+          {
+            type: "paragraph",
+            content: [{ type: "text", text: "Text " }, picture({ alt: "Dot", float })],
+          },
+        ],
+      } as NodeJSON as never),
+      document,
+    );
+    const element = block?.element as HTMLElement;
+    expect(element.children[1]?.getAttribute(FLOAT_ATTR)).toBe("square");
+    expect(element.textContent).toBe("Text ");
   });
 });

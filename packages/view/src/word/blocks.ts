@@ -124,20 +124,53 @@ export function floatGeometry(section: SectionJSON | undefined): FloatGeometry {
 }
 
 type FloatPosition = { relativeTo: string; offset?: number; align?: string };
-/** Horizontal positions measured from the page's left edge (the others: the column's). */
-const FROM_PAGE_LEFT = new Set(["page", "leftMargin", "insideMargin", "outsideMargin"]);
+
+/** Where a float's position is measured from, and the box its alignment is in (px). */
+function horizontalBox(relativeTo: string, g: FloatGeometry): [start: number, size: number] {
+  const right = g.pageWidth - g.marginLeft - g.textWidth;
+  switch (relativeTo) {
+    case "page":
+      return [0, g.pageWidth];
+    case "leftMargin":
+    case "insideMargin":
+      return [0, g.marginLeft];
+    case "rightMargin":
+    case "outsideMargin":
+      return [g.marginLeft + g.textWidth, right];
+    default:
+      // margin, column, character (shortcut: the column).
+      return [g.marginLeft, g.textWidth];
+  }
+}
+
+function verticalBox(relativeTo: string, g: FloatGeometry): [start: number, size: number] {
+  const bottom = g.pageHeight - g.marginTop - g.textHeight;
+  switch (relativeTo) {
+    case "page":
+      return [0, g.pageHeight];
+    case "topMargin":
+    case "insideMargin":
+      return [0, g.marginTop];
+    case "bottomMargin":
+    case "outsideMargin":
+      return [g.pageHeight - bottom, bottom];
+    default:
+      return [g.marginTop, g.textHeight];
+  }
+}
+
+/** Where `size` px goes in `[start, start + box)` by offset (EMU) or alignment. */
+function placed(position: FloatPosition, [start, box]: [number, number], size: number): number {
+  if (typeof position.offset === "number") return start + position.offset / EMU_PER_PX;
+  const { align } = position;
+  if (align === "right" || align === "bottom" || align === "outside") return start + box - size;
+  if (align === "center") return start + (box - size) / 2;
+  return start;
+}
 
 /** Where a float's left edge is, in px from the column's left edge. */
 function floatLeft(h: FloatPosition, width: number, g: FloatGeometry): number {
-  const page = FROM_PAGE_LEFT.has(h.relativeTo);
-  const box = page ? g.pageWidth : g.textWidth;
-  let x: number;
-  if (typeof h.offset === "number") x = h.offset / EMU_PER_PX;
-  else if (h.align === "right" || h.align === "outside") x = box - width;
-  else if (h.align === "center") x = (box - width) / 2;
-  else x = 0;
-  if (h.relativeTo === "rightMargin") return g.textWidth + x;
-  return page ? x - g.marginLeft : x;
+  return placed(h, horizontalBox(h.relativeTo, g), width) - g.marginLeft;
 }
 
 /**
@@ -149,13 +182,9 @@ function floatTop(
   height: number,
   g: FloatGeometry,
 ): { paragraph?: number; page?: number } {
-  const offset = typeof v.offset === "number" ? v.offset / EMU_PER_PX : undefined;
-  if (v.relativeTo === "paragraph" || v.relativeTo === "line") return { paragraph: offset ?? 0 };
-  const [start, box] = v.relativeTo === "page" ? [0, g.pageHeight] : [g.marginTop, g.textHeight];
-  if (offset !== undefined) return { page: start + offset };
-  if (v.align === "bottom" || v.align === "outside") return { page: start + box - height };
-  if (v.align === "center") return { page: start + (box - height) / 2 };
-  return { page: start };
+  if (v.relativeTo === "paragraph" || v.relativeTo === "line")
+    return { paragraph: typeof v.offset === "number" ? v.offset / EMU_PER_PX : 0 };
+  return { page: placed(v, verticalBox(v.relativeTo, g), height) };
 }
 
 /**
@@ -169,7 +198,10 @@ function floatTop(
  *   the containing block and its own stacking context).
  * shortcut: a wrapping picture placed against the page or its margins vertically is drawn at
  * its paragraph's top; horizontal positions are against the paragraph's box (its indents in);
- * all against `geometry` (one section's page), not each page's.
+ * all against `geometry` (one section's page), not each page's. A float's top is never above an
+ * earlier float's (CSS), and `clear` stacks it below earlier floats on its side: several floats
+ * in a paragraph, or one above a float of an earlier paragraph, add their offsets down and do
+ * not sit side by side.
  */
 export function floatElements(
   attrs: Record<string, unknown>,
@@ -186,7 +218,7 @@ export function floatElements(
   };
   const width = Number(attrs.width) / EMU_PER_PX;
   const height = Number(attrs.height) / EMU_PER_PX;
-  const distance = (side: "bottom" | "left" | "right") =>
+  const distance = (side: "top" | "bottom" | "left" | "right") =>
     (float.distance?.[side] ?? 0) / EMU_PER_PX;
   const picture = pictureElement(attrs, doc, image);
   picture.style.display = "block";
@@ -206,12 +238,14 @@ export function floatElements(
     else style.marginTop = `${top.paragraph}px`;
     return { nodes: [holder], holder };
   }
-  const down = top.paragraph ?? 0;
+  // Its distance from the text above and below as its margins: lines there go around it too.
+  const above = distance("top");
+  const down = (top.paragraph ?? 0) - above;
   const spacer = doc.createElement("span");
   spacer.setAttribute("aria-hidden", "true");
   spacer.style.width = "0";
   spacer.style.height = `${Math.max(0, down)}px`;
-  if (down < 0) style.marginTop = `${down}px`;
+  style.marginTop = `${above + Math.min(0, down)}px`;
   style.marginBottom = `${distance("bottom")}px`;
   if (float.wrap === "topAndBottom") {
     spacer.style.float = "left";
@@ -603,7 +637,7 @@ export function renderBlocks(
 
   content.forEach((node, index) => {
     if (node.type !== "paragraph") {
-      blocks.push(opaqueBlock(node, index, resolver, doc, ratio, image));
+      blocks.push(opaqueBlock(node, index, resolver, doc, ratio, image, geometry));
       return;
     }
     const attrs = attrsOf(node);
@@ -851,6 +885,8 @@ export function opaqueBlock(
   doc: Document,
   ratio: (family: string) => number,
   image?: ImageSource,
+  /** The page floating pictures in its cells are placed against. */
+  geometry: FloatGeometry = floatGeometry(undefined),
 ): WordBlock {
   const attrs = (node.attrs ?? {}) as Record<string, unknown>;
   const element = doc.createElement("div");
@@ -859,7 +895,8 @@ export function opaqueBlock(
   element.style.display = "flow-root";
   const xml = node.type === "table" ? null : parseOpaque(String(attrs.xml ?? ""), doc);
   let after = 0;
-  if (node.type === "table") element.append(modelTable(node, resolver, doc, ratio, image));
+  if (node.type === "table")
+    element.append(modelTable(node, resolver, doc, ratio, image, geometry));
   else if (xml?.localName === "tbl") element.append(opaqueTable(xml, resolver, doc, ratio));
   else if (xml) {
     const paragraphs = outermost(xml, PARAGRAPHS);
@@ -1097,7 +1134,8 @@ function modelTable(
   resolver: Resolver,
   doc: Document,
   ratio: (family: string) => number,
-  image?: ImageSource,
+  image: ImageSource | undefined,
+  geometry: FloatGeometry,
 ): HTMLElement {
   const attrs = (node.attrs ?? {}) as Record<string, unknown>;
   const table = doc.createElement("table");
@@ -1122,8 +1160,8 @@ function modelTable(
     comments: new Set<number>(),
     ratio,
     image,
-    // shortcut: a floating picture in a cell is placed against a Letter page's text width.
-    geometry: floatGeometry(undefined),
+    // shortcut: a floating picture in a cell is placed against the page, not its cell.
+    geometry,
   };
   rows.forEach((rowNode, r) => {
     const rowAttrs = (rowNode.attrs ?? {}) as Record<string, unknown>;
@@ -1155,11 +1193,11 @@ function modelTable(
       if (cellAttrs.vMerge === "continue") return;
       for (const block of cellNode.content ?? []) {
         if (block.type === "table") {
-          cell.append(modelTable(block, resolver, doc, ratio, image));
+          cell.append(modelTable(block, resolver, doc, ratio, image, geometry));
           continue;
         }
         if (block.type !== "paragraph") {
-          cell.append(opaqueBlock(block, 0, resolver, doc, ratio, image).element);
+          cell.append(opaqueBlock(block, 0, resolver, doc, ratio, image, geometry).element);
           continue;
         }
         const { paragraph, run } = resolver.paragraph(block.attrs ?? {}, format);

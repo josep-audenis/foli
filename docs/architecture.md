@@ -745,19 +745,26 @@ float on the side of the column the picture is on (or the side `side` names), it
 the text as its margin, a zero-width spacer float before it giving its offset down from the
 paragraph's top; text goes on the other side only. Top and bottom is a float as wide as the
 paragraph. Behind and in front of text are absolutely positioned against the page (each page
-is `position: relative; isolation: isolate`), z-index -1 (under the text, over the page's
-background) or 1. Positions are against the column, margin or page of the last section
-(`floatGeometry`). In the editable view the holder and spacer are the view's own
+is `position: relative; isolation: isolate; display: flow-root`), z-index -1 (under the text,
+over the page's background) or 1. Positions are against the column, the page, its margins
+(left, right, top, bottom) or the page's text, as offsets or alignments, on the last section's
+page (`floatGeometry`); the distance from the text above and below is the float's margin. In the editable view the holder and spacer are the view's own
 (`contenteditable="false"`, not read back, like a list marker); the picture's place in the text
 is an empty non-editable anchor span (`FLOAT_ANCHORS` maps the holder to it): a press on the
 picture selects that position, and the selected picture's outline and resize handle are on the
-holder. A block drawn again on a page holding a floating picture has the blocks after it on
-that page and the next measured again (their lines go around it). In the editing view the
+holder. A paragraph holding only a floating picture shows its empty line. A block that changed
+(new, drawn again or stale) on a page holding a floating picture has the blocks after it on that
+page and the next measured again (their lines go around it); a float in a paragraph split across
+pages settles (`word-floats.spec.ts`). In the editing view the
 corpus's picture report (07) has its three floats on Word's page and paragraph, at Word's
 offsets to the pixel (`apps/playground/e2e/word-floats.spec.ts`, three engines).
 shortcut: a wrapping picture placed against the page or its margins vertically is drawn at its
-paragraph's top; horizontal positions are against the paragraph's box (its indents in); a float
-reaching past its page's text is not pushed to the next page; the clipboard writes it inline.
+paragraph's top; horizontal positions are against the paragraph's box (its indents in), in a
+table cell against the page too; a float's top is never above an earlier float's and `clear`
+stacks floats on one side, so several floats in a paragraph (or one placed above a float of an
+earlier paragraph) add their offsets down instead of sitting side by side; a float reaching past
+its page's text makes the page taller (pages contain their floats) instead of moving to the next
+page; the clipboard writes it inline.
 
 Review in the editable view (9.5): `EditorView` draws tracked changes as the editor's state says
 (`trackState(state).view`, `setReviewView`), every block again when it changes. `markup`:

@@ -239,7 +239,9 @@ interface Sheet {
 function sheetOf(settings: DocumentSettings, index: number): Sheet {
   const { pageSize, margins } = settings;
   const css =
-    "position: relative; isolation: isolate; " +
+    // The containing block, stacking context and formatting context of floating pictures: one
+    // reaching past the page's text makes the page taller, never overlaps the next page.
+    "position: relative; isolation: isolate; display: flow-root; " +
     `box-sizing: border-box; width: ${pageSize.width}mm; min-height: ${pageSize.height}mm; ` +
     `padding: ${margins.top}mm ${margins.right}mm ${margins.bottom}mm ${margins.left}mm;`;
   return { settings, css, index };
@@ -988,28 +990,34 @@ export class EditorView {
 
   /**
    * A floating picture reaches into the blocks after its paragraph (their lines go around it):
-   * a block drawn again or stale on a page holding one has the blocks after it on that page and
-   * the next measured again.
+   * a block that changed (new, drawn again or stale) on a page holding one has the blocks after
+   * it on that page and the next measured again. A new block counts on the page of the block
+   * before it, where `place` first puts it; only blocks that changed reach on, not the ones this
+   * marks, so an edit re-measures two pages at most.
    */
   private staleAroundFloats(
     doc: ModelNode,
     pagesOf: ReadonlyMap<ModelNode, readonly number[]>,
     redrawn: ReadonlySet<ModelNode>,
   ): void {
-    const floatPages = new Set<number>();
+    const blocks: { node: ModelNode; pages: readonly number[]; changed: boolean }[] = [];
+    let last = 0;
     doc.forEach((node) => {
-      if (holdsFloat(node)) for (const p of pagesOf.get(node) ?? []) floatPages.add(p);
+      const known = pagesOf.get(node);
+      const pages = known?.length ? known : [last];
+      last = pages[pages.length - 1] as number;
+      blocks.push({ node, pages, changed: !known || redrawn.has(node) || this.stale.has(node) });
     });
+    const floatPages = new Set<number>();
+    for (const { node, pages } of blocks)
+      if (holdsFloat(node)) for (const p of pages) floatPages.add(p);
     if (!floatPages.size) return;
     let reach = -1;
-    doc.forEach((node) => {
-      const pages = pagesOf.get(node) ?? [];
-      const first = pages[0];
-      if (first === undefined) return;
-      if (first <= reach) this.stale.add(node);
-      if ((redrawn.has(node) || this.stale.has(node)) && pages.some((p) => floatPages.has(p)))
+    for (const { node, pages, changed } of blocks) {
+      if ((pages[0] as number) <= reach) this.stale.add(node);
+      if (changed && pages.some((p) => floatPages.has(p)))
         reach = Math.max(reach, (pages[pages.length - 1] as number) + 1);
-    });
+    }
   }
 
   /** A font's normal line height ratio, measured outside the host (no input to read back). */

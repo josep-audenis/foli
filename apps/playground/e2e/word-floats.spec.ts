@@ -153,3 +153,59 @@ test("a click on a floating picture selects it, at its place in the text", async
   await expect(editor(page).locator("[data-foli-float]")).toHaveCount(2);
   expect(await page.evaluate(() => window.foliEdit.validate())).toBe(true);
 });
+
+test("the pages settle with a floating picture in a paragraph split across them", async ({
+  page,
+}) => {
+  await open(page, "07-picture-report.docx");
+  // Paragraphs added before the logo's until its paragraph runs over a page end.
+  const split = await page.evaluate(async () => {
+    const { editor } = window.foliEdit;
+    const holder = () =>
+      [...document.querySelectorAll("[data-foli-float]")].find(
+        (el) => el.querySelector("img")?.getAttribute("alt") === "Northwind logo",
+      ) as HTMLElement;
+    for (let i = 0; i < 60; i++) {
+      if (holder().parentElement?.dataset.fragment !== undefined) return i;
+      let at = -1;
+      editor.state.doc.forEach((node, offset) => {
+        let has = false;
+        node.descendants((child) => {
+          if (child.attrs.alt === "Northwind logo") has = true;
+        });
+        if (has && at < 0) at = offset;
+      });
+      const { schema } = editor.state;
+      const filler = schema.nodes.paragraph.create(
+        null,
+        schema.text("A paragraph added to move the logo's paragraph down the page."),
+      );
+      editor.dispatch(editor.state.tr.insert(at, filler));
+      await new Promise((resolve) => requestAnimationFrame(() => setTimeout(resolve, 30)));
+    }
+    return -1;
+  });
+  expect(split).toBeGreaterThan(0);
+  await page.waitForTimeout(500);
+  // No relayout after that: the view's DOM stays as it is.
+  const changes = await page.evaluate(
+    () =>
+      new Promise<number>((resolve) => {
+        let count = 0;
+        const observer = new MutationObserver((records) => {
+          count += records.length;
+        });
+        observer.observe(document.querySelector("[role=textbox]") as Element, {
+          subtree: true,
+          childList: true,
+          attributes: true,
+        });
+        setTimeout(() => {
+          observer.disconnect();
+          resolve(count);
+        }, 1500);
+      }),
+  );
+  expect(changes).toBe(0);
+  expect(await page.evaluate(() => window.foliEdit.validate())).toBe(true);
+});

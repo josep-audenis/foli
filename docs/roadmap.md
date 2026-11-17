@@ -1022,7 +1022,10 @@ Each task is a PR on `phase-10/tables-images`, the build green after each.
   position agreement with Word measured on the corpus.
   (Done: spike passed, CSS floats in the editable host in three engines, ADR-0006 updated;
   `wp:anchor` read and written as `picture.float`; floats laid out on pages in both views, 07's
-  three on Word's page and paragraph at Word's offsets.)
+  three on Word's page and paragraph at Word's offsets. Shortcuts (architecture.md, "Floating
+  pictures"): a square or top-and-bottom picture placed against the page or its margins
+  vertically is drawn at its paragraph's top; text goes on one side of a square picture; several
+  floats in a paragraph stack; one reaching past its page's text makes the page taller.)
 - [ ] 10.10 Close: docs (ADR-0006 outcome, architecture, document model, pagination, docx README,
   limitations), size budgets, the acceptance above checked with the harness, the 0.5.0
   changeset (schema v4: 0.4.0 cannot read documents saved by 0.5.0), the version PR; publish
