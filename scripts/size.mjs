@@ -66,14 +66,15 @@ writeFileSync(appEntry, `export { FoliEditor } from "${dist("react")}";\n`);
  * 10.8c (52.7 kB): picture commands (insert with its resource, size, alt text). View and React
  * raised in 10.8d (62.5 and 85.4 kB): selecting and resizing pictures, pasting and dropping
  * image files through the upload hook. React raised in 10.8e (87.9 kB): the toolbar's picture
- * dialog (insert from a file, alt text, size).
+ * dialog (insert from a file, alt text, size). Docx raised in 10.9b (44.9 kB): floating pictures
+ * read and written (`wp:anchor` positions and wrapping, new anchors).
  */
 const BUNDLES = [
   { name: "@folijs/core", entry: dist("core"), budget: 54_000 },
   { name: "@folijs/view", entry: dist("view"), budget: 64_000 },
   { name: "@folijs/react", entry: dist("react"), budget: 90_000 },
   { name: "FoliEditor only", entry: appEntry, budget: 90_000 },
-  { name: "@folijs/docx", entry: dist("docx"), budget: 45_000 },
+  { name: "@folijs/docx", entry: dist("docx"), budget: 46_000 },
 ];
 
 let failed = false;

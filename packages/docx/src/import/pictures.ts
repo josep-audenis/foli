@@ -1,11 +1,12 @@
 /**
- * Pictures (10.8, ADR-0006): a `w:drawing` holding one inline DrawingML picture (`wp:inline`,
- * `pic:pic`) becomes a `picture` node; its image part becomes a resource of the envelope, keyed
- * by part name. Anchored (floating) pictures, charts, shapes and anything else stay opaque.
+ * Pictures (10.8, 10.9, ADR-0006): a `w:drawing` holding one DrawingML picture (`pic:pic`),
+ * inline (`wp:inline`) or floating (`wp:anchor`, its position and wrapping as `float`), becomes
+ * a `picture` node; its image part becomes a resource of the envelope, keyed by part name.
+ * Charts, shapes and anything else stay opaque.
  */
 import type { ResourceJSON } from "@folijs/core";
 import type { XmlElement } from "../xml.js";
-import { A, attr, integer, R } from "./ooxml.js";
+import { A, attr, integer, R, textOf } from "./ooxml.js";
 import { type Context, sourceOf } from "./properties.js";
 
 export const WP = "http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing";
@@ -14,6 +15,14 @@ const ADEC = "http://schemas.microsoft.com/office/drawing/2017/decorative";
 const IMAGE = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image";
 /** The largest EMU the schema takes. */
 const MAX_EMU = 2_147_483_647;
+/** `wp:wrap*` to the model's wrapping (`wp:wrapNone` is behind or in front, by `behindDoc`). */
+const WRAPS: Record<string, string> = {
+  wrapSquare: "square",
+  wrapTight: "tight",
+  wrapThrough: "through",
+  wrapTopAndBottom: "topAndBottom",
+};
+const SIDES = new Set(["bothSides", "left", "right", "largest"]);
 
 export interface PictureContext extends Context {
   /** The part's relationship with this id. */
@@ -49,6 +58,58 @@ const emu = (value: string | undefined) => {
   return n !== undefined && n >= 0 && n <= MAX_EMU ? n : undefined;
 };
 
+const flag = (value: string | undefined) =>
+  value === "1" || value === "true" ? true : value === "0" || value === "false" ? false : undefined;
+
+/** A `wp:positionH`/`wp:positionV`: where it is from, and its offset or alignment. */
+function position(el: XmlElement | undefined) {
+  const relativeTo = plain(el, "relativeFrom");
+  if (!el || !relativeTo) return undefined;
+  const offsetEl = kid(el, WP, "posOffset");
+  const offset = offsetEl ? integer(textOf(offsetEl).trim()) : undefined;
+  const align = kid(el, WP, "align");
+  if (offset !== undefined && Math.abs(offset) <= MAX_EMU) return { relativeTo, offset };
+  if (align) return { relativeTo, align: textOf(align).trim() };
+  return undefined;
+}
+
+/** The `float` of a `wp:anchor`: undefined for one the model cannot hold (kept opaque). */
+export function floatOf(anchor: XmlElement): Record<string, unknown> | undefined {
+  const horizontal = position(kid(anchor, WP, "positionH"));
+  const vertical = position(kid(anchor, WP, "positionV"));
+  // `simplePos`: a position from the page's corner, which Word itself ignores unless set.
+  if (!horizontal || !vertical || flag(plain(anchor, "simplePos")) === true) return undefined;
+  const wrapEl = anchor.children.find(
+    (c): c is XmlElement => c.kind === "element" && c.ns === WP && c.local.startsWith("wrap"),
+  );
+  const wrap = !wrapEl
+    ? undefined
+    : wrapEl.local === "wrapNone"
+      ? flag(plain(anchor, "behindDoc"))
+        ? "behind"
+        : "inFront"
+      : WRAPS[wrapEl.local];
+  if (!wrap) return undefined;
+  const side = plain(wrapEl, "wrapText");
+  const distance = {
+    top: emu(plain(anchor, "distT")) ?? 0,
+    bottom: emu(plain(anchor, "distB")) ?? 0,
+    left: emu(plain(anchor, "distL")) ?? 0,
+    right: emu(plain(anchor, "distR")) ?? 0,
+  };
+  const allowOverlap = flag(plain(anchor, "allowOverlap"));
+  const layoutInCell = flag(plain(anchor, "layoutInCell"));
+  return {
+    horizontal,
+    vertical,
+    wrap,
+    ...(side && SIDES.has(side) ? { side } : {}),
+    distance,
+    ...(allowOverlap !== undefined ? { allowOverlap } : {}),
+    ...(layoutInCell !== undefined ? { layoutInCell } : {}),
+  };
+}
+
 /**
  * The picture node's attributes for `drawing`, its image added to `resources`; undefined for
  * a drawing Foli keeps opaque (not one inline picture, no embedded image part).
@@ -60,9 +121,10 @@ export function pictureAttrs(
   resource: [string?, ResourceJSON?] = [],
 ): Record<string, unknown> | undefined {
   const children = drawing.children.filter((c) => c.kind === "element");
-  const inline = kid(drawing, WP, "inline");
-  // shortcut: anchored pictures stay opaque until floating pictures (10.9).
+  const inline = kid(drawing, WP, "inline") ?? kid(drawing, WP, "anchor");
   if (!inline || children.length !== 1) return undefined;
+  const float = inline.local === "anchor" ? floatOf(inline) : null;
+  if (float === undefined) return undefined;
   const data = descendant(inline, A, "graphicData");
   if (plain(data, "uri") !== PIC) return undefined;
   const blip = descendant(data, A, "blip");
@@ -91,6 +153,7 @@ export function pictureAttrs(
     ...(alt !== undefined ? { alt } : {}),
     ...(title !== undefined ? { title } : {}),
     ...(decorative === "1" || decorative === "true" ? { decorative: true } : {}),
+    ...(float ? { float } : {}),
     ext: sourceOf(context, drawing),
   };
 }
