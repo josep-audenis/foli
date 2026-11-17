@@ -73,10 +73,12 @@ results and what follows from them are in [ADR-0006](../../docs/decisions/ADR-00
 
 `floats.html` is a static page in one editable host: a picture wrapped square as a CSS float at
 the start of its anchor paragraph (offset down by a zero-width spacer float, across by its
-margin), a top-and-bottom picture as a float as wide as the column, and a picture behind text
-absolutely positioned. `e2e/floats.spec.ts` checks, in Chromium, Firefox and WebKit, that the
-lines beside a float are shortened (in its paragraph and the next), that ArrowDown walks those
-lines without entering the picture, that a click and Home beside it land on that line after
-it, that typing beside it leaves it in place, and that top-and-bottom and behind-text pictures
-leave the lines as Word does. All pass; the decision is in
-[ADR-0006](../../docs/decisions/ADR-0006-tables-and-pictures.md).
+margin), a top-and-bottom picture as a float as wide as the column, and pictures behind and in
+front of text absolutely positioned at their paragraph. `e2e/floats.spec.ts` checks, in
+Chromium, Firefox and WebKit: lines beside the float shortened in its paragraph and the next,
+and back at full width under it; ArrowDown reaching every such line without entering the
+picture; a click and Home beside it landing on that line after it; typing beside it and right
+after it leaving it in place; no line beside a top-and-bottom picture; full-width lines over a
+picture behind or in front of text, with clicks reaching the text or the picture. All pass;
+what they leave open (clicks on the picture and left of it, Backspace next to it, pages) and
+the decision are in [ADR-0006](../../docs/decisions/ADR-0006-tables-and-pictures.md).

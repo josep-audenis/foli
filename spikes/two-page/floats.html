@@ -7,18 +7,22 @@
          floating picture inside one contenteditable host, as CSS floats. A picture wrapped
          square is a float at the start of its anchor paragraph, offset down by a zero-width
          spacer float and across by its margin; top-and-bottom is a float as wide as the
-         column; behind text is absolutely positioned. Static DOM: the experiments record what
-         browsers do natively. -->
+         column; behind and in front of text are absolutely positioned at the paragraph's start
+         (no `top`: the static position), under the text (z-index -1 inside the page's own
+         stacking context) or over it. Static DOM: the experiments record what browsers do
+         natively. -->
     <style>
       body { margin: 0; background: #e9e9e6; font: 16px/24px Georgia, "Times New Roman", serif; }
       #editor { display: flex; flex-direction: column; align-items: center; gap: 24px; padding: 24px 0; outline: none; }
-      .page { position: relative; box-sizing: border-box; width: 160mm; height: 240mm; padding: 10mm; background: #fff; }
+      .page { position: relative; isolation: isolate; box-sizing: border-box; width: 160mm; height: 240mm; padding: 10mm; background: #fff; }
       p { margin: 0 0 8px; }
       .spacer { float: left; width: 0; }
       .float { float: left; clear: left; display: block; }
       .float.right { float: right; clear: right; }
       .picture { display: block; background: #7aa7d9; }
-      .behind { position: absolute; z-index: 0; opacity: 0.5; }
+      .behind { position: absolute; z-index: -1; }
+      .front { position: absolute; z-index: 1; }
+      .behind .picture { background: #dfe9f5; }
     </style>
   </head>
   <body>
@@ -30,8 +34,10 @@
         <p id="below">The next paragraph starts beside the picture too when the picture reaches down into it: a float is not the paragraph's own, it belongs to the page's flow, as in Word.</p>
         <!-- Top and bottom: as wide as the column, no line beside it. -->
         <p id="tb"><span class="float" id="topbottom" contenteditable="false" style="width: 100%; margin: 0 0 6px"><span class="picture" style="width: 200px; height: 72px"></span></span>Text of a paragraph whose picture is wrapped top and bottom: no line goes beside it.</p>
-        <!-- Behind text: positioned on the page, no effect on lines. -->
-        <p id="behindp"><span class="behind" id="behind" contenteditable="false" style="left: 300px; top: 560px"><span class="picture" style="width: 120px; height: 80px"></span></span>Text over a picture behind it keeps its full line width; the picture is drawn under the text.</p>
+        <!-- Behind text: positioned at the paragraph, no effect on lines, drawn under them. -->
+        <p id="behindp"><span class="behind" id="behind" contenteditable="false" style="left: 200px"><span class="picture" style="width: 160px; height: 64px"></span></span>Text over a picture behind it keeps its full line width; the picture is drawn under the text, and a click on the text over it reaches the text.</p>
+        <!-- In front of text: positioned at the paragraph, no effect on lines, drawn over them. -->
+        <p id="frontp"><span class="front" id="front" contenteditable="false" style="left: 200px"><span class="picture" style="width: 160px; height: 64px"></span></span>Text under a picture in front of it keeps its full line width too; the picture is drawn over the text and takes the clicks on it.</p>
         <p id="last">The last paragraph.</p>
       </section>
     </div>
