@@ -366,6 +366,12 @@ describe("floating pictures on pages (10.9)", () => {
     // The edited block and those after it on its page and the next; not the last page.
     for (const t of ["ax", "b", "c", "d"]) expect(read.has(t)).toBe(true);
     expect(read.has("e")).toBe(false);
+    // The picture deleted: the blocks that went around it are measured again too.
+    spy.mockClear();
+    editor.dispatch(editor.state.tr.delete(1, 2));
+    expect(host.querySelector(`[${FLOAT_ATTR}]`)).toBeNull();
+    const after = new Set(spy.mock.contexts.map((el) => (el as Element).textContent));
+    for (const t of ["ax", "b", "c", "d"]) expect(after.has(t)).toBe(true);
   });
 
   it("are drawn first in their paragraph by renderBlocks, the text after them", () => {

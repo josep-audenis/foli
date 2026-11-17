@@ -112,8 +112,8 @@ included). Within the parts it writes:
 - Tables are written from the model: each properties element as paragraphs' are (verbatim
   while unchanged, else child by child), the grid as read while its widths are, rows and cells
   in order; Word reads every corpus table back with Foli's text, unchanged and edited
-  (`scripts/corpus/table-roundtrip.mjs`). A changed table style is refused (`DocxError`) until
-  table styles are written.
+  (`scripts/corpus/table-roundtrip.mjs`). A changed table style definition is refused
+  (`DocxError`): Foli has no command that changes one.
 - **Pictures** (10.8, 10.9): a `w:drawing` holding one DrawingML picture (`wp:inline` or
   `wp:anchor`, `pic:pic`, its image an embedded `image/*` part) becomes a `picture` node: `resource` (the
   image part's name, `word/media/image1.png`, a key of the envelope's `resources`, which give

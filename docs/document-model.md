@@ -1,10 +1,9 @@
 # Document model
 
 > Status: the Word model (`packages/core/src/v3/`) is the current schema (`SCHEMA_VERSION` 4:
-> schema v3 plus tables, pictures and `resources`, ADR-0006; Phase 10, not released yet): the
-> editor and view edit it. Tables and pictures are in the model and validated; import, export,
-> rendering and editing of them come in 10.4–10.9 (until then export refuses them and the view
-> shows a placeholder). Schema v2 (0.2.0, `packages/core/src/document.ts`,
+> schema v3 plus tables, pictures and `resources`, ADR-0006; 0.5.0): the editor and view edit
+> it, tables and pictures included, and `@folijs/docx` reads and writes them. 0.4.0 cannot read
+> documents saved by 0.5.0. Schema v2 (0.2.0, `packages/core/src/document.ts`,
 > `packages/core/src/schema.ts`) and v1 (0.1.0) are kept to read and migrate documents saved
 > with them, and v2 to read pasted HTML. The document model (schema from specs, immutable nodes,
 > positions, slices, JSON in/out) is `packages/core/src/model/`. Steps, transactions, history and

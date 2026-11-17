@@ -126,9 +126,10 @@ All in Playwright on Chromium, Firefox and WebKit (Windows 11), plus unit and pr
 
 ## Known limits
 
-- Layout works on the document's blocks (paragraphs and opaque blocks). A table is one opaque
-  block: never split across pages in the editor (the read-only Word pages split it). Images
-  (Phase 10) are not laid out yet.
+- Layout works on the document's blocks (paragraphs and opaque blocks) and tables (rows as the
+  flow's units, split at a line, header rows repeated). Floating pictures are laid out by the
+  browser around their paragraph, not by the flow: one reaching past its page's text makes the
+  page taller instead of moving to the next page ([limitations](limitations.md#pictures)).
 - No page chrome: headers, footers and page numbers arrive in Phase 11.
 - Line measurement assumes left-to-right text without vertical-align offsets. A split block's
   padding and border repeat on every fragment. Negative block margins are not modelled.

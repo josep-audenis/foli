@@ -227,7 +227,8 @@ Delete deleted. Formatting is recorded as Word records it: a run's properties be
 tracked change on a `formatChange` mark (`previous`: run property marks), a paragraph's on its
 `formatChange` attribute (`previous`: its properties, without the mark's look); later changes
 keep that record, and one's own insertions record none. An edit that would delete
-or insert a block Foli does not model (a table) is not made while tracking (Phase 10). Undo and redo, transactions with
+or insert a block Foli does not model (an opaque block) is not made while tracking; tables are
+tracked row by row. Undo and redo, transactions with
 `addToHistory: false` and those with the `untracked` meta are not tracked; an edit that cannot
 be recorded is not made. `editor.commands.setTrackChanges(on, author?)` (the
 `setTrackChanges` command), `editor.trackingChanges`, `trackState(state)` (`{ on, author, view }`).
@@ -246,8 +247,8 @@ Comments (not tracked changes; each its own undo step): `editor.commands.addComm
 it; at a caret, a point; select-all, the whole text), `replyToComment(id, content, options?)`
 (a reply to a reply answers the thread), `editComment(id, content)`, `resolveComment(id, done =
 true)` (the whole thread), `deleteComment(id)`
-(its replies and anchors too; false for a comment anchored in a table, which stays until Phase
-10), `deleteAllComments()` (threads anchored in a table kept); the same as commands. `content` is text
+(its replies and anchors too; false for a comment anchored inside content kept verbatim, an
+opaque block, which stays), `deleteAllComments()` (threads anchored there kept); the same as commands. `content` is text
 (a paragraph per line) or schema v3 blocks; the author defaults to the editor's. A comment whose
 reference mark an edit removes goes too, with its replies (a tracked deletion keeps it until
 accepted). `commentAnchors(doc)` gives each comment's range and reference positions.
@@ -415,6 +416,11 @@ const view = new EditorView(host, editor, { editable: true, placeholder: "" });
   node selection, outlined); dragging the handle at its corner resizes it with its aspect ratio
   kept (`setPictureSize` on release; Escape cancels). An image pasted alone (no text: a
   screenshot) and image files dropped go in through `upload`.
+- A floating picture (`float`) is drawn first in its paragraph and the lines go around it: square
+  (tight and through as square) as a CSS float on its side, top and bottom as a float as wide as
+  the paragraph, behind and in front of text absolutely positioned on its page (pages are
+  `position: relative; isolation: isolate`). A click on it selects it at its place in the text
+  (an empty anchor there); its outline and handle are on the picture.
 - `view.focus()`: focuses the host, shows the editor's selection, scrolls it into view.
 - `view.destroy()`: removes listeners, injected styles and the attributes it added; empties the
   host.

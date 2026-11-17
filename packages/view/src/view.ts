@@ -1008,8 +1008,12 @@ export class EditorView {
       last = pages[pages.length - 1] as number;
       blocks.push({ node, pages, changed: !known || redrawn.has(node) || this.stale.has(node) });
     });
+    // The pages floats are on now, and were on before (a float deleted or made inline leaves
+    // lines that went around it).
     const floatPages = new Set<number>();
     for (const { node, pages } of blocks)
+      if (holdsFloat(node)) for (const p of pages) floatPages.add(p);
+    for (const [node, pages] of pagesOf)
       if (holdsFloat(node)) for (const p of pages) floatPages.add(p);
     if (!floatPages.size) return;
     let reach = -1;

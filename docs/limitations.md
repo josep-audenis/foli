@@ -1,6 +1,6 @@
 # Known limitations
 
-What Foli does not do yet, or does with caveats, as of 0.4.0. Read it before you ship. Details
+What Foli does not do yet, or does with caveats, as of 0.5.0. Read it before you ship. Details
 and the reasons are in [architecture.md](architecture.md), [pagination.md](pagination.md) and
 [ADR-0003](decisions/ADR-0003-rendering-and-input.md); what comes next is in the
 [roadmap](roadmap.md).
@@ -26,18 +26,17 @@ checklist in [testing/ime.md](testing/ime.md)):
 
 ## Content
 
-- The editor holds schema v3 (Word's model, 8.7): paragraphs in styles (headings are Word's
-  heading styles), lists as Word's numbering, run formatting, line and page breaks, links;
-  everything else Word has (tables, fields, content controls...) is kept as opaque content,
-  selected and deleted whole. Documents saved by 0.1.0 and 0.2.0 are migrated when loaded.
-  No tables or images editing (Phase 10), no
-  headers, footers or page numbers (Phase 11). Sections are laid out with their own page
+- The editor holds schema v4 (Word's model, 8.7; tables and pictures, 10.3): paragraphs in
+  styles (headings are Word's heading styles), lists as Word's numbering, run formatting, line
+  and page breaks, links, tables, inline and floating pictures; everything else Word has
+  (fields, content controls, charts, shapes...) is kept as opaque content, selected and deleted
+  whole. Documents saved by 0.1.0 to 0.4.0 are migrated when loaded; 0.4.0 cannot read
+  documents saved by 0.5.0. No headers, footers or page numbers (Phase 11). Sections are laid out with their own page
   setups; a continuous section with another page setup starts a new page, and an even or odd
   page section gets no blank page before it. Page setups and section breaks are not editable
   yet.
-- Imported headers, footers, footnotes and floating pictures are kept and exported, but the
-  editor does not show or lay them out. A table is one opaque block: not editable, and never
-  split across pages in the editor (one taller than a page makes its page grow).
+- Imported headers, footers and footnotes are kept and exported, but the editor does not show
+  or lay them out.
 - No horizontal rule button (Word's rule is a paragraph's bottom border, kept and shown).
 - On Android, Backspace at a list paragraph's start may join it into the paragraph before
   instead of removing its number (untested on a device).
@@ -59,8 +58,9 @@ checklist in [testing/ime.md](testing/ime.md)):
     one editor, each opens its own dialog.
   - Relative links include `//host/path`, which goes to another site over the page's own
     protocol (allowed by the format; the protocol is still http or https).
-- HTML paste keeps paragraphs, headings, lists, rules, links, colors and alignment; table cells
-  become paragraphs, images are dropped. Word and Google Docs lists are read best effort, from
+- HTML paste keeps paragraphs, headings, lists, rules, links, colors and alignment; tables from
+  other applications become paragraphs, images in pasted HTML are dropped (an image file pasted
+  or dropped alone goes to the upload hook). Word and Google Docs lists are read best effort, from
   hand-written fixtures, not real captures. Pasted text colors equal to black or white and
   highlights equal to white are dropped (defaults, or text from a dark page); colors on block
   containers (a web page's colored sections) and a link's own underline and color are not
@@ -72,10 +72,50 @@ checklist in [testing/ime.md](testing/ime.md)):
 - Documents in `schemaVersion: 1` load in later versions: they migrate without dropping
   content.
 
+## Tables
+
+- Autofit tables keep the column widths Word saved (Foli does not fit them to their content);
+  border conflicts are resolved by the browser's `border-collapse`, close to Word's rules.
+- A row splits across pages between its lines; a row in a vertical merge, or holding a nested
+  table, moves whole to the next page.
+- Rows pasted into a table fill its cells from the selected one; columns beyond the table's are
+  dropped (not reported). Tables pasted from other applications become paragraphs.
+- No keyboard way to set a column's width (drag its border). Nested tables are drawn whole with
+  their parent's row.
+- While tracking, only rows are tracked (inserted and deleted as Word records them): column
+  commands, merging and splitting cells, header rows, table styles, shading and column widths
+  are refused. A table style's own definition cannot be changed (a changed one is refused on
+  export).
+- A table with a page, column or section break in a cell stays opaque.
+- IME in table cells is tested in Chromium only, as everywhere else.
+
+## Pictures
+
+- Pictures are inline or floating (wrapped square and top-and-bottom, behind and in front of
+  text); tight and through wrapping are shown as square, and text goes on one side of a square
+  picture only (the side with more room). Charts, shapes, text boxes and linked images stay
+  opaque.
+- A floating picture is laid out with its paragraph; a square or top-and-bottom picture placed
+  against the page or its margins vertically is drawn at its paragraph's top, horizontal
+  positions count the paragraph's indents, several floating pictures in a paragraph stack
+  instead of sitting side by side, and a picture reaching past the page's text makes the page
+  taller instead of moving to the next page. Positions are against the last section's page. There is no command to change a
+  picture's position or wrapping; one changed through the API is written as a new drawing,
+  losing what only its original held (cropping, effects, z-order).
+- A picture behind text cannot be clicked where text covers it (select it with the keyboard).
+- No cropping, rotation or touch resizing; resizing is refused while tracking (Word does not
+  track it either; the size is not recorded). Alt text changes are not tracked.
+- Pictures copied to another document lose their images (their resources stay behind); Word's
+  picture-and-text paste brings the text only. The clipboard writes a floating picture inline.
+- `renderDocument` measures blocks on one long page: the lines after a floating picture may
+  wrap a little differently than on the editing view's pages.
+- Word's line numbers count the lines beside a floating picture differently from its own
+  layout: `pnpm corpus:pages` reports fewer paragraphs on Word's line there (04).
+
 ## Tracked changes and comments
 
-- While tracking, an edit that would delete or insert a table (any block Foli keeps verbatim) is
-  not made (Phase 10 tracks tables). Moves are kept and shown from imported files but not
+- While tracking, an edit that would delete or insert content Foli keeps verbatim (an opaque
+  block) is not made; tables are tracked row by row. Moves are kept and shown from imported files but not
   recorded: moving text records a deletion and an insertion.
 - Accepting removes a paragraph whose text and mark are both deleted whole, as Word does; the
   same edits made untracked, one after another, may have kept its properties on the joined
@@ -87,7 +127,8 @@ checklist in [testing/ime.md](testing/ime.md)):
   Foli's times shifted by the time zone.
 - Comments: the pane (`FoliComments`) is React only (the view marks commented text); a comment
   with formatting other than its paragraph style is not editable there, only replied to,
-  resolved or deleted. A comment anchored in a table stays (it cannot be deleted until Phase 10).
+  resolved or deleted. A comment anchored inside content Foli keeps verbatim (an opaque block)
+  stays: its anchors there cannot be removed.
 - Revisions carry no initials (Word has none); comments do.
 
 ## .docx (`@folijs/docx`)
@@ -101,7 +142,7 @@ Details in the [package README](../packages/docx/README.md).
   cannot be exported without it (`DocxError`).
 - The theme is read-only: export keeps the original part; a new package has none, so Word's
   default theme applies.
-- Elements Foli does not model (tables, content controls, pictures, fields, equations...) are
+- Elements Foli does not model (content controls, fields, charts, shapes, equations...) are
   kept verbatim and exported, but are not editable. A value the model cannot hold (out of
   range, a unit such as `1.5cm`) stays in its element and is exported, but is not editable
   (`report.unmodeled`).

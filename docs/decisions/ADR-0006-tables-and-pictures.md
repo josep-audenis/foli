@@ -1,6 +1,7 @@
 # ADR-0006: Tables and pictures in the model and on pages
 
-- **Status:** Accepted (owner, 2026-11-16), task 10.1.
+- **Status:** Accepted (owner, 2026-11-16), task 10.1. Implemented in Phase 10 (0.5.0); the
+  outcome is at the end.
 - **Context:** schema v3 ([ADR-0005](ADR-0005-word-compatible-model.md)) keeps a table as one
   `opaqueBlock` (its `w:tbl` XML: exported byte for byte, shown read-only from the XML, selected
   and deleted whole, refused while tracking) and a drawing as an `opaqueInline` (shown as
@@ -228,3 +229,21 @@ documents, which the 0.5.0 changeset says.
   store pictures beside them (the upload hook and resolver), or opt into `data:` URLs.
 - Floating pictures depended on a spike (10.9); it passed (CSS floats in the editable host, three
   engines), so square, top-and-bottom, behind and in front of text are a commitment.
+
+## Outcome (10.10, 2026-11-17)
+
+- The model, the flow and the mapping are as decided: tables are rows of cells holding blocks
+  (schema v4), rows are the flow's units (split at a line, header rows repeated, `cantSplit`
+  kept), `CellSelection` selects cells, and tracking records rows as Word does. The spike's
+  experiments became e2e tests of the real view (`word-tables.spec.ts`, three engines).
+- Corpus: every table and picture is modeled (`scripts/corpus/import-report.mjs`); 277 of 280
+  cell paragraphs are on Word's page; Word reads Foli's tables and pictures back, unchanged and
+  edited (`table-roundtrip.mjs`, `picture-roundtrip.mjs`).
+- Floating pictures are CSS floats in the editable host, as the 10.9 spike showed: the corpus's
+  three are on Word's page and paragraph at Word's offsets. Shortcuts taken (in
+  [limitations](../limitations.md#pictures)): tight and through shown as square, text on one side
+  of a square picture, positions against the page drawn at the paragraph's top vertically,
+  several floats in a paragraph stacked, a float past the page's text making the page taller,
+  no command to change a float.
+- Not done, as decided or left: autofit computed by Foli (Word's saved grid is used), column
+  changes tracked, cropping, touch resizing.
