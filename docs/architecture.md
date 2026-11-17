@@ -695,8 +695,11 @@ nested table, and a keyboard way to set a column's width (the table menu's).
 
 Picture commands (10.8c, `packages/core/src/state/pictures.ts`): `insertPicture` adds the image
 as a new resource (`foli-picture-N`, its `url` or opted-in `data:` URL checked as the envelope's
-resources are) and inserts the picture at the selection with the marks typing would get there,
-as one undo step; it needs alt text unless the picture is marked decorative. Inserting and
+resources are, a `data:` URL of the stated type) and inserts the picture at the selection
+(over selected cells, in the anchor cell) with the marks typing would get there (never a
+tracked change's), as one undo step; it needs alt text unless the picture is marked decorative
+(which has none). Undo takes the picture away and leaves its resource (the envelope is not in
+the history; export writes only the images pictures use). Inserting and
 deleting a picture is tracked as text is (insertion and deletion marks, exported as `w:ins` and
 `w:del` around its run). `setPictureSize` does not apply while tracking (Foli does not record
 the change yet); `setPictureAlt` does (Word does not track alt text either).

@@ -4,6 +4,7 @@ import { parseDocument } from "../v3/document.js";
 import { createEditor } from "./editor.js";
 import { insertPicture, selectedPicture, setPictureAlt, setPictureSize } from "./pictures.js";
 import { NodeSelection, TextSelection } from "./selection.js";
+import { CellSelection } from "./tables.js";
 
 /** Picture commands (10.8, ADR-0006). */
 
@@ -139,5 +140,79 @@ describe("a picture's size and alt text", () => {
     const editor = withPicture(true);
     expect(editor.run(setPictureSize(3, 457200, 228600))).toBe(false);
     expect(editor.run(setPictureAlt(3, "A small dot"))).toBe(true);
+  });
+});
+
+describe("review findings", () => {
+  it("never carries a tracked change of the text around it", () => {
+    const editor = editorOf([
+      {
+        type: "paragraph",
+        content: [
+          {
+            type: "text",
+            text: "gone",
+            marks: [{ type: "deletion", attrs: { id: 1, author: "Other" } }],
+          },
+        ],
+      },
+    ]);
+    caret(editor, 3);
+    expect(editor.run(insertPicture({ ...dot, alt: "A dot" }))).toBe(true);
+    const picture = editor
+      .getDocument()
+      .content.content?.[0]?.content?.find((n) => n.type === "picture");
+    expect(picture?.marks ?? []).toEqual([]);
+  });
+
+  it("refuses alt text and titles the model cannot hold, and a data: URL of another type", () => {
+    const editor = editorOf([p("ab")]);
+    caret(editor, 2);
+    expect(editor.run(insertPicture({ ...dot, alt: "x".repeat(70_000) }))).toBe(false);
+    expect(editor.run(insertPicture({ ...dot, alt: "x", title: 5 as unknown as string }))).toBe(
+      false,
+    );
+    expect(
+      editor.run(insertPicture({ ...dot, alt: "x", data: "data:image/svg+xml,%3Csvg/%3E" })),
+    ).toBe(false);
+  });
+
+  it("replaces only the anchor cell's content over selected cells", () => {
+    const cell = (text: string): NodeJSON => ({ type: "tableCell", content: [p(text)] });
+    const row = (...cells: NodeJSON[]): NodeJSON => ({ type: "tableRow", content: cells });
+    const editor = editorOf([
+      p("x"),
+      { type: "table", content: [row(cell("a1"), cell("b1")), row(cell("a2"), cell("b2"))] },
+      p("y"),
+    ]);
+    const cellPos = (text: string) => {
+      let at = -1;
+      editor.state.doc.descendants((node, pos) => {
+        if (at < 0 && node.type.name === "tableCell" && node.textContent === text) at = pos;
+      });
+      return at;
+    };
+    editor.dispatch(
+      editor.state.tr.setSelection(
+        CellSelection.create(editor.state.doc, cellPos("a1"), cellPos("b2")),
+      ),
+    );
+    expect(editor.run(insertPicture({ ...dot, alt: "A dot" }))).toBe(true);
+    const texts: string[] = [];
+    editor.state.doc.child(1).forEach((r) => {
+      r.forEach((c) => {
+        texts.push(c.textContent);
+      });
+    });
+    expect(texts).toEqual(["", "b1", "a2", "b2"]);
+  });
+
+  it("changes alt text only when it changes; a decorative picture has none", () => {
+    const editor = editorOf([p("abcd")]);
+    caret(editor, 3);
+    editor.run(insertPicture({ ...dot, alt: "A dot" }));
+    expect(editor.run(setPictureAlt(3, "A dot"))).toBe(false);
+    expect(editor.run(setPictureAlt(3, "A dot", true))).toBe(true);
+    expect(editor.state.doc.nodeAt(3)?.attrs).toMatchObject({ alt: null, decorative: true });
   });
 });
