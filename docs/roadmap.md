@@ -9,20 +9,20 @@ leaves `main` green with a working playground.
 **Update this table in the same PR that starts, advances or finishes a phase.** It is the only
 place that says what is in progress; check it before starting work.
 
-| Phase                    | Status                   | Branch                   | Notes                                                                                      |
-| ------------------------ | ------------------------ | ------------------------ | ------------------------------------------------------------------------------------------ |
-| 0 Foundation             | ✅ Done                  | —                        |                                                                                            |
-| 1 Architecture spike     | ✅ Done (G1 provisional) | —                        | Merged in #1; ADR-0003 accepted provisionally; IME, dead-key and screen-reader checks open |
-| 2 Document model         | ✅ Done                  | —                        | Merged in #2                                                                               |
-| 3 Transactions & history | ✅ Done                  | —                        | Merged in #4; gate G2 passed                                                               |
-| 4 Editor view            | ✅ Done (G3 provisional) | —                        | Merged in #8–#13; manual checks (4.6) deferred, open risks in ADR-0003                     |
-| 5 Native pagination      | ✅ Done (G4 provisional) | —                        | Merged in #15–#22; page-break manual checks open, risks in ADR-0003                        |
-| 6 React API & 0.1.0      | ✅ Done                  | —                        | Merged in #23–#31; 0.1.0 on npm; manual checks shipped as known risks (ADR-0003)           |
-| 7 Rich content           | ✅ Done                  | —                        | Merged in #33–#41; 0.2.0 on npm; list-document benchmark misses accepted (known limit)     |
-| 8 Word model & DOCX      | ✅ Done                  | —                        | Merged in #44–#61; 0.3.0 on npm (`@folijs/docx` first released); gate G5 passed            |
-| 9 Review                 | ✅ Done                  | —                        | Merged in #63–#72; 0.4.0 on npm                                                            |
-| 10 Tables & images       | In progress              | `phase-10/tables-images` | #73–#96 (#90 is the landing page); 0.5.0 versioned, publishing needs the owner's approval  |
-| 11–12                    | Not started              |                          |                                                                                            |
+| Phase                    | Status                   | Branch | Notes                                                                                      |
+| ------------------------ | ------------------------ | ------ | ------------------------------------------------------------------------------------------ |
+| 0 Foundation             | ✅ Done                  | —      |                                                                                            |
+| 1 Architecture spike     | ✅ Done (G1 provisional) | —      | Merged in #1; ADR-0003 accepted provisionally; IME, dead-key and screen-reader checks open |
+| 2 Document model         | ✅ Done                  | —      | Merged in #2                                                                               |
+| 3 Transactions & history | ✅ Done                  | —      | Merged in #4; gate G2 passed                                                               |
+| 4 Editor view            | ✅ Done (G3 provisional) | —      | Merged in #8–#13; manual checks (4.6) deferred, open risks in ADR-0003                     |
+| 5 Native pagination      | ✅ Done (G4 provisional) | —      | Merged in #15–#22; page-break manual checks open, risks in ADR-0003                        |
+| 6 React API & 0.1.0      | ✅ Done                  | —      | Merged in #23–#31; 0.1.0 on npm; manual checks shipped as known risks (ADR-0003)           |
+| 7 Rich content           | ✅ Done                  | —      | Merged in #33–#41; 0.2.0 on npm; list-document benchmark misses accepted (known limit)     |
+| 8 Word model & DOCX      | ✅ Done                  | —      | Merged in #44–#61; 0.3.0 on npm (`@folijs/docx` first released); gate G5 passed            |
+| 9 Review                 | ✅ Done                  | —      | Merged in #63–#72; 0.4.0 on npm                                                            |
+| 10 Tables & images       | ✅ Done (misses open)    | —      | Merged in #73–#96 (not #90); 0.5.0 on npm; two misses for the owner to accept (below)      |
+| 11–12                    | Not started              |        |                                                                                            |
 
 Status values: `Ready` (dependencies met, nobody on it) · `In progress` · `In review` (PR open) ·
 `✅ Done` (merged, acceptance criteria met) · `Blocked by …`.
@@ -934,8 +934,8 @@ style and shading boxes and the picture dialog are keyboard-usable and axe-clean
 engines. Two misses, for the owner to accept as known limits: on Word's line, 101 of 115
 paragraphs; 04 has 25 of 35, below 0.3.0's 33, because its floating chart is now laid out and
 Word's line numbers count the 9 lines beside it, which its own PDF shows as Foli does, as 5; and
-T4 (IME) in cells runs in Chromium only, as everywhere in the editor. Publishing waits for the
-owner's approval.)
+T4 (IME) in cells runs in Chromium only, as everywhere in the editor. 0.5.0 published
+2026-11-17 with the owner's approval.)
 
 ### Tasks
 
@@ -1050,8 +1050,8 @@ Each task is a PR on `phase-10/tables-images`, the build green after each.
   limitations with table and picture sections, ADR-0006's outcome, docx and corpus READMEs);
   budgets as raised per task (core 52.7, view 63.5, React 87.9, docx 44.9 kB gzip), each with
   its reason; acceptance checked (above), `scripts/corpus/picture-roundtrip.mjs` added; the
-  0.5.0 changeset with the changed behaviours (#95); the version PR (#96). 0.5.0 is not
-  published yet: it waits for the owner's approval.)
+  0.5.0 changeset with the changed behaviours (#95); the version PR (#96); 0.5.0 published
+  2026-11-17 with the owner's approval.)
 
 ## Phase 11 — Sections, fields, templates & PDF · L → 0.6.0
 
