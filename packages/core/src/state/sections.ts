@@ -182,10 +182,13 @@ export function insertSectionBreak(kind: SectionBreakKind = "nextPage"): Command
         section: setup,
         ...(revision ? { revision: { insertion: revision } } : {}),
       });
-      // A tracked setup change covers both parts: each records it, under an id of its own.
+      // A tracked setup change covers both parts: each records it, under an id of its own. What
+      // the later part was before it starts as this break says.
+      const type = kind === "nextPage" ? undefined : kind;
       const change = setup.change && {
         ...setup.change,
         id: nextRevisionId(state) + (revision ? 1 : 0),
+        previous: clean({ ...setup.change.previous, type }),
       };
       writeSection(
         state,
@@ -196,7 +199,7 @@ export function insertSectionBreak(kind: SectionBreakKind = "nextPage"): Command
           headers: undefined,
           footers: undefined,
           change,
-          type: kind === "nextPage" ? undefined : kind,
+          type,
         }),
       );
       tr.setSelection(TextSelection.create(tr.doc, $from.pos + 2));

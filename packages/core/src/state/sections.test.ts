@@ -2,7 +2,13 @@ import { describe, expect, it } from "vitest";
 import { createDocument, type FoliDocument, type SectionJSON } from "../v3/document.js";
 import { createEditor, type Editor } from "./editor.js";
 import { redo, undo } from "./history.js";
-import { acceptAllChanges, rejectAllChanges, trackedChanges } from "./review.js";
+import {
+  acceptAllChanges,
+  acceptChange,
+  rejectAllChanges,
+  rejectChange,
+  trackedChanges,
+} from "./review.js";
 import {
   insertSectionBreak,
   removeSectionBreak,
@@ -288,6 +294,22 @@ describe("rejecting and accepting sections together", () => {
     editor.run(rejectAllChanges());
     expect(texts(editor)).toEqual(["Hello"]);
     expect(editor.getDocument().section).toEqual(START);
+  });
+
+  it("the later part's record says it starts as the break does", () => {
+    const editor = editorOf([p("Hello")], START, true);
+    editor.select(3);
+    editor.run(setSectionSetup({ columns: { count: 3 } }));
+    editor.run(insertSectionBreak("continuous"));
+    // Accept the break alone (the first paragraph's mark), then reject the later setup.
+    editor.select(3);
+    editor.run(acceptChange);
+    editor.select(editor.state.doc.content.size - 1);
+    editor.run(rejectChange);
+    const last = editor.getDocument().section;
+    expect(last.type).toBe("continuous");
+    expect(last.columns).toEqual(SETUP.columns);
+    expect(last.change).toBeUndefined();
   });
 
   it("carries a setup change to the later part when not tracking any more", () => {

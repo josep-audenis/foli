@@ -31,6 +31,7 @@ import {
   imageSource,
   latin,
   lineHeight,
+  marginAbove,
   markerElement,
   onlyPictures,
   opaqueBlock,
@@ -40,7 +41,6 @@ import {
   parseOpaque,
   pictureElement,
   type ReviewView,
-  spaceAfter,
   styleParagraph,
   styleRun,
   tagOf,
@@ -121,6 +121,8 @@ export class WordRenderer {
   #markers: (ListMarker | null)[] = [];
   /** Comment ranges open at the start of each block. */
   #comments: number[][] = [];
+  /** Where a document adds paragraph spacing: the space after the paragraph above, in a cell. */
+  #above: number[] = [];
 
   constructor(
     context: WordContext,
@@ -149,9 +151,23 @@ export class WordRenderer {
 
   /**
    * Numbering and comment state for `blocks`, the blocks rendered, in document order (the
-   * paragraphs in table cells among them: Word numbers lists through tables).
+   * paragraphs in table cells among them: Word numbers lists through tables). `aboveInCell`
+   * gives the paragraph before one in its table cell, with that cell's format.
    */
-  prepare(blocks: readonly ModelNode[]): void {
+  prepare(
+    blocks: readonly ModelNode[],
+    aboveInCell?: (index: number) => { node: ModelNode; cell: CellFormat } | null,
+  ): void {
+    const { resolver } = this.#context;
+    this.#above =
+      resolver.addsParagraphSpacing && aboveInCell
+        ? blocks.map((_, i) => {
+            const previous = aboveInCell(i);
+            if (previous?.node.type.name !== "paragraph") return 0;
+            const { spacing } = resolver.paragraph(previous.node.attrs, previous.cell).paragraph;
+            return (spacing.afterAutospacing ? 280 : spacing.after) * PX_PER_TWIP;
+          })
+        : [];
     const attrs: Record<string, unknown>[] = [];
     const comments: number[][] = [];
     const open = new Set<number>();
@@ -176,7 +192,8 @@ export class WordRenderer {
   /** What a block's rendering depends on at `index`, besides its node (and its cell's format). */
   key(index: number, cell?: CellFormat | null): string {
     const inCell = cell ? `|${cell.style ?? ""}:${cell.conditions.join(",")}` : "";
-    return `${this.#markers[index]?.text ?? ""}|${(this.#comments[index] ?? []).join(" ")}${inCell}`;
+    const above = this.#above[index] ? `|${this.#above[index]}` : "";
+    return `${this.#markers[index]?.text ?? ""}|${(this.#comments[index] ?? []).join(" ")}${inCell}${above}`;
   }
 
   /** A block; `cell` is the format of the table cell it is in, if any. */
@@ -353,8 +370,8 @@ export class WordRenderer {
       // In a cell its spacing is its margins (the page flow spaces top-level blocks); a
       // fragment continued on the next page has none at the split.
       // shortcut: contextual spacing between paragraphs in a cell is not applied.
-      dom.style.marginTop = `${word.before}px`;
-      spaceAfter(fragments[fragments.length - 1] as HTMLElement, word.after, resolver);
+      dom.style.marginTop = `${marginAbove(word.before, this.#above[index] ?? 0, resolver)}px`;
+      (fragments[fragments.length - 1] as HTMLElement).style.marginBottom = `${word.after}px`;
     }
     if (this.#clipboard) {
       // The flow places the spacing in the editor; elsewhere it is the paragraph's margins.
@@ -489,18 +506,20 @@ export function clipboardBlocks(
 /**
  * A block's space before and after next to its neighbours: Word ignores the space between
  * paragraphs of the same style that ask for it (contextual spacing). When only the first asks,
- * its space after still eats into the second's space before.
+ * its space after still eats into the second's space before, unless the document adds the two
+ * (`adds`).
  */
 export function spacing(
   above: WordInfo | undefined,
   block: WordInfo,
   below: WordInfo | undefined,
+  adds = false,
 ): { before: number; after: number } {
   const same = (other: WordInfo | undefined) => other !== undefined && other.style === block.style;
   let { before } = block;
   if (above && same(above)) {
     if (block.contextual) before = 0;
-    else if (above.contextual) before = Math.max(0, block.before - above.after);
+    else if (above.contextual && !adds) before = Math.max(0, block.before - above.after);
   }
   return { before, after: same(below) && block.contextual ? 0 : block.after };
 }

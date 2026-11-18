@@ -463,10 +463,26 @@ describe("EditorView on a schema v3 document", () => {
       settings: { doNotUseHTMLParagraphAutoSpacing: true },
     });
     expect(blocks(host)[1]?.style.marginTop).toBe("12px");
-    const inCell = host.querySelector("td p") as HTMLElement;
-    // Padding, which does not collapse with the next paragraph's margin as a margin would.
-    expect(inCell.style.paddingBottom).toBe("8px");
-    expect(inCell.style.marginBottom).toBe("0px");
+    const [first, second] = host.querySelectorAll<HTMLElement>("td p");
+    // Nothing that paints: margins, which collapse to the larger, 8 and 8 + 4 px.
+    expect(first?.style.paddingBottom).toBe("");
+    expect(first?.style.marginBottom).toBe("8px");
+    expect(second?.style.marginTop).toBe("12px");
+  });
+
+  it("takes nothing from the space before after a contextual paragraph when adding", () => {
+    const pair = (settings?: { doNotUseHTMLParagraphAutoSpacing: boolean }) => {
+      const { host } = mountDocument({
+        ...documentOf(
+          p({ contextualSpacing: true, spacing: { after: 120 } }, text("a")),
+          p({ spacing: { before: 240 } }, text("b")),
+        ),
+        ...(settings ? { settings } : {}),
+      });
+      return blocks(host)[1]?.style.marginTop;
+    };
+    expect(pair()).toBe("8px"); // 16 - 8
+    expect(pair({ doNotUseHTMLParagraphAutoSpacing: true })).toBe("16px");
   });
 
   it("flows with Word's spacing: the larger of the space after and before", () => {

@@ -904,7 +904,17 @@ export class EditorView {
     // The blocks the view renders (paragraphs in table cells among them) and the page flow's
     // items (top-level paragraphs and opaque blocks, and tables).
     const { units, items } = collect(doc, context.resolver);
-    word.prepare(units.map((unit) => unit.node));
+    word.prepare(
+      units.map((unit) => unit.node),
+      (i) => {
+        const unit = units[i] as Unit;
+        const previous = units[i - 1];
+        // Siblings: one ends where the other starts.
+        return unit.cell && previous && previous.pos + previous.node.nodeSize === unit.pos
+          ? { node: previous.node, cell: unit.cell }
+          : null;
+      },
+    );
     // A story's view has none of the body's sections: its one flow is not a page's.
     const spans = sectionSpans(doc, this.paged ? context.envelope.section : {});
     const { regions } = this;
@@ -1154,7 +1164,16 @@ export class EditorView {
           };
         }
         const desc = blocks[item.unit] as WordBlockDesc;
-        return wordBox(words, i, desc, measureOf(desc), () => lines(desc), own, atWidth);
+        return wordBox(
+          words,
+          i,
+          desc,
+          measureOf(desc),
+          () => lines(desc),
+          own,
+          atWidth,
+          context.resolver.addsParagraphSpacing,
+        );
       });
       const rules = context.resolver.addsParagraphSpacing
         ? { ...WORD_RULES, addSpacing: true }
@@ -3683,13 +3702,14 @@ function wordBox(
   lines: () => Lines,
   layout: BlockLayout,
   atWidth: (desc: BlockDesc, width: number, kept: boolean) => WidthMeasure,
+  adds: boolean,
 ): BlockBox {
   const pageHeight = contentHeight(layout.sheet.settings);
   const { section } = layout;
   // Without pages nothing is kept off the next one, and a page break ends nothing.
   const paged = layout.sheet.css !== UNPAGED_CSS;
   const next = words[i + 1] ? { word: words[i + 1] as WordInfo } : undefined;
-  const { before, after } = spacing(words[i - 1], desc.word, next?.word);
+  const { before, after } = spacing(words[i - 1], desc.word, next?.word, adds);
   const leavesWith = (attr: string) =>
     desc.leaves.filter(
       (leaf) => leaf.dom.nodeType !== Node.TEXT_NODE && (leaf.dom as Element).hasAttribute(attr),

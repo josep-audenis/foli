@@ -714,7 +714,7 @@ export function renderBlocks(
     element.dataset.style = paragraph.style ?? "";
     if (paragraph.contextualSpacing) element.dataset.contextual = "";
   });
-  applyContextualSpacing(blocks);
+  applyContextualSpacing(blocks, resolver.addsParagraphSpacing);
   return blocks;
 }
 
@@ -751,14 +751,13 @@ const INVISIBLE = new Set([
 ]);
 
 /**
- * The space after a paragraph among others in a box the page flow does not lay out (a table
- * cell). As a margin it collapses with the next one's space before, to the larger: Word's rule.
- * In a document where the two add up it is padding, which does not collapse.
+ * The top margin of a paragraph after another (whose space after is `above`) in a box the page
+ * flow does not lay out (a table cell). Adjacent margins collapse to the larger: Word's rule. In
+ * a document where the two spaces add up this margin holds both, so the collapse gives the sum
+ * and no paragraph's shading or border grows.
  */
-export function spaceAfter(element: HTMLElement, px: number, resolver: Resolver): void {
-  if (!resolver.addsParagraphSpacing) element.style.marginBottom = `${px}px`;
-  else
-    element.style.paddingBottom = `${(Number.parseFloat(element.style.paddingBottom) || 0) + px}px`;
+export function marginAbove(before: number, above: number, resolver: Resolver): number {
+  return resolver.addsParagraphSpacing ? before + above : before;
 }
 
 /** A paragraph's element: a heading of its outline level (1-6), else a paragraph. */
@@ -767,8 +766,12 @@ export function tagOf(paragraph: ParagraphFormat): string {
   return level !== null && level >= 0 && level < 6 ? `h${level + 1}` : "p";
 }
 
-/** Word ignores the space between paragraphs of the same style that ask for it. */
-function applyContextualSpacing(blocks: WordBlock[]): void {
+/**
+ * Word ignores the space between paragraphs of the same style that ask for it. When only the
+ * first asks, its space after still eats into the second's space before, unless the document
+ * adds the two (`adds`).
+ */
+function applyContextualSpacing(blocks: WordBlock[], adds: boolean): void {
   for (let i = 1; i < blocks.length; i++) {
     const a = blocks[i - 1] as WordBlock;
     const b = blocks[i] as WordBlock;
@@ -776,9 +779,8 @@ function applyContextualSpacing(blocks: WordBlock[]): void {
     if (style === undefined || style !== b.element.dataset.style) continue;
     const first = "contextual" in a.element.dataset;
     const second = "contextual" in b.element.dataset;
-    // Word: the first one's space after still eats into a space before the second keeps.
-    if (first) b.before = second ? 0 : Math.max(0, b.before - a.after);
-    else if (second) b.before = 0;
+    if (second) b.before = 0;
+    else if (first && !adds) b.before = Math.max(0, b.before - a.after);
     if (first) a.after = 0;
   }
 }
@@ -968,10 +970,12 @@ export function opaqueBlock(
   else if (xml?.localName === "tbl") element.append(opaqueTable(xml, resolver, doc, ratio));
   else if (xml) {
     const paragraphs = outermost(xml, PARAGRAPHS);
+    let above = 0;
     paragraphs.forEach((p, i) => {
-      const rendered = opaqueParagraph(p, resolver, doc, ratio);
-      if (i < paragraphs.length - 1) spaceAfter(rendered.element, rendered.after, resolver);
+      const rendered = opaqueParagraph(p, resolver, doc, ratio, above);
+      if (i < paragraphs.length - 1) rendered.element.style.marginBottom = `${rendered.after}px`;
       else after = rendered.after;
+      above = rendered.after;
       element.append(rendered.element);
     });
   }
@@ -1011,6 +1015,8 @@ function opaqueParagraph(
   resolver: Resolver,
   doc: Document,
   ratio: (family: string) => number,
+  /** The space after the paragraph before it in its box. */
+  above = 0,
 ): { element: HTMLElement; after: number } {
   const pPr = child(p, "pPr");
   const style = childValue(pPr, "pStyle");
@@ -1032,8 +1038,8 @@ function opaqueParagraph(
     element.append(span);
   }
   if (!element.textContent) element.append(doc.createElement("br"));
-  if (paragraph.spacing.before)
-    element.style.marginTop = `${paragraph.spacing.before * PX_PER_TWIP}px`;
+  const top = marginAbove(paragraph.spacing.before * PX_PER_TWIP, above, resolver);
+  if (top) element.style.marginTop = `${top}px`;
   return { element, after: paragraph.spacing.after * PX_PER_TWIP };
 }
 
@@ -1161,14 +1167,17 @@ function opaqueTable(
         row.append(cell);
         continue;
       }
+      let above = 0;
       for (const p of outermost(tc, CELL_CONTENT)) {
         if (p.localName === "tbl") {
           cell.append(opaqueTable(p, resolver, doc, ratio));
+          above = 0;
           continue;
         }
         // Word counts the space after a cell's last paragraph in the row's height too.
-        const rendered = opaqueParagraph(p, resolver, doc, ratio);
-        spaceAfter(rendered.element, rendered.after, resolver);
+        const rendered = opaqueParagraph(p, resolver, doc, ratio, above);
+        rendered.element.style.marginBottom = `${rendered.after}px`;
+        above = rendered.after;
         cell.append(rendered.element);
       }
       row.append(cell);
@@ -1260,13 +1269,16 @@ function modelTable(
       }
       row.append(cell);
       if (cellAttrs.vMerge === "continue") return;
+      let above = 0;
       for (const block of cellNode.content ?? []) {
         if (block.type === "table") {
           cell.append(modelTable(block, resolver, doc, ratio, image, geometry));
+          above = 0;
           continue;
         }
         if (block.type !== "paragraph") {
           cell.append(opaqueBlock(block, 0, resolver, doc, ratio, image, geometry).element);
+          above = 0;
           continue;
         }
         const { paragraph, run } = resolver.paragraph(block.attrs ?? {}, format);
@@ -1277,9 +1289,11 @@ function modelTable(
         styleRun(element, run, lineHeight(paragraph, run, ratio(fontStack(latin(run)))));
         renderInline(element, block.content ?? [], run, paragraph, context);
         if (!element.textContent) element.append(doc.createElement("br"));
-        element.style.marginTop = `${paragraph.spacing.before * PX_PER_TWIP}px`;
+        const before = paragraph.spacing.before * PX_PER_TWIP;
+        element.style.marginTop = `${marginAbove(before, above, resolver)}px`;
         // Word counts the space after a cell's last paragraph in the row's height too.
-        spaceAfter(element, paragraph.spacing.after * PX_PER_TWIP, resolver);
+        above = paragraph.spacing.after * PX_PER_TWIP;
+        element.style.marginBottom = `${above}px`;
         cell.append(element);
       }
     });
