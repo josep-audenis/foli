@@ -6,10 +6,9 @@
     <!-- Phase 11.1 throwaway spike (ADR-0007): the packages as they are today, unchanged. The
          main view is made read-only and a second EditorView is mounted on its first page,
          inside a contenteditable=false wrapper. `?bare=1` leaves it at that: the main view's
-         observer then removes the wrapper as stray DOM. Otherwise the main view is kept off
-         it the two ways ADR-0007 decides: its observer stops while a story is mounted (it is
-         read-only, there is no input to read back) and the wrapper stops the story's events
-         from reaching the host. -->
+         observer then has it removed. Otherwise the main view is kept off it: its observer
+         stops while a story is mounted (it is read-only, there is no input to read back) and
+         the wrapper stops the story's events, standing in for the guards ADR-0007 decides. -->
   </head>
   <body>
     <div id="main"></div>

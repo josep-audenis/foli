@@ -46,15 +46,18 @@ characters against the header's 12) and ArrowDown leaves it in every engine.
 **The real `EditorView`.** The packages as they are, a second view mounted on the first page of a
 read-only one, inside a `contenteditable="false"` wrapper, in three engines:
 
-- Left alone, the main view's mutation observer removes the wrapper as stray DOM at once.
+- Left alone, the main view's mutation observer sees the wrapper, and the re-render its read-back
+  causes removes it at once.
 - With the main view's observer stopped and the wrapper stopping the story's events from reaching
-  the host: typing, Enter and Backspace reach the story only, the body and its selection do not
-  change, nothing is discarded, and a copy event carries the story's text (Chromium and WebKit;
-  Firefox ignores a synthetic event's `clipboardData`).
-- A render of the main view while the story is mounted still removes the wrapper: `place` must
-  keep it (below).
+  the host (a stand-in for the guards decided below): typing, Enter and Backspace reach the story
+  only, the body and its selection do not change, and nothing is discarded. Recorded, not
+  asserted: a copy event carries the story's text in Chromium and WebKit (Firefox ignores a
+  synthetic event's `clipboardData`).
+- A render of the main view while the story is mounted still removes the wrapper, so mounting
+  **does not work yet**: `place` has to change, in 11.7.
 
-Not in the spike: a note split across pages, and tables or pictures in a story.
+The two editors there are independent: no `StoryStep`, no `paged: false`. Not in the spike either:
+a note split across pages, and tables or pictures in a story.
 
 ## Decision
 
@@ -75,27 +78,41 @@ content, ext? }`. `content` is a `doc` of the body's blocks. `noteType` is Word'
   part as before.
 - **`StoryStep(id, before, after)`, one history.** Stories live in the envelope, so a story's
   change is a step of the **body's** transaction. The step holds the story's trees before and
-  after (immutable nodes sharing structure; `null` for no story): it inverts by swapping them, has
-  an empty position map for the body, and takes effect only where the story still equals `before`
-  (a change made since wins, as for comments; `Step.invert` receives the body, which is why the
-  step cannot compute its inverse from an inner step). Undo is one stack across the document, as
-  in Word, and inserting a note (reference and story) is one transaction.
+  after (immutable nodes sharing structure; `null` for no story): it inverts by swapping them and
+  has an empty position map for the body (`Step.invert` receives the body, which is why it cannot
+  compute an inverse from an inner step). Undo is one stack across the document, as in Word, and
+  inserting a note (reference and story) is one transaction.
+- **A stale step fails its whole event.** `Step.apply` sees only the body, so history's
+  `applyStored` checks `StoryStep`s and `EnvelopeStep`s against the envelope as the transaction has
+  left it: where the story or key no longer equals `before`, the event is not applied at all and
+  is dropped, never half applied (a reference gone, its story kept). Every change to a story goes
+  through these steps, so only a change made with `addToHistory: false` can cause this.
 - **`EnvelopeStep(key, before, after)`**, the same idea for what undo must take back in the
   envelope: the last section (`section`), `settings`, and one control's properties. So undoing an
   added header leaves no reference to a story that has gone. `withEnvelope` stays for what undo
-  leaves as it is (numbering definitions and styles).
+  leaves as it is (numbering definitions, styles and resources).
 - **Grouping.** History groups story typing by the rules body typing has: the story's own
   transaction decides adjacency, passed on the body transaction; consecutive `StoryStep`s of a
   story in one group merge (first `before`, last `after`), so a word is one undo step and does
   not use up the depth.
 - **Editing.** `editor.story(id)` gives an `Editor` over the story: its own `EditorState`
-  (selection, stored marks, the tracking and `word` plugins, no history). Its `dispatch` applies
-  the transaction there and sends the body editor a `StoryStep`, **hoisting** what belongs to the
-  document: `withEnvelope` changes, `CommentStep`s and `EnvelopeStep`s go on the body transaction.
-  Undo and redo run on the body editor. A `StoryStep` arriving from the body (undo, another view)
-  replaces the story state's document, the selection mapped to the nearest valid place.
-- **Ids across trees.** Revision, comment and bookmark ids are allocated over the body and every
-  story (`maxRevisionId` and its kin scan one tree today).
+  (selection, stored marks, the tracking and `word` plugins, no history). **The body goes first:**
+  its `dispatch` computes the next story state without keeping it, sends the body editor a
+  `StoryStep`, and adopts that state only if the body then holds its tree; a transaction the body
+  refuses leaves the story as it was. `CommentStep`s and `EnvelopeStep`s move to the body
+  transaction. A story's `withEnvelope` is **hoisted as a patch** of `numbering`, `styles` and
+  `resources` only, applied to the body's current envelope (the story's copy of the rest may be
+  stale), and every change to those reaches the story states. Undo and redo run on the body
+  editor. A `StoryStep` arriving from the body (undo, another view) replaces the story state's
+  document; a history event keeps the story's selection with its id, restored if that story is
+  mounted, otherwise mapped to the nearest valid place.
+- **The view follows stories apart from `doc`.** A `StoryStep` leaves the body's `doc` as it is, so
+  the view compares the stories too, redraws the occurrences of those that changed and reflows only
+  if a height changed. The renderer's context depends on `styles`, `numbering`, `defaults`, `theme`
+  and `resources`, not on the envelope object, so typing in a story keeps it and the layout cache.
+- **Across trees.** Revision, comment and bookmark ids are allocated over the body and every story
+  (`maxRevisionId` and its kin scan one tree today), and removing a comment removes its anchors
+  wherever they are, notes included (`comments.ts` scans the body today).
 - **Review.** Accept and reject all reach every story. Comments anchor in the body and notes, as
   Word allows; headers and footers refuse them.
 - **Notes and the clipboard.** Deleting the last reference removes the story in the same
@@ -110,10 +127,11 @@ content, ext? }`. `content` is a `doc` of the body's blocks. `noteType` is Word'
   `editor.story(id)`, unpaginated (a new `paged: false` option), is mounted in that occurrence
   inside a `contenteditable="false"` wrapper. Double click or a command enters; Escape, or a press
   outside, leaves and restores the body's selection from its state.
-- **Keeping the main view off it** (the spike): while a story is mounted the main view's observer
-  is stopped (it is read-only: there is no input to read back); the wrapper stops the story's events from
-  bubbling to the host; `onSelectionChange` ignores selections inside it; `place` keeps the wrapper
-  instead of removing it as stray DOM.
+- **Keeping the main view off it:** while a story is mounted the main view's observer is stopped
+  (it is read-only: there is no input to read back); its handlers ignore events whose target is in
+  the wrapper, which is left to bubble (a resize's drag listens on the document, so stopping
+  `mousemove` there would break it); `onSelectionChange` ignores selections inside it; `place`
+  keeps the wrapper.
 - Other occurrences re-render from the model. Layout never moves the mounted story during a
   composition. A note split across pages shows whole at its reference's page while it is edited.
 
@@ -130,11 +148,16 @@ content, ext? }`. `content` is a `doc` of the body's blocks. `noteType` is Word'
   Word's PDF check these; a rule they contradict is corrected in 11.7.
 - **Notes.** A line holding a reference goes on a page only if it, the separator and the note's
   **first line** fit; the rest of the note fills the space left at the foot and continues on the
-  next page under the continuation separator, so a note taller than a page works. `FlowState`
-  gains the notes' use of the page and what carries over (`sameState` compares them, or
-  incremental reflow would stop too early). Lines are measured for blocks with references.
-  Endnotes are blocks after the body (or the section). In a section with columns a footnote sits
-  at the foot of its reference's **column**.
+  next page under the continuation separator, so a note taller than a page works. What carries
+  over is placed first on the next page and leaves room for at least one line of text; what still
+  does not fit carries on, so both advance. A note's use of a page comes from the lines that end
+  up on it: when widow, orphan or keep rules take a line back, its notes go with it and the page
+  is measured again. A line forced onto an empty page because nothing else can take it keeps its
+  note's first line, and the page grows as for any line taller than a page. `FlowState` gains the
+  notes' use of the page and what carries over (`sameState` compares them, or incremental reflow
+  would stop too early). Lines are measured for blocks with references. Endnotes are blocks after
+  the body (or the section). In a section with columns a footnote sits at the foot of its
+  reference's **column**.
 - **Columns.** A section has `columns` (`count`, `space`, `widths`, `separator`); a page holds
   **bands** (one per section on it, for continuous sections), a band holds columns, and `flow`
   fills columns where it filled pages. A band above a continuous break is balanced. A
@@ -149,9 +172,12 @@ content, ext? }`. `content` is a `doc` of the body's blocks. `noteType` is Word'
 
 - **Markers, as Word has them.** Inline atoms `fieldStart` (`dirty`, `locked`, `simple`, `ext`),
   `fieldCode` (one `w:instrText` run's text), `fieldSeparator` (optional, as in Word), `fieldEnd`.
-  The code is what lies between start and separator, so **a field nested in a code** (`{ IF {
-MERGEFIELD x } = … }`) stays a field; the instruction is read from it. The result is ordinary
-  content between separator and end: editable, it may span paragraphs (`TOC`), and fields nest.
+  The **code range** runs from the start to the field's separator or, without one, to its end
+  (partners found by nesting depth), so **a field nested in a code** (`{ IF { MERGEFIELD x } = … }`)
+  stays a field, and the instruction is read from the range. Everything in it, a nested field's
+  result too, is hidden: not drawn unless codes are shown, stepped over by the caret as one unit,
+  not searched. The result is ordinary content between separator and end: editable, it may span
+  paragraphs (`TOC`), and fields nest.
   `w:fldSimple` reads as the same markers with `simple: true` and is written back as it was.
 - **Tracked as runs.** `w:fldChar` and `w:instrText` sit in runs, inside `w:ins` and `w:del`, so
   these atoms carry revision marks like text (they do not join the markers tracking skips).
@@ -167,9 +193,11 @@ MERGEFIELD x } = … }`) stays a field; the instruction is read from it. The res
 ### Content controls
 
 - **Inline:** `controlStart` and `controlEnd` atoms, as comment anchors (they stand between runs).
-- **Block, row, cell:** a `controls` attribute on each paragraph, table, row or cell, the ids of
-  the controls around it, **outermost first**, keeping blocks flat and allowing nesting (a
-  repeating section around its items). Consecutive blocks sharing an id at a level are one control.
+- **Block, row, cell:** a `controls` attribute on each paragraph, table, opaque block, row or
+  cell, the ids of the controls around it, **outermost first**, keeping blocks flat and allowing
+  nesting (a repeating section around its items). Consecutive blocks sharing an id at a level are
+  one control. A table may follow a table when their `controls` differ: each is in a control of
+  its own in the file, so Word does not merge them.
 - **Ids** are Foli's keys, made on import whether or not the file has `w:id` (kept in `ext`). When
   an edit separates a control's blocks, export gives the later part a fresh `w:id`.
 - **Empty** block controls have no block to carry them and stay `opaqueBlock`, reported.
