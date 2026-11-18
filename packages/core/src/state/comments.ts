@@ -264,7 +264,10 @@ function removeComments(tr: Transaction, comments: readonly CommentJSON[], ids: 
 
 /** Deletes comment `id` with its replies and their anchors. */
 export function deleteComment(id: number): Command {
-  return (state, dispatch) => {
+  const command: Command = (state, dispatch) => {
+    // The anchors are in the body.
+    const body = storyBody(state);
+    if (body) return dispatch ? body.run(command) : body.can(command);
     const comments = wordContext(state)?.envelope.comments ?? [];
     const ids = thread(comments, id);
     // shortcut: a comment anchored in content Foli keeps verbatim (an opaque block) stays, its
@@ -278,10 +281,13 @@ export function deleteComment(id: number): Command {
     }
     return true;
   };
+  return command;
 }
 
 /** Deletes every comment and its anchors (not the threads anchored in verbatim content). */
 export const deleteAllComments: Command = (state, dispatch) => {
+  const body = storyBody(state);
+  if (body) return dispatch ? body.run(deleteAllComments) : body.can(deleteAllComments);
   const comments = wordContext(state)?.envelope.comments ?? [];
   const verbatim = opaqueCommentIds(state.doc);
   const kept = new Set<number>();

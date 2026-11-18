@@ -122,6 +122,93 @@ test("every page has its header and footer in its margins, its fields filled", a
   expect(stored).toContain('"text":"9"');
 });
 
+test("a field's own format goes before the section's, however it is written", async ({ page }) => {
+  const section = {
+    ...A5,
+    headers: { default: "h" },
+    pageNumbers: { format: "lowerRoman", start: 4 },
+  };
+  await load(
+    page,
+    documentOf([paragraph("One")], section, {
+      stories: {
+        h: story("header", {
+          type: "paragraph",
+          content: [
+            ...field("PAGE", "0"),
+            text(" "),
+            ...field("PAGE \\* Arabic", "0"),
+            text(" "),
+            ...field("PAGE \\*Arabic", "0"),
+            text(" "),
+            ...field("PAGE \\* ROMAN", "0"),
+          ],
+        }),
+      },
+    }),
+  );
+  expect((await pages(page))[0]?.header).toBe("iv 4 4 IV");
+});
+
+test("a reference naming what every object inherits shows nothing and freezes nothing", async ({
+  page,
+}) => {
+  for (const id of ["constructor", "__proto__", "toString"]) {
+    await load(page, documentOf([paragraph("Body")], { ...A5, headers: { default: id } }));
+    expect((await pages(page))[0]?.header).toBeNull();
+    await expect(editor(page)).toContainText("Body");
+  }
+});
+
+test("a render that fails is not read back as input, over and over", async ({ page }) => {
+  await load(page, documentOf([paragraph("Body")], A5));
+  const calls = await page.evaluate(async () => {
+    const view = window.foliEdit.view as unknown as { renderPages(): void };
+    let count = 0;
+    view.renderPages = () => {
+      count++;
+      document.querySelector("section.foli-page")?.append(document.createElement("i"));
+      throw new Error("expected in this test");
+    };
+    document.querySelector("section.foli-page > p")?.append("typed");
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    return count;
+  });
+  expect(calls).toBeLessThanOrEqual(2);
+});
+
+test("a footer's last space after keeps it up, in both renderers", async ({ page }) => {
+  const document = documentOf(
+    [paragraph("Body")],
+    { ...A5, footers: { default: "f" } },
+    {
+      stories: {
+        f: story("footer", { ...paragraph("Foot", { spacing: { after: 600 } }) }),
+      },
+    },
+  );
+  const wanted = (400 + 600) * PX_PER_TWIP;
+  const gap = (pageSelector: string) =>
+    page.evaluate((selector) => {
+      const p = document.querySelector(selector) as HTMLElement;
+      const foot = p.querySelector(".foli-footer p") as HTMLElement;
+      return p.getBoundingClientRect().bottom - foot.getBoundingClientRect().bottom;
+    }, pageSelector);
+  await load(page, document);
+  expect(await gap("section.foli-page")).toBeCloseTo(wanted, 0);
+  await page.goto("/word.html");
+  await page.waitForFunction(() => "foliWord" in window);
+  await page.evaluate(
+    (doc) =>
+      (window as unknown as { foliWord: { show(d: unknown, r: string): void } }).foliWord.show(
+        doc,
+        "final",
+      ),
+    document,
+  );
+  expect(await gap(".foli-word-page")).toBeCloseTo(wanted, 0);
+});
+
 test("first, even and default variants; a section inherits what it does not have", async ({
   page,
 }) => {
@@ -351,6 +438,111 @@ test("undo crosses stories and the body, and a growing header moves the text", a
   await expect(inStory(page)).toBeFocused();
   await page.keyboard.type("z");
   expect(await storyText(page)).toBe("HeadHz");
+});
+
+test("typing that makes a page number wrap from page 10 on moves that page's text", async ({
+  page,
+}) => {
+  const blocks = Array.from({ length: 11 }, (_, i) => pageBreak(`Page ${i + 1}`));
+  await load(
+    page,
+    documentOf(
+      blocks,
+      { ...A5, margins: { ...A5.margins, top: 800 }, headers: { default: "h" } },
+      {
+        stories: {
+          h: story("header", { type: "paragraph", content: [text("x"), ...field("PAGE", "0")] }),
+        },
+      },
+    ),
+  );
+  await openHeader(page);
+  await page.keyboard.press("Home");
+  const lines = () =>
+    page.evaluate(() =>
+      [...document.querySelectorAll("section.foli-page")].map((p) => {
+        const content = p.querySelector(".foli-header .foli-region-content") as HTMLElement;
+        const shown = content.style.display === "none";
+        content.style.display = "";
+        const height = content.getBoundingClientRect().height;
+        if (shown) content.style.display = "none";
+        return { height, top: Number.parseFloat(getComputedStyle(p).paddingTop) };
+      }),
+    );
+  for (let i = 0; i < 200; i++) {
+    await page.keyboard.type("x");
+    const all = await lines();
+    const [one, ten] = [all[1], all[9]];
+    if (one && ten && ten.height > one.height + 1) {
+      expect(ten.top).toBeGreaterThan(one.top + 1);
+      return;
+    }
+  }
+  throw new Error("the page number never wrapped");
+});
+
+test("from the read-only host, Escape leaves the story and nothing moves the body", async ({
+  page,
+}) => {
+  await load(page, twoPages());
+  await editor(page).click();
+  await page.keyboard.press(`${MOD}+Home`);
+  await page.keyboard.press("ArrowRight");
+  await openHeader(page);
+  await page.keyboard.press("Shift+Tab");
+  await expect(editor(page)).toBeFocused();
+  await page.keyboard.press(`${MOD}+End`);
+  await page.keyboard.press(`${MOD}+a`);
+  await page.keyboard.press("Escape");
+  await expect(page.locator(".foli-story-mount")).toHaveCount(0);
+  await page.keyboard.type("x");
+  expect(await bodyText(page)).toBe("Fxirst pageSecond page");
+});
+
+test("a composition running when the story closes goes into it", async ({ page, browserName }) => {
+  test.skip(browserName !== "chromium", "CDP IME emulation is Chromium-only");
+  await load(page, twoPages());
+  const cdp = await page.context().newCDPSession(page);
+  const compose = async () => {
+    await openHeader(page);
+    await page.keyboard.press("End");
+    await cdp.send("Input.imeSetComposition", { text: "か", selectionStart: 1, selectionEnd: 1 });
+  };
+  await compose();
+  await page.evaluate(() => window.foliEdit.view.setOptions({ editable: false }));
+  expect(await storyText(page)).toBe("Headか");
+  await page.evaluate(() => window.foliEdit.view.setOptions({ editable: true }));
+  await compose();
+  await page.evaluate(() => window.foliEdit.view.closeStory());
+  expect(await storyText(page)).toBe("Headかか");
+});
+
+test("printing with a story open shows no editing marks", async ({ page }) => {
+  await load(page, twoPages());
+  await openHeader(page);
+  await page.emulateMedia({ media: "print" });
+  const look = await page.evaluate(() => ({
+    opacity: getComputedStyle(document.querySelector("section.foli-page > p") as Element).opacity,
+    outline: getComputedStyle(document.querySelector(".foli-story-mount") as Element).outlineStyle,
+  }));
+  expect(look).toEqual({ opacity: "1", outline: "none" });
+});
+
+test("with two views, the one with the story open answers for it", async ({ page }) => {
+  await load(page, twoPages());
+  const open = await page.evaluate(() => {
+    const { view, editor } = window.foliEdit;
+    const host = document.createElement("div");
+    document.body.append(host);
+    const second = new (view.constructor as typeof import("@folijs/view").EditorView)(host, editor);
+    view.openStory("header", 0);
+    const id = editor.storyView?.open?.id;
+    view.closeStory();
+    second.destroy();
+    host.remove();
+    return id;
+  });
+  expect(open).toBe("h");
 });
 
 test("T1 in a header: typing and formatting keep the tree valid at every key", async ({ page }) => {

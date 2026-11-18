@@ -349,13 +349,15 @@ export function flowFrom(
     }
     if (state.onPage || state.used || state.column || state.band) newPage(true);
     else state.forcedPage = true;
-    if (section.pageStart !== undefined) state.number = section.pageStart;
-    // Word's even and odd page sections: a blank page when the next number is the wrong kind.
-    if (
-      (section.start === "oddPage" && state.number % 2 === 0) ||
-      (section.start === "evenPage" && state.number % 2 === 1)
-    )
-      newPage(true);
+    const wrongKind = (number: number) =>
+      (section.start === "oddPage" && number % 2 === 0) ||
+      (section.start === "evenPage" && number % 2 === 1);
+    // Word's even and odd page sections (its PDFs, every kind, start and page before): a restart
+    // takes the next number of the right kind, with no blank page; without one, a blank page when
+    // the number the pages have reached is the wrong kind.
+    if (section.pageStart !== undefined)
+      state.number = section.pageStart + (wrongKind(section.pageStart) ? 1 : 0);
+    else if (wrongKind(state.number)) newPage(true);
     state.sectionPage = state.page;
     return undefined;
   };

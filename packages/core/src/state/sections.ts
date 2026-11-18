@@ -28,6 +28,7 @@ import {
   splitAttrs,
   storyAfter,
   storyBody,
+  storyState,
   wordContext,
 } from "./word.js";
 
@@ -390,16 +391,38 @@ export function pageVariant(
   return evenAndOdd && page.number % 2 === 0 ? "even" : "default";
 }
 
-/** A story id no story and no section uses. */
+/** Every story id a section refers to, once per reference. */
+function storyReferences(sections: readonly SectionJSON[]): string[] {
+  return sections.flatMap((setup) => [
+    ...Object.values(setup.headers ?? {}),
+    ...Object.values(setup.footers ?? {}),
+  ]);
+}
+
+/**
+ * A new story id. Random, never counted: the id of a story removed since may still be a
+ * relationship of the package the document came from, to another part.
+ */
 function freshStoryId(state: EditorState, tr: Transaction): string {
   const used = new Set<string>(wordContext(state)?.stories.keys());
-  for (const { setup } of documentSections(state))
-    for (const refs of [setup.headers, setup.footers])
-      for (const id of Object.values(refs ?? {})) used.add(id);
+  for (const id of storyReferences(documentSections(state).map((s) => s.setup))) used.add(id);
   for (const step of tr.steps) if (step instanceof StoryStep) used.add(step.id);
-  let n = used.size + 1;
-  while (used.has(`rIdFoli${n}`)) n++;
-  return `rIdFoli${n}`;
+  for (;;) {
+    const id = `rIdFoli${Math.random().toString(36).slice(2, 12)}`;
+    if (!used.has(id)) return id;
+  }
+}
+
+/** A copy of a story for another section: a bookmark's name is the document's only once. */
+function copyOfStory(state: EditorState, story: Story): Story {
+  const tr = storyState(state, story.doc).tr;
+  const marks: number[] = [];
+  story.doc.descendants((node, pos) => {
+    if (node.type.name === "bookmarkStart" || node.type.name === "bookmarkEnd") marks.push(pos);
+    return true;
+  });
+  for (const pos of marks.reverse()) tr.delete(pos, pos + 1);
+  return { ...story, doc: tr.doc };
 }
 
 /** An empty header or footer, in the document's style for it when it has one. */
@@ -493,18 +516,16 @@ export function setStoryLinked(
       const tr = state.tr.setMeta(untracked, true).setMeta(closeHistory, true);
       if (own) {
         setStoryReference(state, tr, at, side, variant, null);
-        const shared = setups.some(
-          (setup, i) =>
-            i !== at &&
-            [setup.headers, setup.footers].some((refs) => Object.values(refs ?? {}).includes(own)),
-        );
+        // Another section's reference, or another variant's of this one, keeps it.
+        const shared = storyReferences(setups).filter((id) => id === own).length > 1;
         const story = storyAfter(state, tr, own);
         if (story && !shared) tr.step(new StoryStep(own, story, null));
       } else {
         const shown = storyOfSection(setups, at - 1, side, variant);
         const copied = shown ? context.stories.get(shown.id) : undefined;
         const id = freshStoryId(state, tr);
-        tr.step(new StoryStep(id, null, copied ?? emptyStory(state, side)));
+        const story = copied ? copyOfStory(state, copied) : emptyStory(state, side);
+        tr.step(new StoryStep(id, null, story));
         setStoryReference(state, tr, at, side, variant, id);
       }
       dispatch(tr);

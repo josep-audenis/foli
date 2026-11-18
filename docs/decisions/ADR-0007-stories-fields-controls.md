@@ -115,8 +115,8 @@ content, ext? }`. `content` is a `doc` of the body's blocks. `noteType` is Word'
   the view compares the stories too, redraws the occurrences of those that changed and reflows only
   if a height changed. The renderer's context depends on `styles`, `numbering`, `defaults`, `theme`
   and `resources`, not on the envelope object, so typing in a story keeps it and the layout cache.
-- **Across trees.** Revision and bookmark ids are allocated over the body and every story
-  (`maxRevisionId` and its kin scan one tree today).
+- **Across trees.** Revision and bookmark ids are allocated over the body and every story. A story
+  copied by unlinking a section leaves its bookmarks behind: their names are the document's once.
 - **Review.** Accept and reject all reach every story. Comments anchor in the body only.
 - **Notes and the clipboard.** Deleting the last reference removes the story in the same
   transaction; undo restores both. A slice holding a reference carries its note's content, so cut
@@ -162,7 +162,9 @@ content, ext? }`. `content` is a `doc` of the body's blocks. `noteType` is Word'
   its place in the file. A missing variant inherits from the previous section. A page holding
   several sections takes its header and footer from the first section on it. Word's PDFs of 01, 03,
   04, 05 and 08 agree with these (11.7, 08 scoring 1.000 on all five pages), and add one rule:
-  **the blank page Word inserts before an even or odd page section has no header or footer.**
+  **the blank page Word inserts before an even or odd page section has no header or footer.** With
+  a restart (`w:pgNumType w:start`) such a section gets no blank page at all, and its first number
+  is the start or, when that is the wrong kind, the next (16 cases on Word's PDFs).
 - **Notes.** A line holding a reference goes on a page only if it, the separator and the note's
   **first line** fit; the rest of the note fills the space left at the foot and continues on the
   next page under the continuation separator, so a note taller than a page works. What carries
@@ -264,8 +266,9 @@ content, ext? }`. `content` is a `doc` of the body's blocks. `noteType` is Word'
   otherwise kept verbatim. Sections gain `columns`, `pageNumbers` (`w:pgNumType`) and their own
   note properties.
 - **Find:** core's `findAll(doc, query)` over the body and each story; results carry the story id.
-- **Slices with half a field or control** are repaired on paste: markers without partners are
-  dropped, their content kept.
+- **Slices with half a field or control** are repaired on paste (`fitPaste`, built in 11.8):
+  markers without partners are dropped, a field that lost its end losing its code too, their
+  content kept.
 - **PDF.** A new `@folijs/pdf`, no browser dependency: `exportPdf(document, { page, resources })`
   drives a page the app supplies (Playwright's or Puppeteer's: `setContent`, `addScriptTag`,
   `evaluate`, `pdf`), loads the read-only renderer's bundle, updates page fields, and prints with

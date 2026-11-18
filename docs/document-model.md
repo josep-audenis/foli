@@ -172,7 +172,7 @@ properties may hold only the marks that describe how text looks (`RUN_PROPERTY_M
   `headers` and `footers` name) and notes as `footnote:<id>` and `endnote:<id>` (what a
   `noteReference` names), each a `doc` of blocks. A story ends no section and holds no note
   reference or comment; a note holds no page or column break. New headers and footers get ids
-  `rIdFoli<n>`. In the editor a story changes through `StoryStep`s of the body's history.
+  `rIdFoli` and a random part, never reused. In the editor a story changes through `StoryStep`s of the body's history.
 - **Settings** (v5): `settings.evenAndOddHeaders` (absent: as the file says; `false` is written
   back as off), `footnotes` and `endnotes`, from `word/settings.xml`. They change through
   `EnvelopeStep`s.

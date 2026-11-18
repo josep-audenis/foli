@@ -528,8 +528,9 @@ describe("flow: sections and columns", () => {
     // Page 1, then 3 (2 is blank), then 4.
     expect(pagesOf(flow(blocks, 100, WORD))).toEqual([0, 2, 3]);
     const restart = section({ start: "oddPage", pageStart: 4 });
+    // A restart takes the right kind of number instead (Word adds no page for it).
     expect(pagesOf(flow([blocks[0] as BlockBox, inSection(restart, box(10))], 100, WORD))).toEqual([
-      0, 2,
+      0, 1,
     ]);
   });
 
@@ -674,6 +675,42 @@ describe("flow: pages of their own heights (headers and footers)", () => {
     const blocks = [inSection(first, box(40)), inSection(second, box(40))];
     // The second section's own box would hold it.
     expect(flow(blocks, 0, WORD).map((f) => f[0]?.page)).toEqual([0, 1]);
+  });
+
+  it("numbers even and odd page sections as Word does, restarted or not", () => {
+    // Word's PDFs: the page numbers of a first section of 1 or 2 pages and a second of 2, a blank
+    // page as null.
+    const cases: [FlowSection["start"], number | undefined, number, (number | null)[]][] = [
+      ["evenPage", 1, 1, [1, 2, 3]],
+      ["evenPage", 1, 2, [1, 2, 2, 3]],
+      ["evenPage", 2, 1, [1, 2, 3]],
+      ["evenPage", 2, 2, [1, 2, 2, 3]],
+      ["evenPage", 3, 1, [1, 4, 5]],
+      ["evenPage", 3, 2, [1, 2, 4, 5]],
+      ["evenPage", undefined, 1, [1, 2, 3]],
+      ["evenPage", undefined, 2, [1, 2, null, 4, 5]],
+      ["oddPage", 1, 1, [1, 1, 2]],
+      ["oddPage", 1, 2, [1, 2, 1, 2]],
+      ["oddPage", 2, 1, [1, 3, 4]],
+      ["oddPage", 2, 2, [1, 2, 3, 4]],
+      ["oddPage", 3, 1, [1, 3, 4]],
+      ["oddPage", 3, 2, [1, 2, 3, 4]],
+      ["oddPage", undefined, 1, [1, null, 3, 4]],
+      ["oddPage", undefined, 2, [1, 2, 3, 4]],
+    ];
+    for (const [start, pageStart, before, numbers] of cases) {
+      const one = section(0);
+      const two = section(1, { start, pageStart });
+      const boxes = [
+        inSection(one, box(before * 100, 0, 0, 100)),
+        inSection(two, box(200, 0, 0, 100)),
+      ];
+      const pages = pageFacts(boxes, flowFrom(boxes, 0, WORD));
+      expect(
+        pages.map((p) => (p.sectionPages ? p.number : null)),
+        `${start} ${pageStart} after ${before}`,
+      ).toEqual(numbers);
+    }
   });
 
   it("says each page's number, section and first page", () => {

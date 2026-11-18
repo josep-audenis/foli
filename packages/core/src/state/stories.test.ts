@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { NodeJSON } from "../model/index.js";
 import type { FoliDocument, SectionJSON } from "../v3/document.js";
 import { createDocument, SCHEMA_VERSION } from "../v3/document.js";
-import { addComment } from "./comments.js";
+import { addComment, deleteAllComments, deleteComment } from "./comments.js";
 import { createEditor, type Editor } from "./editor.js";
 import { closeHistory, redoDepth, undo, undoDepth } from "./history.js";
 import { acceptAllChanges, rejectAllChanges } from "./review.js";
@@ -16,6 +16,7 @@ import {
   setStoryLinked,
   storyOfSection,
 } from "./sections.js";
+import { Plugin, PluginKey } from "./state.js";
 import { StoryStep, withEnvelope, wordContext } from "./word.js";
 
 const p = (text: string, attrs?: Record<string, unknown>): NodeJSON => ({
@@ -234,6 +235,54 @@ describe("editing a story", () => {
   });
 });
 
+describe("what a story's editor leaves to the body", () => {
+  it("deletes comments with their anchors, which are in the body", () => {
+    const anchored: FoliDocument = {
+      ...documentOf(),
+      comments: [{ id: 1, author: "A", content: [p("note")] }],
+      content: docOf({
+        type: "paragraph",
+        content: [
+          { type: "commentStart", attrs: { id: 1 } },
+          { type: "text", text: "body" },
+          { type: "commentEnd", attrs: { id: 1 } },
+        ],
+      }),
+    };
+    for (const remove of [deleteComment(1), deleteAllComments]) {
+      const editor = createEditor({ document: anchored });
+      expect(story(editor).run(remove)).toBe(true);
+      expect(editor.getDocument().comments).toEqual([]);
+      expect(JSON.stringify(editor.getDocument().content)).not.toContain("comment");
+    }
+  });
+
+  it("keeps the state of the editor's plugins across typing and undo", () => {
+    let made = 0;
+    const key = new PluginKey<number>("count");
+    const counting = new Plugin<number>({
+      key,
+      state: {
+        init: () => {
+          made++;
+          return 0;
+        },
+        apply: (tr, value) => (tr.docChanged ? value + 1 : value),
+      },
+    });
+    const editor = createEditor({ document: documentOf(), plugins: [counting] });
+    const head = story(editor);
+    made = 0;
+    head.select(5);
+    head.commands.insertText("a");
+    head.commands.insertText("b");
+    expect(key.getState(head.state)).toBe(2);
+    head.commands.undo();
+    expect(key.getState(head.state)).toBe(2);
+    expect(made).toBe(0);
+  });
+});
+
 describe("headers and footers of sections", () => {
   const twoSections = (first: SectionJSON, last: SectionJSON = {}): FoliDocument => ({
     ...documentOf(last),
@@ -279,6 +328,46 @@ describe("headers and footers of sections", () => {
     expect(textOf(story(editor, id))).toBe("Xhead");
     // The first section has nothing to link to.
     expect(editor.can(setStoryLinked("header", "default", true, 0))).toBe(false);
+  });
+
+  it("keeps a story another variant of the section still shows", () => {
+    const editor = createEditor({
+      document: twoSections({}, { headers: { default: "h1", first: "h1" } }),
+    });
+    expect(editor.run(setStoryLinked("header", "default", true, 1))).toBe(true);
+    expect(sectionsOf(editor)[1]?.headers).toEqual({ first: "h1" });
+    expect(textOf(story(editor))).toBe("head");
+  });
+
+  it("gives an unlinked copy no bookmarks, and never an id used before", () => {
+    const marked: FoliDocument = {
+      ...twoSections({ headers: { default: "h1" } }),
+      stories: {
+        h1: {
+          kind: "header",
+          content: docOf({
+            type: "paragraph",
+            content: [
+              { type: "bookmarkStart", attrs: { id: 7, name: "here" } },
+              { type: "text", text: "head" },
+              { type: "bookmarkEnd", attrs: { id: 7 } },
+            ],
+          }),
+        },
+      },
+    };
+    const editor = createEditor({ document: marked });
+    const ids = new Set<string>();
+    for (let i = 0; i < 5; i++) {
+      editor.run(setStoryLinked("header", "default", false, 1));
+      const id = sectionsOf(editor)[1]?.headers?.default as string;
+      expect(ids.has(id)).toBe(false);
+      ids.add(id);
+      expect(textOf(story(editor, id))).toBe("head");
+      expect(JSON.stringify(editor.getDocument().stories?.[id])).not.toContain("bookmark");
+      editor.run(setStoryLinked("header", "default", true, 1));
+    }
+    expect(JSON.stringify(editor.getDocument().stories?.h1)).toContain("bookmarkStart");
   });
 
   it("adds a missing story to the first section, once", () => {

@@ -325,6 +325,8 @@ export function wordPlugin(envelope: WordEnvelope, context?: WordContext): Plugi
     state: {
       init: () => initial,
       apply: (tr, value) => {
+        const adopted = tr.getMeta(ADOPT) as WordContext | undefined;
+        if (adopted) return adopted;
         const next = tr.getMeta(key) as WordEnvelope | undefined;
         const comments = applyCommentSteps(value.envelope.comments, tr.steps);
         const base = next ?? value.envelope;
@@ -377,6 +379,12 @@ export function wordPlugin(envelope: WordEnvelope, context?: WordContext): Plugi
 export function withEnvelope(tr: Transaction, envelope: WordEnvelope): Transaction {
   return tr.setMeta(key, envelope);
 }
+
+const ADOPT = "adoptWordContext";
+
+/** Makes `tr` give a story's state the body's context as it now is. */
+export const withContext = (tr: Transaction, context: WordContext): Transaction =>
+  tr.setMeta(ADOPT, context);
 
 /** The envelope `tr` gives the document through `withEnvelope`, if any. */
 export const envelopeChange = (tr: Transaction): WordEnvelope | undefined =>

@@ -240,6 +240,45 @@ export function fitPaste(
 }
 
 /**
+ * Adds to `out` the field and inline control markers of `nodes` without partners (ADR-0007): a
+ * field that lost its end loses its start and code too, so the code never becomes text. What they
+ * held stays. `open` carries what is open from one node to the next.
+ */
+function unpairedMarkers(
+  nodes: readonly NodeJSON[],
+  out: Set<NodeJSON>,
+  open: {
+    fields: { parts: NodeJSON[]; separated: boolean }[];
+    controls: Map<unknown, NodeJSON[]>;
+  } = { fields: [], controls: new Map() },
+  top = true,
+): void {
+  for (const node of nodes) {
+    const field = open.fields[open.fields.length - 1];
+    const id = node.attrs?.id;
+    if (node.type === "fieldStart") open.fields.push({ parts: [node], separated: false });
+    else if (node.type === "fieldCode") {
+      if (field && !field.separated) field.parts.push(node);
+      else out.add(node);
+    } else if (node.type === "fieldSeparator") {
+      if (field && !field.separated) {
+        field.parts.push(node);
+        field.separated = true;
+      } else out.add(node);
+    } else if (node.type === "fieldEnd") {
+      if (!open.fields.pop()) out.add(node);
+    } else if (node.type === "controlStart")
+      open.controls.set(id, [...(open.controls.get(id) ?? []), node]);
+    else if (node.type === "controlEnd") {
+      if (!open.controls.get(id)?.pop()) out.add(node);
+    } else if (node.content) unpairedMarkers(node.content, out, open, false);
+  }
+  if (!top) return;
+  for (const { parts } of open.fields) for (const part of parts) out.add(part);
+  for (const starts of open.controls.values()) for (const start of starts) out.add(start);
+}
+
+/**
  * `fitPaste` on validated input. `same`: the content is the target document's own (its lists go
  * on, and an id the definitions lack is kept; from elsewhere it names nothing).
  */
@@ -403,7 +442,13 @@ function fit(
   const noteAvailable = (story: string) =>
     same && Object.hasOwn(target.stories ?? {}, story) && !referredTo.has(story);
 
+  // Half a field or control from elsewhere: its markers go, what it held stays.
+  const unpaired = new Set<NodeJSON>();
+  unpairedMarkers([json], unpaired);
+  for (const comment of source.comments) unpairedMarkers(comment.content, unpaired);
+
   const mapNode = (node: NodeJSON): NodeJSON | null => {
+    if (unpaired.has(node)) return null;
     const attrs = node.attrs as Json | undefined;
     if (inStory && (COMMENT_ANCHORS.has(node.type) || node.type === "noteReference")) return null;
     // From another document their definitions are not here: the content comes without them.
