@@ -212,7 +212,7 @@ content, ext? }`. `content` is a `doc` of the body's blocks. `noteType` is Word'
 
 ### Other
 
-- **Notes in the text:** `noteReference` (`story`, `customMark`, `ext`) and, inside a note,
+- **Notes in the text:** `noteReference` (`story`, `customMark`, `attributes`) and, inside a note,
   `noteMark` (`w:footnoteRef`), both run content. Numbers come from document order and
   `w:footnotePr`/`w:endnotePr`, never stored.
 - **Document settings:** `settings` in the envelope: `evenAndOddHeaders`, `footnotes` and

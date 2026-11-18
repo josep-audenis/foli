@@ -7,7 +7,7 @@ import { FoliEditor, type FoliEditorHandle } from "./index.js";
 
 const anchor = (type: string, id: number) => ({ type, attrs: { id } });
 const document3 = (comments: FoliDocument["comments"]): FoliDocument => ({
-  schemaVersion: 4,
+  schemaVersion: 5,
   section: {},
   defaults: {},
   styles: [{ id: "Normal", type: "paragraph", name: "Normal", isDefault: true }],

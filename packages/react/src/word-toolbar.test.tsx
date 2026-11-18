@@ -12,7 +12,7 @@ import { afterEach, describe, expect, it, onTestFinished, vi } from "vitest";
 import { FoliCanvas, FoliToolbar } from "./index.js";
 
 const document3: FoliDocument = {
-  schemaVersion: 4,
+  schemaVersion: 5,
   section: {},
   defaults: { run: [{ type: "fontSize", attrs: { value: 22 } }] },
   styles: [

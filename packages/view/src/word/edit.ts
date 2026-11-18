@@ -44,6 +44,22 @@ import {
   WORD_PAGE_BREAK_ATTR,
 } from "./blocks.js";
 
+/** Inline nodes with nothing to show: a line holding only these is still an empty line. */
+const NOT_IN_LINE = new Set([
+  "bookmarkStart",
+  "bookmarkEnd",
+  "commentStart",
+  "commentEnd",
+  "controlStart",
+  "controlEnd",
+  "fieldStart",
+  "fieldCode",
+  "fieldSeparator",
+  "fieldEnd",
+  "noteReference",
+  "noteMark",
+]);
+
 const REVIEW_MARKS = new Set(["insertion", "deletion", "formatChange"]);
 
 /** Whether a paragraph has tracked changes: in its text, its mark or its formatting. */
@@ -287,7 +303,7 @@ export class WordRenderer {
       const child = node.child(i);
       // A floating picture is not in the line: a paragraph holding only one shows its empty line.
       if (
-        !["bookmarkStart", "bookmarkEnd", "commentStart", "commentEnd"].includes(child.type.name) &&
+        !NOT_IN_LINE.has(child.type.name) &&
         !(child.type.name === "picture" && child.attrs.float)
       )
         last = child;

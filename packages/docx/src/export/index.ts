@@ -5,7 +5,13 @@
  * byte for byte. Without a package, a new one is made.
  */
 
-import { type FoliDocument, parseDocument, type ResourceJSON } from "@folijs/core";
+import {
+  type FoliDocument,
+  type NodeJSON,
+  parseDocument,
+  type ResourceJSON,
+  type SectionJSON,
+} from "@folijs/core";
 import { child, REL } from "../import/ooxml.js";
 import { DocxError, type DocxPackage, type NewPart } from "../package.js";
 import { newSettingsXml, withTrackRevisions } from "../settings.js";
@@ -188,6 +194,7 @@ export async function exportDocx(
   options: ExportOptions = {},
 ): Promise<Uint8Array> {
   const doc = withThreadIds(parseDocument(document), original);
+  refuseNotYetWritten(doc);
   // Before the app is asked for any picture's bytes.
   const reference = original ? undefined : packageReference(doc);
   if (reference) {
@@ -208,6 +215,24 @@ export async function exportDocx(
   const bytes = await pictureBytes(doc, original, options.resource);
   const media = new Media(doc, original, bytes, rewritten);
   return original ? intoPackage(doc, original, options, media) : newPackage(doc, options, media);
+}
+
+/** Schema v5's additions outside the content, until 11.4-11.6 write them: never dropped. */
+function refuseNotYetWritten(doc: FoliDocument): void {
+  const written = (key: string) => new DocxError(`${key} cannot be exported to .docx yet`);
+  for (const key of ["stories", "controls", "settings"] as const) if (doc[key]) throw written(key);
+  const sections = [doc.section];
+  const walk = (node: NodeJSON) => {
+    const attrs = node.attrs as { section?: SectionJSON; controls?: unknown } | undefined;
+    if (attrs?.controls) throw written("controls");
+    if (attrs?.section) sections.push(attrs.section);
+    node.content?.forEach(walk);
+  };
+  walk(doc.content);
+  for (const comment of doc.comments) comment.content.forEach(walk);
+  for (const section of sections)
+    for (const key of ["columns", "pageNumbers", "footnotes", "endnotes"] as const)
+      if (section[key]) throw written(`A section's ${key}`);
 }
 
 const PARA_ID = "w14:paraId";

@@ -35,7 +35,7 @@ const p = (attrs: Record<string, unknown>, ...content: NodeJSON[]): NodeJSON => 
 
 function documentOf(...blocks: NodeJSON[]): FoliDocument {
   return {
-    schemaVersion: 4,
+    schemaVersion: 5,
     section: { pageSize: { width: 11906, height: 16838 }, margins: { top: 1440, left: 1800 } },
     defaults: {},
     styles: STYLES,
@@ -54,7 +54,7 @@ describe("an editor on a schema v3 document", () => {
   it("keeps the envelope and gives page settings from the last section", () => {
     const editor = editorOf(p({}, text("Hello")));
     const document = editor.getDocument();
-    expect(document.schemaVersion).toBe(4);
+    expect(document.schemaVersion).toBe(5);
     expect(document.styles).toEqual(STYLES);
     expect(document.section).toEqual(documentOf().section);
     // A4 in twips; unset margins are Word's inch.
@@ -128,6 +128,13 @@ describe("Enter on a v3 document", () => {
       p({ style: "Heading1", justification: "center" }, text("Title")),
       p({ style: "Normal", ...own }),
     ]);
+  });
+
+  it("at the end of a heading stays in the heading's content controls", () => {
+    const editor = editorOf(p({ style: "Heading1", controls: ["c"] }, text("Title")));
+    editor.select(6);
+    editor.commands.splitBlock();
+    expect(blocks(editor)[1]).toEqual(p({ style: "Normal", controls: ["c"] }));
   });
 
   it("at the end of a paragraph whose style goes on (or names none) keeps its formatting", () => {

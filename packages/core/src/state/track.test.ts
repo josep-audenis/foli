@@ -20,7 +20,7 @@ const p = (...content: NodeJSON[]): NodeJSON => ({
 
 function documentOf(...blocks: NodeJSON[]): FoliDocument {
   return {
-    schemaVersion: 4,
+    schemaVersion: 5,
     section: {},
     defaults: {},
     styles: STYLES,

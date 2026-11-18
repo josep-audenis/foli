@@ -14,7 +14,14 @@ import type { Transform } from "../transform/transform.js";
 export const MARK_ATTRS = ["section", "revision", "formatChange", "attributes"] as const;
 
 /** Inline nodes that stand between runs: bookmarks and comment ranges. */
-const MARKERS = new Set(["bookmarkStart", "bookmarkEnd", "commentStart", "commentEnd"]);
+const MARKERS = new Set([
+  "bookmarkStart",
+  "bookmarkEnd",
+  "commentStart",
+  "commentEnd",
+  "controlStart",
+  "controlEnd",
+]);
 
 /**
  * After a join, or a deletion across paragraphs, the merged paragraph at `pos` ends with the

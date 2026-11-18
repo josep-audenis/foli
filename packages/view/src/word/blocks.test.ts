@@ -41,7 +41,7 @@ const STYLES: StyleJSON[] = [
 
 function documentOf(content: NodeJSON[], over: Partial<FoliDocument> = {}): FoliDocument {
   return {
-    schemaVersion: 4,
+    schemaVersion: 5,
     section: {},
     defaults: {},
     styles: STYLES,

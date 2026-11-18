@@ -59,7 +59,14 @@ const key = new PluginKey<TrackState>("track");
 export const untracked = "untracked";
 
 /** Inline nodes a tracked change does not mark: they stand between runs in Word. */
-const MARKERS = new Set(["bookmarkStart", "bookmarkEnd", "commentStart", "commentEnd"]);
+const MARKERS = new Set([
+  "bookmarkStart",
+  "bookmarkEnd",
+  "commentStart",
+  "commentEnd",
+  "controlStart",
+  "controlEnd",
+]);
 
 const RUN_MARKS = new Set<string>(RUN_PROPERTY_MARKS);
 /**

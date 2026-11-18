@@ -25,6 +25,7 @@ import {
   type AbstractNumberingJSON,
   type CommentJSON,
   migrateToV4,
+  migrateToV5,
   type NumberingInstanceJSON,
   type NumberingLevelJSON,
   type ParagraphPropertiesJSON,
@@ -145,12 +146,14 @@ export function fitPastedV2(
   state: EditorState,
   content: Node,
 ): { doc: Node; envelope: WordEnvelope } {
-  const migrated = migrateToV4(
-    migrateToV3({
-      schemaVersion: 2,
-      settings: DEFAULT_SETTINGS,
-      content: content.toJSON() as DocJSON,
-    }),
+  const migrated = migrateToV5(
+    migrateToV4(
+      migrateToV3({
+        schemaVersion: 2,
+        settings: DEFAULT_SETTINGS,
+        content: content.toJSON() as DocJSON,
+      }),
+    ),
   );
   const definitions: WordDefinitions = {
     styles: migrated.styles.map((style) => {

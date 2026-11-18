@@ -48,7 +48,7 @@ const numbered = { numbering: { id: 1, level: 0 } };
 
 function documentOf(...blocks: NodeJSON[]): FoliDocument {
   return {
-    schemaVersion: 4,
+    schemaVersion: 5,
     section: {},
     defaults: {},
     styles: STYLES,
@@ -502,6 +502,15 @@ describe("WordRenderer", () => {
       [2, 2],
       [4, 2],
     ]);
+  });
+
+  it("keeps the line of a paragraph holding only a field's parts", () => {
+    const { renderer, doc } = rendererOf(
+      p({}, { type: "fieldStart" }, { type: "fieldEnd" }),
+      p({}, text("a"), { type: "hardBreak" }, { type: "fieldStart" }, { type: "fieldEnd" }),
+    );
+    const last = (i: number) => renderer.render(doc.child(i), i).dom.lastChild?.nodeName;
+    expect([last(0), last(1)]).toEqual(["BR", "BR"]);
   });
 
   it("shows the last line of a paragraph ending in a line break, not one ending in markers", () => {

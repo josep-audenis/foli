@@ -136,6 +136,17 @@ const ID = int(0, 2_147_483_647);
 const revisionFields = { id: ID, author: str(), date: nullable(date) };
 const revision = shape(revisionFields, ["id", "author"]);
 
+/** How notes are placed and numbered (`w:footnotePr`, `w:endnotePr`), for a document or section. */
+export const checkNoteProperties: Check = shape({
+  position: oneOf(["pageBottom", "beneathText", "sectEnd", "docEnd"]),
+  format: token,
+  start: ID,
+  restart: oneOf(["continuous", "eachSect", "eachPage"]),
+});
+
+/** Word's limit on a section's columns. */
+const MAX_SECTION_COLUMNS = 45;
+
 /**
  * A section's page setup (`w:sectPr`): on the last paragraph of each section, and the
  * envelope's for the last. Every part is optional (Word's defaults apply); `{}` is a section
@@ -161,6 +172,21 @@ export const checkSection: Check = shape(
     titlePage: bool,
     headers: shape({ default: text(), first: text(), even: text() }),
     footers: shape({ default: text(), first: text(), even: text() }),
+    /** `w:cols` (schema v5): `widths` when the columns are not equal. */
+    columns: shape({
+      count: int(1, MAX_SECTION_COLUMNS),
+      space: positiveTwips,
+      equalWidth: bool,
+      separator: bool,
+      widths: listOf(
+        shape({ width: positiveTwips, space: positiveTwips }, ["width"]),
+        MAX_SECTION_COLUMNS,
+      ),
+    }),
+    /** `w:pgNumType` (schema v5). */
+    pageNumbers: shape({ start: ID, format: token }),
+    footnotes: checkNoteProperties,
+    endnotes: checkNoteProperties,
     ext: xml,
   },
   [],
@@ -433,6 +459,18 @@ const reviewMark: MarkSpec = {
 };
 /** A marker's own unknown attributes (`w:displacedByCustomXml`…). */
 const markerAttributes = { attributes: nullableAttr(attributes) };
+/** Ids of content controls, outermost first: at least one, none twice. */
+const controlIds: Check = (v) => {
+  const error = listOf(text(), 64)(v);
+  if (error) return error;
+  const ids = v as string[];
+  if (!ids.length) return "must not be empty (use null)";
+  return new Set(ids).size === ids.length ? undefined : "must not repeat an id";
+};
+/** The content controls around a block, row or cell (schema v5, ADR-0007). */
+const controlsAttr = { controls: nullableAttr(controlIds) };
+/** Part of a field (schema v5): stands in a run, verbatim XML of what the model does not hold. */
+const fieldPart = { group: "inline", inline: true, selectable: false } as const;
 const fontName = markAttr(nullable(text()), null);
 const themeFont = markAttr(nullable(oneOf(THEME_FONTS)), null);
 const hexByte = (v: unknown) =>
@@ -446,6 +484,7 @@ export const schema = new Schema({
       content: "inline*",
       attrs: {
         ...paragraphProperties,
+        ...controlsAttr,
         /** Ends a section: its page setup. The last section's is the envelope's `section`. */
         section: nullableAttr(checkSection),
         /** The paragraph mark inserted and/or deleted as tracked changes. */
@@ -472,6 +511,7 @@ export const schema = new Schema({
       content: "tableRow+",
       attrs: {
         ...tableProperties,
+        ...controlsAttr,
         /** The grid's column widths in twips (`w:tblGrid`). */
         grid: { default: [], validate: listOf(positiveTwips, MAX_COLUMNS) },
         /** The `w:tblGrid` the grid was read from, verbatim. */
@@ -482,6 +522,7 @@ export const schema = new Schema({
       content: "tableCell+",
       attrs: {
         ...rowProperties,
+        ...controlsAttr,
         /** The row inserted or deleted as a tracked change (`w:trPr/w:ins`, `w:del`). */
         revision: nullableAttr(shape({ insertion: revision, deletion: revision })),
         /** The row's table property exceptions (`w:tblPrEx`). */
@@ -493,12 +534,12 @@ export const schema = new Schema({
     tableCell: {
       // As Word requires, a cell ends with a paragraph.
       content: "block* paragraph",
-      attrs: cellProperties,
+      attrs: { ...cellProperties, ...controlsAttr },
     },
     /** Block content Foli does not model yet (a table inside a content control…), kept verbatim. */
     opaqueBlock: {
       group: "block",
-      attrs: { xml: { validate: xml }, label: nullableAttr(text()) },
+      attrs: { xml: { validate: xml }, label: nullableAttr(text()), ...controlsAttr },
     },
     text: { group: "inline" },
     tab: { group: "inline", inline: true },
@@ -541,6 +582,51 @@ export const schema = new Schema({
       inline: true,
       attrs: { id: { validate: ID }, ...markerAttributes },
     },
+    /**
+     * A field, as Word has it (schema v5, ADR-0007): start, code, optional separator, result,
+     * end. The code range runs from the start to the separator (or the end) and may hold other
+     * fields; the result is ordinary content.
+     */
+    fieldStart: {
+      ...fieldPart,
+      attrs: {
+        dirty: nullableAttr(bool),
+        locked: nullableAttr(bool),
+        /** Read from `w:fldSimple`, and written back as one. */
+        simple: nullableAttr(bool),
+        ext: nullableAttr(xml),
+      },
+    },
+    /** One `w:instrText`: part of a field's code. */
+    fieldCode: { ...fieldPart, attrs: { text: { validate: str(65_535) }, ...markerAttributes } },
+    fieldSeparator: { ...fieldPart, attrs: { ext: nullableAttr(xml) } },
+    fieldEnd: { ...fieldPart, attrs: { ext: nullableAttr(xml) } },
+    /** An inline content control's ends; its properties are the envelope's `controls[id]`. */
+    controlStart: {
+      group: "inline",
+      inline: true,
+      selectable: false,
+      attrs: { id: { validate: text() } },
+    },
+    controlEnd: {
+      group: "inline",
+      inline: true,
+      selectable: false,
+      attrs: { id: { validate: text() } },
+    },
+    /** A footnote's or endnote's reference: its text is the envelope's `stories[story]`. */
+    noteReference: {
+      group: "inline",
+      inline: true,
+      attrs: {
+        story: { validate: text() },
+        /** `w:customMarkFollows`: the mark is the text after it, not a number. */
+        customMark: nullableAttr(bool),
+        ...markerAttributes,
+      },
+    },
+    /** Where a note shows its own number (`w:footnoteRef`, `w:endnoteRef`). */
+    noteMark: { group: "inline", inline: true, selectable: false },
     /**
      * A picture (`w:drawing` holding `pic:pic`, schema v4), inline or floating. Its bytes are
      * the envelope's `resources[resource]`.
