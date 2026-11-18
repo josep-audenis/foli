@@ -1166,8 +1166,9 @@ Each task is a PR on `phase-11/sections-fields`, the build green after each.
   menu and page setup dialog. Tracked, not refused, as Word 16 saves them: a break is an inserted
   or deleted paragraph mark, a setup `w:sectPrChange`, reviewed like other changes;
   `scripts/corpus/section-roundtrip.mjs` has Word read them. Word's PDFs also showed that it takes
-  the larger of space after and space before, not their sum: fixed in the flow, which moved every
-  corpus document's score. Shortcuts: a paragraph split between columns of different widths
+  the larger of space after and space before, not their sum (the sum only with
+  `w:doNotUseHTMLParagraphAutoSpacing`, read into `settings`): fixed in the flow, which moved
+  most corpus documents' scores. Shortcuts: a paragraph split between columns of different widths
   continues by its share of the text, and read-only pages can repeat or lose a few words there; a
   selection deleted across a break does not pass its header references on; the break is not
   drawn; a next-column section with another column count starts a page.)

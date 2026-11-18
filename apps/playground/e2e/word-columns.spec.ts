@@ -177,6 +177,63 @@ test("an odd page section after page 1 leaves a blank page of its own setup", as
   expect(await pageCount(page)).toBe(3);
 });
 
+test("a click on the blank page puts the caret at the next section's start", async ({ page }) => {
+  const landscape = {
+    ...A4,
+    type: "oddPage",
+    pageSize: { width: 16838, height: 11906, orientation: "landscape" },
+  };
+  await load(page, documentOf([paragraph("one", A4), paragraph("three")], landscape));
+  await page
+    .locator("section.foli-page")
+    .nth(1)
+    .click({ position: { x: 200, y: 200 } });
+  await page.keyboard.type("X");
+  const texts = await page.evaluate(() =>
+    (window.foliEdit.editor.getDocument().content.content ?? []).map((b) =>
+      (b.content ?? []).map((c) => c.text).join(""),
+    ),
+  );
+  expect(texts).toEqual(["one", "Xthree"]);
+});
+
+test("a column break in the wide column ends the line it is on there", async ({ page }) => {
+  const set = {
+    ...A4,
+    columns: {
+      count: 2,
+      space: 360,
+      equalWidth: false,
+      widths: [{ width: 1500, space: 360 }, { width: 7166 }],
+    },
+  };
+  // Column 1 is filled; the paragraph starts in the wide column 2, where its text before the
+  // break takes one line (several in the narrow column's width).
+  const filler = Array.from({ length: 60 }, (_, i) => paragraph(`f${i}`));
+  await load(
+    page,
+    documentOf(
+      [
+        ...filler,
+        paragraph("", undefined, [
+          { type: "text", text: words(12, "before") },
+          { type: "columnBreak" },
+          { type: "text", text: "after" },
+        ]),
+      ],
+      set,
+    ),
+  );
+  const shown = await page.evaluate(() =>
+    [...document.querySelectorAll<HTMLElement>(".foli-column")].map((c) => c.textContent ?? ""),
+  );
+  const holding = (text: string) => shown.findIndex((column) => column.includes(text));
+  // The break's line is the last of the text before it: the rest starts the next column.
+  expect(holding("after")).toBe(holding("before") + 1);
+  expect(shown[holding("before")]?.endsWith("before")).toBe(true);
+  expect(shown[holding("after")]?.startsWith("after")).toBe(true);
+});
+
 test("the section menu and page setup dialog work from the keyboard and pass axe", async ({
   page,
 }) => {

@@ -167,10 +167,15 @@ function edgesOf(section: SectionJSON): Edges {
 }
 
 /** Lays `blocks` out as a story: spacing as between the paragraphs of a page. */
-function stack(blocks: readonly WordBlock[], parent: HTMLElement): number {
+function stack(blocks: readonly WordBlock[], parent: HTMLElement, adds: boolean): number {
   let previous = 0;
   blocks.forEach((block, i) => {
-    block.element.style.marginTop = `${i ? Math.max(previous, block.before) : block.before}px`;
+    const gap = !i
+      ? block.before
+      : adds
+        ? previous + block.before
+        : Math.max(previous, block.before);
+    block.element.style.marginTop = `${gap}px`;
     block.element.style.marginBottom = "0";
     previous = block.after;
     parent.append(block.element);
@@ -285,7 +290,7 @@ export class PageRegions {
         this.doc,
         { ...this.options, ...(this.resolver ? { resolver: this.resolver } : {}) },
       );
-      const after = stack(blocks, content);
+      const after = stack(blocks, content, !!this.resolver?.addsParagraphSpacing);
       // Measured down to its last block: floating pictures do not make a story taller.
       const parent = this.options.measureIn();
       const { style } = content;

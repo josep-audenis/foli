@@ -296,7 +296,11 @@ export function renderDocument(
   });
 
   /** A block's height and lines at each column width it was asked for. */
-  type Measured = Pick<BlockBox, "height" | "lines"> & { shown(): number[] };
+  type Measured = Pick<BlockBox, "height" | "lines"> & {
+    shown(): number[];
+    /** The lines, at this width, that end with a break `attr` marks. */
+    breaks(attr: string): number[];
+  };
   const measured = new Map<WordBlock, Map<number, Measured>>();
   const inWidth = (block: WordBlock, width: number) => {
     const section = sectionOf.get(block) as Section;
@@ -323,7 +327,12 @@ export function renderDocument(
       lines ??= atWidth(() => keepRows(block.element, lineBottoms(block.element), pageHeight));
       return lines;
     };
-    const entry = { height, shown, lines: () => (kept ? [height] : shown()) };
+    const entry: Measured = {
+      height,
+      shown,
+      lines: () => (kept ? [height] : shown()),
+      breaks: (attr) => atWidth(() => breakLines(block.element, entry.lines(), attr)),
+    };
     widths.set(width, entry);
     return entry;
   };
@@ -372,20 +381,27 @@ export function renderDocument(
       inColumn: widths.every((width) => width === widths[0])
         ? undefined
         : (column) => inWidth(block, widths[column] as number),
-      breaksAfter: () => {
-        const bottoms = whole.lines();
-        const breaks = hasPageBreak ? breakLines(block.element, bottoms, WORD_PAGE_BREAK_ATTR) : [];
+      breaksAfter: (column = 0) => {
+        const measure = inWidth(block, widths[column] as number);
+        const breaks = hasPageBreak ? measure.breaks(WORD_PAGE_BREAK_ATTR) : [];
         // The next block starts a page: this one's last line ends it.
-        if (next?.pageBreakBefore) breaks.push(bottoms.length - 1);
+        if (next?.pageBreakBefore) breaks.push(measure.lines().length - 1);
         return breaks;
       },
-      columnBreaksAfter: () =>
-        hasColumnBreak ? breakLines(block.element, whole.lines(), WORD_COLUMN_BREAK_ATTR) : [],
+      columnBreaksAfter: (column = 0) =>
+        hasColumnBreak
+          ? inWidth(block, widths[column] as number).breaks(WORD_COLUMN_BREAK_ATTR)
+          : [],
     };
   });
   // shortcut: widow and orphan control is on for every paragraph (Word's Normal has it; a
   // paragraph turning it off is still kept to two lines).
-  const rules = { orphans: 2, widows: 2, spacing: "word" } as const;
+  const rules = {
+    orphans: 2,
+    widows: 2,
+    spacing: "word",
+    addSpacing: document.settings?.doNotUseHTMLParagraphAutoSpacing === true,
+  } as const;
   let flowed = flowFrom(boxes, 0, rules);
   let facts = pagesOf(boxes, flowed);
   // The page count is known once flowed; a header holding it can change what fits.

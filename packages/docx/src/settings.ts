@@ -1,11 +1,11 @@
 /**
  * Word's document settings part (`settings.xml`): Foli reads and writes `w:trackRevisions`
  * (whether Word records edits as tracked changes), `w:evenAndOddHeaders` and the note properties
- * of `w:footnotePr` and `w:endnotePr`; the rest is kept verbatim, and so is the part when none of
- * them changes.
+ * of `w:footnotePr` and `w:endnotePr`, and reads `w:doNotUseHTMLParagraphAutoSpacing`; the rest is
+ * kept verbatim, and so is the part when none of them changes.
  */
 import type { NotePropertiesJSON, WordSettingsJSON } from "@folijs/core";
-import { isW, W } from "./import/ooxml.js";
+import { child, isW, toggle, W } from "./import/ooxml.js";
 import { parseXml, type XmlElement } from "./xml.js";
 
 const elementsOf = (parent: XmlElement) =>
@@ -47,13 +47,16 @@ function noteProperties(element: XmlElement | undefined): NotePropertiesJSON {
   };
 }
 
-/** What the model holds of a settings part (nothing to say: undefined). */
-export function settingsOf(settings: XmlElement | undefined): WordSettingsJSON | undefined {
+/** What the document's `settings` model holds of the part, undefined when nothing. */
+export function readSettings(settings: XmlElement | undefined): WordSettingsJSON | undefined {
   if (!settings) return undefined;
   const notes = (local: string) => noteProperties(elementsOf(settings).find((c) => isW(c, local)));
   const footnotes = notes("footnotePr");
   const endnotes = notes("endnotePr");
+  const compat = child(settings, "compat");
+  const spacing = compat && child(compat, "doNotUseHTMLParagraphAutoSpacing");
   const out: WordSettingsJSON = {
+    ...(spacing && toggle(spacing) ? { doNotUseHTMLParagraphAutoSpacing: true } : {}),
     ...(isOn(settings, "evenAndOddHeaders") ? { evenAndOddHeaders: true } : {}),
     ...(Object.keys(footnotes).length ? { footnotes } : {}),
     ...(Object.keys(endnotes).length ? { endnotes } : {}),
@@ -224,10 +227,13 @@ export function withSettings(source: string, root: XmlElement, settings: WordSet
 }
 
 /** A new settings part. */
-export function newSettingsXml(trackRevisions = true, settings: WordSettingsJSON = {}): string {
+export function newSettingsXml(trackRevisions: boolean, settings: WordSettingsJSON = {}): string {
   const children =
     (trackRevisions ? "<w:trackRevisions/>" : "") +
     (settings.evenAndOddHeaders ? "<w:evenAndOddHeaders/>" : "") +
-    NOTES.map(([key, local]) => notesXml("w:", local, settings[key] ?? {})).join("");
+    NOTES.map(([key, local]) => notesXml("w:", local, settings[key] ?? {})).join("") +
+    (settings.doNotUseHTMLParagraphAutoSpacing
+      ? "<w:compat><w:doNotUseHTMLParagraphAutoSpacing/></w:compat>"
+      : "");
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\r\n<w:settings xmlns:w="${W}">${children}</w:settings>`;
 }

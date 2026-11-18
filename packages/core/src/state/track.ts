@@ -193,7 +193,12 @@ function maxRevisionId(state: EditorState): number {
 export function newRevision(state: EditorState): Revision | null {
   const track = key.getState(state);
   if (!track?.on) return null;
-  return { id: maxRevisionId(state) + 1, author: track.author, date: now() };
+  return { id: nextRevisionId(state), author: track.author, date: now() };
+}
+
+/** @internal The id after every change of the document, in all its trees. */
+export function nextRevisionId(state: EditorState): number {
+  return maxRevisionId(state) + 1;
 }
 
 /** A replaced range: `a..b` before the transaction, `c..d` after it. */

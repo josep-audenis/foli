@@ -441,6 +441,34 @@ describe("EditorView on a schema v3 document", () => {
     expect(blocks(host).map((b) => b.style.marginTop)).toEqual(["16px", "8px", "8px", "0px"]);
   });
 
+  it("adds the spaces in a document that says so, and between a cell's paragraphs", () => {
+    const cell = {
+      type: "tableCell",
+      content: [
+        p({ spacing: { after: 120 } }, text("x")),
+        p({ spacing: { before: 60 } }, text("y")),
+      ],
+    };
+    const { host } = mountDocument({
+      ...documentOf(
+        p({ spacing: { after: 120 } }, text("a")),
+        p({ spacing: { before: 60 } }, text("b")),
+        {
+          type: "table",
+          attrs: { grid: [2000] },
+          content: [{ type: "tableRow", content: [cell] }],
+        },
+        p({}, text("z")),
+      ),
+      settings: { doNotUseHTMLParagraphAutoSpacing: true },
+    });
+    expect(blocks(host)[1]?.style.marginTop).toBe("12px");
+    const inCell = host.querySelector("td p") as HTMLElement;
+    // Padding, which does not collapse with the next paragraph's margin as a margin would.
+    expect(inCell.style.paddingBottom).toBe("8px");
+    expect(inCell.style.marginBottom).toBe("0px");
+  });
+
   it("flows with Word's spacing: the larger of the space after and before", () => {
     // Every paragraph 20 px tall: the flow is arithmetic (Letter, inch margins: 864 px).
     const rect = Element.prototype.getBoundingClientRect;

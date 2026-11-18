@@ -346,6 +346,11 @@ export interface ControlJSON {
 
 /** What `word/settings.xml` says about pages and notes (schema v5). */
 export interface WordSettingsJSON {
+  /**
+   * `w:compat/w:doNotUseHTMLParagraphAutoSpacing`: the space after a paragraph and the space
+   * before the next add up (without it Word takes the larger, in every compatibility mode).
+   */
+  doNotUseHTMLParagraphAutoSpacing?: boolean;
   evenAndOddHeaders?: boolean;
   footnotes?: NotePropertiesJSON;
   endnotes?: NotePropertiesJSON;
@@ -897,7 +902,12 @@ export const checkControl: Check = shape(
 const checkControls = recordOf(checkControl, "control");
 
 const checkSettings: Check = shape(
-  { evenAndOddHeaders: bool, footnotes: checkNoteProperties, endnotes: checkNoteProperties },
+  {
+    doNotUseHTMLParagraphAutoSpacing: bool,
+    evenAndOddHeaders: bool,
+    footnotes: checkNoteProperties,
+    endnotes: checkNoteProperties,
+  },
   [],
   true,
 );

@@ -555,7 +555,7 @@ async function intoPackage(
       "/word/settings.xml",
       CT.settings,
       (o) => {
-        if (!o) return newSettingsXml(trackRevisions, settings);
+        if (!o) return newSettingsXml(!!trackRevisions, settings);
         const source =
           trackRevisions === undefined
             ? o.source

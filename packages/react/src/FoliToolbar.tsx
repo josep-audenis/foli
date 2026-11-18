@@ -1608,6 +1608,7 @@ function PageSetupDialog({
       start: setup.type ?? "nextPage",
       orientation: setup.pageSize?.orientation ?? (width > height ? "landscape" : "portrait"),
       separator: setup.columns?.separator === true,
+      columns: setup.columns,
       fields: {
         width: toCm(width),
         height: toCm(height),
@@ -1625,7 +1626,7 @@ function PageSetupDialog({
   const [orientation, setOrientation] = useState<string>(initial.orientation);
   const [separator, setSeparator] = useState(initial.separator);
   const [fields, setFields] = useState(initial.fields);
-  const [error, setError] = useState<SetupField | "setup" | null>(null);
+  const [error, setError] = useState<SetupField | "setup" | "mismatch" | null>(null);
   const first = useRef<HTMLSelectElement>(null);
   useEffect(() => first.current?.focus(), []);
 
@@ -1670,29 +1671,43 @@ function PageSetupDialog({
       changed("widths") ||
       separator !== initial.separator
     ) {
-      const space = toTwips(fields.space, 0);
+      // What was not changed stays exactly as it is, each column's own space included.
+      const before = initial.columns;
+      const set = before?.equalWidth === false ? (before.widths ?? []) : [];
+      const space = changed("space") ? toTwips(fields.space, 0) : (before?.space ?? 720);
       if (space === null) return wrong("space");
-      const widths = fields.widths.trim()
-        ? fields.widths
-            .trim()
-            .split(/[;\s]+/)
-            .map((width) => toTwips(width, 1))
-        : [];
+      let widths: (number | null)[] = set.map((column) => column.width);
+      if (changed("widths"))
+        widths = fields.widths.trim()
+          ? fields.widths
+              .trim()
+              .split(/[;\s]+/)
+              .map((width) => toTwips(width, 1))
+          : [];
       if (widths.includes(null)) return wrong("widths");
-      const count = widths.length || Number(fields.count);
+      const asked = Number(fields.count);
+      if (widths.length && changed("count") && asked !== widths.length) {
+        setError("mismatch");
+        document.getElementById(`${id}-count`)?.focus();
+        return;
+      }
+      const count = widths.length || asked;
       if (!Number.isInteger(count) || count < 1 || count > MAX_SECTION_COLUMNS)
         return wrong("count");
+      const { separator: _line, equalWidth: _equal, widths: _widths, ...rest } = before ?? {};
       setup.columns = {
+        ...rest,
         count,
-        space,
+        ...(changed("space") || before?.space === undefined ? { space } : {}),
         ...(separator ? { separator } : {}),
         ...(widths.length
           ? {
               equalWidth: false,
-              widths: widths.map((width, i) => ({
-                width: width as number,
-                ...(i < widths.length - 1 ? { space } : {}),
-              })),
+              widths: widths.map((width, i) => {
+                const own = changed("space") ? undefined : set[i]?.space;
+                const gap = own ?? (i < widths.length - 1 ? space : undefined);
+                return { width: width as number, ...(gap === undefined ? {} : { space: gap }) };
+              }),
             }
           : {}),
       };
@@ -1707,6 +1722,7 @@ function PageSetupDialog({
     setOrientation(next);
     setError(null);
   };
+  const marked = (name: SetupField) => error === name || (name === "count" && error === "mismatch");
   const field = (name: SetupField) => (
     <div key={name} className="foli-setup-field">
       <label htmlFor={`${id}-${name}`}>{SETUP_LABELS[name]}</label>
@@ -1715,8 +1731,8 @@ function PageSetupDialog({
         type="text"
         inputMode={name === "widths" ? "text" : "decimal"}
         value={fields[name]}
-        aria-invalid={error === name || undefined}
-        aria-describedby={error === name ? `${id}-error` : undefined}
+        aria-invalid={marked(name) || undefined}
+        aria-describedby={marked(name) ? `${id}-error` : undefined}
         onChange={(event) => {
           setFields((current) => ({ ...current, [name]: event.target.value }));
           setError(null);
@@ -1784,7 +1800,9 @@ function PageSetupDialog({
           <p id={`${id}-error`} className="foli-link-error" role="alert">
             {error === "setup"
               ? "This setup leaves no room for text, or its columns do not fit the page."
-              : `Check this value: ${SETUP_LABELS[error]}.`}
+              : error === "mismatch"
+                ? "The number of columns differs from the set widths: list one width per column, or clear them for equal columns."
+                : `Check this value: ${SETUP_LABELS[error]}.`}
           </p>
         )}
       </form>

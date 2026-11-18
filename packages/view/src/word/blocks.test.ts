@@ -164,6 +164,15 @@ describe("renderBlocks: paragraphs", () => {
     expect(span?.style.lineHeight).toBe("20px");
   });
 
+  it("lets a contextual paragraph's space after eat into the next one's space before", () => {
+    const blocks = render([
+      p({ contextualSpacing: true, spacing: { after: 120 } }, text("a")),
+      p({ spacing: { before: 300 } }, text("b")),
+    ]);
+    expect(blocks[0]?.after).toBe(0);
+    expect(blocks[1]?.before).toBeCloseTo(12);
+  });
+
   it("drops the space between paragraphs of a style with contextual spacing", () => {
     const blocks = render([
       p({}, text("a")),

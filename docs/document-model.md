@@ -184,6 +184,10 @@ properties may hold only the marks that describe how text looks (`RUN_PROPERTY_M
   read and written since 11.6. `change` (`w:sectPrChange`: `id`, `author`, `date`, `previous`) is
   a tracked change of the setup; accepting drops it, rejecting restores `previous` with the
   section's header and footer references.
+- **Settings** (v5): `settings.doNotUseHTMLParagraphAutoSpacing` (`w:compat` in
+  `word/settings.xml`) says a paragraph's space after and the next one's space before add up;
+  without it Word takes the larger. Import reads it, a new package writes it, an export over its
+  package keeps the part as it is. The other settings arrive with 11.7.
 - **Links:** `href` keeps the target as the file has it (`file:` and network paths included):
   whether a link may be opened is decided where it is opened (`isSafeHref`, at rendering), so
   real documents load and keep their links.

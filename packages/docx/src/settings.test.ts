@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { exportDocx, importDocx, readPackage } from "./index.js";
 import {
   newSettingsXml,
-  settingsOf,
+  readSettings,
   trackRevisionsOf,
   withSettings,
   withTrackRevisions,
@@ -23,18 +23,18 @@ describe("settings in the model", () => {
     withSettings(source, parseXml(source).root, value);
 
   it("reads even and odd headers and note properties, not the separators", () => {
-    expect(settingsOf(undefined)).toBeUndefined();
-    expect(settingsOf(parseXml(settings('<w:zoom w:percent="100"/>')).root)).toBeUndefined();
+    expect(readSettings(undefined)).toBeUndefined();
+    expect(readSettings(parseXml(settings('<w:zoom w:percent="100"/>')).root)).toBeUndefined();
     const part = settings(
       '<w:evenAndOddHeaders/><w:footnotePr><w:pos w:val="beneathText"/><w:numFmt w:val="lowerRoman"/><w:numStart w:val="3"/><w:numRestart w:val="eachPage"/><w:footnote w:id="-1"/></w:footnotePr><w:endnotePr><w:endnote w:id="0"/></w:endnotePr>',
     );
-    expect(settingsOf(parseXml(part).root)).toEqual({
+    expect(readSettings(parseXml(part).root)).toEqual({
       evenAndOddHeaders: true,
       footnotes: { position: "beneathText", format: "lowerRoman", start: 3, restart: "eachPage" },
     });
     // What the model cannot hold is left to the file.
     const odd = settings('<w:footnotePr><w:pos w:val="sideways"/></w:footnotePr>');
-    expect(settingsOf(parseXml(odd).root)).toBeUndefined();
+    expect(readSettings(parseXml(odd).root)).toBeUndefined();
   });
 
   it("writes changes in their place, the separators and the rest kept", () => {
@@ -55,12 +55,12 @@ describe("settings in the model", () => {
     expect(notes).toContain(
       '<w:footnotePr><w:numFmt w:val="upperRoman"/><w:footnote w:id="-1"/></w:footnotePr><w:endnotePr><w:pos w:val="sectEnd"/></w:endnotePr><w:compat/>',
     );
-    expect(settingsOf(parseXml(notes).root)?.endnotes).toEqual({ position: "sectEnd" });
+    expect(readSettings(parseXml(notes).root)?.endnotes).toEqual({ position: "sectEnd" });
   });
 
   it("makes a new part, and goes through a package and back", async () => {
     const made = newSettingsXml(false, { evenAndOddHeaders: true });
-    expect(settingsOf(parseXml(made).root)).toEqual({ evenAndOddHeaders: true });
+    expect(readSettings(parseXml(made).root)).toEqual({ evenAndOddHeaders: true });
     const bytes = await exportDocx({ ...createDocument(), settings: { evenAndOddHeaders: true } });
     expect((await importDocx(bytes)).document.settings).toEqual({ evenAndOddHeaders: true });
 
@@ -119,8 +119,8 @@ describe("w:trackRevisions", () => {
 
     // Unchanged: the settings part is the original's, byte for byte.
     const kept = await exportDocx(plain.document, plain.package);
-    const settingsOf = async (b: Uint8Array) => (await readPackage(b)).text("/word/settings.xml");
-    expect(await settingsOf(kept)).toBe(plain.package.text("/word/settings.xml"));
+    const readSettings = async (b: Uint8Array) => (await readPackage(b)).text("/word/settings.xml");
+    expect(await readSettings(kept)).toBe(plain.package.text("/word/settings.xml"));
     const on = await exportDocx(plain.document, plain.package, { trackRevisions: true });
     expect((await importDocx(on)).trackRevisions).toBe(true);
     const off = await exportDocx(redlined.document, redlined.package, { trackRevisions: false });

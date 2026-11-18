@@ -471,6 +471,29 @@ describe("schema v5 content not written yet", () => {
   });
 });
 
+describe("paragraph spacing that adds up (w:doNotUseHTMLParagraphAutoSpacing)", () => {
+  const settings = { doNotUseHTMLParagraphAutoSpacing: true };
+
+  it("is written in a new package and read back", async () => {
+    const bytes = await exportDocx({ ...createDocument(), settings });
+    expect((await readPackage(bytes)).text("/word/settings.xml")).toContain(
+      "<w:compat><w:doNotUseHTMLParagraphAutoSpacing/></w:compat>",
+    );
+    expect((await importDocx(bytes)).document.settings).toEqual(settings);
+  });
+
+  it("stays out of documents without it", async () => {
+    const { document } = await load("08-newsletter.docx");
+    expect(document.settings?.doNotUseHTMLParagraphAutoSpacing).toBeUndefined();
+  });
+
+  it("is written beside the other settings", async () => {
+    const both = { ...settings, evenAndOddHeaders: true };
+    const bytes = await exportDocx({ ...createDocument(), settings: both });
+    expect((await importDocx(bytes)).document.settings).toEqual(both);
+  });
+});
+
 describe("sections: columns, page numbers, note properties, tracked setup", () => {
   const section: SectionJSON = {
     columns: {

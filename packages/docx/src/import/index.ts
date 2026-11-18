@@ -5,6 +5,7 @@ import {
   type ResourceJSON,
   SCHEMA_VERSION,
   type StoryJSON,
+  type WordSettingsJSON,
 } from "@folijs/core";
 import {
   DocxError,
@@ -13,7 +14,7 @@ import {
   type Relationship,
   readPackage,
 } from "../package.js";
-import { settingsOf, trackRevisionsOf } from "../settings.js";
+import { readSettings, trackRevisionsOf } from "../settings.js";
 import type { XmlElement } from "../xml.js";
 import { blocks, type ContentContext, Moves } from "./content.js";
 import { child, isW, REL, W_STRICT } from "./ooxml.js";
@@ -132,13 +133,13 @@ export function importPackage(pkg: DocxPackage): DocxImport {
     : [];
   const stories = readStories(pkg, contextFor);
   const usedControls = controlsUsed([content, commented, stories]);
-  // A settings part Foli cannot read is kept as it is, and tracking taken as off.
+  // A settings part Foli cannot read is kept as it is, and read as saying nothing.
   let trackRevisions = false;
-  let settings: FoliDocument["settings"];
+  let settings: WordSettingsJSON | undefined;
   try {
     const root = related(REL.settings)?.root;
     trackRevisions = trackRevisionsOf(root);
-    settings = settingsOf(root);
+    settings = readSettings(root);
   } catch (error) {
     if (!(error instanceof DocxError)) throw error;
   }
@@ -148,6 +149,7 @@ export function importPackage(pkg: DocxPackage): DocxImport {
     document = parseDocument({
       schemaVersion: SCHEMA_VERSION,
       section: lastSection,
+      ...(settings ? { settings } : {}),
       defaults: styled.defaults,
       styles: styled.styles,
       numbering: numbered,

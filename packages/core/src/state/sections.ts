@@ -19,7 +19,7 @@ import { closeHistory } from "./history.js";
 import { keepLastMark } from "./mark.js";
 import { TextSelection } from "./selection.js";
 import type { Command, EditorState, Transaction } from "./state.js";
-import { newRevision, untracked } from "./track.js";
+import { newRevision, nextRevisionId, untracked } from "./track.js";
 import {
   EnvelopeStep,
   type Story,
@@ -96,7 +96,7 @@ function holderFrom(doc: Node, from: number): { pos: number; node: Node } | null
 }
 
 /** The last section's setup as `tr` leaves it. */
-function lastSection(state: EditorState, tr: Transaction): SectionJSON {
+export function lastSection(state: EditorState, tr: Transaction): SectionJSON {
   let section = wordContext(state)?.envelope.section ?? {};
   for (const step of tr.steps)
     if (step instanceof EnvelopeStep && step.key === "section") section = step.after as SectionJSON;
@@ -175,13 +175,18 @@ export function insertSectionBreak(kind: SectionBreakKind = "nextPage"): Command
       const second = $from.pos + 1;
       const holder = holderFrom(tr.doc, second);
       const setup = holder ? (holder.node.attrs.section as SectionJSON) : lastSection(state, tr);
-      // The first part keeps the section as it is; a tracked setup change stays with it.
+      // The first part keeps the section as it is.
       const revision = newRevision(state);
       tr.setNodeMarkup(start, paragraph.type, {
         ...(before ?? paragraph.attrs),
         section: setup,
         ...(revision ? { revision: { insertion: revision } } : {}),
       });
+      // A tracked setup change covers both parts: each records it, under an id of its own.
+      const change = setup.change && {
+        ...setup.change,
+        id: nextRevisionId(state) + (revision ? 1 : 0),
+      };
       writeSection(
         state,
         tr,
@@ -190,7 +195,7 @@ export function insertSectionBreak(kind: SectionBreakKind = "nextPage"): Command
           ...setup,
           headers: undefined,
           footers: undefined,
-          change: undefined,
+          change,
           type: kind === "nextPage" ? undefined : kind,
         }),
       );

@@ -80,7 +80,11 @@ editor state ──► measure the blocks without a cached measurement (DOM read
   reads where its lines fall.
 - **Flow:** blocks fill a page's content box; between two paragraphs goes the larger of the
   first's space after and the second's space before, in Word's documents as in CSS (Word's PDFs:
-  until 11.6 the two were added, which put every heading too low). A block that does not fit is
+  until 11.6 the two were added, which put every heading too low). A document with
+  `w:doNotUseHTMLParagraphAutoSpacing` (`settings.doNotUseHTMLParagraphAutoSpacing`) adds them, in
+  table cells too (checked with Word 16: 24 pt after and 12 pt before give 24 pt, 36 pt with it).
+  When only the first of two paragraphs of a style has contextual spacing, its space after is
+  taken from the second's space before. A block that does not fit is
   split at a line (over as many pages as it takes). Rules:
   - a line holding a `pageBreak` (Mod+Enter; pasted from Word and Google Docs markup, checked
     with hand-written fixture HTML) ends its page;
