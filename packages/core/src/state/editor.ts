@@ -49,6 +49,7 @@ import {
   rejectAllChanges,
   rejectChange,
 } from "./review.js";
+import type { StorySide, StoryVariant } from "./sections.js";
 import { Selection, TextSelection } from "./selection.js";
 import { type Command, EditorState, type Plugin, type Transaction } from "./state.js";
 import { StoryEditing } from "./stories.js";
@@ -88,6 +89,23 @@ export interface EditorOptions {
 }
 
 export type EditorListener = (state: EditorState, transactions: readonly Transaction[]) => void;
+
+/** A header or footer open for editing on its page. */
+export interface OpenStory {
+  id: string;
+  side: StorySide;
+  variant: StoryVariant;
+  /** The section it was opened from (a linked one shows an earlier section's story). */
+  section: number;
+}
+
+/** What opens stories on the pages: the view of the editor's document. */
+export interface StoryView {
+  readonly open: OpenStory | null;
+  /** Opens the header or footer of a page (default: the selection's). Whether it is open now. */
+  edit(side: StorySide, page?: number): boolean;
+  close(): void;
+}
 
 /** A headless editor: state, commands, history and change notifications, no DOM. */
 export interface Editor {
@@ -186,6 +204,10 @@ export interface Editor {
    * `setDocument` replaces its content.
    */
   story(id: string): Editor | null;
+  /** Set by the view showing the pages: what opens a story there, shared with stories' editors. */
+  storyView: StoryView | null;
+  /** The view opened or closed a story: tells the editor's listeners (no transaction). */
+  storyChanged(): void;
 }
 
 /** Word's page when a section leaves it out: Letter, 1 inch margins. */
@@ -229,6 +251,9 @@ interface EditorParts {
   setDocument(document: EditorDocument): void;
   subscribe(listener: EditorListener): () => void;
   story(id: string): Editor | null;
+  /** The view opening stories, one for the body and its stories. */
+  views: { current: StoryView | null };
+  storyChanged(): void;
 }
 
 function makeEditor(parts: EditorParts): Editor {
@@ -304,6 +329,13 @@ function makeEditor(parts: EditorParts): Editor {
     setDocument: parts.setDocument,
     subscribe: parts.subscribe,
     story: parts.story,
+    get storyView() {
+      return parts.views.current;
+    },
+    set storyView(view) {
+      parts.views.current = view;
+    },
+    storyChanged: parts.storyChanged,
   };
 }
 
@@ -328,12 +360,14 @@ export function createEditor({
   ];
   let state = EditorState.create({ doc: loaded.doc, plugins: pluginsFor(loaded) });
   const listeners = new Set<EditorListener>();
+  const views: EditorParts["views"] = { current: null };
   /** The stories being edited, by id. */
   const stories = new Map<string, { editing: StoryEditing; editor: Editor }>();
 
   const notify = (transactions: readonly Transaction[]) => {
     for (const listener of listeners) listener(state, transactions);
   };
+  const storyChanged = () => notify([]);
   const dispatch = (tr: Transaction) => {
     // With tracking on, the edit is rebuilt as tracked changes; one that cannot be is not made.
     const tracked = trackTransaction(state, tr);
@@ -398,6 +432,8 @@ export function createEditor({
         return () => editing.listeners.delete(listener);
       },
       story,
+      views,
+      storyChanged,
     });
     stories.set(id, { editing, editor });
     return editor;
@@ -423,5 +459,7 @@ export function createEditor({
       return () => listeners.delete(listener);
     },
     story,
+    views,
+    storyChanged,
   });
 }

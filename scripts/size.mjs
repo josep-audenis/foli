@@ -77,13 +77,14 @@ writeFileSync(appEntry, `export { FoliEditor } from "${dist("react")}";\n`);
  * bands and balancing in the flow and both renderers; the section menu and page setup dialog.
  * Core and React raised in 11.7 (57.1 and 96.0 kB so far): story editors, `StoryStep`, the header
  * and footer commands. Docx raised in 11.7 (53.5 kB): `word/settings.xml` read and written back.
- * View and React raised in 11.7 (71.6 and 99.8 kB): headers and footers on pages in both renderers.
+ * View and React raised in 11.7 (73.6 and 102.5 kB): headers and footers on pages in both
+ * renderers, a story edited in place (a second view mounted on its page), the header menu.
  */
 const BUNDLES = [
   { name: "@folijs/core", entry: dist("core"), budget: 59_000 },
-  { name: "@folijs/view", entry: dist("view"), budget: 74_000 },
-  { name: "@folijs/react", entry: dist("react"), budget: 103_000 },
-  { name: "FoliEditor only", entry: appEntry, budget: 103_000 },
+  { name: "@folijs/view", entry: dist("view"), budget: 77_000 },
+  { name: "@folijs/react", entry: dist("react"), budget: 107_000 },
+  { name: "FoliEditor only", entry: appEntry, budget: 107_000 },
   { name: "@folijs/docx", entry: dist("docx"), budget: 55_500 },
 ];
 

@@ -390,6 +390,9 @@ export class PageRegions {
     style.inset = "0";
     style.boxSizing = "border-box";
     style.pointerEvents = "none";
+    // Not part of what the body's selection shows.
+    style.userSelect = "none";
+    style.setProperty("-webkit-user-select", "none");
     style.paddingLeft = `${edges.left}px`;
     style.paddingRight = `${edges.right}px`;
     if (side === "header") style.paddingTop = `${edges.header}px`;

@@ -36,6 +36,8 @@ export {
   type EditorDocument,
   type EditorListener,
   type EditorOptions,
+  type OpenStory,
+  type StoryView,
   sectionSettings,
 } from "./editor.js";
 export {
