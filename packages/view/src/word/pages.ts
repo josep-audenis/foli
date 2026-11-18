@@ -401,6 +401,7 @@ export function renderDocument(
     widows: 2,
     spacing: "word",
     addSpacing: document.settings?.doNotUseHTMLParagraphAutoSpacing === true,
+    evenAndOddHeaders: document.settings?.evenAndOddHeaders === true,
   } as const;
   let flowed = flowFrom(boxes, 0, rules);
   let facts = pagesOf(boxes, flowed);

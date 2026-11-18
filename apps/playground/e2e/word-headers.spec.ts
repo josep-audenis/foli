@@ -481,6 +481,52 @@ test("typing that makes a page number wrap from page 10 on moves that page's tex
   throw new Error("the page number never wrapped");
 });
 
+test("page numbers in letters are measured as they are: vii can wrap where iii does not", async ({
+  page,
+}) => {
+  const blocks = Array.from({ length: 8 }, (_, i) => pageBreak(`Page ${i + 1}`));
+  await load(
+    page,
+    documentOf(
+      blocks,
+      {
+        ...A5,
+        margins: { ...A5.margins, top: 800 },
+        headers: { default: "h" },
+        pageNumbers: { format: "lowerRoman" },
+      },
+      {
+        stories: {
+          h: story("header", { type: "paragraph", content: [text("i"), ...field("PAGE", "0")] }),
+        },
+      },
+    ),
+  );
+  await openHeader(page);
+  await page.keyboard.press("Home");
+  const sizes = () =>
+    page.evaluate(() =>
+      [...document.querySelectorAll("section.foli-page")].map((p) => {
+        const content = p.querySelector(".foli-header .foli-region-content") as HTMLElement;
+        const shown = content.style.display === "none";
+        content.style.display = "";
+        const height = content.getBoundingClientRect().height;
+        if (shown) content.style.display = "none";
+        return { height, top: Number.parseFloat(getComputedStyle(p).paddingTop) };
+      }),
+    );
+  for (let i = 0; i < 400; i++) {
+    await page.keyboard.type("i");
+    const all = await sizes();
+    const [three, seven] = [all[2], all[6]];
+    if (three && seven && seven.height > three.height + 1) {
+      expect(seven.top).toBeGreaterThan(three.top + 1);
+      return;
+    }
+  }
+  throw new Error("the page number never wrapped");
+});
+
 test("from the read-only host, Escape leaves the story and nothing moves the body", async ({
   page,
 }) => {
@@ -537,12 +583,17 @@ test("with two views, the one with the story open answers for it", async ({ page
     const second = new (view.constructor as typeof import("@folijs/view").EditorView)(host, editor);
     view.openStory("header", 0);
     const id = editor.storyView?.open?.id;
+    // The other view in use, then back into the open story.
+    host.focus();
+    const elsewhere = editor.storyView?.open ?? null;
+    (document.querySelector(".foli-story-mount [contenteditable=true]") as HTMLElement).focus();
+    const back = editor.storyView?.open?.id;
     view.closeStory();
     second.destroy();
     host.remove();
-    return id;
+    return [id, elsewhere, back];
   });
-  expect(open).toBe("h");
+  expect(open).toEqual(["h", null, "h"]);
 });
 
 test("T1 in a header: typing and formatting keep the tree valid at every key", async ({ page }) => {

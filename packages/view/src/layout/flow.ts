@@ -118,6 +118,8 @@ export interface FlowRules {
    * `w:doNotUseHTMLParagraphAutoSpacing`, in every compatibility mode).
    */
   addSpacing?: boolean;
+  /** The document has even and odd headers: a section restarting its numbers still keeps sides. */
+  evenAndOddHeaders?: boolean;
 }
 
 export const DEFAULT_RULES: FlowRules = { orphans: 2, widows: 2 };
@@ -352,12 +354,14 @@ export function flowFrom(
     const wrongKind = (number: number) =>
       (section.start === "oddPage" && number % 2 === 0) ||
       (section.start === "evenPage" && number % 2 === 1);
-    // Word's even and odd page sections (its PDFs, every kind, start and page before): a restart
-    // takes the next number of the right kind, with no blank page; without one, a blank page when
-    // the number the pages have reached is the wrong kind.
+    // Word's even and odd page sections (its PDFs, every kind, start and page before): a blank
+    // page when the number the pages have reached is the wrong kind, unless the section restarts
+    // its numbers in a document without even and odd headers. A restart then takes its start, or
+    // the next number when that is the wrong kind.
+    if (wrongKind(state.number) && (section.pageStart === undefined || rules.evenAndOddHeaders))
+      newPage(true);
     if (section.pageStart !== undefined)
       state.number = section.pageStart + (wrongKind(section.pageStart) ? 1 : 0);
-    else if (wrongKind(state.number)) newPage(true);
     state.sectionPage = state.page;
     return undefined;
   };

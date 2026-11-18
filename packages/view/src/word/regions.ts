@@ -317,9 +317,11 @@ export class PageRegions {
         content ??= filledCopy(entry.template, texts);
         return content;
       };
-      // shortcut: texts of the same lengths are taken to wrap alike (digits are about as wide);
-      // measuring each page's costs a layout per page per keystroke.
-      const shape = `${edges.width}|${texts.map((text) => text.length).join(" ")}`;
+      // shortcut: numbers of as many digits are taken to wrap alike (digits are about as wide);
+      // measuring each page's costs a layout per page per keystroke. Letters are not: `iii`, `vii`.
+      const shape = `${edges.width}|${texts
+        .map((text) => (/^\d*$/.test(text) ? text.length : text))
+        .join(" ")}`;
       let height = entry.heights.get(shape);
       if (height === undefined) {
         height = this.measure(made(), edges.width, entry.after);

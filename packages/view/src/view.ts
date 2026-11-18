@@ -54,6 +54,7 @@ import {
   typedMarks,
   undo,
   type WordContext,
+  type WordSettingsJSON,
   withEnvelope,
   wordContext,
 } from "@folijs/core";
@@ -683,7 +684,7 @@ export class EditorView {
     this.listen("drop", this.onDrop);
     this.listen("click", this.onClick);
     this.listen("auxclick", this.onClick);
-    if (this.paged) editor.storyView = this.stories;
+    this.claimStories();
     host.ownerDocument.addEventListener("selectionchange", this.onSelectionChange);
     host.ownerDocument.fonts?.addEventListener("loadingdone", this.onFontsLoaded);
     this.unsubscribe = editor.subscribe((state) => this.update(state));
@@ -1186,9 +1187,11 @@ export class EditorView {
           context.resolver.addsParagraphSpacing,
         );
       });
-      const rules = context.resolver.addsParagraphSpacing
-        ? { ...WORD_RULES, addSpacing: true }
-        : WORD_RULES;
+      const rules = {
+        ...WORD_RULES,
+        addSpacing: context.resolver.addsParagraphSpacing,
+        evenAndOddHeaders: context.envelope.settings?.evenAndOddHeaders === true,
+      };
       const flowHeight = contentHeight(this.editor.settings);
       let result = flowFrom(boxes, flowHeight, rules, reuse);
       let facts = pagesOf(boxes, result);
@@ -1343,7 +1346,12 @@ export class EditorView {
       return false;
     this.regionsFor = { stories, settings, sections };
     const key = regions.key();
-    const changed = key !== this.regionsKey;
+    // Even and odd headers also decide the blank pages: the flow depends on them.
+    const changed =
+      key !== this.regionsKey ||
+      (known?.settings !== settings &&
+        (known?.settings as WordSettingsJSON | undefined)?.evenAndOddHeaders !==
+          settings?.evenAndOddHeaders);
     this.regionsKey = key;
     return changed;
   }
@@ -1475,6 +1483,14 @@ export class EditorView {
     close: () => view.closeStory(),
   }))(this);
 
+  /** Makes this view the one `Editor.storyView` speaks for, telling listeners if it was not. */
+  private claimStories(): void {
+    if (!this.paged || this.editor.storyView === this.stories) return;
+    const first = !this.editor.storyView;
+    this.editor.storyView = this.stories;
+    if (!first) this.editor.storyChanged();
+  }
+
   /** The sections of the document, in order. */
   private sections(): SectionJSON[] {
     const { envelope } = wordContext(this.state) as WordContext;
@@ -1557,8 +1573,9 @@ export class EditorView {
       view,
       moved: false,
     };
-    // With several views of the editor, the one with the story open answers for it.
-    this.editor.storyView = this.stories;
+    // With several views of the editor, the one in use answers for its story.
+    wrapper.addEventListener("focusin", () => this.claimStories());
+    this.claimStories();
     view.focus();
     this.editor.storyChanged();
     return true;
@@ -3125,7 +3142,7 @@ export class EditorView {
    * and so is the scroll position.
    */
   private onFocus = (): void => {
-    if (this.paged) this.editor.storyView = this.stories;
+    this.claimStories();
     const pointer = this.pointerFocus;
     this.pointerFocus = false;
     if (pointer || this.mount) return;

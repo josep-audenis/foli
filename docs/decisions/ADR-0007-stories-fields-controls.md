@@ -162,9 +162,10 @@ content, ext? }`. `content` is a `doc` of the body's blocks. `noteType` is Word'
   its place in the file. A missing variant inherits from the previous section. A page holding
   several sections takes its header and footer from the first section on it. Word's PDFs of 01, 03,
   04, 05 and 08 agree with these (11.7, 08 scoring 1.000 on all five pages), and add one rule:
-  **the blank page Word inserts before an even or odd page section has no header or footer.** With
-  a restart (`w:pgNumType w:start`) such a section gets no blank page at all, and its first number
-  is the start or, when that is the wrong kind, the next (16 cases on Word's PDFs).
+  **the blank page Word inserts before an even or odd page section has no header or footer.** The
+  blank page comes when the number the pages have reached is the wrong kind; a section restarting
+  its numbers (`w:pgNumType w:start`) skips it unless the document has even and odd headers. Its
+  first number is the start or, when that is the wrong kind, the next (32 cases on Word's PDFs).
 - **Notes.** A line holding a reference goes on a page only if it, the separator and the note's
   **first line** fit; the rest of the note fills the space left at the foot and continues on the
   next page under the continuation separator, so a note taller than a page works. What carries

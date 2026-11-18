@@ -698,19 +698,42 @@ describe("flow: pages of their own heights (headers and footers)", () => {
       ["oddPage", undefined, 1, [1, null, 3, 4]],
       ["oddPage", undefined, 2, [1, 2, 3, 4]],
     ];
-    for (const [start, pageStart, before, numbers] of cases) {
-      const one = section(0);
-      const two = section(1, { start, pageStart });
-      const boxes = [
-        inSection(one, box(before * 100, 0, 0, 100)),
-        inSection(two, box(200, 0, 0, 100)),
-      ];
-      const pages = pageFacts(boxes, flowFrom(boxes, 0, WORD));
-      expect(
-        pages.map((p) => (p.sectionPages ? p.number : null)),
-        `${start} ${pageStart} after ${before}`,
-      ).toEqual(numbers);
-    }
+    // With even and odd headers (`w:evenAndOddHeaders`) a restart keeps the blank page.
+    const evenAndOdd: typeof cases = [
+      ["evenPage", 1, 1, [1, 2, 3]],
+      ["evenPage", 1, 2, [1, 2, null, 2, 3]],
+      ["evenPage", 2, 1, [1, 2, 3]],
+      ["evenPage", 2, 2, [1, 2, null, 2, 3]],
+      ["evenPage", 3, 1, [1, 4, 5]],
+      ["evenPage", 3, 2, [1, 2, null, 4, 5]],
+      ["evenPage", undefined, 1, [1, 2, 3]],
+      ["evenPage", undefined, 2, [1, 2, null, 4, 5]],
+      ["oddPage", 1, 1, [1, null, 1, 2]],
+      ["oddPage", 1, 2, [1, 2, 1, 2]],
+      ["oddPage", 2, 1, [1, null, 3, 4]],
+      ["oddPage", 2, 2, [1, 2, 3, 4]],
+      ["oddPage", 3, 1, [1, null, 3, 4]],
+      ["oddPage", 3, 2, [1, 2, 3, 4]],
+      ["oddPage", undefined, 1, [1, null, 3, 4]],
+      ["oddPage", undefined, 2, [1, 2, 3, 4]],
+    ];
+    const check = (list: typeof cases, rules: typeof WORD & { evenAndOddHeaders?: boolean }) => {
+      for (const [start, pageStart, before, numbers] of list) {
+        const one = section(0);
+        const two = section(1, { start, pageStart });
+        const boxes = [
+          inSection(one, box(before * 100, 0, 0, 100)),
+          inSection(two, box(200, 0, 0, 100)),
+        ];
+        const pages = pageFacts(boxes, flowFrom(boxes, 0, rules));
+        expect(
+          pages.map((p) => (p.sectionPages ? p.number : null)),
+          `${start} ${pageStart} after ${before}`,
+        ).toEqual(numbers);
+      }
+    };
+    check(cases, WORD);
+    check(evenAndOdd, { ...WORD, evenAndOddHeaders: true });
   });
 
   it("says each page's number, section and first page", () => {
