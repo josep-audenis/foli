@@ -1,8 +1,9 @@
 # ADR-0007: Stories, fields and content controls
 
-- **Status:** Accepted, task 11.1 (2026-11-18), under the owner's instruction of that day to
-  build Phase 11 task by task and merge each task after an agent's review. The owner has not
-  read it line by line; a change of mind costs what has been built on it by then.
+- **Status:** Accepted when merged, task 11.1 (2026-11-18): the owner asked that day for Phase 11
+  to be built task by task, each task merged after an agent's review, so this record is accepted
+  by that review and not by the owner reading it. A change of mind costs what has been built on
+  it by then.
 - **Context:** schema v4 keeps a section's headers and footers as relationship ids into the
   original package and notes as parts of it: exported verbatim, never shown. A note reference,
   a simple field, a content control are `opaqueInline` or `opaqueBlock` nodes; a complex field's
@@ -15,12 +16,12 @@ How does Foli model, lay out and edit content that lives outside the body (heade
 notes), Word's fields and content controls, and columns, keeping one editable host per page
 flow, one undo history, tracked changes and a lossless DOCX round trip?
 
-## Spike (`spikes/two-page/stories.html`, `e2e/stories.spec.ts`)
+## Spike (`spikes/two-page/stories.html`, `story-view.html`, `e2e/stories.spec.ts`)
 
-A header repeated on two pages and a footnote at its reference's page foot, edited in place. To
-edit a story the host's `contenteditable` is turned off and the story's element turned on, so
-the story is the only editing host; Escape, or a press outside it, reverses that. Passing twice
-in Chromium, Firefox and WebKit (Playwright, Windows), 2026-11-18:
+**Editing in place, a plain element.** A header repeated on two pages and a footnote at its
+reference's page foot. To edit a story the host's `contenteditable` is turned off and the
+story's element turned on, so the story is the only editing host; Escape, or a press outside it,
+reverses that. Passing twice in Chromium, Firefox and WebKit (Playwright, Windows), 2026-11-18:
 
 | Experiment                                                   | All three engines                         |
 | ------------------------------------------------------------ | ----------------------------------------- |
@@ -35,83 +36,125 @@ in Chromium, Firefox and WebKit (Playwright, Windows), 2026-11-18:
 | A note growing until its reference moves, while being edited | moved element, focus and caret restored   |
 
 IME through CDP (Chromium only): a composition in a header commits into every copy; a
-composition in a note is not moved while composing, and the note changes page once committed.
+composition in a note is seen composing, is not moved meanwhile, and the note changes page once
+committed.
 
-Recorded for comparison, an **editable island** (the story editable inside the still-editable
-host): typing reaches the story, but Ctrl+A selects the whole host (151, 182 and 136 characters
-against the header's 12) and ArrowDown leaves it in every engine. That is why the host is turned
-off. Not in the spike: a note split across pages (the body's line splitting applies), and
-tables or pictures in a story (the real view renders them).
+An **editable island** (the story editable inside the still-editable host) was recorded for
+comparison: typing reaches the story, but Ctrl+A selects the whole host (151, 182 and 136
+characters against the header's 12) and ArrowDown leaves it in every engine.
+
+**The real `EditorView`.** The packages as they are, a second view mounted on the first page of a
+read-only one, inside a `contenteditable="false"` wrapper, in three engines:
+
+- Left alone, the main view's mutation observer removes the wrapper as stray DOM at once.
+- With the main view's observer stopped and the wrapper stopping the story's events from reaching
+  the host: typing, Enter and Backspace reach the story only, the body and its selection do not
+  change, nothing is discarded, and a copy event carries the story's text (Chromium and WebKit;
+  Firefox ignores a synthetic event's `clipboardData`).
+- A render of the main view while the story is mounted still removes the wrapper: `place` must
+  keep it (below).
+
+Not in the spike: a note split across pages, and tables or pictures in a story.
 
 ## Decision
 
 ### Stories
 
 - **A story** is a content tree outside the body: `stories: Record<string, StoryJSON>` in the
-  envelope, `StoryJSON = { kind: "header" | "footer" | "footnote" | "endnote", content }`, plus
-  what the part keeps verbatim (`ext`). `content` is a `doc` of the body's blocks (paragraphs,
-  tables, opaque blocks). No section breaks in a story; no note references in a header or footer
-  or a note; no page or column breaks in a note. Validation refuses these.
+  envelope, `StoryJSON = { kind: "header" | "footer" | "footnote" | "endnote", noteType?,
+content, ext? }`. `content` is a `doc` of the body's blocks. `noteType` is Word's `w:type` of a
+  note: `separator`, `continuationSeparator` and `continuationNotice` have no reference, are not
+  numbered, are never removed as unreferenced, and are what layout draws above the notes.
+- **What a story may hold.** No section breaks anywhere; no note references in a header, footer
+  or note; no page or column breaks in a note. `parseDocument` refuses them; **import never
+  fails on them**: such content stays opaque and is reported, as a table it cannot hold does.
 - **Ids.** A header's or footer's id is its relationship id, as `section.headers` and
   `section.footers` already hold, so those attributes and every v4 document stay valid. New ones
   get a fresh id. A note's id is `footnote:<w:id>` or `endnote:<w:id>`. A section whose reference
   has no story (a v4 document, until its `.docx` is imported again) shows nothing and exports the
   part as before.
-- **One state per story, one history.** `EditorState` stays one tree. Stories live in the
-  envelope (the `word` plugin's context, as comments do), so a story's change is a step of the
-  **body's** transaction: `StoryStep(id, step)` applies `step` to the story's tree, has an empty
-  position map for the body and inverts to `StoryStep(id, inverted)`, as `CommentStep` does.
-  Adding or removing a story is a `StoryStep` too. So undo is one stack across the document, as
+- **`StoryStep(id, before, after)`, one history.** Stories live in the envelope, so a story's
+  change is a step of the **body's** transaction. The step holds the story's trees before and
+  after (immutable nodes sharing structure; `null` for no story): it inverts by swapping them, has
+  an empty position map for the body, and takes effect only where the story still equals `before`
+  (a change made since wins, as for comments; `Step.invert` receives the body, which is why the
+  step cannot compute its inverse from an inner step). Undo is one stack across the document, as
   in Word, and inserting a note (reference and story) is one transaction.
-- **Editing.** `editor.story(id)` gives an `Editor` over that story: its own `EditorState`
-  (selection, stored marks, the tracking and `word` plugins) whose transactions are dispatched
-  to the body editor wrapped in `StoryStep`s; an incoming `StoryStep` (undo, another view) is
-  applied to it. Commands, tracking and find work unchanged on it.
-- **Review.** Accept and reject all reach every story. Comments anchor in the body and notes,
-  as Word allows; headers and footers refuse them.
+- **`EnvelopeStep(key, before, after)`**, the same idea for what undo must take back in the
+  envelope: the last section (`section`), `settings`, and one control's properties. So undoing an
+  added header leaves no reference to a story that has gone. `withEnvelope` stays for what undo
+  leaves as it is (numbering definitions and styles).
+- **Grouping.** History groups story typing by the rules body typing has: the story's own
+  transaction decides adjacency, passed on the body transaction; consecutive `StoryStep`s of a
+  story in one group merge (first `before`, last `after`), so a word is one undo step and does
+  not use up the depth.
+- **Editing.** `editor.story(id)` gives an `Editor` over the story: its own `EditorState`
+  (selection, stored marks, the tracking and `word` plugins, no history). Its `dispatch` applies
+  the transaction there and sends the body editor a `StoryStep`, **hoisting** what belongs to the
+  document: `withEnvelope` changes, `CommentStep`s and `EnvelopeStep`s go on the body transaction.
+  Undo and redo run on the body editor. A `StoryStep` arriving from the body (undo, another view)
+  replaces the story state's document, the selection mapped to the nearest valid place.
+- **Ids across trees.** Revision, comment and bookmark ids are allocated over the body and every
+  story (`maxRevisionId` and its kin scan one tree today).
+- **Review.** Accept and reject all reach every story. Comments anchor in the body and notes, as
+  Word allows; headers and footers refuse them.
+- **Notes and the clipboard.** Deleting the last reference removes the story in the same
+  transaction; undo restores both. A slice holding a reference carries its note's content, so cut
+  and paste keep the note, and every paste makes a new story with a fresh id (a copy never gives
+  two references to one note). Without Foli's clipboard format the reference is dropped.
 
 ### In place on the page
 
-- The view renders every story occurrence read-only with the blocks renderer. To edit one it
-  sets the main view `editable: false`, marks the host `foli-in-story` (the body dimmed), and
-  mounts an `EditorView` of `editor.story(id)` in that occurrence, unpaginated (a new `paged:
-  false` option: one flow, no pages). Double click or a command enters; Escape, or a press
+- Every occurrence of a story is rendered read-only by the blocks renderer. To edit one, the main
+  view becomes read-only and marks the host `foli-in-story` (the body dimmed); an `EditorView` of
+  `editor.story(id)`, unpaginated (a new `paged: false` option), is mounted in that occurrence
+  inside a `contenteditable="false"` wrapper. Double click or a command enters; Escape, or a press
   outside, leaves and restores the body's selection from its state.
-- Other occurrences of the story re-render from the model as it changes.
-- Layout never moves the mounted story during a composition. A note split across pages shows
-  whole at its reference's page while it is being edited.
+- **Keeping the main view off it** (the spike): while a story is mounted the main view's observer
+  is stopped (it is read-only: there is no input to read back); the wrapper stops the story's events from
+  bubbling to the host; `onSelectionChange` ignores selections inside it; `place` keeps the wrapper
+  instead of removing it as stray DOM.
+- Other occurrences re-render from the model. Layout never moves the mounted story during a
+  composition. A note split across pages shows whole at its reference's page while it is edited.
 
 ### Layout
 
-- **Page regions.** `flow` gets a page's content box from a function of the page number
-  (section, first page, even page), not one height per section. A header starts at
-  `margins.header`; the text starts at the larger of `margins.top` and the header's bottom (a
-  negative top margin is exact, as in Word); the footer mirrors it. Variants: `titlePage` for
-  the first page of a section, the document's `evenAndOddHeaders` for even pages; a missing
-  variant inherits from the previous section (Word's "link to previous").
-- **Notes.** A line holding references carries their note heights: it goes on a page only if it
-  and the notes so far fit (with the separator), so a note always starts on its reference's
-  page. A note that does not fit is split at a line and continues at the next page's foot under
-  the continuation separator; a reference line never moves away from a note's first line.
-  Lines are measured for blocks with references. Endnotes are blocks after the body (or the
-  section).
+- **Page regions.** `flow` gets a page's content box from a function of the page (section, first
+  page, odd or even), not one height per section. A header starts at `margins.header`; the text
+  starts at the larger of `margins.top` and the header's bottom (a negative top margin is exact, as
+  in Word); the footer mirrors it.
+- **Which header.** `titlePage` gives the first page of a section its first-page variant.
+  `evenAndOddHeaders` picks by the page's **displayed number** (`w:pgNumType` restarts count), not
+  its place in the file. A missing variant inherits from the previous section. A page holding
+  several sections takes its header and footer from the first section on it. The corpus's 08 and
+  Word's PDF check these; a rule they contradict is corrected in 11.7.
+- **Notes.** A line holding a reference goes on a page only if it, the separator and the note's
+  **first line** fit; the rest of the note fills the space left at the foot and continues on the
+  next page under the continuation separator, so a note taller than a page works. `FlowState`
+  gains the notes' use of the page and what carries over (`sameState` compares them, or
+  incremental reflow would stop too early). Lines are measured for blocks with references.
+  Endnotes are blocks after the body (or the section). In a section with columns a footnote sits
+  at the foot of its reference's **column**.
 - **Columns.** A section has `columns` (`count`, `space`, `widths`, `separator`); a page holds
   **bands** (one per section on it, for continuous sections), a band holds columns, and `flow`
   fills columns where it filled pages. A band above a continuous break is balanced. A
   `columnBreak` ends its column. Blocks go into `.foli-column` elements; positions still map
   through block descriptors.
 - **Sections.** Even and odd page sections add Word's blank page; continuous sections with a new
-  page setup keep starting a page (Word does the same when the size differs).
+  page setup keep starting a page.
 - **Fixed point.** Headers can hold `PAGE` and `NUMPAGES`, whose width can change a height. Layout
   repeats at most twice, then keeps the result.
 
 ### Fields
 
-- **Markers, as Word has them.** `fieldStart`, `fieldSeparator`, `fieldEnd`: inline atoms holding
-  `dirty`, `locked`, `ext`; the instruction is `fieldStart.instruction` (its `w:instrText` runs
-  joined, with their run properties in `ext`). The result is ordinary content between separator
-  and end, so results stay editable, may span paragraphs (`TOC`) and fields nest. `w:fldSimple`
-  reads as the same markers with `simple: true` and is written back as it was.
+- **Markers, as Word has them.** Inline atoms `fieldStart` (`dirty`, `locked`, `simple`, `ext`),
+  `fieldCode` (one `w:instrText` run's text), `fieldSeparator` (optional, as in Word), `fieldEnd`.
+  The code is what lies between start and separator, so **a field nested in a code** (`{ IF {
+MERGEFIELD x } = … }`) stays a field; the instruction is read from it. The result is ordinary
+  content between separator and end: editable, it may span paragraphs (`TOC`), and fields nest.
+  `w:fldSimple` reads as the same markers with `simple: true` and is written back as it was.
+- **Tracked as runs.** `w:fldChar` and `w:instrText` sit in runs, inside `w:ins` and `w:del`, so
+  these atoms carry revision marks like text (they do not join the markers tracking skips).
 - **Results.** Shown as stored. `PAGE`, `NUMPAGES` and `SECTIONPAGES` in a story are drawn per page
   by the view and never written to the tree; elsewhere they update on demand like the rest.
 - **Update.** `updateFields(editor, { layout, data, now })` in core recomputes `PAGE`, `NUMPAGES`,
@@ -123,28 +166,34 @@ tables or pictures in a story (the real view renders them).
 
 ### Content controls
 
-- **Inline:** `controlStart` and `controlEnd` atoms, as comment anchors. **Block, row, cell:** a
-  `control` attribute on each paragraph, table, row or cell it wraps, keeping blocks flat;
-  consecutive blocks with one id are one control. Export regroups them, so a block control whose
-  blocks were separated by an edit becomes two.
+- **Inline:** `controlStart` and `controlEnd` atoms, as comment anchors (they stand between runs).
+- **Block, row, cell:** a `controls` attribute on each paragraph, table, row or cell, the ids of
+  the controls around it, **outermost first**, keeping blocks flat and allowing nesting (a
+  repeating section around its items). Consecutive blocks sharing an id at a level are one control.
+- **Ids** are Foli's keys, made on import whether or not the file has `w:id` (kept in `ext`). When
+  an edit separates a control's blocks, export gives the later part a fresh `w:id`.
+- **Empty** block controls have no block to carry them and stay `opaqueBlock`, reported.
 - **Properties** in the envelope, `controls: Record<string, ControlJSON>`: `kind` (`text`,
-  `richText`, `dropDown`, `comboBox`, `date`, `checkbox`, `picture`, `repeating`, `other`), `tag`,
-  `alias`, `lock`, `items`, `dateFormat`, `checked`, `placeholder` (showing it, its doc part),
-  `binding`, `ext` (`w:sdtPr` and `w:sdtEndPr` verbatim). Data bindings are kept, not evaluated.
-- **Editing.** A plugin filters transactions: locked content and locked controls refuse changes,
-  a plain text control holds one paragraph's text without formatting. `setControlValue` and
+  `richText`, `dropDown`, `comboBox`, `date`, `checkbox`, `picture`, `repeating`,
+  `repeatingItem`, `other`), `tag`, `alias`, `lock`, `items`, `dateFormat`, `checked`,
+  `placeholder` (showing it, its doc part), `binding`, `ext` (`w:sdtPr` and `w:sdtEndPr` verbatim).
+  Data bindings are kept, not evaluated.
+- **Editing.** A plugin filters transactions: locked content and locked controls refuse changes, a
+  plain text control holds one paragraph's text without formatting. `setControlValue` and
   `controlValues` are the API, by id or tag.
 
 ### Other
 
 - **Notes in the text:** `noteReference` (`story`, `customMark`, `ext`) and, inside a note,
-  `noteMark` (`w:footnoteRef`). Removing the last reference removes its story. Numbers are
-  computed from document order and `w:footnotePr`/`w:endnotePr`, never stored.
+  `noteMark` (`w:footnoteRef`), both run content. Numbers come from document order and
+  `w:footnotePr`/`w:endnotePr`, never stored.
 - **Document settings:** `settings` in the envelope: `evenAndOddHeaders`, `footnotes` and
   `endnotes` (position, number format, start, restart), from `word/settings.xml`, which is
   otherwise kept verbatim. Sections gain `columns`, `pageNumbers` (`w:pgNumType`) and their own
   note properties.
 - **Find:** core's `findAll(doc, query)` over the body and each story; results carry the story id.
+- **Slices with half a field or control** are repaired on paste: markers without partners are
+  dropped, their content kept.
 - **PDF.** A new `@folijs/pdf`, no browser dependency: `exportPdf(document, { page, resources })`
   drives a page the app supplies (Playwright's or Puppeteer's: `setContent`, `addScriptTag`,
   `evaluate`, `pdf`), loads the read-only renderer's bundle, updates page fields, and prints with
@@ -153,9 +202,9 @@ tables or pictures in a story (the real view renders them).
 
 ### Format
 
-Schema v5 adds `stories`, `controls`, `settings`, the new nodes and section attributes. The
-v4 → v5 migration changes the version only; what is opaque stays so until the `.docx` is imported
-again. 0.5.0 cannot read v5 documents, which the 0.6.0 changeset says.
+Schema v5 adds `stories`, `controls`, `settings`, the new nodes and attributes. The v4 → v5
+migration changes the version only; what is opaque stays so until the `.docx` is imported again.
+0.5.0 cannot read v5 documents, which the 0.6.0 changeset says.
 
 ## Options rejected
 
@@ -164,6 +213,8 @@ again. 0.5.0 cannot read v5 documents, which the 0.6.0 changeset says.
   block list.
 - **An independent `Editor` and history per story:** undo would be per story, unlike Word, and
   inserting a note would be two undo steps.
+- **`StoryStep` wrapping the inner step:** its inverse needs the story's tree, which `Step.invert`
+  does not get, and a stale inner step would apply to the wrong content.
 - **An editable island in the live host:** select-all and arrows escape it (the spike).
 - **Fields and controls as container nodes:** a field's result can span paragraphs and cross
   other structure; markers are what the file has and keep the round trip exact.
@@ -172,10 +223,12 @@ again. 0.5.0 cannot read v5 documents, which the 0.6.0 changeset says.
 
 ## Consequences
 
-- `flow` and the two renderers gain per-page boxes, bands and columns, and note heights: Phase
-  11's main layout risk. Incremental reflow must invalidate pages when a story's height changes.
-- Inline markers join the ones the commands already step over (bookmarks, comment anchors);
-  each new one needs the same treatment in Backspace, Delete, arrows and clipboard.
-- A slice pasted with half a field or control must be repaired (markers without partners are
-  dropped, their content kept).
+- `flow` and the two renderers gain per-page boxes, bands and columns, and note use: Phase 11's
+  main layout risk. Incremental reflow must invalidate pages when a story's height changes.
+- Inline markers join the ones the commands already step over; each new one needs the same
+  treatment in Backspace, Delete, arrows and clipboard.
+- A story's whole tree is the unit of its undo: cheap with shared structure, but a change made to
+  a story outside history (none exists today) would block older undo steps of that story.
 - `exportPdf` depends on the app's headless browser and its fonts.
+- Word's rules above come from the format as documented and the corpus; those not yet checked
+  against Word are checked when their task builds them.

@@ -47,11 +47,9 @@ const caretInLine = (page: Page, line: number, offset: number) =>
     },
     [`l${line}`, offset] as const,
   );
+/** The line as the page shows it: the model only changes while no story is being edited. */
 const lineText = (page: Page, line: number) =>
-  page.evaluate(
-    (i) => (window as unknown as { __spike: Spike }).__spike.model.lines[i] as string,
-    line,
-  );
+  page.locator(`#l${line}`).evaluate((p) => p.firstChild?.textContent ?? "");
 const MORE = " and some more words so the note takes a second line";
 
 test.beforeEach(async ({ page }) => {
@@ -162,15 +160,27 @@ test("IME composition in a header, and in a note that moves when committed", asy
   await page.goto("/stories.html?ref=8");
   await note(page).dblclick();
   const long = " 漢字".repeat(30);
+  await page.evaluate(() => {
+    const seen = { composing: false };
+    (window as unknown as { seen: typeof seen }).seen = seen;
+    document.getElementById("editor")?.addEventListener("input", (event) => {
+      if ((event as InputEvent).isComposing) seen.composing = true;
+    });
+  });
   await cdp.send("Input.imeSetComposition", {
     text: long,
     selectionStart: long.length,
     selectionEnd: long.length,
   });
+  await expect(note(page)).toContainText("漢字");
+  expect(
+    await page.evaluate(
+      () => (window as unknown as { seen: { composing: boolean } }).seen.composing,
+    ),
+  ).toBe(true);
   expect(await pageOf(page, "note")).toBe(0);
   await cdp.send("Input.insertText", { text: long });
   await expect.poll(() => pageOf(page, "note")).toBe(1);
-  await expect(note(page)).toContainText("漢字");
   expect((await focus(page)).in).toBe("note");
 });
 
@@ -191,4 +201,92 @@ test("recorded: an editable island inside the still-editable host", async ({ pag
     description: JSON.stringify({ typed, body, selected, after }),
   });
   console.log(info.project.name, JSON.stringify({ typed, body, selected, after }));
+});
+
+type Real = {
+  main: { state: { doc: { textContent: string }; tr: never; selection: { toJSON(): unknown } } };
+  story: { state: { doc: { textContent: string } } };
+  wrapper: HTMLElement;
+  mount(): void;
+};
+const real = (page: Page) =>
+  page.evaluate(() => {
+    const { main, story, wrapper } = (window as unknown as { __real: Real }).__real;
+    return {
+      main: main.state.doc.textContent,
+      story: story.state.doc.textContent,
+      mounted: wrapper.isConnected,
+      selection: main.state.selection.toJSON(),
+    };
+  });
+
+test.describe("a real EditorView mounted on a page of a read-only one", () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto("/story-view.html");
+    await page.waitForFunction(() => "__real" in window);
+    await page.locator("section.foli-page").first().waitFor();
+  });
+
+  test("typing, Enter and Backspace reach the story only, in a non-editable wrapper", async ({
+    page,
+  }) => {
+    const warnings: string[] = [];
+    page.on("console", (m) => {
+      if (m.type() === "warning") warnings.push(m.text());
+    });
+    await page.evaluate(() => (window as unknown as { __real: Real }).__real.mount());
+    const before = await real(page);
+    await page.keyboard.press("Control+End");
+    await page.keyboard.type("XY");
+    await page.keyboard.press("Enter");
+    await page.keyboard.type("Z");
+    await page.keyboard.press("Backspace");
+    await page.keyboard.type("W");
+    const after = await real(page);
+    expect(after.story).toBe("HeaderXYW");
+    expect(after.main).toBe("Body oneBody two");
+    expect(after.mounted).toBe(true);
+    expect(after.selection).toEqual(before.selection);
+    expect(warnings).toEqual([]);
+  });
+
+  test("left alone, the main view removes the mounted story as stray DOM", async ({ page }) => {
+    await page.goto("/story-view.html?bare=1");
+    await page.waitForFunction(() => "__real" in window);
+    await page.locator("section.foli-page").first().waitFor();
+    await page.evaluate(() => (window as unknown as { __real: Real }).__real.mount());
+    await expect.poll(async () => (await real(page)).mounted).toBe(false);
+  });
+
+  test("recorded: what the unchanged main view does around a mounted story", async ({
+    page,
+  }, info) => {
+    await page.evaluate(() => (window as unknown as { __real: Real }).__real.mount());
+    await page.keyboard.press("Control+a");
+    const copied = await page.evaluate(() => {
+      const data = new DataTransfer();
+      const event = new ClipboardEvent("copy", {
+        bubbles: true,
+        cancelable: true,
+        clipboardData: data,
+      });
+      document.getElementById("story")?.dispatchEvent(event);
+      return { text: data.getData("text/plain"), prevented: event.defaultPrevented };
+    });
+    const selectionAfterSelectAll = (await real(page)).selection;
+    const survives = await page.evaluate(() => {
+      const r = (window as unknown as { __real: Real }).__real as unknown as {
+        main: {
+          state: { tr: { insertText(t: string, at: number): unknown } };
+          dispatch(t: unknown): void;
+        };
+        wrapper: HTMLElement;
+      };
+      r.main.dispatch(r.main.state.tr.insertText("x", 1));
+      return r.wrapper.isConnected;
+    });
+    const observed = { copied, selectionAfterSelectAll, survivesMainRender: survives };
+    info.annotations.push({ type: "observed", description: JSON.stringify(observed) });
+    console.log(info.project.name, JSON.stringify(observed));
+  });
 });

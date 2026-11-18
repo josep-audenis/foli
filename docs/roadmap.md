@@ -1118,8 +1118,9 @@ Each task is a PR on `phase-11/sections-fields`, the build green after each.
   Spike evidence for a header edited in place and a footnote moving pages as its reference
   does, in three engines. The owner accepts it before 11.2. (Done: spike passing in three
   engines; the host is turned off while a story is edited, an editable island leaks select-all
-  and arrows. Accepted under the owner's instruction of 2026-11-18 to build the phase task by
-  task, each merged after an agent's review.)
+  and arrows, and a real `EditorView` mounts on a page once the main view's observer, events and
+  `place` keep off it. Accepted by review on merge, as the owner instructed on 2026-11-18: each
+  task merged after an agent's review.)
 - [ ] 11.2 Corpus: Word-authored documents for what 01–07 lack (several sections with two and
   three columns, a column break, a continuous section, even and odd headers and footers, a
   section with headers not linked to the previous, endnotes, bookmarks with `REF` and

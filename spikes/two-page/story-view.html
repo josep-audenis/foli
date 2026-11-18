@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Foli spike: a real EditorView mounted on a page</title>
+    <!-- Phase 11.1 throwaway spike (ADR-0007): the packages as they are today, unchanged. The
+         main view is made read-only and a second EditorView is mounted on its first page,
+         inside a contenteditable=false wrapper. `?bare=1` leaves it at that: the main view's
+         observer then removes the wrapper as stray DOM. Otherwise the main view is kept off
+         it the two ways ADR-0007 decides: its observer stops while a story is mounted (it is
+         read-only, there is no input to read back) and the wrapper stops the story's events
+         from reaching the host. -->
+  </head>
+  <body>
+    <div id="main"></div>
+    <script type="module">
+      import { createEditor } from "../../packages/core/src/index.ts";
+      import { EditorView } from "../../packages/view/src/index.ts";
+
+      const EVENTS = ["beforeinput", "input", "keydown", "compositionstart", "compositionend", "mousedown", "mousemove", "copy", "cut", "paste", "dragover", "drop", "click", "auxclick"];
+      const document_ = (...texts) => ({
+        schemaVersion: 2,
+        settings: {
+          pageSize: { width: 120, height: 100 },
+          margins: { top: 10, right: 10, bottom: 10, left: 10 },
+        },
+        content: {
+          type: "doc",
+          content: texts.map((text) => ({ type: "paragraph", content: [{ type: "text", text }] })),
+        },
+      });
+      const main = createEditor({ document: document_("Body one", "Body two") });
+      const story = createEditor({ document: document_("Header") });
+      const mainView = new EditorView(document.getElementById("main"), main);
+      const wrapper = document.createElement("div");
+      wrapper.contentEditable = "false";
+      wrapper.id = "wrapper";
+      const inner = document.createElement("div");
+      inner.id = "story";
+      wrapper.append(inner);
+      window.__real = {
+        main,
+        story,
+        wrapper,
+        mount() {
+          mainView.setOptions({ editable: false });
+          if (!new URLSearchParams(location.search).has("bare")) {
+            mainView.observer.disconnect();
+            for (const type of EVENTS) wrapper.addEventListener(type, (e) => e.stopPropagation());
+          }
+          document.querySelector("section.foli-page").prepend(wrapper);
+          this.storyView = new EditorView(inner, story);
+          inner.focus();
+        },
+      };
+    </script>
+  </body>
+</html>
