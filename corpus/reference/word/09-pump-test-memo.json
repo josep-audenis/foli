@@ -15,7 +15,7 @@
                            "inTable":  false
                        },
                        {
-                           "text":  "Issued on 18 November 2026",
+                           "text":  "Issued on 3 March 2026",
                            "page":  1,
                            "line":  2,
                            "endPage":  1,
@@ -204,7 +204,7 @@
                    {
                        "type":  31,
                        "code":  "DATE \\@ \"d MMMM yyyy\"",
-                       "result":  "18 November 2026",
+                       "result":  "3 March 2026",
                        "page":  1
                    },
                    {

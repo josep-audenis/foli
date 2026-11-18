@@ -727,10 +727,10 @@ try {
   }
 
   # ---------------------------------------------------------------------------------------
-  # 08: Newsletter (Phase 11). Five sections: one column, two with a line between them and a
-  # column break (continuous), one column again (continuous), three of set widths on a new page
-  # with its own header, and a landscape section starting on an even page. Even and odd headers
-  # and footers, a different first page.
+  # 08: Newsletter (Phase 11). Five sections: one column, two with a line between them (continuous,
+  # so Word balances them), one column again (continuous), three of set widths with a column break
+  # on a new page with its own header, and a landscape section starting on an even page, which
+  # leaves a blank page before it. Even and odd headers and footers, a different first page.
   if (Want "08") {
   Set-Author "Communications" "CO"
   $doc = New-Doc
@@ -741,19 +741,20 @@ try {
   }
   Add-Para $doc "Northwind Quarterly" $S_TITLE | Out-Null
   Add-Para $doc "News from the depots, the fleet and the people who keep them running." $S_SUBTITLE | Out-Null
-  Add-Para $doc ($story * 2) | Out-Null
+  Add-Para $doc $story | Out-Null
   Add-Section $SECTION_CONTINUOUS
   Add-Para $doc "From the depots" $S_H1 | Out-Null
-  Add-Para $doc ($story * 3) | Out-Null
-  $second = Add-Para $doc ($story * 2)
-  $second.Collapse(1)
-  $second.InsertBreak($COLUMN_BREAK)
+  Add-Para $doc ($story * 2) | Out-Null
+  Add-Para $doc $story | Out-Null
   Add-Section $SECTION_CONTINUOUS
   Add-Para $doc "A word from the managing director" $S_H1 | Out-Null
   Add-Para $doc ($story * 2) | Out-Null
   Add-Section $SECTION_NEXT_PAGE
   Add-Para $doc "Around the fleet" $S_H1 | Out-Null
-  foreach ($n in 1..3) { Add-Para $doc ($story * 3) | Out-Null }
+  foreach ($n in 1..2) { Add-Para $doc ($story * 3) | Out-Null }
+  $third = Add-Para $doc ($story * 3)
+  $third.Collapse(1)
+  $third.InsertBreak($COLUMN_BREAK)
   Add-Section $SECTION_EVEN_PAGE
   Add-Para $doc "The year in figures" $S_H1 | Out-Null
   Add-Para $doc ($story * 2) | Out-Null
@@ -786,7 +787,8 @@ try {
 
   # ---------------------------------------------------------------------------------------
   # 09: Technical memo (Phase 11). Footnotes (one continuing on the next page), endnotes,
-  # bookmarks with REF and PAGEREF to them, a date field, numbered figures (SEQ).
+  # bookmarks with REF and PAGEREF to them, a locked date field (Word recomputes an unlocked one
+  # whenever it opens the file, so its reference data would change daily), numbered figures (SEQ).
   if (Want "09") {
   Set-Author "Engineering" "EN"
   $doc = New-Doc
@@ -818,6 +820,9 @@ try {
   Add-Para $doc "As stated on page : " | Out-Null
   Add-Para $doc ($long * 2) | Out-Null
   Add-Field "Issued on " "DATE \@ ""d MMMM yyyy"""
+  $date = $doc.Fields.Item(1)
+  $date.Result.Text = "3 March 2026"
+  $date.Locked = $true
   Add-Field "As stated on page : " "REF PeakEfficiency \h"
   Add-Field "As stated on page " "PAGEREF PeakEfficiency \h"
   foreach ($caption in @("Figure : efficiency", "Figure : power")) {

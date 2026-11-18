@@ -16,11 +16,13 @@
 #     wrapping (WdWrapType);
 #   - sections: each section's first page, column count, section start, different first page,
 #     and its headers and footers (default, first, even): whether they exist, are linked to the
-#     previous section, and their stored text (page fields as Word last cached them);
+#     previous section, and their text as Word has it open (page fields recomputed, a picture
+#     as "/"); exists says the variant is in effect, not that the file has the part;
 #   - evenAndOddHeaders; pageSections: the section each page starts in;
 #   - notes: each footnote and endnote: its kind, its reference's page and its text (Word answers
 #     a note's own page with its reference's: where a note continues shows only in its PDF);
-#   - fields: each field of the main text: type (WdFieldType), code, stored result, page;
+#   - fields: each field of the main text: type (WdFieldType), code, result as Word has it
+#     open (unlocked DATE fields are today's), page;
 #   - bookmarks: each visible bookmark: name, page, text;
 #   - paragraphs: for every paragraph of the main text, in Word's order (table cells included,
 #     end-of-row marks not): its text, the page and the line on that page where it starts, the
