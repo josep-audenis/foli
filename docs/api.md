@@ -125,6 +125,11 @@ Header is a menu button: Edit header, Edit footer, Close header and footer, and 
 Different first page, Different odd and even pages and Link to previous (with a story open). While
 a story is open the toolbar's commands go to it.
 
+Notes is a menu button: Insert footnote and Insert endnote (the caret goes into the new note), Go
+to note or reference, Convert footnotes to endnotes and back, and Note options…, a dialog
+(`.foli-table-dialog`, "Note options"): which notes, position, number format, start (for numbers
+that do not restart) and numbering; Apply (Enter), Cancel (Escape). It applies to the whole document.
+
 Table is a menu button (WAI-ARIA menu: `menuitem` items, "Repeat as header row" a
 `menuitemcheckbox` checked when the selection's rows are header rows): Insert table…, insert row
 above or below, insert column left or right, delete rows, columns or the table, merge cells,
@@ -332,7 +337,7 @@ definitions (the Word 2013 to 2019 template's) the first time they are applied, 
 | `getDocument()`                | The current document (`FoliDocument`).                                                                                                                                                                                                                                                                                        |
 | `setDocument(doc)`             | Replaces the document and settings, clears undo history. Listeners get an empty transaction list.                                                                                                                                                                                                                             |
 | `story(id)`                    | An `Editor` over a story (header, footer or note), null when there is none: its own selection, every change a step of this editor's history. `getDocument` gives the story as the content; `undo` and `redo` are the document's.                                                                                              |
-| `storyView`                    | Set by the view showing the pages: `open` (the story open there: `id`, `side`, `variant`, `section`), `edit(side, page?)`, `close()`, `fieldLayout` and `updateFields(options?, editor?)` (fields, from its pages). `storyChanged()` tells listeners it changed.                                                              |
+| `storyView`                    | Set by the view showing the pages: `open` (the story open there: `id`, `side`, `variant`, `section`), `edit(side, page?)`, `editNote(id?)`, `toReference()`, `close()`, `fieldLayout` and `updateFields(options?, editor?)` (fields, from its pages). `storyChanged()` tells listeners it changed.                            |
 | `subscribe(listener)`          | `(state, transactions) => void` after every change (selection included); returns unsubscribe. `transactions.some(tr => tr.docChanged)` tells content changes apart.                                                                                                                                                           |
 
 Headers and footers: `ensureStory(side, variant, section)` makes one where none shows,
@@ -340,6 +345,15 @@ Headers and footers: `ensureStory(side, variant, section)` makes one where none 
 unlinks it with a copy, `setDifferentFirstPage(on, section?)`, `setDifferentEvenPages(on)`.
 `documentSections(state)`, `storyOfSection(sections, index, side, variant)` and
 `pageVariant(section, page, evenAndOdd)` say which story a page shows.
+
+Notes: `insertNote(kind = "footnote", { customMark? })` adds the reference and the story (one undo
+step, Word's `footnote text` and `footnote reference` styles made when missing; not in a story);
+`setNoteProperties(kind, { position, format, start, restart })` sets them for the whole document;
+`convertNotes(to, story?)` turns notes into the other kind. `noteNumbers(doc, envelope, { pageOf,
+hideDeleted })` gives each reference's number, `noteTexts(numbers)` them by story,
+`noteAtSelection(state)` the reference at the selection, `noteProperties(envelope, kind, section?)`
+what is in force. Deleting a reference deletes its note in the same transaction; while tracking
+both are recorded, as Word does, and settled together.
 
 Headings: `setBlockType("heading", { level: 2 })`; back to text: `setBlockType("paragraph")`.
 Lists: `commands.toggleList("bulletList" | "orderedList")` (removes the selection's numbering
@@ -516,6 +530,10 @@ const view = new EditorView(host, editor, { editable: true, placeholder: "" });
   leaves it, as Escape and a press on the page do. Meanwhile the host has the class
   `foli-in-story`, is read-only and the text is dimmed; `view.focus()` focuses the story.
   `paged: false` (when the view is made) gives one flow without pages, what the open story uses.
+- Footnotes sit at the foot of their references' pages, endnotes after the text. Double click a
+  note or its reference's number, or press Shift+Alt+N at the reference, to edit the note where it
+  is (`view.openNote(id?)`); Shift+Alt+N goes back to the reference, Escape to where the caret was.
+  Ctrl+Alt+F and Ctrl+Alt+D insert a footnote and an endnote, as in Word.
 - Fields show their results; a code range (a field nested in it too) is not drawn and the caret
   does not rest in it. A field the selection is in is shaded (`data-foli-field-selected`, not
   printed). F9 updates the field at the caret or those selected, Ctrl+A then F9 all of them;

@@ -352,7 +352,7 @@ export function flowFrom(
     // What was kept on earlier pages is done with.
     if (Object.keys(state.reserves).length)
       state.reserves = Object.fromEntries(
-        Object.entries(state.reserves).filter(([key]) => Number.parseInt(key) >= state.page),
+        Object.entries(state.reserves).filter(([key]) => Number.parseInt(key, 10) >= state.page),
       );
   };
   /** The next column of the band, or the next page after its last. */

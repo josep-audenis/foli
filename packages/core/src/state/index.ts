@@ -142,7 +142,6 @@ export {
   noteKindOf,
   noteNumbers,
   noteProperties,
-  noteTextStart,
   noteTexts,
   referencesIn,
   setNoteProperties,

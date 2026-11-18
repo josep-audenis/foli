@@ -590,6 +590,10 @@ A stale `StoryStep` or `EnvelopeStep` drops its whole event (`storedStepsApply`)
 bookmark ids are allocated over every tree (`otherTrees`), and accepting or rejecting all changes
 reaches every story.
 
+A note opens the same way (`openNote`: double click on it or its number, Shift+Alt+N, the Notes
+menu), mounted in its piece at the foot of its reference's page, whole. A plugin in core
+(`notesPlugin`) keeps a note with its reference: removed with it, tracked with it, settled with it.
+
 The main view shows every header and footer read-only (`word/regions.ts`, both renderers). To edit
 one, `EditorView.openStory(side, page?)` (a double click in the page's margin, or
 `editor.storyView.edit` from the toolbar) makes the host read-only, stops its mutation observer,
@@ -874,7 +878,13 @@ Word lays it out, read-only and without an editor (`EditorView` edits on the sam
   line on it as Word numbers lines); the corpus harness compares them with Word's, and each
   page's ink with Word's PDF of it (`pnpm corpus:pages`, numbers in corpus/README.md).
 
-Not yet: footnotes, floating objects other than pictures (10.9: drawn as
+Footnotes and endnotes (11.10, `word/notes.ts`, both renderers): `PageNotes` draws each note from
+its story with its number and measures it as lines for the flow (`BlockBox.notes`, `endnotes`,
+`FlowRules.notes`); the flow's `NotePiece`s, held by the fragments that brought them, say which
+lines go where, and the renderers put them at the band's foot (absolute, above the bottom margin)
+or after the text. Numbers come from `noteNumbers` in core and are drawn, never stored.
+
+Not yet: floating objects other than pictures (10.9: drawn as
 in the editing view; the blocks are measured on one long page without the space between
 paragraphs, so the lines after a floating picture may go around it a little differently than
 on the page), custom tab stops (default

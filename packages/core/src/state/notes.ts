@@ -295,19 +295,6 @@ export function insertNote(kind: NoteKind = "footnote", options: InsertNoteOptio
   };
 }
 
-/** Where a selection in a note's editor belongs after opening it: after its mark and space. */
-export function noteTextStart(doc: Node): number {
-  const first = doc.firstChild;
-  if (!first?.isTextblock) return 1;
-  let at = 1;
-  const mark = first.maybeChild(0);
-  if (mark?.type.name !== "noteMark") return at;
-  at += mark.nodeSize;
-  const next = first.maybeChild(1);
-  if (next?.isText && next.text?.startsWith(" ")) at += 1;
-  return at;
-}
-
 /** `properties` without what says the same as leaving it out. */
 function withoutDefaults(kind: NoteKind, properties: NotePropertiesJSON): NotePropertiesJSON {
   const defaults: NotePropertiesJSON = DEFAULTS[kind];
@@ -332,10 +319,15 @@ export function setNoteProperties(kind: NoteKind, changes: NotePropertiesJSON): 
     if (!context) return false;
     if (!dispatch) return true;
     const key = KEYS[kind];
-    const merge = (current: NotePropertiesJSON | undefined, section: boolean) => {
+    const merge = (current: NotePropertiesJSON | undefined) => {
       const next: NotePropertiesJSON = { ...current, ...changes };
       if ((next.restart ?? "continuous") !== "continuous") delete next.start;
-      if (section && kind === "endnote") delete next.position;
+      return next;
+    };
+    /** A section's: an endnote's position is the document's, Word's defaults go unsaid. */
+    const forSection = (current: NotePropertiesJSON | undefined) => {
+      const next = merge(current);
+      if (kind === "endnote") delete next.position;
       return withoutDefaults(kind, next);
     };
     /** `holder` saying `value`, the key left out when it says nothing. */
@@ -348,9 +340,10 @@ export function setNoteProperties(kind: NoteKind, changes: NotePropertiesJSON): 
     };
     const tr = state.tr.setMeta(untracked, true).setMeta(closeHistory, true);
     const settings = context.envelope.settings ?? {};
-    setEnvelopeValue(state, tr, "settings", put(settings, merge(settings[key], false)));
+    // Spelled out, defaults too: what is left out, export keeps as the file says.
+    setEnvelopeValue(state, tr, "settings", { ...settings, [key]: merge(settings[key]) });
     for (const { setup, pos } of documentSections(state)) {
-      const next = put(setup, merge(setup[key], true));
+      const next = put(setup, forSection(setup[key]));
       if (pos === null) setEnvelopeValue(state, tr, "section", next);
       else {
         const node = tr.doc.nodeAt(pos) as Node;

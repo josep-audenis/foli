@@ -9,7 +9,6 @@ import {
   insertNote,
   noteAtSelection,
   noteNumbers,
-  noteTextStart,
   setNoteProperties,
 } from "./notes.js";
 import { acceptAllChanges, acceptChange, rejectAllChanges, rejectChange } from "./review.js";
@@ -179,13 +178,6 @@ describe("inserting a note", () => {
       expect.objectContaining({ type: "text", text: "#" }),
     );
     expect((editor.story("endnote:8") as Editor).run(insertNote())).toBe(false);
-  });
-
-  it("puts a note's caret after its mark and space", () => {
-    const editor = empty();
-    editor.run(insertNote());
-    const inner = editor.story("footnote:1") as Editor;
-    expect(noteTextStart(inner.state.doc)).toBe(3);
   });
 
   it("makes the styles' size and raise those Word has", () => {
