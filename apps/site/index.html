@@ -65,10 +65,10 @@
               <a class="button button-primary" href="https://github.com/josep-audenis/foli/blob/main/docs/getting-started.md">Get started</a>
               <a class="button" href="https://github.com/josep-audenis/foli">GitHub</a>
             </div>
-            <p class="hero-meta">MIT · v0.4.0 · React or plain DOM · Chromium, Firefox, WebKit</p>
+            <p class="hero-meta">MIT · v0.5.0 · React or plain DOM · Chromium, Firefox, WebKit</p>
             <ul class="hero-facts">
               <li><span>Pages</span>A4, Letter or any size, per section; widows, orphans, keep with next</li>
-              <li><span>Model</span>Word's: paragraph styles, numbering, runs and their properties</li>
+              <li><span>Model</span>Word's: paragraph styles, numbering, tables, pictures</li>
               <li><span>.docx</span>In and out; parts Foli does not edit come back byte for byte</li>
               <li><span>Review</span>Tracked changes and comments that round-trip with Word</li>
             </ul>
@@ -191,8 +191,8 @@
               <h2 id="docx-title">Open a <code>.docx</code>. Save it back. Lose nothing.</h2>
               <p>
                 <code>@folijs/docx</code> reads Word files into a model shaped like Word's own:
-                paragraph styles, numbering, runs with their properties, sections, comments and
-                tracked changes. On export, the parts Foli does not edit come back byte for byte,
+                paragraph styles, numbering, runs with their properties, tables, pictures, sections,
+                comments and tracked changes. On export, the parts Foli does not edit come back byte for byte,
                 and unchanged elements verbatim.
               </p>
               <p>
@@ -205,7 +205,7 @@
 
 <span class="k">const</span> { document, package: pkg, report } =
   <span class="k">await</span> <span class="f">importDocx</span>(bytes);
-report.opaque; <span class="c">// { "w:sdt": 1 }: kept as is</span>
+report.opaque; <span class="c">// { "w:drawing": 1 }: kept as is</span>
 
 <span class="c">// …edit…</span>
 <span class="k">const</span> doc = editor.<span class="f">getDocument</span>();
@@ -214,8 +214,8 @@ report.opaque; <span class="c">// { "w:sdt": 1 }: kept as is</span>
             </div>
             <figure class="xml" aria-label="Part of a document.xml after a round-trip">
               <div class="xml-bar"><span>word/document.xml</span><span class="xml-legend"><i class="lg lg-edit"></i>edited <i class="lg lg-keep"></i>kept verbatim</span></div>
-<pre><span class="x-keep">&lt;w:p w14:paraId="1E2F0A3C"&gt;</span><span class="x-keep">  &lt;w:pPr&gt;&lt;w:pStyle w:val="Heading1"/&gt;&lt;/w:pPr&gt;</span><span class="x-keep">  &lt;w:r&gt;&lt;w:t&gt;Terms of service&lt;/w:t&gt;&lt;/w:r&gt;</span><span class="x-keep">&lt;/w:p&gt;</span><span class="x-edit">&lt;w:p&gt;</span><span class="x-edit">  &lt;w:r&gt;&lt;w:t xml:space="preserve"&gt;Payment is due in </span><span class="x-edit">  &lt;/w:t&gt;&lt;/w:r&gt;&lt;w:ins w:author="You"&gt;</span><span class="x-edit">    &lt;w:r&gt;&lt;w:t&gt;30&lt;/w:t&gt;&lt;/w:r&gt;&lt;/w:ins&gt;</span><span class="x-edit">  &lt;w:r&gt;&lt;w:t xml:space="preserve"&gt; days.&lt;/w:t&gt;&lt;/w:r&gt;</span><span class="x-edit">&lt;/w:p&gt;</span><span class="x-keep">&lt;w:sdt&gt;</span><span class="x-keep">  &lt;w:sdtPr&gt;&lt;w:alias w:val="Signature"/&gt;&lt;/w:sdtPr&gt;</span><span class="x-keep">  &lt;w:sdtContent&gt;…&lt;/w:sdtContent&gt;</span><span class="x-keep">&lt;/w:sdt&gt;</span></pre>
-              <figcaption>A content control Foli does not edit yet, written back as it came in.</figcaption>
+<pre><span class="x-keep">&lt;w:p w14:paraId="1E2F0A3C"&gt;</span><span class="x-keep">  &lt;w:pPr&gt;&lt;w:pStyle w:val="Heading1"/&gt;&lt;/w:pPr&gt;</span><span class="x-keep">  &lt;w:r&gt;&lt;w:t&gt;Terms of service&lt;/w:t&gt;&lt;/w:r&gt;</span><span class="x-keep">&lt;/w:p&gt;</span><span class="x-edit">&lt;w:p&gt;</span><span class="x-edit">  &lt;w:r&gt;&lt;w:t xml:space="preserve"&gt;Payment is due in </span><span class="x-edit">  &lt;/w:t&gt;&lt;/w:r&gt;&lt;w:ins w:author="You"&gt;</span><span class="x-edit">    &lt;w:r&gt;&lt;w:t&gt;30&lt;/w:t&gt;&lt;/w:r&gt;&lt;/w:ins&gt;</span><span class="x-edit">  &lt;w:r&gt;&lt;w:t xml:space="preserve"&gt; days.&lt;/w:t&gt;&lt;/w:r&gt;</span><span class="x-edit">&lt;/w:p&gt;</span><span class="x-keep">&lt;w:p&gt;</span><span class="x-keep">  &lt;w:r&gt;&lt;w:drawing&gt;</span><span class="x-keep">    &lt;wp:inline&gt;…&lt;c:chart r:id="rId7"/&gt;…&lt;/wp:inline&gt;</span><span class="x-keep">  &lt;/w:drawing&gt;&lt;/w:r&gt;</span><span class="x-keep">&lt;/w:p&gt;</span></pre>
+              <figcaption>A chart Foli does not edit yet, written back as it came in.</figcaption>
             </figure>
           </div>
           <footer class="folio">3</footer>
@@ -293,13 +293,13 @@ report.opaque; <span class="c">// { "w:sdt": 1 }: kept as is</span>
               </p>
             </div>
             <figure class="stack" aria-label="Foli's packages">
-              <div class="pkg pkg-react"><code>@folijs/react</code><span>Editor, toolbar, comments pane, SSR</span><em class="pkg-size">81.9 kB</em></div>
-              <div class="pkg pkg-view"><code>@folijs/view</code><span>DOM view, input, IME, layout into pages</span><em class="pkg-size">59.1 kB</em></div>
+              <div class="pkg pkg-react"><code>@folijs/react</code><span>Editor, toolbar, comments pane, SSR</span><em class="pkg-size">88.6 kB</em></div>
+              <div class="pkg pkg-view"><code>@folijs/view</code><span>DOM view, input, IME, layout into pages</span><em class="pkg-size">64.2 kB</em></div>
               <div class="pkg-row">
-                <div class="pkg pkg-core"><code>@folijs/core</code><span>Model, steps, history, commands. No DOM.</span><em class="pkg-size">50.6 kB</em></div>
-                <div class="pkg pkg-docx"><code>@folijs/docx</code><span>Import and lossless export. No DOM.</span><em class="pkg-size">43.3 kB</em></div>
+                <div class="pkg pkg-core"><code>@folijs/core</code><span>Model, steps, history, commands. No DOM.</span><em class="pkg-size">52.7 kB</em></div>
+                <div class="pkg pkg-docx"><code>@folijs/docx</code><span>Import and lossless export. No DOM.</span><em class="pkg-size">51.9 kB</em></div>
               </div>
-              <figcaption>The view and React packages build on core; docx needs only core. Sizes: minified and gzipped with the Foli packages each pulls in, React excluded, measured on main after 0.4.0.</figcaption>
+              <figcaption>The view and React packages build on core; docx needs only core. Sizes: minified and gzipped with the Foli packages each pulls in, React excluded, measured on main after 0.5.0.</figcaption>
             </figure>
           </div>
           <footer class="folio">5</footer>
@@ -324,8 +324,9 @@ report.opaque; <span class="c">// { "w:sdt": 1 }: kept as is</span>
               <li class="toc-done"><span class="toc-name">Lists, links, colors, paste</span><span class="toc-leader"></span><span class="toc-state">0.2</span></li>
               <li class="toc-done"><span class="toc-name">Word's model, .docx import and export</span><span class="toc-leader"></span><span class="toc-state">0.3</span></li>
               <li class="toc-done"><span class="toc-name">Tracked changes and comments</span><span class="toc-leader"></span><span class="toc-state">0.4</span></li>
-              <li class="toc-now"><span class="toc-name">Tables and images</span><span class="toc-leader"></span><span class="toc-state">in progress</span></li>
-              <li><span class="toc-name">Headers, footers, page numbers</span><span class="toc-leader"></span><span class="toc-state">next</span></li>
+              <li class="toc-done"><span class="toc-name">Tables and pictures</span><span class="toc-leader"></span><span class="toc-state">0.5</span></li>
+              <li class="toc-now"><span class="toc-name">Sections, headers and footers, fields, templates, PDF</span><span class="toc-leader"></span><span class="toc-state">in progress</span></li>
+              <li><span class="toc-name">Ecosystem and 1.0</span><span class="toc-leader"></span><span class="toc-state">next</span></li>
             </ol>
           </div>
           <footer class="folio">6</footer>
