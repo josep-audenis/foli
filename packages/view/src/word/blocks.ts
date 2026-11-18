@@ -342,6 +342,8 @@ export interface BlockOptions {
    * resource's own image `data:` URL or web URL (fetched as it is shown).
    */
   resource?: (key: string, resource: ResourceJSON) => string | null | undefined;
+  /** The document's resolver, when the caller has one (a story of it, drawn per page). */
+  resolver?: Resolver;
 }
 
 /** The source for a document's pictures: the app's URL, else the resource's own. */
@@ -350,7 +352,7 @@ export function imageSource(
   resolve?: (key: string, resource: ResourceJSON) => string | null | undefined,
 ): ImageSource {
   return (key) => {
-    const resource = resources?.[key];
+    const resource = resources && Object.hasOwn(resources, key) ? resources[key] : undefined;
     if (!resource) return undefined;
     const url = resolve?.(key, resource);
     // The app's answer stands, a refusal (null, "") included.
@@ -608,7 +610,7 @@ export function renderBlocks(
     }
     return value;
   };
-  const resolver = new Resolver(document);
+  const resolver = options.resolver ?? new Resolver(document);
   const image = imageSource(document.resources, options.resource);
   // shortcut: floating pictures are placed against the last section's page.
   const geometry = floatGeometry(document.section);
@@ -659,7 +661,9 @@ export function renderBlocks(
     const { paragraph, run } = resolver.paragraph(attrs);
     const element = doc.createElement(tagOf(paragraph));
     styleParagraph(element, paragraph);
-    styleRun(element, run, lineHeight(paragraph, run, ratio(fontStack(latin(run)))));
+    // The line's own height is the paragraph mark's (Word has none but its runs' and the mark's).
+    const mark = resolver.run(run, (attrs.markFormat ?? []) as MarkJSON[]);
+    styleRun(element, mark, lineHeight(paragraph, mark, ratio(fontStack(latin(mark)))));
     const marker = markers[index];
     const firstMerged = merged.nodes[0];
     const shownMarker = firstMerged !== undefined ? (markers[firstMerged] ?? null) : marker;
@@ -674,6 +678,15 @@ export function renderBlocks(
       image,
       geometry,
     });
+    if (
+      onlyPictures(
+        inline,
+        (node) => node.type,
+        (node) => !!node.attrs?.float,
+      )
+    )
+      for (const picture of element.querySelectorAll<HTMLElement>(`[${PICTURE_ATTR}]`))
+        picture.style.verticalAlign = "bottom";
     // An empty paragraph, or one ending in a line break, shows its last (empty) line; after a
     // page break the paragraph mark stays on the break's line, as in Word.
     const last = element.lastChild as Element | null;
@@ -704,6 +717,38 @@ export function renderBlocks(
   applyContextualSpacing(blocks, resolver.addsParagraphSpacing);
   return blocks;
 }
+
+/**
+ * Whether a paragraph's line holds nothing but inline pictures: Word's line then ends at the
+ * picture's foot (its PDFs of the corpus: no room below it for the text it does not have).
+ */
+export function onlyPictures<T>(
+  inline: Iterable<T>,
+  type: (node: T) => string,
+  floats: (node: T) => boolean,
+): boolean {
+  let found = false;
+  for (const node of inline) {
+    const name = type(node);
+    if (name === "picture") found ||= !floats(node);
+    else if (!INVISIBLE.has(name)) return false;
+  }
+  return found;
+}
+
+const INVISIBLE = new Set([
+  "bookmarkStart",
+  "bookmarkEnd",
+  "commentStart",
+  "commentEnd",
+  "commentReference",
+  "controlStart",
+  "controlEnd",
+  "fieldStart",
+  "fieldCode",
+  "fieldSeparator",
+  "fieldEnd",
+]);
 
 /**
  * The top margin of a paragraph after another (whose space after is `above`) in a box the page

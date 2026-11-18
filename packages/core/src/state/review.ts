@@ -20,7 +20,7 @@ import { TextSelection } from "./selection.js";
 import type { Command, EditorState, Transaction } from "./state.js";
 import { keepTablesApart } from "./tables.js";
 import { RECORDED, trackState, untracked } from "./track.js";
-import { setEnvelopeValue, wordContext } from "./word.js";
+import { StoryStep, setEnvelopeValue, storyBody, storyState, wordContext } from "./word.js";
 
 export type ChangeKind =
   | "insertion"
@@ -412,9 +412,13 @@ function command(
   accept: boolean,
   range: (state: EditorState) => readonly { from: number; to: number }[],
   filter?: ChangeFilter,
+  /** Every story too: accepting or rejecting all changes of the document. */
+  everywhere = false,
 ): Command {
-  return (state, dispatch) => {
+  const run: Command = (state, dispatch) => {
     if (!state.schema.marks.insertion) return false;
+    const body = everywhere ? storyBody(state) : null;
+    if (body) return dispatch ? body.run(run) : body.can(run);
     // A change around several selected cells (a row revision, a move's partner) counts once.
     const seen = new Set<string>();
     const changes = range(state)
@@ -425,14 +429,26 @@ function command(
         const key = `${c.kind} ${c.id} ${c.from} ${c.to}`;
         return !seen.has(key) && !!seen.add(key);
       });
-    if (!changes.length) return false;
+    const stories = everywhere
+      ? [...(wordContext(state)?.stories ?? [])].flatMap(([id, story]) => {
+          const inStory = changesIn(story.doc, undefined, 0, story.doc.content.size, filter);
+          return inStory.length ? [{ id, story, changes: inStory }] : [];
+        })
+      : [];
+    if (!changes.length && !stories.length) return false;
     if (dispatch) {
       // Its own undo step, never merged with the typing before it.
       const tr = state.tr.setMeta(untracked, true).setMeta(closeHistory, true);
       // A document the result would not fit (a structure Word allows and Foli cannot change
       // yet): nothing is changed.
       try {
-        resolve(state, tr, changes, accept);
+        if (changes.length) resolve(state, tr, changes, accept);
+        for (const { id, story, changes: inStory } of stories) {
+          const inner = storyState(state, story.doc);
+          const storyTr = inner.tr;
+          resolve(inner, storyTr, inStory, accept);
+          tr.step(new StoryStep(id, story, { ...story, doc: storyTr.doc }));
+        }
       } catch (error) {
         if (error instanceof TransformError) return false;
         throw error;
@@ -441,6 +457,7 @@ function command(
     }
     return true;
   };
+  return run;
 }
 
 const selected = (state: EditorState) => state.selection.ranges;
@@ -452,10 +469,10 @@ export const acceptChange: Command = command(true, selected);
 export const rejectChange: Command = command(false, selected);
 /** Accepts every change (of `author`, if given). */
 export const acceptAllChanges = (author?: string): Command =>
-  command(true, everything, author === undefined ? {} : { author });
+  command(true, everything, author === undefined ? {} : { author }, true);
 /** Rejects every change (of `author`, if given). */
 export const rejectAllChanges = (author?: string): Command =>
-  command(false, everything, author === undefined ? {} : { author });
+  command(false, everything, author === undefined ? {} : { author }, true);
 
 /** Selects the next (or previous) change after (before) the selection. */
 function goTo(forward: boolean): Command {

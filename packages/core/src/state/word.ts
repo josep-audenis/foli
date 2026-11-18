@@ -12,18 +12,26 @@
 import { deepEqual } from "../model/attrs.js";
 import type { Attrs, Mark, MarkType, Node } from "../model/index.js";
 import { Step, StepResult } from "../transform/steps.js";
-import type { CommentJSON, FoliDocument } from "../v3/document.js";
+import type { CommentJSON, FoliDocument, StoryJSON } from "../v3/document.js";
+import { parseContent } from "../v3/document.js";
 import { Resolver, type RunFormat } from "../v3/resolve.js";
 import { MARK_ATTRS } from "./mark.js";
-import { NodeSelection, TextSelection } from "./selection.js";
-import { type EditorState, Plugin, PluginKey, type Transaction } from "./state.js";
+import { NodeSelection, type SelectionJSON, TextSelection } from "./selection.js";
+import { type Command, EditorState, Plugin, PluginKey, type Transaction } from "./state.js";
 
 /** A v3 document without its content: what the editor keeps beside the edited tree. */
 export type WordEnvelope = Omit<FoliDocument, "content">;
 
+/** A story as the editor holds it: its tree, and what the envelope says beside it. */
+export interface Story extends Omit<StoryJSON, "content"> {
+  readonly doc: Node;
+}
+
 export interface WordContext {
   readonly envelope: WordEnvelope;
   readonly resolver: Resolver;
+  /** The envelope's `stories` as trees: what `StoryStep`s hold and compare. */
+  readonly stories: ReadonlyMap<string, Story>;
   /**
    * Made when the document is loaded and kept while it is edited: a copy carries it, so a paste
    * tells this document's lists from another's (Word's `w:nsid`; Foli makes equal definitions
@@ -109,19 +117,19 @@ export function setComments(
   return tr;
 }
 
-/** What `EnvelopeStep` can change (ADR-0007; `settings` and controls join it with their tasks). */
-export type EnvelopeKey = "section";
+/** What `EnvelopeStep` can change (ADR-0007; controls join it with their task). */
+export type EnvelopeKey = "section" | "settings";
 
 /**
- * Changes one value of the envelope (the last section's setup) from `before` to `after`. A step,
- * unlike `withEnvelope`, so undo and redo take it with the edit it belongs to. It leaves the tree
- * as it is; history refuses an undo whose `before` no longer holds.
+ * Changes one value of the envelope (the last section's setup, the document's settings) from
+ * `before` to `after`. A step, unlike `withEnvelope`, so undo and redo take it with the edit it
+ * belongs to. It leaves the tree as it is; history refuses an undo whose `before` no longer holds.
  */
-export class EnvelopeStep extends Step {
+export class EnvelopeStep<K extends EnvelopeKey = EnvelopeKey> extends Step {
   constructor(
-    readonly key: EnvelopeKey,
-    readonly before: WordEnvelope[EnvelopeKey],
-    readonly after: WordEnvelope[EnvelopeKey],
+    readonly key: K,
+    readonly before: WordEnvelope[K],
+    readonly after: WordEnvelope[K],
   ) {
     super();
   }
@@ -139,24 +147,89 @@ export class EnvelopeStep extends Step {
   }
 }
 
+/**
+ * Changes story `id` from `before` to `after` (null: no story), a step of the body's transaction
+ * (ADR-0007): its inverse needs no document, it moves no position of the body. The selections are
+ * the story's around the change, so undo can give it back.
+ */
+export class StoryStep extends Step {
+  constructor(
+    readonly id: string,
+    readonly before: Story | null,
+    readonly after: Story | null,
+    readonly selectionBefore: SelectionJSON | null = null,
+    readonly selectionAfter: SelectionJSON | null = null,
+  ) {
+    super();
+  }
+
+  apply(doc: Node): StepResult {
+    return StepResult.ok(doc);
+  }
+
+  invert(): Step {
+    return new StoryStep(
+      this.id,
+      this.after,
+      this.before,
+      this.selectionAfter,
+      this.selectionBefore,
+    );
+  }
+
+  map(): Step {
+    return this;
+  }
+
+  /** This step followed by `next`, when `next` starts from what this one leaves. */
+  merge(next: StoryStep): StoryStep | null {
+    if (next.id !== this.id || !sameStory(this.after, next.before)) return null;
+    return new StoryStep(
+      this.id,
+      this.before,
+      next.after,
+      this.selectionBefore,
+      next.selectionAfter,
+    );
+  }
+}
+
+/** Whether two stories are the same: identical trees are the usual case. */
+export function sameStory(a: Story | null | undefined, b: Story | null | undefined): boolean {
+  if (a === b || (!a && !b)) return true;
+  return (
+    !!a &&
+    !!b &&
+    a.kind === b.kind &&
+    a.noteType === b.noteType &&
+    a.ext === b.ext &&
+    (a.doc === b.doc || a.doc.eq(b.doc))
+  );
+}
+
+/** A story's JSON in the envelope. */
+function storyJSON({ doc, ...rest }: Story): StoryJSON {
+  return { ...rest, content: doc.toJSON() };
+}
+
 /** The value of `key` as `steps` leave it, from `value`. */
-function afterEnvelopeSteps(
-  key: EnvelopeKey,
-  value: WordEnvelope[EnvelopeKey],
+function afterEnvelopeSteps<K extends EnvelopeKey>(
+  key: K,
+  value: WordEnvelope[K],
   steps: readonly Step[],
-): WordEnvelope[EnvelopeKey] {
+): WordEnvelope[K] {
   let current = value;
   for (const step of steps)
-    if (step instanceof EnvelopeStep && step.key === key) current = step.after;
+    if (step instanceof EnvelopeStep && step.key === key) current = step.after as WordEnvelope[K];
   return current;
 }
 
 /** Makes `tr` set the envelope's `key` to `value`, from what it holds after `tr` so far. */
-export function setEnvelopeValue(
+export function setEnvelopeValue<K extends EnvelopeKey>(
   state: EditorState,
   tr: Transaction,
-  key: EnvelopeKey,
-  value: WordEnvelope[EnvelopeKey],
+  key: K,
+  value: WordEnvelope[K],
 ): Transaction {
   const envelope = wordContext(state)?.envelope;
   if (!envelope) return tr;
@@ -164,43 +237,136 @@ export function setEnvelopeValue(
 }
 
 /**
- * Whether stored `steps` can apply to `envelope`: every `EnvelopeStep` finds what it expects,
- * given the ones before it. A change made outside history makes them stale.
+ * Whether stored `steps` can apply to `context`: every `EnvelopeStep` and `StoryStep` finds what
+ * it expects, given the ones before it. A change made outside history makes them stale.
  */
-export function envelopeStepsApply(envelope: WordEnvelope, steps: readonly Step[]): boolean {
-  let section = envelope.section;
+export function storedStepsApply(context: WordContext, steps: readonly Step[]): boolean {
+  const values = new Map<EnvelopeKey, unknown>();
+  const stories = new Map<string, Story | null>();
   for (const step of steps) {
-    if (!(step instanceof EnvelopeStep)) continue;
-    if (!deepEqual(section, step.before)) return false;
-    section = step.after;
+    if (step instanceof EnvelopeStep) {
+      const key = step.key as EnvelopeKey;
+      const current = values.has(key) ? values.get(key) : context.envelope[key];
+      if (!deepEqual(current, step.before)) return false;
+      values.set(key, step.after);
+    } else if (step instanceof StoryStep) {
+      const current = stories.has(step.id)
+        ? stories.get(step.id)
+        : (context.stories.get(step.id) ?? null);
+      if (!sameStory(current, step.before)) return false;
+      stories.set(step.id, step.after);
+    }
   }
   return true;
+}
+
+/** The story as `tr` leaves it (`state`'s, after the story steps `tr` already has). */
+export function storyAfter(state: EditorState, tr: Transaction, id: string): Story | null {
+  let story = wordContext(state)?.stories.get(id) ?? null;
+  for (const step of tr.steps) if (step instanceof StoryStep && step.id === id) story = step.after;
+  return story;
+}
+
+/** What a story's editor knows of the body's: undo, and the trees it allocates ids across. */
+export interface StoryBody {
+  readonly state: EditorState;
+  run(command: Command): boolean;
+  can(command: Command): boolean;
+}
+
+/** On the state of a story's editor: the body it belongs to. */
+export const storyBodyKey = new PluginKey<StoryBody>("storyBody");
+
+/** The body of the story `state` edits; null when `state` is the body's. */
+export const storyBody = (state: EditorState): StoryBody | null =>
+  storyBodyKey.getState(state) ?? null;
+
+/** A state over a story's `doc` for working on it, with `state`'s word context. */
+export function storyState(state: EditorState, doc: Node): EditorState {
+  const context = wordContext(state) as WordContext;
+  return EditorState.create({ doc, plugins: [wordPlugin(context.envelope, context)] });
+}
+
+/** Every tree of the document but `state`'s own: ids are allocated across them (ADR-0007). */
+export function otherTrees(state: EditorState): Node[] {
+  const trees = [...(wordContext(state)?.stories.values() ?? [])].map((story) => story.doc);
+  const body = storyBody(state)?.state.doc;
+  return (body ? [body, ...trees] : trees).filter((tree) => tree !== state.doc);
+}
+
+/** The trees of `envelope`'s stories. */
+function storyTrees(envelope: WordEnvelope): Map<string, Story> {
+  return new Map(
+    Object.entries(envelope.stories ?? {}).map(([id, { content, ...rest }]) => [
+      id,
+      { ...rest, doc: parseContent(content, `stories[${JSON.stringify(id)}].content`) },
+    ]),
+  );
 }
 
 /**
  * The plugin that gives commands a v3 document's envelope. A transaction changes it with
  * `withEnvelope` (a new list's numbering definition); undo leaves such additions, as Word does.
- * Comments change only through `CommentStep`s and the last section through `EnvelopeStep`s,
- * which undo takes back.
+ * Comments change only through `CommentStep`s, the last section and the settings through
+ * `EnvelopeStep`s and stories through `StoryStep`s, which undo takes back. A story's editor is
+ * given its body's `context` as it stands.
  */
-export function wordPlugin(envelope: WordEnvelope): Plugin<WordContext> {
+export function wordPlugin(envelope: WordEnvelope, context?: WordContext): Plugin<WordContext> {
   // Not a secret: only tells documents apart.
   const id = `${Date.now().toString(36)}${Math.random().toString(36).slice(2)}`;
-  const context: WordContext = { envelope, resolver: new Resolver(envelope), id };
+  const initial: WordContext = context ?? {
+    envelope,
+    resolver: new Resolver(envelope),
+    stories: storyTrees(envelope),
+    id,
+  };
   return new Plugin({
     key,
     state: {
-      init: () => context,
+      init: () => initial,
       apply: (tr, value) => {
+        const adopted = tr.getMeta(ADOPT) as WordContext | undefined;
+        if (adopted) return adopted;
         const next = tr.getMeta(key) as WordEnvelope | undefined;
         const comments = applyCommentSteps(value.envelope.comments, tr.steps);
         const base = next ?? value.envelope;
         const section = afterEnvelopeSteps("section", base.section, tr.steps);
-        if (!next && comments === value.envelope.comments && section === base.section) return value;
-        const envelope = { ...base, section, comments: comments as CommentJSON[] };
-        // Only comments changed: they do not affect formatting, the resolver stays.
+        const settings = afterEnvelopeSteps("settings", value.envelope.settings, tr.steps);
+        let { stories } = value;
+        let storiesJSON = value.envelope.stories;
+        for (const step of tr.steps) {
+          if (!(step instanceof StoryStep)) continue;
+          const trees = new Map(stories);
+          const json = { ...storiesJSON };
+          if (step.after) {
+            trees.set(step.id, step.after);
+            json[step.id] = storyJSON(step.after);
+          } else {
+            trees.delete(step.id);
+            delete json[step.id];
+          }
+          stories = trees;
+          storiesJSON = json;
+        }
+        if (
+          !next &&
+          comments === value.envelope.comments &&
+          section === base.section &&
+          settings === value.envelope.settings &&
+          stories === value.stories
+        )
+          return value;
+        const { stories: _stories, settings: _settings, ...rest } = base;
+        const envelope: WordEnvelope = {
+          ...rest,
+          section,
+          comments: comments as CommentJSON[],
+          ...(storiesJSON && Object.keys(storiesJSON).length ? { stories: storiesJSON } : {}),
+          ...(settings ? { settings } : {}),
+        };
+        // Only comments, stories or steps changed: they do not affect formatting.
         const resolver = next ? new Resolver(envelope) : value.resolver;
-        return { envelope, resolver, id: value.id };
+        return { envelope, resolver, stories, id: value.id };
       },
     },
   });
@@ -213,6 +379,16 @@ export function wordPlugin(envelope: WordEnvelope): Plugin<WordContext> {
 export function withEnvelope(tr: Transaction, envelope: WordEnvelope): Transaction {
   return tr.setMeta(key, envelope);
 }
+
+const ADOPT = "adoptWordContext";
+
+/** Makes `tr` give a story's state the body's context as it now is. */
+export const withContext = (tr: Transaction, context: WordContext): Transaction =>
+  tr.setMeta(ADOPT, context);
+
+/** The envelope `tr` gives the document through `withEnvelope`, if any. */
+export const envelopeChange = (tr: Transaction): WordEnvelope | undefined =>
+  tr.getMeta(key) as WordEnvelope | undefined;
 
 /** The envelope and resolver of the v3 document in `state`, or null for a v2 editor. */
 export function wordContext(state: EditorState): WordContext | null {

@@ -32,7 +32,7 @@ checklist in [testing/ime.md](testing/ime.md)):
   results) and content controls (their text editable, nothing marking them yet; those bound to
   data, showing their placeholder or with locked content stay opaque); everything else
   Word has (charts, shapes...) is kept as opaque content, selected and deleted whole. Documents saved by 0.1.0 to 0.4.0 are migrated when loaded; 0.4.0 cannot read
-  documents saved by 0.5.0. No headers, footers or page numbers (Phase 11). Sections are laid out with their own page
+  documents saved by 0.5.0. Sections are laid out with their own page
   setups and columns (11.6); a continuous section with another page setup starts a new page, and
   a next-column section with another number of columns too. A paragraph split between columns of
   different widths is measured there by its share of the text, so a line can differ, and on
@@ -41,8 +41,12 @@ checklist in [testing/ime.md](testing/ime.md)):
   the next (Delete, Backspace at the break and `removeSectionBreak` do). The break itself is not
   drawn: an empty paragraph ending a section takes no room, as in Word, and the caret reaches it
   by the keyboard.
-- Imported headers, footers, footnotes and endnotes are in the document (`stories`) and exported,
-  but the editor does not show or lay them out yet, and a note's reference shows nothing.
+- Headers and footers are on the pages and edited there (11.7). While one is open its page fields
+  show their stored results (the other pages show theirs); a field is typed over as text until
+  11.8. Moving between a header and the body takes a double click or the toolbar (no keyboard
+  shortcut of its own). Headers are not dimmed while the body is edited, as they are in Word.
+- Imported footnotes and endnotes are in the document (`stories`) and exported, but the editor does
+  not show or lay them out yet, and a note's reference shows nothing.
 - No horizontal rule button (Word's rule is a paragraph's bottom border, kept and shown).
 - On Android, Backspace at a list paragraph's start may join it into the paragraph before
   instead of removing its number (untested on a device).

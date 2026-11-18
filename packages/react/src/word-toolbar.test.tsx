@@ -4,6 +4,7 @@ import {
   type FoliDocument,
   insertTable,
   NodeSelection,
+  type OpenStory,
   trackState,
 } from "@folijs/core";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
@@ -42,6 +43,63 @@ const attrs = (editor: ReturnType<typeof setup>) =>
 
 describe("FoliToolbar on a schema v3 document", () => {
   afterEach(cleanup);
+
+  it("opens a header from its menu, then sends its commands to the header", () => {
+    const editor = createEditor({
+      document: {
+        ...document3,
+        section: { headers: { default: "h" } },
+        stories: {
+          h: {
+            kind: "header",
+            content: {
+              type: "doc",
+              content: [{ type: "paragraph", content: [{ type: "text", text: "Head" }] }],
+            },
+          },
+        },
+      },
+    });
+    let open: OpenStory | null = null;
+    editor.storyView = {
+      get open() {
+        return open;
+      },
+      edit(side) {
+        open = { id: "h", side, variant: "default", section: 0 };
+        editor.storyChanged();
+        return true;
+      },
+      close() {
+        open = null;
+        editor.storyChanged();
+      },
+    };
+    render(<FoliToolbar editor={editor} />);
+    const menu = screen.getByRole("button", { name: "Header" });
+    fireEvent.click(menu);
+    expect(
+      screen
+        .getByRole("menuitemcheckbox", { name: "Link to previous" })
+        .getAttribute("aria-disabled"),
+    ).toBe("true");
+    fireEvent.click(screen.getByRole("menuitem", { name: "Edit header" }));
+    expect(open).not.toBeNull();
+
+    act(() => {
+      editor.story("h")?.select(1, 5);
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Bold" }));
+    expect(JSON.stringify(editor.getDocument().stories?.h?.content)).toContain("bold");
+    expect(JSON.stringify(editor.getDocument().content)).not.toContain("bold");
+
+    fireEvent.click(menu);
+    fireEvent.click(screen.getByRole("menuitemcheckbox", { name: "Different first page" }));
+    expect(editor.getDocument().section.titlePage).toBe(true);
+    fireEvent.click(menu);
+    fireEvent.click(screen.getByRole("menuitem", { name: "Close header and footer" }));
+    expect(open).toBeNull();
+  });
 
   it("shows Word's controls: style, font, size, line spacing; no headings or rule", () => {
     setup();

@@ -1,9 +1,42 @@
 import { readdirSync, readFileSync } from "node:fs";
-import { createDocument, type FoliDocument, type NodeJSON, parseDocument } from "@folijs/core";
+import {
+  createDocument,
+  createEditor,
+  ensureStory,
+  type FoliDocument,
+  type NodeJSON,
+  parseDocument,
+  setStoryLinked,
+} from "@folijs/core";
 import { describe, expect, it } from "vitest";
 import { exportDocx, importDocx, readPackage } from "./index.js";
 
 /** Headers, footers and notes as stories (11.4, ADR-0007). */
+
+describe("stories made by the editor", () => {
+  it("a new story never takes the id of a part of the package it was read with", async () => {
+    const make = createEditor({
+      document: {
+        ...createDocument(doc(paragraph("end"), paragraph("last"))),
+      },
+    });
+    const { state } = make;
+    make.dispatch(
+      state.tr.setNodeMarkup(0, state.doc.child(0).type, {
+        ...state.doc.child(0).attrs,
+        section: {},
+      }),
+    );
+    make.run(ensureStory("footer", "default", 1));
+    make.run(setStoryLinked("footer", "default", false, 1));
+    const first = await importDocx(await exportDocx(make.getDocument()));
+    const editor = createEditor({ document: first.document });
+    expect(editor.run(setStoryLinked("footer", "default", true, 1))).toBe(true);
+    expect(editor.run(ensureStory("header", "default", 1))).toBe(true);
+    const again = await importDocx(await exportDocx(editor.getDocument(), first.package));
+    expect(Object.values(again.document.stories ?? {}).map((s) => s.kind)).toContain("header");
+  });
+});
 
 const CORPUS = new URL("../../../corpus/word/", import.meta.url);
 const names = readdirSync(CORPUS).filter((n) => n.endsWith(".docx"));

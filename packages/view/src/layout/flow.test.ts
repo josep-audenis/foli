@@ -8,6 +8,7 @@ import {
   flow,
   flowFrom,
   PX_PER_MM,
+  pagesOf as pageFacts,
 } from "./flow.js";
 
 /** No widow/orphan rules: pure geometry. */
@@ -527,8 +528,9 @@ describe("flow: sections and columns", () => {
     // Page 1, then 3 (2 is blank), then 4.
     expect(pagesOf(flow(blocks, 100, WORD))).toEqual([0, 2, 3]);
     const restart = section({ start: "oddPage", pageStart: 4 });
+    // A restart takes the right kind of number instead (Word adds no page for it).
     expect(pagesOf(flow([blocks[0] as BlockBox, inSection(restart, box(10))], 100, WORD))).toEqual([
-      0, 2,
+      0, 1,
     ]);
   });
 
@@ -639,6 +641,121 @@ describe("flow: sections and columns", () => {
       expect(incremental.states, `seed ${seed}`).toEqual(full.states);
       expect(incremental.gaps, `seed ${seed}`).toEqual(full.gaps);
     }
+  });
+});
+
+describe("flow: pages of their own heights (headers and footers)", () => {
+  const WORD = { orphans: 1, widows: 1, spacing: "word" as const };
+  const section = (index: number, over: Partial<FlowSection> = {}): FlowSection => ({
+    index,
+    start: "nextPage",
+    columns: 1,
+    box: () => ({ height: 100 }),
+    samePage: () => true,
+    ...over,
+  });
+  const inSection = (s: FlowSection, b: BlockBox): BlockBox => ({ ...b, section: s });
+
+  it("takes each page's height from its number and whether its section starts on it", () => {
+    const seen: unknown[] = [];
+    const s = section(0, {
+      box: (page) => {
+        seen.push(page.number);
+        return { height: page.first ? 50 : page.number % 2 ? 100 : 80 };
+      },
+    });
+    const blocks = [40, 40, 50, 40, 70, 40].map((h) => inSection(s, box(h)));
+    expect(pagesOf(flow(blocks, 0, WORD))).toEqual([0, 1, 2, 2, 3, 4]);
+    expect(seen).toContain(4);
+  });
+
+  it("gives a page shared by sections the box of the first one on it", () => {
+    const first = section(0, { box: () => ({ height: 60 }) });
+    const second = section(1, { start: "continuous", box: () => ({ height: 1000 }) });
+    const blocks = [inSection(first, box(40)), inSection(second, box(40))];
+    // The second section's own box would hold it.
+    expect(flow(blocks, 0, WORD).map((f) => f[0]?.page)).toEqual([0, 1]);
+  });
+
+  it("numbers even and odd page sections as Word does, restarted or not", () => {
+    // Word's PDFs: the page numbers of a first section of 1 or 2 pages and a second of 2, a blank
+    // page as null.
+    const cases: [FlowSection["start"], number | undefined, number, (number | null)[]][] = [
+      ["evenPage", 1, 1, [1, 2, 3]],
+      ["evenPage", 1, 2, [1, 2, 2, 3]],
+      ["evenPage", 2, 1, [1, 2, 3]],
+      ["evenPage", 2, 2, [1, 2, 2, 3]],
+      ["evenPage", 3, 1, [1, 4, 5]],
+      ["evenPage", 3, 2, [1, 2, 4, 5]],
+      ["evenPage", undefined, 1, [1, 2, 3]],
+      ["evenPage", undefined, 2, [1, 2, null, 4, 5]],
+      ["oddPage", 1, 1, [1, 1, 2]],
+      ["oddPage", 1, 2, [1, 2, 1, 2]],
+      ["oddPage", 2, 1, [1, 3, 4]],
+      ["oddPage", 2, 2, [1, 2, 3, 4]],
+      ["oddPage", 3, 1, [1, 3, 4]],
+      ["oddPage", 3, 2, [1, 2, 3, 4]],
+      ["oddPage", undefined, 1, [1, null, 3, 4]],
+      ["oddPage", undefined, 2, [1, 2, 3, 4]],
+    ];
+    // With even and odd headers (`w:evenAndOddHeaders`) a restart keeps the blank page.
+    const evenAndOdd: typeof cases = [
+      ["evenPage", 1, 1, [1, 2, 3]],
+      ["evenPage", 1, 2, [1, 2, null, 2, 3]],
+      ["evenPage", 2, 1, [1, 2, 3]],
+      ["evenPage", 2, 2, [1, 2, null, 2, 3]],
+      ["evenPage", 3, 1, [1, 4, 5]],
+      ["evenPage", 3, 2, [1, 2, null, 4, 5]],
+      ["evenPage", undefined, 1, [1, 2, 3]],
+      ["evenPage", undefined, 2, [1, 2, null, 4, 5]],
+      ["oddPage", 1, 1, [1, null, 1, 2]],
+      ["oddPage", 1, 2, [1, 2, 1, 2]],
+      ["oddPage", 2, 1, [1, null, 3, 4]],
+      ["oddPage", 2, 2, [1, 2, 3, 4]],
+      ["oddPage", 3, 1, [1, null, 3, 4]],
+      ["oddPage", 3, 2, [1, 2, 3, 4]],
+      ["oddPage", undefined, 1, [1, null, 3, 4]],
+      ["oddPage", undefined, 2, [1, 2, 3, 4]],
+    ];
+    const check = (list: typeof cases, rules: typeof WORD & { evenAndOddHeaders?: boolean }) => {
+      for (const [start, pageStart, before, numbers] of list) {
+        const one = section(0);
+        const two = section(1, { start, pageStart });
+        const boxes = [
+          inSection(one, box(before * 100, 0, 0, 100)),
+          inSection(two, box(200, 0, 0, 100)),
+        ];
+        const pages = pageFacts(boxes, flowFrom(boxes, 0, rules));
+        expect(
+          pages.map((p) => (p.sectionPages ? p.number : null)),
+          `${start} ${pageStart} after ${before}`,
+        ).toEqual(numbers);
+      }
+    };
+    check(cases, WORD);
+    check(evenAndOdd, { ...WORD, evenAndOddHeaders: true });
+  });
+
+  it("says each page's number, section and first page", () => {
+    const one = section(0);
+    const two = section(1, { pageStart: 7 });
+    const even = section(2, { start: "evenPage" });
+    const boxes = [
+      inSection(one, box(250, 0, 0, 10)),
+      inSection(two, box(150, 0, 0, 10)),
+      inSection(even, box(10)),
+    ];
+    const pages = pageFacts(boxes, flowFrom(boxes, 0, WORD));
+    expect(pages.map((p) => [p.number, p.section, p.first, p.sectionPages])).toEqual([
+      [1, 0, true, 3],
+      [2, 0, false, 3],
+      [3, 0, false, 3],
+      [7, 1, true, 2],
+      [8, 1, false, 2],
+      // The blank page before the even one: the next page's section, nothing on it.
+      [9, 2, false, 0],
+      [10, 2, true, 1],
+    ]);
   });
 });
 

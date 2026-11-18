@@ -133,11 +133,13 @@ export function importPackage(pkg: DocxPackage): DocxImport {
     : [];
   const stories = readStories(pkg, contextFor);
   const usedControls = controlsUsed([content, commented, stories]);
-
   // A settings part Foli cannot read is kept as it is, and read as saying nothing.
+  let trackRevisions = false;
   let settings: WordSettingsJSON | undefined;
   try {
-    settings = readSettings(related(REL.settings)?.root);
+    const root = related(REL.settings)?.root;
+    trackRevisions = trackRevisionsOf(root);
+    settings = readSettings(root);
   } catch (error) {
     if (!(error instanceof DocxError)) throw error;
   }
@@ -155,6 +157,7 @@ export function importPackage(pkg: DocxPackage): DocxImport {
       comments: commented,
       ...(resources.size ? { resources: Object.fromEntries(resources) } : {}),
       ...(Object.keys(stories).length ? { stories } : {}),
+      ...(settings ? { settings } : {}),
       ...(usedControls.size
         ? {
             controls: Object.fromEntries([...controls].filter(([id]) => usedControls.has(id))),
@@ -166,13 +169,6 @@ export function importPackage(pkg: DocxPackage): DocxImport {
     // Each value was checked as it was read; what is left is beyond the model's limits (an
     // element over 16 MiB kept verbatim…). A DocxError like every other import failure.
     throw new DocxError(`Cannot import: ${(error as Error).message}`, { cause: error });
-  }
-  // A settings part Foli cannot read is kept as it is, and tracking taken as off.
-  let trackRevisions = false;
-  try {
-    trackRevisions = trackRevisionsOf(related(REL.settings)?.root);
-  } catch (error) {
-    if (!(error instanceof DocxError)) throw error;
   }
   return { document, package: pkg, report: report.report(), trackRevisions };
 }

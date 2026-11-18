@@ -82,14 +82,16 @@ content, ext? }`. `content` is a `doc` of the body's blocks. `noteType` is Word'
   after (immutable nodes sharing structure; `null` for no story): it inverts by swapping them and
   has an empty position map for the body (`Step.invert` receives the body, which is why it cannot
   compute an inverse from an inner step). Undo is one stack across the document, as in Word, and
-  inserting a note (reference and story) is one transaction.
+  inserting a note (reference and story) is one transaction. Built in 11.7: what the step holds is
+  a `Story` (the tree with its `kind`, `noteType` and `ext`) and the story's selection before and
+  after, which is how undo gives the selection back.
 - **A stale step fails its whole event.** `Step.apply` sees only the body, so history's
   `applyStored` checks `StoryStep`s and `EnvelopeStep`s against the envelope as the transaction has
   left it: where the story or key no longer equals `before`, the event is not applied at all and
   is dropped, never half applied (a reference gone, its story kept). Every change to a story goes
   through these steps, so only a change made with `addToHistory: false` can cause this.
 - **`EnvelopeStep(key, before, after)`**, the same idea for what undo must take back in the
-  envelope: the last section (`section`), `settings`, and one control's properties. So undoing an
+  envelope: the last section (`section`), `settings` (both built), and one control's properties (11.9). So undoing an
   added header leaves no reference to a story that has gone. `withEnvelope` stays for what undo
   leaves as it is (numbering definitions, styles and resources).
 - **Grouping.** History groups story typing by the rules body typing has: the story's own
@@ -105,14 +107,16 @@ content, ext? }`. `content` is a `doc` of the body's blocks. `noteType` is Word'
   `resources` only, applied to the body's current envelope (the story's copy of the rest may be
   stale), and every change to those reaches the story states. Undo and redo run on the body
   editor. A `StoryStep` arriving from the body (undo, another view) replaces the story state's
-  document; a history event keeps the story's selection with its id, restored if that story is
-  mounted, otherwise mapped to the nearest valid place.
+  document and takes the selection the step holds, clamped to the tree. Built in 11.7: a story's
+  state is made again from the body's word context and tracking state whenever they change, so it
+  shares the body's resolver instead of patching a copy; a story's editor also refuses by itself
+  what a story may not hold (`storyRules`, run on every change of its tree).
 - **The view follows stories apart from `doc`.** A `StoryStep` leaves the body's `doc` as it is, so
   the view compares the stories too, redraws the occurrences of those that changed and reflows only
   if a height changed. The renderer's context depends on `styles`, `numbering`, `defaults`, `theme`
   and `resources`, not on the envelope object, so typing in a story keeps it and the layout cache.
-- **Across trees.** Revision and bookmark ids are allocated over the body and every story
-  (`maxRevisionId` and its kin scan one tree today).
+- **Across trees.** Revision and bookmark ids are allocated over the body and every story. A story
+  copied by unlinking a section leaves its bookmarks behind: their names are the document's once.
 - **Review.** Accept and reject all reach every story. Comments anchor in the body only.
 - **Notes and the clipboard.** Deleting the last reference removes the story in the same
   transaction; undo restores both. A slice holding a reference carries its note's content, so cut
@@ -125,7 +129,11 @@ content, ext? }`. `content` is a `doc` of the body's blocks. `noteType` is Word'
   view becomes read-only and marks the host `foli-in-story` (the body dimmed); an `EditorView` of
   `editor.story(id)`, unpaginated (a new `paged: false` option), is mounted in that occurrence
   inside a `contenteditable="false"` wrapper. Double click or a command enters; Escape, or a press
-  outside, leaves and restores the body's selection from its state.
+  outside, leaves and restores the body's selection from its state. A press outside means on the
+  host: the toolbar keeps the story open and its commands go to the story's editor
+  (`Editor.storyView` says which is open). A press on a page's header or footer places no caret in
+  the body, and the second press of a double click opens the story (the click event comes too
+  late in Firefox, where the first press could scroll the page from under the pointer).
 - **Keeping the main view off it:** while a story is mounted the main view's observer is stopped
   (it is read-only: there is no input to read back); its handlers ignore events whose target is in
   the wrapper, which is left to bubble (a resize's drag listens on the document, so stopping
@@ -133,18 +141,31 @@ content, ext? }`. `content` is a `doc` of the body's blocks. `noteType` is Word'
   keeps the wrapper.
 - Other occurrences re-render from the model. Layout never moves the mounted story during a
   composition. A note split across pages shows whole at its reference's page while it is edited.
+  When the page stops showing the story (a different first page turned on, the section unlinked)
+  the page's own story opens in its place; when reflow takes the page away, the story moves with
+  the focus to another occurrence.
+- Ctrl+Home and Ctrl+End on pages with headers go by the model: Chromium stopped the caret before
+  the non-editable footer of the last page (11.7).
 
 ### Layout
 
 - **Page regions.** `flow` gets a page's content box from a function of the page (section, first
   page, odd or even), not one height per section. A header starts at `margins.header`; the text
   starts at the larger of `margins.top` and the header's bottom (a negative top margin is exact, as
-  in Word); the footer mirrors it.
+  in Word); the footer mirrors it. A page shared by sections has the box of the first one on it.
+  Measured in 11.7 against Word's PDFs (03's letterhead): a story's height runs to its last block
+  and that block's space after, floating pictures not counted; a line is as tall as its runs and
+  the paragraph mark, not the paragraph style's font (`markFormat` sets the block's own line); a
+  line holding only inline pictures ends at their foot, with no room below for text.
 - **Which header.** `titlePage` gives the first page of a section its first-page variant.
   `evenAndOddHeaders` picks by the page's **displayed number** (`w:pgNumType` restarts count), not
   its place in the file. A missing variant inherits from the previous section. A page holding
-  several sections takes its header and footer from the first section on it. The corpus's 08 and
-  Word's PDF check these; a rule they contradict is corrected in 11.7.
+  several sections takes its header and footer from the first section on it. Word's PDFs of 01, 03,
+  04, 05 and 08 agree with these (11.7, 08 scoring 1.000 on all five pages), and add one rule:
+  **the blank page Word inserts before an even or odd page section has no header or footer.** The
+  blank page comes when the number the pages have reached is the wrong kind; a section restarting
+  its numbers (`w:pgNumType w:start`) skips it unless the document has even and odd headers. Its
+  first number is the start or, when that is the wrong kind, the next (32 cases on Word's PDFs).
 - **Notes.** A line holding a reference goes on a page only if it, the separator and the note's
   **first line** fit; the rest of the note fills the space left at the foot and continues on the
   next page under the continuation separator, so a note taller than a page works. What carries
@@ -168,8 +189,9 @@ content, ext? }`. `content` is a `doc` of the body's blocks. `noteType` is Word'
   tallest column and the space after it; between two paragraphs goes the larger of the space
   after and the space before, not their sum. A changed page setup is tracked as `w:sectPrChange`
   (`SectionJSON.change`), the recorded setup spelling out its values, or Word sees no change.
-- **Fixed point.** Headers can hold `PAGE` and `NUMPAGES`, whose width can change a height. Layout
-  repeats at most twice, then keeps the result.
+- **Fixed point.** Headers can hold `PAGE` and `NUMPAGES`, whose width can change a height. `PAGE`
+  is known as each page is flowed; the page counts come from the flow before, and the flow is
+  repeated at most twice when they change a page's text height, then the result is kept.
 
 ### Fields
 
@@ -185,7 +207,9 @@ content, ext? }`. `content` is a `doc` of the body's blocks. `noteType` is Word'
 - **Tracked as runs.** `w:fldChar` and `w:instrText` sit in runs, inside `w:ins` and `w:del`, so
   these atoms carry revision marks like text (they do not join the markers tracking skips).
 - **Results.** Shown as stored. `PAGE`, `NUMPAGES` and `SECTIONPAGES` in a story are drawn per page
-  by the view and never written to the tree; elsewhere they update on demand like the rest.
+  by the view and never written to the tree; elsewhere they update on demand like the rest. While
+  its story is open for editing they show the stored result (11.7: the open view's text is the
+  model's), and the other occurrences go on showing their page's.
 - **Update.** `updateFields(editor, { layout, data, now })` in core recomputes `PAGE`, `NUMPAGES`,
   `SECTIONPAGES`, `DATE`, `TIME`, `REF`, `PAGEREF`, `SEQ`, `TOC` and, from `data`, `MERGEFIELD`, in
   one transaction; `layout` (from the view) gives a position's page. Locked fields stay.

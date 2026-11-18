@@ -171,6 +171,11 @@ a new footnote with its reference), and a new package with a header, a footer, a
 endnote. Word opens all of them; unchanged ones give Word's own pages, sections and notes, edited
 ones Foli's text.
 
+Since 11.7 it also has Word read what the editor's header commands make: 08 with even pages and
+its first page turned off and its last section's header unlinked, 05 with even pages on and a
+header typed in through `editor.story`, and a new package with even and odd headers. All 18 files
+pass (2026-11-18, Word 16.0.20527).
+
 `scripts/corpus/table-roundtrip.mjs` (10.4) has Word read Foli's tables back: every corpus
 document with a table exported unchanged and edited (a cell's text as a tracked insertion, a row
 kept from breaking, a cell shaded, a row deleted as a tracked change), then `word-reference.ps1`
@@ -215,8 +220,8 @@ The documents are short (1-4 pages) and most of their page breaks are explicit, 
 number alone says little: the line is the stricter measure, and it moves with the fonts. The
 three lines that differ: the paragraph after the fee table in 02 (Word counts the header row it
 repeats on the second page as a line; Foli does not), and two empty paragraphs around the table
-of contents in 04 (a field Foli keeps opaque). Not laid out yet, so not measured: headers and
-footers (their space is Word's margin here) and footnotes.
+of contents in 04 (a field Foli keeps opaque). Footnotes were not laid out, so not measured; headers
+and footers were not either until 11.7 (below).
 
 Floating pictures (10.9, 2026-11-17, with Aptos): 07 has all 5 of its paragraphs on Word's page
 (2 pages, as Word), 4 on Word's line. 04 keeps its 35 on Word's page but has 25 on Word's line
@@ -261,6 +266,26 @@ within a line (122); 277 of 280 paragraphs in table cells on Word's page, as bef
 lower: its text starts about 44 px above Word's until its letterhead pushes it down (11.7), so the
 score there measures where lines happen to overlap.
 
+After 11.7 (2026-11-18, the same setup): headers and footers are on the pages, so the page score
+now counts them. A header taller than its margin pushes the text (03), a line is as tall as its
+runs and paragraph mark, and a line holding only a picture ends at its foot, as in Word's PDFs. The
+paragraph numbers do not change. 03's text is where Word's: what it still loses on the page is its
+letterhead, a picture drawn as a box against Word's ink. 09 waits for its footnotes (11.10), 04
+for its footnotes and 07 for its pictures' ink.
+
+| Document | After 11.6 | After 11.7 | Inside the margins, after |
+| -------- | ---------: | ---------: | ------------------------: |
+| 01       |      0.977 |      0.994 |                     0.994 |
+| 02       |      0.852 |      0.858 |                     0.861 |
+| 03       |      0.138 |      0.830 |                     1.000 |
+| 04       |      0.790 |      0.821 |                     0.810 |
+| 05       |      0.927 |      0.968 |                     0.968 |
+| 06       |      0.942 |      0.942 |                     0.942 |
+| 07       |      0.394 |      0.394 |                     0.394 |
+| 08       |      0.989 |      1.000 |                     1.000 |
+| 09       |      0.387 |      0.391 |                     0.388 |
+| **All**  |  **0.768** |  **0.811** |                 **0.816** |
+
 ## Pages against Word's PDF
 
 The same run compares every page Foli shows with Word's page as Word prints it, when it is
@@ -280,7 +305,7 @@ matched: 1 when the pages agree, falling as text moves or wraps differently (in 
 a block of text 3 px lower scores 0.9, half a line lower under 0.5, a whole line lower about
 0.5), 0 when no ink is where the other has it. A page only one of them has, or of another size
 (another orientation or paper), scores 0 and is reported. The score inside the margins leaves
-out headers, footers and page numbers, which Foli does not lay out yet. Documents without a
+out headers, footers and page numbers; the page score counts them since 11.7. Documents without a
 PDF are listed in the results (`pdf.missing`). Overlays go to `test-results/word-pdf/`: black
 where both have ink, red Word only, blue Foli only.
 

@@ -4,7 +4,14 @@
  * back as a .docx. The editing tests on schema v3 drive it (`e2e/word-editing.spec.ts`,
  * `e2e/word-format.spec.ts`).
  */
-import { createEditor, type Editor, type FoliDocument, parseDocument } from "@folijs/core";
+import {
+  createEditor,
+  type Editor,
+  type FoliDocument,
+  insertPicture,
+  insertTable,
+  parseDocument,
+} from "@folijs/core";
 import {
   type DocxPackage,
   exportDocx,
@@ -152,6 +159,8 @@ declare global {
       sample: FoliDocument;
       /** Whether the editor's document passes validation (throws the error if not). */
       validate(): true;
+      /** Commands the tests run on a story's editor. */
+      commands: { insertPicture: typeof insertPicture; insertTable: typeof insertTable };
     };
   }
 }
@@ -174,4 +183,5 @@ window.foliEdit = {
     parseDocument(editor.getDocument());
     return true;
   },
+  commands: { insertPicture, insertTable },
 };

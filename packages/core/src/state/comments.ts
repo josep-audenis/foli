@@ -13,7 +13,7 @@ import { closeHistory } from "./history.js";
 import { AllSelection, Selection, TextSelection } from "./selection.js";
 import { type Command, type EditorState, Plugin, PluginKey, type Transaction } from "./state.js";
 import { now, trackState, untracked } from "./track.js";
-import { setComments, wordContext } from "./word.js";
+import { setComments, storyBody, wordContext } from "./word.js";
 
 const ANCHORS = new Set(["commentStart", "commentEnd", "commentReference"]);
 
@@ -117,7 +117,9 @@ export function addComment(content: CommentContent, options: CommentOptions = {}
       end: schema.nodes.commentEnd,
       reference: schema.nodes.commentReference,
     };
-    if (!context || !types.start || !types.end || !types.reference) return false;
+    // Comments anchor in the body only (ADR-0007).
+    if (!context || storyBody(state) || !types.start || !types.end || !types.reference)
+      return false;
     // Select-all comments the whole text: from the first textblock to the last.
     const all = state.selection instanceof AllSelection;
     const $from = all ? Selection.atStart(state.doc).$from : state.selection.$from;
@@ -262,7 +264,10 @@ function removeComments(tr: Transaction, comments: readonly CommentJSON[], ids: 
 
 /** Deletes comment `id` with its replies and their anchors. */
 export function deleteComment(id: number): Command {
-  return (state, dispatch) => {
+  const command: Command = (state, dispatch) => {
+    // The anchors are in the body.
+    const body = storyBody(state);
+    if (body) return dispatch ? body.run(command) : body.can(command);
     const comments = wordContext(state)?.envelope.comments ?? [];
     const ids = thread(comments, id);
     // shortcut: a comment anchored in content Foli keeps verbatim (an opaque block) stays, its
@@ -276,10 +281,13 @@ export function deleteComment(id: number): Command {
     }
     return true;
   };
+  return command;
 }
 
 /** Deletes every comment and its anchors (not the threads anchored in verbatim content). */
 export const deleteAllComments: Command = (state, dispatch) => {
+  const body = storyBody(state);
+  if (body) return dispatch ? body.run(deleteAllComments) : body.can(deleteAllComments);
   const comments = wordContext(state)?.envelope.comments ?? [];
   const verbatim = opaqueCommentIds(state.doc);
   const kept = new Set<number>();
