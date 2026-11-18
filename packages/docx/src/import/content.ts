@@ -13,7 +13,7 @@ import {
 } from "@folijs/core";
 import type { DocxPackage, Relationship } from "../package.js";
 import type { XmlElement, XmlNode } from "../xml.js";
-import { controlProperties } from "./controls.js";
+import { controlProperties, plainlyEditable } from "./controls.js";
 import { attr, child, deepText, elements, integer, isW, R, REL, textOf, W } from "./ooxml.js";
 import { pictureAttrs } from "./pictures.js";
 import {
@@ -152,14 +152,22 @@ function controlOf(
 ): { id: string; content: XmlElement } | undefined {
   const content = child(sdt, "sdtContent");
   if (!content || sdt.attributes.length) return undefined;
+  const children = elements(sdt);
+  const once = (local: string) => children.filter((c) => isW(c, local)).length <= 1;
   const known = new Set(["sdtPr", "sdtEndPr", "sdtContent"]);
-  if (elements(sdt).some((c) => !isW(c) || !known.has(c.local))) return undefined;
+  if (children.some((c) => !isW(c) || !known.has(c.local))) return undefined;
+  if (![...known].every(once)) return undefined;
   const control = controlProperties(sdt, context);
-  if (!control) return undefined;
+  if (!control || !plainlyEditable(control)) return undefined;
   const id = `${context.part}#${context.ordinals.next++}`;
   context.controls.set(id, control);
   return { id, content };
 }
+
+/** How many controls the model lets a block, row or cell be in. */
+const MAX_CONTROLS = 64;
+const roomForControl = (node: NodeJSON) =>
+  ((node.attrs?.controls as string[] | undefined)?.length ?? 0) < MAX_CONTROLS;
 
 /** `node` inside control `id`, outermost first. */
 function inControl(node: NodeJSON, id: string): NodeJSON {
@@ -172,7 +180,8 @@ function blockControl(sdt: XmlElement, context: ContentContext): NodeJSON[] | un
   const control = controlOf(sdt, context);
   if (!control) return undefined;
   const inner = blocks(control.content.children, context);
-  return inner.length ? inner.map((block) => inControl(block, control.id)) : undefined;
+  if (!inner.length || !inner.every(roomForControl)) return undefined;
+  return inner.map((block) => inControl(block, control.id));
 }
 
 /**
@@ -195,7 +204,7 @@ function controlled(
     } else if (isW(node, "sdt")) {
       const control = controlOf(node, context);
       const inner = control && controlled(control.content.children, local, read, context);
-      if (!control || !inner?.length) return undefined;
+      if (!control || !inner?.length || !inner.every(roomForControl)) return undefined;
       out.push(...inner.map((item) => inControl(item, control.id)));
     } else return undefined;
   }
@@ -678,7 +687,7 @@ function run(
       case "instrText":
       case "delInstrText": {
         const bag = attributeBag(el, ["xml:space"], context);
-        const attrs: Record<string, unknown> = { text: textOf(el) };
+        const attrs: Record<string, unknown> = { text: spaced(el) };
         if (bag) attrs.attributes = bag;
         const leaf = valid(node("fieldCode", marks, attrs), el, context);
         if (leaf) out.push(leaf);

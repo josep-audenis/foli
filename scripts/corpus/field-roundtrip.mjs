@@ -5,17 +5,18 @@
 //     -In <dir>/foli -Out <dir>/word
 //   node scripts/corpus/field-roundtrip.mjs check <dir>
 //
-// `make` exports every corpus document with fields or controls to <dir>/foli: as imported
-// (<name>.docx) and edited (<name>-edited.docx: "Foli edit" added to the result of a REF, SEQ or
-// MERGEFIELD field, and to the first text of each control not showing its placeholder; a block
-// control of several blocks split by a paragraph put between them). `check` needs Word's data for
-// every file made: each opened; an unchanged one has the original's fields and controls; an edited
-// one Foli's edits, and one more control where one was split. One line per file; exits 1 on any
-// difference.
+// `make` exports every corpus document with fields or controls, in its body or stories, to
+// <dir>/foli: as imported (<name>.docx) and edited (<name>-edited.docx: "Foli edit" added to the
+// result of a REF, SEQ or MERGEFIELD field and to the first text of each control; a block control
+// of several blocks split by a paragraph put between them). The corpus's own controls show their
+// placeholders and stay verbatim, so 00-controls adds an inline and a block control to a document
+// (and must see both edited). `check` needs Word's data for every file made: each opened; an
+// unchanged one has the original's fields, controls, bookmarks and sections; an edited one Foli's
+// edits, and one more control where one was split. One line per file; exits 1 on any difference.
 
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { exportDocx, importDocx } from "../../packages/docx/dist/index.js";
+import { exportDocx, importDocx, readPackage } from "../../packages/docx/dist/index.js";
 
 const [mode, dir] = process.argv.slice(2);
 if ((mode !== "make" && mode !== "check") || !dir) {
@@ -86,8 +87,36 @@ if (mode === "make") {
     const { document, package: pkg } = await importDocx(
       new Uint8Array(readFileSync(join(corpus, name))),
     );
-    const text = JSON.stringify(document.content);
+    const text = JSON.stringify([document.content, document.stories]);
     if (!document.controls && !text.includes('"fieldCode"')) continue;
+    await both(name, document, pkg);
+  }
+  // Controls the model holds: added to a document the corpus has.
+  const source = await readPackage(
+    new Uint8Array(readFileSync(join(corpus, "05-business-letter.docx"))),
+  );
+  const main = source.text(source.mainDocument);
+  const run = (text) => `<w:r><w:t>${text}</w:t></w:r>`;
+  const properties = (id, kind) =>
+    `<w:sdtPr><w:alias w:val="C${id}"/><w:tag w:val="c${id}"/><w:id w:val="${id}"/>${kind}</w:sdtPr>`;
+  const added =
+    `<w:p>${run("Before ")}<w:sdt>${properties(9001, "<w:text/>")}<w:sdtContent>${run("value")}</w:sdtContent></w:sdt></w:p>` +
+    `<w:sdt>${properties(9002, "")}<w:sdtContent><w:p>${run("first")}</w:p><w:p>${run("second")}</w:p></w:sdtContent></w:sdt>`;
+  const at = main.indexOf("<w:p>") >= 0 ? main.indexOf("<w:p>") : main.indexOf("<w:p ");
+  const fixture = await source.write(
+    new Map([
+      [
+        source.mainDocument,
+        new TextEncoder().encode(`${main.slice(0, at)}${added}${main.slice(at)}`),
+      ],
+    ]),
+  );
+  const read = await importDocx(fixture);
+  await both("00-controls.docx", read.document, read.package);
+  writeFileSync(join(dir, "expected.json"), JSON.stringify(expected));
+  process.exit(0);
+
+  async function both(name, document, pkg) {
     writeFileSync(join(dir, "foli", name), await exportDocx(document, pkg));
     const change = edited(document);
     expected[name.replace(".docx", "")] = change.expected;
@@ -96,8 +125,6 @@ if (mode === "make") {
       await exportDocx(change.document, pkg),
     );
   }
-  writeFileSync(join(dir, "expected.json"), JSON.stringify(expected));
-  process.exit(0);
 }
 
 const expected = json(join(dir, "expected.json"));
@@ -110,13 +137,22 @@ for (const file of readdirSync(join(dir, "foli")).filter((n) => n.endsWith(".doc
   if (!word) problems.push("no data from Word");
   else if (!word.opened) problems.push(`not opened: ${word.error}`);
   else {
-    const base = json(join(reference, `${name.replace(/-edited$/, "")}.json`));
-    if (!name.endsWith("-edited")) {
+    const plain = name.replace(/-edited$/, "");
+    const base = json(
+      plain === "00-controls"
+        ? join(dir, "word", `${plain}.json`)
+        : join(reference, `${plain}.json`),
+    );
+    if (plain === "00-controls" && !name.endsWith("-edited")) {
+      if (word.controls.length !== 2) problems.push(`${word.controls.length} controls, not 2`);
+    } else if (!name.endsWith("-edited")) {
       if (word.pages !== base.pages) problems.push(`${word.pages} pages, Word's ${base.pages}`);
-      for (const key of ["fields", "controls", "bookmarks"])
+      for (const key of ["fields", "controls", "bookmarks", "sections"])
         if (JSON.stringify(word[key]) !== JSON.stringify(base[key])) problems.push(`${key} differ`);
     } else {
-      const want = expected[name.replace(/-edited$/, "")];
+      const want = expected[plain];
+      if (plain === "00-controls" && (want.controls !== 1 || want.split !== 1))
+        problems.push("the fixture's controls were not edited");
       for (const code of want.editedFields)
         if (!word.fields.some((f) => f.code === code && f.result.includes(EDIT)))
           problems.push(`field ${code}: no edit`);

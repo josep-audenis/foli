@@ -20,6 +20,7 @@ import { DocxError, type DocxPackage, type NewPart } from "../package.js";
 import { newSettingsXml, withTrackRevisions } from "../settings.js";
 import { parseXml, type XmlElement } from "../xml.js";
 import { deflateEntry, writeZip } from "../zip.js";
+import { balanced } from "./balance.js";
 import { blocksXml, type WriteContext } from "./content.js";
 import {
   commentsExtendedXml,
@@ -207,7 +208,7 @@ export async function exportDocx(
   original?: DocxPackage,
   options: ExportOptions = {},
 ): Promise<Uint8Array> {
-  const doc = withThreadIds(parseDocument(document), original);
+  const doc = balanced(withThreadIds(parseDocument(document), original));
   refuseNotYetWritten(doc);
   // Before the app is asked for any picture's bytes.
   const reference = original ? undefined : packageReference(doc);

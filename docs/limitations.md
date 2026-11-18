@@ -29,7 +29,8 @@ checklist in [testing/ime.md](testing/ime.md)):
 - The editor holds schema v5 (Word's model, 8.7; tables and pictures, 10.3; v5's stories, fields and content controls are not produced yet): paragraphs in
   styles (headings are Word's heading styles), lists as Word's numbering, run formatting, line
   and page breaks, links, tables, inline and floating pictures, fields (shown with their stored
-  results) and content controls (their text editable, nothing marking them yet); everything else
+  results) and content controls (their text editable, nothing marking them yet; those bound to
+  data, showing their placeholder or with locked content stay opaque); everything else
   Word has (charts, shapes...) is kept as opaque content, selected and deleted whole. Documents saved by 0.1.0 to 0.4.0 are migrated when loaded; 0.4.0 cannot read
   documents saved by 0.5.0. No headers, footers or page numbers (Phase 11). Sections are laid out with their own page
   setups; a continuous section with another page setup starts a new page, and an even or odd

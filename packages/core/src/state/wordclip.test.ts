@@ -185,6 +185,27 @@ describe("fitPaste", () => {
     expect(fitPaste(editor.state, content).envelope).toBe(envelope);
   });
 
+  it("leaves another document's controls and note references behind, keeping the text", () => {
+    const editor = editorOf([p({})]);
+    const content = docOf({
+      type: "paragraph",
+      attrs: { controls: ["c"] },
+      content: [
+        { type: "controlStart", attrs: { id: "d" } },
+        text("kept"),
+        { type: "controlEnd", attrs: { id: "d" } },
+        { type: "noteReference", attrs: { story: "footnote:1" } },
+      ],
+    });
+    const fitted = fitPaste(editor.state, content, {
+      id: "another",
+      styles: [],
+      numbering: { abstracts: [], instances: [] },
+      comments: [],
+    } as never);
+    expect(fitted.doc.toJSON()).toEqual(docOf(p({}, text("kept"))));
+  });
+
   it("uses the target's style of the same name, adds the others with free ids", () => {
     const editor = editorOf([p({}, text("x"))]);
     const definitions: WordDefinitions = {

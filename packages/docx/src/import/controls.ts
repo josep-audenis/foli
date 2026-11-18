@@ -31,6 +31,20 @@ const OTHER = new Set([
 
 const on = (value: string | undefined) => value !== "0" && value !== "false" && value !== "off";
 
+/**
+ * Whether its content may be edited as ordinary content. A bound control takes its value from its
+ * data, one showing its placeholder treats typed text as placeholder, a locked one refuses edits:
+ * until 11.9 honours these, such a control stays verbatim.
+ */
+export function plainlyEditable(control: ControlJSON): boolean {
+  return (
+    !control.binding &&
+    !control.placeholder?.showing &&
+    control.lock !== "contentLocked" &&
+    control.lock !== "sdtContentLocked"
+  );
+}
+
 /** The properties of `sdt`'s `w:sdtPr` and `w:sdtEndPr`, or undefined if the model cannot hold them. */
 export function controlProperties(sdt: XmlElement, context: Context): ControlJSON | undefined {
   const pr = child(sdt, "sdtPr");
@@ -81,10 +95,7 @@ export function controlProperties(sdt: XmlElement, context: Context): ControlJSO
           prefixMappings: attr(binding, "prefixMappings"),
         })
       : undefined,
-    ext:
-      pr || end
-        ? `<${sdt.name}>${pr ? sourceOf(context, pr) : ""}${end ? sourceOf(context, end) : ""}</${sdt.name}>`
-        : undefined,
+    ext: `<${sdt.name}>${pr ? sourceOf(context, pr) : ""}${end ? sourceOf(context, end) : ""}</${sdt.name}>`,
   }) as unknown as ControlJSON;
   return checkControl(control) ? undefined : control;
 }

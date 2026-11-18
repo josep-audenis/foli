@@ -143,7 +143,7 @@ opaque is counted in those parts too; paragraphs count the body's, those in tabl
 | ------------------------------ | ---------: | -----: | ------------------------- | ---------------: |
 | 01-mutual-nda                  |         37 |      1 | none                      |                0 |
 | 02-services-agreement-redlined |         98 |      1 | comment reference marks 4 |                0 |
-| 03-offer-letter-template       |         14 |      0 | none                      |                0 |
+| 03-offer-letter-template       |         14 |      0 | content controls 3        |                0 |
 | 04-board-report                |         59 |      1 | none                      |                0 |
 | 05-business-letter             |         17 |      0 | none                      |                0 |
 | 06-price-schedule              |        202 |      2 | none                      |                0 |
@@ -151,7 +151,7 @@ opaque is counted in those parts too; paragraphs count the body's, those in tabl
 | 08-newsletter                  |         22 |      0 | none                      |                0 |
 | 09-pump-test-memo              |         15 |      0 | none                      |                0 |
 
-Comment reference marks have nothing to show. The tests check every imported paragraph's text
+Comment reference marks have nothing to show. The content controls are those that show their placeholder (kept verbatim until 11.9). The tests check every imported paragraph's text
 against Word's (`reference/word/`), table cells included (a cell a vertical merge covers has none in
 Word's list: 06 counts 32 of them).
 

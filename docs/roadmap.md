@@ -1152,9 +1152,10 @@ Each task is a PR on `phase-11/sections-fields`, the build green after each.
   reported; harness as in 11.4. (Done: fields as markers with their codes, `w:fldSimple` written
   back as one; controls at run, block, row and cell level, nested, their properties in `controls`
   with `w:sdtPr` kept; `scripts/corpus/field-roundtrip.mjs` has Word read them, unchanged and with
-  a field's result, a control's text and a control split in two. A control's properties changing
-  is refused until 11.9. Bookmarks were modeled already. Until 11.8 a field's code range with a
-  nested field shows that field's result.)
+  a field's result, a control's text and a control split in two. Controls that are bound, show
+  their placeholder or lock their content stay verbatim until 11.9 honours that, and a control's
+  properties changing is refused until then. Bookmarks were modeled already. Until 11.8 a field's
+  code range with a nested field shows that field's result.)
 - [ ] 11.6 Sections on pages and their editing: columns (equal and set widths, the line between
   them, column breaks), continuous sections, even and odd page sections with Word's blank page;
   insert and remove section breaks, page setup per section (size, orientation, margins,

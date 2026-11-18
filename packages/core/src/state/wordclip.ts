@@ -387,6 +387,8 @@ function fit(
   const leftOut = new Set<number>();
 
   const mapNode = (node: NodeJSON): NodeJSON | null => {
+    // Their definitions are the source document's: the content comes without them (ADR-0007).
+    if (["controlStart", "controlEnd", "noteReference"].includes(node.type)) return null;
     const attrs = node.attrs as Json | undefined;
     let next: Json | undefined = attrs;
     if (node.type === "paragraph" && attrs) {
@@ -419,6 +421,10 @@ function fit(
       if (leftOut.has(id)) return null;
       if (node.type === "bookmarkStart") names.add(String(attrs?.name));
       next = { ...attrs, id: fresh("bookmark", bookmarkIds, id) };
+    }
+    if (next?.controls) {
+      next = { ...next };
+      delete next.controls;
     }
     const marks = node.marks && runMarks(node.marks);
     const children = node.content
