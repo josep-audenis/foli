@@ -1103,7 +1103,7 @@ published.
 Each task is a PR on `phase-11/sections-fields`, the build green after each.
 
 - [x] Claim phase, branch `phase-11/sections-fields`
-- [ ] 11.1 ADR-0007, stories, fields and content controls in the model and on pages: headers,
+- [x] 11.1 ADR-0007, stories, fields and content controls in the model and on pages: headers,
   footers, footnotes and endnotes as stories (content trees of their own in the envelope,
   referenced by id from sections and note references; one editor state per story or one state
   with several roots, and what undo, selection, tracking and comments do across them); fields
@@ -1116,7 +1116,10 @@ Each task is a PR on `phase-11/sections-fields`, the build green after each.
   page; columns and column breaks; continuous sections), editing in place (focus moves between
   the body and a story, the body dimmed); `exportPdf`'s approach; schema v5 and its migration.
   Spike evidence for a header edited in place and a footnote moving pages as its reference
-  does, in three engines. The owner accepts it before 11.2.
+  does, in three engines. The owner accepts it before 11.2. (Done: spike passing in three
+  engines; the host is turned off while a story is edited, an editable island leaks select-all
+  and arrows. Accepted under the owner's instruction of 2026-11-18 to build the phase task by
+  task, each merged after an agent's review.)
 - [ ] 11.2 Corpus: Word-authored documents for what 01–07 lack (several sections with two and
   three columns, a column break, a continuous section, even and odd headers and footers, a
   section with headers not linked to the previous, endnotes, bookmarks with `REF` and
