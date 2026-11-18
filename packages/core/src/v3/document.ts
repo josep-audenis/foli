@@ -629,7 +629,7 @@ function wordRules(parent: Node, path: string, inCell: boolean, fragment = false
 }
 
 /** What a story may not hold (ADR-0007): import keeps such content opaque instead. */
-function storyRules(tree: Node, kind: StoryJSON["kind"], path: string): void {
+export function storyRules(tree: Node, kind: StoryJSON["kind"], path: string): void {
   tree.descendants((node) => {
     const name = node.type.name;
     if (node.attrs.section) fail(path, "a story cannot end a section");

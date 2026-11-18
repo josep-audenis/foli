@@ -75,12 +75,14 @@ writeFileSync(appEntry, `export { FoliEditor } from "${dist("react")}";\n`);
  * in 11.5 (52.7 kB): fields and content controls read and written. Core, view and React raised
  * in 11.6 (55.7, 68.8 and 95.7 kB): section commands, `EnvelopeStep` and tracked setups; columns,
  * bands and balancing in the flow and both renderers; the section menu and page setup dialog.
+ * Core and React raised in 11.7 (57.1 and 96.0 kB so far): story editors, `StoryStep`, the header
+ * and footer commands.
  */
 const BUNDLES = [
-  { name: "@folijs/core", entry: dist("core"), budget: 57_000 },
+  { name: "@folijs/core", entry: dist("core"), budget: 59_000 },
   { name: "@folijs/view", entry: dist("view"), budget: 70_500 },
-  { name: "@folijs/react", entry: dist("react"), budget: 98_000 },
-  { name: "FoliEditor only", entry: appEntry, budget: 98_000 },
+  { name: "@folijs/react", entry: dist("react"), budget: 100_000 },
+  { name: "FoliEditor only", entry: appEntry, budget: 100_000 },
   { name: "@folijs/docx", entry: dist("docx"), budget: 54_000 },
 ];
 

@@ -35,7 +35,7 @@ import { PARAGRAPH_PROPERTY_KEYS, RUN_PROPERTY_MARKS } from "../v3/schema.js";
 import { MARK_ATTRS } from "./mark.js";
 import { NodeSelection, Selection, TextSelection } from "./selection.js";
 import { type Command, type EditorState, Plugin, PluginKey, type Transaction } from "./state.js";
-import { wordContext } from "./word.js";
+import { otherTrees, wordContext } from "./word.js";
 
 /**
  * How tracked changes show: `markup` (inserted text underlined and deleted text struck through,
@@ -109,6 +109,10 @@ export function trackState(state: EditorState): TrackState | null {
   return key.getState(state) ?? null;
 }
 
+/** Makes `tr` set the tracking state (a story's editor passes its change to the body). */
+export const withTrackState = (tr: Transaction, state: TrackState): Transaction =>
+  tr.setMeta(key, state);
+
 /** Turns tracking on or off (and sets the author). Applies only to a schema v3 editor. */
 export function setTrackChanges(on: boolean, author?: string): Command {
   return (state, dispatch) => {
@@ -137,30 +141,35 @@ export function now(): string {
 const REVIEW_MARKS = new Set(["insertion", "deletion", "formatChange"]);
 
 /**
- * The largest change id in `doc`, the comments' content (marks, paragraph revisions) and the
- * sections' tracked setups (`last`: the envelope's section), or -1.
+ * The largest change id in the document's trees (the body and every story: ids are allocated
+ * across them), the comments' content (marks, paragraph revisions) and the sections' tracked
+ * setups, or -1.
  */
-function maxRevisionId(doc: Node, comments: readonly CommentJSON[], last?: SectionJSON): number {
+function maxRevisionId(state: EditorState): number {
+  const envelope = wordContext(state)?.envelope;
+  const comments: readonly CommentJSON[] = envelope?.comments ?? [];
+  const last: SectionJSON | undefined = envelope?.section;
   let max = -1;
   const see = (value: unknown) => {
     const id = (value as { id?: unknown } | null | undefined)?.id;
     if (typeof id === "number" && id > max) max = id;
   };
   see(last?.change);
-  doc.descendants((node) => {
-    for (const mark of node.marks) {
-      const name = mark.type.name;
-      if (REVIEW_MARKS.has(name)) see(mark.attrs);
-    }
-    if (node.isTextblock) {
-      const revision = node.attrs.revision as ParagraphRevision | null | undefined;
-      see(revision?.insertion);
-      see(revision?.deletion);
-      see(node.attrs.formatChange);
-      see((node.attrs.section as SectionJSON | null | undefined)?.change);
-    }
-    return true;
-  });
+  for (const doc of [state.doc, ...otherTrees(state)])
+    doc.descendants((node) => {
+      for (const mark of node.marks) {
+        const name = mark.type.name;
+        if (REVIEW_MARKS.has(name)) see(mark.attrs);
+      }
+      if (node.isTextblock) {
+        const revision = node.attrs.revision as ParagraphRevision | null | undefined;
+        see(revision?.insertion);
+        see(revision?.deletion);
+        see(node.attrs.formatChange);
+        see((node.attrs.section as SectionJSON | null | undefined)?.change);
+      }
+      return true;
+    });
   // Comments hold paragraphs too, which can carry changes (JSON: walked as it is).
   const walk = (value: unknown): void => {
     if (Array.isArray(value)) value.forEach(walk);
@@ -184,9 +193,7 @@ function maxRevisionId(doc: Node, comments: readonly CommentJSON[], last?: Secti
 export function newRevision(state: EditorState): Revision | null {
   const track = key.getState(state);
   if (!track?.on) return null;
-  const envelope = wordContext(state)?.envelope;
-  const id = maxRevisionId(state.doc, envelope?.comments ?? [], envelope?.section) + 1;
-  return { id, author: track.author, date: now() };
+  return { id: maxRevisionId(state) + 1, author: track.author, date: now() };
 }
 
 /** A replaced range: `a..b` before the transaction, `c..d` after it. */
@@ -276,13 +283,7 @@ function rebuild(
   const date = now();
   let nextId = -1;
   const newId = () => {
-    if (nextId < 0)
-      nextId =
-        maxRevisionId(
-          state.doc,
-          wordContext(state)?.envelope.comments ?? [],
-          wordContext(state)?.envelope.section,
-        ) + 1;
+    if (nextId < 0) nextId = maxRevisionId(state) + 1;
     return nextId++;
   };
   const at = (x: At, assoc: number) => out.mapping.slice(x.step).map(x.pos, assoc);

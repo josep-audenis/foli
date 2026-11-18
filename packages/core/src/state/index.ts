@@ -96,15 +96,24 @@ export {
   trackedChanges,
 } from "./review.js";
 export {
+  documentSections,
+  ensureStory,
   insertSectionBreak,
+  pageVariant,
   removeSectionBreak,
   type SectionAt,
   type SectionBreakKind,
   type SectionColumns,
   type SectionSetup,
+  type StorySide,
+  type StoryVariant,
   sectionAt,
   sectionColumns,
+  setDifferentEvenPages,
+  setDifferentFirstPage,
   setSectionSetup,
+  setStoryLinked,
+  storyOfSection,
 } from "./sections.js";
 export {
   AllSelection,
@@ -162,7 +171,10 @@ export {
 export {
   CommentStep,
   EnvelopeStep,
+  type Story,
+  StoryStep,
   setComments,
+  storyBody,
   type WordContext,
   type WordEnvelope,
   withEnvelope,
