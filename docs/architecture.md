@@ -161,9 +161,32 @@ Foli's own (see `THIRD_PARTY_NOTICES.md`).
     change and own attributes (`state/mark.ts`), so deleting a paragraph's mark merges its
     section into the next, as in Word.
   - Backspace and Delete step over the zero-width markers (bookmarks, comment ranges, comment
-    reference marks), which stay, and select opaque content (a field, a content control, a
-    table) instead of deleting it; the next key deletes the selection. A word deletion stops at
-    the inline node before or after it (a tab, a break, a marker, a field).
+    reference marks), which stay, and select opaque content (a table kept verbatim) instead
+    of deleting it; the next key deletes the selection. A word deletion stops at the inline node
+    before or after it (a tab, a break, a marker).
+  - Fields (`state/fields.ts`, ADR-0007) are markers paired by depth over a tree (`fieldsIn`,
+    cached per tree). A plugin keeps the selection to Word's rules after every transaction: a
+    caret never rests in what is hidden, a range with one end inside a field takes all of it, and
+    Backspace or Delete at a field's edge selects it first. Two positions with only markers
+    between them count as one place, as a browser reads them. `state/fieldupdate.ts` works results
+    out (`updateFields`) in stages, so what a result depends on comes first: fields inside codes,
+    values and `SEQ`, `REF` and `PAGEREF`, then tables of contents, which are built again only
+    when their lines or styles differ. The view passes its pages (`FieldLayout`); the page numbers
+    a rebuilt table moves are updated by a second pass joined to the same undo step
+    (`joinHistory`). Renderers ask `fieldDisplay` what to hide: hidden nodes stay in the editing
+    DOM inside `display: none`, as deleted text does in the simple views, so positions and the
+    read-back are unchanged.
+  - Content controls (`state/controls.ts`, ADR-0007): `controlsIn` pairs the inline markers and
+    joins the blocks, rows and cells listing an id, cached per tree. One plugin holds their rules:
+    its filter compares each control's content before and after a transaction (locks, what a kind
+    holds; undo passes), so no command needs to know them; `appendTransaction` leaves or restores
+    placeholders in the same undo step, keeps a text control's formatting even and settles the
+    selection (a placeholder selected whole, a range over an edge taking the control); a keymap gives
+    Backspace, Delete, Enter and Space Word's meaning at their edges. Properties change through
+    `EnvelopeStep("controls")`. In the view `word/controls.ts` draws frames on the pages after each
+    render, its own marked elements the read-back and the observer ignore, and opens the lists and
+    date picker outside the host; the two sides of a marker count as one place when the selection
+    is read.
   - Typed, inserted and pasted text never takes a tracked-change mark (`insertion`, `deletion`,
     `formatChange`) from the text around it (`typedMarks`; changes are recorded from Phase 9).
 

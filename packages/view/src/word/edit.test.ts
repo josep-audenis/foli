@@ -529,6 +529,33 @@ describe("WordRenderer", () => {
     return { renderer, doc: editor.state.doc };
   }
 
+  it("keeps what a field's code hides as leaves, out of sight", () => {
+    const { renderer, doc } = rendererOf(
+      p(
+        {},
+        { type: "fieldStart" },
+        { type: "fieldCode", attrs: { text: " IF " } },
+        { type: "fieldStart" },
+        { type: "fieldCode", attrs: { text: " X " } },
+        { type: "fieldSeparator" },
+        text("inner"),
+        { type: "fieldEnd" },
+        { type: "fieldSeparator" },
+        text("shown"),
+        { type: "fieldEnd" },
+      ),
+    );
+    const { dom, leaves } = renderer.render(doc.child(0), 0);
+    const inner = leaves.find((l) => l.dom.textContent === "inner");
+    expect(inner?.offset).toBe(5);
+    expect(inner?.dom.parentElement?.parentElement?.style.display).toBe("none");
+    // The read-back still finds every position's text; nothing else of it is drawn.
+    expect(dom.textContent).toBe("innershown");
+    expect(
+      leaves.find((l) => l.dom.textContent === "shown")?.dom.parentElement?.style.display,
+    ).toBe("");
+  });
+
   it("splits a paragraph into fragments at content offsets", () => {
     const { renderer, doc } = rendererOf(
       p({ ...numbered, justification: "both", indent: { firstLine: 720 } }, text("abcdef")),

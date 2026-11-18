@@ -73,6 +73,48 @@ function documentOf(content: NodeJSON[], over: Partial<FoliDocument> = {}): Foli
 const render = (content: NodeJSON[], options?: Parameters<typeof renderBlocks>[2]) =>
   renderBlocks(documentOf(content), document, options);
 
+describe("fields", () => {
+  const code = (value: string): NodeJSON => ({ type: "fieldCode", attrs: { text: value } });
+  const start: NodeJSON = { type: "fieldStart" };
+  const separator: NodeJSON = { type: "fieldSeparator" };
+  const end: NodeJSON = { type: "fieldEnd" };
+  const nested = [
+    p(
+      {},
+      text("a "),
+      start,
+      code(" IF "),
+      start,
+      code(" X "),
+      separator,
+      text("inner"),
+      end,
+      code(" y "),
+      separator,
+      text("result"),
+      end,
+    ),
+    p({}, start, code(" TOC "), separator, text("first")),
+    p({}, text("second")),
+    p({}, end, text("after")),
+  ];
+
+  it("show their results: what is in a code range never shows", () => {
+    const blocks = render(nested);
+    expect(blocks[0]?.element.textContent).toBe("a result");
+    expect(blocks[1]?.element.textContent).toBe("first");
+  });
+
+  it("with `fieldCodes` show their codes in braces, results and whole paragraphs gone", () => {
+    const blocks = render(nested, { fieldCodes: true });
+    expect(blocks[0]?.element.textContent).toBe("a { IF { X } y }");
+    expect(blocks[1]?.element.textContent).toBe("{ TOC }");
+    expect(blocks[2]?.element.style.display).toBe("none");
+    expect(blocks[2]?.after).toBe(0);
+    expect(blocks[3]?.element.textContent).toBe("after");
+  });
+});
+
 describe("fontStack", () => {
   it("names the font, its metric-compatible substitutes and a generic family", () => {
     expect(fontStack("Calibri")).toBe('"Calibri", "Carlito", sans-serif');

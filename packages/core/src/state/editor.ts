@@ -37,6 +37,16 @@ import {
   replyToComment,
   resolveComment,
 } from "./comments.js";
+import {
+  type ControlValue,
+  type ControlValueInput,
+  controlsIn,
+  controlsPlugin,
+  controlValues,
+  setControlValue,
+} from "./controls.js";
+import { fieldsPlugin } from "./fields.js";
+import type { FieldLayout, FieldsReport, UpdateFieldsOptions } from "./fieldupdate.js";
 import { setAlign, setHighlight, setTextColor } from "./format.js";
 import { history, redo, undo } from "./history.js";
 import { removeLink, setLink } from "./links.js";
@@ -63,7 +73,7 @@ import {
   trackState,
   trackTransaction,
 } from "./track.js";
-import { type WordContext, type WordEnvelope, wordContext, wordPlugin } from "./word.js";
+import { storyBody, type WordContext, type WordEnvelope, wordContext, wordPlugin } from "./word.js";
 import type { ListKind } from "./wordformat.js";
 
 /**
@@ -105,6 +115,13 @@ export interface StoryView {
   /** Opens the header or footer of a page (default: the selection's). Whether it is open now. */
   edit(side: StorySide, page?: number): boolean;
   close(): void;
+  /** The pages as last laid out, for fields; null when there are none. */
+  readonly fieldLayout: FieldLayout | null;
+  /**
+   * Updates fields with the pages in view (of the body, or of `editor`, a story's), again when
+   * that moved them. One undo step.
+   */
+  updateFields(options?: UpdateFieldsOptions, editor?: Editor): FieldsReport;
 }
 
 /** A headless editor: state, commands, history and change notifications, no DOM. */
@@ -188,7 +205,14 @@ export interface Editor {
     deleteComment(id: number): boolean;
     /** Deletes every comment. */
     deleteAllComments(): boolean;
+    /**
+     * Fills the content controls with this id or tag, here and in the stories (from the body's
+     * editor): one undo step, tracked when tracking is on. False when none could take it.
+     */
+    setControlValue(target: string, value: ControlValueInput): boolean;
   };
+  /** The content controls' values, the stories' after the body's (from the body's editor). */
+  controlValues(): ControlValue[];
   /** Whether edits are recorded as tracked changes. */
   readonly trackingChanges: boolean;
   isMarkActive(type: string): boolean;
@@ -259,7 +283,20 @@ interface EditorParts {
 function makeEditor(parts: EditorParts): Editor {
   const { dispatch } = parts;
   const run = (command: Command) => command(parts.state(), dispatch);
-  return {
+  /** This editor and, from the body's, those of the stories holding controls. */
+  const withStories = (): { editor: Editor; story?: string }[] => {
+    const state = parts.state();
+    const context = storyBody(state) ? null : wordContext(state);
+    const held = [...(context?.stories ?? [])].filter(([, s]) => controlsIn(s.doc).length);
+    return [
+      { editor: self },
+      ...held.flatMap(([story]) => {
+        const editor = parts.story(story);
+        return editor ? [{ editor, story }] : [];
+      }),
+    ];
+  };
+  const self: Editor = {
     get settings() {
       return parts.settings();
     },
@@ -320,7 +357,17 @@ function makeEditor(parts: EditorParts): Editor {
       resolveComment: (id, done) => run(resolveComment(id, done)),
       deleteComment: (id) => run(deleteComment(id)),
       deleteAllComments: () => run(deleteAllComments),
+      setControlValue(target, value) {
+        let done = false;
+        for (const { editor } of withStories())
+          if (editor.run(setControlValue(target, value, done))) done = true;
+        return done;
+      },
     },
+    controlValues: () =>
+      withStories().flatMap(({ editor, story }) =>
+        controlValues(editor.state).map((value) => (story ? { ...value, story } : value)),
+      ),
     get trackingChanges() {
       return trackState(parts.state())?.on ?? false;
     },
@@ -337,6 +384,7 @@ function makeEditor(parts: EditorParts): Editor {
     },
     storyChanged: parts.storyChanged,
   };
+  return self;
 }
 
 export function createEditor({
@@ -353,6 +401,8 @@ export function createEditor({
     history(),
     wordPlugin(envelope),
     trackPlugin(track),
+    fieldsPlugin(),
+    controlsPlugin(),
     commentsPlugin(),
     tableKeymap(),
     listKeymap(),
@@ -407,6 +457,8 @@ export function createEditor({
         ...plugins,
         wordPlugin(context.envelope, context),
         trackPlugin(value ?? track),
+        fieldsPlugin(),
+        controlsPlugin(),
         commentsPlugin(),
         tableKeymap(),
         listKeymap(),

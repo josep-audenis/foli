@@ -14,6 +14,9 @@
  * - From another document, a style or list the copy does not define is not one: the text is in
  *   the default style, not numbered (not the target's style or list of that id).
  * - Paragraph ids (`w14:paraId`, `w14:textId`) are left out: export makes the ones it needs.
+ * - A content control copied inside its document is a new control with the same properties while
+ *   the original stays (cut and pasted, it is the same one). From elsewhere its content comes
+ *   without it.
  *
  * shortcut: ids inside opaque content (a table's bookmarks and paragraph ids) and tracked-change
  * ids are pasted as they are; Word tolerates repeats of both. Map them when a file shows otherwise.
@@ -24,6 +27,7 @@ import { type DocJSON, isSafeLink } from "../schema.js";
 import {
   type AbstractNumberingJSON,
   type CommentJSON,
+  type ControlJSON,
   migrateToV4,
   migrateToV5,
   type NumberingInstanceJSON,
@@ -36,6 +40,7 @@ import {
 } from "../v3/document.js";
 import { migrateToV3 } from "../v3/migrate.js";
 import { Resolver } from "../v3/resolve.js";
+import { controlsIn, copiedControl, freshControlId } from "./controls.js";
 import type { EditorState } from "./state.js";
 import { otherTrees, storyBody, type WordContext, type WordEnvelope, wordContext } from "./word.js";
 import { builtinStyle, levels } from "./wordformat.js";
@@ -240,6 +245,45 @@ export function fitPaste(
 }
 
 /**
+ * Adds to `out` the field and inline control markers of `nodes` without partners (ADR-0007): a
+ * field that lost its end loses its start and code too, so the code never becomes text. What they
+ * held stays. `open` carries what is open from one node to the next.
+ */
+function unpairedMarkers(
+  nodes: readonly NodeJSON[],
+  out: Set<NodeJSON>,
+  open: {
+    fields: { parts: NodeJSON[]; separated: boolean }[];
+    controls: Map<unknown, NodeJSON[]>;
+  } = { fields: [], controls: new Map() },
+  top = true,
+): void {
+  for (const node of nodes) {
+    const field = open.fields[open.fields.length - 1];
+    const id = node.attrs?.id;
+    if (node.type === "fieldStart") open.fields.push({ parts: [node], separated: false });
+    else if (node.type === "fieldCode") {
+      if (field && !field.separated) field.parts.push(node);
+      else out.add(node);
+    } else if (node.type === "fieldSeparator") {
+      if (field && !field.separated) {
+        field.parts.push(node);
+        field.separated = true;
+      } else out.add(node);
+    } else if (node.type === "fieldEnd") {
+      if (!open.fields.pop()) out.add(node);
+    } else if (node.type === "controlStart")
+      open.controls.set(id, [...(open.controls.get(id) ?? []), node]);
+    else if (node.type === "controlEnd") {
+      if (!open.controls.get(id)?.pop()) out.add(node);
+    } else if (node.content) unpairedMarkers(node.content, out, open, false);
+  }
+  if (!top) return;
+  for (const { parts } of open.fields) for (const part of parts) out.add(part);
+  for (const starts of open.controls.values()) for (const start of starts) out.add(start);
+}
+
+/**
  * `fitPaste` on validated input. `same`: the content is the target document's own (its lists go
  * on, and an id the definitions lack is kept; from elsewhere it names nothing).
  */
@@ -392,8 +436,24 @@ function fit(
   const bookmarkIds = new Map<number, number>();
   const leftOut = new Set<number>();
 
-  const hasControl = (id: unknown) =>
-    same && typeof id === "string" && Object.hasOwn(target.controls ?? {}, id);
+  // Controls that stay in the document: what is pasted of them is a copy, under a new id.
+  let controls = target.controls;
+  const staying = new Set<string>();
+  for (const range of controlsIn(state.doc))
+    if (range.from < from || range.to > to) staying.add(range.id);
+  for (const tree of otherTrees(state)) for (const range of controlsIn(tree)) staying.add(range.id);
+  const copiedControls = new Map<string, string>();
+  const mapControl = (id: unknown): string | null => {
+    if (!same || typeof id !== "string" || !Object.hasOwn(target.controls ?? {}, id)) return null;
+    if (!staying.has(id)) return id;
+    let copy = copiedControls.get(id);
+    if (!copy) {
+      copy = freshControlId(controls);
+      copiedControls.set(id, copy);
+      controls = { ...controls, [copy]: copiedControl(target.controls?.[id] as ControlJSON) };
+    }
+    return copy;
+  };
   // A note has one reference: one still in the document keeps it (cut and paste moves it).
   const referredTo = new Set<string>();
   state.doc.descendants((node, pos) => {
@@ -403,15 +463,23 @@ function fit(
   const noteAvailable = (story: string) =>
     same && Object.hasOwn(target.stories ?? {}, story) && !referredTo.has(story);
 
+  // Half a field or control from elsewhere: its markers go, what it held stays.
+  const unpaired = new Set<NodeJSON>();
+  unpairedMarkers([json], unpaired);
+  for (const comment of source.comments) unpairedMarkers(comment.content, unpaired);
+
   const mapNode = (node: NodeJSON): NodeJSON | null => {
+    if (unpaired.has(node)) return null;
     const attrs = node.attrs as Json | undefined;
     if (inStory && (COMMENT_ANCHORS.has(node.type) || node.type === "noteReference")) return null;
-    // From another document their definitions are not here: the content comes without them.
-    if ((node.type === "controlStart" || node.type === "controlEnd") && !hasControl(attrs?.id))
-      return null;
     if (node.type === "noteReference" && !noteAvailable(String(attrs?.story))) return null;
     let next: Json | undefined = attrs;
-    if (node.type === "paragraph" && attrs) {
+    if (node.type === "controlStart" || node.type === "controlEnd") {
+      // From another document their definitions are not here: the content comes without them.
+      const id = mapControl(attrs?.id);
+      if (!id) return null;
+      next = { ...attrs, id };
+    } else if (node.type === "paragraph" && attrs) {
       next = paragraphProperties(attrs as ParagraphPropertiesJSON) as Json;
       const change = attrs.formatChange as { previous: ParagraphPropertiesJSON } | null | undefined;
       if (change) next.formatChange = { ...change, previous: paragraphProperties(change.previous) };
@@ -447,9 +515,9 @@ function fit(
       delete next.section;
     }
     if (next?.controls) {
-      const controls = (next.controls as string[]).filter(hasControl);
+      const ids = (next.controls as string[]).flatMap((id) => mapControl(id) ?? []);
       next = { ...next };
-      if (controls.length) next.controls = controls;
+      if (ids.length) next.controls = ids;
       else delete next.controls;
     }
     const marks = node.marks && runMarks(node.marks);
@@ -464,7 +532,24 @@ function fit(
     } as NodeJSON;
   };
 
-  const doc = parseContent(mapNode(json), "content", true);
+  // Pasted into a block control, the new paragraphs are in it as the one at the caret is.
+  const around = (
+    from === to || state.selection.$from.parent === state.selection.$to.parent
+      ? state.selection.$from.parent.attrs.controls
+      : null
+  ) as string[] | null | undefined;
+  const mapped = mapNode(json) as NodeJSON;
+  const inPlace = around?.length
+    ? {
+        ...mapped,
+        content: mapped.content?.map((block) => {
+          const attrs = block.attrs as Json | undefined;
+          const own = (attrs?.controls as string[] | undefined) ?? [];
+          return { ...block, attrs: { ...attrs, controls: [...around, ...own] } };
+        }),
+      }
+    : mapped;
+  const doc = parseContent(inPlace, "content", true);
   let comments = target.comments;
   const copiedComments = source.comments.filter((c) => commentIds.has(c.id));
   if (copiedComments.length) {
@@ -487,11 +572,18 @@ function fit(
     styles !== target.styles ||
     abstracts !== target.numbering.abstracts ||
     instances !== target.numbering.instances ||
-    comments !== target.comments;
+    comments !== target.comments ||
+    controls !== target.controls;
   return {
     doc,
     envelope: changed
-      ? { ...target, styles, numbering: { abstracts, instances }, comments }
+      ? {
+          ...target,
+          styles,
+          numbering: { abstracts, instances },
+          comments,
+          ...(controls ? { controls } : {}),
+        }
       : target,
   };
 }
