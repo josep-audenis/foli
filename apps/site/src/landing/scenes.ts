@@ -1,4 +1,4 @@
-import { onFirstView, reducedMotion, wait } from "./words.js";
+import { reducedMotion, wait, whileInView } from "./words.js";
 
 const EASE = "cubic-bezier(0.23, 1, 0.32, 1)";
 
@@ -37,7 +37,7 @@ export function mountTable(root: HTMLElement): void {
   const GAP = 20;
   const HEAD = 28;
   const INTRO = 62;
-  const state = { rows: 16, repeat: true };
+  const state = { rows: 9 };
   const pages: HTMLElement[] = [];
   const heads: HTMLElement[] = [];
 
@@ -70,7 +70,7 @@ export function mountTable(root: HTMLElement): void {
       const height = ITEMS[i]?.[2] ?? 34;
       if (y + height > bottom) {
         page++;
-        y = MARGIN + (state.repeat ? HEAD : 0);
+        y = MARGIN + HEAD;
       }
       spots.push({ page, y });
       y += height;
@@ -100,7 +100,7 @@ export function mountTable(root: HTMLElement): void {
       sheet.style.transform = `translate3d(${x(i)}px,${top(i)}px,0)`;
     });
     heads.forEach((head, i) => {
-      head.classList.toggle("is-off", i >= count || (i > 0 && !state.repeat));
+      head.classList.toggle("is-off", i >= count);
       head.classList.toggle("is-repeated", i > 0);
       const headY = i === 0 ? MARGIN + INTRO - 20 : MARGIN;
       head.style.transform = `translate3d(${x(i) + MARGIN}px,${top(i) + headY}px,0)`;
@@ -117,41 +117,59 @@ export function mountTable(root: HTMLElement): void {
     canvas.style.width = `${total}px`;
     canvas.style.transform = `scale(${scale})`;
     if (view) view.style.height = `${(lines * HEIGHT + (lines - 1) * GAP) * scale}px`;
-    const rowsOut = out("rows");
-    if (rowsOut) rowsOut.textContent = String(state.rows);
     const pagesOut = out("table-pages");
-    if (pagesOut) {
-      pagesOut.textContent = `${state.rows} rows on ${count} ${count === 1 ? "page" : "pages"}.`;
-    }
-    // aria-disabled, not disabled: the button keeps the keyboard focus at either limit.
-    root.querySelector('[data-rows="-1"]')?.setAttribute("aria-disabled", String(state.rows <= 3));
-    root
-      .querySelector('[data-rows="1"]')
-      ?.setAttribute("aria-disabled", String(state.rows >= ITEMS.length));
+    if (pagesOut) pagesOut.textContent = count === 1 ? "One page." : `${count} pages.`;
+    add?.classList.toggle("is-done", state.rows >= ITEMS.length);
+    if (add) add.textContent = state.rows >= ITEMS.length ? "Start over" : "Add a row";
   }
 
-  for (const button of root.querySelectorAll<HTMLButtonElement>("[data-rows]")) {
-    button.addEventListener("click", () => {
-      state.rows = Math.min(ITEMS.length, Math.max(3, state.rows + Number(button.dataset.rows)));
-      layout();
-    });
-  }
-  root.querySelector("[data-repeat]")?.addEventListener("click", (event) => {
-    state.repeat = !state.repeat;
-    (event.currentTarget as HTMLElement).setAttribute("aria-pressed", String(state.repeat));
+  const add = root.querySelector<HTMLButtonElement>("[data-add-row]");
+  let touched = false;
+  add?.addEventListener("click", () => {
+    touched = true;
+    state.rows = state.rows >= ITEMS.length ? 9 : state.rows + 1;
     layout();
   });
   layout();
   new ResizeObserver(layout).observe(view);
+
+  // The table grows across the page break each time you come back to it.
+  if (reducedMotion()) {
+    state.rows = 16;
+    layout();
+    return;
+  }
+  let growth = 0;
+  whileInView(
+    view,
+    async () => {
+      const id = ++growth;
+      touched = false;
+      state.rows = 9;
+      layout();
+      await wait(350);
+      while (id === growth && !touched && state.rows < 16) {
+        state.rows++;
+        layout();
+        await wait(190);
+      }
+    },
+    () => {
+      growth++;
+    },
+  );
 }
 
-/** Figure 4: a package going through Foli. Which parts are written follows `exportDocx`. */
+/** Figure 1: a package going through Foli. Which parts are written follows `exportDocx`. */
 export function mountRoundTrip(root: HTMLElement): void {
-  const run = root.querySelector<HTMLButtonElement>("[data-run]");
-  const stage = root.querySelector<HTMLElement>("[data-rt]");
-  const value = root.querySelector<HTMLElement>("[data-value]");
+  const foundRun = root.querySelector<HTMLButtonElement>("[data-run]");
+  const foundStage = root.querySelector<HTMLElement>("[data-rt]");
+  const foundValue = root.querySelector<HTMLElement>("[data-value]");
   const status = root.querySelector<HTMLElement>("[data-rt-status]");
-  if (!run || !stage || !value) return;
+  if (!foundRun || !foundStage || !foundValue) return;
+  const run: HTMLButtonElement = foundRun;
+  const stage: HTMLElement = foundStage;
+  const value: HTMLElement = foundValue;
   const inputs = [...root.querySelectorAll<HTMLElement>("[data-in] li")];
   const outputs = [...root.querySelectorAll<HTMLElement>("[data-out-list] li")];
   let running = false;
@@ -163,8 +181,7 @@ export function mountRoundTrip(root: HTMLElement): void {
   svg.setAttribute("aria-hidden", "true");
   let routes: string[] = [];
   function wires(): void {
-    const box = stage?.getBoundingClientRect();
-    if (!box) return;
+    const box = stage.getBoundingClientRect();
     routes = inputs.map((row, index) => {
       const target = outputs[index];
       if (!target) return "";
@@ -190,7 +207,7 @@ export function mountRoundTrip(root: HTMLElement): void {
   new ResizeObserver(wires).observe(stage);
   document.fonts?.ready.then(wires);
 
-  run.addEventListener("click", async () => {
+  async function go(): Promise<void> {
     if (running) return;
     running = true;
     run.setAttribute("aria-disabled", "true");
@@ -239,9 +256,12 @@ export function mountRoundTrip(root: HTMLElement): void {
     root.classList.add("is-done");
     run.textContent = "Run it again";
     run.removeAttribute("aria-disabled");
-    if (status) status.textContent = "Saved. One part rewritten, eight copied byte for byte.";
+    if (status) status.textContent = "Saved. Foli rewrote one part and copied the other eight.";
     running = false;
-  });
+  }
+
+  run.addEventListener("click", go);
+  if (!reducedMotion()) whileInView(stage, () => void go());
 }
 
 /** Figure 5: one keystroke through the engine, in the order `docs/architecture.md` gives. */
@@ -306,39 +326,28 @@ export function mountKeystroke(root: HTMLElement): void {
     byHand();
   });
 
-  // It types its own sentence once, until the reader takes over.
+  // It types its sentence each time you come back, until you take over.
   if (reducedMotion()) return;
-  onFirstView(root, async () => {
-    await wait(350);
-    while (!touched && length < sentence.length) {
-      press();
-      await wait(sentence[length - 1] === " " ? 170 : 105);
-    }
-  });
-}
-
-/** Word-style line numbers beside a listing; a line holding an insertion gets a change bar. */
-export function mountListings(): void {
-  for (const pre of document.querySelectorAll<HTMLElement>("pre[data-lines]")) {
-    const lines = (pre.textContent ?? "").replace(/\n$/, "").split("\n");
-    const inserted = pre.querySelector("ins");
-    let changed = -1;
-    if (inserted) {
-      const range = document.createRange();
-      range.setStart(pre, 0);
-      range.setEndBefore(inserted);
-      changed = range.toString().split("\n").length - 1;
-    }
-    const gutter = document.createElement("div");
-    gutter.className = "listing-lines";
-    gutter.setAttribute("aria-hidden", "true");
-    lines.forEach((_, index) => {
-      const number = gutter.appendChild(document.createElement("span"));
-      number.textContent = String(index + 1);
-      number.classList.toggle("is-changed", index === changed);
-    });
-    pre.before(gutter);
-  }
+  let typing = 0;
+  whileInView(
+    root.querySelector(".ks") ?? root,
+    async () => {
+      const id = ++typing;
+      touched = false;
+      length = 0;
+      output.setAttribute("aria-live", "off");
+      output.textContent = "";
+      showNext();
+      await wait(350);
+      while (id === typing && !touched && length < sentence.length) {
+        press();
+        await wait(sentence[length - 1] === " " ? 170 : 105);
+      }
+    },
+    () => {
+      typing++;
+    },
+  );
 }
 
 export function mountCopy(): void {

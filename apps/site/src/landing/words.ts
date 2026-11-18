@@ -117,19 +117,24 @@ export class WordLayer {
   }
 }
 
-/** Runs `start` once, when `element` first comes into view. */
-export function onFirstView(element: Element, start: () => void): void {
-  const observer = new IntersectionObserver(
-    (entries) => {
-      if (entries.some((entry) => entry.isIntersecting)) {
-        observer.disconnect();
-        start();
-      }
-    },
-    { threshold: 0.35 },
-  );
-  observer.observe(element);
-}
-
 export const wait = (ms: number): Promise<void> =>
   new Promise((resolve) => setTimeout(resolve, ms));
+
+/** Runs `enter` each time `element` comes into view and `leave` each time it goes. */
+export function whileInView(
+  element: Element,
+  enter: () => void,
+  leave: () => void = () => {},
+): void {
+  let inside = false;
+  new IntersectionObserver(
+    (entries) => {
+      const now = entries.some((entry) => entry.isIntersecting);
+      if (now === inside) return;
+      inside = now;
+      if (now) enter();
+      else leave();
+    },
+    { threshold: 0.35 },
+  ).observe(element);
+}
