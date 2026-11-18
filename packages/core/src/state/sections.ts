@@ -519,9 +519,9 @@ export function setDifferentEvenPages(on: boolean): Command {
     if (!context || !!context.envelope.settings?.evenAndOddHeaders === on) return false;
     if (dispatch) {
       const { evenAndOddHeaders: _old, ...rest } = context.envelope.settings ?? {};
-      const settings = on ? { ...rest, evenAndOddHeaders: true } : rest;
+      // Said even when off: left out, export would keep what the file says.
       const tr = state.tr.setMeta(untracked, true).setMeta(closeHistory, true);
-      setEnvelopeValue(state, tr, "settings", Object.keys(settings).length ? settings : undefined);
+      setEnvelopeValue(state, tr, "settings", { ...rest, evenAndOddHeaders: on });
       dispatch(tr);
     }
     return true;

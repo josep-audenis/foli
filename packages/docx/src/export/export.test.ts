@@ -456,9 +456,6 @@ describe("exporting without a package", () => {
 describe("schema v5 content not written yet", () => {
   const base = createDocument();
   it("is refused, never dropped", async () => {
-    await expect(exportDocx({ ...base, settings: { evenAndOddHeaders: true } })).rejects.toThrow(
-      /settings cannot be exported/,
-    );
     await expect(
       exportDocx({
         ...base,

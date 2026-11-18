@@ -17,7 +17,7 @@ import {
 import { controlsUsed, noteIds, packageStories } from "../import/index.js";
 import { child, isW, REL, W } from "../import/ooxml.js";
 import { DocxError, type DocxPackage, type NewPart } from "../package.js";
-import { newSettingsXml, withTrackRevisions } from "../settings.js";
+import { newSettingsXml, withSettings, withTrackRevisions } from "../settings.js";
 import { parseXml, type XmlElement } from "../xml.js";
 import { deflateEntry, writeZip } from "../zip.js";
 import { balanced } from "./balance.js";
@@ -209,7 +209,6 @@ export async function exportDocx(
   options: ExportOptions = {},
 ): Promise<Uint8Array> {
   const doc = balanced(withThreadIds(parseDocument(document), original), original);
-  refuseNotYetWritten(doc);
   // Before the app is asked for any picture's bytes.
   const reference = original ? undefined : packageReference(doc);
   if (reference) {
@@ -297,11 +296,6 @@ function checkedPart(name: string, text: string): string {
     if (child.kind === "element" && child.prefix === "w" && child.ns !== W)
       throw new DocxError(`${name}: its w: prefix is not WordprocessingML`);
   return text;
-}
-
-/** Schema v5's document settings, until 11.7 writes them: never dropped. */
-function refuseNotYetWritten(doc: FoliDocument): void {
-  if (doc.settings) throw new DocxError("settings cannot be exported to .docx yet");
 }
 
 const PARA_ID = "w14:paraId";
@@ -554,13 +548,21 @@ async function intoPackage(
   }
 
   const { trackRevisions } = options;
-  if (trackRevisions !== undefined) {
+  const { settings } = doc;
+  if (trackRevisions !== undefined || settings) {
     part(
       REL.settings,
       "/word/settings.xml",
       CT.settings,
-      (o) => (o ? withTrackRevisions(o.source, o.root, trackRevisions) : newSettingsXml()),
-      trackRevisions,
+      (o) => {
+        if (!o) return newSettingsXml(trackRevisions, settings);
+        const source =
+          trackRevisions === undefined
+            ? o.source
+            : withTrackRevisions(o.source, o.root, trackRevisions);
+        return settings ? withSettings(source, parseXml(source).root, settings) : source;
+      },
+      !!trackRevisions || !!settings,
     );
   }
 
@@ -711,8 +713,13 @@ async function newPackage(
       );
     }
   }
-  if (options.trackRevisions)
-    add("/word/settings.xml", REL.settings, CT.settings, newSettingsXml());
+  if (options.trackRevisions || doc.settings)
+    add(
+      "/word/settings.xml",
+      REL.settings,
+      CT.settings,
+      newSettingsXml(!!options.trackRevisions, doc.settings),
+    );
   parts.push({
     name: "/word/_rels/document.xml.rels",
     text: rels.xml(undefined),
