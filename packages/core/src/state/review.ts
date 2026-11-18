@@ -15,7 +15,7 @@ import type { SectionJSON } from "../v3/document.js";
 import { RUN_PROPERTY_MARKS } from "../v3/schema.js";
 import { closeHistory } from "./history.js";
 import { MARK_ATTRS } from "./mark.js";
-import { absorbSection, resolveSectionChange } from "./sections.js";
+import { absorbSection, lastSection, resolveSectionChange } from "./sections.js";
 import { TextSelection } from "./selection.js";
 import type { Command, EditorState, Transaction } from "./state.js";
 import { keepTablesApart } from "./tables.js";
@@ -222,7 +222,12 @@ function resolve(
   const rowsGoing = new Map<number, [number, number][]>();
   /** Whether whole rows or paragraphs go: what lies inside them must not be removed again. */
   let wholes = false;
-  for (const change of changes) {
+  // Setups first: a section break that goes then hands the next section what is restored.
+  const ordered = [
+    ...changes.filter((c) => c.kind === "sectionFormatting"),
+    ...changes.filter((c) => c.kind !== "sectionFormatting"),
+  ];
+  for (const change of ordered) {
     const { kind, from, to } = change;
     const markType = schema.marks[kind === "formatting" ? "formatChange" : kind];
     switch (kind) {
@@ -273,10 +278,13 @@ function resolve(
             ...node.attrs,
             section: resolveSectionChange(own, accept),
           });
-        else {
-          const last = wordContext(state)?.envelope.section;
-          if (last) setEnvelopeValue(state, tr, "section", resolveSectionChange(last, accept));
-        }
+        else
+          setEnvelopeValue(
+            state,
+            tr,
+            "section",
+            resolveSectionChange(lastSection(state, tr), accept),
+          );
         break;
       }
       case "rowInsertion":
@@ -308,12 +316,16 @@ function resolve(
         const end = start + node.nodeSize;
         // A paragraph whose text goes too is removed whole: the next one stays as it is.
         const emptied = covered(node, start + 1, removed);
-        if (goes && tr.doc.resolve(end).nodeAfter?.isTextblock) {
-          joins.push({ pos: end, keepFirst: accept && !emptied });
-          // A section break that goes: the next section takes over.
-          const section = node.attrs.section as SectionJSON | null | undefined;
-          if (section) absorbSection(state, tr, section, end);
+        const joining = goes && !!tr.doc.resolve(end).nodeAfter?.isTextblock;
+        // A section break that goes: the next section takes over. Without a paragraph to join
+        // (a table follows) the mark stays, no longer ending a section.
+        const section = node.attrs.section as SectionJSON | null | undefined;
+        if (goes && section) {
+          absorbSection(state, tr, section, end);
+          if (!joining)
+            tr.setNodeMarkup(start, node.type, { ...node.attrs, revision: next, section: null });
         }
+        if (joining) joins.push({ pos: end, keepFirst: accept && !emptied });
         // Nothing to join with (a table follows, or a cell ends): an inserted paragraph left
         // empty goes whole when rejected (Word's rules are restored after: `keepTablesApart`).
         // (Never a cell's only paragraph: a cell ends with one.)

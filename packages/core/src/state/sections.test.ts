@@ -10,6 +10,7 @@ import {
   sectionColumns,
   setSectionSetup,
 } from "./sections.js";
+import { setTrackChanges } from "./track.js";
 import { setEnvelopeValue, wordContext } from "./word.js";
 
 const SETUP: SectionJSON = {
@@ -257,6 +258,63 @@ describe("setSectionSetup", () => {
     editor.commands.insertText("x");
     editor.run(setSectionSetup({ columns: { count: 3 } }));
     expect(editor.getDocument().section.change?.id).toBeGreaterThan(0);
+  });
+});
+
+describe("rejecting and accepting sections together", () => {
+  const START: SectionJSON = { ...SETUP, type: "oddPage" };
+
+  it("a tracked break, then a tracked setup of the last section: Reject All restores it", () => {
+    const editor = editorOf([p("Hello")], START, true);
+    editor.select(3);
+    editor.run(insertSectionBreak("continuous"));
+    editor.run(setSectionSetup({ columns: { count: 3 } }));
+    editor.run(rejectAllChanges());
+    expect(texts(editor)).toEqual(["Hello"]);
+    expect(editor.getDocument().section).toEqual(START);
+  });
+
+  it("a tracked setup, then a tracked break: Reject All restores the setup on both sides", () => {
+    const editor = editorOf([p("Hello")], START, true);
+    editor.select(3);
+    editor.run(setSectionSetup({ columns: { count: 3 } }));
+    editor.run(insertSectionBreak("continuous"));
+    const [first] = sectionsOf(editor);
+    const last = editor.getDocument().section;
+    // One record each, with ids of their own.
+    expect(first?.change?.previous.columns).toEqual(SETUP.columns);
+    expect(last.change?.previous.columns).toEqual(SETUP.columns);
+    expect(last.change?.id).not.toBe(first?.change?.id);
+    editor.run(rejectAllChanges());
+    expect(texts(editor)).toEqual(["Hello"]);
+    expect(editor.getDocument().section).toEqual(START);
+  });
+
+  it("carries a setup change to the later part when not tracking any more", () => {
+    const editor = editorOf([p("Hello")], START, true);
+    editor.select(3);
+    editor.run(setSectionSetup({ columns: { count: 3 } }));
+    editor.run(setTrackChanges(false));
+    editor.run(insertSectionBreak("continuous"));
+    const last = editor.getDocument().section;
+    expect(last.change?.id).toBeDefined();
+    expect(last.change?.id).not.toBe(sectionsOf(editor)[0]?.change?.id);
+  });
+
+  it("a tracked removal before a table, accepted: the break goes, the next section inherits", () => {
+    const cell = { type: "tableCell", content: [p("x")] };
+    const table = { type: "table", content: [{ type: "tableRow", content: [cell] }] };
+    const first: SectionJSON = { type: "oddPage", headers: { default: "rId2" } };
+    const editor = editorOf([p("ab", { section: first }), table, p("z")], {}, true);
+    editor.select(1);
+    editor.run(removeSectionBreak);
+    editor.run(acceptAllChanges());
+    expect(sectionsOf(editor)).toEqual([]);
+    expect(blocks(editor)[0]?.attrs?.revision).toBeUndefined();
+    expect(editor.getDocument().section).toEqual({
+      type: "oddPage",
+      headers: { default: "rId2" },
+    });
   });
 });
 

@@ -1031,7 +1031,10 @@ export class EditorView {
         const desc = blocks[item.unit] as WordBlockDesc;
         return wordBox(words, i, desc, measureOf(desc), () => lines(desc), own, atWidth);
       });
-      const result = flowFrom(boxes, contentHeight(this.editor.settings), WORD_RULES, reuse);
+      const rules = context.resolver.addsParagraphSpacing
+        ? { ...WORD_RULES, addSpacing: true }
+        : WORD_RULES;
+      const result = flowFrom(boxes, contentHeight(this.editor.settings), rules, reuse);
       this.flowed = { nodes, result };
       this.stale.clear();
       const flowed = result.fragments;
@@ -2309,6 +2312,19 @@ export class EditorView {
       }
       return;
     }
+    // Word's blank page before an even or odd page section holds nothing: the caret goes to the
+    // section after it (the browser would put it at the document's start).
+    const blank = event.target as HTMLElement;
+    if (!event.shiftKey && this.pages.includes(blank) && !blank.firstChild) {
+      const pos = this.posFromDOM(blank, 0);
+      if (pos !== null) {
+        event.preventDefault();
+        if (!this.hasFocus()) this.host.focus({ preventScroll: true });
+        this.dispatch(this.state.tr.setSelection(Selection.near(this.state.doc.resolve(pos))));
+        this.writeSelection(true);
+      }
+      return;
+    }
     const element = this.blockElement(event.target as Node | null);
     const owner = element ? this.owner.get(element) : undefined;
     const index = owner ? (this.indexOf.get(owner) ?? -1) : -1;
@@ -3175,12 +3191,18 @@ function wordBox(
   const keep = desc.word.keepLines && !hasBreak;
   const kept = keep && measure.height <= pageHeight;
   const bottoms = () => (kept ? [measure.height] : lines().bottoms);
-  // The line holding a break: the last one starting at or before it.
-  const lineOf = (leaf: LeafDesc) => {
-    const { starts } = lines();
-    let line = starts.length - 1;
-    while (line > 0 && (starts[line] as number) > leaf.offset) line--;
-    return line;
+  /** The block as it is in `column`, when the columns' widths differ. */
+  const inColumn = (column: number) =>
+    atWidth(desc, section.columns.widths[column] as number, keep);
+  // The line holding a break, among the column's lines: the last starting at or before it.
+  const linesOf = (leaves: readonly LeafDesc[], column = 0) => {
+    if (!leaves.length) return [];
+    const { starts } = section.unequal ? inColumn(column).all() : lines();
+    return leaves.map((leaf) => {
+      let line = starts.length - 1;
+      while (line > 0 && (starts[line] as number) > leaf.offset) line--;
+      return line;
+    });
   };
   return {
     height: measure.height,
@@ -3190,14 +3212,13 @@ function wordBox(
     pageHeight,
     section: section.flow,
     sectionMark: !!desc.node.attrs.section && desc.word.empty,
-    inColumn: section.unequal
-      ? (column) => atWidth(desc, section.columns.widths[column] as number, keep)
-      : undefined,
+    inColumn: section.unequal ? inColumn : undefined,
     lines: bottoms,
-    columnBreaksAfter: () => columnBreaks.map(lineOf),
-    breaksAfter: () => {
-      const breaks = pageBreaks.map(lineOf);
-      if (next?.word.pageBreakBefore) breaks.push(bottoms().length - 1);
+    columnBreaksAfter: (column) => linesOf(columnBreaks, column),
+    breaksAfter: (column = 0) => {
+      const breaks = linesOf(pageBreaks, column);
+      if (next?.word.pageBreakBefore)
+        breaks.push((section.unequal ? inColumn(column).lines() : bottoms()).length - 1);
       return breaks;
     },
   };

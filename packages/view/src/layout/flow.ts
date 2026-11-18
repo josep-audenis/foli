@@ -17,13 +17,16 @@ export interface BlockBox {
   /** Keep on the same page as the start of the next block (headings). */
   keepWithNext?: boolean;
   /** The lines that end with an explicit page break (indices into `lines()`), if any. */
-  breaksAfter?(): readonly number[];
+  breaksAfter?(column?: number): readonly number[];
   /** Height shown again at the top of each fragment after the first (a table's header rows). */
   repeat?: number;
   /** Splits at any of its line ends, without widow and orphan control (a table's rows). */
   anyLine?: boolean;
-  /** The lines that end with an explicit column break (indices into `lines()`), if any. */
-  columnBreaksAfter?(): readonly number[];
+  /**
+   * The lines that end with an explicit column break, if any: indices into the lines of column
+   * `column` (`inColumn`), as for `breaksAfter`.
+   */
+  columnBreaksAfter?(column?: number): readonly number[];
   /**
    * Content height of the pages this block goes on, when not the flow's. A block with another
    * page height than the one before it must start a page (an explicit break before it).
@@ -97,6 +100,11 @@ export interface FlowRules {
    * after the last block on a page need not fit.
    */
   spacing?: "css" | "word";
+  /**
+   * With `word` spacing: the two spaces add up instead (a document with Word's
+   * `w:doNotUseHTMLParagraphAutoSpacing`, in every compatibility mode).
+   */
+  addSpacing?: boolean;
 }
 
 export const DEFAULT_RULES: FlowRules = { orphans: 2, widows: 2 };
@@ -341,11 +349,13 @@ export function flowFrom(
     else if (breakBefore.has(index) && state.onPage) nextColumn(box);
     state.breakPending = false;
     state.columnPending = false;
+    const leadPage = state.page;
     const at = (fromLine: number, toLine: number): Fragment => {
       const fragment: Fragment = { page: state.page, fromLine, toLine };
       if (state.band) fragment.band = state.band;
       if (state.column) fragment.column = state.column;
-      if (lead !== undefined) fragment.lead = lead;
+      // Moved on to the next page, the block opens no band below anything.
+      if (lead !== undefined && state.page === leadPage) fragment.lead = lead;
       lead = undefined;
       return fragment;
     };
@@ -355,15 +365,18 @@ export function flowFrom(
     }
     const above = state.previousMargin;
     state.previousMargin = box.marginBottom;
+    const adding = word && rules.addSpacing === true;
     const gap = () => {
-      if (!state.onPage)
-        return word && !state.forcedPage ? 0 : Math.max(0, box.marginTop - state.lead);
-      return Math.max(above, box.marginTop);
+      if (!state.onPage) {
+        if (word && !state.forcedPage) return 0;
+        return adding ? box.marginTop : Math.max(0, box.marginTop - state.lead);
+      }
+      return adding ? above + box.marginTop : Math.max(above, box.marginTop);
     };
     // The bottom margin that must fit on the page (Word lets the space after hang).
     const below = word ? 0 : box.marginBottom;
-    const pageBreaks = box.breaksAfter?.() ?? [];
-    const columnBreaks = box.columnBreaksAfter?.() ?? [];
+    const pageBreaks = box.breaksAfter?.(state.column) ?? [];
+    const columnBreaks = box.columnBreaksAfter?.(state.column) ?? [];
     const forced = pageBreaks.length + columnBreaks.length > 0;
     let measured: Pick<BlockBox, "height" | "lines"> = box.inColumn?.(state.column) ?? box;
     if (!forced && state.used + gap() + measured.height + below <= room(box) + SLACK) {
@@ -375,27 +388,36 @@ export function flowFrom(
     }
     let lines = measured.lines();
     let count = lines.length;
-    const pageAfter = new Set(pageBreaks.filter((line) => line >= 0 && line < count));
-    const columnAfter = new Set(columnBreaks.filter((line) => line >= 0 && line < count));
+    const inRange = (list: readonly number[]) =>
+      new Set(list.filter((at) => at >= 0 && at < count));
+    let pageAfter = inRange(pageBreaks);
+    let columnAfter = inRange(columnBreaks);
     const fragments: Fragment[] = [];
     let line = 0;
+    /** The explicit breaks passed so far. */
+    let passed = 0;
     /** After a move: `measured` is the new column's, and `line` where the text has got to. */
-    const remeasure = () => {
+    const remeasure = (broken = false) => {
       if (!box.inColumn) return;
       const next = box.inColumn(state.column);
       if (next === measured) return;
       const nextLines = next.lines();
-      if (line > 0) {
-        // shortcut: the same share of the text is taken to start the same line in another
-        // width (a line either way); a word-exact tail needs the text in the flow's terms.
-        const share = (lines[line - 1] as number) / (measured.height || 1);
-        let mapped = nextLines.findIndex((bottom) => bottom / (next.height || 1) > share + 1e-6);
-        if (mapped < 0) mapped = nextLines.length - 1;
-        line = Math.max(mapped, 1);
-      }
+      // shortcut: the same share of the text is taken to start the same line in another
+      // width (a line either way); a word-exact tail needs the text in the flow's terms.
+      const share = line ? (lines[line - 1] as number) / (measured.height || 1) : 0;
       measured = next;
       lines = nextLines;
       count = lines.length;
+      // Breaks are lines of this width.
+      pageAfter = inRange(box.breaksAfter?.(state.column) ?? []);
+      columnAfter = inRange(box.columnBreaksAfter?.(state.column) ?? []);
+      if (line > 0) {
+        // After an explicit break the text goes on right after the same break.
+        const after = [...pageAfter, ...columnAfter].sort((a, b) => a - b)[passed - 1];
+        let mapped = lines.findIndex((bottom) => bottom / (next.height || 1) > share + 1e-6);
+        if (mapped < 0) mapped = count - 1;
+        line = broken && after !== undefined ? after + 1 : Math.max(mapped, 1);
+      }
       // Nothing left in this width (all of it fits one wider line): the last fragment ends it.
       if (line >= count) {
         const last = fragments.at(-1);
@@ -440,9 +462,10 @@ export function flowFrom(
       const pageBroken = pageAfter.has(end - 1);
       const columnBroken = columnAfter.has(end - 1);
       if (line < count) {
+        if (pageBroken || columnBroken) passed++;
         if (pageBroken) newPage();
         else nextColumn(box, columnBroken);
-        remeasure();
+        remeasure(pageBroken || columnBroken);
       } else if (pageBroken) state.breakPending = true;
       else if (columnBroken) state.columnPending = true;
     }
@@ -583,7 +606,8 @@ export function flowFrom(
       attempts.clear();
       for (const moved of breakBefore) if (moved >= first) breakBefore.delete(moved);
       run(first, end);
-      return state.page === page;
+      // The last column takes what it is given: a column over the limit is a failure too.
+      return state.page === page && Math.max(state.used, state.bandBottom) <= height + SLACK;
     };
     while (high - low > 0.5) {
       const middle = (low + high) / 2;

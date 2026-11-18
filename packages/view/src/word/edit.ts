@@ -38,6 +38,7 @@ import {
   parseOpaque,
   pictureElement,
   type ReviewView,
+  spaceAfter,
   styleParagraph,
   styleRun,
   tagOf,
@@ -330,7 +331,7 @@ export class WordRenderer {
       // fragment continued on the next page has none at the split.
       // shortcut: contextual spacing between paragraphs in a cell is not applied.
       dom.style.marginTop = `${word.before}px`;
-      (fragments[fragments.length - 1] as HTMLElement).style.marginBottom = `${word.after}px`;
+      spaceAfter(fragments[fragments.length - 1] as HTMLElement, word.after, resolver);
     }
     if (this.#clipboard) {
       // The flow places the spacing in the editor; elsewhere it is the paragraph's margins.
@@ -464,7 +465,8 @@ export function clipboardBlocks(
 
 /**
  * A block's space before and after next to its neighbours: Word ignores the space between
- * paragraphs of the same style that ask for it (contextual spacing).
+ * paragraphs of the same style that ask for it (contextual spacing). When only the first asks,
+ * its space after still eats into the second's space before.
  */
 export function spacing(
   above: WordInfo | undefined,
@@ -472,8 +474,10 @@ export function spacing(
   below: WordInfo | undefined,
 ): { before: number; after: number } {
   const same = (other: WordInfo | undefined) => other !== undefined && other.style === block.style;
-  return {
-    before: same(above) && block.contextual ? 0 : block.before,
-    after: same(below) && block.contextual ? 0 : block.after,
-  };
+  let { before } = block;
+  if (above && same(above)) {
+    if (block.contextual) before = 0;
+    else if (above.contextual) before = Math.max(0, block.before - above.after);
+  }
+  return { before, after: same(below) && block.contextual ? 0 : block.after };
 }

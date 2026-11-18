@@ -1,9 +1,21 @@
 /**
- * Word's document settings part (`settings.xml`): Foli reads and writes only
- * `w:trackRevisions` (whether Word records edits as tracked changes); the rest is kept verbatim.
+ * Word's document settings part (`settings.xml`): Foli reads and writes `w:trackRevisions`
+ * (whether Word records edits as tracked changes) and reads what `readSettings` models; the rest
+ * is kept verbatim.
  */
-import { isW, W } from "./import/ooxml.js";
+import type { WordSettingsJSON } from "@folijs/core";
+import { child, isW, toggle, W } from "./import/ooxml.js";
 import type { XmlElement } from "./xml.js";
+
+/**
+ * What the document's `settings` model holds of the part, undefined when nothing. 11.7 adds its
+ * keys here (even and odd headers, note properties) and stops `exportDocx` refusing them.
+ */
+export function readSettings(settings: XmlElement | undefined): WordSettingsJSON | undefined {
+  const compat = settings && child(settings, "compat");
+  const spacing = compat && child(compat, "doNotUseHTMLParagraphAutoSpacing");
+  return spacing && toggle(spacing) ? { doNotUseHTMLParagraphAutoSpacing: true } : undefined;
+}
 
 /** Whether `settings` (the `w:settings` root) turns tracked changes on. */
 export function trackRevisionsOf(settings: XmlElement | undefined): boolean {
@@ -69,7 +81,11 @@ export function withTrackRevisions(source: string, root: XmlElement, on: boolean
   return source.slice(0, root.openEnd) + element + source.slice(root.openEnd);
 }
 
-/** A new settings part with tracked changes on. */
-export function newSettingsXml(): string {
-  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\r\n<w:settings xmlns:w="${W}"><w:trackRevisions/></w:settings>`;
+/** A new settings part: with tracked changes on, and what `settings` says. */
+export function newSettingsXml(trackRevisions: boolean, settings?: WordSettingsJSON): string {
+  const track = trackRevisions ? "<w:trackRevisions/>" : "";
+  const compat = settings?.doNotUseHTMLParagraphAutoSpacing
+    ? "<w:compat><w:doNotUseHTMLParagraphAutoSpacing/></w:compat>"
+    : "";
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\r\n<w:settings xmlns:w="${W}">${track}${compat}</w:settings>`;
 }

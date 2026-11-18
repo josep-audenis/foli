@@ -184,9 +184,13 @@ function maxRevisionId(doc: Node, comments: readonly CommentJSON[], last?: Secti
 export function newRevision(state: EditorState): Revision | null {
   const track = key.getState(state);
   if (!track?.on) return null;
+  return { id: nextRevisionId(state), author: track.author, date: now() };
+}
+
+/** @internal The id after every change of the document in `state`. */
+export function nextRevisionId(state: EditorState): number {
   const envelope = wordContext(state)?.envelope;
-  const id = maxRevisionId(state.doc, envelope?.comments ?? [], envelope?.section) + 1;
-  return { id, author: track.author, date: now() };
+  return maxRevisionId(state.doc, envelope?.comments ?? [], envelope?.section) + 1;
 }
 
 /** A replaced range: `a..b` before the transaction, `c..d` after it. */

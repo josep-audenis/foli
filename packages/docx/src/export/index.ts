@@ -299,9 +299,13 @@ function checkedPart(name: string, text: string): string {
   return text;
 }
 
-/** Schema v5's document settings, until 11.7 writes them: never dropped. */
+/**
+ * Schema v5's document settings, until 11.7 writes them: never dropped. The spacing flag is read
+ * from the settings part, which an export over its package keeps as it is.
+ */
 function refuseNotYetWritten(doc: FoliDocument): void {
-  if (doc.settings) throw new DocxError("settings cannot be exported to .docx yet");
+  const { doNotUseHTMLParagraphAutoSpacing: _kept, ...rest } = doc.settings ?? {};
+  if (Object.keys(rest).length) throw new DocxError("settings cannot be exported to .docx yet");
 }
 
 const PARA_ID = "w14:paraId";
@@ -559,7 +563,10 @@ async function intoPackage(
       REL.settings,
       "/word/settings.xml",
       CT.settings,
-      (o) => (o ? withTrackRevisions(o.source, o.root, trackRevisions) : newSettingsXml()),
+      (o) =>
+        o
+          ? withTrackRevisions(o.source, o.root, trackRevisions)
+          : newSettingsXml(trackRevisions, doc.settings),
       trackRevisions,
     );
   }
@@ -711,8 +718,13 @@ async function newPackage(
       );
     }
   }
-  if (options.trackRevisions)
-    add("/word/settings.xml", REL.settings, CT.settings, newSettingsXml());
+  if (options.trackRevisions || doc.settings?.doNotUseHTMLParagraphAutoSpacing)
+    add(
+      "/word/settings.xml",
+      REL.settings,
+      CT.settings,
+      newSettingsXml(!!options.trackRevisions, doc.settings),
+    );
   parts.push({
     name: "/word/_rels/document.xml.rels",
     text: rels.xml(undefined),

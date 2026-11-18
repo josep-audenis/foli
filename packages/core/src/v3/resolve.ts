@@ -532,7 +532,7 @@ export function tableConditions(
   return out;
 }
 
-type Envelope = Pick<FoliDocument, "defaults" | "styles" | "numbering" | "theme">;
+type Envelope = Pick<FoliDocument, "defaults" | "styles" | "numbering" | "theme" | "settings">;
 
 interface Level {
   instance: NumberingInstanceJSON;
@@ -558,6 +558,11 @@ export class Resolver {
   readonly #abstracts = new Map<number, AbstractNumberingJSON>();
   #defaultTableStyle: string | undefined;
   readonly #layers = new Map<string, TableLayer>();
+
+  /** Whether a paragraph's space after and the next one's space before add up (else: the larger). */
+  get addsParagraphSpacing(): boolean {
+    return this.#envelope.settings?.doNotUseHTMLParagraphAutoSpacing === true;
+  }
 
   constructor(envelope: Envelope) {
     this.#envelope = envelope;

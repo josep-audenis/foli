@@ -555,6 +555,59 @@ describe("flow: sections and columns", () => {
     ]);
   });
 
+  it("adds the two spaces when the document says so", () => {
+    const ADD = { ...WORD, addSpacing: true };
+    const boxes = [box(30, 10, 20), box(30, 5, 20), box(20, 10, 0)];
+    // 10 + 30 | + (20 + 5) + 30 = 95 | + (20 + 10) + 20 = 145
+    expect(pagesOf(flow(boxes, 145, ADD))).toEqual([0, 0, 0]);
+    expect(pagesOf(flow(boxes, 144, ADD))).toEqual([0, 0, 1]);
+    expect(flowFrom(boxes, 145, ADD).gaps).toEqual([10, 25, 30]);
+    // The first block of a band: its space before comes on top of the space above the band.
+    const one = section();
+    const next = section({ start: "continuous" });
+    const banded = [inSection(one, box(10, 0, 20)), inSection(next, box(10, 8))];
+    expect(flowFrom(banded, 100, ADD).gaps[1]).toBe(8);
+    expect(flowFrom(banded, 100, WORD).gaps[1]).toBe(0);
+  });
+
+  it("keeps a balanced band's first column in use: a lone line is not left to the last", () => {
+    const two = section({ columns: 2, balanced: true });
+    const after = section({ start: "continuous" });
+    const result = flow([inSection(two, box(10)), inSection(after, box(10))], 100, WORD);
+    expect(result[0]).toEqual([{ page: 0, fromLine: 0, toLine: Infinity }]);
+  });
+
+  it("gives no lead to a band whose first block moved to the next page", () => {
+    const one = section();
+    const next = section({ start: "continuous" });
+    const blocks = [inSection(one, box(95, 0, 2)), inSection(next, box(20))];
+    const [first] = flow(blocks, 100, WORD)[1] as Fragment[];
+    expect(first?.page).toBe(1);
+    expect(first?.lead).toBeUndefined();
+  });
+
+  it("takes breaks at the lines of the column the block is in", () => {
+    const two = section({ columns: 2 });
+    const wide = { height: 20, lines: () => [10, 20] };
+    const narrow = { height: 40, lines: () => [10, 20, 30, 40] };
+    const asked: (number | undefined)[] = [];
+    const block: BlockBox = {
+      ...inSection(two, box(20)),
+      inColumn: (column) => (column ? narrow : wide),
+      columnBreaksAfter: (column) => {
+        asked.push(column);
+        return column ? [2] : [];
+      },
+    };
+    const result = flow([inSection(two, box(95)), block], 100, WORD);
+    // It starts in column 1 (no room in 0): three lines, then the break ends the column.
+    expect(asked).toContain(1);
+    expect(result[1]?.map((f) => [f.page, f.column ?? 0, f.toLine])).toEqual([
+      [0, 1, 3],
+      [1, 0, 2],
+    ]);
+  });
+
   it("flows the same incrementally as in full, balanced sections included", () => {
     const random = (seed: number) => () => {
       seed = (seed * 1664525 + 1013904223) >>> 0;
