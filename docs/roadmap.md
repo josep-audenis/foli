@@ -1204,10 +1204,21 @@ Each task is a PR on `phase-11/sections-fields`, the build green after each.
   `MERGEFORMAT` keeps the first run's look, not word by word; a multi-paragraph `REF` gets line
   breaks; table of contents entries are plain text; English date names; codes shown are not
   editable, no Shift+F9 or Ctrl+F9; the browser's own Print does not update fields.)
-- [ ] 11.9 Content controls: shown with their bounds, title and placeholder; plain and rich
+- [x] 11.9 Content controls: shown with their bounds, title and placeholder; plain and rich
   text edited inside (and only inside when locked), drop-down and combo box lists, date picker,
   check box, repeating sections kept; filled from the UI and through the API (by tag or id),
-  read back as data; keyboard-usable and axe-clean.
+  read back as data; keyboard-usable and axe-clean. (Done: every control modeled, 03 with none
+  opaque; a filter on what each transaction leaves enforces locks and what a kind holds, in stories
+  too; placeholders selected whole, replaced, brought back; `insertControl`, `setControlValue`,
+  `controlValues`, `setControlProperties`, `addRepeatingItem`; properties patched into the kept
+  `w:sdtPr`, new ones written whole; frames, titles, lists, date picker and check boxes in the view,
+  by keyboard too (Alt+Down, Space); a Controls menu and properties dialog.
+  `word-controls.spec.ts` in three engines, T1 to T3 in a rich text control;
+  `control-roundtrip.mjs` has Word read 8 files, every control as Foli holds it. Word's rules are
+  in ADR-0007. Shortcuts: a bound control's content is read-only, the binding not evaluated;
+  dates typed are not parsed and date names are English; `w:temporary` is kept but does not remove
+  the control when edited; a group control's fixed content is editable; no picture chosen for a
+  picture control; a list's or date's button is mouse-only, Alt+Down its keyboard way.)
 - [ ] 11.10 Footnotes and endnotes: insert a note (numbered in Word's formats, restarting per
   section or page where set), its text edited in place; footnotes laid out at their reference's
   page foot (separator, continuation to the next page), endnotes at the end of the document or

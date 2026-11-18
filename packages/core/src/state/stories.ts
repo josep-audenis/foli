@@ -8,7 +8,7 @@
 import { FoliDocumentError, type Node } from "../model/index.js";
 import type { StoryJSON } from "../v3/document.js";
 import { storyRules } from "../v3/document.js";
-import { closeHistory, type StoryEdit, storyEdit } from "./history.js";
+import { closeHistory, joinHistory, type StoryEdit, storyEdit } from "./history.js";
 import { Selection, type SelectionJSON } from "./selection.js";
 import { EditorState, Plugin, type Transaction } from "./state.js";
 import {
@@ -134,9 +134,16 @@ export class StoryEditing {
     }
     // Only these: the story's copy of the rest of the envelope may be behind the body's.
     if (patched) {
-      const { numbering, styles, resources } = (wordContext(next) as WordContext).envelope;
-      const { resources: _resources, ...rest } = bodyContext.envelope;
-      withEnvelope(bodyTr, { ...rest, numbering, styles, ...(resources ? { resources } : {}) });
+      const { numbering, styles, resources, controls } = (wordContext(next) as WordContext)
+        .envelope;
+      const { resources: _resources, controls: _controls, ...rest } = bodyContext.envelope;
+      withEnvelope(bodyTr, {
+        ...rest,
+        numbering,
+        styles,
+        ...(resources ? { resources } : {}),
+        ...(controls ? { controls } : {}),
+      });
     }
     const track = trackState(next);
     const trackChanged = !!track && track !== trackState(before);
@@ -147,6 +154,7 @@ export class StoryEditing {
       bodyTr.time = tracked.time;
       if (!tracked.addToHistory) bodyTr.setMeta("addToHistory", false);
       if (tracked.getMeta(closeHistory)) bodyTr.setMeta(closeHistory, true);
+      if (tracked.getMeta(joinHistory)) bodyTr.setMeta(joinHistory, true);
       this.own = true;
       try {
         host.dispatch(bodyTr);

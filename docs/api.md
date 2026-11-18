@@ -86,7 +86,7 @@ New comment (with `comments`: on the selection, written in the pane), Track chan
 previous and next change, Accept, Reject (the change at the caret or the selected ones),
 Accept all, Reject all ·
 undo, redo · Table (a menu), Table style (a box of the document's table styles and Word's Table
-Grid), Shading (a menu of light cell fills; both in a table, not while tracking) · Picture… (a dialog) · page break · Section, Header (menus) · Fields (a menu: page number, date, Cross-reference… (a dialog of the document's headings and bookmarks), table of contents, update the selected fields or all of them, show field codes). A pointer pick in a box calls `onClickCommand`, like a button click.
+Grid), Shading (a menu of light cell fills; both in a table, not while tracking) · Picture… (a dialog) · page break · Section, Header (menus) · Controls (a menu: rich text, plain text, drop-down list, combo box, date picker, check box, picture around a selected one, repeating section, Add repeating item, Control properties… (a dialog: title, tag, the two locks, list items, date format, line breaks)) · Fields (a menu: page number, date, Cross-reference… (a dialog of the document's headings and bookmarks), table of contents, update the selected fields or all of them, show field codes). A pointer pick in a box calls `onClickCommand`, like a button click.
 Up and Down on a closed box apply each value they pass (Chrome and Firefox on Windows), one
 undo step each. Text color and highlight are menu buttons (WAI-ARIA menu, `menuitemradio`
 items) with a fixed palette (Word's highlight colors), the current color checked; arrow keys,
@@ -165,7 +165,7 @@ No DOM: runs in Node, workers and the browser.
 
 ### Documents
 
-Documents are schema v5, Word's model with tables and pictures (v5 adds stories, fields and content controls, which import and the editor do not produce yet) ([document-model.md](document-model.md)).
+Documents are schema v5, Word's model with tables, pictures, stories, fields and content controls ([document-model.md](document-model.md)).
 
 - `createDocument(content?, section?): FoliDocument`: a new document: `content` (schema v5;
   default: one empty paragraph) on A4 with 25.4 mm margins, with Normal, Heading 1–6, List
@@ -446,9 +446,31 @@ or end of a result goes just outside the field, so what is typed there is not lo
 A table of contents lists paragraphs by their style's level (a heading style, a style based on one,
 a style with an outline level) and, with `\u`, by their own outline level; hidden text is left out.
 
+Content controls (11.9, ADR-0007). `editor.commands.setControlValue(target, value)` fills the
+controls with that id or tag, in the body and, from the body's editor, the stories, as one undo
+step, tracked when tracking is on; it returns whether any took it. `value`: text; a list item's
+value or shown text (a combo box takes any text, a drop-down list only its items); a `Date` or
+`yyyy-mm-dd`; `true` or `false` for a check box; `{ content: NodeJSON[] }` for rich text; `null` or
+`""` empties it, bringing its placeholder back. A locked or bound control refuses.
+`editor.controlValues()` reads them all (`controlValues(state)`: one tree): `id`, `kind`, `tag`,
+`title`, `story`, `showingPlaceholder`, `text`, `value`, `content` (rich text).
+
+| Command                                 | Does                                                                                                                                   |
+| --------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `insertControl(kind, options?)`         | At the caret, around selected text or paragraphs; `title`, `tag`, `lock`, `items`, `dateFormat`, `placeholder`, `checked`, `multiLine` |
+| `setControlValue(target, value, join?)` | The command behind `editor.commands.setControlValue`, for one tree                                                                     |
+| `setControlProperties(target, patch)`   | `title`, `tag`, `lock`, `items`, `dateFormat`, `multiLine`; allowed on a locked control                                                |
+| `addRepeatingItem(target?)`             | A copy of the caret's (or the last) item of a repeating section                                                                        |
+| `insertControlText(text)`               | Text into a plain text, combo box or date control: what paste uses                                                                     |
+
+`controlsIn(tree)`, `controlAt(tree, pos)` (`id`, `level`, `from`, `to`, `contentFrom`, `contentTo`),
+`controlProperties(state, id)` and `controlIsReadOnly(control)` find them.
+
 ## `@folijs/view`
 
-The editable view without a framework. Needs a browser DOM.
+The editable view without a framework. Needs a browser DOM. Content controls: it draws the frame
+and title of the control the caret is in or the pointer is over; Alt+Down (or its button) opens a
+list or date picker, Space or a click changes a check box, Left and Right stop at a control's edges.
 
 ```ts
 const view = new EditorView(host, editor, { editable: true, placeholder: "" });

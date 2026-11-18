@@ -91,7 +91,7 @@ content, ext? }`. `content` is a `doc` of the body's blocks. `noteType` is Word'
   is dropped, never half applied (a reference gone, its story kept). Every change to a story goes
   through these steps, so only a change made with `addToHistory: false` can cause this.
 - **`EnvelopeStep(key, before, after)`**, the same idea for what undo must take back in the
-  envelope: the last section (`section`), `settings` (both built), and one control's properties (11.9). So undoing an
+  envelope: the last section (`section`), `settings` and the controls' properties (`controls`, the whole record: 11.9). So undoing an
   added header leaves no reference to a story that has gone. `withEnvelope` stays for what undo
   leaves as it is (numbering definitions, styles and resources).
 - **Grouping.** History groups story typing by the rules body typing has: the story's own
@@ -266,6 +266,38 @@ content, ext? }`. `content` is a `doc` of the body's blocks. `noteType` is Word'
 - **Editing.** A plugin filters transactions: locked content and locked controls refuse changes, a
   plain text control holds one paragraph's text without formatting. `setControlValue` and
   `controlValues` are the API, by id or tag.
+- **Built in 11.9**, Word 16.0.20527's behaviour read through its object model and saved files
+  (`scripts/corpus/control-roundtrip.mjs` has it read what Foli writes):
+  - **Locks.** `sdtLocked`: the content is edited, the control cannot be deleted, alone or in a
+    range over it. `contentLocked`: no text or formatting change, but the whole control can be
+    deleted. `sdtContentLocked`: both. Properties and the locks themselves stay changeable. The
+    filter compares what a transaction leaves with what was there (undo passes), so it does not
+    depend on how the change came. Tracked changes in locked content can be accepted, not rejected.
+  - **Placeholder.** Typing replaces it and removes `w:showingPlcHdr`; the text loses the
+    `PlaceholderText` style. While tracking Word records the insertion only, not the placeholder's
+    deletion. Emptying a control (by typing or code) brings back its `w:docPart`'s text, not what
+    the file showed; Word knows `DefaultPlaceholder_*` without a glossary, and shows five spaces for
+    an entry it cannot find. `placeholder.text` holds the glossary's text. An empty control in a
+    file stays empty until edited. Backspace and Delete do nothing on a placeholder or at a
+    control's inner edges; from outside they select its content.
+  - **What a kind takes.** Plain text: one paragraph, no Enter, no line break unless `w:multiLine`;
+    formatting part of it formats all of it. Drop-down and check box: no typing. Combo box and date:
+    typing. No paragraph mark inside an inline control. Typed text that is not the picked date drops
+    `w:fullDate` (Word also re-reads a date typed; Foli does not parse them).
+  - **Check box.** `w14:checked` and the glyph are separate: Word does not re-sync them on opening.
+    Toggling while tracking is an insertion and a deletion of the glyph.
+  - **Lists.** A choice writes the shown text only; Word writes no `w:lastValue` and drops one it
+    finds, so an old one is left as it is.
+  - **Data binding.** On opening Word replaces the content with the bound node's value, even with
+    an unknown `storeItemID` when the path resolves; a path that does not keeps the content. Bindings
+    stay unevaluated, so editing one here would be lost in Word without notice: **a bound control's
+    content is read-only**, in the editor and through `setControlValue`.
+  - **Ids.** Word gives a control with no `w:id`, or a repeated one, an id of its own: a copy made
+    here drops it. A copied repeating item holds its source's content, as Word's does.
+  - **The caret.** The two sides of a marker are one place to a browser: the view treats them so
+    when reading the selection, and Left and Right step across each edge, as Word's caret does.
+  - Frames and titles are the view's own elements on the page, `contenteditable="false"`; the lists
+    and the date picker (a native date input) are outside the editing host.
 
 ### Other
 

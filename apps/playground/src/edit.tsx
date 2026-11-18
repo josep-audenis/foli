@@ -8,6 +8,7 @@ import {
   createEditor,
   type Editor,
   type FoliDocument,
+  insertControl,
   insertPicture,
   insertTable,
   parseDocument,
@@ -160,7 +161,11 @@ declare global {
       /** Whether the editor's document passes validation (throws the error if not). */
       validate(): true;
       /** Commands the tests run on a story's editor. */
-      commands: { insertPicture: typeof insertPicture; insertTable: typeof insertTable };
+      commands: {
+        insertPicture: typeof insertPicture;
+        insertTable: typeof insertTable;
+        insertControl: typeof insertControl;
+      };
     };
   }
 }
@@ -183,5 +188,5 @@ window.foliEdit = {
     parseDocument(editor.getDocument());
     return true;
   },
-  commands: { insertPicture, insertTable },
+  commands: { insertPicture, insertTable, insertControl },
 };

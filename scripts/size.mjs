@@ -84,13 +84,18 @@ writeFileSync(appEntry, `export { FoliEditor } from "${dist("react")}";\n`);
  * the insert commands), hidden code ranges and shading in the view, the fields menu and dialog.
  * Raised again after its review (68.8, 88.8 and 117.2 kB): Word's numeric pictures in full, self
  * references, what a table of contents lists, results written a paragraph at a time.
+ * Core and React raised in 11.9 (74.7 kB, 76.5 kB allowed; React with core): content controls (the
+ * lock and text rules, placeholders, values, insert commands). Docx raised in 11.9 (55.1 kB, 57.0
+ * allowed): controls' properties patched into the kept `w:sdtPr`, new controls, glossary text.
+ * View and React raised in 11.9 (92.9 and 125.6 kB, 95.2 and 128.9 allowed): controls' frames,
+ * lists and date picker in the view, the controls menu and properties dialog.
  */
 const BUNDLES = [
-  { name: "@folijs/core", entry: dist("core"), budget: 72_500 },
-  { name: "@folijs/view", entry: dist("view"), budget: 93_000 },
-  { name: "@folijs/react", entry: dist("react"), budget: 122_500 },
-  { name: "FoliEditor only", entry: appEntry, budget: 122_500 },
-  { name: "@folijs/docx", entry: dist("docx"), budget: 55_500 },
+  { name: "@folijs/core", entry: dist("core"), budget: 79_000 },
+  { name: "@folijs/view", entry: dist("view"), budget: 99_000 },
+  { name: "@folijs/react", entry: dist("react"), budget: 136_000 },
+  { name: "FoliEditor only", entry: appEntry, budget: 136_000 },
+  { name: "@folijs/docx", entry: dist("docx"), budget: 58_400 },
 ];
 
 let failed = false;
