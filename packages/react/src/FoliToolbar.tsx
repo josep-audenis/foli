@@ -44,6 +44,7 @@ import {
   linkAt,
   listKindAt,
   mergeCells,
+  type NavigationRequest,
   type NoteKind,
   type NotePropertiesJSON,
   nextChange,
@@ -435,6 +436,32 @@ const CONTROL_ACTIONS: readonly Action[] = [
     command: (state) => selectedControl(state) !== null,
   },
 ];
+
+/**
+ * The navigation menu: what `FoliNavigation` shows, with Word's keys. Nothing applies without it.
+ */
+function navigationActions(body: Editor): readonly Action[] {
+  const open =
+    (request: NavigationRequest): Command =>
+    (_state, dispatch) => {
+      if (!body.navigation) return false;
+      if (dispatch) body.navigation(request);
+      return true;
+    };
+  const item = (key: NavigationRequest, label: string): Action => ({
+    key,
+    label,
+    command: open(key),
+    movesFocus: true,
+  });
+  return [
+    item("find", "Find\u2026"),
+    item("replace", "Replace\u2026"),
+    item("goTo", "Go to\u2026"),
+    item("bookmarks", "Bookmarks\u2026"),
+    item("outline", "Outline"),
+  ];
+}
 
 /**
  * The fields menu: what can be inserted at the selection, updating (the view's pages when there is
@@ -881,6 +908,13 @@ const GROUPS: Item[][] = [
       text: "Fields",
       enabled: (state) => wordContext(state) !== null,
       actions: fieldActions,
+    },
+    {
+      key: "navigate",
+      label: "Find and go to",
+      text: "Navigate",
+      enabled: (state) => wordContext(state) !== null,
+      actions: navigationActions,
     },
     {
       key: "notes",

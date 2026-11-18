@@ -14,4 +14,5 @@ export {
   type FoliEditorHandle,
   type FoliEditorProps,
 } from "./FoliEditor.js";
+export { FoliNavigation, type FoliNavigationProps } from "./FoliNavigation.js";
 export { FoliToolbar, type FoliToolbarProps } from "./FoliToolbar.js";

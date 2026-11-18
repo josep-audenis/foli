@@ -270,6 +270,7 @@ export function storyAfter(state: EditorState, tr: Transaction, id: string): Sto
 /** What a story's editor knows of the body's: undo, and the trees it allocates ids across. */
 export interface StoryBody {
   readonly state: EditorState;
+  dispatch(tr: Transaction): void;
   run(command: Command): boolean;
   can(command: Command): boolean;
 }

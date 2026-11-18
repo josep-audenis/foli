@@ -16,6 +16,7 @@ import {
 } from "./editor.js";
 import { FoliCanvas, type FoliCanvasHandle, type FoliCanvasProps } from "./FoliCanvas.js";
 import { FoliComments } from "./FoliComments.js";
+import { FoliNavigation } from "./FoliNavigation.js";
 import { FoliToolbar } from "./FoliToolbar.js";
 
 /**
@@ -138,6 +139,7 @@ export const FoliEditor = forwardRef<FoliEditorHandle, FoliEditorProps>(function
       )}
       {children}
       <div className="foli-editor-body">
+        <FoliNavigation editor={editor} readOnly={canvas.readOnly} />
         <FoliCanvas ref={canvasRef} editor={editor} {...canvas} />
         {/* "auto": mounted while hidden, so a comment made from the toolbar opens for writing. */}
         {comments !== false && (

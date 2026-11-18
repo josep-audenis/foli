@@ -12,6 +12,7 @@
   controlProperties,
   controlSpot,
   type DocumentSettings,
+  type DocumentTarget,
   deleteBackward,
   deleteForward,
   deleteSelection,
@@ -23,6 +24,7 @@
   type Field,
   type FieldLayout,
   type FieldsReport,
+  type FoundMatches,
   fieldCodesShown,
   fieldsIn,
   fitPaste,
@@ -38,6 +40,7 @@
   keepTablesApart,
   type Node as ModelNode,
   marksAt,
+  type NavigationRequest,
   NodeSelection,
   type NoteNumber,
   noteAtSelection,
@@ -130,6 +133,7 @@ import {
   type WordInfo,
   WordRenderer,
 } from "./word/edit.js";
+import { MATCH_STYLES, MatchMarks, rangesInText } from "./word/matches.js";
 import { NOTE_ATTR, type NoteGroup, PageNotes } from "./word/notes.js";
 import { measureLineRatio } from "./word/pages.js";
 import { PageRegions, REGION_CONTENT_CLASS } from "./word/regions.js";
@@ -233,7 +237,7 @@ const FIELD_SELECTED_ATTR = "data-foli-field-selected";
 const MIN_PICTURE = 8;
 // Generated content is not document text: no caret stops inside it, a zero-height float keeps
 // the caret at the line start, and the empty alt text keeps screen readers on aria-placeholder.
-const STYLES = `[${FIELD_SELECTED_ATTR}]{background-color:rgba(0,0,0,.14)}@media print{[${FIELD_SELECTED_ATTR}]{background-color:transparent}}.foli-in-story>.foli-page>:not(.foli-region){opacity:.45}.foli-story-mount{pointer-events:auto;outline:1px dashed GrayText;outline-offset:2px}.foli-story-mount>[contenteditable=true]:focus{outline:none}@media print{.foli-in-story>.foli-page>:not(.foli-region){opacity:1}.foli-story-mount{outline:none}}.${CELL_CLASS}{box-shadow:inset 0 0 0 9999px rgba(0,120,215,.22)}[${CELLS_ATTR}] ::selection{background:transparent}[data-foli-no-alt]{outline:2px dashed #b45309;outline-offset:-2px}@media print{[data-foli-no-alt]{outline:none}}[${PICTURE_SELECTED_ATTR}]{position:relative;outline:2px solid Highlight}[${PICTURE_SELECTED_ATTR}] [data-foli-resize]{position:absolute;right:-5px;bottom:-5px;width:10px;height:10px;box-sizing:border-box;border:1px solid Canvas;background:Highlight;cursor:nwse-resize;forced-color-adjust:none}@media print{[${PICTURE_SELECTED_ATTR}]{outline:none}[${PICTURE_SELECTED_ATTR}] [data-foli-resize]{display:none}}[${PLACEHOLDER_ATTR}]::before{content:attr(${PLACEHOLDER_ATTR});content:attr(${PLACEHOLDER_ATTR}) / "";float:inline-start;height:0;pointer-events:none;color:GrayText}${CONTROL_STYLES}`;
+const STYLES = `[${FIELD_SELECTED_ATTR}]{background-color:rgba(0,0,0,.14)}@media print{[${FIELD_SELECTED_ATTR}]{background-color:transparent}}.foli-in-story>.foli-page>:not(.foli-region){opacity:.45}.foli-story-mount{pointer-events:auto;outline:1px dashed GrayText;outline-offset:2px}.foli-story-mount>[contenteditable=true]:focus{outline:none}@media print{.foli-in-story>.foli-page>:not(.foli-region){opacity:1}.foli-story-mount{outline:none}}.${CELL_CLASS}{box-shadow:inset 0 0 0 9999px rgba(0,120,215,.22)}[${CELLS_ATTR}] ::selection{background:transparent}[data-foli-no-alt]{outline:2px dashed #b45309;outline-offset:-2px}@media print{[data-foli-no-alt]{outline:none}}[${PICTURE_SELECTED_ATTR}]{position:relative;outline:2px solid Highlight}[${PICTURE_SELECTED_ATTR}] [data-foli-resize]{position:absolute;right:-5px;bottom:-5px;width:10px;height:10px;box-sizing:border-box;border:1px solid Canvas;background:Highlight;cursor:nwse-resize;forced-color-adjust:none}@media print{[${PICTURE_SELECTED_ATTR}]{outline:none}[${PICTURE_SELECTED_ATTR}] [data-foli-resize]{display:none}}[${PLACEHOLDER_ATTR}]::before{content:attr(${PLACEHOLDER_ATTR});content:attr(${PLACEHOLDER_ATTR}) / "";float:inline-start;height:0;pointer-events:none;color:GrayText}${CONTROL_STYLES}${MATCH_STYLES}`;
 
 /**
  * Adds the view's stylesheet once per document or shadow root, when a placeholder is first shown
@@ -697,6 +701,13 @@ export class EditorView {
   private placeAgain: (() => void) | null = null;
   /** The story being edited on its page, if any (ADR-0007). */
   private mount: StoryMount | null = null;
+  /** What find shows, and which tree this view draws of it (a mounted story's view: its own). */
+  private found: FoundMatches | null = null;
+  private matchStory: string | null = null;
+  private readonly matchMarks: MatchMarks;
+  /** The pages marked, as a key; the frame waiting to look again. */
+  private matchPages = "";
+  private matchFrame = 0;
   /** The body's selection before the press of a double click in a page's margin. */
   private pressSelection: Selection | null = null;
   /** The listeners on the host, to remove them. */
@@ -710,6 +721,7 @@ export class EditorView {
     options: EditorViewOptions = {},
   ) {
     this.state = editor.state;
+    this.matchMarks = new MatchMarks(host.ownerDocument);
     this.paged = options.paged !== false;
     this.noteMark = options.noteMark;
     const view = this;
@@ -795,6 +807,7 @@ export class EditorView {
 
   destroy(): void {
     this.closeStory(false);
+    this.showFound(null);
     this.controlChrome.destroy();
     if (this.editor.storyView === this.stories) this.editor.storyView = null;
     this.destroyed = true;
@@ -1722,6 +1735,7 @@ export class EditorView {
   /** The story being edited, moved with its region: the focus goes back to it. */
   private afterPlace(): void {
     this.drawControls();
+    this.drawMatches();
     if (!this.mount?.moved) return;
     this.mount.moved = false;
     this.mount.view.focus();
@@ -1745,6 +1759,10 @@ export class EditorView {
       return view.fieldLayout();
     },
     updateFields: (options, editor) => view.updateFields(options, editor),
+    showMatches: (found) => view.showMatches(found),
+    reveal: (target, options) => view.reveal(target, options),
+    goToPage: (page, options) => view.goToPage(page, options),
+    focus: () => view.focus(),
   }))(this);
 
   /** Makes this view the one `Editor.storyView` speaks for, telling listeners if it was not. */
@@ -1753,6 +1771,198 @@ export class EditorView {
     const first = !this.editor.storyView;
     this.editor.storyView = this.stories;
     if (!first) this.editor.storyChanged();
+  }
+
+  // ---------- find, and going places (11.11) ----------
+
+  /**
+   * Marks what find found: on the pages, in the story open, and in the drawn copies of the others.
+   * Nothing of it is in the document or the pages' DOM, and it does not print. The current match is
+   * scrolled to when it is where the view can show it.
+   */
+  showMatches(found: FoundMatches | null): void {
+    this.showFound(found);
+    const { current } = found ?? {};
+    if (!current) return;
+    if (current.story === this.matchStory) this.scrollToRange(current.from, current.to);
+    else if (current.story === this.mount?.id)
+      this.mount?.view.scrollToRange(current.from, current.to);
+  }
+
+  /** The screen ranges of `from..to` in one paragraph: one per text node it covers. */
+  private rangesOf(from: number, to: number): Range[] {
+    const { doc } = this.state;
+    if (to > doc.content.size) return [];
+    const $from = doc.resolve(from);
+    if (!$from.parent.isTextblock) return [];
+    const desc = this.blocks[this.blockFrom($from.before())];
+    if (!desc) return [];
+    const start = $from.start();
+    const out: Range[] = [];
+    for (const leaf of desc.leaves) {
+      const at = start + leaf.offset;
+      const a = Math.max(from, at);
+      const b = Math.min(to, at + leaf.size);
+      if (a >= b || hiddenIn(leaf.dom, desc.dom)) continue;
+      const range = this.host.ownerDocument.createRange();
+      if (leaf.dom.nodeType === Node.TEXT_NODE) {
+        range.setStart(leaf.dom, a - at);
+        range.setEnd(leaf.dom, b - at);
+      } else range.selectNodeContents(leaf.dom);
+      out.push(range);
+    }
+    return out;
+  }
+
+  /** The pages on the screen and a screen around it: only these carry marks. */
+  private pagesNearView(): Set<number> {
+    const height = this.host.ownerDocument.defaultView?.innerHeight ?? 0;
+    const near = new Set<number>();
+    this.pages.forEach((page, i) => {
+      const { top, bottom } = page.getBoundingClientRect();
+      if (bottom >= -height && top <= 2 * height) near.add(i);
+    });
+    return near;
+  }
+
+  private drawMatches(): void {
+    const { found, mount } = this;
+    if (mount) {
+      mount.view.matchStory = mount.id;
+      mount.view.showFound(found);
+    }
+    if (!found) {
+      this.matchMarks.set([], []);
+      this.matchPages = "";
+      return;
+    }
+    injectStyles(this.host);
+    const { doc } = this.state;
+    const near = this.pagesNearView();
+    this.matchPages = [...near].join();
+    const shown = (from: number) => {
+      if (!this.paged || from > doc.content.size) return true;
+      const pages = this.itemPages.get(doc.resolve(from).node(1));
+      return !pages || pages.some((page) => near.has(page));
+    };
+    const all: Range[] = [];
+    const others = new Set<string>();
+    for (const { story, from, to } of found.matches) {
+      if (story === this.matchStory) {
+        if (shown(from)) all.push(...this.rangesOf(from, to));
+      } else if (story !== null && story !== mount?.id) others.add(story);
+    }
+    const { current, query, matchCase, wholeWord } = found;
+    const here = current?.story === this.matchStory ? current : null;
+    if (others.size) {
+      const options = { matchCase, wholeWord };
+      const add = (root: Element | null | undefined) => {
+        if (root) all.push(...rangesInText(root, query, options));
+      };
+      for (const p of near) {
+        const { header, footer } = this.pageRegions[p] ?? {};
+        for (const region of [header, footer])
+          if (region && others.has(region.id))
+            add(region.element.querySelector(`:scope > .${REGION_CONTENT_CLASS}`));
+        for (const note of this.pages[p]?.querySelectorAll(`[${NOTE_ATTR}]`) ?? [])
+          if (others.has(note.getAttribute(NOTE_ATTR) as string)) add(note);
+      }
+    }
+    this.matchMarks.set(all, here ? this.rangesOf(here.from, here.to) : []);
+  }
+
+  /** Scrolling brings other pages near: their marks are drawn, once per frame. */
+  private readonly onMatchScroll = (): void => {
+    const win = this.host.ownerDocument.defaultView;
+    if (this.matchFrame || !win) return;
+    this.matchFrame = win.requestAnimationFrame(() => {
+      this.matchFrame = 0;
+      if (this.found && [...this.pagesNearView()].join() !== this.matchPages) this.drawMatches();
+    });
+  };
+
+  /** What find shows here, marked; a story's view is told by its page's view. */
+  private showFound(found: FoundMatches | null): void {
+    const doc = this.host.ownerDocument;
+    if (this.paged && !this.found !== !found) {
+      if (found) doc.addEventListener("scroll", this.onMatchScroll, SCROLL_OPTIONS);
+      else doc.removeEventListener("scroll", this.onMatchScroll, SCROLL_OPTIONS);
+    }
+    this.found = found;
+    this.drawMatches();
+  }
+
+  private scrollToRange(from: number, to: number): void {
+    let rect = this.rangesOf(from, to)[0]?.getClientRects?.()[0];
+    if (!rect) {
+      // A place, not a stretch of text: what holds it.
+      const { node } = this.domFromPos(from);
+      rect = (node instanceof Element ? node : node.parentElement)?.getBoundingClientRect();
+    }
+    // With room around it: a panel may float over the top of the window.
+    if (rect)
+      scrollRectIntoView(this.host, { top: rect.top - REVEAL_ABOVE, bottom: rect.bottom + 48 });
+  }
+
+  /** Opens story `id` where a page shows it, leaving the focus where it is. */
+  private openForReveal(id: string): boolean {
+    const kind = wordContext(this.state)?.stories.get(id)?.kind;
+    if (kind === "footnote" || kind === "endnote") return this.openNote(id, false);
+    if (kind !== "header" && kind !== "footer") return false;
+    const page = this.pageRegions.findIndex((regions) => regions[kind]?.id === id);
+    return page >= 0 && this.openStory(kind, page, false, false);
+  }
+
+  /**
+   * Selects `target` and scrolls to it: in the body (leaving a story that is open), or in its story,
+   * opened where it is. `focus`: the document takes the focus. False when no page shows it.
+   */
+  reveal({ story, from, to }: DocumentTarget, { focus = false } = {}): boolean {
+    if (story === null) {
+      this.closeStory(false);
+      const { doc } = this.state;
+      if (to > doc.content.size) return false;
+      this.editor.dispatch(this.state.tr.setSelection(TextSelection.create(doc, from, to)));
+      if (focus) this.focus();
+      this.scrollToRange(from, to);
+      return true;
+    }
+    if (this.mount?.id !== story && !this.openForReveal(story)) return false;
+    const { mount } = this;
+    if (!mount) return false;
+    mount.view.editor.select(from, to);
+    if (focus) mount.view.focus();
+    mount.view.scrollToRange(from, to);
+    return true;
+  }
+
+  /** The caret to the start of page `page` (1-based) and the page into view. */
+  goToPage(page: number, { focus = false } = {}): boolean {
+    const element = this.pages[page - 1];
+    if (!element) return false;
+    this.closeStory(false);
+    search: for (const [i, desc] of this.blocks.entries()) {
+      for (const [f, fragment] of desc.fragments.entries()) {
+        if (fragment.closest(".foli-page") !== element) continue;
+        const start = (this.starts[i] as number) + 1 + (f ? (desc.splits[f - 1] as number) : 0);
+        const { doc } = this.state;
+        this.editor.dispatch(
+          this.state.tr.setSelection(
+            Selection.near(doc.resolve(Math.min(start, doc.content.size))),
+          ),
+        );
+        break search;
+      }
+    }
+    if (focus) this.focus();
+    scrollRectIntoView(this.host, element.getBoundingClientRect());
+    return true;
+  }
+
+  /** Word's keys for finding and going places, when the app shows something for them. */
+  private navigationKey(name: string): boolean {
+    const request = Object.hasOwn(NAVIGATION_KEYS, name) ? NAVIGATION_KEYS[name] : undefined;
+    return !!request && this.editor.navigation?.(request) === true;
   }
 
   // ---------- content controls ----------
@@ -1979,7 +2189,7 @@ export class EditorView {
    * Opens the header or footer of page `at` (by default the selection's) for editing where it is;
    * made first when the page has none. Whether it is open now.
    */
-  openStory(side: StorySide, at = this.selectionPage(), create = true): boolean {
+  openStory(side: StorySide, at = this.selectionPage(), create = true, focus = true): boolean {
     if (!this.regions || !this.editable || this.composing) return false;
     // Word's blank page has none: the next page's.
     let p = at;
@@ -1992,7 +2202,7 @@ export class EditorView {
     const variant = pageVariant(setup, page, even);
     const before = storyOfSection(this.sections(), page.section, side, variant);
     if (this.mount?.id === before?.id && this.mount?.side === side && this.mount?.page === p) {
-      this.mount?.view.focus();
+      if (focus) this.mount?.view.focus();
       return true;
     }
     this.closeStory(false);
@@ -2006,6 +2216,8 @@ export class EditorView {
       editor,
       { id: found.id, side, variant, section: page.section, page: p, region },
       side === "header" ? "Header" : "Footer",
+      undefined,
+      focus,
     );
     return true;
   }
@@ -2014,13 +2226,13 @@ export class EditorView {
    * Opens note `id`, or the one whose reference is at the selection, in place: shown whole at its
    * reference's page. Whether it is open now.
    */
-  openNote(id?: string): boolean {
+  openNote(id?: string, focus = true): boolean {
     const { notes } = this;
     if (!notes || !this.editable || this.composing) return false;
     const story = id ?? noteAtSelection(this.state)?.story;
     if (!story) return false;
     if (this.mount?.id === story) {
-      this.mount.view.focus();
+      if (focus) this.mount.view.focus();
       return true;
     }
     this.closeStory(false);
@@ -2045,6 +2257,7 @@ export class EditorView {
       { id: story, side: "note", variant: "default", section: 0, page, region },
       "Note",
       () => texts().get(story) ?? "",
+      focus,
     );
     editor.select(Selection.atEnd(editor.state.doc).from);
     return true;
@@ -2073,6 +2286,7 @@ export class EditorView {
     place: Omit<StoryMount, "wrapper" | "view" | "moved">,
     label: string,
     noteMark?: () => string,
+    focus = true,
   ): void {
     const { region } = place;
     injectStyles(this.host);
@@ -2117,7 +2331,8 @@ export class EditorView {
     // With several views of the editor, the one in use answers for its story.
     wrapper.addEventListener("focusin", () => this.claimStories());
     this.claimStories();
-    view.focus();
+    if (focus) view.focus();
+    this.drawMatches();
     this.editor.storyChanged();
   }
 
@@ -2149,6 +2364,7 @@ export class EditorView {
     this.observer.takeRecords();
     this.observer.observe(this.host, { childList: true, characterData: true, subtree: true });
     if (focus && !this.destroyed) this.focus();
+    if (!this.destroyed) this.drawMatches();
     this.editor.storyChanged();
   }
 
@@ -3520,7 +3736,8 @@ export class EditorView {
       this.documentEdgeKey(name) ||
       this.fieldKey(name) ||
       this.controlKey(name) ||
-      this.noteKey(event, name)
+      this.noteKey(event, name) ||
+      this.navigationKey(name)
     ) {
       event.preventDefault();
       return;
@@ -4639,7 +4856,7 @@ function clusterBoundary(doc: ModelNode, pos: number, forward: boolean): number 
  * Scrolls every scrollable ancestor of `from`, then the window, so that `rect` is inside its
  * visible area (minus `scroll-padding`, e.g. for a sticky toolbar). Vertical only: text wraps.
  */
-function scrollRectIntoView(from: HTMLElement, rect: DOMRect): void {
+function scrollRectIntoView(from: HTMLElement, rect: Pick<DOMRect, "top" | "bottom">): void {
   const doc = from.ownerDocument;
   const win = doc.defaultView;
   if (!win) return;
@@ -4666,6 +4883,20 @@ function scrollRectIntoView(from: HTMLElement, rect: DOMRect): void {
   );
   if (move) win.scrollBy(0, move);
 }
+
+const SCROLL_OPTIONS = { capture: true, passive: true };
+/** Room kept above what is scrolled to for find, in px. */
+const REVEAL_ABOVE = 200;
+
+/** Word's keys for finding and going places. */
+const NAVIGATION_KEYS: Readonly<Record<string, NavigationRequest>> = {
+  "Mod-f": "find",
+  "Mod-h": "replace",
+  "Mod-g": "goTo",
+  F3: "next",
+  "Shift-F3": "previous",
+  "Mod-Shift-F5": "bookmarks",
+};
 
 /** Shift+Alt+N: from a note's reference to the note, and back. */
 const isNoteKey = (event: KeyboardEvent) =>
