@@ -82,12 +82,14 @@ writeFileSync(appEntry, `export { FoliEditor } from "${dist("react")}";\n`);
  * Core, view and React raised in 11.8 (66.6, 86.4 and 114.6 kB): fields (finding them, the
  * selection rules, every field Foli updates with Word's switches, tables of contents rebuilt,
  * the insert commands), hidden code ranges and shading in the view, the fields menu and dialog.
+ * Raised again after its review (68.8, 88.8 and 117.2 kB): Word's numeric pictures in full, self
+ * references, what a table of contents lists, results written a paragraph at a time.
  */
 const BUNDLES = [
-  { name: "@folijs/core", entry: dist("core"), budget: 70_000 },
-  { name: "@folijs/view", entry: dist("view"), budget: 90_500 },
-  { name: "@folijs/react", entry: dist("react"), budget: 119_500 },
-  { name: "FoliEditor only", entry: appEntry, budget: 119_500 },
+  { name: "@folijs/core", entry: dist("core"), budget: 72_500 },
+  { name: "@folijs/view", entry: dist("view"), budget: 93_000 },
+  { name: "@folijs/react", entry: dist("react"), budget: 122_500 },
+  { name: "FoliEditor only", entry: appEntry, budget: 122_500 },
   { name: "@folijs/docx", entry: dist("docx"), budget: 55_500 },
 ];
 

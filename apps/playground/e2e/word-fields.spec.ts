@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Fields in the editable view (11.8), on the editing page (`/edit.html`): results shown, codes
  * hidden and toggled, a field selected and deleted whole, updated with F9 from the pages, inserted
  * from the toolbar.
@@ -132,6 +132,65 @@ test("the caret passes over the code, a press lands outside it, typing stays out
   expect(after?.result).toBe("192");
   expect(after?.code).toBe("SEQ x");
   await page.evaluate(() => window.foliEdit.validate());
+});
+
+test("what is typed after a trailing field, or before a leading one, stays outside", async ({
+  page,
+}) => {
+  await load(page, documentOf([paragraph("Page ", ...field("SEQ x", "7"))]));
+  await editor(page).click();
+  await page.keyboard.press("End");
+  await page.keyboard.type(" of 9");
+  await expect.poll(() => shownText(page)).toBe("Page 7 of 9");
+  await page.keyboard.press("F9");
+  await page.keyboard.press("Control+a");
+  await page.keyboard.press("F9");
+  await expect.poll(() => shownText(page)).toBe("Page 1 of 9");
+  await load(page, documentOf([paragraph(...field("SEQ x", "7"), " end")]));
+  await editor(page).click();
+  await page.keyboard.press("Home");
+  await page.keyboard.type("No ");
+  await page.keyboard.press("Control+a");
+  await page.keyboard.press("F9");
+  await expect.poll(() => shownText(page)).toBe("No 1 end");
+  // A click past the end of the line, and Right after the last digit, are outside too.
+  await load(page, documentOf([paragraph("Page ", ...field("SEQ x", "7"))]));
+  const box = await page.locator("section.foli-page p").first().boundingBox();
+  await page.mouse.click((box?.x ?? 0) + (box?.width ?? 0) - 4, (box?.y ?? 0) + 4);
+  const [one] = await fields(page);
+  await expect.poll(async () => (await selection(page)).from).toBe(one?.to);
+  await page.keyboard.press("ArrowLeft");
+  await page.keyboard.press("ArrowRight");
+  await expect.poll(async () => (await selection(page)).from).toBe(one?.to);
+  await page.evaluate(() => window.foliEdit.validate());
+});
+
+test("a composition after a trailing field goes outside it", async ({ page, browserName }) => {
+  test.skip(browserName !== "chromium", "IME through CDP");
+  await load(page, documentOf([paragraph("Page ", ...field("SEQ x", "7"))]));
+  await editor(page).click();
+  await page.keyboard.press("End");
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send("Input.imeSetComposition", { text: "x", selectionStart: 1, selectionEnd: 1 });
+  await cdp.send("Input.insertText", { text: "x" });
+  await expect.poll(async () => (await fields(page))[0]?.result).toBe("7");
+  await expect.poll(() => shownText(page)).toBe("Page 7x");
+});
+
+test("with codes shown, typing goes beside the field and leaves its code alone", async ({
+  page,
+}) => {
+  await load(page, documentOf([paragraph("a", ...field("SEQ x", "7"), "b")]));
+  await editor(page).click();
+  await page.keyboard.press("Alt+F9");
+  await expect(editor(page)).toContainText("{ SEQ x }");
+  await page.keyboard.press("Control+Home");
+  await page.keyboard.press("ArrowRight");
+  await page.keyboard.press("ArrowRight");
+  await page.keyboard.type("C");
+  await page.keyboard.press("Alt+F9");
+  expect((await fields(page))[0]?.code).toBe("SEQ x");
+  await expect.poll(() => shownText(page)).toBe("a7Cb");
 });
 
 test("Backspace after a field selects it, shaded; the next one deletes it, undo restores", async ({

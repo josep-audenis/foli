@@ -235,6 +235,14 @@ content, ext? }`. `content` is a `doc` of the body's blocks. `noteType` is Word'
     only markers between them as one place, or a range would give a field up when the browser
     reads its end back one position short. Left and Right start past the markers next to the caret
     (WebKit spent a key press on each empty element).
+  - A caret at a result's very start or end goes outside the field (typed text would be lost to
+    the next update), and with codes shown the whole field is closed to it. Only a move does this:
+    text typed over a whole result goes on inside it.
+  - Checked against Word 16 by updating documents in it: a table of contents lists paragraphs by
+    their style's level (heading styles, styles based on them, styles with an outline level) and
+    with `\u` by their own; a heading holding one is listed by the rest of its text; a TOC style
+    with tab stops gets none on its paragraphs; `\#` pictures (558 cases are a test fixture).
+    Bookmarks referring to each other grow in Word at every update; Foli leaves them and reports it.
   - Find (11.11) has to skip code ranges: `fieldsIn` gives them.
 
 ### Content controls

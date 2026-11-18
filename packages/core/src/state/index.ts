@@ -48,6 +48,7 @@ export {
   fieldCodesShown,
   fieldDisplay,
   fieldsIn,
+  sameSpot,
   toggleFieldCodes,
 } from "./fields.js";
 export {

@@ -48,8 +48,12 @@ checklist in [testing/ime.md](testing/ime.md)):
   `SECTIONPAGES`, `DATE`, `TIME`, `SEQ`, `REF`, `PAGEREF`, `TOC`, `MERGEFIELD`. Any other field
   (`IF`, `STYLEREF`, formulas, form fields…), and a switch Foli does not follow (`TOC \c`, `\f`,
   `\l`, `\a`, `\s`, `\d`; `REF \f`, `\d`; the number words of `\* CardText`, `OrdText`,
-  `DollarText`), keeps its result and is reported; so does a reference to a missing bookmark, where
-  Word writes an error into the result. `\* MERGEFORMAT` keeps the old result's first run's look,
+  `DollarText`; a `\#` picture with backquotes, two points or a comma in its decimals), keeps its
+  result and is reported; so does a reference to a missing bookmark or to a bookmark holding the
+  field, where Word writes an error into the result, and bookmarks referring to each other, which
+  Word lets grow at every update. `REF \p` and `PAGEREF \p` say "above", "below" and "on page" in
+  English, whatever Word's language. A numbered table of contents entry's tab is 440 twips a level;
+  Word works it out from the number's width. `\* MERGEFORMAT` keeps the old result's first run's look,
   not word by word. A `REF` to text over several paragraphs gets line breaks between them. Table of
   contents entries are plain: a heading's own italics are not carried over. Date names are in
   English. Codes shown cannot be edited there (Word's code editing, Shift+F9 for one field and
