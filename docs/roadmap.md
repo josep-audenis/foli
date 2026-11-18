@@ -1198,7 +1198,7 @@ Each task is a PR on `phase-11/sections-fields`, the build green after each.
   selected field shaded, `view.print()` updating first; a Fields menu and cross-reference dialog.
   On the corpus with Word's pages every field works out to Word's result and nothing changes
   (`fields-word.test.ts`); `word-fields.spec.ts` in three engines; `field-roundtrip.mjs` has Word
-  read updated, rebuilt (in a content control too), merged (tracked) and inserted fields: all 23
+  read updated, rebuilt (in a content control too), merged (tracked) and inserted fields: all 24
   files pass; `\#` pictures match 558 cases read from Word. Shortcuts: unknown
   fields, unfollowed switches and missing bookmarks keep their result and are reported;
   `MERGEFORMAT` keeps the first run's look, not word by word; a multi-paragraph `REF` gets line

@@ -241,7 +241,9 @@ content, ext? }`. `content` is a `doc` of the body's blocks. `noteType` is Word'
   - Checked against Word 16 by updating documents in it: a table of contents lists paragraphs by
     their style's level (heading styles, styles based on them, styles with an outline level) and
     with `\u` by their own; a heading holding one is listed by the rest of its text; a TOC style
-    with tab stops gets none on its paragraphs; `\#` pictures (558 cases are a test fixture).
+    with tab stops gets none on its paragraphs; its end always stands first in a paragraph of its
+    own, with what follows it; `\#` pictures (558 cases are a test fixture). A rebuild goes line
+    by line, so tracked it records each entry's text and style where the old one was.
     Bookmarks referring to each other grow in Word at every update; Foli leaves them and reports it.
   - Find (11.11) has to skip code ranges: `fieldsIn` gives them.
 

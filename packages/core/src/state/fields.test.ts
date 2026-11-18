@@ -1056,6 +1056,118 @@ describe("tables of contents", () => {
     ]);
   });
 
+  const blockTexts = (editor: Editor) => {
+    const out: string[] = [];
+    editor.state.doc.forEach((node) => {
+      out.push(`${node.attrs.style ?? "-"}:${node.textContent}`);
+    });
+    return out;
+  };
+  const twice = (editor: Editor) => {
+    updateFields(editor, { layout: pagesEvery(1000) });
+    const after = editor.state.doc;
+    for (let i = 0; i < 2; i++) {
+      const report = updateFields(editor, { layout: pagesEvery(1000) });
+      expect(report).toMatchObject({ rebuilt: 0, skipped: [] });
+    }
+    expect(editor.state.doc).toBe(after);
+  };
+
+  it("keeps what follows it in a paragraph of its own", () => {
+    const editor = editorOf([p(...field("TOC \\o", ""), " tail"), styled("Heading1", "A")]);
+    twice(editor);
+    expect(blockTexts(editor)).toEqual(["TOC1:A1", "-: tail", "Heading1:A"]);
+    const multi = editorOf([
+      p(
+        { type: "fieldStart" },
+        { type: "fieldCode", attrs: { text: "TOC \\o" } },
+        { type: "fieldSeparator" },
+        "old",
+      ),
+      p("older", { type: "fieldEnd" }, " tail"),
+      styled("Heading1", "A"),
+      styled("Heading1", "B"),
+    ]);
+    twice(multi);
+    expect(blockTexts(multi)).toEqual([
+      "TOC1:A1",
+      "TOC1:B1",
+      "-: tail",
+      "Heading1:A",
+      "Heading1:B",
+    ]);
+    valid(multi);
+  });
+
+  it("in a heading lists the text beside it, each side an entry, and stays as it is", () => {
+    const after = editorOf([
+      { ...p(...field("TOC \\o", ""), " tail"), attrs: { style: "Heading1" } },
+      styled("Heading1", "A"),
+    ]);
+    twice(after);
+    expect(firstField(after).result).toBe("tail\t1\rA\t1");
+    expect(blockTexts(after)).toEqual(["TOC1:tail1", "TOC1:A1", "Heading1: tail", "Heading1:A"]);
+    const both = editorOf([
+      { ...p("Title ", ...field("TOC \\o", ""), " tail"), attrs: { style: "Heading1" } },
+      styled("Heading1", "A"),
+    ]);
+    twice(both);
+    expect(firstField(both).result).toBe("\rTitle\t1\rtail\t1\rA\t1");
+    expect(blockTexts(both)[0]).toBe("Heading1:Title ");
+    valid(both);
+  });
+
+  it("strips the spaces around a heading's text", () => {
+    const editor = editorOf([
+      p(...field("TOC \\o", "")),
+      p(),
+      styled("Heading1", "   Spaced  title \u00a0 "),
+      { ...p({ type: "tab" }, "tabbed"), attrs: { style: "Heading1" } },
+    ]);
+    updateFields(editor, { layout: pagesEvery(1000) });
+    expect(firstField(editor).result).toBe("Spaced  title\t1\rtabbed\t1");
+  });
+
+  it("while tracking goes line by line: accepted it is right, and stays", () => {
+    const old = (value: string, ...more: NodeJSON[]) => ({
+      ...p(value, ...more),
+      attrs: { style: "Note" },
+    });
+    const content = [
+      {
+        ...p(
+          { type: "fieldStart" },
+          { type: "fieldCode", attrs: { text: "TOC \\o" } },
+          { type: "fieldSeparator" },
+          "old one",
+        ),
+        attrs: { style: "Note" },
+      },
+      old("old two"),
+      old("old three"),
+      p({ type: "fieldEnd" }),
+      styled("Heading1", "New"),
+    ];
+    const editor = editorOf(content, {}, true);
+    twice(editor);
+    expect(firstField(editor).result).toBe("New\t1");
+    editor.run(acceptAllChanges());
+    const [first] = editor.getDocument().content.content ?? [];
+    expect(first?.attrs).toMatchObject({ style: "TOC1", tabs: [{ kind: "right" }] });
+    expect(blockTexts(editor)).toEqual(["TOC1:New1", "-:", "Heading1:New"]);
+    twice(editor);
+    valid(editor);
+    const rejected = editorOf(content, {}, true);
+    updateFields(rejected, { layout: pagesEvery(1000) });
+    rejected.run(rejectAllChanges());
+    expect(blockTexts(rejected).slice(0, 3)).toEqual([
+      "Note:old one",
+      "Note:old two",
+      "Note:old three",
+    ]);
+    valid(rejected);
+  });
+
   it("is rebuilt while tracking as tracked content", () => {
     const editor = editorOf([p(...field("TOC \\o")), p(), ...headings], {}, true);
     updateFields(editor, { layout: pagesEvery(1000) });
@@ -1240,6 +1352,64 @@ describe("inserting fields", () => {
       "1",
       "(i)",
       "(i)Section 1",
+    ]);
+  });
+
+  it("reads REF \\r against where the list stands at the field, as Word does", () => {
+    const numbering = {
+      abstracts: [
+        {
+          id: 1,
+          levels: [
+            { level: 0, format: "decimal", text: "%1.", start: 1 },
+            { level: 1, format: "lowerLetter", text: "%2)", start: 1 },
+            { level: 2, format: "lowerRoman", text: "(%3)", start: 1 },
+          ],
+        },
+      ],
+      instances: [
+        { id: 1, abstract: 1 },
+        { id: 2, abstract: 1 },
+      ],
+    };
+    const item = (level: number, ...content: (NodeJSON | string)[]): NodeJSON => ({
+      ...p(...content),
+      attrs: { numbering: { id: 1, level } },
+    });
+    const mark = (id: number, name: string): NodeJSON[] => [
+      { type: "bookmarkStart", attrs: { id, name } },
+      text(name),
+      { type: "bookmarkEnd", attrs: { id } },
+    ];
+    const refs = [p(...field("REF t \\r")), p(...field("REF u \\r"))];
+    const editor = editorOf(
+      [
+        ...refs,
+        item(0, "one"),
+        item(1, "a"),
+        item(2, ...mark(1, "t")),
+        ...refs,
+        item(1, ...mark(2, "u")),
+        ...refs,
+        item(0, "two"),
+        ...refs,
+        { ...p("other"), attrs: { numbering: { id: 2, level: 0 } } },
+        ...refs,
+      ],
+      { numbering } as never,
+    );
+    updateFields(editor);
+    expect(results(editor)).toEqual([
+      "1.a)(i)",
+      "1.b)",
+      "(i)",
+      "b)",
+      "a)(i)",
+      "b)",
+      "1.a)(i)",
+      "1.b)",
+      "1.a)(i)",
+      "1.b)",
     ]);
   });
 

@@ -496,10 +496,17 @@ const withoutLinks = (marks: readonly Mark[]) =>
 class ListNumbers {
   private readonly paragraphs: ParagraphAt[];
   private readonly markers: (ListMarker | null)[];
+  /** For each paragraph, the numbered one at or before it (-1: none). */
+  private readonly numbered: number[];
 
   constructor(tree: Node, word: WordContext) {
     this.paragraphs = paragraphsOf(tree);
     this.markers = word.resolver.markers(this.paragraphs.map((p) => p.node.attrs));
+    let last = -1;
+    this.numbered = this.markers.map((marker, i) => {
+      if (marker) last = i;
+      return last;
+    });
   }
 
   private indexAt(pos: number): number {
@@ -534,9 +541,10 @@ class ListNumbers {
   }
 
   /**
-   * `\n`: alone; `\w`: in full; `\r`: what differs from the paragraph at `from` (alone, from
-   * outside its list). `plain` (`\t`): without the words of the number's format. As Word writes
-   * them, only the last trailing period goes.
+   * `\n`: alone; `\w`: in full; `\r`: what differs from where the list stands at `from`, the
+   * last numbered paragraph there (in full when that is none, or of another list). `plain`
+   * (`\t`): without the words of the number's format. As Word writes them, only the last
+   * trailing period goes.
    */
   number(pos: number, mode: "n" | "w" | "r", from: number, plain: boolean): string {
     const index = this.indexAt(pos);
@@ -548,11 +556,11 @@ class ListNumbers {
     };
     let chain = mode === "n" ? [index] : this.chain(index);
     if (mode === "r") {
-      const at = this.indexAt(from);
-      const here = this.markers[at]?.instance === marker.instance ? this.chain(at) : null;
+      const at = this.numbered[this.indexAt(from)] ?? -1;
+      const here = this.markers[at]?.instance === marker.instance ? this.chain(at) : [];
       let shared = 0;
-      while (here && shared < chain.length - 1 && chain[shared] === here[shared]) shared++;
-      chain = here ? chain.slice(shared) : [index];
+      while (shared < chain.length - 1 && chain[shared] === here[shared]) shared++;
+      chain = chain.slice(shared);
     }
     const parts: string[] = [];
     for (const i of chain) {
@@ -1041,7 +1049,9 @@ function updateTree(run: Run): void {
 // ---------- tables of contents ----------
 
 interface Entry {
-  paragraph: ParagraphAt;
+  /** The stretch of its paragraph it comes from. */
+  from: number;
+  to: number;
   level: number;
   title: string;
   number: string;
@@ -1062,19 +1072,38 @@ function everyContents(tree: Node): Field[] {
   return found;
 }
 
+/** A stretch of a paragraph that makes an entry. */
+interface EntryPart {
+  title: string;
+  from: number;
+  to: number;
+  bookmark: string | null;
+}
+
 /**
- * A paragraph's text for its entry: no codes, deleted or hidden text, nothing of a table of
- * contents (a heading holding one is listed by the rest of its text, as Word lists it); line
- * breaks as spaces.
+ * What a paragraph gives entries from: its text without codes, deleted or hidden text, spaces
+ * around it dropped and line breaks as spaces. A table of contents standing in it divides it: Word
+ * lists what is before and after as entries of their own.
  */
-function entryTitle(tree: Node, word: WordContext, { node, pos }: ParagraphAt): string {
+function entryParts(tree: Node, word: WordContext, { node, pos }: ParagraphAt): EntryPart[] {
   const { run } = word.resolver.paragraph(node.attrs);
   const contents = everyContents(tree);
-  let out = "";
+  const parts: EntryPart[] = [];
+  let part: EntryPart | null = null;
   node.forEach((child, offset) => {
     const at = pos + 1 + offset;
+    if (contents.some((f) => at >= f.from && at < f.to)) {
+      part = null;
+      return;
+    }
+    if (!part) {
+      part = { title: "", from: at, to: at, bookmark: null };
+      parts.push(part);
+    }
+    part.to = at + child.nodeSize;
+    if (child.type.name === "bookmarkStart" && TOC_BOOKMARK.test(String(child.attrs.name)))
+      part.bookmark ??= String(child.attrs.name);
     if (isGone(child) || inFieldCode(tree, at)) return;
-    if (contents.some((f) => at >= f.from && at < f.to)) return;
     if (
       word.resolver.run(
         run,
@@ -1082,12 +1111,20 @@ function entryTitle(tree: Node, word: WordContext, { node, pos }: ParagraphAt): 
       ).hidden
     )
       return;
-    if (child.isText) out += child.text;
-    else if (child.type.name === "tab") out += "\t";
-    else if (child.type.name === "hardBreak") out += " ";
+    if (child.isText) part.title += child.text;
+    else if (child.type.name === "tab") part.title += "\t";
+    else if (child.type.name === "hardBreak") part.title += " ";
   });
-  return out.trimEnd();
+  return parts
+    .map((found) => ({ ...found, title: found.title.trim() }))
+    .filter((found) => found.title);
 }
+
+/** A paragraph's text as a heading to refer to. */
+const entryTitle = (tree: Node, word: WordContext, paragraph: ParagraphAt) =>
+  entryParts(tree, word, paragraph)
+    .map((part) => part.title)
+    .join(" ");
 
 const TOC_BOOKMARK = /^_Toc\d+$/;
 
@@ -1134,22 +1171,17 @@ function contentsEntries(tree: Node, word: WordContext, { switches }: FieldInstr
     if (level === undefined && switches.has("u") && outline !== null && outline < 9)
       if (inRange(outline + 1)) level = outline + 1;
     if (level === undefined) return;
-    const title = entryTitle(tree, word, paragraph);
-    if (!title.trim()) return;
     const marker = markers[i];
-    let bookmark: string | null = null;
-    node.forEach((child) => {
-      if (child.type.name === "bookmarkStart" && TOC_BOOKMARK.test(String(child.attrs.name)))
-        bookmark ??= String(child.attrs.name);
-    });
-    out.push({
-      paragraph,
-      level,
-      title,
-      number: marker?.text ?? "",
-      numberGap: marker?.suffix === "space" ? " " : marker?.suffix === "nothing" ? "" : "\t",
-      bookmark,
-    });
+    for (const { title, from, to, bookmark } of entryParts(tree, word, paragraph))
+      out.push({
+        from,
+        to,
+        level,
+        title,
+        number: marker?.text ?? "",
+        numberGap: marker?.suffix === "space" ? " " : marker?.suffix === "nothing" ? "" : "\t",
+        bookmark,
+      });
   });
   return out;
 }
@@ -1170,21 +1202,24 @@ function textWidth(tree: Node, word: WordContext, pos: number): number {
   );
 }
 
-/**
- * The styles of the paragraphs a result fills: not its last when that holds only the end, nor those
- * a tracked change has deleted.
- */
+/** Whether a paragraph has something of `field` a tracked change has not deleted. */
+function holdsResult(node: Node, pos: number, field: Field): boolean {
+  let live = pos < field.from;
+  node.forEach((child, offset) => {
+    const at = pos + 1 + offset;
+    if (at >= field.from && at < field.to && !isGone(child))
+      live ||= !child.type.name.startsWith("field") || at === field.from;
+  });
+  return live;
+}
+
+/** The styles of the paragraphs a result fills: not the one holding only the end. */
 function resultStyles(tree: Node, field: Field): (string | null)[] {
   const out: (string | null)[] = [];
   tree.nodesBetween(field.from, field.to, (node, pos) => {
     if (!node.isTextblock) return true;
-    let live = pos < field.from;
-    node.forEach((child, offset) => {
-      const at = pos + 1 + offset;
-      if (at >= field.from && at < field.to && !isGone(child))
-        live ||= !child.type.name.startsWith("field") || at === field.from;
-    });
-    if (live && pos + 1 !== field.resultTo) out.push((node.attrs.style as string | null) ?? null);
+    if (holdsResult(node, pos, field) && pos + 1 !== field.resultTo)
+      out.push((node.attrs.style as string | null) ?? null);
     return false;
   });
   return out;
@@ -1213,7 +1248,7 @@ function rebuildContents(run: Run, index: number): void {
   const { layout } = run.options;
   const pageText = (entry: Entry) => {
     if (pagesHidden(entry.level) || !layout) return "";
-    const page = layout.pageAt(originalPos(tr, entry.paragraph.pos + 1));
+    const page = layout.pageAt(originalPos(tr, entry.from));
     return page ? formatNumber(page.number, page.format) : "";
   };
   const line = (entry: Entry, page: string) =>
@@ -1253,14 +1288,9 @@ function rebuildContents(run: Run, index: number): void {
   const ids = new Map(missing.map((entry) => [entry, id++]));
   for (const entry of missing) entry.bookmark = nextName();
   for (const entry of missing.reverse()) {
-    const { pos, node } = entry.paragraph;
     const mark = ids.get(entry) as number;
-    // Before a table of contents the heading holds: the rest of the paragraph may be replaced.
-    const holds = everyContents(tr.doc).find(
-      (f) => f.from > pos && f.from <= pos + node.content.size,
-    );
-    tr.insert(holds?.from ?? pos + 1 + node.content.size, end.create({ id: mark }));
-    tr.insert(pos + 1, start.create({ id: mark, name: entry.bookmark }));
+    tr.insert(entry.to, end.create({ id: mark }));
+    tr.insert(entry.from, start.create({ id: mark, name: entry.bookmark }));
   }
   field = contentsField();
   const hyperlinks = switches.has("h");
@@ -1317,36 +1347,53 @@ function rebuildContents(run: Run, index: number): void {
     );
     return;
   }
-  // The end stays in its own paragraph when it has one (or would be left with the last entry).
-  const endAttrs = $end.parent.attrs;
+  // The end goes on in a paragraph of its own, with what follows it, as in Word.
+  if (field.separator === null) {
+    const marks = field.codeMarks ?? [];
+    tr.insert(field.resultTo, node("fieldSeparator", null, withoutReview(marks)));
+    field = contentsField();
+  }
+  if (tr.doc.resolve(field.resultTo).parentOffset) {
+    tr.split(field.resultTo);
+    field = contentsField();
+  }
+  const $close = tr.doc.resolve(field.resultTo);
+  const closing = $close.before();
+  const closes = $close.parent;
+  // The paragraphs entries go into, line for line: tracked, each keeps its place and its change.
+  const lines: ParagraphAt[] = [];
   // A section ending in what is replaced goes on ending after the last entry, not after the first.
-  let section = endAttrs.section ?? null;
-  tr.doc.nodesBetween(field.from, field.resultTo, (block) => {
-    if (block.isTextblock && block !== $end.parent) section ??= block.attrs.section ?? null;
-    return !block.isTextblock;
+  let section = closes.attrs.section ?? null;
+  tr.doc.nodesBetween(field.from, field.resultTo, (block, pos) => {
+    if (!block.isTextblock) return true;
+    if (pos === closing) return false;
+    section ??= block.attrs.section ?? null;
+    if (pos > $start.before() || startsParagraph)
+      if (holdsResult(block, pos, field)) lines.push({ node: block, pos });
+    return false;
   });
-  const ownEnd = $end.parentOffset === 0 || $end.pos === field.resultFrom;
-  const last = paragraphs[paragraphs.length - 1] as Node;
-  const closing = (ownEnd ? $end.parent : last).type.create(
-    ownEnd
-      ? { ...endAttrs, section }
-      : { ...last.attrs, section, controls: endAttrs.controls ?? null },
-    ownEnd ? null : last.content,
-  );
-  const held = $start.parent.attrs;
-  const nodes = [
-    // The rest of the paragraph it starts in ends there.
-    ...(startsParagraph ? [] : [$start.parent.type.create(held)]),
-    ...(ownEnd ? paragraphs : paragraphs.slice(0, -1)),
-    closing,
-  ];
-  tr.replace(field.resultFrom, field.resultTo, new Slice(Fragment.fromArray(nodes), 1, 1));
-  const first = nodes[0] as Node;
-  if (startsParagraph) tr.setNodeMarkup($start.before(), first.type, first.attrs);
-  else if (nodes.length > 1 && held.section)
-    tr.setNodeMarkup($start.before(), first.type, { ...held, section: null });
-  else if (nodes.length === 1 && section !== (held.section ?? null))
-    tr.setNodeMarkup($start.before(), first.type, { ...held, section });
+  if (section !== (closes.attrs.section ?? null))
+    tr.setNodeMarkup(closing, closes.type, { ...closes.attrs, section });
+  if (paragraphs.length > lines.length) tr.insert(closing, paragraphs.slice(lines.length));
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const { node: old, pos } = lines[i] as ParagraphAt;
+    const entry = paragraphs[i];
+    if (!entry) {
+      tr.delete(pos, pos + old.nodeSize);
+      continue;
+    }
+    const from = pos < field.from ? field.resultFrom : pos + 1;
+    tr.replace(from, pos + 1 + old.content.size, new Slice(entry.content, 0, 0));
+    const { revision, formatChange } = old.attrs;
+    tr.setNodeMarkup(pos, old.type, { ...entry.attrs, revision, formatChange });
+  }
+  if (!startsParagraph) {
+    // What the first paragraph held of the old result goes; the text before the field stays.
+    const held = tr.doc.resolve(field.from);
+    if (field.resultFrom < held.end()) tr.delete(field.resultFrom, held.end());
+    if (held.parent.attrs.section)
+      tr.setNodeMarkup(held.before(), held.parent.type, { ...held.parent.attrs, section: null });
+  }
 }
 
 /** A bookmark id no tree of the document uses yet. */

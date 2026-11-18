@@ -17,7 +17,7 @@
 //
 // Since 11.8 it also has Word read what `updateFields` and the insert commands write, with Word's
 // pages as the layout: <name>-updated (every result spoiled, then updated), 04-rebuilt (an entry
-// spoiled, the table of contents built again), 04-control (the same inside a block content control,
+// spoiled, the table of contents built again), 04-tracked (that while tracking), 04-control (the same inside a block content control,
 // as Word's gallery puts it), 03-merged (merge fields filled from data while tracking), 04-inserted
 // (a page number, the date, cross-references and a new table of contents).
 // Word must find exactly the fields and results Foli holds (a `DATE`'s result aside: Word
@@ -127,10 +127,12 @@ function wordLayout(doc, word) {
 }
 
 const heldFields = (editor) =>
-  fieldsIn(editor.state.doc).map((f) => ({
-    code: f.instruction,
-    result: f.result.replace(/\r/g, ""),
-  }));
+  fieldsIn(editor.state.doc)
+    .filter((f) => !f.deleted)
+    .map((f) => ({
+      code: f.instruction,
+      result: f.result.replace(/\r/g, ""),
+    }));
 
 /** Documents written through `updateFields` and the insert commands, by file name. */
 async function fieldEdits(name, document, packages) {
@@ -168,6 +170,21 @@ async function fieldEdits(name, document, packages) {
       },
     });
     out[`${base}-rebuilt`] = rebuilt;
+
+    // The same while tracking: Word reads it with the changes accepted.
+    const tracked = open({ trackChanges: true });
+    const first = fieldsIn(tracked.state.doc)[0];
+    tracked.dispatch(tracked.state.tr.insertText("X", first.resultFrom + 1));
+    updateFields(tracked, {
+      layout: {
+        pages: word.pages,
+        pageAt: (pos) => ({
+          number: pages.get(tracked.state.doc.resolve(pos).parent.textContent) ?? 1,
+          sectionPages: word.pages,
+        }),
+      },
+    });
+    out[`${base}-tracked`] = tracked;
 
     // The table of contents in a block content control, as Word's gallery has it: the rebuilt
     // entries must stay in it.
