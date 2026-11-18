@@ -101,10 +101,10 @@ export interface EditorOptions {
 
 export type EditorListener = (state: EditorState, transactions: readonly Transaction[]) => void;
 
-/** A header or footer open for editing on its page. */
+/** A header, footer or note open for editing on its page. */
 export interface OpenStory {
   id: string;
-  side: StorySide;
+  side: StorySide | "note";
   variant: StoryVariant;
   /** The section it was opened from (a linked one shows an earlier section's story). */
   section: number;
@@ -115,6 +115,10 @@ export interface StoryView {
   readonly open: OpenStory | null;
   /** Opens the header or footer of a page (default: the selection's). Whether it is open now. */
   edit(side: StorySide, page?: number): boolean;
+  /** Opens a note where it is: `id`, or the one whose reference is at the selection. */
+  editNote(id?: string): boolean;
+  /** Back from the note being edited to its reference, the caret after it. */
+  toReference(): boolean;
   close(): void;
   /** The pages as last laid out, for fields; null when there are none. */
   readonly fieldLayout: FieldLayout | null;

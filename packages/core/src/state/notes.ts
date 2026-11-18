@@ -116,7 +116,7 @@ export interface NoteNumber {
 
 export interface NoteNumberOptions {
   /** The page a position is on: numbers restarting on each page need it. */
-  pageOf?: (pos: number) => number | undefined;
+  pageOf?: (pos: number, story: string) => number | undefined;
   /** Deleted references count for nothing (the views that show the changes as accepted). */
   hideDeleted?: boolean;
 }
@@ -159,7 +159,7 @@ export function noteNumbers(
       }
       const properties = noteProperties(envelope, kind, setup);
       const counter = counters[kind];
-      const page = properties.restart === "eachPage" ? options.pageOf?.(pos) : undefined;
+      const page = properties.restart === "eachPage" ? options.pageOf?.(pos, ref.story) : undefined;
       const fresh = counter.section < 0;
       const newSection = counter.section !== section;
       if (

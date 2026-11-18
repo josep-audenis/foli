@@ -12,6 +12,7 @@ import {
   colorAt,
   controlAt,
   controlProperties,
+  convertNotes,
   crossReferenceTargets,
   deleteColumns,
   deleteRows,
@@ -29,6 +30,7 @@ import {
   insertControl,
   insertCrossReference,
   insertDate,
+  insertNote,
   insertPageBreak,
   insertPageNumber,
   insertPicture,
@@ -42,8 +44,12 @@ import {
   linkAt,
   listKindAt,
   mergeCells,
+  type NoteKind,
+  type NotePropertiesJSON,
   nextChange,
   normalizeHref,
+  noteAtSelection,
+  noteProperties,
   openLinkEditor,
   paragraphStyleAt,
   paragraphStyles,
@@ -71,6 +77,7 @@ import {
   setHighlight,
   setLineSpacing,
   setLink,
+  setNoteProperties,
   setParagraphStyle,
   setPictureAlt,
   setPictureSize,
@@ -181,7 +188,7 @@ interface Action {
   label: string;
   /** The command it runs; with `dialog`, whether it applies: the dialog does the rest. */
   command: Command;
-  dialog?: "insertTable" | "pageSetup" | "crossReference" | "controlProperties";
+  dialog?: "insertTable" | "pageSetup" | "crossReference" | "controlProperties" | "noteOptions";
   checked?: (state: EditorState) => boolean;
   /** It takes the focus where it belongs (into a story, or back to the body). */
   movesFocus?: boolean;
@@ -298,6 +305,7 @@ function storyActions(body: Editor): readonly Action[] {
   const linked = (state: EditorState) => {
     const story = open();
     if (!story) return false;
+    if (story.side === "note") return false;
     const references = story.side === "header" ? setup(state).headers : setup(state).footers;
     return !references?.[story.variant];
   };
@@ -335,7 +343,7 @@ function storyActions(body: Editor): readonly Action[] {
       checked: linked,
       command: (state, dispatch) => {
         const story = open();
-        return story
+        return story && story.side !== "note"
           ? setStoryLinked(
               story.side,
               story.variant,
@@ -344,6 +352,60 @@ function storyActions(body: Editor): readonly Action[] {
             )(state, dispatch)
           : false;
       },
+    },
+  ];
+}
+
+/**
+ * The notes menu: a new note (the caret goes into it), between a reference and its note, the
+ * conversions Word has, and the options dialog.
+ */
+function noteActions(body: Editor): readonly Action[] {
+  const insert =
+    (kind: NoteKind): Command =>
+    (state, dispatch) => {
+      if (!insertNote(kind)(state)) return false;
+      if (dispatch) {
+        insertNote(kind)(state, dispatch);
+        body.storyView?.editNote();
+      }
+      return true;
+    };
+  return [
+    { key: "footnote", label: "Insert footnote", command: insert("footnote"), movesFocus: true },
+    { key: "endnote", label: "Insert endnote", command: insert("endnote"), movesFocus: true },
+    {
+      key: "goToNote",
+      label: "Go to note or reference",
+      movesFocus: true,
+      command: (state, dispatch) => {
+        const view = body.storyView;
+        if (!view) return false;
+        if (view.open?.side === "note") {
+          if (dispatch) view.toReference();
+          return true;
+        }
+        if (!noteAtSelection(state)) return false;
+        if (dispatch) view.editNote();
+        return true;
+      },
+    },
+    {
+      key: "toEndnotes",
+      label: "Convert footnotes to endnotes",
+      command: (_state, dispatch) => convertNotes("endnote")(body.state, dispatch && body.dispatch),
+    },
+    {
+      key: "toFootnotes",
+      label: "Convert endnotes to footnotes",
+      command: (_state, dispatch) =>
+        convertNotes("footnote")(body.state, dispatch && body.dispatch),
+    },
+    {
+      key: "noteOptions",
+      label: "Note options…",
+      dialog: "noteOptions",
+      command: (state) => wordContext(state) !== null,
     },
   ];
 }
@@ -821,6 +883,13 @@ const GROUPS: Item[][] = [
       actions: fieldActions,
     },
     {
+      key: "notes",
+      label: "Footnotes and endnotes",
+      text: "Notes",
+      enabled: (state) => wordContext(state) !== null,
+      actions: noteActions,
+    },
+    {
       key: "controls",
       label: "Content controls",
       text: "Controls",
@@ -974,6 +1043,11 @@ export function FoliToolbar({
               ? null
               : current,
           );
+          setNoteDialog((current) =>
+            current && (!transactions.length || transactions.some((tr) => tr.docChanged))
+              ? null
+              : current,
+          );
           // The control properties dialog is for the control it opened on.
           setControlDialog((current) =>
             current &&
@@ -1068,6 +1142,11 @@ export function FoliToolbar({
   } | null>(null);
   useEffect(() => {
     if (disabled) setControlDialog(null);
+  }, [disabled]);
+  // The note options dialog (from the notes menu).
+  const [noteDialog, setNoteDialog] = useState<{ restore: HTMLElement | null } | null>(null);
+  useEffect(() => {
+    if (disabled) setNoteDialog(null);
   }, [disabled]);
   // The picture dialog: inserts at (or edits the picture at `pos`) the selection it opened on.
   const [pictureDialog, setPictureDialog] = useState<{
@@ -1213,6 +1292,15 @@ export function FoliToolbar({
                         state={editor.state}
                         onPick={(action, pointer) => {
                           setMenu(null);
+                          if (action.dialog === "noteOptions") {
+                            setDialog(null);
+                            setTableDialog(null);
+                            setSetupDialog(null);
+                            setReferenceDialog(null);
+                            setControlDialog(null);
+                            setNoteDialog({ restore: buttons.current[i] ?? null });
+                            return;
+                          }
                           if (action.dialog === "controlProperties") {
                             setDialog(null);
                             setTableDialog(null);
@@ -1328,6 +1416,17 @@ export function FoliToolbar({
             const { restore } = referenceDialog;
             setReferenceDialog(null);
             if (inserted && onClickCommand) onClickCommand();
+            else restore?.focus();
+          }}
+        />
+      )}
+      {noteDialog && !disabled && (
+        <NoteOptionsDialog
+          editor={body}
+          onClose={(applied) => {
+            const { restore } = noteDialog;
+            setNoteDialog(null);
+            if (applied && onClickCommand) onClickCommand();
             else restore?.focus();
           }}
         />
@@ -1835,6 +1934,151 @@ function CrossReferenceDialog({
         {failed && (
           <p className="foli-link-error" role="alert">
             A cross-reference cannot be inserted here.
+          </p>
+        )}
+      </form>
+    </div>
+  );
+}
+
+/** Word's number formats for notes. */
+const NOTE_FORMATS = [
+  ["decimal", "1, 2, 3"],
+  ["lowerLetter", "a, b, c"],
+  ["upperLetter", "A, B, C"],
+  ["lowerRoman", "i, ii, iii"],
+  ["upperRoman", "I, II, III"],
+  ["chicago", "*, †, ‡"],
+] as const;
+
+/**
+ * How notes are placed and numbered, for the whole document as Word's dialog applies it: where
+ * they go, the number format, where numbers start and when they restart; Escape cancels.
+ */
+function NoteOptionsDialog({
+  editor,
+  onClose,
+}: {
+  editor: Editor;
+  onClose: (applied: boolean) => void;
+}) {
+  const [kind, setKind] = useState<NoteKind>("footnote");
+  const valuesOf = (of: NoteKind) => {
+    const envelope = wordContext(editor.state)?.envelope;
+    const section = sectionAt(editor.state)?.setup;
+    return noteProperties(envelope ?? {}, of, section);
+  };
+  const [values, setValues] = useState(() => valuesOf("footnote"));
+  const [start, setStart] = useState(String(values.start));
+  const first = useRef<HTMLSelectElement>(null);
+  const id = useId();
+  useEffect(() => {
+    first.current?.focus();
+  }, []);
+  const set = (change: Partial<typeof values>) => setValues((v) => ({ ...v, ...change }));
+  const restarts = values.restart !== "continuous";
+  const number = Number(start);
+  const invalid = !restarts && (!Number.isInteger(number) || number < 1 || number > 16383);
+  const apply = (event: FormEvent) => {
+    event.preventDefault();
+    if (invalid) return;
+    const properties: NotePropertiesJSON = {
+      position: values.position,
+      format: values.format,
+      restart: values.restart,
+      start: restarts ? 1 : number,
+    };
+    onClose(editor.run(setNoteProperties(kind, properties)));
+  };
+  return (
+    <div
+      role="dialog"
+      aria-label="Note options"
+      className="foli-link-dialog foli-table-dialog"
+      onKeyDown={(event) => {
+        if (event.key !== "Escape") return;
+        event.preventDefault();
+        onClose(false);
+      }}
+    >
+      <form onSubmit={apply} noValidate>
+        <label htmlFor={`${id}-kind`}>Notes</label>
+        <select
+          ref={first}
+          id={`${id}-kind`}
+          value={kind}
+          onChange={(event) => {
+            const next = event.target.value as NoteKind;
+            const shown = valuesOf(next);
+            setKind(next);
+            setValues(shown);
+            setStart(String(shown.start));
+          }}
+        >
+          <option value="footnote">Footnotes</option>
+          <option value="endnote">Endnotes</option>
+        </select>
+        <label htmlFor={`${id}-position`}>Position</label>
+        <select
+          id={`${id}-position`}
+          value={values.position}
+          onChange={(event) =>
+            set({ position: event.target.value as NonNullable<NotePropertiesJSON["position"]> })
+          }
+        >
+          {kind === "footnote" ? (
+            <>
+              <option value="pageBottom">Bottom of page</option>
+              <option value="beneathText">Below text</option>
+            </>
+          ) : (
+            <>
+              <option value="docEnd">End of document</option>
+              <option value="sectEnd">End of section</option>
+            </>
+          )}
+        </select>
+        <label htmlFor={`${id}-format`}>Number format</label>
+        <select
+          id={`${id}-format`}
+          value={values.format}
+          onChange={(event) => set({ format: event.target.value })}
+        >
+          {NOTE_FORMATS.map(([value, label]) => (
+            <option key={value} value={value}>
+              {label}
+            </option>
+          ))}
+        </select>
+        <label htmlFor={`${id}-start`}>Start at</label>
+        <input
+          id={`${id}-start`}
+          type="number"
+          min={1}
+          value={restarts ? "1" : start}
+          disabled={restarts}
+          aria-invalid={invalid || undefined}
+          onChange={(event) => setStart(event.target.value)}
+        />
+        <label htmlFor={`${id}-restart`}>Numbering</label>
+        <select
+          id={`${id}-restart`}
+          value={values.restart}
+          onChange={(event) =>
+            set({ restart: event.target.value as NonNullable<NotePropertiesJSON["restart"]> })
+          }
+        >
+          <option value="continuous">Continuous</option>
+          <option value="eachSect">Restart each section</option>
+          {kind === "footnote" && <option value="eachPage">Restart each page</option>}
+        </select>
+        <button type="submit">Apply</button>
+        <button type="button" onClick={() => onClose(false)}>
+          Cancel
+        </button>
+        {invalid && (
+          <p className="foli-link-error" role="alert">
+            The start must be a whole number from 1.
           </p>
         )}
       </form>

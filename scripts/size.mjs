@@ -89,13 +89,15 @@ writeFileSync(appEntry, `export { FoliEditor } from "${dist("react")}";\n`);
  * lists and date picker in the view, the controls menu and properties dialog.
  * Core raised in 11.10 (75.6 kB, 77.1 allowed): notes (numbers from the settings and sections, the
  * insert, options and convert commands, keeping a note with its reference while tracking, notes
- * carried on the clipboard).
+ * carried on the clipboard). View and React raised in 11.10 (100.9 and 135.2 kB, 102.5 and 137.7
+ * allowed): footnotes and endnotes in the flow and both renderers, a note edited in place, the
+ * notes menu and options dialog, and core's notes with them.
  */
 const BUNDLES = [
   { name: "@folijs/core", entry: dist("core"), budget: 79_000 },
-  { name: "@folijs/view", entry: dist("view"), budget: 97_500 },
-  { name: "@folijs/react", entry: dist("react"), budget: 132_000 },
-  { name: "FoliEditor only", entry: appEntry, budget: 132_000 },
+  { name: "@folijs/view", entry: dist("view"), budget: 105_000 },
+  { name: "@folijs/react", entry: dist("react"), budget: 141_000 },
+  { name: "FoliEditor only", entry: appEntry, budget: 141_000 },
   { name: "@folijs/docx", entry: dist("docx"), budget: 58_400 },
 ];
 
