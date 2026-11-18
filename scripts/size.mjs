@@ -1,4 +1,4 @@
-// Bundle size, as an app gets it: each package's published entry (`dist`, after `pnpm build`)
+﻿// Bundle size, as an app gets it: each package's published entry (`dist`, after `pnpm build`)
 // bundled with its Foli dependencies, fully minified, React external; and an app that imports
 // only `FoliEditor`, where `sideEffects` and tree shaking decide what is left. Fails when a
 // bundle grows past its budget. Run: `pnpm size` (part of `pnpm check`). Numbers and method:
@@ -79,12 +79,15 @@ writeFileSync(appEntry, `export { FoliEditor } from "${dist("react")}";\n`);
  * and footer commands. Docx raised in 11.7 (53.5 kB): `word/settings.xml` read and written back.
  * View and React raised in 11.7 (73.6 and 102.5 kB): headers and footers on pages in both
  * renderers, a story edited in place (a second view mounted on its page), the header menu.
+ * Core, view and React raised in 11.8 (66.4, 86.2 and 114.2 kB): fields (finding them, the
+ * selection rules, every field Foli updates with Word's switches, tables of contents rebuilt,
+ * the insert commands), hidden code ranges and shading in the view, the fields menu and dialog.
  */
 const BUNDLES = [
-  { name: "@folijs/core", entry: dist("core"), budget: 59_000 },
-  { name: "@folijs/view", entry: dist("view"), budget: 77_000 },
-  { name: "@folijs/react", entry: dist("react"), budget: 107_000 },
-  { name: "FoliEditor only", entry: appEntry, budget: 107_000 },
+  { name: "@folijs/core", entry: dist("core"), budget: 70_000 },
+  { name: "@folijs/view", entry: dist("view"), budget: 90_500 },
+  { name: "@folijs/react", entry: dist("react"), budget: 119_500 },
+  { name: "FoliEditor only", entry: appEntry, budget: 119_500 },
   { name: "@folijs/docx", entry: dist("docx"), budget: 55_500 },
 ];
 

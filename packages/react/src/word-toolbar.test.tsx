@@ -74,6 +74,8 @@ describe("FoliToolbar on a schema v3 document", () => {
         open = null;
         editor.storyChanged();
       },
+      fieldLayout: null,
+      updateFields: () => ({ updated: 0, unchanged: 0, rebuilt: 0, skipped: [] }),
     };
     render(<FoliToolbar editor={editor} />);
     const menu = screen.getByRole("button", { name: "Header" });

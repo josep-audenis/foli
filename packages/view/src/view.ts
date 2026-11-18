@@ -15,6 +15,11 @@ import {
   type EditorState,
   ensureStory,
   extendCellSelection,
+  type Field,
+  type FieldLayout,
+  type FieldsReport,
+  fieldCodesShown,
+  fieldsIn,
   fitPaste,
   fitPastedV2,
   goToCellVertically,
@@ -49,10 +54,13 @@ import {
   TextSelection,
   type Transaction,
   TransformError,
+  toggleFieldCodes,
   toggleMark,
   trackState,
   typedMarks,
+  type UpdateFieldsOptions,
   undo,
+  updateFields,
   type WordContext,
   withEnvelope,
   wordContext,
@@ -185,11 +193,13 @@ export interface EditorViewOptions {
 const PLACEHOLDER_ATTR = "data-foli-placeholder";
 /** On the span of a selected picture (it holds the resize handle). */
 const PICTURE_SELECTED_ATTR = "data-foli-picture-selected";
+/** On what shows a field the selection is in: Word shades it. */
+const FIELD_SELECTED_ATTR = "data-foli-field-selected";
 /** The smallest a picture gets by dragging its handle, in px. */
 const MIN_PICTURE = 8;
 // Generated content is not document text: no caret stops inside it, a zero-height float keeps
 // the caret at the line start, and the empty alt text keeps screen readers on aria-placeholder.
-const STYLES = `.foli-in-story>.foli-page>:not(.foli-region){opacity:.45}.foli-story-mount{pointer-events:auto;outline:1px dashed GrayText;outline-offset:2px}.foli-story-mount>[contenteditable=true]:focus{outline:none}.${CELL_CLASS}{box-shadow:inset 0 0 0 9999px rgba(0,120,215,.22)}[${CELLS_ATTR}] ::selection{background:transparent}[data-foli-no-alt]{outline:2px dashed #b45309;outline-offset:-2px}@media print{[data-foli-no-alt]{outline:none}}[${PICTURE_SELECTED_ATTR}]{position:relative;outline:2px solid Highlight}[${PICTURE_SELECTED_ATTR}] [data-foli-resize]{position:absolute;right:-5px;bottom:-5px;width:10px;height:10px;box-sizing:border-box;border:1px solid Canvas;background:Highlight;cursor:nwse-resize;forced-color-adjust:none}@media print{[${PICTURE_SELECTED_ATTR}]{outline:none}[${PICTURE_SELECTED_ATTR}] [data-foli-resize]{display:none}}[${PLACEHOLDER_ATTR}]::before{content:attr(${PLACEHOLDER_ATTR});content:attr(${PLACEHOLDER_ATTR}) / "";float:inline-start;height:0;pointer-events:none;color:GrayText}`;
+const STYLES = `[${FIELD_SELECTED_ATTR}]{background-color:rgba(0,0,0,.14)}@media print{[${FIELD_SELECTED_ATTR}]{background-color:transparent}}.foli-in-story>.foli-page>:not(.foli-region){opacity:.45}.foli-story-mount{pointer-events:auto;outline:1px dashed GrayText;outline-offset:2px}.foli-story-mount>[contenteditable=true]:focus{outline:none}.${CELL_CLASS}{box-shadow:inset 0 0 0 9999px rgba(0,120,215,.22)}[${CELLS_ATTR}] ::selection{background:transparent}[data-foli-no-alt]{outline:2px dashed #b45309;outline-offset:-2px}@media print{[data-foli-no-alt]{outline:none}}[${PICTURE_SELECTED_ATTR}]{position:relative;outline:2px solid Highlight}[${PICTURE_SELECTED_ATTR}] [data-foli-resize]{position:absolute;right:-5px;bottom:-5px;width:10px;height:10px;box-sizing:border-box;border:1px solid Canvas;background:Highlight;cursor:nwse-resize;forced-color-adjust:none}@media print{[${PICTURE_SELECTED_ATTR}]{outline:none}[${PICTURE_SELECTED_ATTR}] [data-foli-resize]{display:none}}[${PLACEHOLDER_ATTR}]::before{content:attr(${PLACEHOLDER_ATTR});content:attr(${PLACEHOLDER_ATTR}) / "";float:inline-start;height:0;pointer-events:none;color:GrayText}`;
 
 /**
  * Adds the view's stylesheet once per document or shadow root, when a placeholder is first shown
@@ -251,6 +261,9 @@ function hiddenIn(node: Node, stop: Node): boolean {
     if (el.style.display === "none") return true;
   return false;
 }
+
+/** The fields whose results depend on where things fall on the pages. */
+const PAGE_DEPENDENT = new Set(["PAGE", "NUMPAGES", "SECTIONPAGES", "PAGEREF"]);
 
 /** The attribute naming a page's page setup (its index among the document's) for print. */
 const SHEET_ATTR = "data-foli-sheet";
@@ -597,6 +610,10 @@ export class EditorView {
   private resource: EditorViewOptions["resource"];
   /** How tracked changes show. */
   private review: ReviewView = "markup";
+  /** Whether fields show their codes (`toggleFieldCodes`). */
+  private fieldCodes = false;
+  /** The elements shaded for the fields the selection is in. */
+  private shadedFields: Element[] = [];
   /** Fonts' normal line height ratios, measured once per family (Word's single spacing). */
   private readonly ratios = new Map<string, number>();
   /** Web fonts loaded since the v3 blocks were drawn: the next render draws them again. */
@@ -640,6 +657,9 @@ export class EditorView {
             get review() {
               return view.review;
             },
+            get fieldCodes() {
+              return view.fieldCodes;
+            },
             lineRatio: (family) => this.lineRatio(family),
             resource: (key, resource) => this.resource?.(key, resource),
             measureIn: () => this.pages[0] ?? host,
@@ -658,6 +678,7 @@ export class EditorView {
     host.style.overflowWrap = "break-word";
     host.replaceChildren();
     this.review = trackState(this.state)?.view ?? "markup";
+    this.fieldCodes = fieldCodesShown(this.state);
     this.resizeObserver =
       typeof ResizeObserver === "undefined" ? null : new ResizeObserver(this.onResize);
     this.observer = new MutationObserver(this.onMutations);
@@ -812,6 +833,13 @@ export class EditorView {
       this.review = review;
       this.word = null;
     }
+    // Codes shown or hidden: every block and story drawn again.
+    const codes = fieldCodesShown(state);
+    const codesChanged = codes !== this.fieldCodes;
+    if (codesChanged) {
+      this.fieldCodes = codes;
+      this.word = null;
+    }
     const before = wordContext(this.state)?.envelope;
     const envelope = wordContext(state)?.envelope;
     // The last section's setup and the settings live in the envelope: changing them leaves the
@@ -819,6 +847,7 @@ export class EditorView {
     const docChanged =
       state.doc !== this.state.doc ||
       reviewChanged ||
+      codesChanged ||
       envelope?.section !== before?.section ||
       envelope?.settings !== before?.settings;
     const storiesChanged = envelope?.stories !== before?.stories;
@@ -828,6 +857,8 @@ export class EditorView {
     this.state = state;
     if (docChanged || (storiesChanged && !this.redrawRegions())) this.render();
     if (lost) this.closeStory(true);
+    // The open story has its own editor, which hears nothing of this.
+    if (codesChanged) this.mount?.view.update(this.mount.view.editor.state);
     this.showSelectedNode();
     this.writeSelection(docChanged);
     // shortcut: scrolls for every change while focused; once remote or plugin changes exist, scroll only for local input (a transaction flag).
@@ -898,6 +929,7 @@ export class EditorView {
         false,
         this.review,
         imageSource(context.envelope.resources, this.resource ?? undefined),
+        this.fieldCodes,
       );
       this.invalidateLayout();
     }
@@ -1461,7 +1493,115 @@ export class EditorView {
     },
     edit: (side, page) => view.openStory(side, page),
     close: () => view.closeStory(),
+    get fieldLayout() {
+      return view.fieldLayout();
+    },
+    updateFields: (options, editor) => view.updateFields(options, editor),
   }))(this);
+
+  // ---------- fields ----------
+
+  /** The pages as last flowed, as fields need them; null without pages. */
+  private fieldLayout(): FieldLayout | null {
+    if (!this.regions || !this.facts.length) return null;
+    return {
+      pages: this.facts.length,
+      pageAt: (pos) => {
+        const { node } = this.domFromPos(Math.min(pos, this.state.doc.content.size));
+        const element =
+          node.nodeType === Node.ELEMENT_NODE ? (node as Element) : node.parentElement;
+        const page = this.facts[this.pages.indexOf(element?.closest(".foli-page") as HTMLElement)];
+        if (!page) return null;
+        const format = this.sections()[page.section]?.pageNumbers?.format;
+        return { number: page.number, sectionPages: page.sectionPages, format };
+      },
+    };
+  }
+
+  /**
+   * Updates fields from the pages shown: all of them, or those `options.only` says, of the body or
+   * of `editor` (a story's). What that does to the pages is taken in by a second pass over what
+   * depends on them, in the same undo step.
+   */
+  updateFields(options: UpdateFieldsOptions = {}, editor: Editor = this.editor): FieldsReport {
+    // A story's view has no pages: the view of the body has.
+    const main = this.regions ? null : this.editor.storyView;
+    if (main) return main.updateFields(options, editor);
+    if (this.composing) this.onCompositionEnd();
+    const report = updateFields(editor, { ...options, layout: this.fieldLayout() });
+    const { only } = options;
+    const range = !!only && typeof only !== "function";
+    if (!report.updated || (range && !report.rebuilt)) return report;
+    const follows = (field: Field) =>
+      range
+        ? field.parent?.name === "TOC"
+        : PAGE_DEPENDENT.has(field.name) && (typeof only !== "function" || only(field));
+    const again = updateFields(editor, {
+      ...options,
+      layout: this.fieldLayout(),
+      only: follows,
+      continues: true,
+    });
+    return { ...report, updated: report.updated + again.updated };
+  }
+
+  /**
+   * Prints what the document is now: fields updated (one undo step), then the browser's dialog.
+   */
+  print(): void {
+    this.updateFields();
+    this.host.ownerDocument.defaultView?.print();
+  }
+
+  /** F9 and Alt+F9, as in Word. */
+  private fieldKey(name: string): boolean {
+    if (name === "Alt-F9") {
+      this.run(toggleFieldCodes);
+      return true;
+    }
+    if (name !== "F9") return false;
+    if (!this.editable) return true;
+    const { selection } = this.state;
+    this.updateFields(
+      selection instanceof AllSelection ? {} : { only: { from: selection.from, to: selection.to } },
+    );
+    return true;
+  }
+
+  /** Shades what shows the fields the selection is in (not printed): the outermost of each. */
+  private showSelectedFields(): void {
+    const { selection, doc } = this.state;
+    const wanted = new Set<Element>();
+    const fields = selection instanceof TextSelection ? fieldsIn(doc) : [];
+    const touched = (field: Field) =>
+      selection.empty
+        ? field.from < selection.from && selection.from < field.to
+        : field.from < selection.to && field.to > selection.from;
+    for (const field of fields) {
+      if (!touched(field) || (field.parent && touched(field.parent))) continue;
+      const [from, to] = this.fieldCodes
+        ? [field.from, field.codeEnd + 1]
+        : [field.resultFrom, field.resultTo];
+      const first = Math.max(this.blockFrom(from) - 1, 0);
+      for (let i = first; i < this.blocks.length; i++) {
+        const start = (this.starts[i] as number) + 1;
+        if (start > to) break;
+        const desc = this.blocks[i] as WordBlockDesc;
+        for (const leaf of desc.leaves) {
+          const at = start + leaf.offset;
+          if (at + leaf.size <= from || at >= to || !leaf.size) continue;
+          if (hiddenIn(leaf.dom, desc.dom)) continue;
+          const element = leaf.dom.nodeType === Node.TEXT_NODE ? leaf.dom.parentElement : leaf.dom;
+          if (element instanceof Element && element.textContent) wanted.add(element);
+        }
+      }
+    }
+    for (const element of this.shadedFields)
+      if (!wanted.has(element)) element.removeAttribute(FIELD_SELECTED_ATTR);
+    if (wanted.size) injectStyles(this.host);
+    for (const element of wanted) element.setAttribute(FIELD_SELECTED_ATTR, "");
+    this.shadedFields = [...wanted];
+  }
 
   /** The sections of the document, in order. */
   private sections(): SectionJSON[] {
@@ -2238,6 +2378,7 @@ export class EditorView {
   private showSelectedNode(): void {
     this.showSelectedCells();
     this.showSelectedPicture();
+    this.showSelectedFields();
     const dom = this.selectedBlock()?.dom ?? this.selectedTable();
     if (dom === this.selectedDom) return;
     this.selectedDom?.classList.remove(SELECTED_CLASS);
@@ -2887,7 +3028,7 @@ export class EditorView {
       return;
     }
     const name = keyName(event);
-    if (this.documentEdgeKey(name)) {
+    if (this.documentEdgeKey(name) || this.fieldKey(name)) {
       event.preventDefault();
       return;
     }
