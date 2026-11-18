@@ -72,13 +72,15 @@ writeFileSync(appEntry, `export { FoliEditor } from "${dist("react")}";\n`);
  * 11.3 (core 53.7, view 65.4, React 89.8, docx 46.9 kB): schema v5 (the field, control and note
  * nodes, the checks of stories, controls and settings), carried by every package. Docx raised
  * in 11.4 (50.8 kB): headers, footers and notes read and written as stories, checked. Raised
- * in 11.5 (52.7 kB): fields and content controls read and written.
+ * in 11.5 (52.7 kB): fields and content controls read and written. Core, view and React raised
+ * in 11.6 (55.7, 68.8 and 95.7 kB): section commands, `EnvelopeStep` and tracked setups; columns,
+ * bands and balancing in the flow and both renderers; the section menu and page setup dialog.
  */
 const BUNDLES = [
-  { name: "@folijs/core", entry: dist("core"), budget: 55_000 },
-  { name: "@folijs/view", entry: dist("view"), budget: 67_000 },
-  { name: "@folijs/react", entry: dist("react"), budget: 92_000 },
-  { name: "FoliEditor only", entry: appEntry, budget: 92_000 },
+  { name: "@folijs/core", entry: dist("core"), budget: 57_000 },
+  { name: "@folijs/view", entry: dist("view"), budget: 70_500 },
+  { name: "@folijs/react", entry: dist("react"), budget: 98_000 },
+  { name: "FoliEditor only", entry: appEntry, budget: 98_000 },
   { name: "@folijs/docx", entry: dist("docx"), budget: 54_000 },
 ];
 

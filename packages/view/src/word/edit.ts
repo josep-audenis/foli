@@ -41,6 +41,7 @@ import {
   styleParagraph,
   styleRun,
   tagOf,
+  WORD_COLUMN_BREAK_ATTR,
   WORD_PAGE_BREAK_ATTR,
 } from "./blocks.js";
 
@@ -83,6 +84,8 @@ export interface WordInfo {
   /** The paragraph's style and whether it drops spacing next to the same style. */
   style: string | null;
   contextual: boolean;
+  /** A paragraph with nothing to show in its line. */
+  empty: boolean;
 }
 
 /** A rendered v3 block: a view block plus its flow information and what it was rendered for. */
@@ -231,9 +234,9 @@ export class WordRenderer {
         case "hardBreak":
         case "columnBreak":
         case "pageBreak": {
-          // shortcut: a column break ends the line; Foli lays out one column.
           const br = doc.createElement("br");
           if (name === "pageBreak") br.setAttribute(WORD_PAGE_BREAK_ATTR, "");
+          if (name === "columnBreak") br.setAttribute(WORD_COLUMN_BREAK_ATTR, "");
           leaves.push({ dom: br, offset, size: 1 });
           fragmentAt(offset).append(br);
           return;
@@ -320,6 +323,7 @@ export class WordRenderer {
       pageBreakBefore: paragraph.pageBreakBefore,
       style: paragraph.style,
       contextual: paragraph.contextualSpacing,
+      empty: !last && !marker,
     };
     if (cell && !this.#clipboard) {
       // In a cell its spacing is its margins (the page flow spaces top-level blocks); a
@@ -414,6 +418,7 @@ export class WordRenderer {
         pageBreakBefore: false,
         style: null,
         contextual: false,
+        empty: false,
       },
     };
   }

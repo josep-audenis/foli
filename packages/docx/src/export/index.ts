@@ -299,22 +299,9 @@ function checkedPart(name: string, text: string): string {
   return text;
 }
 
-/** Schema v5's additions outside the content, until 11.6 and 11.7 write them: never dropped. */
+/** Schema v5's document settings, until 11.7 writes them: never dropped. */
 function refuseNotYetWritten(doc: FoliDocument): void {
-  const written = (key: string) => new DocxError(`${key} cannot be exported to .docx yet`);
-  if (doc.settings) throw written("settings");
-  const sections = [doc.section];
-  const walk = (node: NodeJSON) => {
-    const attrs = node.attrs as { section?: SectionJSON } | undefined;
-    if (attrs?.section) sections.push(attrs.section);
-    node.content?.forEach(walk);
-  };
-  walk(doc.content);
-  for (const comment of doc.comments) comment.content.forEach(walk);
-  for (const story of Object.values(doc.stories ?? {})) walk(story.content);
-  for (const section of sections)
-    for (const key of ["columns", "pageNumbers", "footnotes", "endnotes"] as const)
-      if (section[key]) throw written(`A section's ${key}`);
+  if (doc.settings) throw new DocxError("settings cannot be exported to .docx yet");
 }
 
 const PARA_ID = "w14:paraId";

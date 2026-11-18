@@ -7,6 +7,7 @@ import {
   type MarkJSON,
   type NodeJSON,
   parseDocument,
+  type SectionJSON,
 } from "@folijs/core";
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
@@ -459,9 +460,6 @@ describe("schema v5 content not written yet", () => {
       /settings cannot be exported/,
     );
     await expect(
-      exportDocx({ ...base, section: { ...base.section, columns: { count: 2 } } }),
-    ).rejects.toThrow(/columns cannot be exported/);
-    await expect(
       exportDocx({
         ...base,
         comments: [
@@ -473,5 +471,74 @@ describe("schema v5 content not written yet", () => {
         ],
       }),
     ).rejects.toThrow(/Content control c has no properties/);
+  });
+});
+
+describe("sections: columns, page numbers, note properties, tracked setup", () => {
+  const section: SectionJSON = {
+    columns: {
+      count: 2,
+      space: 360,
+      equalWidth: false,
+      separator: true,
+      widths: [{ width: 3000, space: 360 }, { width: 5000 }],
+    },
+    pageNumbers: { start: 5, format: "lowerRoman" },
+    footnotes: { position: "beneathText", format: "upperLetter", start: 2, restart: "eachPage" },
+    endnotes: { position: "docEnd", restart: "continuous" },
+    change: {
+      id: 7,
+      author: "Ann",
+      date: "2026-11-18T10:00:00Z",
+      // Spelled out in the file, as Word needs to see a change (each of them read back).
+      previous: {
+        type: "nextPage",
+        pageSize: { width: 12240, height: 15840 },
+        margins: {
+          top: 1440,
+          right: 1440,
+          bottom: 1440,
+          left: 1440,
+          header: 720,
+          footer: 720,
+          gutter: 0,
+        },
+        columns: { count: 1 },
+      },
+    },
+  };
+  const main = async (bytes: Uint8Array) => (await readPackage(bytes)).text("/word/document.xml");
+
+  it("writes them where Word's schema has them and reads them back", async () => {
+    const bytes = await exportDocx({ ...createDocument(), section });
+    const xml = await main(bytes);
+    expect(xml).toContain(
+      '<w:cols w:num="2" w:sep="1" w:space="360" w:equalWidth="0"><w:col w:w="3000" w:space="360"/><w:col w:w="5000"/></w:cols>',
+    );
+    expect(xml).toContain('<w:pgNumType w:fmt="lowerRoman" w:start="5"/>');
+    expect(xml.indexOf("<w:footnotePr>")).toBeLessThan(xml.indexOf("<w:endnotePr>"));
+    expect(xml.indexOf("<w:pgNumType")).toBeLessThan(xml.indexOf("<w:cols"));
+    expect(xml.indexOf("<w:cols")).toBeLessThan(xml.indexOf("<w:sectPrChange"));
+    const { document } = await importDocx(bytes);
+    expect(values(document.section)).toEqual(section);
+  });
+
+  it("keeps a section read from a file byte for byte while nothing changes, and only what changed after", async () => {
+    const { document, package: pkg } = await load("08-newsletter.docx");
+    const sections = (document.content.content ?? []).flatMap((b) =>
+      b.attrs?.section ? [b.attrs.section as SectionJSON] : [],
+    );
+    expect(sections[1]?.columns).toEqual({ count: 2, separator: true, space: 708 });
+    expect(sections[3]?.columns?.widths?.map((c) => c.width)).toEqual([4000, 2000, 2306]);
+    const before = await main(await exportDocx(document, pkg));
+    for (const s of sections) expect(before).toContain(s.ext as string);
+    const changed = structuredClone(document);
+    const target = (changed.content.content ?? []).filter((b) => b.attrs?.section)[1];
+    (target?.attrs?.section as SectionJSON).columns = { count: 3, space: 708 };
+    const after = await main(await exportDocx(changed, pkg));
+    expect(after).toContain('<w:cols w:num="3" w:space="708"/>');
+    expect(after).not.toContain('<w:cols w:num="2" w:sep="1" w:space="708"/>');
+    // What did not change stays as written, around the new element.
+    expect(after).toContain('<w:docGrid w:linePitch="360"/>');
   });
 });

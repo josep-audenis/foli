@@ -5,19 +5,24 @@
  * v3 in 8.7.
  */
 import type { FoliDocument, SectionJSON } from "@folijs/core";
-import { type BlockBox, flow } from "../layout/flow.js";
+import { type BlockBox, type FlowSection, type Fragment, flowFrom } from "../layout/flow.js";
 import {
   type BlockOptions,
+  PICTURE_ATTR,
   PX_PER_TWIP,
   renderBlocks,
+  WORD_COLUMN_BREAK_ATTR,
   WORD_PAGE_BREAK_ATTR,
   type WordBlock,
 } from "./blocks.js";
+import { bandElement, type ColumnsPx, columnsPx } from "./columns.js";
 
 export type { ReviewView } from "./blocks.js";
 
 /** The class of each page element. */
 export const WORD_PAGE_CLASS = "foli-word-page";
+/** The breaks that keep a paragraph from being one line to the flow. */
+const BREAKS = `br[${WORD_PAGE_BREAK_ATTR}],br[${WORD_COLUMN_BREAK_ATTR}]`;
 
 export interface DocumentPages {
   /** The page elements, in order. */
@@ -190,20 +195,33 @@ function headerHeight(element: HTMLElement): number {
   return bottom ? bottom - element.getBoundingClientRect().top : 0;
 }
 
-/** The lines that end with an explicit page break, by the break's position. */
-function breakLines(element: HTMLElement, bottoms: readonly number[]): number[] {
+/** The lines that end with one of the explicit breaks `attr` marks, by the break's position. */
+function breakLines(element: HTMLElement, bottoms: readonly number[], attr: string): number[] {
   const top = element.getBoundingClientRect().top;
-  return [...element.querySelectorAll(`br[${WORD_PAGE_BREAK_ATTR}]`)].map((br) => {
+  return [...element.querySelectorAll(`br[${attr}]`)].map((br) => {
     const y = br.getBoundingClientRect().top - top;
     const line = bottoms.findIndex((bottom) => y < bottom);
     return line < 0 ? bottoms.length - 1 : line;
   });
 }
 
+/** A section on pages: its setup, its blocks and where they are measured. */
+interface Section {
+  setup: SectionJSON;
+  geometry: Geometry;
+  columns: ColumnsPx;
+  blocks: WordBlock[];
+  flow: FlowSection;
+  /** A hidden page of the section's, and in it a column holding its blocks. */
+  measuring: HTMLElement;
+  column: HTMLElement;
+}
+
 /**
- * Lays a v3 document out on pages inside `container`. Headers, footers, footnotes and floating
- * content are not laid out yet (Phase 11); tables are shown from their verbatim XML until
- * Phase 10.
+ * Lays a v3 document out on pages inside `container`: every section's page setup, its columns
+ * (a band per section on a page), continuous sections and Word's blank pages. Headers, footers,
+ * footnotes and floating content are not laid out yet (Phase 11); tables are shown from their
+ * verbatim XML until Phase 10.
  */
 export function renderDocument(
   document: FoliDocument,
@@ -215,186 +233,266 @@ export function renderDocument(
     ...options,
     lineRatio: measureLineRatio(container),
   });
-  // Sections: consecutive blocks with one page setup. A section starts a new page unless it is
-  // continuous with the same geometry (shortcut: a continuous section with another geometry
-  // starts a new page).
-  const groups: { geometry: Geometry; blocks: WordBlock[] }[] = [];
+  const sections: Section[] = [];
+  const geometryOf = new Map<FlowSection, Geometry>();
+  const sectionOf = new Map<WordBlock, Section>();
   let current: WordBlock[] = [];
-  const close = (section: SectionJSON) => {
-    const g = geometry(section);
-    const previous = groups[groups.length - 1];
-    if (section.type === "continuous" && previous && sameGeometry(previous.geometry, g))
-      previous.blocks.push(...current);
-    else groups.push({ geometry: g, blocks: current });
+  const close = (setup: SectionJSON) => {
+    const g = geometry(setup);
+    const columns = columnsPx(setup);
+    const flow: FlowSection = {
+      start: setup.type ?? "nextPage",
+      columns: columns.widths.length,
+      pageStart: setup.pageNumbers?.start,
+      box: () => ({ height: g.height - g.top - g.bottom }),
+      samePage: (other) => sameGeometry(g, geometryOf.get(other) as Geometry),
+    };
+    geometryOf.set(flow, g);
+    // Measured in a page of the section's width, out of view, in its first column's width.
+    const { page, body } = createPage(doc, g);
+    page.style.position = "absolute";
+    page.style.visibility = "hidden";
+    page.style.height = "auto";
+    const column = doc.createElement("div");
+    column.style.display = "flow-root";
+    column.style.width = `${columns.widths[0]}px`;
+    body.append(column);
+    container.append(page);
+    column.append(...current.map((block) => block.element));
+    const section = { setup, geometry: g, columns, blocks: current, flow, measuring: page, column };
+    for (const block of current) sectionOf.set(block, section);
+    sections.push(section);
     current = [];
   };
   for (const block of blocks) {
     current.push(block);
     if (block.section) close(block.section);
   }
-  if (current.length || !groups.length) close(document.section);
+  if (current.length || !sections.length) close(document.section);
+  sections.forEach((section, i) => {
+    const next = sections[i + 1];
+    section.flow.balanced =
+      !!next &&
+      section.flow.columns > 1 &&
+      next.setup.type === "continuous" &&
+      sameGeometry(section.geometry, next.geometry);
+  });
 
-  const pages: HTMLElement[] = [];
-  const firstPage = new Map<number, number>();
-  /** Every fragment placed, in order: its page and how many lines it shows (measured lazily). */
-  const placements: { page: number; nodes: number[] | null; lines: () => number }[] = [];
-  const cellPages: { page: number; text: string }[] = [];
-  for (const group of groups) {
-    const g = group.geometry;
-    // Measure in a page of the section's width, out of view.
-    const measuring = createPage(doc, g);
-    measuring.page.style.position = "absolute";
-    measuring.page.style.visibility = "hidden";
-    measuring.page.style.height = "auto";
-    container.append(measuring.page);
-    for (const block of group.blocks) measuring.body.append(block.element);
-    const lines = new Map<WordBlock, number[]>();
+  /** A block's height and lines at each column width it was asked for. */
+  type Measured = Pick<BlockBox, "height" | "lines"> & { shown(): number[] };
+  const measured = new Map<WordBlock, Map<number, Measured>>();
+  const inWidth = (block: WordBlock, width: number) => {
+    const section = sectionOf.get(block) as Section;
+    const widths: Map<number, Measured> = measured.get(block) ?? new Map();
+    measured.set(block, widths);
+    const known = widths.get(width);
+    if (known) return known;
+    const { column, geometry: g } = section;
     const pageHeight = g.height - g.top - g.bottom;
-    const linesOf = (block: WordBlock) => {
-      let value = lines.get(block);
-      if (!value) {
-        value = keepRows(block.element, lineBottoms(block.element), pageHeight);
-        lines.set(block, value);
-      }
+    const atWidth = <T>(read: () => T): T => {
+      const before = column.style.width;
+      column.style.width = `${width}px`;
+      const value = read();
+      column.style.width = before;
       return value;
     };
-    // Each cell paragraph's top in its block, measured while the blocks are laid out whole.
-    const cellTops = new Map<WordBlock, { top: number; text: string }[]>();
-    for (const block of group.blocks) {
-      const cells = block.element.querySelectorAll("[data-foli-cell]");
-      if (!cells.length) continue;
-      const top = block.element.getBoundingClientRect().top;
-      cellTops.set(
-        block,
-        [...cells].map((cell) => ({
-          top: cell.getBoundingClientRect().top - top,
-          text: cell.textContent ?? "",
-        })),
-      );
-    }
-    const headers = new Map<WordBlock, number>();
-    const boxes: BlockBox[] = group.blocks.map((block, i) => {
-      const height = block.element.getBoundingClientRect().height;
-      const repeat = block.element.querySelector("tr") ? headerHeight(block.element) : 0;
-      if (repeat) headers.set(block, repeat);
-      const next = group.blocks[i + 1];
-      const hasBreak = !!block.element.querySelector(`br[${WORD_PAGE_BREAK_ATTR}]`);
-      // A paragraph kept together is one line to the flow, unless it cannot be: taller than a
-      // page, or broken by a page break.
-      const kept = block.keepLines && !hasBreak && height <= pageHeight;
-      return {
-        height,
-        marginTop: block.before,
-        marginBottom: block.after,
-        repeat,
-        // A table splits at any line: no widow and orphan control across its rows.
-        anyLine: !!block.element.querySelector(":scope > table"),
-        keepWithNext: block.keepNext,
-        lines: () => (kept ? [height] : linesOf(block)),
-        breaksAfter: () => {
-          const breaks = hasBreak ? breakLines(block.element, linesOf(block)) : [];
-          // The next block starts a page: this one's last line ends it.
-          if (next?.pageBreakBefore) breaks.push((kept ? 1 : linesOf(block).length) - 1);
-          return breaks;
-        },
-      };
-    });
-    // shortcut: widow and orphan control is on for every paragraph (Word's Normal has it; a
-    // paragraph turning it off is still kept to two lines).
-    const fragments = flow(boxes, pageHeight, { orphans: 2, widows: 2, spacing: "word" });
-    // What placing needs of the layout, read while the blocks are still laid out: the lines of
-    // split blocks, and which blocks end with an explicit page break.
-    const endsWithBreak = new Set<WordBlock>();
-    group.blocks.forEach((block, b) => {
-      if ((fragments[b]?.length ?? 0) > 1) linesOf(block);
-      if (!block.element.querySelector(`br[${WORD_PAGE_BREAK_ATTR}]`)) return;
-      const bottoms = linesOf(block);
-      if (breakLines(block.element, bottoms).includes(bottoms.length - 1)) endsWithBreak.add(block);
-    });
-    measuring.page.remove();
+    const height = atWidth(() => block.element.getBoundingClientRect().height);
+    const hasBreak = !!block.element.querySelector(BREAKS);
+    // A paragraph kept together is one line to the flow, unless it cannot be: taller than a
+    // page, or broken by a page break.
+    const kept = block.keepLines && !hasBreak && height <= pageHeight;
+    let lines: number[] | undefined;
+    const shown = () => {
+      lines ??= atWidth(() => keepRows(block.element, lineBottoms(block.element), pageHeight));
+      return lines;
+    };
+    const entry = { height, shown, lines: () => (kept ? [height] : shown()) };
+    widths.set(width, entry);
+    return entry;
+  };
+  const widthIn = (section: Section, fragment: Fragment) =>
+    section.columns.widths[fragment.column ?? 0] as number;
 
-    const count = Math.max(1, ...fragments.flat().map((f) => f.page + 1));
-    const groupPages = Array.from({ length: count }, () => createPage(doc, g));
-    let previousOnPage: { page: number; block: number } | null = null;
-    group.blocks.forEach((block, b) => {
-      const placed = fragments[b] ?? [];
-      const bottoms = placed.length > 1 ? linesOf(block) : [];
-      placed.forEach((fragment, f) => {
-        const target = groupPages[fragment.page] as { body: HTMLElement };
-        let gap = 0;
-        if (fragment.fromLine === 0) {
-          if (previousOnPage?.page === fragment.page)
-            gap = (group.blocks[previousOnPage.block] as WordBlock).after + block.before;
-          else {
-            // The first block on a page: Word keeps its space before on the section's first
-            // page and after an explicit break only.
-            const prior = group.blocks[b - 1];
-            const forced =
-              fragment.page === 0 ||
-              block.pageBreakBefore ||
-              (prior !== undefined && endsWithBreak.has(prior));
-            gap = forced ? block.before : 0;
-          }
-        }
-        let element: HTMLElement = block.element;
-        if (placed.length > 1) {
-          // A split block: each fragment shows its lines of the whole block, clipped.
-          const top = fragment.fromLine ? (bottoms[fragment.fromLine - 1] ?? 0) : 0;
-          const end =
-            fragment.toLine === Number.POSITIVE_INFINITY
-              ? (bottoms[bottoms.length - 1] ?? 0)
-              : (bottoms[fragment.toLine - 1] ?? 0);
-          const clip = doc.createElement("div");
-          clip.style.overflow = "hidden";
-          clip.style.height = `${end - top}px`;
-          const inner = f === 0 ? block.element : (block.element.cloneNode(true) as HTMLElement);
-          if (f > 0) inner.setAttribute("aria-hidden", "true");
-          inner.style.marginTop = `${-top}px`;
-          clip.append(inner);
-          element = clip;
-          const repeat = f > 0 ? (headers.get(block) ?? 0) : 0;
-          if (repeat) {
-            // The header rows again above the continuation.
-            const header = doc.createElement("div");
-            header.style.overflow = "hidden";
-            header.style.height = `${repeat}px`;
-            const copy = block.element.cloneNode(true) as HTMLElement;
-            copy.setAttribute("aria-hidden", "true");
-            copy.style.marginTop = "0";
-            header.append(copy);
-            element = doc.createElement("div");
-            element.append(header, clip);
-          }
-        }
-        element.style.marginTop = `${gap}px`;
-        target.body.append(element);
-        previousOnPage = { page: fragment.page, block: b };
-        placements.push({
-          page: pages.length + fragment.page,
-          nodes: f === 0 ? block.nodes : null,
-          lines: () =>
-            (fragment.toLine === Number.POSITIVE_INFINITY
-              ? linesOf(block).length
-              : fragment.toLine) - fragment.fromLine,
-        });
-      });
-      // Its cell paragraphs: on the page of the fragment their top is in.
-      for (const cell of cellTops.get(block) ?? []) {
-        let at = placed[0]?.page ?? 0;
-        for (const fragment of placed) {
-          const start = fragment.fromLine ? (bottoms[fragment.fromLine - 1] ?? 0) : 0;
-          if (cell.top + 0.5 >= start) at = fragment.page;
-        }
-        cellPages.push({ page: pages.length + at, text: cell.text });
-      }
-      const first = placed[0];
-      if (first) for (const index of block.nodes) firstPage.set(index, pages.length + first.page);
-    });
-    for (const { page } of groupPages) {
-      container.append(page);
-      pages.push(page);
-    }
+  // Each cell paragraph's top in its block, measured while the blocks are laid out whole.
+  const cellTops = new Map<WordBlock, { top: number; text: string }[]>();
+  for (const block of blocks) {
+    const cells = block.element.querySelectorAll("[data-foli-cell]");
+    if (!cells.length) continue;
+    const top = block.element.getBoundingClientRect().top;
+    cellTops.set(
+      block,
+      [...cells].map((cell) => ({
+        top: cell.getBoundingClientRect().top - top,
+        text: cell.textContent ?? "",
+      })),
+    );
   }
+  const headers = new Map<WordBlock, number>();
+  const boxes: BlockBox[] = blocks.map((block, i) => {
+    const section = sectionOf.get(block) as Section;
+    const { widths } = section.columns;
+    const whole = inWidth(block, widths[0] as number);
+    const repeat = block.element.querySelector("tr") ? headerHeight(block.element) : 0;
+    if (repeat) headers.set(block, repeat);
+    const next = blocks[i + 1];
+    const has = (attr: string) => !!block.element.querySelector(`br[${attr}]`);
+    const hasPageBreak = has(WORD_PAGE_BREAK_ATTR);
+    const hasColumnBreak = has(WORD_COLUMN_BREAK_ATTR);
+    return {
+      height: whole.height,
+      marginTop: block.before,
+      marginBottom: block.after,
+      repeat,
+      // A table splits at any line: no widow and orphan control across its rows.
+      anyLine: !!block.element.querySelector(":scope > table"),
+      keepWithNext: block.keepNext,
+      section: section.flow,
+      sectionMark:
+        !!block.section &&
+        !block.element.textContent &&
+        !block.element.querySelector(`[${PICTURE_ATTR}]`),
+      lines: whole.lines,
+      inColumn: widths.every((width) => width === widths[0])
+        ? undefined
+        : (column) => inWidth(block, widths[column] as number),
+      breaksAfter: () => {
+        const bottoms = whole.lines();
+        const breaks = hasPageBreak ? breakLines(block.element, bottoms, WORD_PAGE_BREAK_ATTR) : [];
+        // The next block starts a page: this one's last line ends it.
+        if (next?.pageBreakBefore) breaks.push(bottoms.length - 1);
+        return breaks;
+      },
+      columnBreaksAfter: () =>
+        hasColumnBreak ? breakLines(block.element, whole.lines(), WORD_COLUMN_BREAK_ATTR) : [],
+    };
+  });
+  // shortcut: widow and orphan control is on for every paragraph (Word's Normal has it; a
+  // paragraph turning it off is still kept to two lines).
+  const { fragments, gaps } = flowFrom(boxes, 0, { orphans: 2, widows: 2, spacing: "word" });
+  // What placing needs of the layout, read while the blocks are still laid out: split blocks' lines.
+  blocks.forEach((block, b) => {
+    const placed = fragments[b] ?? [];
+    if (placed.length < 2) return;
+    const section = sectionOf.get(block) as Section;
+    for (const fragment of placed) inWidth(block, widthIn(section, fragment)).lines();
+  });
+  for (const section of sections) section.measuring.remove();
+
+  // Each page's bands, from what is on it; a page with nothing (Word's blank page before an even
+  // or odd page section) has the setup of the page after it.
+  const bandsOf: Section[][] = [];
+  blocks.forEach((block, b) => {
+    for (const fragment of fragments[b] ?? []) {
+      const bands = bandsOf[fragment.page] ?? [];
+      bandsOf[fragment.page] = bands;
+      bands[fragment.band ?? 0] ??= sectionOf.get(block) as Section;
+    }
+  });
+  const count = Math.max(1, bandsOf.length);
+  const pageSetups: Section[] = [];
+  for (let p = count - 1; p >= 0; p--)
+    pageSetups[p] = bandsOf[p]?.[0] ?? pageSetups[p + 1] ?? (sections.at(-1) as Section);
+  const created = pageSetups.map((section) => createPage(doc, section.geometry));
+  const bandElements = new Map<string, { band: HTMLElement; columns: HTMLElement[] }>();
+  /** Where a fragment goes: the page's body, or its column when the page has bands. */
+  const holder = (fragment: Fragment, section: Section): HTMLElement => {
+    const { body } = created[fragment.page] as { body: HTMLElement };
+    const bands = bandsOf[fragment.page] as Section[];
+    if (bands.length === 1 && section.flow.columns === 1) return body;
+    const band = fragment.band ?? 0;
+    // Bands in order: one that nothing starts in yet still comes before the later ones.
+    for (let b = 0; b <= band; b++) {
+      const key = `${fragment.page} ${b}`;
+      if (bandElements.has(key)) continue;
+      const made = bandElement(doc, (bands[b] as Section).columns);
+      bandElements.set(key, made);
+      body.append(made.band);
+    }
+    const made = bandElements.get(`${fragment.page} ${band}`) as {
+      band: HTMLElement;
+      columns: HTMLElement[];
+    };
+    if (fragment.lead) made.band.style.marginTop = `${fragment.lead}px`;
+    return made.columns[fragment.column ?? 0] as HTMLElement;
+  };
+
+  const firstPage = new Map<number, number>();
+  /** Every fragment placed, in order: its page and how many lines it shows (measured lazily). */
+  const placements: {
+    page: number;
+    nodes: number[] | null;
+    mark: boolean;
+    lines: () => number;
+  }[] = [];
+  const cellPages: { page: number; text: string }[] = [];
+  blocks.forEach((block, b) => {
+    const section = sectionOf.get(block) as Section;
+    const placed = fragments[b] ?? [];
+    const bottomsOf = (fragment: Fragment) =>
+      inWidth(block, widthIn(section, fragment)).lines() as number[];
+    placed.forEach((fragment, f) => {
+      const target = holder(fragment, section);
+      let element: HTMLElement = block.element;
+      if (placed.length > 1) {
+        // A split block: each fragment shows its lines of the whole block, clipped.
+        const bottoms = bottomsOf(fragment);
+        const top = fragment.fromLine ? (bottoms[fragment.fromLine - 1] ?? 0) : 0;
+        const end =
+          fragment.toLine === Number.POSITIVE_INFINITY
+            ? (bottoms[bottoms.length - 1] ?? 0)
+            : (bottoms[fragment.toLine - 1] ?? 0);
+        const clip = doc.createElement("div");
+        clip.style.overflow = "hidden";
+        clip.style.height = `${end - top}px`;
+        const inner = f === 0 ? block.element : (block.element.cloneNode(true) as HTMLElement);
+        if (f > 0) inner.setAttribute("aria-hidden", "true");
+        inner.style.marginTop = `${-top}px`;
+        clip.append(inner);
+        element = clip;
+        const repeat = f > 0 ? (headers.get(block) ?? 0) : 0;
+        if (repeat) {
+          // The header rows again above the continuation.
+          const header = doc.createElement("div");
+          header.style.overflow = "hidden";
+          header.style.height = `${repeat}px`;
+          const copy = block.element.cloneNode(true) as HTMLElement;
+          copy.setAttribute("aria-hidden", "true");
+          copy.style.marginTop = "0";
+          header.append(copy);
+          element = doc.createElement("div");
+          element.append(header, clip);
+        }
+      }
+      // A section's empty last paragraph takes no room.
+      if (fragment.mark) element.style.position = "absolute";
+      element.style.marginTop = `${fragment.fromLine === 0 ? (gaps[b] ?? 0) : 0}px`;
+      target.append(element);
+      placements.push({
+        page: fragment.page,
+        nodes: f === 0 ? block.nodes : null,
+        mark: !!fragment.mark,
+        lines: () =>
+          (fragment.toLine === Number.POSITIVE_INFINITY
+            ? inWidth(block, widthIn(section, fragment)).shown().length
+            : fragment.toLine) - fragment.fromLine,
+      });
+    });
+    // Its cell paragraphs: on the page of the fragment their top is in.
+    for (const cell of cellTops.get(block) ?? []) {
+      let at = placed[0]?.page ?? 0;
+      for (const fragment of placed) {
+        const start = fragment.fromLine ? (bottomsOf(fragment)[fragment.fromLine - 1] ?? 0) : 0;
+        if (cell.top + 0.5 >= start) at = fragment.page;
+      }
+      cellPages.push({ page: at, text: cell.text });
+    }
+    const first = placed[0];
+    if (first) for (const index of block.nodes) firstPage.set(index, first.page);
+  });
+  const pages = created.map(({ page }) => {
+    container.append(page);
+    return page;
+  });
   let firstLine: Map<number, number> | null = null;
   return {
     pages,
@@ -409,8 +507,10 @@ export function renderDocument(
             page = placement.page;
             line = 1;
           }
-          for (const node of placement.nodes ?? []) firstLine.set(node, line);
-          line += placement.lines();
+          // A section's mark is on the line before it, as Word numbers it.
+          for (const node of placement.nodes ?? [])
+            firstLine.set(node, placement.mark ? Math.max(line - 1, 1) : line);
+          if (!placement.mark) line += placement.lines();
         }
       }
       return firstLine.get(index);

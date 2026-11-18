@@ -1,6 +1,14 @@
 import { DEFAULT_SETTINGS } from "@folijs/core";
 import { describe, expect, it } from "vitest";
-import { type BlockBox, contentHeight, type Fragment, flow, flowFrom, PX_PER_MM } from "./flow.js";
+import {
+  type BlockBox,
+  contentHeight,
+  type FlowSection,
+  type Fragment,
+  flow,
+  flowFrom,
+  PX_PER_MM,
+} from "./flow.js";
 
 /** No widow/orphan rules: pure geometry. */
 const ANY = { orphans: 1, widows: 1 };
@@ -349,13 +357,11 @@ describe("flowFrom: incremental flow equals a full flow", () => {
 describe("flow: Word spacing", () => {
   const WORD = { orphans: 1, widows: 1, spacing: "word" as const };
 
-  it("adds the space after one block and the space before the next", () => {
-    // 10 + 30 | + (20 + 5) + 30 = 95 | + (20 + 10) + 20 = 145
+  it("takes the larger of the space after one block and the space before the next", () => {
+    // 10 + 30 | + max(20, 5) + 30 = 90 | + max(20, 10) + 20 = 130
     const boxes = [box(30, 10, 20), box(30, 5, 20), box(20, 10, 0)];
-    expect(pagesOf(flow(boxes, 145, WORD))).toEqual([0, 0, 0]);
-    expect(pagesOf(flow(boxes, 144, WORD))).toEqual([0, 0, 1]);
-    // CSS collapses the same margins: 10 + 30 + 20 + 30 + 20 + 20 = 130.
-    expect(pagesOf(flow(boxes, 130, ANY))).toEqual([0, 0, 0]);
+    expect(pagesOf(flow(boxes, 130, WORD))).toEqual([0, 0, 0]);
+    expect(pagesOf(flow(boxes, 129, WORD))).toEqual([0, 0, 1]);
   });
 
   it("lets the space after the last block on a page hang below it", () => {
@@ -403,6 +409,183 @@ describe("flow: Word spacing", () => {
       previousIndex: (i) => (i >= 1 ? i : -1),
     });
     expect(incremental).toEqual(flowFrom(after, 100, WORD));
+  });
+});
+
+describe("flow: sections and columns", () => {
+  const WORD = { orphans: 1, widows: 1, spacing: "word" as const };
+  const section = (over: Partial<FlowSection> = {}, height = 100): FlowSection => ({
+    start: "nextPage",
+    columns: 1,
+    box: () => ({ height }),
+    samePage: (other) => other.box({ index: 0, number: 1, first: true }).height === height,
+    ...over,
+  });
+  const inSection = (s: FlowSection, b: BlockBox): BlockBox => ({ ...b, section: s });
+  const places = (result: Fragment[][]) =>
+    result.map((fragments) =>
+      fragments.map((f) => [f.page, f.band ?? 0, f.column ?? 0, f.fromLine]),
+    );
+
+  it("fills columns, then the next page", () => {
+    const two = section({ columns: 2 });
+    const blocks = [60, 60, 60, 60, 60].map((h) => inSection(two, box(h)));
+    expect(places(flow(blocks, 100, WORD)).map((p) => p[0]?.slice(0, 3))).toEqual([
+      [0, 0, 0],
+      [0, 0, 1],
+      [1, 0, 0],
+      [1, 0, 1],
+      [2, 0, 0],
+    ]);
+  });
+
+  it("splits a block across columns and drops its space before at a column's top", () => {
+    const two = section({ columns: 2 });
+    const result = flow([inSection(two, box(150, 10, 0, 10))], 100, WORD);
+    expect(result[0]).toEqual([
+      { page: 0, fromLine: 0, toLine: 9 },
+      { page: 0, column: 1, fromLine: 9, toLine: 15 },
+    ]);
+    // The second block flows to the column's top: no space before.
+    const moved = flowFrom([inSection(two, box(95)), inSection(two, box(30, 20))], 100, WORD);
+    expect(moved.fragments[1]?.[0]?.column).toBe(1);
+    expect(moved.gaps).toEqual([0, 0]);
+  });
+
+  it("ends a column at a column break, and the page at the last column", () => {
+    const two = section({ columns: 2 });
+    const broken: BlockBox = {
+      ...inSection(two, box(30, 0, 0, 10)),
+      columnBreaksAfter: () => [0],
+    };
+    const result = flow([broken, inSection(two, box(10)), broken], 100, WORD);
+    expect(places(result)).toEqual([
+      [
+        [0, 0, 0, 0],
+        [0, 0, 1, 1],
+      ],
+      [[0, 0, 1, 0]],
+      [
+        [0, 0, 1, 0],
+        [1, 0, 0, 1],
+      ],
+    ]);
+  });
+
+  it("opens a band below a continuous break, with the space between them", () => {
+    const one = section();
+    const two = section({ start: "continuous", columns: 2 });
+    const result = flowFrom(
+      [
+        inSection(one, box(30, 0, 10)),
+        inSection(two, box(20, 4)),
+        inSection(two, box(100, 0, 0, 10)),
+      ],
+      100,
+      WORD,
+    );
+    expect(result.fragments[1]).toEqual([
+      { page: 0, band: 1, fromLine: 0, toLine: Infinity, lead: 10 },
+    ]);
+    // Band top 40: 60 high. Its space before counts from the end of the last band's text.
+    expect(result.gaps[1]).toBe(0);
+    expect(result.fragments[2]?.map((f) => [f.page, f.band, f.column])).toEqual([
+      [0, 1, undefined],
+      [0, 1, 1],
+    ]);
+  });
+
+  it("gives an empty section mark no room, unless it is alone in its column", () => {
+    const one = section();
+    const next = section();
+    const mark = { ...inSection(one, box(20, 5, 10)), sectionMark: true };
+    const result = flow([inSection(one, box(90)), mark, inSection(next, box(10))], 100, WORD);
+    expect(result[1]).toEqual([{ page: 0, fromLine: 0, toLine: Infinity, mark: true }]);
+    expect(result[2]?.[0]?.page).toBe(1);
+    expect(flow([mark], 100, WORD)[0]?.[0]?.mark).toBeUndefined();
+  });
+
+  it("balances the columns above a continuous section", () => {
+    const two = section({ columns: 2, balanced: true });
+    const after = section({ start: "continuous" });
+    const blocks = [inSection(two, box(120, 0, 0, 10)), inSection(after, box(10))];
+    const result = flowFrom(blocks, 100, WORD);
+    expect(result.fragments[0]).toEqual([
+      { page: 0, fromLine: 0, toLine: 6 },
+      { page: 0, column: 1, fromLine: 6, toLine: 12 },
+    ]);
+    // The next band starts below the tallest column.
+    expect(result.fragments[1]?.[0]).toMatchObject({ page: 0, band: 1 });
+    expect(result.states[2]?.bandTop).toBe(60);
+  });
+
+  it("adds a blank page before an odd or even page section, by the displayed number", () => {
+    const one = section();
+    const odd = section({ start: "oddPage" });
+    const even = section({ start: "evenPage" });
+    const blocks = [inSection(one, box(10)), inSection(odd, box(10)), inSection(even, box(10))];
+    // Page 1, then 3 (2 is blank), then 4.
+    expect(pagesOf(flow(blocks, 100, WORD))).toEqual([0, 2, 3]);
+    const restart = section({ start: "oddPage", pageStart: 4 });
+    expect(pagesOf(flow([blocks[0] as BlockBox, inSection(restart, box(10))], 100, WORD))).toEqual([
+      0, 2,
+    ]);
+  });
+
+  it("starts a page for a continuous section with another page", () => {
+    const wide = section({ start: "continuous" }, 50);
+    const blocks = [inSection(section(), box(10)), inSection(wide, box(10))];
+    expect(pagesOf(flow(blocks, 100, WORD))).toEqual([0, 1]);
+  });
+
+  it("measures a block in its column when the widths differ", () => {
+    const two = section({ columns: 2 });
+    const narrow = { height: 60, lines: () => [20, 40, 60] };
+    const wide = { height: 40, lines: () => [20, 40] };
+    const block = (): BlockBox => ({
+      ...inSection(two, box(20)),
+      inColumn: (column) => (column ? narrow : wide),
+    });
+    const result = flowFrom([inSection(two, box(90)), block(), block()], 100, WORD);
+    // The second is in column 1 (narrow, 60); of the third, 40 fit there and the rest moves on.
+    expect(result.fragments[1]?.[0]?.column).toBe(1);
+    expect(result.fragments[2]?.map((f) => [f.page, f.toLine])).toEqual([
+      [0, 2],
+      [1, 2],
+    ]);
+  });
+
+  it("flows the same incrementally as in full, balanced sections included", () => {
+    const random = (seed: number) => () => {
+      seed = (seed * 1664525 + 1013904223) >>> 0;
+      return seed / 4294967296;
+    };
+    for (let seed = 1; seed <= 400; seed++) {
+      const next = random(seed);
+      const sections = [
+        section({ columns: 2, balanced: true }),
+        section({ start: "continuous", columns: 3 }),
+        section({ start: "oddPage" }),
+      ];
+      const make = (s: FlowSection): BlockBox => ({
+        ...inSection(s, box(10 * (1 + Math.floor(next() * 12)), 4, 6, 10)),
+        keepWithNext: next() < 0.2,
+      });
+      const before = sections.flatMap((s) => Array.from({ length: 4 }, () => make(s)));
+      const previous = flowFrom(before, 100, WORD);
+      const at = Math.floor(next() * before.length);
+      const after = [...before];
+      after[at] = make(before[at]?.section as FlowSection);
+      const incremental = flowFrom(after, 100, WORD, {
+        previous,
+        from: at,
+        previousIndex: (i) => (i > at ? i : -1),
+      });
+      const full = flowFrom(after, 100, WORD);
+      expect(incremental.fragments, `seed ${seed}`).toEqual(full.fragments);
+      expect(incremental.states, `seed ${seed}`).toEqual(full.states);
+      expect(incremental.gaps, `seed ${seed}`).toEqual(full.gaps);
+    }
   });
 });
 

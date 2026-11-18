@@ -18,6 +18,8 @@ import {
 
 /** Marks the <br> of an explicit page break (the page flow ends the page after its line). */
 export const WORD_PAGE_BREAK_ATTR = "data-page-break";
+/** Marks the <br> of an explicit column break (the flow ends the column after its line). */
+export const WORD_COLUMN_BREAK_ATTR = "data-column-break";
 
 /** CSS px per twip (1/1440 inch; CSS: 96 px per inch). */
 export const PX_PER_TWIP = 96 / 1440;
@@ -822,10 +824,14 @@ function renderInline(
         else parent.append(pictureElement(attrs, doc, image));
         continue;
       case "hardBreak":
-      case "columnBreak":
-        // shortcut: a column break ends the line; Foli lays out one column.
         parent.append(doc.createElement("br"));
         continue;
+      case "columnBreak": {
+        const br = doc.createElement("br");
+        br.setAttribute(WORD_COLUMN_BREAK_ATTR, "");
+        parent.append(br);
+        continue;
+      }
       case "pageBreak": {
         const br = doc.createElement("br");
         br.setAttribute(WORD_PAGE_BREAK_ATTR, "");

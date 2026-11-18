@@ -62,6 +62,8 @@ export interface SectionJSON {
   pageNumbers?: { start?: number; format?: string };
   footnotes?: NotePropertiesJSON;
   endnotes?: NotePropertiesJSON;
+  /** `w:sectPrChange`: who changed the page setup while tracking, and what it was. */
+  change?: { id: number; author: string; date?: string | null; previous: SectionJSON };
   /** The `w:sectPr` this was read from, verbatim. */
   ext?: string;
 }

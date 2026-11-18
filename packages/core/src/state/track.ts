@@ -30,7 +30,7 @@ import {
   type Step,
 } from "../transform/steps.js";
 import { TransformError } from "../transform/transform.js";
-import type { CommentJSON } from "../v3/document.js";
+import type { CommentJSON, SectionJSON } from "../v3/document.js";
 import { PARAGRAPH_PROPERTY_KEYS, RUN_PROPERTY_MARKS } from "../v3/schema.js";
 import { MARK_ATTRS } from "./mark.js";
 import { NodeSelection, Selection, TextSelection } from "./selection.js";
@@ -136,13 +136,17 @@ export function now(): string {
 
 const REVIEW_MARKS = new Set(["insertion", "deletion", "formatChange"]);
 
-/** The largest change id in `doc` and the comments' content (marks, paragraph revisions), or -1. */
-function maxRevisionId(doc: Node, comments: readonly CommentJSON[]): number {
+/**
+ * The largest change id in `doc`, the comments' content (marks, paragraph revisions) and the
+ * sections' tracked setups (`last`: the envelope's section), or -1.
+ */
+function maxRevisionId(doc: Node, comments: readonly CommentJSON[], last?: SectionJSON): number {
   let max = -1;
   const see = (value: unknown) => {
     const id = (value as { id?: unknown } | null | undefined)?.id;
     if (typeof id === "number" && id > max) max = id;
   };
+  see(last?.change);
   doc.descendants((node) => {
     for (const mark of node.marks) {
       const name = mark.type.name;
@@ -153,6 +157,7 @@ function maxRevisionId(doc: Node, comments: readonly CommentJSON[]): number {
       see(revision?.insertion);
       see(revision?.deletion);
       see(node.attrs.formatChange);
+      see((node.attrs.section as SectionJSON | null | undefined)?.change);
     }
     return true;
   });
@@ -173,6 +178,15 @@ function maxRevisionId(doc: Node, comments: readonly CommentJSON[]): number {
   };
   walk(comments.map((c) => c.content));
   return max;
+}
+
+/** @internal A new tracked change's id, author and date, when `state` is tracking; else null. */
+export function newRevision(state: EditorState): Revision | null {
+  const track = key.getState(state);
+  if (!track?.on) return null;
+  const envelope = wordContext(state)?.envelope;
+  const id = maxRevisionId(state.doc, envelope?.comments ?? [], envelope?.section) + 1;
+  return { id, author: track.author, date: now() };
 }
 
 /** A replaced range: `a..b` before the transaction, `c..d` after it. */
@@ -263,7 +277,12 @@ function rebuild(
   let nextId = -1;
   const newId = () => {
     if (nextId < 0)
-      nextId = maxRevisionId(state.doc, wordContext(state)?.envelope.comments ?? []) + 1;
+      nextId =
+        maxRevisionId(
+          state.doc,
+          wordContext(state)?.envelope.comments ?? [],
+          wordContext(state)?.envelope.section,
+        ) + 1;
     return nextId++;
   };
   const at = (x: At, assoc: number) => out.mapping.slice(x.step).map(x.pos, assoc);

@@ -547,10 +547,47 @@ const SECTION_CHILDREN: Record<string, readonly string[]> = {
   pageSize: ["pgSz"],
   margins: ["pgMar"],
   titlePage: ["titlePg"],
+  columns: ["cols"],
+  pageNumbers: ["pgNumType"],
+  footnotes: ["footnotePr"],
+  endnotes: ["endnotePr"],
+  change: ["sectPrChange"],
 };
 const SECTION_MODELED = new Set(Object.values(SECTION_CHILDREN).flat());
 
-function sectionChild(name: string, value: unknown): string {
+/** `w:footnotePr` or `w:endnotePr`: its children in CT_FtnProps order. */
+function noteProperties(local: string, v: Json): string {
+  const s = (x: unknown) => (x === undefined ? undefined : String(x));
+  const children =
+    val("pos", s(v.position)) +
+    val("numFmt", s(v.format)) +
+    val("numStart", s(v.start)) +
+    val("numRestart", s(v.restart));
+  return children ? el(`w:${local}`, {}, children) : "";
+}
+
+/**
+ * The setup a tracked change records, every value it could have changed spelled out: Word finds
+ * no change in what the recorded `w:sectPr` leaves out (a `w:cols` without `w:num`, checked with
+ * Word 16). One read from a file stays as it was.
+ */
+function previousSetup(previous: Json): Json {
+  if (previous.ext) return previous;
+  const size = (previous.pageSize ?? {}) as Json;
+  const columns = (previous.columns ?? {}) as Json;
+  return {
+    ...previous,
+    type: previous.type ?? "nextPage",
+    pageSize: { ...size, width: size.width ?? 12240, height: size.height ?? 15840 },
+    margins: previous.margins ?? {},
+    columns: {
+      ...columns,
+      count: columns.count ?? (columns.widths as unknown[] | undefined)?.length ?? 1,
+    },
+  };
+}
+
+function sectionChild(name: string, value: unknown, ns: Namespaces): string {
   if (value === undefined || value === null) return "";
   const v = value as Json;
   const s = (x: unknown) => (x === undefined || x === null ? undefined : String(x));
@@ -580,6 +617,35 @@ function sectionChild(name: string, value: unknown): string {
       });
     case "titlePage":
       return onOff("titlePg", value as boolean);
+    case "columns":
+      return el(
+        "w:cols",
+        {
+          "w:num": s(v.count),
+          "w:sep": v.separator as boolean | undefined,
+          "w:space": s(v.space),
+          "w:equalWidth": v.equalWidth as boolean | undefined,
+        },
+        ((v.widths ?? []) as Json[])
+          .map((col) => el("w:col", { "w:w": s(col.width), "w:space": s(col.space) }))
+          .join(""),
+      );
+    case "pageNumbers":
+      return el("w:pgNumType", { "w:fmt": s(v.format), "w:start": s(v.start) });
+    case "footnotes":
+      return noteProperties("footnotePr", v);
+    case "endnotes":
+      return noteProperties("endnotePr", v);
+    case "change":
+      return el(
+        "w:sectPrChange",
+        { "w:id": s(v.id), "w:author": s(v.author) ?? "", "w:date": s(v.date) },
+        // What the section was: never its header references (CT_SectPrBase has none).
+        sectionXml(
+          { ...previousSetup(v.previous as Json), headers: undefined, footers: undefined },
+          ns,
+        ),
+      );
     default:
       return "";
   }
@@ -597,7 +663,7 @@ export function sectionXml(section: Json, ns: Namespaces): string {
     generated.set(
       locals[0] as string,
       child(original, same(section[prop], reread[prop]), locals, () =>
-        sectionChild(prop, section[prop]),
+        sectionChild(prop, section[prop], ns),
       ),
     );
   }
