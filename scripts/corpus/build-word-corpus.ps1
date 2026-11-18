@@ -2,7 +2,7 @@
 # automation, so the files carry what real Word documents carry (full styles, numbering
 # definitions, theme, revision ids, settings). Windows with desktop Word only.
 #
-#   powershell -ExecutionPolicy Bypass -File scripts/corpus/build-word-corpus.ps1 [-PdfDir <folder>] [-Only 06,07]
+#   powershell -ExecutionPolicy Bypass -File scripts/corpus/build-word-corpus.ps1 [-PdfDir <folder>] [-Only "06 07"]
 #
 # -PdfDir also exports Word's own PDF of each document there (to look at, or compare with).
 #
@@ -15,7 +15,7 @@ param([string]$PdfDir = "", [string]$Only = "")
 # Only the documents whose numbers are in -Only ("06", "07"…), when given: the others are left as
 # they are, so their reference data stays valid.
 $wanted = @($Only -split "[,\s]+" | Where-Object { $_ })
-$known = @("01", "02", "03", "04", "05", "06", "07")
+$known = @("01", "02", "03", "04", "05", "06", "07", "08", "09")
 foreach ($number in $wanted) {
   if ($known -notcontains $number) { throw "-Only: no document $number (the documents are $($known -join ', '))" }
 }
@@ -35,12 +35,13 @@ $S_LIST_BULLET = -49; $S_LIST_NUMBER = -50; $S_CAPTION = -35; $S_QUOTE = -181
 # Other constants
 $FORMAT_DOCX = 16          # wdFormatDocumentDefault
 $FIELD_EMPTY = -1
-$SECTION_NEXT_PAGE = 2
+$SECTION_CONTINUOUS = 3; $SECTION_NEXT_PAGE = 2; $SECTION_EVEN_PAGE = 4
+$COLUMN_BREAK = 8
 $PAGE_BREAK = 7
 $ALIGN_LEFT = 0; $ALIGN_CENTER = 1; $ALIGN_RIGHT = 2; $ALIGN_JUSTIFY = 3
 $TAB_RIGHT = 2; $LEADER_DOTS = 1
 $NUM_ARABIC = 0; $NUM_LOWER_LETTER = 4; $NUM_LOWER_ROMAN = 2
-$HF_PRIMARY = 1; $HF_FIRST = 2
+$HF_PRIMARY = 1; $HF_FIRST = 2; $HF_EVEN = 3
 $CC_RICH = 0; $CC_TEXT = 1; $CC_DROPDOWN = 4; $CC_DATE = 6; $CC_CHECKBOX = 8
 $ORIENT_LANDSCAPE = 1
 $COLOR_LIGHT_GRAY = 15132390   # BGR
@@ -723,6 +724,116 @@ try {
     if ($paragraph -ne $expected[$s.AlternativeText]) { throw "07: '$($s.AlternativeText)' is anchored in paragraph $paragraph, not $($expected[$s.AlternativeText])" }
   }
   Save-Doc $doc "07-picture-report.docx"
+  }
+
+  # ---------------------------------------------------------------------------------------
+  # 08: Newsletter (Phase 11). Five sections: one column, two with a line between them and a
+  # column break (continuous), one column again (continuous), three of set widths on a new page
+  # with its own header, and a landscape section starting on an even page. Even and odd headers
+  # and footers, a different first page.
+  if (Want "08") {
+  Set-Author "Communications" "CO"
+  $doc = New-Doc
+  $story = "The warehouse team moved the last of the old racking out in the spring, and the new layout has already cut the distance walked on an average shift. Orders now leave the floor in the order the vans are loaded, which has shortened the morning queue at the gates and given drivers a clearer idea of when they will be away. "
+  function Add-Section($type) {
+    $doc.Content.InsertParagraphAfter()
+    $doc.Paragraphs.Last.Range.InsertBreak($type)
+  }
+  Add-Para $doc "Northwind Quarterly" $S_TITLE | Out-Null
+  Add-Para $doc "News from the depots, the fleet and the people who keep them running." $S_SUBTITLE | Out-Null
+  Add-Para $doc ($story * 2) | Out-Null
+  Add-Section $SECTION_CONTINUOUS
+  Add-Para $doc "From the depots" $S_H1 | Out-Null
+  Add-Para $doc ($story * 3) | Out-Null
+  $second = Add-Para $doc ($story * 2)
+  $second.Collapse(1)
+  $second.InsertBreak($COLUMN_BREAK)
+  Add-Section $SECTION_CONTINUOUS
+  Add-Para $doc "A word from the managing director" $S_H1 | Out-Null
+  Add-Para $doc ($story * 2) | Out-Null
+  Add-Section $SECTION_NEXT_PAGE
+  Add-Para $doc "Around the fleet" $S_H1 | Out-Null
+  foreach ($n in 1..3) { Add-Para $doc ($story * 3) | Out-Null }
+  Add-Section $SECTION_EVEN_PAGE
+  Add-Para $doc "The year in figures" $S_H1 | Out-Null
+  Add-Para $doc ($story * 2) | Out-Null
+  $doc.Sections.Item(2).PageSetup.TextColumns.SetCount(2)
+  $doc.Sections.Item(2).PageSetup.TextColumns.LineBetween = -1
+  $columns = $doc.Sections.Item(4).PageSetup.TextColumns
+  $columns.SetCount(3)
+  $columns.EvenlySpaced = 0
+  # The narrow ones first: Word refuses a total wider than the text at every step.
+  $columns.Item(1).SpaceAfter = 18; $columns.Item(2).SpaceAfter = 18
+  $columns.Item(2).Width = 100; $columns.Item(3).Width = 115.3
+  $columns.Item(1).Width = 200
+  $doc.Sections.Item(5).PageSetup.Orientation = $ORIENT_LANDSCAPE
+  $doc.PageSetup.OddAndEvenPagesHeaderFooter = -1
+  $doc.Sections.Item(1).PageSetup.DifferentFirstPageHeaderFooter = -1
+  $first = $doc.Sections.Item(1)
+  $first.Headers.Item($HF_FIRST).Range.Text = "Northwind Quarterly - first page"
+  $first.Headers.Item($HF_PRIMARY).Range.Text = "Northwind Quarterly - odd page"
+  $first.Headers.Item($HF_EVEN).Range.Text = "Northwind Quarterly - even page"
+  $first.Footers.Item($HF_EVEN).Range.Text = "Even page footer"
+  $fleet = $doc.Sections.Item(4).Headers.Item($HF_PRIMARY)
+  $fleet.LinkToPrevious = $false
+  $fleet.Range.Text = "Around the fleet"
+  $r = $first.Footers.Item($HF_PRIMARY).Range
+  $r.Text = "Page "
+  $r.Collapse(0)
+  $doc.Fields.Add($r, $FIELD_EMPTY, "PAGE", $false) | Out-Null
+  Save-Doc $doc "08-newsletter.docx"
+  }
+
+  # ---------------------------------------------------------------------------------------
+  # 09: Technical memo (Phase 11). Footnotes (one continuing on the next page), endnotes,
+  # bookmarks with REF and PAGEREF to them, a date field, numbered figures (SEQ).
+  if (Want "09") {
+  Set-Author "Engineering" "EN"
+  $doc = New-Doc
+  $long = "Each pump was run at its rated speed for an hour before the readings were taken, and the bearings were checked again once it had cooled. The figures below are the mean of three runs on different days, with the same operator and the same instruments, calibrated at the start of the week. "
+  function Add-Note($collection, [string]$after, [string]$text) {
+    $at = Find-Range $doc $after
+    $at.Collapse(0)
+    $collection.Add($at, $missing, $text) | Out-Null
+  }
+  function Add-Field([string]$after, [string]$code) {
+    $at = Find-Range $doc $after
+    $at.Collapse(0)
+    $doc.Fields.Add($at, $FIELD_EMPTY, $code, $false) | Out-Null
+  }
+  Add-Para $doc "Pump test memo" $S_TITLE | Out-Null
+  Add-Para $doc "Issued on " | Out-Null
+  Add-Para $doc "Method" $S_H1 | Out-Null
+  $method = Add-Para $doc "The test followed the agreed procedure."
+  Add-Para $doc ($long * 5) | Out-Null
+  Add-Para $doc ($long * 4) | Out-Null
+  Add-Para $doc ($long * 2) | Out-Null
+  Add-Para $doc "The rig is described in the maintenance file." | Out-Null
+  Add-Para $doc "Results" $S_H1 | Out-Null
+  $result = Add-Para $doc "Peak efficiency was 81 percent at the design flow."
+  $doc.Bookmarks.Add("PeakEfficiency", $doc.Range($result.Start, $result.Start + "Peak efficiency was 81 percent".Length)) | Out-Null
+  Add-Para $doc "Figure : efficiency against flow" $S_CAPTION | Out-Null
+  Add-Para $doc "Figure : power against flow" $S_CAPTION | Out-Null
+  Add-Para $doc "Conclusions" $S_H1 | Out-Null
+  Add-Para $doc "As stated on page : " | Out-Null
+  Add-Para $doc ($long * 2) | Out-Null
+  Add-Field "Issued on " "DATE \@ ""d MMMM yyyy"""
+  Add-Field "As stated on page : " "REF PeakEfficiency \h"
+  Add-Field "As stated on page " "PAGEREF PeakEfficiency \h"
+  foreach ($caption in @("Figure : efficiency", "Figure : power")) {
+    $at = Find-Range $doc $caption
+    $at.SetRange($at.Start + "Figure ".Length, $at.Start + "Figure ".Length)
+    $doc.Fields.Add($at, $FIELD_EMPTY, "SEQ Figure \* ARABIC", $false) | Out-Null
+  }
+  Add-Note $doc.Footnotes "agreed procedure" "Procedure P-14, issue 3."
+  Add-Note $doc.Footnotes "maintenance file" (("The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. " * 45).Trim())
+  Add-Note $doc.Endnotes "design flow" "Design flow is 40 litres per second."
+  Add-Note $doc.Endnotes "Peak efficiency was 81 percent" "Measured at the coupling."
+  $header = $doc.Sections.Item(1).Headers.Item($HF_PRIMARY).Range
+  $header.Text = "Pump test memo, page "
+  $header.Collapse(0)
+  $doc.Fields.Add($header, $FIELD_EMPTY, "PAGE", $false) | Out-Null
+  Save-Doc $doc "09-pump-test-memo.docx"
   }
 }
 finally {

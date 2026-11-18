@@ -129,5 +129,71 @@
                    ],
     "pictures":  [
 
-                 ]
+                 ],
+    "evenAndOddHeaders":  false,
+    "pageSections":  [
+                         1
+                     ],
+    "sections":  [
+                     {
+                         "page":  1,
+                         "start":  2,
+                         "columns":  1,
+                         "differentFirstPage":  false,
+                         "headers":  {
+                                         "default":  {
+                                                         "exists":  true,
+                                                         "linked":  false,
+                                                         "text":  "/Northwind Traders Limited - 1 Harbour Street - London E14 5AB"
+                                                     },
+                                         "first":  {
+                                                       "exists":  false,
+                                                       "linked":  false,
+                                                       "text":  ""
+                                                   },
+                                         "even":  {
+                                                      "exists":  false,
+                                                      "linked":  false,
+                                                      "text":  ""
+                                                  }
+                                     },
+                         "footers":  {
+                                         "default":  {
+                                                         "exists":  true,
+                                                         "linked":  false,
+                                                         "text":  "Northwind Traders Limited is registered in England and Wales under number 01234567."
+                                                     },
+                                         "first":  {
+                                                       "exists":  false,
+                                                       "linked":  false,
+                                                       "text":  ""
+                                                   },
+                                         "even":  {
+                                                      "exists":  false,
+                                                      "linked":  false,
+                                                      "text":  ""
+                                                  }
+                                     }
+                     }
+                 ],
+    "notes":  [
+
+              ],
+    "fields":  [
+                   {
+                       "type":  59,
+                       "code":  "MERGEFIELD CandidateFirstName \\* MERGEFORMAT",
+                       "result":  "«CandidateFirstName»",
+                       "page":  1
+                   },
+                   {
+                       "type":  59,
+                       "code":  "MERGEFIELD StartDate \\@ \"d MMMM yyyy\" \\* MERGEFORMAT",
+                       "result":  "«StartDate»",
+                       "page":  1
+                   }
+               ],
+    "bookmarks":  [
+
+                  ]
 }

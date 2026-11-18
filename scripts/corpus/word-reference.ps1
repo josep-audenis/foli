@@ -14,6 +14,14 @@
 #     size in points (an inline one from the page's corner; a floating one from what it is
 #     relative to, recorded, or its alignment when aligned), alt text, and a floating one's
 #     wrapping (WdWrapType);
+#   - sections: each section's first page, column count, section start, different first page,
+#     and its headers and footers (default, first, even): whether they exist, are linked to the
+#     previous section, and their stored text (page fields as Word last cached them);
+#   - evenAndOddHeaders; pageSections: the section each page starts in;
+#   - notes: each footnote and endnote: its kind, its reference's page and its text (Word answers
+#     a note's own page with its reference's: where a note continues shows only in its PDF);
+#   - fields: each field of the main text: type (WdFieldType), code, stored result, page;
+#   - bookmarks: each visible bookmark: name, page, text;
 #   - paragraphs: for every paragraph of the main text, in Word's order (table cells included,
 #     end-of-row marks not): its text, the page and the line on that page where it starts, the
 #     page where it ends, its list number as Word shows it ("1.1", "(a)"), and whether it is in a
@@ -97,6 +105,12 @@ try {
       pages = $null
       paragraphs = @()
       pictures = @()
+      evenAndOddHeaders = $null
+      pageSections = @()
+      sections = @()
+      notes = @()
+      fields = @()
+      bookmarks = @()
     }
     $doc = $null
     try {
@@ -170,6 +184,52 @@ try {
           })
       }
       $result.pictures = $pictures.ToArray()
+      $result.evenAndOddHeaders = [bool]$doc.PageSetup.OddAndEvenPagesHeaderFooter
+      $pageSections = New-Object System.Collections.Generic.List[object]
+      for ($n = 1; $n -le $result.pages; $n++) {
+        $start = $doc.GoTo(1, 1, $n)   # wdGoToPage, wdGoToAbsolute
+        $pageSections.Add([int]$start.Information(2))   # wdActiveEndSectionNumber
+      }
+      $result.pageSections = $pageSections.ToArray()
+      $kinds = [ordered]@{ default = 1; first = 2; even = 3 }   # WdHeaderFooterIndex
+      function Stories($collection) {
+        $out = [ordered]@{}
+        foreach ($kind in $kinds.Keys) {
+          $item = $collection.Item($kinds[$kind])
+          $out[$kind] = [ordered]@{ exists = [bool]$item.Exists; linked = [bool]$item.LinkToPrevious; text = Clean $item.Range.Text }
+        }
+        return $out
+      }
+      $sections = New-Object System.Collections.Generic.List[object]
+      foreach ($section in $doc.Sections) {
+        $setup = $section.PageSetup
+        $sections.Add([ordered]@{
+            page = [int]$section.Range.Characters.First.Information($INFO_PAGE)
+            start = [int]$setup.SectionStart
+            columns = [int]$setup.TextColumns.Count
+            differentFirstPage = [bool]$setup.DifferentFirstPageHeaderFooter
+            headers = Stories $section.Headers
+            footers = Stories $section.Footers
+          })
+      }
+      $result.sections = $sections.ToArray()
+      $notes = New-Object System.Collections.Generic.List[object]
+      foreach ($pair in @(@("footnote", $doc.Footnotes), @("endnote", $doc.Endnotes))) {
+        foreach ($note in $pair[1]) {
+          $notes.Add([ordered]@{ kind = $pair[0]; referencePage = [int]$note.Reference.Information($INFO_PAGE); text = Clean $note.Range.Text })
+        }
+      }
+      $result.notes = $notes.ToArray()
+      $fields = New-Object System.Collections.Generic.List[object]
+      foreach ($field in $doc.Fields) {
+        $fields.Add([ordered]@{ type = [int]$field.Type; code = ([string]$field.Code.Text).Trim(); result = Clean $field.Result.Text; page = [int]$field.Code.Information($INFO_PAGE) })
+      }
+      $result.fields = $fields.ToArray()
+      $bookmarks = New-Object System.Collections.Generic.List[object]
+      foreach ($bookmark in $doc.Bookmarks) {
+        $bookmarks.Add([ordered]@{ name = [string]$bookmark.Name; page = [int]$bookmark.Range.Information($INFO_PAGE); text = Clean $bookmark.Range.Text })
+      }
+      $result.bookmarks = $bookmarks.ToArray()
       if ($PdfDir) { $doc.ExportAsFixedFormat([string](Join-Path $PdfDir ($file.BaseName + ".pdf")), $PDF) }
     } catch {
       $result.error = Scrub $_.Exception.Message $file
@@ -182,7 +242,7 @@ try {
       Write-Output "$($file.Name): FAILED: $($result.error)"
       continue
     }
-    $json = ($result | ConvertTo-Json -Depth 4) -replace "`r`n", "`n"
+    $json = ($result | ConvertTo-Json -Depth 6) -replace "`r`n", "`n"
     [System.IO.File]::WriteAllText([string](Join-Path $Out ($file.BaseName + ".json")), $json + "`n", $utf8)
     $state = if ($result.opened) { "opened, $($result.pages) pages, $($result.paragraphs.Count) paragraphs, $($result.revisionsAccepted) revisions accepted" } else { "NOT opened: $($result.error)" }
     Write-Output "$($file.Name): $state"

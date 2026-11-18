@@ -19,6 +19,8 @@ not exist.
 | `05-business-letter.docx`             | Custom styles based on Normal, right tab stops with dot leaders, first-line and hanging indents, 1.15 line spacing, highlight, colored text, small caps, double underline, superscript, a manual page break, a page number in the header                                                                                                                    |
 | `06-price-schedule.docx`              | Phase 10: a 41-row table over two pages with a repeated header row, a banded built-in table style (Medium List 1 - Accent 1), a category column merged down (`vMerge`), subtotal rows merged across (`gridSpan`), a tall row that may not break across pages (Word moves it to page 2 whole), a nested table in a cell after its caption, set column widths |
 | `07-picture-report.docx`              | Phase 10: inline pictures at the end of their paragraphs, with and without alt text; floating pictures wrapped square and top-and-bottom beside body text, one behind the text                                                                                                                                                                              |
+| `08-newsletter.docx`                  | Phase 11: five sections: one column, two columns with a line between them and a column break (continuous), one column (continuous), three columns of set widths on a new page with a header of its own, a landscape section starting on an even page; even and odd headers and footers, a different first page, `PAGE` in the footer                        |
+| `09-pump-test-memo.docx`              | Phase 11: footnotes, one longer than a page so it continues on the next, endnotes, a bookmark with `REF` and `PAGEREF` to it, a `DATE` field (its result changes whenever Word updates it: not to be compared), numbered captions (`SEQ`), `PAGE` in the header                                                                                             |
 
 Page fields in headers and footers (`PAGE`, `NUMPAGES`) keep the result Word cached when it
 last updated them ("Page 1 of 1" in a 2-page document): Word computes them per page when it
@@ -32,7 +34,7 @@ result; Word stamps new revision ids and dates on every run:
 powershell -ExecutionPolicy Bypass -File scripts/corpus/build-word-corpus.ps1 -PdfDir <folder>
 ```
 
-`-Only 06,07` builds only those documents and leaves the others as they are (their reference
+`-Only "06 07"` builds only those documents and leaves the others as they are (their reference
 data stays valid).
 
 `-PdfDir` also exports Word's own PDF of each document (Word's rendering, to look at and compare
@@ -62,6 +64,12 @@ One `<name>.json` per document:
 | `pages`             | Word's page count                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
 | `paragraphs`        | One per `w:p` of the main text, in order, table cells included: `text`, `page` and `line` where it starts, `endPage`, `listString` (the number Word shows: "1.1", "(a)"), `inTable`                                                                                                                                                                                                                                                                                         |
 | `pictures`          | Each picture of the main text (inline ones first, then floating ones; headers' and footers' are left out): `page`, `left`/`top` (an inline one from the page's corner; a floating one from what it is `horizontalTo`/`verticalTo`, Word's WdRelative…Position; null when aligned, the alignment then in `horizontalAlign`/`verticalAlign`), `width`, `height` (points), `alt`, `wrap` (a floating one's WdWrapType), `paragraph` (a floating one's anchor, numbered from 1) |
+| `evenAndOddHeaders` | Whether even pages have their own headers and footers                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| `pageSections`      | The section each page starts in, from page 1                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| `sections`          | Each section: `page` it starts on, `start` (WdSectionStart), `columns`, `differentFirstPage`, and `headers` and `footers`, each with `default`, `first`, `even`: `exists`, `linked` (to the previous section), `text` (as stored: page fields keep the value Word cached)                                                                                                                                                                                                   |
+| `notes`             | Each footnote, then each endnote: `kind`, `referencePage`, `text`. Word answers a note's own page with its reference's, so where a note continues shows only in its PDF                                                                                                                                                                                                                                                                                                     |
+| `fields`            | Each field of the main text: `type` (WdFieldType), `code`, stored `result`, `page`                                                                                                                                                                                                                                                                                                                                                                                          |
+| `bookmarks`         | Each visible bookmark: `name`, `page`, `text`                                                                                                                                                                                                                                                                                                                                                                                                                               |
 
 In `text` a manual line break is a newline; bullets in `listString` are the bullet font's code point
 (U+F0B7 for Symbol's bullet). Pages and lines depend on the Word build, the installed fonts and
@@ -138,6 +146,8 @@ cells):
 | 05-business-letter             |         17 |      0 | none                                                 |                0 |
 | 06-price-schedule              |        202 |      2 | none                                                 |                0 |
 | 07-picture-report              |          7 |      0 | none                                                 |                0 |
+| 08-newsletter                  |         22 |      0 | none                                                 |                0 |
+| 09-pump-test-memo              |         15 |      0 | note references 4; field structure 20                |                0 |
 
 Field structure (`w:fldChar`, `w:instrText`) and comment reference marks have nothing to show:
 the field's result stays editable text. The tests check every imported paragraph's text against
@@ -203,6 +213,11 @@ Paragraphs in table cells (2026-11-16, after 10.5, with Aptos): 277 of 280 on Wo
 split moved whole to page 2, as in Word). The three that differ are one row of 02's fee table
 that Word moves to the next page and Foli keeps on the first. The editing view lays tables out
 the same way; `apps/playground/e2e/word-tables.spec.ts` checks 06 in it in three engines.
+
+Phase 11's documents before it lays them out (2026-11-18, with Aptos), the numbers its tasks start
+from: 08 has all 22 paragraphs on Word's page (4 pages, as Word) but 11 on Word's line, its columns
+being laid out as one; 09 has 7 of 15 on Word's page and 2 pages against Word's 3, its footnote
+of more than a page not being laid out. Against Word's PDF: 08 0.551, 09 0.109.
 
 ## Pages against Word's PDF
 

@@ -145,5 +145,61 @@
                    ],
     "pictures":  [
 
-                 ]
+                 ],
+    "evenAndOddHeaders":  false,
+    "pageSections":  [
+                         1,
+                         1
+                     ],
+    "sections":  [
+                     {
+                         "page":  1,
+                         "start":  2,
+                         "columns":  1,
+                         "differentFirstPage":  true,
+                         "headers":  {
+                                         "default":  {
+                                                         "exists":  true,
+                                                         "linked":  false,
+                                                         "text":  "Litware SAS - 12 February 2026 - page 1"
+                                                     },
+                                         "first":  {
+                                                       "exists":  true,
+                                                       "linked":  false,
+                                                       "text":  ""
+                                                   },
+                                         "even":  {
+                                                      "exists":  false,
+                                                      "linked":  false,
+                                                      "text":  ""
+                                                  }
+                                     },
+                         "footers":  {
+                                         "default":  {
+                                                         "exists":  true,
+                                                         "linked":  false,
+                                                         "text":  ""
+                                                     },
+                                         "first":  {
+                                                       "exists":  true,
+                                                       "linked":  false,
+                                                       "text":  ""
+                                                   },
+                                         "even":  {
+                                                      "exists":  false,
+                                                      "linked":  false,
+                                                      "text":  ""
+                                                  }
+                                     }
+                     }
+                 ],
+    "notes":  [
+
+              ],
+    "fields":  [
+
+               ],
+    "bookmarks":  [
+
+                  ]
 }
