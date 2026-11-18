@@ -35,7 +35,7 @@ $S_LIST_BULLET = -49; $S_LIST_NUMBER = -50; $S_CAPTION = -35; $S_QUOTE = -181
 # Other constants
 $FORMAT_DOCX = 16          # wdFormatDocumentDefault
 $FIELD_EMPTY = -1
-$SECTION_CONTINUOUS = 3; $SECTION_NEXT_PAGE = 2; $SECTION_EVEN_PAGE = 4
+$SECTION_CONTINUOUS = 3; $SECTION_NEXT_PAGE = 2; $SECTION_ODD_PAGE = 5
 $COLUMN_BREAK = 8
 $PAGE_BREAK = 7
 $ALIGN_LEFT = 0; $ALIGN_CENTER = 1; $ALIGN_RIGHT = 2; $ALIGN_JUSTIFY = 3
@@ -729,7 +729,7 @@ try {
   # ---------------------------------------------------------------------------------------
   # 08: Newsletter (Phase 11). Five sections: one column, two with a line between them (continuous,
   # so Word balances them), one column again (continuous), three of set widths with a column break
-  # on a new page with its own header, and a landscape section starting on an even page, which
+  # on a new page with its own header, and a landscape section starting on an odd page, which
   # leaves a blank page before it. Even and odd headers and footers, a different first page.
   if (Want "08") {
   Set-Author "Communications" "CO"
@@ -748,14 +748,15 @@ try {
   Add-Para $doc $story | Out-Null
   Add-Section $SECTION_CONTINUOUS
   Add-Para $doc "A word from the managing director" $S_H1 | Out-Null
-  Add-Para $doc ($story * 2) | Out-Null
+  # Long enough to reach page 2, so the fleet section is on odd page 3 and its header is printed.
+  Add-Para $doc ($story * 8) | Out-Null
   Add-Section $SECTION_NEXT_PAGE
   Add-Para $doc "Around the fleet" $S_H1 | Out-Null
   foreach ($n in 1..2) { Add-Para $doc ($story * 3) | Out-Null }
   $third = Add-Para $doc ($story * 3)
   $third.Collapse(1)
   $third.InsertBreak($COLUMN_BREAK)
-  Add-Section $SECTION_EVEN_PAGE
+  Add-Section $SECTION_ODD_PAGE
   Add-Para $doc "The year in figures" $S_H1 | Out-Null
   Add-Para $doc ($story * 2) | Out-Null
   $doc.Sections.Item(2).PageSetup.TextColumns.SetCount(2)
