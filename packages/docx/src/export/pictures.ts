@@ -27,7 +27,7 @@ const EXTENSIONS: Record<string, string> = {
   "image/x-wmf": "wmf",
 };
 
-/** Every picture node of the document (body and comments). */
+/** Every picture node of the document (body, comments and stories). */
 function picturesOf(doc: FoliDocument): Json[] {
   const out: Json[] = [];
   const visit = (nodes: readonly NodeJSON[] | undefined) => {
@@ -38,6 +38,7 @@ function picturesOf(doc: FoliDocument): Json[] {
   };
   visit(doc.content.content);
   for (const comment of doc.comments) visit(comment.content);
+  for (const story of Object.values(doc.stories ?? {})) visit(story.content.content);
   return out;
 }
 
@@ -129,7 +130,7 @@ export class Media {
         max = Math.max(max, id);
       }
     };
-    JSON.stringify([doc.content, doc.comments], (key, value) => {
+    JSON.stringify([doc.content, doc.comments, doc.stories], (key, value) => {
       if (key === "xml" && typeof value === "string") reserve(value);
       return value;
     });

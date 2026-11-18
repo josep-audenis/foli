@@ -3,6 +3,7 @@
     "word":  "16.0.20527",
     "opened":  true,
     "error":  null,
+    "comments":  0,
     "revisionsAccepted":  0,
     "pages":  2,
     "paragraphs":  [
@@ -161,34 +162,40 @@
                                          "default":  {
                                                          "exists":  true,
                                                          "linked":  false,
-                                                         "text":  "Litware SAS - 12 February 2026 - page 1"
+                                                         "text":  "Litware SAS - 12 February 2026 - page 1",
+                                                         "tables":  0
                                                      },
                                          "first":  {
                                                        "exists":  true,
                                                        "linked":  false,
-                                                       "text":  ""
+                                                       "text":  "",
+                                                       "tables":  0
                                                    },
                                          "even":  {
                                                       "exists":  false,
                                                       "linked":  false,
-                                                      "text":  ""
+                                                      "text":  "",
+                                                      "tables":  0
                                                   }
                                      },
                          "footers":  {
                                          "default":  {
                                                          "exists":  true,
                                                          "linked":  false,
-                                                         "text":  ""
+                                                         "text":  "",
+                                                         "tables":  0
                                                      },
                                          "first":  {
                                                        "exists":  true,
                                                        "linked":  false,
-                                                       "text":  ""
+                                                       "text":  "",
+                                                       "tables":  0
                                                    },
                                          "even":  {
                                                       "exists":  false,
                                                       "linked":  false,
-                                                      "text":  ""
+                                                      "text":  "",
+                                                      "tables":  0
                                                   }
                                      }
                      }

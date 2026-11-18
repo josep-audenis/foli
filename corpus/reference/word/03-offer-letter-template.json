@@ -3,6 +3,7 @@
     "word":  "16.0.20527",
     "opened":  true,
     "error":  null,
+    "comments":  0,
     "revisionsAccepted":  0,
     "pages":  1,
     "paragraphs":  [
@@ -144,34 +145,40 @@
                                          "default":  {
                                                          "exists":  true,
                                                          "linked":  false,
-                                                         "text":  "/Northwind Traders Limited - 1 Harbour Street - London E14 5AB"
+                                                         "text":  "/Northwind Traders Limited - 1 Harbour Street - London E14 5AB",
+                                                         "tables":  0
                                                      },
                                          "first":  {
                                                        "exists":  false,
                                                        "linked":  false,
-                                                       "text":  ""
+                                                       "text":  "",
+                                                       "tables":  0
                                                    },
                                          "even":  {
                                                       "exists":  false,
                                                       "linked":  false,
-                                                      "text":  ""
+                                                      "text":  "",
+                                                      "tables":  0
                                                   }
                                      },
                          "footers":  {
                                          "default":  {
                                                          "exists":  true,
                                                          "linked":  false,
-                                                         "text":  "Northwind Traders Limited is registered in England and Wales under number 01234567."
+                                                         "text":  "Northwind Traders Limited is registered in England and Wales under number 01234567.",
+                                                         "tables":  0
                                                      },
                                          "first":  {
                                                        "exists":  false,
                                                        "linked":  false,
-                                                       "text":  ""
+                                                       "text":  "",
+                                                       "tables":  0
                                                    },
                                          "even":  {
                                                       "exists":  false,
                                                       "linked":  false,
-                                                      "text":  ""
+                                                      "text":  "",
+                                                      "tables":  0
                                                   }
                                      }
                      }

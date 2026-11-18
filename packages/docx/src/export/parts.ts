@@ -12,9 +12,10 @@ import type {
   FoliDocument,
   NumberingInstanceJSON,
   NumberingLevelJSON,
+  StoryJSON,
   StyleJSON,
 } from "@folijs/core";
-import { attr, child, isW, W, W15 } from "../import/ooxml.js";
+import { attr, child, integer, isW, W, W15 } from "../import/ooxml.js";
 import {
   abstractOf,
   defaultsOf,
@@ -24,6 +25,7 @@ import {
   usableStyle,
 } from "../import/parts.js";
 import { Recorder } from "../import/report.js";
+import { notesOf } from "../import/stories.js";
 import { DocxError } from "../package.js";
 import type { XmlElement, XmlNode } from "../xml.js";
 import { blocksXml, type WriteContext } from "./content.js";
@@ -75,7 +77,7 @@ function childSource(
 }
 
 /** A part's text: the original's prolog and root around `children`, or a new root. */
-function wrapPart(
+export function wrapPart(
   part: OriginalPart | undefined,
   rootName: string,
   ns: Namespaces,
@@ -533,6 +535,77 @@ export function commentsXml(
   );
   const added = comments.rest().map(write).join("");
   return wrapPart(part, "w:comments", context.namespaces, body + added);
+}
+
+/** The separators a new notes part starts with, as Word writes them (unless it has its own). */
+const noteSeparators = (
+  kind: "footnote" | "endnote",
+  stories: Readonly<Record<string, StoryJSON>>,
+) =>
+  (Object.hasOwn(stories, `${kind}:-1`)
+    ? ""
+    : `<w:${kind} w:type="separator" w:id="-1"><w:p><w:r><w:separator/></w:r></w:p></w:${kind}>`) +
+  (Object.hasOwn(stories, `${kind}:0`)
+    ? ""
+    : `<w:${kind} w:type="continuationSeparator" w:id="0"><w:p><w:r><w:continuationSeparator/></w:r></w:p></w:${kind}>`);
+
+/**
+ * A footnotes or endnotes part: a note unchanged from `originals` keeps its bytes, a changed one
+ * is written from its story, and new ones go at the end. One whose story is gone is removed,
+ * unless Word needs it: a separator, or a note something still refers to (`isReferenced`).
+ */
+export function notesXml(
+  kind: "footnote" | "endnote",
+  stories: Readonly<Record<string, StoryJSON>>,
+  originals: Readonly<Record<string, StoryJSON>>,
+  isReferenced: (key: string) => boolean,
+  part: OriginalPart | undefined,
+  context: WriteContext,
+): string {
+  const write = (key: string, story: StoryJSON) => {
+    if (!new RegExp(`^${kind}:-?\\d+$`).test(key))
+      throw new DocxError(`Not the id of a ${kind}: ${key.slice(0, 64)}`);
+    const type = story.noteType ? ` w:type="${story.noteType}"` : "";
+    if (story.ext) {
+      // The element it was read from must be this note: a copy would repeat another's id.
+      const { element } = fragment(story.ext.replace(/\/?>$/, "/>"), context.namespaces, kind);
+      if (
+        integer(attr(element, "id")) !== Number(key.slice(kind.length + 1)) ||
+        attr(element, "type") !== story.noteType
+      )
+        throw new DocxError(`The start tag kept for ${key.slice(0, 64)} is another note's`);
+    }
+    const start =
+      story.ext?.replace(/\/>$/, ">") ?? `<w:${kind}${type} w:id="${key.slice(kind.length + 1)}">`;
+    return `${start}${blocksXml(story.content.content ?? [], context)}</w:${kind}>`;
+  };
+  const seen = new Set<string>();
+  const held = part ? notesOf(part.root, kind) : new Map<string, XmlElement>();
+  const keyOf = new Map([...held].map(([key, el]) => [el, key]));
+  const body = rebuild<string>(
+    part,
+    (child) => {
+      const key = keyOf.get(child);
+      if (key === undefined) return undefined;
+      seen.add(key);
+      if (!Object.hasOwn(stories, key)) {
+        const original = originals[key];
+        const needed =
+          !original || (original.noteType ?? "normal") !== "normal" || isReferenced(key);
+        return needed ? undefined : null;
+      }
+      const story = stories[key] as StoryJSON;
+      return same(story, originals[key]) ? undefined : key;
+    },
+    (key) => write(key, stories[key] as StoryJSON),
+    [],
+  );
+  const added = Object.entries(stories)
+    .filter(([key, story]) => story.kind === kind && !seen.has(key))
+    .map(([key, story]) => write(key, story))
+    .join("");
+  const separators = part ? "" : noteSeparators(kind, stories);
+  return wrapPart(part, `w:${kind}s`, context.namespaces, separators + body + added);
 }
 
 /**

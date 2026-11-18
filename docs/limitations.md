@@ -35,8 +35,8 @@ checklist in [testing/ime.md](testing/ime.md)):
   setups; a continuous section with another page setup starts a new page, and an even or odd
   page section gets no blank page before it. Page setups and section breaks are not editable
   yet.
-- Imported headers, footers and footnotes are kept and exported, but the editor does not show
-  or lay them out.
+- Imported headers, footers, footnotes and endnotes are in the document (`stories`) and exported,
+  but the editor does not show or lay them out yet, and a note's reference shows nothing.
 - No horizontal rule button (Word's rule is a paragraph's bottom border, kept and shown).
 - On Android, Backspace at a list paragraph's start may join it into the paragraph before
   instead of removing its number (untested on a device).

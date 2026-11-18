@@ -17,7 +17,8 @@ const paragraphs = (d: FoliDocument) =>
 describe("a new package", () => {
   it("refuses a document that refers to parts of its original package", async () => {
     for (const name of names) {
-      const { document } = await load(name);
+      // Without its stories: a story read from a part needs no package.
+      const { stories: _stories, ...document } = (await load(name)).document;
       const exported = exportDocx(document);
       // 06 refers to none (no header, footer, picture or linked content): a new package holds it.
       if (name.startsWith("06-")) await expect(exported, name).resolves.toBeInstanceOf(Uint8Array);

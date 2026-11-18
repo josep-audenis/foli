@@ -3,6 +3,7 @@
     "word":  "16.0.20527",
     "opened":  true,
     "error":  null,
+    "comments":  0,
     "revisionsAccepted":  0,
     "pages":  3,
     "paragraphs":  [
@@ -146,34 +147,40 @@
                                          "default":  {
                                                          "exists":  true,
                                                          "linked":  false,
-                                                         "text":  "Pump test memo, page 1"
+                                                         "text":  "Pump test memo, page 1",
+                                                         "tables":  0
                                                      },
                                          "first":  {
                                                        "exists":  false,
                                                        "linked":  false,
-                                                       "text":  ""
+                                                       "text":  "",
+                                                       "tables":  0
                                                    },
                                          "even":  {
                                                       "exists":  false,
                                                       "linked":  false,
-                                                      "text":  ""
+                                                      "text":  "",
+                                                      "tables":  0
                                                   }
                                      },
                          "footers":  {
                                          "default":  {
                                                          "exists":  true,
                                                          "linked":  false,
-                                                         "text":  ""
+                                                         "text":  "",
+                                                         "tables":  0
                                                      },
                                          "first":  {
                                                        "exists":  false,
                                                        "linked":  false,
-                                                       "text":  ""
+                                                       "text":  "",
+                                                       "tables":  0
                                                    },
                                          "even":  {
                                                       "exists":  false,
                                                       "linked":  false,
-                                                      "text":  ""
+                                                      "text":  "",
+                                                      "tables":  0
                                                   }
                                      }
                      }
@@ -182,22 +189,26 @@
                   {
                       "kind":  "footnote",
                       "referencePage":  1,
-                      "text":  "Procedure P-14, issue 3."
+                      "text":  "Procedure P-14, issue 3.",
+                      "revisions":  0
                   },
                   {
                       "kind":  "footnote",
                       "referencePage":  2,
-                      "text":  "The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file."
+                      "text":  "The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file.",
+                      "revisions":  0
                   },
                   {
                       "kind":  "endnote",
                       "referencePage":  3,
-                      "text":  "Measured at the coupling."
+                      "text":  "Measured at the coupling.",
+                      "revisions":  0
                   },
                   {
                       "kind":  "endnote",
                       "referencePage":  3,
-                      "text":  "Design flow is 40 litres per second."
+                      "text":  "Design flow is 40 litres per second.",
+                      "revisions":  0
                   }
               ],
     "fields":  [

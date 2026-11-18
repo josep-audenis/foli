@@ -68,8 +68,9 @@ a note split across pages, and tables or pictures in a story.
 content, ext? }`. `content` is a `doc` of the body's blocks. `noteType` is Word's `w:type` of a
   note: `separator`, `continuationSeparator` and `continuationNotice` have no reference, are not
   numbered, are never removed as unreferenced, and are what layout draws above the notes.
-- **What a story may hold.** No section breaks anywhere; no note references in a header, footer
-  or note; no page or column breaks in a note. `parseDocument` refuses them; **import never
+- **What a story may hold.** No section breaks anywhere; no note references and no comments in
+  any story (Word 16 drops a comment anchored in a note when it saves: 11.4 checked it); no page
+  or column breaks in a note. `parseDocument` refuses them; **import never
   fails on them**: such content stays opaque and is reported, as a table it cannot hold does.
 - **Ids.** A header's or footer's id is its relationship id, as `section.headers` and
   `section.footers` already hold, so those attributes and every v4 document stay valid. New ones
@@ -110,11 +111,9 @@ content, ext? }`. `content` is a `doc` of the body's blocks. `noteType` is Word'
   the view compares the stories too, redraws the occurrences of those that changed and reflows only
   if a height changed. The renderer's context depends on `styles`, `numbering`, `defaults`, `theme`
   and `resources`, not on the envelope object, so typing in a story keeps it and the layout cache.
-- **Across trees.** Revision, comment and bookmark ids are allocated over the body and every story
-  (`maxRevisionId` and its kin scan one tree today), and removing a comment removes its anchors
-  wherever they are, notes included (`comments.ts` scans the body today).
-- **Review.** Accept and reject all reach every story. Comments anchor in the body and notes, as
-  Word allows; headers and footers refuse them.
+- **Across trees.** Revision and bookmark ids are allocated over the body and every story
+  (`maxRevisionId` and its kin scan one tree today).
+- **Review.** Accept and reject all reach every story. Comments anchor in the body only.
 - **Notes and the clipboard.** Deleting the last reference removes the story in the same
   transaction; undo restores both. A slice holding a reference carries its note's content, so cut
   and paste keep the note, and every paste makes a new story with a fresh id (a copy never gives

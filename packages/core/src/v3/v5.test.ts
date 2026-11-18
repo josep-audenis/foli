@@ -151,7 +151,7 @@ describe("schema v5", () => {
     expect(parsed.comments[0]?.content[0]?.attrs?.controls).toEqual(["c"]);
   });
 
-  it("refuses empty or repeating control lists, and comments in headers", () => {
+  it("refuses empty or repeating control lists, and comments in stories", () => {
     const withControls = (controls: unknown) =>
       parseContent(doc({ type: "paragraph", attrs: { controls } }));
     expect(() => withControls([])).toThrow(/must not be empty/);
@@ -162,7 +162,7 @@ describe("schema v5", () => {
     ).toThrow(/cannot hold comments/);
     expect(() =>
       parseDocument(envelope({ stories: { s: { kind: "footnote", content: commented } } })),
-    ).not.toThrow();
+    ).toThrow(/cannot hold comments/);
   });
 
   it("holds long field codes and binding paths, and survives cyclic comment content", () => {

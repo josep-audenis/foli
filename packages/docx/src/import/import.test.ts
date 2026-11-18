@@ -111,7 +111,7 @@ describe("importing the Word corpus", () => {
     expect(document.section.pageSize).toEqual({ width: 11906, height: 16838 });
     expect(document.section.titlePage).toBe(true);
     // A cross-reference field: its structure opaque, its result editable text.
-    expect(report.opaque).toEqual({ "w:fldChar": 3, "w:instrText": 1 });
+    expect(report.opaque).toEqual({ "w:fldChar": 9, "w:instrText": 3 });
     // The signature table is a table (schema v4).
     expect((document.content.content ?? []).filter((b) => b.type === "table").length).toBe(1);
     const bookmarks = (document.content.content ?? []).flatMap((p) =>
@@ -176,7 +176,7 @@ describe("importing the Word corpus", () => {
     expect(landscape.sort()).toEqual(["landscape", undefined].sort());
     // Its one drawing, a floating picture, is a picture node.
     expect(report.opaque["w:drawing"]).toBeUndefined();
-    expect(report.opaque["w:footnoteReference"]).toBe(2);
+    expect(report.opaque["w:footnoteReference"]).toBeUndefined();
     const blocks = document.content.content ?? [];
     expect(blocks.filter((b) => b.type === "opaqueBlock")).toEqual([]);
     expect(blocks.filter((b) => b.type === "table").length).toBe(1);
@@ -200,7 +200,7 @@ describe("importing the Word corpus", () => {
         (p) => (p.attrs?.indent as { hanging?: number })?.hanging,
       ),
     ).toBe(true);
-    expect(report.opaque).toEqual({});
+    expect(report.opaque).toEqual({ "w:fldChar": 3, "w:instrText": 1 });
   });
 });
 
