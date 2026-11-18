@@ -159,6 +159,15 @@ Word's list: 06 counts 32 of them).
 back: every document holding them exported unchanged (Word finds the same fields, controls and
 bookmarks) and edited (a field's result, a control's text, a block control split in two).
 
+Since 11.8 it has Word read what `updateFields` and the insert commands write, Word's own pages as
+the layout: 01, 04 and 09 with every result spoiled and updated, 04's table of contents built again
+after an entry was spoiled, 03's merge fields filled from data while tracking, and 04 with a page
+number, the date, two cross-references to a heading and a new table of contents. Word finds exactly
+the fields and results Foli holds (an unlocked `DATE` it recomputes; a `w:hyperlink` to a bookmark
+counts as a field in Word's list and is left out). All 22 files pass (2026-11-18, Word 16.0.20527).
+`packages/docx/src/fields-word.test.ts` does the arithmetic part on every run: on the corpus, with
+Word's pages from `reference/word/`, every field works out to Word's result and nothing changes.
+
 `scripts/corpus/section-roundtrip.mjs` (11.6) has Word read Foli's sections back: 08 exported
 unchanged (Word's own pages and sections), edited through the editor's commands (a continuous
 break, three columns in one section, a line between columns in the last), the same edits while

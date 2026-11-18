@@ -158,6 +158,20 @@ export function builtinStyle(context: HasEnvelope, name: string): StyleJSON | nu
       ],
     };
   }
+  const contents = /^toc ([1-9])$/.exec(name)?.[1];
+  if (contents) {
+    // Word indents each level by the default font's size (11 pt: 220 twips).
+    const size = context.envelope.defaults.run?.find((m) => m.type === "fontSize")?.attrs?.value;
+    const indent = (Number(contents) - 1) * (typeof size === "number" ? size * 10 : 220);
+    return {
+      id: `TOC${contents}`,
+      type: "paragraph",
+      name,
+      ...based,
+      ...(normal ? { next: normal } : {}),
+      paragraph: { spacing: { after: 100 }, ...(indent ? { indent: { left: indent } } : {}) },
+    };
+  }
   if (name === "List Paragraph")
     return {
       id: "ListParagraph",

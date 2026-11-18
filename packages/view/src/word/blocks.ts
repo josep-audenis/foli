@@ -5,7 +5,9 @@
  * createElement/textContent only (never innerHTML); the page layout is in `pages.ts`.
  */
 import {
+  type FieldDisplay,
   type FoliDocument,
+  fieldDisplay,
   type ListMarker,
   type MarkJSON,
   type NodeJSON,
@@ -330,6 +332,8 @@ export function changeElement(
 export interface BlockOptions {
   /** `markup` (the default): insertions underlined, deletions struck through; `simple`, `final`: as if accepted. */
   review?: ReviewView;
+  /** Fields show their codes instead of their results (Word's Alt+F9). */
+  fieldCodes?: boolean;
   /**
    * The ratio of a font's normal line height to its size (`fontFamily`: a CSS font-family
    * list). Word's single line spacing is the font's own line height; multiples scale it.
@@ -601,6 +605,7 @@ export function renderBlocks(
   options: BlockOptions = {},
 ): WordBlock[] {
   const review = options.review ?? "markup";
+  const codes = options.fieldCodes === true;
   const ratios = new Map<string, number>();
   const ratio = (family: string) => {
     let value = ratios.get(family);
@@ -635,29 +640,30 @@ export function renderBlocks(
     ),
   );
   const blocks: WordBlock[] = [];
-  let carried: { nodes: number[]; inline: NodeJSON[] } | null = null;
+  const displays = fieldDisplay(content.map(inlineTypes), codes);
+  let carried: { nodes: number[]; inline: NodeJSON[]; display: FieldDisplay } | null = null;
   /** Comment ranges open at this point of the document. */
   const comments = new Set<number>();
 
   content.forEach((node, index) => {
     if (node.type !== "paragraph") {
-      blocks.push(opaqueBlock(node, index, resolver, doc, ratio, image, geometry));
+      blocks.push(opaqueBlock(node, index, resolver, doc, ratio, image, geometry, codes));
       return;
     }
     const attrs = attrsOf(node);
+    const own = displays[index] as FieldDisplay;
     if (joins(index)) {
-      const previous: { nodes: number[]; inline: NodeJSON[] } = carried ?? {
-        nodes: [],
-        inline: [],
-      };
+      const previous = carried ?? { nodes: [], inline: [], display: NO_DISPLAY };
       carried = {
         nodes: [...previous.nodes, index],
         inline: [...previous.inline, ...(node.content ?? [])],
+        display: joinDisplays(previous.display, previous.inline.length, own),
       };
       return;
     }
-    const merged: { nodes: number[]; inline: NodeJSON[] } = carried ?? { nodes: [], inline: [] };
+    const merged = carried ?? { nodes: [], inline: [] as NodeJSON[], display: NO_DISPLAY };
     carried = null;
+    const display = joinDisplays(merged.display, merged.inline.length, own);
     const { paragraph, run } = resolver.paragraph(attrs);
     const element = doc.createElement(tagOf(paragraph));
     styleParagraph(element, paragraph);
@@ -677,7 +683,10 @@ export function renderBlocks(
       ratio,
       image,
       geometry,
+      codes,
+      display,
     });
+    if (display.gone) element.style.display = "none";
     if (
       onlyPictures(
         inline,
@@ -704,8 +713,8 @@ export function renderBlocks(
     blocks.push({
       element,
       nodes: [...merged.nodes, index],
-      before: pt(spaceBefore),
-      after: pt(spaceAfter),
+      before: display.gone ? 0 : pt(spaceBefore),
+      after: display.gone ? 0 : pt(spaceAfter),
       keepNext: paragraph.keepNext,
       keepLines: paragraph.keepLines,
       pageBreakBefore: paragraph.pageBreakBefore,
@@ -716,6 +725,23 @@ export function renderBlocks(
   });
   applyContextualSpacing(blocks, resolver.addsParagraphSpacing);
   return blocks;
+}
+
+const NO_DISPLAY = fieldDisplay([[]], false)[0] as FieldDisplay;
+const inlineTypes = (node: NodeJSON) =>
+  node.type === "paragraph" ? (node.content ?? []).map((child) => child.type) : [];
+
+/** `after`, whose nodes follow `length` others, added to `before` (paragraphs drawn as one). */
+function joinDisplays(before: FieldDisplay, length: number, after: FieldDisplay): FieldDisplay {
+  if (!length) return after;
+  return {
+    hidden: new Set([...before.hidden, ...[...after.hidden].map((i) => i + length)]),
+    braces: new Map([
+      ...before.braces,
+      ...[...after.braces].map(([i, b]) => [i + length, b] as const),
+    ]),
+    gone: before.gone && after.gone,
+  };
 }
 
 /**
@@ -845,6 +871,10 @@ interface InlineContext {
   image?: ImageSource | undefined;
   /** The page floating pictures are positioned against. */
   geometry: FloatGeometry;
+  /** Whether fields show their codes. */
+  codes: boolean;
+  /** What these nodes show of their fields. */
+  display: FieldDisplay;
 }
 
 /** A paragraph's inline content: runs as spans, breaks, comment anchors, opaque inline content. */
@@ -855,9 +885,10 @@ function renderInline(
   paragraph: ParagraphFormat,
   context: InlineContext,
 ): void {
-  const { resolver, doc, review, comments, ratio, image } = context;
+  const { resolver, doc, review, comments, ratio, image, codes, display } = context;
   const floats: HTMLElement[] = [];
-  for (const node of inline) {
+  for (const [index, node] of inline.entries()) {
+    if (display.hidden.has(index)) continue;
     const marks = (node.marks ?? []) as MarkJSON[];
     const inserted = marks.some((m) => m.type === "insertion");
     const deleted = marks.some((m) => m.type === "deletion");
@@ -902,8 +933,11 @@ function renderInline(
       }
       default:
     }
+    const code =
+      display.braces.get(index) ?? (codes && node.type === "fieldCode" ? String(attrs.text) : "");
     let text: string;
-    if (node.type === "text") text = node.text ?? "";
+    if (code) text = code;
+    else if (node.type === "text") text = node.text ?? "";
     else if (node.type === "tab") text = "\t";
     else if (node.type === "opaqueInline") {
       const xml = parseOpaque(String(attrs.xml ?? ""), doc);
@@ -957,6 +991,7 @@ export function opaqueBlock(
   image?: ImageSource,
   /** The page floating pictures in its cells are placed against. */
   geometry: FloatGeometry = floatGeometry(undefined),
+  codes = false,
 ): WordBlock {
   const attrs = (node.attrs ?? {}) as Record<string, unknown>;
   const element = doc.createElement("div");
@@ -966,7 +1001,7 @@ export function opaqueBlock(
   const xml = node.type === "table" ? null : parseOpaque(String(attrs.xml ?? ""), doc);
   let after = 0;
   if (node.type === "table")
-    element.append(modelTable(node, resolver, doc, ratio, image, geometry));
+    element.append(modelTable(node, resolver, doc, ratio, image, geometry, codes));
   else if (xml?.localName === "tbl") element.append(opaqueTable(xml, resolver, doc, ratio));
   else if (xml) {
     const paragraphs = outermost(xml, PARAGRAPHS);
@@ -1214,6 +1249,7 @@ function modelTable(
   ratio: (family: string) => number,
   image: ImageSource | undefined,
   geometry: FloatGeometry,
+  codes: boolean,
 ): HTMLElement {
   const attrs = (node.attrs ?? {}) as Record<string, unknown>;
   const table = doc.createElement("table");
@@ -1240,6 +1276,7 @@ function modelTable(
     image,
     // shortcut: a floating picture in a cell is placed against the page, not its cell.
     geometry,
+    codes,
   };
   rows.forEach((rowNode, r) => {
     const rowAttrs = (rowNode.attrs ?? {}) as Record<string, unknown>;
@@ -1270,14 +1307,16 @@ function modelTable(
       row.append(cell);
       if (cellAttrs.vMerge === "continue") return;
       let above = 0;
-      for (const block of cellNode.content ?? []) {
+      const blocks = cellNode.content ?? [];
+      const displays = fieldDisplay(blocks.map(inlineTypes), codes);
+      for (const [b, block] of blocks.entries()) {
         if (block.type === "table") {
-          cell.append(modelTable(block, resolver, doc, ratio, image, geometry));
+          cell.append(modelTable(block, resolver, doc, ratio, image, geometry, codes));
           above = 0;
           continue;
         }
         if (block.type !== "paragraph") {
-          cell.append(opaqueBlock(block, 0, resolver, doc, ratio, image, geometry).element);
+          cell.append(opaqueBlock(block, 0, resolver, doc, ratio, image, geometry, codes).element);
           above = 0;
           continue;
         }
@@ -1287,7 +1326,9 @@ function modelTable(
         element.dataset.foliCell = "";
         styleParagraph(element, paragraph);
         styleRun(element, run, lineHeight(paragraph, run, ratio(fontStack(latin(run)))));
-        renderInline(element, block.content ?? [], run, paragraph, context);
+        const display = displays[b] as FieldDisplay;
+        renderInline(element, block.content ?? [], run, paragraph, { ...context, display });
+        if (display.gone) element.style.display = "none";
         if (!element.textContent) element.append(doc.createElement("br"));
         const before = paragraph.spacing.before * PX_PER_TWIP;
         element.style.marginTop = `${marginAbove(before, above, resolver)}px`;

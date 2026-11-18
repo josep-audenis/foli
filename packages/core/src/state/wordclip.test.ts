@@ -170,6 +170,31 @@ describe("copiedDefinitions", () => {
 });
 
 describe("fitPaste", () => {
+  it("drops the markers of half a field or control, keeping what they held", () => {
+    const editor = editorOf([p({}, text("x"))]);
+    const code = { type: "fieldCode", attrs: { text: " PAGE " } };
+    const whole = [{ type: "fieldStart" }, code, { type: "fieldSeparator" }, text("1")];
+    const types = (content: NodeJSON[]) =>
+      (fitPaste(editor.state, docOf(...content)).doc.toJSON().content ?? []).map((block) =>
+        (block.content ?? []).map((n) => n.text ?? n.type),
+      );
+    // No end: start, code and separator go, the result stays.
+    expect(types([p({}, ...whole, text("x"))])).toEqual([["1x"]]);
+    // No start: the end and the separator before it go.
+    expect(types([p({}, text("a"), { type: "fieldSeparator" }, { type: "fieldEnd" })])).toEqual([
+      ["a"],
+    ]);
+    // A whole field stays, inside half of another and across paragraphs.
+    const inner = [...whole, { type: "fieldEnd" }];
+    expect(types([p({}, { type: "fieldStart" }, ...inner)])).toEqual([
+      ["fieldStart", "fieldCode", "fieldSeparator", "1", "fieldEnd"],
+    ]);
+    expect(types([p({}, ...whole), p({}, { type: "fieldEnd" })])).toEqual([
+      ["fieldStart", "fieldCode", "fieldSeparator", "1"],
+      ["fieldEnd"],
+    ]);
+  });
+
   it("pastes inside one document as it is: same styles and lists, nothing added", () => {
     const editor = editorOf([p({ style: "Heading1", numbering: { id: 1, level: 0 } }, text("a"))]);
     const envelope = envelopeOf(editor);

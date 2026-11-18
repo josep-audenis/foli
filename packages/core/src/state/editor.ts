@@ -37,6 +37,8 @@ import {
   replyToComment,
   resolveComment,
 } from "./comments.js";
+import { fieldsPlugin } from "./fields.js";
+import type { FieldLayout, FieldsReport, UpdateFieldsOptions } from "./fieldupdate.js";
 import { setAlign, setHighlight, setTextColor } from "./format.js";
 import { history, redo, undo } from "./history.js";
 import { removeLink, setLink } from "./links.js";
@@ -105,6 +107,13 @@ export interface StoryView {
   /** Opens the header or footer of a page (default: the selection's). Whether it is open now. */
   edit(side: StorySide, page?: number): boolean;
   close(): void;
+  /** The pages as last laid out, for fields; null when there are none. */
+  readonly fieldLayout: FieldLayout | null;
+  /**
+   * Updates fields with the pages in view (of the body, or of `editor`, a story's), again when
+   * that moved them. One undo step.
+   */
+  updateFields(options?: UpdateFieldsOptions, editor?: Editor): FieldsReport;
 }
 
 /** A headless editor: state, commands, history and change notifications, no DOM. */
@@ -353,6 +362,7 @@ export function createEditor({
     history(),
     wordPlugin(envelope),
     trackPlugin(track),
+    fieldsPlugin(),
     commentsPlugin(),
     tableKeymap(),
     listKeymap(),
@@ -407,6 +417,7 @@ export function createEditor({
         ...plugins,
         wordPlugin(context.envelope, context),
         trackPlugin(value ?? track),
+        fieldsPlugin(),
         commentsPlugin(),
         tableKeymap(),
         listKeymap(),

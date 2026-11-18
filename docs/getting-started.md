@@ -225,6 +225,10 @@ its context.
 | Enter on an empty list paragraph                            | one level up; at the top, leave the list                    |
 | Backspace at a list paragraph's start                       | remove its number (the text stays where it was)             |
 | Tab elsewhere                                               | type a tab, as in Word                                      |
+| F9                                                          | update the field at the caret, or those selected            |
+| Ctrl+A, then F9                                             | update every field                                          |
+| Alt+F9                                                      | show or hide field codes                                    |
+| Backspace after, or Delete before, a field                  | select it; the same key again deletes it                    |
 | Escape, then Tab or Shift+Tab                               | move the focus on (out of the editor)                       |
 
 Word and line deletion use the platform's own keys (Ctrl+Backspace, Option+Backspace,
