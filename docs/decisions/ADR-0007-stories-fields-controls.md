@@ -325,6 +325,26 @@ content, ext? }`. `content` is a `doc` of the body's blocks. `noteType` is Word'
   otherwise kept verbatim. Sections gain `columns`, `pageNumbers` (`w:pgNumType`) and their own
   note properties.
 - **Find:** core's `findAll(doc, query)` over the body and each story; results carry the story id.
+  **Built in 11.11:** `findAll(editorOrDocument, query, { matchCase, wholeWord })`, which depends on
+  what the document shows (codes shown, review view, placeholders), hence the editor. `replace` and
+  `replaceAll` make one body transaction over all trees (`editTrees`), one undo step. Word 16.0.20527,
+  read through its object model:
+  - A match runs across runs and field markers, and over a comment's anchor, not over a note's
+    reference. Straight quotes find curly ones and a space a no-break space, not the reverse; accents
+    count; `ss` does not find `ß`. A query of several words ignores whole words; a word ends at
+    anything but a letter or digit (`_` and `'` end it).
+  - The replacement takes the first matched character's formatting and, without match case, follows
+    its capitals: all capitals, or the first letter when the match starts with a capital.
+  - Tracked: the old text deleted, then the new inserted. Inside a field's result it replaces; over
+    the result's edge Word changes nothing, and likewise over a control's edge and in locked content.
+  - With codes shown Word finds the code and not the result. A bookmark's name takes letters, digits
+    and `_`, starts with a letter, and is the same in any case: using it again moves the bookmark.
+  - **Foli differs on purpose:** bookmarks and comment anchors inside a replaced match stay (Word
+    loses them); text already deleted is refused, reported (Word adds the replacement after it); a
+    view hiding deleted text matches across it (Word does not); what is refused is returned, where
+    Word says nothing.
+  - **Marks** use the CSS Custom Highlight API instead of a decoration in the pages: nothing to keep
+    away from the read-back, and no layout.
 - **Slices with half a field or control** are repaired on paste (`fitPaste`, built in 11.8):
   markers without partners are dropped, a field that lost its end losing its code too, their
   content kept.

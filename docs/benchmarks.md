@@ -259,6 +259,24 @@ serialization, virtualizing pages far from the viewport, and moving the first la
 thread. None is needed for these targets; revisit when a target fails or documents grow past a
 few hundred pages.
 
+## Find on a long document (11.11)
+
+A document of 1,640 paragraphs (107 A5 pages, about 125,000 characters), `findAll` in Node and the
+find panel in `apps/playground/e2e/word-navigation.spec.ts`: from the input event to the next frame
+after it, the panel updated and the matches marked. One worker, Windows, 2026-11-19.
+
+| Query              | Matches | `findAll` (median) | Chromium | Firefox | WebKit |
+| ------------------ | ------: | -----------------: | -------: | ------: | -----: |
+| `th`               |   4,922 |             1.2 ms |    85 ms |  197 ms | 170 ms |
+| `the `             |   4,922 |             1.1 ms |    74 ms |  226 ms | 204 ms |
+| `the la`           |   1,640 |             0.4 ms |    22 ms |   98 ms | 109 ms |
+| `zebra` (none)     |       0 |             0.2 ms |    18 ms |   42 ms |  80 ms |
+
+The first search after a change reads the trees again (2 ms, 15 ms the very first time, before the
+JIT has warmed up); the rest of each figure is the panel and painting. Replacing all 4,920 takes
+0.64 s and undoing it 0.16 s. Marks are made only for pages near the window: marking every match of
+a 224-page document took up to 1.6 s per key in WebKit.
+
 ## Bundle size (Phase 6.4)
 
 **Run:** `pnpm size` (after `pnpm build`; part of `pnpm check`; source: `scripts/size.mjs`).

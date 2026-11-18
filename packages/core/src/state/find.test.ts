@@ -462,6 +462,26 @@ describe("properties", () => {
     );
   });
 
+  it("keeps every other match where it belongs after replacing one", () => {
+    fc.assert(
+      fc.property(lines, fc.nat(), replacement, (body, pick, text) => {
+        const editor = open(body.map((l) => p(l)));
+        const before = findAll(editor, "cat", { matchCase: true });
+        const match = before[pick % Math.max(before.length, 1)];
+        if (!match) return;
+        expect(replace(editor, match, text, { matchCase: true }).replaced).toBe(1);
+        const delta = text.length - 3;
+        const expected = before
+          .filter((m) => m !== match)
+          .map((m) => (m.from > match.from ? m.from + delta : m.from));
+        // What the new text adds or joins into is a match of its own: the others are all there.
+        const after = findAll(editor, "cat", { matchCase: true }).map((m) => m.from);
+        for (const from of expected) expect(after).toContain(from);
+        expect(editor.state.selection.from).toBe(match.from + text.length);
+      }),
+    );
+  });
+
   it("gives positions holding what was found", () => {
     fc.assert(
       fc.property(lines, (body) => {
