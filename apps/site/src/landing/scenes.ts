@@ -19,8 +19,6 @@ const ITEMS: [string, string, number][] = [
   ["Final review", "€900", 34],
   ["Style guide for new templates", "€1,300", 34],
   ["Training, second cohort", "€1,750", 34],
-  ["Translation memory export", "€640", 34],
-  ["Project management", "€2,200", 34],
 ];
 
 /** Figure 3: a table crossing a page break. Drawn for this page, with rows set not to split. */
@@ -119,23 +117,14 @@ export function mountTable(root: HTMLElement): void {
     if (view) view.style.height = `${(lines * HEIGHT + (lines - 1) * GAP) * scale}px`;
     const pagesOut = out("table-pages");
     if (pagesOut) pagesOut.textContent = count === 1 ? "One page." : `${count} pages.`;
-    add?.classList.toggle("is-done", state.rows >= ITEMS.length);
-    if (add) add.textContent = state.rows >= ITEMS.length ? "Start over" : "Add a row";
   }
 
-  const add = root.querySelector<HTMLButtonElement>("[data-add-row]");
-  let touched = false;
-  add?.addEventListener("click", () => {
-    touched = true;
-    state.rows = state.rows >= ITEMS.length ? 9 : state.rows + 1;
-    layout();
-  });
   layout();
   new ResizeObserver(layout).observe(view);
 
   // The table grows across the page break each time you come back to it.
   if (reducedMotion()) {
-    state.rows = 16;
+    state.rows = ITEMS.length;
     layout();
     return;
   }
@@ -144,11 +133,10 @@ export function mountTable(root: HTMLElement): void {
     view,
     async () => {
       const id = ++growth;
-      touched = false;
       state.rows = 9;
       layout();
       await wait(350);
-      while (id === growth && !touched && state.rows < 16) {
+      while (id === growth && state.rows < ITEMS.length) {
         state.rows++;
         layout();
         await wait(190);
@@ -266,36 +254,33 @@ export function mountRoundTrip(root: HTMLElement): void {
 
 /** Figure 5: one keystroke through the engine, in the order `docs/architecture.md` gives. */
 export function mountKeystroke(root: HTMLElement): void {
-  const key = root.querySelector<HTMLButtonElement>("[data-key]");
+  const key = root.querySelector<HTMLElement>("[data-key]");
   const typed = root.querySelector<HTMLElement>("[data-typed]");
   const steps = [...root.querySelectorAll<HTMLElement>("[data-step]")];
   if (!key || !typed) return;
-  const button: HTMLButtonElement = key;
+  const keycap: HTMLElement = key;
   const output: HTMLElement = typed;
   const sentence = "Every key takes this path.";
   let length = 0;
   let timers: ReturnType<typeof setTimeout>[] = [];
-  let touched = false;
 
   const showNext = () => {
     const next = sentence[length >= sentence.length ? 0 : length] ?? "";
-    button.textContent = next === " " ? "␣" : next;
+    keycap.textContent = next === " " ? "␣" : next;
   };
 
   function press(): void {
-    length = length >= sentence.length ? 1 : length + 1;
+    length++;
     output.textContent = sentence.slice(0, length);
     showNext();
-    if (!reducedMotion()) {
-      button.animate([{ transform: "translateY(4px)" }, { transform: "none" }], {
-        duration: 160,
-        easing: EASE,
-      });
-    }
+    keycap.animate([{ transform: "translateY(4px)" }, { transform: "none" }], {
+      duration: 160,
+      easing: EASE,
+    });
     for (const timer of timers) clearTimeout(timer);
     timers = [];
     for (const step of steps) step.classList.remove("is-lit");
-    const gap = reducedMotion() ? 0 : 70;
+    const gap = 70;
     steps.forEach((step, index) => {
       timers.push(setTimeout(() => step.classList.add("is-lit"), index * gap));
       // The last stop stays lit: the keystroke has reached the page.
@@ -305,41 +290,23 @@ export function mountKeystroke(root: HTMLElement): void {
     });
   }
 
-  function byHand(): void {
-    touched = true;
-    // Announced only for the reader's own keys, never for the page typing by itself.
-    output.setAttribute("aria-live", "polite");
-    press();
-  }
-
   length = reducedMotion() ? sentence.length : 0;
   output.textContent = sentence.slice(0, length);
   showNext();
   steps.at(-1)?.classList.add("is-lit");
-  button.addEventListener("click", () => {
-    button.focus({ preventScroll: true }); // Safari does not focus a clicked button.
-    byHand();
-  });
-  button.addEventListener("keydown", (event) => {
-    if (event.key.length !== 1 || event.ctrlKey || event.metaKey || event.altKey) return;
-    event.preventDefault(); // Space and letters both type; a held key repeats.
-    byHand();
-  });
 
-  // It types its sentence each time you come back, until you take over.
+  // It types its sentence each time you come back.
   if (reducedMotion()) return;
   let typing = 0;
   whileInView(
     root.querySelector(".ks") ?? root,
     async () => {
       const id = ++typing;
-      touched = false;
       length = 0;
-      output.setAttribute("aria-live", "off");
       output.textContent = "";
       showNext();
       await wait(350);
-      while (id === typing && !touched && length < sentence.length) {
+      while (id === typing && length < sentence.length) {
         press();
         await wait(sentence[length - 1] === " " ? 170 : 105);
       }
