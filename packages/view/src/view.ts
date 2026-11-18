@@ -1463,6 +1463,8 @@ export class EditorView {
    */
   openStory(side: StorySide, at = this.selectionPage(), create = true): boolean {
     if (!this.regions || !this.editable || this.composing) return false;
+    // `selectionchange` comes late: what the body shows is what Escape comes back to.
+    if (!this.mount && this.hasFocus()) this.syncSelection();
     // Word's blank page has none: the next page's.
     let p = at;
     while (this.facts[p] && !this.facts[p]?.sectionPages) p++;
