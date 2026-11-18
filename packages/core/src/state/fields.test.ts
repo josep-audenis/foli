@@ -1168,6 +1168,69 @@ describe("tables of contents", () => {
     valid(rejected);
   });
 
+  it("while tracking is rebuilt from any shape of old result", () => {
+    const start: NodeJSON[] = [
+      { type: "fieldStart" },
+      { type: "fieldCode", attrs: { text: "TOC \\o" } },
+      { type: "fieldSeparator" },
+    ];
+    for (const lead of [false, true])
+      for (const inline of [false, true])
+        for (const old of [1, 2, 3])
+          for (const wanted of [1, 2, 3]) {
+            const lines = Array.from({ length: old }, (_, i) => `old ${i}`);
+            const blocks: NodeJSON[] = lines.map((line) => p(line));
+            const head = lead ? ["before "] : [];
+            blocks[0] = p(...head, ...start, lines[0] as string);
+            const end: NodeJSON = { type: "fieldEnd" };
+            if (inline) {
+              const last = blocks[blocks.length - 1] as NodeJSON;
+              blocks[blocks.length - 1] = { ...last, content: [...(last.content ?? []), end] };
+            } else blocks.push(p(end));
+            const titles = Array.from({ length: wanted }, (_, i) => `H${i}`);
+            const editor = editorOf(
+              [p(...field("SEQ a", "9")), ...blocks, ...titles.map((t) => styled("Heading1", t))],
+              {},
+              true,
+            );
+            const report = updateFields(editor, { layout: pagesEvery(100_000) });
+            const shape = `${lead} ${inline} ${old} ${wanted}`;
+            expect(report.skipped, shape).toEqual([]);
+            expect(report.rebuilt, shape).toBe(1);
+            expect(results(editor)[0], shape).toBe("1");
+            editor.run(acceptAllChanges());
+            valid(editor);
+            const toc = fieldsIn(editor.state.doc)[1] as ReturnType<typeof fieldsIn>[0];
+            const lineText = titles.map((t) => `${t}\t1`).join("\r");
+            expect(toc.result, shape).toBe(lead ? `\r${lineText}` : lineText);
+            expect(updateFields(editor, { layout: pagesEvery(100_000) }).rebuilt, shape).toBe(0);
+          }
+  });
+
+  it("says so when tracking cannot record it, and updates the rest", () => {
+    // No headings: the whole result goes, a block tracking cannot delete among it.
+    const editor = editorOf(
+      [
+        p(...field("SEQ a", "9")),
+        p(
+          { type: "fieldStart" },
+          { type: "fieldCode", attrs: { text: "TOC \\o" } },
+          { type: "fieldSeparator" },
+          "old",
+        ),
+        { type: "opaqueBlock", attrs: { xml: "<w:p/>" } } as NodeJSON,
+        p("old two", { type: "fieldEnd" }),
+      ],
+      {},
+      true,
+    );
+    const report = updateFields(editor, { layout: pagesEvery(100_000) });
+    expect(results(editor)).toEqual(["1", "old\rold two"]);
+    expect(report).toMatchObject({ updated: 1, rebuilt: 0 });
+    expect(report.skipped.map((s) => s.reason)).toEqual(["untrackable"]);
+    valid(editor);
+  });
+
   it("is rebuilt while tracking as tracked content", () => {
     const editor = editorOf([p(...field("TOC \\o")), p(), ...headings], {}, true);
     updateFields(editor, { layout: pagesEvery(1000) });
@@ -1411,6 +1474,38 @@ describe("inserting fields", () => {
       "1.a)(i)",
       "1.b)",
     ]);
+    // Another list after the target's does not change where the target's stands.
+    const between = editorOf(
+      [
+        item(0, "one"),
+        item(1, "a"),
+        item(2, ...mark(1, "t")),
+        item(1, ...mark(2, "u")),
+        item(2, "under b"),
+        { ...p("other"), attrs: { numbering: { id: 2, level: 0 } } },
+        ...refs,
+      ],
+      { numbering } as never,
+    );
+    updateFields(between);
+    expect(results(between)).toEqual(["a)(i)", "b)"]);
+    // Read from Word: two lists of one definition count on together.
+    const shared = editorOf(
+      [
+        item(0, "one"),
+        item(1, "a"),
+        item(2, ...mark(1, "t")),
+        { ...p("o"), attrs: { numbering: { id: 2, level: 0 } } },
+        ...refs,
+        item(1, ...mark(2, "u")),
+        item(2, "under b"),
+        { ...p("o2"), attrs: { numbering: { id: 2, level: 0 } } },
+        ...refs,
+      ],
+      { numbering } as never,
+    );
+    updateFields(shared);
+    expect(results(shared)).toEqual(["(i)", "2.a)", "1.a)(i)", "a)"]);
   });
 
   it("numbers a clause reference as Word's \\r, \\n and \\w do", () => {

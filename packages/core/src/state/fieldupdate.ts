@@ -496,17 +496,31 @@ const withoutLinks = (marks: readonly Mark[]) =>
 class ListNumbers {
   private readonly paragraphs: ParagraphAt[];
   private readonly markers: (ListMarker | null)[];
-  /** For each paragraph, the numbered one at or before it (-1: none). */
-  private readonly numbered: number[];
+  /** The numbered paragraphs of each list, in order. */
+  private readonly lists = new Map<number, number[]>();
 
   constructor(tree: Node, word: WordContext) {
     this.paragraphs = paragraphsOf(tree);
     this.markers = word.resolver.markers(this.paragraphs.map((p) => p.node.attrs));
-    let last = -1;
-    this.numbered = this.markers.map((marker, i) => {
-      if (marker) last = i;
-      return last;
+    this.markers.forEach((marker, i) => {
+      if (!marker) return;
+      const list = this.lists.get(marker.instance);
+      if (list) list.push(i);
+      else this.lists.set(marker.instance, [i]);
     });
+  }
+
+  /** The last paragraph of list `instance` at or before paragraph `index` (-1: none). */
+  private lastOfList(instance: number, index: number): number {
+    const list = this.lists.get(instance) ?? [];
+    let low = 0;
+    let high = list.length;
+    while (low < high) {
+      const middle = (low + high) >> 1;
+      if ((list[middle] as number) <= index) low = middle + 1;
+      else high = middle;
+    }
+    return list[low - 1] ?? -1;
   }
 
   private indexAt(pos: number): number {
@@ -529,10 +543,10 @@ class ListNumbers {
   private chain(index: number): number[] {
     const out = [index];
     let level = this.markers[index]?.level ?? 0;
-    const list = this.markers[index]?.instance;
+    const list = this.markers[index]?.abstract;
     for (let i = index - 1; i >= 0 && level > 0; i--) {
       const marker = this.markers[i];
-      if (marker?.instance === list && marker && marker.level < level) {
+      if (marker?.abstract === list && marker && marker.level < level) {
         out.unshift(i);
         level = marker.level;
       }
@@ -541,8 +555,8 @@ class ListNumbers {
   }
 
   /**
-   * `\n`: alone; `\w`: in full; `\r`: what differs from where the list stands at `from`, the
-   * last numbered paragraph there (in full when that is none, or of another list). `plain`
+   * `\n`: alone; `\w`: in full; `\r`: what differs from where its list stands at `from`, the
+   * last paragraph of that list there, other lists between counting for nothing. `plain`
    * (`\t`): without the words of the number's format. As Word writes them, only the last
    * trailing period goes.
    */
@@ -556,8 +570,8 @@ class ListNumbers {
     };
     let chain = mode === "n" ? [index] : this.chain(index);
     if (mode === "r") {
-      const at = this.numbered[this.indexAt(from)] ?? -1;
-      const here = this.markers[at]?.instance === marker.instance ? this.chain(at) : [];
+      const at = this.lastOfList(marker.instance, this.indexAt(from));
+      const here = at < 0 ? [] : this.chain(at);
       let shared = 0;
       while (shared < chain.length - 1 && chain[shared] === here[shared]) shared++;
       chain = chain.slice(shared);
@@ -591,6 +605,8 @@ interface Run {
   envelope: WordEnvelope;
   /** List numbers, per tree worked on. */
   numbers: Map<Node, ListNumbers>;
+  /** Whether tables of contents are built (not when tracking cannot record that). */
+  contents: boolean;
   /** Picks fields of this tree. */
   picked(field: Field): boolean;
 }
@@ -1038,6 +1054,10 @@ function updateTree(run: Run): void {
   for (let i = 0; i < count; i++) {
     const field = contentsIn(tr.doc)[i];
     if (!field || !usable(field)) continue;
+    if (!run.contents) {
+      skip(run, field, "untrackable");
+      continue;
+    }
     try {
       rebuildContents(run, i);
     } catch (error) {
@@ -1353,24 +1373,37 @@ function rebuildContents(run: Run, index: number): void {
     tr.insert(field.resultTo, node("fieldSeparator", null, withoutReview(marks)));
     field = contentsField();
   }
-  if (tr.doc.resolve(field.resultTo).parentOffset) {
-    tr.split(field.resultTo);
+  /** The paragraphs entries go into, line for line: tracked, each keeps its place and change. */
+  const linesBefore = (closing: number) => {
+    const found: ParagraphAt[] = [];
+    tr.doc.nodesBetween(field.from, field.resultTo, (block, pos) => {
+      if (!block.isTextblock) return true;
+      if (pos !== closing && (pos > $start.before() || startsParagraph))
+        if (holdsResult(block, pos, field)) found.push({ node: block, pos });
+      return false;
+    });
+    return found;
+  };
+  const $inline = tr.doc.resolve(field.resultTo);
+  if ($inline.parentOffset) {
+    // Its paragraph becomes the end's: emptied when no entry needs it (a split beside lines being
+    // deleted cannot be tracked), else divided.
+    const spare =
+      $inline.before() !== $start.before() &&
+      paragraphs.length <= linesBefore($inline.before()).length;
+    if (spare) tr.delete($inline.start(), field.resultTo);
+    else tr.split(field.resultTo);
     field = contentsField();
   }
   const $close = tr.doc.resolve(field.resultTo);
   const closing = $close.before();
   const closes = $close.parent;
-  // The paragraphs entries go into, line for line: tracked, each keeps its place and its change.
-  const lines: ParagraphAt[] = [];
+  const lines = linesBefore(closing);
   // A section ending in what is replaced goes on ending after the last entry, not after the first.
   let section = closes.attrs.section ?? null;
   tr.doc.nodesBetween(field.from, field.resultTo, (block, pos) => {
-    if (!block.isTextblock) return true;
-    if (pos === closing) return false;
-    section ??= block.attrs.section ?? null;
-    if (pos > $start.before() || startsParagraph)
-      if (holdsResult(block, pos, field)) lines.push({ node: block, pos });
-    return false;
+    if (block.isTextblock && pos !== closing) section ??= block.attrs.section ?? null;
+    return !block.isTextblock;
   });
   if (section !== (closes.attrs.section ?? null))
     tr.setNodeMarkup(closing, closes.type, { ...closes.attrs, section });
@@ -1426,10 +1459,14 @@ function storyRun(editor: Editor, id: string, story: Story, body: Run, out: Tran
   if (!storyEditor || !fieldsIn(story.doc).length) return;
   const { state } = storyEditor;
   const tr = state.tr;
+  const { updated, unchanged } = body.report;
   updateTree({ ...body, state, tr, story: id, bodyTr: body.tr });
   if (!tr.docChanged) return;
   const tracked = trackTransaction(state, tr);
   if (!tracked) {
+    // None of it happens: what the count said of this story is taken back.
+    body.report.updated = updated;
+    body.report.unchanged = unchanged;
     body.report.skipped.push({ instruction: "", story: id, reason: "untrackable" });
     return;
   }
@@ -1458,53 +1495,57 @@ function storyIdOf(body: EditorState, doc: Node): string {
  */
 export function updateFields(editor: Editor, options: UpdateFieldsOptions = {}): FieldsReport {
   const { state } = editor;
-  const report = emptyReport();
   const word = wordContext(state);
-  if (!word) return report;
+  if (!word) return emptyReport();
   const body = storyBody(state)?.state;
   const { only } = options;
   const picks =
     only && typeof only !== "function" ? fieldsInRange(state.doc, only.from, only.to) : null;
-  const tr = state.tr;
-  const run: Run = {
-    state,
-    tr,
-    word,
-    story: null,
-    bodyTr: tr,
-    options,
-    report,
-    envelope: word.envelope,
-    numbers: new Map(),
-    picked: (field) => {
-      if (typeof only === "function") return only(field);
-      if (!picks) return true;
-      // What a table of contents holds goes with it.
-      const contents = field.parent?.name === "TOC" ? field.parent : null;
-      return [field, contents].some((f) => f && picks.has(originalPos(tr, f.from)));
-    },
+  const attempt = (contents: boolean) => {
+    const tr = state.tr;
+    const run: Run = {
+      state,
+      tr,
+      word,
+      story: null,
+      bodyTr: tr,
+      options,
+      report: emptyReport(),
+      envelope: word.envelope,
+      numbers: new Map(),
+      contents,
+      picked: (field) => {
+        if (typeof only === "function") return only(field);
+        if (!picks) return true;
+        // What a table of contents holds goes with it.
+        const holder = field.parent?.name === "TOC" ? field.parent : null;
+        return [field, holder].some((f) => f && picks.has(originalPos(tr, f.from)));
+      },
+    };
+    if (body) {
+      run.story = storyIdOf(body, state.doc);
+      run.bodyTr = body.tr;
+    }
+    updateTree(run);
+    return { run, out: trackTransaction(state, tr) };
   };
-  if (body) {
-    run.story = storyIdOf(body, state.doc);
-    run.bodyTr = body.tr;
-  }
-  updateTree(run);
-  const finish = (out: Transaction) => {
-    if (run.envelope !== word.envelope) withEnvelope(out, run.envelope);
-    return out.setMeta(options.continues ? joinHistory : closeHistory, true);
-  };
-  if (body || picks) {
-    if (tr.docChanged) editor.dispatch(finish(tr));
-    return report;
-  }
-  const out = trackTransaction(state, tr);
+  // What tracking cannot record stays out, and the other fields are still updated.
+  let made = attempt(true);
+  if (!made.out) made = attempt(false);
+  const { run, out } = made;
   if (!out) {
-    report.skipped.push({ instruction: "", story: null, reason: "untrackable" });
+    const report = emptyReport();
+    report.skipped.push({ instruction: "", story: run.story, reason: "untrackable" });
     return report;
   }
-  for (const [id, story] of word.stories) storyRun(editor, id, story, run, out);
-  if (out.docChanged) editor.dispatch(finish(out).setMeta(untracked, true));
-  return report;
+  if (!body && !picks)
+    for (const [id, story] of word.stories) storyRun(editor, id, story, run, out);
+  if (out.docChanged) {
+    if (run.envelope !== word.envelope) withEnvelope(out, run.envelope);
+    out.setMeta(options.continues ? joinHistory : closeHistory, true);
+    editor.dispatch(out.setMeta(untracked, true));
+  }
+  return run.report;
 }
 
 // ---------- inserting ----------
@@ -1555,6 +1596,7 @@ function placeField(
     report: emptyReport(),
     envelope: word.envelope,
     numbers: new Map(),
+    contents: true,
     picked: (field) => field.from === pos,
   };
   updateTree(run);

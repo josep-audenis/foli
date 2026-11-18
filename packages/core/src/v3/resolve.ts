@@ -92,6 +92,8 @@ export interface ListMarker {
   /** The marker's formatting: the paragraph's, its mark's, then the level's run properties. */
   run: RunFormat;
   instance: number;
+  /** The definition counted: instances sharing one go on from each other. */
+  abstract: number;
   level: number;
 }
 
@@ -895,6 +897,7 @@ export class Resolver {
         justification: level.justification ?? "left",
         run: marker,
         instance: instance.id,
+        abstract: abstract.id,
         level: index,
       };
     });
