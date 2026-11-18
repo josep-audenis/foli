@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Foli spike: headers and notes edited in place</title>
+    <!-- Phase 11.1 throwaway spike (ADR-0007): a story (a header, a footnote) edited in place
+         on a page of the one editable host. Entering one turns the host off and the story's
+         element on, so the story is the only editing host; leaving reverses it. A footnote is
+         laid out at the foot of its reference's page and takes space from that page's lines.
+         `?nested=1` leaves the host editable instead (an editable island). `?ref=n` puts the
+         reference on line n. -->
+    <style>
+      body { margin: 0; background: #e9e9e6; font: 16px/24px Georgia, "Times New Roman", serif; }
+      #editor { display: flex; flex-direction: column; align-items: center; gap: 24px; padding: 24px 0; outline: none; }
+      .page { box-sizing: border-box; width: 440px; height: 340px; padding: 40px 20px 60px; background: #fff; position: relative; display: flex; flex-direction: column; }
+      .header { position: absolute; top: 8px; left: 20px; right: 20px; min-height: 24px; color: #666; white-space: pre-wrap; }
+      .lines { flex: 1; }
+      .lines p { margin: 0; height: 24px; }
+      .notes { white-space: pre-wrap; }
+      #note { display: block; }
+      #measure { position: absolute; visibility: hidden; width: 400px; white-space: pre-wrap; }
+      .in-story .lines { opacity: 0.5; }
+      sup { line-height: 0; }
+    </style>
+  </head>
+  <body>
+    <div id="editor" contenteditable="true"></div>
+    <div id="measure"></div>
+    <script type="module">
+      const params = new URLSearchParams(location.search);
+      const nested = params.has("nested");
+      const CAPACITY = 240;
+      const LINE = 24;
+      const model = {
+        header: "Header text",
+        note: "A note.",
+        ref: Number(params.get("ref") ?? 3),
+        lines: Array.from({ length: 14 }, (_, i) => `Line ${i}`),
+      };
+      const editor = document.getElementById("editor");
+      const measure = document.getElementById("measure");
+      const noteEl = Object.assign(document.createElement("span"), { id: "note" });
+      noteEl.contentEditable = "false";
+      noteEl.textContent = model.note;
+      let active = null;
+      let saved = null;
+
+      const offsetIn = (el) => {
+        const sel = getSelection();
+        if (!sel.rangeCount || !el.contains(sel.focusNode)) return null;
+        const range = document.createRange();
+        range.selectNodeContents(el);
+        range.setEnd(sel.focusNode, sel.focusOffset);
+        return range.toString().length;
+      };
+      const caretIn = (el, offset) => {
+        const text = el.firstChild ?? el;
+        getSelection().collapse(text, text === el ? 0 : Math.min(offset, text.length));
+      };
+
+      /** Greedy: a line goes on the page if it, and the note of any reference so far on the page, fit. */
+      function flow() {
+        measure.textContent = model.note || " ";
+        const noteHeight = measure.getBoundingClientRect().height;
+        const pages = [[]];
+        let used = 0;
+        let notePage = -1;
+        model.lines.forEach((_, i) => {
+          const isRef = i === model.ref;
+          const note = isRef || notePage === pages.length - 1 ? noteHeight : 0;
+          if (used + LINE + note > CAPACITY && pages.at(-1).length) {
+            pages.push([]);
+            used = 0;
+          }
+          pages.at(-1).push(i);
+          used += LINE;
+          if (isRef) notePage = pages.length - 1;
+        });
+        return { pages, notePage };
+      }
+
+      function render() {
+        const { pages, notePage } = flow();
+        const noteOffset = active === noteEl ? offsetIn(noteEl) : null;
+        while (editor.children.length > pages.length) editor.lastChild.remove();
+        while (editor.children.length < pages.length) {
+          const page = document.createElement("section");
+          page.className = "page";
+          const header = document.createElement("div");
+          header.className = "header";
+          header.contentEditable = "false";
+          const lines = document.createElement("div");
+          lines.className = "lines";
+          const notes = document.createElement("div");
+          notes.className = "notes";
+          notes.contentEditable = "false";
+          page.append(header, lines, notes);
+          editor.append(page);
+        }
+        pages.forEach((indices, n) => {
+          const page = editor.children[n];
+          const header = page.querySelector(".header");
+          if (header !== active) header.textContent = model.header;
+          page.querySelector(".lines").replaceChildren(
+            ...indices.map((i) => {
+              const p = document.createElement("p");
+              p.id = `l${i}`;
+              p.textContent = model.lines[i];
+              if (i === model.ref) {
+                const sup = document.createElement("sup");
+                sup.contentEditable = "false";
+                sup.textContent = "1";
+                p.append(sup);
+              }
+              return p;
+            }),
+          );
+        });
+        const target = editor.children[notePage].querySelector(".notes");
+        if (noteEl.parentNode !== target) target.append(noteEl);
+        if (active === noteEl && noteOffset !== null) {
+          if (document.activeElement !== noteEl) noteEl.focus();
+          caretIn(noteEl, noteOffset);
+        }
+      }
+
+      // As the view's model selection would: a double click has moved the DOM's by the time it fires.
+      function remember() {
+        const sel = getSelection();
+        const line = sel.focusNode?.parentElement?.closest?.("p");
+        if (line) saved = { id: line.id, offset: sel.focusOffset };
+      }
+
+      function enter(el) {
+        active = el;
+        if (!nested) editor.contentEditable = "false";
+        editor.classList.add("in-story");
+        el.contentEditable = "true";
+        el.focus();
+        caretIn(el, el.textContent.length);
+      }
+
+      function leave(restore) {
+        const el = active;
+        active = null;
+        el.contentEditable = "false";
+        editor.contentEditable = "true";
+        editor.classList.remove("in-story");
+        editor.focus();
+        const target = saved && document.getElementById(saved.id);
+        if (restore && target) getSelection().collapse(target.firstChild, saved.offset);
+      }
+
+      editor.addEventListener("dblclick", (event) => {
+        const story = event.target.closest?.(".header, #note");
+        if (story && story !== active) enter(story);
+      });
+      document.addEventListener("mousedown", (event) => {
+        if (!active) remember();
+        else if (!active.contains(event.target)) leave(false);
+      });
+      document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape" && active) leave(true);
+      });
+      editor.addEventListener("input", (event) => {
+        if (active?.classList.contains("header")) {
+          model.header = active.textContent;
+          if (!event.isComposing) render();
+        } else if (active === noteEl) {
+          model.note = noteEl.textContent;
+          // The note may change pages: never move it under a composition.
+          if (!event.isComposing) render();
+        } else {
+          for (const p of editor.querySelectorAll(".lines p"))
+            model.lines[Number(p.id.slice(1))] = p.firstChild?.textContent ?? "";
+        }
+      });
+      editor.addEventListener("compositionend", () => {
+        if (active) requestAnimationFrame(render);
+      });
+
+      window.__spike = {
+        model,
+        render,
+        insertLines(n) {
+          model.lines.unshift(...Array.from({ length: n }, (_, i) => `New ${i}`));
+          model.ref += n;
+          render();
+        },
+      };
+      render();
+    </script>
+  </body>
+</html>
