@@ -1482,8 +1482,6 @@ export class EditorView {
    */
   openStory(side: StorySide, at = this.selectionPage(), create = true): boolean {
     if (!this.regions || !this.editable || this.composing) return false;
-    // `selectionchange` comes late: what the body shows is what Escape comes back to.
-    if (!this.mount && this.hasFocus()) this.syncSelection();
     // Word's blank page has none: the next page's.
     let p = at;
     while (this.facts[p] && !this.facts[p]?.sectionPages) p++;
@@ -1614,6 +1612,10 @@ export class EditorView {
         this.mount?.view.placeCaret(event.clientX, event.clientY);
       return;
     }
+    // What the body shows now is what leaving the story comes back to (`selectionchange` comes
+    // late, and the browser may select something on the way to the second press).
+    if (margin && this.hasFocus()) this.syncSelection();
+    this.pressSelection = margin ? this.state.selection : null;
     // On a header or footer a press is not for the body: it places no caret.
     if (margin && this.pageRegions[margin.page]?.[margin.side]) {
       event.preventDefault();
@@ -1624,7 +1626,6 @@ export class EditorView {
       }
       return;
     }
-    this.pressSelection = margin ? this.state.selection : null;
     this.onMouseDown(event);
   };
 
