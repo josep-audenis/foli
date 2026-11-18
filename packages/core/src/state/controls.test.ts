@@ -684,6 +684,13 @@ describe("copy and paste", () => {
     expect(doc.content?.[0]?.attrs?.controls).not.toEqual(["b"]);
   });
 
+  it("pasted blocks join the block control at the caret", () => {
+    const editor = editorOf([inBlock(p("v"), "b")], { b: { kind: "richText" } });
+    editor.select(2);
+    const { doc } = paste(editor, { type: "doc", content: [p("x"), p("y")] });
+    expect(doc.content?.map((block) => block.attrs?.controls)).toEqual([["b"], ["b"]]);
+  });
+
   it("over its own selection it is the same control", () => {
     const editor = editorOf([p(inline("c", text("v")))], { c: { kind: "text" } });
     const { from, to } = range(editor, "c");

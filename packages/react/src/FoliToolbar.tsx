@@ -3,11 +3,15 @@ import {
   acceptAllChanges,
   acceptChange,
   addComment,
+  addRepeatingItem,
   alignAt,
   type Command,
+  type ControlJSON,
   canOutdent,
   changeIndent,
   colorAt,
+  controlAt,
+  controlProperties,
   crossReferenceTargets,
   deleteColumns,
   deleteRows,
@@ -22,6 +26,7 @@ import {
   fontSizeAt,
   insertColumn,
   insertColumnBreak,
+  insertControl,
   insertCrossReference,
   insertDate,
   insertPageBreak,
@@ -58,6 +63,7 @@ import {
   selectedPicture,
   setAlign,
   setCellShading,
+  setControlProperties,
   setDifferentEvenPages,
   setDifferentFirstPage,
   setFontFamily,
@@ -175,7 +181,7 @@ interface Action {
   label: string;
   /** The command it runs; with `dialog`, whether it applies: the dialog does the rest. */
   command: Command;
-  dialog?: "insertTable" | "pageSetup" | "crossReference";
+  dialog?: "insertTable" | "pageSetup" | "crossReference" | "controlProperties";
   checked?: (state: EditorState) => boolean;
   /** It takes the focus where it belongs (into a story, or back to the body). */
   movesFocus?: boolean;
@@ -341,6 +347,32 @@ function storyActions(body: Editor): readonly Action[] {
     },
   ];
 }
+
+/** The control the selection is in. */
+const selectedControl = (state: EditorState) => {
+  const range = controlAt(state.doc, state.selection.from);
+  const control = range && controlProperties(state, range.id);
+  return range && control ? { id: range.id, control } : null;
+};
+
+/** The content controls menu: each kind to insert, then what applies to the one at the caret. */
+const CONTROL_ACTIONS: readonly Action[] = [
+  { key: "richText", label: "Rich text", command: insertControl("richText") },
+  { key: "plainText", label: "Plain text", command: insertControl("text") },
+  { key: "dropDown", label: "Drop-down list", command: insertControl("dropDown") },
+  { key: "comboBox", label: "Combo box", command: insertControl("comboBox") },
+  { key: "datePicker", label: "Date picker", command: insertControl("date") },
+  { key: "checkBox", label: "Check box", command: insertControl("checkbox") },
+  { key: "pictureControl", label: "Picture (selected)", command: insertControl("picture") },
+  { key: "repeating", label: "Repeating section", command: insertControl("repeating") },
+  { key: "repeatingItem", label: "Add repeating item", command: addRepeatingItem() },
+  {
+    key: "controlProperties",
+    label: "Control properties…",
+    dialog: "controlProperties",
+    command: (state) => selectedControl(state) !== null,
+  },
+];
 
 /**
  * The fields menu: what can be inserted at the selection, updating (the view's pages when there is
@@ -788,6 +820,13 @@ const GROUPS: Item[][] = [
       enabled: (state) => wordContext(state) !== null,
       actions: fieldActions,
     },
+    {
+      key: "controls",
+      label: "Content controls",
+      text: "Controls",
+      enabled: (state) => wordContext(state) !== null,
+      actions: CONTROL_ACTIONS,
+    },
   ],
 ];
 
@@ -935,6 +974,15 @@ export function FoliToolbar({
               ? null
               : current,
           );
+          // The control properties dialog is for the control it opened on.
+          setControlDialog((current) =>
+            current &&
+            (!transactions.length ||
+              transactions.some((tr) => tr.docChanged) ||
+              !state.selection.eq(current.selection))
+              ? null
+              : current,
+          );
           // So is the page setup dialog: its section may have changed.
           setSetupDialog((current) =>
             current &&
@@ -966,6 +1014,7 @@ export function FoliToolbar({
         setPictureDialog(null);
         setSetupDialog(null);
         setReferenceDialog(null);
+        setControlDialog(null);
         setDialog((current) =>
           current
             ? { ...current, request: current.request + 1 }
@@ -1011,6 +1060,14 @@ export function FoliToolbar({
   } | null>(null);
   useEffect(() => {
     if (disabled) setReferenceDialog(null);
+  }, [disabled]);
+  // The control properties dialog (from the content controls menu).
+  const [controlDialog, setControlDialog] = useState<{
+    restore: HTMLElement | null;
+    selection: EditorState["selection"];
+  } | null>(null);
+  useEffect(() => {
+    if (disabled) setControlDialog(null);
   }, [disabled]);
   // The picture dialog: inserts at (or edits the picture at `pos`) the selection it opened on.
   const [pictureDialog, setPictureDialog] = useState<{
@@ -1156,6 +1213,17 @@ export function FoliToolbar({
                         state={editor.state}
                         onPick={(action, pointer) => {
                           setMenu(null);
+                          if (action.dialog === "controlProperties") {
+                            setDialog(null);
+                            setTableDialog(null);
+                            setSetupDialog(null);
+                            setReferenceDialog(null);
+                            setControlDialog({
+                              restore: buttons.current[i] ?? null,
+                              selection: editor.state.selection,
+                            });
+                            return;
+                          }
                           if (action.dialog === "crossReference") {
                             setDialog(null);
                             setTableDialog(null);
@@ -1260,6 +1328,17 @@ export function FoliToolbar({
             const { restore } = referenceDialog;
             setReferenceDialog(null);
             if (inserted && onClickCommand) onClickCommand();
+            else restore?.focus();
+          }}
+        />
+      )}
+      {controlDialog && !disabled && (
+        <ControlDialog
+          editor={editor}
+          onClose={(applied) => {
+            const { restore } = controlDialog;
+            setControlDialog(null);
+            if (applied && onClickCommand) onClickCommand();
             else restore?.focus();
           }}
         />
@@ -1758,6 +1837,158 @@ function CrossReferenceDialog({
             A cross-reference cannot be inserted here.
           </p>
         )}
+      </form>
+    </div>
+  );
+}
+
+/** A list's items as the dialog shows them: one a line, `shown | value` where they differ. */
+const itemsText = (items: ControlJSON["items"]) =>
+  (items ?? [])
+    .map((item) =>
+      item.display === undefined || item.display === item.value
+        ? item.value
+        : `${item.display} | ${item.value}`,
+    )
+    .join("\n");
+
+function parseItems(text: string): NonNullable<ControlJSON["items"]> {
+  const seen = new Set<string>();
+  return text.split("\n").flatMap((line) => {
+    const [shown = "", value = shown] = line.split("|").map((part) => part.trim());
+    // Word refuses two items of one value.
+    if (!shown || seen.has(value)) return [];
+    seen.add(value);
+    return [{ value, display: shown }];
+  });
+}
+
+/**
+ * The properties of the control at the caret: title, tag, locks and what its kind has (list items,
+ * date format, line breaks); OK and Cancel; Escape cancels.
+ */
+function ControlDialog({
+  editor,
+  onClose,
+}: {
+  editor: Editor;
+  onClose: (applied: boolean) => void;
+}) {
+  const [selected] = useState(() => selectedControl(editor.state));
+  const control = selected?.control;
+  const [title, setTitle] = useState(control?.alias ?? "");
+  const [tag, setTag] = useState(control?.tag ?? "");
+  const [noDelete, setNoDelete] = useState(
+    control?.lock === "sdtLocked" || control?.lock === "sdtContentLocked",
+  );
+  const [noEdit, setNoEdit] = useState(
+    control?.lock === "contentLocked" || control?.lock === "sdtContentLocked",
+  );
+  const [items, setItems] = useState(itemsText(control?.items));
+  const [dateFormat, setDateFormat] = useState(control?.dateFormat ?? "d MMMM yyyy");
+  const [multiLine, setMultiLine] = useState(control?.multiLine === true);
+  const first = useRef<HTMLInputElement>(null);
+  const id = useId();
+  useEffect(() => {
+    first.current?.focus();
+  }, []);
+  if (!selected || !control) return null;
+  const { kind } = control;
+  const hasList = kind === "dropDown" || kind === "comboBox";
+  const apply = (event: FormEvent) => {
+    event.preventDefault();
+    const lock = noDelete
+      ? noEdit
+        ? "sdtContentLocked"
+        : "sdtLocked"
+      : noEdit
+        ? "contentLocked"
+        : "unlocked";
+    onClose(
+      editor.run(
+        setControlProperties(selected.id, {
+          title,
+          tag,
+          lock,
+          ...(hasList ? { items: parseItems(items) } : {}),
+          ...(kind === "date" ? { dateFormat } : {}),
+          ...(kind === "text" ? { multiLine } : {}),
+        }),
+      ),
+    );
+  };
+  return (
+    <div
+      role="dialog"
+      aria-label="Content control properties"
+      className="foli-link-dialog foli-table-dialog"
+      onKeyDown={(event) => {
+        if (event.key !== "Escape") return;
+        event.preventDefault();
+        onClose(false);
+      }}
+    >
+      <form onSubmit={apply} noValidate>
+        <label htmlFor={`${id}-title`}>Title</label>
+        <input
+          ref={first}
+          id={`${id}-title`}
+          value={title}
+          onChange={(event) => setTitle(event.target.value)}
+        />
+        <label htmlFor={`${id}-tag`}>Tag</label>
+        <input id={`${id}-tag`} value={tag} onChange={(event) => setTag(event.target.value)} />
+        <label>
+          <input
+            type="checkbox"
+            checked={noDelete}
+            onChange={(event) => setNoDelete(event.target.checked)}
+          />
+          The control cannot be deleted
+        </label>
+        <label>
+          <input
+            type="checkbox"
+            checked={noEdit}
+            onChange={(event) => setNoEdit(event.target.checked)}
+          />
+          The contents cannot be edited
+        </label>
+        {hasList && (
+          <>
+            <label htmlFor={`${id}-items`}>List items, one per line (shown | value)</label>
+            <textarea
+              id={`${id}-items`}
+              rows={4}
+              value={items}
+              onChange={(event) => setItems(event.target.value)}
+            />
+          </>
+        )}
+        {kind === "date" && (
+          <>
+            <label htmlFor={`${id}-format`}>Date format</label>
+            <input
+              id={`${id}-format`}
+              value={dateFormat}
+              onChange={(event) => setDateFormat(event.target.value)}
+            />
+          </>
+        )}
+        {kind === "text" && (
+          <label>
+            <input
+              type="checkbox"
+              checked={multiLine}
+              onChange={(event) => setMultiLine(event.target.checked)}
+            />
+            Allow line breaks
+          </label>
+        )}
+        <button type="submit">OK</button>
+        <button type="button" onClick={() => onClose(false)}>
+          Cancel
+        </button>
       </form>
     </div>
   );

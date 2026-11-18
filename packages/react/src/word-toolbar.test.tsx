@@ -4,6 +4,7 @@ import {
   type FoliDocument,
   fieldCodesShown,
   fieldsIn,
+  insertControl,
   insertTable,
   NodeSelection,
   type OpenStory,
@@ -604,6 +605,60 @@ describe("FoliCanvas's pictures", () => {
     } finally {
       if (descriptor) Object.defineProperty(HTMLImageElement.prototype, "src", descriptor);
     }
+  });
+
+  describe("the content controls menu", () => {
+    const openMenu = () => fireEvent.click(screen.getByRole("button", { name: "Controls" }));
+
+    it("inserts a control, and its properties dialog changes it", () => {
+      const editor = setup();
+      act(() => editor.select(6));
+      openMenu();
+      expect(
+        screen.getByRole("menuitem", { name: "Control properties…" }).getAttribute("aria-disabled"),
+      ).toBe("true");
+      fireEvent.click(screen.getByRole("menuitem", { name: "Drop-down list" }));
+      expect(editor.controlValues()[0]).toMatchObject({
+        kind: "dropDown",
+        showingPlaceholder: true,
+      });
+      openMenu();
+      fireEvent.click(screen.getByRole("menuitem", { name: "Control properties…" }));
+      const dialog = screen.getByRole("dialog", { name: "Content control properties" });
+      expect(window.document.activeElement).toBe(screen.getByLabelText("Title"));
+      fireEvent.change(screen.getByLabelText("Title"), { target: { value: "Size" } });
+      fireEvent.change(screen.getByLabelText("Tag"), { target: { value: "size" } });
+      fireEvent.change(screen.getByLabelText(/List items/), {
+        target: { value: "Small | s\nLarge | l\nLarge | l" },
+      });
+      fireEvent.click(screen.getByLabelText("The contents cannot be edited"));
+      fireEvent.submit(dialog.querySelector("form") as HTMLFormElement);
+      expect(screen.queryByRole("dialog")).toBeNull();
+      expect(Object.values(editor.getDocument().controls ?? {})[0]).toMatchObject({
+        alias: "Size",
+        tag: "size",
+        lock: "contentLocked",
+        items: [
+          { value: "s", display: "Small" },
+          { value: "l", display: "Large" },
+        ],
+      });
+    });
+
+    it("closes the dialog on Escape, changing nothing", () => {
+      const editor = setup();
+      act(() => {
+        editor.select(6);
+        editor.run(insertControl("text", { title: "Name" }));
+      });
+      const before = editor.getDocument().controls;
+      openMenu();
+      fireEvent.click(screen.getByRole("menuitem", { name: "Control properties…" }));
+      fireEvent.change(screen.getByLabelText("Title"), { target: { value: "Other" } });
+      fireEvent.keyDown(screen.getByLabelText("Title"), { key: "Escape" });
+      expect(screen.queryByRole("dialog")).toBeNull();
+      expect(editor.getDocument().controls).toEqual(before);
+    });
   });
 
   describe("the fields menu", () => {

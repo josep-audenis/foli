@@ -532,7 +532,24 @@ function fit(
     } as NodeJSON;
   };
 
-  const doc = parseContent(mapNode(json), "content", true);
+  // Pasted into a block control, the new paragraphs are in it as the one at the caret is.
+  const around = (
+    from === to || state.selection.$from.parent === state.selection.$to.parent
+      ? state.selection.$from.parent.attrs.controls
+      : null
+  ) as string[] | null | undefined;
+  const mapped = mapNode(json) as NodeJSON;
+  const inPlace = around?.length
+    ? {
+        ...mapped,
+        content: mapped.content?.map((block) => {
+          const attrs = block.attrs as Json | undefined;
+          const own = (attrs?.controls as string[] | undefined) ?? [];
+          return { ...block, attrs: { ...attrs, controls: [...around, ...own] } };
+        }),
+      }
+    : mapped;
+  const doc = parseContent(inPlace, "content", true);
   let comments = target.comments;
   const copiedComments = source.comments.filter((c) => commentIds.has(c.id));
   if (copiedComments.length) {
