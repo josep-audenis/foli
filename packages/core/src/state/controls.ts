@@ -892,6 +892,13 @@ export interface ControlInsertOptions {
   multiLine?: boolean;
 }
 
+/** A control's properties for a copy of it: Word gives the copy a `w:id` of its own. */
+export function copiedControl(control: ControlJSON): ControlJSON {
+  return control.ext
+    ? { ...control, ext: control.ext.replace(/<[\w.-]+:id\b[^>]*\/>/, "") }
+    : control;
+}
+
 /** An id no control of `controls` has. */
 export function freshControlId(controls: Controls | undefined): string {
   let n = Object.keys(controls ?? {}).length + 1;
@@ -1115,7 +1122,7 @@ export function addRepeatingItem(target?: string): Command {
       if (!copy) {
         copy = freshControlId({ ...controls, ...added });
         copies.set(id, copy);
-        added[copy] = controls[id] as ControlJSON;
+        added[copy] = copiedControl(controls[id] as ControlJSON);
       }
       return copy;
     };

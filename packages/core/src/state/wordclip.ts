@@ -40,7 +40,7 @@ import {
 } from "../v3/document.js";
 import { migrateToV3 } from "../v3/migrate.js";
 import { Resolver } from "../v3/resolve.js";
-import { controlsIn, freshControlId } from "./controls.js";
+import { controlsIn, copiedControl, freshControlId } from "./controls.js";
 import type { EditorState } from "./state.js";
 import { otherTrees, storyBody, type WordContext, type WordEnvelope, wordContext } from "./word.js";
 import { builtinStyle, levels } from "./wordformat.js";
@@ -450,7 +450,7 @@ function fit(
     if (!copy) {
       copy = freshControlId(controls);
       copiedControls.set(id, copy);
-      controls = { ...controls, [copy]: target.controls?.[id] as ControlJSON };
+      controls = { ...controls, [copy]: copiedControl(target.controls?.[id] as ControlJSON) };
     }
     return copy;
   };

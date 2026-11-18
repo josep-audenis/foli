@@ -13,7 +13,7 @@ import {
 } from "@folijs/core";
 import type { DocxPackage, Relationship } from "../package.js";
 import type { XmlElement, XmlNode } from "../xml.js";
-import { controlProperties, plainlyEditable } from "./controls.js";
+import { controlProperties } from "./controls.js";
 import { attr, child, deepText, elements, integer, isW, R, REL, textOf, W } from "./ooxml.js";
 import { pictureAttrs } from "./pictures.js";
 import {
@@ -158,7 +158,7 @@ function controlOf(
   if (children.some((c) => !isW(c) || !known.has(c.local))) return undefined;
   if (![...known].every(once)) return undefined;
   const control = controlProperties(sdt, context);
-  if (!control || !plainlyEditable(control)) return undefined;
+  if (!control) return undefined;
   const id = `${context.part}#${context.ordinals.next++}`;
   context.controls.set(id, control);
   return { id, content };

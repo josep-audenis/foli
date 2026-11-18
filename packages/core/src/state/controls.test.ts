@@ -660,13 +660,13 @@ describe("copy and paste", () => {
 
   it("a copy is a new control with the same properties", () => {
     const editor = editorOf([p(inline("c", text("v"))), p("")], {
-      c: { kind: "text", tag: "t", ext: "<w:sdt/>" },
+      c: { kind: "text", tag: "t", ext: '<w:sdt><w:sdtPr><w:id w:val="5"/></w:sdtPr></w:sdt>' },
     });
     editor.select(editor.state.doc.content.size - 1);
     const { doc, controls } = paste(editor, content);
     const id = doc.content?.[0]?.content?.[0]?.attrs?.id as string;
     expect(id).not.toBe("c");
-    expect(controls[id]).toEqual(controls.c);
+    expect(controls[id]).toEqual({ ...controls.c, ext: "<w:sdt><w:sdtPr></w:sdtPr></w:sdt>" });
   });
 
   it("cut and pasted, it stays the same control", () => {
