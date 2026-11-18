@@ -6,7 +6,7 @@
     <title>Foli — real pages for the web</title>
     <meta
       name="description"
-      content="Add a Word-style editor to your React app. Open a .docx, edit it on real pages with tracked changes and comments, and save it back. MIT licensed."
+      content="A Word-style editor for React apps. Open a .docx, edit it on real pages with tracked changes and comments, and save it back. MIT licensed."
     />
     <meta name="theme-color" content="#f3f3f1" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
@@ -52,8 +52,8 @@
           </h1>
           <div class="hero-side">
             <p>
-              Add a Word-style editor to your React app. You open a <code>.docx</code>, edit it on
-              real pages and save it back.
+              A Word-style editor for React apps. Open a <code>.docx</code>, edit it on real pages and
+              save it back.
             </p>
             <div class="hero-actions">
               <a class="button button-primary" href="/test/">Try the editor</a>
@@ -64,7 +64,7 @@
 
         <div class="app" id="pages">
           <fieldset class="app-tabs" aria-label="What the drawing shows">
-            <button type="button" data-chapter="write" aria-pressed="true"><b>Write</b><span>Text moves to the next page as you type</span></button>
+            <button type="button" data-chapter="write" aria-pressed="true"><b>Write</b><span>Text flows on to the next page</span></button>
             <button type="button" data-chapter="review" aria-pressed="false"><b>Review</b><span>Track changes and leave comments</span></button>
             <button type="button" data-chapter="save" aria-pressed="false"><b>Save</b><span>Export back to .docx</span></button>
           </fieldset>
@@ -95,7 +95,7 @@
                 </section>
               </aside>
               <div class="app-result" data-result role="status">
-                <strong>Saved.</strong> Foli rewrote <code>word/document.xml</code> and copied every other part.
+                <strong>Saved.</strong> Only <code>word/document.xml</code> changed.
               </div>
             </div>
             <div class="app-status"><span data-status>3 pages</span><span>This is a drawing. <a href="/test/">Open the real editor</a></span></div>
@@ -156,16 +156,16 @@
 
       <section class="why wrap-wide" aria-label="Why Foli">
         <p class="why-lead">
-          <strong>Foli puts every line on a real page while you type.</strong> It stores your
-          document the way Word does, so a contract keeps its styles, numbering and tracked changes.
+          <strong>Foli puts every line on a real page during editing.</strong> Documents follow Word's
+          model, so a contract keeps its styles, numbering and tracked changes.
         </p>
         <div class="why-side">
           <p>
-            We compared 9 <a href="https://github.com/josep-audenis/foli/blob/main/corpus/README.md">test files</a>
-            with Word: 147 of 155 paragraphs and 277 of 280 table-cell paragraphs start on the same
-            page. We ran that with Word's fonts installed, before we added headers and footers.
+            9 <a href="https://github.com/josep-audenis/foli/blob/main/corpus/README.md">test files</a> have been compared with Word: 147 of 155 paragraphs and 277 of 280
+            table-cell paragraphs start on the same page. The comparison used Word's fonts and
+            predates headers and footers.
           </p>
-          <p>Foli doesn't show footnotes yet. Headers and footers ship in 0.6.</p>
+          <p>Footnotes are not shown yet. Headers and footers arrive in 0.6.</p>
         </div>
       </section>
 
@@ -173,8 +173,8 @@
         <header class="scene-head">
           <h2 id="docx-title">Save a <code>.docx</code> and the rest of the file stays put.</h2>
           <p>
-            We saved our 9 test files without editing them. Foli changed
-            <code>word/document.xml</code> in each one and copied everything else byte for byte.
+            9 test files have been saved without edits. Only <code>word/document.xml</code> changed in
+            each one. Every other part was copied byte for byte.
           </p>
         </header>
         <figure class="rt">
@@ -216,7 +216,7 @@
               </ul>
             </div>
           </div>
-          <figcaption class="caption"><span data-rt-status role="status">You change one number. Foli saves the file.</span></figcaption>
+          <span class="sr-only" data-rt-status role="status"></span>
         </figure>
       </section>
 
@@ -224,8 +224,8 @@
         <header class="scene-head">
           <h2 id="review-title">Settle a draft, <del>all at once</del> <ins>one change</ins> at a time.</h2>
           <p>
-            Turn on tracking and Foli saves each edit under the name of the person who made it. You
-            can open those changes and comments in Word.
+            With tracking on, each edit is saved under its author's name. Changes and comments open in
+            Word.
           </p>
         </header>
         <figure class="rv">
@@ -305,11 +305,11 @@
         <div class="tb-side">
           <h2 id="tables-title">Long tables cross pages.</h2>
           <p>
-            Foli repeats the header row on the next page. You also get merged cells, table styles
-            and tracked rows.
+            The header row repeats on the next page. Merged cells, table styles and tracked rows are
+            supported.
           </p>
           <button type="button" class="text-button" data-add-row>Add a row</button>
-          <p class="caption">These sample rows stay whole. You can let a row break across pages instead.</p>
+          <p class="caption">These sample rows stay whole. Rows can also break across pages.</p>
         </div>
         <div class="tb-view" data-table-view aria-hidden="true"><div class="tb-canvas" data-canvas></div></div>
       </section>
@@ -317,10 +317,10 @@
       <section class="band" id="engine" aria-labelledby="engine-title">
         <div class="wrap-wide">
           <header class="scene-head">
-            <h2 id="engine-title">We wrote the engine ourselves.</h2>
+            <h2 id="engine-title">An engine built from scratch.</h2>
             <p>
-              You won't find ProseMirror, Tiptap, Lexical or Slate underneath. Foli owns the layout,
-              so your caret and selection cross page breaks like any other line.
+              No ProseMirror, Tiptap, Lexical or Slate underneath. Foli owns the layout, so the caret and
+              selection cross page breaks like any other line.
             </p>
           </header>
           <figure class="ks">
@@ -346,7 +346,7 @@
           <p class="engine-note">
             Gzipped sizes from main, with the Foli packages each one needs and without React. In
             Chromium a keystroke painted within 13.2 ms (p95) in paragraph documents up to 100 pages.
-            We measured that on an older schema, when Enter in long lists took up to about 65 ms.
+            That figure comes from an older schema, when Enter in long lists took up to about 65 ms.
             <a href="https://github.com/josep-audenis/foli/blob/main/docs/benchmarks.md#pagination-layout-keystrokes-and-re-flow-phase-5">See the method</a>.
           </p>
         </div>
@@ -354,10 +354,10 @@
 
       <div class="closing wrap-wide">
         <section class="start" id="start" aria-labelledby="start-title">
-          <h2 id="start-title">Add it to your app.</h2>
+          <h2 id="start-title">Add it to a React app.</h2>
           <p>
-            <code>FoliEditor</code> gives you pages, a toolbar and comments. Documents are JSON, so
-            you store them wherever you like. The
+            <code>FoliEditor</code> includes pages, a toolbar and comments. Documents are JSON and can
+            be stored anywhere. The
             <a href="https://github.com/josep-audenis/foli/blob/main/docs/getting-started.md">guide</a>
             covers custom toolbars, Next.js and using Foli without React.
           </p>
@@ -383,10 +383,10 @@ export function Editor() {
         <section class="status" id="status" aria-labelledby="status-title">
           <h2 id="status-title">It's early.</h2>
           <p>
-            The API can change in any 0.x release. We haven't tested IME on real devices, screen
-            readers or Safari on a Mac by hand.
+            The API can change in any 0.x release. IME on real devices, screen readers and Safari on a
+            Mac have not been tested by hand.
             <a href="https://github.com/josep-audenis/foli/blob/main/docs/limitations.md">Read the known limitations</a>
-            before you ship.
+            before shipping.
           </p>
           <ol class="toc" aria-label="Roadmap">
             <li class="toc-done"><span class="toc-name">Engine and pagination</span><span class="toc-leader"></span><span class="toc-state">0.1</span></li>
@@ -403,9 +403,9 @@ export function Editor() {
 
     <footer class="cover">
       <div class="wrap-wide">
-        <p class="cover-title"><a href="/test/">Now try the real one.</a></p>
+        <p class="cover-title"><a href="/test/">Try the real editor.</a></p>
         <div class="cover-row">
-          <p>Set in Caladea, Carlito and Cousine. They match the widths of Cambria, Calibri and Courier New.</p>
+          <p>Set in Caladea, Carlito and Cousine. These match the widths of Cambria, Calibri and Courier New.</p>
           <p><a href="https://github.com/josep-audenis/foli">GitHub</a> · v0.5.0 · MIT · © 2026 Josep Audenis</p>
         </div>
       </div>

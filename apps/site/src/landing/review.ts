@@ -179,7 +179,8 @@ export function mountReview(root: HTMLElement): void {
     const id = balloon?.dataset.for;
     if (!button || !balloon || !id) return;
     // The next balloon slides under the finger: a double tap must not settle it too.
-    if (event.timeStamp - lastAction < 350) return;
+    const touch = (event as PointerEvent).pointerType === "touch";
+    if (touch && event.timeStamp - lastAction < 350) return;
     lastAction = event.timeStamp;
     state.set(id, button.dataset.act === "reject" ? "rejected" : "accepted");
     layout();

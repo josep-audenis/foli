@@ -120,7 +120,7 @@ export class WordLayer {
 export const wait = (ms: number): Promise<void> =>
   new Promise((resolve) => setTimeout(resolve, ms));
 
-/** Runs `enter` each time `element` comes into view and `leave` each time it goes. */
+/** Runs `enter` when `element` comes well into view, and `leave` once it is fully out of it. */
 export function whileInView(
   element: Element,
   enter: () => void,
@@ -129,12 +129,16 @@ export function whileInView(
   let inside = false;
   new IntersectionObserver(
     (entries) => {
-      const now = entries.some((entry) => entry.isIntersecting);
-      if (now === inside) return;
-      inside = now;
-      if (now) enter();
-      else leave();
+      const entry = entries.at(-1);
+      if (!entry) return;
+      if (!inside && entry.intersectionRatio >= 0.35) {
+        inside = true;
+        enter();
+      } else if (inside && !entry.isIntersecting) {
+        inside = false;
+        leave();
+      }
     },
-    { threshold: 0.35 },
+    { threshold: [0, 0.35] },
   ).observe(element);
 }

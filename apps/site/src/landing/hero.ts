@@ -7,7 +7,6 @@ const MARGIN = 40;
 const TEXT = WIDTH - MARGIN * 2;
 const GAP = 24;
 const PADDING = 28;
-const PANE = 260;
 
 const STYLES: Styles = {
   title: { size: 22, line: 28, before: 0, after: 10, keepNext: true },
@@ -43,6 +42,7 @@ export function mountHero(root: HTMLElement): void {
   const result = root.querySelector<HTMLElement>("[data-result]");
   const status = root.querySelector<HTMLElement>("[data-status]");
   const card = pane.querySelector<HTMLElement>("[data-card]");
+  const decisions = [...root.querySelectorAll<HTMLButtonElement>("[data-decide]")];
 
   const state = {
     chapter: "write" as Chapter,
@@ -71,8 +71,8 @@ export function mountHero(root: HTMLElement): void {
       keepWithNext: true,
     });
     const wide = stage.clientWidth >= 720;
-    const room = stage.clientWidth - (wide ? PANE : 0) - PADDING * 2;
-    const shown = wide ? 2.55 * WIDTH + 2 * GAP : WIDTH;
+    const room = stage.clientWidth - PADDING * 2;
+    const shown = wide ? 3 * WIDTH + 2 * GAP : WIDTH;
     const scale = Math.min(1.12, room / shown);
     canvas.style.transform = `translate3d(${PADDING}px,${PADDING}px,0) scale(${scale})`;
     const left = (p: number) => p * (WIDTH + GAP);
@@ -119,10 +119,12 @@ export function mountHero(root: HTMLElement): void {
 
     if (card) {
       card.classList.toggle("is-on", state.comment);
-      card.style.transform = `translate3d(0,${PADDING + noteY * scale - 8}px,0)`;
+      card.style.transform = wide ? `translate3d(0,${PADDING + noteY * scale - 8}px,0)` : "";
       card.inert = !state.comment;
     }
     track?.setAttribute("aria-pressed", String(marked()));
+    const decidable = marked() && state.change === "open";
+    for (const button of decisions) button.setAttribute("aria-disabled", String(!decidable));
     result?.classList.toggle("is-on", state.saved);
     if (result) result.inert = !state.saved;
     if (status) {
@@ -187,12 +189,12 @@ export function mountHero(root: HTMLElement): void {
   }
   track?.addEventListener("click", () => pick(marked() ? "write" : "review"));
   root.querySelector("[data-save]")?.addEventListener("click", () => pick("save"));
-  for (const button of root.querySelectorAll<HTMLButtonElement>("[data-decide]")) {
+  for (const button of decisions) {
     button.addEventListener("click", () => {
+      if (button.getAttribute("aria-disabled") === "true") return;
       auto = false;
       root.classList.remove("is-auto");
       run++;
-      if (!marked()) show("review");
       state.change = button.dataset.decide === "reject" ? "rejected" : "accepted";
       layout();
     });

@@ -125,6 +125,15 @@ main,
   overflow-x: clip;
 }
 
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
 /* Hero */
 .hero {
   padding-block: clamp(16px, 2vw, 26px) clamp(36px, 5vw, 64px);
@@ -346,6 +355,11 @@ main,
   text-align: center;
 }
 
+button.app-tool[aria-disabled="true"] {
+  color: var(--ink-3);
+  cursor: default;
+}
+
 button.app-tool {
   cursor: pointer;
   transition:
@@ -424,21 +438,19 @@ button.app-tool {
   opacity: 1;
 }
 
+/* Comments float over the desk, only while there is one to show. */
 .app-pane {
   position: absolute;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  width: 260px;
-  border-left: 1px solid var(--rule);
-  background: var(--paper);
+  inset: 0;
+  pointer-events: none;
 }
 
 .app-card {
   position: absolute;
   top: 0;
-  right: 12px;
-  left: 12px;
+  right: 16px;
+  width: 244px;
+  pointer-events: auto;
   display: grid;
   gap: 5px;
   justify-items: start;
@@ -480,8 +492,10 @@ button.app-tool {
 
 .app-result {
   position: absolute;
-  bottom: 16px;
-  left: 16px;
+  top: 16px;
+  left: 50%;
+  width: max-content;
+  margin-left: calc(min(460px, 100% - 32px) / -2);
   max-width: min(460px, calc(100% - 32px));
   padding: 11px 14px;
   border-left: 3px solid var(--accent);
@@ -531,12 +545,12 @@ button.app-tool {
 }
 
 .app-save:active,
-button.app-tool:active {
+button.app-tool:not([aria-disabled="true"]):active {
   transform: scale(0.97);
 }
 
 @media (hover: hover) and (pointer: fine) {
-  button.app-tool:hover {
+  button.app-tool:not([aria-disabled="true"]):hover {
     background: var(--desk);
   }
 
@@ -1502,7 +1516,6 @@ button.app-tool:active {
 }
 
 @media (max-width: 760px) {
-  .app-pane,
   .app-select,
   .app-sep,
   span.app-tool {
@@ -1515,6 +1528,20 @@ button.app-tool:active {
 
   .app-body {
     height: 390px;
+  }
+
+  .app-card {
+    top: auto;
+    right: 12px;
+    bottom: 12px;
+    left: 12px;
+    width: auto;
+  }
+
+  .app-result {
+    left: 16px;
+    width: auto;
+    margin-left: 0;
   }
 
   .rv-body,

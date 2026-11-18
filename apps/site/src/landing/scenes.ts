@@ -256,7 +256,7 @@ export function mountRoundTrip(root: HTMLElement): void {
     root.classList.add("is-done");
     run.textContent = "Run it again";
     run.removeAttribute("aria-disabled");
-    if (status) status.textContent = "Saved. Foli rewrote one part and copied the other eight.";
+    if (status) status.textContent = "Saved. One part changed.";
     running = false;
   }
 
