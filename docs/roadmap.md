@@ -1156,11 +1156,21 @@ Each task is a PR on `phase-11/sections-fields`, the build green after each.
   their placeholder or lock their content stay verbatim until 11.9 honours that, and a control's
   properties changing is refused until then. Bookmarks were modeled already. Until 11.8 a field's
   code range with a nested field shows that field's result.)
-- [ ] 11.6 Sections on pages and their editing: columns (equal and set widths, the line between
+- [x] 11.6 Sections on pages and their editing: columns (equal and set widths, the line between
   them, column breaks), continuous sections, even and odd page sections with Word's blank page;
   insert and remove section breaks, page setup per section (size, orientation, margins,
   columns) as commands and a keyboard-usable dialog; tracked as Word records them; page
-  agreement with Word (`pnpm corpus:pages`).
+  agreement with Word (`pnpm corpus:pages`). (Done: bands and columns in the flow and both
+  renderers, balanced above a continuous break; `insertSectionBreak`, `removeSectionBreak`,
+  `setSectionSetup`, `insertColumnBreak`, `EnvelopeStep` with a stale undo dropped whole; a Section
+  menu and page setup dialog. Tracked, not refused, as Word 16 saves them: a break is an inserted
+  or deleted paragraph mark, a setup `w:sectPrChange`, reviewed like other changes;
+  `scripts/corpus/section-roundtrip.mjs` has Word read them. Word's PDFs also showed that it takes
+  the larger of space after and space before, not their sum: fixed in the flow, which moved every
+  corpus document's score. Shortcuts: a paragraph split between columns of different widths
+  continues by its share of the text, and read-only pages can repeat or lose a few words there; a
+  selection deleted across a break does not pass its header references on; the break is not
+  drawn; a next-column section with another column count starts a page.)
 - [ ] 11.7 Headers and footers: laid out in their margins on every page (first, even and
   default variants, linked to the previous section, a taller one pushing the text), page
   fields filled per page; edited in place (double-click or a command opens the story, Escape

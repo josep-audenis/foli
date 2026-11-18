@@ -494,13 +494,20 @@ when they change (`key`), not only when its node does. What is shown but is not 
 (`contenteditable="false"`: list numbers, opaque content) is skipped by the read-back. The flow
 uses Word's spacing (`spacing: "word"`, contextual spacing between paragraphs of one style,
 keep with next, keep lines together, page break before); the space above each block is written
-as its top margin after the flow (none at the top of a page the text flowed onto). Each block
-belongs to a section (the one a paragraph's `section` ends, else the envelope's): its pages get
-that section's size and margins, its box the section's page height (`BlockBox.pageHeight`), and a
-section end breaks the page unless the next section is continuous with the same setup (as
-`renderDocument` does). Before a flow, blocks are placed so that a page holds one section's
-blocks, so each is measured in its own page's width; a block whose section or break changed is
-measured and flowed again. Print gives each page setup a named `@page`. Fonts' line height ratios are measured once per family
+as its top margin after the flow (`FlowResult.gaps`: none at the top of a page or column the text
+flowed onto). Each block belongs to a section (the one a paragraph's `section` ends, else the
+envelope's), given to the flow as `BlockBox.section` (`FlowSection`: how it starts, its columns,
+whether they are balanced, its page box as a function of the page). A page holds **bands**, one
+per section on it, each with its section's **columns** (`.foli-band`, `.foli-column`, from
+`word/columns.ts`; a page of one section in one column keeps its blocks as direct children).
+`place` puts each fragment in its slot (page, band, column); positions still map through block
+descriptors, and bands and columns count as holding blocks (`holdsBlocks`). Before a flow, blocks
+stay where they were (`initialPlaces`), each section in a band of its own, so each is measured in
+its own column's width; with columns of different widths a block is also measured at the width of
+the column it lands in (the fragment's width set for the reading, `Measure.widths`). A block whose
+section's layout changed, or that became a section's first, is measured and flowed again. A
+section's empty last paragraph takes no room (`position: absolute`, still a place for the caret).
+Print gives each page setup a named `@page`. Fonts' line height ratios are measured once per family
 outside the host and measured again after web fonts load (every block is drawn again).
 
 Copy from a v3 document: plain text has tabs as tabs, opaque content as its text (a table's
@@ -802,14 +809,15 @@ Word lays it out, read-only and without an editor (`EditorView` edits on the sam
   spans, margins, borders, shading, header rows; rows and cells inside content controls; nested
   tables), a content control or field as its text, a picture or text box as nothing (the text
   of a text box, and the fallback copy of alternate content, are left out of the line).
-- **Pages** (`pages.ts`): sections in order (each its page size and margins; a continuous
-  section with the same geometry goes on). The blocks are measured in a hidden page of the
-  section's width; their lines are the clusters of their text's client rects. The pure `flow`
-  places them with Word's spacing (`spacing: "word"`): the space after one paragraph and the
-  space before the next add up, a page the text flowed onto drops the space before its first
-  paragraph (a page an explicit break started keeps it), and the space after the last paragraph
-  on a page may hang below it. Keep with next, keep lines together (not for a paragraph taller
-  than a page, or one with a page break in it), page break before, explicit page breaks, widow
+- **Pages** (`pages.ts`): one flow over the sections in order, each with its page size, margins
+  and columns (bands and columns as in the editor, a blank page before an even or odd page section
+  when the number asks for one). The blocks are measured in a hidden page of the section's, in a
+  column of its first column's width (other widths on demand); their lines are the clusters of
+  their text's client rects. The pure `flow` places them with Word's spacing (`spacing: "word"`):
+  the larger of the space after one paragraph and the space before the next, a page or column the
+  text flowed onto drops the space before its first paragraph (one an explicit break started
+  keeps it), and the space after the last paragraph on a page may hang below it. Keep with next, keep lines together (not for a paragraph taller
+  than a page, or one with a break in it), page break before, explicit page and column breaks, widow
   and orphan control (two lines) apply; a table's header rows are repeated
   at the top of each page it continues on (`BlockBox.repeat`), and a row that may not split
   (`cantSplit`) has no break inside it. A block split across pages is

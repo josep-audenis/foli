@@ -33,9 +33,14 @@ checklist in [testing/ime.md](testing/ime.md)):
   data, showing their placeholder or with locked content stay opaque); everything else
   Word has (charts, shapes...) is kept as opaque content, selected and deleted whole. Documents saved by 0.1.0 to 0.4.0 are migrated when loaded; 0.4.0 cannot read
   documents saved by 0.5.0. No headers, footers or page numbers (Phase 11). Sections are laid out with their own page
-  setups; a continuous section with another page setup starts a new page, and an even or odd
-  page section gets no blank page before it. Page setups and section breaks are not editable
-  yet.
+  setups and columns (11.6); a continuous section with another page setup starts a new page, and
+  a next-column section with another number of columns too. A paragraph split between columns of
+  different widths is measured there by its share of the text, so a line can differ, and on
+  read-only pages (`renderDocument`) a few words can repeat or go missing where it continues.
+  Deleting a selection across a section break does not pass that section's header references to
+  the next (Delete, Backspace at the break and `removeSectionBreak` do). The break itself is not
+  drawn: an empty paragraph ending a section takes no room, as in Word, and the caret reaches it
+  by the keyboard.
 - Imported headers, footers, footnotes and endnotes are in the document (`stories`) and exported,
   but the editor does not show or lay them out yet, and a note's reference shows nothing.
 - No horizontal rule button (Word's rule is a paragraph's bottom border, kept and shown).

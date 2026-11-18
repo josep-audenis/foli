@@ -114,6 +114,13 @@ picture": its alt text, decorative, and its width and height in px with "Keep pr
 marked (`aria-invalid`) with an announced message; Escape cancels; a change to the document or
 the selection closes it. This is also the keyboard way to resize a picture.
 
+Section is a menu button of the same kind: Page setup…, section breaks (next page, continuous,
+even page, odd page), Remove section break, Column break. Page setup… opens a dialog under the
+toolbar (`.foli-setup-dialog`, `role="dialog"`, "Page setup") for the caret's section: how it
+starts, orientation (swapping width and height), page size and margins in centimetres, columns,
+the space between them, a line between them and set widths. Only what changed is applied; a wrong
+value marks its field with an announced message; Apply (Enter), Cancel (Escape).
+
 Table is a menu button (WAI-ARIA menu: `menuitem` items, "Repeat as header row" a
 `menuitemcheckbox` checked when the selection's rows are header rows): Insert table…, insert row
 above or below, insert column left or right, delete rows, columns or the table, merge cells,
@@ -359,6 +366,16 @@ selection, else null),
 `undoDepth(state)`, `redoDepth(state)`,
 `marksAt`. `baseKeymap()` is the default key binding plugin (keys in
 [getting-started.md](getting-started.md#keyboard)).
+
+Sections (11.6, schema v3 and later): `insertSectionBreak(kind)` (`nextPage`, `continuous`,
+`evenPage`, `oddPage`; at the selection's start, in a body paragraph), `removeSectionBreak` (the
+break ending the caret's section; in the last section, the one before it), `setSectionSetup({
+pageSize, margins, columns, type })` (the caret's section; `pageSize` and `margins` merge, refused
+when no room for text is left), `insertColumnBreak`; `sectionAt(state)` (`setup`, `pos`, `index`,
+`count`), `sectionColumns(section)` (widths and spaces in twips). Undo takes all of them back, the
+last section's setup through `EnvelopeStep`. While tracking they are recorded as Word records
+them: an inserted or deleted paragraph mark, `w:sectPrChange` for a setup; `trackedChanges(doc,
+section)` lists those as `sectionFormatting`, and accepting and rejecting resolve them.
 
 Tables (on the table around the selection: a cell selection's rectangle, or the caret's cell):
 `insertTable(rows, columns)` (Word's Table Grid style, up to 1000 rows and 63 columns),

@@ -16,7 +16,7 @@ A paragraph spanning two pages is still one node; nothing about pages is stored 
 document except its sections' page setups (in twips: the envelope's `section` for the last
 section, a paragraph's `section` attribute for each one it ends), the paragraphs' keep with
 next, keep lines together and page break before, and explicit `pageBreak` and `columnBreak`
-nodes (Foli lays out one column: a column break ends the line).
+nodes.
 
 ## Why owning the engine changes the design
 
@@ -46,9 +46,20 @@ editor state ──► measure the blocks without a cached measurement (DOM read
              ──► descriptors map every fragment and text node to model positions
 ```
 
-- **Geometry:** each page gets its section's size (`width`, `min-height`) and margins
-  (`padding`) inline in mm; a section starts a new page unless it is continuous with the same
-  page setup. The content box is `height − top − bottom` by `width − left − right`. A scaled
+- **Sections and columns (11.6):** a page holds bands, one per section on it, and a band holds
+  its section's columns (`.foli-band`, `.foli-column`; a page of one section in one column holds
+  its blocks directly). The flow fills columns where it filled pages, and takes a page's content
+  box from a function of the page (`FlowSection.box`). A section starts as its `type` says: a new
+  page, a band below the last (`continuous`, with the same page setup; otherwise a new page), the
+  next column, or an even or odd page, after a blank page when the page's displayed number asks
+  for one (the blank page has the following section's size, as in Word's PDF). A band above a
+  continuous break is balanced: its section is flowed again with its last page's columns limited,
+  a binary search for the shortest height that keeps it on that page. A column break ends its
+  column (the last column's, its page). Word's rules read from its PDF of corpus 08: the next
+  band starts after the tallest column plus the last paragraph's space after, and every column of
+  that band starts there; an empty paragraph that only holds a section break takes no room.
+- **Geometry:** each page gets its first section's size (`width`, `min-height`) and margins
+  (`padding`) inline in mm. The content box is `height − top − bottom` by `width − left − right`. A scaled
   ancestor (`transform`, `zoom`) is divided out of every measurement. The React theme
   (`@folijs/react/styles.css`) adds background, shadow and the gap between pages; a bare
   `@folijs/view` host gets none of them.
@@ -56,8 +67,10 @@ editor state ──► measure the blocks without a cached measurement (DOM read
   block. Lines only for blocks that cross a page end or hold a page break: per-character `Range` rects, a binary
   search per line, splits snapped to grapheme clusters. The browser shapes the text; Foli only
   reads where its lines fall.
-- **Flow:** blocks fill a page's content box with CSS margin collapsing; a block that does not
-  fit is split at a line (over as many pages as it takes). Rules:
+- **Flow:** blocks fill a page's content box; between two paragraphs goes the larger of the
+  first's space after and the second's space before, in Word's documents as in CSS (Word's PDFs:
+  until 11.6 the two were added, which put every heading too low). A block that does not fit is
+  split at a line (over as many pages as it takes). Rules:
   - a line holding a `pageBreak` (Mod+Enter; pasted from Word and Google Docs markup, checked
     with hand-written fixture HTML) ends its page;
   - widows and orphans: at least 2 lines of a split block on each page (`FlowRules`; a block too
@@ -81,8 +94,9 @@ editor state ──► measure the blocks without a cached measurement (DOM read
   pages flow after it ends.
 - **Incremental reflow:** measurements are cached by model node (unchanged nodes keep their
   identity). An edit measures only the blocks it changed; `flowFrom` starts at the first
-  changed block from the previous flow's state and stops once the state before an unchanged
-  block equals the previous one (property test: equal to a full flow). Unchanged fragments keep
+  changed block (at the start of its section when that is balanced) from the previous flow's
+  state and stops once the state before an unchanged block equals the previous one, never inside
+  a balanced section (property tests: equal to a full flow, sections included). Unchanged fragments keep
   their DOM. Edits flow synchronously, and so does a settings change (`setDocument`, measuring
   every block again). A block resized without an edit (CSS, a font, a container; seen by a
   `ResizeObserver`) and web fonts loading re-flow in the next animation frame, at most once per
@@ -131,6 +145,8 @@ All in Playwright on Chromium, Firefox and WebKit (Windows 11), plus unit and pr
   browser around their paragraph, not by the flow: one reaching past its page's text makes the
   page taller instead of moving to the next page ([limitations](limitations.md#pictures)).
 - No page chrome: headers, footers and page numbers arrive in Phase 11.
+- A paragraph split between columns of different widths continues by its share of the text (a
+  line either way; [limitations](limitations.md)). Keep with next stops at a section's start.
 - Line measurement assumes left-to-right text without vertical-align offsets. A split block's
   padding and border repeat on every fragment. Negative block margins are not modelled.
 - Page breaks depend on the fonts the browser has: the same document can paginate differently
