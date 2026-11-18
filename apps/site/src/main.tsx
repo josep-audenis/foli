@@ -1,5 +1,6 @@
 import { setFontFamily } from "@folijs/core";
-import { FoliEditor, type FoliEditorHandle } from "@folijs/react";
+import type { PackageImages } from "@folijs/docx";
+import { FoliEditor, type FoliEditorHandle, type FoliEditorProps } from "@folijs/react";
 import "@folijs/react/styles.css";
 import { type ChangeEvent, StrictMode, useCallback, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
@@ -46,6 +47,7 @@ function Demo() {
   const request = useRef(0);
   const editorRef = useRef<FoliEditorHandle>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const images = useRef<PackageImages | null>(null);
   const [key, setKey] = useState(0);
   const [name, setName] = useState(SAMPLE_NAME);
   const [error, setError] = useState("");
@@ -55,6 +57,12 @@ function Demo() {
     editorRef.current = handle;
     setSampleFont(handle);
   }, []);
+
+  // An opened file shows only images it contains: one linked from the web stays a box, unfetched.
+  const resource = useCallback<NonNullable<FoliEditorProps["resource"]>>(
+    (key, entry) => (images.current ? (images.current.url(key, entry) ?? null) : undefined),
+    [],
+  );
 
   // Pages appear after the first layout; web fonts loading later re-flow them.
   useEffect(() => {
@@ -70,9 +78,9 @@ function Demo() {
     if (!file) return;
     const id = ++request.current;
     setError("");
-    let importDocx: typeof import("@folijs/docx").importDocx;
+    let docx: typeof import("@folijs/docx");
     try {
-      ({ importDocx } = await import("@folijs/docx"));
+      docx = await import("@folijs/docx");
     } catch (cause) {
       console.warn(cause);
       if (id === request.current)
@@ -80,9 +88,19 @@ function Demo() {
       return;
     }
     try {
-      const imported = await importDocx(new Uint8Array(await file.arrayBuffer()));
+      const imported = await docx.importDocx(new Uint8Array(await file.arrayBuffer()));
       if (id !== request.current) return;
-      editorRef.current?.editor.setDocument(imported.document);
+      const previous = images.current;
+      const next = docx.packageImages(imported.package);
+      images.current = next;
+      try {
+        editorRef.current?.editor.setDocument(imported.document);
+      } catch (cause) {
+        images.current = previous;
+        next.revoke();
+        throw cause;
+      }
+      previous?.revoke();
       setName(file.name);
       update();
     } catch (cause) {
@@ -94,6 +112,8 @@ function Demo() {
 
   function reset() {
     request.current++;
+    images.current?.revoke();
+    images.current = null;
     setName(SAMPLE_NAME);
     setError("");
     setKey((k) => k + 1);
@@ -125,6 +145,7 @@ function Demo() {
         ref={attach}
         initialContent={sample}
         author="You"
+        resource={resource}
         onChange={update}
         className="demo-canvas"
       />
