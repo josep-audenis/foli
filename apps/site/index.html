@@ -159,23 +159,11 @@
           <strong>Foli puts every line on a real page during editing.</strong> Documents follow Word's
           model, so a contract keeps its styles, numbering and tracked changes.
         </p>
-        <div class="why-side">
-          <p>
-            9 <a href="https://github.com/josep-audenis/foli/blob/main/corpus/README.md">test files</a> have been compared with Word: 147 of 155 paragraphs and 277 of 280
-            table-cell paragraphs start on the same page. The comparison used Word's fonts and
-            predates headers and footers.
-          </p>
-          <p>Footnotes are not shown yet. Headers and footers arrive in 0.6.</p>
-        </div>
       </section>
 
       <section class="scene wrap-wide" id="docx" aria-labelledby="docx-title">
         <header class="scene-head">
           <h2 id="docx-title">Save a <code>.docx</code> and the rest of the file stays put.</h2>
-          <p>
-            9 test files have been saved without edits. Only <code>word/document.xml</code> changed in
-            each one. Every other part was copied byte for byte.
-          </p>
         </header>
         <figure class="rt">
           <div class="rt-stage" data-rt>
@@ -297,7 +285,6 @@
               </section>
             </div>
           </div>
-          <figcaption class="caption">In the editor, Accept and Reject sit in the toolbar and comments sit beside the page.</figcaption>
         </figure>
       </section>
 
@@ -317,10 +304,6 @@
         <div class="wrap-wide">
           <header class="scene-head">
             <h2 id="engine-title">An engine built from scratch.</h2>
-            <p>
-              No ProseMirror, Tiptap, Lexical or Slate underneath. Foli owns the layout, so the caret and
-              selection cross page breaks like any other line.
-            </p>
           </header>
           <figure class="ks">
             <div class="ks-input">
@@ -336,18 +319,6 @@
               <li data-step><b>Layout</b><span>Pages re-flow from that block</span></li>
             </ol>
           </figure>
-          <dl class="pkgs">
-            <div><dt><code>@folijs/react</code></dt><dd class="pkg-size">117.5 kB</dd><dd>Editor, toolbar, comments</dd></div>
-            <div><dt><code>@folijs/view</code></dt><dd class="pkg-size">89.1 kB</dd><dd>Pages and input</dd></div>
-            <div><dt><code>@folijs/core</code></dt><dd class="pkg-size">69.1 kB</dd><dd>Model and commands</dd></div>
-            <div><dt><code>@folijs/docx</code></dt><dd class="pkg-size">53.5 kB</dd><dd>Import and export</dd></div>
-          </dl>
-          <p class="engine-note">
-            Gzipped sizes from main, with the Foli packages each one needs and without React. In
-            Chromium a keystroke painted within 13.2 ms (p95) in paragraph documents up to 100 pages.
-            That figure comes from an older schema, when Enter in long lists took up to about 65 ms.
-            <a href="https://github.com/josep-audenis/foli/blob/main/docs/benchmarks.md#pagination-layout-keystrokes-and-re-flow-phase-5">See the method</a>.
-          </p>
         </div>
       </section>
 
@@ -404,7 +375,6 @@ export function Editor() {
       <div class="wrap-wide">
         <p class="cover-title"><a href="/test/">Try the real editor.</a></p>
         <div class="cover-row">
-          <p>Set in Caladea, Carlito and Cousine. These match the widths of Cambria, Calibri and Courier New.</p>
           <p><a href="https://github.com/josep-audenis/foli">GitHub</a> · v0.5.0 · MIT · © 2026 Josep Audenis</p>
         </div>
       </div>
