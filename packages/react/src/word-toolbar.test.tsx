@@ -158,6 +158,53 @@ describe("FoliToolbar on a schema v3 document", () => {
   });
 });
 
+describe("FoliToolbar's page setup dialog, with set column widths", () => {
+  afterEach(cleanup);
+  const columns = {
+    count: 2,
+    space: 708,
+    equalWidth: false,
+    widths: [{ width: 3000, space: 300 }, { width: 5000 }],
+  };
+  const open = () => {
+    const editor = createEditor({
+      document: { ...document3, section: { ...document3.section, columns } },
+    });
+    render(<FoliToolbar editor={editor} />);
+    act(() => editor.select(1));
+    fireEvent.click(screen.getByRole("button", { name: "Section" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Page setup…" }));
+    const dialog = screen.getByRole("dialog", { name: "Page setup" });
+    const apply = () => fireEvent.submit(dialog.querySelector("form") as HTMLFormElement);
+    return { editor, apply };
+  };
+
+  it("adds the line and keeps every width and space", () => {
+    const { editor, apply } = open();
+    fireEvent.click(screen.getByLabelText("Line between columns"));
+    apply();
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(editor.getDocument().section.columns).toEqual({ ...columns, separator: true });
+  });
+
+  it("says so when the number of columns differs from the widths", () => {
+    const { editor, apply } = open();
+    fireEvent.change(screen.getByLabelText("Columns"), { target: { value: "3" } });
+    apply();
+    expect(screen.getByRole("alert").textContent).toContain("differs from the set widths");
+    expect(screen.getByLabelText("Columns").getAttribute("aria-invalid")).toBe("true");
+    expect(editor.getDocument().section.columns).toEqual(columns);
+  });
+
+  it("makes the columns equal when the widths are cleared", () => {
+    const { editor, apply } = open();
+    fireEvent.change(screen.getByLabelText(/Set column widths/), { target: { value: "" } });
+    fireEvent.change(screen.getByLabelText("Columns"), { target: { value: "3" } });
+    apply();
+    expect(editor.getDocument().section.columns).toEqual({ count: 3, space: 708 });
+  });
+});
+
 describe("FoliToolbar's table menu", () => {
   afterEach(cleanup);
   const tableIn = (editor: ReturnType<typeof setup>) =>

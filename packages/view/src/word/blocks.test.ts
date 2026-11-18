@@ -164,6 +164,60 @@ describe("renderBlocks: paragraphs", () => {
     expect(span?.style.lineHeight).toBe("20px");
   });
 
+  it("lets a contextual paragraph's space after eat into the next one's space before", () => {
+    const blocks = render([
+      p({ contextualSpacing: true, spacing: { after: 120 } }, text("a")),
+      p({ spacing: { before: 300 } }, text("b")),
+    ]);
+    expect(blocks[0]?.after).toBe(0);
+    expect(blocks[1]?.before).toBeCloseTo(12);
+  });
+
+  it("keeps the next one's space before whole where the document adds the spaces", () => {
+    const settings = { doNotUseHTMLParagraphAutoSpacing: true };
+    const pair = (after: number, before: number) =>
+      renderBlocks(
+        documentOf(
+          [
+            p({ contextualSpacing: true, spacing: { after } }, text("a")),
+            p({ spacing: { before } }, text("b")),
+          ],
+          { settings },
+        ),
+        document,
+      );
+    expect(pair(120, 240)[1]?.before).toBeCloseTo(16); // after 6 pt, before 12 pt: 12 pt
+    expect(pair(240, 120)[1]?.before).toBeCloseTo(8); // after 12 pt, before 6 pt: 6 pt
+    expect(pair(240, 120)[0]?.after).toBe(0);
+  });
+
+  it("adds the spaces in a cell with margins, painting nothing in between", () => {
+    const shaded = { shading: { pattern: "clear", fill: "FFFF00" } };
+    const cell = {
+      type: "tableCell",
+      content: [
+        p({ ...shaded, spacing: { after: 480 } }, text("x")),
+        p({ spacing: { before: 240 } }, text("y")),
+      ],
+    };
+    const table = {
+      type: "table",
+      attrs: { grid: [2000] },
+      content: [{ type: "tableRow", content: [cell] }],
+    };
+    const [block] = renderBlocks(
+      documentOf([table, p({}, text("z"))], {
+        settings: { doNotUseHTMLParagraphAutoSpacing: true },
+      }),
+      document,
+    );
+    const [first, second] = block?.element.querySelectorAll<HTMLElement>("[data-foli-cell]") ?? [];
+    expect(first?.style.paddingBottom).toBe("");
+    // Margins collapse to the larger: 32 px and 48 px make the 48 px of the sum.
+    expect(first?.style.marginBottom).toBe("32px");
+    expect(second?.style.marginTop).toBe("48px");
+  });
+
   it("drops the space between paragraphs of a style with contextual spacing", () => {
     const blocks = render([
       p({}, text("a")),

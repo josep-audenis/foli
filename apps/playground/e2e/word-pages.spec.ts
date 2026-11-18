@@ -203,10 +203,10 @@ test("space before is dropped at the top of a page the text flowed onto, kept af
   ]);
   result = await pages(page);
   expect(result.map((r) => r.blocks[0]?.marginTop)).toEqual(["0px", "40px"]);
-  // Between paragraphs the space after one and the space before the next add up: 20 + 40.
+  // Between paragraphs, the larger of the space after one and the space before the next.
   await show(page, [p({ spacing: { after: 300 } }, text("a")), p(before, text("b"))]);
   result = await pages(page);
-  expect(result[0]?.blocks.map((b) => b.marginTop)).toEqual(["0px", "60px"]);
+  expect(result[0]?.blocks.map((b) => b.marginTop)).toEqual(["0px", "40px"]);
   // On the first page, and between paragraphs, it is kept: after 0 + before 40.
   await show(page, [p(before, text("first")), p(before, text("second"))]);
   result = await pages(page);

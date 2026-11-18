@@ -246,10 +246,14 @@ export function createEditor({
     if (result.transactions.length) notify(result.transactions);
   };
   const run = (command: Command) => command(state, dispatch);
+  let current = { section: loaded.envelope.section, settings: loaded.settings };
 
   return {
+    // The last section's page setup, as it is now (`setSectionSetup` changes it).
     get settings() {
-      return loaded.settings;
+      const section = wordContext(state)?.envelope.section ?? current.section;
+      if (section !== current.section) current = { section, settings: sectionSettings(section) };
+      return current.settings;
     },
     get state() {
       return state;

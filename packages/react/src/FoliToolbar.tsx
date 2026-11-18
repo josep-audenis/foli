@@ -16,9 +16,11 @@ import {
   fontFamilyAt,
   fontSizeAt,
   insertColumn,
+  insertColumnBreak,
   insertPageBreak,
   insertPicture,
   insertRow,
+  insertSectionBreak,
   insertTable,
   isHeaderRow,
   isSafeHref,
@@ -38,7 +40,11 @@ import {
   rejectAllChanges,
   rejectChange,
   removeLink,
+  removeSectionBreak,
   requestsLinkEditor,
+  type SectionJSON,
+  type SectionSetup,
+  sectionAt,
   selectedPicture,
   setAlign,
   setCellShading,
@@ -51,6 +57,7 @@ import {
   setPictureAlt,
   setPictureSize,
   setReviewView,
+  setSectionSetup,
   setTableStyle,
   setTextColor,
   setTrackChanges,
@@ -150,9 +157,9 @@ interface Item {
 interface Action {
   key: string;
   label: string;
-  /** The command it runs; `insertTable` opens the dialog that asks for the size instead. */
+  /** The command it runs; with `dialog`, whether it applies: the dialog does the rest. */
   command: Command;
-  dialog?: "insertTable";
+  dialog?: "insertTable" | "pageSetup";
   checked?: (state: EditorState) => boolean;
 }
 
@@ -225,6 +232,25 @@ const TABLE_ACTIONS: readonly Action[] = [
     command: toggleHeaderRow,
     checked: isHeaderRow,
   },
+];
+
+const SECTION_ACTIONS: readonly Action[] = [
+  {
+    key: "pageSetup",
+    label: "Page setup…",
+    command: (state) => sectionAt(state) !== null,
+    dialog: "pageSetup",
+  },
+  { key: "breakNext", label: "Section break: next page", command: insertSectionBreak("nextPage") },
+  {
+    key: "breakContinuous",
+    label: "Section break: continuous",
+    command: insertSectionBreak("continuous"),
+  },
+  { key: "breakEven", label: "Section break: even page", command: insertSectionBreak("evenPage") },
+  { key: "breakOdd", label: "Section break: odd page", command: insertSectionBreak("oddPage") },
+  { key: "removeBreak", label: "Remove section break", command: removeSectionBreak },
+  { key: "columnBreak", label: "Column break", command: insertColumnBreak },
 ];
 
 /** Whether the selection holds a textblock (a caret's own block first; else it walks the range). */
@@ -586,6 +612,13 @@ const GROUPS: Item[][] = [
       dialog: "picture",
     },
     { key: "pageBreak", label: "Page break", text: "Page break", command: () => insertPageBreak },
+    {
+      key: "section",
+      label: "Section",
+      text: "Section",
+      enabled: (state) => wordContext(state) !== null,
+      actions: SECTION_ACTIONS,
+    },
   ],
 ];
 
@@ -722,6 +755,15 @@ export function FoliToolbar({
               ? null
               : current,
           );
+          // So is the page setup dialog: its section may have changed.
+          setSetupDialog((current) =>
+            current &&
+            (!transactions.length ||
+              transactions.some((tr) => tr.docChanged) ||
+              !state.selection.eq(current.selection))
+              ? null
+              : current,
+          );
           // The insert table dialog is for the caret it opened on, as the link dialog is.
           setTableDialog((current) =>
             current &&
@@ -742,6 +784,7 @@ export function FoliToolbar({
         const active = typeof document === "undefined" ? null : document.activeElement;
         setTableDialog(null);
         setPictureDialog(null);
+        setSetupDialog(null);
         setDialog((current) =>
           current
             ? { ...current, request: current.request + 1 }
@@ -771,6 +814,14 @@ export function FoliToolbar({
   } | null>(null);
   useEffect(() => {
     if (disabled) setTableDialog(null);
+  }, [disabled]);
+  // The page setup dialog (from the section menu), for the section of the caret it opened on.
+  const [setupDialog, setSetupDialog] = useState<{
+    restore: HTMLElement | null;
+    selection: EditorState["selection"];
+  } | null>(null);
+  useEffect(() => {
+    if (disabled) setSetupDialog(null);
   }, [disabled]);
   // The picture dialog: inserts at (or edits the picture at `pos`) the selection it opened on.
   const [pictureDialog, setPictureDialog] = useState<{
@@ -915,8 +966,18 @@ export function FoliToolbar({
                         state={editor.state}
                         onPick={(action, pointer) => {
                           setMenu(null);
+                          if (action.dialog === "pageSetup") {
+                            setDialog(null);
+                            setTableDialog(null);
+                            setSetupDialog({
+                              restore: buttons.current[i] ?? null,
+                              selection: editor.state.selection,
+                            });
+                            return;
+                          }
                           if (action.dialog) {
                             setDialog(null);
+                            setSetupDialog(null);
                             setTableDialog((current) => ({
                               restore: buttons.current[i] ?? null,
                               selection: editor.state.selection,
@@ -975,6 +1036,17 @@ export function FoliToolbar({
             const { restore } = pictureDialog;
             setPictureDialog(null);
             if (done && onClickCommand) onClickCommand();
+            else restore?.focus();
+          }}
+        />
+      )}
+      {setupDialog && !disabled && (
+        <PageSetupDialog
+          editor={editor}
+          onClose={(applied) => {
+            const { restore } = setupDialog;
+            setSetupDialog(null);
+            if (applied && onClickCommand) onClickCommand();
             else restore?.focus();
           }}
         />
@@ -1375,6 +1447,273 @@ function InsertTableDialog({
         {error && (
           <p id={`${id}-error`} className="foli-link-error" role="alert">
             {messages[error]}
+          </p>
+        )}
+      </form>
+    </div>
+  );
+}
+
+const TWIPS_PER_CM = 1440 / 2.54;
+const MAX_TWIPS = 31_680;
+/** Word's limit on a section's columns. */
+const MAX_SECTION_COLUMNS = 45;
+const toCm = (twips: number) => String(Number((twips / TWIPS_PER_CM).toFixed(2)));
+/** A length in cm as whole twips (a decimal comma too), or null when it is not one in range. */
+function toTwips(text: string, min: number): number | null {
+  const value = Number(text.trim().replace(",", "."));
+  const twips = Math.round(value * TWIPS_PER_CM);
+  return text.trim() && Number.isFinite(value) && twips >= min && twips <= MAX_TWIPS ? twips : null;
+}
+
+const SECTION_STARTS = [
+  ["nextPage", "Next page"],
+  ["continuous", "Continuous"],
+  ["evenPage", "Even page"],
+  ["oddPage", "Odd page"],
+  ["nextColumn", "Next column"],
+] as const;
+type SetupField =
+  | "width"
+  | "height"
+  | "top"
+  | "bottom"
+  | "left"
+  | "right"
+  | "count"
+  | "space"
+  | "widths";
+const SETUP_LABELS: Record<SetupField, string> = {
+  width: "Page width (cm)",
+  height: "Page height (cm)",
+  top: "Top margin (cm)",
+  bottom: "Bottom margin (cm)",
+  left: "Left margin (cm)",
+  right: "Right margin (cm)",
+  count: "Columns",
+  space: "Space between columns (cm)",
+  widths: "Set column widths (cm, separated by ;)",
+};
+
+/**
+ * The page setup dialog, for the caret's section: how it starts, its page size and orientation,
+ * margins and columns (equal, or set widths; the line between them), in centimetres. Only what
+ * was changed is applied. Apply and Cancel; Escape cancels; a wrong field is marked and announced.
+ */
+function PageSetupDialog({
+  editor,
+  onClose,
+}: {
+  editor: Editor;
+  /** `applied`: the setup changed (the focus may go to the document). */
+  onClose: (applied: boolean) => void;
+}) {
+  const id = useId();
+  const [initial] = useState(() => {
+    const setup = sectionAt(editor.state)?.setup ?? {};
+    const width = setup.pageSize?.width ?? 12_240;
+    const height = setup.pageSize?.height ?? 15_840;
+    const m = setup.margins ?? {};
+    const set = setup.columns?.equalWidth === false ? (setup.columns.widths ?? []) : [];
+    return {
+      start: setup.type ?? "nextPage",
+      orientation: setup.pageSize?.orientation ?? (width > height ? "landscape" : "portrait"),
+      separator: setup.columns?.separator === true,
+      columns: setup.columns,
+      fields: {
+        width: toCm(width),
+        height: toCm(height),
+        top: toCm(Math.abs(m.top ?? 1440)),
+        bottom: toCm(Math.abs(m.bottom ?? 1440)),
+        left: toCm(m.left ?? 1440),
+        right: toCm(m.right ?? 1440),
+        count: String(set.length || (setup.columns?.count ?? 1)),
+        space: toCm(setup.columns?.space ?? 720),
+        widths: set.map((column) => toCm(column.width)).join("; "),
+      } satisfies Record<SetupField, string>,
+    };
+  });
+  const [start, setStart] = useState<string>(initial.start);
+  const [orientation, setOrientation] = useState<string>(initial.orientation);
+  const [separator, setSeparator] = useState(initial.separator);
+  const [fields, setFields] = useState(initial.fields);
+  const [error, setError] = useState<SetupField | "setup" | "mismatch" | null>(null);
+  const first = useRef<HTMLSelectElement>(null);
+  useEffect(() => first.current?.focus(), []);
+
+  const apply = (event: FormEvent) => {
+    event.preventDefault();
+    const wrong = (field: SetupField) => {
+      setError(field);
+      document.getElementById(`${id}-${field}`)?.focus();
+    };
+    const changed = (field: SetupField) => fields[field] !== initial.fields[field];
+    const setup: SectionSetup = {};
+    if (start !== initial.start)
+      setup.type = start === "nextPage" ? undefined : (start as SectionJSON["type"]);
+    const lengths: Partial<Record<SetupField, number>> = {};
+    for (const field of ["width", "height", "top", "bottom", "left", "right"] as const) {
+      if (!changed(field)) continue;
+      const twips = toTwips(fields[field], field === "width" || field === "height" ? 1 : 0);
+      if (twips === null) return wrong(field);
+      lengths[field] = twips;
+    }
+    if (
+      lengths.width !== undefined ||
+      lengths.height !== undefined ||
+      orientation !== initial.orientation
+    )
+      setup.pageSize = {
+        ...(lengths.width !== undefined ? { width: lengths.width } : {}),
+        ...(lengths.height !== undefined ? { height: lengths.height } : {}),
+        orientation: orientation as "portrait" | "landscape",
+      };
+    const margins = {
+      top: lengths.top,
+      bottom: lengths.bottom,
+      left: lengths.left,
+      right: lengths.right,
+    };
+    const given = Object.entries(margins).filter(([, value]) => value !== undefined);
+    if (given.length) setup.margins = Object.fromEntries(given);
+    if (
+      changed("count") ||
+      changed("space") ||
+      changed("widths") ||
+      separator !== initial.separator
+    ) {
+      // What was not changed stays exactly as it is, each column's own space included.
+      const before = initial.columns;
+      const set = before?.equalWidth === false ? (before.widths ?? []) : [];
+      const space = changed("space") ? toTwips(fields.space, 0) : (before?.space ?? 720);
+      if (space === null) return wrong("space");
+      let widths: (number | null)[] = set.map((column) => column.width);
+      if (changed("widths"))
+        widths = fields.widths.trim()
+          ? fields.widths
+              .trim()
+              .split(/[;\s]+/)
+              .map((width) => toTwips(width, 1))
+          : [];
+      if (widths.includes(null)) return wrong("widths");
+      const asked = Number(fields.count);
+      if (widths.length && changed("count") && asked !== widths.length) {
+        setError("mismatch");
+        document.getElementById(`${id}-count`)?.focus();
+        return;
+      }
+      const count = widths.length || asked;
+      if (!Number.isInteger(count) || count < 1 || count > MAX_SECTION_COLUMNS)
+        return wrong("count");
+      const { separator: _line, equalWidth: _equal, widths: _widths, ...rest } = before ?? {};
+      setup.columns = {
+        ...rest,
+        count,
+        ...(changed("space") || before?.space === undefined ? { space } : {}),
+        ...(separator ? { separator } : {}),
+        ...(widths.length
+          ? {
+              equalWidth: false,
+              widths: widths.map((width, i) => {
+                const own = changed("space") ? undefined : set[i]?.space;
+                const gap = own ?? (i < widths.length - 1 ? space : undefined);
+                return { width: width as number, ...(gap === undefined ? {} : { space: gap }) };
+              }),
+            }
+          : {}),
+      };
+    }
+    if (!Object.keys(setup).length) return onClose(false);
+    if (editor.run(setSectionSetup(setup))) return onClose(true);
+    setError("setup");
+  };
+  const setOrientationSwapping = (next: string) => {
+    if (next !== orientation)
+      setFields((current) => ({ ...current, width: current.height, height: current.width }));
+    setOrientation(next);
+    setError(null);
+  };
+  const marked = (name: SetupField) => error === name || (name === "count" && error === "mismatch");
+  const field = (name: SetupField) => (
+    <div key={name} className="foli-setup-field">
+      <label htmlFor={`${id}-${name}`}>{SETUP_LABELS[name]}</label>
+      <input
+        id={`${id}-${name}`}
+        type="text"
+        inputMode={name === "widths" ? "text" : "decimal"}
+        value={fields[name]}
+        aria-invalid={marked(name) || undefined}
+        aria-describedby={marked(name) ? `${id}-error` : undefined}
+        onChange={(event) => {
+          setFields((current) => ({ ...current, [name]: event.target.value }));
+          setError(null);
+        }}
+      />
+    </div>
+  );
+
+  return (
+    <div
+      role="dialog"
+      aria-label="Page setup"
+      className="foli-link-dialog foli-setup-dialog"
+      onKeyDown={(event) => {
+        if (event.key !== "Escape") return;
+        event.preventDefault();
+        onClose(false);
+      }}
+    >
+      <form onSubmit={apply} noValidate>
+        <div className="foli-setup-field">
+          <label htmlFor={`${id}-start`}>Section starts</label>
+          <select
+            ref={first}
+            id={`${id}-start`}
+            value={start}
+            onChange={(event) => setStart(event.target.value)}
+          >
+            {SECTION_STARTS.map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="foli-setup-field">
+          <label htmlFor={`${id}-orientation`}>Orientation</label>
+          <select
+            id={`${id}-orientation`}
+            value={orientation}
+            onChange={(event) => setOrientationSwapping(event.target.value)}
+          >
+            <option value="portrait">Portrait</option>
+            <option value="landscape">Landscape</option>
+          </select>
+        </div>
+        {(["width", "height", "top", "bottom", "left", "right", "count", "space"] as const).map(
+          field,
+        )}
+        <div className="foli-setup-field foli-setup-check">
+          <input
+            id={`${id}-separator`}
+            type="checkbox"
+            checked={separator}
+            onChange={(event) => setSeparator(event.target.checked)}
+          />
+          <label htmlFor={`${id}-separator`}>Line between columns</label>
+        </div>
+        {field("widths")}
+        <button type="submit">Apply</button>
+        <button type="button" onClick={() => onClose(false)}>
+          Cancel
+        </button>
+        {error && (
+          <p id={`${id}-error`} className="foli-link-error" role="alert">
+            {error === "setup"
+              ? "This setup leaves no room for text, or its columns do not fit the page."
+              : error === "mismatch"
+                ? "The number of columns differs from the set widths: list one width per column, or clear them for equal columns."
+                : `Check this value: ${SETUP_LABELS[error]}.`}
           </p>
         )}
       </form>

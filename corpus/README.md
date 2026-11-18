@@ -159,6 +159,12 @@ Word's list: 06 counts 32 of them).
 back: every document holding them exported unchanged (Word finds the same fields, controls and
 bookmarks) and edited (a field's result, a control's text, a block control split in two).
 
+`scripts/corpus/section-roundtrip.mjs` (11.6) has Word read Foli's sections back: 08 exported
+unchanged (Word's own pages and sections), edited through the editor's commands (a continuous
+break, three columns in one section, a line between columns in the last), the same edits while
+tracking (Word finds the inserted break and both setup changes), and a new package with columns,
+set widths, an odd page section, page numbers and note properties. All 4 pass (2026-11-18).
+
 `scripts/corpus/story-roundtrip.mjs` (11.4) has Word read Foli's stories back: every document
 with stories exported unchanged and edited (text added to every header and footer and to a note,
 a new footnote with its reference), and a new package with a header, a footer, a footnote and an
@@ -230,6 +236,30 @@ from: 08 has 19 of 22 paragraphs on Word's page and 6 on Word's line, and 4 page
 its columns being laid out as one and the blank page before its last section missing; 09 has 7 of
 15 on Word's page and 2 pages against Word's 3, its footnote of more than a page not being laid
 out. Against Word's PDF: 08 0.321, 09 0.109.
+
+After 11.6 (2026-11-18, Word 16.0.20527, Chromium, with Aptos): sections are laid out with their
+columns, and the flow takes the larger of the space after and the space before, as Word's PDFs
+show (it added them). 08 has all 22 paragraphs on Word's page, 20 on Word's line (the two others
+are in columns of different widths, which Word numbers its own way) and Word's 5 pages, the blank
+one included.
+
+| Document | Page score before | After 11.6 | Inside the margins, after |
+| -------- | ----------------: | ---------: | ------------------------: |
+| 01       |             0.420 |      0.977 |                     0.994 |
+| 02       |             0.530 |      0.852 |                     0.861 |
+| 03       |             0.163 |      0.138 |                     0.160 |
+| 04       |             0.513 |      0.790 |                     0.810 |
+| 05       |             0.927 |      0.927 |                     0.968 |
+| 06       |             0.942 |      0.942 |                     0.942 |
+| 07       |             0.394 |      0.394 |                     0.394 |
+| 08       |             0.321 |      0.989 |                     1.000 |
+| 09       |             0.109 |      0.387 |                     0.388 |
+| **All**  |         **0.463** |  **0.768** |                 **0.781** |
+
+Of 155 paragraphs outside tables: 147 on Word's page (144 before), 131 on Word's line (117), 132
+within a line (122); 277 of 280 paragraphs in table cells on Word's page, as before. 03 is the one
+lower: its text starts about 44 px above Word's until its letterhead pushes it down (11.7), so the
+score there measures where lines happen to overlap.
 
 ## Pages against Word's PDF
 

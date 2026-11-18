@@ -465,9 +465,54 @@ export function paragraphProperties(
   return out;
 }
 
+/** `w:footnotePr` or `w:endnotePr` of a section: how its notes are placed and numbered. */
+function noteProperties(element: XmlElement | undefined, context: Context) {
+  if (!element) return undefined;
+  const value = (local: string) => attr(child(element, local), "val");
+  return compact({
+    position: value("pos"),
+    format: value("numFmt"),
+    start: whole(child(element, "numStart"), "val", context),
+    restart: value("numRestart"),
+  });
+}
+
+/** `w:cols`: `widths` from its `w:col` children, when it has them. */
+function sectionColumns(cols: XmlElement | undefined, context: Context) {
+  if (!cols) return undefined;
+  const on = (local: string) => {
+    const value = attr(cols, local);
+    return value === undefined ? undefined : !["0", "false", "off"].includes(value);
+  };
+  const widths = elements(cols)
+    .filter((el) => isW(el, "col"))
+    .map((el) => compact({ width: whole(el, "w", context), space: whole(el, "space", context) }));
+  return compact({
+    count: whole(cols, "num", context),
+    space: whole(cols, "space", context),
+    equalWidth: on("equalWidth"),
+    separator: on("sep"),
+    widths: widths.length ? widths : undefined,
+  });
+}
+
+/** `w:sectPrChange`: who changed the section's setup, and the setup before (`w:sectPr`). */
+function sectionChange(element: XmlElement | undefined, context: Context) {
+  if (!element) return undefined;
+  const { id, author, date } = revisionOf(element);
+  const before = child(element, "sectPr");
+  return compact({
+    id,
+    author,
+    date: date ?? undefined,
+    previous: before ? section(before, context) : {},
+  });
+}
+
 /** `w:sectPr` as a section; every part checked on its own. */
 export function section(sectPr: XmlElement, context: Context): Record<string, unknown> {
   const pgSz = child(sectPr, "pgSz");
+  const pgNumType = child(sectPr, "pgNumType");
   const pgMar = child(sectPr, "pgMar");
   const references = (local: string) =>
     compact(
@@ -501,6 +546,13 @@ export function section(sectPr: XmlElement, context: Context): Record<string, un
     titlePage: titlePg ? toggle(titlePg) : undefined,
     headers: references("headerReference"),
     footers: references("footerReference"),
+    columns: sectionColumns(child(sectPr, "cols"), context),
+    pageNumbers:
+      pgNumType &&
+      compact({ start: whole(pgNumType, "start", context), format: attr(pgNumType, "fmt") }),
+    footnotes: noteProperties(child(sectPr, "footnotePr"), context),
+    endnotes: noteProperties(child(sectPr, "endnotePr"), context),
+    change: sectionChange(child(sectPr, "sectPrChange"), context),
   };
   const out: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(parts)) {

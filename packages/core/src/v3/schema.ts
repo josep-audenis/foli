@@ -152,7 +152,8 @@ const MAX_SECTION_COLUMNS = 45;
  * envelope's for the last. Every part is optional (Word's defaults apply); `{}` is a section
  * break with Word's defaults.
  */
-export const checkSection: Check = shape(
+export const checkSection: Check = (value) => sectionShape(value);
+const sectionShape: Check = shape(
   {
     pageSize: shape({
       width: int(1, MAX_TWIPS),
@@ -187,6 +188,8 @@ export const checkSection: Check = shape(
     pageNumbers: shape({ start: ID, format: token }),
     footnotes: checkNoteProperties,
     endnotes: checkNoteProperties,
+    /** `w:sectPrChange`: a tracked change of the page setup, and the setup before it. */
+    change: shape({ ...revisionFields, previous: checkSection }, ["id", "author", "previous"]),
     ext: xml,
   },
   [],

@@ -6,6 +6,7 @@ export {
   deleteForward,
   deleteSelection,
   deleteSelectionKeepingTables,
+  insertColumnBreak,
   insertHardBreak,
   insertPageBreak,
   insertTab,
@@ -95,6 +96,17 @@ export {
   trackedChanges,
 } from "./review.js";
 export {
+  insertSectionBreak,
+  removeSectionBreak,
+  type SectionAt,
+  type SectionBreakKind,
+  type SectionColumns,
+  type SectionSetup,
+  sectionAt,
+  sectionColumns,
+  setSectionSetup,
+} from "./sections.js";
+export {
   AllSelection,
   marksAt,
   NodeSelection,
@@ -149,6 +161,7 @@ export {
 } from "./track.js";
 export {
   CommentStep,
+  EnvelopeStep,
   setComments,
   type WordContext,
   type WordEnvelope,
