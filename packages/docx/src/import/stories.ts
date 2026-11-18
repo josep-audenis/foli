@@ -1,0 +1,89 @@
+/**
+ * Headers, footers, footnotes and endnotes as stories (ADR-0007): content trees of their own,
+ * read from their parts with the same reader as the body. A header's or footer's id is its
+ * relationship id; a note's is `footnote:<w:id>` or `endnote:<w:id>`. A note the model cannot
+ * name stays in its part, untouched.
+ */
+import { parseContent, type StoryJSON } from "@folijs/core";
+import type { DocxPackage } from "../package.js";
+import type { XmlElement } from "../xml.js";
+import { blocks, type ContentContext } from "./content.js";
+import { attr, elements, integer, isW, REL } from "./ooxml.js";
+
+const NOTE_TYPES = new Set(["normal", "separator", "continuationSeparator", "continuationNotice"]);
+
+/** The notes of a footnotes or endnotes part that the model holds, by story id. */
+export function notesOf(root: XmlElement, kind: "footnote" | "endnote"): Map<string, XmlElement> {
+  const out = new Map<string, XmlElement>();
+  for (const el of elements(root)) {
+    if (!isW(el, kind)) continue;
+    const id = integer(attr(el, "id"));
+    const type = attr(el, "type");
+    const key = `${kind}:${id}`;
+    if (id === undefined || (type !== undefined && !NOTE_TYPES.has(type)) || out.has(key)) continue;
+    out.set(key, el);
+  }
+  return out;
+}
+
+const docOf = (content: StoryJSON["content"]["content"]): StoryJSON["content"] => ({
+  type: "doc",
+  content: content?.length ? content : [{ type: "paragraph" }],
+});
+
+/** Every story of the package, by id. `contextFor` gives the reading context of a part. */
+export function readStories(
+  pkg: DocxPackage,
+  contextFor: (part: string, source: string) => ContentContext,
+): Record<string, StoryJSON> {
+  const stories: Record<string, StoryJSON> = {};
+  for (const relationship of pkg.relationships(pkg.mainDocument)) {
+    const part = relationship.partName ? pkg.part(relationship.partName) : undefined;
+    if (relationship.external || !part) continue;
+    const headerOrFooter =
+      relationship.type === REL.header
+        ? ["header", "hdr"]
+        : relationship.type === REL.footer
+          ? ["footer", "ftr"]
+          : undefined;
+    const note =
+      relationship.type === REL.footnotes
+        ? "footnote"
+        : relationship.type === REL.endnotes
+          ? "endnote"
+          : undefined;
+    if (!headerOrFooter && !note) continue;
+    const xml = pkg.xml(part.name);
+    const context = contextFor(part.name, xml.source);
+    if (headerOrFooter) {
+      const [kind, root] = headerOrFooter as ["header" | "footer", string];
+      // An id the envelope cannot hold as a key: the part stays as it is.
+      if (!isW(xml.root, root) || relationship.id === "__proto__") continue;
+      stories[relationship.id] = {
+        kind,
+        content: docOf(blocks(xml.root.children, { ...context, story: kind })),
+      };
+    } else if (note) {
+      for (const [key, el] of notesOf(xml.root, note)) {
+        const type = attr(el, "type");
+        stories[key] = {
+          kind: note,
+          ...(type ? { noteType: type as StoryJSON["noteType"] & string } : {}),
+          content: docOf(blocks(el.children, { ...context, story: note })),
+          ext: xml.source.slice(el.start, el.openEnd),
+        };
+      }
+    }
+  }
+  return stories;
+}
+
+/** The stories in the form a validated document holds them, to compare with one. */
+export function canonicalStories(
+  pkg: DocxPackage,
+  contextFor: (part: string, source: string) => ContentContext,
+): Record<string, StoryJSON> {
+  const stories = readStories(pkg, contextFor);
+  for (const story of Object.values(stories)) story.content = parseContent(story.content).toJSON();
+  return stories;
+}

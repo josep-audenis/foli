@@ -1,4 +1,10 @@
-import { type FoliDocument, parseDocument, type ResourceJSON, SCHEMA_VERSION } from "@folijs/core";
+import {
+  type FoliDocument,
+  parseDocument,
+  type ResourceJSON,
+  SCHEMA_VERSION,
+  type StoryJSON,
+} from "@folijs/core";
 import {
   DocxError,
   type DocxPackage,
@@ -13,9 +19,10 @@ import { child, isW, REL, W_STRICT } from "./ooxml.js";
 import { comments, numbering, styles, theme } from "./parts.js";
 import { section } from "./properties.js";
 import { type ImportReport, Recorder } from "./report.js";
+import { canonicalStories, readStories } from "./stories.js";
 
 export interface DocxImport {
-  /** The document in the current schema (v4), validated. */
+  /** The document in the current schema (v5), validated. */
   readonly document: FoliDocument;
   /**
    * The package it was read from. Export (8.5) writes the parts Foli does not edit back from
@@ -109,6 +116,7 @@ export function importPackage(pkg: DocxPackage): DocxImport {
         contextFor(commentsPart.name, commentsPart.source),
       )
     : [];
+  const stories = readStories(pkg, contextFor);
 
   let document: FoliDocument;
   try {
@@ -121,6 +129,7 @@ export function importPackage(pkg: DocxPackage): DocxImport {
       ...(themed ? { theme: themed } : {}),
       comments: commented,
       ...(resources.size ? { resources: Object.fromEntries(resources) } : {}),
+      ...(Object.keys(stories).length ? { stories } : {}),
       content: { type: "doc", content },
     });
   } catch (error) {
@@ -136,6 +145,21 @@ export function importPackage(pkg: DocxPackage): DocxImport {
     if (!(error instanceof DocxError)) throw error;
   }
   return { document, package: pkg, report: report.report(), trackRevisions };
+}
+
+/** The package's stories as a validated document holds them (what export compares with). */
+export function packageStories(pkg: DocxPackage): Record<string, StoryJSON> {
+  const report = new Recorder();
+  const resources = new Map<string, ResourceJSON>();
+  return canonicalStories(pkg, (part, source) => ({
+    source,
+    report,
+    pkg,
+    part,
+    moves: new Moves(),
+    relationship: (id) => pkg.relationships(part).find((r) => r.id === id),
+    resources,
+  }));
 }
 
 export type { ImportReport } from "./report.js";

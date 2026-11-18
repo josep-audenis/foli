@@ -106,9 +106,13 @@ included). Within the parts it writes:
   into: one element of the expected kind, prefixes the part declares, no attribute the writer
   writes itself. What does not fit is a `DocxError`, never ill-formed XML.
 - Without a package, a new one is made (from a migrated v2 document, say), declaring Word's
-  namespaces. A document that refers to parts of its original package (headers, footers,
-  pictures, content kept verbatim with relationship ids) needs that package: exporting it
-  without one is a `DocxError`.
+  namespaces. A document that refers to parts of its original package (headers and footers it
+  has no story for, pictures, content kept verbatim with relationship ids) needs that package:
+  exporting it without one is a `DocxError`.
+- Headers, footers, footnotes and endnotes are the document's `stories`. An unchanged one keeps
+  its part (or, for a note, its element) byte for byte; a changed one is written from the model;
+  a new one gets its part, relationship and content type. A note whose story is gone is removed
+  from its part. A document without `stories` leaves those parts as they are.
 - Tables are written from the model: each properties element as paragraphs' are (verbatim
   while unchanged, else child by child), the grid as read while its widths are, rows and cells
   in order; Word reads every corpus table back with Foli's text, unchanged and edited

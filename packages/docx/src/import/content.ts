@@ -33,6 +33,8 @@ export interface ContentContext extends Context {
   readonly tableDepth?: number;
   /** The envelope's resources (pictures' images), filled as content is read. */
   readonly resources: Map<string, ResourceJSON>;
+  /** The kind of story being read (ADR-0007): what one may not hold stays verbatim. */
+  readonly story?: "header" | "footer" | "footnote" | "endnote";
 }
 
 /** Tables nested deeper stay opaque: within the model's depth (three levels per table). */
@@ -86,6 +88,9 @@ const INLINE_LABELS: Record<string, string | null> = {
   customXmlDelRangeStart: null,
   customXmlDelRangeEnd: null,
 };
+
+/** What a separator note holds: kept in its run, with nothing to report or edit. */
+const NOTE_SEPARATORS = new Set(["separator", "continuationSeparator", "continuationNotice"]);
 
 /** Recomputed by Word, never kept: spelling marks, the last rendered page breaks. */
 const DROPPED = new Set(["proofErr", "lastRenderedPageBreak"]);
@@ -244,7 +249,10 @@ function withLabel(attrs: Record<string, unknown>, value: string | null): Record
 }
 
 export function paragraph(p: XmlElement, context: ContentContext): NodeJSON {
-  const attrs: Record<string, unknown> = paragraphProperties(child(p, "pPr"), context, true);
+  // A story ends no section: such a paragraph stays as it is.
+  const pPr = child(p, "pPr");
+  if (context.story && pPr && child(pPr, "sectPr")) return opaqueOf(p, context);
+  const attrs: Record<string, unknown> = paragraphProperties(pPr, context, true);
   const bag = attributeBag(p, [], context);
   if (bag) setParagraph(attrs, "attributes", bag, p.name, context);
   const content: NodeJSON[] = [];
@@ -326,6 +334,14 @@ function inlines(
       case "commentRangeStart":
       case "commentRangeEnd": {
         const type = MARKER_TYPES[el.local] as string;
+        // Headers and footers hold no comments (ADR-0007): such an anchor stays verbatim.
+        if (
+          type.startsWith("comment") &&
+          (context.story === "header" || context.story === "footer")
+        ) {
+          opaque(el, BLOCK_LABELS);
+          break;
+        }
         const isStart = type === "bookmarkStart";
         const bag = attributeBag(el, isStart ? ["w:id", "w:name"] : ["w:id"], context);
         const attrs: Record<string, unknown> = { id: integer(attr(el, "id")) };
@@ -480,7 +496,9 @@ function run(
         break;
       case "br": {
         const type = attr(el, "type");
-        if (type === "page") out.push(node("pageBreak", marks));
+        const inNote = context.story === "footnote" || context.story === "endnote";
+        if ((type === "page" || type === "column") && inNote) opaqueRun(el);
+        else if (type === "page") out.push(node("pageBreak", marks));
         else if (type === "column") out.push(node("columnBreak", marks));
         else {
           const clear = attr(el, "clear");
@@ -518,6 +536,10 @@ function run(
         break;
       }
       case "commentReference": {
+        if (context.story === "header" || context.story === "footer") {
+          opaqueRun(el);
+          break;
+        }
         const bag = attributeBag(el, ["w:id"], context);
         const attrs: Record<string, unknown> = { id: integer(attr(el, "id")) };
         if (bag) attrs.attributes = bag;
@@ -526,16 +548,51 @@ function run(
         else opaqueRun(el);
         break;
       }
+      case "footnoteReference":
+      case "endnoteReference": {
+        const id = integer(attr(el, "id"));
+        const custom = attr(el, "customMarkFollows");
+        const on = custom === undefined ? null : ["1", "true", "on"].includes(custom);
+        // A story holds no references (ADR-0007), and a value the node cannot say stays verbatim.
+        if (
+          context.story ||
+          id === undefined ||
+          (custom !== undefined && !["0", "1", "true", "false", "on", "off"].includes(custom))
+        ) {
+          opaqueRun(el);
+          break;
+        }
+        const bag = attributeBag(el, ["w:id", "w:customMarkFollows"], context);
+        const attrs: Record<string, unknown> = {
+          story: `${el.local === "footnoteReference" ? "footnote" : "endnote"}:${id}`,
+        };
+        if (on !== null) attrs.customMark = on;
+        if (bag) attrs.attributes = bag;
+        const leaf = valid(node("noteReference", marks, attrs), el, context);
+        if (leaf) out.push(leaf);
+        else opaqueRun(el);
+        break;
+      }
+      case "footnoteRef":
+      case "endnoteRef":
+        if (context.story === el.local.slice(0, -3) && !el.attributes.length)
+          out.push(node("noteMark", marks));
+        else opaqueRun(el);
+        break;
       default:
         if (DROPPED.has(el.local)) context.report.dropped(el.name);
-        else opaqueRun(el);
+        else opaqueRun(el, undefined, context.story && NOTE_SEPARATORS.has(el.local));
     }
   }
   // A run with properties and nothing else shows nothing; Word drops those too.
   if (out.length === before) context.report.dropped("w:r (empty)");
 
-  function opaqueRun(el: XmlElement, labelValue = label(INLINE_LABELS, el)): void {
-    context.report.opaque(el.name);
+  function opaqueRun(
+    el: XmlElement,
+    labelValue = label(INLINE_LABELS, el),
+    expected: boolean | undefined = false,
+  ): void {
+    if (!expected) context.report.opaque(el.name);
     out.push(
       node("opaqueInline", marks, {
         ...withLabel({ xml: sourceOf(context, el) }, labelValue),

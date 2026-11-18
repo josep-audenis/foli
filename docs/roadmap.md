@@ -1137,10 +1137,14 @@ Each task is a PR on `phase-11/sections-fields`, the build green after each.
   opaque until imported again), `SCHEMA_VERSION` 5. (Done: nothing produces the new content
   yet: `.docx` export refuses it, the views show its result or nothing, until 11.4-11.10. The
   steps of ADR-0007 come with their first user, 11.7.)
-- [ ] 11.4 DOCX stories: headers, footers, footnotes and endnotes imported as stories and
+- [x] 11.4 DOCX stories: headers, footers, footnotes and endnotes imported as stories and
   exported losslessly (unchanged parts byte for byte, changed ones rewritten, new ones with
   their relationships and content types); pictures, tables, tracked changes and comments in
-  them; harness: round trip, opens in Word, edited exports too.
+  them; harness: round trip, opens in Word, edited exports too. (Done: headers, footers and
+  notes are stories, note references and note marks nodes; a story unchanged keeps its part or
+  note byte for byte; `scripts/corpus/story-roundtrip.mjs` has Word read the corpus unchanged and
+  edited and a new package with a header, footer and notes. What a story may not hold stays
+  verbatim. The editor does not show them yet, and a reference shows nothing until 11.10.)
 - [ ] 11.5 DOCX fields, content controls and bookmarks: complex and simple fields (nested,
   across runs and paragraphs), merge and form fields, content controls at every level (with
   data binding and placeholders kept), bookmarks; what the model cannot hold stays verbatim,

@@ -566,8 +566,6 @@ export function parseDocument(input: unknown): FoliDocument {
             fail(`comments[${i}].content`, "a comment cannot hold a note reference");
           return true;
         });
-        if (block.type.name === "noteReference")
-          fail(`comments[${i}].content`, "a comment cannot hold a note reference");
         return copied(block);
       }),
     })),

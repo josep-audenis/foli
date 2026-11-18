@@ -18,6 +18,10 @@ export const REL = {
   commentsExtended: "http://schemas.microsoft.com/office/2011/relationships/commentsExtended",
   hyperlink: "http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink",
   settings: "http://schemas.openxmlformats.org/officeDocument/2006/relationships/settings",
+  header: "http://schemas.openxmlformats.org/officeDocument/2006/relationships/header",
+  footer: "http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer",
+  footnotes: "http://schemas.openxmlformats.org/officeDocument/2006/relationships/footnotes",
+  endnotes: "http://schemas.openxmlformats.org/officeDocument/2006/relationships/endnotes",
 };
 
 /** Whether `node` is the WordprocessingML element `local`. */

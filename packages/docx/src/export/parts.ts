@@ -12,6 +12,7 @@ import type {
   FoliDocument,
   NumberingInstanceJSON,
   NumberingLevelJSON,
+  StoryJSON,
   StyleJSON,
 } from "@folijs/core";
 import { attr, child, isW, W, W15 } from "../import/ooxml.js";
@@ -24,6 +25,7 @@ import {
   usableStyle,
 } from "../import/parts.js";
 import { Recorder } from "../import/report.js";
+import { notesOf } from "../import/stories.js";
 import { DocxError } from "../package.js";
 import type { XmlElement, XmlNode } from "../xml.js";
 import { blocksXml, type WriteContext } from "./content.js";
@@ -75,7 +77,7 @@ function childSource(
 }
 
 /** A part's text: the original's prolog and root around `children`, or a new root. */
-function wrapPart(
+export function wrapPart(
   part: OriginalPart | undefined,
   rootName: string,
   ns: Namespaces,
@@ -533,6 +535,52 @@ export function commentsXml(
   );
   const added = comments.rest().map(write).join("");
   return wrapPart(part, "w:comments", context.namespaces, body + added);
+}
+
+/** The separators a new notes part starts with, as Word writes them. */
+const noteSeparators = (kind: "footnote" | "endnote") =>
+  `<w:${kind} w:type="separator" w:id="-1"><w:p><w:r><w:separator/></w:r></w:p></w:${kind}>` +
+  `<w:${kind} w:type="continuationSeparator" w:id="0"><w:p><w:r><w:continuationSeparator/></w:r></w:p></w:${kind}>`;
+
+/**
+ * A footnotes or endnotes part: a note unchanged from `originals` keeps its bytes, a changed one
+ * is written from its story, one whose story is gone is removed, and new ones go at the end.
+ */
+export function notesXml(
+  kind: "footnote" | "endnote",
+  stories: Readonly<Record<string, StoryJSON>>,
+  originals: Readonly<Record<string, StoryJSON>>,
+  part: OriginalPart | undefined,
+  context: WriteContext,
+): string {
+  const write = (key: string, story: StoryJSON) => {
+    const type = story.noteType ? ` w:type="${story.noteType}"` : "";
+    const start =
+      story.ext?.replace(/\/>$/, ">") ?? `<w:${kind}${type} w:id="${key.slice(kind.length + 1)}">`;
+    return `${start}${blocksXml(story.content.content ?? [], context)}</w:${kind}>`;
+  };
+  const seen = new Set<string>();
+  const held = part ? notesOf(part.root, kind) : new Map<string, XmlElement>();
+  const keyOf = new Map([...held].map(([key, el]) => [el, key]));
+  const body = rebuild<string>(
+    part,
+    (child) => {
+      const key = keyOf.get(child);
+      if (key === undefined) return undefined;
+      seen.add(key);
+      if (!Object.hasOwn(stories, key)) return null;
+      const story = stories[key] as StoryJSON;
+      return same(story, originals[key]) ? undefined : key;
+    },
+    (key) => write(key, stories[key] as StoryJSON),
+    [],
+  );
+  const added = Object.entries(stories)
+    .filter(([key, story]) => story.kind === kind && !seen.has(key))
+    .map(([key, story]) => write(key, story))
+    .join("");
+  const separators = part ? "" : noteSeparators(kind);
+  return wrapPart(part, `w:${kind}s`, context.namespaces, separators + body + added);
 }
 
 /**

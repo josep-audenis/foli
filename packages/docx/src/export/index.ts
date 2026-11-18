@@ -11,7 +11,9 @@ import {
   parseDocument,
   type ResourceJSON,
   type SectionJSON,
+  type StoryJSON,
 } from "@folijs/core";
+import { packageStories } from "../import/index.js";
 import { child, REL } from "../import/ooxml.js";
 import { DocxError, type DocxPackage, type NewPart } from "../package.js";
 import { newSettingsXml, withTrackRevisions } from "../settings.js";
@@ -20,12 +22,14 @@ import { blocksXml, type WriteContext } from "./content.js";
 import {
   commentsExtendedXml,
   commentsXml,
+  notesXml,
   numberingXml,
   type OriginalPart,
   stylesXml,
+  wrapPart,
 } from "./parts.js";
 import { drawingXml, Media, pictureBytes } from "./pictures.js";
-import { sectionXml } from "./properties.js";
+import { same, sectionXml } from "./properties.js";
 import {
   DEFAULT_NAMESPACES,
   escapeAttribute,
@@ -42,6 +46,10 @@ const CT = {
   commentsExtended:
     "application/vnd.openxmlformats-officedocument.wordprocessingml.commentsExtended+xml",
   settings: "application/vnd.openxmlformats-officedocument.wordprocessingml.settings+xml",
+  header: "application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml",
+  footer: "application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml",
+  footnotes: "application/vnd.openxmlformats-officedocument.wordprocessingml.footnotes+xml",
+  endnotes: "application/vnd.openxmlformats-officedocument.wordprocessingml.endnotes+xml",
   rels: "application/vnd.openxmlformats-package.relationships+xml",
 };
 
@@ -105,10 +113,13 @@ class Relationships {
     return this.add(REL.hyperlink, href, true);
   }
 
-  add(type: string, target: string, external: boolean): string {
+  /** Adds a relationship; `wanted` is its id (a story's), refused if another has it. */
+  add(type: string, target: string, external: boolean, wanted?: string): string {
+    if (wanted !== undefined && this.#ids.has(wanted))
+      throw new DocxError(`Relationship id ${wanted} is already in use`);
     let n = this.#ids.size + 1;
     while (this.#ids.has(`rId${n}`)) n++;
-    const id = `rId${n}`;
+    const id = wanted ?? `rId${n}`;
     this.#ids.add(id);
     this.added.push({ id, type, target, external });
     if (type === REL.hyperlink && external) this.#byTarget.set(target, id);
@@ -202,25 +213,37 @@ export async function exportDocx(
       `The document refers to a part of its original package (${reference}): export it with that package`,
     );
   }
+  const originals = original && doc.stories ? packageStories(original) : {};
   // The parts written from the model: their drawings are the document's own.
   const rewritten = original
     ? [
         original.mainDocument,
         ...original
           .relationships(original.mainDocument)
-          .filter((r) => r.type === REL.comments && r.partName)
+          .filter(
+            (r) =>
+              r.partName &&
+              (r.type === REL.comments ||
+                r.type === REL.footnotes ||
+                r.type === REL.endnotes ||
+                (doc.stories &&
+                  Object.hasOwn(doc.stories, r.id) &&
+                  !same(doc.stories[r.id], originals[r.id]))),
+          )
           .map((r) => r.partName as string),
       ]
     : [];
   const bytes = await pictureBytes(doc, original, options.resource);
   const media = new Media(doc, original, bytes, rewritten);
-  return original ? intoPackage(doc, original, options, media) : newPackage(doc, options, media);
+  return original
+    ? intoPackage(doc, original, originals, options, media)
+    : newPackage(doc, options, media);
 }
 
-/** Schema v5's additions outside the content, until 11.4-11.6 write them: never dropped. */
+/** Schema v5's additions outside the content, until 11.5 and 11.6 write them: never dropped. */
 function refuseNotYetWritten(doc: FoliDocument): void {
   const written = (key: string) => new DocxError(`${key} cannot be exported to .docx yet`);
-  for (const key of ["stories", "controls", "settings"] as const) if (doc[key]) throw written(key);
+  for (const key of ["controls", "settings"] as const) if (doc[key]) throw written(key);
   const sections = [doc.section];
   const walk = (node: NodeJSON) => {
     const attrs = node.attrs as { section?: SectionJSON; controls?: unknown } | undefined;
@@ -230,6 +253,7 @@ function refuseNotYetWritten(doc: FoliDocument): void {
   };
   walk(doc.content);
   for (const comment of doc.comments) comment.content.forEach(walk);
+  for (const story of Object.values(doc.stories ?? {})) walk(story.content);
   for (const section of sections)
     for (const key of ["columns", "pageNumbers", "footnotes", "endnotes"] as const)
       if (section[key]) throw written(`A section's ${key}`);
@@ -295,9 +319,27 @@ function withThreadIds(doc: FoliDocument, pkg: DocxPackage | undefined): FoliDoc
   return copy;
 }
 
+/** A free name for a new part: `/word/header1.xml`, `/word/header2.xml`… */
+function freePart(stem: string, taken: (name: string) => boolean): string {
+  let n = 1;
+  while (taken(`/word/${stem}${n}.xml`)) n++;
+  return `/word/${stem}${n}.xml`;
+}
+
+const HEADER_FOOTER = {
+  header: { root: "w:hdr", rel: REL.header, contentType: CT.header },
+  footer: { root: "w:ftr", rel: REL.footer, contentType: CT.footer },
+} as const;
+const NOTES = {
+  footnote: { rel: REL.footnotes, contentType: CT.footnotes, name: "/word/footnotes.xml" },
+  endnote: { rel: REL.endnotes, contentType: CT.endnotes, name: "/word/endnotes.xml" },
+} as const;
+const NOTE_KINDS = ["footnote", "endnote"] as const;
+
 async function intoPackage(
   doc: FoliDocument,
   pkg: DocxPackage,
+  originals: Readonly<Record<string, StoryJSON>>,
   options: ExportOptions,
   media: Media,
 ): Promise<Uint8Array> {
@@ -401,6 +443,48 @@ async function intoPackage(
     );
   }
 
+  // Stories: none in the document (schema v4, or none read) leaves their parts as they are.
+  const stories = doc.stories ?? {};
+  const ownRelationships = (name: string, existing: boolean) =>
+    new Relationships(existing ? pkg.relationships(name) : []);
+  const newNames = new Set<string>();
+  for (const [id, story] of Object.entries(stories)) {
+    if (story.kind !== "header" && story.kind !== "footer") continue;
+    const { root, rel, contentType } = HEADER_FOOTER[story.kind];
+    const related = pkg.relationships(mainName).find((r) => r.id === id);
+    const existing = related?.partName ? pkg.part(related.partName) : undefined;
+    if (existing && same(story, originals[id])) continue;
+    const name = existing?.name ?? freePart(story.kind, (n) => !!pkg.part(n) || newNames.has(n));
+    const xml = existing ? pkg.xml(existing.name) : undefined;
+    const ns = xml ? namespacesOf(xml.root, xml.source) : namespaces;
+    const partRels = ownRelationships(name, !!existing);
+    const inner = blocksXml(story.content.content ?? [], contextFor(ns, partRels, media, name));
+    const text = wrapPart(xml && { root: xml.root, source: xml.source }, root, ns, inner);
+    if (existing) set(name, text);
+    else {
+      newNames.add(name);
+      add.push({ name, data: encoder.encode(text), contentType });
+      rels.add(rel, relative(mainName, name), false, id);
+    }
+    if (partRels.added.length) writeRelationships(name, partRels);
+  }
+  for (const kind of NOTE_KINDS) {
+    const { rel, contentType, name: defaultName } = NOTES[kind];
+    const name = pkg.relationships(mainName).find((r) => r.type === rel)?.partName;
+    const held = Object.values(stories).some((s) => s.kind === kind);
+    if (!name && !held) continue;
+    if (name && !doc.stories) continue;
+    const target = name ?? defaultName;
+    const partRels = ownRelationships(target, !!name);
+    const write = (o: OriginalPart | undefined, ns: Namespaces) =>
+      notesXml(kind, stories, originals, o, {
+        ...contextFor(ns, partRels, media, target),
+        note: kind,
+      });
+    part(rel, defaultName, contentType, write, held);
+    if (partRels.added.length) writeRelationships(target, partRels);
+  }
+
   const { trackRevisions } = options;
   if (trackRevisions !== undefined) {
     part(
@@ -486,6 +570,49 @@ async function newPackage(
       numberingXml(doc, undefined, DEFAULT_NAMESPACES),
     );
   }
+  for (const [id, story] of Object.entries(doc.stories ?? {})) {
+    if (story.kind !== "header" && story.kind !== "footer") continue;
+    const { root, rel, contentType } = HEADER_FOOTER[story.kind];
+    const name = freePart(story.kind, (n) => parts.some((p) => p.name === n));
+    const partRels = new Relationships([]);
+    const inner = blocksXml(
+      story.content.content ?? [],
+      contextFor(DEFAULT_NAMESPACES, partRels, media, name),
+    );
+    parts.push({
+      name,
+      text: wrapPart(undefined, root, DEFAULT_NAMESPACES, inner),
+      contentType,
+    });
+    rels.add(rel, relative("/word/document.xml", name), false, id);
+    if (partRels.added.length)
+      parts.push({
+        name: relationshipsPartName(name),
+        text: partRels.xml(undefined),
+        contentType: CT.rels,
+      });
+  }
+  for (const kind of NOTE_KINDS) {
+    const stories = doc.stories ?? {};
+    if (!Object.values(stories).some((s) => s.kind === kind)) continue;
+    const { rel, contentType, name } = NOTES[kind];
+    const partRels = new Relationships([]);
+    add(
+      name,
+      rel,
+      contentType,
+      notesXml(kind, stories, {}, undefined, {
+        ...contextFor(DEFAULT_NAMESPACES, partRels, media, name),
+        note: kind,
+      }),
+    );
+    if (partRels.added.length)
+      parts.push({
+        name: relationshipsPartName(name),
+        text: partRels.xml(undefined),
+        contentType: CT.rels,
+      });
+  }
   if (doc.comments.length) {
     const commentRels = new Relationships([]);
     add(
@@ -555,11 +682,18 @@ function bodySection(doc: FoliDocument, namespaces: Namespaces): string {
 function packageReference(doc: FoliDocument): string | undefined {
   const sections = [doc.section, ...(doc.content.content ?? []).map((b) => b.attrs?.section)];
   for (const s of sections) {
-    const section = s as { headers?: object; footers?: object } | undefined;
-    if (section?.headers || section?.footers) return "a header or footer";
+    const section = s as
+      | { headers?: Record<string, string>; footers?: Record<string, string> }
+      | undefined;
+    const ids = [
+      ...Object.values(section?.headers ?? {}),
+      ...Object.values(section?.footers ?? {}),
+    ];
+    if (ids.some((id) => !doc.stories || !Object.hasOwn(doc.stories, id)))
+      return "a header or footer";
   }
   let found: string | undefined;
-  JSON.stringify([doc.content, doc.comments], (key, value) => {
+  JSON.stringify([doc.content, doc.comments, doc.stories], (key, value) => {
     if (!found && key === "xml" && typeof value === "string" && /\sr:[A-Za-z]+="/.test(value))
       found = "content kept verbatim";
     const link = value as {

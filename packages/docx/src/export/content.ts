@@ -24,6 +24,8 @@ export interface WriteContext {
   readonly hyperlink: (href: string, id: string | undefined) => string;
   /** A picture's `w:drawing` (its image related to the part, its media part allocated). */
   readonly picture: (attrs: Record<string, unknown>) => string;
+  /** The kind of note being written: what its `noteMark` is. */
+  readonly note?: "footnote" | "endnote";
 }
 
 type Json = Record<string, unknown>;
@@ -175,6 +177,8 @@ function inRun(node: NodeJSON): boolean {
     "pageBreak",
     "columnBreak",
     "commentReference",
+    "noteReference",
+    "noteMark",
     "picture",
   ].includes(node.type);
 }
@@ -263,6 +267,18 @@ function runContentXml(node: NodeJSON, deleted: boolean, context: WriteContext):
       return el("w:br", { "w:type": "column" });
     case "commentReference":
       return `${el("w:commentReference", { "w:id": String(a.id) }).slice(0, -2)}${bagXml(a.attributes, context.namespaces, ["w:id"])}/>`;
+    case "noteReference": {
+      const [kind, id] = String(a.story).split(/:(.*)/s) as [string, string];
+      if ((kind !== "footnote" && kind !== "endnote") || !id) return notYet(node);
+      const known = ["w:customMarkFollows", "w:id"];
+      const open = el(`w:${kind}Reference`, {
+        "w:customMarkFollows": a.customMark === undefined ? undefined : a.customMark ? "1" : "0",
+        "w:id": id,
+      }).slice(0, -2);
+      return `${open}${bagXml(a.attributes, context.namespaces, known)}/>`;
+    }
+    case "noteMark":
+      return context.note ? `<w:${context.note}Ref/>` : notYet(node);
     case "opaqueInline":
       return verbatim(a.xml, context);
     case "picture":
