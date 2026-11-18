@@ -27,6 +27,7 @@ import {
   StoryStep,
   storyBodyKey,
   type WordContext,
+  withContext,
   withEnvelope,
   wordContext,
 } from "./word.js";
@@ -54,25 +55,20 @@ export class StoryEditing {
     private readonly host: StoryHost,
   ) {
     const doc = this.tree()?.doc as Node;
-    this.state = this.create(doc, Selection.atStart(doc), null);
+    this.state = this.create(doc);
   }
 
   private tree(): Story | undefined {
     return wordContext(this.host.state)?.stories.get(this.id);
   }
 
-  private create(
-    doc: Node,
-    selection: Selection,
-    storedMarks: EditorState["storedMarks"],
-  ): EditorState {
+  private create(doc: Node): EditorState {
     const { host, id } = this;
     const context = wordContext(host.state) as WordContext;
     const kind = context.stories.get(id)?.kind as StoryJSON["kind"];
     return EditorState.create({
       doc,
-      selection,
-      storedMarks,
+      selection: Selection.atStart(doc),
       plugins: [
         new Plugin<StoryBody>({
           key: storyBodyKey,
@@ -100,13 +96,14 @@ export class StoryEditing {
     for (const listener of this.listeners) listener(this.state, transactions);
   }
 
-  /** The state again, if the body's context or tracking moved on from what it was made with. */
+  /** `state` with the body's context and tracking; its plugins keep their state. */
   private current(state: EditorState): EditorState {
-    const { host } = this;
-    return wordContext(state) === wordContext(host.state) &&
-      trackState(state) === trackState(host.state)
-      ? state
-      : this.create(state.doc, state.selection, state.storedMarks);
+    const context = wordContext(this.host.state) as WordContext;
+    const track = trackState(this.host.state);
+    if (wordContext(state) === context && trackState(state) === track) return state;
+    const tr = withContext(state.tr, context);
+    if (track) withTrackState(tr, track);
+    return state.apply(tr);
   }
 
   dispatch = (tr: Transaction): void => {
@@ -178,7 +175,7 @@ export class StoryEditing {
         if (step instanceof StoryStep && step.id === this.id) selection = step.selectionAfter;
     if (tree.doc !== state.doc) {
       const json = selection ?? state.selection.toJSON();
-      this.state = this.create(tree.doc, Selection.fromJSON(tree.doc, json), null);
+      this.state = this.current(state.withDocument(tree.doc, Selection.fromJSON(tree.doc, json)));
       this.notify([]);
       return;
     }

@@ -352,7 +352,7 @@ export function imageSource(
   resolve?: (key: string, resource: ResourceJSON) => string | null | undefined,
 ): ImageSource {
   return (key) => {
-    const resource = resources?.[key];
+    const resource = resources && Object.hasOwn(resources, key) ? resources[key] : undefined;
     if (!resource) return undefined;
     const url = resolve?.(key, resource);
     // The app's answer stands, a refusal (null, "") included.

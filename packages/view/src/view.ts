@@ -189,7 +189,7 @@ const PICTURE_SELECTED_ATTR = "data-foli-picture-selected";
 const MIN_PICTURE = 8;
 // Generated content is not document text: no caret stops inside it, a zero-height float keeps
 // the caret at the line start, and the empty alt text keeps screen readers on aria-placeholder.
-const STYLES = `.foli-in-story>.foli-page>:not(.foli-region){opacity:.45}.foli-story-mount{pointer-events:auto;outline:1px dashed GrayText;outline-offset:2px}.foli-story-mount>[contenteditable=true]:focus{outline:none}.${CELL_CLASS}{box-shadow:inset 0 0 0 9999px rgba(0,120,215,.22)}[${CELLS_ATTR}] ::selection{background:transparent}[data-foli-no-alt]{outline:2px dashed #b45309;outline-offset:-2px}@media print{[data-foli-no-alt]{outline:none}}[${PICTURE_SELECTED_ATTR}]{position:relative;outline:2px solid Highlight}[${PICTURE_SELECTED_ATTR}] [data-foli-resize]{position:absolute;right:-5px;bottom:-5px;width:10px;height:10px;box-sizing:border-box;border:1px solid Canvas;background:Highlight;cursor:nwse-resize;forced-color-adjust:none}@media print{[${PICTURE_SELECTED_ATTR}]{outline:none}[${PICTURE_SELECTED_ATTR}] [data-foli-resize]{display:none}}[${PLACEHOLDER_ATTR}]::before{content:attr(${PLACEHOLDER_ATTR});content:attr(${PLACEHOLDER_ATTR}) / "";float:inline-start;height:0;pointer-events:none;color:GrayText}`;
+const STYLES = `.foli-in-story>.foli-page>:not(.foli-region){opacity:.45}.foli-story-mount{pointer-events:auto;outline:1px dashed GrayText;outline-offset:2px}.foli-story-mount>[contenteditable=true]:focus{outline:none}@media print{.foli-in-story>.foli-page>:not(.foli-region){opacity:1}.foli-story-mount{outline:none}}.${CELL_CLASS}{box-shadow:inset 0 0 0 9999px rgba(0,120,215,.22)}[${CELLS_ATTR}] ::selection{background:transparent}[data-foli-no-alt]{outline:2px dashed #b45309;outline-offset:-2px}@media print{[data-foli-no-alt]{outline:none}}[${PICTURE_SELECTED_ATTR}]{position:relative;outline:2px solid Highlight}[${PICTURE_SELECTED_ATTR}] [data-foli-resize]{position:absolute;right:-5px;bottom:-5px;width:10px;height:10px;box-sizing:border-box;border:1px solid Canvas;background:Highlight;cursor:nwse-resize;forced-color-adjust:none}@media print{[${PICTURE_SELECTED_ATTR}]{outline:none}[${PICTURE_SELECTED_ATTR}] [data-foli-resize]{display:none}}[${PLACEHOLDER_ATTR}]::before{content:attr(${PLACEHOLDER_ATTR});content:attr(${PLACEHOLDER_ATTR}) / "";float:inline-start;height:0;pointer-events:none;color:GrayText}`;
 
 /**
  * Adds the view's stylesheet once per document or shadow root, when a placeholder is first shown
@@ -869,6 +869,17 @@ export class EditorView {
    * Measurements are cached by node and the flow restarts at the first changed block (5.4).
    */
   private render(): void {
+    try {
+      this.renderPages();
+    } catch (error) {
+      // What it had changed is not input: read back, it would render and fail again, for ever.
+      this.observer.takeRecords();
+      this.pending = [];
+      throw error;
+    }
+  }
+
+  private renderPages(): void {
     const { doc } = this.state;
     const ownerDocument = this.host.ownerDocument;
     // A new document (envelope) gets its renderer; nothing rendered before is reused then. An
@@ -1379,6 +1390,7 @@ export class EditorView {
             mount.region.element
               .querySelector(`:scope > .${REGION_CONTENT_CLASS}`)
               ?.replaceWith(copy);
+            mount.wrapper.style.paddingBottom = copy.style.paddingBottom;
           }
           continue;
         }
@@ -1519,7 +1531,10 @@ export class EditorView {
     inner.setAttribute("aria-label", side === "header" ? "Header" : "Footer");
     wrapper.append(inner);
     const shown = region.element.querySelector<HTMLElement>(`:scope > .${REGION_CONTENT_CLASS}`);
-    if (shown) shown.style.display = "none";
+    if (shown) {
+      shown.style.display = "none";
+      wrapper.style.paddingBottom = shown.style.paddingBottom;
+    }
     region.element.append(wrapper);
     const view = new EditorView(inner, editor, {
       paged: false,
@@ -1542,15 +1557,23 @@ export class EditorView {
       view,
       moved: false,
     };
+    // With several views of the editor, the one with the story open answers for it.
+    this.editor.storyView = this.stories;
     view.focus();
     this.editor.storyChanged();
     return true;
+  }
+
+  /** Finishes a running composition, its text going into the model. */
+  endComposition(): void {
+    if (this.composing) this.onCompositionEnd();
   }
 
   /** Leaves the story being edited; `focus`: the body takes the focus, with its selection back. */
   closeStory(focus = true): void {
     const { mount } = this;
     if (!mount) return;
+    mount.view.endComposition();
     this.mount = null;
     mount.view.destroy();
     mount.wrapper.remove();
@@ -2880,6 +2903,15 @@ export class EditorView {
   }
 
   private onKeyDown = (event: KeyboardEvent): void => {
+    // The host itself focused while a story is open (Shift+Tab): it is read-only, and its selection
+    // is what leaving the story comes back to.
+    if (this.mount) {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        this.closeStory(true);
+      }
+      return;
+    }
     if (event.isComposing || this.composing) return;
     this.syncSelection();
     if (this.crossFragmentEdge(event) || this.crossListNumber(event)) {
@@ -3093,9 +3125,10 @@ export class EditorView {
    * and so is the scroll position.
    */
   private onFocus = (): void => {
+    if (this.paged) this.editor.storyView = this.stories;
     const pointer = this.pointerFocus;
     this.pointerFocus = false;
-    if (pointer) return;
+    if (pointer || this.mount) return;
     const current = this.readSelection();
     if (current && this.shows(current)) return;
     this.writeSelection(true);
@@ -3415,7 +3448,7 @@ export class EditorView {
   }
 
   private onSelectionChange = (): void => {
-    if (!this.composing && this.hasFocus()) this.syncSelection();
+    if (!this.composing && !this.mount && this.hasFocus()) this.syncSelection();
   };
 }
 

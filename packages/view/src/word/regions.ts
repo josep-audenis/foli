@@ -33,40 +33,50 @@ export interface FieldValues {
 }
 
 const PAGE_FIELDS = new Set(["PAGE", "NUMPAGES", "SECTIONPAGES"]);
-const FORMATS: Record<string, string> = {
-  arabic: "decimal",
-  roman: "lowerRoman",
-  ROMAN: "upperRoman",
-  alphabetic: "lowerLetter",
-  ALPHABETIC: "upperLetter",
-};
+/** `\\*` switches: `arabic` in any case, the others as Word spells their case. */
+const FORMATS = new Map([
+  ["roman", "lowerRoman"],
+  ["ROMAN", "upperRoman"],
+  ["alphabetic", "lowerLetter"],
+  ["ALPHABETIC", "upperLetter"],
+]);
 
-/** What a field shows for `code` (its instruction), or null when it is not a page field. */
-function pageFieldText(code: string, values: FieldValues, numbers: string | undefined) {
-  const words = code.trim().split(/\s+/);
-  const name = words[0]?.toUpperCase() ?? "";
+/** A page field in a story: which, and the format its own switch asks for. */
+interface FieldSlot {
+  name: string;
+  format: string | undefined;
+}
+
+/** Stands in the drawn story for a slot's text: the private use area is not document text. */
+const SLOT_MARK = "\uE000";
+const SLOT_TEXT = /\uE000([\uE100-\uF8FF])/g;
+
+/** The page field `code` (its instruction) is, or null. */
+function pageField(code: string): FieldSlot | null {
+  const name = code.trim().split(/\s+/)[0]?.toUpperCase() ?? "";
   if (!PAGE_FIELDS.has(name)) return null;
-  const at = words.indexOf("\\*");
-  const asked = at >= 0 ? FORMATS[words[at + 1] ?? ""] : undefined;
+  const asked = /\\\*\s*(\S+)/.exec(code)?.[1];
+  const format = asked?.toLowerCase() === "arabic" ? "decimal" : FORMATS.get(asked ?? "");
+  return { name, format };
+}
+
+/** What `slot` shows; the section's number format is the page number's, a switch goes first. */
+function slotText(slot: FieldSlot, values: FieldValues, numbers: string | undefined): string {
   const raw =
-    name === "PAGE" ? values.page : name === "NUMPAGES" ? values.pages : values.sectionPages;
-  const n = Number(raw);
-  // The section's number format is the page number's; a switch in the field goes before it.
-  const format = asked ?? (name === "PAGE" ? numbers : undefined);
-  return { name, text: Number.isFinite(n) ? formatNumber(n, format) : raw };
+    slot.name === "PAGE"
+      ? values.page
+      : slot.name === "NUMPAGES"
+        ? values.pages
+        : values.sectionPages;
+  return formatNumber(Number(raw), slot.format ?? (slot.name === "PAGE" ? numbers : undefined));
 }
 
 /**
- * A paragraph's inline nodes with its page fields' results replaced by what `values` says (one run,
- * formatted as the result's first). Only whole fields inside the list: a page field does not span
- * paragraphs. `seen` collects the names of those found.
+ * A paragraph's inline nodes with each page field's result replaced by a mark for its slot (one
+ * run, formatted as the result's first). Only whole fields inside the list: a page field does not
+ * span paragraphs.
  */
-function fillInline(
-  nodes: readonly NodeJSON[],
-  values: FieldValues,
-  numbers: string | undefined,
-  seen: Set<string>,
-): NodeJSON[] {
+function markInline(nodes: readonly NodeJSON[], slots: FieldSlot[]): NodeJSON[] {
   const out: NodeJSON[] = [];
   for (let i = 0; i < nodes.length; i++) {
     const node = nodes[i] as NodeJSON;
@@ -84,51 +94,68 @@ function fillInline(
       else if (depth === 1 && separator < 0 && inner.type === "fieldCode")
         code += String(inner.attrs?.text ?? "");
     }
-    const shown = end < 0 ? null : pageFieldText(code, values, numbers);
-    if (!shown) continue;
-    seen.add(shown.name);
+    const slot = end < 0 ? null : pageField(code);
+    if (!slot) continue;
     const codeEnd = separator < 0 ? end : separator + 1;
     const result = nodes.slice(codeEnd, end);
     const model = result.find((n) => n.type === "text") ?? nodes[codeEnd - 1];
     out.push(...nodes.slice(i + 1, codeEnd));
-    if (shown.text)
-      out.push({
-        type: "text",
-        text: shown.text,
-        ...(model?.marks ? { marks: model.marks } : {}),
-      });
+    out.push({
+      type: "text",
+      text: SLOT_MARK + String.fromCharCode(0xe100 + slots.length),
+      ...(model?.marks ? { marks: model.marks } : {}),
+    });
+    slots.push(slot);
     out.push(nodes[end] as NodeJSON);
     i = end;
   }
   return out;
 }
 
-/** `node` with the page fields in it filled. */
-function filled(
-  node: NodeJSON,
-  values: FieldValues,
-  numbers: string | undefined,
-  seen: Set<string>,
-): NodeJSON {
+/** `node` with the page fields in it marked. */
+function marked(node: NodeJSON, slots: FieldSlot[]): NodeJSON {
   if (!node.content) return node;
   const content =
     node.type === "paragraph"
-      ? fillInline(node.content, values, numbers, seen)
-      : node.content.map((child) => filled(child, values, numbers, seen));
+      ? markInline(node.content, slots)
+      : node.content.map((child) => marked(child, slots));
   return { ...node, content };
 }
 
-/** The page fields a story holds. */
-const NO_VALUES: FieldValues = { page: "", pages: "", sectionPages: "" };
+/** A copy of `template` with each slot's text in it. */
+function filledCopy(template: HTMLElement, texts: readonly string[]): HTMLElement {
+  const copy = template.cloneNode(true) as HTMLElement;
+  if (!texts.length) return copy;
+  const walker = template.ownerDocument.createTreeWalker(copy, NodeFilter.SHOW_TEXT);
+  for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+    const text = node as Text;
+    if (text.data.includes(SLOT_MARK))
+      text.data = text.data.replace(
+        SLOT_TEXT,
+        (_, slot: string) => texts[slot.charCodeAt(0) - 0xe100] ?? "",
+      );
+  }
+  return copy;
+}
 
-/** A story with some values: its height, and its content to draw. */
+/** A story with some values: its height, and its content to draw (made when asked for). */
 interface Drawn {
   height: number;
-  content: HTMLElement;
+  readonly content: HTMLElement;
+}
+
+/** A story once drawn, its page fields left to fill: what every page starts from. */
+interface StoryDrawing {
+  slots: FieldSlot[];
+  template: HTMLElement;
+  /** The last block's space after, which ends the story. */
+  after: number;
+  drawn: Map<string, Drawn>;
+  heights: Map<string, number>;
 }
 
 /** Per story (an object replaced when the story changes), what was measured and drawn of it. */
-export type RegionCache = WeakMap<StoryJSON, { fields: Set<string>; drawn: Map<string, Drawn> }>;
+export type RegionCache = WeakMap<StoryJSON, StoryDrawing>;
 
 /** A section's page as the regions need it, in CSS px. */
 interface Edges {
@@ -196,6 +223,8 @@ export class PageRegions {
   private pages = 1;
   private sectionPages = new Map<number, number>();
   private edges: Edges[] = [];
+  /** The pages of the last flow. */
+  private flowed: readonly PageFacts[] = [];
   private document: Omit<FoliDocument, "content"> | null = null;
   /** The document's sections, in order. */
   private sections: readonly SectionJSON[] = [];
@@ -220,8 +249,10 @@ export class PageRegions {
     this.edges = [];
   }
 
-  private get stories() {
-    return this.document?.stories;
+  /** A story by id: ids come from the file, and may name what every object inherits. */
+  private story(id: string): StoryJSON | undefined {
+    const stories = this.document?.stories;
+    return stories && Object.hasOwn(stories, id) ? stories[id] : undefined;
   }
 
   private edgesAt(index: number): Edges {
@@ -240,15 +271,25 @@ export class PageRegions {
     const even = this.document?.settings?.evenAndOddHeaders === true;
     const variant = pageVariant(section, page, even);
     const found = storyOfSection(this.sections, index, side, variant);
-    return found && this.stories?.[found.id] ? found.id : null;
+    return found && this.story(found.id) ? found.id : null;
   }
 
-  private entry(story: StoryJSON) {
+  private entry(story: StoryJSON): StoryDrawing {
     let entry = this.cache.get(story);
     if (!entry) {
-      const fields = new Set<string>();
-      filled(story.content, NO_VALUES, undefined, fields);
-      entry = { fields, drawn: new Map() };
+      const slots: FieldSlot[] = [];
+      const content = marked(story.content, slots);
+      const template = this.doc.createElement("div");
+      template.className = REGION_CONTENT_CLASS;
+      template.style.paddingTop = "0.01px";
+      const blocks = renderBlocks({ ...this.document, content } as FoliDocument, this.doc, {
+        ...this.options,
+        ...(this.resolver ? { resolver: this.resolver } : {}),
+      });
+      const after = stack(blocks, template, !!this.resolver?.addsParagraphSpacing);
+      // The last space after is the story's too: a footer sits above it.
+      template.style.paddingBottom = `${after}px`;
+      entry = { slots, template, after, drawn: new Map(), heights: new Map() };
       this.cache.set(story, entry);
     }
     return entry;
@@ -263,53 +304,54 @@ export class PageRegions {
   }
 
   private drawn(id: string, index: number, number: number): Drawn {
-    const story = this.stories?.[id] as StoryJSON;
-    const entry = this.entry(story);
-    const section = this.sections[index] ?? {};
+    const entry = this.entry(this.story(id) as StoryJSON);
     const edges = this.edgesAt(index);
     const values = this.valuesFor(index, number);
-    const format = section.pageNumbers?.format;
-    const key = [
-      edges.width,
-      entry.fields.has("PAGE") ? `${values.page} ${format ?? ""}` : "",
-      entry.fields.has("NUMPAGES") ? values.pages : "",
-      entry.fields.has("SECTIONPAGES") ? values.sectionPages : "",
-    ].join("|");
+    const numbers = this.sections[index]?.pageNumbers?.format;
+    const texts = entry.slots.map((slot) => slotText(slot, values, numbers));
+    const key = `${edges.width}|${texts.join("|")}`;
     let found = entry.drawn.get(key);
     if (!found) {
-      const content = this.doc.createElement("div");
-      content.className = REGION_CONTENT_CLASS;
-      content.style.paddingTop = "0.01px";
-      const blocks = renderBlocks(
-        {
-          ...this.document,
-          content: entry.fields.size
-            ? filled(story.content, values, format, new Set())
-            : story.content,
-        } as FoliDocument,
-        this.doc,
-        { ...this.options, ...(this.resolver ? { resolver: this.resolver } : {}) },
-      );
-      const after = stack(blocks, content, !!this.resolver?.addsParagraphSpacing);
-      // Measured down to its last block: floating pictures do not make a story taller.
-      const parent = this.options.measureIn();
-      const { style } = content;
-      style.position = "absolute";
-      style.visibility = "hidden";
-      style.width = `${edges.width}px`;
-      parent.append(content);
-      const last = content.lastElementChild;
-      const scale = this.options.scale?.() ?? 1;
-      const top = content.getBoundingClientRect().top;
-      const bottom = last ? last.getBoundingClientRect().bottom : top;
-      content.remove();
-      style.position = "";
-      style.visibility = "";
-      style.width = "";
-      found = { height: (bottom - top) / scale + after, content };
+      let content: HTMLElement | null = null;
+      const made = () => {
+        content ??= filledCopy(entry.template, texts);
+        return content;
+      };
+      // shortcut: texts of the same lengths are taken to wrap alike (digits are about as wide);
+      // measuring each page's costs a layout per page per keystroke.
+      const shape = `${edges.width}|${texts.map((text) => text.length).join(" ")}`;
+      let height = entry.heights.get(shape);
+      if (height === undefined) {
+        height = this.measure(made(), edges.width, entry.after);
+        entry.heights.set(shape, height);
+      }
+      found = {
+        height,
+        get content() {
+          return made();
+        },
+      };
       entry.drawn.set(key, found);
     }
     return found;
+  }
+
+  /** A story's height: down to its last block (floating pictures add none) and its space after. */
+  private measure(content: HTMLElement, width: number, after: number): number {
+    const { style } = content;
+    style.position = "absolute";
+    style.visibility = "hidden";
+    style.width = `${width}px`;
+    this.options.measureIn().append(content);
+    const last = content.lastElementChild;
+    const scale = this.options.scale?.() ?? 1;
+    const top = content.getBoundingClientRect().top;
+    const bottom = last ? last.getBoundingClientRect().bottom : top;
+    content.remove();
+    style.position = "";
+    style.visibility = "";
+    style.width = "";
+    return (bottom - top) / scale + after;
   }
 
   /** How tall the header or footer of a page is (0: none). */
@@ -346,6 +388,7 @@ export class PageRegions {
         .map((p) => this.boxHeight(p.section, p))
         .join(" ");
     const before = heights();
+    this.flowed = pages;
     this.pages = pages.length;
     this.sectionPages = new Map();
     for (const page of pages)
@@ -353,19 +396,25 @@ export class PageRegions {
     return heights() !== before;
   }
 
-  /** Every header and footer height a section can give: a change means a new flow. */
+  /**
+   * The header and footer heights of what a section can show and of every flowed page (a page
+   * number can wrap from some page on): a change means a new flow.
+   */
   key(): string {
-    return this.sections
-      .flatMap((_, index) =>
-        (["header", "footer"] as const).flatMap((side) =>
-          [
-            { first: true, number: 1 },
-            { first: false, number: 1 },
-            { first: false, number: 2 },
-          ].map((page) => this.heightOf(index, side, { ...page, index: 0 })),
-        ),
-      )
-      .join(" ");
+    const sides = ["header", "footer"] as const;
+    const sampled = this.sections.flatMap((_, index) =>
+      sides.flatMap((side) =>
+        [
+          { first: true, number: 1 },
+          { first: false, number: 1 },
+          { first: false, number: 2 },
+        ].map((page) => this.heightOf(index, side, { ...page, index: 0 })),
+      ),
+    );
+    const flowed = this.flowed
+      .filter((page) => page.sectionPages && page.section < this.sections.length)
+      .flatMap((page) => sides.map((side) => this.heightOf(page.section, side, page)));
+    return [...sampled, "|", ...flowed].join(" ");
   }
 
   /** What a page's region shows: equal keys, the same drawing. */
@@ -379,7 +428,7 @@ export class PageRegions {
     return {
       id,
       content: this.drawn(id, index, page.number),
-      story: this.stories?.[id] as StoryJSON,
+      story: this.story(id) as StoryJSON,
     };
   }
 

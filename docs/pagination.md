@@ -52,7 +52,8 @@ editor state ──► measure the blocks without a cached measurement (DOM read
   box from a function of the page (`FlowSection.box`). A section starts as its `type` says: a new
   page, a band below the last (`continuous`, with the same page setup; otherwise a new page), the
   next column, or an even or odd page, after a blank page when the page's displayed number asks
-  for one (the blank page has the following section's size, as in Word's PDF). A band above a
+  for one (the blank page has the following section's size, as in Word's PDF; a section that
+  restarts its numbers gets no blank page, and starts on its start or the next number of its kind). A band above a
   continuous break is balanced: its section is flowed again with its last page's columns limited,
   a binary search for the shortest height that keeps it on that page. A column break ends its
   column (the last column's, its page). Word's rules read from its PDF of corpus 08: the next
