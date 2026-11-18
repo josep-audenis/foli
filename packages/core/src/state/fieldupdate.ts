@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Updating and inserting Word's fields (ADR-0007, 11.8). A field's result is worked out from its
  * instruction, as Word's switches say, and put between its separator and end; a table of contents
  * is rebuilt from the headings as Word builds it. Everything happens in one transaction, recorded
@@ -53,7 +53,7 @@ const WITH_VALUE: Record<string, string> = {
 };
 const GENERAL = "*@#";
 
-/** Word's quoting: `"…"`, with `\"` and `\\` inside; a switch is `\` and one character. */
+/** Word's quoting: `"â€¦"`, with `\"` and `\\` inside; a switch is `\` and one character. */
 function tokens(text: string): { value: string; quoted: boolean }[] {
   const out: { value: string; quoted: boolean }[] = [];
   let i = 0;
@@ -232,7 +232,7 @@ export interface FieldPage {
   number: number;
   /** How many pages its section has. */
   sectionPages: number;
-  /** The section's number format (`upperRoman`…). */
+  /** The section's number format (`upperRoman`â€¦). */
   format?: string | undefined;
 }
 
@@ -1183,7 +1183,7 @@ export function insertField(instruction: string, options: InsertFieldOptions = {
       const marks = withoutReview(state.storedMarks ?? marksAt(state.selection.$from));
       tr.deleteSelection();
       const end = placeField(state, tr, tr.selection.from, instruction.trim(), marks, options);
-      tr.setSelection(TextSelection.create(tr.doc, end));
+      tr.setSelection(TextSelection.create(tr.doc, end)).setMeta(closeHistory, true);
     });
   };
 }
@@ -1196,7 +1196,7 @@ export const insertPageNumber = (options: InsertFieldOptions = {}): Command =>
 export const insertDate = (picture = "d MMMM yyyy", options: InsertFieldOptions = {}): Command =>
   insertField(`DATE \\@ "${picture.replace(/"/g, '\\"')}"`, options);
 
-/** What can be cross-referenced: bookmarks (not Word's own, `_…`) and headings. */
+/** What can be cross-referenced: bookmarks (not Word's own, `_â€¦`) and headings. */
 export interface CrossReferenceTargets {
   bookmarks: { name: string; text: string }[];
   headings: { pos: number; level: number; text: string; number: string }[];
@@ -1276,7 +1276,7 @@ export function insertCrossReference(reference: CrossReference): Command {
         (show === "number" ? " \\r" : "") +
         (link ? " \\h" : "");
       const end = placeField(state, tr, tr.selection.from, code, marks, { layout });
-      tr.setSelection(TextSelection.create(tr.doc, end));
+      tr.setSelection(TextSelection.create(tr.doc, end)).setMeta(closeHistory, true);
     });
   };
 }
@@ -1322,7 +1322,7 @@ export function insertTableOfContents(options: TableOfContentsOptions = {}): Com
       }
       const code = `TOC \\o "${from}-${to}"${hyperlinks ? " \\h" : ""} \\z \\u`;
       const end = placeField(state, tr, at, code, [], { layout });
-      tr.setSelection(TextSelection.create(tr.doc, end));
+      tr.setSelection(TextSelection.create(tr.doc, end)).setMeta(closeHistory, true);
     });
   };
 }

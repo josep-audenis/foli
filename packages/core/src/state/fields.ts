@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Word's fields in the editor (ADR-0007, 11.8): finding them over a tree of markers, what a view
  * hides or shows of them, and the selection rules (a field is selected whole when the selection
  * crosses its markers; the caret never rests in what is hidden). Their instructions and results:
@@ -292,12 +292,25 @@ function outOfHidden(fields: readonly Field[], at: number, forward: boolean, cod
   return pos;
 }
 
+/** Whether only what takes no room stands between two positions of a paragraph. */
+function sameSpot(tree: Node, a: number, b: number): boolean {
+  const from = Math.min(a, b);
+  const to = Math.max(a, b);
+  if (tree.resolve(from).parent !== tree.resolve(to).parent) return false;
+  let seen = false;
+  tree.nodesBetween(from, to, (node) => {
+    if (node.isInline && !UNSEEN.has(node.type.name)) seen = true;
+    return !seen;
+  });
+  return !seen;
+}
+
 /**
  * The selection `selection` should be, if it should change: out of hidden ranges, and a range with
  * one end inside a field and the other outside it grown over the whole field (or, when the head
  * comes back into it from outside, stopped before it).
  */
-function settled(state: EditorState, previous: Selection): Selection | null {
+function settled(state: EditorState, previous: Selection, sameDoc: boolean): Selection | null {
   const { selection, doc } = state;
   if (!(selection instanceof TextSelection)) return null;
   const fields = fieldsIn(doc);
@@ -308,6 +321,11 @@ function settled(state: EditorState, previous: Selection): Selection | null {
   let anchor = selection.empty
     ? head
     : outOfHidden(fields, selection.anchor, selection.anchor > selection.head, codes);
+  // A browser reads the two sides of a marker as one place: the range has not moved.
+  if (sameDoc && !selection.empty) {
+    if (!previous.empty && sameSpot(doc, head, previous.head)) head = previous.head;
+    if (sameSpot(doc, anchor, previous.anchor)) anchor = previous.anchor;
+  }
   const inside = (field: Field, pos: number) => pos > field.from && pos < field.to;
   if (anchor !== head)
     for (let again = true, rounds = 0; again && rounds < 64; rounds++) {
@@ -316,14 +334,42 @@ function settled(state: EditorState, previous: Selection): Selection | null {
         if (field.deleted || inside(field, anchor) === inside(field, head)) continue;
         again = true;
         if (inside(field, anchor)) anchor = head > field.from ? field.from : field.to;
-        // The head coming back over the field it had taken in stops on the other side.
-        else if (anchor < field.from) head = previous.head >= field.to ? field.from : field.to;
-        else head = previous.head <= field.from ? field.to : field.from;
+        else {
+          // The head coming back over the field it had taken in stops on the other side.
+          const [near, far] =
+            anchor <= field.from ? [field.to, field.from] : [field.from, field.to];
+          const back = anchor <= field.from ? previous.head >= near : previous.head <= near;
+          head = !sameSpot(doc, head, near) && back ? far : near;
+        }
       }
     }
   return anchor === selection.anchor && head === selection.head
     ? null
     : TextSelection.create(doc, anchor, head);
+}
+
+/**
+ * Where a caret at `pos` really is on its way forward or back: past the field markers and hidden
+ * ranges next to it, up to what can be seen. `pos` itself when no field part is next to it.
+ */
+export function caretStop(state: EditorState, pos: number, forward: boolean): number {
+  const { doc } = state;
+  const next = ($pos: ReturnType<Node["resolve"]>) => (forward ? $pos.nodeAfter : $pos.nodeBefore);
+  if (!isFieldPart(next(doc.resolve(pos)))) return pos;
+  const fields = fieldsIn(doc);
+  const codes = fieldCodesShown(state);
+  let at = pos;
+  for (;;) {
+    const out = outOfHidden(fields, at, forward, codes);
+    const node = next(doc.resolve(out));
+    // With codes shown a field's code and braces are something to see.
+    const seen =
+      !node ||
+      !UNSEEN.has(node.type.name) ||
+      (codes && isFieldPart(node) && node.type.name !== "fieldEnd");
+    if (seen) return out;
+    at = out + (forward ? 1 : -1);
+  }
 }
 
 /** The fields' state, and the selection kept to their rules. */
@@ -341,7 +387,7 @@ export function fieldsPlugin(): Plugin<boolean> {
         fieldCodesShown(before) === fieldCodesShown(after)
       )
         return null;
-      const next = settled(after, before.selection);
+      const next = settled(after, before.selection, before.doc === after.doc);
       return next ? after.tr.setSelection(next) : null;
     },
   });

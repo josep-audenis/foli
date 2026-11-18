@@ -181,7 +181,10 @@ describe("selecting and deleting a field", () => {
     const { from, to } = firstField(editor);
     editor.select(2, 6);
     expect(editor.state.selection.head).toBe(to);
+    // Back to the other side of the end marker only: the same place.
     editor.select(2, to - 1);
+    expect(editor.state.selection.head).toBe(to);
+    editor.select(2, to - 2);
     expect(editor.state.selection.head).toBe(from);
   });
 

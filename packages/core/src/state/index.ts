@@ -41,6 +41,7 @@ export {
   sectionSettings,
 } from "./editor.js";
 export {
+  caretStop,
   type Field,
   type FieldDisplay,
   fieldAround,

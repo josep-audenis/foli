@@ -1,9 +1,10 @@
-import {
+﻿import {
   AllSelection,
   arrowAcrossLeaf,
   autolinkHref,
   CellSelection,
   type Command,
+  caretStop,
   cellsAsTable,
   closeHistory,
   type DocumentSettings,
@@ -1553,6 +1554,24 @@ export class EditorView {
     this.host.ownerDocument.defaultView?.print();
   }
 
+  /**
+   * Left and Right next to a field's markers: the browser's move starts where something can be
+   * seen, or the markers (empty elements) cost WebKit a key press each.
+   */
+  private skipFieldParts(event: KeyboardEvent): void {
+    const forward = event.key === "ArrowRight";
+    if ((!forward && event.key !== "ArrowLeft") || event.ctrlKey || event.altKey || event.metaKey)
+      return;
+    const { selection } = this.state;
+    // Shift extends by itself: an extended DOM selection would lose its anchor to the same spot.
+    if (!(selection instanceof TextSelection) || event.shiftKey || !selection.empty) return;
+    const stop = caretStop(this.state, selection.head, forward);
+    const sel = this.host.ownerDocument.getSelection();
+    if (stop === selection.head || !sel) return;
+    const { node, offset } = this.domFromPos(stop);
+    sel.collapse(node, offset);
+  }
+
   /** F9 and Alt+F9, as in Word. */
   private fieldKey(name: string): boolean {
     if (name === "Alt-F9") {
@@ -3027,6 +3046,7 @@ export class EditorView {
       event.preventDefault();
       return;
     }
+    this.skipFieldParts(event);
     const name = keyName(event);
     if (this.documentEdgeKey(name) || this.fieldKey(name)) {
       event.preventDefault();
@@ -3369,7 +3389,7 @@ export class EditorView {
       end--;
       domEnd--;
     }
-    // A pure insertion or deletion inside repeated text ("aa" → "aaa") could sit at several
+    // A pure insertion or deletion inside repeated text ("aa" â†’ "aaa") could sit at several
     // offsets; slide it back to where the DOM caret says it happened.
     const insertion = end === start;
     if (caret >= 0 && insertion !== (domEnd === start)) {
