@@ -11,13 +11,16 @@
  */
 import type { Attrs, Mark, Node } from "../model/index.js";
 import { TransformError } from "../transform/transform.js";
+import type { SectionJSON } from "../v3/document.js";
 import { RUN_PROPERTY_MARKS } from "../v3/schema.js";
 import { closeHistory } from "./history.js";
 import { MARK_ATTRS } from "./mark.js";
+import { absorbSection, lastSection, resolveSectionChange } from "./sections.js";
 import { TextSelection } from "./selection.js";
 import type { Command, EditorState, Transaction } from "./state.js";
 import { keepTablesApart } from "./tables.js";
 import { RECORDED, trackState, untracked } from "./track.js";
+import { setEnvelopeValue, wordContext } from "./word.js";
 
 export type ChangeKind =
   | "insertion"
@@ -26,6 +29,7 @@ export type ChangeKind =
   | "paragraphInsertion"
   | "paragraphDeletion"
   | "paragraphFormatting"
+  | "sectionFormatting"
   | "rowInsertion"
   | "rowDeletion";
 
@@ -60,9 +64,23 @@ interface Revision {
   date?: string | null;
 }
 
-/** Every tracked change of `doc`, in document order. */
-export function trackedChanges(doc: Node): Change[] {
+/**
+ * Every tracked change of `doc`, in document order; with `last` (the envelope's section) the
+ * change of the last section's setup too, at the document's last paragraph mark.
+ */
+export function trackedChanges(doc: Node, last?: SectionJSON): Change[] {
   const changes: Change[] = [];
+  const end = doc.content.size;
+  if (last?.change && doc.lastChild?.isTextblock)
+    changes.push({
+      kind: "sectionFormatting",
+      id: last.change.id,
+      author: last.change.author,
+      date: last.change.date ?? null,
+      from: end - 1,
+      to: end,
+      move: null,
+    });
   const flush = (run: { mark: Mark; from: number; to: number }) => {
     const attrs = run.mark.attrs;
     changes.push({
@@ -98,6 +116,8 @@ export function trackedChanges(doc: Node): Change[] {
     if (!block.isTextblock) return true;
     const change = block.attrs.formatChange as Revision | null;
     if (change) changes.push(paragraphChange("paragraphFormatting", change, offset, block));
+    const setup = (block.attrs.section as SectionJSON | null | undefined)?.change;
+    if (setup) changes.push(paragraphChange("sectionFormatting", setup, offset, block));
     // Runs of content with the same change mark, extended while the next node has it too.
     let open: { mark: Mark; from: number; to: number }[] = [];
     block.forEach((inline, at) => {
@@ -157,12 +177,20 @@ const MARKERS = new Set([
  * the paragraph's formatting only when nothing else is. In a selection, changes to content only
  * as far as the selection goes (Word accepts the selected part).
  */
-function changesIn(doc: Node, from: number, to: number, filter: ChangeFilter = {}): Change[] {
-  const all = trackedChanges(doc).filter((c) => !filter.author || c.author === filter.author);
+function changesIn(
+  doc: Node,
+  last: SectionJSON | undefined,
+  from: number,
+  to: number,
+  filter: ChangeFilter = {},
+): Change[] {
+  const all = trackedChanges(doc, last).filter((c) => !filter.author || c.author === filter.author);
   let picked: Change[];
   if (from === to) {
     const around = all.filter((c) => c.from <= from && from <= c.to);
-    const own = around.filter((c) => c.kind !== "paragraphFormatting");
+    const own = around.filter(
+      (c) => c.kind !== "paragraphFormatting" && c.kind !== "sectionFormatting",
+    );
     picked = own.length ? own : around;
   } else
     picked = all
@@ -181,7 +209,12 @@ function changesIn(doc: Node, from: number, to: number, filter: ChangeFilter = {
 }
 
 /** Applies accepting (or rejecting) `changes` to `tr`. */
-function resolve(tr: Transaction, changes: readonly Change[], accept: boolean): void {
+function resolve(
+  state: EditorState,
+  tr: Transaction,
+  changes: readonly Change[],
+  accept: boolean,
+): void {
   const schema = tr.doc.type.schema;
   const removed: [number, number][] = [];
   const joins: { pos: number; keepFirst: boolean }[] = [];
@@ -189,7 +222,12 @@ function resolve(tr: Transaction, changes: readonly Change[], accept: boolean): 
   const rowsGoing = new Map<number, [number, number][]>();
   /** Whether whole rows or paragraphs go: what lies inside them must not be removed again. */
   let wholes = false;
-  for (const change of changes) {
+  // Setups first: a section break that goes then hands the next section what is restored.
+  const ordered = [
+    ...changes.filter((c) => c.kind === "sectionFormatting"),
+    ...changes.filter((c) => c.kind !== "sectionFormatting"),
+  ];
+  for (const change of ordered) {
     const { kind, from, to } = change;
     const markType = schema.marks[kind === "formatting" ? "formatChange" : kind];
     switch (kind) {
@@ -231,6 +269,24 @@ function resolve(tr: Transaction, changes: readonly Change[], accept: boolean): 
         tr.setNodeMarkup(start, node.type, attrs);
         break;
       }
+      case "sectionFormatting": {
+        const start = tr.doc.resolve(from).before();
+        const node = tr.doc.nodeAt(start);
+        const own = node?.attrs.section as SectionJSON | null | undefined;
+        if (node && own?.change?.id === change.id)
+          tr.setNodeMarkup(start, node.type, {
+            ...node.attrs,
+            section: resolveSectionChange(own, accept),
+          });
+        else
+          setEnvelopeValue(
+            state,
+            tr,
+            "section",
+            resolveSectionChange(lastSection(state, tr), accept),
+          );
+        break;
+      }
       case "rowInsertion":
       case "rowDeletion": {
         const row = tr.doc.nodeAt(from);
@@ -260,8 +316,16 @@ function resolve(tr: Transaction, changes: readonly Change[], accept: boolean): 
         const end = start + node.nodeSize;
         // A paragraph whose text goes too is removed whole: the next one stays as it is.
         const emptied = covered(node, start + 1, removed);
-        if (goes && tr.doc.resolve(end).nodeAfter?.isTextblock)
-          joins.push({ pos: end, keepFirst: accept && !emptied });
+        const joining = goes && !!tr.doc.resolve(end).nodeAfter?.isTextblock;
+        // A section break that goes: the next section takes over. Without a paragraph to join
+        // (a table follows) the mark stays, no longer ending a section.
+        const section = node.attrs.section as SectionJSON | null | undefined;
+        if (goes && section) {
+          absorbSection(state, tr, section, end);
+          if (!joining)
+            tr.setNodeMarkup(start, node.type, { ...node.attrs, revision: next, section: null });
+        }
+        if (joining) joins.push({ pos: end, keepFirst: accept && !emptied });
         // Nothing to join with (a table follows, or a cell ends): an inserted paragraph left
         // empty goes whole when rejected (Word's rules are restored after: `keepTablesApart`).
         // (Never a cell's only paragraph: a cell ends with one.)
@@ -354,7 +418,9 @@ function command(
     // A change around several selected cells (a row revision, a move's partner) counts once.
     const seen = new Set<string>();
     const changes = range(state)
-      .flatMap((r) => changesIn(state.doc, r.from, r.to, filter))
+      .flatMap((r) =>
+        changesIn(state.doc, wordContext(state)?.envelope.section, r.from, r.to, filter),
+      )
       .filter((c) => {
         const key = `${c.kind} ${c.id} ${c.from} ${c.to}`;
         return !seen.has(key) && !!seen.add(key);
@@ -366,7 +432,7 @@ function command(
       // A document the result would not fit (a structure Word allows and Foli cannot change
       // yet): nothing is changed.
       try {
-        resolve(tr, changes, accept);
+        resolve(state, tr, changes, accept);
       } catch (error) {
         if (error instanceof TransformError) return false;
         throw error;
@@ -396,7 +462,7 @@ function goTo(forward: boolean): Command {
   return (state, dispatch) => {
     // Where the review view hides deleted content, only what it shows.
     const hidden = (trackState(state)?.view ?? "markup") !== "markup";
-    const changes = trackedChanges(state.doc).filter(
+    const changes = trackedChanges(state.doc, wordContext(state)?.envelope.section).filter(
       (c) => !hidden || (c.kind !== "deletion" && c.kind !== "paragraphDeletion"),
     );
     const { from, to } = state.selection;
@@ -407,7 +473,10 @@ function goTo(forward: boolean): Command {
     if (!target) return false;
     if (dispatch) {
       // A paragraph mark: the caret at the end of its paragraph.
-      const mark = target.kind === "paragraphInsertion" || target.kind === "paragraphDeletion";
+      const mark =
+        target.kind === "paragraphInsertion" ||
+        target.kind === "paragraphDeletion" ||
+        target.kind === "sectionFormatting";
       const head = mark ? target.from : target.to;
       dispatch(state.tr.setSelection(TextSelection.create(state.doc, target.from, head)));
     }

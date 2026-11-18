@@ -4,6 +4,7 @@ import { AddMarkStep, RemoveMarkStep, ReplaceStep, type Step } from "../transfor
 import { TransformError } from "../transform/transform.js";
 import { Selection, type SelectionJSON } from "./selection.js";
 import { type Command, type EditorState, Plugin, PluginKey, type Transaction } from "./state.js";
+import { envelopeStepsApply, wordContext } from "./word.js";
 
 /** One undoable unit: inverted steps in the order they apply, and the selection to restore. */
 interface HistoryEvent {
@@ -268,6 +269,19 @@ function historyCommand(redo: boolean): Command {
     if (!hist || !source || !event) return false;
     if (dispatch) {
       const tr = state.tr;
+      // The envelope changed outside history: the event is dropped whole, never half applied.
+      const envelope = wordContext(state)?.envelope;
+      if (envelope && !envelopeStepsApply(envelope, event.steps)) {
+        const rest = source.slice(0, -1);
+        tr.setMeta(historyKey, {
+          done: redo ? hist.done : rest,
+          undone: redo ? rest : hist.undone,
+          prevTime: 0,
+          prevRanges: null,
+        } satisfies HistoryState);
+        dispatch(tr);
+        return true;
+      }
       // Rebasing keeps stored steps applicable; should one still fail, later steps are remapped
       // as if it never existed rather than applied at positions that assumed it.
       let remap: RebaseMapping | null = null;

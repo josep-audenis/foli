@@ -30,6 +30,11 @@ from `commentsExtended`) and sections:
   (`w14:paraId`…). **Runs** become text, tabs and breaks with their properties as marks; tracked
   insertions, deletions and moves, hyperlinks (target from the relationship, or a bookmark),
   bookmarks, comment ranges and references are modeled.
+- **Sections** (11.6): page size and margins, how each starts, `w:cols` (equal or set widths, the
+  line between them), `w:pgNumType`, `w:footnotePr`, `w:endnotePr` and a tracked setup change
+  (`w:sectPrChange`), read and written; a section unchanged is exported byte for byte, a changed
+  one rewrites only what changed. A recorded setup is written with every value spelled out: Word
+  sees no change in what it leaves out.
 - **Tables** (10.4) become `table`, `tableRow` and `tableCell` nodes: the table's, rows' and
   cells' properties (`w:tblPr`, `w:tblGrid`, `w:tblPrEx`, `w:trPr`, `w:tcPr`) as attributes,
   merges as Word writes them (`gridSpan`, `vMerge`), a row inserted or deleted as a tracked

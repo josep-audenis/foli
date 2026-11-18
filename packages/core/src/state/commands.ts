@@ -11,10 +11,12 @@ import {
 } from "../model/index.js";
 import { isSafeLink } from "../schema.js";
 import { TransformError } from "../transform/index.js";
+import type { SectionJSON } from "../v3/document.js";
 import { attempt } from "./attempt.js";
 import { redo, undo } from "./history.js";
 import { openLinkEditor } from "./links.js";
 import { keepLastMark, typedMarks } from "./mark.js";
+import { absorbSection } from "./sections.js";
 import { AllSelection, marksAt, NodeSelection, Selection, TextSelection } from "./selection.js";
 import {
   type Command,
@@ -233,6 +235,15 @@ export function deleteForward(unit: DeleteUnit = "char"): Command {
 }
 
 /**
+ * `first` was joined with the next paragraph at `pos`: if its mark ended a section, the next one
+ * takes over. While tracking the mark stays, recorded as deleted: accepting it does this.
+ */
+function sectionBreakGone(state: EditorState, tr: Transaction, first: Node, pos: number): void {
+  const section = first.attrs.section as SectionJSON | null | undefined;
+  if (section && !trackState(state)?.on) absorbSection(state, tr, section, pos);
+}
+
+/**
  * At the start of a textblock: merges it into the previous textblock, or selects a previous
  * opaque block (a table), as Word does. Does nothing at the start of the first block.
  */
@@ -248,6 +259,7 @@ export const joinBackward: Command = (state, dispatch) => {
       tr.join(boundary);
       // The merged paragraph ends with this one's mark (schema v3: its section break).
       keepLastMark(tr, boundary - before.nodeSize, $pos.parent);
+      sectionBreakGone(state, tr, before, boundary - before.nodeSize);
     });
   // A table: the caret goes to the end of its last cell, as Word moves into it.
   if (before.type.name === "table") {
@@ -276,6 +288,7 @@ export const joinForward: Command = (state, dispatch) => {
     return attempt(state, dispatch, (tr) => {
       tr.join(boundary);
       keepLastMark(tr, $pos.before(), after);
+      sectionBreakGone(state, tr, $pos.parent, $pos.before());
     });
   }
   // A table: the caret goes to the start of its first cell.
@@ -420,6 +433,10 @@ export const insertHardBreak: Command = (state, dispatch) =>
 /** Inserts an explicit page break in place of the selection (Mod-Enter). */
 export const insertPageBreak: Command = (state, dispatch) =>
   insertLeaf("pageBreak", state, dispatch);
+
+/** A column break at the selection: what follows it starts the next column. */
+export const insertColumnBreak: Command = (state, dispatch) =>
+  insertLeaf("columnBreak", state, dispatch);
 
 /** Replaces the selection with an inline leaf node of `name`, keeping the marks typing gets. */
 function insertLeaf(name: string, ...[state, dispatch]: Parameters<Command>): boolean {

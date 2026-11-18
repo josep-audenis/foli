@@ -58,13 +58,23 @@ import {
   DEFAULT_RULES,
   type FlowResult,
   type FlowRules,
+  type FlowSection,
+  type Fragment,
   flowFrom,
   PX_PER_MM,
   type Reuse,
 } from "./layout/flow.js";
-import { type BlockDesc, PAGE_BREAK_ATTR } from "./render.js";
+import { type BlockDesc, type LeafDesc, PAGE_BREAK_ATTR } from "./render.js";
 
-import { EMU_PER_PX, imageSource, PICTURE_ATTR } from "./word/blocks.js";
+import { EMU_PER_PX, imageSource, PICTURE_ATTR, WORD_COLUMN_BREAK_ATTR } from "./word/blocks.js";
+import {
+  BAND_CLASS,
+  bandElement,
+  COLUMN_CLASS,
+  type ColumnsPx,
+  columnsKey,
+  columnsPx,
+} from "./word/columns.js";
 import {
   FLOAT_ANCHORS,
   spacing,
@@ -92,6 +102,7 @@ const TABLE_WORD: WordInfo = {
   pageBreakBefore: false,
   style: null,
   contextual: false,
+  empty: false,
 };
 
 /** Where a table's fragment is: the rows it shows, the header rows drawn again above them. */
@@ -250,18 +261,45 @@ function sheetOf(settings: DocumentSettings, index: number): Sheet {
 /** The style each page element was last given (its `cssText` reads back normalized). */
 const pageSheets = new WeakMap<HTMLElement, string>();
 
-/** A block's section: its page setup, and whether the next block starts a new page. */
+/** A section as laid out: its page setup, its columns, what the flow needs of it. */
+interface SectionLayout {
+  readonly sheet: Sheet;
+  readonly columns: ColumnsPx;
+  /** Columns of different widths: a block is measured in the one it lands in. */
+  readonly unequal: boolean;
+  readonly flow: FlowSection;
+  /** What a block's place depends on, besides its own content. */
+  readonly key: string;
+}
+
+/** A block's section, and whether it is the section's first block. */
 interface BlockLayout {
   readonly sheet: Sheet;
-  readonly breakAfter: boolean;
+  readonly section: SectionLayout;
+  readonly first: boolean;
 }
+
+/** A fragment's place on its page. */
+interface Slot {
+  band: number;
+  column: number;
+  /** The space above its band, when it opens one. */
+  lead: number | undefined;
+  /** A section's empty last paragraph: on the page, taking no room. */
+  mark: boolean;
+}
+
+const slotOf = (fragment: Fragment): Slot => ({
+  band: fragment.band ?? 0,
+  column: fragment.column ?? 0,
+  lead: fragment.lead,
+  mark: !!fragment.mark,
+});
 
 /**
  * The section of each top-level block (the section a paragraph's `section` ends; the
- * envelope's for the blocks after the last such paragraph). A section starts a new page,
- * unless it is continuous with the same page setup as the one before (shortcut: a continuous
- * section with another page setup starts a new page; Word's even and odd page sections do not
- * add a blank page), as `renderDocument` lays sections out.
+ * envelope's for the blocks after the last such paragraph), as `renderDocument` lays sections
+ * out. By position: two paragraphs may end sections with one object.
  */
 function sectionLayouts(doc: ModelNode, last: SectionJSON): BlockLayout[] {
   const sheets = new Map<string, Sheet>();
@@ -277,45 +315,110 @@ function sectionLayouts(doc: ModelNode, last: SectionJSON): BlockLayout[] {
     }
     return found;
   };
-  const sections: SectionJSON[] = [];
-  let section = last;
-  for (let i = doc.childCount - 1; i >= 0; i--) {
-    const own = doc.child(i).attrs.section as SectionJSON | null | undefined;
-    if (own) section = own;
-    sections[i] = section;
-  }
-  // Indexes in document order: the first page setup is 0.
-  sections.forEach(sheet);
-  return sections.map((own, i) => {
-    const next = sections[i + 1];
-    // By position, as `renderDocument`: two paragraphs may end sections with one object.
-    const ends = !!next && !!doc.child(i).attrs.section;
-    const breakAfter = ends && !(next.type === "continuous" && sheet(next).css === sheet(own).css);
-    return { sheet: sheet(own), breakAfter };
+  const spans: { setup: SectionJSON; from: number; to: number }[] = [];
+  let from = 0;
+  doc.forEach((node, _, i) => {
+    const own = node.attrs.section as SectionJSON | null | undefined;
+    if (!own) return;
+    spans.push({ setup: own, from, to: i + 1 });
+    from = i + 1;
   });
+  if (from < doc.childCount || !spans.length) spans.push({ setup: last, from, to: doc.childCount });
+  const sheetByFlow = new Map<FlowSection, Sheet>();
+  const out: BlockLayout[] = [];
+  spans.forEach(({ setup, from: start, to }, s) => {
+    // Indexes in document order: the first page setup is 0.
+    const own = sheet(setup);
+    const next = spans[s + 1]?.setup;
+    const columns = columnsPx(setup);
+    const count = columns.widths.length;
+    const balanced =
+      !!next && count > 1 && next.type === "continuous" && sheet(next).css === own.css;
+    const height = contentHeight(own.settings);
+    const flow: FlowSection = {
+      start: setup.type ?? "nextPage",
+      columns: count,
+      balanced,
+      pageStart: setup.pageNumbers?.start,
+      box: () => ({ height }),
+      samePage: (other) => sheetByFlow.get(other)?.css === own.css,
+    };
+    sheetByFlow.set(flow, own);
+    const section: SectionLayout = {
+      sheet: own,
+      columns,
+      unequal: new Set(columns.widths).size > 1,
+      flow,
+      key: `${own.css}|${flow.start}|${flow.pageStart ?? ""}|${balanced}|${columnsKey(columns)}`,
+    };
+    for (let i = start; i < to; i++) out[i] = { sheet: own, section, first: i === start };
+  });
+  return out;
 }
 
 /**
- * Initial pages (before a flow), moved where needed so that each page holds blocks of one
- * page setup: a block is measured in a page of its own section's width.
+ * Where blocks are before a flow: where they were (`known`), moved where needed so that each
+ * page holds blocks of one page setup and each section has a band of its own: a block is
+ * measured in a column of its own section's width.
  */
-function separateSheets(
+function initialPlaces(
   pages: readonly (readonly number[])[],
   layout: readonly BlockLayout[],
-): number[][] {
-  const css: string[] = [];
-  let floor = 0;
-  return pages.map((list, i) =>
-    list.map((p) => {
-      const want = (layout[i] as BlockLayout).sheet.css;
-      let page = Math.max(p, floor);
-      // Only the last page used so far has a setup: the next one is free.
-      if (css[page] !== undefined && css[page] !== want) page++;
-      css[page] ??= want;
-      floor = page;
+  known: readonly (readonly Slot[] | undefined)[],
+): { pages: number[][]; slots: Slot[][] } {
+  let page = 0;
+  let band = 0;
+  let column = 0;
+  let section: SectionLayout | undefined;
+  const slots: Slot[][] = [];
+  const placed = pages.map((list, i) => {
+    const own = (layout[i] as BlockLayout).section;
+    const out: Slot[] = [];
+    slots[i] = out;
+    return list.map((p, f) => {
+      let target = Math.max(p, page);
+      if (target === page && section && section !== own) {
+        // Only the last page used so far has a setup: the next one is free.
+        if (section.sheet.css !== own.sheet.css) target++;
+        else {
+          band++;
+          column = 0;
+        }
+      }
+      if (target > page) {
+        page = target;
+        band = 0;
+        column = 0;
+      }
+      section = own;
+      const was = known[i]?.[f];
+      column = Math.min(Math.max(column, was?.column ?? 0), own.columns.widths.length - 1);
+      out.push({
+        band,
+        column,
+        lead: was?.band === band ? was.lead : undefined,
+        mark: was?.mark ?? false,
+      });
       return page;
-    }),
-  );
+    });
+  });
+  return { pages: placed, slots };
+}
+
+/** Makes `list` the children of `parent`, moving as little as possible; returns what it removed. */
+function fillElement(parent: HTMLElement, list: readonly HTMLElement[], removed: WeakSet<Node>) {
+  let at = parent.firstChild;
+  for (const dom of list) {
+    if (dom === at) at = at.nextSibling;
+    else parent.insertBefore(dom, at);
+  }
+  // What is left after the last placed one: strays, and blocks of later pages.
+  while (at) {
+    const next: ChildNode | null = at.nextSibling;
+    at.remove();
+    removed.add(at);
+    at = next;
+  }
 }
 
 /**
@@ -344,6 +447,13 @@ export class EditorView {
   private cellCaret: number | null = null;
   /** The pages of each top-level item (a paragraph's fragments, a table's wrappers), by node. */
   private itemPages = new Map<ModelNode, readonly number[]>();
+  /** Where on its page each of those is (band and column). */
+  private itemSlots = new Map<ModelNode, readonly Slot[]>();
+  /** Each page's band elements, as last placed. */
+  private bands = new WeakMap<
+    HTMLElement,
+    { key: string; band: HTMLElement; columns: HTMLElement[] }[]
+  >();
   /** Each table as last rendered, by node. */
   private frames = new Map<ModelNode, FrameState>();
   /** The table each wrapper element draws (part of). */
@@ -606,7 +716,11 @@ export class EditorView {
       this.review = review;
       this.word = null;
     }
-    const docChanged = state.doc !== this.state.doc || reviewChanged;
+    // The last section's setup lives in the envelope: changing it leaves the tree as it is.
+    const docChanged =
+      state.doc !== this.state.doc ||
+      reviewChanged ||
+      wordContext(state)?.envelope.section !== wordContext(this.state)?.envelope.section;
     const selectionChanged = !state.selection.eq(this.state.selection);
     this.state = state;
     if (docChanged) this.render();
@@ -678,11 +792,21 @@ export class EditorView {
     // The blocks the view renders (paragraphs in table cells among them) and the page flow's
     // items (top-level paragraphs and opaque blocks, and tables).
     const { units, items } = collect(doc, context.resolver);
-    word.prepare(units.map((unit) => unit.node));
+    word.prepare(
+      units.map((unit) => unit.node),
+      (i) => {
+        const unit = units[i] as Unit;
+        const previous = units[i - 1];
+        // Siblings: one ends where the other starts.
+        return unit.cell && previous && previous.pos + previous.node.nodeSize === unit.pos
+          ? { node: previous.node, cell: unit.cell }
+          : null;
+      },
+    );
     const layout = sectionLayouts(doc, context.envelope.section);
     doc.forEach((node, _, i) => {
-      const { sheet, breakAfter } = layout[i] as BlockLayout;
-      const key = `${sheet.css}${breakAfter ? "|break" : ""}`;
+      const { section, first } = layout[i] as BlockLayout;
+      const key = `${section.key}${first ? "|first" : ""}`;
       const before = this.layoutKeys.get(node);
       if (before !== undefined && before !== key) this.stale.add(node);
       this.layoutKeys.set(node, key);
@@ -801,7 +925,13 @@ export class EditorView {
       const desc = blocks[item.unit] as WordBlockDesc;
       return desc.fragments.map((_, f) => (last = Math.max(last, before?.[f] ?? last)));
     });
-    pages = separateSheets(pages, layout);
+    const initial = initialPlaces(
+      pages,
+      layout,
+      items.map((_, i) => this.itemSlots.get(doc.child(i))),
+    );
+    pages = initial.pages;
+    let slots = initial.slots;
     const elementsOf = (item: FlowItem, i: number): readonly HTMLElement[] =>
       item.frame
         ? (frames.get(doc.child(i)) as FrameState).wrappers
@@ -809,6 +939,7 @@ export class EditorView {
     this.place(
       items.map((item, i) => elementsOf(item, i)),
       pages,
+      slots,
       layout,
     );
     if (!this.composing) {
@@ -821,7 +952,10 @@ export class EditorView {
       if (dropLines)
         for (const desc of blocks) {
           const measure = this.measures.get(desc.node);
-          if (measure) delete measure.lines;
+          if (measure) {
+            delete measure.lines;
+            delete measure.widths;
+          }
         }
       const nodes = items.map((_, i) => doc.child(i));
       // A block's spacing depends on its neighbours' styles: reuse stops a block earlier.
@@ -839,6 +973,38 @@ export class EditorView {
         const found = measureOf(desc);
         found.lines ??= measureLines(desc, layoutPx());
         return found.lines;
+      };
+      /** A block's height and lines at a column's width, wherever it is now. */
+      const atWidth = (desc: BlockDesc, width: number, kept: boolean): WidthMeasure => {
+        const measure = measureOf(desc);
+        const widths = measure.widths ?? new Map<number, WidthMeasure>();
+        measure.widths = widths;
+        const known = widths.get(width);
+        if (known) return known;
+        const read = <T>(measure: () => T): T => {
+          for (const { style } of desc.fragments) {
+            style.boxSizing = "border-box";
+            style.width = `${width}px`;
+          }
+          const value = measure();
+          for (const { style } of desc.fragments) {
+            style.boxSizing = "";
+            style.width = "";
+          }
+          return value;
+        };
+        const { height } = read(() => measureBox(desc, layoutPx()));
+        let all: Lines | undefined;
+        const found: WidthMeasure = {
+          height,
+          all: () => {
+            all ??= read(() => measureLines(desc, layoutPx()));
+            return all;
+          },
+          lines: () => (kept ? [height] : found.all().bottoms),
+        };
+        widths.set(width, found);
+        return found;
       };
       const tableOf = (frame: Frame, i: number) => {
         let found = this.measures.get(frame.node);
@@ -859,16 +1025,18 @@ export class EditorView {
         item.frame ? TABLE_WORD : (blocks[item.unit] as WordBlockDesc).word,
       );
       const boxes = items.map((item, i) => {
-        const pageHeight = contentHeight((layout[i] as BlockLayout).sheet.settings);
+        const own = layout[i] as BlockLayout;
+        const pageHeight = contentHeight(own.sheet.settings);
         if (item.frame) {
           const frame = item.frame;
           const measure = tableOf(frame, i);
-          // A section break after it, or a page break before the next paragraph, ends its page.
-          const breakAfter =
-            (layout[i] as BlockLayout).breakAfter || !!words[i + 1]?.pageBreakBefore;
-          return tableBox(frame, measure, pageHeight, breakAfter, () =>
-            breaksOf(frame, measure, blocks, pageHeight, lines),
-          );
+          // A page break before the next paragraph ends its page.
+          return {
+            ...tableBox(frame, measure, pageHeight, !!words[i + 1]?.pageBreakBefore, () =>
+              breaksOf(frame, measure, blocks, pageHeight, lines),
+            ),
+            section: own.section.flow,
+          };
         }
         const desc = blocks[item.unit] as WordBlockDesc;
         return wordBox(
@@ -877,13 +1045,19 @@ export class EditorView {
           desc,
           measureOf(desc),
           () => lines(desc),
-          layout[i] as BlockLayout,
+          own,
+          atWidth,
+          context.resolver.addsParagraphSpacing,
         );
       });
-      const result = flowFrom(boxes, contentHeight(this.editor.settings), WORD_RULES, reuse);
+      const rules = context.resolver.addsParagraphSpacing
+        ? { ...WORD_RULES, addSpacing: true }
+        : WORD_RULES;
+      const result = flowFrom(boxes, contentHeight(this.editor.settings), rules, reuse);
       this.flowed = { nodes, result };
       this.stale.clear();
       const flowed = result.fragments;
+      slots = flowed.map((fragments) => fragments.map(slotOf));
       // Paragraphs: split where their fragments start. Tables: the rows each fragment shows,
       // and their blocks split where a row is.
       const splitsOf = new Map<number, number[]>();
@@ -893,10 +1067,15 @@ export class EditorView {
         if (item.unit !== undefined) {
           const desc = blocks[item.unit] as WordBlockDesc;
           const contentStart = ((units[item.unit] as Unit).pos as number) + 1;
+          const { section } = layout[i] as BlockLayout;
           splitsOf.set(
             item.unit,
             fragments.slice(1).map((fragment) => {
-              const offset = lines(desc).starts[fragment.fromLine] as number;
+              // Line numbers are those of the column the fragment is in.
+              const measured = section.unequal
+                ? atWidth(desc, section.columns.widths[fragment.column ?? 0] as number, false).all()
+                : lines(desc);
+              const offset = measured.starts[fragment.fromLine] as number;
               // Never split a grapheme cluster across pages.
               return clusterBoundary(doc, contentStart + offset, false) - contentStart;
             }),
@@ -952,10 +1131,11 @@ export class EditorView {
           ? ((frames.get(doc.child(i)) as FrameState).wrappers[0] as HTMLElement)
           : (blocks[item.unit] as WordBlockDesc).dom,
       );
-      applyGaps(firsts, pages, boxes);
+      applyGaps(firsts, result.gaps);
       this.place(
         items.map((item, i) => elementsOf(item, i)),
         pages,
+        slots,
         layout,
       );
     }
@@ -975,6 +1155,7 @@ export class EditorView {
     this.starts = units.map((unit) => unit.pos);
     this.indexOf = new Map(blocks.map((desc, i) => [desc, i]));
     this.itemPages = new Map(items.map((_, i) => [doc.child(i), pages[i] ?? []]));
+    this.itemSlots = new Map(items.map((_, i) => [doc.child(i), slots[i] ?? []]));
     this.owner = new Map(
       blocks.flatMap((desc) => desc.fragments.map((fragment) => [fragment, desc] as const)),
     );
@@ -1038,25 +1219,33 @@ export class EditorView {
 
   /**
    * Puts each fragment of each block into its page (pages are non-decreasing in document
-   * order), creating and removing pages as needed, and gives each page the page setup of its
-   * blocks' section (one per page: `separateSheets`, section breaks). Anything else in the host
-   * or a page (stray DOM) is removed.
+   * order) and, on a page with several sections or columns, into its band's column, creating
+   * and removing pages as needed, and gives each page the page setup of its first section.
+   * Anything else in the host or a page (stray DOM) is removed.
    */
   private place(
     elements: readonly (readonly HTMLElement[])[],
     pages: readonly (readonly number[])[],
+    slots: readonly (readonly Slot[])[],
     layout: readonly BlockLayout[],
   ): void {
     const { host } = this;
     const items = elements.flatMap((list, i) =>
-      list.map((dom, f) => ({ dom, page: pages[i]?.[f] ?? 0 })),
+      list.map((dom, f) => ({
+        dom,
+        page: pages[i]?.[f] ?? 0,
+        slot: slots[i]?.[f] as Slot,
+        section: (layout[i] as BlockLayout).section,
+      })),
     );
     const count = (items[items.length - 1]?.page ?? 0) + 1;
     const sheets: Sheet[] = [];
     pages.forEach((list, i) => {
       for (const p of list) sheets[p] ??= (layout[i] as BlockLayout).sheet;
     });
-    // A page no block starts on (none yet) takes the setup of the page before it.
+    // A page no block is on has the setup of the page after it (Word's blank page before an
+    // even or odd page section); the last, one with no blocks yet, of the page before it.
+    for (let p = count - 1; p >= 0; p--) if (sheets[p + 1]) sheets[p] ??= sheets[p + 1] as Sheet;
     for (let p = 0; p < count; p++)
       sheets[p] ??=
         sheets[p - 1] ?? (layout[0] as BlockLayout | undefined)?.sheet ?? this.lastSheet();
@@ -1079,19 +1268,54 @@ export class EditorView {
     let i = 0;
     for (let p = 0; p < count; p++) {
       const page = this.pages[p] as HTMLElement;
-      let at = page.firstChild;
-      for (; i < items.length && items[i]?.page === p; i++) {
-        const { dom } = items[i] as (typeof items)[number];
-        if (dom === at) at = at.nextSibling;
-        else page.insertBefore(dom, at);
+      const first = i;
+      while (i < items.length && items[i]?.page === p) i++;
+      const onPage = items.slice(first, i);
+      for (const { dom, slot } of onPage) {
+        const position = slot.mark ? "absolute" : "";
+        if (dom.style.position !== position) dom.style.position = position;
       }
-      // What is left after the last placed block: strays, and blocks of later pages.
-      while (at) {
-        const next: ChildNode | null = at.nextSibling;
-        at.remove();
-        this.viewRemoved.add(at);
-        at = next;
+      // One section in one column: the blocks are the page's children.
+      const last = onPage[onPage.length - 1];
+      if (!last || (!last.slot.band && last.section.columns.widths.length === 1)) {
+        fillElement(
+          page,
+          onPage.map((item) => item.dom),
+          this.viewRemoved,
+        );
+        this.bands.delete(page);
+        continue;
       }
+      const known = this.bands.get(page) ?? [];
+      const bands: typeof known = [];
+      for (const { section, slot } of onPage) {
+        if (bands[slot.band]) continue;
+        const key = columnsKey(section.columns);
+        const reused = known[slot.band];
+        bands[slot.band] =
+          reused?.key === key
+            ? reused
+            : { key, ...bandElement(host.ownerDocument, section.columns) };
+      }
+      this.bands.set(page, bands);
+      fillElement(
+        page,
+        bands.map((b) => b.band),
+        this.viewRemoved,
+      );
+      bands.forEach((band, b) => {
+        const inBand = onPage.filter((item) => item.slot.band === b);
+        const lead = inBand[0]?.slot.lead;
+        const margin = lead ? `${lead}px` : "";
+        if (band.band.style.marginTop !== margin) band.band.style.marginTop = margin;
+        band.columns.forEach((column, c) => {
+          fillElement(
+            column,
+            inBand.filter((item) => item.slot.column === c).map((item) => item.dom),
+            this.viewRemoved,
+          );
+        });
+      });
     }
     // Pages no longer needed and stray DOM in the host: all after the last page by now.
     let rest = (this.pages[count - 1] as HTMLElement).nextSibling;
@@ -1259,16 +1483,17 @@ export class EditorView {
   }
 
   /**
-   * Whether `node` holds blocks rather than content: the host, a page, or a table's wrapper,
-   * table, rows and cells.
+   * Whether `node` holds blocks rather than content: the host, a page, a band or column of one,
+   * or a table's wrapper, table, rows and cells.
    */
   private holdsBlocks(node: Node): boolean {
+    if (node === this.host || this.pages.includes(node as HTMLElement)) return true;
+    if (node.nodeType !== Node.ELEMENT_NODE) return false;
+    const element = node as Element;
     return (
-      node === this.host ||
-      this.pages.includes(node as HTMLElement) ||
-      (node.nodeType === Node.ELEMENT_NODE &&
-        (node as Element).hasAttribute(FRAME_ATTR) &&
-        !(node as Element).closest(`[${REPEATED_ATTR}]`))
+      element.classList.contains(BAND_CLASS) ||
+      element.classList.contains(COLUMN_CLASS) ||
+      (element.hasAttribute(FRAME_ATTR) && !element.closest(`[${REPEATED_ATTR}]`))
     );
   }
 
@@ -2106,6 +2331,19 @@ export class EditorView {
       }
       return;
     }
+    // Word's blank page before an even or odd page section holds nothing: the caret goes to the
+    // section after it (the browser would put it at the document's start).
+    const blank = event.target as HTMLElement;
+    if (!event.shiftKey && this.pages.includes(blank) && !blank.firstChild) {
+      const pos = this.posFromDOM(blank, 0);
+      if (pos !== null) {
+        event.preventDefault();
+        if (!this.hasFocus()) this.host.focus({ preventScroll: true });
+        this.dispatch(this.state.tr.setSelection(Selection.near(this.state.doc.resolve(pos))));
+        this.writeSelection(true);
+      }
+      return;
+    }
     const element = this.blockElement(event.target as Node | null);
     const owner = element ? this.owner.get(element) : undefined;
     const index = owner ? (this.indexOf.get(owner) ?? -1) : -1;
@@ -2723,8 +2961,17 @@ export interface Measure {
   /** Vertical padding and border, which every fragment of a split block repeats. */
   box: number;
   lines?: Lines;
+  /** At the widths of columns it may land in, when a section's columns differ. */
+  widths?: Map<number, WidthMeasure>;
   /** A table's rows and blocks. */
   table?: TableMeasure;
+}
+
+/** A block measured at a width other than where it is. */
+interface WidthMeasure {
+  height: number;
+  lines(): readonly number[];
+  all(): Lines;
 }
 
 /** The innermost cell around pos (the position before it) and its table's, or null. */
@@ -2937,8 +3184,8 @@ function measureBox(desc: BlockDesc, scale: number): Measure {
 /**
  * What the flow needs of a block: its measurement, its lines (on demand), Word's spacing before
  * and after (next to its neighbours), keep with next, keep lines together (not for a block
- * taller than a page, or one with a page break in it), page breaks ending their line's page,
- * and a page break before the next block ending this one's page.
+ * taller than a page, or one with a break in it), page and column breaks ending their line's
+ * page or column, and a page break before the next block ending this one's page.
  */
 function wordBox(
   words: readonly WordInfo[],
@@ -2947,63 +3194,63 @@ function wordBox(
   measure: Measure,
   lines: () => Lines,
   layout: BlockLayout,
+  atWidth: (desc: BlockDesc, width: number, kept: boolean) => WidthMeasure,
+  adds: boolean,
 ): BlockBox {
   const pageHeight = contentHeight(layout.sheet.settings);
+  const { section } = layout;
   const next = words[i + 1] ? { word: words[i + 1] as WordInfo } : undefined;
-  const { before, after } = spacing(words[i - 1], desc.word, next?.word);
-  const pageBreaks = desc.leaves.filter(
-    (leaf) =>
-      leaf.dom.nodeType !== Node.TEXT_NODE && (leaf.dom as Element).hasAttribute(PAGE_BREAK_ATTR),
-  );
-  const hasBreak = pageBreaks.length > 0;
-  const kept = desc.word.keepLines && !hasBreak && measure.height <= pageHeight;
+  const { before, after } = spacing(words[i - 1], desc.word, next?.word, adds);
+  const leavesWith = (attr: string) =>
+    desc.leaves.filter(
+      (leaf) => leaf.dom.nodeType !== Node.TEXT_NODE && (leaf.dom as Element).hasAttribute(attr),
+    );
+  const pageBreaks = leavesWith(PAGE_BREAK_ATTR);
+  const columnBreaks = leavesWith(WORD_COLUMN_BREAK_ATTR);
+  const hasBreak = pageBreaks.length + columnBreaks.length > 0;
+  const keep = desc.word.keepLines && !hasBreak;
+  const kept = keep && measure.height <= pageHeight;
   const bottoms = () => (kept ? [measure.height] : lines().bottoms);
+  /** The block as it is in `column`, when the columns' widths differ. */
+  const inColumn = (column: number) =>
+    atWidth(desc, section.columns.widths[column] as number, keep);
+  // The line holding a break, among the column's lines: the last starting at or before it.
+  const linesOf = (leaves: readonly LeafDesc[], column = 0) => {
+    if (!leaves.length) return [];
+    const { starts } = section.unequal ? inColumn(column).all() : lines();
+    return leaves.map((leaf) => {
+      let line = starts.length - 1;
+      while (line > 0 && (starts[line] as number) > leaf.offset) line--;
+      return line;
+    });
+  };
   return {
     height: measure.height,
     marginTop: before,
     marginBottom: after,
     keepWithNext: desc.word.keepNext,
     pageHeight,
+    section: section.flow,
+    sectionMark: !!desc.node.attrs.section && desc.word.empty,
+    inColumn: section.unequal ? inColumn : undefined,
     lines: bottoms,
-    breaksAfter: () => {
-      // The line holding each break: the last one starting at or before it.
-      const breaks = pageBreaks.map((leaf) => {
-        const { starts } = lines();
-        let line = starts.length - 1;
-        while (line > 0 && (starts[line] as number) > leaf.offset) line--;
-        return line;
-      });
-      if (next?.word.pageBreakBefore || layout.breakAfter) breaks.push(bottoms().length - 1);
+    columnBreaksAfter: (column) => linesOf(columnBreaks, column),
+    breaksAfter: (column = 0) => {
+      const breaks = linesOf(pageBreaks, column);
+      if (next?.word.pageBreakBefore)
+        breaks.push((section.unequal ? inColumn(column).lines() : bottoms()).length - 1);
       return breaks;
     },
   };
 }
 
 /**
- * Writes Word's space above each v3 block as its top margin: the space after the block above
- * and the space before this one, on the same page; at the top of a page only its space before,
- * and only on the first page or after an explicit break (a page the text flowed onto drops it).
- * Written only when it changes.
+ * Writes Word's space above each v3 block, as the flow worked it out, as its top margin. Written
+ * only when it changes.
  */
-function applyGaps(
-  firsts: readonly HTMLElement[],
-  pages: readonly (readonly number[])[],
-  boxes: readonly BlockBox[],
-): void {
+function applyGaps(firsts: readonly HTMLElement[], spaces: readonly number[]): void {
   firsts.forEach((dom, i) => {
-    const page = pages[i]?.[0] ?? 0;
-    const above = pages[i - 1];
-    const box = boxes[i] as BlockBox;
-    let gap: number;
-    if (above && above[above.length - 1] === page)
-      gap = (boxes[i - 1] as BlockBox).marginBottom + box.marginTop;
-    else {
-      const prior = boxes[i - 1];
-      const breaks = prior?.breaksAfter?.() ?? [];
-      const forced =
-        page === 0 || (!!prior && breaks.length > 0 && breaks.includes(prior.lines().length - 1));
-      gap = forced ? box.marginTop : 0;
-    }
+    const gap = spaces[i] ?? 0;
     if (gaps.get(dom) === gap) return;
     gaps.set(dom, gap);
     dom.style.marginTop = `${gap}px`;

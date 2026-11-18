@@ -9,6 +9,7 @@
  * shortcut: v2 and v3 editing live side by side until 8.7d makes v3 the only schema; then these
  * become the commands themselves.
  */
+import { deepEqual } from "../model/attrs.js";
 import type { Attrs, Mark, MarkType, Node } from "../model/index.js";
 import { Step, StepResult } from "../transform/steps.js";
 import type { CommentJSON, FoliDocument } from "../v3/document.js";
@@ -108,10 +109,79 @@ export function setComments(
   return tr;
 }
 
+/** What `EnvelopeStep` can change (ADR-0007; `settings` and controls join it with their tasks). */
+export type EnvelopeKey = "section";
+
+/**
+ * Changes one value of the envelope (the last section's setup) from `before` to `after`. A step,
+ * unlike `withEnvelope`, so undo and redo take it with the edit it belongs to. It leaves the tree
+ * as it is; history refuses an undo whose `before` no longer holds.
+ */
+export class EnvelopeStep extends Step {
+  constructor(
+    readonly key: EnvelopeKey,
+    readonly before: WordEnvelope[EnvelopeKey],
+    readonly after: WordEnvelope[EnvelopeKey],
+  ) {
+    super();
+  }
+
+  apply(doc: Node): StepResult {
+    return StepResult.ok(doc);
+  }
+
+  invert(): Step {
+    return new EnvelopeStep(this.key, this.after, this.before);
+  }
+
+  map(): Step {
+    return this;
+  }
+}
+
+/** The value of `key` as `steps` leave it, from `value`. */
+function afterEnvelopeSteps(
+  key: EnvelopeKey,
+  value: WordEnvelope[EnvelopeKey],
+  steps: readonly Step[],
+): WordEnvelope[EnvelopeKey] {
+  let current = value;
+  for (const step of steps)
+    if (step instanceof EnvelopeStep && step.key === key) current = step.after;
+  return current;
+}
+
+/** Makes `tr` set the envelope's `key` to `value`, from what it holds after `tr` so far. */
+export function setEnvelopeValue(
+  state: EditorState,
+  tr: Transaction,
+  key: EnvelopeKey,
+  value: WordEnvelope[EnvelopeKey],
+): Transaction {
+  const envelope = wordContext(state)?.envelope;
+  if (!envelope) return tr;
+  return tr.step(new EnvelopeStep(key, afterEnvelopeSteps(key, envelope[key], tr.steps), value));
+}
+
+/**
+ * Whether stored `steps` can apply to `envelope`: every `EnvelopeStep` finds what it expects,
+ * given the ones before it. A change made outside history makes them stale.
+ */
+export function envelopeStepsApply(envelope: WordEnvelope, steps: readonly Step[]): boolean {
+  let section = envelope.section;
+  for (const step of steps) {
+    if (!(step instanceof EnvelopeStep)) continue;
+    if (!deepEqual(section, step.before)) return false;
+    section = step.after;
+  }
+  return true;
+}
+
 /**
  * The plugin that gives commands a v3 document's envelope. A transaction changes it with
  * `withEnvelope` (a new list's numbering definition); undo leaves such additions, as Word does.
- * Comments change only through `CommentStep`s, which undo takes back.
+ * Comments change only through `CommentStep`s and the last section through `EnvelopeStep`s,
+ * which undo takes back.
  */
 export function wordPlugin(envelope: WordEnvelope): Plugin<WordContext> {
   // Not a secret: only tells documents apart.
@@ -124,8 +194,10 @@ export function wordPlugin(envelope: WordEnvelope): Plugin<WordContext> {
       apply: (tr, value) => {
         const next = tr.getMeta(key) as WordEnvelope | undefined;
         const comments = applyCommentSteps(value.envelope.comments, tr.steps);
-        if (!next && comments === value.envelope.comments) return value;
-        const envelope = { ...(next ?? value.envelope), comments: comments as CommentJSON[] };
+        const base = next ?? value.envelope;
+        const section = afterEnvelopeSteps("section", base.section, tr.steps);
+        if (!next && comments === value.envelope.comments && section === base.section) return value;
+        const envelope = { ...base, section, comments: comments as CommentJSON[] };
         // Only comments changed: they do not affect formatting, the resolver stays.
         const resolver = next ? new Resolver(envelope) : value.resolver;
         return { envelope, resolver, id: value.id };

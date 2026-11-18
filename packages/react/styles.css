@@ -193,6 +193,31 @@
   flex: 0 0 5em;
 }
 
+.foli-setup-field {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 0 1 12em;
+}
+
+.foli-setup-field select,
+.foli-setup-field input {
+  flex: none;
+  height: 32px;
+  font: inherit;
+}
+
+.foli-setup-check {
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+}
+
+.foli-setup-check input {
+  width: 16px;
+  height: 16px;
+}
+
 .foli-menu-swatch {
   width: 16px;
   height: 16px;

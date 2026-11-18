@@ -430,7 +430,7 @@ describe("EditorView on a schema v3 document", () => {
     expect(link?.querySelector("span")?.style.fontStyle).toBe("italic");
   });
 
-  it("writes Word's space above each block: before, then after + before, contextual dropped", () => {
+  it("writes Word's space above each block: before, then the larger of after and before, contextual dropped", () => {
     const { host } = mount(
       p({ spacing: { before: 240, after: 120 } }, text("a")),
       p({ spacing: { before: 60, after: 120 } }, text("b")),
@@ -438,10 +438,54 @@ describe("EditorView on a schema v3 document", () => {
       p({ style: "List", spacing: { before: 60, after: 120 } }, text("d")),
     );
     // jsdom lays nothing out: every block is on the first page.
-    expect(blocks(host).map((b) => b.style.marginTop)).toEqual(["16px", "12px", "12px", "0px"]);
+    expect(blocks(host).map((b) => b.style.marginTop)).toEqual(["16px", "8px", "8px", "0px"]);
   });
 
-  it("flows with Word's spacing: the space after and before add up", () => {
+  it("adds the spaces in a document that says so, and between a cell's paragraphs", () => {
+    const cell = {
+      type: "tableCell",
+      content: [
+        p({ spacing: { after: 120 } }, text("x")),
+        p({ spacing: { before: 60 } }, text("y")),
+      ],
+    };
+    const { host } = mountDocument({
+      ...documentOf(
+        p({ spacing: { after: 120 } }, text("a")),
+        p({ spacing: { before: 60 } }, text("b")),
+        {
+          type: "table",
+          attrs: { grid: [2000] },
+          content: [{ type: "tableRow", content: [cell] }],
+        },
+        p({}, text("z")),
+      ),
+      settings: { doNotUseHTMLParagraphAutoSpacing: true },
+    });
+    expect(blocks(host)[1]?.style.marginTop).toBe("12px");
+    const [first, second] = host.querySelectorAll<HTMLElement>("td p");
+    // Nothing that paints: margins, which collapse to the larger, 8 and 8 + 4 px.
+    expect(first?.style.paddingBottom).toBe("");
+    expect(first?.style.marginBottom).toBe("8px");
+    expect(second?.style.marginTop).toBe("12px");
+  });
+
+  it("takes nothing from the space before after a contextual paragraph when adding", () => {
+    const pair = (settings?: { doNotUseHTMLParagraphAutoSpacing: boolean }) => {
+      const { host } = mountDocument({
+        ...documentOf(
+          p({ contextualSpacing: true, spacing: { after: 120 } }, text("a")),
+          p({ spacing: { before: 240 } }, text("b")),
+        ),
+        ...(settings ? { settings } : {}),
+      });
+      return blocks(host)[1]?.style.marginTop;
+    };
+    expect(pair()).toBe("8px"); // 16 - 8
+    expect(pair({ doNotUseHTMLParagraphAutoSpacing: true })).toBe("16px");
+  });
+
+  it("flows with Word's spacing: the larger of the space after and before", () => {
     // Every paragraph 20 px tall: the flow is arithmetic (Letter, inch margins: 864 px).
     const rect = Element.prototype.getBoundingClientRect;
     Element.prototype.getBoundingClientRect = function (this: Element) {
@@ -450,11 +494,10 @@ describe("EditorView on a schema v3 document", () => {
     };
     try {
       const spaced = { spacing: { before: 1500, after: 1500 } }; // 100 px each
-      const { host } = mount(...Array.from({ length: 5 }, (_, i) => p(spaced, text(`${i}`))));
-      // 100 + 20, then 200 + 20 three times: 780 px; a fifth (1000 px) goes on. As CSS
-      // (margins collapsing to 100 px) all five would fit.
+      const { host } = mount(...Array.from({ length: 8 }, (_, i) => p(spaced, text(`${i}`))));
+      // 100 + 20, then 100 + 20 six times: 840 px; an eighth (960 px) goes on.
       const pages = [...host.querySelectorAll(".foli-page")].map((page) => page.textContent);
-      expect(pages).toEqual(["0123", "4"]);
+      expect(pages).toEqual(["0123456", "7"]);
     } finally {
       Element.prototype.getBoundingClientRect = rect;
     }

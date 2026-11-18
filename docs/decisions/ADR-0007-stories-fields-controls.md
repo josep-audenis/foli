@@ -162,8 +162,12 @@ content, ext? }`. `content` is a `doc` of the body's blocks. `noteType` is Word'
   fills columns where it filled pages. A band above a continuous break is balanced. A
   `columnBreak` ends its column. Blocks go into `.foli-column` elements; positions still map
   through block descriptors.
-- **Sections.** Even and odd page sections add Word's blank page; continuous sections with a new
-  page setup keep starting a page.
+- **Sections.** Even and odd page sections add Word's blank page, of the next section's size;
+  continuous sections with a new page setup keep starting a page. Measured in 11.6 against Word's
+  PDFs: the paragraph ending a section takes no room when empty; the next band starts after the
+  tallest column and the space after it; between two paragraphs goes the larger of the space
+  after and the space before, not their sum. A changed page setup is tracked as `w:sectPrChange`
+  (`SectionJSON.change`), the recorded setup spelling out its values, or Word sees no change.
 - **Fixed point.** Headers can hold `PAGE` and `NUMPAGES`, whose width can change a height. Layout
   repeats at most twice, then keeps the result.
 
