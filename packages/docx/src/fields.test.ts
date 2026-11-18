@@ -105,6 +105,19 @@ describe("fields and controls as edits leave them", () => {
     expect(out).not.toContain("fldChar");
   });
 
+  it("leaves fields alone where the file itself has them unbalanced or verbatim", async () => {
+    const begin = '<w:r><w:fldChar w:fldCharType="begin"/></w:r>';
+    const end = '<w:r><w:fldChar w:fldCharType="end"/></w:r>';
+    const code = "<w:r><w:instrText>QUOTE x</w:instrText></w:r>";
+    const broken = await read(p(begin + code));
+    expect(await written(broken.document, broken.package)).toContain("instrText");
+    const locked = '<w:sdtPr><w:lock w:val="contentLocked"/><w:text/></w:sdtPr>';
+    const split = await read(p(sdt(begin + code, locked) + end));
+    const out = await written(split.document, split.package);
+    expect(out.match(/fldCharType="end"/g)).toHaveLength(1);
+    expect(out.match(/fldCharType="begin"/g)).toHaveLength(1);
+  });
+
   it("writes a simple field split over paragraphs as a complex one", async () => {
     const { document, package: pkg } = await read(p(simple(run("result"))) + p(""));
     const blocks = document.content.content as NodeJSON[];

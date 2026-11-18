@@ -206,6 +206,29 @@ describe("fitPaste", () => {
     expect(fitted.doc.toJSON()).toEqual(docOf(p({}, text("kept"))));
   });
 
+  it("keeps a document's own control and a note whose reference is being moved", () => {
+    const paragraph = {
+      type: "paragraph",
+      attrs: { controls: ["c"] },
+      content: [text("kept"), { type: "noteReference", attrs: { story: "footnote:1" } }],
+    };
+    const editor = editorOf([p({})], {
+      controls: { c: { kind: "richText" } },
+      stories: { "footnote:1": { kind: "footnote", content: docOf(p({})) } },
+    });
+    const fitted = fitPaste(editor.state, docOf(paragraph));
+    expect(fitted.doc.toJSON()).toEqual(docOf(paragraph));
+    const held = editorOf(
+      [p({}, { type: "noteReference", attrs: { story: "footnote:1" } }), p({})],
+      {
+        stories: { "footnote:1": { kind: "footnote", content: docOf(p({})) } },
+      },
+    );
+    held.select(held.state.doc.content.size - 1);
+    const pasted = fitPaste(held.state, docOf(paragraph)).doc.toJSON();
+    expect(JSON.stringify(pasted)).not.toContain("noteReference");
+  });
+
   it("uses the target's style of the same name, adds the others with free ids", () => {
     const editor = editorOf([p({}, text("x"))]);
     const definitions: WordDefinitions = {

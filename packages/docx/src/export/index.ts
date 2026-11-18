@@ -208,7 +208,7 @@ export async function exportDocx(
   original?: DocxPackage,
   options: ExportOptions = {},
 ): Promise<Uint8Array> {
-  const doc = balanced(withThreadIds(parseDocument(document), original));
+  const doc = balanced(withThreadIds(parseDocument(document), original), original);
   refuseNotYetWritten(doc);
   // Before the app is asked for any picture's bytes.
   const reference = original ? undefined : packageReference(doc);

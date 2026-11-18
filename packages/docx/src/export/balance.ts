@@ -6,6 +6,7 @@
  * when written.
  */
 import type { FoliDocument, NodeJSON } from "@folijs/core";
+import type { DocxPackage } from "../package.js";
 
 function paragraphsOf(nodes: readonly NodeJSON[], out: NodeJSON[] = []): NodeJSON[] {
   for (const node of nodes) {
@@ -66,8 +67,38 @@ function balanceControls(paragraphs: readonly NodeJSON[]): void {
   }
 }
 
-/** `doc` (a validated copy, changed in place) with its fields and inline controls writable. */
-export function balanced(doc: FoliDocument): FoliDocument {
+/** Whether the field characters of a part's XML open and close properly. */
+function fieldsWhole(xml: string): boolean {
+  let depth = 0;
+  for (const [, type] of xml.matchAll(/fldCharType\s*=\s*["'](begin|separate|end)["']/g)) {
+    if (type === "begin") depth++;
+    else if (depth === 0) return false;
+    else if (type === "end") depth--;
+  }
+  return depth === 0;
+}
+
+/** Whether content kept verbatim among `nodes` holds field characters. */
+function holdsVerbatimField(nodes: readonly NodeJSON[]): boolean {
+  return nodes.some(
+    (node) =>
+      (typeof node.attrs?.xml === "string" && node.attrs.xml.includes("fldChar")) ||
+      holdsVerbatimField(node.content ?? []),
+  );
+}
+
+/**
+ * `doc` (a validated copy, changed in place) with its fields and inline controls writable. Field
+ * parts are only repaired where an edit can be what broke them: not in a package holding broken
+ * fields of its own (Word reads those in its way), nor where verbatim content holds field
+ * characters, whose partners the model cannot see.
+ */
+export function balanced(doc: FoliDocument, original?: DocxPackage): FoliDocument {
+  const packageWhole =
+    !original ||
+    original.parts
+      .filter((part) => /^\/word\/[^/]+\.xml$/.test(part.name))
+      .every((part) => fieldsWhole(original.text(part.name)));
   const trees = [
     doc.content.content ?? [],
     ...doc.comments.map((c) => c.content),
@@ -75,7 +106,7 @@ export function balanced(doc: FoliDocument): FoliDocument {
   ];
   for (const tree of trees) {
     const paragraphs = paragraphsOf(tree);
-    balanceFields(paragraphs);
+    if (packageWhole && !holdsVerbatimField(tree)) balanceFields(paragraphs);
     balanceControls(paragraphs);
   }
   return doc;

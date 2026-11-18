@@ -7,8 +7,9 @@
 //
 // `make` exports every corpus document with fields or controls, in its body or stories, to
 // <dir>/foli: as imported (<name>.docx) and edited (<name>-edited.docx: "Foli edit" added to the
-// result of a REF, SEQ or MERGEFIELD field and to the first text of each control; a block control
-// of several blocks split by a paragraph put between them). The corpus's own controls show their
+// result of a REF, SEQ or MERGEFIELD field and to the first text of each control; text added to
+// every header or footer holding a field, so Foli writes those fields; a block control of several
+// blocks split by a paragraph put between them). The corpus's own controls show their
 // placeholders and stay verbatim, so 00-controls adds an inline and a block control to a document
 // (and must see both edited). `check` needs Word's data for every file made: each opened; an
 // unchanged one has the original's fields, controls, bookmarks and sections; an edited one Foli's
@@ -67,6 +68,16 @@ function edited(document) {
       }
     });
   }
+  // A header or footer holding a field: rewritten by Foli, with the field in it.
+  let stories = 0;
+  for (const story of Object.values(copy.stories ?? {})) {
+    if (story.kind !== "header" && story.kind !== "footer") continue;
+    if (!JSON.stringify(story.content).includes('"fieldCode"')) continue;
+    const last = story.content.content.at(-1);
+    if (last.type !== "paragraph") continue;
+    last.content = [...(last.content ?? []), { type: "text", text: ` ${EDIT}` }];
+    stories++;
+  }
   // A block control of two blocks or more: a paragraph outside it between them.
   const blocks = copy.content.content;
   let split = 0;
@@ -77,7 +88,7 @@ function edited(document) {
       split = 1;
     }
   }
-  return { document: copy, expected: { editedFields, controls, split } };
+  return { document: copy, expected: { editedFields, controls, split, stories } };
 }
 
 if (mode === "make") {
@@ -161,6 +172,21 @@ for (const file of readdirSync(join(dir, "foli")).filter((n) => n.endsWith(".doc
       if (word.controls.length !== base.controls.length + want.split)
         problems.push(`${word.controls.length} controls, not ${base.controls.length + want.split}`);
       if (word.fields.length !== base.fields.length) problems.push("the fields' number changed");
+      if (want.stories) {
+        let seen = 0;
+        for (const side of ["headers", "footers"])
+          word.sections.forEach((section, s) => {
+            for (const [variant, story] of Object.entries(section[side])) {
+              if (!story.text.includes(EDIT)) continue;
+              seen++;
+              // A page field Word computes again reads as it does in the original.
+              const before = base.sections[s]?.[side][variant]?.text ?? "";
+              if (!story.text.startsWith(before.trim()))
+                problems.push(`section ${s + 1} ${side} ${variant}: its field is not as it was`);
+            }
+          });
+        if (!seen) problems.push("no edited header or footer");
+      }
     }
   }
   if (problems.length) failed++;
