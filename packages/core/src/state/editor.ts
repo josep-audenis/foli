@@ -51,6 +51,7 @@ import { setAlign, setHighlight, setTextColor } from "./format.js";
 import { history, redo, undo } from "./history.js";
 import { removeLink, setLink } from "./links.js";
 import { liftListItem, listKeymap, sinkListItem, toggleList, wrapInList } from "./lists.js";
+import { notesPlugin } from "./notes.js";
 import {
   acceptAllChanges,
   acceptChange,
@@ -404,6 +405,7 @@ export function createEditor({
     fieldsPlugin(),
     controlsPlugin(),
     commentsPlugin(),
+    notesPlugin(),
     tableKeymap(),
     listKeymap(),
     baseKeymap(),

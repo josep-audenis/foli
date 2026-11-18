@@ -87,9 +87,12 @@ writeFileSync(appEntry, `export { FoliEditor } from "${dist("react")}";\n`);
  * allowed): controls' properties patched into the kept `w:sdtPr`, new controls, glossary text.
  * View and React raised in 11.9 (92.9 and 125.6 kB, 95.2 and 128.9 allowed): controls' frames,
  * lists and date picker in the view, the controls menu and properties dialog.
+ * Core raised in 11.10 (75.6 kB, 77.1 allowed): notes (numbers from the settings and sections, the
+ * insert, options and convert commands, keeping a note with its reference while tracking, notes
+ * carried on the clipboard).
  */
 const BUNDLES = [
-  { name: "@folijs/core", entry: dist("core"), budget: 76_500 },
+  { name: "@folijs/core", entry: dist("core"), budget: 79_000 },
   { name: "@folijs/view", entry: dist("view"), budget: 97_500 },
   { name: "@folijs/react", entry: dist("react"), budget: 132_000 },
   { name: "FoliEditor only", entry: appEntry, budget: 132_000 },

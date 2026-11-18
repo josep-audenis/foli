@@ -131,6 +131,23 @@ export {
 } from "./lists.js";
 export { typedMarks } from "./mark.js";
 export {
+  convertNotes,
+  type InsertNoteOptions,
+  insertNote,
+  isNote,
+  type NoteKind,
+  type NoteNumber,
+  type NoteNumberOptions,
+  noteAtSelection,
+  noteKindOf,
+  noteNumbers,
+  noteProperties,
+  noteTextStart,
+  noteTexts,
+  referencesIn,
+  setNoteProperties,
+} from "./notes.js";
+export {
   insertPicture,
   type NewPicture,
   selectedPicture,
@@ -236,6 +253,7 @@ export {
 } from "./word.js";
 export {
   copiedDefinitions,
+  type FittedPaste,
   fitPaste,
   fitPastedV2,
   type WordDefinitions,

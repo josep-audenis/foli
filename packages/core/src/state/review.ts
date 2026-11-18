@@ -21,7 +21,14 @@ import { TextSelection } from "./selection.js";
 import type { Command, EditorState, Transaction } from "./state.js";
 import { keepTablesApart } from "./tables.js";
 import { RECORDED, trackState, untracked } from "./track.js";
-import { StoryStep, setEnvelopeValue, storyBody, storyState, wordContext } from "./word.js";
+import {
+  StoryStep,
+  setEnvelopeValue,
+  storyAfter,
+  storyBody,
+  storyState,
+  wordContext,
+} from "./word.js";
 
 export type ChangeKind =
   | "insertion"
@@ -407,6 +414,30 @@ function join(tr: Transaction, pos: number, keepFirst: boolean): void {
   if (keepFirst)
     for (const key of MARK_ATTRS) (attrs as Record<string, unknown>)[key] = last.attrs[key] ?? null;
   tr.setNodeMarkup(start, first.type, attrs);
+}
+
+/**
+ * Accepts or rejects every insertion or deletion recorded in story `id`, in `tr`: a note's, when
+ * the reference's own record is settled and the note stays.
+ */
+export function resolveStoryChanges(
+  state: EditorState,
+  tr: Transaction,
+  id: string,
+  accept: boolean,
+  kind: "insertion" | "deletion",
+): void {
+  const story = storyAfter(state, tr, id);
+  if (!story) return;
+  const paragraph = kind === "insertion" ? "paragraphInsertion" : "paragraphDeletion";
+  const changes = changesIn(story.doc, undefined, 0, story.doc.content.size).filter(
+    (c) => c.kind === kind || c.kind === paragraph,
+  );
+  if (!changes.length) return;
+  const inner = storyState(state, story.doc);
+  const storyTr = inner.tr;
+  resolve(inner, storyTr, changes, accept);
+  tr.step(new StoryStep(id, story, { ...story, doc: storyTr.doc }));
 }
 
 function command(

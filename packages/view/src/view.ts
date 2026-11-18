@@ -49,6 +49,7 @@
   Selection,
   Slice,
   type StorySide,
+  StoryStep,
   type StoryView,
   sectionSettings,
   setColumnWidth,
@@ -3696,7 +3697,7 @@ export class EditorView {
     // One empty paragraph: nothing to paste (a lone opaque block is something).
     const only = pasted?.doc.childCount === 1 ? pasted.doc.firstChild : null;
     if (!pasted || (only?.isTextblock && !only.content.size)) return false;
-    const { doc, open, envelope } = pasted;
+    const { doc, open, envelope, notes } = pasted;
     // As a slice (text joins the text around the caret); where that cannot be (an opaque block
     // at an end), as whole blocks at the caret.
     const asSlice = (tr: Transaction) => {
@@ -3737,6 +3738,7 @@ export class EditorView {
           withEnvelope(tr, envelope);
           setComments(tr, current.comments, envelope.comments);
         }
+        for (const { id, story } of notes ?? []) tr.step(new StoryStep(id, null, story));
       } catch (error) {
         if (error instanceof TransformError) continue;
         throw error;
