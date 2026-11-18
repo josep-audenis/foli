@@ -1186,11 +1186,24 @@ Each task is a PR on `phase-11/sections-fields`, the build green after each.
   results; a line with text and a picture keeps the room below the baseline, only a line of
   pictures alone ends at their foot; a story's height comes from the read-only renderer, the open
   one is drawn by the editing renderer.)
-- [ ] 11.8 Fields: shown with their results (shaded when selected, as Word does), selected and
+- [x] 11.8 Fields: shown with their results (shaded when selected, as Word does), selected and
   deleted whole, updated on demand (one field, all, before print and PDF): `PAGE`, `NUMPAGES`,
   `SECTIONPAGES`, `DATE`, `REF`, `PAGEREF`, `SEQ`, `TOC` built from heading styles with their
   pages; insert a page number, the date, a cross-reference and a table of contents; merge
-  fields filled from data through the API; field codes shown and hidden.
+  fields filled from data through the API; field codes shown and hidden. (Done: `fieldsIn`, the
+  selection rules as a plugin, `updateFields` with Word's switches, one undo step, tracked, stories
+  included; `TOC` built with `TOC1`-`TOC9`, `_Toc` bookmarks, links, nested `PAGEREF`, a right tab;
+  `insertField`, `insertPageNumber`, `insertDate`, `insertCrossReference`,
+  `insertTableOfContents`; code ranges hidden in both renderers, Alt+F9, F9, Ctrl+A then F9, the
+  selected field shaded, `view.print()` updating first; a Fields menu and cross-reference dialog.
+  On the corpus with Word's pages every field works out to Word's result and nothing changes
+  (`fields-word.test.ts`); `word-fields.spec.ts` in three engines; `field-roundtrip.mjs` has Word
+  read updated, rebuilt (in a content control too), merged (tracked) and inserted fields: all 24
+  files pass; `\#` pictures match 558 cases read from Word. Shortcuts: unknown
+  fields, unfollowed switches and missing bookmarks keep their result and are reported;
+  `MERGEFORMAT` keeps the first run's look, not word by word; a multi-paragraph `REF` gets line
+  breaks; table of contents entries are plain text; English date names; codes shown are not
+  editable, no Shift+F9 or Ctrl+F9; the browser's own Print does not update fields.)
 - [ ] 11.9 Content controls: shown with their bounds, title and placeholder; plain and rich
   text edited inside (and only inside when locked), drop-down and combo box lists, date picker,
   check box, repeating sections kept; filled from the UI and through the API (by tag or id),

@@ -39,6 +39,9 @@ const historyOp = "historyOp";
 /** Set this meta on a transaction to make it an undo step of its own (no merging either side). */
 export const closeHistory = "closeHistory";
 
+/** Set this meta on a transaction to make it part of the undo step before it. */
+export const joinHistory = "joinHistory";
+
 /**
  * On a body transaction carrying a story's change: the story's id and its own transaction, which
  * decides what typing joins, as the body's does for body typing.
@@ -101,6 +104,7 @@ export function history({ newGroupDelay = 500, depth = 100 }: HistoryOptions = {
         const merge =
           last !== undefined &&
           (root !== undefined ||
+            tr.getMeta(joinHistory) === true ||
             (!tr.getMeta(closeHistory) &&
               tr.time - hist.prevTime < newGroupDelay &&
               (hist.prevStory ?? null) === (story?.id ?? null) &&

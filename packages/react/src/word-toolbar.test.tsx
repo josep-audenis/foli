@@ -2,6 +2,8 @@
 import {
   createEditor,
   type FoliDocument,
+  fieldCodesShown,
+  fieldsIn,
   insertTable,
   NodeSelection,
   type OpenStory,
@@ -74,6 +76,8 @@ describe("FoliToolbar on a schema v3 document", () => {
         open = null;
         editor.storyChanged();
       },
+      fieldLayout: null,
+      updateFields: () => ({ updated: 0, unchanged: 0, rebuilt: 0, skipped: [] }),
     };
     render(<FoliToolbar editor={editor} />);
     const menu = screen.getByRole("button", { name: "Header" });
@@ -600,5 +604,118 @@ describe("FoliCanvas's pictures", () => {
     } finally {
       if (descriptor) Object.defineProperty(HTMLImageElement.prototype, "src", descriptor);
     }
+  });
+
+  describe("the fields menu", () => {
+    const openMenu = () => fireEvent.click(screen.getByRole("button", { name: "Fields" }));
+    const pick = (name: string) => {
+      openMenu();
+      fireEvent.click(screen.getByRole("menuitem", { name }));
+    };
+
+    it("inserts a page number and the date at the selection, each one undo step", () => {
+      const editor = setup();
+      act(() => editor.select(6));
+      pick("Page number");
+      pick("Date");
+      expect(fieldsIn(editor.state.doc).map((f) => f.name)).toEqual(["PAGE", "DATE"]);
+      act(() => {
+        editor.commands.undo();
+      });
+      expect(fieldsIn(editor.state.doc).map((f) => f.name)).toEqual(["PAGE"]);
+    });
+
+    it("inserts a table of contents and updates fields through the view when there is one", () => {
+      const editor = createEditor({
+        document: {
+          ...document3,
+          content: {
+            type: "doc",
+            content: [
+              { type: "paragraph" },
+              {
+                type: "paragraph",
+                attrs: { style: "Heading1" },
+                content: [{ type: "text", text: "Title" }],
+              },
+            ],
+          },
+        },
+      });
+      const updates = vi.fn(() => ({ updated: 0, unchanged: 0, rebuilt: 0, skipped: [] }));
+      editor.storyView = {
+        open: null,
+        edit: () => false,
+        close: () => {},
+        fieldLayout: { pages: 7, pageAt: () => ({ number: 7, sectionPages: 7 }) },
+        updateFields: updates,
+      };
+      render(<FoliToolbar editor={editor} />);
+      act(() => editor.select(1));
+      pick("Table of contents");
+      const [contents, page] = fieldsIn(editor.state.doc);
+      expect(contents?.result).toBe("Title\t7");
+      expect(page?.name).toBe("PAGEREF");
+      // The page numbers again, once the table has moved the headings.
+      expect(updates).toHaveBeenCalledTimes(1);
+      pick("Update all fields");
+      expect(updates).toHaveBeenCalledTimes(2);
+      expect(updates.mock.calls[1]).toEqual([{}, editor]);
+    });
+
+    it("shows the codes as a checked item; without a heading or bookmark, no reference", () => {
+      const editor = setup();
+      openMenu();
+      expect(
+        screen.getByRole("menuitem", { name: "Cross-reference…" }).getAttribute("aria-disabled"),
+      ).toBe("true");
+      const item = screen.getByRole("menuitemcheckbox", { name: "Show field codes" });
+      expect(item.getAttribute("aria-checked")).toBe("false");
+      fireEvent.click(item);
+      expect(fieldCodesShown(editor.state)).toBe(true);
+      openMenu();
+      expect(
+        screen
+          .getByRole("menuitemcheckbox", { name: "Show field codes" })
+          .getAttribute("aria-checked"),
+      ).toBe("true");
+    });
+
+    it("inserts a cross-reference from its dialog; Escape leaves it", () => {
+      const editor = createEditor({
+        document: {
+          ...document3,
+          content: {
+            type: "doc",
+            content: [
+              {
+                type: "paragraph",
+                attrs: { style: "Heading1" },
+                content: [{ type: "text", text: "Title" }],
+              },
+              { type: "paragraph" },
+            ],
+          },
+        },
+      });
+      render(<FoliToolbar editor={editor} />);
+      act(() => editor.select(8));
+      pick("Cross-reference…");
+      const dialog = screen.getByRole("dialog", { name: "Insert cross-reference" });
+      expect(document.activeElement).toBe(screen.getByLabelText("Refer to"));
+      expect(dialog.getAttribute("aria-modal")).toBe("true");
+      // Tab stays in the dialog, round from its first control to its last.
+      fireEvent.keyDown(screen.getByLabelText("Refer to"), { key: "Tab", shiftKey: true });
+      expect(document.activeElement).toBe(screen.getByRole("button", { name: "Cancel" }));
+      fireEvent.keyDown(screen.getByRole("button", { name: "Cancel" }), { key: "Tab" });
+      expect(document.activeElement).toBe(screen.getByLabelText("Refer to"));
+      fireEvent.keyDown(dialog, { key: "Escape" });
+      expect(screen.queryByRole("dialog")).toBeNull();
+      pick("Cross-reference…");
+      fireEvent.change(screen.getByLabelText("Show"), { target: { value: "number" } });
+      fireEvent.click(screen.getByLabelText("Link to it"));
+      fireEvent.click(screen.getByRole("button", { name: "Insert" }));
+      expect(fieldsIn(editor.state.doc)[0]?.instruction).toMatch(/^REF _Ref\d+ \\r$/);
+    });
   });
 });

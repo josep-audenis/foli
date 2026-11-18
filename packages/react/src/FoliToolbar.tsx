@@ -8,21 +8,29 @@ import {
   canOutdent,
   changeIndent,
   colorAt,
+  crossReferenceTargets,
   deleteColumns,
   deleteRows,
   deleteTable,
   documentSections,
   type Editor,
   type EditorState,
+  type FieldLayout,
+  fieldCodesShown,
+  fieldsIn,
   fontFamilyAt,
   fontSizeAt,
   insertColumn,
   insertColumnBreak,
+  insertCrossReference,
+  insertDate,
   insertPageBreak,
+  insertPageNumber,
   insertPicture,
   insertRow,
   insertSectionBreak,
   insertTable,
+  insertTableOfContents,
   isHeaderRow,
   isSafeHref,
   lineSpacingAt,
@@ -69,12 +77,15 @@ import {
   splitCell,
   tableStyleAt,
   tableStyles,
+  toggleFieldCodes,
   toggleHeaderRow,
   toggleList,
   toggleMark,
   trackState,
+  type UpdateFieldsOptions,
   undo,
   undoDepth,
+  updateFields,
   wordContext,
 } from "@folijs/core";
 import { type EditorViewOptions, EMU_PER_PX, measureImageFile, textWidthEmu } from "@folijs/view";
@@ -164,7 +175,7 @@ interface Action {
   label: string;
   /** The command it runs; with `dialog`, whether it applies: the dialog does the rest. */
   command: Command;
-  dialog?: "insertTable" | "pageSetup";
+  dialog?: "insertTable" | "pageSetup" | "crossReference";
   checked?: (state: EditorState) => boolean;
   /** It takes the focus where it belongs (into a story, or back to the body). */
   movesFocus?: boolean;
@@ -327,6 +338,72 @@ function storyActions(body: Editor): readonly Action[] {
             )(state, dispatch)
           : false;
       },
+    },
+  ];
+}
+
+/**
+ * The fields menu: what can be inserted at the selection, updating (the view's pages when there is
+ * one) and the codes shown or hidden.
+ */
+function fieldActions(body: Editor): readonly Action[] {
+  const layout = () => body.storyView?.fieldLayout ?? null;
+  const active = () => {
+    const open = body.storyView?.open;
+    return (open && body.story(open.id)) || body;
+  };
+  const update = (editor: Editor, options: UpdateFieldsOptions) =>
+    body.storyView ? body.storyView.updateFields(options, editor) : updateFields(editor, options);
+  return [
+    {
+      key: "pageNumber",
+      label: "Page number",
+      command: (state, dispatch) => insertPageNumber({ layout: layout() })(state, dispatch),
+    },
+    { key: "date", label: "Date", command: insertDate() },
+    {
+      key: "crossReference",
+      label: "Cross-reference…",
+      dialog: "crossReference",
+      command: (state) => {
+        const { bookmarks, headings } = crossReferenceTargets(state);
+        return insertPageBreak(state) && bookmarks.length + headings.length > 0;
+      },
+    },
+    {
+      key: "tableOfContents",
+      label: "Table of contents",
+      command: (state, dispatch) => {
+        const done = insertTableOfContents({ layout: layout() })(state, dispatch);
+        // Its own lines moved the headings: their page numbers follow, in the same undo step.
+        if (done && dispatch)
+          update(body, { only: (field) => field.parent?.name === "TOC", continues: true });
+        return done;
+      },
+    },
+    {
+      key: "updateSelected",
+      label: "Update selected fields",
+      command: (state, dispatch) => {
+        if (!fieldsIn(state.doc).length) return false;
+        const { from, to } = state.selection;
+        if (dispatch) update(active(), { only: { from, to } });
+        return true;
+      },
+    },
+    {
+      key: "updateAll",
+      label: "Update all fields",
+      command: (_state, dispatch) => {
+        if (dispatch) update(body, {});
+        return true;
+      },
+    },
+    {
+      key: "fieldCodes",
+      label: "Show field codes",
+      checked: fieldCodesShown,
+      command: toggleFieldCodes,
     },
   ];
 }
@@ -704,6 +781,13 @@ const GROUPS: Item[][] = [
       enabled: (state) => wordContext(state) !== null,
       actions: storyActions,
     },
+    {
+      key: "fields",
+      label: "Fields",
+      text: "Fields",
+      enabled: (state) => wordContext(state) !== null,
+      actions: fieldActions,
+    },
   ],
 ];
 
@@ -842,6 +926,15 @@ export function FoliToolbar({
               ? null
               : current,
           );
+          // The cross-reference dialog inserts at the selection it opened on.
+          setReferenceDialog((current) =>
+            current &&
+            (!transactions.length ||
+              transactions.some((tr) => tr.docChanged) ||
+              !state.selection.eq(current.selection))
+              ? null
+              : current,
+          );
           // So is the page setup dialog: its section may have changed.
           setSetupDialog((current) =>
             current &&
@@ -872,6 +965,7 @@ export function FoliToolbar({
         setTableDialog(null);
         setPictureDialog(null);
         setSetupDialog(null);
+        setReferenceDialog(null);
         setDialog((current) =>
           current
             ? { ...current, request: current.request + 1 }
@@ -909,6 +1003,14 @@ export function FoliToolbar({
   } | null>(null);
   useEffect(() => {
     if (disabled) setSetupDialog(null);
+  }, [disabled]);
+  // The cross-reference dialog (from the fields menu).
+  const [referenceDialog, setReferenceDialog] = useState<{
+    restore: HTMLElement | null;
+    selection: EditorState["selection"];
+  } | null>(null);
+  useEffect(() => {
+    if (disabled) setReferenceDialog(null);
   }, [disabled]);
   // The picture dialog: inserts at (or edits the picture at `pos`) the selection it opened on.
   const [pictureDialog, setPictureDialog] = useState<{
@@ -1054,6 +1156,16 @@ export function FoliToolbar({
                         state={editor.state}
                         onPick={(action, pointer) => {
                           setMenu(null);
+                          if (action.dialog === "crossReference") {
+                            setDialog(null);
+                            setTableDialog(null);
+                            setSetupDialog(null);
+                            setReferenceDialog({
+                              restore: buttons.current[i] ?? null,
+                              selection: editor.state.selection,
+                            });
+                            return;
+                          }
                           if (action.dialog === "pageSetup") {
                             setDialog(null);
                             setTableDialog(null);
@@ -1136,6 +1248,18 @@ export function FoliToolbar({
             const { restore } = setupDialog;
             setSetupDialog(null);
             if (applied && onClickCommand) onClickCommand();
+            else restore?.focus();
+          }}
+        />
+      )}
+      {referenceDialog && !disabled && (
+        <CrossReferenceDialog
+          editor={editor}
+          layout={() => body.storyView?.fieldLayout ?? null}
+          onClose={(inserted) => {
+            const { restore } = referenceDialog;
+            setReferenceDialog(null);
+            if (inserted && onClickCommand) onClickCommand();
             else restore?.focus();
           }}
         />
@@ -1536,6 +1660,113 @@ function InsertTableDialog({
         {error && (
           <p id={`${id}-error`} className="foli-link-error" role="alert">
             {messages[error]}
+          </p>
+        )}
+      </form>
+    </div>
+  );
+}
+
+/**
+ * The cross-reference dialog: what to refer to (the document's bookmarks and headings), what to
+ * show of it, whether it links there; Insert and Cancel; Escape cancels.
+ */
+function CrossReferenceDialog({
+  editor,
+  layout,
+  onClose,
+}: {
+  editor: Editor;
+  layout: () => FieldLayout | null;
+  onClose: (inserted: boolean) => void;
+}) {
+  const [{ bookmarks, headings }] = useState(() => crossReferenceTargets(editor.state));
+  const options = [
+    ...headings.map((h) => ({
+      value: `h${h.pos}`,
+      label: `${"\u00a0".repeat((h.level - 1) * 2)}${h.number ? `${h.number} ` : ""}${h.text}`,
+    })),
+    ...bookmarks.map((b) => ({ value: `b${b.name}`, label: `Bookmark: ${b.name}` })),
+  ];
+  const [target, setTarget] = useState(options[0]?.value ?? "");
+  const [show, setShow] = useState<"text" | "page" | "number">("text");
+  const [link, setLink] = useState(true);
+  const [failed, setFailed] = useState(false);
+  const first = useRef<HTMLSelectElement>(null);
+  const id = useId();
+  useEffect(() => {
+    first.current?.focus();
+  }, []);
+  const insert = (event: FormEvent) => {
+    event.preventDefault();
+    const to = target[0] === "h" ? Number(target.slice(1)) : target.slice(1);
+    if (editor.run(insertCrossReference({ to, show, link, layout: layout() }))) onClose(true);
+    else setFailed(true);
+  };
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="Insert cross-reference"
+      className="foli-link-dialog foli-table-dialog"
+      onKeyDown={(event) => {
+        if (event.key === "Escape") {
+          event.preventDefault();
+          onClose(false);
+        }
+        if (event.key !== "Tab") return;
+        // Tab goes round inside the dialog.
+        const stops = [
+          ...event.currentTarget.querySelectorAll<HTMLElement>("select, input, button"),
+        ];
+        const at = stops.indexOf(event.target as HTMLElement);
+        const next = (at + (event.shiftKey ? -1 : 1) + stops.length) % stops.length;
+        event.preventDefault();
+        stops[next]?.focus();
+      }}
+    >
+      <form onSubmit={insert} noValidate>
+        <label htmlFor={`${id}-target`}>Refer to</label>
+        <select
+          ref={first}
+          id={`${id}-target`}
+          value={target}
+          onChange={(event) => {
+            setTarget(event.target.value);
+            setFailed(false);
+          }}
+        >
+          {options.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+        <label htmlFor={`${id}-show`}>Show</label>
+        <select
+          id={`${id}-show`}
+          value={show}
+          onChange={(event) => setShow(event.target.value as typeof show)}
+        >
+          <option value="text">Its text</option>
+          <option value="page">Its page number</option>
+          <option value="number">Its paragraph number</option>
+        </select>
+        <label>
+          <input
+            type="checkbox"
+            checked={link}
+            onChange={(event) => setLink(event.target.checked)}
+          />
+          Link to it
+        </label>
+        <button type="submit">Insert</button>
+        <button type="button" onClick={() => onClose(false)}>
+          Cancel
+        </button>
+        {failed && (
+          <p className="foli-link-error" role="alert">
+            A cross-reference cannot be inserted here.
           </p>
         )}
       </form>
