@@ -44,7 +44,7 @@ const TABLE = table(
 
 function documentOf(...blocks: NodeJSON[]): FoliDocument {
   return {
-    schemaVersion: 4,
+    schemaVersion: 5,
     section: {},
     defaults: {},
     styles: [{ id: "Normal", type: "paragraph", name: "Normal", isDefault: true }],

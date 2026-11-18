@@ -12,7 +12,7 @@ const DOT = "data:image/png;base64,iVBORw0KGgo=";
 const editorOf = (content: NodeJSON[], tracking = false) =>
   createEditor({
     document: {
-      schemaVersion: 4,
+      schemaVersion: 5,
       section: {},
       defaults: {},
       styles: [{ id: "Normal", type: "paragraph", name: "Normal", isDefault: true }],

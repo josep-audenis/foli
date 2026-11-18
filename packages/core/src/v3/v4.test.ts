@@ -213,7 +213,7 @@ describe("schema v3 → v4", () => {
   it("changes the version only", () => {
     const v3 = envelope({ schemaVersion: 3, content: doc(p("kept")) });
     const migrated = parseDocument(v3);
-    expect(migrated.schemaVersion).toBe(4);
+    expect(migrated.schemaVersion).toBe(5);
     expect(migrated).toEqual({ ...parseDocument(envelope({ content: doc(p("kept")) })) });
   });
 

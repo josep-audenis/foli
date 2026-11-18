@@ -143,7 +143,14 @@ function paragraphChange(
 }
 const INLINE: ReadonlySet<ChangeKind> = new Set(["insertion", "deletion", "formatting"]);
 /** Inline nodes no change marks: they stay when the text around them goes. */
-const MARKERS = new Set(["bookmarkStart", "bookmarkEnd", "commentStart", "commentEnd"]);
+const MARKERS = new Set([
+  "bookmarkStart",
+  "bookmarkEnd",
+  "commentStart",
+  "commentEnd",
+  "controlStart",
+  "controlEnd",
+]);
 
 /**
  * The changes `from..to` touches, with their moves' other ends. At a caret: the ones around it,

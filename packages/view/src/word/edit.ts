@@ -287,7 +287,14 @@ export class WordRenderer {
       const child = node.child(i);
       // A floating picture is not in the line: a paragraph holding only one shows its empty line.
       if (
-        !["bookmarkStart", "bookmarkEnd", "commentStart", "commentEnd"].includes(child.type.name) &&
+        ![
+          "bookmarkStart",
+          "bookmarkEnd",
+          "commentStart",
+          "commentEnd",
+          "controlStart",
+          "controlEnd",
+        ].includes(child.type.name) &&
         !(child.type.name === "picture" && child.attrs.float)
       )
         last = child;

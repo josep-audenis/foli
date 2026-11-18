@@ -68,14 +68,16 @@ writeFileSync(appEntry, `export { FoliEditor } from "${dist("react")}";\n`);
  * image files through the upload hook. React raised in 10.8e (87.9 kB): the toolbar's picture
  * dialog (insert from a file, alt text, size). Docx raised in 10.9b (44.9 kB): floating pictures
  * read and written (`wp:anchor` positions and wrapping, new anchors). View raised in 10.9c
- * (63.5 kB): floating pictures drawn as CSS floats at their paragraphs' start.
+ * (63.5 kB): floating pictures drawn as CSS floats at their paragraphs' start. All raised in
+ * 11.3 (core 53.7, view 65.4, React 89.8, docx 46.9 kB): schema v5 (the field, control and note
+ * nodes, the checks of stories, controls and settings), carried by every package.
  */
 const BUNDLES = [
-  { name: "@folijs/core", entry: dist("core"), budget: 54_000 },
-  { name: "@folijs/view", entry: dist("view"), budget: 65_000 },
-  { name: "@folijs/react", entry: dist("react"), budget: 90_000 },
-  { name: "FoliEditor only", entry: appEntry, budget: 90_000 },
-  { name: "@folijs/docx", entry: dist("docx"), budget: 46_000 },
+  { name: "@folijs/core", entry: dist("core"), budget: 55_000 },
+  { name: "@folijs/view", entry: dist("view"), budget: 67_000 },
+  { name: "@folijs/react", entry: dist("react"), budget: 92_000 },
+  { name: "FoliEditor only", entry: appEntry, budget: 92_000 },
+  { name: "@folijs/docx", entry: dist("docx"), budget: 48_000 },
 ];
 
 let failed = false;

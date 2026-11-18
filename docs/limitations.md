@@ -26,7 +26,7 @@ checklist in [testing/ime.md](testing/ime.md)):
 
 ## Content
 
-- The editor holds schema v4 (Word's model, 8.7; tables and pictures, 10.3): paragraphs in
+- The editor holds schema v5 (Word's model, 8.7; tables and pictures, 10.3; v5's stories, fields and content controls are not produced yet): paragraphs in
   styles (headings are Word's heading styles), lists as Word's numbering, run formatting, line
   and page breaks, links, tables, inline and floating pictures; everything else Word has
   (fields, content controls, charts, shapes...) is kept as opaque content, selected and deleted

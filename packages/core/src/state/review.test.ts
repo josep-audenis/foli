@@ -27,7 +27,7 @@ const del = (id: number, author = "A", move?: string): MarkJSON => ({
 
 function editorOf(...blocks: NodeJSON[]): Editor {
   const document: FoliDocument = {
-    schemaVersion: 4,
+    schemaVersion: 5,
     section: {},
     defaults: {},
     styles: STYLES,
@@ -204,7 +204,7 @@ describe("accepting and rejecting changes", () => {
   it("records nothing while tracking, and undo takes it back", () => {
     const editor = createEditor({
       document: {
-        schemaVersion: 4,
+        schemaVersion: 5,
         section: {},
         defaults: {},
         styles: STYLES,

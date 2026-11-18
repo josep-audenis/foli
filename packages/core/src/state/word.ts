@@ -303,6 +303,8 @@ const MARKERS = new Set([
   "bookmarkEnd",
   "commentStart",
   "commentEnd",
+  "controlStart",
+  "controlEnd",
   // A comment's reference mark: deleting it would take the comment's anchor.
   "commentReference",
 ]);

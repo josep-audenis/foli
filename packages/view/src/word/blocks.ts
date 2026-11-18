@@ -814,6 +814,8 @@ function renderInline(
       }
       case "bookmarkStart":
       case "bookmarkEnd":
+      case "controlStart":
+      case "controlEnd":
         continue;
       case "picture":
         if (attrs.float) floats.push(...floatElements(attrs, doc, image, context.geometry).nodes);

@@ -1,5 +1,6 @@
 import { readdirSync, readFileSync } from "node:fs";
 import {
+  createDocument,
   DEFAULT_SETTINGS,
   type FoliDocument,
   type FoliDocumentV2,
@@ -449,4 +450,33 @@ describe("exporting without a package", () => {
     );
     // 100 zip round trips: about half a second alone, past 5s beside the whole suite.
   }, 20_000);
+});
+
+describe("schema v5 content not written yet", () => {
+  const base = createDocument();
+  it("is refused, never dropped", async () => {
+    await expect(
+      exportDocx({
+        ...base,
+        stories: {
+          s: { kind: "header", content: { type: "doc", content: [{ type: "paragraph" }] } },
+        },
+      }),
+    ).rejects.toThrow(/stories cannot be exported/);
+    await expect(exportDocx({ ...base, settings: { evenAndOddHeaders: true } })).rejects.toThrow(
+      /settings cannot be exported/,
+    );
+    await expect(
+      exportDocx({ ...base, section: { ...base.section, columns: { count: 2 } } }),
+    ).rejects.toThrow(/columns cannot be exported/);
+    await expect(
+      exportDocx({
+        ...base,
+        content: {
+          type: "doc",
+          content: [{ type: "paragraph", content: [{ type: "fieldEnd" }] }],
+        },
+      }),
+    ).rejects.toThrow(/fieldEnd cannot be exported/);
+  });
 });

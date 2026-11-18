@@ -71,7 +71,7 @@ describe("replacing the document (setDocument)", () => {
     act(() => editor.setDocument(text("Old") as never));
     type("x");
     expect(screen.getByRole("textbox").textContent).toBe("xOld");
-    expect(changes[0]?.document).toMatchObject({ schemaVersion: 4, section: {} });
+    expect(changes[0]?.document).toMatchObject({ schemaVersion: 5, section: {} });
     expect(() => parseDocument(changes[0]?.document)).not.toThrow();
   });
 });

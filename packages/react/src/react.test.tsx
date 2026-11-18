@@ -179,7 +179,7 @@ describe("FoliEditor", () => {
     expect(text(changes[0])).toBe("a");
     expect(text(changes[1])).toBe("ab");
     // A current-schema document, with the page the editor shows.
-    expect(changes[0]?.document.schemaVersion).toBe(4);
+    expect(changes[0]?.document.schemaVersion).toBe(5);
     expect(sectionSettings(changes[0]?.document.section ?? {})).toEqual(editor.settings);
   });
 

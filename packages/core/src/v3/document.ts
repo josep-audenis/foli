@@ -18,6 +18,7 @@ import {
 import { migrateToV3 } from "./migrate.js";
 import {
   checkCellProperties,
+  checkNoteProperties,
   checkRowProperties,
   checkSection,
   checkTableProperties,
@@ -26,8 +27,11 @@ import {
   schema,
 } from "./schema.js";
 
-/** The schema version of documents in the Word model (ADR-0005; v4 adds tables and pictures, ADR-0006). */
-export const SCHEMA_VERSION = 4;
+/**
+ * The schema version of documents in the Word model (ADR-0005; v4 adds tables and pictures,
+ * ADR-0006; v5 stories, fields, content controls and notes, ADR-0007).
+ */
+export const SCHEMA_VERSION = 5;
 
 /** Page setup of a section, in twips (1/1440 inch). Missing parts take Word's defaults. */
 export interface SectionJSON {
@@ -46,8 +50,28 @@ export interface SectionJSON {
   /** Relationship ids of the header and footer parts (their content stays in the package until Phase 11). */
   headers?: { default?: string; first?: string; even?: string };
   footers?: { default?: string; first?: string; even?: string };
+  /** `w:cols` (v5). `widths` when the columns are not of equal width. */
+  columns?: {
+    count?: number;
+    space?: number;
+    equalWidth?: boolean;
+    separator?: boolean;
+    widths?: { width: number; space?: number }[];
+  };
+  /** `w:pgNumType` (v5). */
+  pageNumbers?: { start?: number; format?: string };
+  footnotes?: NotePropertiesJSON;
+  endnotes?: NotePropertiesJSON;
   /** The `w:sectPr` this was read from, verbatim. */
   ext?: string;
+}
+
+/** How notes are placed and numbered (`w:footnotePr`, `w:endnotePr`). */
+export interface NotePropertiesJSON {
+  position?: "pageBottom" | "beneathText" | "sectEnd" | "docEnd";
+  format?: string;
+  start?: number;
+  restart?: "continuous" | "eachSect" | "eachPage";
 }
 
 export interface BorderJSON {
@@ -278,6 +302,53 @@ export interface CommentJSON {
   ext?: string;
 }
 
+/**
+ * Content outside the body (schema v5, ADR-0007). `noteType` is a note's `w:type`: the separators
+ * and the continuation notice have no reference and are not numbered.
+ */
+export interface StoryJSON {
+  kind: "header" | "footer" | "footnote" | "endnote";
+  noteType?: "normal" | "separator" | "continuationSeparator" | "continuationNotice";
+  /** A `doc` of blocks. */
+  content: NodeJSON;
+  /** What the part keeps of the story's own element, verbatim. */
+  ext?: string;
+}
+
+/** A content control's properties (`w:sdtPr`, schema v5), by the id its nodes refer to. */
+export interface ControlJSON {
+  kind:
+    | "text"
+    | "richText"
+    | "dropDown"
+    | "comboBox"
+    | "date"
+    | "checkbox"
+    | "picture"
+    | "repeating"
+    | "repeatingItem"
+    | "other";
+  tag?: string;
+  alias?: string;
+  lock?: "sdtLocked" | "contentLocked" | "sdtContentLocked" | "unlocked";
+  items?: { value: string; display?: string }[];
+  dateFormat?: string;
+  checked?: boolean;
+  /** `showing`: the content is the placeholder. `docPart`: the glossary entry it comes from. */
+  placeholder?: { showing?: boolean; docPart?: string };
+  /** `w:dataBinding`: kept, not evaluated. */
+  binding?: { xpath?: string; storeItemId?: string; prefixMappings?: string };
+  /** `w:sdtPr` and `w:sdtEndPr`, verbatim. */
+  ext?: string;
+}
+
+/** What `word/settings.xml` says about pages and notes (schema v5). */
+export interface WordSettingsJSON {
+  evenAndOddHeaders?: boolean;
+  footnotes?: NotePropertiesJSON;
+  endnotes?: NotePropertiesJSON;
+}
+
 /** A document in the Word model: the content tree and what Word keeps beside it. */
 export interface FoliDocument {
   schemaVersion: typeof SCHEMA_VERSION;
@@ -296,21 +367,37 @@ export interface FoliDocument {
   comments: CommentJSON[];
   /** The pictures' bytes, by the key `picture` nodes give (none when missing). */
   resources?: Record<string, ResourceJSON>;
+  /** Headers, footers and notes, by id (a header's or footer's is its relationship id). */
+  stories?: Record<string, StoryJSON>;
+  /** Content controls' properties, by the id their nodes refer to. */
+  controls?: Record<string, ControlJSON>;
+  settings?: WordSettingsJSON;
   content: NodeJSON;
 }
 
+/** A document of schema v4 (no stories, fields or content controls in the model). */
+export type FoliDocumentV4 = Omit<
+  FoliDocument,
+  "schemaVersion" | "stories" | "controls" | "settings"
+> & { schemaVersion: 4 };
+
 /** A document of schema v3 (no tables or pictures in the model), as `migrateToV3` gives it. */
-export type FoliDocumentV3 = Omit<FoliDocument, "schemaVersion" | "resources"> & {
+export type FoliDocumentV3 = Omit<FoliDocumentV4, "schemaVersion" | "resources"> & {
   schemaVersion: 3;
 };
 
 /** Schema v3 → v4: the version only (a table kept opaque stays so until imported again). */
-export function migrateToV4(doc: FoliDocumentV3): FoliDocument {
+export function migrateToV4(doc: FoliDocumentV3): FoliDocumentV4 {
+  return { ...doc, schemaVersion: 4 };
+}
+
+/** Schema v4 → v5: the version only (what is opaque stays so until imported again). */
+export function migrateToV5(doc: FoliDocumentV4): FoliDocument {
   return { ...doc, schemaVersion: SCHEMA_VERSION };
 }
 
 /**
- * A new document: `content` (schema v4; default: one empty paragraph) on A4 with 25.4 mm
+ * A new document: `content` (schema v5; default: one empty paragraph) on A4 with 25.4 mm
  * margins, with the styles and list definitions the editor's commands use (Normal, Heading 1–6,
  * List Paragraph, Hyperlink; bullets and numbers) and 11 pt Georgia, 1.5 lines: the look a
  * migrated 0.2.0 document has. `section` (in twips: `mmToTwips`) is merged over that page:
@@ -322,8 +409,10 @@ export function createDocument(
   section?: SectionJSON,
 ): FoliDocument {
   const empty = { type: "doc", content: [] } as const satisfies NodeJSON;
-  const blank = migrateToV4(
-    migrateToV3({ schemaVersion: 2, settings: DEFAULT_SETTINGS, content: empty as never }),
+  const blank = migrateToV5(
+    migrateToV4(
+      migrateToV3({ schemaVersion: 2, settings: DEFAULT_SETTINGS, content: empty as never }),
+    ),
   );
   const base = blank.section;
   return {
@@ -353,25 +442,35 @@ export function parseDocument(input: unknown): FoliDocument {
   if (!isRecord(input)) throw new FoliDocumentError("Document must be an object");
   const version = input.schemaVersion;
   if (version === 1 || version === 2) {
-    return parseDocument(migrateToV4(migrateToV3(parseDocumentV2(input))));
+    return parseDocument(migrateToV5(migrateToV4(migrateToV3(parseDocumentV2(input)))));
   }
-  if (version === 3) {
-    if (Object.hasOwn(input, "resources")) fail("resources", "unknown key (schema 4 and later)");
+  if (version === 3 || version === 4) {
+    if (version === 3 && Object.hasOwn(input, "resources"))
+      fail("resources", "unknown key (schema 4 and later)");
+    for (const key of V5_KEYS)
+      if (Object.hasOwn(input, key)) fail(key, "unknown key (schema 5 and later)");
     const doc = parseDocument({ ...input, schemaVersion: SCHEMA_VERSION });
-    // Tables and pictures are schema 4's: a schema 3 document holding one is not one.
+    // What a later schema added is not in a document that says it is of an earlier one.
+    const later = laterSection(doc.section);
+    if (later) fail("section", `${later} is of schema 5 (the document says schema ${version})`);
     for (const [path, content] of [
       ["content", doc.content],
       ...doc.comments.map((c, i) => [`comments[${i}].content`, { content: c.content }] as const),
     ] as const) {
-      const found = nodeOfV4(content);
-      if (found) fail(path, `${found} is a schema 4 node (the document says schema 3)`);
+      const found = laterNode(content, version);
+      if (found)
+        fail(
+          path,
+          `${found.name} is a schema ${found.schema} node (the document says schema ${version})`,
+        );
     }
-    doc.styles.forEach((style, i) => {
-      for (const key of ["table", "row", "cell", "conditions"]) {
-        if (Object.hasOwn(style, key))
-          fail(`styles[${i}]`, `unknown key ${key} (schema 4 and later)`);
-      }
-    });
+    if (version === 3)
+      doc.styles.forEach((style, i) => {
+        for (const key of ["table", "row", "cell", "conditions"]) {
+          if (Object.hasOwn(style, key))
+            fail(`styles[${i}]`, `unknown key ${key} (schema 4 and later)`);
+        }
+      });
     return doc;
   }
   if (version !== SCHEMA_VERSION) {
@@ -402,6 +501,9 @@ export function parseDocument(input: unknown): FoliDocument {
   if (input.theme !== undefined) check("theme", input.theme, checkTheme);
   check("comments", input.comments, listOf(checkComment));
   if (input.resources !== undefined) check("resources", input.resources, checkResources);
+  if (input.stories !== undefined) check("stories", input.stories, checkStories);
+  if (input.controls !== undefined) check("controls", input.controls, checkControls);
+  if (input.settings !== undefined) check("settings", input.settings, checkSettings);
   const styles = input.styles as StyleJSON[];
   const comments = input.comments as CommentJSON[];
   noCycles(
@@ -420,6 +522,15 @@ export function parseDocument(input: unknown): FoliDocument {
   );
 
   const content = parseContent(input.content);
+  noteReferencesOnlyInBody(comments);
+  const stories = Object.entries((input.stories ?? {}) as Record<string, StoryJSON>).map(
+    ([id, story]) => {
+      const path = `stories[${JSON.stringify(id)}].content`;
+      const tree = parseContent(story.content, path);
+      storyRules(tree, story.kind, path);
+      return [id, { ...structuredClone({ ...story, content: null }), content: tree.toJSON() }];
+    },
+  );
   // A copy: the validated document must not change when the caller's input does.
   const envelope = structuredClone({
     section: input.section,
@@ -428,7 +539,19 @@ export function parseDocument(input: unknown): FoliDocument {
     numbering: input.numbering,
     theme: input.theme,
     resources: input.resources,
-  }) as Pick<FoliDocument, "section" | "defaults" | "styles" | "numbering" | "theme" | "resources">;
+    controls: input.controls,
+    settings: input.settings,
+  }) as Pick<
+    FoliDocument,
+    | "section"
+    | "defaults"
+    | "styles"
+    | "numbering"
+    | "theme"
+    | "resources"
+    | "controls"
+    | "settings"
+  >;
   return {
     schemaVersion: SCHEMA_VERSION,
     section: envelope.section,
@@ -441,6 +564,9 @@ export function parseDocument(input: unknown): FoliDocument {
       content: blocks(c.content, `comments[${i}].content`).map((block) => block.toJSON()),
     })),
     ...(envelope.resources === undefined ? {} : { resources: envelope.resources }),
+    ...(input.stories === undefined ? {} : { stories: Object.fromEntries(stories) }),
+    ...(envelope.controls === undefined ? {} : { controls: envelope.controls }),
+    ...(envelope.settings === undefined ? {} : { settings: envelope.settings }),
     content: content.toJSON(),
   };
 }
@@ -448,8 +574,9 @@ export function parseDocument(input: unknown): FoliDocument {
 /**
  * Parses untrusted schema v4 content into a `doc` node, with Word's rules the content
  * expressions do not say (`fragment`: content to paste, which a table may end): a table is never
- * followed by a table (Word would merge them) nor ends
- * the document, and a paragraph in a cell ends no section and holds no page or column break.
+ * followed by a table (Word would merge them; tables in different content controls stay apart)
+ * nor ends the document, and a paragraph in a cell ends no section and holds no page or column
+ * break.
  */
 export function parseContent(value: unknown, path = "content", fragment = false): Node {
   const doc = schema.nodeFromJSON(value, path);
@@ -464,7 +591,10 @@ function wordRules(parent: Node, path: string, inCell: boolean, fragment = false
     const at = `${path}.content[${index}]`;
     if (node.type.name === "table") {
       const next = parent.maybeChild(index + 1);
-      if (next?.type.name === "table") {
+      if (
+        next?.type.name === "table" &&
+        JSON.stringify(next.attrs.controls) === JSON.stringify(node.attrs.controls)
+      ) {
         fail(at, "a table cannot follow a table (Word would merge them): a paragraph goes between");
       }
       if (!next && parent.type.name === "doc" && !fragment) {
@@ -487,15 +617,71 @@ function wordRules(parent: Node, path: string, inCell: boolean, fragment = false
   });
 }
 
-const V4_NODES = new Set(["table", "tableRow", "tableCell", "picture"]);
+/** What a story may not hold (ADR-0007): import keeps such content opaque instead. */
+function storyRules(tree: Node, kind: StoryJSON["kind"], path: string): void {
+  tree.descendants((node) => {
+    const name = node.type.name;
+    if (node.attrs.section) fail(path, "a story cannot end a section");
+    if (name === "noteReference") fail(path, "a story cannot hold a note reference");
+    if (
+      (kind === "footnote" || kind === "endnote") &&
+      (name === "pageBreak" || name === "columnBreak")
+    )
+      fail(path, `a note cannot hold a ${name}`);
+    return true;
+  });
+}
 
-/** The first schema 4 node type in validated content JSON, if any. */
-function nodeOfV4(content: NodeJSON | { content: NodeJSON[] }): string | undefined {
+function noteReferencesOnlyInBody(comments: readonly CommentJSON[]): void {
+  comments.forEach((comment, i) => {
+    const found = laterNode({ content: comment.content }, 4, (name) => name === "noteReference");
+    if (found) fail(`comments[${i}].content`, "a comment cannot hold a note reference");
+  });
+}
+
+const V4_NODES = new Set(["table", "tableRow", "tableCell", "picture"]);
+const V5_NODES = new Set([
+  "fieldStart",
+  "fieldCode",
+  "fieldSeparator",
+  "fieldEnd",
+  "controlStart",
+  "controlEnd",
+  "noteReference",
+  "noteMark",
+]);
+const V5_KEYS = ["stories", "controls", "settings"];
+const V5_SECTION_KEYS = ["columns", "pageNumbers", "footnotes", "endnotes"];
+
+/** The first part of a section that schema 5 added, if any. */
+function laterSection(section: unknown): string | undefined {
+  return isRecord(section) ? V5_SECTION_KEYS.find((key) => Object.hasOwn(section, key)) : undefined;
+}
+
+/**
+ * The first thing in validated content JSON that a schema after `version` added (or that `only`
+ * picks), if any: a node type, a block's `controls`, a part of a section.
+ */
+function laterNode(
+  content: NodeJSON | { content: NodeJSON[] },
+  version: number,
+  only?: (name: string) => boolean,
+): { name: string; schema: number } | undefined {
   const stack: unknown[] = [content];
   while (stack.length) {
     const node = stack.pop();
     if (!isRecord(node)) continue;
-    if (V4_NODES.has(node.type as string)) return node.type as string;
+    const name = node.type as string;
+    if (only) {
+      if (only(name)) return { name, schema: 5 };
+    } else {
+      if (version < 4 && V4_NODES.has(name)) return { name, schema: 4 };
+      if (V5_NODES.has(name)) return { name, schema: 5 };
+      const attrs = isRecord(node.attrs) ? node.attrs : {};
+      if (attrs.controls) return { name: "controls", schema: 5 };
+      const part = laterSection(attrs.section);
+      if (part) return { name: part, schema: 5 };
+    }
     if (Array.isArray(node.content)) for (const child of node.content) stack.push(child);
   }
   return undefined;
@@ -510,6 +696,9 @@ const ENVELOPE_KEYS = [
   "theme",
   "comments",
   "resources",
+  "stories",
+  "controls",
+  "settings",
   "content",
 ];
 
@@ -636,19 +825,77 @@ export const checkResource: Check = (v) => {
     : undefined;
 };
 
-const checkResources: Check = (v) => {
-  if (!isRecord(v)) return "must be an object";
-  const entries = Object.entries(v);
-  if (entries.length > 100_000) return "must have at most 100000 resources";
-  for (const [key, value] of entries) {
-    // An own `__proto__` key would read as the prototype wherever a missing key is looked up.
-    const keyError = key === "__proto__" ? "is not a resource key" : text()(key);
-    if (keyError) return `${key.slice(0, 64)} ${keyError}`;
-    const error = checkResource(value);
-    if (error) return `${key} ${error}`;
-  }
-  return undefined;
-};
+/** An object keyed by ids, every value passing `check`. */
+const recordOf =
+  (check: Check, what: string): Check =>
+  (v) => {
+    if (!isRecord(v)) return "must be an object";
+    const entries = Object.entries(v);
+    if (entries.length > 100_000) return `must have at most 100000 ${what}s`;
+    for (const [key, value] of entries) {
+      // An own `__proto__` key would read as the prototype wherever a missing key is looked up.
+      const keyError = key === "__proto__" ? `is not a ${what} key` : text()(key);
+      if (keyError) return `${key.slice(0, 64)} ${keyError}`;
+      const error = check(value);
+      if (error) return `${key} ${error}`;
+    }
+    return undefined;
+  };
+
+const checkResources = recordOf(checkResource, "resource");
+
+const NOTE_KINDS = ["footnote", "endnote"];
+/** The tree is checked by `parseContent` afterwards, with its path. */
+const checkStory: Check = (v) =>
+  shape(
+    {
+      kind: oneOf(["header", "footer", ...NOTE_KINDS]),
+      noteType: oneOf(["normal", "separator", "continuationSeparator", "continuationNotice"]),
+      content: (c) => (isRecord(c) ? undefined : "must be an object"),
+      ext: xml,
+    },
+    ["kind", "content"],
+  )(v) ??
+  (isRecord(v) && v.noteType !== undefined && !NOTE_KINDS.includes(v.kind as string)
+    ? "noteType is for notes"
+    : undefined);
+const checkStories = recordOf(checkStory, "story");
+
+const checkControls = recordOf(
+  shape(
+    {
+      kind: oneOf([
+        "text",
+        "richText",
+        "dropDown",
+        "comboBox",
+        "date",
+        "checkbox",
+        "picture",
+        "repeating",
+        "repeatingItem",
+        "other",
+      ]),
+      tag: str(),
+      alias: str(),
+      lock: oneOf(["sdtLocked", "contentLocked", "sdtContentLocked", "unlocked"]),
+      items: listOf(shape({ value: str(), display: str() }, ["value"])),
+      dateFormat: str(),
+      checked: bool,
+      placeholder: shape({ showing: bool, docPart: str() }, [], true),
+      binding: shape({ xpath: str(), storeItemId: str(), prefixMappings: str() }, [], true),
+      ext: xml,
+    },
+    ["kind"],
+  ),
+  "control",
+);
+
+const checkSettings: Check = shape(
+  { evenAndOddHeaders: bool, footnotes: checkNoteProperties, endnotes: checkNoteProperties },
+  [],
+  true,
+);
 
 const checkLevel: Check = shape(
   {

@@ -154,9 +154,9 @@ No DOM: runs in Node, workers and the browser.
 
 ### Documents
 
-Documents are schema v4, Word's model with tables and pictures ([document-model.md](document-model.md)).
+Documents are schema v5, Word's model with tables and pictures (v5 adds stories, fields and content controls, which import and the editor do not produce yet) ([document-model.md](document-model.md)).
 
-- `createDocument(content?, section?): FoliDocument`: a new document: `content` (schema v4;
+- `createDocument(content?, section?): FoliDocument`: a new document: `content` (schema v5;
   default: one empty paragraph) on A4 with 25.4 mm margins, with Normal, Heading 1–6, List
   Paragraph and Hyperlink styles, bullet and number definitions, in 11 pt Georgia with 1.5
   lines (the look a migrated 0.2.0 document has). `section` is in twips (`mmToTwips(mm)`) and
@@ -461,7 +461,7 @@ Details (what import keeps, what export writes, limits): the
 [package README](../packages/docx/README.md).
 
 - `importDocx(bytes, options?): Promise<DocxImport>`: reads a `.docx` (`Uint8Array`) into a
-  schema v4 document. `DocxImport`: `{ document, package, report, trackRevisions }`, the
+  schema v5 document. `DocxImport`: `{ document, package, report, trackRevisions }`, the
   validated document, the package it was read from (keep it with the document for export),
   `ImportReport` (`opaque`, `dropped`, `unmodeled`, `unmodeledCount`, `picturesWithoutAlt`) and whether Word tracks
   changes in it (`w:trackRevisions`: the editor's `trackChanges`). `options` are `readPackage`'s.

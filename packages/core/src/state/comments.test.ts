@@ -16,7 +16,7 @@ const DATE = expect.stringMatching(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/);
 
 function editorOf(blocks: NodeJSON[], comments: CommentJSON[] = [], trackChanges = false): Editor {
   const document: FoliDocument = {
-    schemaVersion: 4,
+    schemaVersion: 5,
     section: {},
     defaults: {},
     styles: [{ id: "Normal", type: "paragraph", name: "Normal", isDefault: true }],

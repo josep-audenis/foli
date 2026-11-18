@@ -1131,10 +1131,12 @@ Each task is a PR on `phase-11/sections-fields`, the build green after each.
   headers and footers, notes, fields and bookmarks for every document, Word giving a note only
   its reference's page; the score over the whole page is the harness's "on the page". Starting
   points in corpus/README.)
-- [ ] 11.3 Schema v5 in `@folijs/core`: stories in the envelope, field, content control,
+- [x] 11.3 Schema v5 in `@folijs/core`: stories in the envelope, field, content control,
   bookmark and note reference nodes and their properties, sections' header and footer
   references to stories; validation, the v4 → v5 migration (a version change: what stays
-  opaque until imported again), `SCHEMA_VERSION` 5.
+  opaque until imported again), `SCHEMA_VERSION` 5. (Done: nothing produces the new content
+  yet: `.docx` export refuses it, the views show its result or nothing, until 11.4-11.10. The
+  steps of ADR-0007 come with their first user, 11.7.)
 - [ ] 11.4 DOCX stories: headers, footers, footnotes and endnotes imported as stories and
   exported losslessly (unchanged parts byte for byte, changed ones rewritten, new ones with
   their relationships and content types); pictures, tables, tracked changes and comments in

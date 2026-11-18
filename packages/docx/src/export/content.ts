@@ -268,6 +268,6 @@ function runContentXml(node: NodeJSON, deleted: boolean, context: WriteContext):
     case "picture":
       return context.picture(a);
     default:
-      return "";
+      return notYet(node);
   }
 }
