@@ -13,6 +13,7 @@ import { isSafeLink } from "../schema.js";
 import { TransformError } from "../transform/index.js";
 import type { SectionJSON } from "../v3/document.js";
 import { attempt } from "./attempt.js";
+import { fieldOfPart, fieldSelection, isFieldPart } from "./fields.js";
 import { redo, undo } from "./history.js";
 import { openLinkEditor } from "./links.js";
 import { keepLastMark, typedMarks } from "./mark.js";
@@ -178,6 +179,23 @@ function skipsDeleted(state: EditorState): boolean {
 /** Content a tracked change deleted (still in the document until accepted). */
 const isDeleted = (node: Node) => node.marks.some((m) => m.type.name === "deletion");
 
+/**
+ * Backspace or Delete arriving at a field's marker (`node`, at `pos`) selects the field whole, as
+ * Word does: the next press deletes it. False for anything else, and a marker without a field.
+ */
+function selectFieldAt(
+  state: EditorState,
+  dispatch: ((tr: Transaction) => void) | undefined,
+  node: Node | null | undefined,
+  pos: number,
+): boolean {
+  if (!isFieldPart(node)) return false;
+  const field = fieldOfPart(state.doc, pos);
+  if (!field || field.deleted) return false;
+  dispatch?.(state.tr.setSelection(fieldSelection(state.doc, field)));
+  return true;
+}
+
 /** Backspace: deletes the selection, else the previous character or word, else joins with the previous block. */
 export function deleteBackward(unit: DeleteUnit = "char"): Command {
   return (state, dispatch) => {
@@ -191,9 +209,10 @@ export function deleteBackward(unit: DeleteUnit = "char"): Command {
     let $pos = found;
     while ($pos.parentOffset > 0) {
       const before = $pos.nodeBefore;
-      if (isMarker(word, before)) $pos = state.doc.resolve($pos.pos - 1);
-      else if (tracking && before && isDeleted(before))
+      if (tracking && before && isDeleted(before))
         $pos = state.doc.resolve($pos.pos - before.nodeSize);
+      else if (selectFieldAt(state, dispatch, before, $pos.pos - 1)) return true;
+      else if (isMarker(word, before)) $pos = state.doc.resolve($pos.pos - 1);
       else break;
     }
     if ($pos.parentOffset === 0) return joinBackward(at(state, $pos.pos), dispatch);
@@ -218,9 +237,10 @@ export function deleteForward(unit: DeleteUnit = "char"): Command {
     let $pos = found;
     while ($pos.parentOffset < $pos.parent.content.size) {
       const after = $pos.nodeAfter;
-      if (isMarker(word, after)) $pos = state.doc.resolve($pos.pos + 1);
-      else if (tracking && after && isDeleted(after))
+      if (tracking && after && isDeleted(after))
         $pos = state.doc.resolve($pos.pos + after.nodeSize);
+      else if (selectFieldAt(state, dispatch, after, $pos.pos)) return true;
+      else if (isMarker(word, after)) $pos = state.doc.resolve($pos.pos + 1);
       else break;
     }
     if ($pos.parentOffset === $pos.parent.content.size)

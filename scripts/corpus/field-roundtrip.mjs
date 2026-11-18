@@ -14,9 +14,27 @@
 // (and must see both edited). `check` needs Word's data for every file made: each opened; an
 // unchanged one has the original's fields, controls, bookmarks and sections; an edited one Foli's
 // edits, and one more control where one was split. One line per file; exits 1 on any difference.
+//
+// Since 11.8 it also has Word read what `updateFields` and the insert commands write, with Word's
+// pages as the layout: <name>-updated (every result spoiled, then updated), 04-rebuilt (an entry
+// spoiled, the table of contents built again), 04-tracked (that while tracking), 04-control (the same inside a block content control,
+// as Word's gallery puts it), 03-merged (merge fields filled from data while tracking), 04-inserted
+// (a page number, the date, cross-references and a new table of contents).
+// Word must find exactly the fields and results Foli holds (a `DATE`'s result aside: Word
+// recomputes an unlocked one on opening).
 
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import {
+  createEditor,
+  crossReferenceTargets,
+  fieldsIn,
+  insertCrossReference,
+  insertDate,
+  insertPageNumber,
+  insertTableOfContents,
+  updateFields,
+} from "../../packages/core/dist/index.js";
 import { exportDocx, importDocx, readPackage } from "../../packages/docx/dist/index.js";
 
 const [mode, dir] = process.argv.slice(2);
@@ -91,6 +109,158 @@ function edited(document) {
   return { document: copy, expected: { editedFields, controls, split, stories } };
 }
 
+/** Word's pages as a layout: a position is on its paragraph's page. */
+function wordLayout(doc, word) {
+  const starts = [];
+  doc.descendants((node, pos) => {
+    if (node.type.name === "paragraph") starts.push(pos);
+    return !node.isTextblock;
+  });
+  return {
+    pages: word.pages,
+    pageAt(pos) {
+      let i = starts.length - 1;
+      while (i > 0 && starts[i] > pos) i--;
+      return { number: word.paragraphs[i]?.page ?? 1, sectionPages: word.pages };
+    },
+  };
+}
+
+const heldFields = (editor) =>
+  fieldsIn(editor.state.doc)
+    .filter((f) => !f.deleted)
+    .map((f) => ({
+      code: f.instruction,
+      result: f.result.replace(/\r/g, ""),
+    }));
+
+/** Documents written through `updateFields` and the insert commands, by file name. */
+async function fieldEdits(name, document, packages) {
+  const base = name.replace(".docx", "");
+  const word = json(join(reference, `${base}.json`));
+  const open = (options) => createEditor({ document, author: "Foli Fields", ...options });
+  const out = {};
+  if (word.fields.some((f) => f.type !== 59)) {
+    const editor = open();
+    const tr = editor.state.tr;
+    for (const field of [...fieldsIn(editor.state.doc)].reverse())
+      if (!field.locked && field.name !== "TOC" && field.parent?.name !== "TOC")
+        if (field.resultTo > field.resultFrom) tr.delete(field.resultFrom, field.resultTo);
+    editor.dispatch(tr);
+    updateFields(editor, { layout: wordLayout(editor.state.doc, word) });
+    out[`${base}-updated`] = editor;
+  }
+  if (base.startsWith("03")) {
+    const editor = open({ trackChanges: true });
+    updateFields(editor, { data: { CandidateFirstName: "Ada", StartDate: new Date(2026, 2, 3) } });
+    out[`${base}-merged`] = editor;
+  }
+  if (base.startsWith("04")) {
+    const pages = new Map(word.paragraphs.map((p) => [p.text, p.page]));
+    const rebuilt = open();
+    const toc = fieldsIn(rebuilt.state.doc)[0];
+    rebuilt.dispatch(rebuilt.state.tr.insertText("X", toc.resultFrom + 1));
+    updateFields(rebuilt, {
+      layout: {
+        pages: word.pages,
+        pageAt: (pos) => ({
+          number: pages.get(rebuilt.state.doc.resolve(pos).parent.textContent) ?? 1,
+          sectionPages: word.pages,
+        }),
+      },
+    });
+    out[`${base}-rebuilt`] = rebuilt;
+
+    // The same while tracking: Word reads it with the changes accepted.
+    const tracked = open({ trackChanges: true });
+    const first = fieldsIn(tracked.state.doc)[0];
+    tracked.dispatch(tracked.state.tr.insertText("X", first.resultFrom + 1));
+    updateFields(tracked, {
+      layout: {
+        pages: word.pages,
+        pageAt: (pos) => ({
+          number: pages.get(tracked.state.doc.resolve(pos).parent.textContent) ?? 1,
+          sectionPages: word.pages,
+        }),
+      },
+    });
+    out[`${base}-tracked`] = tracked;
+
+    // The table of contents in a block content control, as Word's gallery has it: the rebuilt
+    // entries must stay in it.
+    const source = await readPackage(new Uint8Array(readFileSync(join(corpus, name))));
+    const main = source.text(source.mainDocument);
+    const from = main.lastIndexOf("<w:p ", main.indexOf(" TOC "));
+    let depth = 0;
+    let close = from;
+    for (const match of main.slice(from).matchAll(/fldCharType="(begin|end)"/g)) {
+      depth += match[1] === "begin" ? 1 : -1;
+      if (!depth) {
+        close = main.indexOf("</w:p>", from + match.index) + "</w:p>".length;
+        break;
+      }
+    }
+    const gallery =
+      '<w:sdtPr><w:id w:val="987654"/><w:docPartObj><w:docPartGallery w:val="Table of Contents"/>' +
+      "<w:docPartUnique/></w:docPartObj></w:sdtPr>";
+    const boxed = await source.write(
+      new Map([
+        [
+          source.mainDocument,
+          new TextEncoder().encode(
+            `${main.slice(0, from)}<w:sdt>${gallery}<w:sdtContent>${main.slice(from, close)}` +
+              `</w:sdtContent></w:sdt>${main.slice(close)}`,
+          ),
+        ],
+      ]),
+    );
+    const read = await importDocx(boxed);
+    const control = createEditor({ document: read.document, author: "Foli Fields" });
+    const start = fieldsIn(control.state.doc)[0];
+    control.dispatch(control.state.tr.insertText("X", start.resultFrom + 1));
+    updateFields(control, {
+      layout: {
+        pages: word.pages,
+        pageAt: (pos) => ({
+          number: pages.get(control.state.doc.resolve(pos).parent.textContent) ?? 1,
+          sectionPages: word.pages,
+        }),
+      },
+    });
+    packages[`${base}-control`] = read.package;
+    out[`${base}-control`] = control;
+
+    const inserted = open();
+    const layout = () => wordLayout(inserted.state.doc, word);
+    const end = () => {
+      let pos = 0;
+      inserted.state.doc.forEach((node, at) => {
+        if (node.type.name === "paragraph") pos = at + node.nodeSize - 1;
+      });
+      return pos;
+    };
+    inserted.select(end());
+    inserted.run(insertPageNumber({ layout: layout() }));
+    inserted.commands.insertText(" ");
+    inserted.run(insertDate("d MMMM yyyy", { now: new Date(2026, 2, 3) }));
+    inserted.commands.insertText(" ");
+    const heading = crossReferenceTargets(inserted.state).headings[1];
+    inserted.run(insertCrossReference({ to: heading.pos, layout: layout() }));
+    inserted.commands.insertText(" ");
+    inserted.run(
+      insertCrossReference({
+        to: crossReferenceTargets(inserted.state).headings[1].pos,
+        show: "page",
+        layout: layout(),
+      }),
+    );
+    inserted.select(1);
+    inserted.run(insertTableOfContents({ from: 1, to: 2, layout: layout() }));
+    out[`${base}-inserted`] = inserted;
+  }
+  return out;
+}
+
 if (mode === "make") {
   mkdirSync(join(dir, "foli"), { recursive: true });
   const expected = {};
@@ -135,6 +305,21 @@ if (mode === "make") {
       join(dir, "foli", name.replace(".docx", "-edited.docx")),
       await exportDocx(change.document, pkg),
     );
+    if (name.startsWith("00")) return;
+    const packages = {};
+    for (const [file, editor] of Object.entries(await fieldEdits(name, document, packages))) {
+      expected[file] = { fields: heldFields(editor) };
+      const bytes = await exportDocx(editor.getDocument(), packages[file] ?? pkg, {
+        trackRevisions: editor.trackingChanges,
+      });
+      writeFileSync(join(dir, "foli", `${file}.docx`), bytes);
+      // The rebuilt table of contents is one control still (Word does not list gallery ones).
+      if (file.endsWith("-control")) {
+        const written = await readPackage(bytes);
+        const sdts = written.text(written.mainDocument).match(/<w:sdt>/g)?.length;
+        if (sdts !== 1) throw new Error(`${sdts} content controls around the table of contents`);
+      }
+    }
   }
 }
 
@@ -147,7 +332,19 @@ for (const file of readdirSync(join(dir, "foli")).filter((n) => n.endsWith(".doc
   const word = existsSync(path) ? json(path) : undefined;
   if (!word) problems.push("no data from Word");
   else if (!word.opened) problems.push(`not opened: ${word.error}`);
-  else {
+  else if (expected[name]?.fields) {
+    const held = expected[name].fields;
+    // Word counts a `w:hyperlink` to a bookmark (a table of contents' entries) as a field.
+    const fields = word.fields.filter((f) => !f.code.startsWith("HYPERLINK \\l "));
+    if (fields.length !== held.length)
+      problems.push(`${fields.length} fields, Foli holds ${held.length}`);
+    held.forEach((field, i) => {
+      const found = fields[i];
+      if (found?.code !== field.code) problems.push(`field ${i}: code ${found?.code}`);
+      else if (!field.code.startsWith("DATE") && found.result !== field.result)
+        problems.push(`${field.code}: Word reads ${JSON.stringify(found.result)}`);
+    });
+  } else {
     const plain = name.replace(/-edited$/, "");
     const base = json(
       plain === "00-controls"

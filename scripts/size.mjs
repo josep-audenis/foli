@@ -79,12 +79,17 @@ writeFileSync(appEntry, `export { FoliEditor } from "${dist("react")}";\n`);
  * and footer commands. Docx raised in 11.7 (53.5 kB): `word/settings.xml` read and written back.
  * View and React raised in 11.7 (73.6 and 102.5 kB): headers and footers on pages in both
  * renderers, a story edited in place (a second view mounted on its page), the header menu.
+ * Core, view and React raised in 11.8 (66.6, 86.4 and 114.6 kB): fields (finding them, the
+ * selection rules, every field Foli updates with Word's switches, tables of contents rebuilt,
+ * the insert commands), hidden code ranges and shading in the view, the fields menu and dialog.
+ * Raised again after its review (68.8, 88.8 and 117.2 kB): Word's numeric pictures in full, self
+ * references, what a table of contents lists, results written a paragraph at a time.
  */
 const BUNDLES = [
-  { name: "@folijs/core", entry: dist("core"), budget: 59_000 },
-  { name: "@folijs/view", entry: dist("view"), budget: 77_000 },
-  { name: "@folijs/react", entry: dist("react"), budget: 107_000 },
-  { name: "FoliEditor only", entry: appEntry, budget: 107_000 },
+  { name: "@folijs/core", entry: dist("core"), budget: 72_500 },
+  { name: "@folijs/view", entry: dist("view"), budget: 93_000 },
+  { name: "@folijs/react", entry: dist("react"), budget: 122_500 },
+  { name: "FoliEditor only", entry: appEntry, budget: 122_500 },
   { name: "@folijs/docx", entry: dist("docx"), budget: 55_500 },
 ];
 

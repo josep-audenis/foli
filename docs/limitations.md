@@ -28,8 +28,7 @@ checklist in [testing/ime.md](testing/ime.md)):
 
 - The editor holds schema v5 (Word's model, 8.7; tables and pictures, 10.3; v5's stories, fields and content controls are not produced yet): paragraphs in
   styles (headings are Word's heading styles), lists as Word's numbering, run formatting, line
-  and page breaks, links, tables, inline and floating pictures, fields (shown with their stored
-  results) and content controls (their text editable, nothing marking them yet; those bound to
+  and page breaks, links, tables, inline and floating pictures, fields (see below) and content controls (their text editable, nothing marking them yet; those bound to
   data, showing their placeholder or with locked content stay opaque); everything else
   Word has (charts, shapes...) is kept as opaque content, selected and deleted whole. Documents saved by 0.1.0 to 0.4.0 are migrated when loaded; 0.4.0 cannot read
   documents saved by 0.5.0. Sections are laid out with their own page
@@ -42,9 +41,24 @@ checklist in [testing/ime.md](testing/ime.md)):
   drawn: an empty paragraph ending a section takes no room, as in Word, and the caret reaches it
   by the keyboard.
 - Headers and footers are on the pages and edited there (11.7). While one is open its page fields
-  show their stored results (the other pages show theirs); a field is typed over as text until
-  11.8. Moving between a header and the body takes a double click or the toolbar (no keyboard
+  show their stored results (the other pages show theirs). Moving between a header and the body takes a double click or the toolbar (no keyboard
   shortcut of its own). Headers are not dimmed while the body is edited, as they are in Word.
+- Fields (11.8) show their stored results until updated (F9, the Fields menu, `updateFields`,
+  `view.print()`); the browser's own Print menu does not update them. Updated: `PAGE`, `NUMPAGES`,
+  `SECTIONPAGES`, `DATE`, `TIME`, `SEQ`, `REF`, `PAGEREF`, `TOC`, `MERGEFIELD`. Any other field
+  (`IF`, `STYLEREF`, formulas, form fields…), and a switch Foli does not follow (`TOC \c`, `\f`,
+  `\l`, `\a`, `\s`, `\d`; `REF \f`, `\d`; the number words of `\* CardText`, `OrdText`,
+  `DollarText`; a `\#` picture with backquotes, two points or a comma in its decimals), keeps its
+  result and is reported; so does a reference to a missing bookmark or to a bookmark holding the
+  field, where Word writes an error into the result, and bookmarks referring to each other, which
+  Word lets grow at every update. `REF \p` and `PAGEREF \p` say "above", "below" and "on page" in
+  English, whatever Word's language. A numbered table of contents entry's tab is 440 twips a level;
+  Word works it out from the number's width. `\* MERGEFORMAT` keeps the old result's first run's look,
+  not word by word. A `REF` to text over several paragraphs gets line breaks between them. Table of
+  contents entries are plain: a heading's own italics are not carried over. Date names are in
+  English. Codes shown cannot be edited there (Word's code editing, Shift+F9 for one field and
+  Ctrl+F9 are not built); the last paragraph of a table of contents stays as an empty line under
+  its code. A field's own `w:dirty` is kept after an update.
 - Imported footnotes and endnotes are in the document (`stories`) and exported, but the editor does
   not show or lay them out yet, and a note's reference shows nothing.
 - No horizontal rule button (Word's rule is a paragraph's bottom border, kept and shown).
@@ -223,6 +237,9 @@ Details in the [package README](../packages/docx/README.md).
 - Formatting thousands of paragraphs at once is slow: bold over 4,000 paragraphs takes about
   0.6 s, the next edit about 0.7 s, its undo about 0.5 s.
 - Undo history keeps the last 100 undo steps (a run of typing is one step).
+
+- Page numbers made of digits are taken to be equally wide when a header's height is measured:
+  with a font whose digits differ, a header on the verge of wrapping can overlap the text.
 
 ## Print
 

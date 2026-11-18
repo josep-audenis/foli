@@ -84,12 +84,16 @@ export interface ParagraphFormat {
 export interface ListMarker {
   /** As Word shows it ("1.", "1.1", "(a)", or a bullet's character as the file has it). */
   text: string;
+  /** The same without the words of its format: "Section 1." is "1." (`REF \\t`). */
+  plain: string;
   /** What follows the marker. */
   suffix: "tab" | "space" | "nothing";
   justification: string;
   /** The marker's formatting: the paragraph's, its mark's, then the level's run properties. */
   run: RunFormat;
   instance: number;
+  /** The definition counted: instances sharing one go on from each other. */
+  abstract: number;
   level: number;
 }
 
@@ -371,6 +375,8 @@ export function formatNumber(n: number, format: string | undefined): string {
       return letters(n).toLowerCase();
     case "ordinal":
       return ordinal(n);
+    case "numberInDash":
+      return `- ${n} -`;
     default:
       return String(n);
   }
@@ -874,20 +880,24 @@ export class Resolver {
         const restart = this.#definition(instance, abstract, deeper)?.restart;
         if (restart === undefined || (restart !== 0 && index < restart)) levels[deeper] = undefined;
       }
-      const text = (level.text ?? "").replace(/%([1-9])/g, (_, d: string) => {
-        const i = Number(d) - 1;
-        const format = level.legal ? "decimal" : this.#definition(instance, abstract, i)?.format;
-        return formatNumber(levels[i] ?? startOf(i), format);
-      });
+      const written = (template: string) =>
+        template.replace(/%([1-9])/g, (_, d: string) => {
+          const i = Number(d) - 1;
+          const format = level.legal ? "decimal" : this.#definition(instance, abstract, i)?.format;
+          return formatNumber(levels[i] ?? startOf(i), format);
+        });
+      const text = written(level.text ?? "");
       const marker = cloneRun(run);
       applyDirect(marker, attrs.markFormat as MarkJSON[] | undefined, this.#envelope.theme);
       applyDirect(marker, level.run, this.#envelope.theme);
       return {
         text,
+        plain: written((level.text ?? "").replace(/\p{L}+/gu, "")).trim(),
         suffix: level.suffix ?? "tab",
         justification: level.justification ?? "left",
         run: marker,
         instance: instance.id,
+        abstract: abstract.id,
         level: index,
       };
     });

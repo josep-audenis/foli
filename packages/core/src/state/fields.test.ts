@@ -1,0 +1,1547 @@
+import fc from "fast-check";
+import { describe, expect, it } from "vitest";
+import type { NodeJSON } from "../model/index.js";
+import type { FoliDocument, StyleJSON } from "../v3/document.js";
+import { createDocument, parseDocument, SCHEMA_VERSION } from "../v3/document.js";
+import { deleteBackward, deleteForward } from "./commands.js";
+import { createEditor, type Editor } from "./editor.js";
+import { fieldCodesShown, fieldDisplay, fieldsIn, toggleFieldCodes } from "./fields.js";
+import {
+  crossReferenceTargets,
+  type FieldLayout,
+  formatDatePicture,
+  formatNumericPicture,
+  insertCrossReference,
+  insertDate,
+  insertField,
+  insertPageNumber,
+  insertTableOfContents,
+  parseFieldInstruction,
+  updateFields,
+} from "./fieldupdate.js";
+import { redo, undo, undoDepth } from "./history.js";
+import pictures from "./numeric-pictures.word.json" with { type: "json" };
+import { acceptAllChanges, rejectAllChanges } from "./review.js";
+import { TextSelection } from "./selection.js";
+
+const text = (value: string): NodeJSON => ({ type: "text", text: value });
+const field = (code: string, shown = "", attrs?: Record<string, unknown>): NodeJSON[] => [
+  { type: "fieldStart", ...(attrs ? { attrs } : {}) },
+  { type: "fieldCode", attrs: { text: ` ${code} ` } },
+  { type: "fieldSeparator" },
+  ...(shown ? [text(shown)] : []),
+  { type: "fieldEnd" },
+];
+const p = (...content: (NodeJSON | string)[]): NodeJSON => ({
+  type: "paragraph",
+  content: content.filter((c) => c !== "").map((c) => (typeof c === "string" ? text(c) : c)),
+});
+const styled = (style: string, value: string): NodeJSON => ({
+  type: "paragraph",
+  attrs: { style },
+  content: [text(value)],
+});
+const STYLES: StyleJSON[] = [
+  { id: "Normal", type: "paragraph", name: "Normal", isDefault: true },
+  {
+    id: "Heading1",
+    type: "paragraph",
+    name: "heading 1",
+    basedOn: "Normal",
+    paragraph: { outlineLevel: 0 },
+  },
+  {
+    id: "Heading2",
+    type: "paragraph",
+    name: "heading 2",
+    basedOn: "Normal",
+    paragraph: { outlineLevel: 1 },
+  },
+  { id: "Note", type: "paragraph", name: "Side note", basedOn: "Normal" },
+];
+
+function documentOf(content: NodeJSON[], more: Partial<FoliDocument> = {}): FoliDocument {
+  return {
+    ...createDocument(),
+    schemaVersion: SCHEMA_VERSION,
+    styles: STYLES,
+    section: { pageSize: { width: 11906, height: 16838 }, margins: { left: 1440, right: 1440 } },
+    content: { type: "doc", content },
+    ...more,
+  };
+}
+const editorOf = (content: NodeJSON[], more?: Partial<FoliDocument>, trackChanges = false) =>
+  createEditor({ document: documentOf(content, more), trackChanges, author: "Ann" });
+const results = (editor: Editor) => fieldsIn(editor.state.doc).map((f) => f.result);
+const firstField = (editor: Editor) =>
+  fieldsIn(editor.state.doc)[0] as ReturnType<typeof fieldsIn>[0];
+/** One page per `perPage` positions. */
+const pagesEvery = (perPage: number, pages = 9): FieldLayout => ({
+  pages,
+  pageAt: (pos) => ({ number: Math.floor(pos / perPage) + 1, sectionPages: pages }),
+});
+/** The document still validates (the markers are in order and paired for export). */
+const valid = (editor: Editor) => expect(() => parseDocument(editor.getDocument())).not.toThrow();
+
+describe("fieldsIn", () => {
+  it("pairs markers by depth, reads a nested field in the code as its result", () => {
+    const editor = editorOf([
+      p(
+        { type: "fieldStart" },
+        { type: "fieldCode", attrs: { text: " IF " } },
+        ...field("MERGEFIELD x", "yes"),
+        { type: "fieldCode", attrs: { text: ' = "yes" ' } },
+        { type: "fieldSeparator" },
+        "shown",
+        { type: "fieldEnd" },
+      ),
+    ]);
+    const [outer, inner] = fieldsIn(editor.state.doc);
+    expect(outer?.instruction).toBe('IF yes = "yes"');
+    expect(outer?.name).toBe("IF");
+    expect(outer?.result).toBe("shown");
+    expect(inner).toMatchObject({ name: "MERGEFIELD", result: "yes", inCode: true });
+    expect(inner?.parent).toBe(outer);
+  });
+
+  it("ignores markers without partners, and gives a field across paragraphs its text", () => {
+    const editor = editorOf([
+      p({ type: "fieldEnd" }, "a", { type: "fieldStart" }),
+      p(...field("X", "one"), { type: "fieldSeparator" }),
+    ]);
+    expect(fieldsIn(editor.state.doc).map((f) => f.name)).toEqual(["X"]);
+    const across = editorOf([
+      p(
+        { type: "fieldStart" },
+        { type: "fieldCode", attrs: { text: "T" } },
+        { type: "fieldSeparator" },
+        "a",
+      ),
+      p("b"),
+      p({ type: "fieldEnd" }),
+    ]);
+    expect(firstField(across).result).toBe("a\rb");
+  });
+});
+
+describe("instructions", () => {
+  it("splits names, quoted arguments and switches", () => {
+    const { name, args, switches } = parseFieldInstruction(
+      'toc \\o "1-3" \\h \\t "Side note,2" \\* MERGEFORMAT',
+    );
+    expect(name).toBe("TOC");
+    expect(args).toEqual([]);
+    expect(switches.get("o")).toEqual(["1-3"]);
+    expect(switches.get("h")).toEqual([""]);
+    expect(switches.get("t")).toEqual(["Side note,2"]);
+    expect(switches.get("*")).toEqual(["MERGEFORMAT"]);
+    expect(parseFieldInstruction('DATE \\@"d/M"').switches.get("@")).toEqual(["d/M"]);
+    expect(parseFieldInstruction('MERGEFIELD "a b" \\b "x\\"y"').args).toEqual(["a b"]);
+    expect(parseFieldInstruction('MERGEFIELD "a b" \\b "x\\"y"').switches.get("b")).toEqual([
+      'x"y',
+    ]);
+  });
+
+  it("formats dates in Word's pictures", () => {
+    const date = new Date(2026, 2, 3, 15, 4, 9);
+    expect(formatDatePicture(date, "d MMMM yyyy")).toBe("3 March 2026");
+    expect(formatDatePicture(date, "dddd, dd/MM/yy")).toBe("Tuesday, 03/03/26");
+    expect(formatDatePicture(date, "ddd MMM")).toBe("Tue Mar");
+    expect(formatDatePicture(date, "h:mm:ss AM/PM")).toBe("3:04:09 PM");
+    expect(formatDatePicture(date, "HH'h'mm")).toBe("15h04");
+  });
+
+  it("formats numbers in pictures exactly as Word did (558 cases read from Word)", () => {
+    const wrong: string[] = [];
+    pictures.pictures.forEach((picture, p) => {
+      pictures.values.forEach((value, v) => {
+        const got = formatNumericPicture(value, picture);
+        const word = pictures.results[p]?.[v];
+        if (got !== word) wrong.push(`${value} ${picture}: ${got} / ${word}`);
+      });
+    });
+    expect(wrong).toEqual([]);
+  });
+
+  it("does not guess a picture it does not follow", () => {
+    expect(formatNumericPicture(5, "0.0.0")).toBeNull();
+    expect(formatNumericPicture(5, "`SEQ`0")).toBeNull();
+    expect(formatNumericPicture(1e22, "0")).toBeNull();
+  });
+
+  it("writes a.m. and p.m. in all of Word's forms", () => {
+    const date = new Date(2026, 2, 3, 15, 4);
+    expect(formatDatePicture(date, "h a/p")).toBe("3 p");
+    expect(formatDatePicture(date, "h A/P")).toBe("3 P");
+    expect(formatDatePicture(new Date(2026, 2, 3, 9), "h am/pm")).toBe("9 am");
+  });
+});
+
+describe("selecting and deleting a field", () => {
+  const doc = () => editorOf([p("ab", ...field("SEQ x", "1"), "cd")]);
+  // Positions: a1 b2, start 3, code 4, separator 5, "1" 6-7, end 7, c at 8.
+
+  it("takes a selection crossing a marker over the whole field", () => {
+    const editor = doc();
+    const { from, to } = firstField(editor);
+    editor.select(2, 6);
+    expect([editor.state.selection.anchor, editor.state.selection.head]).toEqual([2, to]);
+    editor.select(to + 1, 6);
+    expect([editor.state.selection.anchor, editor.state.selection.head]).toEqual([to + 1, from]);
+    editor.select(6, 9);
+    expect([editor.state.selection.anchor, editor.state.selection.head]).toEqual([from, 9]);
+  });
+
+  it("gives the field up when the head comes back over it", () => {
+    const editor = doc();
+    const { from, to } = firstField(editor);
+    editor.select(2, 6);
+    expect(editor.state.selection.head).toBe(to);
+    // Back to the other side of the end marker only: the same place.
+    editor.select(2, to - 1);
+    expect(editor.state.selection.head).toBe(to);
+    editor.select(2, to - 2);
+    expect(editor.state.selection.head).toBe(from);
+  });
+
+  it("keeps a selection inside the result, and the caret out of the code", () => {
+    const editor = editorOf([p("ab", ...field("X", "result"), "cd")]);
+    const { from, resultFrom } = firstField(editor);
+    editor.select(resultFrom + 1, resultFrom + 3);
+    expect(editor.state.selection.from).toBe(resultFrom + 1);
+    // Out of the code, and from the result's edge out of the field.
+    editor.select(from);
+    editor.select(from + 1);
+    expect(editor.state.selection.head).toBe(from);
+    editor.select(resultFrom + 2);
+    editor.select(from + 1);
+    expect(editor.state.selection.head).toBe(from);
+  });
+
+  it("Backspace after a field selects it, then deletes it, undo bringing it back", () => {
+    const editor = doc();
+    const { from, to } = firstField(editor);
+    editor.select(to);
+    expect(editor.run(deleteBackward())).toBe(true);
+    expect(editor.state.doc.textContent).toBe("ab1cd");
+    expect([editor.state.selection.from, editor.state.selection.to]).toEqual([from, to]);
+    editor.run(deleteBackward());
+    expect(editor.state.doc.textContent).toBe("abcd");
+    expect(fieldsIn(editor.state.doc)).toEqual([]);
+    valid(editor);
+    editor.run(undo);
+    expect(fieldsIn(editor.state.doc)).toHaveLength(1);
+  });
+
+  it("Delete before a field selects it", () => {
+    const editor = doc();
+    const { from, to } = firstField(editor);
+    for (const [at, run] of [[from, deleteForward()]] as const) {
+      editor.select(at);
+      editor.run(run);
+      expect([editor.state.selection.from, editor.state.selection.to]).toEqual([from, to]);
+    }
+  });
+
+  it("puts a caret at a result's edge outside the field, so what is typed there stays", () => {
+    const editor = editorOf([p("Page ", ...field("SEQ a", "9"))]);
+    const { from, to, resultFrom, resultTo } = firstField(editor);
+    editor.select(resultTo);
+    expect(editor.state.selection.head).toBe(to);
+    editor.commands.insertText(" of 9");
+    updateFields(editor);
+    expect(editor.state.doc.textContent).toBe("Page 1 of 9");
+    editor.select(resultFrom);
+    expect(editor.state.selection.head).toBe(from);
+  });
+
+  it("goes on inside a result when its whole text is typed over", () => {
+    const editor = editorOf([p("a", ...field("X", "old"), "b")]);
+    const { resultFrom, resultTo } = firstField(editor);
+    editor.select(resultFrom, resultTo);
+    editor.commands.insertText("n");
+    editor.commands.insertText("w");
+    expect(firstField(editor).result).toBe("nw");
+  });
+
+  it("with codes shown keeps the caret and typing out of the code", () => {
+    const editor = editorOf([p("a", ...field("PAGE", "1"), "b")]);
+    editor.run(toggleFieldCodes);
+    const { from, to } = firstField(editor);
+    editor.select(from);
+    editor.select(from + 2);
+    expect(editor.state.selection.head).toBe(to);
+    editor.commands.insertText("x");
+    expect(firstField(editor).instruction).toBe("PAGE");
+    editor.select(to + 1);
+    editor.select(to - 2);
+    expect(editor.state.selection.head).toBe(from);
+  });
+
+  it("still types and deletes inside a result", () => {
+    const editor = editorOf([p(...field("X", "abc"))]);
+    const { resultFrom } = firstField(editor);
+    editor.select(resultFrom + 2);
+    editor.run(deleteBackward());
+    expect(firstField(editor).result).toBe("ac");
+  });
+
+  it("deleted while tracking, every part is marked and the field is skipped afterwards", () => {
+    const editor = editorOf([p("ab", ...field("SEQ x", "1"), "cd")], {}, true);
+    const { to } = firstField(editor);
+    editor.select(to);
+    editor.run(deleteBackward());
+    editor.run(deleteBackward());
+    const parts = (editor.getDocument().content.content?.[0]?.content ?? []).filter((n) =>
+      n.type.startsWith("field"),
+    );
+    expect(parts).toHaveLength(4);
+    expect(parts.every((n) => n.marks?.some((m) => m.type === "deletion"))).toBe(true);
+    // The next Backspace goes on to the text before it.
+    editor.run(deleteBackward());
+    expect(firstField(editor).deleted).toBe(true);
+    expect(JSON.stringify(editor.getDocument().content)).toContain('"text":"b"');
+    editor.run(rejectAllChanges());
+    expect(firstField(editor).deleted).toBe(false);
+    expect(editor.state.doc.textContent).toBe("ab1cd");
+  });
+
+  it("selection never rests half in a field, whatever is asked (property)", () => {
+    const content = [
+      p("ab", ...field("A", "xy"), "cd", ...field("B", ""), "e"),
+      p(...field("C", "z"), "f"),
+    ];
+    const editor = editorOf(content);
+    const size = editor.state.doc.content.size;
+    const fields = fieldsIn(editor.state.doc);
+    const positions = fc.integer({ min: 1, max: size - 1 });
+    fc.assert(
+      fc.property(positions, positions, (anchor, head) => {
+        const { state } = editor;
+        const inline = (pos: number) => state.doc.resolve(pos).parent.inlineContent;
+        fc.pre(inline(anchor) && inline(head));
+        editor.dispatch(state.tr.setSelection(TextSelection.create(state.doc, anchor, head)));
+        const { from, to, empty } = editor.state.selection;
+        for (const f of fields) {
+          // The caret is never in the code; a range holds a field whole or stays in or out of it.
+          expect(from > f.from && from <= f.codeEnd).toBe(false);
+          expect(to > f.from && to <= f.codeEnd).toBe(false);
+          if (!empty) expect(from > f.from && from < f.to).toBe(to > f.from && to < f.to);
+        }
+      }),
+      { numRuns: 200 },
+    );
+  });
+});
+
+describe("what a view shows", () => {
+  const types = (...lists: string[][]) => lists;
+  const whole = ["fieldStart", "fieldCode", "fieldSeparator", "text", "fieldEnd"];
+
+  it("hides what is in a code range, a nested field's result included", () => {
+    const [shown] = fieldDisplay(
+      types(["fieldStart", "fieldCode", ...whole, "fieldSeparator", "text", "fieldEnd"]),
+      false,
+    );
+    expect([...(shown?.hidden ?? [])]).toEqual([1, 3, 5]);
+    expect(shown?.braces.size).toBe(0);
+  });
+
+  it("with codes, shows braces and hides results, paragraphs inside them going", () => {
+    const shown = fieldDisplay(
+      types(["fieldStart", "fieldCode", "fieldSeparator", "text"], ["text"], ["fieldEnd", "text"]),
+      true,
+    );
+    expect([...(shown[0]?.braces ?? [])]).toEqual([
+      [0, "{"],
+      [2, "}"],
+    ]);
+    expect([...(shown[0]?.hidden ?? [])]).toEqual([3]);
+    expect(shown[0]?.gone).toBe(false);
+    expect(shown[1]?.gone).toBe(true);
+    expect(shown[2]?.gone).toBe(false);
+    expect(shown[2]?.hidden.size).toBe(0);
+  });
+
+  it("toggles codes through a command, the caret leaving a result then hidden", () => {
+    const editor = editorOf([p("a", ...field("X", "res"), "b")]);
+    const { resultFrom, to } = firstField(editor);
+    editor.select(resultFrom + 1);
+    expect(fieldCodesShown(editor.state)).toBe(false);
+    editor.run(toggleFieldCodes);
+    expect(fieldCodesShown(editor.state)).toBe(true);
+    expect(editor.state.selection.head).toBe(to);
+    expect(undoDepth(editor.state)).toBe(0);
+  });
+});
+
+describe("updateFields", () => {
+  it("numbers SEQ fields, each sequence by itself, with \\r, \\c, \\h and \\*", () => {
+    const editor = editorOf([
+      p(...field("SEQ a", "9")),
+      p(...field("SEQ b \\* ROMAN", "9")),
+      p(...field("SEQ a", "9")),
+      p(...field("SEQ a \\c", "9")),
+      p(...field("SEQ a \\r 7", "9")),
+      p(...field("SEQ a \\* roman", "9")),
+      p(...field("SEQ a \\h", "9")),
+      p(...field('SEQ a \\# "000"', "9")),
+    ]);
+    const report = updateFields(editor);
+    expect(report.updated).toBe(8);
+    expect(results(editor)).toEqual(["1", "I", "2", "2", "7", "viii", "", "010"]);
+  });
+
+  it("follows Word on SEQ's switches read together", () => {
+    const editor = editorOf([
+      p(...field("SEQ c \\h")),
+      p(...field("SEQ c \\h \\* Arabic")),
+      p(...field("SEQ c \\h \\* ROMAN")),
+      p(...field("SEQ c \\h \\* MERGEFORMAT")),
+      p(...field("SEQ d \\r 7")),
+      p(...field("SEQ d \\c \\r 3")),
+      p(...field("SEQ d \\r 4 \\c")),
+      p(...field("SEQ d \\n \\r 9")),
+      p(...field("SEQ e \\* ArabicDash")),
+    ]);
+    updateFields(editor);
+    expect(results(editor)).toEqual(["", "2", "III", "", "7", "7", "4", "5", "- 1 -"]);
+  });
+
+  it("restarts SEQ at a heading with \\s", () => {
+    const editor = editorOf([
+      styled("Heading1", "One"),
+      p(...field("SEQ a \\s 1")),
+      p(...field("SEQ a \\s 1")),
+      styled("Heading1", "Two"),
+      p(...field("SEQ a \\s 1")),
+    ]);
+    updateFields(editor);
+    expect(results(editor)).toEqual(["1", "2", "1"]);
+  });
+
+  it("restarts each sequence by itself at a heading", () => {
+    const editor = editorOf([
+      styled("Heading1", "One"),
+      p(...field("SEQ a \\s 1")),
+      p(...field("SEQ b \\s 1")),
+      styled("Heading1", "Two"),
+      p(...field("SEQ b \\s 1")),
+      p(...field("SEQ a \\s 1")),
+      p(...field("SEQ a \\s 1")),
+    ]);
+    updateFields(editor);
+    expect(results(editor)).toEqual(["1", "1", "1", "1", "2"]);
+  });
+
+  it("fills page fields from the layout, formats and all", () => {
+    const editor = editorOf([
+      p(...field("PAGE", "?")),
+      p(...field("PAGE \\* ROMAN", "?")),
+      p(...field("NUMPAGES", "?")),
+      p(...field("SECTIONPAGES", "?")),
+    ]);
+    updateFields(editor, {
+      layout: { pages: 12, pageAt: () => ({ number: 4, sectionPages: 5, format: "lowerRoman" }) },
+    });
+    expect(results(editor)).toEqual(["iv", "IV", "12", "5"]);
+  });
+
+  it("reports page fields it has no layout for, and keeps them", () => {
+    const editor = editorOf([p(...field("PAGE", "3")), p(...field("NUMPAGES", "4"))]);
+    const report = updateFields(editor);
+    expect(results(editor)).toEqual(["3", "4"]);
+    expect(report.skipped.map((s) => s.reason)).toEqual(["no-layout", "no-layout"]);
+  });
+
+  it("gives DATE and TIME the time asked, leaves locked fields and reports them", () => {
+    const now = new Date(2026, 10, 18, 9, 5);
+    const editor = editorOf([
+      p(...field('DATE \\@ "d MMM yyyy"', "x")),
+      p(...field('TIME \\@ "HH:mm"', "x")),
+      p(...field('DATE \\@ "yyyy"', "kept", { locked: true })),
+    ]);
+    const report = updateFields(editor, { now });
+    expect(results(editor)).toEqual(["18 Nov 2026", "09:05", "kept"]);
+    expect(report.skipped).toMatchObject([{ reason: "locked" }]);
+  });
+
+  it("keeps unknown instructions and missing bookmarks, reporting them", () => {
+    const editor = editorOf([
+      p(...field("WEIRD thing", "a")),
+      p(...field("REF nowhere", "b")),
+      p(...field("SEQ a \\z", "c")),
+      p(...field("SEQ b \\* Nonsense", "d")),
+    ]);
+    const report = updateFields(editor);
+    expect(results(editor)).toEqual(["a", "b", "c", "d"]);
+    expect(report.skipped.map((s) => [s.reason, s.detail])).toEqual([
+      ["unsupported-switch", "\\z"],
+      ["unsupported-switch", "\\*"],
+      ["unknown", undefined],
+      ["missing-bookmark", "nowhere"],
+    ]);
+  });
+
+  const marked: NodeJSON[] = [
+    { type: "bookmarkStart", attrs: { id: 1, name: "there" } },
+    { type: "text", text: "Marked", marks: [{ type: "bold" }] },
+    { type: "bookmarkEnd", attrs: { id: 1 } },
+  ];
+
+  it("REF copies the bookmark with its formatting; a bare name is a REF", () => {
+    const editor = editorOf([
+      p(...marked, " rest"),
+      p(...field("REF there \\h")),
+      p(...field("there")),
+    ]);
+    const report = updateFields(editor);
+    expect(report.skipped).toEqual([]);
+    expect(results(editor)).toEqual(["Marked", "Marked"]);
+    const json = JSON.stringify(editor.getDocument().content.content?.[1]);
+    expect(json).toContain('"marks":[{"type":"bold"');
+  });
+
+  it("REF \\* Upper and \\* CHARFORMAT take the field's own format", () => {
+    const code = { type: "fieldCode", attrs: { text: " REF there \\* Upper \\* CHARFORMAT " } };
+    const editor = editorOf([
+      p(...marked),
+      p(
+        { type: "fieldStart" },
+        { ...code, marks: [{ type: "italic" }] },
+        { type: "fieldSeparator" },
+        { type: "fieldEnd" },
+      ),
+    ]);
+    updateFields(editor);
+    expect(results(editor)).toEqual(["MARKED"]);
+    const json = JSON.stringify(editor.getDocument().content.content?.[1]);
+    expect(json).toContain('"text":"MARKED","marks":[{"type":"italic"');
+  });
+
+  it("REF \\p, PAGEREF and PAGEREF \\p say where", () => {
+    const editor = editorOf([
+      p(...field("REF there \\p")),
+      p(...marked),
+      p(...field("REF there \\p")),
+      p(...field("PAGEREF there \\h")),
+      p(...field("PAGEREF there \\p")),
+    ]);
+    updateFields(editor, {
+      layout: {
+        pages: 3,
+        pageAt: (pos) => ({ number: pos < 20 ? 2 : 3, sectionPages: 3 }),
+      },
+    });
+    expect(results(editor)).toEqual(["below", "above", "2", "on page 2"]);
+  });
+
+  it("MERGEFORMAT keeps the old result's look, a field without one takes its code's", () => {
+    const old: NodeJSON = { type: "text", text: "old", marks: [{ type: "bold" }] };
+    const editor = editorOf([
+      p(
+        { type: "fieldStart" },
+        { type: "fieldCode", attrs: { text: " SEQ a \\* MERGEFORMAT " } },
+        { type: "fieldSeparator" },
+        old,
+        { type: "fieldEnd" },
+      ),
+      p(
+        { type: "fieldStart" },
+        { type: "fieldCode", attrs: { text: " SEQ b " } },
+        { type: "fieldSeparator" },
+        old,
+        { type: "fieldEnd" },
+      ),
+    ]);
+    updateFields(editor);
+    const [first, second] = editor.getDocument().content.content ?? [];
+    expect(first?.content?.find((n) => n.type === "text")?.marks).toEqual([{ type: "bold" }]);
+    expect(second?.content?.find((n) => n.type === "text")?.marks).toBeUndefined();
+  });
+
+  it("gives a field without a separator one when it has a result", () => {
+    const editor = editorOf([
+      p(
+        { type: "fieldStart" },
+        { type: "fieldCode", attrs: { text: "SEQ a" } },
+        { type: "fieldEnd" },
+      ),
+    ]);
+    updateFields(editor);
+    expect(firstField(editor).separator).not.toBeNull();
+    expect(results(editor)).toEqual(["1"]);
+    valid(editor);
+  });
+
+  it("is one undo step, and doing it twice changes nothing more", () => {
+    const editor = editorOf([p(...field("SEQ a", "5")), p(...field("SEQ a", "5"))]);
+    updateFields(editor);
+    expect(undoDepth(editor.state)).toBe(1);
+    const after = editor.state.doc;
+    const report = updateFields(editor);
+    expect(report).toMatchObject({ updated: 0, unchanged: 2 });
+    expect(editor.state.doc).toBe(after);
+    editor.run(undo);
+    expect(results(editor)).toEqual(["5", "5"]);
+    editor.run(redo);
+    expect(results(editor)).toEqual(["1", "2"]);
+  });
+
+  it("while tracking, records the change, and again without piling up", () => {
+    const editor = editorOf([p(...field("SEQ a", "5"))], {}, true);
+    updateFields(editor);
+    const json = () => JSON.stringify(editor.getDocument().content);
+    expect(json()).toContain('"text":"5","marks":[{"type":"deletion"');
+    expect(json()).toContain('"text":"1","marks":[{"type":"insertion"');
+    expect(firstField(editor).result).toBe("1");
+    updateFields(editor);
+    expect(json().match(/"insertion"/g)).toHaveLength(1);
+    editor.run(acceptAllChanges());
+    expect(firstField(editor).result).toBe("1");
+    expect(json()).not.toContain('"deletion"');
+    valid(editor);
+  });
+
+  it("only: a caret takes the field around it, a range what it touches, a function its pick", () => {
+    const content = [
+      p(...field("SEQ a", "x")),
+      p(...field("SEQ a", "x")),
+      p(...field("SEQ a", "x")),
+    ];
+    const caret = editorOf(content);
+    const second = fieldsIn(caret.state.doc)[1] as ReturnType<typeof fieldsIn>[0];
+    updateFields(caret, { only: { from: second.resultFrom, to: second.resultFrom } });
+    expect(results(caret)).toEqual(["x", "2", "x"]);
+    // A caret beside a field: a one-digit result has no place inside for it.
+    const beside = editorOf(content);
+    const third = fieldsIn(beside.state.doc)[2] as ReturnType<typeof fieldsIn>[0];
+    updateFields(beside, { only: { from: third.to, to: third.to } });
+    expect(results(beside)).toEqual(["x", "x", "3"]);
+    const range = editorOf(content);
+    updateFields(range, { only: { from: 0, to: second.to } });
+    expect(results(range)).toEqual(["1", "2", "x"]);
+    const picked = editorOf(content);
+    let n = 0;
+    updateFields(picked, { only: () => n++ === 2 });
+    expect(results(picked)).toEqual(["x", "x", "3"]);
+  });
+
+  it("MERGEFIELD: from data, \\b and \\f around a value, none around nothing", () => {
+    const editor = editorOf([
+      p(...field("MERGEFIELD Name", "«Name»")),
+      p(...field('MERGEFIELD City \\b "in " \\f "!"', "«City»")),
+      p(...field('MERGEFIELD Gone \\b "x"', "«Gone»")),
+      p(...field("MERGEFIELD Missing", "«Missing»")),
+      p(...field('MERGEFIELD Total \\# "0.00"', "«Total»")),
+      p(...field("MERGEFIELD Name \\* Upper", "«Name»")),
+    ]);
+    const report = updateFields(editor, {
+      data: { Name: "Ada", City: "Paris", Gone: "", Total: 3 },
+    });
+    expect(results(editor)).toEqual(["Ada", "in Paris!", "", "«Missing»", "3.00", "ADA"]);
+    expect(report.skipped).toMatchObject([{ reason: "no-data", detail: "Missing" }]);
+    // Without data merge fields stay as they are, unreported.
+    expect(updateFields(editorOf([p(...field("MERGEFIELD A", "x"))])).skipped).toEqual([]);
+  });
+
+  it("filled from data while tracking, the value is a tracked insertion", () => {
+    const editor = editorOf([p(...field("MERGEFIELD Name", "«Name»"))], {}, true);
+    updateFields(editor, { data: { Name: "Ada" } });
+    expect(JSON.stringify(editor.getDocument().content)).toContain(
+      '"text":"Ada","marks":[{"type":"insertion"',
+    );
+  });
+
+  describe("in stories", () => {
+    const stories = {
+      h1: {
+        kind: "header" as const,
+        content: {
+          type: "doc" as const,
+          content: [p(...field("REF there", "?"), ...field("PAGE", "7"))],
+        },
+      },
+    };
+    const body = [
+      p({ type: "bookmarkStart", attrs: { id: 1, name: "there" } }, "T", {
+        type: "bookmarkEnd",
+        attrs: { id: 1 },
+      }),
+    ];
+    const section = { headers: { default: "h1" } };
+
+    it("updates them with the body, one undo step, page fields left to the view", () => {
+      const editor = editorOf(body, { stories, section });
+      updateFields(editor, { layout: pagesEvery(100) });
+      const tree = () => (editor.story("h1") as Editor).state.doc;
+      expect(fieldsIn(tree()).map((f) => f.result)).toEqual(["T", "7"]);
+      expect(undoDepth(editor.state)).toBe(1);
+      editor.run(undo);
+      expect(fieldsIn(tree()).map((f) => f.result)).toEqual(["?", "7"]);
+    });
+
+    it("tracks them when tracking is on", () => {
+      const editor = editorOf(body, { stories, section }, true);
+      updateFields(editor);
+      const json = JSON.stringify(editor.getDocument().stories?.h1?.content);
+      expect(json).toContain('"text":"T","marks":[{"type":"insertion"');
+    });
+
+    it("updates from a story's own editor", () => {
+      const editor = editorOf(body, { stories, section });
+      const story = editor.story("h1") as Editor;
+      updateFields(story, { only: { from: 0, to: story.state.doc.content.size } });
+      expect(fieldsIn(story.state.doc)[0]?.result).toBe("T");
+      expect(JSON.stringify(editor.getDocument().stories?.h1?.content)).toContain('"text":"T"');
+    });
+  });
+});
+
+describe("what cannot grow or stop an update", () => {
+  const mark = (id: number, name: string, ...content: (NodeJSON | string)[]): NodeJSON[] => [
+    { type: "bookmarkStart", attrs: { id, name } },
+    ...content.map((c) => (typeof c === "string" ? text(c) : c)),
+    { type: "bookmarkEnd", attrs: { id } },
+  ];
+
+  it("leaves a REF inside its own bookmark, however many times it is updated", () => {
+    const editor = editorOf([
+      p(...mark(1, "loop", "x ", ...field("REF loop", "a"), " ", ...field("REF LOOP", "b"))),
+    ]);
+    const size = editor.state.doc.content.size;
+    for (let i = 0; i < 3; i++) {
+      const report = updateFields(editor);
+      expect(report.skipped.map((s) => s.reason)).toEqual(["self-reference", "self-reference"]);
+    }
+    expect(editor.state.doc.content.size).toBe(size);
+  });
+
+  it("leaves bookmarks that refer to each other", () => {
+    const editor = editorOf([
+      p(...mark(1, "A", "a ", ...field("REF B", "?"))),
+      p(...mark(2, "B", "b ", ...field("REF A", "?"))),
+    ]);
+    expect(updateFields(editor).updated).toBe(0);
+    expect(results(editor)).toEqual(["?", "?"]);
+  });
+
+  it("finds bookmarks whatever the case of their names", () => {
+    const editor = editorOf([p(...mark(1, "Spot", "text")), p(...field("REF SPOT", "?"))]);
+    updateFields(editor);
+    expect(results(editor)).toEqual(["text"]);
+  });
+
+  it("keeps a table of contents in a heading out of itself, and stable", () => {
+    const editor = editorOf([
+      { ...p("Title ", ...field("TOC \\o", "")), attrs: { style: "Heading1" } },
+      styled("Heading1", "Other"),
+    ]);
+    updateFields(editor, { layout: pagesEvery(1000) });
+    const once = editor.state.doc.content.size;
+    // As Word has it: the heading by the rest of its text, the entries on lines of their own.
+    expect(firstField(editor).result).toBe("\rTitle\t1\rOther\t1");
+    expect(editor.state.doc.child(0).textContent).toBe("Title ");
+    valid(editor);
+    updateFields(editor, { layout: pagesEvery(1000) });
+    expect(editor.state.doc.content.size).toBe(once);
+  });
+
+  it("survives a picture too long for numbers, and a table of contents in another", () => {
+    const zeros = "0".repeat(101);
+    const editor = editorOf([
+      p(...field(`SEQ a \\# "0.${zeros}"`, "?")),
+      p(
+        { type: "fieldStart" },
+        { type: "fieldCode", attrs: { text: "TOC" } },
+        { type: "fieldSeparator" },
+        ...field("TOC", "inner"),
+        { type: "fieldEnd" },
+      ),
+      styled("Heading1", "One"),
+    ]);
+    expect(() => updateFields(editor, { layout: pagesEvery(1000) })).not.toThrow();
+    expect(results(editor)[0]).toBe(`1.${zeros}`);
+  });
+
+  it("refuses a table of contents inside another", () => {
+    const editor = editorOf([p(...field("TOC", "entry")), p()]);
+    editor.select(firstField(editor).resultFrom + 2);
+    expect(editor.can(insertTableOfContents())).toBe(false);
+  });
+
+  it("does not take long over many references, or fields nested deep", () => {
+    const refs = Array.from({ length: 4000 }, () => field("REF t", "?")).flat();
+    const wide = editorOf([p(...mark(1, "t", "x")), p(...refs)]);
+    let start = performance.now();
+    updateFields(wide);
+    // Far under what a step per field took (over 20 s here), with room for a busy machine.
+    expect(performance.now() - start).toBeLessThan(10_000);
+    const depth = 4000;
+    const deep: NodeJSON[] = [];
+    for (let i = 0; i < depth; i++)
+      deep.push(
+        { type: "fieldStart" },
+        { type: "fieldCode", attrs: { text: "X" } },
+        { type: "fieldSeparator" },
+      );
+    deep.push(text("x"));
+    for (let i = 0; i < depth; i++) deep.push({ type: "fieldEnd" });
+    const nested = editorOf([p(...deep)]);
+    start = performance.now();
+    updateFields(nested);
+    expect(performance.now() - start).toBeLessThan(10_000);
+  }, 30_000);
+});
+
+describe("tables of contents", () => {
+  const headings = [
+    styled("Heading1", "First"),
+    p("body"),
+    styled("Heading2", "Second"),
+    styled("Note", "A note"),
+    styled("Heading1", "Third"),
+  ];
+  const tocText = (editor: Editor) => firstField(editor).result;
+
+  it("is inserted as Word's: styles, _Toc bookmarks, links, nested PAGEREF, right tab", () => {
+    const editor = editorOf([p(), ...headings]);
+    editor.select(1);
+    expect(editor.run(insertTableOfContents({ layout: pagesEvery(1000) }))).toBe(true);
+    expect(firstField(editor).instruction).toBe('TOC \\o "1-3" \\h \\z \\u');
+    expect(tocText(editor)).toBe("First\t1\rSecond\t1\rThird\t1");
+    const document = editor.getDocument();
+    const [one, two, three, end] = document.content.content ?? [];
+    expect(one?.attrs).toMatchObject({
+      style: "TOC1",
+      tabs: [{ position: 9016, kind: "right", leader: "dot" }],
+    });
+    expect(two?.attrs?.style).toBe("TOC2");
+    expect(three?.attrs?.style).toBe("TOC1");
+    expect(end?.content?.map((n) => n.type)).toEqual(["fieldEnd"]);
+    const styles = document.styles.map((s) => s.id);
+    expect(styles).toEqual(expect.arrayContaining(["TOC1", "TOC2", "Hyperlink"]));
+    expect(document.styles.find((s) => s.id === "TOC2")?.paragraph?.indent?.left).toBe(220);
+    // The entries point at bookmarks around their headings.
+    const nested = fieldsIn(editor.state.doc).filter((f) => f.name === "PAGEREF");
+    expect(nested).toHaveLength(3);
+    const name = nested[0]?.instruction.split(" ")[1] as string;
+    expect(name).toMatch(/^_Toc\d+$/);
+    expect(JSON.stringify(document.content)).toContain(
+      `"bookmarkStart","attrs":{"id":0,"name":"${name}"`,
+    );
+    expect(JSON.stringify(one)).toContain(`"anchor":"${name}"`);
+    valid(editor);
+    // One undo step takes it all back.
+    editor.run(undo);
+    expect(fieldsIn(editor.state.doc)).toEqual([]);
+    expect(editor.state.doc.childCount).toBe(6);
+  });
+
+  it("in a paragraph with text, goes in one of its own", () => {
+    const editor = editorOf([p("before after"), ...headings]);
+    editor.select(8);
+    editor.run(insertTableOfContents({ layout: pagesEvery(1000), hyperlinks: false }));
+    const texts: string[] = [];
+    editor.state.doc.forEach((node) => {
+      texts.push(node.textContent);
+    });
+    expect(texts[0]).toBe("before ");
+    expect(texts.at(-headings.length - 1)).toBe("after");
+    expect(JSON.stringify(editor.getDocument().content)).not.toContain('"link"');
+    valid(editor);
+  });
+
+  it("follows \\o, \\u and \\t", () => {
+    const outline: NodeJSON = {
+      type: "paragraph",
+      attrs: { outlineLevel: 1 },
+      content: [text("Outlined")],
+    };
+    const make = (code: string) => {
+      const editor = editorOf([p(...field(code)), p(), ...headings, outline]);
+      updateFields(editor, { layout: pagesEvery(1000) });
+      return tocText(editor).replace(/\t\d+/g, "").split("\r");
+    };
+    expect(make('TOC \\o "1-1"')).toEqual(["First", "Third"]);
+    expect(make('TOC \\o "2-2" \\u')).toEqual(["Second", "Outlined"]);
+    expect(make('TOC \\t "Side note,2"')).toEqual(["A note"]);
+    expect(make("TOC")).toEqual(["First", "Second", "Third"]);
+  });
+
+  it("leaves page numbers out with \\n, and says so when nothing is found", () => {
+    const editor = editorOf([p(...field('TOC \\o "1-2" \\n "2-2"')), p(), ...headings]);
+    updateFields(editor, { layout: pagesEvery(1000) });
+    expect(tocText(editor)).toBe("First\t1\rSecond\rThird\t1");
+    const none = editorOf([p(...field("TOC \\o")), p("text")]);
+    updateFields(none);
+    expect(tocText(none)).toBe("No table of contents entries found.");
+    valid(none);
+  });
+
+  it("lists a numbered heading's number, reports switches it does not follow", () => {
+    const numbering = {
+      abstracts: [{ id: 1, levels: [{ level: 0, format: "decimal", text: "%1.", start: 1 }] }],
+      instances: [{ id: 1, abstract: 1 }],
+    };
+    const numbered: NodeJSON = {
+      type: "paragraph",
+      attrs: { style: "Heading1", numbering: { id: 1, level: 0 } },
+      content: [text("Numbered")],
+    };
+    const editor = editorOf([p(...field("TOC")), p(), numbered], { numbering } as never);
+    updateFields(editor, { layout: pagesEvery(1000) });
+    expect(tocText(editor)).toBe("1.\tNumbered\t1");
+    const other = editorOf([p(...field("TOC \\c Figure", "kept")), p()]);
+    const report = updateFields(other);
+    expect(tocText(other)).toBe("kept");
+    expect(report.skipped).toMatchObject([{ reason: "unsupported-switch", detail: "\\c" }]);
+  });
+
+  it("keeps its entries in the content control it stands in", () => {
+    const editor = editorOf(
+      [
+        { ...p(...field("TOC \\o", "")), attrs: { controls: ["g"] } },
+        { type: "paragraph", attrs: { controls: ["g"] } },
+        ...headings,
+      ],
+      { controls: { g: { kind: "other" } } } as never,
+    );
+    updateFields(editor, { layout: pagesEvery(1000) });
+    const blocks = editor.getDocument().content.content ?? [];
+    expect(blocks.slice(0, 4).map((b) => b.attrs?.controls)).toEqual([["g"], ["g"], ["g"], ["g"]]);
+    valid(editor);
+  });
+
+  it("leaves a section break after its last entry, not its first", () => {
+    const section = { type: "nextPage" as const };
+    const editor = editorOf([{ ...p(...field("TOC \\o", "")), attrs: { section } }, ...headings]);
+    updateFields(editor, { layout: pagesEvery(1000) });
+    const blocks = editor.getDocument().content.content ?? [];
+    expect(blocks.slice(0, 4).map((b) => !!b.attrs?.section)).toEqual([false, false, false, true]);
+    valid(editor);
+  });
+
+  it("does not build itself again at every update while tracking", () => {
+    const editor = editorOf([p(...field("TOC \\o", "")), p(), ...headings], {}, true);
+    updateFields(editor, { layout: pagesEvery(1000) });
+    const after = editor.state.doc;
+    const report = updateFields(editor, { layout: pagesEvery(1000) });
+    expect(report.rebuilt).toBe(0);
+    expect(editor.state.doc).toBe(after);
+  });
+
+  it("gives names no bookmark has, past a serial too large to count from", () => {
+    const huge: NodeJSON[] = [
+      { type: "bookmarkStart", attrs: { id: 9, name: "_Toc99999999999999999999" } },
+      { type: "bookmarkEnd", attrs: { id: 9 } },
+    ];
+    const editor = editorOf([p(...field("TOC \\o", "")), p(...huge), p(), ...headings]);
+    updateFields(editor, { layout: pagesEvery(1000) });
+    const names = fieldsIn(editor.state.doc)
+      .filter((f) => f.name === "PAGEREF")
+      .map((f) => f.instruction.split(" ")[1]);
+    expect(new Set(names).size).toBe(3);
+  });
+
+  it("lists what Word lists: styles by their levels, not hidden text", () => {
+    const styles: StyleJSON[] = [
+      ...STYLES,
+      {
+        id: "H3",
+        type: "paragraph",
+        name: "heading 3",
+        basedOn: "Normal",
+        paragraph: { outlineLevel: 2 },
+      },
+      { id: "BasedH1", type: "paragraph", name: "Based H1", basedOn: "Heading1" },
+      {
+        id: "BasedH2Out",
+        type: "paragraph",
+        name: "Based H2 out",
+        basedOn: "Heading2",
+        paragraph: { outlineLevel: 3 },
+      },
+      {
+        id: "OutStyle",
+        type: "paragraph",
+        name: "Out style",
+        basedOn: "Normal",
+        paragraph: { outlineLevel: 1 },
+      },
+    ];
+    const hidden = (value: string) => ({ ...text(value), marks: [{ type: "hidden" }] });
+    const body: NodeJSON[] = [
+      styled("Heading1", "Plain one"),
+      styled("BasedH1", "Based on heading"),
+      styled("BasedH2Out", "Based with outline"),
+      styled("OutStyle", "Style with outline"),
+      { ...p("Direct outline"), attrs: { outlineLevel: 2 } },
+      { ...p(hidden("All hidden")), attrs: { style: "Heading2" } },
+      { ...p("Part ", hidden("hidden "), "shown"), attrs: { style: "Heading2" } },
+      styled("H3", "Plain three"),
+    ];
+    const listed = (code: string) => {
+      const editor = editorOf([p(...field(code)), p(), ...body], { styles });
+      updateFields(editor, { layout: pagesEvery(1000) });
+      return firstField(editor).result.replace(/\t\d+/g, "").split("\r");
+    };
+    const common = ["Plain one", "Based on heading"];
+    expect(listed('TOC \\o "1-3"')).toEqual([
+      ...common,
+      "Style with outline",
+      "Part shown",
+      "Plain three",
+    ]);
+    expect(listed('TOC \\o "1-3" \\u')).toEqual([
+      ...common,
+      "Style with outline",
+      "Direct outline",
+      "Part shown",
+      "Plain three",
+    ]);
+    expect(listed("TOC \\u")).toEqual([
+      ...common,
+      "Based with outline",
+      "Style with outline",
+      "Direct outline",
+      "Part shown",
+      "Plain three",
+    ]);
+    expect(listed("TOC")).toEqual([
+      ...common,
+      "Based with outline",
+      "Style with outline",
+      "Part shown",
+      "Plain three",
+    ]);
+  });
+
+  it("leaves tab stops to a TOC style that has its own", () => {
+    const styles: StyleJSON[] = [
+      ...STYLES,
+      {
+        id: "TOC1",
+        type: "paragraph",
+        name: "toc 1",
+        basedOn: "Normal",
+        paragraph: {
+          tabs: [
+            { position: 900, kind: "left" },
+            { position: 8000, kind: "right", leader: "hyphen" },
+          ],
+        },
+      },
+    ];
+    const numbering = {
+      abstracts: [{ id: 1, levels: [{ level: 0, format: "decimal", text: "%1.", start: 1 }] }],
+      instances: [{ id: 1, abstract: 1 }],
+    };
+    const numbered: NodeJSON = {
+      type: "paragraph",
+      attrs: { style: "Heading1", numbering: { id: 1, level: 0 } },
+      content: [text("Numbered")],
+    };
+    const editor = editorOf([p(...field("TOC \\h")), p(), numbered], {
+      styles,
+      numbering,
+    } as never);
+    updateFields(editor, { layout: pagesEvery(1000) });
+    expect(editor.getDocument().content.content?.[0]?.attrs?.tabs).toBeUndefined();
+    const plain = editorOf([p(...field("TOC")), p(), numbered], { numbering } as never);
+    updateFields(plain, { layout: pagesEvery(1000) });
+    expect(plain.getDocument().content.content?.[0]?.attrs?.tabs).toEqual([
+      { position: 440, kind: "left" },
+      { position: 9016, kind: "right", leader: "dot" },
+    ]);
+  });
+
+  const blockTexts = (editor: Editor) => {
+    const out: string[] = [];
+    editor.state.doc.forEach((node) => {
+      out.push(`${node.attrs.style ?? "-"}:${node.textContent}`);
+    });
+    return out;
+  };
+  const twice = (editor: Editor) => {
+    updateFields(editor, { layout: pagesEvery(1000) });
+    const after = editor.state.doc;
+    for (let i = 0; i < 2; i++) {
+      const report = updateFields(editor, { layout: pagesEvery(1000) });
+      expect(report).toMatchObject({ rebuilt: 0, skipped: [] });
+    }
+    expect(editor.state.doc).toBe(after);
+  };
+
+  it("keeps what follows it in a paragraph of its own", () => {
+    const editor = editorOf([p(...field("TOC \\o", ""), " tail"), styled("Heading1", "A")]);
+    twice(editor);
+    expect(blockTexts(editor)).toEqual(["TOC1:A1", "-: tail", "Heading1:A"]);
+    const multi = editorOf([
+      p(
+        { type: "fieldStart" },
+        { type: "fieldCode", attrs: { text: "TOC \\o" } },
+        { type: "fieldSeparator" },
+        "old",
+      ),
+      p("older", { type: "fieldEnd" }, " tail"),
+      styled("Heading1", "A"),
+      styled("Heading1", "B"),
+    ]);
+    twice(multi);
+    expect(blockTexts(multi)).toEqual([
+      "TOC1:A1",
+      "TOC1:B1",
+      "-: tail",
+      "Heading1:A",
+      "Heading1:B",
+    ]);
+    valid(multi);
+  });
+
+  it("in a heading lists the text beside it, each side an entry, and stays as it is", () => {
+    const after = editorOf([
+      { ...p(...field("TOC \\o", ""), " tail"), attrs: { style: "Heading1" } },
+      styled("Heading1", "A"),
+    ]);
+    twice(after);
+    expect(firstField(after).result).toBe("tail\t1\rA\t1");
+    expect(blockTexts(after)).toEqual(["TOC1:tail1", "TOC1:A1", "Heading1: tail", "Heading1:A"]);
+    const both = editorOf([
+      { ...p("Title ", ...field("TOC \\o", ""), " tail"), attrs: { style: "Heading1" } },
+      styled("Heading1", "A"),
+    ]);
+    twice(both);
+    expect(firstField(both).result).toBe("\rTitle\t1\rtail\t1\rA\t1");
+    expect(blockTexts(both)[0]).toBe("Heading1:Title ");
+    valid(both);
+  });
+
+  it("strips the spaces around a heading's text", () => {
+    const editor = editorOf([
+      p(...field("TOC \\o", "")),
+      p(),
+      styled("Heading1", "   Spaced  title \u00a0 "),
+      { ...p({ type: "tab" }, "tabbed"), attrs: { style: "Heading1" } },
+    ]);
+    updateFields(editor, { layout: pagesEvery(1000) });
+    expect(firstField(editor).result).toBe("Spaced  title\t1\rtabbed\t1");
+  });
+
+  it("while tracking goes line by line: accepted it is right, and stays", () => {
+    const old = (value: string, ...more: NodeJSON[]) => ({
+      ...p(value, ...more),
+      attrs: { style: "Note" },
+    });
+    const content = [
+      {
+        ...p(
+          { type: "fieldStart" },
+          { type: "fieldCode", attrs: { text: "TOC \\o" } },
+          { type: "fieldSeparator" },
+          "old one",
+        ),
+        attrs: { style: "Note" },
+      },
+      old("old two"),
+      old("old three"),
+      p({ type: "fieldEnd" }),
+      styled("Heading1", "New"),
+    ];
+    const editor = editorOf(content, {}, true);
+    twice(editor);
+    expect(firstField(editor).result).toBe("New\t1");
+    editor.run(acceptAllChanges());
+    const [first] = editor.getDocument().content.content ?? [];
+    expect(first?.attrs).toMatchObject({ style: "TOC1", tabs: [{ kind: "right" }] });
+    expect(blockTexts(editor)).toEqual(["TOC1:New1", "-:", "Heading1:New"]);
+    twice(editor);
+    valid(editor);
+    const rejected = editorOf(content, {}, true);
+    updateFields(rejected, { layout: pagesEvery(1000) });
+    rejected.run(rejectAllChanges());
+    expect(blockTexts(rejected).slice(0, 3)).toEqual([
+      "Note:old one",
+      "Note:old two",
+      "Note:old three",
+    ]);
+    valid(rejected);
+  });
+
+  it("while tracking is rebuilt from any shape of old result", () => {
+    const start: NodeJSON[] = [
+      { type: "fieldStart" },
+      { type: "fieldCode", attrs: { text: "TOC \\o" } },
+      { type: "fieldSeparator" },
+    ];
+    for (const lead of [false, true])
+      for (const inline of [false, true])
+        for (const old of [1, 2, 3])
+          for (const wanted of [1, 2, 3]) {
+            const lines = Array.from({ length: old }, (_, i) => `old ${i}`);
+            const blocks: NodeJSON[] = lines.map((line) => p(line));
+            const head = lead ? ["before "] : [];
+            blocks[0] = p(...head, ...start, lines[0] as string);
+            const end: NodeJSON = { type: "fieldEnd" };
+            if (inline) {
+              const last = blocks[blocks.length - 1] as NodeJSON;
+              blocks[blocks.length - 1] = { ...last, content: [...(last.content ?? []), end] };
+            } else blocks.push(p(end));
+            const titles = Array.from({ length: wanted }, (_, i) => `H${i}`);
+            const editor = editorOf(
+              [p(...field("SEQ a", "9")), ...blocks, ...titles.map((t) => styled("Heading1", t))],
+              {},
+              true,
+            );
+            const report = updateFields(editor, { layout: pagesEvery(100_000) });
+            const shape = `${lead} ${inline} ${old} ${wanted}`;
+            expect(report.skipped, shape).toEqual([]);
+            expect(report.rebuilt, shape).toBe(1);
+            expect(results(editor)[0], shape).toBe("1");
+            editor.run(acceptAllChanges());
+            valid(editor);
+            const toc = fieldsIn(editor.state.doc)[1] as ReturnType<typeof fieldsIn>[0];
+            const lineText = titles.map((t) => `${t}\t1`).join("\r");
+            expect(toc.result, shape).toBe(lead ? `\r${lineText}` : lineText);
+            expect(updateFields(editor, { layout: pagesEvery(100_000) }).rebuilt, shape).toBe(0);
+          }
+  });
+
+  it("says so when tracking cannot record it, and updates the rest", () => {
+    // No headings: the whole result goes, a block tracking cannot delete among it.
+    const editor = editorOf(
+      [
+        p(...field("SEQ a", "9")),
+        p(
+          { type: "fieldStart" },
+          { type: "fieldCode", attrs: { text: "TOC \\o" } },
+          { type: "fieldSeparator" },
+          "old",
+        ),
+        { type: "opaqueBlock", attrs: { xml: "<w:p/>" } } as NodeJSON,
+        p("old two", { type: "fieldEnd" }),
+      ],
+      {},
+      true,
+    );
+    const report = updateFields(editor, { layout: pagesEvery(100_000) });
+    expect(results(editor)).toEqual(["1", "old\rold two"]);
+    expect(report).toMatchObject({ updated: 1, rebuilt: 0 });
+    expect(report.skipped.map((s) => s.reason)).toEqual(["untrackable"]);
+    valid(editor);
+  });
+
+  it("is rebuilt while tracking as tracked content", () => {
+    const editor = editorOf([p(...field("TOC \\o")), p(), ...headings], {}, true);
+    updateFields(editor, { layout: pagesEvery(1000) });
+    expect(tocText(editor)).toBe("First\t1\rSecond\t1\rThird\t1");
+    expect(JSON.stringify(editor.getDocument().content)).toContain(
+      '"text":"First","marks":[{"type":"insertion"',
+    );
+    editor.run(rejectAllChanges());
+    expect(fieldsIn(editor.state.doc).filter((f) => f.name === "PAGEREF")).toEqual([]);
+    valid(editor);
+  });
+});
+
+describe("inserting fields", () => {
+  it("puts a page number at the caret, worked out from the layout", () => {
+    const editor = editorOf([p("ab")]);
+    editor.select(2);
+    editor.run(
+      insertPageNumber({ layout: { pages: 3, pageAt: () => ({ number: 3, sectionPages: 3 }) } }),
+    );
+    expect(firstField(editor)).toMatchObject({ instruction: "PAGE", result: "3" });
+    expect(editor.state.selection.head).toBe(firstField(editor).to);
+    expect(editor.state.doc.textContent).toBe("a3b");
+    valid(editor);
+  });
+
+  it("replaces the selection, and keeps the marks of the text there", () => {
+    const editor = editorOf([
+      p({ type: "text", text: "abc", marks: [{ type: "bold" }] } as NodeJSON),
+    ]);
+    editor.select(1, 3);
+    editor.run(insertField("SEQ a"));
+    expect(editor.state.doc.textContent).toBe("1c");
+    expect(JSON.stringify(editor.getDocument().content)).toContain(
+      '"fieldStart","marks":[{"type":"bold"',
+    );
+  });
+
+  it("puts the date in Word's picture", () => {
+    const editor = editorOf([p("")]);
+    editor.select(1);
+    editor.run(insertDate("d MMMM yyyy", { now: new Date(2026, 0, 2) }));
+    expect(firstField(editor)).toMatchObject({
+      instruction: 'DATE \\@ "d MMMM yyyy"',
+      result: "2 January 2026",
+    });
+  });
+
+  it("works in a story, its page number left for the view to draw", () => {
+    const editor = editorOf([p("x")], {
+      section: { headers: { default: "h1" } },
+      stories: { h1: { kind: "header", content: { type: "doc", content: [p("")] } } },
+    });
+    const story = editor.story("h1") as Editor;
+    story.select(1);
+    expect(story.run(insertPageNumber())).toBe(true);
+    expect(fieldsIn(story.state.doc)[0]?.result).toBe("1");
+    expect(story.can(insertTableOfContents())).toBe(false);
+    story.run(undo);
+    expect(fieldsIn(story.state.doc)).toEqual([]);
+  });
+
+  describe("cross-references", () => {
+    const content = [
+      p({ type: "bookmarkStart", attrs: { id: 3, name: "spot" } }, "Spot", {
+        type: "bookmarkEnd",
+        attrs: { id: 3 },
+      }),
+      styled("Heading1", "Chapter"),
+      p("here"),
+    ];
+
+    it("lists bookmarks and headings", () => {
+      const editor = editorOf(content);
+      const targets = crossReferenceTargets(editor.state);
+      expect(targets.bookmarks).toEqual([{ name: "spot", text: "Spot" }]);
+      expect(targets.headings).toMatchObject([{ text: "Chapter", level: 1 }]);
+    });
+
+    it("to a bookmark: its text, or its page", () => {
+      const editor = editorOf(content);
+      editor.select(editor.state.doc.content.size - 1);
+      editor.run(insertCrossReference({ to: "spot" }));
+      expect(fieldsIn(editor.state.doc)[0]).toMatchObject({
+        instruction: "REF spot \\h",
+        result: "Spot",
+      });
+      editor.run(insertCrossReference({ to: "spot", show: "page", layout: pagesEvery(1000) }));
+      expect(fieldsIn(editor.state.doc)[1]).toMatchObject({
+        instruction: "PAGEREF spot \\h",
+        result: "1",
+      });
+    });
+
+    it("to a heading: gives it a _Ref bookmark, reused the next time", () => {
+      const editor = editorOf(content);
+      const { pos } = crossReferenceTargets(editor.state).headings[0] as { pos: number };
+      editor.select(editor.state.doc.content.size - 1);
+      editor.run(insertCrossReference({ to: pos }));
+      const first = firstField(editor);
+      expect(first.result).toBe("Chapter");
+      const name = first.instruction.split(" ")[1] as string;
+      expect(name).toMatch(/^_Ref\d+$/);
+      const next = crossReferenceTargets(editor.state).headings[0] as { pos: number };
+      editor.run(insertCrossReference({ to: next.pos, link: false }));
+      expect(fieldsIn(editor.state.doc)[1]?.instruction).toBe(`REF ${name}`);
+      valid(editor);
+      editor.run(undo);
+      editor.run(undo);
+      expect(JSON.stringify(editor.getDocument().content)).not.toContain("_Ref");
+    });
+
+    it("quotes a bookmark name with a space", () => {
+      const editor = editorOf([
+        p({ type: "bookmarkStart", attrs: { id: 3, name: "my spot" } }, "S", {
+          type: "bookmarkEnd",
+          attrs: { id: 3 },
+        }),
+        p("x"),
+      ]);
+      editor.select(editor.state.doc.content.size - 1);
+      editor.run(insertCrossReference({ to: "my spot" }));
+      expect(firstField(editor)).toMatchObject({ instruction: 'REF "my spot" \\h', result: "S" });
+    });
+
+    it("says it cannot when the target is gone", () => {
+      const editor = editorOf(content);
+      expect(editor.can(insertCrossReference({ to: "nothing" }))).toBe(false);
+      expect(editor.can(insertCrossReference({ to: 1 }))).toBe(false);
+    });
+  });
+
+  it("writes list numbers in REF as Word does, word for word", () => {
+    const numbering = {
+      abstracts: [
+        {
+          id: 1,
+          levels: [
+            { level: 0, format: "decimal", text: "%1.", start: 1 },
+            { level: 1, format: "lowerLetter", text: "%2)", start: 1 },
+            { level: 2, format: "lowerRoman", text: "(%3)", start: 1 },
+            { level: 3, format: "decimal", text: "Section %4.", start: 1 },
+          ],
+        },
+      ],
+      instances: [{ id: 1, abstract: 1 }],
+    };
+    const item = (level: number, ...content: (NodeJSON | string)[]): NodeJSON => ({
+      ...p(...content),
+      attrs: { numbering: { id: 1, level } },
+    });
+    const mark = (id: number, name: string, value: string): NodeJSON[] => [
+      { type: "bookmarkStart", attrs: { id, name } },
+      text(value),
+      { type: "bookmarkEnd", attrs: { id } },
+    ];
+    const switches = ["\\w", "\\n", "\\r", "\\w \\t", "\\n \\t", "\\r \\t"];
+    const editor = editorOf(
+      [
+        item(0, "one"),
+        item(1, "a"),
+        item(2, ...mark(1, "t", "target")),
+        item(3, ...mark(2, "s", "section")),
+        ...switches.flatMap((s) => [p(...field(`REF t ${s}`)), p(...field(`REF s ${s}`))]),
+        item(2, "sibling ", ...field("REF t \\r"), " ", ...field("REF s \\r")),
+      ],
+      { numbering } as never,
+    );
+    updateFields(editor);
+    expect(results(editor)).toEqual([
+      "1.a)(i)",
+      "1.a)(i)Section 1",
+      "(i)",
+      "Section 1",
+      "(i)",
+      "Section 1",
+      "1.a)(i)",
+      "1.a)(i)1",
+      "(i)",
+      "1",
+      "(i)",
+      "1",
+      "(i)",
+      "(i)Section 1",
+    ]);
+  });
+
+  it("reads REF \\r against where the list stands at the field, as Word does", () => {
+    const numbering = {
+      abstracts: [
+        {
+          id: 1,
+          levels: [
+            { level: 0, format: "decimal", text: "%1.", start: 1 },
+            { level: 1, format: "lowerLetter", text: "%2)", start: 1 },
+            { level: 2, format: "lowerRoman", text: "(%3)", start: 1 },
+          ],
+        },
+      ],
+      instances: [
+        { id: 1, abstract: 1 },
+        { id: 2, abstract: 1 },
+      ],
+    };
+    const item = (level: number, ...content: (NodeJSON | string)[]): NodeJSON => ({
+      ...p(...content),
+      attrs: { numbering: { id: 1, level } },
+    });
+    const mark = (id: number, name: string): NodeJSON[] => [
+      { type: "bookmarkStart", attrs: { id, name } },
+      text(name),
+      { type: "bookmarkEnd", attrs: { id } },
+    ];
+    const refs = [p(...field("REF t \\r")), p(...field("REF u \\r"))];
+    const editor = editorOf(
+      [
+        ...refs,
+        item(0, "one"),
+        item(1, "a"),
+        item(2, ...mark(1, "t")),
+        ...refs,
+        item(1, ...mark(2, "u")),
+        ...refs,
+        item(0, "two"),
+        ...refs,
+        { ...p("other"), attrs: { numbering: { id: 2, level: 0 } } },
+        ...refs,
+      ],
+      { numbering } as never,
+    );
+    updateFields(editor);
+    expect(results(editor)).toEqual([
+      "1.a)(i)",
+      "1.b)",
+      "(i)",
+      "b)",
+      "a)(i)",
+      "b)",
+      "1.a)(i)",
+      "1.b)",
+      "1.a)(i)",
+      "1.b)",
+    ]);
+    // Another list after the target's does not change where the target's stands.
+    const between = editorOf(
+      [
+        item(0, "one"),
+        item(1, "a"),
+        item(2, ...mark(1, "t")),
+        item(1, ...mark(2, "u")),
+        item(2, "under b"),
+        { ...p("other"), attrs: { numbering: { id: 2, level: 0 } } },
+        ...refs,
+      ],
+      { numbering } as never,
+    );
+    updateFields(between);
+    expect(results(between)).toEqual(["a)(i)", "b)"]);
+    // Read from Word: two lists of one definition count on together.
+    const shared = editorOf(
+      [
+        item(0, "one"),
+        item(1, "a"),
+        item(2, ...mark(1, "t")),
+        { ...p("o"), attrs: { numbering: { id: 2, level: 0 } } },
+        ...refs,
+        item(1, ...mark(2, "u")),
+        item(2, "under b"),
+        { ...p("o2"), attrs: { numbering: { id: 2, level: 0 } } },
+        ...refs,
+      ],
+      { numbering } as never,
+    );
+    updateFields(shared);
+    expect(results(shared)).toEqual(["(i)", "2.a)", "1.a)(i)", "a)"]);
+  });
+
+  it("numbers a clause reference as Word's \\r, \\n and \\w do", () => {
+    const numbering = {
+      abstracts: [
+        {
+          id: 1,
+          levels: [
+            { level: 0, format: "decimal", text: "%1.", start: 1 },
+            { level: 1, format: "decimal", text: "%1.%2", start: 1 },
+            { level: 2, format: "lowerLetter", text: "(%3)", start: 1 },
+          ],
+        },
+      ],
+      instances: [{ id: 1, abstract: 1 }],
+    };
+    const item = (level: number, ...content: (NodeJSON | string)[]): NodeJSON => ({
+      ...p(...content),
+      attrs: { numbering: { id: 1, level } },
+    });
+    const mark: NodeJSON[] = [
+      { type: "bookmarkStart", attrs: { id: 1, name: "c" } },
+      text("target"),
+      { type: "bookmarkEnd", attrs: { id: 1 } },
+    ];
+    const editor = editorOf(
+      [
+        item(0, "one"),
+        item(1, "one one"),
+        item(2, ...mark),
+        item(2, ...field("REF c \\r"), " ", ...field("REF c \\n"), " ", ...field("REF c \\w")),
+        p(...field("REF c \\r"), ...field("REF c \\w \\t")),
+      ],
+      { numbering } as never,
+    );
+    updateFields(editor);
+    expect(results(editor)).toEqual(["(a)", "(a)", "1.1(a)", "(a)", "1.1(a)"]);
+  });
+});

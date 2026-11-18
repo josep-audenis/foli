@@ -53,6 +53,7 @@ describe("formatNumber", () => {
     expect(formatNumber(112, "ordinal")).toBe("112th");
     expect(formatNumber(21, "ordinal")).toBe("21st");
     expect(formatNumber(3, "none")).toBe("");
+    expect(formatNumber(4, "numberInDash")).toBe("- 4 -");
     expect(formatNumber(3, "chineseCounting")).toBe("3");
   });
 });

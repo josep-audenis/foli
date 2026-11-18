@@ -11,6 +11,8 @@
  */
 import {
   type CellFormat,
+  type FieldDisplay,
+  fieldDisplay,
   isSafeHref,
   type ListMarker,
   type Mark,
@@ -91,6 +93,16 @@ export interface WordInfo {
   empty: boolean;
 }
 
+/** A paragraph's inline nodes, by type name. */
+function childTypes(node: ModelNode): string[] {
+  const types: string[] = [];
+  if (node.type.name === "paragraph")
+    node.forEach((child) => {
+      types.push(child.type.name);
+    });
+  return types;
+}
+
 /** A rendered v3 block: a view block plus its flow information and what it was rendered for. */
 export interface WordBlockDesc extends BlockDesc {
   readonly word: WordInfo;
@@ -123,6 +135,10 @@ export class WordRenderer {
   #comments: number[][] = [];
   /** Where a document adds paragraph spacing: the space after the paragraph above, in a cell. */
   #above: number[] = [];
+  /** Whether fields show their codes. */
+  readonly #codes: boolean;
+  /** What each block shows of its fields. */
+  #fields: FieldDisplay[] = [];
 
   constructor(
     context: WordContext,
@@ -131,7 +147,9 @@ export class WordRenderer {
     clipboard = false,
     review: ReviewView = "markup",
     image?: ImageSource,
+    codes = false,
   ) {
+    this.#codes = codes;
     this.#context = context;
     this.#doc = doc;
     this.#ratio = ratio;
@@ -182,6 +200,7 @@ export class WordRenderer {
     }
     this.#markers = this.#context.resolver.markers(attrs);
     this.#comments = comments;
+    this.#fields = fieldDisplay(blocks.map(childTypes), this.#codes);
   }
 
   /** Whether the block at `index` (of those prepared) shows a list number. */
@@ -193,7 +212,10 @@ export class WordRenderer {
   key(index: number, cell?: CellFormat | null): string {
     const inCell = cell ? `|${cell.style ?? ""}:${cell.conditions.join(",")}` : "";
     const above = this.#above[index] ? `|${this.#above[index]}` : "";
-    return `${this.#markers[index]?.text ?? ""}|${(this.#comments[index] ?? []).join(" ")}${inCell}${above}`;
+    // A field opened or closed in an earlier block changes what shows here.
+    const field = this.#fields[index];
+    const fields = field?.hidden.size || field?.gone ? `|${[...field.hidden]}${field.gone}` : "";
+    return `${this.#markers[index]?.text ?? ""}|${(this.#comments[index] ?? []).join(" ")}${inCell}${above}${fields}`;
   }
 
   /** A block; `cell` is the format of the table cell it is in, if any. */
@@ -208,6 +230,11 @@ export class WordRenderer {
     const { paragraph, run } = resolver.paragraph(node.attrs, cell ?? undefined);
     const line = (r: RunFormat) => lineHeight(paragraph, r, this.#ratio(fontStack(latin(r))));
     const doc = this.#doc;
+    const codes = this.#codes;
+    // On the clipboard a block stands by itself.
+    const display = this.#clipboard
+      ? (fieldDisplay([childTypes(node)], false)[0] as FieldDisplay)
+      : (this.#fields[index] ?? (fieldDisplay([[]], false)[0] as FieldDisplay));
     const changed = this.#review !== "final" && hasChanges(node);
     // The line's own height is the paragraph mark's, as in `renderBlocks`.
     const mark = resolver.run(run, (node.attrs.markFormat ?? []) as MarkJSON[]);
@@ -225,6 +252,7 @@ export class WordRenderer {
           fragment.style.textAlignLast = "justify";
       }
       if (changed && !this.#clipboard) fragment.style.boxShadow = CHANGE_BAR;
+      if (display.gone) fragment.style.display = "none";
       return fragment;
     });
     const dom = fragments[0] as HTMLElement;
@@ -247,13 +275,23 @@ export class WordRenderer {
     const floats = new Map<HTMLElement, HTMLElement[]>();
     let geometry: FloatGeometry | undefined;
     const comments = new Set(this.#comments[index] ?? []);
-    node.forEach((child, offset) => {
+    node.forEach((child, offset, childIndex) => {
       const name = child.type.name;
       if (name === "commentStart") comments.add(child.attrs.id as number);
       if (name === "commentEnd") comments.delete(child.attrs.id as number);
+      const hidden = display.hidden.has(childIndex);
+      /** Where this node's DOM goes: out of sight when it is hidden, as hidden deletions are. */
+      const holder = (at: number): HTMLElement => {
+        const fragment = fragmentAt(at);
+        if (!hidden) return fragment;
+        const span = doc.createElement("span");
+        span.style.display = "none";
+        fragment.append(span);
+        return span;
+      };
       const leafElement = (element: HTMLElement) => {
         leaves.push({ dom: element, offset, size: child.nodeSize });
-        fragmentAt(offset).append(this.#wrap(element, child.marks, comments));
+        holder(offset).append(this.#wrap(element, child.marks, comments));
       };
       switch (name) {
         case "text":
@@ -265,7 +303,7 @@ export class WordRenderer {
           if (name === "pageBreak") br.setAttribute(WORD_PAGE_BREAK_ATTR, "");
           if (name === "columnBreak") br.setAttribute(WORD_COLUMN_BREAK_ATTR, "");
           leaves.push({ dom: br, offset, size: 1 });
-          fragmentAt(offset).append(br);
+          holder(offset).append(br);
           return;
         }
         case "tab": {
@@ -274,14 +312,14 @@ export class WordRenderer {
           const tab = doc.createTextNode("\t");
           span.append(tab);
           leaves.push({ dom: tab, offset, size: 1 });
-          fragmentAt(offset).append(this.#wrap(span, child.marks, comments));
+          holder(offset).append(this.#wrap(span, child.marks, comments));
           return;
         }
         case "picture": {
           // Not editable inside (no browser resize handles); one position, like opaque content.
           const span = doc.createElement("span");
           span.setAttribute("contenteditable", "false");
-          if (child.attrs.float && !this.#clipboard) {
+          if (child.attrs.float && !this.#clipboard && !hidden) {
             // Floating: drawn at the fragment's start (ADR-0006), its place in the text an
             // empty anchor.
             geometry ??= floatGeometry(this.#context.envelope.section);
@@ -304,12 +342,25 @@ export class WordRenderer {
           return;
         }
         default: {
+          // A field's code and braces, when codes show: drawn, not document text.
+          const shown =
+            display.braces.get(childIndex) ??
+            (codes && !hidden && name === "fieldCode" ? String(child.attrs.text ?? "") : "");
+          if (shown) {
+            const span = this.#run(run, child.marks, line);
+            span.textContent = shown;
+            span.dataset.foliFieldCode = "";
+            span.setAttribute("contenteditable", "false");
+            leaves.push({ dom: span, offset, size: child.nodeSize });
+            fragmentAt(offset).append(span);
+            return;
+          }
           // Bookmarks, comment anchors and reference marks: nothing to see, a place to map to.
           const span = doc.createElement("span");
           if (name === "commentReference")
             span.dataset.foliCommentReference = String(child.attrs.id);
           leaves.push({ dom: span, offset, size: child.nodeSize });
-          fragmentAt(offset).append(span);
+          holder(offset).append(span);
           return;
         }
       }
@@ -321,7 +372,7 @@ export class WordRenderer {
         leaves.push({ dom: leaf, offset: from, size: to - from });
         const span = this.#run(run, child.marks, line);
         span.append(leaf);
-        fragmentAt(from).append(this.#wrap(span, child.marks, comments));
+        holder(from).append(this.#wrap(span, child.marks, comments));
         from = to;
       }
     });
@@ -345,10 +396,12 @@ export class WordRenderer {
     let last: ModelNode | null = null;
     for (let i = node.childCount - 1; i >= 0 && !last; i--) {
       const child = node.child(i);
+      if (display.hidden.has(i)) continue;
       // A floating picture is not in the line: a paragraph holding only one shows its empty line.
       if (
-        !NOT_IN_LINE.has(child.type.name) &&
-        !(child.type.name === "picture" && child.attrs.float)
+        display.braces.has(i) ||
+        (codes && child.type.name === "fieldCode") ||
+        (!NOT_IN_LINE.has(child.type.name) && !(child.type.name === "picture" && child.attrs.float))
       )
         last = child;
     }
@@ -357,8 +410,8 @@ export class WordRenderer {
     const { before, after } = paragraph.spacing;
     // Word's automatic spacing (HTML): 14 pt.
     const word: WordInfo = {
-      before: (paragraph.spacing.beforeAutospacing ? 280 : before) * PX_PER_TWIP,
-      after: (paragraph.spacing.afterAutospacing ? 280 : after) * PX_PER_TWIP,
+      before: display.gone ? 0 : (paragraph.spacing.beforeAutospacing ? 280 : before) * PX_PER_TWIP,
+      after: display.gone ? 0 : (paragraph.spacing.afterAutospacing ? 280 : after) * PX_PER_TWIP,
       keepNext: paragraph.keepNext,
       keepLines: paragraph.keepLines,
       pageBreakBefore: paragraph.pageBreakBefore,

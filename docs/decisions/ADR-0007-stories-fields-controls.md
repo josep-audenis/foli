@@ -216,6 +216,36 @@ content, ext? }`. `content` is a `doc` of the body's blocks. `noteType` is Word'
   Unknown instructions keep their result, reported. Tracked when tracking is on.
 - A field is selected and deleted whole when the selection crosses its markers; Backspace at its
   edge selects it first, as Word does.
+- **Built in 11.8**, where the above left room or turned out otherwise:
+  - `updateFields(editor, { layout, data, now, only })` returns what it did and what it left
+    (`updated`, `unchanged`, `rebuilt`, `skipped` with a reason). `layout` is `{ pages, pageAt(pos)
+    }`, a position's displayed number, its section's page count and number format. Core makes one
+    pass; `view.updateFields` makes a second, joined to the same undo step, for the page numbers a
+    rebuilt table of contents moved.
+  - Results are worked out in stages (fields in codes, values and `SEQ`, `REF` and `PAGEREF`, `TOC`)
+    so what depends on another result sees it. A table of contents whose lines and styles are
+    already right is left alone: its paragraphs keep their ids, and updating an untouched document
+    changes nothing, the check against Word on the corpus.
+  - A missing bookmark keeps the old result and is reported. Word writes "Error! Reference source
+    not found." into the document; a failed update should not cost the reader the text.
+  - With codes shown, a field's closing brace is drawn at its separator, so a table of contents
+    reads `{ TOC … }` on one line; paragraphs wholly inside a hidden result take no room. The
+    paragraph holding the end stays, an empty line. Codes are not editable there.
+  - Browsers cannot tell the two sides of a marker apart: the selection rules treat positions with
+    only markers between them as one place, or a range would give a field up when the browser
+    reads its end back one position short. Left and Right start past the markers next to the caret
+    (WebKit spent a key press on each empty element).
+  - A caret at a result's very start or end goes outside the field (typed text would be lost to
+    the next update), and with codes shown the whole field is closed to it. Only a move does this:
+    text typed over a whole result goes on inside it.
+  - Checked against Word 16 by updating documents in it: a table of contents lists paragraphs by
+    their style's level (heading styles, styles based on them, styles with an outline level) and
+    with `\u` by their own; a heading holding one is listed by the rest of its text; a TOC style
+    with tab stops gets none on its paragraphs; its end always stands first in a paragraph of its
+    own, with what follows it; `\#` pictures (558 cases are a test fixture). A rebuild goes line
+    by line, so tracked it records each entry's text and style where the old one was.
+    Bookmarks referring to each other grow in Word at every update; Foli leaves them and reports it.
+  - Find (11.11) has to skip code ranges: `fieldsIn` gives them.
 
 ### Content controls
 
@@ -247,8 +277,9 @@ content, ext? }`. `content` is a `doc` of the body's blocks. `noteType` is Word'
   otherwise kept verbatim. Sections gain `columns`, `pageNumbers` (`w:pgNumType`) and their own
   note properties.
 - **Find:** core's `findAll(doc, query)` over the body and each story; results carry the story id.
-- **Slices with half a field or control** are repaired on paste: markers without partners are
-  dropped, their content kept.
+- **Slices with half a field or control** are repaired on paste (`fitPaste`, built in 11.8):
+  markers without partners are dropped, a field that lost its end losing its code too, their
+  content kept.
 - **PDF.** A new `@folijs/pdf`, no browser dependency: `exportPdf(document, { page, resources })`
   drives a page the app supplies (Playwright's or Puppeteer's: `setContent`, `addScriptTag`,
   `evaluate`, `pdf`), loads the read-only renderer's bundle, updates page fields, and prints with
