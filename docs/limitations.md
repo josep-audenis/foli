@@ -28,9 +28,9 @@ checklist in [testing/ime.md](testing/ime.md)):
 
 - The editor holds schema v5 (Word's model, 8.7; tables and pictures, 10.3; v5's stories, fields and content controls are not produced yet): paragraphs in
   styles (headings are Word's heading styles), lists as Word's numbering, run formatting, line
-  and page breaks, links, tables, inline and floating pictures; everything else Word has
-  (fields, content controls, charts, shapes...) is kept as opaque content, selected and deleted
-  whole. Documents saved by 0.1.0 to 0.4.0 are migrated when loaded; 0.4.0 cannot read
+  and page breaks, links, tables, inline and floating pictures, fields (shown with their stored
+  results) and content controls (their text editable, nothing marking them yet); everything else
+  Word has (charts, shapes...) is kept as opaque content, selected and deleted whole. Documents saved by 0.1.0 to 0.4.0 are migrated when loaded; 0.4.0 cannot read
   documents saved by 0.5.0. No headers, footers or page numbers (Phase 11). Sections are laid out with their own page
   setups; a continuous section with another page setup starts a new page, and an even or odd
   page section gets no blank page before it. Page setups and section breaks are not editable
@@ -181,7 +181,7 @@ Details in the [package README](../packages/docx/README.md).
   cannot be exported without it (`DocxError`).
 - The theme is read-only: export keeps the original part; a new package has none, so Word's
   default theme applies.
-- Elements Foli does not model (content controls, fields, charts, shapes, equations...) are
+- Elements Foli does not model (charts, shapes, equations...) are
   kept verbatim and exported, but are not editable. A value the model cannot hold (out of
   range, a unit such as `1.5cm`) stays in its element and is exported, but is not editable
   (`report.unmodeled`).

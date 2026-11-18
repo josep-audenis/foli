@@ -472,15 +472,6 @@ describe("schema v5 content not written yet", () => {
           },
         ],
       }),
-    ).rejects.toThrow(/controls cannot be exported/);
-    await expect(
-      exportDocx({
-        ...base,
-        content: {
-          type: "doc",
-          content: [{ type: "paragraph", content: [{ type: "fieldEnd" }] }],
-        },
-      }),
-    ).rejects.toThrow(/fieldEnd cannot be exported/);
+    ).rejects.toThrow(/Content control c has no properties/);
   });
 });

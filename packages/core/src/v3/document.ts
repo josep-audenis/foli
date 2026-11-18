@@ -861,39 +861,38 @@ const checkStory: Check = (v) =>
     : undefined);
 const checkStories = recordOf(checkStory, "story");
 
-const checkControls = recordOf(
-  shape(
-    {
-      kind: oneOf([
-        "text",
-        "richText",
-        "dropDown",
-        "comboBox",
-        "date",
-        "checkbox",
-        "picture",
-        "repeating",
-        "repeatingItem",
-        "other",
-      ]),
-      tag: str(),
-      alias: str(),
-      lock: oneOf(["sdtLocked", "contentLocked", "sdtContentLocked", "unlocked"]),
-      items: listOf(shape({ value: str(), display: str() }, ["value"])),
-      dateFormat: str(),
-      checked: bool,
-      placeholder: shape({ showing: bool, docPart: str() }, [], true),
-      binding: shape(
-        { xpath: str(65_535), storeItemId: str(), prefixMappings: str(65_535) },
-        [],
-        true,
-      ),
-      ext: xml,
-    },
-    ["kind"],
-  ),
-  "control",
+/** A content control's properties. */
+export const checkControl: Check = shape(
+  {
+    kind: oneOf([
+      "text",
+      "richText",
+      "dropDown",
+      "comboBox",
+      "date",
+      "checkbox",
+      "picture",
+      "repeating",
+      "repeatingItem",
+      "other",
+    ]),
+    tag: str(),
+    alias: str(),
+    lock: oneOf(["sdtLocked", "contentLocked", "sdtContentLocked", "unlocked"]),
+    items: listOf(shape({ value: str(), display: str() }, ["value"])),
+    dateFormat: str(),
+    checked: bool,
+    placeholder: shape({ showing: bool, docPart: str() }, [], true),
+    binding: shape(
+      { xpath: str(65_535), storeItemId: str(), prefixMappings: str(65_535) },
+      [],
+      true,
+    ),
+    ext: xml,
+  },
+  ["kind"],
 );
+const checkControls = recordOf(checkControl, "control");
 
 const checkSettings: Check = shape(
   { evenAndOddHeaders: bool, footnotes: checkNoteProperties, endnotes: checkNoteProperties },

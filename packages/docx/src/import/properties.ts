@@ -19,6 +19,13 @@ export function sourceOf(context: Context, element: XmlElement): string {
   return context.source.slice(element.start, element.end);
 }
 
+/** `object` without its undefined values. */
+export function compactDefined<T extends Record<string, unknown>>(object: T): Partial<T> {
+  return Object.fromEntries(
+    Object.entries(object).filter(([, value]) => value !== undefined),
+  ) as Partial<T>;
+}
+
 const ATTRIBUTE_NAME = /^[A-Za-z_][\w.-]*(:[A-Za-z_][\w.-]*)?$/;
 
 /**

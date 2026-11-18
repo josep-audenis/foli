@@ -4,6 +4,7 @@ export {
   type CellPropertiesJSON,
   type CommentJSON,
   type ControlJSON,
+  checkControl,
   createDocument,
   type FoliDocument,
   type FoliDocumentV3,

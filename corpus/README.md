@@ -70,6 +70,7 @@ One `<name>.json` per document:
 | `sections`          | Each section: `page` it starts on, `start` (WdSectionStart), `columns`, `differentFirstPage`, and `headers` and `footers`, each with `default`, `first`, `even`: `exists`, `linked` (to the previous section), `tables`, `text` (as Word has it open: page fields recomputed, so not what the part stores, and a picture as `/`). `exists` says the variant is in effect (`first` needs a different first page, `even` even and odd headers), not that the file has the part |
 | `notes`             | Each footnote, then each endnote: `kind`, `referencePage`, `text`, and the tracked changes in it (`revisions`, counted before changes are accepted). Word answers a note's own page with its reference's, so where a note continues shows only in its PDF                                                                                                                                                                                                                    |
 | `fields`            | Each field of the main text: `type` (WdFieldType), `code`, `result` as Word has it open (an unlocked `DATE` would be today's), `page`                                                                                                                                                                                                                                                                                                                                        |
+| `controls`          | Each content control of the main text: `type` (WdContentControlType), `tag`, `title`, `placeholder` (showing it), `text`                                                                                                                                                                                                                                                                                                                                                     |
 | `bookmarks`         | Each visible bookmark: `name`, `page`, `text`                                                                                                                                                                                                                                                                                                                                                                                                                                |
 
 `line` counts on down a page's columns (Word numbers the lines of a page in one run). In `text` a manual line break is a newline; bullets in `listString` are the bullet font's code point
@@ -135,25 +136,28 @@ there (and UTC in `w16du:dateUtc`), so Word shows Foli's times shifted by the ti
 `scripts/corpus/import-report.mjs` (after `pnpm build`) imports each document and prints what
 became editable and what stayed opaque; counts and element names only, never text, so it runs
 on a private folder too (`node scripts/corpus/import-report.mjs <folder>`). On the corpus
-(2026-11-18, after 11.4: tables, pictures, headers, footers and notes are modeled, and what stays
+(2026-11-18, after 11.5: tables, pictures, headers, footers, notes, fields and content controls are modeled, and what stays
 opaque is counted in those parts too; paragraphs count the body's, those in table cells included):
 
-| Document                       | Paragraphs | Tables | Opaque                                               | Unmodeled values |
-| ------------------------------ | ---------: | -----: | ---------------------------------------------------- | ---------------: |
-| 01-mutual-nda                  |         37 |      1 | field structure 12                                   |                0 |
-| 02-services-agreement-redlined |         98 |      1 | comment reference marks 4; field structure 8         |                0 |
-| 03-offer-letter-template       |         14 |      0 | content controls 5, merge field 1; field structure 4 |                0 |
-| 04-board-report                |         59 |      1 | field structure 44                                   |                0 |
-| 05-business-letter             |         17 |      0 | field structure 4                                    |                0 |
-| 06-price-schedule              |        202 |      2 | none                                                 |                0 |
-| 07-picture-report              |          7 |      0 | none                                                 |                0 |
-| 08-newsletter                  |         22 |      0 | field structure 4                                    |                0 |
-| 09-pump-test-memo              |         15 |      0 | field structure 24                                   |                0 |
+| Document                       | Paragraphs | Tables | Opaque                    | Unmodeled values |
+| ------------------------------ | ---------: | -----: | ------------------------- | ---------------: |
+| 01-mutual-nda                  |         37 |      1 | none                      |                0 |
+| 02-services-agreement-redlined |         98 |      1 | comment reference marks 4 |                0 |
+| 03-offer-letter-template       |         14 |      0 | none                      |                0 |
+| 04-board-report                |         59 |      1 | none                      |                0 |
+| 05-business-letter             |         17 |      0 | none                      |                0 |
+| 06-price-schedule              |        202 |      2 | none                      |                0 |
+| 07-picture-report              |          7 |      0 | none                      |                0 |
+| 08-newsletter                  |         22 |      0 | none                      |                0 |
+| 09-pump-test-memo              |         15 |      0 | none                      |                0 |
 
-Field structure (`w:fldChar`, `w:instrText`) and comment reference marks have nothing to show:
-the field's result stays editable text. The tests check every imported paragraph's text against
-Word's (`reference/word/`), table cells included (a cell a vertical merge covers has none in
+Comment reference marks have nothing to show. The tests check every imported paragraph's text
+against Word's (`reference/word/`), table cells included (a cell a vertical merge covers has none in
 Word's list: 06 counts 32 of them).
+
+`scripts/corpus/field-roundtrip.mjs` (11.5) has Word read Foli's fields and content controls
+back: every document holding them exported unchanged (Word finds the same fields, controls and
+bookmarks) and edited (a field's result, a control's text, a block control split in two).
 
 `scripts/corpus/story-roundtrip.mjs` (11.4) has Word read Foli's stories back: every document
 with stories exported unchanged and edited (text added to every header and footer and to a note,

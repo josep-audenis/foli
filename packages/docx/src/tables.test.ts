@@ -187,9 +187,8 @@ describe("what the model cannot hold as a table", () => {
   const table = (rows: string, props = "<w:tblPr/>") =>
     `<w:tbl>${props}<w:tblGrid><w:gridCol w:w="2000"/></w:tblGrid>${rows}</w:tbl>`;
 
-  it("keeps it verbatim: rows in a content control, a cell ending with a table, markers between rows", async () => {
+  it("keeps it verbatim: a cell ending with a table, markers between rows", async () => {
     for (const body of [
-      `${table(`<w:sdt><w:sdtContent><w:tr>${cell}</w:tr></w:sdtContent></w:sdt>`)}<w:p/>`,
       `${table(`<w:tr><w:tc>${table(`<w:tr>${cell}</w:tr>`)}</w:tc></w:tr>`)}<w:p/>`,
       `${table(`<w:tr>${cell}</w:tr><w:bookmarkStart w:id="1" w:name="b"/><w:tr>${cell}</w:tr>`)}<w:p/>`,
       `${table("")}<w:p/>`,

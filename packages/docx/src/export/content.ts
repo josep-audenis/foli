@@ -5,6 +5,7 @@
 
 import type { MarkJSON, NodeJSON } from "@folijs/core";
 import { DocxError } from "../package.js";
+import type { ControlWriter } from "./controls.js";
 import { paragraphPropertiesXml, runPropertiesXml, same } from "./properties.js";
 import {
   cellPropertiesXml,
@@ -13,7 +14,7 @@ import {
   rowPropertiesXml,
   tablePropertiesXml,
 } from "./tables.js";
-import { bagXml, el, escapeText, fragment, type Namespaces } from "./xmlout.js";
+import { bagXml, el, escapeAttribute, escapeText, fragment, type Namespaces } from "./xmlout.js";
 
 export interface WriteContext {
   readonly namespaces: Namespaces;
@@ -26,6 +27,8 @@ export interface WriteContext {
   readonly picture: (attrs: Record<string, unknown>) => string;
   /** The kind of note being written: what its `noteMark` is. */
   readonly note?: "footnote" | "endnote";
+  /** The document's content controls. */
+  readonly controls: ControlWriter;
 }
 
 type Json = Record<string, unknown>;
@@ -37,15 +40,36 @@ function verbatim(xml: unknown, context: WriteContext): string {
   return text;
 }
 
+/** A control around `inner` (`w:sdtPr`, `w:sdtEndPr`, then the content, as `w:sdt` requires). */
+function controlXml(id: string, inner: string, context: WriteContext): string {
+  const { properties } = context.controls.parts(id, context.namespaces);
+  return `<w:sdt>${properties}<w:sdtContent>${inner}</w:sdtContent></w:sdt>`;
+}
+
+/** `items` written by `write`, the runs of them in one control (at `depth`) inside it. */
+function inControls(
+  items: readonly NodeJSON[],
+  depth: number,
+  context: WriteContext,
+  write: (item: NodeJSON) => string,
+): string {
+  return grouped(
+    items,
+    (n) => (n.attrs?.controls as string[] | undefined)?.[depth],
+    (group, id) =>
+      id === undefined
+        ? group.map(write).join("")
+        : controlXml(id as string, inControls(group, depth + 1, context, write), context),
+  );
+}
+
 export function blocksXml(blocks: readonly NodeJSON[], context: WriteContext): string {
-  let out = "";
-  for (const block of blocks) {
-    if (block.type === "paragraph") out += paragraphXml(block, context);
-    else if (block.type === "opaqueBlock") out += verbatim(block.attrs?.xml, context);
-    else if (block.type === "table") out += tableXml(block, context);
-    else notYet(block);
-  }
-  return out;
+  return inControls(blocks, 0, context, (block) => {
+    if (block.type === "paragraph") return paragraphXml(block, context);
+    if (block.type === "opaqueBlock") return verbatim(block.attrs?.xml, context);
+    if (block.type === "table") return tableXml(block, context);
+    return notYet(block);
+  });
 }
 
 /** A table: its properties, its grid, then each row's exceptions, properties and cells. */
@@ -53,15 +77,14 @@ function tableXml(table: NodeJSON, context: WriteContext): string {
   const ns = context.namespaces;
   const attrs = (table.attrs ?? {}) as Json;
   let out = `<w:tbl>${tablePropertiesXml(attrs, ns)}${gridXml(attrs, ns)}`;
-  for (const row of table.content ?? []) {
+  out += inControls(table.content ?? [], 0, context, (row) => {
     const r = (row.attrs ?? {}) as Json;
-    out += `<w:tr${bagXml(r.attributes, ns)}>${exceptionsXml(r.exceptions, ns)}${rowPropertiesXml(r, ns)}`;
-    for (const cell of row.content ?? []) {
+    const cells = inControls(row.content ?? [], 0, context, (cell) => {
       const c = (cell.attrs ?? {}) as Json;
-      out += `<w:tc>${cellPropertiesXml(c, ns)}${blocksXml(cell.content ?? [], context)}</w:tc>`;
-    }
-    out += "</w:tr>";
-  }
+      return `<w:tc>${cellPropertiesXml(c, ns)}${blocksXml(cell.content ?? [], context)}</w:tc>`;
+    });
+    return `<w:tr${bagXml(r.attributes, ns)}>${exceptionsXml(r.exceptions, ns)}${rowPropertiesXml(r, ns)}${cells}</w:tr>`;
+  });
   return `${out}</w:tbl>`;
 }
 
@@ -97,8 +120,83 @@ function grouped(
   return out;
 }
 
-/** Hyperlinks outermost, then insertions (or move destinations), then deletions (or move sources). */
+/** Where the node matching the opening one at `from` is, by nesting; -1 if none. */
+function closing(
+  nodes: readonly NodeJSON[],
+  from: number,
+  opens: (n: NodeJSON) => boolean,
+  closes: (n: NodeJSON) => boolean,
+): number {
+  let depth = 0;
+  for (let i = from; i < nodes.length; i++) {
+    const node = nodes[i] as NodeJSON;
+    if (opens(node)) depth++;
+    else if (closes(node) && --depth === 0) return i;
+  }
+  return -1;
+}
+
+/** A field read from `w:fldSimple`, written as one: start, its code, a separator, the result. */
+function simpleFieldXml(inner: readonly NodeJSON[], context: WriteContext): string | undefined {
+  const start = inner[0] as NodeJSON;
+  const code = inner[1];
+  if (code?.type !== "fieldCode" || inner[2]?.type !== "fieldSeparator") return undefined;
+  const instruction = String(code.attrs?.text ?? "");
+  const ext = start.attrs?.ext as string | undefined;
+  let open = `<w:fldSimple w:instr="${escapeAttribute(instruction)}">`;
+  if (ext) {
+    const { element, source } = fragment(`${ext}</w:fldSimple>`, context.namespaces, "fldSimple");
+    const others = element.attributes
+      .filter((a) => a.name !== "w:instr")
+      .map((a) => ` ${source.slice(a.start, a.end)}`)
+      .join("");
+    const same = element.attributes.find((a) => a.name === "w:instr")?.value === instruction;
+    open = same ? ext : `<w:fldSimple w:instr="${escapeAttribute(instruction)}"${others}>`;
+  }
+  return `${open}${inlinesXml(inner.slice(3), context)}</w:fldSimple>`;
+}
+
+/**
+ * Inline content: inline controls and simple fields as the elements around what they hold (ends
+ * whose partner an edit removed are dropped, their content kept); the rest in runs.
+ */
 function inlinesXml(nodes: readonly NodeJSON[], context: WriteContext): string {
+  let out = "";
+  let from = 0;
+  const flush = (to: number) => {
+    if (to > from) out += plainInlinesXml(nodes.slice(from, to), context);
+  };
+  for (let i = 0; i < nodes.length; i++) {
+    const node = nodes[i] as NodeJSON;
+    let end = -1;
+    let element: string | undefined;
+    if (node.type === "controlStart") {
+      const id = node.attrs?.id;
+      const isEnd = (n: NodeJSON) => n.type === "controlEnd" && n.attrs?.id === id;
+      end = closing(nodes, i, (n) => n.type === "controlStart" && n.attrs?.id === id, isEnd);
+      if (end >= 0)
+        element = controlXml(String(id), inlinesXml(nodes.slice(i + 1, end), context), context);
+    } else if (node.type === "fieldStart" && node.attrs?.simple) {
+      end = closing(
+        nodes,
+        i,
+        (n) => n.type === "fieldStart",
+        (n) => n.type === "fieldEnd",
+      );
+      if (end >= 0) element = simpleFieldXml(nodes.slice(i, end), context);
+    }
+    if (element === undefined) continue;
+    flush(i);
+    out += element;
+    i = end;
+    from = end + 1;
+  }
+  flush(nodes.length);
+  return out;
+}
+
+/** Hyperlinks outermost, then insertions (or move destinations), then deletions (or move sources). */
+function plainInlinesXml(nodes: readonly NodeJSON[], context: WriteContext): string {
   return grouped(
     nodes,
     (n) => markOf(n, "link"),
@@ -180,6 +278,10 @@ function inRun(node: NodeJSON): boolean {
     "noteReference",
     "noteMark",
     "picture",
+    "fieldStart",
+    "fieldCode",
+    "fieldSeparator",
+    "fieldEnd",
   ].includes(node.type);
 }
 
@@ -224,9 +326,25 @@ function markerXml(node: NodeJSON, context: WriteContext): string {
       return tag("w:commentRangeEnd", { "w:id": String(a.id) });
     case "opaqueInline":
       return verbatim(a.xml, context);
+    // Their partner is gone (an edit): the content around them stays.
+    case "controlStart":
+    case "controlEnd":
+      return "";
     default:
       return notYet(node);
   }
+}
+
+/** A `w:fldChar`: the element as read if it holds more than the model does. */
+function fieldCharXml(type: string, a: Json, context: WriteContext): string {
+  if (a.ext) return verbatim(a.ext, context);
+  const flag = (value: unknown) =>
+    value === null || value === undefined ? undefined : value ? "1" : "0";
+  return el("w:fldChar", {
+    "w:fldCharType": type,
+    "w:dirty": flag(a.dirty),
+    "w:fldLock": flag(a.locked),
+  });
 }
 
 /**
@@ -280,6 +398,19 @@ function runContentXml(node: NodeJSON, deleted: boolean, context: WriteContext):
     }
     case "noteMark":
       return context.note ? `<w:${context.note}Ref/>` : notYet(node);
+    case "fieldStart":
+      return fieldCharXml("begin", a, context);
+    case "fieldSeparator":
+      return fieldCharXml("separate", a, context);
+    case "fieldEnd":
+      return fieldCharXml("end", a, context);
+    case "fieldCode": {
+      const name = deleted ? "w:delInstrText" : "w:instrText";
+      const value = String(a.text ?? "");
+      const preserve = /^\s|\s$/.test(value) ? ' xml:space="preserve"' : "";
+      const bag = bagXml(a.attributes, context.namespaces, ["xml:space"]);
+      return `<${name}${preserve}${bag}>${escapeText(value)}</${name}>`;
+    }
     case "opaqueInline":
       return verbatim(a.xml, context);
     case "picture":
