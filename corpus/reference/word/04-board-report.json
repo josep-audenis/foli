@@ -514,34 +514,40 @@
                                          "default":  {
                                                          "exists":  true,
                                                          "linked":  false,
-                                                         "text":  "Quarterly Board Report - Q1 2026"
+                                                         "text":  "Quarterly Board Report - Q1 2026",
+                                                         "tables":  0
                                                      },
                                          "first":  {
                                                        "exists":  true,
                                                        "linked":  false,
-                                                       "text":  ""
+                                                       "text":  "",
+                                                       "tables":  0
                                                    },
                                          "even":  {
                                                       "exists":  false,
                                                       "linked":  false,
-                                                      "text":  ""
+                                                      "text":  "",
+                                                      "tables":  0
                                                   }
                                      },
                          "footers":  {
                                          "default":  {
                                                          "exists":  true,
                                                          "linked":  false,
-                                                         "text":  "Page 1 of 4"
+                                                         "text":  "Page 1 of 4",
+                                                         "tables":  0
                                                      },
                                          "first":  {
                                                        "exists":  true,
                                                        "linked":  false,
-                                                       "text":  ""
+                                                       "text":  "",
+                                                       "tables":  0
                                                    },
                                          "even":  {
                                                       "exists":  false,
                                                       "linked":  false,
-                                                      "text":  ""
+                                                      "text":  "",
+                                                      "tables":  0
                                                   }
                                      }
                      },
@@ -554,34 +560,40 @@
                                          "default":  {
                                                          "exists":  true,
                                                          "linked":  true,
-                                                         "text":  "Quarterly Board Report - Q1 2026"
+                                                         "text":  "Quarterly Board Report - Q1 2026",
+                                                         "tables":  0
                                                      },
                                          "first":  {
                                                        "exists":  false,
                                                        "linked":  true,
-                                                       "text":  ""
+                                                       "text":  "",
+                                                       "tables":  0
                                                    },
                                          "even":  {
                                                       "exists":  false,
                                                       "linked":  true,
-                                                      "text":  ""
+                                                      "text":  "",
+                                                      "tables":  0
                                                   }
                                      },
                          "footers":  {
                                          "default":  {
                                                          "exists":  true,
                                                          "linked":  true,
-                                                         "text":  "Page 1 of 4"
+                                                         "text":  "Page 1 of 4",
+                                                         "tables":  0
                                                      },
                                          "first":  {
                                                        "exists":  false,
                                                        "linked":  true,
-                                                       "text":  ""
+                                                       "text":  "",
+                                                       "tables":  0
                                                    },
                                          "even":  {
                                                       "exists":  false,
                                                       "linked":  true,
-                                                      "text":  ""
+                                                      "text":  "",
+                                                      "tables":  0
                                                   }
                                      }
                      }

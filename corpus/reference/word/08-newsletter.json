@@ -205,34 +205,40 @@
                                          "default":  {
                                                          "exists":  true,
                                                          "linked":  false,
-                                                         "text":  "Northwind Quarterly - odd page"
+                                                         "text":  "Northwind Quarterly - odd page",
+                                                         "tables":  0
                                                      },
                                          "first":  {
                                                        "exists":  true,
                                                        "linked":  false,
-                                                       "text":  "Northwind Quarterly - first page"
+                                                       "text":  "Northwind Quarterly - first page",
+                                                       "tables":  0
                                                    },
                                          "even":  {
                                                       "exists":  true,
                                                       "linked":  false,
-                                                      "text":  "Northwind Quarterly - even page"
+                                                      "text":  "Northwind Quarterly - even page",
+                                                      "tables":  0
                                                   }
                                      },
                          "footers":  {
                                          "default":  {
                                                          "exists":  true,
                                                          "linked":  false,
-                                                         "text":  "Page 1"
+                                                         "text":  "Page 1",
+                                                         "tables":  0
                                                      },
                                          "first":  {
                                                        "exists":  true,
                                                        "linked":  false,
-                                                       "text":  ""
+                                                       "text":  "",
+                                                       "tables":  0
                                                    },
                                          "even":  {
                                                       "exists":  true,
                                                       "linked":  false,
-                                                      "text":  "Even page footer"
+                                                      "text":  "Even page footer",
+                                                      "tables":  0
                                                   }
                                      }
                      },
@@ -245,34 +251,40 @@
                                          "default":  {
                                                          "exists":  true,
                                                          "linked":  true,
-                                                         "text":  "Northwind Quarterly - odd page"
+                                                         "text":  "Northwind Quarterly - odd page",
+                                                         "tables":  0
                                                      },
                                          "first":  {
                                                        "exists":  false,
                                                        "linked":  true,
-                                                       "text":  "Northwind Quarterly - first page"
+                                                       "text":  "Northwind Quarterly - first page",
+                                                       "tables":  0
                                                    },
                                          "even":  {
                                                       "exists":  true,
                                                       "linked":  true,
-                                                      "text":  "Northwind Quarterly - even page"
+                                                      "text":  "Northwind Quarterly - even page",
+                                                      "tables":  0
                                                   }
                                      },
                          "footers":  {
                                          "default":  {
                                                          "exists":  true,
                                                          "linked":  true,
-                                                         "text":  "Page 1"
+                                                         "text":  "Page 1",
+                                                         "tables":  0
                                                      },
                                          "first":  {
                                                        "exists":  false,
                                                        "linked":  true,
-                                                       "text":  ""
+                                                       "text":  "",
+                                                       "tables":  0
                                                    },
                                          "even":  {
                                                       "exists":  true,
                                                       "linked":  true,
-                                                      "text":  "Even page footer"
+                                                      "text":  "Even page footer",
+                                                      "tables":  0
                                                   }
                                      }
                      },
@@ -285,34 +297,40 @@
                                          "default":  {
                                                          "exists":  true,
                                                          "linked":  true,
-                                                         "text":  "Northwind Quarterly - odd page"
+                                                         "text":  "Northwind Quarterly - odd page",
+                                                         "tables":  0
                                                      },
                                          "first":  {
                                                        "exists":  false,
                                                        "linked":  true,
-                                                       "text":  "Northwind Quarterly - first page"
+                                                       "text":  "Northwind Quarterly - first page",
+                                                       "tables":  0
                                                    },
                                          "even":  {
                                                       "exists":  true,
                                                       "linked":  true,
-                                                      "text":  "Northwind Quarterly - even page"
+                                                      "text":  "Northwind Quarterly - even page",
+                                                      "tables":  0
                                                   }
                                      },
                          "footers":  {
                                          "default":  {
                                                          "exists":  true,
                                                          "linked":  true,
-                                                         "text":  "Page 1"
+                                                         "text":  "Page 1",
+                                                         "tables":  0
                                                      },
                                          "first":  {
                                                        "exists":  false,
                                                        "linked":  true,
-                                                       "text":  ""
+                                                       "text":  "",
+                                                       "tables":  0
                                                    },
                                          "even":  {
                                                       "exists":  true,
                                                       "linked":  true,
-                                                      "text":  "Even page footer"
+                                                      "text":  "Even page footer",
+                                                      "tables":  0
                                                   }
                                      }
                      },
@@ -325,34 +343,40 @@
                                          "default":  {
                                                          "exists":  true,
                                                          "linked":  false,
-                                                         "text":  "Around the fleet"
+                                                         "text":  "Around the fleet",
+                                                         "tables":  0
                                                      },
                                          "first":  {
                                                        "exists":  false,
                                                        "linked":  true,
-                                                       "text":  "Northwind Quarterly - first page"
+                                                       "text":  "Northwind Quarterly - first page",
+                                                       "tables":  0
                                                    },
                                          "even":  {
                                                       "exists":  true,
                                                       "linked":  true,
-                                                      "text":  "Northwind Quarterly - even page"
+                                                      "text":  "Northwind Quarterly - even page",
+                                                      "tables":  0
                                                   }
                                      },
                          "footers":  {
                                          "default":  {
                                                          "exists":  true,
                                                          "linked":  true,
-                                                         "text":  "Page 1"
+                                                         "text":  "Page 1",
+                                                         "tables":  0
                                                      },
                                          "first":  {
                                                        "exists":  false,
                                                        "linked":  true,
-                                                       "text":  ""
+                                                       "text":  "",
+                                                       "tables":  0
                                                    },
                                          "even":  {
                                                       "exists":  true,
                                                       "linked":  true,
-                                                      "text":  "Even page footer"
+                                                      "text":  "Even page footer",
+                                                      "tables":  0
                                                   }
                                      }
                      },
@@ -365,34 +389,40 @@
                                          "default":  {
                                                          "exists":  true,
                                                          "linked":  true,
-                                                         "text":  "Around the fleet"
+                                                         "text":  "Around the fleet",
+                                                         "tables":  0
                                                      },
                                          "first":  {
                                                        "exists":  false,
                                                        "linked":  true,
-                                                       "text":  "Northwind Quarterly - first page"
+                                                       "text":  "Northwind Quarterly - first page",
+                                                       "tables":  0
                                                    },
                                          "even":  {
                                                       "exists":  true,
                                                       "linked":  true,
-                                                      "text":  "Northwind Quarterly - even page"
+                                                      "text":  "Northwind Quarterly - even page",
+                                                      "tables":  0
                                                   }
                                      },
                          "footers":  {
                                          "default":  {
                                                          "exists":  true,
                                                          "linked":  true,
-                                                         "text":  "Page 1"
+                                                         "text":  "Page 1",
+                                                         "tables":  0
                                                      },
                                          "first":  {
                                                        "exists":  false,
                                                        "linked":  true,
-                                                       "text":  ""
+                                                       "text":  "",
+                                                       "tables":  0
                                                    },
                                          "even":  {
                                                       "exists":  true,
                                                       "linked":  true,
-                                                      "text":  "Even page footer"
+                                                      "text":  "Even page footer",
+                                                      "tables":  0
                                                   }
                                      }
                      }

@@ -552,13 +552,13 @@ const noteSeparators = (
 /**
  * A footnotes or endnotes part: a note unchanged from `originals` keeps its bytes, a changed one
  * is written from its story, and new ones go at the end. One whose story is gone is removed,
- * unless Word needs it: a separator, or a note something still refers to (`referenced`).
+ * unless Word needs it: a separator, or a note something still refers to (`isReferenced`).
  */
 export function notesXml(
   kind: "footnote" | "endnote",
   stories: Readonly<Record<string, StoryJSON>>,
   originals: Readonly<Record<string, StoryJSON>>,
-  referenced: ReadonlySet<string>,
+  isReferenced: (key: string) => boolean,
   part: OriginalPart | undefined,
   context: WriteContext,
 ): string {
@@ -591,7 +591,7 @@ export function notesXml(
       if (!Object.hasOwn(stories, key)) {
         const original = originals[key];
         const needed =
-          !original || (original.noteType ?? "normal") !== "normal" || referenced.has(key);
+          !original || (original.noteType ?? "normal") !== "normal" || isReferenced(key);
         return needed ? undefined : null;
       }
       const story = stories[key] as StoryJSON;

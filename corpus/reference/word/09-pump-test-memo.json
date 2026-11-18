@@ -147,34 +147,40 @@
                                          "default":  {
                                                          "exists":  true,
                                                          "linked":  false,
-                                                         "text":  "Pump test memo, page 1"
+                                                         "text":  "Pump test memo, page 1",
+                                                         "tables":  0
                                                      },
                                          "first":  {
                                                        "exists":  false,
                                                        "linked":  false,
-                                                       "text":  ""
+                                                       "text":  "",
+                                                       "tables":  0
                                                    },
                                          "even":  {
                                                       "exists":  false,
                                                       "linked":  false,
-                                                      "text":  ""
+                                                      "text":  "",
+                                                      "tables":  0
                                                   }
                                      },
                          "footers":  {
                                          "default":  {
                                                          "exists":  true,
                                                          "linked":  false,
-                                                         "text":  ""
+                                                         "text":  "",
+                                                         "tables":  0
                                                      },
                                          "first":  {
                                                        "exists":  false,
                                                        "linked":  false,
-                                                       "text":  ""
+                                                       "text":  "",
+                                                       "tables":  0
                                                    },
                                          "even":  {
                                                       "exists":  false,
                                                       "linked":  false,
-                                                      "text":  ""
+                                                      "text":  "",
+                                                      "tables":  0
                                                   }
                                      }
                      }

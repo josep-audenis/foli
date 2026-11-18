@@ -11,14 +11,33 @@
 // reference at the end of the first paragraph), and a new package with a header, a footer, a
 // footnote and an endnote (00-new-stories). `check` needs Word's data for every file made: each
 // opened; an unchanged one has the original's pages, sections and notes; an edited one every
-// header and footer with its original text (pictures included) and the edit, the table's text,
-// every other note as it was, the edited and the added note, and the tracked insertion. One
-// line per file; exits 1 on any difference.
+// header and footer with its original text, the edit and (headers) one more table, its pictures
+// showing the same image bytes, every other note as it was and in its place, the edited and the
+// added note, and the tracked insertion. One line per file; exits 1 on any difference.
 
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { createDocument } from "../../packages/core/dist/index.js";
 import { exportDocx, importDocx } from "../../packages/docx/dist/index.js";
+
+/** Each story's pictures, in order, as the bytes of their images. */
+async function storyImages(path) {
+  const { document, package: pkg } = await importDocx(new Uint8Array(readFileSync(path)));
+  const images = {};
+  for (const [id, story] of Object.entries(document.stories ?? {})) {
+    const found = [];
+    const walk = (node) => {
+      if (node.type === "picture") {
+        const part = document.resources?.[node.attrs.resource]?.part;
+        found.push(part ? Buffer.from(pkg.part(`/${part}`).data).toString("base64") : "");
+      }
+      for (const child of node.content ?? []) walk(child);
+    };
+    walk(story.content);
+    images[id] = found;
+  }
+  return images;
+}
 
 const [mode, dir] = process.argv.slice(2);
 if ((mode !== "make" && mode !== "check") || !dir) {
@@ -161,9 +180,19 @@ for (const file of readdirSync(join(dir, "foli")).filter((n) => n.endsWith(".doc
       problems.push(`${word.notes.length} notes, expected ${base.notes.length + 1}`);
     const footnotes = base.notes.filter((n) => n.kind === "footnote");
     if (footnotes.length && !notes.some((t) => t.includes(EDIT))) problems.push("the edited note");
-    for (const original of base.notes)
-      if (!notes.some((t) => t.includes(original.text)))
-        problems.push(`a note lost its text: ${original.text.slice(0, 24)}`);
+    // Every original note, in order, once the added one is left out.
+    const kept = word.notes.filter((n) => !n.text.includes(ADDED));
+    base.notes.forEach((original, i) => {
+      const note = kept[i];
+      if (note?.kind !== original.kind || !note.text.includes(original.text))
+        problems.push(`note ${i + 1} is not the original's`);
+    });
+    const source = join(corpus, `${name.replace(/-edited$/, "")}.docx`);
+    const before = await storyImages(source);
+    const after = await storyImages(join(dir, "foli", file));
+    for (const [id, images] of Object.entries(before))
+      if (JSON.stringify(images) !== JSON.stringify(after[id] ?? []))
+        problems.push(`story ${id}: its pictures changed`);
     const added = word.notes.find((n) => n.text.includes(ADDED));
     if (added?.revisions !== 1) problems.push(`added note: ${added?.revisions} revisions, not 1`);
     for (const side of ["headers", "footers"])
@@ -176,6 +205,9 @@ for (const file of readdirSync(join(dir, "foli")).filter((n) => n.endsWith(".doc
             problems.push(`section ${s + 1} ${side} ${variant}: lost its text`);
           if (side === "headers" && !text.includes(CELL))
             problems.push(`section ${s + 1} header ${variant}: no table`);
+          const tables = word.sections[s]?.[side][variant]?.tables;
+          if (side === "headers" && tables !== story.tables + 1)
+            problems.push(`section ${s + 1} header ${variant}: ${tables} tables`);
         }
       });
   } else {

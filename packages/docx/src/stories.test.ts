@@ -205,6 +205,8 @@ describe("writing stories", () => {
       "<w:footnoteReference w:id='1'/>",
       '<w:footnoteReference w:id = "1"/>',
       '<w:footnoteReference w:id="01"/>',
+      '<w:footnoteReference w:id="&#49;"/>',
+      '<w:footnoteReference xml:lang=">" w:id="1"/>',
     ]) {
       const { "footnote:1": _gone, ...stories } = document.stories ?? {};
       const strip = (node: NodeJSON): NodeJSON => ({

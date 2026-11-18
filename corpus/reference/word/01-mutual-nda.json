@@ -322,34 +322,40 @@
                                          "default":  {
                                                          "exists":  true,
                                                          "linked":  false,
-                                                         "text":  "CONFIDENTIAL - Mutual NDA - Northwind / Contoso"
+                                                         "text":  "CONFIDENTIAL - Mutual NDA - Northwind / Contoso",
+                                                         "tables":  0
                                                      },
                                          "first":  {
                                                        "exists":  true,
                                                        "linked":  false,
-                                                       "text":  ""
+                                                       "text":  "",
+                                                       "tables":  0
                                                    },
                                          "even":  {
                                                       "exists":  false,
                                                       "linked":  false,
-                                                      "text":  ""
+                                                      "text":  "",
+                                                      "tables":  0
                                                   }
                                      },
                          "footers":  {
                                          "default":  {
                                                          "exists":  true,
                                                          "linked":  false,
-                                                         "text":  "Page 1 of 2"
+                                                         "text":  "Page 1 of 2",
+                                                         "tables":  0
                                                      },
                                          "first":  {
                                                        "exists":  true,
                                                        "linked":  false,
-                                                       "text":  "Northwind Traders Limited - Registered in England and Wales No. 01234567"
+                                                       "text":  "Northwind Traders Limited - Registered in England and Wales No. 01234567",
+                                                       "tables":  0
                                                    },
                                          "even":  {
                                                       "exists":  false,
                                                       "linked":  false,
-                                                      "text":  ""
+                                                      "text":  "",
+                                                      "tables":  0
                                                   }
                                      }
                      }

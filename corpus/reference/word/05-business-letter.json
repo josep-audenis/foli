@@ -162,34 +162,40 @@
                                          "default":  {
                                                          "exists":  true,
                                                          "linked":  false,
-                                                         "text":  "Litware SAS - 12 February 2026 - page 1"
+                                                         "text":  "Litware SAS - 12 February 2026 - page 1",
+                                                         "tables":  0
                                                      },
                                          "first":  {
                                                        "exists":  true,
                                                        "linked":  false,
-                                                       "text":  ""
+                                                       "text":  "",
+                                                       "tables":  0
                                                    },
                                          "even":  {
                                                       "exists":  false,
                                                       "linked":  false,
-                                                      "text":  ""
+                                                      "text":  "",
+                                                      "tables":  0
                                                   }
                                      },
                          "footers":  {
                                          "default":  {
                                                          "exists":  true,
                                                          "linked":  false,
-                                                         "text":  ""
+                                                         "text":  "",
+                                                         "tables":  0
                                                      },
                                          "first":  {
                                                        "exists":  true,
                                                        "linked":  false,
-                                                       "text":  ""
+                                                       "text":  "",
+                                                       "tables":  0
                                                    },
                                          "even":  {
                                                       "exists":  false,
                                                       "linked":  false,
-                                                      "text":  ""
+                                                      "text":  "",
+                                                      "tables":  0
                                                   }
                                      }
                      }

@@ -210,7 +210,7 @@ try {
         $out = [ordered]@{}
         foreach ($kind in $kinds.Keys) {
           $item = $collection.Item($kinds[$kind])
-          $out[$kind] = [ordered]@{ exists = [bool]$item.Exists; linked = [bool]$item.LinkToPrevious; text = Clean $item.Range.Text }
+          $out[$kind] = [ordered]@{ exists = [bool]$item.Exists; linked = [bool]$item.LinkToPrevious; text = Clean $item.Range.Text; tables = [int]$item.Range.Tables.Count }
         }
         return $out
       }

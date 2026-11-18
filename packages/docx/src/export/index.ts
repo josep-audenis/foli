@@ -242,32 +242,34 @@ export async function exportDocx(
   const bytes = await pictureBytes(doc, original, options.resource);
   const media = new Media(doc, original, bytes, rewritten);
   return original
-    ? intoPackage(doc, original, originals, referenced.all, options, media)
-    : newPackage(doc, referenced.all, options, media);
+    ? intoPackage(doc, original, originals, referenced.isReferenced, options, media)
+    : newPackage(doc, referenced.isReferenced, options, media);
 }
 
 /**
- * The notes the document refers to: by `noteReference` nodes (`modeled`), and those with the
- * references kept verbatim too (`all`), as story ids.
+ * The notes the document refers to, as story ids: `modeled` by `noteReference` nodes. `isReferenced`
+ * also says yes to every note of a kind that verbatim XML refers to: which one it means is not
+ * worth guessing, and removing a note still referred to makes Word refuse the file.
  */
-function noteReferences(doc: FoliDocument): { modeled: Set<string>; all: Set<string> } {
+function noteReferences(doc: FoliDocument): {
+  modeled: Set<string>;
+  isReferenced: (key: string) => boolean;
+} {
   const modeled = new Set<string>();
-  const all = new Set<string>();
+  const verbatim = new Set<string>();
   JSON.stringify([doc.content, doc.comments, doc.stories], (key, value) => {
     if (key === "xml" && typeof value === "string")
-      // As XML allows it: either quote, spaces around `=`, and the number however written.
-      for (const [, kind, , id] of value.matchAll(
-        /<(?:[\w.-]+:)?(foot|end)noteReference\b[^>]*?\s(?:[\w.-]+:)?id\s*=\s*(["'])\s*([-+]?\d+)\s*\2/g,
-      ))
-        all.add(`${kind}note:${Number(id)}`);
+      for (const [, kind] of value.matchAll(/(foot|end)noteReference/g))
+        verbatim.add(`${kind}note`);
     const node = value as { type?: unknown; attrs?: { story?: unknown } } | null;
-    if (node?.type === "noteReference" && typeof node.attrs?.story === "string") {
+    if (node?.type === "noteReference" && typeof node.attrs?.story === "string")
       modeled.add(node.attrs.story);
-      all.add(node.attrs.story);
-    }
     return value;
   });
-  return { modeled, all };
+  return {
+    modeled,
+    isReferenced: (key) => modeled.has(key) || verbatim.has(key.split(":")[0] as string),
+  };
 }
 
 /** `text` if it is a well-formed part whose `w:` content is WordprocessingML; DocxError if not. */
@@ -386,7 +388,7 @@ async function intoPackage(
   doc: FoliDocument,
   pkg: DocxPackage,
   originals: Readonly<Record<string, StoryJSON>>,
-  referenced: ReadonlySet<string>,
+  isReferenced: (key: string) => boolean,
   options: ExportOptions,
   media: Media,
 ): Promise<Uint8Array> {
@@ -544,7 +546,7 @@ async function intoPackage(
     const write = (o: OriginalPart | undefined, ns: Namespaces) =>
       checkedPart(
         target,
-        notesXml(kind, stories, originals, referenced, o, {
+        notesXml(kind, stories, originals, isReferenced, o, {
           ...contextFor(ns, partRels, media, target),
           note: kind,
         }),
@@ -616,7 +618,7 @@ function changedThreads(doc: FoliDocument, pkg: DocxPackage): boolean {
 /** A new package: content types, relationships, the document and the parts it needs. */
 async function newPackage(
   doc: FoliDocument,
-  referenced: ReadonlySet<string>,
+  isReferenced: (key: string) => boolean,
   options: ExportOptions,
   media: Media,
 ): Promise<Uint8Array> {
@@ -672,7 +674,7 @@ async function newPackage(
       name,
       rel,
       contentType,
-      notesXml(kind, stories, {}, referenced, undefined, {
+      notesXml(kind, stories, {}, isReferenced, undefined, {
         ...contextFor(DEFAULT_NAMESPACES, partRels, media, name),
         note: kind,
       }),
