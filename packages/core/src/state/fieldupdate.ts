@@ -1248,10 +1248,8 @@ export function insertCrossReference(reference: CrossReference): Command {
       if (typeof to === "number") {
         const node = heading as Node;
         node.forEach((child) => {
-          if (
-            child.type.name === "bookmarkStart" &&
-            /^_(Ref|Toc)\d+$/.test(child.attrs.name as string)
-          )
+          // Not a `_Toc` one: Word makes those again with the table of contents.
+          if (child.type.name === "bookmarkStart" && /^_Ref\d+$/.test(child.attrs.name as string))
             name ??= child.attrs.name as string;
         });
         if (!name) {

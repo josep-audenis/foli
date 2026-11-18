@@ -213,6 +213,26 @@ content, ext? }`. `content` is a `doc` of the body's blocks. `noteType` is Word'
   Unknown instructions keep their result, reported. Tracked when tracking is on.
 - A field is selected and deleted whole when the selection crosses its markers; Backspace at its
   edge selects it first, as Word does.
+- **Built in 11.8**, where the above left room or turned out otherwise:
+  - `updateFields(editor, { layout, data, now, only })` returns what it did and what it left
+    (`updated`, `unchanged`, `rebuilt`, `skipped` with a reason). `layout` is `{ pages, pageAt(pos)
+    }`, a position's displayed number, its section's page count and number format. Core makes one
+    pass; `view.updateFields` makes a second, joined to the same undo step, for the page numbers a
+    rebuilt table of contents moved.
+  - Results are worked out in stages (fields in codes, values and `SEQ`, `REF` and `PAGEREF`, `TOC`)
+    so what depends on another result sees it. A table of contents whose lines and styles are
+    already right is left alone: its paragraphs keep their ids, and updating an untouched document
+    changes nothing, the check against Word on the corpus.
+  - A missing bookmark keeps the old result and is reported. Word writes "Error! Reference source
+    not found." into the document; a failed update should not cost the reader the text.
+  - With codes shown, a field's closing brace is drawn at its separator, so a table of contents
+    reads `{ TOC … }` on one line; paragraphs wholly inside a hidden result take no room. The
+    paragraph holding the end stays, an empty line. Codes are not editable there.
+  - Browsers cannot tell the two sides of a marker apart: the selection rules treat positions with
+    only markers between them as one place, or a range would give a field up when the browser
+    reads its end back one position short. Left and Right start past the markers next to the caret
+    (WebKit spent a key press on each empty element).
+  - Find (11.11) has to skip code ranges: `fieldsIn` gives them.
 
 ### Content controls
 
