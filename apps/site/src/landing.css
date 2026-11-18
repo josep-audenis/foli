@@ -562,8 +562,9 @@ button.app-tool:not([aria-disabled="true"]):active {
     box-shadow: var(--shadow-lift);
   }
 
+  /* Balloons stay light in dark mode, so the tint comes from the page, not the desk. */
   .balloon-actions button:hover {
-    background: var(--desk);
+    background: color-mix(in srgb, var(--page-ink) 9%, var(--page));
   }
 }
 
@@ -1215,8 +1216,8 @@ button.app-tool:not([aria-disabled="true"]):active {
   border-radius: 14px;
   background: #33332f;
   color: var(--band-ink);
-  cursor: pointer;
   font: 700 clamp(3rem, 4.6vw, 4rem) / 1 var(--font-display);
+  user-select: none;
 }
 
 .ks-page {

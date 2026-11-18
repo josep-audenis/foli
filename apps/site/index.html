@@ -308,7 +308,6 @@
             The header row repeats on the next page. Merged cells, table styles and tracked rows are
             supported.
           </p>
-          <button type="button" class="text-button" data-add-row>Add a row</button>
           <p class="caption">These sample rows stay whole. Rows can also break across pages.</p>
         </div>
         <div class="tb-view" data-table-view aria-hidden="true"><div class="tb-canvas" data-canvas></div></div>
@@ -325,8 +324,8 @@
           </header>
           <figure class="ks">
             <div class="ks-input">
-              <button type="button" class="keycap" data-key aria-label="Type the next letter">F</button>
-              <p class="ks-page"><span data-typed aria-live="off"></span><i aria-hidden="true"></i></p>
+              <div class="keycap" data-key aria-hidden="true">E</div>
+              <p class="ks-page"><span class="sr-only">Every key takes this path.</span><span data-typed aria-hidden="true"></span><i aria-hidden="true"></i></p>
             </div>
             <ol class="ks-steps">
               <li data-step><b>Input</b><span><code>beforeinput</code> reaches the view</span></li>
