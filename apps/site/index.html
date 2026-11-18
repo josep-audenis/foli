@@ -6,7 +6,7 @@
     <title>Foli — real pages for the web</title>
     <meta
       name="description"
-      content="Foli is an open-source document-editing engine for the web: native pagination, Word's document model, lossless .docx round-trips, tracked changes and comments. MIT licensed."
+      content="An open-source document engine for React: open a .docx, edit it on real pages with tracked changes and comments, and save it back. MIT licensed."
     />
     <meta name="theme-color" content="#f3f3f1" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
@@ -31,10 +31,9 @@
           <span class="brand-name">Foli</span>
         </a>
         <nav class="nav" aria-label="Main">
-          <a href="#pages">Pages</a>
+          <a href="#docx">.docx</a>
           <a href="#review">Review</a>
           <a href="#tables">Tables</a>
-          <a href="#docx">.docx</a>
           <a href="#engine">Engine</a>
           <a href="https://github.com/josep-audenis/foli/blob/main/docs/getting-started.md">Docs</a>
           <a href="https://github.com/josep-audenis/foli">GitHub</a>
@@ -53,22 +52,19 @@
           </h1>
           <div class="hero-side">
             <p>
-              An open-source editing engine with real pages, Word's document model and lossless
-              <code>.docx</code> round trips.
+              For teams building contract, report and review products in React. Open a
+              <code>.docx</code>, edit it on real pages, save it back.
             </p>
             <div class="hero-actions">
-              <a class="button button-primary" href="/test/">Try the editor</a>
-              <div class="install">
-                <code id="install-cmd">npm i @folijs/react @folijs/core</code>
-                <button type="button" class="copy" data-copy="install-cmd">Copy</button>
-              </div>
+              <a class="button button-primary" href="/test/">Try it on a redlined contract</a>
+              <button type="button" class="button" data-copy="install-cmd" data-label="Copy npm install">Copy npm install</button>
             </div>
           </div>
         </div>
 
         <div class="pg" id="pages">
           <aside class="pg-panel" aria-label="Page controls">
-            <p class="fig">Fig. 1 · Pagination</p>
+            <p class="fig">Fig. 1</p>
             <h2>Pull the page.</h2>
             <p class="pg-hint">
               Drag its bottom edge, or the margin on the ruler. Every word finds its new place.
@@ -76,11 +72,11 @@
             <div class="pg-switches">
               <button type="button" class="switch" data-rule="widows" aria-pressed="true">
                 <span class="switch-track" aria-hidden="true"></span>
-                <span><b>Widow control</b><small>No line left alone at a page edge</small></span>
+                <span><b>Widow control</b><small>Always on in Foli. Switch it off to see why.</small></span>
               </button>
               <button type="button" class="switch" data-rule="keepWithNext" aria-pressed="true">
                 <span class="switch-track" aria-hidden="true"></span>
-                <span><b>Keep with next</b><small>Headings stay with their text</small></span>
+                <span><b>Keep with next</b><small>Word's paragraph setting</small></span>
               </button>
             </div>
             <dl class="pg-read">
@@ -92,7 +88,7 @@
             <button type="button" class="text-button" data-reset>Reset the page</button>
           </aside>
           <div class="pg-stage">
-            <div class="pg-view" data-view aria-hidden="true"></div>
+            <div class="pg-view" data-view></div>
             <article class="pg-source" data-source>
               <h3>On pages</h3>
               <p>
@@ -121,13 +117,12 @@
               </p>
               <h4>Made for review</h4>
               <p>
-                Reviewers work the way they do in Word. Every insertion and deletion is recorded in
-                its author's name, and each one can be accepted or rejected on its own. Comments sit
-                beside the pages, with replies.
+                Every insertion and deletion is recorded in its author's name, and each one can be
+                accepted or rejected on its own. Comments sit beside the pages, with replies.
               </p>
               <p>
-                Long tables break between rows and repeat their header on the next page, so nothing
-                is cut in half. Pictures keep their size and their place in the text.
+                Long tables cross page breaks and repeat their header rows. Pictures keep their size
+                and their place in the text.
               </p>
               <h4>An engine of its own</h4>
               <p>
@@ -135,329 +130,336 @@
                 view and layout are all Foli, so pages are part of the engine and never an effect
                 drawn over a long scroll.
               </p>
-              <p><em>This is a drawing of that behaviour. The real editor is one click away.</em></p>
+              <h4>What you install</h4>
+              <p>
+                Four packages. The core holds the model and commands and runs anywhere, with no DOM.
+                The view draws the pages and handles input. The React package adds the editor, a
+                toolbar and the comments pane, and the docx package reads and writes Word files.
+              </p>
+              <p>
+                Documents are plain JSON, so they can live in your own database and travel through
+                your own API. Older versions are migrated when they load.
+              </p>
+              <h4>Still to come</h4>
+              <p>
+                Headers, footers, footnotes and page numbers are kept when you save, but the editor
+                does not show them yet. They are being built now.
+              </p>
+              <p><em>This is a drawing of how pages behave. The real editor is one click away.</em></p>
             </article>
           </div>
         </div>
       </section>
 
-      <section class="statement wrap-wide" aria-label="What Foli is">
-        <p>
-          <strong>A document is not a long text box.</strong> It has pages, styles, numbering,
-          reviewers and a file format older than most browsers. Foli treats all of that as the
-          engine's job, so your product does not have to fake it.
+      <section class="why wrap-wide" aria-label="Why an engine">
+        <p class="why-lead">
+          <strong>A pagination plugin sits on an editor built for one long scroll.</strong> Foli's
+          layout engine places every line on its page as you type, and its document model is
+          Word's.
         </p>
+        <div class="why-side">
+        <p class="why-proof">
+          <b>115 of 115</b> body paragraphs and <b>277 of 280</b> table-cell paragraphs land on
+          Word's page, with Word's fonts installed, in the
+          <a href="https://github.com/josep-audenis/foli/blob/main/corpus/README.md">test documents</a>
+          checked for 0.5. Files added since, with long footnotes, are not there yet.
+        </p>
+        <p class="why-note">
+          MIT · v0.5.0 · Not shown yet: headers, footers, footnotes, page numbers. Imported ones are
+          kept on save.
+        </p>
+        </div>
       </section>
 
-      <div class="sheets">
-        <article class="sheet scene" id="review" aria-labelledby="review-title">
-          <header class="running-head"><span>Foli</span><span>Review</span></header>
-          <div class="scene-head">
-            <h2 id="review-title">Settle a draft, one change at a time.</h2>
-            <p>
-              Foli records insertions, deletions and formatting as people type. Show all markup,
-              simple markup or none, then accept or reject each change. Comments and changes
-              round-trip with Word.
-            </p>
-          </div>
-          <figure class="rv">
-            <div class="fig-bar">
-              <span class="fig">Fig. 2 · Try the buttons</span>
-              <fieldset class="segments" aria-label="Markup shown">
-                <button type="button" data-view-mode="all" aria-pressed="true">All markup</button>
-                <button type="button" data-view-mode="simple" aria-pressed="false">Simple</button>
-                <button type="button" data-view-mode="none" aria-pressed="false">No markup</button>
-              </fieldset>
+      <section class="scene wrap-wide" id="docx" aria-labelledby="docx-title">
+        <header class="scene-head">
+          <h2 id="docx-title">
+            Open a <code>.docx</code>. Save it back. Keep what Word reads.
+          </h2>
+          <p>
+            Foli rewrites what you changed and copies the rest of the package byte for byte. Saved
+            unedited, each of our 9 test files changed only <code>word/document.xml</code>.
+          </p>
+        </header>
+        <figure class="rt">
+          <div class="rt-stage" data-rt>
+            <div class="rt-file rt-source">
+              <p class="rt-name">contract.docx <span>opened</span></p>
+              <ul data-in>
+                <li data-part="owned" data-short="document.xml">word/document.xml</li>
+                <li data-part="owned" data-short="styles.xml">word/styles.xml</li>
+                <li data-part="owned" data-short="numbering.xml">word/numbering.xml</li>
+                <li data-part="owned" data-short="comments.xml">word/comments.xml</li>
+                <li data-short="settings.xml">word/settings.xml</li>
+                <li data-short="theme1.xml">word/theme/theme1.xml</li>
+                <li data-short="header1.xml">word/header1.xml</li>
+                <li data-short="chart1.xml">word/charts/chart1.xml</li>
+                <li data-short="image1.png">word/media/image1.png</li>
+              </ul>
             </div>
-            <div class="rv-body">
-              <div class="rv-page" data-page>
-                <div class="rv-source" data-source>
-                  <h4>4. Payment</h4>
-                  <p>
-                    The Client pays each invoice within
-                    <del data-change="c1">fourteen (14)</del>
-                    <ins data-change="c1">thirty (30)</ins> days of receiving it. Late payments
-                    carry interest at the <span data-comment="n1">statutory rate</span>.
-                  </p>
-                  <p>
-                    Invoices are sent <ins data-change="c2">by email</ins> at the end of each
-                    calendar month<del data-change="c3">, in arrears</del>.
-                  </p>
+            <div class="rt-core" data-core>
+              <div class="rt-sheet">
+                <b>Terms of service</b>
+                <p>Payment is due in <span class="rt-value" data-value>14</span> days.</p>
+                <p>Invoices are sent at the end of each month.</p>
+                <p>Late payments carry interest.</p>
+              </div>
+              <button type="button" class="button button-primary rt-run" data-run>Change 14 to 30 and save</button>
+            </div>
+            <div class="rt-file rt-result">
+              <p class="rt-name">contract.docx <span>saved</span></p>
+              <ul data-out-list>
+                <li><span>word/document.xml</span><em class="is-changed">rewritten, with your edit</em></li>
+                <li><span>word/styles.xml</span><em>byte for byte, if unchanged</em></li>
+                <li><span>word/numbering.xml</span><em>byte for byte, if unchanged</em></li>
+                <li><span>word/comments.xml</span><em>byte for byte, if unchanged</em></li>
+                <li><span>word/settings.xml</span><em>byte for byte</em></li>
+                <li><span>word/theme/theme1.xml</span><em>byte for byte</em></li>
+                <li><span>word/header1.xml</span><em>byte for byte</em></li>
+                <li><span>word/charts/chart1.xml</span><em>byte for byte</em></li>
+                <li><span>word/media/image1.png</span><em>byte for byte</em></li>
+              </ul>
+            </div>
+          </div>
+          <figcaption class="caption">
+            <b>Fig. 2.</b> <span data-rt-status role="status">The edit goes through Foli. Everything else stays as it was.</span>
+          </figcaption>
+        </figure>
+      </section>
+
+      <section class="scene wrap-wide" id="review" aria-labelledby="review-title">
+        <header class="scene-head">
+          <h2 id="review-title">Settle a draft, <del>all at once</del> <ins>one change</ins> at a time.</h2>
+          <p>
+            Foli records insertions, deletions and formatting as people type, each in its author's
+            name. Changes and comments round-trip with Word.
+          </p>
+        </header>
+        <figure class="rv">
+          <div class="rv-tools">
+            <fieldset class="segments" aria-label="Markup shown">
+              <button type="button" data-view-mode="all" aria-pressed="true">All markup</button>
+              <button type="button" data-view-mode="simple" aria-pressed="false">Simple</button>
+              <button type="button" data-view-mode="none" aria-pressed="false">No markup</button>
+            </fieldset>
+            <span class="rv-summary" data-summary role="status">4 open in this draft.</span>
+            <button type="button" class="text-button" data-accept-all>Accept all changes</button>
+            <button type="button" class="text-button" data-restore>Start over</button>
+          </div>
+          <div class="rv-body">
+            <div class="rv-page" data-page>
+              <div class="rv-source" data-source>
+                <h4>4. Payment</h4>
+                <p>
+                  The Client pays each invoice within
+                  <del data-change="c1">fourteen (14)</del>
+                  <ins data-change="c1">thirty (30)</ins> days of receiving it, by bank transfer to
+                  the account named on the invoice.
+                </p>
+                <p>
+                  Late payments carry interest at the <span data-comment="n1">statutory rate</span>,
+                  calculated daily from the due date until the invoice is paid in full.
+                </p>
+                <p>
+                  Invoices are sent <ins data-change="c2">by email</ins> at the end of each calendar
+                  month, to the billing contact named in Schedule 2.
+                </p>
+                <p>
+                  Agreed expenses are reimbursed at cost<del data-change="c3">, in arrears</del>, on
+                  the invoice that follows the month they were incurred.
+                </p>
+              </div>
+            </div>
+            <div class="rv-margin" data-margin>
+              <section class="balloon" data-tone="is-ins" data-for="c1" data-kind="change" aria-label="Replacement by Marta">
+                <p class="balloon-who"><b>Marta</b><span>Replaced</span></p>
+                <p>“fourteen (14)” with “thirty (30)”</p>
+                <div class="balloon-actions">
+                  <button type="button" data-act="accept">Accept</button>
+                  <button type="button" data-act="reject">Reject</button>
                 </div>
-              </div>
-              <div class="rv-margin" data-margin>
-                <section class="balloon" data-for="c1" data-kind="change">
-                  <p class="balloon-who"><b>Marta</b><span>Replaced</span></p>
-                  <p>“fourteen (14)” with “thirty (30)”</p>
-                  <div class="balloon-actions">
-                    <button type="button" data-act="accept">Accept</button>
-                    <button type="button" data-act="reject">Reject</button>
-                  </div>
-                </section>
-                <section class="balloon is-note" data-for="n1" data-kind="comment">
-                  <p class="balloon-who"><b>Marta</b><span>Comment</span></p>
-                  <p>Which statute? Name it, or legal will ask.</p>
-                  <div class="balloon-actions">
-                    <button type="button" data-act="accept">Resolve</button>
-                  </div>
-                </section>
-                <section class="balloon" data-for="c2" data-kind="change">
-                  <p class="balloon-who"><b>You</b><span>Inserted</span></p>
-                  <p>“by email”</p>
-                  <div class="balloon-actions">
-                    <button type="button" data-act="accept">Accept</button>
-                    <button type="button" data-act="reject">Reject</button>
-                  </div>
-                </section>
-                <section class="balloon is-del" data-for="c3" data-kind="change">
-                  <p class="balloon-who"><b>Marta</b><span>Deleted</span></p>
-                  <p>“, in arrears”</p>
-                  <div class="balloon-actions">
-                    <button type="button" data-act="accept">Accept</button>
-                    <button type="button" data-act="reject">Reject</button>
-                  </div>
-                </section>
-              </div>
-            </div>
-            <figcaption class="fig-foot">
-              <span data-summary aria-live="polite">4 open in this draft</span>
-              <span class="fig-actions">
-                <button type="button" class="text-button" data-accept-all>Accept all changes</button>
-                <button type="button" class="text-button" data-restore>Start over</button>
-              </span>
-            </figcaption>
-          </figure>
-          <footer class="folio">1</footer>
-        </article>
-
-        <article class="sheet scene" id="tables" aria-labelledby="tables-title">
-          <header class="running-head"><span>Foli</span><span>Tables</span></header>
-          <div class="scene-head">
-            <h2 id="tables-title">Tables that know about pages.</h2>
-            <p>
-              A long table splits between rows and repeats its header rows on the next page. Merged
-              cells, table styles and tracked row changes come with it, as Word models them.
-            </p>
-          </div>
-          <figure class="tb">
-            <div class="fig-bar">
-              <span class="fig">Fig. 3 · Add a few rows</span>
-              <div class="tb-controls">
-                <fieldset class="stepper" aria-label="Rows">
-                  <button type="button" data-rows="-1" aria-label="Remove a row">−</button>
-                  <output data-out="rows">9</output>
-                  <button type="button" data-rows="1" aria-label="Add a row">+</button>
-                </fieldset>
-                <button type="button" class="switch switch-inline" data-repeat aria-pressed="true">
-                  <span class="switch-track" aria-hidden="true"></span>
-                  <span><b>Repeat header</b></span>
-                </button>
-              </div>
-            </div>
-            <div class="tb-view" data-table-view aria-hidden="true"><div class="tb-canvas" data-canvas></div></div>
-            <figcaption class="fig-foot">
-              <span><span data-out="table-pages">2</span> pages. An illustration; sample figures.</span>
-            </figcaption>
-          </figure>
-          <footer class="folio">2</footer>
-        </article>
-
-        <article class="sheet scene" id="docx" aria-labelledby="docx-title">
-          <header class="running-head"><span>Foli</span><span>.docx</span></header>
-          <div class="scene-head">
-            <h2 id="docx-title">Open a <code>.docx</code>. Save it back. Lose nothing.</h2>
-            <p>
-              <code>@folijs/docx</code> writes only the parts the editor owns, keeps unchanged
-              elements verbatim, and copies every other part of the package byte for byte.
-            </p>
-          </div>
-          <figure class="rt">
-            <div class="fig-bar">
-              <span class="fig">Fig. 4 · One edit, one round trip</span>
-              <button type="button" class="button button-primary button-small" data-run>Change 14 to 30 and save</button>
-            </div>
-            <div class="rt-stage" data-rt>
-              <div class="rt-file">
-                <p class="rt-name">contract.docx <span>opened</span></p>
-                <ul data-in>
-                  <li data-part="owned" data-short="document.xml">word/document.xml</li>
-                  <li data-part="owned" data-short="styles.xml">word/styles.xml</li>
-                  <li data-part="owned" data-short="numbering.xml">word/numbering.xml</li>
-                  <li data-part="owned" data-short="comments.xml">word/comments.xml</li>
-                  <li data-short="settings.xml">word/settings.xml</li>
-                  <li data-short="theme1.xml">word/theme/theme1.xml</li>
-                  <li data-short="header1.xml">word/header1.xml</li>
-                  <li data-short="chart1.xml">word/charts/chart1.xml</li>
-                  <li data-short="image1.png">word/media/image1.png</li>
-                </ul>
-              </div>
-              <div class="rt-core" data-core>
-                <div class="rt-sheet">
-                  <b>Terms of service</b>
-                  <p>Payment is due in <span class="rt-value" data-value>14</span> days.</p>
-                  <p>Invoices are sent at the end of each month.</p>
-                  <p>Late payments carry interest.</p>
+              </section>
+              <section class="balloon is-note" data-tone="is-note" data-for="n1" data-kind="comment" aria-label="Comment by Marta">
+                <p class="balloon-who"><b>Marta</b><span>Comment</span></p>
+                <p>Which statute? Name it, or legal will ask.</p>
+                <div class="balloon-actions">
+                  <button type="button" data-act="accept">Resolve</button>
                 </div>
-                <p class="rt-label">Foli edits what it owns</p>
-              </div>
-              <div class="rt-file rt-result">
-                <p class="rt-name">contract.docx <span>saved</span></p>
-                <ul data-out-list>
-                  <li><span>word/document.xml</span><em class="is-changed">1 run changed</em></li>
-                  <li><span>word/styles.xml</span><em>verbatim</em></li>
-                  <li><span>word/numbering.xml</span><em>verbatim</em></li>
-                  <li><span>word/comments.xml</span><em>verbatim</em></li>
-                  <li><span>word/settings.xml</span><em>byte for byte</em></li>
-                  <li><span>word/theme/theme1.xml</span><em>byte for byte</em></li>
-                  <li><span>word/header1.xml</span><em>byte for byte</em></li>
-                  <li><span>word/charts/chart1.xml</span><em>byte for byte</em></li>
-                  <li><span>word/media/image1.png</span><em>byte for byte</em></li>
-                </ul>
-              </div>
-              <p class="rt-track">Everything else is copied, untouched</p>
+              </section>
+              <section class="balloon" data-tone="is-ins" data-for="c2" data-kind="change" aria-label="Insertion by you">
+                <p class="balloon-who"><b>You</b><span>Inserted</span></p>
+                <p>“by email”</p>
+                <div class="balloon-actions">
+                  <button type="button" data-act="accept">Accept</button>
+                  <button type="button" data-act="reject">Reject</button>
+                </div>
+              </section>
+              <section class="balloon is-del" data-tone="is-del" data-for="c3" data-kind="change" aria-label="Deletion by Marta">
+                <p class="balloon-who"><b>Marta</b><span>Deleted</span></p>
+                <p>“, in arrears”</p>
+                <div class="balloon-actions">
+                  <button type="button" data-act="accept">Accept</button>
+                  <button type="button" data-act="reject">Reject</button>
+                </div>
+              </section>
             </div>
-            <div class="code">
-              <div class="code-bar"><span>open-and-save.ts</span><button type="button" class="copy" data-copy="code-docx">Copy</button></div>
-<pre id="code-docx"><span class="k">import</span> { importDocx, exportDocx } <span class="k">from</span> <span class="s">"@folijs/docx"</span>;
-
-<span class="k">const</span> { document, package: pkg, report } = <span class="k">await</span> <span class="f">importDocx</span>(bytes);
-report.opaque; <span class="c">// { "w:drawing": 1 }: a chart, kept as is</span>
-<span class="k">const</span> out = <span class="k">await</span> <span class="f">exportDocx</span>(editor.<span class="f">getDocument</span>(), pkg);</pre>
-            </div>
-          </figure>
-          <footer class="folio">3</footer>
-        </article>
-
-        <article class="sheet scene" id="engine" aria-labelledby="engine-title">
-          <header class="running-head"><span>Foli</span><span>Engine</span></header>
-          <div class="scene-head">
-            <h2 id="engine-title">An engine of its own, from model to layout.</h2>
-            <p>
-              No ProseMirror, Tiptap, Lexical or Slate underneath. Because pagination is part of the
-              engine, the cursor, selection and undo all know where pages begin.
-            </p>
           </div>
+          <figcaption class="caption">
+            <b>Fig. 3.</b> Drawn for this page. In the editor, Accept and Reject are in the toolbar and
+            comments sit in a pane beside the pages.
+          </figcaption>
+        </figure>
+      </section>
+
+      <section class="scene scene-tables wrap-wide" id="tables" aria-labelledby="tables-title">
+        <div class="tb-side">
+          <h2 id="tables-title">Tables that know about pages.</h2>
+          <p>
+            A long table crosses page breaks and repeats its header rows. Rows set not to split move
+            whole; other rows break between their lines. Merged cells, table styles and tracked rows
+            come with it.
+          </p>
+          <div class="tb-controls">
+            <fieldset class="stepper" aria-label="Rows">
+              <button type="button" data-rows="-1" aria-label="Remove a row">−</button>
+              <output data-out="rows">16</output>
+              <button type="button" data-rows="1" aria-label="Add a row">+</button>
+            </fieldset>
+            <button type="button" class="switch switch-inline" data-repeat aria-pressed="true">
+              <span class="switch-track" aria-hidden="true"></span>
+              <span><b>Repeat header</b></span>
+            </button>
+          </div>
+          <p class="caption"><b>Fig. 4.</b> <span data-out="table-pages" role="status">16 rows on 2 pages.</span> Sample figures, rows set not to split.</p>
+        </div>
+        <div class="tb-view" data-table-view aria-hidden="true"><div class="tb-canvas" data-canvas></div></div>
+      </section>
+
+      <section class="band" id="engine" aria-labelledby="engine-title">
+        <div class="wrap-wide">
+          <header class="scene-head">
+            <h2 id="engine-title">An engine of its own.</h2>
+            <p>
+              No ProseMirror, Tiptap, Lexical or Slate underneath. Pages belong to the layout engine,
+              so the caret and the selection cross page breaks natively.
+            </p>
+          </header>
           <figure class="ks">
             <div class="ks-input">
-              <span class="fig">Fig. 5 · Press the key</span>
               <button type="button" class="keycap" data-key aria-label="Type the next letter">F</button>
-              <p class="ks-page"><span data-typed></span><i aria-hidden="true"></i></p>
+              <p class="ks-page"><span data-typed aria-live="off"></span><i aria-hidden="true"></i></p>
+              <figcaption class="caption"><b>Fig. 5.</b> Press the key, or focus it and type.</figcaption>
             </div>
             <ol class="ks-steps">
               <li data-step><b>Input</b><span><code>beforeinput</code> reaches the view</span></li>
               <li data-step><b>Command</b><span>The view turns it into a command</span></li>
               <li data-step><b>Transaction</b><span>Steps, selection and metadata</span></li>
               <li data-step><b>State</b><span>Core applies it to a new immutable state</span></li>
-              <li data-step><b>View</b><span>Only the changed nodes render again</span></li>
+              <li data-step><b>View</b><span>Changed blocks render again</span></li>
               <li data-step><b>Layout</b><span>Pages re-flow from the first changed block</span></li>
             </ol>
           </figure>
-          <div class="engine-foot">
-            <div class="stack">
-              <div class="pkg pkg-react"><code>@folijs/react</code><span>Editor, toolbar, comments pane, SSR</span><em class="pkg-size">88.6 kB</em></div>
-              <div class="pkg pkg-view"><code>@folijs/view</code><span>DOM view, input, IME, layout into pages</span><em class="pkg-size">64.2 kB</em></div>
-              <div class="pkg-row">
-                <div class="pkg pkg-core"><code>@folijs/core</code><span>Model, steps, history, commands. No DOM.</span><em class="pkg-size">52.7 kB</em></div>
-                <div class="pkg pkg-docx"><code>@folijs/docx</code><span>Import and lossless export. No DOM.</span><em class="pkg-size">51.9 kB</em></div>
-              </div>
-            </div>
-            <div class="engine-notes">
-              <p class="proof">
-                <strong>Under a frame.</strong> In Chromium, a keystroke painted in at most 13.2 ms
-                (p95) in documents up to 100 pages, with Enter moving every later page.
-                <a href="https://github.com/josep-audenis/foli/blob/main/docs/benchmarks.md#pagination-layout-keystrokes-and-re-flow-phase-5">Method and numbers</a>,
-                measured in Phase 5, before schema v3.
-              </p>
-              <p class="note">
-                Sizes are minified and gzipped with the Foli packages each pulls in, React excluded,
-                measured on main after 0.5.0.
-              </p>
-            </div>
+          <dl class="pkgs">
+            <div><dt><code>@folijs/react</code></dt><dd class="pkg-size">95.0 kB</dd><dd>Editor, toolbar, comments pane</dd></div>
+            <div><dt><code>@folijs/view</code></dt><dd class="pkg-size">68.4 kB</dd><dd>DOM view, layout into pages</dd></div>
+            <div><dt><code>@folijs/core</code></dt><dd class="pkg-size">54.7 kB</dd><dd>Model and commands, no DOM</dd></div>
+            <div><dt><code>@folijs/docx</code></dt><dd class="pkg-size">52.5 kB</dd><dd>Import and export, no DOM</dd></div>
+          </dl>
+          <div class="engine-notes">
+            <p class="proof">
+              <strong>Under a frame.</strong> In Chromium, a keystroke painted in at most 13.2 ms
+              (p95) in paragraph documents up to 100 pages. Measured on schema v2 and not yet re-run
+              on the current model; Enter in long lists was slower then, up to about 65 ms.
+              <a href="https://github.com/josep-audenis/foli/blob/main/docs/benchmarks.md#pagination-layout-keystrokes-and-re-flow-phase-5">Method and numbers</a>.
+            </p>
+            <p class="note">
+              Sizes are minified and gzipped with the Foli packages each pulls in, React excluded,
+              measured on main, ahead of 0.5.0.
+            </p>
           </div>
-          <footer class="folio">4</footer>
-        </article>
+        </div>
+      </section>
 
+      <div class="closing wrap-wide">
         <article class="sheet" id="start" aria-labelledby="start-title">
           <header class="running-head"><span>Foli</span><span>Getting started</span></header>
-          <div class="sheet-grid sheet-grid-code">
+          <div class="start-body">
             <div class="sheet-copy">
               <h2 id="start-title">One component, real pages.</h2>
               <p>
-                <code>FoliEditor</code> brings the pages, a toolbar and a comments pane. Load a
-                saved document with <code>parseDocument</code>, which validates it and migrates
-                older versions. Save from <code>onChange</code>.
+                <code>FoliEditor</code> brings the pages, a toolbar and a comments pane. Documents
+                are plain JSON: save them from <code>onChange</code>, load them with
+                <code>parseDocument</code>.
               </p>
               <p>
-                Prefer your own toolbar, or no React at all? The
+                Your own toolbar, Next.js or no React at all? The
                 <a href="https://github.com/josep-audenis/foli/blob/main/docs/getting-started.md">getting started guide</a>
-                covers both.
+                covers them.
               </p>
-              <p><a class="button button-primary" href="/test/">Try the editor</a></p>
             </div>
-            <div class="code">
-              <div class="code-bar"><span>Editor.tsx</span><button type="button" class="copy" data-copy="code-start">Copy</button></div>
-<pre id="code-start"><span class="k">import</span> { createDocument, parseDocument } <span class="k">from</span> <span class="s">"@folijs/core"</span>;
-<span class="k">import</span> { type FoliChange, FoliEditor } <span class="k">from</span> <span class="s">"@folijs/react"</span>;
-<span class="k">import</span> <span class="s">"@folijs/react/styles.css"</span>;
+            <div class="install">
+              <code id="install-cmd">npm i @folijs/react @folijs/core @folijs/docx</code>
+              <button type="button" class="copy" data-copy="install-cmd">Copy</button>
+            </div>
+            <div class="listing">
+              <div class="listing-head"><span>Editor.tsx</span><button type="button" class="copy" data-copy="code-start">Copy</button></div>
+              <div class="listing-body">
+<pre id="code-start" data-lines>"use client";
+import { createDocument } from "@folijs/core";
+import { FoliEditor } from "@folijs/react";
+import "@folijs/react/styles.css";
 
-<span class="k">const</span> saved = localStorage.<span class="f">getItem</span>(<span class="s">"doc"</span>);
-<span class="k">const</span> initial = saved
-  ? <span class="f">parseDocument</span>(JSON.<span class="f">parse</span>(saved))
-  : <span class="f">createDocument</span>();
+const initial = createDocument();
 
-<span class="k">const</span> <span class="f">save</span> = (c: FoliChange) =&gt;
-  localStorage.<span class="f">setItem</span>(<span class="s">"doc"</span>, JSON.<span class="f">stringify</span>(c.document));
-
-<span class="k">export function</span> <span class="f">Editor</span>() {
-  <span class="k">return</span> (
-    &lt;<span class="t">FoliEditor</span> initialContent={initial} onChange={save} /&gt;
-  );
+export function Editor() {
+  return <ins>&lt;FoliEditor initialContent={initial} /&gt;</ins>;
 }</pre>
+              </div>
             </div>
           </div>
-          <footer class="folio">5</footer>
+          <footer class="folio">1</footer>
         </article>
 
-        <article class="sheet" id="status" aria-labelledby="status-title">
+        <article class="sheet sheet-contents" id="status" aria-labelledby="status-title">
           <header class="running-head"><span>Foli</span><span>Status</span></header>
-          <div class="sheet-grid">
-            <div class="sheet-copy">
-              <h2 id="status-title">Where it stands.</h2>
-              <p>
-                Foli is young and says so. The API may change in any 0.x release, and some checks
-                have not been done by hand yet: IME on real devices, screen readers, Safari on a
-                Mac. The <a href="https://github.com/josep-audenis/foli/blob/main/docs/limitations.md">known limitations</a>
-                list them all. Read it before you ship.
-              </p>
-            </div>
-            <ol class="toc" aria-label="Roadmap">
-              <li class="toc-done"><span class="toc-name">Engine, model, transactions, view</span><span class="toc-leader"></span><span class="toc-state">0.1</span></li>
-              <li class="toc-done"><span class="toc-name">Native pagination</span><span class="toc-leader"></span><span class="toc-state">0.1</span></li>
-              <li class="toc-done"><span class="toc-name">Lists, links, colors, paste</span><span class="toc-leader"></span><span class="toc-state">0.2</span></li>
-              <li class="toc-done"><span class="toc-name">Word's model, .docx import and export</span><span class="toc-leader"></span><span class="toc-state">0.3</span></li>
-              <li class="toc-done"><span class="toc-name">Tracked changes and comments</span><span class="toc-leader"></span><span class="toc-state">0.4</span></li>
-              <li class="toc-done"><span class="toc-name">Tables and pictures</span><span class="toc-leader"></span><span class="toc-state">0.5</span></li>
-              <li class="toc-now"><span class="toc-name">Sections, headers and footers, fields, templates, PDF</span><span class="toc-leader"></span><span class="toc-state">in progress</span></li>
-              <li><span class="toc-name">Ecosystem and 1.0</span><span class="toc-leader"></span><span class="toc-state">next</span></li>
-            </ol>
-          </div>
-          <footer class="folio">6</footer>
+          <h2 id="status-title">Where it stands.</h2>
+          <ol class="toc" aria-label="Roadmap">
+            <li class="toc-done"><span class="toc-name">Engine, model, view</span><span class="toc-leader"></span><span class="toc-state">0.1</span></li>
+            <li class="toc-done"><span class="toc-name">Native pagination</span><span class="toc-leader"></span><span class="toc-state">0.1</span></li>
+            <li class="toc-done"><span class="toc-name">Lists, links, paste</span><span class="toc-leader"></span><span class="toc-state">0.2</span></li>
+            <li class="toc-done"><span class="toc-name">Word's model, .docx</span><span class="toc-leader"></span><span class="toc-state">0.3</span></li>
+            <li class="toc-done"><span class="toc-name">Changes and comments</span><span class="toc-leader"></span><span class="toc-state">0.4</span></li>
+            <li class="toc-done"><span class="toc-name">Tables and pictures</span><span class="toc-leader"></span><span class="toc-state">0.5</span></li>
+            <li class="toc-now"><span class="toc-name">Sections, headers, fields, templates, PDF</span><span class="toc-leader"></span><span class="toc-state">now</span></li>
+            <li><span class="toc-name">Ecosystem and 1.0</span><span class="toc-leader"></span><span class="toc-state">next</span></li>
+          </ol>
+          <p class="status-note">
+            The API may change in any 0.x release. IME on real devices, screen readers and Safari on
+            a Mac have not been checked by hand.
+            <a href="https://github.com/josep-audenis/foli/blob/main/docs/limitations.md">Read the known limitations</a>
+            before you ship.
+          </p>
+          <footer class="folio">2</footer>
         </article>
       </div>
     </main>
 
-    <footer class="colophon wrap">
-      <p class="colophon-big">
-        Everything above is a drawing. <a href="/test/">The real editor</a> is one click away.
-      </p>
-      <div class="colophon-row">
-        <p>
-          <strong>Colophon.</strong> Set in Caladea, Carlito and Cousine, metric twins of Cambria,
-          Calibri and Courier New. Matching widths are how a browser can break a Word document's
-          lines where Word did.
-        </p>
-        <p>v0.5.0 · MIT License · © 2026 Josep Audenis</p>
+    <footer class="cover">
+      <div class="wrap-wide">
+        <p class="cover-title">The real editor is<br /><a href="/test/">one click away.</a></p>
+        <div class="cover-row">
+          <p>
+            <strong>Colophon.</strong> Set in Caladea, Carlito and Cousine, metric twins of Cambria,
+            Calibri and Courier New. Matching widths are how a browser can break a Word document's
+            lines where Word did.
+          </p>
+          <p>
+            <a href="https://github.com/josep-audenis/foli">GitHub</a> · v0.5.0 · MIT License · © 2026
+            Josep Audenis
+          </p>
+        </div>
       </div>
+      <a class="corner" href="/test/" aria-label="Open the editor at /test"><span>/test/</span></a>
     </footer>
 
     <script type="module" src="/src/landing/main.ts"></script>

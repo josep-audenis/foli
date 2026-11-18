@@ -35,6 +35,50 @@ body.try {
   white-space: nowrap;
 }
 
+.try-guide {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ink-2);
+  font-size: 1rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.try-result {
+  position: fixed;
+  z-index: 5;
+  bottom: 42px;
+  left: max(16px, env(safe-area-inset-left, 0px));
+  display: grid;
+  gap: 2px;
+  max-width: min(440px, calc(100vw - 32px));
+  padding: 12px 40px 12px 14px;
+  border-left: 3px solid var(--accent);
+  background: var(--paper);
+  box-shadow: var(--shadow-lift);
+  color: var(--ink-2);
+  font-size: 0.98rem;
+  line-height: 1.3;
+}
+
+.try-result strong {
+  color: var(--ink);
+  font: 700 1.2rem / 1.2 var(--font-display);
+}
+
+.try-result button {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  background: none;
+  color: var(--ink-2);
+  cursor: pointer;
+  font-size: 1.2rem;
+}
+
 .try-actions {
   display: flex;
   flex: none;
@@ -45,6 +89,8 @@ body.try {
 
 .try-actions .button {
   height: 38px;
+  padding: 0 14px;
+  white-space: nowrap;
   cursor: pointer;
   font-family: var(--font-text);
   font-size: 1rem;
@@ -119,7 +165,7 @@ body.try {
 
 .try-status {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 4px 20px;
   padding: 6px 12px;
   background: var(--paper);
@@ -133,13 +179,29 @@ body.try {
   margin-left: auto;
 }
 
-.try-error {
-  flex-basis: 100%;
-  color: var(--strike);
+.try-message {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ink);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.try-error:empty {
+.try-message:empty {
   display: none;
+}
+
+.try-loading {
+  display: grid;
+  place-items: center;
+  color: var(--ink-2);
+  font: italic 400 1.1rem / 1.3 var(--font-display);
+}
+
+@media (max-width: 1180px) {
+  .try-guide {
+    display: none;
+  }
 }
 
 @media (max-width: 640px) {
@@ -162,9 +224,23 @@ body.try {
   }
 }
 
-/* An A5 page (559px) is wider than a phone: scale the pages. Pagination is unchanged by zoom. */
+/* Word's pages are wider than small screens: scale them. Pagination is unchanged by zoom. */
+@media (max-width: 1000px) {
+  .try-app .foli-editor-body {
+    display: block;
+  }
+
+  .try-app .foli-content {
+    zoom: 0.72;
+  }
+}
+
 @media (max-width: 620px) {
   .try-app .foli-content {
-    zoom: 0.6;
+    zoom: 0.42;
+  }
+
+  .try-actions .try-link {
+    display: none;
   }
 }

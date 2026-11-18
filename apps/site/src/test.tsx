@@ -1,12 +1,24 @@
-import { setFontFamily } from "@folijs/core";
-import type { PackageImages } from "@folijs/docx";
+import type { EditorDocument } from "@folijs/core";
+import type { DocxPackage, PackageImages } from "@folijs/docx";
 import { FoliEditor, type FoliEditorHandle, type FoliEditorProps } from "@folijs/react";
 import "@folijs/react/styles.css";
 import { type ChangeEvent, StrictMode, useCallback, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
+import sampleUrl from "../../../corpus/word/02-services-agreement-redlined.docx?url";
+import { sample } from "./sample.js";
 import "./site.css";
 import "./test.css";
-import { sample } from "./sample.js";
+
+const SAMPLE_NAME = "services-agreement-redlined.docx";
+const DOCX_TYPE = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+
+interface Opened {
+  id: number;
+  name: string;
+  document: EditorDocument;
+  pkg?: DocxPackage;
+  trackChanges: boolean;
+}
 
 /** Word's status bar: page count and word count, read from the rendered pages. */
 function useStatus(host: React.RefObject<HTMLDivElement | null>) {
@@ -26,38 +38,20 @@ function useStatus(host: React.RefObject<HTMLDivElement | null>) {
   return [status, update] as const;
 }
 
-/**
- * Sets the sample in Caladea, the metric twin of Cambria the site is set in, then clears the
- * undo history so Undo does not take the font back off.
- */
-const styled = new WeakSet<object>();
-function setSampleFont(handle: FoliEditorHandle | null) {
-  if (!handle || styled.has(handle.editor)) return;
-  styled.add(handle.editor);
-  const { editor } = handle;
-  editor.commands.selectAll();
-  editor.run(setFontFamily("Caladea"));
-  editor.setDocument(editor.getDocument());
-}
-
-const SAMPLE_NAME = "On pages.docx";
-
-function Demo() {
+function Try() {
   const host = useRef<HTMLDivElement>(null);
-  // The latest open or reset: an import that finishes after a newer one is dropped.
-  const request = useRef(0);
   const editorRef = useRef<FoliEditorHandle>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const saveRef = useRef<HTMLButtonElement>(null);
+  // The latest open or reset: an import that finishes after a newer one is dropped.
+  const request = useRef(0);
   const images = useRef<PackageImages | null>(null);
-  const [key, setKey] = useState(0);
-  const [name, setName] = useState(SAMPLE_NAME);
-  const [error, setError] = useState("");
+  const [opened, setOpened] = useState<Opened | null>(null);
+  const [message, setMessage] = useState("");
+  const [saved, setSaved] = useState<{ same: number; total: number; changed: string[] } | null>(
+    null,
+  );
   const [status, update] = useStatus(host);
-  // Stable, so FoliEditor's imperative handle is not rebuilt on every status update.
-  const attach = useCallback((handle: FoliEditorHandle | null) => {
-    editorRef.current = handle;
-    setSampleFont(handle);
-  }, []);
 
   // An opened file shows only images it contains: one linked from the web stays a box, unfetched.
   const resource = useCallback<NonNullable<FoliEditorProps["resource"]>>(
@@ -65,60 +59,101 @@ function Demo() {
     [],
   );
 
+  const load = useCallback(async (name: string, read: () => Promise<ArrayBuffer>) => {
+    const id = ++request.current;
+    setMessage("");
+    setSaved(null);
+    const docx = await import("@folijs/docx");
+    const imported = await docx.importDocx(new Uint8Array(await read()));
+    if (id !== request.current) return;
+    const previous = images.current;
+    images.current = docx.packageImages(imported.package);
+    setOpened({
+      id,
+      name,
+      document: imported.document,
+      pkg: imported.package,
+      trackChanges: imported.trackRevisions,
+    });
+    // After the editor showing the previous file's pictures has gone.
+    setTimeout(() => previous?.revoke(), 0);
+  }, []);
+
+  const openSample = useCallback(async () => {
+    try {
+      await load(SAMPLE_NAME, async () => {
+        const response = await fetch(sampleUrl);
+        if (!response.ok) throw new Error(`The sample answered ${response.status}`);
+        return response.arrayBuffer();
+      });
+    } catch (cause) {
+      console.warn(cause);
+      images.current?.revoke();
+      images.current = null;
+      setOpened({ id: ++request.current, name: "On pages", document: sample, trackChanges: false });
+    }
+  }, [load]);
+
+  useEffect(() => {
+    void openSample();
+  }, [openSample]);
+
   // Pages appear after the first layout; web fonts loading later re-flow them.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: each opened document is counted again.
   useEffect(() => {
     update();
-    const timer = setTimeout(update, 400);
+    const timer = setTimeout(update, 500);
     document.fonts?.ready.then(update);
     return () => clearTimeout(timer);
-  }, [update]);
+  }, [update, opened]);
 
   async function open(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     event.target.value = "";
     if (!file) return;
-    const id = ++request.current;
-    setError("");
-    let docx: typeof import("@folijs/docx");
     try {
-      docx = await import("@folijs/docx");
+      await load(file.name, () => file.arrayBuffer());
     } catch (cause) {
       console.warn(cause);
-      if (id === request.current)
-        setError("Could not load the .docx reader. Check your connection and try again.");
-      return;
-    }
-    try {
-      const imported = await docx.importDocx(new Uint8Array(await file.arrayBuffer()));
-      if (id !== request.current) return;
-      const previous = images.current;
-      const next = docx.packageImages(imported.package);
-      images.current = next;
-      try {
-        editorRef.current?.editor.setDocument(imported.document);
-      } catch (cause) {
-        images.current = previous;
-        next.revoke();
-        throw cause;
-      }
-      previous?.revoke();
-      setName(file.name);
-      update();
-    } catch (cause) {
-      console.warn(cause);
-      if (id === request.current)
-        setError(`Could not open ${file.name}: it is not a .docx Foli can read.`);
+      setMessage(`Could not open ${file.name}. It is not a .docx Foli can read.`);
     }
   }
 
-  function reset() {
-    request.current++;
-    images.current?.revoke();
-    images.current = null;
-    setName(SAMPLE_NAME);
-    setError("");
-    setKey((k) => k + 1);
-    setTimeout(update, 400);
+  async function save() {
+    const editor = editorRef.current?.editor;
+    if (!editor || !opened) return;
+    setMessage("");
+    try {
+      const { exportDocx, readPackage } = await import("@folijs/docx");
+      const bytes = await exportDocx(editor.getDocument(), opened.pkg, {
+        trackRevisions: editor.trackingChanges,
+      });
+      const url = URL.createObjectURL(new Blob([bytes as BlobPart], { type: DOCX_TYPE }));
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = opened.name.endsWith(".docx") ? opened.name : `${opened.name}.docx`;
+      link.click();
+      // Revoked once the download has started (at once, Firefox and Safari may cancel it).
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      if (opened.pkg) {
+        const before = new Map(opened.pkg.parts.map((part) => [part.name, part.data]));
+        const after = (await readPackage(bytes)).parts;
+        const changed = after.filter((part) => {
+          const old = before.get(part.name);
+          return old?.length !== part.data.length || !old.every((b, i) => b === part.data[i]);
+        });
+        setSaved({
+          same: after.length - changed.length,
+          total: after.length,
+          changed: changed.map((part) => part.name.replace(/^\//, "")),
+        });
+      } else {
+        setMessage(`Saved ${link.download}.`);
+      }
+    } catch (cause) {
+      console.warn(cause);
+      setMessage("Could not save this document as .docx.");
+    }
   }
 
   return (
@@ -132,46 +167,86 @@ function Demo() {
           </svg>
           <span className="brand-name">Foli</span>
         </a>
-        <span className="try-file">{name}</span>
+        <span className="try-file">{opened?.name ?? "Opening the sample…"}</span>
+        {opened?.name === SAMPLE_NAME && (
+          <span className="try-guide">
+            Try this: accept both edits in clause 2.1, save, then open the file in Word.
+          </span>
+        )}
         <span className="try-actions">
-          <button type="button" className="try-link" onClick={reset}>
+          <button type="button" className="try-link" onClick={openSample}>
             Reset
           </button>
+          <button type="button" className="button" onClick={() => fileRef.current?.click()}>
+            Open .docx
+          </button>
           <button
+            ref={saveRef}
             type="button"
             className="button button-primary"
-            onClick={() => fileRef.current?.click()}
+            onClick={save}
+            disabled={!opened}
           >
-            Open a .docx
+            Save .docx
           </button>
           <input
             ref={fileRef}
             type="file"
             aria-label="Open a .docx file"
-            accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            accept={`.docx,${DOCX_TYPE}`}
             hidden
             onChange={open}
           />
         </span>
       </header>
-      <FoliEditor
-        key={key}
-        ref={attach}
-        initialContent={sample}
-        author="You"
-        resource={resource}
-        onChange={update}
-        className="try-canvas"
-      />
+      {saved && (
+        <aside className="try-result" role="status">
+          <button
+            type="button"
+            aria-label="Dismiss"
+            onClick={() => {
+              setSaved(null);
+              saveRef.current?.focus();
+            }}
+          >
+            ×
+          </button>
+          <strong>
+            {saved.same} of {saved.total} parts byte-identical
+          </strong>
+          <span>
+            {saved.changed.length === 0
+              ? "Nothing in the file changed."
+              : `Only ${saved.changed.slice(0, 3).join(", ")}${saved.changed.length > 3 ? ` and ${saved.changed.length - 3} more` : ""} changed.`}
+          </span>
+        </aside>
+      )}
+      {opened ? (
+        <FoliEditor
+          key={opened.id}
+          ref={editorRef}
+          initialContent={opened.document}
+          trackChanges={opened.trackChanges}
+          author="You"
+          resource={resource}
+          onChange={update}
+          className="try-canvas"
+        />
+      ) : (
+        <div className="try-loading" role="status">
+          Opening a redlined services agreement…
+        </div>
+      )}
       <footer className="try-status">
         <span>
           {status.pages} {status.pages === 1 ? "page" : "pages"}
         </span>
         <span>{status.words} words</span>
-        <span className="try-private">Files stay in this browser</span>
-        {name === SAMPLE_NAME && <span>A5 · 148 × 210 mm</span>}
-        <span className="try-error" role="alert">
-          {error}
+        <span className="try-message" role="status">
+          {message}
+        </span>
+        <span className="try-private">
+          Built from main, ahead of npm 0.5.0 · Your files stay in this browser
         </span>
       </footer>
     </div>
@@ -182,7 +257,7 @@ const mount = document.getElementById("try");
 if (mount) {
   createRoot(mount).render(
     <StrictMode>
-      <Demo />
+      <Try />
     </StrictMode>,
   );
 }

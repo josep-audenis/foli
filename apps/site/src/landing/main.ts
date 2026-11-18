@@ -2,7 +2,7 @@ import "../site.css";
 import "../landing.css";
 import { mountPages } from "./pages.js";
 import { mountReview } from "./review.js";
-import { mountCopy, mountKeystroke, mountRoundTrip, mountTable } from "./scenes.js";
+import { mountCopy, mountKeystroke, mountListings, mountRoundTrip, mountTable } from "./scenes.js";
 
 const scenes: [string, (root: HTMLElement) => void][] = [
   ["#pages", mountPages],
@@ -16,4 +16,5 @@ for (const [selector, mount] of scenes) {
   const root = document.querySelector<HTMLElement>(selector);
   if (root) mount(root);
 }
+mountListings();
 mountCopy();

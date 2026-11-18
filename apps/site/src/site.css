@@ -402,44 +402,6 @@ body::before {
   color: var(--ink-3);
 }
 
-.sheet-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
-  gap: clamp(32px, 5vw, 72px);
-  align-items: start;
-}
-
-.sheet-grid-even {
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-}
-
-.sheet-grid-code {
-  grid-template-columns: minmax(0, 4fr) minmax(0, 6fr);
-}
-
-/* Verso sheets mirror the recto ones, as facing pages do. */
-@media (min-width: 901px) {
-  .sheet:nth-child(even) .running-head {
-    flex-direction: row-reverse;
-  }
-
-  .sheet:nth-child(even) .folio {
-    justify-self: start;
-  }
-
-  .sheet:nth-child(even) .sheet-grid {
-    grid-template-columns: minmax(0, 6fr) minmax(0, 5fr);
-  }
-
-  .sheet:nth-child(even) .sheet-grid-even {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  }
-
-  .sheet:nth-child(even) .sheet-grid > :last-child {
-    order: -1;
-  }
-}
-
 .sheet-copy {
   display: grid;
   gap: 18px;
@@ -464,122 +426,6 @@ body::before {
   max-width: 60ch;
 }
 
-/* Code */
-.code,
-.xml {
-  min-width: 0;
-  margin: 0;
-  border-radius: 6px;
-  overflow: hidden;
-  background: var(--code-bg);
-  color: var(--code-ink);
-}
-
-.code-bar,
-.xml-bar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 6px 14px;
-  border-bottom: 1px solid rgb(255 255 255 / 0.08);
-  font: 400 0.75rem / 1.4 var(--font-mono);
-  color: rgb(232 232 228 / 0.6);
-  min-height: 40px;
-}
-
-.code .copy {
-  color: rgb(232 232 228 / 0.7);
-}
-
-.code .copy:hover {
-  color: #fff;
-  background: rgb(255 255 255 / 0.08);
-}
-
-pre {
-  margin: 0;
-  padding: 16px 18px 20px;
-  overflow-x: auto;
-  font: 400 0.75rem / 1.7 var(--font-mono);
-  tab-size: 2;
-}
-
-.k {
-  color: #f4a7c3;
-}
-
-.s {
-  color: #b9e4a5;
-}
-
-.f {
-  color: #9cc4ff;
-}
-
-.t {
-  color: #ffd27a;
-}
-
-.c {
-  color: rgb(232 232 228 / 0.45);
-  font-style: italic;
-}
-
-.xml {
-  display: grid;
-}
-
-.xml pre {
-  padding-inline: 0;
-}
-
-.xml pre > span {
-  display: block;
-  padding-inline: 18px;
-}
-
-.x-keep {
-  color: rgb(232 232 228 / 0.82);
-}
-
-.x-edit {
-  color: #ffffff;
-  background: rgb(122 167 255 / 0.16);
-  box-shadow: inset 3px 0 0 #7aa7ff;
-}
-
-.xml-legend {
-  display: inline-flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  align-items: center;
-  gap: 6px;
-}
-
-.lg {
-  display: inline-block;
-  width: 10px;
-  height: 10px;
-  border-radius: 2px;
-  margin-left: 6px;
-}
-
-.lg-edit {
-  background: #7aa7ff;
-}
-
-.lg-keep {
-  background: rgb(232 232 228 / 0.3);
-}
-
-.xml figcaption {
-  padding: 0 18px 16px;
-  font: 400 var(--step--1) / 1.4 var(--font-mono);
-  color: rgb(232 232 228 / 0.55);
-}
-
 .proof {
   padding-top: 16px;
   border-top: 1px solid var(--rule);
@@ -599,64 +445,6 @@ pre {
   margin-top: 16px;
   font: 400 var(--step--1) / 1.4 var(--font-mono);
   color: var(--ink-3);
-}
-
-/* Package stack */
-.stack {
-  display: grid;
-  gap: 8px;
-  margin: 0;
-}
-
-.pkg-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-}
-
-.pkg {
-  display: grid;
-  gap: 4px;
-  padding: 16px 18px;
-  border: 1px solid var(--rule);
-  border-radius: var(--radius);
-  background: var(--desk);
-}
-
-.pkg code {
-  font-size: 0.95rem;
-  font-weight: 700;
-  color: var(--ink);
-}
-
-.pkg span {
-  font-size: 0.95rem;
-  line-height: 1.4;
-  color: var(--ink-2);
-}
-
-.pkg {
-  position: relative;
-}
-
-.pkg-size {
-  position: absolute;
-  top: 16px;
-  right: 18px;
-  font: 400 0.75rem / 1.4 var(--font-mono);
-  font-style: normal;
-  color: var(--ink-3);
-  font-variant-numeric: tabular-nums;
-}
-
-.pkg-react {
-  background: var(--paper);
-  border-color: var(--ink);
-}
-
-.pkg-core {
-  background: var(--accent-wash);
-  border-color: color-mix(in srgb, var(--accent) 40%, var(--rule));
 }
 
 /* Roadmap as a table of contents: leaders run to the release. */
@@ -761,21 +549,9 @@ pre {
   }
 }
 
-@media (max-width: 900px) {
-  .sheet-grid,
-  .sheet-grid-even,
-  .sheet-grid-code {
-    grid-template-columns: minmax(0, 1fr);
-  }
-}
-
 @media (max-width: 640px) {
   .nav a:not(.nav-gh, .nav-try) {
     display: none;
-  }
-
-  .pkg-row {
-    grid-template-columns: minmax(0, 1fr);
   }
 
   .install {
