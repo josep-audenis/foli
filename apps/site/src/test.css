@@ -1,0 +1,170 @@
+/* /test: the real editor, filling the window. */
+html:has(body.try),
+body.try,
+#try {
+  height: 100%;
+}
+
+body.try {
+  overflow: hidden;
+}
+
+.try-app {
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  height: 100%;
+  background: var(--desk-deep);
+}
+
+.try-bar {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  min-height: 60px;
+  padding: 8px max(16px, env(safe-area-inset-right, 0px)) 8px var(--gutter);
+  background: var(--paper);
+  border-bottom: 1px solid var(--rule);
+}
+
+.try-file {
+  min-width: 0;
+  overflow: hidden;
+  font: 400 var(--step--1) / 1.4 var(--font-mono);
+  color: var(--ink-2);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.try-actions {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.try-actions .button {
+  height: 38px;
+  cursor: pointer;
+  font-family: var(--font-text);
+  font-size: 1rem;
+}
+
+.try-link {
+  height: 38px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: var(--radius);
+  background: none;
+  color: var(--ink-2);
+  cursor: pointer;
+  font: 400 1rem / 1 var(--font-text);
+}
+
+.try-link:hover {
+  background: var(--desk);
+  color: var(--ink);
+}
+
+.try-app .foli-toolbar {
+  --foli-toolbar-background: var(--paper);
+  --foli-toolbar-color: var(--ink);
+  --foli-border-color: var(--rule);
+  --foli-toolbar-hover: var(--desk);
+  --foli-toolbar-pressed: var(--accent-wash);
+  --foli-focus-ring: var(--accent);
+  padding-inline: 12px;
+  font-family: var(--font-text);
+  font-size: 15px;
+}
+
+.try-app .foli-editor-body {
+  min-height: 0;
+  overflow: auto;
+  background: var(--desk-deep);
+}
+
+.try-app .foli-canvas {
+  --foli-canvas-background: var(--desk-deep);
+  --foli-page-gap: 28px;
+  min-height: 100%;
+  padding: 32px 24px 64px;
+}
+
+/* Pages sit side by side as far as the window allows. */
+.try-app .foli-content {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: center;
+  gap: var(--foli-page-gap);
+}
+
+/* The page is the editing surface; the site's focus outline would box the whole canvas. */
+.try-app .foli-content:focus-visible {
+  outline: none;
+}
+
+.try-app .foli-page {
+  flex: none;
+  margin: 0;
+  box-shadow:
+    0 1px 2px rgb(0 0 0 / 0.1),
+    0 8px 24px -6px rgb(0 0 0 / 0.18);
+}
+
+.try-app .foli-page + .foli-page {
+  margin-top: 0;
+}
+
+.try-status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 20px;
+  padding: 6px 12px;
+  background: var(--paper);
+  border-top: 1px solid var(--rule);
+  font: 400 0.75rem / 1.4 var(--font-mono);
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.try-private {
+  margin-left: auto;
+}
+
+.try-error {
+  flex-basis: 100%;
+  color: var(--strike);
+}
+
+.try-error:empty {
+  display: none;
+}
+
+@media (max-width: 640px) {
+  .try-file,
+  .try-private {
+    display: none;
+  }
+
+  .try-app .foli-toolbar {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+  }
+
+  .try-app .foli-toolbar > * {
+    flex: none;
+  }
+
+  .try-app .foli-canvas {
+    padding: 16px 12px 40px;
+  }
+}
+
+/* An A5 page (559px) is wider than a phone: scale the pages. Pagination is unchanged by zoom. */
+@media (max-width: 620px) {
+  .try-app .foli-content {
+    zoom: 0.6;
+  }
+}

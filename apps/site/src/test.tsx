@@ -5,6 +5,7 @@ import "@folijs/react/styles.css";
 import { type ChangeEvent, StrictMode, useCallback, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import "./site.css";
+import "./test.css";
 import { sample } from "./sample.js";
 
 /** Word's status bar: page count and word count, read from the rendered pages. */
@@ -121,25 +122,38 @@ function Demo() {
   }
 
   return (
-    <div className="demo-frame" ref={host}>
-      <div className="demo-titlebar">
-        <span className="demo-file">{name}</span>
-        <span className="demo-actions">
-          <button type="button" className="demo-link" onClick={() => fileRef.current?.click()}>
-            Open your own .docx
-          </button>
-          <button type="button" className="demo-link" onClick={reset}>
+    <div className="try-app" ref={host}>
+      <header className="try-bar">
+        <a className="brand" href="/" aria-label="Foli home">
+          <svg className="brand-mark" viewBox="0 0 28 32" aria-hidden="true">
+            <path className="brand-back" d="M7 1h15v24H7z" />
+            <path className="brand-front" d="M2 6h12l5 5v20H2z" />
+            <path className="brand-fold" d="M14 6v5h5" />
+          </svg>
+          <span className="brand-name">Foli</span>
+        </a>
+        <span className="try-file">{name}</span>
+        <span className="try-actions">
+          <button type="button" className="try-link" onClick={reset}>
             Reset
+          </button>
+          <button
+            type="button"
+            className="button button-primary"
+            onClick={() => fileRef.current?.click()}
+          >
+            Open a .docx
           </button>
           <input
             ref={fileRef}
             type="file"
+            aria-label="Open a .docx file"
             accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
             hidden
             onChange={open}
           />
         </span>
-      </div>
+      </header>
       <FoliEditor
         key={key}
         ref={attach}
@@ -147,45 +161,28 @@ function Demo() {
         author="You"
         resource={resource}
         onChange={update}
-        className="demo-canvas"
+        className="try-canvas"
       />
-      <div className="demo-status">
+      <footer className="try-status">
         <span>
           {status.pages} {status.pages === 1 ? "page" : "pages"}
         </span>
         <span>{status.words} words</span>
-        {name === SAMPLE_NAME && <span className="demo-status-size">A6 · 105 × 148 mm</span>}
-        <span className="demo-error" role="alert">
+        <span className="try-private">Files stay in this browser</span>
+        {name === SAMPLE_NAME && <span>A5 · 148 × 210 mm</span>}
+        <span className="try-error" role="alert">
           {error}
         </span>
-      </div>
+      </footer>
     </div>
   );
 }
 
-const mount = document.getElementById("demo");
+const mount = document.getElementById("try");
 if (mount) {
   createRoot(mount).render(
     <StrictMode>
       <Demo />
     </StrictMode>,
   );
-}
-
-// Copy buttons for install commands and code samples.
-for (const button of document.querySelectorAll<HTMLButtonElement>("[data-copy]")) {
-  button.addEventListener("click", async () => {
-    const source = document.getElementById(button.dataset.copy ?? "");
-    const text = source?.textContent?.trim() ?? "";
-    try {
-      await navigator.clipboard.writeText(text);
-      button.textContent = "Copied";
-    } catch {
-      if (source) getSelection()?.selectAllChildren(source);
-      button.textContent = "Selected";
-    }
-    setTimeout(() => {
-      button.textContent = "Copy";
-    }, 1600);
-  });
 }
