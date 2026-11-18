@@ -37,7 +37,7 @@ import {
 import { migrateToV3 } from "../v3/migrate.js";
 import { Resolver } from "../v3/resolve.js";
 import type { EditorState } from "./state.js";
-import { type WordContext, type WordEnvelope, wordContext } from "./word.js";
+import { otherTrees, storyBody, type WordContext, type WordEnvelope, wordContext } from "./word.js";
 import { builtinStyle, levels } from "./wordformat.js";
 
 /** What a v3 copy carries beside its content: the definitions the content references. */
@@ -364,15 +364,21 @@ function fit(
   for (const c of target.comments) nextId.comment = Math.max(nextId.comment, c.id + 1);
   const names = new Set<string>();
   const { from, to } = state.selection;
-  state.doc.descendants((node, pos) => {
-    const id = (node.attrs.id as number) + 1;
-    if (COMMENT_ANCHORS.has(node.type.name)) nextId.comment = Math.max(nextId.comment, id);
-    // A bookmark in the selection goes with it.
-    if (node.type.name === "bookmarkStart" && (pos < from || pos >= to))
-      names.add(String(node.attrs.name));
-    if (node.type.name.startsWith("bookmark")) nextId.bookmark = Math.max(nextId.bookmark, id);
-    return node.type.name === "doc" || node.isTextblock;
-  });
+  /** What every tree says about ids and names in use (ids are allocated across them). */
+  const scan = (tree: Node, inSelection: (pos: number) => boolean) =>
+    tree.descendants((node, pos) => {
+      const id = (node.attrs.id as number) + 1;
+      if (COMMENT_ANCHORS.has(node.type.name)) nextId.comment = Math.max(nextId.comment, id);
+      // A bookmark in the selection goes with it.
+      if (node.type.name === "bookmarkStart" && !inSelection(pos))
+        names.add(String(node.attrs.name));
+      if (node.type.name.startsWith("bookmark")) nextId.bookmark = Math.max(nextId.bookmark, id);
+      return node.type.name === "doc" || node.isBlock;
+    });
+  scan(state.doc, (pos) => pos >= from && pos < to);
+  for (const tree of otherTrees(state)) scan(tree, () => false);
+  // A story holds no comments, note references or section breaks (ADR-0007).
+  const inStory = storyBody(state) !== null;
   const fresh = (kind: keyof typeof nextId, map: Map<number, number>, id: number) => {
     let next = map.get(id);
     if (next === undefined) {
@@ -399,6 +405,7 @@ function fit(
 
   const mapNode = (node: NodeJSON): NodeJSON | null => {
     const attrs = node.attrs as Json | undefined;
+    if (inStory && (COMMENT_ANCHORS.has(node.type) || node.type === "noteReference")) return null;
     // From another document their definitions are not here: the content comes without them.
     if ((node.type === "controlStart" || node.type === "controlEnd") && !hasControl(attrs?.id))
       return null;
@@ -434,6 +441,10 @@ function fit(
       if (leftOut.has(id)) return null;
       if (node.type === "bookmarkStart") names.add(String(attrs?.name));
       next = { ...attrs, id: fresh("bookmark", bookmarkIds, id) };
+    }
+    if (inStory && next?.section) {
+      next = { ...next };
+      delete next.section;
     }
     if (next?.controls) {
       const controls = (next.controls as string[]).filter(hasControl);

@@ -40,6 +40,11 @@
   outline: none;
 }
 
+/* A header or footer being edited on its page (the view dims the rest of the page). */
+.foli-story-mount {
+  outline-color: var(--foli-focus-ring);
+}
+
 .foli-content ::selection {
   background: var(--foli-selection-color);
 }

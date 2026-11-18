@@ -227,6 +227,11 @@ export class EditorState {
     return this.applyTransaction(tr).state;
   }
 
+  /** @internal This state over another tree (a story's, after undo): plugin states stay. */
+  withDocument(doc: Node, selection: Selection): EditorState {
+    return new EditorState(doc, selection, null, this.plugins, new Map(this.fields));
+  }
+
   /** Applies `root` plus any transactions plugins append; returns all that were applied. */
   applyTransaction(root: Transaction): { state: EditorState; transactions: Transaction[] } {
     if (!this.passesFilters(root)) return { state: this, transactions: [] };

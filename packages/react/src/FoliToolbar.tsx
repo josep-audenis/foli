@@ -11,6 +11,7 @@ import {
   deleteColumns,
   deleteRows,
   deleteTable,
+  documentSections,
   type Editor,
   type EditorState,
   fontFamilyAt,
@@ -44,10 +45,13 @@ import {
   requestsLinkEditor,
   type SectionJSON,
   type SectionSetup,
+  type StorySide,
   sectionAt,
   selectedPicture,
   setAlign,
   setCellShading,
+  setDifferentEvenPages,
+  setDifferentFirstPage,
   setFontFamily,
   setFontSize,
   setHighlight,
@@ -58,6 +62,7 @@ import {
   setPictureSize,
   setReviewView,
   setSectionSetup,
+  setStoryLinked,
   setTableStyle,
   setTextColor,
   setTrackChanges,
@@ -85,7 +90,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { useEditorOrContext, useEditorState } from "./editor.js";
+import { useActiveEditor, useEditorOrContext, useEditorState } from "./editor.js";
 
 export interface FoliToolbarProps {
   /** Default: the editor of the nearest `FoliEditorProvider`. */
@@ -142,7 +147,7 @@ interface Item {
     pick: (color: string | null) => Command;
   };
   /** An action menu button (the table menu): its commands, in order. */
-  actions?: readonly Action[];
+  actions?: readonly Action[] | ((editor: Editor) => readonly Action[]);
   /** A button opening a dialog (the picture's). */
   dialog?: "picture";
   /** A drop-down list (a `select`): its options, the current value, and what picking runs. */
@@ -161,6 +166,8 @@ interface Action {
   command: Command;
   dialog?: "insertTable" | "pageSetup";
   checked?: (state: EditorState) => boolean;
+  /** It takes the focus where it belongs (into a story, or back to the body). */
+  movesFocus?: boolean;
 }
 
 interface ColorOption {
@@ -252,6 +259,77 @@ const SECTION_ACTIONS: readonly Action[] = [
   { key: "removeBreak", label: "Remove section break", command: removeSectionBreak },
   { key: "columnBreak", label: "Column break", command: insertColumnBreak },
 ];
+
+/**
+ * The header and footer menu: opening them on the caret's page, and, for the one open (else the
+ * caret's section), what a section does about them.
+ */
+function storyActions(body: Editor): readonly Action[] {
+  const open = () => body.storyView?.open ?? null;
+  const setup = (state: EditorState) => {
+    const index = open()?.section ?? sectionAt(state)?.index ?? 0;
+    return documentSections(state)[index]?.setup ?? {};
+  };
+  const edit =
+    (side: StorySide): Command =>
+    (_state, dispatch) => {
+      const view = body.storyView;
+      if (!view) return false;
+      if (dispatch) view.edit(side);
+      return true;
+    };
+  const linked = (state: EditorState) => {
+    const story = open();
+    if (!story) return false;
+    const references = story.side === "header" ? setup(state).headers : setup(state).footers;
+    return !references?.[story.variant];
+  };
+  const evenPages = (state: EditorState) =>
+    wordContext(state)?.envelope.settings?.evenAndOddHeaders === true;
+  return [
+    { key: "editHeader", label: "Edit header", command: edit("header"), movesFocus: true },
+    { key: "editFooter", label: "Edit footer", command: edit("footer"), movesFocus: true },
+    {
+      key: "closeStory",
+      label: "Close header and footer",
+      movesFocus: true,
+      command: (_state, dispatch) => {
+        if (!open()) return false;
+        if (dispatch) body.storyView?.close();
+        return true;
+      },
+    },
+    {
+      key: "firstPage",
+      label: "Different first page",
+      checked: (state) => setup(state).titlePage === true,
+      command: (state, dispatch) =>
+        setDifferentFirstPage(setup(state).titlePage !== true, open()?.section)(state, dispatch),
+    },
+    {
+      key: "evenPages",
+      label: "Different odd and even pages",
+      checked: evenPages,
+      command: (state, dispatch) => setDifferentEvenPages(!evenPages(state))(state, dispatch),
+    },
+    {
+      key: "linkPrevious",
+      label: "Link to previous",
+      checked: linked,
+      command: (state, dispatch) => {
+        const story = open();
+        return story
+          ? setStoryLinked(
+              story.side,
+              story.variant,
+              !linked(state),
+              story.section,
+            )(state, dispatch)
+          : false;
+      },
+    },
+  ];
+}
 
 /** Whether the selection holds a textblock (a caret's own block first; else it walks the range). */
 function hasTextblock(state: EditorState): boolean {
@@ -619,6 +697,13 @@ const GROUPS: Item[][] = [
       enabled: (state) => wordContext(state) !== null,
       actions: SECTION_ACTIONS,
     },
+    {
+      key: "headerFooter",
+      label: "Header and footer",
+      text: "Header",
+      enabled: (state) => wordContext(state) !== null,
+      actions: storyActions,
+    },
   ],
 ];
 
@@ -685,7 +770,9 @@ export function FoliToolbar({
   comments = false,
   upload,
 }: FoliToolbarProps) {
-  const editor = useEditorOrContext(given, "FoliToolbar");
+  const body = useEditorOrContext(given, "FoliToolbar");
+  // A story open on its page takes the formatting commands; the body otherwise.
+  const editor = useActiveEditor(body);
   const groups = comments ? GROUPS : GROUPS_NO_COMMENT;
   const items = comments ? ITEMS : ITEMS_NO_COMMENT;
   const states = useEditorState(comments ? selectStates : selectStatesNoComment, {
@@ -955,7 +1042,8 @@ export function FoliToolbar({
                 </button>
               );
               if (item.actions) {
-                const { actions } = item;
+                const actions =
+                  typeof item.actions === "function" ? item.actions(body) : item.actions;
                 return (
                   <span key={item.key} className="foli-toolbar-menu">
                     {button}
@@ -986,6 +1074,7 @@ export function FoliToolbar({
                             return;
                           }
                           editor.run(action.command);
+                          if (action.movesFocus) return;
                           if (pointer) onClickCommand?.();
                           else buttons.current[i]?.focus();
                         }}

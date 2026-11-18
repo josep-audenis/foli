@@ -2,7 +2,13 @@ import { readFileSync } from "node:fs";
 import { createDocument, createEditor } from "@folijs/core";
 import { describe, expect, it } from "vitest";
 import { exportDocx, importDocx, readPackage } from "./index.js";
-import { trackRevisionsOf, withTrackRevisions } from "./settings.js";
+import {
+  newSettingsXml,
+  readSettings,
+  trackRevisionsOf,
+  withSettings,
+  withTrackRevisions,
+} from "./settings.js";
 import { parseXml } from "./xml.js";
 
 const W_NS = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
@@ -11,6 +17,68 @@ const settings = (inner: string, open = `<w:settings xmlns:w="${W_NS}">`) =>
 const toggle = (source: string, on: boolean) =>
   withTrackRevisions(source, parseXml(source).root, on);
 const read = (source: string) => trackRevisionsOf(parseXml(source).root);
+
+describe("settings in the model", () => {
+  const change = (source: string, value: Parameters<typeof withSettings>[2]) =>
+    withSettings(source, parseXml(source).root, value);
+
+  it("reads even and odd headers and note properties, not the separators", () => {
+    expect(readSettings(undefined)).toBeUndefined();
+    expect(readSettings(parseXml(settings('<w:zoom w:percent="100"/>')).root)).toBeUndefined();
+    const part = settings(
+      '<w:evenAndOddHeaders/><w:footnotePr><w:pos w:val="beneathText"/><w:numFmt w:val="lowerRoman"/><w:numStart w:val="3"/><w:numRestart w:val="eachPage"/><w:footnote w:id="-1"/></w:footnotePr><w:endnotePr><w:endnote w:id="0"/></w:endnotePr>',
+    );
+    expect(readSettings(parseXml(part).root)).toEqual({
+      evenAndOddHeaders: true,
+      footnotes: { position: "beneathText", format: "lowerRoman", start: 3, restart: "eachPage" },
+    });
+    // What the model cannot hold is left to the file.
+    const odd = settings('<w:footnotePr><w:pos w:val="sideways"/></w:footnotePr>');
+    expect(readSettings(parseXml(odd).root)).toBeUndefined();
+  });
+
+  it("writes changes in their place, the separators and the rest kept", () => {
+    const source = settings(
+      '<w:defaultTabStop w:val="720"/><w:characterSpacingControl w:val="x"/><w:footnotePr><w:footnote w:id="-1"/></w:footnotePr><w:compat/>',
+    );
+    expect(change(source, {})).toBe(source);
+    const even = change(source, { evenAndOddHeaders: true });
+    expect(even).toBe(
+      source.replace("<w:characterSpacing", "<w:evenAndOddHeaders/><w:characterSpacing"),
+    );
+    expect(change(even, { evenAndOddHeaders: true })).toBe(even);
+    expect(change(even, { evenAndOddHeaders: false })).toBe(source);
+    const notes = change(source, {
+      footnotes: { format: "upperRoman" },
+      endnotes: { position: "sectEnd" },
+    });
+    expect(notes).toContain(
+      '<w:footnotePr><w:numFmt w:val="upperRoman"/><w:footnote w:id="-1"/></w:footnotePr><w:endnotePr><w:pos w:val="sectEnd"/></w:endnotePr><w:compat/>',
+    );
+    expect(readSettings(parseXml(notes).root)?.endnotes).toEqual({ position: "sectEnd" });
+  });
+
+  it("makes a new part, and goes through a package and back", async () => {
+    const made = newSettingsXml(false, { evenAndOddHeaders: true });
+    expect(readSettings(parseXml(made).root)).toEqual({ evenAndOddHeaders: true });
+    const bytes = await exportDocx({ ...createDocument(), settings: { evenAndOddHeaders: true } });
+    expect((await importDocx(bytes)).document.settings).toEqual({ evenAndOddHeaders: true });
+
+    const corpus = new URL("../../../corpus/word/08-newsletter.docx", import.meta.url);
+    const read = await importDocx(new Uint8Array(readFileSync(corpus)));
+    expect(read.document.settings?.evenAndOddHeaders).toBe(true);
+    const part = async (b: Uint8Array) => (await readPackage(b)).text("/word/settings.xml");
+    expect(await part(await exportDocx(read.document, read.package))).toBe(
+      read.package.text("/word/settings.xml"),
+    );
+    const off = await exportDocx(
+      { ...read.document, settings: { evenAndOddHeaders: false } },
+      read.package,
+    );
+    expect(await part(off)).not.toContain("evenAndOddHeaders");
+    expect((await importDocx(off)).document.settings).toBeUndefined();
+  });
+});
 
 describe("w:trackRevisions", () => {
   it("reads on, off and Word's false values", () => {
@@ -51,8 +119,8 @@ describe("w:trackRevisions", () => {
 
     // Unchanged: the settings part is the original's, byte for byte.
     const kept = await exportDocx(plain.document, plain.package);
-    const settingsOf = async (b: Uint8Array) => (await readPackage(b)).text("/word/settings.xml");
-    expect(await settingsOf(kept)).toBe(plain.package.text("/word/settings.xml"));
+    const readSettings = async (b: Uint8Array) => (await readPackage(b)).text("/word/settings.xml");
+    expect(await readSettings(kept)).toBe(plain.package.text("/word/settings.xml"));
     const on = await exportDocx(plain.document, plain.package, { trackRevisions: true });
     expect((await importDocx(on)).trackRevisions).toBe(true);
     const off = await exportDocx(redlined.document, redlined.package, { trackRevisions: false });

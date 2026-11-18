@@ -4,7 +4,7 @@ import { AddMarkStep, RemoveMarkStep, ReplaceStep, type Step } from "../transfor
 import { TransformError } from "../transform/transform.js";
 import { Selection, type SelectionJSON } from "./selection.js";
 import { type Command, type EditorState, Plugin, PluginKey, type Transaction } from "./state.js";
-import { envelopeStepsApply, wordContext } from "./word.js";
+import { StoryStep, storedStepsApply, storyBody, wordContext } from "./word.js";
 
 /** One undoable unit: inverted steps in the order they apply, and the selection to restore. */
 interface HistoryEvent {
@@ -21,6 +21,8 @@ interface HistoryState {
   /** Time and changed ranges (in current-document positions) of the last recorded change. */
   readonly prevTime: number;
   readonly prevRanges: readonly number[] | null;
+  /** The story `prevRanges` are positions of (ADR-0007); none: the body. */
+  readonly prevStory?: string | null;
 }
 
 export interface HistoryOptions {
@@ -36,6 +38,16 @@ const historyOp = "historyOp";
 
 /** Set this meta on a transaction to make it an undo step of its own (no merging either side). */
 export const closeHistory = "closeHistory";
+
+/**
+ * On a body transaction carrying a story's change: the story's id and its own transaction, which
+ * decides what typing joins, as the body's does for body typing.
+ */
+export const storyEdit = "storyEdit";
+export interface StoryEdit {
+  id: string;
+  tr: Transaction;
+}
 
 const EMPTY: HistoryState = { done: [], undone: [], prevTime: 0, prevRanges: null };
 
@@ -85,12 +97,14 @@ export function history({ newGroupDelay = 500, depth = 100 }: HistoryOptions = {
         }
 
         const last = hist.done[hist.done.length - 1];
+        const story = tr.getMeta(storyEdit) as StoryEdit | undefined;
         const merge =
           last !== undefined &&
           (root !== undefined ||
             (!tr.getMeta(closeHistory) &&
               tr.time - hist.prevTime < newGroupDelay &&
-              isAdjacent(hist.prevRanges, tr)));
+              (hist.prevStory ?? null) === (story?.id ?? null) &&
+              isAdjacent(hist.prevRanges, story?.tr ?? tr)));
         const done = merge
           ? [
               ...hist.done.slice(0, -1),
@@ -102,18 +116,26 @@ export function history({ newGroupDelay = 500, depth = 100 }: HistoryOptions = {
           undone: [],
           // A closed change is a step of its own on both sides: what follows does not join it.
           prevTime: root ? hist.prevTime : tr.getMeta(closeHistory) ? 0 : tr.time,
-          prevRanges: root ? mapRanges(hist.prevRanges, tr.mapping) : changedRanges(tr),
+          prevRanges: root
+            ? mapRanges(hist.prevRanges, tr.mapping)
+            : changedRanges(story?.tr ?? tr),
+          prevStory: root ? (hist.prevStory ?? null) : (story?.id ?? null),
         };
       },
     },
   });
 }
 
-/** Puts `inverted` (applied first) before `steps`, merging adjacent replace steps (typing runs). */
+/** Puts `inverted` (applied first) before `steps`, merging adjacent steps (typing runs). */
 function prepend(inverted: readonly Step[], steps: readonly Step[]): Step[] {
   const last = inverted[inverted.length - 1];
   const first = steps[0];
-  const merged = last instanceof ReplaceStep && first ? last.merge(first) : null;
+  const merged =
+    last instanceof ReplaceStep && first
+      ? last.merge(first)
+      : last instanceof StoryStep && first instanceof StoryStep
+        ? last.merge(first)
+        : null;
   return merged ? [...inverted.slice(0, -1), merged, ...steps.slice(1)] : [...inverted, ...steps];
 }
 
@@ -262,7 +284,10 @@ function applyStored(tr: Transaction, step: Step): boolean {
 }
 
 function historyCommand(redo: boolean): Command {
-  return (state, dispatch) => {
+  const command: Command = (state, dispatch) => {
+    // One history, the body's: a story's editor has none of its own.
+    const body = storyBody(state);
+    if (body) return dispatch ? body.run(command) : body.can(command);
     const hist = historyKey.getState(state);
     const source = hist && (redo ? hist.undone : hist.done);
     const event = source?.[source.length - 1];
@@ -270,8 +295,8 @@ function historyCommand(redo: boolean): Command {
     if (dispatch) {
       const tr = state.tr;
       // The envelope changed outside history: the event is dropped whole, never half applied.
-      const envelope = wordContext(state)?.envelope;
-      if (envelope && !envelopeStepsApply(envelope, event.steps)) {
+      const context = wordContext(state);
+      if (context && !storedStepsApply(context, event.steps)) {
         const rest = source.slice(0, -1);
         tr.setMeta(historyKey, {
           done: redo ? hist.done : rest,
@@ -311,15 +336,16 @@ function historyCommand(redo: boolean): Command {
     }
     return true;
   };
+  return command;
 }
 
 export const undo: Command = historyCommand(false);
 export const redo: Command = historyCommand(true);
 
 export function undoDepth(state: EditorState): number {
-  return historyKey.getState(state)?.done.length ?? 0;
+  return historyKey.getState(storyBody(state)?.state ?? state)?.done.length ?? 0;
 }
 
 export function redoDepth(state: EditorState): number {
-  return historyKey.getState(state)?.undone.length ?? 0;
+  return historyKey.getState(storyBody(state)?.state ?? state)?.undone.length ?? 0;
 }

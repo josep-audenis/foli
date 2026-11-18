@@ -554,7 +554,30 @@ The view moves the caret over a list number in one press: browsers stop before a
 non-editable number, the same model position, so Right at the end of the paragraph before and
 Left at a numbered paragraph's start step over the boundary themselves.
 
-Not yet in the editor: editing page setups or inserting section breaks, headers and footers, a
+**Stories (11.7, ADR-0007).** The word plugin's context holds each story as a tree
+(`context.stories`, `Story`), mirrored as JSON in the envelope. `StoryStep(id, before, after, ...)`
+changes one in a body transaction; it maps nothing and inverts by swapping. `editor.story(id)`
+(`state/stories.ts`) gives an `Editor` with its own `EditorState` (selection, stored marks, the
+word context and tracking state of the body's, no history): its `dispatch` computes the next state,
+sends the body a `StoryStep` (and the comment and envelope steps, the numbering, styles and
+resources it changed, a change of tracking), and takes the state only if the body then holds its
+tree. `undo` and `redo` on a story's state run on the body (`storyBody`); history groups story
+typing by the story's own transaction (`storyEdit` meta) and merges consecutive steps of a story.
+A stale `StoryStep` or `EnvelopeStep` drops its whole event (`storedStepsApply`). Revision and
+bookmark ids are allocated over every tree (`otherTrees`), and accepting or rejecting all changes
+reaches every story.
+
+The main view shows every header and footer read-only (`word/regions.ts`, both renderers). To edit
+one, `EditorView.openStory(side, page?)` (a double click in the page's margin, or
+`editor.storyView.edit` from the toolbar) makes the host read-only, stops its mutation observer,
+hides that occurrence and mounts a second `EditorView` of the story's editor (`paged: false`) in a
+`contenteditable="false"` wrapper in its place. The main view's listeners ignore events from the
+wrapper, its selection reading and `hasFocus` too, and `place` keeps the region. Escape, or a press
+on the host outside the wrapper, closes it (`closeStory`). A `StoryStep` reaching the main view
+redraws the story's other occurrences, and flows the pages only if a height changed; the renderer
+and the layout cache stay.
+
+Not yet in the editor: a
 horizontal rule button (a rule is a paragraph's bottom
 border). Links are drawn as `<a>` where `isSafeHref` takes the target (schema v3 keeps any),
 inheriting the run's own color and underline (Word shows a link without the Hyperlink style
@@ -811,7 +834,7 @@ Word lays it out, read-only and without an editor (`EditorView` edits on the sam
   of a text box, and the fallback copy of alternate content, are left out of the line).
 - **Pages** (`pages.ts`): one flow over the sections in order, each with its page size, margins
   and columns (bands and columns as in the editor, a blank page before an even or odd page section
-  when the number asks for one). The blocks are measured in a hidden page of the section's, in a
+  when the number asks for one), each page with its header and footer (`regions.ts`). The blocks are measured in a hidden page of the section's, in a
   column of its first column's width (other widths on demand); their lines are the clusters of
   their text's client rects. The pure `flow` places them with Word's spacing (`spacing: "word"`):
   the larger of the space after one paragraph and the space before the next, a page or column the
@@ -828,13 +851,13 @@ Word lays it out, read-only and without an editor (`EditorView` edits on the sam
   line on it as Word numbers lines); the corpus harness compares them with Word's, and each
   page's ink with Word's PDF of it (`pnpm corpus:pages`, numbers in corpus/README.md).
 
-Not yet: headers and footers, footnotes, floating objects other than pictures (10.9: drawn as
+Not yet: footnotes, floating objects other than pictures (10.9: drawn as
 in the editing view; the blocks are measured on one long page without the space between
 paragraphs, so the lines after a floating picture may go around it a little differently than
-on the page), columns, custom tab stops (default
+on the page), custom tab stops (default
 stops every half inch), widow control turned off for one paragraph, right-aligned or centered
 list numbers, and a marker wider than its hanging indent (Word moves the text to the next tab
-stop). Sections starting on an even or odd page (the blank page Word inserts). A table row
+stop). A table row
 splits between its lines. Paragraphs inside opaque blocks and table cells collapse their
 spacing (the larger of after and before) where Word adds it. Measuring is synchronous: fonts
 must have loaded, and the container must not be scaled (`transform`, `zoom`).

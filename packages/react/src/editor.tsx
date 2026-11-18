@@ -89,6 +89,17 @@ export function useEditorOrContext(editor: Editor | undefined, caller: string): 
   return found;
 }
 
+/** The editor commands go to: the story open on its page, if any, else `editor`. */
+export function useActiveEditor(editor: Editor): Editor {
+  const subscribe = useCallback((notify: () => void) => editor.subscribe(notify), [editor]);
+  const id = useSyncExternalStore(
+    subscribe,
+    () => editor.storyView?.open?.id ?? null,
+    () => null,
+  );
+  return (id && editor.story(id)) || editor;
+}
+
 export interface UseEditorStateOptions<T> {
   /** Default: the context's editor. */
   editor?: Editor | undefined;

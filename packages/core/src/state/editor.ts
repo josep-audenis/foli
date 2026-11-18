@@ -1,5 +1,5 @@
 import type { DocumentSettings, FoliDocumentV2 } from "../document.js";
-import type { Attrs, Node } from "../model/index.js";
+import { type Attrs, type Node, Slice } from "../model/index.js";
 import type { Alignment } from "../schema.js";
 import {
   createDocument,
@@ -49,8 +49,10 @@ import {
   rejectAllChanges,
   rejectChange,
 } from "./review.js";
-import { TextSelection } from "./selection.js";
+import type { StorySide, StoryVariant } from "./sections.js";
+import { Selection, TextSelection } from "./selection.js";
 import { type Command, EditorState, type Plugin, type Transaction } from "./state.js";
+import { StoryEditing } from "./stories.js";
 import { tableKeymap } from "./tables.js";
 import {
   type ReviewView,
@@ -61,7 +63,7 @@ import {
   trackState,
   trackTransaction,
 } from "./track.js";
-import { type WordEnvelope, wordContext, wordPlugin } from "./word.js";
+import { type WordContext, type WordEnvelope, wordContext, wordPlugin } from "./word.js";
 import type { ListKind } from "./wordformat.js";
 
 /**
@@ -87,6 +89,23 @@ export interface EditorOptions {
 }
 
 export type EditorListener = (state: EditorState, transactions: readonly Transaction[]) => void;
+
+/** A header or footer open for editing on its page. */
+export interface OpenStory {
+  id: string;
+  side: StorySide;
+  variant: StoryVariant;
+  /** The section it was opened from (a linked one shows an earlier section's story). */
+  section: number;
+}
+
+/** What opens stories on the pages: the view of the editor's document. */
+export interface StoryView {
+  readonly open: OpenStory | null;
+  /** Opens the header or footer of a page (default: the selection's). Whether it is open now. */
+  edit(side: StorySide, page?: number): boolean;
+  close(): void;
+}
 
 /** A headless editor: state, commands, history and change notifications, no DOM. */
 export interface Editor {
@@ -178,6 +197,17 @@ export interface Editor {
   /** Replaces the whole document (an older one migrated) and resets history. */
   setDocument(document: EditorDocument): void;
   subscribe(listener: EditorListener): () => void;
+  /**
+   * An editor over a story (a header, footer or note) by id, null when there is none. It has its
+   * own selection, and its changes go through this editor: one undo history, in `state.doc` order
+   * of the changes. On a story's editor `getDocument` gives the story as a document's content and
+   * `setDocument` replaces its content.
+   */
+  story(id: string): Editor | null;
+  /** Set by the view showing the pages: what opens a story there, shared with stories' editors. */
+  storyView: StoryView | null;
+  /** The view opened or closed a story: tells the editor's listeners (no transaction). */
+  storyChanged(): void;
 }
 
 /** Word's page when a section leaves it out: Letter, 1 inch margins. */
@@ -212,62 +242,42 @@ function load(document: EditorDocument): Loaded {
   return { doc: parseContent(content), settings: sectionSettings(envelope.section), envelope };
 }
 
-export function createEditor({
-  document = createDocument(),
-  plugins = [],
-  author = "Author",
-  trackChanges = false,
-  reviewView = "markup",
-}: EditorOptions = {}): Editor {
-  let loaded = load(document);
-  let track: TrackState = { on: trackChanges, author, view: reviewView };
-  const pluginsFor = ({ envelope }: Loaded) => [
-    ...plugins,
-    history(),
-    wordPlugin(envelope),
-    trackPlugin(track),
-    commentsPlugin(),
-    tableKeymap(),
-    listKeymap(),
-    baseKeymap(),
-  ];
-  let state = EditorState.create({ doc: loaded.doc, plugins: pluginsFor(loaded) });
-  const listeners = new Set<EditorListener>();
+/** What differs between the editor of the body and of a story. */
+interface EditorParts {
+  state(): EditorState;
+  dispatch(tr: Transaction): void;
+  settings(): DocumentSettings;
+  getDocument(): FoliDocument;
+  setDocument(document: EditorDocument): void;
+  subscribe(listener: EditorListener): () => void;
+  story(id: string): Editor | null;
+  /** The view opening stories, one for the body and its stories. */
+  views: { current: StoryView | null };
+  storyChanged(): void;
+}
 
-  const notify = (transactions: readonly Transaction[]) => {
-    for (const listener of listeners) listener(state, transactions);
-  };
-  const dispatch = (tr: Transaction) => {
-    // With tracking on, the edit is rebuilt as tracked changes; one that cannot be is not made.
-    const tracked = trackTransaction(state, tr);
-    if (!tracked) return;
-    const result = state.applyTransaction(tracked);
-    state = result.state;
-    if (result.transactions.length) notify(result.transactions);
-  };
-  const run = (command: Command) => command(state, dispatch);
-  let current = { section: loaded.envelope.section, settings: loaded.settings };
-
+function makeEditor(parts: EditorParts): Editor {
+  const { dispatch } = parts;
+  const run = (command: Command) => command(parts.state(), dispatch);
   return {
-    // The last section's page setup, as it is now (`setSectionSetup` changes it).
     get settings() {
-      const section = wordContext(state)?.envelope.section ?? current.section;
-      if (section !== current.section) current = { section, settings: sectionSettings(section) };
-      return current.settings;
+      return parts.settings();
     },
     get state() {
-      return state;
+      return parts.state();
     },
     dispatch,
     run,
-    can: (command) => command(state),
+    can: (command) => command(parts.state()),
     handleKey(key) {
+      const state = parts.state();
       return state.plugins.some((plugin) => {
         const command = plugin.spec.keymap?.[key];
         return command ? command(state, dispatch) : false;
       });
     },
     select(anchor, head = anchor) {
+      const state = parts.state();
       const size = state.doc.content.size;
       const clamp = (pos: number) => Math.max(0, Math.min(pos, size));
       dispatch(state.tr.setSelection(TextSelection.create(state.doc, clamp(anchor), clamp(head))));
@@ -312,22 +322,144 @@ export function createEditor({
       deleteAllComments: () => run(deleteAllComments),
     },
     get trackingChanges() {
-      return trackState(state)?.on ?? false;
+      return trackState(parts.state())?.on ?? false;
     },
-    isMarkActive: (type) => isMarkActive(state, type),
-    getDocument: () => ({
-      ...structuredClone(wordContext(state)?.envelope ?? loaded.envelope),
-      content: state.doc.toJSON(),
-    }),
+    isMarkActive: (type) => isMarkActive(parts.state(), type),
+    getDocument: parts.getDocument,
+    setDocument: parts.setDocument,
+    subscribe: parts.subscribe,
+    story: parts.story,
+    get storyView() {
+      return parts.views.current;
+    },
+    set storyView(view) {
+      parts.views.current = view;
+    },
+    storyChanged: parts.storyChanged,
+  };
+}
+
+export function createEditor({
+  document = createDocument(),
+  plugins = [],
+  author = "Author",
+  trackChanges = false,
+  reviewView = "markup",
+}: EditorOptions = {}): Editor {
+  let loaded = load(document);
+  let track: TrackState = { on: trackChanges, author, view: reviewView };
+  const pluginsFor = ({ envelope }: Loaded) => [
+    ...plugins,
+    history(),
+    wordPlugin(envelope),
+    trackPlugin(track),
+    commentsPlugin(),
+    tableKeymap(),
+    listKeymap(),
+    baseKeymap(),
+  ];
+  let state = EditorState.create({ doc: loaded.doc, plugins: pluginsFor(loaded) });
+  const listeners = new Set<EditorListener>();
+  const views: EditorParts["views"] = { current: null };
+  /** The stories being edited, by id. */
+  const stories = new Map<string, { editing: StoryEditing; editor: Editor }>();
+
+  const notify = (transactions: readonly Transaction[]) => {
+    for (const listener of listeners) listener(state, transactions);
+  };
+  const storyChanged = () => notify([]);
+  const dispatch = (tr: Transaction) => {
+    // With tracking on, the edit is rebuilt as tracked changes; one that cannot be is not made.
+    const tracked = trackTransaction(state, tr);
+    if (!tracked) return;
+    const result = state.applyTransaction(tracked);
+    state = result.state;
+    if (!result.transactions.length) return;
+    // The stories first: a view of the body redraws them from what they now are.
+    for (const [id, { editing }] of stories) {
+      editing.sync(result.transactions);
+      if (!editing.alive) stories.delete(id);
+    }
+    notify(result.transactions);
+  };
+  const run = (command: Command) => command(state, dispatch);
+  let current = { section: loaded.envelope.section, settings: loaded.settings };
+  const settings = () => {
+    // The last section's page setup, as it is now (`setSectionSetup` changes it).
+    const section = wordContext(state)?.envelope.section ?? current.section;
+    if (section !== current.section) current = { section, settings: sectionSettings(section) };
+    return current.settings;
+  };
+  const getDocument = (): FoliDocument => ({
+    ...structuredClone(wordContext(state)?.envelope ?? loaded.envelope),
+    content: state.doc.toJSON(),
+  });
+
+  const storyEditor = (id: string): Editor => {
+    const editing = new StoryEditing(id, {
+      get state() {
+        return state;
+      },
+      run,
+      can: (command) => command(state),
+      dispatch,
+      plugins: (context: WordContext, value) => [
+        ...plugins,
+        wordPlugin(context.envelope, context),
+        trackPlugin(value ?? track),
+        commentsPlugin(),
+        tableKeymap(),
+        listKeymap(),
+        baseKeymap(),
+      ],
+    });
+    const editor = makeEditor({
+      state: () => editing.state,
+      dispatch: editing.dispatch,
+      settings,
+      getDocument: () => ({ ...getDocument(), content: editing.state.doc.toJSON() }),
+      setDocument(next) {
+        const { doc } = load(next);
+        const tr = editing.state.tr.replace(
+          0,
+          editing.state.doc.content.size,
+          new Slice(doc.content, 0, 0),
+        );
+        editing.dispatch(tr.setSelection(Selection.atStart(tr.doc)));
+      },
+      subscribe(listener) {
+        editing.listeners.add(listener);
+        return () => editing.listeners.delete(listener);
+      },
+      story,
+      views,
+      storyChanged,
+    });
+    stories.set(id, { editing, editor });
+    return editor;
+  };
+  const story = (id: string): Editor | null =>
+    wordContext(state)?.stories.has(id) ? (stories.get(id)?.editor ?? storyEditor(id)) : null;
+
+  return makeEditor({
+    state: () => state,
+    dispatch,
+    settings,
+    getDocument,
     setDocument(next) {
       track = trackState(state) ?? track;
       loaded = load(next);
       state = EditorState.create({ doc: loaded.doc, plugins: pluginsFor(loaded) });
+      for (const { editing } of stories.values()) editing.retire();
+      stories.clear();
       notify([]);
     },
     subscribe(listener) {
       listeners.add(listener);
       return () => listeners.delete(listener);
     },
-  };
+    story,
+    views,
+    storyChanged,
+  });
 }

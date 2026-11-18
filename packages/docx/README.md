@@ -74,14 +74,17 @@ from `commentsExtended`) and sections:
   between elements, and the empty paragraph given to an empty body or comment. Text is read as
   Word reads it: without `xml:space="preserve"`, whitespace at the ends of a `w:t` is not text.
 
-**Settings.** Of `settings.xml` only `w:trackRevisions` is read (`DocxImport.trackRevisions`)
-and, when `exportDocx` is given `trackRevisions`, written: added in its place among the
-settings, or removed; the rest of the part is kept byte for byte. A new package gets a settings
-part only with tracking on.
+**Settings.** Of `settings.xml`, `w:trackRevisions` is read (`DocxImport.trackRevisions`)
+and, when `exportDocx` is given `trackRevisions`, written; `w:evenAndOddHeaders` and the note
+properties of `w:footnotePr` and `w:endnotePr` are the document's `settings`, written when they
+differ from the part (the separators listed in those elements stay). Each is added in its place
+among the settings, or removed; the rest of the part is kept byte for byte, and all of it when
+nothing differs. A new package gets a settings part only with tracking on or `settings`.
 
 **Export** (`exportDocx(document, package?, options?)`) writes the parts the editor owns
 (`document.xml`, `styles.xml`, `numbering.xml`, `comments.xml`, `commentsExtended.xml`,
-relationships for new hyperlink targets, and `settings.xml` when `trackRevisions` changes it)
+relationships for new hyperlink targets, and `settings.xml` when `trackRevisions` or `settings`
+change it)
 and copies every other part of the original package byte for byte (its compressed entry
 included). Within the parts it writes:
 

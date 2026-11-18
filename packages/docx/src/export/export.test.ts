@@ -456,9 +456,6 @@ describe("exporting without a package", () => {
 describe("schema v5 content not written yet", () => {
   const base = createDocument();
   it("is refused, never dropped", async () => {
-    await expect(exportDocx({ ...base, settings: { evenAndOddHeaders: true } })).rejects.toThrow(
-      /settings cannot be exported/,
-    );
     await expect(
       exportDocx({
         ...base,
@@ -487,13 +484,13 @@ describe("paragraph spacing that adds up (w:doNotUseHTMLParagraphAutoSpacing)", 
 
   it("stays out of documents without it", async () => {
     const { document } = await load("08-newsletter.docx");
-    expect(document.settings).toBeUndefined();
+    expect(document.settings?.doNotUseHTMLParagraphAutoSpacing).toBeUndefined();
   });
 
-  it("does not make other settings exportable", async () => {
-    await expect(
-      exportDocx({ ...createDocument(), settings: { ...settings, evenAndOddHeaders: true } }),
-    ).rejects.toThrow(/settings cannot be exported/);
+  it("is written beside the other settings", async () => {
+    const both = { ...settings, evenAndOddHeaders: true };
+    const bytes = await exportDocx({ ...createDocument(), settings: both });
+    expect((await importDocx(bytes)).document.settings).toEqual(both);
   });
 });
 

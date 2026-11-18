@@ -4,8 +4,14 @@
  * Word's spacing, keep rules, widow and orphan control and explicit breaks. Editing moves to
  * v3 in 8.7.
  */
-import type { FoliDocument, SectionJSON } from "@folijs/core";
-import { type BlockBox, type FlowSection, type Fragment, flowFrom } from "../layout/flow.js";
+import { type FoliDocument, Resolver, type SectionJSON } from "@folijs/core";
+import {
+  type BlockBox,
+  type FlowSection,
+  type Fragment,
+  flowFrom,
+  pagesOf,
+} from "../layout/flow.js";
 import {
   type BlockOptions,
   PICTURE_ATTR,
@@ -16,6 +22,7 @@ import {
   type WordBlock,
 } from "./blocks.js";
 import { bandElement, type ColumnsPx, columnsPx } from "./columns.js";
+import { PageRegions } from "./regions.js";
 
 export type { ReviewView } from "./blocks.js";
 
@@ -219,9 +226,8 @@ interface Section {
 
 /**
  * Lays a v3 document out on pages inside `container`: every section's page setup, its columns
- * (a band per section on a page), continuous sections and Word's blank pages. Headers, footers,
- * footnotes and floating content are not laid out yet (Phase 11); tables are shown from their
- * verbatim XML until Phase 10.
+ * (a band per section on a page), continuous sections, Word's blank pages, headers and footers
+ * with their page fields. Footnotes are not laid out yet (11.10).
  */
 export function renderDocument(
   document: FoliDocument,
@@ -234,17 +240,28 @@ export function renderDocument(
     lineRatio: measureLineRatio(container),
   });
   const sections: Section[] = [];
+  const setups: SectionJSON[] = [];
+  const lineRatio = measureLineRatio(container);
+  const regions = new PageRegions(
+    doc,
+    { ...options, lineRatio, measureIn: () => container },
+    new WeakMap(),
+  );
+  regions.setDocument(document, setups, new Resolver(document));
   const geometryOf = new Map<FlowSection, Geometry>();
   const sectionOf = new Map<WordBlock, Section>();
   let current: WordBlock[] = [];
   const close = (setup: SectionJSON) => {
     const g = geometry(setup);
     const columns = columnsPx(setup);
+    const index = setups.length;
+    setups.push(setup);
     const flow: FlowSection = {
+      index,
       start: setup.type ?? "nextPage",
       columns: columns.widths.length,
       pageStart: setup.pageNumbers?.start,
-      box: () => ({ height: g.height - g.top - g.bottom }),
+      box: (page) => ({ height: regions.boxHeight(index, page) }),
       samePage: (other) => sameGeometry(g, geometryOf.get(other) as Geometry),
     };
     geometryOf.set(flow, g);
@@ -379,12 +396,21 @@ export function renderDocument(
   });
   // shortcut: widow and orphan control is on for every paragraph (Word's Normal has it; a
   // paragraph turning it off is still kept to two lines).
-  const { fragments, gaps } = flowFrom(boxes, 0, {
+  const rules = {
     orphans: 2,
     widows: 2,
     spacing: "word",
     addSpacing: document.settings?.doNotUseHTMLParagraphAutoSpacing === true,
-  });
+    evenAndOddHeaders: document.settings?.evenAndOddHeaders === true,
+  } as const;
+  let flowed = flowFrom(boxes, 0, rules);
+  let facts = pagesOf(boxes, flowed);
+  // The page count is known once flowed; a header holding it can change what fits.
+  for (let pass = 0; pass < 2 && regions.settle(facts); pass++) {
+    flowed = flowFrom(boxes, 0, rules);
+    facts = pagesOf(boxes, flowed);
+  }
+  const { fragments, gaps } = flowed;
   // What placing needs of the layout, read while the blocks are still laid out: split blocks' lines.
   blocks.forEach((block, b) => {
     const placed = fragments[b] ?? [];
@@ -408,7 +434,23 @@ export function renderDocument(
   const pageSetups: Section[] = [];
   for (let p = count - 1; p >= 0; p--)
     pageSetups[p] = bandsOf[p]?.[0] ?? pageSetups[p + 1] ?? (sections.at(-1) as Section);
-  const created = pageSetups.map((section) => createPage(doc, section.geometry));
+  const created = pageSetups.map((section, p) => {
+    const made = createPage(doc, section.geometry);
+    const page = facts[p];
+    // Word's blank page before an even or odd page section has no header or footer (its PDF).
+    if (!page?.sectionPages) return made;
+    const { top, bottom } = regions.margins(page.section, page);
+    made.page.style.paddingTop = `${top}px`;
+    made.page.style.paddingBottom = `${bottom}px`;
+    for (const side of ["header", "footer"] as const) {
+      const drawing = regions.drawing(page.section, side, page);
+      if (!drawing) continue;
+      const region = regions.element(page.section, side);
+      region.append(drawing.content.content.cloneNode(true));
+      made.page.append(region);
+    }
+    return made;
+  });
   const bandElements = new Map<string, { band: HTMLElement; columns: HTMLElement[] }>();
   /** Where a fragment goes: the page's body, or its column when the page has bands. */
   const holder = (fragment: Fragment, section: Section): HTMLElement => {

@@ -13,6 +13,7 @@ import {
   deleteSelectionKeepingTables,
   type Editor,
   type EditorState,
+  ensureStory,
   extendCellSelection,
   fitPaste,
   fitPastedV2,
@@ -26,6 +27,8 @@ import {
   type Node as ModelNode,
   marksAt,
   NodeSelection,
+  type OpenStory,
+  pageVariant,
   parseContentV2,
   pasteCells,
   type ResourceJSON,
@@ -34,12 +37,15 @@ import {
   type SectionJSON,
   Selection,
   Slice,
+  type StorySide,
+  type StoryView,
   sectionSettings,
   setColumnWidth,
   setComments,
   setLink,
   setPictureSize,
   splitBlock,
+  storyOfSection,
   TextSelection,
   type Transaction,
   TransformError,
@@ -48,6 +54,7 @@ import {
   typedMarks,
   undo,
   type WordContext,
+  type WordSettingsJSON,
   withEnvelope,
   wordContext,
 } from "@folijs/core";
@@ -56,12 +63,15 @@ import {
   type BlockBox,
   contentHeight,
   DEFAULT_RULES,
+  type FlowPage,
   type FlowResult,
   type FlowRules,
   type FlowSection,
   type Fragment,
   flowFrom,
+  type PageFacts,
   PX_PER_MM,
+  pagesOf,
   type Reuse,
 } from "./layout/flow.js";
 import { type BlockDesc, type LeafDesc, PAGE_BREAK_ATTR } from "./render.js";
@@ -83,6 +93,7 @@ import {
   WordRenderer,
 } from "./word/edit.js";
 import { measureLineRatio } from "./word/pages.js";
+import { PageRegions, REGION_CONTENT_CLASS } from "./word/regions.js";
 import {
   collect,
   type FlowItem,
@@ -165,6 +176,11 @@ export interface EditorViewOptions {
   upload?:
     | ((file: File) => Promise<string | { src: string; alt?: string; decorative?: boolean }>)
     | null;
+  /**
+   * `false`: the content in one flow, without pages, headers or print rules (a story being edited
+   * on its page, ADR-0007). Set when the view is made. Default true.
+   */
+  paged?: boolean;
 }
 
 const PLACEHOLDER_ATTR = "data-foli-placeholder";
@@ -174,7 +190,7 @@ const PICTURE_SELECTED_ATTR = "data-foli-picture-selected";
 const MIN_PICTURE = 8;
 // Generated content is not document text: no caret stops inside it, a zero-height float keeps
 // the caret at the line start, and the empty alt text keeps screen readers on aria-placeholder.
-const STYLES = `.${CELL_CLASS}{box-shadow:inset 0 0 0 9999px rgba(0,120,215,.22)}[${CELLS_ATTR}] ::selection{background:transparent}[data-foli-no-alt]{outline:2px dashed #b45309;outline-offset:-2px}@media print{[data-foli-no-alt]{outline:none}}[${PICTURE_SELECTED_ATTR}]{position:relative;outline:2px solid Highlight}[${PICTURE_SELECTED_ATTR}] [data-foli-resize]{position:absolute;right:-5px;bottom:-5px;width:10px;height:10px;box-sizing:border-box;border:1px solid Canvas;background:Highlight;cursor:nwse-resize;forced-color-adjust:none}@media print{[${PICTURE_SELECTED_ATTR}]{outline:none}[${PICTURE_SELECTED_ATTR}] [data-foli-resize]{display:none}}[${PLACEHOLDER_ATTR}]::before{content:attr(${PLACEHOLDER_ATTR});content:attr(${PLACEHOLDER_ATTR}) / "";float:inline-start;height:0;pointer-events:none;color:GrayText}`;
+const STYLES = `.foli-in-story>.foli-page>:not(.foli-region){opacity:.45}.foli-story-mount{pointer-events:auto;outline:1px dashed GrayText;outline-offset:2px}.foli-story-mount>[contenteditable=true]:focus{outline:none}@media print{.foli-in-story>.foli-page>:not(.foli-region){opacity:1}.foli-story-mount{outline:none}}.${CELL_CLASS}{box-shadow:inset 0 0 0 9999px rgba(0,120,215,.22)}[${CELLS_ATTR}] ::selection{background:transparent}[data-foli-no-alt]{outline:2px dashed #b45309;outline-offset:-2px}@media print{[data-foli-no-alt]{outline:none}}[${PICTURE_SELECTED_ATTR}]{position:relative;outline:2px solid Highlight}[${PICTURE_SELECTED_ATTR}] [data-foli-resize]{position:absolute;right:-5px;bottom:-5px;width:10px;height:10px;box-sizing:border-box;border:1px solid Canvas;background:Highlight;cursor:nwse-resize;forced-color-adjust:none}@media print{[${PICTURE_SELECTED_ATTR}]{outline:none}[${PICTURE_SELECTED_ATTR}] [data-foli-resize]{display:none}}[${PLACEHOLDER_ATTR}]::before{content:attr(${PLACEHOLDER_ATTR});content:attr(${PLACEHOLDER_ATTR}) / "";float:inline-start;height:0;pointer-events:none;color:GrayText}`;
 
 /**
  * Adds the view's stylesheet once per document or shadow root, when a placeholder is first shown
@@ -260,6 +276,10 @@ function sheetOf(settings: DocumentSettings, index: number): Sheet {
 
 /** The style each page element was last given (its `cssText` reads back normalized). */
 const pageSheets = new WeakMap<HTMLElement, string>();
+/** The margins a header or footer gave each page element, as last written. */
+const pagePads = new WeakMap<HTMLElement, string>();
+/** What a view without pages gives its one flow of content. */
+const UNPAGED_CSS = "display: flow-root;";
 
 /** A section as laid out: its page setup, its columns, what the flow needs of it. */
 interface SectionLayout {
@@ -279,6 +299,27 @@ interface BlockLayout {
   readonly first: boolean;
 }
 
+/** A page's header or footer as drawn. */
+interface RegionElement {
+  element: HTMLElement;
+  /** What it shows: the same object, the same drawing. */
+  drawing: object;
+  section: number;
+  /** Its story. */
+  id: string;
+}
+
+/** A story being edited on its page. */
+interface StoryMount extends OpenStory {
+  /** The page and the region it is open in. */
+  page: number;
+  region: RegionElement;
+  wrapper: HTMLElement;
+  view: EditorView;
+  /** Moved to another page by a new layout: the focus went with the DOM. */
+  moved: boolean;
+}
+
 /** A fragment's place on its page. */
 interface Slot {
   band: number;
@@ -296,25 +337,8 @@ const slotOf = (fragment: Fragment): Slot => ({
   mark: !!fragment.mark,
 });
 
-/**
- * The section of each top-level block (the section a paragraph's `section` ends; the
- * envelope's for the blocks after the last such paragraph), as `renderDocument` lays sections
- * out. By position: two paragraphs may end sections with one object.
- */
-function sectionLayouts(doc: ModelNode, last: SectionJSON): BlockLayout[] {
-  const sheets = new Map<string, Sheet>();
-  const bySection = new Map<SectionJSON, Sheet>();
-  const sheet = (section: SectionJSON) => {
-    let found = bySection.get(section);
-    if (!found) {
-      const settings = sectionSettings(section);
-      const css = sheetOf(settings, 0).css;
-      found = sheets.get(css) ?? sheetOf(settings, sheets.size);
-      sheets.set(css, found);
-      bySection.set(section, found);
-    }
-    return found;
-  };
+/** The document's sections and the blocks of each. */
+function sectionSpans(doc: ModelNode, last: SectionJSON) {
   const spans: { setup: SectionJSON; from: number; to: number }[] = [];
   let from = 0;
   doc.forEach((node, _, i) => {
@@ -324,6 +348,32 @@ function sectionLayouts(doc: ModelNode, last: SectionJSON): BlockLayout[] {
     from = i + 1;
   });
   if (from < doc.childCount || !spans.length) spans.push({ setup: last, from, to: doc.childCount });
+  return spans;
+}
+
+/**
+ * The section of each top-level block (the section a paragraph's `section` ends; the
+ * envelope's for the blocks after the last such paragraph), as `renderDocument` lays sections
+ * out. By position: two paragraphs may end sections with one object. `box` gives a page's text
+ * height: null for a view without pages.
+ */
+function sectionLayouts(
+  spans: ReturnType<typeof sectionSpans>,
+  box: ((section: number, page: FlowPage) => number) | null,
+): BlockLayout[] {
+  const sheets = new Map<string, Sheet>();
+  const bySection = new Map<SectionJSON, Sheet>();
+  const sheet = (section: SectionJSON) => {
+    let found = bySection.get(section);
+    if (!found) {
+      const settings = sectionSettings(section);
+      const css = box ? sheetOf(settings, 0).css : UNPAGED_CSS;
+      found = sheets.get(css) ?? { ...sheetOf(settings, sheets.size), css };
+      sheets.set(css, found);
+      bySection.set(section, found);
+    }
+    return found;
+  };
   const sheetByFlow = new Map<FlowSection, Sheet>();
   const out: BlockLayout[] = [];
   spans.forEach(({ setup, from: start, to }, s) => {
@@ -334,13 +384,13 @@ function sectionLayouts(doc: ModelNode, last: SectionJSON): BlockLayout[] {
     const count = columns.widths.length;
     const balanced =
       !!next && count > 1 && next.type === "continuous" && sheet(next).css === own.css;
-    const height = contentHeight(own.settings);
     const flow: FlowSection = {
+      index: s,
       start: setup.type ?? "nextPage",
       columns: count,
       balanced,
       pageStart: setup.pageNumbers?.start,
-      box: () => ({ height }),
+      box: (page) => ({ height: box ? box(s, page) : Number.POSITIVE_INFINITY }),
       samePage: (other) => sheetByFlow.get(other)?.css === own.css,
     };
     sheetByFlow.set(flow, own);
@@ -505,7 +555,8 @@ export class EditorView {
   private readonly resizeObserver: ResizeObserver | null;
   private readonly observed = new Set<Element>();
   private relayoutPending = false;
-  private composing = false;
+  /** A composition runs in this view. */
+  composing = false;
   /** Set by Ctrl/Cmd+Shift+V for the paste event it triggers. */
   private plainPaste = false;
   /** Blocks whose DOM the browser changed: the next render rebuilds them. */
@@ -551,6 +602,29 @@ export class EditorView {
   private readonly ratios = new Map<string, number>();
   /** Web fonts loaded since the v3 blocks were drawn: the next render draws them again. */
   private fontsChanged = false;
+  /** Whether content goes on pages (`EditorViewOptions.paged`). */
+  private readonly paged: boolean;
+  /** The headers and footers of the pages; none without pages. */
+  private readonly regions: PageRegions | null;
+  /** Each page as last flowed. */
+  private facts: PageFacts[] = [];
+  /** The header and footer element of each page, as last drawn. */
+  private pageRegions: { header?: RegionElement; footer?: RegionElement }[] = [];
+  /** Each page's margins, when a header or footer pushes them. */
+  private pageMargins: { top: string; bottom: string }[] = [];
+  /** What the header and footer heights were when last laid out (`PageRegions.key`). */
+  private regionsKey = "";
+  /** What `regionsKey` was computed from. */
+  private regionsFor: { stories: unknown; settings: unknown; sections: SectionJSON[] } | null =
+    null;
+  /** Puts everything on its page again, as the last render left it. */
+  private placeAgain: (() => void) | null = null;
+  /** The story being edited on its page, if any (ADR-0007). */
+  private mount: StoryMount | null = null;
+  /** The body's selection before the press of a double click in a page's margin. */
+  private pressSelection: Selection | null = null;
+  /** The listeners on the host, to remove them. */
+  private readonly listeners: [string, EventListener][] = [];
 
   constructor(
     readonly host: HTMLElement,
@@ -558,6 +632,23 @@ export class EditorView {
     options: EditorViewOptions = {},
   ) {
     this.state = editor.state;
+    this.paged = options.paged !== false;
+    const view = this;
+    this.regions = this.paged
+      ? new PageRegions(
+          host.ownerDocument,
+          {
+            get review() {
+              return view.review;
+            },
+            lineRatio: (family) => this.lineRatio(family),
+            resource: (key, resource) => this.resource?.(key, resource),
+            measureIn: () => this.pages[0] ?? host,
+            scale: () => this.scale(),
+          },
+          new WeakMap(),
+        )
+      : null;
     host.setAttribute("role", "textbox");
     host.setAttribute("aria-multiline", "true");
     host.setAttribute(VIEW_ATTR, this.id);
@@ -577,28 +668,40 @@ export class EditorView {
     this.render();
     this.setOptions(options);
 
-    host.addEventListener("beforeinput", this.onBeforeInput);
-    host.addEventListener("focus", this.onFocus);
-    host.addEventListener("keydown", this.onKeyDown);
-    host.addEventListener("input", this.onInput);
-    host.addEventListener("compositionstart", this.onCompositionStart);
-    host.addEventListener("compositionend", this.onCompositionEnd);
-    host.addEventListener("blur", this.onBlur);
-    host.addEventListener("mousedown", this.onMouseDown);
-    host.addEventListener("mousemove", this.onMouseMove);
-    host.addEventListener("copy", this.onCopy);
-    host.addEventListener("cut", this.onCut);
-    host.addEventListener("paste", this.onPaste);
-    host.addEventListener("dragover", this.onDragOver);
-    host.addEventListener("drop", this.onDrop);
-    host.addEventListener("click", this.onClick);
-    host.addEventListener("auxclick", this.onClick);
+    this.listen("beforeinput", this.onBeforeInput);
+    this.listen("focus", this.onFocus);
+    this.listen("keydown", this.onKeyDown);
+    this.listen("input", this.onInput);
+    this.listen("compositionstart", this.onCompositionStart);
+    this.listen("compositionend", this.onCompositionEnd);
+    this.listen("blur", this.onBlur);
+    this.listen("mousedown", this.onPress);
+    this.listen("mousemove", this.onMouseMove);
+    this.listen("copy", this.onCopy);
+    this.listen("cut", this.onCut);
+    this.listen("paste", this.onPaste);
+    this.listen("dragover", this.onDragOver);
+    this.listen("drop", this.onDrop);
+    this.listen("click", this.onClick);
+    this.listen("auxclick", this.onClick);
+    this.claimStories();
     host.ownerDocument.addEventListener("selectionchange", this.onSelectionChange);
     host.ownerDocument.fonts?.addEventListener("loadingdone", this.onFontsLoaded);
     this.unsubscribe = editor.subscribe((state) => this.update(state));
   }
 
+  /** Adds a listener for the body's events: a story open on a page has its own view. */
+  private listen<E extends Event>(type: string, handler: (event: E) => void): void {
+    const listener: EventListener = (event) => {
+      if (!this.mount?.wrapper.contains(event.target as Node | null)) handler(event as E);
+    };
+    this.host.addEventListener(type, listener);
+    this.listeners.push([type, listener]);
+  }
+
   destroy(): void {
+    this.closeStory(false);
+    if (this.editor.storyView === this.stories) this.editor.storyView = null;
     this.destroyed = true;
     this.unsubscribe();
     this.host.ownerDocument.fonts?.removeEventListener("loadingdone", this.onFontsLoaded);
@@ -606,24 +709,9 @@ export class EditorView {
     this.resizeObserver?.disconnect();
     for (const style of this.printStyles) style.remove();
     const { host } = this;
-    host.removeEventListener("beforeinput", this.onBeforeInput);
-    host.removeEventListener("focus", this.onFocus);
-    host.removeEventListener("keydown", this.onKeyDown);
-    host.removeEventListener("input", this.onInput);
-    host.removeEventListener("compositionstart", this.onCompositionStart);
-    host.removeEventListener("compositionend", this.onCompositionEnd);
-    host.removeEventListener("blur", this.onBlur);
-    host.removeEventListener("mousedown", this.onMouseDown);
-    host.removeEventListener("mousemove", this.onMouseMove);
+    for (const [type, listener] of this.listeners) host.removeEventListener(type, listener);
     this.endDrag();
-    host.removeEventListener("copy", this.onCopy);
-    host.removeEventListener("cut", this.onCut);
-    host.removeEventListener("paste", this.onPaste);
-    host.removeEventListener("dragover", this.onDragOver);
-    host.removeEventListener("drop", this.onDrop);
     this.endResize();
-    host.removeEventListener("click", this.onClick);
-    host.removeEventListener("auxclick", this.onClick);
     host.ownerDocument.removeEventListener("selectionchange", this.onSelectionChange);
     const owned = [
       "contenteditable",
@@ -643,6 +731,10 @@ export class EditorView {
 
   /** Focuses the host, shows the model selection in it and scrolls it into view. */
   focus(): void {
+    if (this.mount) {
+      this.mount.view.focus();
+      return;
+    }
     this.host.focus();
     this.writeSelection(true);
     // The focus handler scrolls only when it writes the selection itself, and a DOM selection
@@ -657,12 +749,17 @@ export class EditorView {
       // Finish a running composition while its text can still go into the model.
       if (!options.editable && this.composing) this.onCompositionEnd();
       this.editable = options.editable;
+      if (!this.editable) this.closeStory(false);
       // A selected picture's handle only while it can be resized.
       this.endResize();
       this.showSelectedPicture();
     }
     if (options.placeholder !== undefined) this.placeholder = options.placeholder;
     if (options.upload !== undefined) this.upload = options.upload ?? undefined;
+    this.mount?.view.setOptions({
+      ...(options.upload !== undefined ? { upload: options.upload } : {}),
+      ...(options.resource !== undefined ? { resource: options.resource } : {}),
+    });
     // null clears the resolver (stored as none): the same as none is no change.
     const resource = options.resource ?? undefined;
     if (options.resource !== undefined && resource !== this.resource) {
@@ -678,8 +775,8 @@ export class EditorView {
     }
 
     // Read-only: no caret and no browser editing; the text stays selectable and copyable.
-    host.setAttribute("contenteditable", String(this.editable));
-    if (this.editable) host.removeAttribute("aria-readonly");
+    host.setAttribute("contenteditable", String(this.editable && !this.mount));
+    if (this.editable && !this.mount) host.removeAttribute("aria-readonly");
     else host.setAttribute("aria-readonly", "true");
     if (this.placeholder) host.setAttribute("aria-placeholder", this.placeholder);
     else host.removeAttribute("aria-placeholder");
@@ -716,14 +813,22 @@ export class EditorView {
       this.review = review;
       this.word = null;
     }
-    // The last section's setup lives in the envelope: changing it leaves the tree as it is.
+    const before = wordContext(this.state)?.envelope;
+    const envelope = wordContext(state)?.envelope;
+    // The last section's setup and the settings live in the envelope: changing them leaves the
+    // tree as it is. So does a story's change, which only its occurrences show.
     const docChanged =
       state.doc !== this.state.doc ||
       reviewChanged ||
-      wordContext(state)?.envelope.section !== wordContext(this.state)?.envelope.section;
+      envelope?.section !== before?.section ||
+      envelope?.settings !== before?.settings;
+    const storiesChanged = envelope?.stories !== before?.stories;
     const selectionChanged = !state.selection.eq(this.state.selection);
+    // Another document: the story being edited closes.
+    const lost = !!this.mount && wordContext(state)?.id !== wordContext(this.state)?.id;
     this.state = state;
-    if (docChanged) this.render();
+    if (docChanged || (storiesChanged && !this.redrawRegions())) this.render();
+    if (lost) this.closeStory(true);
     this.showSelectedNode();
     this.writeSelection(docChanged);
     // shortcut: scrolls for every change while focused; once remote or plugin changes exist, scroll only for local input (a transaction flag).
@@ -765,17 +870,36 @@ export class EditorView {
    * Measurements are cached by node and the flow restarts at the first changed block (5.4).
    */
   private render(): void {
+    try {
+      this.renderPages();
+    } catch (error) {
+      // What it had changed is not input: read back, it would render and fail again, for ever.
+      this.observer.takeRecords();
+      this.pending = [];
+      throw error;
+    }
+  }
+
+  private renderPages(): void {
     const { doc } = this.state;
     const ownerDocument = this.host.ownerDocument;
     // A new document (envelope) gets its renderer; nothing rendered before is reused then. An
     // editor's state always has one (`createEditor`).
     const context = wordContext(this.state) as WordContext;
     // Fonts loaded: a new renderer (new line heights), but not while a composition runs in a
-    // block it would redraw.
+    // block it would redraw. What only stories or the settings changed leaves blocks as they are.
+    const drawn = this.word?.context;
     const renewed =
-      context !== (this.word?.context ?? null) || (this.fontsChanged && !this.composing);
+      !drawn ||
+      drawn.id !== context.id ||
+      drawn.resolver !== context.resolver ||
+      drawn.envelope.section !== context.envelope.section ||
+      drawn.envelope.resources !== context.envelope.resources ||
+      drawn.envelope.comments !== context.envelope.comments ||
+      (this.fontsChanged && !this.composing);
     if (renewed) this.fontsChanged = false;
     let word = this.word as WordRenderer;
+    if (!renewed) word.context = context;
     if (renewed) {
       // A document with pictures: the mark of one without alt text is the view's stylesheet's.
       if (context.envelope.resources) injectStyles(this.host);
@@ -803,7 +927,18 @@ export class EditorView {
           : null;
       },
     );
-    const layout = sectionLayouts(doc, context.envelope.section);
+    // A story's view has none of the body's sections: its one flow is not a page's.
+    const spans = sectionSpans(doc, this.paged ? context.envelope.section : {});
+    const { regions } = this;
+    regions?.setDocument(
+      context.envelope,
+      spans.map((span) => span.setup),
+      context.resolver,
+    );
+    const layout = sectionLayouts(
+      spans,
+      regions && ((section, page) => regions.boxHeight(section, page)),
+    );
     doc.forEach((node, _, i) => {
       const { section, first } = layout[i] as BlockLayout;
       const key = `${section.key}${first ? "|first" : ""}`;
@@ -946,9 +1081,11 @@ export class EditorView {
       // DOM reads only for blocks without a valid measurement (new, changed or stale ones).
       let scale: number | undefined;
       const layoutPx = () => {
-        scale ??= layoutScale(this.pages[0] as HTMLElement, (this.sheets[0] as Sheet).settings);
+        scale ??= this.scale();
         return scale;
       };
+      // A header or footer of another height moves every page's text: no flow is reused.
+      if (regions && this.regionsChanged(regions, spans)) this.flowed = null;
       if (dropLines)
         for (const desc of blocks) {
           const measure = this.measures.get(desc.node);
@@ -1050,10 +1187,20 @@ export class EditorView {
           context.resolver.addsParagraphSpacing,
         );
       });
-      const rules = context.resolver.addsParagraphSpacing
-        ? { ...WORD_RULES, addSpacing: true }
-        : WORD_RULES;
-      const result = flowFrom(boxes, contentHeight(this.editor.settings), rules, reuse);
+      const rules = {
+        ...WORD_RULES,
+        addSpacing: context.resolver.addsParagraphSpacing,
+        evenAndOddHeaders: context.envelope.settings?.evenAndOddHeaders === true,
+      };
+      const flowHeight = contentHeight(this.editor.settings);
+      let result = flowFrom(boxes, flowHeight, rules, reuse);
+      let facts = pagesOf(boxes, result);
+      // The page count is known once flowed; a header holding it can change what fits.
+      for (let pass = 0; regions && pass < 2 && regions.settle(facts); pass++) {
+        result = flowFrom(boxes, flowHeight, rules);
+        facts = pagesOf(boxes, result);
+      }
+      this.facts = facts;
       this.flowed = { nodes, result };
       this.stale.clear();
       const flowed = result.fragments;
@@ -1132,13 +1279,19 @@ export class EditorView {
           : (blocks[item.unit] as WordBlockDesc).dom,
       );
       applyGaps(firsts, result.gaps);
+      this.drawRegions();
       this.place(
         items.map((item, i) => elementsOf(item, i)),
         pages,
         slots,
         layout,
       );
+      this.afterPlace();
     }
+    const placed = items.map((item, i) => elementsOf(item, i));
+    const placedPages = pages;
+    const placedSlots = slots;
+    this.placeAgain = () => this.place(placed, placedPages, placedSlots, layout);
     // (Wrappers no longer drawn are not in a page: `place` removed them.)
     this.frames = frames;
     this.frameAt = items.map((item, i) => {
@@ -1167,6 +1320,378 @@ export class EditorView {
     // changed before this render: the touched blocks are read back at compositionend.
     const records = this.observer.takeRecords();
     if (this.composing) this.pending.push(...records);
+  }
+
+  /** Layout px per px on screen: what a scaled ancestor (`transform`, `zoom`) multiplies by. */
+  private scale(): number {
+    const page = this.pages[0];
+    if (!page) return 1;
+    return this.paged
+      ? layoutScale(page, (this.sheets[0] as Sheet).settings)
+      : page.getBoundingClientRect().width / page.offsetWidth || 1;
+  }
+
+  /** Whether the headers' and footers' heights differ from when the pages were last flowed. */
+  private regionsChanged(regions: PageRegions, spans: readonly { setup: SectionJSON }[]): boolean {
+    const { stories, settings } = (wordContext(this.state) as WordContext).envelope;
+    const sections = spans.map((span) => span.setup);
+    const known = this.regionsFor;
+    if (
+      known &&
+      known.stories === stories &&
+      known.settings === settings &&
+      known.sections.length === sections.length &&
+      known.sections.every((section, i) => section === sections[i])
+    )
+      return false;
+    this.regionsFor = { stories, settings, sections };
+    const key = regions.key();
+    // Even and odd headers also decide the blank pages: the flow depends on them.
+    const changed =
+      key !== this.regionsKey ||
+      (known?.settings !== settings &&
+        (known?.settings as WordSettingsJSON | undefined)?.evenAndOddHeaders !==
+          settings?.evenAndOddHeaders);
+    this.regionsKey = key;
+    return changed;
+  }
+
+  /**
+   * Gives every page the header and footer the last flow says, redrawing those that changed. The
+   * one holding the story being edited stays; it follows the story if its page no longer shows it.
+   */
+  private drawRegions(): void {
+    const { regions, facts, mount } = this;
+    if (!regions) return;
+    const sides = ["header", "footer"] as const;
+    const wanted = facts.map((page) =>
+      // Word's blank page before an even or odd page section has neither.
+      page.sectionPages
+        ? {
+            header: regions.drawing(page.section, "header", page),
+            footer: regions.drawing(page.section, "footer", page),
+          }
+        : { header: null, footer: null },
+    );
+    const shows = (p: number) => !!mount && wanted[p]?.[mount.side]?.id === mount.id;
+    // Its page, while it shows it. Replaced there (the section unlinked, another variant turned
+    // on) it does not follow the old story to another page: the page's own opens.
+    const replaced = !!mount && facts[mount.page]?.section === mount.section;
+    const home = !mount
+      ? -1
+      : shows(mount.page)
+        ? mount.page
+        : replaced
+          ? -1
+          : wanted.findIndex((_, p) => shows(p));
+    this.pageRegions = facts.map((page, p) => {
+      const own: EditorView["pageRegions"][number] = {};
+      for (const side of sides) {
+        const drawing = wanted[p]?.[side];
+        if (!drawing) continue;
+        if (mount && p === home && side === mount.side) {
+          own[side] = mount.region;
+          if (mount.region.drawing !== drawing.content) {
+            mount.region.drawing = drawing.content;
+            const copy = drawing.content.content.cloneNode(true) as HTMLElement;
+            copy.style.display = "none";
+            mount.region.element
+              .querySelector(`:scope > .${REGION_CONTENT_CLASS}`)
+              ?.replaceWith(copy);
+            mount.wrapper.style.paddingBottom = copy.style.paddingBottom;
+          }
+          continue;
+        }
+        const known = this.pageRegions[p]?.[side];
+        if (known?.drawing === drawing.content && known.section === page.section) {
+          own[side] = known;
+          continue;
+        }
+        const element = regions.element(page.section, side);
+        element.append(drawing.content.content.cloneNode(true));
+        own[side] = { element, drawing: drawing.content, section: page.section, id: drawing.id };
+      }
+      return own;
+    });
+    this.pageMargins = facts.map((page, p) => {
+      if (!page.sectionPages) return { top: "", bottom: "" };
+      const { top, bottom } = regions.margins(page.section, page);
+      const { margins } = this.sheetOfPage(p).settings;
+      return {
+        top: Math.abs(top - margins.top * PX_PER_MM) < 0.01 ? "" : `${top}px`,
+        bottom: Math.abs(bottom - margins.bottom * PX_PER_MM) < 0.01 ? "" : `${bottom}px`,
+      };
+    });
+    if (!mount) return;
+    // Not shown anywhere any more (a variant turned on or off): the page's own story opens.
+    if (home < 0) queueMicrotask(this.reopenStory);
+    else if (home !== mount.page) {
+      mount.page = home;
+      mount.moved = true;
+    }
+  }
+
+  /** The page setup page `p` has, or will have once placed. */
+  private sheetOfPage(p: number): Sheet {
+    return this.sheets[p] ?? this.sheets[this.sheets.length - 1] ?? this.lastSheet();
+  }
+
+  /**
+   * After a story changed: its occurrences redrawn. False when a height changed, which takes a
+   * new flow (`render`), or during a composition.
+   */
+  private redrawRegions(): boolean {
+    const { regions } = this;
+    if (!regions) return true;
+    if (this.composing) return true;
+    const context = wordContext(this.state) as WordContext;
+    const spans = sectionSpans(this.state.doc, context.envelope.section);
+    regions.setDocument(
+      context.envelope,
+      spans.map((span) => span.setup),
+      context.resolver,
+    );
+    if (this.regionsChanged(regions, spans)) {
+      this.flowed = null;
+      return false;
+    }
+    this.drawRegions();
+    this.placeAgain?.();
+    this.afterPlace();
+    this.observer.takeRecords();
+    return true;
+  }
+
+  /** The story being edited, moved with its region: the focus goes back to it. */
+  private afterPlace(): void {
+    if (!this.mount?.moved) return;
+    this.mount.moved = false;
+    this.mount.view.focus();
+  }
+
+  // ---------- stories on their pages (ADR-0007) ----------
+
+  /** What the toolbar and code open stories through (`Editor.storyView`). */
+  private readonly stories: StoryView = ((view: EditorView) => ({
+    get open(): OpenStory | null {
+      const { mount } = view;
+      return mount
+        ? { id: mount.id, side: mount.side, variant: mount.variant, section: mount.section }
+        : null;
+    },
+    edit: (side, page) => view.openStory(side, page),
+    close: () => view.closeStory(),
+  }))(this);
+
+  /** Makes this view the one `Editor.storyView` speaks for, telling listeners if it was not. */
+  private claimStories(): void {
+    if (!this.paged || this.editor.storyView === this.stories) return;
+    const first = !this.editor.storyView;
+    this.editor.storyView = this.stories;
+    if (!first) this.editor.storyChanged();
+  }
+
+  /** The sections of the document, in order. */
+  private sections(): SectionJSON[] {
+    const { envelope } = wordContext(this.state) as WordContext;
+    return sectionSpans(this.state.doc, envelope.section).map((span) => span.setup);
+  }
+
+  /** The page the selection's head is on. */
+  private selectionPage(): number {
+    const { node } = this.domFromPos(this.state.selection.head);
+    const element = node.nodeType === Node.ELEMENT_NODE ? (node as Element) : node.parentElement;
+    return Math.max(this.pages.indexOf(element?.closest(".foli-page") as HTMLElement), 0);
+  }
+
+  /**
+   * Opens the header or footer of page `at` (by default the selection's) for editing where it is;
+   * made first when the page has none. Whether it is open now.
+   */
+  openStory(side: StorySide, at = this.selectionPage(), create = true): boolean {
+    if (!this.regions || !this.editable || this.composing) return false;
+    // Word's blank page has none: the next page's.
+    let p = at;
+    while (this.facts[p] && !this.facts[p]?.sectionPages) p++;
+    const page = this.facts[p];
+    if (!page) return false;
+    const context = wordContext(this.state) as WordContext;
+    const setup = this.sections()[page.section] as SectionJSON;
+    const even = context.envelope.settings?.evenAndOddHeaders === true;
+    const variant = pageVariant(setup, page, even);
+    const before = storyOfSection(this.sections(), page.section, side, variant);
+    if (this.mount?.id === before?.id && this.mount?.side === side && this.mount?.page === p) {
+      this.mount?.view.focus();
+      return true;
+    }
+    this.closeStory(false);
+    if (!before && (!create || !this.editor.run(ensureStory(side, variant, page.section))))
+      return false;
+    const found = storyOfSection(this.sections(), page.section, side, variant);
+    const editor = found && this.editor.story(found.id);
+    const region = this.pageRegions[p]?.[side];
+    if (!found || !editor || !region) return false;
+
+    injectStyles(this.host);
+    this.observer.disconnect();
+    this.host.setAttribute("contenteditable", "false");
+    this.host.setAttribute("aria-readonly", "true");
+    this.host.classList.add("foli-in-story");
+    const doc = this.host.ownerDocument;
+    const wrapper = doc.createElement("div");
+    wrapper.className = "foli-story-mount";
+    wrapper.setAttribute("contenteditable", "false");
+    wrapper.style.userSelect = "text";
+    wrapper.style.setProperty("-webkit-user-select", "text");
+    const inner = doc.createElement("div");
+    inner.setAttribute("aria-label", side === "header" ? "Header" : "Footer");
+    wrapper.append(inner);
+    const shown = region.element.querySelector<HTMLElement>(`:scope > .${REGION_CONTENT_CLASS}`);
+    if (shown) {
+      shown.style.display = "none";
+      wrapper.style.paddingBottom = shown.style.paddingBottom;
+    }
+    region.element.append(wrapper);
+    const view = new EditorView(inner, editor, {
+      paged: false,
+      upload: this.upload ?? null,
+      resource: this.resource ?? null,
+    });
+    wrapper.addEventListener("keydown", (event) => {
+      if (event.key !== "Escape" || event.isComposing || view.composing) return;
+      event.preventDefault();
+      this.closeStory(true);
+    });
+    this.mount = {
+      id: found.id,
+      side,
+      variant,
+      section: page.section,
+      page: p,
+      region,
+      wrapper,
+      view,
+      moved: false,
+    };
+    // With several views of the editor, the one in use answers for its story.
+    wrapper.addEventListener("focusin", () => this.claimStories());
+    this.claimStories();
+    view.focus();
+    this.editor.storyChanged();
+    return true;
+  }
+
+  /** Finishes a running composition, its text going into the model. */
+  endComposition(): void {
+    if (this.composing) this.onCompositionEnd();
+  }
+
+  /** Leaves the story being edited; `focus`: the body takes the focus, with its selection back. */
+  closeStory(focus = true): void {
+    const { mount } = this;
+    if (!mount) return;
+    mount.view.endComposition();
+    this.mount = null;
+    mount.view.destroy();
+    mount.wrapper.remove();
+    const shown = mount.region.element.querySelector<HTMLElement>(
+      `:scope > .${REGION_CONTENT_CLASS}`,
+    );
+    if (shown) shown.style.display = "";
+    this.host.classList.remove("foli-in-story");
+    this.host.setAttribute("contenteditable", String(this.editable));
+    if (this.editable) this.host.removeAttribute("aria-readonly");
+    this.observer.takeRecords();
+    this.observer.observe(this.host, { childList: true, characterData: true, subtree: true });
+    if (focus && !this.destroyed) this.focus();
+    this.editor.storyChanged();
+  }
+
+  /** The page's own story, after what was open is shown nowhere any more. */
+  private reopenStory = (): void => {
+    const { mount } = this;
+    if (!mount || this.facts.length === 0) return;
+    const { side, page, id } = mount;
+    // A story that went (undone) is not made again.
+    const create = !!wordContext(this.state)?.stories.has(id);
+    this.closeStory(false);
+    if (!this.openStory(side, Math.min(page, this.facts.length - 1), create)) this.focus();
+  };
+
+  /** The margin of a page a mouse event is in, if it is on the page itself. */
+  private marginAt(event: MouseEvent): { side: StorySide; page: number } | null {
+    const element = event.target as Element | null;
+    const page = this.pages.indexOf(element as HTMLElement);
+    if (page < 0 || !this.regions) return null;
+    const box = (element as Element).getBoundingClientRect();
+    const scale = this.scale();
+    const style = getComputedStyle(element as Element);
+    const y = (event.clientY - box.top) / scale;
+    if (y < Number.parseFloat(style.paddingTop)) return { side: "header", page };
+    return y > box.height / scale - Number.parseFloat(style.paddingBottom)
+      ? { side: "footer", page }
+      : null;
+  }
+
+  /**
+   * A press outside the story being edited leaves it. The second press of a double click in a
+   * page's margin opens its header or footer, the body's selection kept: on the press, since the
+   * first click may have scrolled the page (Firefox) and the double click would land elsewhere.
+   */
+  private onPress = (event: MouseEvent): void => {
+    this.closeStory(false);
+    const margin = event.button === 0 && !event.shiftKey ? this.marginAt(event) : null;
+    if (margin && event.detail > 1) {
+      event.preventDefault();
+      if (event.detail > 2 || !this.editable) return;
+      const selection = this.pressSelection;
+      this.pressSelection = null;
+      if (selection && !selection.eq(this.state.selection))
+        this.editor.dispatch(this.state.tr.setSelection(selection));
+      if (this.openStory(margin.side, margin.page))
+        this.mount?.view.placeCaret(event.clientX, event.clientY);
+      return;
+    }
+    // What the body shows now is what leaving the story comes back to (`selectionchange` comes
+    // late, and the browser may select something on the way to the second press).
+    if (margin && this.hasFocus()) this.syncSelection();
+    this.pressSelection = margin ? this.state.selection : null;
+    // On a header or footer a press is not for the body: it places no caret.
+    if (margin && this.pageRegions[margin.page]?.[margin.side]) {
+      event.preventDefault();
+      if (!this.hasFocus()) {
+        this.pointerFocus = true;
+        this.host.focus({ preventScroll: true });
+        this.writeSelection(true);
+      }
+      return;
+    }
+    this.onMouseDown(event);
+  };
+
+  /** Puts the caret at a point of the window, if it is on this view's content. */
+  placeCaret(x: number, y: number): void {
+    const pos = this.posAtPoint(x, y);
+    if (pos !== null)
+      this.editor.dispatch(
+        this.state.tr.setSelection(TextSelection.near(this.state.doc.resolve(pos))),
+      );
+  }
+
+  /** The model position at a point of the window, or null. */
+  private posAtPoint(x: number, y: number): number | null {
+    const doc = this.host.ownerDocument as Document & {
+      caretPositionFromPoint?: (
+        x: number,
+        y: number,
+      ) => { offsetNode: Node; offset: number } | null;
+      caretRangeFromPoint?: (x: number, y: number) => Range | null;
+    };
+    const point = doc.caretPositionFromPoint?.(x, y);
+    const range = point ? null : doc.caretRangeFromPoint?.(x, y);
+    const node = point?.offsetNode ?? range?.startContainer;
+    const offset = point?.offset ?? range?.startOffset ?? 0;
+    return node && this.host.contains(node) ? this.posFromDOM(node, offset) : null;
   }
 
   /**
@@ -1254,10 +1779,19 @@ export class EditorView {
     this.sheets.forEach((sheet, p) => {
       const page = this.pages[p] as HTMLElement;
       const key = `${sheet.index} ${sheet.css}`;
-      if (pageSheets.get(page) === key) return;
-      pageSheets.set(page, key);
-      page.style.cssText = sheet.css;
-      page.setAttribute(SHEET_ATTR, String(sheet.index));
+      if (pageSheets.get(page) !== key) {
+        pageSheets.set(page, key);
+        pagePads.delete(page);
+        page.style.cssText = sheet.css;
+        page.setAttribute(SHEET_ATTR, String(sheet.index));
+      }
+      const { top = "", bottom = "" } = this.pageMargins[p] ?? {};
+      const pads = `${top} ${bottom}`;
+      if ((pagePads.get(page) ?? " ") !== pads) {
+        pagePads.set(page, pads);
+        page.style.paddingTop = top;
+        page.style.paddingBottom = bottom;
+      }
     });
     // Pages first, in order; anything else in the host ends up after them.
     let cursor = host.firstChild;
@@ -1271,6 +1805,13 @@ export class EditorView {
       const first = i;
       while (i < items.length && items[i]?.page === p) i++;
       const onPage = items.slice(first, i);
+      const { header, footer } = this.pageRegions[p] ?? {};
+      /** A page's children: its header, what it holds, its footer. */
+      const framed = (list: readonly HTMLElement[]) => [
+        ...(header ? [header.element] : []),
+        ...list,
+        ...(footer ? [footer.element] : []),
+      ];
       for (const { dom, slot } of onPage) {
         const position = slot.mark ? "absolute" : "";
         if (dom.style.position !== position) dom.style.position = position;
@@ -1278,11 +1819,7 @@ export class EditorView {
       // One section in one column: the blocks are the page's children.
       const last = onPage[onPage.length - 1];
       if (!last || (!last.slot.band && last.section.columns.widths.length === 1)) {
-        fillElement(
-          page,
-          onPage.map((item) => item.dom),
-          this.viewRemoved,
-        );
+        fillElement(page, framed(onPage.map((item) => item.dom)), this.viewRemoved);
         this.bands.delete(page);
         continue;
       }
@@ -1298,11 +1835,7 @@ export class EditorView {
             : { key, ...bandElement(host.ownerDocument, section.columns) };
       }
       this.bands.set(page, bands);
-      fillElement(
-        page,
-        bands.map((b) => b.band),
-        this.viewRemoved,
-      );
+      fillElement(page, framed(bands.map((b) => b.band)), this.viewRemoved);
       bands.forEach((band, b) => {
         const inBand = onPage.filter((item) => item.slot.band === b);
         const lead = inBand[0]?.slot.lead;
@@ -1363,7 +1896,7 @@ export class EditorView {
 
   private createPage(): HTMLElement {
     const page = this.host.ownerDocument.createElement("section");
-    page.className = "foli-page";
+    page.className = this.paged ? "foli-page" : "foli-story-flow";
     return page;
   }
 
@@ -1374,6 +1907,7 @@ export class EditorView {
 
   /** The print rules for the document's page setups, written when they change. */
   private applyPrintStyles(layout: readonly BlockLayout[]): void {
+    if (!this.paged) return;
     const sheets = [...new Set(layout.map((block) => block.sheet))];
     const key = [this.lastSheet(), ...sheets].map((sheet) => sheet.css).join("\n");
     if (key === this.printKey) return;
@@ -1397,6 +1931,8 @@ export class EditorView {
   private invalidateLayout(): void {
     this.measures = new WeakMap();
     this.flowed = null;
+    this.regionsFor = null;
+    if (this.regions) this.regions.cache = new WeakMap();
   }
 
   /** Re-flows the pages once web fonts have loaded: line heights and wrapping change. */
@@ -1435,7 +1971,7 @@ export class EditorView {
       if (!desc || !measured || this.stale.has(desc.node)) continue;
       // A hidden host (display: none) reports every block as 0x0: nothing to re-flow.
       if (!entry.contentRect.width) continue;
-      scale ??= layoutScale(this.pages[0] as HTMLElement, (this.sheets[0] as Sheet).settings);
+      scale ??= this.scale();
       let height = 0;
       for (const fragment of desc.fragments) height += fragment.getBoundingClientRect().height;
       // A block is measured whole; each fragment of a split one keeps its padding and border,
@@ -1462,7 +1998,7 @@ export class EditorView {
       this.relayoutPending = false;
       if (this.destroyed) return;
       // compositionend flows what a composition kept from moving.
-      if (this.composing) {
+      if (this.composing || this.mount?.view.composing) {
         this.unflowed = true;
         return;
       }
@@ -1621,6 +2157,7 @@ export class EditorView {
   private readSelection(): Selection | null {
     const sel = this.host.ownerDocument.getSelection();
     if (!sel?.anchorNode || !sel.focusNode) return null;
+    if (this.mount?.wrapper.contains(sel.anchorNode)) return null;
     // A range around exactly one block leaf element (a rule): the node selection that wrote it.
     // (Its end, mapped alone, would be the start of the next block, not the end of the rule.)
     if (sel.anchorNode === sel.focusNode && Math.abs(sel.anchorOffset - sel.focusOffset) === 1) {
@@ -1774,7 +2311,9 @@ export class EditorView {
 
   private hasFocus(): boolean {
     const active = this.host.ownerDocument.activeElement;
-    return active === this.host || this.host.contains(active);
+    return (
+      (active === this.host || this.host.contains(active)) && !this.mount?.wrapper.contains(active)
+    );
   }
 
   /** Writes the model selection to the DOM unless the DOM already shows it (keeps native affinity). */
@@ -1824,7 +2363,7 @@ export class EditorView {
    */
   private dispatch(tr: Transaction): boolean {
     const marksAdded = tr.storedMarks !== null && tr.storedMarks !== this.state.storedMarks;
-    if (!this.editable && (tr.docChanged || marksAdded)) return false;
+    if ((!this.editable || this.mount) && (tr.docChanged || marksAdded)) return false;
     this.editor.dispatch(tr);
     return true;
   }
@@ -2212,18 +2751,7 @@ export class EditorView {
     const files = this.imageFiles(event.dataTransfer);
     if (!files.length || this.composing) return;
     // The place the files were dropped.
-    const doc = this.host.ownerDocument as Document & {
-      caretPositionFromPoint?: (
-        x: number,
-        y: number,
-      ) => { offsetNode: Node; offset: number } | null;
-      caretRangeFromPoint?: (x: number, y: number) => Range | null;
-    };
-    const point = doc.caretPositionFromPoint?.(event.clientX, event.clientY);
-    const range = point ? null : doc.caretRangeFromPoint?.(event.clientX, event.clientY);
-    const node = point?.offsetNode ?? range?.startContainer;
-    const offset = point?.offset ?? range?.startOffset ?? 0;
-    const pos = node ? this.posFromDOM(node, offset) : null;
+    const pos = this.posAtPoint(event.clientX, event.clientY);
     if (pos !== null)
       this.dispatch(this.state.tr.setSelection(TextSelection.near(this.state.doc.resolve(pos))));
     void this.insertFiles(files);
@@ -2392,6 +2920,15 @@ export class EditorView {
   }
 
   private onKeyDown = (event: KeyboardEvent): void => {
+    // The host itself focused while a story is open (Shift+Tab): it is read-only, and its selection
+    // is what leaving the story comes back to.
+    if (this.mount) {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        this.closeStory(true);
+      }
+      return;
+    }
     if (event.isComposing || this.composing) return;
     this.syncSelection();
     if (this.crossFragmentEdge(event) || this.crossListNumber(event)) {
@@ -2399,6 +2936,10 @@ export class EditorView {
       return;
     }
     const name = keyName(event);
+    if (this.documentEdgeKey(name)) {
+      event.preventDefault();
+      return;
+    }
     // Ctrl/Cmd+Shift+V: the paste event that follows uses only the plain text.
     this.plainPaste = name === "Mod-Shift-v";
     // Tab and Shift+Tab move the focus on in read-only mode, and right after Escape where Tab
@@ -2450,6 +2991,22 @@ export class EditorView {
       event.preventDefault();
     }
   };
+
+  /**
+   * Ctrl+Home and Ctrl+End (with Shift, extending) on pages with headers and footers: the browser
+   * stops at the first or last place before what it cannot edit, so the model says where.
+   */
+  private documentEdgeKey(name: string): boolean {
+    const shift = name.startsWith("Mod-Shift-");
+    const key = name.replace("Mod-Shift-", "Mod-");
+    if ((key !== "Mod-Home" && key !== "Mod-End") || !this.editable) return false;
+    if (!this.pageRegions.some((page) => page.header || page.footer)) return false;
+    const { doc, selection } = this.state;
+    const edge = key === "Mod-Home" ? Selection.atStart(doc) : Selection.atEnd(doc);
+    const next = shift ? TextSelection.between(selection.$anchor, edge.$head) : edge;
+    this.dispatch(this.state.tr.setSelection(next).setStoredMarks(null));
+    return true;
+  }
 
   /**
    * Whether the caret is on the first (`dir` -1) or last (1) line of its textblock, in the
@@ -2585,9 +3142,10 @@ export class EditorView {
    * and so is the scroll position.
    */
   private onFocus = (): void => {
+    this.claimStories();
     const pointer = this.pointerFocus;
     this.pointerFocus = false;
-    if (pointer) return;
+    if (pointer || this.mount) return;
     const current = this.readSelection();
     if (current && this.shows(current)) return;
     this.writeSelection(true);
@@ -2907,7 +3465,7 @@ export class EditorView {
   }
 
   private onSelectionChange = (): void => {
-    if (!this.composing && this.hasFocus()) this.syncSelection();
+    if (!this.composing && !this.mount && this.hasFocus()) this.syncSelection();
   };
 }
 
@@ -3199,6 +3757,8 @@ function wordBox(
 ): BlockBox {
   const pageHeight = contentHeight(layout.sheet.settings);
   const { section } = layout;
+  // Without pages nothing is kept off the next one, and a page break ends nothing.
+  const paged = layout.sheet.css !== UNPAGED_CSS;
   const next = words[i + 1] ? { word: words[i + 1] as WordInfo } : undefined;
   const { before, after } = spacing(words[i - 1], desc.word, next?.word, adds);
   const leavesWith = (attr: string) =>
@@ -3236,6 +3796,7 @@ function wordBox(
     lines: bottoms,
     columnBreaksAfter: (column) => linesOf(columnBreaks, column),
     breaksAfter: (column = 0) => {
+      if (!paged) return [];
       const breaks = linesOf(pageBreaks, column);
       if (next?.word.pageBreakBefore)
         breaks.push((section.unequal ? inColumn(column).lines() : bottoms()).length - 1);
