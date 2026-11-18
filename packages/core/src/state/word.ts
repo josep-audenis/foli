@@ -181,7 +181,8 @@ export function splitAttrs(
   const next = style?.next;
   if (next === undefined || next === id) return { before, after: attrs };
   const mark = Object.fromEntries(Object.keys(MARK_ONLY).map((k) => [k, attrs[k] ?? null]));
-  return { before, after: { ...mark, style: next } };
+  // The new paragraph is in the same content controls.
+  return { before, after: { ...mark, controls: attrs.controls, style: next } };
 }
 
 /** Run toggles: whether text shows the property, from its resolved formatting. */

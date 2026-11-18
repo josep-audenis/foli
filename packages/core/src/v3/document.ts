@@ -522,13 +522,12 @@ export function parseDocument(input: unknown): FoliDocument {
   );
 
   const content = parseContent(input.content);
-  noteReferencesOnlyInBody(comments);
   const stories = Object.entries((input.stories ?? {}) as Record<string, StoryJSON>).map(
     ([id, story]) => {
       const path = `stories[${JSON.stringify(id)}].content`;
       const tree = parseContent(story.content, path);
       storyRules(tree, story.kind, path);
-      return [id, { ...structuredClone({ ...story, content: null }), content: tree.toJSON() }];
+      return [id, { ...structuredClone({ ...story, content: null }), content: copied(tree) }];
     },
   );
   // A copy: the validated document must not change when the caller's input does.
@@ -561,15 +560,27 @@ export function parseDocument(input: unknown): FoliDocument {
     ...(envelope.theme === undefined ? {} : { theme: envelope.theme }),
     comments: comments.map((c, i) => ({
       ...structuredClone({ ...c, content: [] }),
-      content: blocks(c.content, `comments[${i}].content`).map((block) => block.toJSON()),
+      content: blocks(c.content, `comments[${i}].content`).map((block) => {
+        block.descendants((node) => {
+          if (node.type.name === "noteReference")
+            fail(`comments[${i}].content`, "a comment cannot hold a note reference");
+          return true;
+        });
+        if (block.type.name === "noteReference")
+          fail(`comments[${i}].content`, "a comment cannot hold a note reference");
+        return copied(block);
+      }),
     })),
     ...(envelope.resources === undefined ? {} : { resources: envelope.resources }),
     ...(input.stories === undefined ? {} : { stories: Object.fromEntries(stories) }),
     ...(envelope.controls === undefined ? {} : { controls: envelope.controls }),
     ...(envelope.settings === undefined ? {} : { settings: envelope.settings }),
-    content: content.toJSON(),
+    content: copied(content),
   };
 }
+
+/** A node's JSON sharing nothing with the input its attributes came from. */
+const copied = (node: Node): NodeJSON => structuredClone(node.toJSON());
 
 /**
  * Parses untrusted schema v4 content into a `doc` node, with Word's rules the content
@@ -623,6 +634,8 @@ function storyRules(tree: Node, kind: StoryJSON["kind"], path: string): void {
     const name = node.type.name;
     if (node.attrs.section) fail(path, "a story cannot end a section");
     if (name === "noteReference") fail(path, "a story cannot hold a note reference");
+    if ((kind === "header" || kind === "footer") && COMMENT_NODES.has(name))
+      fail(path, `a ${kind} cannot hold comments`);
     if (
       (kind === "footnote" || kind === "endnote") &&
       (name === "pageBreak" || name === "columnBreak")
@@ -632,12 +645,7 @@ function storyRules(tree: Node, kind: StoryJSON["kind"], path: string): void {
   });
 }
 
-function noteReferencesOnlyInBody(comments: readonly CommentJSON[]): void {
-  comments.forEach((comment, i) => {
-    const found = laterNode({ content: comment.content }, 4, (name) => name === "noteReference");
-    if (found) fail(`comments[${i}].content`, "a comment cannot hold a note reference");
-  });
-}
+const COMMENT_NODES = new Set(["commentStart", "commentEnd", "commentReference"]);
 
 const V4_NODES = new Set(["table", "tableRow", "tableCell", "picture"]);
 const V5_NODES = new Set([
@@ -659,29 +667,24 @@ function laterSection(section: unknown): string | undefined {
 }
 
 /**
- * The first thing in validated content JSON that a schema after `version` added (or that `only`
- * picks), if any: a node type, a block's `controls`, a part of a section.
+ * The first thing in validated content JSON that a schema after `version` added, if any: a node
+ * type, a block's `controls`, a part of a section.
  */
 function laterNode(
   content: NodeJSON | { content: NodeJSON[] },
   version: number,
-  only?: (name: string) => boolean,
 ): { name: string; schema: number } | undefined {
   const stack: unknown[] = [content];
   while (stack.length) {
     const node = stack.pop();
     if (!isRecord(node)) continue;
     const name = node.type as string;
-    if (only) {
-      if (only(name)) return { name, schema: 5 };
-    } else {
-      if (version < 4 && V4_NODES.has(name)) return { name, schema: 4 };
-      if (V5_NODES.has(name)) return { name, schema: 5 };
-      const attrs = isRecord(node.attrs) ? node.attrs : {};
-      if (attrs.controls) return { name: "controls", schema: 5 };
-      const part = laterSection(attrs.section);
-      if (part) return { name: part, schema: 5 };
-    }
+    if (version < 4 && V4_NODES.has(name)) return { name, schema: 4 };
+    if (V5_NODES.has(name)) return { name, schema: 5 };
+    const attrs = isRecord(node.attrs) ? node.attrs : {};
+    if (attrs.controls) return { name: "controls", schema: 5 };
+    const part = laterSection(attrs.section);
+    if (part) return { name: part, schema: 5 };
     if (Array.isArray(node.content)) for (const child of node.content) stack.push(child);
   }
   return undefined;
@@ -883,7 +886,11 @@ const checkControls = recordOf(
       dateFormat: str(),
       checked: bool,
       placeholder: shape({ showing: bool, docPart: str() }, [], true),
-      binding: shape({ xpath: str(), storeItemId: str(), prefixMappings: str() }, [], true),
+      binding: shape(
+        { xpath: str(65_535), storeItemId: str(), prefixMappings: str(65_535) },
+        [],
+        true,
+      ),
       ext: xml,
     },
     ["kind"],

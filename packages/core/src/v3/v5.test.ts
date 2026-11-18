@@ -128,6 +128,60 @@ describe("schema v5", () => {
     ).toThrow(/comment cannot hold a note reference/);
   });
 
+  it("shares nothing with its input", () => {
+    const controls = ["c"];
+    const columns = { count: 2 };
+    const input = envelope({
+      content: doc({
+        type: "paragraph",
+        attrs: { controls, section: { columns } },
+      }),
+      stories: {
+        s: { kind: "header", content: doc({ type: "paragraph", attrs: { controls } }) },
+      },
+      comments: [{ id: 1, author: "A", content: [{ type: "paragraph", attrs: { controls } }] }],
+    });
+    const parsed = parseDocument(input);
+    controls.push("later");
+    columns.count = 99;
+    const attrs = parsed.content.content?.[0]?.attrs as Record<string, never>;
+    expect(attrs.controls).toEqual(["c"]);
+    expect(attrs.section).toEqual({ columns: { count: 2 } });
+    expect(parsed.stories?.s?.content.content?.[0]?.attrs?.controls).toEqual(["c"]);
+    expect(parsed.comments[0]?.content[0]?.attrs?.controls).toEqual(["c"]);
+  });
+
+  it("refuses empty or repeating control lists, and comments in headers", () => {
+    const withControls = (controls: unknown) =>
+      parseContent(doc({ type: "paragraph", attrs: { controls } }));
+    expect(() => withControls([])).toThrow(/must not be empty/);
+    expect(() => withControls(["a", "a"])).toThrow(/must not repeat/);
+    const commented = doc(p({ type: "commentStart", attrs: { id: 1 } }));
+    expect(() =>
+      parseDocument(envelope({ stories: { s: { kind: "header", content: commented } } })),
+    ).toThrow(/cannot hold comments/);
+    expect(() =>
+      parseDocument(envelope({ stories: { s: { kind: "footnote", content: commented } } })),
+    ).not.toThrow();
+  });
+
+  it("holds long field codes and binding paths, and survives cyclic comment content", () => {
+    const code = "x".repeat(10_000);
+    const content = doc(p({ type: "fieldCode", attrs: { text: code } }));
+    expect(parseContent(content).toJSON()).toEqual(content);
+    const cyclic: Record<string, unknown> = { type: "paragraph" };
+    cyclic.content = [cyclic];
+    expect(() =>
+      parseDocument(envelope({ comments: [{ id: 1, author: "A", content: [cyclic] }] })),
+    ).toThrow();
+  });
+
+  it("refuses what schema 5 added in a document saying schema 3", () => {
+    expect(() => parseDocument(envelope({ schemaVersion: 3, content: doc(p(reference)) }))).toThrow(
+      /noteReference is a schema 5 node \(the document says schema 3\)/,
+    );
+  });
+
   it("accepts a reference whose note is missing, as Word opens it", () => {
     expect(() => parseDocument(envelope({ content: doc(p(reference)) }))).not.toThrow();
   });

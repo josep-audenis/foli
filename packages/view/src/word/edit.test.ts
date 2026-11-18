@@ -504,6 +504,15 @@ describe("WordRenderer", () => {
     ]);
   });
 
+  it("keeps the line of a paragraph holding only a field's parts", () => {
+    const { renderer, doc } = rendererOf(
+      p({}, { type: "fieldStart" }, { type: "fieldEnd" }),
+      p({}, text("a"), { type: "hardBreak" }, { type: "fieldStart" }, { type: "fieldEnd" }),
+    );
+    const last = (i: number) => renderer.render(doc.child(i), i).dom.lastChild?.nodeName;
+    expect([last(0), last(1)]).toEqual(["BR", "BR"]);
+  });
+
   it("shows the last line of a paragraph ending in a line break, not one ending in markers", () => {
     const { renderer, doc } = rendererOf(
       p({}, text("a"), { type: "hardBreak" }, bookmark),

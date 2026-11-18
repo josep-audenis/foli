@@ -472,6 +472,18 @@ describe("schema v5 content not written yet", () => {
     await expect(
       exportDocx({
         ...base,
+        comments: [
+          {
+            id: 1,
+            author: "A",
+            content: [{ type: "paragraph", attrs: { controls: ["c"] } }],
+          },
+        ],
+      }),
+    ).rejects.toThrow(/controls cannot be exported/);
+    await expect(
+      exportDocx({
+        ...base,
         content: {
           type: "doc",
           content: [{ type: "paragraph", content: [{ type: "fieldEnd" }] }],

@@ -229,6 +229,7 @@ function refuseNotYetWritten(doc: FoliDocument): void {
     node.content?.forEach(walk);
   };
   walk(doc.content);
+  for (const comment of doc.comments) comment.content.forEach(walk);
   for (const section of sections)
     for (const key of ["columns", "pageNumbers", "footnotes", "endnotes"] as const)
       if (section[key]) throw written(`A section's ${key}`);

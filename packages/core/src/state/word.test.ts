@@ -130,6 +130,13 @@ describe("Enter on a v3 document", () => {
     ]);
   });
 
+  it("at the end of a heading stays in the heading's content controls", () => {
+    const editor = editorOf(p({ style: "Heading1", controls: ["c"] }, text("Title")));
+    editor.select(6);
+    editor.commands.splitBlock();
+    expect(blocks(editor)[1]).toEqual(p({ style: "Normal", controls: ["c"] }));
+  });
+
   it("at the end of a paragraph whose style goes on (or names none) keeps its formatting", () => {
     for (const style of [null, "Normal", "Quote", "Missing"]) {
       const attrs = { ...(style ? { style } : {}), justification: "right" };

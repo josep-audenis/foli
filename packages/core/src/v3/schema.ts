@@ -459,8 +459,16 @@ const reviewMark: MarkSpec = {
 };
 /** A marker's own unknown attributes (`w:displacedByCustomXml`…). */
 const markerAttributes = { attributes: nullableAttr(attributes) };
-/** The content controls around a block, row or cell, outermost first (schema v5, ADR-0007). */
-const controlsAttr = { controls: nullableAttr(listOf(text(), 64)) };
+/** Ids of content controls, outermost first: at least one, none twice. */
+const controlIds: Check = (v) => {
+  const error = listOf(text(), 64)(v);
+  if (error) return error;
+  const ids = v as string[];
+  if (!ids.length) return "must not be empty (use null)";
+  return new Set(ids).size === ids.length ? undefined : "must not repeat an id";
+};
+/** The content controls around a block, row or cell (schema v5, ADR-0007). */
+const controlsAttr = { controls: nullableAttr(controlIds) };
 /** Part of a field (schema v5): stands in a run, verbatim XML of what the model does not hold. */
 const fieldPart = { group: "inline", inline: true, selectable: false } as const;
 const fontName = markAttr(nullable(text()), null);
@@ -590,7 +598,7 @@ export const schema = new Schema({
       },
     },
     /** One `w:instrText`: part of a field's code. */
-    fieldCode: { ...fieldPart, attrs: { text: { validate: str() } } },
+    fieldCode: { ...fieldPart, attrs: { text: { validate: str(65_535) }, ...markerAttributes } },
     fieldSeparator: { ...fieldPart, attrs: { ext: nullableAttr(xml) } },
     fieldEnd: { ...fieldPart, attrs: { ext: nullableAttr(xml) } },
     /** An inline content control's ends; its properties are the envelope's `controls[id]`. */
