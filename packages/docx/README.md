@@ -35,6 +35,11 @@ from `commentsExtended`) and sections:
   (`w:sectPrChange`), read and written; a section unchanged is exported byte for byte, a changed
   one rewrites only what changed. A recorded setup is written with every value spelled out: Word
   sees no change in what it leaves out.
+- **Content controls** (11.5, 11.9) at run, block, row and cell level are modeled with their
+  properties (`controls`), `w:sdtPr` and `w:sdtEndPr` kept in `ext`: what changes is patched child
+  by child, the rest stays byte for byte, a new control gets a whole `w:sdtPr`, and the glossary
+  gives the text an emptied one shows. Data bindings are kept, not evaluated. An empty block
+  control stays verbatim.
 - **Tables** (10.4) become `table`, `tableRow` and `tableCell` nodes: the table's, rows' and
   cells' properties (`w:tblPr`, `w:tblGrid`, `w:tblPrEx`, `w:trPr`, `w:tcPr`) as attributes,
   merges as Word writes them (`gridSpan`, `vMerge`), a row inserted or deleted as a tracked
@@ -51,8 +56,7 @@ from `commentsExtended`) and sections:
   styles, numbering levels and definitions, the document defaults; `runExt` on runs; a comment's
   start tag), and unknown attributes of modeled elements go to attribute bags (paragraphs,
   links, tracked changes, bookmarks and comment anchors: `w16du:dateUtc`, `w14:paraId`…). Every
-  element Foli does not model yet (content controls, pictures, fields' structure,
-  footnote references, equations…) becomes an opaque node holding its source, and so does an
+  element Foli does not model yet (equations, charts, shapes…) becomes an opaque node holding its source, and so does an
   element the model rejects as a whole (a tracked change with an id past Word's range, a link in
   a link, a run with an unknown attribute): never stripped to plain text. Export (8.5) writes all
   of it back; keep `package` with the document, the parts Foli does not edit come from it. The
@@ -120,7 +124,9 @@ included). Within the parts it writes:
 - Headers, footers, footnotes and endnotes are the document's `stories`. An unchanged one keeps
   its part (or, for a note, its element) byte for byte; a changed one is written from the model;
   a new one gets its part, relationship and content type. A note whose story is gone is removed
-  from its part. A document without `stories` leaves those parts as they are.
+  from its part. A document without `stories` leaves those parts as they are. Notes inserted,
+  deleted, tracked, converted or given new options in the editor are written as Word writes them,
+  and Word reads them back (`scripts/corpus/story-roundtrip.mjs`).
 - Tables are written from the model: each properties element as paragraphs' are (verbatim
   while unchanged, else child by child), the grid as read while its widths are, rows and cells
   in order; Word reads every corpus table back with Foli's text, unchanged and edited

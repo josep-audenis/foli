@@ -111,7 +111,7 @@ const builtinName = (id: string) =>
 
 /**
  * Word's definition of built-in style `name` ("heading 1"–"heading 9", "List Paragraph",
- * "Hyperlink"), as Word adds it to a document the first time it is used (the Word 2013–2019
+ * "Hyperlink", "Placeholder Text"), as Word adds it to a document the first time it is used (the Word 2013–2019
  * template's values; not checked against newer Word).
  */
 export function builtinStyle(context: HasEnvelope, name: string): StyleJSON | null {
@@ -158,6 +158,20 @@ export function builtinStyle(context: HasEnvelope, name: string): StyleJSON | nu
       ],
     };
   }
+  const contents = /^toc ([1-9])$/.exec(name)?.[1];
+  if (contents) {
+    // Word indents each level by the default font's size (11 pt: 220 twips).
+    const size = context.envelope.defaults.run?.find((m) => m.type === "fontSize")?.attrs?.value;
+    const indent = (Number(contents) - 1) * (typeof size === "number" ? size * 10 : 220);
+    return {
+      id: `TOC${contents}`,
+      type: "paragraph",
+      name,
+      ...based,
+      ...(normal ? { next: normal } : {}),
+      paragraph: { spacing: { after: 100 }, ...(indent ? { indent: { left: indent } } : {}) },
+    };
+  }
   if (name === "List Paragraph")
     return {
       id: "ListParagraph",
@@ -186,6 +200,52 @@ export function builtinStyle(context: HasEnvelope, name: string): StyleJSON | nu
           insideV: line,
         },
       },
+    };
+  }
+  const note = /^(foot|end)note (text|reference)$/.exec(name);
+  const textChar = /^(Foot|End)note Text Char$/.exec(name);
+  if (note || textChar) {
+    // Word's: 10 pt text without space after, and a superscript reference.
+    const font = defaultParagraphStyleOf(context, "character");
+    const fontBased = font ? { basedOn: font } : {};
+    const size = { type: "fontSize", attrs: { value: 20, complexScript: 20 } };
+    const stem =
+      (note?.[1] ?? textChar?.[1] ?? "").toLowerCase() === "foot" ? "Footnote" : "Endnote";
+    if (textChar)
+      return {
+        id: `${stem}TextChar`,
+        type: "character",
+        name,
+        ...fontBased,
+        link: `${stem}Text`,
+        run: [size],
+      };
+    if (note?.[2] === "reference")
+      return {
+        id: `${stem}Reference`,
+        type: "character",
+        name,
+        ...fontBased,
+        run: [{ type: "verticalAlign", attrs: { value: "superscript" } }],
+      };
+    return {
+      id: `${stem}Text`,
+      type: "paragraph",
+      name,
+      ...based,
+      link: `${stem}TextChar`,
+      paragraph: { spacing: { after: 0, line: 240, lineRule: "auto" } },
+      run: [size],
+    };
+  }
+  if (name === "Placeholder Text") {
+    const font = defaultParagraphStyleOf(context, "character");
+    return {
+      id: "PlaceholderText",
+      type: "character",
+      name,
+      ...(font ? { basedOn: font } : {}),
+      run: [{ type: "color", attrs: { value: "666666" } }],
     };
   }
   if (name === "Hyperlink") {

@@ -86,7 +86,7 @@ New comment (with `comments`: on the selection, written in the pane), Track chan
 previous and next change, Accept, Reject (the change at the caret or the selected ones),
 Accept all, Reject all ·
 undo, redo · Table (a menu), Table style (a box of the document's table styles and Word's Table
-Grid), Shading (a menu of light cell fills; both in a table, not while tracking) · Picture… (a dialog) · page break. A pointer pick in a box calls `onClickCommand`, like a button click.
+Grid), Shading (a menu of light cell fills; both in a table, not while tracking) · Picture… (a dialog) · page break · Section, Header (menus) · Controls (a menu: rich text, plain text, drop-down list, combo box, date picker, check box, picture around a selected one, repeating section, Add repeating item, Control properties… (a dialog: title, tag, the two locks, list items, date format, line breaks)) · Fields (a menu: page number, date, Cross-reference… (a dialog of the document's headings and bookmarks), table of contents, update the selected fields or all of them, show field codes). A pointer pick in a box calls `onClickCommand`, like a button click.
 Up and Down on a closed box apply each value they pass (Chrome and Firefox on Windows), one
 undo step each. Text color and highlight are menu buttons (WAI-ARIA menu, `menuitemradio`
 items) with a fixed palette (Word's highlight colors), the current color checked; arrow keys,
@@ -124,6 +124,11 @@ value marks its field with an announced message; Apply (Enter), Cancel (Escape).
 Header is a menu button: Edit header, Edit footer, Close header and footer, and the checkbox items
 Different first page, Different odd and even pages and Link to previous (with a story open). While
 a story is open the toolbar's commands go to it.
+
+Notes is a menu button: Insert footnote and Insert endnote (the caret goes into the new note), Go
+to note or reference, Convert footnotes to endnotes and back, and Note options…, a dialog
+(`.foli-table-dialog`, "Note options"): which notes, position, number format, start (for numbers
+that do not restart) and numbering; Apply (Enter), Cancel (Escape). It applies to the whole document.
 
 Table is a menu button (WAI-ARIA menu: `menuitem` items, "Repeat as header row" a
 `menuitemcheckbox` checked when the selection's rows are header rows): Insert table…, insert row
@@ -165,7 +170,7 @@ No DOM: runs in Node, workers and the browser.
 
 ### Documents
 
-Documents are schema v5, Word's model with tables and pictures (v5 adds stories, fields and content controls, which import and the editor do not produce yet) ([document-model.md](document-model.md)).
+Documents are schema v5, Word's model with tables, pictures, stories, fields and content controls ([document-model.md](document-model.md)).
 
 - `createDocument(content?, section?): FoliDocument`: a new document: `content` (schema v5;
   default: one empty paragraph) on A4 with 25.4 mm margins, with Normal, Heading 1–6, List
@@ -332,7 +337,7 @@ definitions (the Word 2013 to 2019 template's) the first time they are applied, 
 | `getDocument()`                | The current document (`FoliDocument`).                                                                                                                                                                                                                                                                                        |
 | `setDocument(doc)`             | Replaces the document and settings, clears undo history. Listeners get an empty transaction list.                                                                                                                                                                                                                             |
 | `story(id)`                    | An `Editor` over a story (header, footer or note), null when there is none: its own selection, every change a step of this editor's history. `getDocument` gives the story as the content; `undo` and `redo` are the document's.                                                                                              |
-| `storyView`                    | Set by the view showing the pages: `open` (the story open there: `id`, `side`, `variant`, `section`), `edit(side, page?)`, `close()`. `storyChanged()` tells listeners it changed.                                                                                                                                            |
+| `storyView`                    | Set by the view showing the pages: `open` (the story open there: `id`, `side`, `variant`, `section`), `edit(side, page?)`, `editNote(id?)`, `toReference()`, `close()`, `fieldLayout` and `updateFields(options?, editor?)` (fields, from its pages). `storyChanged()` tells listeners it changed.                            |
 | `subscribe(listener)`          | `(state, transactions) => void` after every change (selection included); returns unsubscribe. `transactions.some(tr => tr.docChanged)` tells content changes apart.                                                                                                                                                           |
 
 Headers and footers: `ensureStory(side, variant, section)` makes one where none shows,
@@ -340,6 +345,15 @@ Headers and footers: `ensureStory(side, variant, section)` makes one where none 
 unlinks it with a copy, `setDifferentFirstPage(on, section?)`, `setDifferentEvenPages(on)`.
 `documentSections(state)`, `storyOfSection(sections, index, side, variant)` and
 `pageVariant(section, page, evenAndOdd)` say which story a page shows.
+
+Notes: `insertNote(kind = "footnote", { customMark? })` adds the reference and the story (one undo
+step, Word's `footnote text` and `footnote reference` styles made when missing; not in a story);
+`setNoteProperties(kind, { position, format, start, restart })` sets them for the whole document;
+`convertNotes(to, story?)` turns notes into the other kind. `noteNumbers(doc, envelope, { pageOf,
+hideDeleted })` gives each reference's number, `noteTexts(numbers)` them by story,
+`noteAtSelection(state)` the reference at the selection, `noteProperties(envelope, kind, section?)`
+what is in force. Deleting a reference deletes its note in the same transaction; while tracking
+both are recorded, as Word does, and settled together.
 
 Headings: `setBlockType("heading", { level: 2 })`; back to text: `setBlockType("paragraph")`.
 Lists: `commands.toggleList("bulletList" | "orderedList")` (removes the selection's numbering
@@ -406,9 +420,68 @@ resource of the document; tracked while tracking), `setPictureSize(pos, width, h
 while tracking), `setPictureAlt(pos, alt, decorative?)`, `selectedPicture(state)` (a node
 selection of a picture, and its position).
 
+Fields (11.8, ADR-0007; markers in the model, see
+[document-model.md](document-model.md)). `updateFields(editor, { layout, data, now, only })` works
+results out and writes them in one transaction, one undo step, recorded as tracked changes when
+tracking is on (a story's change is a `StoryStep` of it), and returns `{ updated, unchanged, rebuilt,
+skipped }`. Locked fields stay; a field left as it was is in `skipped`, with its `instruction`, its
+`story` and why (`locked`, `unknown`, `no-layout`, `no-data`, `missing-bookmark`,
+`unsupported-switch`, `untrackable`). `layout` is a `FieldLayout` (`pages`, `pageAt(pos)`: `number`,
+`sectionPages`, `format`), what `view.updateFields` passes: without one, page fields keep their
+results. `data`: `MERGEFIELD` values by name (any case; left alone without it); `now`: for `DATE` and
+`TIME`; `only`: a range of the editor's tree (a caret: the field around it) or a function of the
+`Field`, else every field of the body and the stories. `PAGE`, `NUMPAGES` and `SECTIONPAGES` in a
+story are never written: the view draws them page by page.
+
+| Field                                     | Honours                                                                                                                                                                                                                            |
+| ----------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| every one                                 | `\*` `MERGEFORMAT` (the old result's first run's look; without it the code's), `CHARFORMAT`, `Arabic`, `ROMAN`, `roman`, `ALPHABETIC`, `alphabetic`, `Ordinal`, `Hex`, `Upper`, `Lower`, `FirstCap`, `Caps`; `\#` numeric pictures |
+| `PAGE`, `NUMPAGES`, `SECTIONPAGES`        | the section's number format for `PAGE`                                                                                                                                                                                             |
+| `DATE`, `TIME`                            | `\@` date pictures (English names)                                                                                                                                                                                                 |
+| `SEQ id [bookmark]`                       | `\c`, `\n`, `\r n`, `\s level`, `\h`                                                                                                                                                                                               |
+| `REF name` (or the bookmark's name alone) | `\h`, `\n`, `\r`, `\w`, `\p`, `\t`; without a number switch, the bookmark's text with its formatting                                                                                                                               |
+| `PAGEREF name`                            | `\h`, `\p`                                                                                                                                                                                                                         |
+| `TOC`                                     | `\o`, `\u`, `\t`, `\h`, `\z`, `\n`, `\b`, `\p`, `\w`, `\x`; styles `TOC1`-`TOC9` made as Word's when missing, `_Toc` bookmarks, a right tab with dots, nested `PAGEREF`s                                                           |
+| `MERGEFIELD name`                         | from `data`: `\b`, `\f` (only around a value), `\@`, `\#`                                                                                                                                                                          |
+
+Inserting, each one undo step: `insertField(instruction, { result?, layout?, data?, now? })`,
+`insertPageNumber(options?)`, `insertDate(picture = "d MMMM yyyy", options?)`,
+`insertCrossReference({ to, show: "text" | "page" | "number", link = true, layout? })` (`to`: a
+bookmark's name or a heading's position; a heading gets a `_Ref` bookmark),
+`crossReferenceTargets(state)` (`bookmarks`, `headings`), `insertTableOfContents({ from = 1, to = 3,
+hyperlinks = true, layout? })` (in a paragraph of its own; not in a story). Reading:
+`fieldsIn(tree)` (`from`, `to`, `separator`, `codeEnd`, `resultFrom`, `resultTo`, `instruction`,
+`name`, `result`, `locked`, `deleted`, `parent`, `inCode`), `fieldAround(tree, pos)`,
+`parseFieldInstruction(text)`, `formatDatePicture(date, picture)`,
+`formatNumericPicture(value, picture)`; `fieldDisplay(paragraphs, codes)` (what a renderer hides),
+`fieldCodesShown(state)`, `toggleFieldCodes`. A selection crossing a field's markers takes the whole
+field; Backspace or Delete at its edge selects it first, as in Word.
+
+Content controls (11.9, ADR-0007). `editor.commands.setControlValue(target, value)` fills the
+controls with that id or tag, in the body and, from the body's editor, the stories, as one undo
+step, tracked when tracking is on; it returns whether any took it. `value`: text; a list item's
+value or shown text (a combo box takes any text, a drop-down list only its items); a `Date` or
+`yyyy-mm-dd`; `true` or `false` for a check box; `{ content: NodeJSON[] }` for rich text; `null` or
+`""` empties it, bringing its placeholder back. A locked or bound control refuses.
+`editor.controlValues()` reads them all (`controlValues(state)`: one tree): `id`, `kind`, `tag`,
+`title`, `story`, `showingPlaceholder`, `text`, `value`, `content` (rich text).
+
+| Command                                 | Does                                                                                                                                   |
+| --------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `insertControl(kind, options?)`         | At the caret, around selected text or paragraphs; `title`, `tag`, `lock`, `items`, `dateFormat`, `placeholder`, `checked`, `multiLine` |
+| `setControlValue(target, value, join?)` | The command behind `editor.commands.setControlValue`, for one tree                                                                     |
+| `setControlProperties(target, patch)`   | `title`, `tag`, `lock`, `items`, `dateFormat`, `multiLine`; allowed on a locked control                                                |
+| `addRepeatingItem(target?)`             | A copy of the caret's (or the last) item of a repeating section                                                                        |
+| `insertControlText(text)`               | Text into a plain text, combo box or date control: what paste uses                                                                     |
+
+`controlsIn(tree)`, `controlAt(tree, pos)` (`id`, `level`, `from`, `to`, `contentFrom`, `contentTo`),
+`controlProperties(state, id)` and `controlIsReadOnly(control)` find them.
+
 ## `@folijs/view`
 
-The editable view without a framework. Needs a browser DOM.
+The editable view without a framework. Needs a browser DOM. Content controls: it draws the frame
+and title of the control the caret is in or the pointer is over; Alt+Down (or its button) opens a
+list or date picker, Space or a click changes a check box, Left and Right stop at a control's edges.
 
 ```ts
 const view = new EditorView(host, editor, { editable: true, placeholder: "" });
@@ -457,6 +530,18 @@ const view = new EditorView(host, editor, { editable: true, placeholder: "" });
   leaves it, as Escape and a press on the page do. Meanwhile the host has the class
   `foli-in-story`, is read-only and the text is dimmed; `view.focus()` focuses the story.
   `paged: false` (when the view is made) gives one flow without pages, what the open story uses.
+- Footnotes sit at the foot of their references' pages, endnotes after the text. Double click a
+  note or its reference's number, or press Shift+Alt+N at the reference, to edit the note where it
+  is (`view.openNote(id?)`); Shift+Alt+N goes back to the reference, Escape to where the caret was.
+  Ctrl+Alt+F and Ctrl+Alt+D insert a footnote and an endnote, as in Word.
+- Fields show their results; a code range (a field nested in it too) is not drawn and the caret
+  does not rest in it. A field the selection is in is shaded (`data-foli-field-selected`, not
+  printed). F9 updates the field at the caret or those selected, Ctrl+A then F9 all of them;
+  Alt+F9 shows and hides codes for the whole document, headers and footers too (results and
+  paragraphs wholly inside them then take no room). `view.updateFields(options?, editor?)` does it
+  from code: `updateFields` with this view's pages, then once more for what depends on the pages
+  those results moved, in one undo step. `view.print()` updates every field and opens the browser's
+  print dialog; a browser's own Print menu does not update them.
 - `view.focus()`: focuses the host, shows the editor's selection, scrolls it into view.
 - `view.destroy()`: removes listeners, injected styles and the attributes it added; empties the
   host.
@@ -478,7 +563,7 @@ const view = new EditorView(host, editor, { editable: true, placeholder: "" });
   (null when the browser cannot show it); `textWidthEmu(state)`: the widest a picture is
   inserted, in EMU (the last section's text width: shortcut, not the caret's section);
   `EMU_PER_PX` (9525). For an app's own picture insert, as the toolbar's dialog does it.
-- `renderDocument(document, container, { review?, resource? }): DocumentPages` (a read-only view, no
+- `renderDocument(document, container, { review?, resource?, fieldCodes? }): DocumentPages` (a read-only view, no
   editor): lays a schema v3 document out on
   pages (`.foli-word-page`, `WORD_PAGE_CLASS`) appended to `container`, formatted as Word
   formats it. `review`: `"markup"` (default: insertions underlined, deletions struck through,

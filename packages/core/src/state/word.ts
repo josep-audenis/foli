@@ -117,8 +117,8 @@ export function setComments(
   return tr;
 }
 
-/** What `EnvelopeStep` can change (ADR-0007; controls join it with their task). */
-export type EnvelopeKey = "section" | "settings";
+/** What `EnvelopeStep` can change (ADR-0007). */
+export type EnvelopeKey = "section" | "settings" | "controls";
 
 /**
  * Changes one value of the envelope (the last section's setup, the document's settings) from
@@ -307,8 +307,9 @@ function storyTrees(envelope: WordEnvelope): Map<string, Story> {
 /**
  * The plugin that gives commands a v3 document's envelope. A transaction changes it with
  * `withEnvelope` (a new list's numbering definition); undo leaves such additions, as Word does.
- * Comments change only through `CommentStep`s, the last section and the settings through
- * `EnvelopeStep`s and stories through `StoryStep`s, which undo takes back. A story's editor is
+ * Comments change only through `CommentStep`s, the last section, the settings and the controls'
+ * properties through `EnvelopeStep`s and stories through `StoryStep`s, which undo takes back (a
+ * paste adds the properties of the controls it copies with `withEnvelope`). A story's editor is
  * given its body's `context` as it stands.
  */
 export function wordPlugin(envelope: WordEnvelope, context?: WordContext): Plugin<WordContext> {
@@ -332,6 +333,7 @@ export function wordPlugin(envelope: WordEnvelope, context?: WordContext): Plugi
         const base = next ?? value.envelope;
         const section = afterEnvelopeSteps("section", base.section, tr.steps);
         const settings = afterEnvelopeSteps("settings", value.envelope.settings, tr.steps);
+        const controls = afterEnvelopeSteps("controls", base.controls, tr.steps);
         let { stories } = value;
         let storiesJSON = value.envelope.stories;
         for (const step of tr.steps) {
@@ -353,16 +355,18 @@ export function wordPlugin(envelope: WordEnvelope, context?: WordContext): Plugi
           comments === value.envelope.comments &&
           section === base.section &&
           settings === value.envelope.settings &&
+          controls === value.envelope.controls &&
           stories === value.stories
         )
           return value;
-        const { stories: _stories, settings: _settings, ...rest } = base;
+        const { stories: _stories, settings: _settings, controls: _controls, ...rest } = base;
         const envelope: WordEnvelope = {
           ...rest,
           section,
           comments: comments as CommentJSON[],
           ...(storiesJSON && Object.keys(storiesJSON).length ? { stories: storiesJSON } : {}),
           ...(settings ? { settings } : {}),
+          ...(controls ? { controls } : {}),
         };
         // Only comments, stories or steps changed: they do not affect formatting.
         const resolver = next ? new Resolver(envelope) : value.resolver;

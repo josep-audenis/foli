@@ -13,6 +13,7 @@ import type { Attrs, Mark, Node } from "../model/index.js";
 import { TransformError } from "../transform/transform.js";
 import type { SectionJSON } from "../v3/document.js";
 import { RUN_PROPERTY_MARKS } from "../v3/schema.js";
+import { controlEdit, readOnlyAt } from "./controls.js";
 import { closeHistory } from "./history.js";
 import { MARK_ATTRS } from "./mark.js";
 import { absorbSection, lastSection, resolveSectionChange } from "./sections.js";
@@ -20,7 +21,14 @@ import { TextSelection } from "./selection.js";
 import type { Command, EditorState, Transaction } from "./state.js";
 import { keepTablesApart } from "./tables.js";
 import { RECORDED, trackState, untracked } from "./track.js";
-import { StoryStep, setEnvelopeValue, storyBody, storyState, wordContext } from "./word.js";
+import {
+  StoryStep,
+  setEnvelopeValue,
+  storyAfter,
+  storyBody,
+  storyState,
+  wordContext,
+} from "./word.js";
 
 export type ChangeKind =
   | "insertion"
@@ -408,6 +416,30 @@ function join(tr: Transaction, pos: number, keepFirst: boolean): void {
   tr.setNodeMarkup(start, first.type, attrs);
 }
 
+/**
+ * Accepts or rejects every insertion or deletion recorded in story `id`, in `tr`: a note's, when
+ * the reference's own record is settled and the note stays.
+ */
+export function resolveStoryChanges(
+  state: EditorState,
+  tr: Transaction,
+  id: string,
+  accept: boolean,
+  kind: "insertion" | "deletion",
+): void {
+  const story = storyAfter(state, tr, id);
+  if (!story) return;
+  const paragraph = kind === "insertion" ? "paragraphInsertion" : "paragraphDeletion";
+  const changes = changesIn(story.doc, undefined, 0, story.doc.content.size).filter(
+    (c) => c.kind === kind || c.kind === paragraph,
+  );
+  if (!changes.length) return;
+  const inner = storyState(state, story.doc);
+  const storyTr = inner.tr;
+  resolve(inner, storyTr, changes, accept);
+  tr.step(new StoryStep(id, story, { ...story, doc: storyTr.doc }));
+}
+
 function command(
   accept: boolean,
   range: (state: EditorState) => readonly { from: number; to: number }[],
@@ -419,19 +451,25 @@ function command(
     if (!state.schema.marks.insertion) return false;
     const body = everywhere ? storyBody(state) : null;
     if (body) return dispatch ? body.run(run) : body.can(run);
+    const controls = wordContext(state)?.envelope.controls;
+    // As Word: a change in content that may not be edited can be accepted, not rejected.
+    const open = (doc: Node) => (c: Change) => accept || !readOnlyAt(doc, controls, c.from, c.to);
     // A change around several selected cells (a row revision, a move's partner) counts once.
     const seen = new Set<string>();
     const changes = range(state)
       .flatMap((r) =>
         changesIn(state.doc, wordContext(state)?.envelope.section, r.from, r.to, filter),
       )
+      .filter(open(state.doc))
       .filter((c) => {
         const key = `${c.kind} ${c.id} ${c.from} ${c.to}`;
         return !seen.has(key) && !!seen.add(key);
       });
     const stories = everywhere
       ? [...(wordContext(state)?.stories ?? [])].flatMap(([id, story]) => {
-          const inStory = changesIn(story.doc, undefined, 0, story.doc.content.size, filter);
+          const inStory = changesIn(story.doc, undefined, 0, story.doc.content.size, filter).filter(
+            open(story.doc),
+          );
           return inStory.length ? [{ id, story, changes: inStory }] : [];
         })
       : [];
@@ -439,6 +477,7 @@ function command(
     if (dispatch) {
       // Its own undo step, never merged with the typing before it.
       const tr = state.tr.setMeta(untracked, true).setMeta(closeHistory, true);
+      if (accept) tr.setMeta(controlEdit, "accept");
       // A document the result would not fit (a structure Word allows and Foli cannot change
       // yet): nothing is changed.
       try {

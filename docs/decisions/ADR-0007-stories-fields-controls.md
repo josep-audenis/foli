@@ -91,7 +91,7 @@ content, ext? }`. `content` is a `doc` of the body's blocks. `noteType` is Word'
   is dropped, never half applied (a reference gone, its story kept). Every change to a story goes
   through these steps, so only a change made with `addToHistory: false` can cause this.
 - **`EnvelopeStep(key, before, after)`**, the same idea for what undo must take back in the
-  envelope: the last section (`section`), `settings` (both built), and one control's properties (11.9). So undoing an
+  envelope: the last section (`section`), `settings` and the controls' properties (`controls`, the whole record: 11.9). So undoing an
   added header leaves no reference to a story that has gone. `withEnvelope` stays for what undo
   leaves as it is (numbering definitions, styles and resources).
 - **Grouping.** History groups story typing by the rules body typing has: the story's own
@@ -121,7 +121,8 @@ content, ext? }`. `content` is a `doc` of the body's blocks. `noteType` is Word'
 - **Notes and the clipboard.** Deleting the last reference removes the story in the same
   transaction; undo restores both. A slice holding a reference carries its note's content, so cut
   and paste keep the note, and every paste makes a new story with a fresh id (a copy never gives
-  two references to one note). Without Foli's clipboard format the reference is dropped.
+  two references to one note). Without Foli's clipboard format the reference is dropped. Built in
+  11.10: `WordDefinitions.notes`, and `fitPaste` returns the new stories for the paste to add.
 
 ### In place on the page
 
@@ -175,9 +176,34 @@ content, ext? }`. `content` is a `doc` of the body's blocks. `noteType` is Word'
   is measured again. A line forced onto an empty page because nothing else can take it keeps its
   note's first line, and the page grows as for any line taller than a page. `FlowState` gains the
   notes' use of the page and what carries over (`sameState` compares them, or incremental reflow
-  would stop too early). Lines are measured for blocks with references. Endnotes are blocks after
-  the body (or the section). In a section with columns a footnote sits at the foot of its
-  reference's **column**.
+  would stop too early). Lines are measured for blocks with references. Endnotes follow the text of
+  the body (or the section). In a section with columns the notes are set **in the section's
+  columns across the band's foot**, whichever column refers to them (corrected in 11.10: this
+  said the foot of the reference's column; Word's PDFs show otherwise).
+- **Built in 11.10**, Word 16.0.20527's behaviour read from its PDFs and saved files
+  (`scripts/corpus/story-roundtrip.mjs` has it read what Foli writes):
+  - A note takes all the room down to its reference's line, up to its whole height: a long one
+    fills the page, the text after it goes to the next. The space after the paragraph holding the
+    reference stays between its last line and the separator, and above notes set beneath the text.
+  - The separator and the continuation separator are both drawn two inches long in Word's PDF.
+    They are the document's stories, their heights their paragraphs'.
+  - Endnotes follow the last text with the paragraph's space after between, under their separator;
+    a footnote carried to that page keeps to the foot.
+  - With columns: every note whole, in order, in as many columns as fit the height of the tallest,
+    the columns' tops level, one separator over the first column; every column's text ends above.
+    A note a later column refers to makes the earlier columns end above it: the band is flowed again
+    with that room kept (`FlowState.reserves`).
+  - Numbers: a custom mark takes none. A reference deleted while tracking keeps its number until
+    accepted (the views showing changes as accepted skip it). Word refuses a start other than 1 when
+    numbers restart. Its options dialog writes the settings and every section; an endnote's position
+    only the settings.
+  - Inserted: the reference a run in the reference style; the note a paragraph in the note text
+    style, the mark in the reference style, a space. Tracked: `w:ins` around the reference and all
+    the note holds, its paragraph mark not recorded. A reference deleted while tracking: `w:del`
+    around it, and all the note holds deleted, paragraph mark included. Accepting or rejecting the
+    reference settles the note too; a note whose reference goes is removed (a plugin, in the same
+    undo step). A copy is a new note with a new id, in Word too.
+  - The open note is one line to the flow: whole on its reference's page.
 - **Columns.** A section has `columns` (`count`, `space`, `widths`, `separator`); a page holds
   **bands** (one per section on it, for continuous sections), a band holds columns, and `flow`
   fills columns where it filled pages. A band above a continuous break is balanced. A
@@ -216,6 +242,26 @@ content, ext? }`. `content` is a `doc` of the body's blocks. `noteType` is Word'
   Unknown instructions keep their result, reported. Tracked when tracking is on.
 - A field is selected and deleted whole when the selection crosses its markers; Backspace at its
   edge selects it first, as Word does.
+- **Built in 11.8**, where the above left room or turned out otherwise:
+  - `updateFields(editor, { layout, data, now, only })` returns what it did and what it left
+    (`updated`, `unchanged`, `rebuilt`, `skipped` with a reason). `layout` is `{ pages, pageAt(pos)
+    }`, a position's displayed number, its section's page count and number format. Core makes one
+    pass; `view.updateFields` makes a second, joined to the same undo step, for the page numbers a
+    rebuilt table of contents moved.
+  - Results are worked out in stages (fields in codes, values and `SEQ`, `REF` and `PAGEREF`, `TOC`)
+    so what depends on another result sees it. A table of contents whose lines and styles are
+    already right is left alone: its paragraphs keep their ids, and updating an untouched document
+    changes nothing, the check against Word on the corpus.
+  - A missing bookmark keeps the old result and is reported. Word writes "Error! Reference source
+    not found." into the document; a failed update should not cost the reader the text.
+  - With codes shown, a field's closing brace is drawn at its separator, so a table of contents
+    reads `{ TOC … }` on one line; paragraphs wholly inside a hidden result take no room. The
+    paragraph holding the end stays, an empty line. Codes are not editable there.
+  - Browsers cannot tell the two sides of a marker apart: the selection rules treat positions with
+    only markers between them as one place, or a range would give a field up when the browser
+    reads its end back one position short. Left and Right start past the markers next to the caret
+    (WebKit spent a key press on each empty element).
+  - Find (11.11) has to skip code ranges: `fieldsIn` gives them.
 
 ### Content controls
 
@@ -236,6 +282,38 @@ content, ext? }`. `content` is a `doc` of the body's blocks. `noteType` is Word'
 - **Editing.** A plugin filters transactions: locked content and locked controls refuse changes, a
   plain text control holds one paragraph's text without formatting. `setControlValue` and
   `controlValues` are the API, by id or tag.
+- **Built in 11.9**, Word 16.0.20527's behaviour read through its object model and saved files
+  (`scripts/corpus/control-roundtrip.mjs` has it read what Foli writes):
+  - **Locks.** `sdtLocked`: the content is edited, the control cannot be deleted, alone or in a
+    range over it. `contentLocked`: no text or formatting change, but the whole control can be
+    deleted. `sdtContentLocked`: both. Properties and the locks themselves stay changeable. The
+    filter compares what a transaction leaves with what was there (undo passes), so it does not
+    depend on how the change came. Tracked changes in locked content can be accepted, not rejected.
+  - **Placeholder.** Typing replaces it and removes `w:showingPlcHdr`; the text loses the
+    `PlaceholderText` style. While tracking Word records the insertion only, not the placeholder's
+    deletion. Emptying a control (by typing or code) brings back its `w:docPart`'s text, not what
+    the file showed; Word knows `DefaultPlaceholder_*` without a glossary, and shows five spaces for
+    an entry it cannot find. `placeholder.text` holds the glossary's text. An empty control in a
+    file stays empty until edited. Backspace and Delete do nothing on a placeholder or at a
+    control's inner edges; from outside they select its content.
+  - **What a kind takes.** Plain text: one paragraph, no Enter, no line break unless `w:multiLine`;
+    formatting part of it formats all of it. Drop-down and check box: no typing. Combo box and date:
+    typing. No paragraph mark inside an inline control. Typed text that is not the picked date drops
+    `w:fullDate` (Word also re-reads a date typed; Foli does not parse them).
+  - **Check box.** `w14:checked` and the glyph are separate: Word does not re-sync them on opening.
+    Toggling while tracking is an insertion and a deletion of the glyph.
+  - **Lists.** A choice writes the shown text only; Word writes no `w:lastValue` and drops one it
+    finds, so an old one is left as it is.
+  - **Data binding.** On opening Word replaces the content with the bound node's value, even with
+    an unknown `storeItemID` when the path resolves; a path that does not keeps the content. Bindings
+    stay unevaluated, so editing one here would be lost in Word without notice: **a bound control's
+    content is read-only**, in the editor and through `setControlValue`.
+  - **Ids.** Word gives a control with no `w:id`, or a repeated one, an id of its own: a copy made
+    here drops it. A copied repeating item holds its source's content, as Word's does.
+  - **The caret.** The two sides of a marker are one place to a browser: the view treats them so
+    when reading the selection, and Left and Right step across each edge, as Word's caret does.
+  - Frames and titles are the view's own elements on the page, `contenteditable="false"`; the lists
+    and the date picker (a native date input) are outside the editing host.
 
 ### Other
 
@@ -247,8 +325,9 @@ content, ext? }`. `content` is a `doc` of the body's blocks. `noteType` is Word'
   otherwise kept verbatim. Sections gain `columns`, `pageNumbers` (`w:pgNumType`) and their own
   note properties.
 - **Find:** core's `findAll(doc, query)` over the body and each story; results carry the story id.
-- **Slices with half a field or control** are repaired on paste: markers without partners are
-  dropped, their content kept.
+- **Slices with half a field or control** are repaired on paste (`fitPaste`, built in 11.8):
+  markers without partners are dropped, a field that lost its end losing its code too, their
+  content kept.
 - **PDF.** A new `@folijs/pdf`, no browser dependency: `exportPdf(document, { page, resources })`
   drives a page the app supplies (Playwright's or Puppeteer's: `setContent`, `addScriptTag`,
   `evaluate`, `pdf`), loads the read-only renderer's bundle, updates page fields, and prints with

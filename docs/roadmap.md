@@ -1186,19 +1186,55 @@ Each task is a PR on `phase-11/sections-fields`, the build green after each.
   results; a line with text and a picture keeps the room below the baseline, only a line of
   pictures alone ends at their foot; a story's height comes from the read-only renderer, the open
   one is drawn by the editing renderer.)
-- [ ] 11.8 Fields: shown with their results (shaded when selected, as Word does), selected and
+- [x] 11.8 Fields: shown with their results (shaded when selected, as Word does), selected and
   deleted whole, updated on demand (one field, all, before print and PDF): `PAGE`, `NUMPAGES`,
   `SECTIONPAGES`, `DATE`, `REF`, `PAGEREF`, `SEQ`, `TOC` built from heading styles with their
   pages; insert a page number, the date, a cross-reference and a table of contents; merge
-  fields filled from data through the API; field codes shown and hidden.
-- [ ] 11.9 Content controls: shown with their bounds, title and placeholder; plain and rich
+  fields filled from data through the API; field codes shown and hidden. (Done: `fieldsIn`, the
+  selection rules as a plugin, `updateFields` with Word's switches, one undo step, tracked, stories
+  included; `TOC` built with `TOC1`-`TOC9`, `_Toc` bookmarks, links, nested `PAGEREF`, a right tab;
+  `insertField`, `insertPageNumber`, `insertDate`, `insertCrossReference`,
+  `insertTableOfContents`; code ranges hidden in both renderers, Alt+F9, F9, Ctrl+A then F9, the
+  selected field shaded, `view.print()` updating first; a Fields menu and cross-reference dialog.
+  On the corpus with Word's pages every field works out to Word's result and nothing changes
+  (`fields-word.test.ts`); `word-fields.spec.ts` in three engines; `field-roundtrip.mjs` has Word
+  read updated, rebuilt, merged (tracked) and inserted fields: all 22 files pass. Shortcuts: unknown
+  fields, unfollowed switches and missing bookmarks keep their result and are reported;
+  `MERGEFORMAT` keeps the first run's look, not word by word; a multi-paragraph `REF` gets line
+  breaks; table of contents entries are plain text; English date names; codes shown are not
+  editable, no Shift+F9 or Ctrl+F9; the browser's own Print does not update fields.)
+- [x] 11.9 Content controls: shown with their bounds, title and placeholder; plain and rich
   text edited inside (and only inside when locked), drop-down and combo box lists, date picker,
   check box, repeating sections kept; filled from the UI and through the API (by tag or id),
-  read back as data; keyboard-usable and axe-clean.
-- [ ] 11.10 Footnotes and endnotes: insert a note (numbered in Word's formats, restarting per
+  read back as data; keyboard-usable and axe-clean. (Done: every control modeled, 03 with none
+  opaque; a filter on what each transaction leaves enforces locks and what a kind holds, in stories
+  too; placeholders selected whole, replaced, brought back; `insertControl`, `setControlValue`,
+  `controlValues`, `setControlProperties`, `addRepeatingItem`; properties patched into the kept
+  `w:sdtPr`, new ones written whole; frames, titles, lists, date picker and check boxes in the view,
+  by keyboard too (Alt+Down, Space); a Controls menu and properties dialog.
+  `word-controls.spec.ts` in three engines, T1 to T3 in a rich text control;
+  `control-roundtrip.mjs` has Word read 8 files, every control as Foli holds it. Word's rules are
+  in ADR-0007. Shortcuts: a bound control's content is read-only, the binding not evaluated;
+  dates typed are not parsed and date names are English; `w:temporary` is kept but does not remove
+  the control when edited; a group control's fixed content is editable; no picture chosen for a
+  picture control; a list's or date's button is mouse-only, Alt+Down its keyboard way.)
+- [x] 11.10 Footnotes and endnotes: insert a note (numbered in Word's formats, restarting per
   section or page where set), its text edited in place; footnotes laid out at their reference's
   page foot (separator, continuation to the next page), endnotes at the end of the document or
-  section; deleted with their reference; tracked; T1–T5 in a note; on Word's pages.
+  section; deleted with their reference; tracked; T1–T5 in a note; on Word's pages. (Done:
+  `noteNumbers` from the settings and sections, drawn and never stored; `insertNote`,
+  `setNoteProperties`, `convertNotes`; a plugin keeps a note with its reference, tracked as Word
+  records it; a copy carries the note and pastes a new one. The flow and both renderers place notes,
+  separators and continuations, `beneathText` and `sectEnd` too; a note opens in place by double
+  click, Shift+Alt+N or the Notes menu, with an options dialog. Page score 0.811 to 0.889: 09 from
+  0.391 to 0.999, 04 from 0.821 to 0.832 (the rest of 04 is not notes), none lower, all 158
+  paragraphs on Word's page; made documents with restarts, section endnotes, notes beneath the text
+  and most column cases match Word's PDFs. `word-notes.spec.ts` in three engines, T4 by CDP in
+  Chromium; T5 here is a note growing and pushing the text; `story-roundtrip.mjs` has Word read 24
+  files. Word's PDFs corrected the ADR: notes in columns are set across the columns' foot, not in
+  their reference's column. Shortcuts: no widow or orphan control in a note's lines,
+  `w:continuationNotice` not drawn, options for the whole document only, a reference in opaque
+  content not counted, Word sometimes ends an earlier column sooner than the notes need.)
 - [ ] 11.11 Navigation: bookmarks (insert, go to, used by cross-references), the document
   outline (headings, moving to them; a React panel), find and replace across every story (case
   and whole words, replace tracked while tracking, one undo step for replace all); keyboard

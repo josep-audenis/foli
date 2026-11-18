@@ -150,7 +150,7 @@ JSON: the style, then the defaults, decide (`Resolver` in `v3/resolve.ts`, 8.6).
 | `bookmarkStart` (`id`, `name`), `bookmarkEnd` (`id`)                                                                     | a bookmark's ends: what cross-references and internal links point at                                                                                                                                                                                                                                                             |
 | `commentStart`, `commentEnd`, `commentReference`                                                                         | `id`: a comment's range and its reference mark, as Word places them (ranges overlap freely, so they are points, not marks)                                                                                                                                                                                                       |
 | `picture` (v4)                                                                                                           | inline; `resource` (a key of the envelope's `resources`), `width`, `height` (EMU), `alt` (optional, as Word allows), `title`, `decorative`, `float` (null inline; else `horizontal`/`vertical` (`relativeTo`, `offset` or `align`), `wrap`, `side`, `distance`, `allowOverlap`, `layoutInCell`), `ext` (the `w:drawing`)         |
-| `fieldStart` (`dirty`, `locked`, `simple`, `ext`), `fieldCode` (`text`, `attributes`), `fieldSeparator`, `fieldEnd` (v5) | a field as Word has it (ADR-0007): the code from the start to the separator (or the end), the result as ordinary content after the separator                                                                                                                                                                                     |
+| `fieldStart` (`dirty`, `locked`, `simple`, `ext`), `fieldCode` (`text`, `attributes`), `fieldSeparator`, `fieldEnd` (v5) | a field as Word has it (ADR-0007): the code from the start to the separator (or the end), hidden with any field nested in it; the result as ordinary content after the separator, written by `updateFields`                                                                                                                      |
 | `controlStart`, `controlEnd` (`id`, v5)                                                                                  | an inline content control's ends; its properties are `controls[id]`. Blocks, rows and cells list theirs in `controls`, outermost first                                                                                                                                                                                           |
 | `noteReference` (`story`, `customMark`, `attributes`, v5), `noteMark` (v5)                                               | a note's reference, and where a note shows its number                                                                                                                                                                                                                                                                            |
 | `opaqueInline`                                                                                                           | `xml`, `label`, `run` (content of a run, written back inside one): fields, charts, shapes, symbols… until modeled                                                                                                                                                                                                                |
@@ -171,8 +171,10 @@ properties may hold only the marks that describe how text looks (`RUN_PROPERTY_M
 - **Stories** (v5): `stories` holds headers and footers by relationship id (what a section's
   `headers` and `footers` name) and notes as `footnote:<id>` and `endnote:<id>` (what a
   `noteReference` names), each a `doc` of blocks. A story ends no section and holds no note
-  reference or comment; a note holds no page or column break. New headers and footers get ids
-  `rIdFoli` and a random part, never reused. In the editor a story changes through `StoryStep`s of the body's history.
+  reference or comment; a note holds no page or column break. A note's number is never stored: it
+  comes from document order and the `footnotes` and `endnotes` properties of the settings and each
+  section (a section's first). New notes take the next number of their kind. New headers and
+  footers get ids `rIdFoli` and a random part, never reused. In the editor a story changes through `StoryStep`s of the body's history.
 - **Settings** (v5): `settings.evenAndOddHeaders` (absent: as the file says; `false` is written
   back as off), `footnotes` and `endnotes`, from `word/settings.xml`. They change through
   `EnvelopeStep`s.
@@ -229,7 +231,8 @@ interface FoliDocument {
   comments: CommentJSON[]; // id, author, initials, date, content (blocks), parent, done
   resources?: Record<string, ResourceJSON>; // contentType, size, part | url | data
   stories?: Record<string, StoryJSON>; // kind, noteType, content (a doc), ext: headers, footers, notes
-  controls?: Record<string, ControlJSON>; // kind, tag, alias, lock, items, placeholder, binding, ext
+  controls?: Record<string, ControlJSON>; // kind, tag, alias, lock, items, dateFormat, date, checked,
+  //   checkedState, uncheckedState, multiLine, placeholder (showing, docPart, text), binding, ext
   settings?: WordSettingsJSON; // evenAndOddHeaders, footnotes, endnotes
   content: NodeJSON; // a doc
 }

@@ -1,11 +1,16 @@
-import {
+﻿import {
   AllSelection,
   arrowAcrossLeaf,
   autolinkHref,
   CellSelection,
   type Command,
+  type ControlRange,
+  caretStop,
   cellsAsTable,
   closeHistory,
+  controlAt,
+  controlProperties,
+  controlSpot,
   type DocumentSettings,
   deleteBackward,
   deleteForward,
@@ -15,11 +20,18 @@ import {
   type EditorState,
   ensureStory,
   extendCellSelection,
+  type Field,
+  type FieldLayout,
+  type FieldsReport,
+  fieldCodesShown,
+  fieldsIn,
   fitPaste,
   fitPastedV2,
   goToCellVertically,
+  insertControlText,
   insertHardBreak,
   insertLink,
+  insertNote,
   insertPicture,
   insertText,
   isSafeHref,
@@ -27,6 +39,11 @@ import {
   type Node as ModelNode,
   marksAt,
   NodeSelection,
+  type NoteNumber,
+  noteAtSelection,
+  noteNumbers,
+  noteProperties,
+  noteTexts,
   type OpenStory,
   pageVariant,
   parseContentV2,
@@ -34,10 +51,12 @@ import {
   type ResourceJSON,
   type ReviewView,
   redo,
+  referencesIn,
   type SectionJSON,
   Selection,
   Slice,
   type StorySide,
+  StoryStep,
   type StoryView,
   sectionSettings,
   setColumnWidth,
@@ -49,10 +68,13 @@ import {
   TextSelection,
   type Transaction,
   TransformError,
+  toggleFieldCodes,
   toggleMark,
   trackState,
   typedMarks,
+  type UpdateFieldsOptions,
   undo,
+  updateFields,
   type WordContext,
   type WordSettingsJSON,
   withEnvelope,
@@ -63,20 +85,29 @@ import {
   type BlockBox,
   contentHeight,
   DEFAULT_RULES,
+  type FlowNote,
   type FlowPage,
   type FlowResult,
   type FlowRules,
   type FlowSection,
   type Fragment,
   flowFrom,
+  notePieces,
   type PageFacts,
   PX_PER_MM,
   pagesOf,
   type Reuse,
+  spaceAfterText,
 } from "./layout/flow.js";
 import { type BlockDesc, type LeafDesc, PAGE_BREAK_ATTR } from "./render.js";
-
-import { EMU_PER_PX, imageSource, PICTURE_ATTR, WORD_COLUMN_BREAK_ATTR } from "./word/blocks.js";
+import {
+  EMU_PER_PX,
+  imageSource,
+  NOTE_NUMBER_ATTR,
+  NOTE_REF_ATTR,
+  PICTURE_ATTR,
+  WORD_COLUMN_BREAK_ATTR,
+} from "./word/blocks.js";
 import {
   BAND_CLASS,
   bandElement,
@@ -86,12 +117,20 @@ import {
   columnsPx,
 } from "./word/columns.js";
 import {
+  type Box,
+  boxOf,
+  CONTROL_STYLES,
+  CONTROL_UI_ATTR,
+  ControlChrome,
+} from "./word/controls.js";
+import {
   FLOAT_ANCHORS,
   spacing,
   type WordBlockDesc,
   type WordInfo,
   WordRenderer,
 } from "./word/edit.js";
+import { NOTE_ATTR, type NoteGroup, PageNotes } from "./word/notes.js";
 import { measureLineRatio } from "./word/pages.js";
 import { PageRegions, REGION_CONTENT_CLASS } from "./word/regions.js";
 import {
@@ -181,16 +220,20 @@ export interface EditorViewOptions {
    * on its page, ADR-0007). Set when the view is made. Default true.
    */
   paged?: boolean;
+  /** What a note's own mark shows, for the view of a note being edited. */
+  noteMark?: () => string;
 }
 
 const PLACEHOLDER_ATTR = "data-foli-placeholder";
 /** On the span of a selected picture (it holds the resize handle). */
 const PICTURE_SELECTED_ATTR = "data-foli-picture-selected";
+/** On what shows a field the selection is in: Word shades it. */
+const FIELD_SELECTED_ATTR = "data-foli-field-selected";
 /** The smallest a picture gets by dragging its handle, in px. */
 const MIN_PICTURE = 8;
 // Generated content is not document text: no caret stops inside it, a zero-height float keeps
 // the caret at the line start, and the empty alt text keeps screen readers on aria-placeholder.
-const STYLES = `.foli-in-story>.foli-page>:not(.foli-region){opacity:.45}.foli-story-mount{pointer-events:auto;outline:1px dashed GrayText;outline-offset:2px}.foli-story-mount>[contenteditable=true]:focus{outline:none}@media print{.foli-in-story>.foli-page>:not(.foli-region){opacity:1}.foli-story-mount{outline:none}}.${CELL_CLASS}{box-shadow:inset 0 0 0 9999px rgba(0,120,215,.22)}[${CELLS_ATTR}] ::selection{background:transparent}[data-foli-no-alt]{outline:2px dashed #b45309;outline-offset:-2px}@media print{[data-foli-no-alt]{outline:none}}[${PICTURE_SELECTED_ATTR}]{position:relative;outline:2px solid Highlight}[${PICTURE_SELECTED_ATTR}] [data-foli-resize]{position:absolute;right:-5px;bottom:-5px;width:10px;height:10px;box-sizing:border-box;border:1px solid Canvas;background:Highlight;cursor:nwse-resize;forced-color-adjust:none}@media print{[${PICTURE_SELECTED_ATTR}]{outline:none}[${PICTURE_SELECTED_ATTR}] [data-foli-resize]{display:none}}[${PLACEHOLDER_ATTR}]::before{content:attr(${PLACEHOLDER_ATTR});content:attr(${PLACEHOLDER_ATTR}) / "";float:inline-start;height:0;pointer-events:none;color:GrayText}`;
+const STYLES = `[${FIELD_SELECTED_ATTR}]{background-color:rgba(0,0,0,.14)}@media print{[${FIELD_SELECTED_ATTR}]{background-color:transparent}}.foli-in-story>.foli-page>:not(.foli-region){opacity:.45}.foli-story-mount{pointer-events:auto;outline:1px dashed GrayText;outline-offset:2px}.foli-story-mount>[contenteditable=true]:focus{outline:none}@media print{.foli-in-story>.foli-page>:not(.foli-region){opacity:1}.foli-story-mount{outline:none}}.${CELL_CLASS}{box-shadow:inset 0 0 0 9999px rgba(0,120,215,.22)}[${CELLS_ATTR}] ::selection{background:transparent}[data-foli-no-alt]{outline:2px dashed #b45309;outline-offset:-2px}@media print{[data-foli-no-alt]{outline:none}}[${PICTURE_SELECTED_ATTR}]{position:relative;outline:2px solid Highlight}[${PICTURE_SELECTED_ATTR}] [data-foli-resize]{position:absolute;right:-5px;bottom:-5px;width:10px;height:10px;box-sizing:border-box;border:1px solid Canvas;background:Highlight;cursor:nwse-resize;forced-color-adjust:none}@media print{[${PICTURE_SELECTED_ATTR}]{outline:none}[${PICTURE_SELECTED_ATTR}] [data-foli-resize]{display:none}}[${PLACEHOLDER_ATTR}]::before{content:attr(${PLACEHOLDER_ATTR});content:attr(${PLACEHOLDER_ATTR}) / "";float:inline-start;height:0;pointer-events:none;color:GrayText}${CONTROL_STYLES}`;
 
 /**
  * Adds the view's stylesheet once per document or shadow root, when a placeholder is first shown
@@ -253,6 +296,9 @@ function hiddenIn(node: Node, stop: Node): boolean {
   return false;
 }
 
+/** The fields whose results depend on where things fall on the pages. */
+const PAGE_DEPENDENT = new Set(["PAGE", "NUMPAGES", "SECTIONPAGES", "PAGEREF"]);
+
 /** The attribute naming a page's page setup (its index among the document's) for print. */
 const SHEET_ATTR = "data-foli-sheet";
 
@@ -279,7 +325,7 @@ const pageSheets = new WeakMap<HTMLElement, string>();
 /** The margins a header or footer gave each page element, as last written. */
 const pagePads = new WeakMap<HTMLElement, string>();
 /** What a view without pages gives its one flow of content. */
-const UNPAGED_CSS = "display: flow-root;";
+const UNPAGED_CSS = "display: flow-root; position: relative;";
 
 /** A section as laid out: its page setup, its columns, what the flow needs of it. */
 interface SectionLayout {
@@ -309,6 +355,12 @@ interface RegionElement {
   id: string;
 }
 
+/** What a page shows of notes: at its feet, and after the text of each column. */
+interface PageNoteElements {
+  foot: HTMLElement[];
+  flow: Map<string, HTMLElement[]>;
+}
+
 /** A story being edited on its page. */
 interface StoryMount extends OpenStory {
   /** The page and the region it is open in. */
@@ -319,6 +371,9 @@ interface StoryMount extends OpenStory {
   /** Moved to another page by a new layout: the focus went with the DOM. */
   moved: boolean;
 }
+
+/** A header or footer being edited. */
+type HeaderMount = StoryMount & { side: StorySide };
 
 /** A fragment's place on its page. */
 interface Slot {
@@ -559,6 +614,8 @@ export class EditorView {
   composing = false;
   /** Set by Ctrl/Cmd+Shift+V for the paste event it triggers. */
   private plainPaste = false;
+  /** How deep `renumberNotes` has rendered again. */
+  private renumbering = 0;
   /** Blocks whose DOM the browser changed: the next render rebuilds them. */
   private readonly dirty = new Set<BlockDesc>();
   /** DOM mutations not yet read back (kept while a composition is running). */
@@ -598,6 +655,10 @@ export class EditorView {
   private resource: EditorViewOptions["resource"];
   /** How tracked changes show. */
   private review: ReviewView = "markup";
+  /** Whether fields show their codes (`toggleFieldCodes`). */
+  private fieldCodes = false;
+  /** The elements shaded for the fields the selection is in. */
+  private shadedFields: Element[] = [];
   /** Fonts' normal line height ratios, measured once per family (Word's single spacing). */
   private readonly ratios = new Map<string, number>();
   /** Web fonts loaded since the v3 blocks were drawn: the next render draws them again. */
@@ -617,6 +678,21 @@ export class EditorView {
   /** What `regionsKey` was computed from. */
   private regionsFor: { stories: unknown; settings: unknown; sections: SectionJSON[] } | null =
     null;
+  /** Footnotes and endnotes on the pages; none without pages. */
+  private readonly notes: PageNotes | null;
+  /** What each page shows of them. */
+  private pageNotes: PageNoteElements[] = [];
+  /** Their elements by what they show. */
+  private noteElements = new Map<string, HTMLElement>();
+  /** The page each note starts on, as last flowed: numbers can restart on each. */
+  private notePages = new Map<string, number>();
+  /** What the note references showed when last drawn. */
+  private shownNotes = "";
+  /** The layout and boxes of the last flow, to draw notes again from. */
+  private flowLayout: readonly BlockLayout[] = [];
+  private flowBoxes: readonly BlockBox[] = [];
+  /** What this view's note mark shows (`EditorViewOptions.noteMark`). */
+  private readonly noteMark: (() => string) | undefined;
   /** Puts everything on its page again, as the last render left it. */
   private placeAgain: (() => void) | null = null;
   /** The story being edited on its page, if any (ADR-0007). */
@@ -625,6 +701,8 @@ export class EditorView {
   private pressSelection: Selection | null = null;
   /** The listeners on the host, to remove them. */
   private readonly listeners: [string, EventListener][] = [];
+  /** The frames, titles and pop-ups of content controls. */
+  private readonly controlChrome: ControlChrome;
 
   constructor(
     readonly host: HTMLElement,
@@ -633,22 +711,36 @@ export class EditorView {
   ) {
     this.state = editor.state;
     this.paged = options.paged !== false;
+    this.noteMark = options.noteMark;
     const view = this;
+    this.controlChrome = new ControlChrome({
+      host,
+      editor,
+      state: () => view.state,
+      editable: () => view.editable && !view.mount,
+      pages: () => view.pages,
+      scale: () => view.scale(),
+      rects: (range) => view.controlRects(range),
+      posFromDOM: (node, offset) => view.posFromDOM(node, offset),
+      focus: () => view.focus(),
+      injectStyles: () => injectStyles(host),
+    });
+    const storyOptions = {
+      get review() {
+        return view.review;
+      },
+      get fieldCodes() {
+        return view.fieldCodes;
+      },
+      lineRatio: (family: string) => this.lineRatio(family),
+      resource: (key: string, resource: ResourceJSON) => this.resource?.(key, resource),
+      measureIn: () => this.pages[0] ?? host,
+      scale: () => this.scale(),
+    };
     this.regions = this.paged
-      ? new PageRegions(
-          host.ownerDocument,
-          {
-            get review() {
-              return view.review;
-            },
-            lineRatio: (family) => this.lineRatio(family),
-            resource: (key, resource) => this.resource?.(key, resource),
-            measureIn: () => this.pages[0] ?? host,
-            scale: () => this.scale(),
-          },
-          new WeakMap(),
-        )
+      ? new PageRegions(host.ownerDocument, storyOptions, new WeakMap())
       : null;
+    this.notes = this.paged ? new PageNotes(host.ownerDocument, storyOptions, new WeakMap()) : null;
     host.setAttribute("role", "textbox");
     host.setAttribute("aria-multiline", "true");
     host.setAttribute(VIEW_ATTR, this.id);
@@ -659,6 +751,7 @@ export class EditorView {
     host.style.overflowWrap = "break-word";
     host.replaceChildren();
     this.review = trackState(this.state)?.view ?? "markup";
+    this.fieldCodes = fieldCodesShown(this.state);
     this.resizeObserver =
       typeof ResizeObserver === "undefined" ? null : new ResizeObserver(this.onResize);
     this.observer = new MutationObserver(this.onMutations);
@@ -677,6 +770,7 @@ export class EditorView {
     this.listen("blur", this.onBlur);
     this.listen("mousedown", this.onPress);
     this.listen("mousemove", this.onMouseMove);
+    this.listen("mouseleave", () => this.controlChrome.hover(null));
     this.listen("copy", this.onCopy);
     this.listen("cut", this.onCut);
     this.listen("paste", this.onPaste);
@@ -701,6 +795,7 @@ export class EditorView {
 
   destroy(): void {
     this.closeStory(false);
+    this.controlChrome.destroy();
     if (this.editor.storyView === this.stories) this.editor.storyView = null;
     this.destroyed = true;
     this.unsubscribe();
@@ -813,6 +908,13 @@ export class EditorView {
       this.review = review;
       this.word = null;
     }
+    // Codes shown or hidden: every block and story drawn again.
+    const codes = fieldCodesShown(state);
+    const codesChanged = codes !== this.fieldCodes;
+    if (codesChanged) {
+      this.fieldCodes = codes;
+      this.word = null;
+    }
     const before = wordContext(this.state)?.envelope;
     const envelope = wordContext(state)?.envelope;
     // The last section's setup and the settings live in the envelope: changing them leaves the
@@ -820,6 +922,7 @@ export class EditorView {
     const docChanged =
       state.doc !== this.state.doc ||
       reviewChanged ||
+      codesChanged ||
       envelope?.section !== before?.section ||
       envelope?.settings !== before?.settings;
     const storiesChanged = envelope?.stories !== before?.stories;
@@ -829,6 +932,8 @@ export class EditorView {
     this.state = state;
     if (docChanged || (storiesChanged && !this.redrawRegions())) this.render();
     if (lost) this.closeStory(true);
+    // The open story has its own editor, which hears nothing of this.
+    if (codesChanged) this.mount?.view.update(this.mount.view.editor.state);
     this.showSelectedNode();
     this.writeSelection(docChanged);
     // shortcut: scrolls for every change while focused; once remote or plugin changes exist, scroll only for local input (a transaction flag).
@@ -910,9 +1015,12 @@ export class EditorView {
         false,
         this.review,
         imageSource(context.envelope.resources, this.resource ?? undefined),
+        this.fieldCodes,
       );
       this.invalidateLayout();
     }
+    const references = this.noteReferences();
+    word.setNotes(noteTexts(references), this.noteMark?.());
     // The blocks the view renders (paragraphs in table cells among them) and the page flow's
     // items (top-level paragraphs and opaque blocks, and tables).
     const { units, items } = collect(doc, context.resolver);
@@ -934,6 +1042,13 @@ export class EditorView {
       context.envelope,
       spans.map((span) => span.setup),
       context.resolver,
+    );
+    const { notes } = this;
+    notes?.setDocument(
+      context.envelope,
+      spans.map((span) => span.setup),
+      context.resolver,
+      references,
     );
     const layout = sectionLayouts(
       spans,
@@ -1161,36 +1276,50 @@ export class EditorView {
       const words = items.map((item) =>
         item.frame ? TABLE_WORD : (blocks[item.unit] as WordBlockDesc).word,
       );
+      const endnotes = notes?.endnotes();
       const boxes = items.map((item, i) => {
         const own = layout[i] as BlockLayout;
         const pageHeight = contentHeight(own.sheet.settings);
+        const index = own.section.flow.index ?? 0;
+        const noteOf = (story: string) => notes?.footnote(story, index) ?? null;
+        // Endnotes follow the last block of their section, or of the document.
+        const after =
+          (layout[i + 1] as BlockLayout | undefined)?.section !== own.section
+            ? { endnotes: endnotes?.get(index) }
+            : {};
         if (item.frame) {
           const frame = item.frame;
           const measure = tableOf(frame, i);
+          const breaks = () => breaksOf(frame, measure, blocks, pageHeight, lines);
           // A page break before the next paragraph ends its page.
           return {
-            ...tableBox(frame, measure, pageHeight, !!words[i + 1]?.pageBreakBefore, () =>
-              breaksOf(frame, measure, blocks, pageHeight, lines),
-            ),
+            ...tableBox(frame, measure, pageHeight, !!words[i + 1]?.pageBreakBefore, breaks),
             section: own.section.flow,
+            notes: tableNotes(frame, measure, blocks, lines, breaks, noteOf),
+            ...after,
           };
         }
         const desc = blocks[item.unit] as WordBlockDesc;
-        return wordBox(
-          words,
-          i,
-          desc,
-          measureOf(desc),
-          () => lines(desc),
-          own,
-          atWidth,
-          context.resolver.addsParagraphSpacing,
-        );
+        return {
+          ...wordBox(
+            words,
+            i,
+            desc,
+            measureOf(desc),
+            () => lines(desc),
+            own,
+            atWidth,
+            context.resolver.addsParagraphSpacing,
+            noteOf,
+          ),
+          ...after,
+        };
       });
       const rules = {
         ...WORD_RULES,
         addSpacing: context.resolver.addsParagraphSpacing,
         evenAndOddHeaders: context.envelope.settings?.evenAndOddHeaders === true,
+        notes: notes?.flowRules(),
       };
       const flowHeight = contentHeight(this.editor.settings);
       let result = flowFrom(boxes, flowHeight, rules, reuse);
@@ -1202,6 +1331,8 @@ export class EditorView {
       }
       this.facts = facts;
       this.flowed = { nodes, result };
+      this.flowLayout = layout;
+      this.flowBoxes = boxes;
       this.stale.clear();
       const flowed = result.fragments;
       slots = flowed.map((fragments) => fragments.map(slotOf));
@@ -1280,6 +1411,7 @@ export class EditorView {
       );
       applyGaps(firsts, result.gaps);
       this.drawRegions();
+      this.drawNotes();
       this.place(
         items.map((item, i) => elementsOf(item, i)),
         pages,
@@ -1320,6 +1452,122 @@ export class EditorView {
     // changed before this render: the touched blocks are read back at compositionend.
     const records = this.observer.takeRecords();
     if (this.composing) this.pending.push(...records);
+    this.renumberNotes();
+  }
+
+  /** The note references shown, with their numbers as the last flow's pages make them. */
+  private noteReferences(): NoteNumber[] {
+    if (!this.paged) return [];
+    const { doc } = this.state;
+    const { envelope } = wordContext(this.state) as WordContext;
+    const hideDeleted = this.review !== "markup";
+    const all = noteNumbers(doc, envelope, {
+      hideDeleted,
+      pageOf: (_pos, story) => this.notePages.get(story),
+    });
+    this.shownNotes = JSON.stringify(all.map((n) => n.text));
+    return hideDeleted ? all.filter((n) => !n.deleted) : all;
+  }
+
+  /**
+   * Numbers that restart on each page depend on the flow just made: when they came out otherwise,
+   * once more with them (their width can move a line), at most twice.
+   */
+  private renumberNotes(): void {
+    if (!this.notes || this.composing || this.renumbering > 1) return;
+    const { envelope } = wordContext(this.state) as WordContext;
+    const each = this.sections().some(
+      (section) => noteProperties(envelope, "footnote", section).restart === "eachPage",
+    );
+    if (!each) return;
+    const shown = this.shownNotes;
+    this.noteReferences();
+    if (this.shownNotes === shown) return;
+    this.renumbering++;
+    try {
+      this.renderPages();
+    } finally {
+      this.renumbering = 0;
+    }
+  }
+
+  /** The section of each page's bands in the last flow, and each note's place on the pages. */
+  private drawNotes(): void {
+    const { notes, flowed, facts, mount } = this;
+    if (!notes) return;
+    const pieces = flowed ? notePieces(flowed.result) : [];
+    const notePages = new Map<string, number>();
+    for (const piece of pieces)
+      if (!piece.fromLine && !notePages.has(piece.id)) notePages.set(piece.id, piece.page);
+    this.notePages = notePages;
+    const bandSections = new Map<string, number>();
+    flowed?.result.fragments.forEach((fragments, i) => {
+      const index = (this.flowLayout[i] as BlockLayout | undefined)?.section.flow.index ?? 0;
+      for (const f of fragments) bandSections.set(`${f.page}|${f.band ?? 0}`, index);
+    });
+    const groups: NoteGroup[] = notes.groups(
+      pieces,
+      (page, band) =>
+        bandSections.get(`${page}|${band}`) ??
+        bandSections.get(`${page}|0`) ??
+        facts[page]?.section ??
+        0,
+    );
+    const foot = groups.filter((group) => !group.inFlow);
+    const known = this.noteElements;
+    const elements = new Map<string, HTMLElement>();
+    const shown: PageNoteElements[] = [];
+    const note = mount?.side === "note" ? mount : null;
+    for (const group of groups) {
+      const { settings } = this.sheetOfPage(group.page);
+      const fact = facts[group.page];
+      const bottom = fact?.sectionPages
+        ? (this.regions as PageRegions).margins(fact.section, fact).bottom
+        : settings.margins.bottom * PX_PER_MM;
+      const place = group.inFlow
+        ? null
+        : notes.footPlace(
+            { left: settings.margins.left * PX_PER_MM, bottom },
+            notes.stacked(group, foot),
+          );
+      // Footnotes beneath the text keep the space after the paragraph above them.
+      const lead =
+        group.inFlow && !group.pieces[0]?.end && flowed
+          ? spaceAfterText(this.flowBoxes, flowed.result, group.page, group.band, group.column)
+          : 0;
+      const key = `${group.page}|${group.band}|${group.column}|${group.inFlow}|${place?.left}|${place?.bottom}|${lead}|${notes.keyOf(group)}`;
+      let element = known.get(key);
+      if (!element) {
+        element = notes.groupElement(
+          group,
+          place,
+          (piece) =>
+            piece.id === note?.id && !piece.fromLine
+              ? note.region.element
+              : notes.pieceElement(piece, group),
+          lead,
+        );
+        if (note && element.contains(note.wrapper)) note.moved = true;
+      }
+      elements.set(key, element);
+      const page = shown[group.page] ?? { foot: [], flow: new Map<string, HTMLElement[]>() };
+      shown[group.page] = page;
+      if (!group.inFlow) page.foot.push(element);
+      else {
+        const slot = `${group.band}|${group.column}`;
+        page.flow.set(slot, [...(page.flow.get(slot) ?? []), element]);
+      }
+    }
+    this.noteElements = elements;
+    this.pageNotes = Array.from(
+      { length: shown.length },
+      (_, p) => shown[p] ?? { foot: [], flow: new Map() },
+    );
+    if (!note) return;
+    // Its reference went (undone, or hidden with the changes): the note closes.
+    const page = notePages.get(note.id);
+    if (page === undefined) queueMicrotask(() => this.closeStory(true));
+    else note.page = page;
   }
 
   /** Layout px per px on screen: what a scaled ancestor (`transform`, `zoom`) multiplies by. */
@@ -1345,7 +1593,7 @@ export class EditorView {
     )
       return false;
     this.regionsFor = { stories, settings, sections };
-    const key = regions.key();
+    const key = `${regions.key()}|${this.notes?.key() ?? ""}`;
     // Even and odd headers also decide the blank pages: the flow depends on them.
     const changed =
       key !== this.regionsKey ||
@@ -1361,7 +1609,9 @@ export class EditorView {
    * one holding the story being edited stays; it follows the story if its page no longer shows it.
    */
   private drawRegions(): void {
-    const { regions, facts, mount } = this;
+    const { regions, facts } = this;
+    // A note open for editing is `drawNotes`' to look after.
+    const mount = this.mount?.side === "note" ? null : (this.mount as HeaderMount | null);
     if (!regions) return;
     const sides = ["header", "footer"] as const;
     const wanted = facts.map((page) =>
@@ -1451,11 +1701,18 @@ export class EditorView {
       spans.map((span) => span.setup),
       context.resolver,
     );
+    this.notes?.setDocument(
+      context.envelope,
+      spans.map((span) => span.setup),
+      context.resolver,
+      this.noteReferences(),
+    );
     if (this.regionsChanged(regions, spans)) {
       this.flowed = null;
       return false;
     }
     this.drawRegions();
+    this.drawNotes();
     this.placeAgain?.();
     this.afterPlace();
     this.observer.takeRecords();
@@ -1464,6 +1721,7 @@ export class EditorView {
 
   /** The story being edited, moved with its region: the focus goes back to it. */
   private afterPlace(): void {
+    this.drawControls();
     if (!this.mount?.moved) return;
     this.mount.moved = false;
     this.mount.view.focus();
@@ -1480,7 +1738,13 @@ export class EditorView {
         : null;
     },
     edit: (side, page) => view.openStory(side, page),
+    editNote: (id) => view.openNote(id),
+    toReference: () => view.toReference(),
     close: () => view.closeStory(),
+    get fieldLayout() {
+      return view.fieldLayout();
+    },
+    updateFields: (options, editor) => view.updateFields(options, editor),
   }))(this);
 
   /** Makes this view the one `Editor.storyView` speaks for, telling listeners if it was not. */
@@ -1489,6 +1753,213 @@ export class EditorView {
     const first = !this.editor.storyView;
     this.editor.storyView = this.stories;
     if (!first) this.editor.storyChanged();
+  }
+
+  // ---------- content controls ----------
+
+  /** The frames of content controls, drawn again (a render takes them off the pages). */
+  private drawControls(): void {
+    if (!this.composing) this.controlChrome.draw(!this.mount);
+  }
+
+  /** Where a control's content is on the screen: its lines, or its blocks by page. */
+  private controlRects(range: ControlRange): Box[] {
+    if (range.level !== "inline") {
+      const byPage = new Map<Element | null, Box>();
+      for (let i = this.blockFrom(range.from); i < this.blocks.length; i++) {
+        if ((this.starts[i] as number) >= range.to) break;
+        for (const fragment of (this.blocks[i] as WordBlockDesc).fragments) {
+          if (!this.host.contains(fragment)) continue;
+          const rect = fragment.getBoundingClientRect();
+          const page = fragment.closest(".foli-page,.foli-story-flow");
+          const known = byPage.get(page);
+          const left = Math.min(known?.left ?? rect.left, rect.left);
+          const top = Math.min(known?.top ?? rect.top, rect.top);
+          byPage.set(
+            page,
+            boxOf(
+              left,
+              top,
+              Math.max(known?.right ?? rect.right, rect.right) - left,
+              Math.max(known?.bottom ?? rect.bottom, rect.bottom) - top,
+            ),
+          );
+        }
+      }
+      return [...byPage.values()];
+    }
+    const dom = this.host.ownerDocument.createRange();
+    const start = this.domFromPos(range.contentFrom);
+    const end = this.domFromPos(range.contentTo);
+    dom.setStart(start.node, start.offset);
+    dom.setEnd(end.node, end.offset);
+    const rects = [...(dom.getClientRects?.() ?? [])].filter((rect) => rect.width > 0);
+    if (rects.length) return rects;
+    // Nothing in it: a thin box where it is.
+    const element =
+      start.node.nodeType === Node.ELEMENT_NODE
+        ? (start.node as Element)
+        : start.node.parentElement;
+    const rect = dom.getBoundingClientRect?.();
+    const box = rect?.height ? rect : element?.getBoundingClientRect();
+    return box ? [boxOf(box.left, box.top, 4, box.height)] : [];
+  }
+
+  /**
+   * The keys of content controls: Alt+Down opens a list or date picker, and Left and Right stop on
+   * each side of a control's edge, as Word's caret does (browsers cannot see the difference).
+   */
+  private controlKey(name: string): boolean {
+    if (name === "Alt-ArrowDown") return this.controlChrome.open();
+    if (name !== "ArrowLeft" && name !== "ArrowRight") return false;
+    const { selection, doc } = this.state;
+    if (!(selection instanceof TextSelection) || !wordContext(this.state)?.envelope.controls)
+      return false;
+    const forward = name === "ArrowRight";
+    const range = controlAt(doc, selection.from);
+    if (!selection.empty) {
+      // A placeholder is one thing: the arrows go past it.
+      if (
+        range?.level !== "inline" ||
+        !controlProperties(this.state, range.id)?.placeholder?.showing ||
+        selection.from !== range.contentFrom ||
+        selection.to !== range.contentTo
+      )
+        return false;
+      this.dispatch(
+        this.state.tr.setSelection(TextSelection.create(doc, forward ? range.to : range.from)),
+      );
+      return true;
+    }
+    const { $from } = selection;
+    const next = forward ? $from.nodeAfter : $from.nodeBefore;
+    if (next?.type.name !== "controlStart" && next?.type.name !== "controlEnd") return false;
+    this.dispatch(
+      this.state.tr.setSelection(TextSelection.create(doc, $from.pos + (forward ? 1 : -1))),
+    );
+    return true;
+  }
+
+  // ---------- fields ----------
+
+  /** The pages as last flowed, as fields need them; null without pages. */
+  private fieldLayout(): FieldLayout | null {
+    if (!this.regions || !this.facts.length) return null;
+    return {
+      pages: this.facts.length,
+      pageAt: (pos) => {
+        const { node } = this.domFromPos(Math.min(pos, this.state.doc.content.size));
+        const element =
+          node.nodeType === Node.ELEMENT_NODE ? (node as Element) : node.parentElement;
+        const page = this.facts[this.pages.indexOf(element?.closest(".foli-page") as HTMLElement)];
+        if (!page) return null;
+        const format = this.sections()[page.section]?.pageNumbers?.format;
+        return { number: page.number, sectionPages: page.sectionPages, format };
+      },
+    };
+  }
+
+  /**
+   * Updates fields from the pages shown: all of them, or those `options.only` says, of the body or
+   * of `editor` (a story's). What that does to the pages is taken in by a second pass over what
+   * depends on them, in the same undo step.
+   */
+  updateFields(options: UpdateFieldsOptions = {}, editor: Editor = this.editor): FieldsReport {
+    // A story's view has no pages: the view of the body has.
+    const main = this.regions ? null : this.editor.storyView;
+    if (main) return main.updateFields(options, editor);
+    if (this.composing) this.onCompositionEnd();
+    const report = updateFields(editor, { ...options, layout: this.fieldLayout() });
+    const { only } = options;
+    const range = !!only && typeof only !== "function";
+    if (!report.updated || (range && !report.rebuilt)) return report;
+    const follows = (field: Field) =>
+      range
+        ? field.parent?.name === "TOC"
+        : PAGE_DEPENDENT.has(field.name) && (typeof only !== "function" || only(field));
+    const again = updateFields(editor, {
+      ...options,
+      layout: this.fieldLayout(),
+      only: follows,
+      continues: true,
+    });
+    return { ...report, updated: report.updated + again.updated };
+  }
+
+  /**
+   * Prints what the document is now: fields updated (one undo step), then the browser's dialog.
+   */
+  print(): void {
+    this.updateFields();
+    this.host.ownerDocument.defaultView?.print();
+  }
+
+  /**
+   * Left and Right next to a field's markers: the browser's move starts where something can be
+   * seen, or the markers (empty elements) cost WebKit a key press each.
+   */
+  private skipFieldParts(event: KeyboardEvent): void {
+    const forward = event.key === "ArrowRight";
+    if ((!forward && event.key !== "ArrowLeft") || event.ctrlKey || event.altKey || event.metaKey)
+      return;
+    const { selection } = this.state;
+    // Shift extends by itself: an extended DOM selection would lose its anchor to the same spot.
+    if (!(selection instanceof TextSelection) || event.shiftKey || !selection.empty) return;
+    const stop = caretStop(this.state, selection.head, forward);
+    const sel = this.host.ownerDocument.getSelection();
+    if (stop === selection.head || !sel) return;
+    const { node, offset } = this.domFromPos(stop);
+    sel.collapse(node, offset);
+  }
+
+  /** F9 and Alt+F9, as in Word. */
+  private fieldKey(name: string): boolean {
+    if (name === "Alt-F9") {
+      this.run(toggleFieldCodes);
+      return true;
+    }
+    if (name !== "F9") return false;
+    if (!this.editable) return true;
+    const { selection } = this.state;
+    this.updateFields(
+      selection instanceof AllSelection ? {} : { only: { from: selection.from, to: selection.to } },
+    );
+    return true;
+  }
+
+  /** Shades what shows the fields the selection is in (not printed): the outermost of each. */
+  private showSelectedFields(): void {
+    const { selection, doc } = this.state;
+    const wanted = new Set<Element>();
+    const fields = selection instanceof TextSelection ? fieldsIn(doc) : [];
+    const touched = (field: Field) =>
+      selection.empty
+        ? field.from < selection.from && selection.from < field.to
+        : field.from < selection.to && field.to > selection.from;
+    for (const field of fields) {
+      if (!touched(field) || (field.parent && touched(field.parent))) continue;
+      const [from, to] = this.fieldCodes
+        ? [field.from, field.codeEnd + 1]
+        : [field.resultFrom, field.resultTo];
+      const first = Math.max(this.blockFrom(from) - 1, 0);
+      for (let i = first; i < this.blocks.length; i++) {
+        const start = (this.starts[i] as number) + 1;
+        if (start > to) break;
+        const desc = this.blocks[i] as WordBlockDesc;
+        for (const leaf of desc.leaves) {
+          const at = start + leaf.offset;
+          if (at + leaf.size <= from || at >= to || !leaf.size) continue;
+          if (hiddenIn(leaf.dom, desc.dom)) continue;
+          const element = leaf.dom.nodeType === Node.TEXT_NODE ? leaf.dom.parentElement : leaf.dom;
+          if (element instanceof Element && element.textContent) wanted.add(element);
+        }
+      }
+    }
+    for (const element of this.shadedFields)
+      if (!wanted.has(element)) element.removeAttribute(FIELD_SELECTED_ATTR);
+    if (wanted.size) injectStyles(this.host);
+    for (const element of wanted) element.setAttribute(FIELD_SELECTED_ATTR, "");
+    this.shadedFields = [...wanted];
   }
 
   /** The sections of the document, in order. */
@@ -1531,7 +2002,79 @@ export class EditorView {
     const editor = found && this.editor.story(found.id);
     const region = this.pageRegions[p]?.[side];
     if (!found || !editor || !region) return false;
+    this.mountStory(
+      editor,
+      { id: found.id, side, variant, section: page.section, page: p, region },
+      side === "header" ? "Header" : "Footer",
+    );
+    return true;
+  }
 
+  /**
+   * Opens note `id`, or the one whose reference is at the selection, in place: shown whole at its
+   * reference's page. Whether it is open now.
+   */
+  openNote(id?: string): boolean {
+    const { notes } = this;
+    if (!notes || !this.editable || this.composing) return false;
+    const story = id ?? noteAtSelection(this.state)?.story;
+    if (!story) return false;
+    if (this.mount?.id === story) {
+      this.mount.view.focus();
+      return true;
+    }
+    this.closeStory(false);
+    const editor = this.editor.story(story);
+    if (!editor) return false;
+    notes.open = story;
+    this.flowed = null;
+    this.render();
+    const element = this.host.querySelector<HTMLElement>(`[${NOTE_ATTR}="${CSS.escape(story)}"]`);
+    const page = this.notePages.get(story);
+    if (!element || page === undefined) {
+      notes.open = null;
+      this.flowed = null;
+      this.render();
+      return false;
+    }
+    const region = { element, drawing: {}, section: 0, id: story };
+    const texts = () =>
+      noteTexts(noteNumbers(this.state.doc, (wordContext(this.state) as WordContext).envelope));
+    this.mountStory(
+      editor,
+      { id: story, side: "note", variant: "default", section: 0, page, region },
+      "Note",
+      () => texts().get(story) ?? "",
+    );
+    editor.select(Selection.atEnd(editor.state.doc).from);
+    return true;
+  }
+
+  /** From the note being edited back to its reference, the caret after it. */
+  private toReference(): boolean {
+    const { mount } = this;
+    if (mount?.side !== "note") return false;
+    const reference = noteNumbers(
+      this.state.doc,
+      (wordContext(this.state) as WordContext).envelope,
+    ).find((n) => n.story === mount.id);
+    this.closeStory(false);
+    if (reference)
+      this.dispatch(
+        this.state.tr.setSelection(TextSelection.create(this.state.doc, reference.pos + 1)),
+      );
+    this.focus();
+    return true;
+  }
+
+  /** Puts `editor`'s story on its page, in `place`, the body read-only and dimmed around it. */
+  private mountStory(
+    editor: Editor,
+    place: Omit<StoryMount, "wrapper" | "view" | "moved">,
+    label: string,
+    noteMark?: () => string,
+  ): void {
+    const { region } = place;
     injectStyles(this.host);
     this.observer.disconnect();
     this.host.setAttribute("contenteditable", "false");
@@ -1544,7 +2087,7 @@ export class EditorView {
     wrapper.style.userSelect = "text";
     wrapper.style.setProperty("-webkit-user-select", "text");
     const inner = doc.createElement("div");
-    inner.setAttribute("aria-label", side === "header" ? "Header" : "Footer");
+    inner.setAttribute("aria-label", label);
     wrapper.append(inner);
     const shown = region.element.querySelector<HTMLElement>(`:scope > .${REGION_CONTENT_CLASS}`);
     if (shown) {
@@ -1556,29 +2099,26 @@ export class EditorView {
       paged: false,
       upload: this.upload ?? null,
       resource: this.resource ?? null,
+      ...(noteMark ? { noteMark } : {}),
     });
     wrapper.addEventListener("keydown", (event) => {
-      if (event.key !== "Escape" || event.isComposing || view.composing) return;
+      if (event.isComposing || view.composing) return;
+      if (isNoteKey(event) && this.toReference()) {
+        // Not on to the body, which would open the note again.
+        event.preventDefault();
+        event.stopPropagation();
+        return;
+      }
+      if (event.key !== "Escape") return;
       event.preventDefault();
       this.closeStory(true);
     });
-    this.mount = {
-      id: found.id,
-      side,
-      variant,
-      section: page.section,
-      page: p,
-      region,
-      wrapper,
-      view,
-      moved: false,
-    };
+    this.mount = { ...place, wrapper, view, moved: false };
     // With several views of the editor, the one in use answers for its story.
     wrapper.addEventListener("focusin", () => this.claimStories());
     this.claimStories();
     view.focus();
     this.editor.storyChanged();
-    return true;
   }
 
   /** Finishes a running composition, its text going into the model. */
@@ -1598,6 +2138,11 @@ export class EditorView {
       `:scope > .${REGION_CONTENT_CLASS}`,
     );
     if (shown) shown.style.display = "";
+    if (mount.side === "note" && this.notes) {
+      this.notes.open = null;
+      this.flowed = null;
+      if (!this.destroyed) this.render();
+    }
     this.host.classList.remove("foli-in-story");
     this.host.setAttribute("contenteditable", String(this.editable));
     if (this.editable) this.host.removeAttribute("aria-readonly");
@@ -1610,7 +2155,7 @@ export class EditorView {
   /** The page's own story, after what was open is shown nowhere any more. */
   private reopenStory = (): void => {
     const { mount } = this;
-    if (!mount || this.facts.length === 0) return;
+    if (!mount || mount.side === "note" || this.facts.length === 0) return;
     const { side, page, id } = mount;
     // A story that went (undone) is not made again.
     const create = !!wordContext(this.state)?.stories.has(id);
@@ -1640,6 +2185,21 @@ export class EditorView {
    */
   private onPress = (event: MouseEvent): void => {
     this.closeStory(false);
+    // A note on the page, or the number of its reference: the second press opens the note.
+    const target = event.target instanceof Element ? event.target : null;
+    const onNote = target?.closest(`[${NOTE_ATTR}]`);
+    const number = target?.closest(`[${NOTE_REF_ATTR}]`);
+    const story = onNote?.getAttribute(NOTE_ATTR) ?? number?.getAttribute(NOTE_REF_ATTR);
+    if (story && event.button === 0 && !event.shiftKey) {
+      const opens = event.detail === 2 && this.editable && isNoteStory(this.state, story);
+      if (onNote || opens) event.preventDefault();
+      if (opens) {
+        if (this.openNote(story) && onNote)
+          this.mount?.view.placeCaret(event.clientX, event.clientY);
+        return;
+      }
+      if (onNote) return;
+    }
     const margin = event.button === 0 && !event.shiftKey ? this.marginAt(event) : null;
     if (margin && event.detail > 1) {
       event.preventDefault();
@@ -1763,7 +2323,8 @@ export class EditorView {
         section: (layout[i] as BlockLayout).section,
       })),
     );
-    const count = (items[items.length - 1]?.page ?? 0) + 1;
+    // A note can reach pages no text is on.
+    const count = Math.max((items[items.length - 1]?.page ?? 0) + 1, this.pageNotes.length);
     const sheets: Sheet[] = [];
     pages.forEach((list, i) => {
       for (const p of list) sheets[p] ??= (layout[i] as BlockLayout).sheet;
@@ -1806,10 +2367,14 @@ export class EditorView {
       while (i < items.length && items[i]?.page === p) i++;
       const onPage = items.slice(first, i);
       const { header, footer } = this.pageRegions[p] ?? {};
-      /** A page's children: its header, what it holds, its footer. */
+      const notes = this.pageNotes[p];
+      /** What follows the text of a column: its endnotes. */
+      const after = (band: number, column: number) => notes?.flow.get(`${band}|${column}`) ?? [];
+      /** A page's children: its header, what it holds, its notes, its footer. */
       const framed = (list: readonly HTMLElement[]) => [
         ...(header ? [header.element] : []),
         ...list,
+        ...(notes?.foot ?? []),
         ...(footer ? [footer.element] : []),
       ];
       for (const { dom, slot } of onPage) {
@@ -1819,7 +2384,11 @@ export class EditorView {
       // One section in one column: the blocks are the page's children.
       const last = onPage[onPage.length - 1];
       if (!last || (!last.slot.band && last.section.columns.widths.length === 1)) {
-        fillElement(page, framed(onPage.map((item) => item.dom)), this.viewRemoved);
+        fillElement(
+          page,
+          framed([...onPage.map((item) => item.dom), ...after(0, 0)]),
+          this.viewRemoved,
+        );
         this.bands.delete(page);
         continue;
       }
@@ -1844,7 +2413,10 @@ export class EditorView {
         band.columns.forEach((column, c) => {
           fillElement(
             column,
-            inBand.filter((item) => item.slot.column === c).map((item) => item.dom),
+            [
+              ...inBand.filter((item) => item.slot.column === c).map((item) => item.dom),
+              ...after(b, c),
+            ],
             this.viewRemoved,
           );
         });
@@ -1933,6 +2505,7 @@ export class EditorView {
     this.flowed = null;
     this.regionsFor = null;
     if (this.regions) this.regions.cache = new WeakMap();
+    if (this.notes) this.notes.cache = new WeakMap();
   }
 
   /** Re-flows the pages once web fonts have loaded: line heights and wrapping change. */
@@ -2278,6 +2851,8 @@ export class EditorView {
   private showSelectedNode(): void {
     this.showSelectedCells();
     this.showSelectedPicture();
+    this.showSelectedFields();
+    this.drawControls();
     const dom = this.selectedBlock()?.dom ?? this.selectedTable();
     if (dom === this.selectedDom) return;
     this.selectedDom?.classList.remove(SELECTED_CLASS);
@@ -2306,7 +2881,9 @@ export class EditorView {
       selection instanceof AllSelection
         ? TextSelection.between(selection.$anchor, selection.$head)
         : selection;
-    return dom.anchor === shown.anchor && dom.head === shown.head;
+    // The two sides of a control's edge are one place to the browser.
+    const { doc } = this.state;
+    return controlSpot(doc, dom.anchor, shown.anchor) && controlSpot(doc, dom.head, shown.head);
   }
 
   private hasFocus(): boolean {
@@ -2514,6 +3091,7 @@ export class EditorView {
   /** The pointer over a column border shows that it can be dragged. */
   private onMouseMove = (event: MouseEvent): void => {
     if (this.drag) return;
+    if (event.buttons === 0) this.controlChrome.hover(event.target);
     const near = event.buttons === 0 && this.columnBorder(event) !== null;
     if (near === this.resizeCursor) return;
     this.resizeCursor = near;
@@ -2900,6 +3478,7 @@ export class EditorView {
    */
   private onClick = (event: MouseEvent): void => {
     const target = event.target;
+    if (event.type === "click" && !event.shiftKey && this.controlChrome.click(target)) return;
     const element = target instanceof Element ? target.closest("a") : null;
     if (!element || !this.host.contains(element)) return;
     event.preventDefault();
@@ -2935,8 +3514,14 @@ export class EditorView {
       event.preventDefault();
       return;
     }
+    this.skipFieldParts(event);
     const name = keyName(event);
-    if (this.documentEdgeKey(name)) {
+    if (
+      this.documentEdgeKey(name) ||
+      this.fieldKey(name) ||
+      this.controlKey(name) ||
+      this.noteKey(event, name)
+    ) {
       event.preventDefault();
       return;
     }
@@ -2991,6 +3576,14 @@ export class EditorView {
       event.preventDefault();
     }
   };
+
+  /** Word's keys for notes, and Shift+Alt+N from a reference to its note. */
+  private noteKey(event: KeyboardEvent, name: string): boolean {
+    if (isNoteKey(event)) return this.openNote();
+    const kind = name === "Mod-Alt-f" ? "footnote" : name === "Mod-Alt-d" ? "endnote" : null;
+    if (!kind || !this.editable || !this.notes) return false;
+    return this.run(insertNote(kind)) && this.openNote();
+  }
 
   /**
    * Ctrl+Home and Ctrl+End (with Shift, extending) on pages with headers and footers: the browser
@@ -3278,7 +3871,7 @@ export class EditorView {
       end--;
       domEnd--;
     }
-    // A pure insertion or deletion inside repeated text ("aa" → "aaa") could sit at several
+    // A pure insertion or deletion inside repeated text ("aa" â†’ "aaa") could sit at several
     // offsets; slide it back to where the DOM caret says it happened.
     const insertion = end === start;
     if (caret >= 0 && insertion !== (domEnd === start)) {
@@ -3386,6 +3979,9 @@ export class EditorView {
    */
   paste(data: Pick<DataTransfer, "getData">, autolink = true): boolean {
     const { state } = this;
+    // A text control takes the text alone.
+    const plainText = data.getData("text/plain");
+    if (plainText && this.run(insertControlText(plainText))) return true;
     const text = autolink && !data.getData(FOLI_MIME) ? data.getData("text/plain") : "";
     const href = text ? autolinkHref(text) : null;
     if (href) {
@@ -3414,7 +4010,7 @@ export class EditorView {
     // One empty paragraph: nothing to paste (a lone opaque block is something).
     const only = pasted?.doc.childCount === 1 ? pasted.doc.firstChild : null;
     if (!pasted || (only?.isTextblock && !only.content.size)) return false;
-    const { doc, open, envelope } = pasted;
+    const { doc, open, envelope, notes } = pasted;
     // As a slice (text joins the text around the caret); where that cannot be (an opaque block
     // at an end), as whole blocks at the caret.
     const asSlice = (tr: Transaction) => {
@@ -3455,6 +4051,7 @@ export class EditorView {
           withEnvelope(tr, envelope);
           setComments(tr, current.comments, envelope.comments);
         }
+        for (const { id, story } of notes ?? []) tr.step(new StoryStep(id, null, story));
       } catch (error) {
         if (error instanceof TransformError) continue;
         throw error;
@@ -3754,6 +4351,7 @@ function wordBox(
   layout: BlockLayout,
   atWidth: (desc: BlockDesc, width: number, kept: boolean) => WidthMeasure,
   adds: boolean,
+  noteOf: (story: string) => FlowNote | null,
 ): BlockBox {
   const pageHeight = contentHeight(layout.sheet.settings);
   const { section } = layout;
@@ -3784,7 +4382,23 @@ function wordBox(
       return line;
     });
   };
+  const references = referencesIn(desc.node);
+  const notes = references.flatMap((ref) => {
+    const note = noteOf(ref.story);
+    return note ? [{ note, offset: ref.offset - 1 }] : [];
+  });
   return {
+    notes: notes.length
+      ? (column) => {
+          if (kept) return notes.map(({ note }) => ({ line: 0, note }));
+          const { starts } = section.unequal ? inColumn(column).all() : lines();
+          return notes.map(({ note, offset }) => {
+            let line = starts.length - 1;
+            while (line > 0 && (starts[line] as number) > offset) line--;
+            return { line, note };
+          });
+        }
+      : undefined,
     height: measure.height,
     marginTop: before,
     marginBottom: after,
@@ -3802,6 +4416,36 @@ function wordBox(
         breaks.push((section.unequal ? inColumn(column).lines() : bottoms()).length - 1);
       return breaks;
     },
+  };
+}
+
+/** The footnotes a table refers to, each on the break at or after its reference's line. */
+function tableNotes(
+  frame: Frame,
+  measure: Measure,
+  blocks: readonly WordBlockDesc[],
+  lines: (desc: BlockDesc) => Lines,
+  breaks: () => number[],
+  noteOf: (story: string) => FlowNote | null,
+): BlockBox["notes"] {
+  const t = measure.table as TableMeasure;
+  const found: { note: FlowNote; unit: number; offset: number }[] = [];
+  for (let unit = frame.first; unit < frame.end; unit++)
+    for (const ref of referencesIn((blocks[unit] as WordBlockDesc).node)) {
+      const note = noteOf(ref.story);
+      if (note && t.tops.get(unit) != null) found.push({ note, unit, offset: ref.offset - 1 });
+    }
+  if (!found.length) return undefined;
+  return () => {
+    const list = breaks();
+    return found.map(({ note, unit, offset }) => {
+      const { starts, bottoms } = lines(blocks[unit] as WordBlockDesc);
+      let k = starts.length - 1;
+      while (k > 0 && (starts[k] as number) > offset) k--;
+      const y = (t.tops.get(unit) as number) + (bottoms[k] as number);
+      const line = list.findIndex((b) => b >= y - 0.5);
+      return { line: line < 0 ? list.length - 1 : line, note };
+    });
   };
 }
 
@@ -3889,6 +4533,8 @@ function measureLines(desc: BlockDesc, scale: number): Lines {
       if (!fragment.contains(leaf.dom)) continue;
       if (leaf.dom.nodeType !== Node.TEXT_NODE) {
         const br = leaf.dom as Element;
+        // A raised number says nothing about where its line is.
+        if (br.hasAttribute(NOTE_NUMBER_ATTR)) continue;
         items.push({ offset: leaf.offset, rect: () => br.getBoundingClientRect() });
         continue;
       }
@@ -4021,6 +4667,13 @@ function scrollRectIntoView(from: HTMLElement, rect: DOMRect): void {
   if (move) win.scrollBy(0, move);
 }
 
+/** Shift+Alt+N: from a note's reference to the note, and back. */
+const isNoteKey = (event: KeyboardEvent) =>
+  event.altKey && event.shiftKey && !event.ctrlKey && !event.metaKey && event.code === "KeyN";
+
+/** Whether story `id` of `state`'s document exists (a number can outlive its note on screen). */
+const isNoteStory = (state: EditorState, id: string) => !!wordContext(state)?.stories.has(id);
+
 function before(node: Node): DomPoint {
   const parent = node.parentNode as Node;
   return { node: parent, offset: Array.prototype.indexOf.call(parent.childNodes, node) };
@@ -4124,12 +4777,17 @@ function holdsFloat(node: ModelNode): boolean {
   return found;
 }
 
-/** A change that only adds or removes a picture's resize handle (the view's own, not input). */
+/** A change that only adds or removes the view's own marks (a resize handle, a control's frame). */
 function handleOnly(record: MutationRecord): boolean {
   const nodes = [...record.addedNodes, ...record.removedNodes];
   return (
     record.type === "childList" &&
     nodes.length > 0 &&
-    nodes.every((n) => n.nodeType === 1 && (n as Element).hasAttribute("data-foli-resize"))
+    nodes.every(
+      (n) =>
+        n.nodeType === 1 &&
+        ((n as Element).hasAttribute("data-foli-resize") ||
+          (n as Element).hasAttribute(CONTROL_UI_ATTR)),
+    )
   );
 }
