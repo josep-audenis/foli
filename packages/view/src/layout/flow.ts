@@ -41,7 +41,7 @@ export interface BlockBox {
   inColumn?: ((column: number) => Pick<BlockBox, "height" | "lines">) | undefined;
 }
 
-/** What a page's layout may depend on (11.7: first page, odd or even, by displayed number). */
+/** What a page's layout depends on: first page, odd or even, by displayed number. */
 export interface FlowPage {
   /** The page's place in the document, from 0. */
   index: number;
@@ -51,8 +51,18 @@ export interface FlowPage {
   first: boolean;
 }
 
+/** A page as flowed: what decides its header and footer (its first section's). */
+export interface PageFacts extends FlowPage {
+  /** The first section on it, by its `index` (a page nothing is on: the next page's). */
+  section: number;
+  /** How many pages that section has text on; 0 for a page nothing is on. */
+  sectionPages: number;
+}
+
 /** A section as the flow sees it. */
 export interface FlowSection {
+  /** Its place among the document's sections, from 0. */
+  index?: number;
   /** How it starts (Word's `w:type`). */
   start: "nextPage" | "continuous" | "evenPage" | "oddPage" | "nextColumn";
   columns: number;
@@ -60,7 +70,10 @@ export interface FlowSection {
   balanced?: boolean;
   /** The displayed number of its first page, when it restarts them. */
   pageStart?: number | undefined;
-  /** The content box of a page of this section. */
+  /**
+   * The content box of a page that starts with this section. A section continuing on another's
+   * page has that page's box, less what is above its band.
+   */
   box(page: FlowPage): { height: number };
   /** Whether a page of this section is a page of `other` (a continuous one can share it). */
   samePage(other: FlowSection): boolean;
@@ -135,6 +148,8 @@ export interface FlowState {
   columnPending: boolean;
   /** The column is the first or an explicit break started it (Word keeps its first space before). */
   forcedPage: boolean;
+  /** On a page shared by sections: the first of them, which gives the page its box. */
+  owner: { section: FlowSection; first: boolean } | null;
 }
 
 /**
@@ -239,6 +254,7 @@ export function flowFrom(
           breakPending: false,
           columnPending: false,
           forcedPage: true,
+          owner: null,
         }
   ) as FlowState;
   /** Blocks that start a column because the keep-with-next rule moved them. */
@@ -258,6 +274,7 @@ export function flowFrom(
     state.bandBottom = 0;
     state.onPage = 0;
     state.forcedPage = forced;
+    state.owner = null;
   };
   /** The next column of the band, or the next page after its last. */
   const nextColumn = (box: BlockBox, forced = false) => {
@@ -274,13 +291,13 @@ export function flowFrom(
   };
   /** The height a block may reach in the column, from the band's top. */
   const room = (box: BlockBox) => {
-    const { section } = box;
+    const section = state.owner?.section ?? box.section;
     const page =
       (section
         ? section.box({
             index: state.page,
             number: state.number,
-            first: state.page === state.sectionPage,
+            first: state.owner?.first ?? state.page === state.sectionPage,
           }).height
         : (box.pageHeight ?? flowHeight)) - state.bandTop;
     return balancing?.page === state.page ? Math.min(page, balancing.height) : page;
@@ -296,6 +313,10 @@ export function flowFrom(
     state.columnPending = false;
     const samePage = !previous || section.samePage(previous);
     if (!pageBroken && samePage && section.start === "continuous") {
+      state.owner ??= {
+        section: previous ?? section,
+        first: state.page === state.sectionPage,
+      };
       const lead = state.previousMargin;
       state.bandTop += Math.max(state.bandBottom, state.used) + lead;
       state.lead = lead;
@@ -603,6 +624,46 @@ export function flowFrom(
   };
 }
 
+/**
+ * Each page of a flow: its number, its first section and whether that section starts on it. A page
+ * nothing is on (the blank page before an even or odd page section) has the next page's section.
+ */
+export function pagesOf(boxes: readonly BlockBox[], result: FlowResult): PageFacts[] {
+  const pages: (PageFacts | undefined)[] = [];
+  const owners: FlowSection[] = [];
+  const seen = new Set<FlowSection>();
+  const onPages = new Map<FlowSection, Set<number>>();
+  result.fragments.forEach((fragments, i) => {
+    const section = boxes[i]?.section as FlowSection;
+    const after = result.states[i + 1] as FlowState;
+    const own = onPages.get(section) ?? new Set<number>();
+    onPages.set(section, own);
+    for (const { page } of fragments) {
+      own.add(page);
+      if (!pages[page]) {
+        owners[page] = section;
+        pages[page] = {
+          index: page,
+          // Pages count on from a block's first to its last: the number where it ended tells.
+          number: after.number - (after.page - page),
+          first: !seen.has(section),
+          section: section.index ?? 0,
+          sectionPages: 0,
+        };
+      }
+      seen.add(section);
+    }
+  });
+  pages.forEach((page, p) => {
+    if (page) page.sectionPages = onPages.get(owners[p] as FlowSection)?.size ?? 0;
+  });
+  for (let p = pages.length - 1; p >= 0; p--) {
+    const next = pages[p + 1] as PageFacts;
+    pages[p] ??= { ...next, index: p, number: next.number - 1, first: false, sectionPages: 0 };
+  }
+  return pages as PageFacts[];
+}
+
 function sameState(a: FlowState, b: FlowState): boolean {
   return (
     a.page === b.page &&
@@ -618,6 +679,7 @@ function sameState(a: FlowState, b: FlowState): boolean {
     a.onPage === b.onPage &&
     a.breakPending === b.breakPending &&
     a.columnPending === b.columnPending &&
-    a.forcedPage === b.forcedPage
+    a.forcedPage === b.forcedPage &&
+    a.owner === b.owner
   );
 }

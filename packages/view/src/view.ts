@@ -56,12 +56,15 @@ import {
   type BlockBox,
   contentHeight,
   DEFAULT_RULES,
+  type FlowPage,
   type FlowResult,
   type FlowRules,
   type FlowSection,
   type Fragment,
   flowFrom,
+  type PageFacts,
   PX_PER_MM,
+  pagesOf,
   type Reuse,
 } from "./layout/flow.js";
 import { type BlockDesc, type LeafDesc, PAGE_BREAK_ATTR } from "./render.js";
@@ -83,6 +86,7 @@ import {
   WordRenderer,
 } from "./word/edit.js";
 import { measureLineRatio } from "./word/pages.js";
+import { PageRegions } from "./word/regions.js";
 import {
   collect,
   type FlowItem,
@@ -165,6 +169,11 @@ export interface EditorViewOptions {
   upload?:
     | ((file: File) => Promise<string | { src: string; alt?: string; decorative?: boolean }>)
     | null;
+  /**
+   * `false`: the content in one flow, without pages, headers or print rules (a story being edited
+   * on its page, ADR-0007). Set when the view is made. Default true.
+   */
+  paged?: boolean;
 }
 
 const PLACEHOLDER_ATTR = "data-foli-placeholder";
@@ -260,6 +269,10 @@ function sheetOf(settings: DocumentSettings, index: number): Sheet {
 
 /** The style each page element was last given (its `cssText` reads back normalized). */
 const pageSheets = new WeakMap<HTMLElement, string>();
+/** The margins a header or footer gave each page element, as last written. */
+const pagePads = new WeakMap<HTMLElement, string>();
+/** What a view without pages gives its one flow of content. */
+const UNPAGED_CSS = "position: relative; display: flow-root;";
 
 /** A section as laid out: its page setup, its columns, what the flow needs of it. */
 interface SectionLayout {
@@ -279,6 +292,16 @@ interface BlockLayout {
   readonly first: boolean;
 }
 
+/** A page's header or footer as drawn. */
+interface RegionElement {
+  element: HTMLElement;
+  /** What it shows: the same object, the same drawing. */
+  drawing: object;
+  section: number;
+  /** Its story. */
+  id: string;
+}
+
 /** A fragment's place on its page. */
 interface Slot {
   band: number;
@@ -296,25 +319,8 @@ const slotOf = (fragment: Fragment): Slot => ({
   mark: !!fragment.mark,
 });
 
-/**
- * The section of each top-level block (the section a paragraph's `section` ends; the
- * envelope's for the blocks after the last such paragraph), as `renderDocument` lays sections
- * out. By position: two paragraphs may end sections with one object.
- */
-function sectionLayouts(doc: ModelNode, last: SectionJSON): BlockLayout[] {
-  const sheets = new Map<string, Sheet>();
-  const bySection = new Map<SectionJSON, Sheet>();
-  const sheet = (section: SectionJSON) => {
-    let found = bySection.get(section);
-    if (!found) {
-      const settings = sectionSettings(section);
-      const css = sheetOf(settings, 0).css;
-      found = sheets.get(css) ?? sheetOf(settings, sheets.size);
-      sheets.set(css, found);
-      bySection.set(section, found);
-    }
-    return found;
-  };
+/** The document's sections and the blocks of each. */
+function sectionSpans(doc: ModelNode, last: SectionJSON) {
   const spans: { setup: SectionJSON; from: number; to: number }[] = [];
   let from = 0;
   doc.forEach((node, _, i) => {
@@ -324,6 +330,32 @@ function sectionLayouts(doc: ModelNode, last: SectionJSON): BlockLayout[] {
     from = i + 1;
   });
   if (from < doc.childCount || !spans.length) spans.push({ setup: last, from, to: doc.childCount });
+  return spans;
+}
+
+/**
+ * The section of each top-level block (the section a paragraph's `section` ends; the
+ * envelope's for the blocks after the last such paragraph), as `renderDocument` lays sections
+ * out. By position: two paragraphs may end sections with one object. `box` gives a page's text
+ * height: null for a view without pages.
+ */
+function sectionLayouts(
+  spans: ReturnType<typeof sectionSpans>,
+  box: ((section: number, page: FlowPage) => number) | null,
+): BlockLayout[] {
+  const sheets = new Map<string, Sheet>();
+  const bySection = new Map<SectionJSON, Sheet>();
+  const sheet = (section: SectionJSON) => {
+    let found = bySection.get(section);
+    if (!found) {
+      const settings = sectionSettings(section);
+      const css = box ? sheetOf(settings, 0).css : UNPAGED_CSS;
+      found = sheets.get(css) ?? { ...sheetOf(settings, sheets.size), css };
+      sheets.set(css, found);
+      bySection.set(section, found);
+    }
+    return found;
+  };
   const sheetByFlow = new Map<FlowSection, Sheet>();
   const out: BlockLayout[] = [];
   spans.forEach(({ setup, from: start, to }, s) => {
@@ -334,13 +366,13 @@ function sectionLayouts(doc: ModelNode, last: SectionJSON): BlockLayout[] {
     const count = columns.widths.length;
     const balanced =
       !!next && count > 1 && next.type === "continuous" && sheet(next).css === own.css;
-    const height = contentHeight(own.settings);
     const flow: FlowSection = {
+      index: s,
       start: setup.type ?? "nextPage",
       columns: count,
       balanced,
       pageStart: setup.pageNumbers?.start,
-      box: () => ({ height }),
+      box: (page) => ({ height: box ? box(s, page) : Number.POSITIVE_INFINITY }),
       samePage: (other) => sheetByFlow.get(other)?.css === own.css,
     };
     sheetByFlow.set(flow, own);
@@ -551,6 +583,23 @@ export class EditorView {
   private readonly ratios = new Map<string, number>();
   /** Web fonts loaded since the v3 blocks were drawn: the next render draws them again. */
   private fontsChanged = false;
+  /** Whether content goes on pages (`EditorViewOptions.paged`). */
+  private readonly paged: boolean;
+  /** The headers and footers of the pages; none without pages. */
+  private readonly regions: PageRegions | null;
+  /** Each page as last flowed. */
+  private facts: PageFacts[] = [];
+  /** The header and footer element of each page, as last drawn. */
+  private pageRegions: { header?: RegionElement; footer?: RegionElement }[] = [];
+  /** Each page's margins, when a header or footer pushes them. */
+  private pageMargins: { top: string; bottom: string }[] = [];
+  /** What the header and footer heights were when last laid out (`PageRegions.key`). */
+  private regionsKey = "";
+  /** What `regionsKey` was computed from. */
+  private regionsFor: { stories: unknown; settings: unknown; sections: SectionJSON[] } | null =
+    null;
+  /** Puts everything on its page again, as the last render left it. */
+  private placeAgain: (() => void) | null = null;
 
   constructor(
     readonly host: HTMLElement,
@@ -558,6 +607,23 @@ export class EditorView {
     options: EditorViewOptions = {},
   ) {
     this.state = editor.state;
+    this.paged = options.paged !== false;
+    const view = this;
+    this.regions = this.paged
+      ? new PageRegions(
+          host.ownerDocument,
+          {
+            get review() {
+              return view.review;
+            },
+            lineRatio: (family) => this.lineRatio(family),
+            resource: (key, resource) => this.resource?.(key, resource),
+            measureIn: () => this.pages[0] ?? host,
+            scale: () => this.scale(),
+          },
+          new WeakMap(),
+        )
+      : null;
     host.setAttribute("role", "textbox");
     host.setAttribute("aria-multiline", "true");
     host.setAttribute(VIEW_ATTR, this.id);
@@ -716,14 +782,19 @@ export class EditorView {
       this.review = review;
       this.word = null;
     }
-    // The last section's setup lives in the envelope: changing it leaves the tree as it is.
+    const before = wordContext(this.state)?.envelope;
+    const envelope = wordContext(state)?.envelope;
+    // The last section's setup and the settings live in the envelope: changing them leaves the
+    // tree as it is. So does a story's change, which only its occurrences show.
     const docChanged =
       state.doc !== this.state.doc ||
       reviewChanged ||
-      wordContext(state)?.envelope.section !== wordContext(this.state)?.envelope.section;
+      envelope?.section !== before?.section ||
+      envelope?.settings !== before?.settings;
+    const storiesChanged = envelope?.stories !== before?.stories;
     const selectionChanged = !state.selection.eq(this.state.selection);
     this.state = state;
-    if (docChanged) this.render();
+    if (docChanged || (storiesChanged && !this.redrawRegions())) this.render();
     this.showSelectedNode();
     this.writeSelection(docChanged);
     // shortcut: scrolls for every change while focused; once remote or plugin changes exist, scroll only for local input (a transaction flag).
@@ -771,11 +842,19 @@ export class EditorView {
     // editor's state always has one (`createEditor`).
     const context = wordContext(this.state) as WordContext;
     // Fonts loaded: a new renderer (new line heights), but not while a composition runs in a
-    // block it would redraw.
+    // block it would redraw. What only stories or the settings changed leaves blocks as they are.
+    const drawn = this.word?.context;
     const renewed =
-      context !== (this.word?.context ?? null) || (this.fontsChanged && !this.composing);
+      !drawn ||
+      drawn.id !== context.id ||
+      drawn.resolver !== context.resolver ||
+      drawn.envelope.section !== context.envelope.section ||
+      drawn.envelope.resources !== context.envelope.resources ||
+      drawn.envelope.comments !== context.envelope.comments ||
+      (this.fontsChanged && !this.composing);
     if (renewed) this.fontsChanged = false;
     let word = this.word as WordRenderer;
+    if (!renewed) word.context = context;
     if (renewed) {
       // A document with pictures: the mark of one without alt text is the view's stylesheet's.
       if (context.envelope.resources) injectStyles(this.host);
@@ -793,7 +872,18 @@ export class EditorView {
     // items (top-level paragraphs and opaque blocks, and tables).
     const { units, items } = collect(doc, context.resolver);
     word.prepare(units.map((unit) => unit.node));
-    const layout = sectionLayouts(doc, context.envelope.section);
+    // A story's view has none of the body's sections: its one flow is not a page's.
+    const spans = sectionSpans(doc, this.paged ? context.envelope.section : {});
+    const { regions } = this;
+    regions?.setDocument(
+      context.envelope,
+      spans.map((span) => span.setup),
+      context.resolver,
+    );
+    const layout = sectionLayouts(
+      spans,
+      regions && ((section, page) => regions.boxHeight(section, page)),
+    );
     doc.forEach((node, _, i) => {
       const { section, first } = layout[i] as BlockLayout;
       const key = `${section.key}${first ? "|first" : ""}`;
@@ -936,9 +1026,11 @@ export class EditorView {
       // DOM reads only for blocks without a valid measurement (new, changed or stale ones).
       let scale: number | undefined;
       const layoutPx = () => {
-        scale ??= layoutScale(this.pages[0] as HTMLElement, (this.sheets[0] as Sheet).settings);
+        scale ??= this.scale();
         return scale;
       };
+      // A header or footer of another height moves every page's text: no flow is reused.
+      if (regions && this.regionsChanged(regions, spans)) this.flowed = null;
       if (dropLines)
         for (const desc of blocks) {
           const measure = this.measures.get(desc.node);
@@ -1031,7 +1123,15 @@ export class EditorView {
         const desc = blocks[item.unit] as WordBlockDesc;
         return wordBox(words, i, desc, measureOf(desc), () => lines(desc), own, atWidth);
       });
-      const result = flowFrom(boxes, contentHeight(this.editor.settings), WORD_RULES, reuse);
+      const flowHeight = contentHeight(this.editor.settings);
+      let result = flowFrom(boxes, flowHeight, WORD_RULES, reuse);
+      let facts = pagesOf(boxes, result);
+      // The page count is known once flowed; a header holding it can change what fits.
+      for (let pass = 0; regions && pass < 2 && regions.settle(facts); pass++) {
+        result = flowFrom(boxes, flowHeight, WORD_RULES);
+        facts = pagesOf(boxes, result);
+      }
+      this.facts = facts;
       this.flowed = { nodes, result };
       this.stale.clear();
       const flowed = result.fragments;
@@ -1110,6 +1210,7 @@ export class EditorView {
           : (blocks[item.unit] as WordBlockDesc).dom,
       );
       applyGaps(firsts, result.gaps);
+      this.drawRegions();
       this.place(
         items.map((item, i) => elementsOf(item, i)),
         pages,
@@ -1117,6 +1218,10 @@ export class EditorView {
         layout,
       );
     }
+    const placed = items.map((item, i) => elementsOf(item, i));
+    const placedPages = pages;
+    const placedSlots = slots;
+    this.placeAgain = () => this.place(placed, placedPages, placedSlots, layout);
     // (Wrappers no longer drawn are not in a page: `place` removed them.)
     this.frames = frames;
     this.frameAt = items.map((item, i) => {
@@ -1145,6 +1250,98 @@ export class EditorView {
     // changed before this render: the touched blocks are read back at compositionend.
     const records = this.observer.takeRecords();
     if (this.composing) this.pending.push(...records);
+  }
+
+  /** Layout px per px on screen: what a scaled ancestor (`transform`, `zoom`) multiplies by. */
+  private scale(): number {
+    const page = this.pages[0];
+    if (!page) return 1;
+    return this.paged
+      ? layoutScale(page, (this.sheets[0] as Sheet).settings)
+      : page.getBoundingClientRect().width / page.offsetWidth || 1;
+  }
+
+  /** Whether the headers' and footers' heights differ from when the pages were last flowed. */
+  private regionsChanged(regions: PageRegions, spans: readonly { setup: SectionJSON }[]): boolean {
+    const { stories, settings } = (wordContext(this.state) as WordContext).envelope;
+    const sections = spans.map((span) => span.setup);
+    const known = this.regionsFor;
+    if (
+      known &&
+      known.stories === stories &&
+      known.settings === settings &&
+      known.sections.length === sections.length &&
+      known.sections.every((section, i) => section === sections[i])
+    )
+      return false;
+    this.regionsFor = { stories, settings, sections };
+    const key = regions.key();
+    const changed = key !== this.regionsKey;
+    this.regionsKey = key;
+    return changed;
+  }
+
+  /** Gives every page the header and footer the last flow says, redrawing those that changed. */
+  private drawRegions(): void {
+    const { regions, facts } = this;
+    if (!regions) return;
+    const drawn: EditorView["pageRegions"] = [];
+    this.pageMargins = facts.map((page, p) => {
+      const own: EditorView["pageRegions"][number] = {};
+      drawn[p] = own;
+      const sheet = this.sheetOfPage(p);
+      // Word's blank page before an even or odd page section has neither.
+      if (!page.sectionPages) return { top: "", bottom: "" };
+      for (const side of ["header", "footer"] as const) {
+        const drawing = regions.drawing(page.section, side, page);
+        if (!drawing) continue;
+        const known = this.pageRegions[p]?.[side];
+        if (known?.drawing === drawing.content && known.section === page.section) {
+          own[side] = known;
+          continue;
+        }
+        const element = regions.element(page.section, side);
+        element.append(drawing.content.content.cloneNode(true));
+        own[side] = { element, drawing: drawing.content, section: page.section, id: drawing.id };
+      }
+      const { top, bottom } = regions.margins(page.section, page);
+      const { margins } = sheet.settings;
+      return {
+        top: Math.abs(top - margins.top * PX_PER_MM) < 0.01 ? "" : `${top}px`,
+        bottom: Math.abs(bottom - margins.bottom * PX_PER_MM) < 0.01 ? "" : `${bottom}px`,
+      };
+    });
+    this.pageRegions = drawn;
+  }
+
+  /** The page setup page `p` has, or will have once placed. */
+  private sheetOfPage(p: number): Sheet {
+    return this.sheets[p] ?? this.sheets[this.sheets.length - 1] ?? this.lastSheet();
+  }
+
+  /**
+   * After a story changed: its occurrences redrawn. False when a height changed, which takes a
+   * new flow (`render`), or during a composition.
+   */
+  private redrawRegions(): boolean {
+    const { regions } = this;
+    if (!regions) return true;
+    if (this.composing) return true;
+    const context = wordContext(this.state) as WordContext;
+    const spans = sectionSpans(this.state.doc, context.envelope.section);
+    regions.setDocument(
+      context.envelope,
+      spans.map((span) => span.setup),
+      context.resolver,
+    );
+    if (this.regionsChanged(regions, spans)) {
+      this.flowed = null;
+      return false;
+    }
+    this.drawRegions();
+    this.placeAgain?.();
+    this.observer.takeRecords();
+    return true;
   }
 
   /**
@@ -1232,10 +1429,19 @@ export class EditorView {
     this.sheets.forEach((sheet, p) => {
       const page = this.pages[p] as HTMLElement;
       const key = `${sheet.index} ${sheet.css}`;
-      if (pageSheets.get(page) === key) return;
-      pageSheets.set(page, key);
-      page.style.cssText = sheet.css;
-      page.setAttribute(SHEET_ATTR, String(sheet.index));
+      if (pageSheets.get(page) !== key) {
+        pageSheets.set(page, key);
+        pagePads.delete(page);
+        page.style.cssText = sheet.css;
+        page.setAttribute(SHEET_ATTR, String(sheet.index));
+      }
+      const { top = "", bottom = "" } = this.pageMargins[p] ?? {};
+      const pads = `${top} ${bottom}`;
+      if ((pagePads.get(page) ?? " ") !== pads) {
+        pagePads.set(page, pads);
+        page.style.paddingTop = top;
+        page.style.paddingBottom = bottom;
+      }
     });
     // Pages first, in order; anything else in the host ends up after them.
     let cursor = host.firstChild;
@@ -1249,6 +1455,13 @@ export class EditorView {
       const first = i;
       while (i < items.length && items[i]?.page === p) i++;
       const onPage = items.slice(first, i);
+      const { header, footer } = this.pageRegions[p] ?? {};
+      /** A page's children: its header, what it holds, its footer. */
+      const framed = (list: readonly HTMLElement[]) => [
+        ...(header ? [header.element] : []),
+        ...list,
+        ...(footer ? [footer.element] : []),
+      ];
       for (const { dom, slot } of onPage) {
         const position = slot.mark ? "absolute" : "";
         if (dom.style.position !== position) dom.style.position = position;
@@ -1256,11 +1469,7 @@ export class EditorView {
       // One section in one column: the blocks are the page's children.
       const last = onPage[onPage.length - 1];
       if (!last || (!last.slot.band && last.section.columns.widths.length === 1)) {
-        fillElement(
-          page,
-          onPage.map((item) => item.dom),
-          this.viewRemoved,
-        );
+        fillElement(page, framed(onPage.map((item) => item.dom)), this.viewRemoved);
         this.bands.delete(page);
         continue;
       }
@@ -1276,11 +1485,7 @@ export class EditorView {
             : { key, ...bandElement(host.ownerDocument, section.columns) };
       }
       this.bands.set(page, bands);
-      fillElement(
-        page,
-        bands.map((b) => b.band),
-        this.viewRemoved,
-      );
+      fillElement(page, framed(bands.map((b) => b.band)), this.viewRemoved);
       bands.forEach((band, b) => {
         const inBand = onPage.filter((item) => item.slot.band === b);
         const lead = inBand[0]?.slot.lead;
@@ -1341,7 +1546,7 @@ export class EditorView {
 
   private createPage(): HTMLElement {
     const page = this.host.ownerDocument.createElement("section");
-    page.className = "foli-page";
+    page.className = this.paged ? "foli-page" : "foli-story-flow";
     return page;
   }
 
@@ -1352,6 +1557,7 @@ export class EditorView {
 
   /** The print rules for the document's page setups, written when they change. */
   private applyPrintStyles(layout: readonly BlockLayout[]): void {
+    if (!this.paged) return;
     const sheets = [...new Set(layout.map((block) => block.sheet))];
     const key = [this.lastSheet(), ...sheets].map((sheet) => sheet.css).join("\n");
     if (key === this.printKey) return;
@@ -1375,6 +1581,9 @@ export class EditorView {
   private invalidateLayout(): void {
     this.measures = new WeakMap();
     this.flowed = null;
+    this.regionsFor = null;
+    if (this.regions) this.regions.cache = new WeakMap();
+    this.pageRegions = [];
   }
 
   /** Re-flows the pages once web fonts have loaded: line heights and wrapping change. */
@@ -1413,7 +1622,7 @@ export class EditorView {
       if (!desc || !measured || this.stale.has(desc.node)) continue;
       // A hidden host (display: none) reports every block as 0x0: nothing to re-flow.
       if (!entry.contentRect.width) continue;
-      scale ??= layoutScale(this.pages[0] as HTMLElement, (this.sheets[0] as Sheet).settings);
+      scale ??= this.scale();
       let height = 0;
       for (const fragment of desc.fragments) height += fragment.getBoundingClientRect().height;
       // A block is measured whole; each fragment of a split one keeps its padding and border,
@@ -3163,6 +3372,8 @@ function wordBox(
 ): BlockBox {
   const pageHeight = contentHeight(layout.sheet.settings);
   const { section } = layout;
+  // Without pages nothing is kept off the next one, and a page break ends nothing.
+  const paged = layout.sheet.css !== UNPAGED_CSS;
   const next = words[i + 1] ? { word: words[i + 1] as WordInfo } : undefined;
   const { before, after } = spacing(words[i - 1], desc.word, next?.word);
   const leavesWith = (attr: string) =>
@@ -3196,6 +3407,7 @@ function wordBox(
     lines: bottoms,
     columnBreaksAfter: () => columnBreaks.map(lineOf),
     breaksAfter: () => {
+      if (!paged) return [];
       const breaks = pageBreaks.map(lineOf);
       if (next?.word.pageBreakBefore) breaks.push(bottoms().length - 1);
       return breaks;

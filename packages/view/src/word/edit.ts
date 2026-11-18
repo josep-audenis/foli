@@ -32,8 +32,10 @@ import {
   latin,
   lineHeight,
   markerElement,
+  onlyPictures,
   opaqueBlock,
   opaqueText,
+  PICTURE_ATTR,
   PX_PER_TWIP,
   parseOpaque,
   pictureElement,
@@ -106,7 +108,7 @@ export const FLOAT_ANCHORS = new WeakMap<Element, HTMLElement>();
  * render: list numbers and comment ranges depend on the blocks before.
  */
 export class WordRenderer {
-  readonly #context: WordContext;
+  #context: WordContext;
   readonly #doc: Document;
   readonly #ratio: (family: string) => number;
   /** For the clipboard (`clipboardBlocks`): links as links, list numbers as Word's HTML has them. */
@@ -137,6 +139,11 @@ export class WordRenderer {
 
   get context(): WordContext {
     return this.#context;
+  }
+
+  /** The envelope moved on without touching what blocks look like (a story was edited). */
+  set context(context: WordContext) {
+    this.#context = context;
   }
 
   /**
@@ -184,10 +191,12 @@ export class WordRenderer {
     const line = (r: RunFormat) => lineHeight(paragraph, r, this.#ratio(fontStack(latin(r))));
     const doc = this.#doc;
     const changed = this.#review !== "final" && hasChanges(node);
+    // The line's own height is the paragraph mark's, as in `renderBlocks`.
+    const mark = resolver.run(run, (node.attrs.markFormat ?? []) as MarkJSON[]);
     const fragments = [0, ...splits].map((_, i, all) => {
       const fragment = doc.createElement(tagOf(paragraph));
       styleParagraph(fragment, paragraph);
-      styleRun(fragment, run, line(run));
+      styleRun(fragment, mark, line(mark));
       if (all.length > 1) {
         fragment.dataset.fragment = String(i);
         // The first-line indent is the paragraph's first line only.
@@ -299,6 +308,20 @@ export class WordRenderer {
       }
     });
     for (const [fragment, nodes] of floats) fragment.prepend(...nodes);
+    const inline: ModelNode[] = [];
+    node.forEach((child) => {
+      inline.push(child);
+    });
+    if (
+      onlyPictures(
+        inline,
+        (child) => child.type.name,
+        (child) => !!child.attrs.float,
+      )
+    )
+      for (const fragment of fragments)
+        for (const picture of fragment.querySelectorAll<HTMLElement>(`[${PICTURE_ATTR}]`))
+          picture.style.verticalAlign = "bottom";
     // An empty paragraph, or one ending in a line break, shows its last line; after a page
     // break the paragraph mark stays on the break's line, as in Word.
     let last: ModelNode | null = null;

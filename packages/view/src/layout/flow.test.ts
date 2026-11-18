@@ -8,6 +8,7 @@ import {
   flow,
   flowFrom,
   PX_PER_MM,
+  pagesOf as pageFacts,
 } from "./flow.js";
 
 /** No widow/orphan rules: pure geometry. */
@@ -586,6 +587,62 @@ describe("flow: sections and columns", () => {
       expect(incremental.states, `seed ${seed}`).toEqual(full.states);
       expect(incremental.gaps, `seed ${seed}`).toEqual(full.gaps);
     }
+  });
+});
+
+describe("flow: pages of their own heights (headers and footers)", () => {
+  const WORD = { orphans: 1, widows: 1, spacing: "word" as const };
+  const section = (index: number, over: Partial<FlowSection> = {}): FlowSection => ({
+    index,
+    start: "nextPage",
+    columns: 1,
+    box: () => ({ height: 100 }),
+    samePage: () => true,
+    ...over,
+  });
+  const inSection = (s: FlowSection, b: BlockBox): BlockBox => ({ ...b, section: s });
+
+  it("takes each page's height from its number and whether its section starts on it", () => {
+    const seen: unknown[] = [];
+    const s = section(0, {
+      box: (page) => {
+        seen.push(page.number);
+        return { height: page.first ? 50 : page.number % 2 ? 100 : 80 };
+      },
+    });
+    const blocks = [40, 40, 50, 40, 70, 40].map((h) => inSection(s, box(h)));
+    expect(pagesOf(flow(blocks, 0, WORD))).toEqual([0, 1, 2, 2, 3, 4]);
+    expect(seen).toContain(4);
+  });
+
+  it("gives a page shared by sections the box of the first one on it", () => {
+    const first = section(0, { box: () => ({ height: 60 }) });
+    const second = section(1, { start: "continuous", box: () => ({ height: 1000 }) });
+    const blocks = [inSection(first, box(40)), inSection(second, box(40))];
+    // The second section's own box would hold it.
+    expect(flow(blocks, 0, WORD).map((f) => f[0]?.page)).toEqual([0, 1]);
+  });
+
+  it("says each page's number, section and first page", () => {
+    const one = section(0);
+    const two = section(1, { pageStart: 7 });
+    const even = section(2, { start: "evenPage" });
+    const boxes = [
+      inSection(one, box(250, 0, 0, 10)),
+      inSection(two, box(150, 0, 0, 10)),
+      inSection(even, box(10)),
+    ];
+    const pages = pageFacts(boxes, flowFrom(boxes, 0, WORD));
+    expect(pages.map((p) => [p.number, p.section, p.first, p.sectionPages])).toEqual([
+      [1, 0, true, 3],
+      [2, 0, false, 3],
+      [3, 0, false, 3],
+      [7, 1, true, 2],
+      [8, 1, false, 2],
+      // The blank page before the even one: the next page's section, nothing on it.
+      [9, 2, false, 0],
+      [10, 2, true, 1],
+    ]);
   });
 });
 
