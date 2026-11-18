@@ -6,6 +6,7 @@
  */
 
 import {
+  type ControlJSON,
   type FoliDocument,
   type NodeJSON,
   parseDocument,
@@ -13,12 +14,13 @@ import {
   type SectionJSON,
   type StoryJSON,
 } from "@folijs/core";
-import { noteIds, packageStories } from "../import/index.js";
+import { controlsUsed, noteIds, packageStories } from "../import/index.js";
 import { child, isW, REL, W } from "../import/ooxml.js";
 import { DocxError, type DocxPackage, type NewPart } from "../package.js";
 import { newSettingsXml, withTrackRevisions } from "../settings.js";
 import { parseXml, type XmlElement } from "../xml.js";
 import { deflateEntry, writeZip } from "../zip.js";
+import { balanced } from "./balance.js";
 import { blocksXml, type WriteContext } from "./content.js";
 import {
   commentsExtendedXml,
@@ -154,6 +156,7 @@ function contextFor(
 ): WriteContext {
   return {
     namespaces,
+    controls: media.controls,
     hyperlink: (href, id) => relationships.hyperlink(href, id),
     picture: (attrs) =>
       drawingXml(
@@ -205,7 +208,7 @@ export async function exportDocx(
   original?: DocxPackage,
   options: ExportOptions = {},
 ): Promise<Uint8Array> {
-  const doc = withThreadIds(parseDocument(document), original);
+  const doc = balanced(withThreadIds(parseDocument(document), original), original);
   refuseNotYetWritten(doc);
   // Before the app is asked for any picture's bytes.
   const reference = original ? undefined : packageReference(doc);
@@ -215,8 +218,18 @@ export async function exportDocx(
     );
   }
   const referenced = noteReferences(doc);
-  const originals =
-    original && (doc.stories || referenced.modeled.size) ? packageStories(original) : {};
+  const read =
+    original && (doc.stories || referenced.modeled.size)
+      ? packageStories(original)
+      : { stories: {}, controls: new Map<string, ControlJSON>() };
+  const originals: Readonly<Record<string, StoryJSON>> = read.stories;
+  // A story is unchanged if its tree is, and the controls in it say what they said.
+  const unchanged = (id: string) =>
+    Object.hasOwn(originals, id) &&
+    same(doc.stories?.[id], originals[id]) &&
+    [...controlsUsed(doc.stories?.[id])].every((c) =>
+      same(doc.controls?.[c], read.controls.get(c)),
+    );
   // Notes the model does not hold (an unknown `w:type`) stay in their part: they count too.
   const inPart = original && referenced.modeled.size ? noteIds(original) : new Set<string>();
   for (const key of referenced.modeled)
@@ -232,9 +245,7 @@ export async function exportDocx(
             (r) =>
               r.partName &&
               (r.type === REL.comments ||
-                (doc.stories &&
-                  Object.hasOwn(doc.stories, r.id) &&
-                  !same(doc.stories[r.id], originals[r.id]))),
+                (doc.stories && Object.hasOwn(doc.stories, r.id) && !unchanged(r.id))),
           )
           .map((r) => r.partName as string),
       ]
@@ -242,7 +253,7 @@ export async function exportDocx(
   const bytes = await pictureBytes(doc, original, options.resource);
   const media = new Media(doc, original, bytes, rewritten);
   return original
-    ? intoPackage(doc, original, originals, referenced.isReferenced, options, media)
+    ? intoPackage(doc, original, originals, unchanged, referenced.isReferenced, options, media)
     : newPackage(doc, referenced.isReferenced, options, media);
 }
 
@@ -288,14 +299,13 @@ function checkedPart(name: string, text: string): string {
   return text;
 }
 
-/** Schema v5's additions outside the content, until 11.5 and 11.6 write them: never dropped. */
+/** Schema v5's additions outside the content, until 11.6 and 11.7 write them: never dropped. */
 function refuseNotYetWritten(doc: FoliDocument): void {
   const written = (key: string) => new DocxError(`${key} cannot be exported to .docx yet`);
-  for (const key of ["controls", "settings"] as const) if (doc[key]) throw written(key);
+  if (doc.settings) throw written("settings");
   const sections = [doc.section];
   const walk = (node: NodeJSON) => {
-    const attrs = node.attrs as { section?: SectionJSON; controls?: unknown } | undefined;
-    if (attrs?.controls) throw written("controls");
+    const attrs = node.attrs as { section?: SectionJSON } | undefined;
     if (attrs?.section) sections.push(attrs.section);
     node.content?.forEach(walk);
   };
@@ -388,6 +398,7 @@ async function intoPackage(
   doc: FoliDocument,
   pkg: DocxPackage,
   originals: Readonly<Record<string, StoryJSON>>,
+  unchanged: (id: string) => boolean,
   isReferenced: (key: string) => boolean,
   options: ExportOptions,
   media: Media,
@@ -508,7 +519,7 @@ async function intoPackage(
     if (!related && !/^[A-Za-z_][\w.-]*$/.test(id))
       throw new DocxError(`Not a relationship id: ${id.slice(0, 64)}`);
     const existing = related?.partName ? pkg.part(related.partName) : undefined;
-    if (existing && same(story, originals[id])) continue;
+    if (existing && unchanged(id)) continue;
     const name = existing?.name ?? freePart(story.kind, (n) => !!pkg.part(n) || newNames.has(n));
     const xml = existing ? pkg.xml(existing.name) : undefined;
     const ns = xml ? namespacesOf(xml.root, xml.source) : namespaces;
@@ -546,7 +557,7 @@ async function intoPackage(
     const write = (o: OriginalPart | undefined, ns: Namespaces) =>
       checkedPart(
         target,
-        notesXml(kind, stories, originals, isReferenced, o, {
+        notesXml(kind, stories, originals, unchanged, isReferenced, o, {
           ...contextFor(ns, partRels, media, target),
           note: kind,
         }),
@@ -674,7 +685,7 @@ async function newPackage(
       name,
       rel,
       contentType,
-      notesXml(kind, stories, {}, isReferenced, undefined, {
+      notesXml(kind, stories, {}, () => false, isReferenced, undefined, {
         ...contextFor(DEFAULT_NAMESPACES, partRels, media, name),
         note: kind,
       }),

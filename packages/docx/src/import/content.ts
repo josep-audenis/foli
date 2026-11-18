@@ -4,10 +4,17 @@
  * for markers that have nothing to show: field characters, range ends).
  */
 
-import { type MarkJSON, type NodeJSON, type ResourceJSON, schema } from "@folijs/core";
+import {
+  type ControlJSON,
+  type MarkJSON,
+  type NodeJSON,
+  type ResourceJSON,
+  schema,
+} from "@folijs/core";
 import type { DocxPackage, Relationship } from "../package.js";
 import type { XmlElement, XmlNode } from "../xml.js";
-import { attr, child, deepText, integer, isW, R, REL, textOf, W } from "./ooxml.js";
+import { controlProperties, plainlyEditable } from "./controls.js";
+import { attr, child, deepText, elements, integer, isW, R, REL, textOf, W } from "./ooxml.js";
 import { pictureAttrs } from "./pictures.js";
 import {
   attributeBag,
@@ -33,6 +40,10 @@ export interface ContentContext extends Context {
   readonly tableDepth?: number;
   /** The envelope's resources (pictures' images), filled as content is read. */
   readonly resources: Map<string, ResourceJSON>;
+  /** The envelope's content controls, filled as content is read. */
+  readonly controls: Map<string, ControlJSON>;
+  /** Numbers the part's controls: their ids are `<part>#<n>`, the same on every reading. */
+  readonly ordinals: { next: number };
   /**
    * The kind of story being read (ADR-0007), or a comment: what one may not hold stays verbatim.
    */
@@ -117,6 +128,8 @@ export function blocks(
   for (const node of nodes) {
     if (node.kind !== "element" || node === section) continue;
     if (isW(node, "p")) out.push(paragraph(node, context));
+    else if (isW(node, "sdt"))
+      out.push(...(blockControl(node, context) ?? [opaqueOf(node, context)]));
     else if (isW(node, "tbl")) {
       // A table right after a table is one table to Word (it merges them): kept verbatim.
       const table = out.at(-1)?.type === "table" ? undefined : tableOf(node, context);
@@ -129,6 +142,72 @@ export function blocks(
   const last = out.at(-1);
   const source = last && tables.get(last);
   if (source) out[out.length - 1] = opaqueOf(source, context);
+  return out;
+}
+
+/** A control's properties taken into the envelope, its id and its content element. */
+function controlOf(
+  sdt: XmlElement,
+  context: ContentContext,
+): { id: string; content: XmlElement } | undefined {
+  const content = child(sdt, "sdtContent");
+  if (!content || sdt.attributes.length) return undefined;
+  const children = elements(sdt);
+  const once = (local: string) => children.filter((c) => isW(c, local)).length <= 1;
+  const known = new Set(["sdtPr", "sdtEndPr", "sdtContent"]);
+  if (children.some((c) => !isW(c) || !known.has(c.local))) return undefined;
+  if (![...known].every(once)) return undefined;
+  const control = controlProperties(sdt, context);
+  if (!control || !plainlyEditable(control)) return undefined;
+  const id = `${context.part}#${context.ordinals.next++}`;
+  context.controls.set(id, control);
+  return { id, content };
+}
+
+/** How many controls the model lets a block, row or cell be in. */
+const MAX_CONTROLS = 64;
+const roomForControl = (node: NodeJSON) =>
+  ((node.attrs?.controls as string[] | undefined)?.length ?? 0) < MAX_CONTROLS;
+
+/** `node` inside control `id`, outermost first. */
+function inControl(node: NodeJSON, id: string): NodeJSON {
+  const controls = [id, ...((node.attrs?.controls as string[] | undefined) ?? [])];
+  return { ...node, attrs: { ...node.attrs, controls } };
+}
+
+/** A block-level control's blocks, each listing it; undefined keeps it verbatim (one that is empty). */
+function blockControl(sdt: XmlElement, context: ContentContext): NodeJSON[] | undefined {
+  const control = controlOf(sdt, context);
+  if (!control) return undefined;
+  const inner = blocks(control.content.children, context);
+  if (!inner.length || !inner.every(roomForControl)) return undefined;
+  return inner.map((block) => inControl(block, control.id));
+}
+
+/**
+ * The rows (or cells) among `nodes`, those in row-level (cell-level) controls listing them;
+ * undefined when anything else is there, which keeps the table verbatim.
+ */
+function controlled(
+  nodes: readonly XmlNode[],
+  local: "tr" | "tc",
+  read: (el: XmlElement) => NodeJSON | undefined,
+  context: ContentContext,
+): NodeJSON[] | undefined {
+  const out: NodeJSON[] = [];
+  for (const node of nodes) {
+    if (node.kind !== "element") continue;
+    if (isW(node, local)) {
+      const item = read(node);
+      if (!item) return undefined;
+      out.push(item);
+    } else if (isW(node, "sdt")) {
+      const control = controlOf(node, context);
+      const inner = control && controlled(control.content.children, local, read, context);
+      if (!control || !inner?.length || !inner.every(roomForControl)) return undefined;
+      out.push(...inner.map((item) => inControl(item, control.id)));
+    } else return undefined;
+  }
   return out;
 }
 
@@ -161,11 +240,11 @@ function tableOf(tbl: XmlElement, context: ContentContext): NodeJSON | undefined
     } else if (stage <= 1 && isW(c, "tblGrid")) {
       tblGrid = c;
       stage = 2;
-    } else if (isW(c, "tr")) {
+    } else if (isW(c, "tr") || isW(c, "sdt")) {
       stage = 2;
-      const row = rowOf(c, inner);
-      if (!row) return undefined;
-      rows.push(row);
+      const read = controlled([c], "tr", (tr) => rowOf(tr, inner), inner);
+      if (!read) return undefined;
+      rows.push(...read);
     } else return undefined;
   }
   if (!rows.length) return undefined;
@@ -195,11 +274,11 @@ function rowOf(tr: XmlElement, context: ContentContext): NodeJSON | undefined {
     } else if (stage <= 1 && isW(c, "trPr")) {
       trPr = c;
       stage = 2;
-    } else if (isW(c, "tc")) {
+    } else if (isW(c, "tc") || isW(c, "sdt")) {
       stage = 2;
-      const cell = cellOf(c, context);
-      if (!cell) return undefined;
-      cells.push(cell);
+      const read = controlled([c], "tc", (tc) => cellOf(tc, context), context);
+      if (!read) return undefined;
+      cells.push(...read);
     } else return undefined;
   }
   if (!cells.length) return undefined;
@@ -365,9 +444,37 @@ function inlines(
         context.moves.close(el.local.startsWith("moveFrom") ? "from" : "to", attr(el, "id") ?? "");
         opaque(el);
         break;
-      case "fldSimple":
-        opaque(el, INLINE_LABELS, deepText(el) || attr(el, "instr")?.trim() || "field");
+      case "fldSimple": {
+        const instruction = attr(el, "instr");
+        const start = node("fieldStart", {
+          simple: true,
+          // The start tag, as an element holding the result has it.
+          ext: context.source.slice(el.start, el.openEnd).replace(/\/>$/, ">"),
+        });
+        const code = node("fieldCode", { text: instruction ?? "" });
+        const leaves = valid(start, el, context) && valid(code, el, context);
+        if (instruction === undefined || !leaves) {
+          opaque(el, INLINE_LABELS, deepText(el) || "field");
+          break;
+        }
+        out.push(start, code, node("fieldSeparator"));
+        inlines(el.children, marks, context, out);
+        out.push(node("fieldEnd"));
         break;
+      }
+      case "sdt": {
+        const blocksInside = (c: XmlElement) =>
+          elements(c).some((e) => isW(e, "p") || isW(e, "tbl"));
+        const control = controlOf(el, context);
+        if (!control || blocksInside(control.content)) {
+          opaque(el);
+          break;
+        }
+        out.push(node("controlStart", { id: control.id }));
+        inlines(control.content.children, marks, context, out);
+        out.push(node("controlEnd", { id: control.id }));
+        break;
+      }
       default:
         if (DROPPED.has(el.local)) context.report.dropped(el.name);
         else opaque(el);
@@ -543,6 +650,46 @@ function run(
         const attrs: Record<string, unknown> = { id: integer(attr(el, "id")) };
         if (bag) attrs.attributes = bag;
         const leaf = valid(node("commentReference", marks, attrs), el, context);
+        if (leaf) out.push(leaf);
+        else opaqueRun(el);
+        break;
+      }
+      case "fldChar": {
+        const type = attr(el, "fldCharType");
+        const name = { begin: "fieldStart", separate: "fieldSeparator", end: "fieldEnd" }[
+          type ?? ""
+        ];
+        if (!name) {
+          opaqueRun(el);
+          break;
+        }
+        const known = ["w:fldCharType", "w:dirty", "w:fldLock"];
+        const plain = !elements(el).length && el.attributes.every((a) => known.includes(a.name));
+        const flags: Record<string, unknown> = {};
+        if (name === "fieldStart" && plain) {
+          const dirty = attr(el, "dirty");
+          const locked = attr(el, "fldLock");
+          if (dirty !== undefined) flags.dirty = !["0", "false", "off"].includes(dirty);
+          if (locked !== undefined) flags.locked = !["0", "false", "off"].includes(locked);
+        }
+        // Form field data, or anything else on it: the element itself is kept.
+        const simple = plain && (name === "fieldStart" || el.attributes.length === 1);
+        const attrs = simple ? flags : { ext: sourceOf(context, el) };
+        const leaf = valid(
+          node(name, marks, Object.keys(attrs).length ? attrs : undefined),
+          el,
+          context,
+        );
+        if (leaf) out.push(leaf);
+        else opaqueRun(el);
+        break;
+      }
+      case "instrText":
+      case "delInstrText": {
+        const bag = attributeBag(el, ["xml:space"], context);
+        const attrs: Record<string, unknown> = { text: spaced(el) };
+        if (bag) attrs.attributes = bag;
+        const leaf = valid(node("fieldCode", marks, attrs), el, context);
         if (leaf) out.push(leaf);
         else opaqueRun(el);
         break;

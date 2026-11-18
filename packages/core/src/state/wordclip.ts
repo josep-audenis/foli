@@ -386,8 +386,23 @@ function fit(
   const bookmarkIds = new Map<number, number>();
   const leftOut = new Set<number>();
 
+  const hasControl = (id: unknown) =>
+    same && typeof id === "string" && Object.hasOwn(target.controls ?? {}, id);
+  // A note has one reference: one still in the document keeps it (cut and paste moves it).
+  const referredTo = new Set<string>();
+  state.doc.descendants((node, pos) => {
+    if (node.type.name === "noteReference" && (pos < from || pos >= to))
+      referredTo.add(String(node.attrs.story));
+  });
+  const noteAvailable = (story: string) =>
+    same && Object.hasOwn(target.stories ?? {}, story) && !referredTo.has(story);
+
   const mapNode = (node: NodeJSON): NodeJSON | null => {
     const attrs = node.attrs as Json | undefined;
+    // From another document their definitions are not here: the content comes without them.
+    if ((node.type === "controlStart" || node.type === "controlEnd") && !hasControl(attrs?.id))
+      return null;
+    if (node.type === "noteReference" && !noteAvailable(String(attrs?.story))) return null;
     let next: Json | undefined = attrs;
     if (node.type === "paragraph" && attrs) {
       next = paragraphProperties(attrs as ParagraphPropertiesJSON) as Json;
@@ -419,6 +434,12 @@ function fit(
       if (leftOut.has(id)) return null;
       if (node.type === "bookmarkStart") names.add(String(attrs?.name));
       next = { ...attrs, id: fresh("bookmark", bookmarkIds, id) };
+    }
+    if (next?.controls) {
+      const controls = (next.controls as string[]).filter(hasControl);
+      next = { ...next };
+      if (controls.length) next.controls = controls;
+      else delete next.controls;
     }
     const marks = node.marks && runMarks(node.marks);
     const children = node.content

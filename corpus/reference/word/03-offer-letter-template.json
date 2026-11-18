@@ -202,5 +202,42 @@
                ],
     "bookmarks":  [
 
-                  ]
+                  ],
+    "controls":  [
+                     {
+                         "type":  6,
+                         "tag":  "offer_date",
+                         "title":  "Offer date",
+                         "placeholder":  true,
+                         "text":  "Click or tap to enter a date."
+                     },
+                     {
+                         "type":  4,
+                         "tag":  "position",
+                         "title":  "Position",
+                         "placeholder":  true,
+                         "text":  "Choose an item."
+                     },
+                     {
+                         "type":  1,
+                         "tag":  "salary",
+                         "title":  "Salary",
+                         "placeholder":  true,
+                         "text":  "Click or tap here to enter text."
+                     },
+                     {
+                         "type":  8,
+                         "tag":  "remote",
+                         "title":  "Remote",
+                         "placeholder":  false,
+                         "text":  "☐"
+                     },
+                     {
+                         "type":  0,
+                         "tag":  "benefits",
+                         "title":  "Benefits",
+                         "placeholder":  false,
+                         "text":  "Private health insurance; 25 days\u0027 annual leave; pension contribution of 5%."
+                     }
+                 ]
 }

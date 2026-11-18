@@ -306,6 +306,12 @@ const MARKERS = new Set([
   "commentEnd",
   "controlStart",
   "controlEnd",
+  // A field's parts and a note's own number: deleting one alone would break what it belongs to.
+  "fieldStart",
+  "fieldCode",
+  "fieldSeparator",
+  "fieldEnd",
+  "noteMark",
   // A comment's reference mark: deleting it would take the comment's anchor.
   "commentReference",
 ]);

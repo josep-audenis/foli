@@ -26,6 +26,8 @@
 #   - fields: each field of the main text: type (WdFieldType), code, result as Word has it
 #     open (unlocked DATE fields are today's), page;
 #   - bookmarks: each visible bookmark: name, page, text;
+#   - controls: each content control of the main text: type (WdContentControlType), tag, title,
+#     whether it shows its placeholder, text;
 #   - paragraphs: for every paragraph of the main text, in Word's order (table cells included,
 #     end-of-row marks not): its text, the page and the line on that page where it starts, the
 #     page where it ends, its list number as Word shows it ("1.1", "(a)"), and whether it is in a
@@ -116,6 +118,7 @@ try {
       notes = @()
       fields = @()
       bookmarks = @()
+      controls = @()
     }
     $doc = $null
     try {
@@ -244,6 +247,11 @@ try {
         $bookmarks.Add([ordered]@{ name = [string]$bookmark.Name; page = [int]$bookmark.Range.Information($INFO_PAGE); text = Clean $bookmark.Range.Text })
       }
       $result.bookmarks = $bookmarks.ToArray()
+      $controls = New-Object System.Collections.Generic.List[object]
+      foreach ($control in $doc.ContentControls) {
+        $controls.Add([ordered]@{ type = [int]$control.Type; tag = [string]$control.Tag; title = [string]$control.Title; placeholder = [bool]$control.ShowingPlaceholderText; text = Clean $control.Range.Text })
+      }
+      $result.controls = $controls.ToArray()
       if ($PdfDir) { $doc.ExportAsFixedFormat([string](Join-Path $PdfDir ($file.BaseName + ".pdf")), $PDF) }
     } catch {
       $result.error = Scrub $_.Exception.Message $file

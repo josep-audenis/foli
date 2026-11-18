@@ -1146,10 +1146,16 @@ Each task is a PR on `phase-11/sections-fields`, the build green after each.
   edited and a new package with a header, footer and notes. What a story may not hold stays
   verbatim, comments included: Word 16 drops a comment anchored in a note when it saves. The
   editor does not show stories yet, and a reference shows nothing until 11.10.)
-- [ ] 11.5 DOCX fields, content controls and bookmarks: complex and simple fields (nested,
+- [x] 11.5 DOCX fields, content controls and bookmarks: complex and simple fields (nested,
   across runs and paragraphs), merge and form fields, content controls at every level (with
   data binding and placeholders kept), bookmarks; what the model cannot hold stays verbatim,
-  reported; harness as in 11.4.
+  reported; harness as in 11.4. (Done: fields as markers with their codes, `w:fldSimple` written
+  back as one; controls at run, block, row and cell level, nested, their properties in `controls`
+  with `w:sdtPr` kept; `scripts/corpus/field-roundtrip.mjs` has Word read them, unchanged and with
+  a field's result, a control's text and a control split in two. Controls that are bound, show
+  their placeholder or lock their content stay verbatim until 11.9 honours that, and a control's
+  properties changing is refused until then. Bookmarks were modeled already. Until 11.8 a field's
+  code range with a nested field shows that field's result.)
 - [ ] 11.6 Sections on pages and their editing: columns (equal and set widths, the line between
   them, column breaks), continuous sections, even and odd page sections with Word's blank page;
   insert and remove section breaks, page setup per section (size, orientation, margins,

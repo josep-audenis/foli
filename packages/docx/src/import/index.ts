@@ -1,4 +1,5 @@
 import {
+  type ControlJSON,
   type FoliDocument,
   parseDocument,
   type ResourceJSON,
@@ -66,6 +67,7 @@ export function importPackage(pkg: DocxPackage): DocxImport {
   if (!body) throw new DocxError(`${pkg.mainDocument}: no w:body`);
 
   const resources = new Map<string, ResourceJSON>();
+  const controls = new Map<string, ControlJSON>();
   const contextFor = (part: string, source: string): ContentContext => {
     report.part = part;
     // One lookup table per part: hyperlinks resolve in constant time.
@@ -74,7 +76,17 @@ export function importPackage(pkg: DocxPackage): DocxImport {
       byId ??= new Map(pkg.relationships(part).map((r) => [r.id, r]));
       return byId.get(id);
     };
-    return { source, report, pkg, part, moves: new Moves(), relationship, resources };
+    return {
+      source,
+      report,
+      pkg,
+      part,
+      moves: new Moves(),
+      relationship,
+      resources,
+      controls,
+      ordinals: { next: 0 },
+    };
   };
   const related = (
     type: string,
@@ -119,6 +131,7 @@ export function importPackage(pkg: DocxPackage): DocxImport {
       )
     : [];
   const stories = readStories(pkg, contextFor);
+  const usedControls = controlsUsed([content, commented, stories]);
 
   let document: FoliDocument;
   try {
@@ -132,6 +145,11 @@ export function importPackage(pkg: DocxPackage): DocxImport {
       comments: commented,
       ...(resources.size ? { resources: Object.fromEntries(resources) } : {}),
       ...(Object.keys(stories).length ? { stories } : {}),
+      ...(usedControls.size
+        ? {
+            controls: Object.fromEntries([...controls].filter(([id]) => usedControls.has(id))),
+          }
+        : {}),
       content: { type: "doc", content },
     });
   } catch (error) {
@@ -149,11 +167,28 @@ export function importPackage(pkg: DocxPackage): DocxImport {
   return { document, package: pkg, report: report.report(), trackRevisions };
 }
 
-/** The package's stories as a validated document holds them (what export compares with). */
-export function packageStories(pkg: DocxPackage): Record<string, StoryJSON> {
+/** The ids of the controls `content` holds (one read but kept verbatim after all has none). */
+export function controlsUsed(content: unknown): Set<string> {
+  const used = new Set<string>();
+  JSON.stringify(content, (key, value) => {
+    if (key === "controls" && Array.isArray(value)) for (const id of value) used.add(id);
+    const node = value as { type?: unknown; attrs?: { id?: unknown } } | null;
+    if (node?.type === "controlStart" && typeof node.attrs?.id === "string")
+      used.add(node.attrs.id);
+    return value;
+  });
+  return used;
+}
+
+/** The package's stories and their controls, as a validated document holds them. */
+export function packageStories(pkg: DocxPackage): {
+  stories: Record<string, StoryJSON>;
+  controls: Map<string, ControlJSON>;
+} {
   const report = new Recorder();
   const resources = new Map<string, ResourceJSON>();
-  return canonicalStories(pkg, (part, source) => {
+  const controls = new Map<string, ControlJSON>();
+  const stories = canonicalStories(pkg, (part, source) => {
     const byId = new Map(pkg.relationships(part).map((r) => [r.id, r]));
     return {
       source,
@@ -163,8 +198,11 @@ export function packageStories(pkg: DocxPackage): Record<string, StoryJSON> {
       moves: new Moves(),
       relationship: (id) => byId.get(id),
       resources,
+      controls,
+      ordinals: { next: 0 },
     };
   });
+  return { stories, controls };
 }
 
 export type { ImportReport } from "./report.js";

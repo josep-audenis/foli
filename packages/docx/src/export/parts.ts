@@ -558,6 +558,7 @@ export function notesXml(
   kind: "footnote" | "endnote",
   stories: Readonly<Record<string, StoryJSON>>,
   originals: Readonly<Record<string, StoryJSON>>,
+  unchanged: (key: string) => boolean,
   isReferenced: (key: string) => boolean,
   part: OriginalPart | undefined,
   context: WriteContext,
@@ -595,7 +596,7 @@ export function notesXml(
         return needed ? undefined : null;
       }
       const story = stories[key] as StoryJSON;
-      return same(story, originals[key]) ? undefined : key;
+      return story && unchanged(key) ? undefined : key;
     },
     (key) => write(key, stories[key] as StoryJSON),
     [],

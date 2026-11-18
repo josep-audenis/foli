@@ -5,12 +5,14 @@
  * Its image is the package's part when the resource names one there, else a new media part
  * whose bytes come from the resource's `data:` URL or the app (`ExportOptions.resource`).
  */
+
 import type { FoliDocument, NodeJSON, ResourceJSON } from "@folijs/core";
 import { A, R } from "../import/ooxml.js";
 import { floatOf, PIC, WP } from "../import/pictures.js";
 import type { DocxPackage } from "../package.js";
 import { DocxError } from "../package.js";
 import type { XmlElement } from "../xml.js";
+import { ControlWriter } from "./controls.js";
 import { same } from "./properties.js";
 import { escapeAttribute, fragment, type Namespaces } from "./xmlout.js";
 
@@ -106,6 +108,8 @@ const docPrIds = (xml: string) =>
 /** The media parts pictures need, allocated as they are written, and the drawings' ids. */
 export class Media {
   readonly added: { name: string; data: Uint8Array; contentType: string }[] = [];
+  /** The document's content controls, written once across its parts. */
+  readonly controls: ControlWriter;
   readonly #parts = new Map<string, string>();
   /** Ids drawings Foli does not write hold (opaque content, headers and footers). */
   readonly #reserved = new Set<number>();
@@ -120,6 +124,7 @@ export class Media {
     /** The parts rewritten from the model (their drawings are the document's). */
     rewritten: readonly string[] = [],
   ) {
+    this.controls = new ControlWriter(doc.controls ?? {});
     // `wp:docPr` ids are unique in a document, across its parts: new ones above all of them.
     let max = 0;
     for (const attrs of picturesOf(doc))

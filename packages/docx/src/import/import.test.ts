@@ -111,7 +111,7 @@ describe("importing the Word corpus", () => {
     expect(document.section.pageSize).toEqual({ width: 11906, height: 16838 });
     expect(document.section.titlePage).toBe(true);
     // A cross-reference field: its structure opaque, its result editable text.
-    expect(report.opaque).toEqual({ "w:fldChar": 9, "w:instrText": 3 });
+    expect(report.opaque).toEqual({});
     // The signature table is a table (schema v4).
     expect((document.content.content ?? []).filter((b) => b.type === "table").length).toBe(1);
     const bookmarks = (document.content.content ?? []).flatMap((p) =>
@@ -156,14 +156,17 @@ describe("importing the Word corpus", () => {
     ]);
   });
 
-  it("keeps content controls and fields opaque (template)", async () => {
+  it("reads content controls and fields (template)", async () => {
     const { document, report } = await load("03-offer-letter-template.docx");
-    expect(report.opaque["w:sdt"]).toBe(5);
-    const labels = (document.content.content ?? []).flatMap((p) =>
-      (p.content ?? []).filter((n) => n.type === "opaqueInline").map((n) => n.attrs?.label),
-    );
-    expect(labels).toContain("«CandidateFirstName»");
-    expect(labels).toContain("content control");
+    // Those showing their placeholder stay verbatim until 11.9.
+    expect(report.opaque["w:fldSimple"]).toBeUndefined();
+    const held = Object.keys(document.controls ?? {}).length;
+    expect(held + (report.opaque["w:sdt"] ?? 0)).toBe(5);
+    for (const control of Object.values(document.controls ?? {}))
+      expect(control.placeholder?.showing).not.toBe(true);
+    const nodes = JSON.stringify(document.content);
+    expect(nodes).toContain('"fieldCode"');
+    expect(nodes).toContain("MERGEFIELD CandidateFirstName");
   });
 
   it("reads sections, pictures, footnotes and tables as Word has them (board report)", async () => {
@@ -200,7 +203,7 @@ describe("importing the Word corpus", () => {
         (p) => (p.attrs?.indent as { hanging?: number })?.hanging,
       ),
     ).toBe(true);
-    expect(report.opaque).toEqual({ "w:fldChar": 3, "w:instrText": 1 });
+    expect(report.opaque).toEqual({});
   });
 });
 
@@ -309,7 +312,7 @@ describe("importing WordprocessingML", () => {
 
   it("keeps unknown block and inline content as opaque nodes", async () => {
     const { blocks, report } = await blocksOf(
-      `<w:tbl><w:sdt><w:sdtContent><w:tr><w:tc><w:p/></w:tc></w:tr></w:sdtContent></w:sdt></w:tbl><w:bookmarkEnd w:id="9"/><x:custom/><w:p><w:smartTag><w:r><w:t>a</w:t></w:r></w:smartTag><w:fldSimple w:instr=" PAGE "><w:r><w:t>3</w:t></w:r></w:fldSimple><w:r><w:drawing/><w:sym w:font="Wingdings" w:char="F0FC"/></w:r></w:p><w:sectPr><w:pgSz w:w="12240" w:h="15840"/></w:sectPr>`,
+      `<w:tbl><w:customXml><w:tr><w:tc><w:p/></w:tc></w:tr></w:customXml></w:tbl><w:bookmarkEnd w:id="9"/><x:custom/><w:p><w:smartTag><w:r><w:t>a</w:t></w:r></w:smartTag><w:r><w:drawing/><w:sym w:font="Wingdings" w:char="F0FC"/></w:r></w:p><w:sectPr><w:pgSz w:w="12240" w:h="15840"/></w:sectPr>`,
     );
     expect(blocks.map((b) => [b.type, b.attrs?.label])).toEqual([
       ["opaqueBlock", "table"],
@@ -317,20 +320,18 @@ describe("importing WordprocessingML", () => {
       ["opaqueBlock", "custom"],
       ["paragraph", undefined],
     ]);
-    // Rows inside a content control: the model cannot hold the table, kept verbatim.
+    // Rows inside custom XML: the model cannot hold the table, kept verbatim.
     expect(blocks[0]?.attrs?.xml).toBe(
-      "<w:tbl><w:sdt><w:sdtContent><w:tr><w:tc><w:p/></w:tc></w:tr></w:sdtContent></w:sdt></w:tbl>",
+      "<w:tbl><w:customXml><w:tr><w:tc><w:p/></w:tc></w:tr></w:customXml></w:tbl>",
     );
     expect(blocks[3]?.content?.map((n) => n.attrs?.label)).toEqual([
       "smartTag",
-      "3",
       "picture",
       "symbol",
     ]);
     expect(report.opaque).toEqual({
       "w:bookmarkEnd": 1,
       "w:drawing": 1,
-      "w:fldSimple": 1,
       "w:smartTag": 1,
       "w:sym": 1,
       "w:tbl": 1,
@@ -433,6 +434,9 @@ const MODELED: Record<string, readonly string[]> = {
   "w:moveTo": ["w:id", "w:author", "w:date"],
   "w:bookmarkStart": ["w:id", "w:name"],
   "w:bookmarkEnd": ["w:id"],
+  "w:instrText": ["xml:space"],
+  "w:delInstrText": ["xml:space"],
+  "w:fldChar": ["w:fldCharType", "w:dirty", "w:fldLock"],
   "w:commentRangeStart": ["w:id"],
   "w:commentRangeEnd": ["w:id"],
   "w:commentReference": ["w:id"],
@@ -442,7 +446,15 @@ const MODELED: Record<string, readonly string[]> = {
   "w:t": ["xml:space"],
   "w:delText": ["xml:space"],
 };
-const REGENERATED = new Set(["w:t@xml:space", "w:delText@xml:space"]);
+const REGENERATED = new Set([
+  "w:t@xml:space",
+  "w:delText@xml:space",
+  "w:instrText@xml:space",
+  "w:delInstrText@xml:space",
+  "w:fldChar@w:fldCharType",
+  "w:fldChar@w:dirty",
+  "w:fldChar@w:fldLock",
+]);
 
 describe("import keeps every attribute of the corpus", () => {
   for (const name of names) {
