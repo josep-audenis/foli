@@ -82,12 +82,14 @@ writeFileSync(appEntry, `export { FoliEditor } from "${dist("react")}";\n`);
  * Core, view and React raised in 11.8 (66.6, 86.4 and 114.6 kB): fields (finding them, the
  * selection rules, every field Foli updates with Word's switches, tables of contents rebuilt,
  * the insert commands), hidden code ranges and shading in the view, the fields menu and dialog.
+ * Core and React raised in 11.9 (74.7 kB, 76.5 kB allowed; React with core): content controls (the
+ * lock and text rules, placeholders, values, insert commands).
  */
 const BUNDLES = [
-  { name: "@folijs/core", entry: dist("core"), budget: 70_000 },
+  { name: "@folijs/core", entry: dist("core"), budget: 76_500 },
   { name: "@folijs/view", entry: dist("view"), budget: 90_500 },
-  { name: "@folijs/react", entry: dist("react"), budget: 119_500 },
-  { name: "FoliEditor only", entry: appEntry, budget: 119_500 },
+  { name: "@folijs/react", entry: dist("react"), budget: 125_000 },
+  { name: "FoliEditor only", entry: appEntry, budget: 125_000 },
   { name: "@folijs/docx", entry: dist("docx"), budget: 55_500 },
 ];
 

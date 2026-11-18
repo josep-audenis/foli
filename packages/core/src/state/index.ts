@@ -31,6 +31,24 @@ export {
   resolveComment,
 } from "./comments.js";
 export {
+  addRepeatingItem,
+  type ControlInsertOptions,
+  type ControlPropertiesPatch,
+  type ControlRange,
+  type ControlValue,
+  type ControlValueInput,
+  controlAt,
+  controlIsReadOnly,
+  controlProperties,
+  controlSpot,
+  controlsIn,
+  controlValues,
+  insertControl,
+  insertControlText,
+  setControlProperties,
+  setControlValue,
+} from "./controls.js";
+export {
   createEditor,
   type Editor,
   type EditorDocument,
