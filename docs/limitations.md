@@ -28,8 +28,7 @@ checklist in [testing/ime.md](testing/ime.md)):
 
 - The editor holds schema v5 (Word's model, 8.7; tables and pictures, 10.3; v5's stories, fields and content controls are not produced yet): paragraphs in
   styles (headings are Word's heading styles), lists as Word's numbering, run formatting, line
-  and page breaks, links, tables, inline and floating pictures, fields (see below) and content controls (their text editable, nothing marking them yet; those bound to
-  data, showing their placeholder or with locked content stay opaque); everything else
+  and page breaks, links, tables, inline and floating pictures, fields and content controls (see below); everything else
   Word has (charts, shapes...) is kept as opaque content, selected and deleted whole. Documents saved by 0.1.0 to 0.4.0 are migrated when loaded; 0.4.0 cannot read
   documents saved by 0.5.0. Sections are laid out with their own page
   setups and columns (11.6); a continuous section with another page setup starts a new page, and
@@ -43,6 +42,13 @@ checklist in [testing/ime.md](testing/ime.md)):
 - Headers and footers are on the pages and edited there (11.7). While one is open its page fields
   show their stored results (the other pages show theirs). Moving between a header and the body takes a double click or the toolbar (no keyboard
   shortcut of its own). Headers are not dimmed while the body is edited, as they are in Word.
+- Content controls (11.9) follow Word's rules for locks, placeholders and what each kind holds. A
+  control bound to data shows what the file stores and cannot be edited: bindings are kept, not
+  evaluated, and Word replaces such content with the bound value when it opens the file. Text typed
+  in a date control is kept as text (Word re-reads a date typed there); picked dates are written in
+  English whatever the control's language. A control that removes itself when edited
+  (`w:temporary`) stays; a group's fixed text can be edited; a picture control keeps its picture
+  (no way to choose another). An empty block control stays opaque.
 - Fields (11.8) show their stored results until updated (F9, the Fields menu, `updateFields`,
   `view.print()`); the browser's own Print menu does not update them. Updated: `PAGE`, `NUMPAGES`,
   `SECTIONPAGES`, `DATE`, `TIME`, `SEQ`, `REF`, `PAGEREF`, `TOC`, `MERGEFIELD`. Any other field
