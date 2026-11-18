@@ -1122,12 +1122,15 @@ Each task is a PR on `phase-11/sections-fields`, the build green after each.
   and its events kept off, but a render of the main view still removes it: `place` changes in
   11.7. Accepted by review on merge, as the owner instructed on 2026-11-18: each task merged
   after an agent's review.)
-- [ ] 11.2 Corpus: Word-authored documents for what 01–07 lack (several sections with two and
+- [x] 11.2 Corpus: Word-authored documents for what 01–07 lack (several sections with two and
   three columns, a column break, a continuous section, even and odd headers and footers, a
   section with headers not linked to the previous, endnotes, bookmarks with `REF` and
   `PAGEREF` to them, a date field) added to the generator, with Word's reference data (pages of
   headers, footers and notes, field results) and PDFs; the page score measured over the whole
-  page.
+  page. (Done: 08 newsletter and 09 pump test memo; `word-reference.ps1` records sections,
+  headers and footers, notes, fields and bookmarks for every document, Word giving a note only
+  its reference's page; the score over the whole page is the harness's "on the page". Starting
+  points in corpus/README.)
 - [ ] 11.3 Schema v5 in `@folijs/core`: stories in the envelope, field, content control,
   bookmark and note reference nodes and their properties, sections' header and footer
   references to stories; validation, the v4 → v5 migration (a version change: what stays

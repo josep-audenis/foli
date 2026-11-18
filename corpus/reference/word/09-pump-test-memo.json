@@ -1,0 +1,242 @@
+{
+    "document":  "09-pump-test-memo.docx",
+    "word":  "16.0.20527",
+    "opened":  true,
+    "error":  null,
+    "revisionsAccepted":  0,
+    "pages":  3,
+    "paragraphs":  [
+                       {
+                           "text":  "Pump test memo",
+                           "page":  1,
+                           "line":  1,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  false
+                       },
+                       {
+                           "text":  "Issued on 3 March 2026",
+                           "page":  1,
+                           "line":  2,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  false
+                       },
+                       {
+                           "text":  "Method",
+                           "page":  1,
+                           "line":  3,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  false
+                       },
+                       {
+                           "text":  "The test followed the agreed procedure.",
+                           "page":  1,
+                           "line":  4,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  false
+                       },
+                       {
+                           "text":  "Each pump was run at its rated speed for an hour before the readings were taken, and the bearings were checked again once it had cooled. The figures below are the mean of three runs on different days, with the same operator and the same instruments, calibrated at the start of the week. Each pump was run at its rated speed for an hour before the readings were taken, and the bearings were checked again once it had cooled. The figures below are the mean of three runs on different days, with the same operator and the same instruments, calibrated at the start of the week. Each pump was run at its rated speed for an hour before the readings were taken, and the bearings were checked again once it had cooled. The figures below are the mean of three runs on different days, with the same operator and the same instruments, calibrated at the start of the week. Each pump was run at its rated speed for an hour before the readings were taken, and the bearings were checked again once it had cooled. The figures below are the mean of three runs on different days, with the same operator and the same instruments, calibrated at the start of the week. Each pump was run at its rated speed for an hour before the readings were taken, and the bearings were checked again once it had cooled. The figures below are the mean of three runs on different days, with the same operator and the same instruments, calibrated at the start of the week. ",
+                           "page":  1,
+                           "line":  5,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  false
+                       },
+                       {
+                           "text":  "Each pump was run at its rated speed for an hour before the readings were taken, and the bearings were checked again once it had cooled. The figures below are the mean of three runs on different days, with the same operator and the same instruments, calibrated at the start of the week. Each pump was run at its rated speed for an hour before the readings were taken, and the bearings were checked again once it had cooled. The figures below are the mean of three runs on different days, with the same operator and the same instruments, calibrated at the start of the week. Each pump was run at its rated speed for an hour before the readings were taken, and the bearings were checked again once it had cooled. The figures below are the mean of three runs on different days, with the same operator and the same instruments, calibrated at the start of the week. Each pump was run at its rated speed for an hour before the readings were taken, and the bearings were checked again once it had cooled. The figures below are the mean of three runs on different days, with the same operator and the same instruments, calibrated at the start of the week. ",
+                           "page":  1,
+                           "line":  21,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  false
+                       },
+                       {
+                           "text":  "Each pump was run at its rated speed for an hour before the readings were taken, and the bearings were checked again once it had cooled. The figures below are the mean of three runs on different days, with the same operator and the same instruments, calibrated at the start of the week. Each pump was run at its rated speed for an hour before the readings were taken, and the bearings were checked again once it had cooled. The figures below are the mean of three runs on different days, with the same operator and the same instruments, calibrated at the start of the week. ",
+                           "page":  1,
+                           "line":  34,
+                           "endPage":  1,
+                           "listString":  "",
+                           "inTable":  false
+                       },
+                       {
+                           "text":  "The rig is described in the maintenance file.",
+                           "page":  2,
+                           "line":  1,
+                           "endPage":  2,
+                           "listString":  "",
+                           "inTable":  false
+                       },
+                       {
+                           "text":  "Results",
+                           "page":  3,
+                           "line":  1,
+                           "endPage":  3,
+                           "listString":  "",
+                           "inTable":  false
+                       },
+                       {
+                           "text":  "Peak efficiency was 81 percent at the design flow.",
+                           "page":  3,
+                           "line":  2,
+                           "endPage":  3,
+                           "listString":  "",
+                           "inTable":  false
+                       },
+                       {
+                           "text":  "Figure 1: efficiency against flow",
+                           "page":  3,
+                           "line":  3,
+                           "endPage":  3,
+                           "listString":  "",
+                           "inTable":  false
+                       },
+                       {
+                           "text":  "Figure 2: power against flow",
+                           "page":  3,
+                           "line":  4,
+                           "endPage":  3,
+                           "listString":  "",
+                           "inTable":  false
+                       },
+                       {
+                           "text":  "Conclusions",
+                           "page":  3,
+                           "line":  5,
+                           "endPage":  3,
+                           "listString":  "",
+                           "inTable":  false
+                       },
+                       {
+                           "text":  "As stated on page 3: Peak efficiency was 81 percent",
+                           "page":  3,
+                           "line":  6,
+                           "endPage":  3,
+                           "listString":  "",
+                           "inTable":  false
+                       },
+                       {
+                           "text":  "Each pump was run at its rated speed for an hour before the readings were taken, and the bearings were checked again once it had cooled. The figures below are the mean of three runs on different days, with the same operator and the same instruments, calibrated at the start of the week. Each pump was run at its rated speed for an hour before the readings were taken, and the bearings were checked again once it had cooled. The figures below are the mean of three runs on different days, with the same operator and the same instruments, calibrated at the start of the week. ",
+                           "page":  3,
+                           "line":  7,
+                           "endPage":  3,
+                           "listString":  "",
+                           "inTable":  false
+                       }
+                   ],
+    "pictures":  [
+
+                 ],
+    "evenAndOddHeaders":  false,
+    "pageSections":  [
+                         1,
+                         1,
+                         1
+                     ],
+    "sections":  [
+                     {
+                         "page":  1,
+                         "start":  2,
+                         "columns":  1,
+                         "differentFirstPage":  false,
+                         "headers":  {
+                                         "default":  {
+                                                         "exists":  true,
+                                                         "linked":  false,
+                                                         "text":  "Pump test memo, page 1"
+                                                     },
+                                         "first":  {
+                                                       "exists":  false,
+                                                       "linked":  false,
+                                                       "text":  ""
+                                                   },
+                                         "even":  {
+                                                      "exists":  false,
+                                                      "linked":  false,
+                                                      "text":  ""
+                                                  }
+                                     },
+                         "footers":  {
+                                         "default":  {
+                                                         "exists":  true,
+                                                         "linked":  false,
+                                                         "text":  ""
+                                                     },
+                                         "first":  {
+                                                       "exists":  false,
+                                                       "linked":  false,
+                                                       "text":  ""
+                                                   },
+                                         "even":  {
+                                                      "exists":  false,
+                                                      "linked":  false,
+                                                      "text":  ""
+                                                  }
+                                     }
+                     }
+                 ],
+    "notes":  [
+                  {
+                      "kind":  "footnote",
+                      "referencePage":  1,
+                      "text":  "Procedure P-14, issue 3."
+                  },
+                  {
+                      "kind":  "footnote",
+                      "referencePage":  2,
+                      "text":  "The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file."
+                  },
+                  {
+                      "kind":  "endnote",
+                      "referencePage":  3,
+                      "text":  "Measured at the coupling."
+                  },
+                  {
+                      "kind":  "endnote",
+                      "referencePage":  3,
+                      "text":  "Design flow is 40 litres per second."
+                  }
+              ],
+    "fields":  [
+                   {
+                       "type":  31,
+                       "code":  "DATE \\@ \"d MMMM yyyy\"",
+                       "result":  "3 March 2026",
+                       "page":  1
+                   },
+                   {
+                       "type":  12,
+                       "code":  "SEQ Figure \\* ARABIC",
+                       "result":  "1",
+                       "page":  3
+                   },
+                   {
+                       "type":  12,
+                       "code":  "SEQ Figure \\* ARABIC",
+                       "result":  "2",
+                       "page":  3
+                   },
+                   {
+                       "type":  37,
+                       "code":  "PAGEREF PeakEfficiency \\h",
+                       "result":  "3",
+                       "page":  3
+                   },
+                   {
+                       "type":  3,
+                       "code":  "REF PeakEfficiency \\h",
+                       "result":  "Peak efficiency was 81 percent",
+                       "page":  3
+                   }
+               ],
+    "bookmarks":  [
+                      {
+                          "name":  "PeakEfficiency",
+                          "page":  3,
+                          "text":  "Peak efficiency was 81 percent"
+                      }
+                  ]
+}
