@@ -37,6 +37,7 @@ export function readStories(
   contextFor: (part: string, source: string) => ContentContext,
 ): Record<string, StoryJSON> {
   const stories: Record<string, StoryJSON> = {};
+  const notesRead = new Set<string>();
   for (const relationship of pkg.relationships(pkg.mainDocument)) {
     const part = relationship.partName ? pkg.part(relationship.partName) : undefined;
     if (relationship.external || !part) continue;
@@ -64,6 +65,9 @@ export function readStories(
         content: docOf(blocks(xml.root.children, { ...context, story: kind })),
       };
     } else if (note) {
+      // One part per kind, of the right kind: any other stays as it is.
+      if (notesRead.has(note) || !isW(xml.root, `${note}s`)) continue;
+      notesRead.add(note);
       for (const [key, el] of notesOf(xml.root, note)) {
         const type = attr(el, "type");
         stories[key] = {

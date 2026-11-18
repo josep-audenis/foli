@@ -537,24 +537,36 @@ export function commentsXml(
   return wrapPart(part, "w:comments", context.namespaces, body + added);
 }
 
-/** The separators a new notes part starts with, as Word writes them. */
-const noteSeparators = (kind: "footnote" | "endnote") =>
-  `<w:${kind} w:type="separator" w:id="-1"><w:p><w:r><w:separator/></w:r></w:p></w:${kind}>` +
-  `<w:${kind} w:type="continuationSeparator" w:id="0"><w:p><w:r><w:continuationSeparator/></w:r></w:p></w:${kind}>`;
+/** The separators a new notes part starts with, as Word writes them (unless it has its own). */
+const noteSeparators = (
+  kind: "footnote" | "endnote",
+  stories: Readonly<Record<string, StoryJSON>>,
+) =>
+  (Object.hasOwn(stories, `${kind}:-1`)
+    ? ""
+    : `<w:${kind} w:type="separator" w:id="-1"><w:p><w:r><w:separator/></w:r></w:p></w:${kind}>`) +
+  (Object.hasOwn(stories, `${kind}:0`)
+    ? ""
+    : `<w:${kind} w:type="continuationSeparator" w:id="0"><w:p><w:r><w:continuationSeparator/></w:r></w:p></w:${kind}>`);
 
 /**
  * A footnotes or endnotes part: a note unchanged from `originals` keeps its bytes, a changed one
- * is written from its story, one whose story is gone is removed, and new ones go at the end.
+ * is written from its story, and new ones go at the end. One whose story is gone is removed,
+ * unless Word needs it: a separator, or a note something still refers to (`referenced`).
  */
 export function notesXml(
   kind: "footnote" | "endnote",
   stories: Readonly<Record<string, StoryJSON>>,
   originals: Readonly<Record<string, StoryJSON>>,
+  referenced: ReadonlySet<string>,
   part: OriginalPart | undefined,
   context: WriteContext,
 ): string {
   const write = (key: string, story: StoryJSON) => {
+    if (!new RegExp(`^${kind}:-?\\d+$`).test(key))
+      throw new DocxError(`Not the id of a ${kind}: ${key.slice(0, 64)}`);
     const type = story.noteType ? ` w:type="${story.noteType}"` : "";
+    if (story.ext) fragment(story.ext.replace(/\/?>$/, "/>"), context.namespaces, kind);
     const start =
       story.ext?.replace(/\/>$/, ">") ?? `<w:${kind}${type} w:id="${key.slice(kind.length + 1)}">`;
     return `${start}${blocksXml(story.content.content ?? [], context)}</w:${kind}>`;
@@ -568,7 +580,12 @@ export function notesXml(
       const key = keyOf.get(child);
       if (key === undefined) return undefined;
       seen.add(key);
-      if (!Object.hasOwn(stories, key)) return null;
+      if (!Object.hasOwn(stories, key)) {
+        const original = originals[key];
+        const needed =
+          !original || (original.noteType ?? "normal") !== "normal" || referenced.has(key);
+        return needed ? undefined : null;
+      }
       const story = stories[key] as StoryJSON;
       return same(story, originals[key]) ? undefined : key;
     },
@@ -579,7 +596,7 @@ export function notesXml(
     .filter(([key, story]) => story.kind === kind && !seen.has(key))
     .map(([key, story]) => write(key, story))
     .join("");
-  const separators = part ? "" : noteSeparators(kind);
+  const separators = part ? "" : noteSeparators(kind, stories);
   return wrapPart(part, `w:${kind}s`, context.namespaces, separators + body + added);
 }
 

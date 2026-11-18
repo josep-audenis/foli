@@ -394,7 +394,7 @@ export function comments(
     if (initials !== undefined && initials.length > 9) {
       context.report.unmodeled("w:comment@w:initials", "longer than 9");
     }
-    const content = blocks(el.children, context);
+    const content = blocks(el.children, { ...context, story: "comment" });
     const comment = compact({
       id: commentId,
       author: author.length <= 255 ? author : author.slice(0, 255),

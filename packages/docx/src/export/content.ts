@@ -269,7 +269,8 @@ function runContentXml(node: NodeJSON, deleted: boolean, context: WriteContext):
       return `${el("w:commentReference", { "w:id": String(a.id) }).slice(0, -2)}${bagXml(a.attributes, context.namespaces, ["w:id"])}/>`;
     case "noteReference": {
       const [kind, id] = String(a.story).split(/:(.*)/s) as [string, string];
-      if ((kind !== "footnote" && kind !== "endnote") || !id) return notYet(node);
+      if ((kind !== "footnote" && kind !== "endnote") || !/^-?\d+$/.test(id ?? ""))
+        throw new DocxError(`Not a note's id: ${String(a.story).slice(0, 64)}`);
       const known = ["w:customMarkFollows", "w:id"];
       const open = el(`w:${kind}Reference`, {
         "w:customMarkFollows": a.customMark === undefined ? undefined : a.customMark ? "1" : "0",

@@ -7,13 +7,14 @@
 //
 // `make` exports every corpus document with stories to <dir>/foli twice: as imported (<name>.docx)
 // and edited (<name>-edited.docx: "Foli edit" added to every header and footer and to the last
-// normal note, and one new footnote story with its reference at the end of the first paragraph),
-// and a new package with a header, a footer, a footnote and an endnote (00-new-stories). `check`
-// reads what Word made of them: each opened, as many pages as the original has (edited ones may
-// differ by what the text adds), the stories' text as Foli wrote it. One line per document; exits
-// 1 on any difference.
+// normal note, a table in every header, and a new footnote with a tracked insertion and a comment,
+// its reference at the end of the first paragraph), and a new package with a header, a footer, a
+// footnote and an endnote (00-new-stories). `check` needs Word's data for every file made: each
+// opened; an unchanged one has the original's pages, sections and notes; an edited one every
+// header and footer, the table's text and every note edit. One line per file; exits 1 on any
+// difference.
 
-import { mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { createDocument } from "../../packages/core/dist/index.js";
 import { exportDocx, importDocx } from "../../packages/docx/dist/index.js";
@@ -28,6 +29,7 @@ const corpus = join(root, "corpus", "word");
 const reference = join(root, "corpus", "reference", "word");
 const EDIT = "Foli edit";
 const ADDED = "A note Foli added";
+const CELL = "Foli cell";
 const json = (path) => JSON.parse(readFileSync(path, "utf8").replace(/^﻿/, ""));
 const paragraph = (text) => ({ type: "paragraph", content: [{ type: "text", text }] });
 const doc = (...content) => ({ type: "doc", content });
@@ -51,9 +53,35 @@ function edited(document) {
         ...(story.content.content.at(-1).content ?? []),
         { type: "text", text: ` ${EDIT}` },
       ];
+    if (story.kind === "header")
+      story.content.content.unshift({
+        type: "table",
+        attrs: { grid: [2000] },
+        content: [
+          { type: "tableRow", content: [{ type: "tableCell", content: [paragraph(CELL)] }] },
+        ],
+      });
   }
   const free = Math.max(0, ...notes.map((id) => Number(id.split(":")[1]))) + 1;
-  stories[`footnote:${free}`] = { kind: "footnote", content: note(ADDED) };
+  const COMMENT = 90_000;
+  stories[`footnote:${free}`] = {
+    kind: "footnote",
+    content: doc({
+      type: "paragraph",
+      content: [
+        { type: "noteMark" },
+        { type: "commentStart", attrs: { id: COMMENT } },
+        {
+          type: "text",
+          text: ` ${ADDED}`,
+          marks: [{ type: "insertion", attrs: { id: 90_001, author: "Foli" } }],
+        },
+        { type: "commentEnd", attrs: { id: COMMENT } },
+        { type: "commentReference", attrs: { id: COMMENT } },
+      ],
+    }),
+  };
+  copy.comments.push({ id: COMMENT, author: "Foli", content: [paragraph("On a note")] });
   copy.stories = stories;
   const first = copy.content.content.find((b) => b.type === "paragraph");
   first.content = [
@@ -107,9 +135,14 @@ const report = (name, problems) => {
 };
 const storyTexts = (word, side) =>
   word.sections.flatMap((s) => Object.values(s[side]).map((v) => v.text));
-for (const file of readdirSync(join(dir, "word")).filter((n) => n.endsWith(".json"))) {
-  const word = json(join(dir, "word", file));
-  const name = file.replace(".json", "");
+for (const file of readdirSync(join(dir, "foli")).filter((n) => n.endsWith(".docx"))) {
+  const name = file.replace(".docx", "");
+  const path = join(dir, "word", `${name}.json`);
+  if (!existsSync(path)) {
+    report(name, ["no data from Word"]);
+    continue;
+  }
+  const word = json(path);
   const problems = [];
   if (!word.opened) {
     report(name, [`not opened: ${word.error}`]);
@@ -130,9 +163,18 @@ for (const file of readdirSync(join(dir, "word")).filter((n) => n.endsWith(".jso
     if (!notes.some((t) => t.includes(ADDED))) problems.push("the added note is missing");
     if (word.notes.length !== base.notes.length + 1)
       problems.push(`${word.notes.length} notes, expected ${base.notes.length + 1}`);
-    const parts = [...storyTexts(word, "headers"), ...storyTexts(word, "footers")];
-    if (base.sections.some((s) => Object.values(s.headers).some((h) => h.exists && h.text.trim())))
-      if (!parts.some((t) => t.includes(EDIT))) problems.push("the edited header or footer");
+    const editedNote = base.notes.some((n) => n.kind === "footnote");
+    if (editedNote && !notes.some((t) => t.includes(EDIT))) problems.push("the edited note");
+    for (const side of ["headers", "footers"])
+      base.sections.forEach((section, s) => {
+        for (const [variant, story] of Object.entries(section[side])) {
+          if (!story.exists || !story.text.trim()) continue;
+          const text = word.sections[s]?.[side][variant]?.text ?? "";
+          if (!text.includes(EDIT)) problems.push(`section ${s + 1} ${side} ${variant}: no edit`);
+          if (side === "headers" && !text.includes(CELL))
+            problems.push(`section ${s + 1} header ${variant}: no table`);
+        }
+      });
   } else {
     if (word.pages !== base.pages) problems.push(`${word.pages} pages, Word's ${base.pages}`);
     if (JSON.stringify(word.notes) !== JSON.stringify(base.notes)) problems.push("notes differ");

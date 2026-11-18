@@ -151,15 +151,18 @@ export function importPackage(pkg: DocxPackage): DocxImport {
 export function packageStories(pkg: DocxPackage): Record<string, StoryJSON> {
   const report = new Recorder();
   const resources = new Map<string, ResourceJSON>();
-  return canonicalStories(pkg, (part, source) => ({
-    source,
-    report,
-    pkg,
-    part,
-    moves: new Moves(),
-    relationship: (id) => pkg.relationships(part).find((r) => r.id === id),
-    resources,
-  }));
+  return canonicalStories(pkg, (part, source) => {
+    const byId = new Map(pkg.relationships(part).map((r) => [r.id, r]));
+    return {
+      source,
+      report,
+      pkg,
+      part,
+      moves: new Moves(),
+      relationship: (id) => byId.get(id),
+      resources,
+    };
+  });
 }
 
 export type { ImportReport } from "./report.js";

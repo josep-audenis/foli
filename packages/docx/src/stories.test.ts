@@ -117,7 +117,21 @@ describe("writing stories", () => {
     (stories["footnote:1"] as { content: NodeJSON }).content = doc(paragraph("Changed note"));
     delete stories["endnote:2"];
     stories["footnote:9"] = { kind: "footnote", content: doc(paragraph("Added note")) };
-    const out = await readPackage(await exportDocx({ ...document, stories }, pkg));
+    const without = (node: NodeJSON): NodeJSON => ({
+      ...node,
+      ...(node.content
+        ? {
+            content: node.content.filter((n) => n.attrs?.story !== "endnote:2").map(without),
+          }
+        : {}),
+    });
+    // The added note needs a reference, or nothing would show it.
+    const content = without(document.content);
+    (content.content?.[0] as NodeJSON).content = [
+      ...(content.content?.[0]?.content ?? []),
+      { type: "noteReference", attrs: { story: "footnote:9" } },
+    ];
+    const out = await readPackage(await exportDocx({ ...document, stories, content }, pkg));
     const footnotes = out.text("/word/footnotes.xml");
     expect(footnotes).toContain(separator);
     expect(footnotes).toContain(long);
@@ -174,6 +188,135 @@ describe("writing stories", () => {
     );
     expect(textOf(added.document.stories?.newFooter?.content as NodeJSON)).toBe("Added footer");
     expect(added.document.section.footers?.default).toBe("newFooter");
+  });
+
+  it("keeps what Word needs when stories are left out", async () => {
+    const { document, package: pkg } = await load("09-pump-test-memo.docx");
+    const { "footnote:1": _used, "footnote:-1": _separator, ...stories } = document.stories ?? {};
+    const out = await readPackage(await exportDocx({ ...document, stories }, pkg));
+    const footnotes = out.text("/word/footnotes.xml");
+    expect(footnotes).toContain('w:id="1"');
+    expect(footnotes).toContain('w:id="-1"');
+  });
+
+  it("refuses a reference without a note, and ids that would break the package", async () => {
+    const { document, package: pkg } = await load("09-pump-test-memo.docx");
+    const note = (extra: NodeJSON): FoliDocument => ({
+      ...document,
+      content: { ...document.content, content: [...(document.content.content ?? []), extra] },
+    });
+    await expect(
+      exportDocx(
+        note({
+          type: "paragraph",
+          content: [{ type: "noteReference", attrs: { story: "footnote:77" } }],
+        }),
+        pkg,
+      ),
+    ).rejects.toThrow(/has no note/);
+    const styles = pkg.relationships(pkg.mainDocument).find((r) => r.type.endsWith("/styles"));
+    const story = { kind: "header" as const, content: doc(paragraph("x")) };
+    await expect(
+      exportDocx({ ...document, stories: { [styles?.id as string]: story } }, pkg),
+    ).rejects.toThrow(/another relationship/);
+    await expect(
+      exportDocx({ ...document, stories: { ...document.stories, 'a"b': story } }, pkg),
+    ).rejects.toThrow(/Not a relationship id/);
+    await expect(
+      exportDocx(
+        {
+          ...document,
+          stories: {
+            ...document.stories,
+            "footnote:x": { kind: "footnote", content: doc(paragraph("x")) },
+          },
+        },
+        pkg,
+      ),
+    ).rejects.toThrow(/Not the id of a footnote/);
+    await expect(
+      exportDocx(
+        {
+          ...document,
+          stories: {
+            ...document.stories,
+            "footnote:8": { kind: "footnote", ext: "<w:p>", content: doc(paragraph("x")) },
+          },
+        },
+        pkg,
+      ),
+    ).rejects.toThrow(/must be a w:footnote/);
+  });
+
+  it("refuses a header part that cannot hold what is written", async () => {
+    const { document, package: pkg } = await load("08-newsletter.docx");
+    const id = headerId(document);
+    const name = pkg.relationships(pkg.mainDocument).find((r) => r.id === id)?.partName as string;
+    const foreign = pkg
+      .text(name)
+      .replace(/\bw:/g, "x:")
+      .replace(/xmlns:w=/, "xmlns:x=");
+    const changed = await readPackage(
+      await pkg.write(new Map([[name, new TextEncoder().encode(foreign)]])),
+    );
+    const stories = structuredClone(document.stories ?? {});
+    (stories[id] as { content: NodeJSON }).content = doc(paragraph("New"));
+    await expect(exportDocx({ ...document, stories }, changed)).rejects.toThrow(/namespaces/);
+  });
+
+  it("keeps references in comments verbatim, so the import succeeds", async () => {
+    const { package: pkg } = await load("02-services-agreement-redlined.docx");
+    const name = "/word/comments.xml";
+    const source = pkg
+      .text(name)
+      .replace(
+        /<\/w:p><\/w:comment>/,
+        '<w:r><w:footnoteReference w:id="1"/></w:r></w:p></w:comment>',
+      );
+    const again = await importDocx(
+      await pkg.write(new Map([[name, new TextEncoder().encode(source)]])),
+    );
+    expect(JSON.stringify(again.document.comments)).toContain("footnoteReference w:id");
+  });
+
+  it("round-trips tables, tracked changes and comments in stories", async () => {
+    const { document, package: pkg } = await load("09-pump-test-memo.docx");
+    const stories = structuredClone(document.stories ?? {});
+    const header = Object.keys(stories).find((id) => stories[id]?.kind === "header") as string;
+    const table: NodeJSON = {
+      type: "table",
+      attrs: { grid: [2000] },
+      content: [
+        {
+          type: "tableRow",
+          content: [{ type: "tableCell", content: [paragraph("Cell in a header")] }],
+        },
+      ],
+    };
+    (stories[header] as { content: NodeJSON }).content = doc(table, paragraph("After"));
+    const insertion = { type: "insertion", attrs: { id: 901, author: "A" } };
+    (stories["footnote:1"] as { content: NodeJSON }).content = doc({
+      type: "paragraph",
+      content: [
+        { type: "noteMark" },
+        { type: "commentStart", attrs: { id: 902 } },
+        { type: "text", text: " tracked", marks: [insertion] },
+        { type: "commentEnd", attrs: { id: 902 } },
+        { type: "commentReference", attrs: { id: 902 } },
+      ],
+    });
+    const comments = [
+      ...document.comments,
+      { id: 902, author: "A", content: [paragraph("On a note")] },
+    ];
+    const again = await importDocx(await exportDocx({ ...document, stories, comments }, pkg));
+    const read = again.document.stories ?? {};
+    expect(read[header]?.content.content?.[0]?.type).toBe("table");
+    expect(textOf(read[header]?.content as NodeJSON)).toContain("Cell in a header");
+    const note = JSON.stringify(read["footnote:1"]?.content);
+    expect(note).toContain('"insertion"');
+    expect(note).toContain('"commentReference"');
+    expect(again.document.comments.some((c) => c.id === 902)).toBe(true);
   });
 
   it("refuses a section whose story is missing without the package", async () => {

@@ -33,8 +33,10 @@ export interface ContentContext extends Context {
   readonly tableDepth?: number;
   /** The envelope's resources (pictures' images), filled as content is read. */
   readonly resources: Map<string, ResourceJSON>;
-  /** The kind of story being read (ADR-0007): what one may not hold stays verbatim. */
-  readonly story?: "header" | "footer" | "footnote" | "endnote";
+  /**
+   * The kind of story being read (ADR-0007), or a comment: what one may not hold stays verbatim.
+   */
+  readonly story?: "header" | "footer" | "footnote" | "endnote" | "comment";
 }
 
 /** Tables nested deeper stay opaque: within the model's depth (three levels per table). */

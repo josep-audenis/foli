@@ -14,9 +14,10 @@ import {
   type StoryJSON,
 } from "@folijs/core";
 import { packageStories } from "../import/index.js";
-import { child, REL } from "../import/ooxml.js";
+import { child, isW, REL, W } from "../import/ooxml.js";
 import { DocxError, type DocxPackage, type NewPart } from "../package.js";
 import { newSettingsXml, withTrackRevisions } from "../settings.js";
+import { parseXml, type XmlElement } from "../xml.js";
 import { deflateEntry, writeZip } from "../zip.js";
 import { blocksXml, type WriteContext } from "./content.js";
 import {
@@ -213,7 +214,12 @@ export async function exportDocx(
       `The document refers to a part of its original package (${reference}): export it with that package`,
     );
   }
-  const originals = original && doc.stories ? packageStories(original) : {};
+  const referenced = noteReferences(doc);
+  const originals =
+    original && (doc.stories || referenced.modeled.size) ? packageStories(original) : {};
+  for (const key of referenced.modeled)
+    if (!Object.hasOwn(doc.stories ?? {}, key) && !Object.hasOwn(originals, key))
+      throw new DocxError(`A note reference has no note: ${key.slice(0, 64)}`);
   // The parts written from the model: their drawings are the document's own.
   const rewritten = original
     ? [
@@ -224,8 +230,6 @@ export async function exportDocx(
             (r) =>
               r.partName &&
               (r.type === REL.comments ||
-                r.type === REL.footnotes ||
-                r.type === REL.endnotes ||
                 (doc.stories &&
                   Object.hasOwn(doc.stories, r.id) &&
                   !same(doc.stories[r.id], originals[r.id]))),
@@ -236,8 +240,47 @@ export async function exportDocx(
   const bytes = await pictureBytes(doc, original, options.resource);
   const media = new Media(doc, original, bytes, rewritten);
   return original
-    ? intoPackage(doc, original, originals, options, media)
-    : newPackage(doc, options, media);
+    ? intoPackage(doc, original, originals, referenced.all, options, media)
+    : newPackage(doc, referenced.all, options, media);
+}
+
+/**
+ * The notes the document refers to: by `noteReference` nodes (`modeled`), and those with the
+ * references kept verbatim too (`all`), as story ids.
+ */
+function noteReferences(doc: FoliDocument): { modeled: Set<string>; all: Set<string> } {
+  const modeled = new Set<string>();
+  const all = new Set<string>();
+  JSON.stringify([doc.content, doc.comments, doc.stories], (key, value) => {
+    if (key === "xml" && typeof value === "string")
+      for (const [, kind, id] of value.matchAll(
+        /<[\w.-]+:(foot|end)noteReference\b[^>]*?\b[\w.-]+:id="(-?\d+)"/g,
+      ))
+        all.add(`${kind}note:${id}`);
+    const node = value as { type?: unknown; attrs?: { story?: unknown } } | null;
+    if (node?.type === "noteReference" && typeof node.attrs?.story === "string") {
+      modeled.add(node.attrs.story);
+      all.add(node.attrs.story);
+    }
+    return value;
+  });
+  return { modeled, all };
+}
+
+/** `text` if it is a well-formed part whose `w:` content is WordprocessingML; DocxError if not. */
+function checkedPart(name: string, text: string): string {
+  let root: XmlElement;
+  try {
+    root = parseXml(text).root;
+  } catch (error) {
+    throw new DocxError(`${name}: its namespaces do not fit what is written: ${error}`, {
+      cause: error,
+    });
+  }
+  for (const child of root.children)
+    if (child.kind === "element" && child.prefix === "w" && child.ns !== W)
+      throw new DocxError(`${name}: its w: prefix is not WordprocessingML`);
+  return text;
 }
 
 /** Schema v5's additions outside the content, until 11.5 and 11.6 write them: never dropped. */
@@ -340,6 +383,7 @@ async function intoPackage(
   doc: FoliDocument,
   pkg: DocxPackage,
   originals: Readonly<Record<string, StoryJSON>>,
+  referenced: ReadonlySet<string>,
   options: ExportOptions,
   media: Media,
 ): Promise<Uint8Array> {
@@ -448,10 +492,16 @@ async function intoPackage(
   const ownRelationships = (name: string, existing: boolean) =>
     new Relationships(existing ? pkg.relationships(name) : []);
   const newNames = new Set<string>();
+  const writtenStories = new Map<string, string>();
   for (const [id, story] of Object.entries(stories)) {
     if (story.kind !== "header" && story.kind !== "footer") continue;
     const { root, rel, contentType } = HEADER_FOOTER[story.kind];
     const related = pkg.relationships(mainName).find((r) => r.id === id);
+    // Only a part this story was read from: an id can name any relationship of the package.
+    if (related && (related.type !== rel || !Object.hasOwn(originals, id)))
+      throw new DocxError(`Story ${id.slice(0, 64)} has the id of another relationship`);
+    if (!related && !/^[A-Za-z_][\w.-]*$/.test(id))
+      throw new DocxError(`Not a relationship id: ${id.slice(0, 64)}`);
     const existing = related?.partName ? pkg.part(related.partName) : undefined;
     if (existing && same(story, originals[id])) continue;
     const name = existing?.name ?? freePart(story.kind, (n) => !!pkg.part(n) || newNames.has(n));
@@ -459,7 +509,15 @@ async function intoPackage(
     const ns = xml ? namespacesOf(xml.root, xml.source) : namespaces;
     const partRels = ownRelationships(name, !!existing);
     const inner = blocksXml(story.content.content ?? [], contextFor(ns, partRels, media, name));
-    const text = wrapPart(xml && { root: xml.root, source: xml.source }, root, ns, inner);
+    const text = checkedPart(
+      name,
+      wrapPart(xml && { root: xml.root, source: xml.source }, root, ns, inner),
+    );
+    // Two relationships can share a part: both stories must then say the same.
+    const earlier = writtenStories.get(name);
+    if (earlier !== undefined && earlier !== text)
+      throw new DocxError(`${name} is shared by stories that differ`);
+    writtenStories.set(name, text);
     if (existing) set(name, text);
     else {
       newNames.add(name);
@@ -475,12 +533,19 @@ async function intoPackage(
     if (!name && !held) continue;
     if (name && !doc.stories) continue;
     const target = name ?? defaultName;
+    if (name && !isW(pkg.xml(name).root, `${kind}s`)) {
+      if (held) throw new DocxError(`${name} is not a ${kind}s part`);
+      continue;
+    }
     const partRels = ownRelationships(target, !!name);
     const write = (o: OriginalPart | undefined, ns: Namespaces) =>
-      notesXml(kind, stories, originals, o, {
-        ...contextFor(ns, partRels, media, target),
-        note: kind,
-      });
+      checkedPart(
+        target,
+        notesXml(kind, stories, originals, referenced, o, {
+          ...contextFor(ns, partRels, media, target),
+          note: kind,
+        }),
+      );
     part(rel, defaultName, contentType, write, held);
     if (partRels.added.length) writeRelationships(target, partRels);
   }
@@ -548,6 +613,7 @@ function changedThreads(doc: FoliDocument, pkg: DocxPackage): boolean {
 /** A new package: content types, relationships, the document and the parts it needs. */
 async function newPackage(
   doc: FoliDocument,
+  referenced: ReadonlySet<string>,
   options: ExportOptions,
   media: Media,
 ): Promise<Uint8Array> {
@@ -572,6 +638,8 @@ async function newPackage(
   }
   for (const [id, story] of Object.entries(doc.stories ?? {})) {
     if (story.kind !== "header" && story.kind !== "footer") continue;
+    if (!/^[A-Za-z_][\w.-]*$/.test(id))
+      throw new DocxError(`Not a relationship id: ${id.slice(0, 64)}`);
     const { root, rel, contentType } = HEADER_FOOTER[story.kind];
     const name = freePart(story.kind, (n) => parts.some((p) => p.name === n));
     const partRels = new Relationships([]);
@@ -601,7 +669,7 @@ async function newPackage(
       name,
       rel,
       contentType,
-      notesXml(kind, stories, {}, undefined, {
+      notesXml(kind, stories, {}, referenced, undefined, {
         ...contextFor(DEFAULT_NAMESPACES, partRels, media, name),
         note: kind,
       }),
