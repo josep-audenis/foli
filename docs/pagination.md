@@ -58,8 +58,19 @@ editor state ──► measure the blocks without a cached measurement (DOM read
   column (the last column's, its page). Word's rules read from its PDF of corpus 08: the next
   band starts after the tallest column plus the last paragraph's space after, and every column of
   that band starts there; an empty paragraph that only holds a section break takes no room.
+- **Headers and footers (11.7):** each page shows those of its first section: the first-page
+  variant on the page a section with a different first page starts on, the even one on an even
+  displayed number when the document has even and odd headers, else the default; what a section
+  does not have comes from the sections before it. They are drawn inside the page's margins
+  (`.foli-region`, as large as the page so that floating pictures in them are placed against it,
+  not editable, no pointer events), from the model, by the read-only blocks renderer, `PAGE`,
+  `NUMPAGES` and `SECTIONPAGES` filled in the copy drawn. One taller than its margin pushes the
+  text: the flow asks the section for each page's box (`FlowSection.box`, by page number and first
+  page), a page shared by sections having the first one's. The page counts are those of the flow
+  before; when they change a text height the flow runs again, twice at most. Word's blank page
+  before an even or odd page section has neither.
 - **Geometry:** each page gets its first section's size (`width`, `min-height`) and margins
-  (`padding`) inline in mm. The content box is `height − top − bottom` by `width − left − right`. A scaled
+  (`padding`) inline in mm (px where a header or footer pushes them). The content box is `height − top − bottom` by `width − left − right`. A scaled
   ancestor (`transform`, `zoom`) is divided out of every measurement. The React theme
   (`@folijs/react/styles.css`) adds background, shadow and the gap between pages; a bare
   `@folijs/view` host gets none of them.
@@ -96,7 +107,9 @@ editor state ──► measure the blocks without a cached measurement (DOM read
   identity). An edit measures only the blocks it changed; `flowFrom` starts at the first
   changed block (at the start of its section when that is balanced) from the previous flow's
   state and stops once the state before an unchanged block equals the previous one, never inside
-  a balanced section (property tests: equal to a full flow, sections included). Unchanged fragments keep
+  a balanced section (property tests: equal to a full flow, sections included). A header or footer
+  whose height changed starts the flow from the top (the measurements stay); one that keeps its
+  height is only drawn again, without a flow. Unchanged fragments keep
   their DOM. Edits flow synchronously, and so does a settings change (`setDocument`, measuring
   every block again). A block resized without an edit (CSS, a font, a container; seen by a
   `ResizeObserver`) and web fonts loading re-flow in the next animation frame, at most once per
@@ -144,7 +157,8 @@ All in Playwright on Chromium, Firefox and WebKit (Windows 11), plus unit and pr
   flow's units, split at a line, header rows repeated). Floating pictures are laid out by the
   browser around their paragraph, not by the flow: one reaching past its page's text makes the
   page taller instead of moving to the next page ([limitations](limitations.md#pictures)).
-- No page chrome: headers, footers and page numbers arrive in Phase 11.
+- Footnotes are not on the pages yet (11.10). While a header is being edited its page fields show
+  their stored results.
 - A paragraph split between columns of different widths continues by its share of the text (a
   line either way; [limitations](limitations.md)). Keep with next stops at a section's start.
 - Line measurement assumes left-to-right text without vertical-align offsets. A split block's

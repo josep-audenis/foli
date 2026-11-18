@@ -1171,11 +1171,20 @@ Each task is a PR on `phase-11/sections-fields`, the build green after each.
   continues by its share of the text, and read-only pages can repeat or lose a few words there; a
   selection deleted across a break does not pass its header references on; the break is not
   drawn; a next-column section with another column count starts a page.)
-- [ ] 11.7 Headers and footers: laid out in their margins on every page (first, even and
+- [x] 11.7 Headers and footers: laid out in their margins on every page (first, even and
   default variants, linked to the previous section, a taller one pushing the text), page
   fields filled per page; edited in place (double-click or a command opens the story, Escape
   returns) with typing, formatting, pictures, tables, undo and tracking; link to previous and
-  different first page and even pages as commands; T1–T5 in a header; on Word's pages.
+  different first page and even pages as commands; T1–T5 in a header; on Word's pages. (Done:
+  `StoryStep`, `editor.story(id)` with one history, accept and reject all across stories,
+  `settings` read and written; both renderers draw the regions, the variant rules checked on
+  Word's PDFs, which added one: Word's blank page has no header or footer. Page score 0.768 to
+  0.811, 03 from 0.138 to 0.830 and 1.000 inside the margins, 08 1.000. `word-headers.spec.ts` in
+  three engines, T4 by CDP in Chromium; T5 here is a header pushing the body across pages, a
+  header having no pages of its own. Shortcuts: an open header shows its page fields' stored
+  results; a line with text and a picture keeps the room below the baseline, only a line of
+  pictures alone ends at their foot; a story's height comes from the read-only renderer, the open
+  one is drawn by the editing renderer.)
 - [ ] 11.8 Fields: shown with their results (shaded when selected, as Word does), selected and
   deleted whole, updated on demand (one field, all, before print and PDF): `PAGE`, `NUMPAGES`,
   `SECTIONPAGES`, `DATE`, `REF`, `PAGEREF`, `SEQ`, `TOC` built from heading styles with their

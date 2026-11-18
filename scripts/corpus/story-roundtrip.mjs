@@ -9,7 +9,11 @@
 // and edited (<name>-edited.docx: "Foli edit" added to every header and footer and to the last
 // normal note, a table in every header, and a new footnote with a tracked insertion, its
 // reference at the end of the first paragraph), and a new package with a header, a footer, a
-// footnote and an endnote (00-new-stories). `check` needs Word's data for every file made: each
+// footnote and an endnote (00-new-stories). 11.7 adds headers changed through the editor's
+// commands: 08 without even pages or a first page and with its last section's header unlinked
+// (08-newsletter-commands), 05 with even pages on and a header typed in through `editor.story`
+// (05-business-letter-commands), and a new package with even and odd headers (00-new-settings).
+// `check` needs Word's data for every file made: each
 // opened; an unchanged one has the original's pages, sections and notes; an edited one every
 // header and footer with its original text, the edit and (headers) one more table, its pictures
 // showing the same image bytes, every other note as it was and in its place, the edited and the
@@ -17,7 +21,13 @@
 
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { createDocument } from "../../packages/core/dist/index.js";
+import {
+  createDocument,
+  createEditor,
+  setDifferentEvenPages,
+  setDifferentFirstPage,
+  setStoryLinked,
+} from "../../packages/core/dist/index.js";
 import { exportDocx, importDocx } from "../../packages/docx/dist/index.js";
 
 /** Each story's pictures, in order, as the bytes of their images. */
@@ -50,6 +60,7 @@ const reference = join(root, "corpus", "reference", "word");
 const EDIT = "Foli edit";
 const ADDED = "A note Foli added";
 const CELL = "Foli cell";
+const TYPED = "Foli typed";
 const json = (path) => JSON.parse(readFileSync(path, "utf8").replace(/^﻿/, ""));
 const paragraph = (text) => ({ type: "paragraph", content: [{ type: "text", text }] });
 const doc = (...content) => ({ type: "doc", content });
@@ -117,6 +128,37 @@ if (mode === "make") {
     await write(name, await exportDocx(document, pkg));
     await write(name.replace(".docx", "-edited.docx"), await exportDocx(edited(document), pkg));
   }
+  const commands = async (name, change) => {
+    const { document, package: pkg } = await importDocx(
+      new Uint8Array(readFileSync(join(corpus, `${name}.docx`))),
+    );
+    const editor = createEditor({ document });
+    change(editor);
+    await write(`${name}-commands.docx`, await exportDocx(editor.getDocument(), pkg));
+  };
+  await commands("08-newsletter", (editor) => {
+    editor.run(setDifferentEvenPages(false));
+    editor.run(setDifferentFirstPage(false, 0));
+    editor.run(setStoryLinked("header", "default", false, 4));
+  });
+  await commands("05-business-letter", (editor) => {
+    editor.run(setDifferentEvenPages(true));
+    const header = editor.story("rId7");
+    header.select(1);
+    header.commands.insertText(`${TYPED} `);
+  });
+  await write(
+    "00-new-settings.docx",
+    await exportDocx({
+      ...createDocument(doc(paragraph("Body"))),
+      section: { ...createDocument().section, headers: { default: "h1", even: "h2" } },
+      settings: { evenAndOddHeaders: true },
+      stories: {
+        h1: { kind: "header", content: doc(paragraph("Odd header")) },
+        h2: { kind: "header", content: doc(paragraph("Even header")) },
+      },
+    }),
+  );
   const blank = createDocument(
     doc({
       type: "paragraph",
@@ -169,6 +211,31 @@ for (const file of readdirSync(join(dir, "foli")).filter((n) => n.endsWith(".doc
     if (!storyTexts(word, "footers").includes("New footer")) problems.push("footer");
     if (!notes.some((t) => t.includes("New footnote"))) problems.push("footnote");
     if (!notes.some((t) => t.includes("New endnote"))) problems.push("endnote");
+    report(name, problems);
+    continue;
+  }
+  if (name === "00-new-settings") {
+    if (word.evenAndOddHeaders !== true) problems.push("even and odd headers are off");
+    const { default: odd, even } = word.sections[0].headers;
+    if (!odd.text.includes("Odd header")) problems.push("default header");
+    if (!even.exists || !even.text.includes("Even header")) problems.push("even header");
+    report(name, problems);
+    continue;
+  }
+  if (name === "08-newsletter-commands") {
+    const base = json(join(reference, "08-newsletter.json"));
+    if (word.evenAndOddHeaders !== false) problems.push("even and odd headers are still on");
+    if (word.sections[0].differentFirstPage !== false) problems.push("still a first page");
+    const header = word.sections[4].headers.default;
+    if (header.linked !== false) problems.push("the last section's header is still linked");
+    if (header.text !== base.sections[4].headers.default.text)
+      problems.push(`the unlinked header says "${header.text}"`);
+    report(name, problems);
+    continue;
+  }
+  if (name === "05-business-letter-commands") {
+    if (word.evenAndOddHeaders !== true) problems.push("even and odd headers are off");
+    if (!word.sections[0].headers.default.text.startsWith(TYPED)) problems.push("typed text");
     report(name, problems);
     continue;
   }

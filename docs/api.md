@@ -121,6 +121,10 @@ starts, orientation (swapping width and height), page size and margins in centim
 the space between them, a line between them and set widths. Only what changed is applied; a wrong
 value marks its field with an announced message; Apply (Enter), Cancel (Escape).
 
+Header is a menu button: Edit header, Edit footer, Close header and footer, and the checkbox items
+Different first page, Different odd and even pages and Link to previous (with a story open). While
+a story is open the toolbar's commands go to it.
+
 Table is a menu button (WAI-ARIA menu: `menuitem` items, "Repeat as header row" a
 `menuitemcheckbox` checked when the selection's rows are header rows): Insert table…, insert row
 above or below, insert column left or right, delete rows, columns or the table, merge cells,
@@ -327,7 +331,15 @@ definitions (the Word 2013 to 2019 template's) the first time they are applied, 
 | `dispatch(tr)`                 | Applies a transaction (`state.tr`).                                                                                                                                                                                                                                                                                           |
 | `getDocument()`                | The current document (`FoliDocument`).                                                                                                                                                                                                                                                                                        |
 | `setDocument(doc)`             | Replaces the document and settings, clears undo history. Listeners get an empty transaction list.                                                                                                                                                                                                                             |
+| `story(id)`                    | An `Editor` over a story (header, footer or note), null when there is none: its own selection, every change a step of this editor's history. `getDocument` gives the story as the content; `undo` and `redo` are the document's.                                                                                              |
+| `storyView`                    | Set by the view showing the pages: `open` (the story open there: `id`, `side`, `variant`, `section`), `edit(side, page?)`, `close()`. `storyChanged()` tells listeners it changed.                                                                                                                                            |
 | `subscribe(listener)`          | `(state, transactions) => void` after every change (selection included); returns unsubscribe. `transactions.some(tr => tr.docChanged)` tells content changes apart.                                                                                                                                                           |
+
+Headers and footers: `ensureStory(side, variant, section)` makes one where none shows,
+`setStoryLinked(side, variant, linked, section?)` links a section's to the previous section's or
+unlinks it with a copy, `setDifferentFirstPage(on, section?)`, `setDifferentEvenPages(on)`.
+`documentSections(state)`, `storyOfSection(sections, index, side, variant)` and
+`pageVariant(section, page, evenAndOdd)` say which story a page shows.
 
 Headings: `setBlockType("heading", { level: 2 })`; back to text: `setBlockType("paragraph")`.
 Lists: `commands.toggleList("bulletList" | "orderedList")` (removes the selection's numbering
@@ -439,6 +451,12 @@ const view = new EditorView(host, editor, { editable: true, placeholder: "" });
   the paragraph, behind and in front of text absolutely positioned on its page (pages are
   `position: relative; isolation: isolate`). A click on it selects it at its place in the text
   (an empty anchor there); its outline and handle are on the picture.
+- Every page shows its header and footer (`.foli-region`, `.foli-header`, `.foli-footer`), page
+  fields filled. `view.openStory("header" | "footer", page?)` opens one for editing on its page (a
+  double click in the page's margin does too; made if the page has none), `view.closeStory()`
+  leaves it, as Escape and a press on the page do. Meanwhile the host has the class
+  `foli-in-story`, is read-only and the text is dimmed; `view.focus()` focuses the story.
+  `paged: false` (when the view is made) gives one flow without pages, what the open story uses.
 - `view.focus()`: focuses the host, shows the editor's selection, scrolls it into view.
 - `view.destroy()`: removes listeners, injected styles and the attributes it added; empties the
   host.
