@@ -15,7 +15,7 @@ import type {
   StoryJSON,
   StyleJSON,
 } from "@folijs/core";
-import { attr, child, isW, W, W15 } from "../import/ooxml.js";
+import { attr, child, integer, isW, W, W15 } from "../import/ooxml.js";
 import {
   abstractOf,
   defaultsOf,
@@ -566,7 +566,15 @@ export function notesXml(
     if (!new RegExp(`^${kind}:-?\\d+$`).test(key))
       throw new DocxError(`Not the id of a ${kind}: ${key.slice(0, 64)}`);
     const type = story.noteType ? ` w:type="${story.noteType}"` : "";
-    if (story.ext) fragment(story.ext.replace(/\/?>$/, "/>"), context.namespaces, kind);
+    if (story.ext) {
+      // The element it was read from must be this note: a copy would repeat another's id.
+      const { element } = fragment(story.ext.replace(/\/?>$/, "/>"), context.namespaces, kind);
+      if (
+        integer(attr(element, "id")) !== Number(key.slice(kind.length + 1)) ||
+        attr(element, "type") !== story.noteType
+      )
+        throw new DocxError(`The start tag kept for ${key.slice(0, 64)} is another note's`);
+    }
     const start =
       story.ext?.replace(/\/>$/, ">") ?? `<w:${kind}${type} w:id="${key.slice(kind.length + 1)}">`;
     return `${start}${blocksXml(story.content.content ?? [], context)}</w:${kind}>`;

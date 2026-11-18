@@ -7,6 +7,7 @@
 # For every document in -In it writes <name>.json to -Out:
 #   - opened: whether Word opened it, and if not the error (a damaged file is refused: Word
 #     repairs only with a person at the dialog);
+#   - comments: how many comments the document has;
 #   - revisionsAccepted: tracked changes in the document. All are accepted (in memory) before
 #     measuring, so the numbers describe the final text whatever the user's markup view;
 #   - pages: Word's page count;
@@ -19,8 +20,9 @@
 #     previous section, and their text as Word has it open (page fields recomputed, a picture
 #     as "/"); exists says the variant is in effect, not that the file has the part;
 #   - evenAndOddHeaders; pageSections: the section each page starts in;
-#   - notes: each footnote and endnote: its kind, its reference's page and its text (Word answers
-#     a note's own page with its reference's: where a note continues shows only in its PDF);
+#   - notes: each footnote and endnote: its kind, its reference's page, its text (Word answers
+#     a note's own page with its reference's: where a note continues shows only in its PDF), and
+#     the tracked changes in it, counted before changes are accepted;
 #   - fields: each field of the main text: type (WdFieldType), code, result as Word has it
 #     open (unlocked DATE fields are today's), page;
 #   - bookmarks: each visible bookmark: name, page, text;
@@ -103,6 +105,7 @@ try {
       word = [string]$word.Build
       opened = $false
       error = $null
+      comments = $null
       revisionsAccepted = $null
       pages = $null
       paragraphs = @()
@@ -120,7 +123,16 @@ try {
       # forever on a hidden password dialog; a wrong password fails instead.
       $doc = $word.Documents.Open([string]$file.FullName, $false, $true, $false, "foli-no-password")
       $result.opened = $true
+      # Text is read as shown: results, whatever Word's option for showing field codes says.
+      $doc.ActiveWindow.View.ShowFieldCodes = $false
+      $result.comments = [int]$doc.Comments.Count
       $result.revisionsAccepted = [int]$doc.Revisions.Count
+      $noteCounts = New-Object System.Collections.Generic.List[object]
+      foreach ($collection in @($doc.Footnotes, $doc.Endnotes)) {
+        foreach ($note in $collection) {
+          $noteCounts.Add([int]$note.Range.Revisions.Count)
+        }
+      }
       $doc.TrackRevisions = $false
       if ($result.revisionsAccepted -gt 0) { $doc.Revisions.AcceptAll() }
       $doc.Repaginate()
@@ -218,7 +230,7 @@ try {
       $notes = New-Object System.Collections.Generic.List[object]
       foreach ($pair in @(@("footnote", $doc.Footnotes), @("endnote", $doc.Endnotes))) {
         foreach ($note in $pair[1]) {
-          $notes.Add([ordered]@{ kind = $pair[0]; referencePage = [int]$note.Reference.Information($INFO_PAGE); text = Clean $note.Range.Text })
+          $notes.Add([ordered]@{ kind = $pair[0]; referencePage = [int]$note.Reference.Information($INFO_PAGE); text = Clean $note.Range.Text; revisions = $noteCounts[$notes.Count] })
         }
       }
       $result.notes = $notes.ToArray()

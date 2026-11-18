@@ -7,12 +7,13 @@
 //
 // `make` exports every corpus document with stories to <dir>/foli twice: as imported (<name>.docx)
 // and edited (<name>-edited.docx: "Foli edit" added to every header and footer and to the last
-// normal note, a table in every header, and a new footnote with a tracked insertion and a comment,
-// its reference at the end of the first paragraph), and a new package with a header, a footer, a
+// normal note, a table in every header, and a new footnote with a tracked insertion, its
+// reference at the end of the first paragraph), and a new package with a header, a footer, a
 // footnote and an endnote (00-new-stories). `check` needs Word's data for every file made: each
 // opened; an unchanged one has the original's pages, sections and notes; an edited one every
-// header and footer, the table's text and every note edit. One line per file; exits 1 on any
-// difference.
+// header and footer with its original text (pictures included) and the edit, the table's text,
+// every other note as it was, the edited and the added note, and the tracked insertion. One
+// line per file; exits 1 on any difference.
 
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -63,25 +64,20 @@ function edited(document) {
       });
   }
   const free = Math.max(0, ...notes.map((id) => Number(id.split(":")[1]))) + 1;
-  const COMMENT = 90_000;
   stories[`footnote:${free}`] = {
     kind: "footnote",
     content: doc({
       type: "paragraph",
       content: [
         { type: "noteMark" },
-        { type: "commentStart", attrs: { id: COMMENT } },
         {
           type: "text",
           text: ` ${ADDED}`,
           marks: [{ type: "insertion", attrs: { id: 90_001, author: "Foli" } }],
         },
-        { type: "commentEnd", attrs: { id: COMMENT } },
-        { type: "commentReference", attrs: { id: COMMENT } },
       ],
     }),
   };
-  copy.comments.push({ id: COMMENT, author: "Foli", content: [paragraph("On a note")] });
   copy.stories = stories;
   const first = copy.content.content.find((b) => b.type === "paragraph");
   first.content = [
@@ -163,14 +159,21 @@ for (const file of readdirSync(join(dir, "foli")).filter((n) => n.endsWith(".doc
     if (!notes.some((t) => t.includes(ADDED))) problems.push("the added note is missing");
     if (word.notes.length !== base.notes.length + 1)
       problems.push(`${word.notes.length} notes, expected ${base.notes.length + 1}`);
-    const editedNote = base.notes.some((n) => n.kind === "footnote");
-    if (editedNote && !notes.some((t) => t.includes(EDIT))) problems.push("the edited note");
+    const footnotes = base.notes.filter((n) => n.kind === "footnote");
+    if (footnotes.length && !notes.some((t) => t.includes(EDIT))) problems.push("the edited note");
+    for (const original of base.notes)
+      if (!notes.some((t) => t.includes(original.text)))
+        problems.push(`a note lost its text: ${original.text.slice(0, 24)}`);
+    const added = word.notes.find((n) => n.text.includes(ADDED));
+    if (added?.revisions !== 1) problems.push(`added note: ${added?.revisions} revisions, not 1`);
     for (const side of ["headers", "footers"])
       base.sections.forEach((section, s) => {
         for (const [variant, story] of Object.entries(section[side])) {
           if (!story.exists || !story.text.trim()) continue;
           const text = word.sections[s]?.[side][variant]?.text ?? "";
           if (!text.includes(EDIT)) problems.push(`section ${s + 1} ${side} ${variant}: no edit`);
+          if (!text.includes(story.text.trim()))
+            problems.push(`section ${s + 1} ${side} ${variant}: lost its text`);
           if (side === "headers" && !text.includes(CELL))
             problems.push(`section ${s + 1} header ${variant}: no table`);
         }

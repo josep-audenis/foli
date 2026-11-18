@@ -171,7 +171,7 @@ properties may hold only the marks that describe how text looks (`RUN_PROPERTY_M
 - **Stories** (v5): `stories` holds headers and footers by relationship id (what a section's
   `headers` and `footers` name) and notes as `footnote:<id>` and `endnote:<id>` (what a
   `noteReference` names), each a `doc` of blocks. A story ends no section and holds no note
-  reference; a header or footer holds no comments; a note no page or column break.
+  reference or comment; a note holds no page or column break.
 - **Sections:** a paragraph's `section` ends a section with that page setup (Word's `w:sectPr`
   in the paragraph's properties); the envelope's `section` is the last one. Every part of a
   section is optional (Word's defaults apply).

@@ -54,7 +54,13 @@ export function readStories(
           ? "endnote"
           : undefined;
     if (!headerOrFooter && !note) continue;
-    const xml = pkg.xml(part.name);
+    // A part that is not XML (a relationship can point anywhere) stays as it is.
+    let xml: ReturnType<DocxPackage["xml"]>;
+    try {
+      xml = pkg.xml(part.name);
+    } catch {
+      continue;
+    }
     const context = contextFor(part.name, xml.source);
     if (headerOrFooter) {
       const [kind, root] = headerOrFooter as ["header" | "footer", string];
@@ -80,6 +86,29 @@ export function readStories(
     }
   }
   return stories;
+}
+
+/** The ids of every note in the package's notes parts, those the model does not hold too. */
+export function noteIds(pkg: DocxPackage): Set<string> {
+  const ids = new Set<string>();
+  for (const [type, kind] of [
+    [REL.footnotes, "footnote"],
+    [REL.endnotes, "endnote"],
+  ] as const) {
+    const name = pkg.relationships(pkg.mainDocument).find((r) => r.type === type)?.partName;
+    if (!name || !pkg.part(name)) continue;
+    let root: XmlElement;
+    try {
+      root = pkg.xml(name).root;
+    } catch {
+      continue;
+    }
+    for (const el of elements(root)) {
+      const id = integer(attr(el, "id"));
+      if (isW(el, kind) && id !== undefined) ids.add(`${kind}:${id}`);
+    }
+  }
+  return ids;
 }
 
 /** The stories in the form a validated document holds them, to compare with one. */

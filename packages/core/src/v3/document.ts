@@ -632,8 +632,7 @@ function storyRules(tree: Node, kind: StoryJSON["kind"], path: string): void {
     const name = node.type.name;
     if (node.attrs.section) fail(path, "a story cannot end a section");
     if (name === "noteReference") fail(path, "a story cannot hold a note reference");
-    if ((kind === "header" || kind === "footer") && COMMENT_NODES.has(name))
-      fail(path, `a ${kind} cannot hold comments`);
+    if (COMMENT_NODES.has(name)) fail(path, `a ${kind} cannot hold comments`);
     if (
       (kind === "footnote" || kind === "endnote") &&
       (name === "pageBreak" || name === "columnBreak")

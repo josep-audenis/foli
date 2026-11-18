@@ -1144,7 +1144,8 @@ Each task is a PR on `phase-11/sections-fields`, the build green after each.
   notes are stories, note references and note marks nodes; a story unchanged keeps its part or
   note byte for byte; `scripts/corpus/story-roundtrip.mjs` has Word read the corpus unchanged and
   edited and a new package with a header, footer and notes. What a story may not hold stays
-  verbatim. The editor does not show them yet, and a reference shows nothing until 11.10.)
+  verbatim, comments included: Word 16 drops a comment anchored in a note when it saves. The
+  editor does not show stories yet, and a reference shows nothing until 11.10.)
 - [ ] 11.5 DOCX fields, content controls and bookmarks: complex and simple fields (nested,
   across runs and paragraphs), merge and form fields, content controls at every level (with
   data binding and placeholders kept), bookmarks; what the model cannot hold stays verbatim,

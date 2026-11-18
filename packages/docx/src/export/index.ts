@@ -13,7 +13,7 @@ import {
   type SectionJSON,
   type StoryJSON,
 } from "@folijs/core";
-import { packageStories } from "../import/index.js";
+import { noteIds, packageStories } from "../import/index.js";
 import { child, isW, REL, W } from "../import/ooxml.js";
 import { DocxError, type DocxPackage, type NewPart } from "../package.js";
 import { newSettingsXml, withTrackRevisions } from "../settings.js";
@@ -217,8 +217,10 @@ export async function exportDocx(
   const referenced = noteReferences(doc);
   const originals =
     original && (doc.stories || referenced.modeled.size) ? packageStories(original) : {};
+  // Notes the model does not hold (an unknown `w:type`) stay in their part: they count too.
+  const inPart = original && referenced.modeled.size ? noteIds(original) : new Set<string>();
   for (const key of referenced.modeled)
-    if (!Object.hasOwn(doc.stories ?? {}, key) && !Object.hasOwn(originals, key))
+    if (!Object.hasOwn(doc.stories ?? {}, key) && !inPart.has(key))
       throw new DocxError(`A note reference has no note: ${key.slice(0, 64)}`);
   // The parts written from the model: their drawings are the document's own.
   const rewritten = original
@@ -253,10 +255,11 @@ function noteReferences(doc: FoliDocument): { modeled: Set<string>; all: Set<str
   const all = new Set<string>();
   JSON.stringify([doc.content, doc.comments, doc.stories], (key, value) => {
     if (key === "xml" && typeof value === "string")
-      for (const [, kind, id] of value.matchAll(
-        /<[\w.-]+:(foot|end)noteReference\b[^>]*?\b[\w.-]+:id="(-?\d+)"/g,
+      // As XML allows it: either quote, spaces around `=`, and the number however written.
+      for (const [, kind, , id] of value.matchAll(
+        /<(?:[\w.-]+:)?(foot|end)noteReference\b[^>]*?\s(?:[\w.-]+:)?id\s*=\s*(["'])\s*([-+]?\d+)\s*\2/g,
       ))
-        all.add(`${kind}note:${id}`);
+        all.add(`${kind}note:${Number(id)}`);
     const node = value as { type?: unknown; attrs?: { story?: unknown } } | null;
     if (node?.type === "noteReference" && typeof node.attrs?.story === "string") {
       modeled.add(node.attrs.story);

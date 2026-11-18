@@ -336,11 +336,8 @@ function inlines(
       case "commentRangeStart":
       case "commentRangeEnd": {
         const type = MARKER_TYPES[el.local] as string;
-        // Headers and footers hold no comments (ADR-0007): such an anchor stays verbatim.
-        if (
-          type.startsWith("comment") &&
-          (context.story === "header" || context.story === "footer")
-        ) {
+        // Stories hold no comments (ADR-0007): such an anchor stays verbatim.
+        if (type.startsWith("comment") && context.story && context.story !== "comment") {
           opaque(el, BLOCK_LABELS);
           break;
         }
@@ -538,7 +535,7 @@ function run(
         break;
       }
       case "commentReference": {
-        if (context.story === "header" || context.story === "footer") {
+        if (context.story && context.story !== "comment") {
           opaqueRun(el);
           break;
         }

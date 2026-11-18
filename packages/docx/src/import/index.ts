@@ -21,6 +21,8 @@ import { section } from "./properties.js";
 import { type ImportReport, Recorder } from "./report.js";
 import { canonicalStories, readStories } from "./stories.js";
 
+export { noteIds } from "./stories.js";
+
 export interface DocxImport {
   /** The document in the current schema (v5), validated. */
   readonly document: FoliDocument;
