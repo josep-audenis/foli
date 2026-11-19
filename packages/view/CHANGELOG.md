@@ -1,5 +1,38 @@
 # @folijs/view
 
+## 0.6.0
+
+### Minor Changes
+
+- cd343e4: Sections, headers and footers, notes, fields, content controls, find and replace, and PDF, as Word models them: imported, laid out on pages, edited there and written back to `.docx`.
+  - **Schema v5** (`@folijs/core`, ADR-0007): `stories` in the envelope (headers, footers, footnotes and endnotes, each a tree of blocks), `controls` (content controls' properties) and `settings` (even and odd headers, note options, `doNotUseHTMLParagraphAutoSpacing`); field markers (`fieldStart`, `fieldCode`, `fieldSeparator`, `fieldEnd`), content control markers (`controlStart`, `controlEnd`; a `controls` attribute on blocks, rows and cells), `noteReference` and `noteMark` nodes; sections gain `columns`, `pageNumbers`, note properties and a tracked setup change (`change`). `SCHEMA_VERSION` 5: v4 documents migrate on load (the version only: what was opaque stays so until the `.docx` is imported again).
+  - **Stories and undo** (`@folijs/core`): `editor.story(id)` gives an editor over a header, footer or note; its changes are `StoryStep`s of the body's history (one undo across the document), `EnvelopeStep` for the last section, settings and controls; accept and reject all reach every story.
+  - **Sections** (`@folijs/core`, `@folijs/view`, `@folijs/react`): columns (equal and set widths, the line between, column breaks), continuous, next-column and even and odd page sections with Word's blank page, balanced columns above a continuous break; `insertSectionBreak`, `removeSectionBreak`, `setSectionSetup`, `insertColumnBreak`, tracked as Word records them; a Section menu and Page setup dialog.
+  - **Headers and footers**: drawn in their margins on every page (first, even and default variants, linked to the previous section, a taller one pushing the text, page fields filled per page), edited in place (double click or the Header menu, Escape returns) with typing, formatting, pictures, tables, undo and tracking; `setDifferentFirstPage`, `setDifferentEvenPages`, `setStoryLinked`.
+  - **Footnotes and endnotes**: at their reference's page foot under a separator, continued on the next page, beneath the text or at the end of a section or the document; numbered in Word's formats with restarts (`noteNumbers`, never stored); `insertNote`, `setNoteProperties`, `convertNotes`; deleted with their reference, tracked, carried on the clipboard; edited in place (double click, Shift+Alt+N, the Notes menu and its options dialog).
+  - **Fields**: shown with their results, selected and deleted whole, codes hidden or shown (Alt+F9); `updateFields` (`PAGE`, `NUMPAGES`, `SECTIONPAGES`, `DATE`, `TIME`, `REF`, `PAGEREF`, `SEQ`, `TOC` from heading styles with their pages, `MERGEFIELD` from data; F9, Ctrl+A then F9, `view.updateFields`, `view.print()`) returning what it updated and what it left; `fieldsIn`, `insertField`, `insertPageNumber`, `insertDate`, `insertCrossReference`, `insertTableOfContents`; a Fields menu and cross-reference dialog.
+  - **Content controls**: plain and rich text, drop-down, combo box, date, check box, picture, repeating sections, with Word's locks, placeholders and what each kind holds; frames, titles, lists, a date picker and check boxes in the view (Alt+Down, Space); `insertControl`, `setControlValue` and `controlValues` (by id or tag), `setControlProperties`, `addRepeatingItem`; a Controls menu and properties dialog.
+  - **Navigation**: `findAll`, `replace`, `replaceAll` over the body and every story (match case, whole words, tracked while tracking, one undo step), `insertBookmark`, `renameBookmark`, `deleteBookmark`, `listBookmarks`, `goTo`, `documentOutline`; matches marked with the CSS Custom Highlight API; `FoliNavigation` (find, replace and go to panel, bookmarks dialog, outline), included in `FoliEditor`, with Word's keys (Ctrl+F, Ctrl+H, Ctrl+G, F3, Shift+F3, Ctrl+Shift+F5) and a Navigate menu.
+  - **DOCX** (`@folijs/docx`): headers, footers, footnotes and endnotes read and written as stories (unchanged ones byte for byte, new ones with their parts, relationships and content types), complex and simple fields, content controls at every level (properties patched into the kept `w:sdtPr`), sections' columns, page numbers and note properties, `word/settings.xml`'s even and odd headers and note options. Word reads Foli's sections, headers, notes, fields, controls and replacements back (`scripts/corpus/*-roundtrip.mjs`).
+  - **PDF** (`@folijs/pdf`, first released): `exportPdf(document, { page, resources, review, styles })` prints Foli's own pages with a headless Chromium page the app supplies (Playwright 1.42+; Puppeteer's page type fits): each section on its own sheet size, fields updated from the pages first, safe links and bookmark links as PDF links, headings as PDF bookmarks, a tagged PDF. The page loads nothing from the network (images and fonts as `data:` URLs only). Against Word's PDFs of the corpus it scores 0.954 over 24 pages.
+  - **Pages against Word**: all 158 paragraphs outside tables that the harness compares on Word's page; headers, footers and notes scored with the rest of the page (0.889 over 24 pages on screen).
+
+  0.5.0 cannot read documents saved by 0.6.0 (schema v5). Known limits are in [Known limitations](https://github.com/josep-audenis/foli/blob/main/docs/limitations.md) (content, finding and going places, print and PDF sections).
+
+  Changed behaviour (pre-1.0 minor):
+  - `.docx` headers, footers and notes import as `stories` (0.5.0 kept them as parts, never shown); note references, fields (`w:fldChar`, `w:instrText`, `w:fldSimple`) and content controls (`w:sdt`) that imported as `opaqueInline` or `opaqueBlock` now import as nodes. A v4 document's opaque content stays opaque until the `.docx` is imported again.
+  - Layout: between two paragraphs goes the larger of the first's space after and the second's space before, as in Word's PDFs (0.5.0 added them; they still add up with `w:doNotUseHTMLParagraphAutoSpacing`); a line is as tall as its runs and paragraph mark, not the paragraph style's font; a header or footer taller than its margin pushes the text. Pages break differently than in 0.5.0, closer to Word.
+  - `FoliEditor` includes `FoliNavigation` and takes Ctrl+F, Ctrl+H, Ctrl+G, F3, Shift+F3 and Ctrl+Shift+F5 while the focus is in the document or its panels (the browser's own find no longer opens there).
+  - `FoliToolbar` shows the Section, Header, Fields, Navigate, Notes and Controls menus.
+  - `view.print()` updates every field before printing; the print rules are shared with `exportPdf`.
+  - Backspace at a field's edge selects the field first, and a selection crossing a field's markers takes the whole field, as in Word; the caret steps over a field's code.
+  - `acceptAllChanges` and `rejectAllChanges` also settle the tracked changes in headers, footers and notes.
+
+### Patch Changes
+
+- Updated dependencies [cd343e4]
+  - @folijs/core@0.6.0
+
 ## 0.5.0
 
 ### Minor Changes

@@ -1,6 +1,6 @@
 {
   "name": "@folijs/react",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "React components for the Foli document editor.",
   "license": "MIT",
   "repository": {
