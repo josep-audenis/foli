@@ -166,8 +166,8 @@ Foli's own (see `THIRD_PARTY_NOTICES.md`).
     before or after it (a tab, a break, a marker).
   - Fields (`state/fields.ts`, ADR-0007) are markers paired by depth over a tree (`fieldsIn`,
     cached per tree). A plugin keeps the selection to Word's rules after every transaction: a
-    caret never rests in what is hidden, a range with one end inside a field takes all of it, and
-    Backspace or Delete at a field's edge selects it first. Two positions with only markers
+    caret never rests in what is hidden or at a result's very edge, a range with one end inside a
+    field takes all of it, and Backspace or Delete at a field's edge selects it first. Two positions with only markers
     between them count as one place, as a browser reads them. `state/fieldupdate.ts` works results
     out (`updateFields`) in stages, so what a result depends on comes first: fields inside codes,
     values and `SEQ`, `REF` and `PAGEREF`, then tables of contents, which are built again only

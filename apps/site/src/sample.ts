@@ -19,14 +19,14 @@ const li = (...content: InlineJSON[]): ListItemJSON => ({
 });
 
 /**
- * The hero's document: A6 pages so several fit on screen and the text visibly flows from one
+ * The hero's document: A5 pages so several fit on screen and the text visibly flows from one
  * to the next. Written as schema v2 (0.2.0), migrated to Word's model on load like a saved one.
  */
 export const sample: FoliDocumentV2 = {
   schemaVersion: 2,
   settings: {
-    pageSize: { width: 105, height: 148 },
-    margins: { top: 12, right: 12, bottom: 12, left: 12 },
+    pageSize: { width: 148, height: 210 },
+    margins: { top: 18, right: 18, bottom: 18, left: 18 },
   },
   content: {
     type: "doc",
@@ -64,7 +64,7 @@ export const sample: FoliDocumentV2 = {
       },
       p(
         t(
-          "Every page here is A6: 105 by 148 millimetres, with 12 mm margins. The size lives in the document, not in a stylesheet, so it is the same on screen, in print and in the .docx you export.",
+          "Every page here is A5: 148 by 210 millimetres, with 18 mm margins. The size lives in the document, not in a stylesheet, so it is the same on screen, in print and in the .docx you export.",
         ),
       ),
       h(2, "Rules typesetters care about"),

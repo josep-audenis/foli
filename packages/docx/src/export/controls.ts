@@ -132,23 +132,29 @@ function patched(source: string, pr: XmlElement, control: ControlJSON, kept: Con
       edits.push({ from: at, to: at, text: xml });
     }
   };
+  const isEmptyTag = (element: XmlElement) => element.openEnd === element.end;
   /** `element`'s start tag with attribute `name` set, or gone. */
   const withAttribute = (element: XmlElement, name: string, value: string | undefined) => {
-    const end = source[element.openEnd - 2] === "/" ? element.openEnd - 2 : element.openEnd - 1;
+    const end = isEmptyTag(element) ? element.openEnd - 2 : element.openEnd - 1;
     let tag = source.slice(element.start, end);
     tag = tag.replace(new RegExp(`\\s${name}\\s*=\\s*("[^"]*"|'[^']*')`), "");
     if (value !== undefined) tag += ` ${name}="${escapeAttribute(value)}"`;
     edits.push({ from: element.start, to: end, text: tag });
   };
-  /** `element` holding `inner` in place of its children. */
-  const withChildren = (element: XmlElement, inner: string) => {
-    if (element.openEnd === element.end)
+  /** `element` holding `inner` in place of its children (none: `inner` goes first among them). */
+  const withChildren = (element: XmlElement, inner: string, replace = true) => {
+    if (isEmptyTag(element))
       edits.push({
         from: element.openEnd - 2,
         to: element.end,
         text: `>${inner}</${element.name}>`,
       });
-    else edits.push({ from: element.openEnd, to: element.closeStart, text: inner });
+    else
+      edits.push({
+        from: element.openEnd,
+        to: replace ? element.closeStart : element.openEnd,
+        text: inner,
+      });
   };
   if (control.kind !== kept.kind) throw new DocxError("A content control cannot change kind");
   if (control.alias !== kept.alias) child1("alias", control.alias);
@@ -172,7 +178,7 @@ function patched(source: string, pr: XmlElement, control: ControlJSON, kept: Con
       const format = child(date, "dateFormat");
       const xml = el(`${prefix}dateFormat`, { [`${prefix}val`]: control.dateFormat });
       if (format) edits.push({ from: format.start, to: format.end, text: xml });
-      else edits.push({ from: date.openEnd, to: date.openEnd, text: xml });
+      else withChildren(date, xml, false);
     }
   }
   const text = named("text");
@@ -185,10 +191,13 @@ function patched(source: string, pr: XmlElement, control: ControlJSON, kept: Con
     const boxPrefix = name.slice(0, name.indexOf(":") + 1);
     const xml = el(name, { [`${boxPrefix}val`]: control.checked ? "1" : "0" });
     if (checked) edits.push({ from: checked.start, to: checked.end, text: xml });
-    else edits.push({ from: box.openEnd, to: box.openEnd, text: xml });
+    else withChildren(box, xml, false);
   }
   let out = source.slice(pr.start, pr.end);
-  for (const edit of edits.sort((a, b) => b.from - a.from || b.to - a.to))
+  // From the end; of two put at one place, the first made ends up first.
+  const order = edits.map((edit, i) => ({ edit, i }));
+  order.sort((a, b) => b.edit.from - a.edit.from || b.edit.to - a.edit.to || b.i - a.i);
+  for (const { edit } of order)
     out = out.slice(0, edit.from - pr.start) + edit.text + out.slice(edit.to - pr.start);
   return out;
 }
@@ -237,7 +246,7 @@ export class ControlWriter {
     const end = child(element, "sdtEndPr");
     const after = end ? source.slice(end.start, end.end) : "";
     const whatItSays = (c: ControlJSON | undefined) => {
-      const { ext: _ext, placeholder, ...rest } = c ?? ({} as ControlJSON);
+      const { ext: _ext, deleted: _deleted, placeholder, ...rest } = c ?? ({} as ControlJSON);
       const { text: _text, ...shown } = placeholder ?? {};
       return { ...rest, placeholder: { ...shown, showing: shown.showing === true } };
     };

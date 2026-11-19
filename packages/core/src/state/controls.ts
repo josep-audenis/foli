@@ -16,15 +16,18 @@ import {
   type NodeJSON,
   Slice,
 } from "../model/index.js";
+import { isSafeLink } from "../schema.js";
 import { Mapping } from "../transform/stepmap.js";
 import { TransformError } from "../transform/transform.js";
 import type { ControlJSON } from "../v3/document.js";
+import { parseContent } from "../v3/document.js";
 import { attempt } from "./attempt.js";
 import { insertHardBreak, insertText } from "./commands.js";
 import { formatDatePicture } from "./fieldupdate.js";
 import { closeHistory, joinHistory } from "./history.js";
 import { marksAt, Selection, TextSelection } from "./selection.js";
 import { type Command, type EditorState, Plugin, type Transaction } from "./state.js";
+import { trackedDeletes, trackTransaction } from "./track.js";
 import {
   setEnvelopeValue,
   type WordContext,
@@ -49,7 +52,10 @@ export interface ControlRange {
   readonly contentTo: number;
 }
 
-/** On a transaction: `value` fills a control, `accept` accepts tracked changes. */
+/**
+ * On a transaction: `value` fills a control, `accept` and `reject` resolve tracked changes, `fields`
+ * updates fields: what Word lets through where typing is refused.
+ */
 export const controlEdit = "controlEdit";
 
 const LOCKED_CONTENT = new Set(["contentLocked", "sdtContentLocked"]);
@@ -61,6 +67,8 @@ const CHOICE_KINDS = new Set(["dropDown", "checkbox", "picture"]);
 /** They have no placeholder to come back to. */
 const NO_PLACEHOLDER = new Set(["checkbox", "picture", "repeating", "repeatingItem", "other"]);
 const REVIEW = new Set(["insertion", "deletion", "formatChange"]);
+/** Word lets a comment be anchored anywhere: they are not what a control holds. */
+const COMMENT_ANCHORS = new Set(["commentStart", "commentEnd", "commentReference"]);
 const isMarkerNode = (node: Node | null | undefined) =>
   node?.type.name === "controlStart" || node?.type.name === "controlEnd";
 const isDeleted = (node: Node) => node.marks.some((m) => m.type.name === "deletion");
@@ -211,7 +219,10 @@ export function controlSpot(tree: Node, a: number, b: number): boolean {
   return only;
 }
 
-/** Whether `from..to` touches content that may not be edited. */
+/**
+ * Whether a change at `from..to` is in content that may not be edited: it touches such a control and
+ * is not all inside an editable one within it. One whose own deletion is tracked does not count.
+ */
 export function readOnlyAt(
   tree: Node,
   controls: Controls | undefined,
@@ -219,14 +230,24 @@ export function readOnlyAt(
   to: number,
 ): boolean {
   if (!controls) return false;
-  return controlsIn(tree).some((range) => {
-    const control = Object.hasOwn(controls, range.id) ? controls[range.id] : undefined;
-    return (
-      !!control &&
-      controlIsReadOnly(control) &&
-      range.from < Math.max(to, from + 1) &&
-      from < range.to
-    );
+  const at = (id: string) => (Object.hasOwn(controls, id) ? controls[id] : undefined);
+  const ranges = controlsIn(tree);
+  return ranges.some((range) => {
+    const control = at(range.id);
+    if (!control || !controlIsReadOnly(control) || control.deleted) return false;
+    if (range.from >= Math.max(to, from + 1) || from >= range.to) return false;
+    return !ranges.some((inner) => {
+      const own = at(inner.id);
+      return (
+        inner !== range &&
+        inner.from >= range.from &&
+        inner.to <= range.to &&
+        inner.from < from &&
+        to < inner.to &&
+        !!own &&
+        !controlIsReadOnly(own)
+      );
+    });
   });
 }
 
@@ -235,15 +256,121 @@ const contentOf = (tree: Node, range: ControlRange): Fragment =>
     ? tree.slice(range.from + 1, range.to - 1).content
     : tree.slice(range.from, range.to).content;
 
-/** The range of `after` that is `range` of `before`: the same control, the same in order. */
-function partner(
-  range: ControlRange,
+/** Each control of `before` with the index in `after` of the same one (by id, then in order). */
+function pairUp(
   before: readonly ControlRange[],
   after: readonly ControlRange[],
-): ControlRange | undefined {
-  const same = (r: ControlRange) => r.id === range.id;
-  return after.filter(same)[before.filter(same).indexOf(range)];
+): Map<ControlRange, number> {
+  const places = new Map<string, number[]>();
+  after.forEach((range, i) => {
+    const list = places.get(range.id);
+    if (list) list.push(i);
+    else places.set(range.id, [i]);
+  });
+  const used = new Map<string, number>();
+  const pairs = new Map<ControlRange, number>();
+  for (const range of before) {
+    const n = used.get(range.id) ?? 0;
+    used.set(range.id, n + 1);
+    const at = places.get(range.id)?.[n];
+    if (at !== undefined) pairs.set(range, at);
+  }
+  return pairs;
 }
+
+/** Where two trees differ, in each one's positions: top-level blocks they share lie outside. */
+function changedSpan(a: Node, b: Node) {
+  const shared = Math.min(a.childCount, b.childCount);
+  let start = 0;
+  let fromA = 0;
+  while (start < shared && a.child(start) === b.child(start)) {
+    fromA += a.child(start).nodeSize;
+    start++;
+  }
+  const fromB = fromA;
+  let toA = a.content.size;
+  let toB = b.content.size;
+  for (let i = 1; i <= shared - start; i++) {
+    const node = a.child(a.childCount - i);
+    if (node !== b.child(b.childCount - i)) break;
+    toA -= node.nodeSize;
+    toB -= node.nodeSize;
+  }
+  return { fromA, toA, fromB, toB };
+}
+
+/** The controls directly inside the one at `index` of `ranges`. */
+function innerControls(ranges: readonly ControlRange[], index: number): ControlRange[] {
+  const outer = ranges[index] as ControlRange;
+  const inner: ControlRange[] = [];
+  let end = -1;
+  for (let i = index + 1; i < ranges.length; i++) {
+    const range = ranges[i] as ControlRange;
+    if (range.from >= outer.to) break;
+    if (range.to > outer.to || range.from < end) continue;
+    inner.push(range);
+    end = range.to;
+  }
+  return inner;
+}
+
+/**
+ * What a control holds of its own, as text to compare: not what the controls inside it hold, nor
+ * comment anchors. `strict`: its formatting too; otherwise only its tracked changes.
+ */
+function signature(
+  tree: Node,
+  range: ControlRange,
+  inner: readonly ControlRange[],
+  strict: boolean,
+): string {
+  const [from, to] =
+    range.level === "inline" ? [range.from + 1, range.to - 1] : [range.from, range.to];
+  const start = (r: ControlRange) => (r.level === "inline" ? r.contentFrom : r.from);
+  const end = (r: ControlRange) => (r.level === "inline" ? r.contentTo : r.to);
+  const parts: string[] = [];
+  let run: string | null = null;
+  let at = 0;
+  let marked = -1;
+  tree.nodesBetween(from, to, (node, pos) => {
+    while (inner[at] && pos >= end(inner[at] as ControlRange)) at++;
+    const hole = inner[at];
+    if (hole && pos >= start(hole)) {
+      if (hole.level !== "inline" && marked !== at) {
+        marked = at;
+        run = null;
+        parts.push(`[${hole.id}]`);
+      }
+      return false;
+    }
+    if (COMMENT_ANCHORS.has(node.type.name)) return false;
+    const marks = JSON.stringify(
+      node.marks
+        .filter((m) => strict || m.type.name === "insertion" || m.type.name === "deletion")
+        .map((m) => m.toJSON()),
+    );
+    if (node.isText) {
+      if (run === marks) parts[parts.length - 1] += node.text ?? "";
+      else parts.push(`${marks}:${node.text}`);
+      run = marks;
+      return false;
+    }
+    run = null;
+    const attrs = strict || node.isInline ? JSON.stringify(node.attrs) : "";
+    parts.push(`<${node.type.name}${attrs}${marks}>`);
+    return true;
+  });
+  return parts.join("\u0001");
+}
+
+/** Whether one of `deleted` (ranges of the same tree) takes in all of `range` and goes past it. */
+const deletedWhole = (range: ControlRange, deleted: readonly (readonly [number, number])[]) =>
+  deleted.some(
+    ([a, b]) =>
+      a <= range.contentFrom &&
+      b >= range.contentTo &&
+      (a < range.contentFrom || b > range.contentTo),
+  );
 
 function inlineNodes(tree: Node, range: ControlRange): Node[] {
   const nodes: Node[] = [];
@@ -265,17 +392,20 @@ function holdsText(
   control: ControlJSON,
   was: readonly Node[],
 ): boolean {
-  const single = tree.nodeAt(range.from);
-  if (
-    range.level !== "inline" &&
-    !(single?.isTextblock && single.nodeSize === range.to - range.from)
-  )
-    return false;
+  if (range.level !== "inline") {
+    const first = tree.nodeAt(range.from);
+    const single =
+      range.level === "cell"
+        ? first?.childCount === 1 && first.firstChild?.isTextblock
+        : first?.isTextblock && first.nodeSize === range.to - range.from;
+    if (!single) return false;
+  }
   const had = new Set(was.map((n) => n.type.name));
   return inlineNodes(tree, range).every(
     (node) =>
       node.isText ||
       had.has(node.type.name) ||
+      COMMENT_ANCHORS.has(node.type.name) ||
       (node.type.name === "hardBreak" && control.multiLine === true),
   );
 }
@@ -289,20 +419,34 @@ function allowed(tr: Transaction, state: EditorState): boolean {
   if (!before.ranges.length) return true;
   const after = scan(tr.doc);
   const edit = tr.getMeta(controlEdit);
-  for (const range of before.ranges) {
+  const deleted = (tr.getMeta(trackedDeletes) ?? []) as [number, number][];
+  const pairs = pairUp(before.ranges, after.ranges);
+  const span = changedSpan(state.doc, tr.doc);
+  for (const [index, range] of before.ranges.entries()) {
     const control = Object.hasOwn(controls, range.id) ? controls[range.id] : undefined;
     if (!control) continue;
     // A paragraph mark cannot go inside an inline control, nor half of one be deleted.
     if (after.unpaired.has(range.id) && !before.unpaired.has(range.id)) return false;
-    const now = partner(range, before.ranges, after.ranges);
-    if (!now) {
+    const at = pairs.get(range);
+    if (at === undefined) {
       if (LOCKED_CONTROL.has(control.lock ?? "")) return false;
       continue;
     }
-    const same = contentOf(state.doc, range).eq(contentOf(tr.doc, now));
-    if (same) continue;
-    if (controlIsReadOnly(control) && edit !== "accept") return false;
-    if (CHOICE_KINDS.has(control.kind) && !edit) return false;
+    if (range.to <= span.fromA || range.from >= span.toA) continue;
+    const now = after.ranges[at] as ControlRange;
+    if (contentOf(state.doc, range).eq(contentOf(tr.doc, now))) continue;
+    // The control itself deleted while tracking: as when it is deleted, what it holds is not edited.
+    if (deletedWhole(range, deleted)) {
+      if (LOCKED_CONTROL.has(control.lock ?? "")) return false;
+      continue;
+    }
+    if (edit === "fields" || edit === "accept" || edit === "reject") continue;
+    const readOnly = controlIsReadOnly(control);
+    if (readOnly || (CHOICE_KINDS.has(control.kind) && !edit)) {
+      const was = signature(state.doc, range, innerControls(before.ranges, index), readOnly);
+      if (was !== signature(tr.doc, now, innerControls(after.ranges, at), readOnly)) return false;
+      continue;
+    }
     if (
       TEXT_KINDS.has(control.kind) &&
       !holdsText(tr.doc, now, control, inlineNodes(state.doc, range))
@@ -341,10 +485,122 @@ function placeholderRun(
 }
 
 /** Whether `range` of the tree before `tr` has nothing in it now. */
-function isEmpty(tree: Node, range: ControlRange, tr: Transaction): boolean {
-  const from = tr.mapping.map(range.from, 1);
-  const to = tr.mapping.map(range.to, -1);
-  return to - from === 2 && (range.level === "inline" || !!tree.nodeAt(from)?.isTextblock);
+const isEmpty = (range: ControlRange, tr: Transaction): boolean =>
+  tr.mapping.map(range.contentFrom, 1) >= tr.mapping.map(range.contentTo, -1);
+
+/** The formatting of text put in a control showing its placeholder (`w:sdtPr/w:rPr`). */
+const formatOf = (state: EditorState, control: ControlJSON): readonly Mark[] =>
+  (control.format ?? []).map((mark) => state.schema.markFromJSON(mark));
+
+/**
+ * The text of `from..to`, put in place of a placeholder: without the placeholder's style (`style`),
+ * with the control's `format` where it says nothing of its own on the point.
+ */
+function leavePlaceholderLook(
+  tr: Transaction,
+  from: number,
+  to: number,
+  style: string | null,
+  format: readonly Mark[],
+): void {
+  tr.doc.nodesBetween(from, to, (node, pos) => {
+    if (!node.isText) return true;
+    const end = pos + node.nodeSize;
+    for (const mark of node.marks) {
+      const name = mark.type.name;
+      if (
+        style &&
+        ((name === "characterStyle" && mark.attrs.id === style) ||
+          (name === "runExt" && String(mark.attrs.xml).includes(`"${style}"`)))
+      )
+        tr.removeMark(pos, end, mark);
+    }
+    for (const mark of format)
+      if (!node.marks.some((m) => m.type === mark.type)) tr.addMark(pos, end, mark);
+    return false;
+  });
+}
+
+/** Whether what a check box shows is its checked state; null when it shows neither. */
+function boxShowsChecked(tree: Node, range: ControlRange, control: ControlJSON): boolean | null {
+  const checked = control.checkedState ?? CHECKED;
+  const unchecked = control.uncheckedState ?? UNCHECKED;
+  const shown = textIn(tree, range);
+  if (shown === glyph(checked)) return true;
+  if (shown === glyph(unchecked)) return false;
+  // A symbol font's character is kept as Word's `w:sym`: its code is the state's, moved to U+F0xx.
+  for (const node of inlineNodes(tree, range)) {
+    const code = /:char="([0-9a-f]+)"/i.exec(String(node.attrs.xml ?? ""))?.[1];
+    if (!code || isDeleted(node)) continue;
+    const low = Number.parseInt(code, 16) & 0xff;
+    if (low === (Number.parseInt(checked.value, 16) & 0xff)) return true;
+    if (low === (Number.parseInt(unchecked.value, 16) & 0xff)) return false;
+  }
+  return null;
+}
+
+/** The months' names in `locale`, long and short; `null` where the platform has none. */
+function monthNames(locale: string): string[][] | null {
+  try {
+    return ["long", "short"].map((month) => {
+      const format = new Intl.DateTimeFormat(locale, {
+        month: month as "long" | "short",
+        timeZone: "UTC",
+      });
+      return Array.from({ length: 12 }, (_, m) =>
+        format
+          .format(Date.UTC(2024, m, 1))
+          .toLowerCase()
+          .replace(/\.$/, ""),
+      );
+    });
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The date `text` says in the control's format and language, as `w:fullDate`; null when it is not
+ * one. Word reads a control's text so: a date typed, or brought back by rejecting a change.
+ */
+function dateFromText(control: ControlJSON, text: string): string | null {
+  const locale = control.ext && /:lid\b[^>]*:val="([^"]+)"/.exec(control.ext)?.[1];
+  const names = monthNames(locale || "en-US") ?? [];
+  const fields: string[] = [];
+  const pattern = (control.dateFormat ?? "d MMMM yyyy").replace(
+    /'[^']*'|d+|M+|y+|[Hhms]+|[AaPp]{2}|[.*+?^${}()|[\]\\/]/g,
+    (token) => {
+      if (token[0] === "'") return token.slice(1, -1).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      if (/^[.*+?^${}()|[\]\\/]$/.test(token)) return `\\${token}`;
+      if (token[0] === "d" && token.length > 2) return "\\p{L}+\\.?";
+      if (token[0] === "d" || token[0] === "y" || token[0] === "M") fields.push(token);
+      if (token[0] === "M" && token.length > 2) return "(\\p{L}+)\\.?";
+      return token[0] === "d" || token[0] === "M" || token[0] === "y" ? "(\\d+)" : "\\S+";
+    },
+  );
+  const found = new RegExp(`^\\s*${pattern}\\s*$`, "iu").exec(text);
+  if (!found) return null;
+  let [day, month, year] = [0, 0, 0];
+  fields.forEach((field, i) => {
+    const value = found[i + 1] as string;
+    if (field[0] === "d") day = Number(value);
+    else if (field[0] === "y") year = Number(value) + (field.length < 3 ? 2000 : 0);
+    else if (field.length < 3) month = Number(value);
+    else {
+      const name = value.toLowerCase();
+      for (const list of names) if (list.includes(name)) month = list.indexOf(name) + 1;
+    }
+  });
+  return dayFromParts(year, month, day);
+}
+
+/** `yyyy-mm-ddT00:00:00Z`, or null for a day the calendar does not have. */
+function dayFromParts(year: number, month: number, day: number): string | null {
+  const date = new Date(Date.UTC(2000, month - 1, day));
+  date.setUTCFullYear(year, month - 1, day);
+  if (date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) return null;
+  const pad = (n: number, size = 2) => String(n).padStart(size, "0");
+  return `${pad(year, 4)}-${pad(month)}-${pad(day)}T00:00:00Z`;
 }
 
 /** Gives every text run of a text control the formatting a change gave one of them. */
@@ -370,8 +626,9 @@ function evenMarks(tr: Transaction, from: number, to: number, was: readonly Mark
 }
 
 /**
- * What follows a change, added to `tr`: placeholders left or come back, a stale date, even
- * formatting. Returns the controls' properties as `tr` leaves them.
+ * What follows a change, added to `tr`: placeholders left or come back, what a control says of its
+ * content (a date, a check box) after the content moved, even formatting. Returns the controls'
+ * properties as `tr` leaves them.
  */
 function reconcile(
   tr: Transaction,
@@ -385,8 +642,13 @@ function reconcile(
   const before = controlsIn(old.doc);
   const after = controlsIn(tr.doc);
   if (!oldControls || !before.length || !after.length) return current;
+  const earlierOf = new Map<ControlRange, ControlRange>();
+  for (const [range, at] of pairUp(before, after)) earlierOf.set(after[at] as ControlRange, range);
+  const span = changedSpan(old.doc, state.doc);
   const mapping = new Mapping(roots.flatMap((t) => t.mapping.maps));
-  const filled = roots.some((t) => t.getMeta(controlEdit));
+  const edit = roots.map((t) => t.getMeta(controlEdit)).find(Boolean);
+  const reviewed = edit === "accept" || edit === "reject";
+  const deleted = roots.flatMap((t) => (t.getMeta(trackedDeletes) ?? []) as [number, number][]);
   let envelope = envelopeNow;
   const controls: Record<string, ControlJSON> = { ...current };
   let changed = false;
@@ -401,45 +663,84 @@ function reconcile(
     if (!control.placeholder?.showing)
       set(range.id, { ...control, placeholder: { ...control.placeholder, showing: true } });
   };
+  /** The control goes, what it holds staying. */
+  const unwrap = (range: ControlRange) => {
+    if (range.level === "inline") {
+      tr.delete(tr.mapping.map(range.to, -1) - 1, tr.mapping.map(range.to, -1));
+      const start = tr.mapping.map(range.from, 1);
+      tr.delete(start, start + 1);
+      return;
+    }
+    const doc = tr.doc;
+    doc.nodesBetween(tr.mapping.map(range.from, 1), tr.mapping.map(range.to, -1), (node, pos) => {
+      const ids = node.attrs.controls as string[] | null | undefined;
+      if (ids?.includes(range.id)) {
+        const rest = ids.filter((id) => id !== range.id);
+        tr.setNodeMarkup(pos, node.type, { ...node.attrs, controls: rest.length ? rest : null });
+      }
+      return true;
+    });
+  };
   for (const range of [...after].reverse()) {
-    const control = Object.hasOwn(controls, range.id) ? controls[range.id] : undefined;
-    const earlier = before.find((r) => r.id === range.id && partner(r, before, after) === range);
+    if (range.to <= span.fromB || range.from >= span.toB) continue;
+    let control = Object.hasOwn(controls, range.id) ? controls[range.id] : undefined;
+    const earlier = earlierOf.get(range);
     if (!control || !earlier) continue;
     if (contentOf(old.doc, earlier).eq(contentOf(state.doc, range))) continue;
-    const emptied = () => isEmpty(tr.doc, range, tr);
-    if (oldControls[range.id]?.placeholder?.showing) {
+    // Deleted whole while tracking: accepting takes the control too, rejecting gives it back.
+    if (deletedWhole(earlier, deleted)) {
+      if (!control.deleted) set(range.id, { ...control, deleted: true });
+      continue;
+    }
+    if (control.deleted && reviewed) {
+      const { deleted: _deleted, ...rest } = control;
+      if (edit === "accept" && !isEmpty(range, tr)) continue;
+      set(range.id, rest);
+      if (edit === "accept") {
+        unwrap(range);
+        continue;
+      }
+      control = rest;
+    }
+    const wasShowing = oldControls[range.id]?.placeholder?.showing === true;
+    if (wasShowing) {
       // What remains of the placeholder goes (tracking keeps a deleted copy: Word records none).
       const start = tr.mapping.map(mapping.map(earlier.contentFrom, 1), 1);
       const end = tr.mapping.map(mapping.map(earlier.contentTo, -1), -1);
       if (start < end) tr.delete(start, end);
-      if (emptied() && !NO_PLACEHOLDER.has(control.kind)) {
-        showPlaceholder(range, control);
-        continue;
-      }
-      // The text put there does not look like it.
-      const style = placeholderId({ envelope });
-      const mark = style && tr.doc.type.schema.marks.characterStyle?.create({ id: style });
-      const a = tr.mapping.map(range.contentFrom, -1);
-      const b = tr.mapping.map(range.contentTo, 1);
-      if (mark && a < b) tr.removeMark(a, b, mark);
-      if (control.placeholder?.showing)
-        set(range.id, { ...control, placeholder: { ...control.placeholder, showing: false } });
-      continue;
     }
-    if (emptied() && !NO_PLACEHOLDER.has(control.kind)) {
+    if (isEmpty(range, tr) && !NO_PLACEHOLDER.has(control.kind)) {
       showPlaceholder(range, control);
       continue;
     }
-    if (filled) continue;
-    if (
-      control.kind === "date" &&
-      control.date &&
-      textIn(state.doc, range) !== formatDate(control, control.date)
-    ) {
-      const { date: _date, ...rest } = control;
-      set(range.id, rest);
+    if (wasShowing) {
+      // The text put there takes the control's formatting, not the placeholder's.
+      leavePlaceholderLook(
+        tr,
+        tr.mapping.map(range.contentFrom, -1),
+        tr.mapping.map(range.contentTo, 1),
+        placeholderId({ envelope }),
+        formatOf(state, control),
+      );
+      if (control.placeholder?.showing) {
+        control = { ...control, placeholder: { ...control.placeholder, showing: false } };
+        set(range.id, control);
+      }
     }
-    if (TEXT_KINDS.has(control.kind)) {
+    if (control.kind === "checkbox" && reviewed) {
+      const checked = boxShowsChecked(state.doc, range, control);
+      if (checked !== null && checked !== control.checked) set(range.id, { ...control, checked });
+    }
+    if (edit === "value" || edit === "fields") continue;
+    if (control.kind === "date") {
+      const text = textIn(state.doc, range);
+      if (wasShowing || text !== textIn(old.doc, earlier)) {
+        const { date, ...rest } = control;
+        const read = dateFromText(control, text);
+        if (read !== (date ?? null)) set(range.id, read ? { ...rest, date: read } : rest);
+      }
+    }
+    if (TEXT_KINDS.has(control.kind) && !wasShowing && !reviewed) {
       const first = inlineNodes(old.doc, earlier).find((n) => n.isText);
       evenMarks(
         tr,
@@ -689,7 +990,12 @@ export function controlValues(state: EditorState): ControlValue[] {
       text,
       value,
       ...(control.kind === "richText" && !showing
-        ? { content: contentOf(state.doc, range).toJSON() }
+        ? {
+            content: (range.level === "cell"
+              ? state.doc.slice(range.from + 1, range.to - 1).content
+              : contentOf(state.doc, range)
+            ).toJSON(),
+          }
         : {}),
     });
   }
@@ -706,11 +1012,10 @@ function targets(state: EditorState, target: string): ControlRange[] {
 function dayOf(value: unknown): string | null {
   if (value instanceof Date) {
     if (Number.isNaN(value.getTime())) return null;
-    const pad = (n: number) => String(n).padStart(2, "0");
-    return `${value.getFullYear()}-${pad(value.getMonth() + 1)}-${pad(value.getDate())}`;
+    return dayFromParts(value.getFullYear(), value.getMonth() + 1, value.getDate());
   }
-  const day = typeof value === "string" ? /^\d{4}-\d{2}-\d{2}/.exec(value)?.[0] : undefined;
-  return day && !Number.isNaN(Date.parse(day)) ? day : null;
+  const parts = typeof value === "string" ? /^(\d{4})-(\d{2})-(\d{2})/.exec(value) : null;
+  return parts ? dayFromParts(Number(parts[1]), Number(parts[2]), Number(parts[3])) : null;
 }
 
 function formatDate(control: ControlJSON, date: string): string {
@@ -718,7 +1023,13 @@ function formatDate(control: ControlJSON, date: string): string {
   return formatDatePicture(new Date(y, m - 1, d), control.dateFormat ?? "d MMMM yyyy");
 }
 
-const glyph = (state: { value: string }) => String.fromCodePoint(Number.parseInt(state.value, 16));
+/** A check box state's character; a code that is none shows as Word's box would. */
+function glyph(state: { value: string }): string {
+  const code = /^[0-9a-f]{1,6}$/i.test(state.value) ? Number.parseInt(state.value, 16) : -1;
+  return code >= 0 && code <= 0x10ffff && (code < 0xd800 || code > 0xdfff)
+    ? String.fromCodePoint(code)
+    : "\u2610";
+}
 
 /** The inline nodes of `text`: line breaks as breaks where the control takes them. */
 function textNodes(state: EditorState, text: string, marks: readonly Mark[]): Node[] {
@@ -732,9 +1043,13 @@ function textNodes(state: EditorState, text: string, marks: readonly Mark[]): No
 }
 
 /** The first run's formatting: what a new value keeps of the old one. */
-function valueMarks(tree: Node, range: ControlRange, control: ControlJSON): readonly Mark[] {
-  if (control.placeholder?.showing) return [];
-  const run = inlineNodes(tree, range).find((n) => n.isText);
+function valueMarks(
+  state: EditorState,
+  range: ControlRange,
+  control: ControlJSON,
+): readonly Mark[] {
+  if (control.placeholder?.showing) return formatOf(state, control);
+  const run = inlineNodes(state.doc, range).find((n) => n.isText);
   return run ? run.marks.filter((m) => !REVIEW.has(m.type.name)) : [];
 }
 
@@ -752,7 +1067,9 @@ function valueFor(
   control: ControlJSON,
   value: ControlValueInput,
 ): NewValue | null {
-  const marks = valueMarks(state.doc, range, control);
+  if (!takesText(state.doc, range) && !(control.kind === "richText" && isBlocks(value)))
+    return null;
+  const marks = valueMarks(state, range, control);
   const shown = control;
   if (value === null || value === "") {
     if (control.kind === "checkbox") return null;
@@ -769,8 +1086,17 @@ function valueFor(
     case "richText": {
       if (typeof value === "string") return text(value);
       if (typeof value !== "object" || value instanceof Date) return null;
-      const nodes = value.content.map((json) => state.schema.nodeFromJSON(json));
-      if (!nodes.length) return { nodes, control };
+      if (!Array.isArray(value.content) || !safeContent(state, range, value.content)) return null;
+      if (!value.content.length) return { nodes: [], control };
+      if (range.level === "row") {
+        const rows = value.content.map((json) => state.schema.nodeFromJSON(json));
+        return rows.every((n) => n.type.name === "tableRow")
+          ? { nodes: rows, blocks: true, control: shown }
+          : null;
+      }
+      const nodes = value.content.every((json) => state.schema.nodes[json.type]?.isInline)
+        ? value.content.map((json) => state.schema.nodeFromJSON(json))
+        : blocksFrom(value.content);
       if (nodes.every((n) => n.isInline)) return { nodes, control: shown };
       if (range.level === "inline") {
         const only = nodes.length === 1 ? nodes[0] : undefined;
@@ -781,7 +1107,9 @@ function valueFor(
         });
         return { nodes: inner, control: shown };
       }
-      return nodes.every((n) => n.isBlock) ? { nodes, blocks: true, control: shown } : null;
+      // Word's rule for what ends a body or a cell.
+      if (nodes.at(-1)?.type.name === "table") return null;
+      return { nodes, blocks: true, control: shown };
     }
     case "dropDown":
     case "comboBox": {
@@ -793,8 +1121,7 @@ function valueFor(
     case "date": {
       const day = dayOf(value);
       if (day) {
-        const date = `${day}T00:00:00Z`;
-        return { ...text(formatDate(control, date)), control: { ...shown, date } };
+        return { ...text(formatDate(control, day)), control: { ...shown, date: day } };
       }
       if (typeof value !== "string") return null;
       const { date: _date, ...rest } = shown;
@@ -816,6 +1143,82 @@ function valueFor(
     default:
       return null;
   }
+}
+
+/** The ids a block, row or cell of `range` lists, up to the control's own. */
+function controlChain(tree: Node, range: ControlRange): string[] {
+  const ids = (tree.nodeAt(range.from)?.attrs.controls ?? []) as string[];
+  return ids.slice(0, ids.indexOf(range.id) + 1);
+}
+
+/** The caret positions of a control's text are in sibling paragraphs: a value can go there. */
+function takesText(tree: Node, range: ControlRange): boolean {
+  if (range.level === "inline") return true;
+  if (range.level === "row") return false;
+  const $from = tree.resolve(range.contentFrom);
+  const $to = tree.resolve(range.contentTo);
+  return (
+    $from.parent.isTextblock &&
+    $to.parent.isTextblock &&
+    $from.depth === $to.depth &&
+    $from.node($from.depth - 1) === $to.node($to.depth - 1)
+  );
+}
+
+const isBlocks = (value: ControlValueInput) =>
+  typeof value === "object" && value !== null && "content" in value;
+
+function blocksFrom(content: readonly NodeJSON[]): Node[] {
+  const blocks: Node[] = [];
+  parseContent({ type: "doc", content }, "content", true).forEach((node) => {
+    blocks.push(node);
+  });
+  return blocks;
+}
+
+/**
+ * Whether rich content from outside can go into `range`: nothing naming what the document does not
+ * hold (a control that is not there or stands elsewhere, a comment, a note), no unsafe link, and in
+ * a cell nothing a cell cannot hold. Its nodes are checked by the schema when they are made.
+ */
+function safeContent(
+  state: EditorState,
+  range: ControlRange,
+  content: readonly NodeJSON[],
+): boolean {
+  const controls = wordContext(state)?.envelope.controls ?? {};
+  const elsewhere = new Set(
+    controlsIn(state.doc)
+      .filter((r) => r === range || r.from < range.from || r.to > range.to)
+      .map((r) => r.id),
+  );
+  const usable = (id: unknown) =>
+    typeof id === "string" && Object.hasOwn(controls, id) && !elsewhere.has(id);
+  // What `controlValues` reads of a block control lists the controls it stands in.
+  const chain = range.level === "inline" ? [] : controlChain(state.doc, range);
+  const $at = state.doc.resolve(range.contentFrom);
+  let inCell = false;
+  for (let d = $at.depth; d > 0; d--) inCell ||= $at.node(d).type.name === "tableCell";
+  const open = new Map<string, number>();
+  const check = (json: NodeJSON): boolean => {
+    if (typeof json !== "object" || json === null || typeof json.type !== "string") return false;
+    const attrs = json.attrs as Record<string, unknown> | undefined;
+    if (COMMENT_ANCHORS.has(json.type) || json.type === "noteReference" || json.type === "noteMark")
+      return false;
+    if (inCell && (json.type === "pageBreak" || json.type === "columnBreak")) return false;
+    if (attrs?.section) return false;
+    if (json.type === "controlStart" || json.type === "controlEnd") {
+      if (!usable(attrs?.id)) return false;
+      const id = attrs?.id as string;
+      open.set(id, (open.get(id) ?? 0) + (json.type === "controlStart" ? 1 : -1));
+    }
+    const ids = attrs?.controls;
+    if (ids != null && !(Array.isArray(ids) && ids.every((c) => chain.includes(c) || usable(c))))
+      return false;
+    if (json.marks?.some((m) => m.type === "link" && !isSafeLink(m.attrs))) return false;
+    return json.content === undefined || (Array.isArray(json.content) && json.content.every(check));
+  };
+  return content.every(check) && [...open.values()].every((n) => n === 0);
 }
 
 function fontMark(type: MarkType, font: string): Mark {
@@ -851,30 +1254,49 @@ export function setControlValue(target: string, value: ControlValueInput, join =
       throw error;
     }
     if (!found.length) return false;
-    return attempt(state, dispatch, (tr) => {
-      tr.setMeta(controlEdit, "value").setMeta(join ? joinHistory : closeHistory, true);
-      const controls: Record<string, ControlJSON> = { ...context.envelope.controls };
+    const tr = state.tr;
+    tr.setMeta(controlEdit, "value").setMeta(join ? joinHistory : closeHistory, true);
+    const controls: Record<string, ControlJSON> = { ...context.envelope.controls };
+    try {
       for (const { range, next } of [...found].reverse()) {
         controls[range.id] = next.control;
-        const wholeBlocks = next.blocks;
-        const blockAttrs = wholeBlocks
-          ? (state.doc.nodeAt(range.from)?.attrs.controls as string[])
-          : null;
-        const nodes = wholeBlocks
-          ? next.nodes.map((n) =>
-              n.type.create({ ...n.attrs, controls: blockAttrs }, n.content, n.marks),
-            )
-          : next.nodes;
-        const [from, to] = wholeBlocks
-          ? [range.from, range.to]
-          : [range.contentFrom, range.contentTo];
-        if (range.level !== "inline" && !wholeBlocks && !state.doc.nodeAt(range.from)?.isTextblock)
-          throw new TransformError("Only a paragraph takes a value here");
-        if (to > from) tr.delete(from, to);
-        if (nodes.length) tr.insert(from, nodes);
+        if (next.blocks) {
+          const prefix = controlChain(state.doc, range);
+          const inCell = range.level === "cell";
+          const nodes = next.nodes.map((n) =>
+            inCell
+              ? n
+              : n.type.create(
+                  {
+                    ...n.attrs,
+                    controls: [
+                      ...prefix,
+                      ...((n.attrs.controls as string[] | null) ?? []).filter(
+                        (id) => !prefix.includes(id),
+                      ),
+                    ],
+                  },
+                  n.content,
+                  n.marks,
+                ),
+          );
+          const [from, to] = inCell ? [range.from + 1, range.to - 1] : [range.from, range.to];
+          tr.replace(from, to, new Slice(Fragment.fromArray(nodes), 0, 0));
+        } else {
+          if (range.contentTo > range.contentFrom) tr.delete(range.contentFrom, range.contentTo);
+          if (next.nodes.length) tr.insert(range.contentFrom, next.nodes);
+        }
       }
-      setEnvelopeValue(state, tr, "controls", controls);
-    });
+    } catch (error) {
+      if (error instanceof TransformError) return false;
+      throw error;
+    }
+    setEnvelopeValue(state, tr, "controls", controls);
+    // Whether it holds: what the document's rules refuse is not reported as done.
+    const tracked = trackTransaction(state, tr);
+    if (!tracked || !state.applyTransaction(tracked).transactions.length) return false;
+    dispatch?.(tr);
+    return true;
   };
 }
 
@@ -1083,7 +1505,7 @@ export function setControlProperties(target: string, patch: ControlPropertiesPat
         !controlIsReadOnly(next) &&
         !next.placeholder?.showing
       ) {
-        const marks = valueMarks(state.doc, range, control);
+        const marks = valueMarks(state, range, control);
         tr.delete(range.contentFrom, range.contentTo);
         tr.insert(range.contentFrom, textNodes(state, formatDate(next, next.date), marks));
       }
@@ -1091,9 +1513,12 @@ export function setControlProperties(target: string, patch: ControlPropertiesPat
   };
 }
 
+const ONCE = new Set([...COMMENT_ANCHORS, "bookmarkStart", "bookmarkEnd"]);
+
 /**
  * A repeating section gets another item after the caret's (or its last), a copy of it as in Word,
- * the controls in it copied too under new ids.
+ * the controls in it copied too under new ids. Not where the section forbids it
+ * (`w15:doNotAllowInsertDeleteSection`).
  */
 export function addRepeatingItem(target?: string): Command {
   return (state, dispatch) => {
@@ -1106,7 +1531,7 @@ export function addRepeatingItem(target?: string): Command {
     const section = target
       ? targets(state, target).find((r) => kindOf(r) === "repeating")
       : ranges.filter((r) => kindOf(r) === "repeating" && r.from < from && from < r.to).at(-1);
-    if (!section) return false;
+    if (!section || controls[section.id]?.noInsertDelete) return false;
     const items = ranges.filter(
       (r) => kindOf(r) === "repeatingItem" && r.from >= section.from && r.to <= section.to,
     );
@@ -1134,7 +1559,10 @@ export function addRepeatingItem(target?: string): Command {
         ...json,
         ...(marker ? { attrs: { ...attrs, id: fresh(String(attrs?.id)) } } : {}),
         ...(ids ? { attrs: { ...attrs, controls: ids.map(fresh) } } : {}),
-        ...(json.content ? { content: json.content.map(renamed) } : {}),
+        // A bookmark's name and a comment's anchors are the document's once.
+        ...(json.content
+          ? { content: json.content.filter((n) => !ONCE.has(n.type)).map(renamed) }
+          : {}),
       };
     };
     const nodes: Node[] = [];

@@ -322,6 +322,37 @@ describe("content controls", () => {
     );
   });
 
+  it("writes a date's format inside an empty w:date, and a title before a tag", async () => {
+    expect(
+      await patchedPr('<w:sdtPr><w:id w:val="1"/><w:date/></w:sdtPr>', {
+        alias: "A",
+        tag: "t",
+        dateFormat: "yyyy",
+      }),
+    ).toBe(
+      '<w:sdtPr><w:alias w:val="A"/><w:tag w:val="t"/><w:id w:val="1"/><w:date><w:dateFormat w:val="yyyy"/></w:date></w:sdtPr>',
+    );
+  });
+
+  it("reads w:sdtPr/w:rPr and a section that forbids new items, and keeps them", async () => {
+    const pr =
+      '<w:sdtPr><w:rPr><w:b/></w:rPr><w15:repeatingSection xmlns:w15="http://schemas.microsoft.com/office/word/2012/wordml"><w15:doNotAllowInsertDeleteSection w:val="1"/></w15:repeatingSection></w:sdtPr>';
+    const { document, package: pkg } = await read(sdt(p(run("x")), pr) + p(""));
+    const control = Object.values(document.controls ?? {})[0];
+    expect(control).toMatchObject({
+      kind: "repeating",
+      noInsertDelete: true,
+      format: [{ type: "bold" }],
+    });
+    expect(await written(document, pkg)).toContain("doNotAllowInsertDeleteSection");
+  });
+
+  it("does not write that a control's deletion is being tracked", async () => {
+    expect(await patchedPr('<w:sdtPr><w:id w:val="1"/></w:sdtPr>', { deleted: true })).toBe(
+      '<w:sdtPr><w:id w:val="1"/></w:sdtPr>',
+    );
+  });
+
   it.each([
     ["text", "<w:text/>"],
     ["richText", ""],

@@ -343,6 +343,12 @@ export interface ControlJSON {
   uncheckedState?: { value: string; font?: string };
   /** `w:text/@w:multiLine`: a plain text control that takes line breaks. */
   multiLine?: boolean;
+  /** `w:sdtPr/w:rPr` as marks: how text put in place of the placeholder looks. */
+  format?: MarkJSON[];
+  /** `w15:doNotAllowInsertDeleteSection`: a repeating section's items are fixed. */
+  noInsertDelete?: boolean;
+  /** Deleted whole while tracking (in the editor: not written): accepting removes the control. */
+  deleted?: boolean;
   /**
    * `showing`: the content is the placeholder. `docPart`: the glossary entry it comes from.
    * `text`: that entry's text, what emptying the control brings back.
@@ -903,6 +909,9 @@ export const checkControl: Check = shape(
     checkedState: shape({ value: str(), font: str() }, ["value"]),
     uncheckedState: shape({ value: str(), font: str() }, ["value"]),
     multiLine: bool,
+    format: runProperties,
+    noInsertDelete: bool,
+    deleted: bool,
     placeholder: shape({ showing: bool, docPart: str(), text: str(65_535) }, [], true),
     binding: shape(
       { xpath: str(65_535), storeItemId: str(), prefixMappings: str(65_535) },

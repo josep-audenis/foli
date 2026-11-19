@@ -1,10 +1,10 @@
-﻿/**
+/**
  * Word's fields in the editor (ADR-0007, 11.8): finding them over a tree of markers, what a view
  * hides or shows of them, and the selection rules (a field is selected whole when the selection
  * crosses its markers; the caret never rests in what is hidden). Their instructions and results:
  * `fieldupdate.ts`.
  */
-import type { Node } from "../model/index.js";
+import type { Mark, Node } from "../model/index.js";
 import { type Selection, TextSelection } from "./selection.js";
 import { type Command, type EditorState, Plugin, PluginKey } from "./state.js";
 import { storyBody } from "./word.js";
@@ -31,6 +31,9 @@ export interface Field {
   locked: boolean;
   /** Its start is a tracked deletion. */
   deleted: boolean;
+  /** The look of its code's first part, and of its result's first text. */
+  codeMarks: readonly Mark[] | null;
+  resultMarks: readonly Mark[] | null;
   /** The field around it, if any. */
   parent: Field | null;
   /** It stands in `parent`'s code. */
@@ -88,13 +91,18 @@ export function fieldsIn(tree: Node): readonly Field[] {
             result: "",
             locked: node.attrs.locked === true,
             deleted: isDeleted(node),
+            codeMarks: null,
+            resultMarks: null,
             parent: top?.field ?? null,
             inCode: !!top && top.field.separator === null,
           },
         });
         break;
       case "fieldCode":
-        if (top?.field.separator === null) top.code += String(node.attrs.text ?? "");
+        if (top?.field.separator === null) {
+          top.code += String(node.attrs.text ?? "");
+          top.field.codeMarks ??= node.marks;
+        }
         break;
       case "fieldSeparator":
         if (top?.field.separator === null) top.field.separator = pos;
@@ -112,10 +120,15 @@ export function fieldsIn(tree: Node): readonly Field[] {
         field.result = entry.text;
         fields.push(field);
         add(entry.text);
+        const outer = open[open.length - 1]?.field;
+        if (outer && outer.separator !== null) outer.resultMarks ??= field.resultMarks;
         break;
       }
       case "text":
-        if (!isDeleted(node)) add(node.text ?? "");
+        if (!isDeleted(node)) {
+          add(node.text ?? "");
+          if (top && top.field.separator !== null) top.field.resultMarks ??= node.marks;
+        }
         break;
       case "tab":
         if (!isDeleted(node)) add("\t");
@@ -271,8 +284,8 @@ export const toggleFieldCodes: Command = (state, dispatch) => {
 
 /** Whether `pos` is somewhere the caret cannot be seen, in `field`. */
 function concealedIn(field: Field, pos: number, codes: boolean): boolean {
-  if (codes) return field.separator !== null && pos > field.separator && pos < field.to;
-  return pos > field.from && pos <= field.codeEnd;
+  // With codes shown the result is hidden and the code is drawn, not text to type in.
+  return pos > field.from && (codes ? pos < field.to : pos <= field.codeEnd);
 }
 
 /** `pos`, out of every hidden range: on in the direction of travel. */
@@ -282,10 +295,27 @@ function outOfHidden(fields: readonly Field[], at: number, forward: boolean, cod
     again = false;
     for (const field of fields) {
       if (!concealedIn(field, pos, codes)) continue;
-      const separator = field.separator as number;
-      if (codes) pos = forward ? field.to : separator;
-      else if (!forward) pos = field.from;
-      else pos = field.separator === null ? field.to : separator + 1;
+      if (!forward) pos = field.from;
+      else pos = codes || field.separator === null ? field.to : field.separator + 1;
+      again = true;
+    }
+  }
+  return pos;
+}
+
+/**
+ * A caret at the very start or end of a result, outside the field: it looks the same, and what is
+ * typed there is not lost to the next update (Word's caret does this at a field's edges).
+ */
+function outOfResultEdge(fields: readonly Field[], at: number, forward: boolean): number {
+  let pos = at;
+  for (let again = true; again; ) {
+    again = false;
+    for (const field of fields) {
+      if (field.separator === null || pos < field.resultFrom || pos > field.resultTo) continue;
+      const atEnd = pos === field.resultTo && (pos !== field.resultFrom || forward);
+      if (!atEnd && pos !== field.resultFrom) continue;
+      pos = atEnd ? field.to : field.from;
       again = true;
     }
   }
@@ -293,7 +323,7 @@ function outOfHidden(fields: readonly Field[], at: number, forward: boolean, cod
 }
 
 /** Whether only what takes no room stands between two positions of a paragraph. */
-function sameSpot(tree: Node, a: number, b: number): boolean {
+export function sameSpot(tree: Node, a: number, b: number): boolean {
   const from = Math.min(a, b);
   const to = Math.max(a, b);
   if (tree.resolve(from).parent !== tree.resolve(to).parent) return false;
@@ -318,6 +348,8 @@ function settled(state: EditorState, previous: Selection, sameDoc: boolean): Sel
   const codes = fieldCodesShown(state);
   const movedOn = selection.head >= previous.head;
   let head = outOfHidden(fields, selection.head, movedOn, codes);
+  // Not after an edit: text typed in place of a whole result goes on inside it.
+  if (selection.empty && sameDoc && !codes) head = outOfResultEdge(fields, head, movedOn);
   let anchor = selection.empty
     ? head
     : outOfHidden(fields, selection.anchor, selection.anchor > selection.head, codes);
@@ -357,17 +389,16 @@ export function caretStop(state: EditorState, pos: number, forward: boolean): nu
   const next = ($pos: ReturnType<Node["resolve"]>) => (forward ? $pos.nodeAfter : $pos.nodeBefore);
   if (!isFieldPart(next(doc.resolve(pos)))) return pos;
   const fields = fieldsIn(doc);
-  const codes = fieldCodesShown(state);
+  // With codes shown a field is one step: its code is drawn, not text to walk through.
+  if (fieldCodesShown(state)) {
+    const whole = fields.find((f) => (forward ? f.from : f.to) === pos);
+    return whole ? (forward ? whole.to : whole.from) : pos;
+  }
   let at = pos;
   for (;;) {
-    const out = outOfHidden(fields, at, forward, codes);
+    const out = outOfHidden(fields, at, forward, false);
     const node = next(doc.resolve(out));
-    // With codes shown a field's code and braces are something to see.
-    const seen =
-      !node ||
-      !UNSEEN.has(node.type.name) ||
-      (codes && isFieldPart(node) && node.type.name !== "fieldEnd");
-    if (seen) return out;
+    if (!node || !UNSEEN.has(node.type.name)) return out;
     at = out + (forward ? 1 : -1);
   }
 }

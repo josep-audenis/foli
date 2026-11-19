@@ -1,4 +1,4 @@
-﻿/**
+/**
  * `updateFields` against Word (11.8): on the corpus, with Word's own pages fed in as the layout,
  * every field works out to what Word has in `corpus/reference/word`, and nothing changes.
  */
@@ -28,7 +28,7 @@ interface WordDocument {
 }
 const reference = (name: string): WordDocument =>
   JSON.parse(
-    readFileSync(join(root, "reference", "word", `${name}.json`), "utf8").replace(/^ï»¿/, ""),
+    readFileSync(join(root, "reference", "word", `${name}.json`), "utf8").replace(/^﻿/, ""),
   );
 
 async function open(name: string, now?: Date) {

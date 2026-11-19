@@ -52,8 +52,10 @@ export interface ControlChromeHost {
   editable(): boolean;
   pages(): readonly HTMLElement[];
   scale(): number;
-  /** The screen rectangles of a control's content: lines, or whole blocks. */
+  /** The screen rectangles of a control: its lines, or its blocks. */
   rects(range: ControlRange): Box[];
+  /** The screen rectangles of what a control's content shows, line by line. */
+  contentRects(range: ControlRange): Box[];
   posFromDOM(node: Node, offset: number): number | null;
   /** Gives the focus back to the document, its selection shown. */
   focus(): void;
@@ -190,7 +192,10 @@ export class ControlChrome {
         open.style.left = "100%";
         open.style.top = "-1px";
         frame.append(open);
-      } else if (control.kind === "repeating" || control.kind === "repeatingItem") {
+      } else if (
+        (control.kind === "repeating" || control.kind === "repeatingItem") &&
+        view.editor.can(addRepeatingItem())
+      ) {
         const add = tab("+", "add", () => {
           view.editor.run(addRepeatingItem());
           view.focus();
@@ -232,13 +237,17 @@ export class ControlChrome {
     this.draw();
   }
 
-  /** A click on `target`: a check box there changes. Whether it was one. */
-  click(target: EventTarget | null): boolean {
+  /** A click on a check box's glyph changes it. Whether it was one. */
+  click(event: MouseEvent): boolean {
+    const { target, clientX: x, clientY: y } = event;
     if (!(target instanceof Node) || !this.view.editable()) return false;
     const pos = this.view.posFromDOM(target, 0);
     const range = pos === null ? null : controlAt(this.view.state().doc, pos);
     const control = range && this.properties(range);
     if (!range || control?.kind !== "checkbox") return false;
+    // On its line but beside it is a click on the line.
+    const on = (box: Box) => x >= box.left && x <= box.right && y >= box.top && y <= box.bottom;
+    if (!this.view.contentRects(range).some(on)) return false;
     this.view.editor.run(setControlValue(range.id, !control.checked));
     return true;
   }
@@ -282,6 +291,8 @@ export class ControlChrome {
     const popup = this.doc.createElement("div");
     popup.setAttribute(CONTROL_UI_ATTR, "");
     popup.setAttribute("data-foli-control-popup", "");
+    popup.setAttribute("role", "dialog");
+    popup.setAttribute("aria-label", NAMES[control.kind] ?? "Content control");
     const rects = lines(this.view.rects(range));
     const last = rects[rects.length - 1];
     popup.style.left = `${last?.left ?? 0}px`;

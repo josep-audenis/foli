@@ -1,4 +1,4 @@
-﻿// Fields and content controls between Foli and Word (11.5). Run after `pnpm build`, with Word:
+// Fields and content controls between Foli and Word (11.5). Run after `pnpm build`, with Word:
 //
 //   node scripts/corpus/field-roundtrip.mjs make <dir>
 //   powershell -ExecutionPolicy Bypass -File scripts/corpus/word-reference.ps1 `
@@ -17,8 +17,9 @@
 //
 // Since 11.8 it also has Word read what `updateFields` and the insert commands write, with Word's
 // pages as the layout: <name>-updated (every result spoiled, then updated), 04-rebuilt (an entry
-// spoiled, the table of contents built again), 03-merged (merge fields filled from data while
-// tracking), 04-inserted (a page number, the date, cross-references and a new table of contents).
+// spoiled, the table of contents built again), 04-tracked (that while tracking), 04-control (the same inside a block content control,
+// as Word's gallery puts it), 03-merged (merge fields filled from data while tracking), 04-inserted
+// (a page number, the date, cross-references and a new table of contents).
 // Word must find exactly the fields and results Foli holds (a `DATE`'s result aside: Word
 // recomputes an unlocked one on opening).
 
@@ -45,7 +46,7 @@ const root = join(import.meta.dirname, "..", "..");
 const corpus = join(root, "corpus", "word");
 const reference = join(root, "corpus", "reference", "word");
 const EDIT = "Foli edit";
-const json = (path) => JSON.parse(readFileSync(path, "utf8").replace(/^ï»¿/, ""));
+const json = (path) => JSON.parse(readFileSync(path, "utf8").replace(/^﻿/, ""));
 
 const paragraphs = (node, out = []) => {
   if (node.type === "paragraph") out.push(node);
@@ -126,13 +127,15 @@ function wordLayout(doc, word) {
 }
 
 const heldFields = (editor) =>
-  fieldsIn(editor.state.doc).map((f) => ({
-    code: f.instruction,
-    result: f.result.replace(/\r/g, ""),
-  }));
+  fieldsIn(editor.state.doc)
+    .filter((f) => !f.deleted)
+    .map((f) => ({
+      code: f.instruction,
+      result: f.result.replace(/\r/g, ""),
+    }));
 
 /** Documents written through `updateFields` and the insert commands, by file name. */
-function fieldEdits(name, document) {
+async function fieldEdits(name, document, packages) {
   const base = name.replace(".docx", "");
   const word = json(join(reference, `${base}.json`));
   const open = (options) => createEditor({ document, author: "Foli Fields", ...options });
@@ -167,6 +170,65 @@ function fieldEdits(name, document) {
       },
     });
     out[`${base}-rebuilt`] = rebuilt;
+
+    // The same while tracking: Word reads it with the changes accepted.
+    const tracked = open({ trackChanges: true });
+    const first = fieldsIn(tracked.state.doc)[0];
+    tracked.dispatch(tracked.state.tr.insertText("X", first.resultFrom + 1));
+    updateFields(tracked, {
+      layout: {
+        pages: word.pages,
+        pageAt: (pos) => ({
+          number: pages.get(tracked.state.doc.resolve(pos).parent.textContent) ?? 1,
+          sectionPages: word.pages,
+        }),
+      },
+    });
+    out[`${base}-tracked`] = tracked;
+
+    // The table of contents in a block content control, as Word's gallery has it: the rebuilt
+    // entries must stay in it.
+    const source = await readPackage(new Uint8Array(readFileSync(join(corpus, name))));
+    const main = source.text(source.mainDocument);
+    const from = main.lastIndexOf("<w:p ", main.indexOf(" TOC "));
+    let depth = 0;
+    let close = from;
+    for (const match of main.slice(from).matchAll(/fldCharType="(begin|end)"/g)) {
+      depth += match[1] === "begin" ? 1 : -1;
+      if (!depth) {
+        close = main.indexOf("</w:p>", from + match.index) + "</w:p>".length;
+        break;
+      }
+    }
+    const gallery =
+      '<w:sdtPr><w:id w:val="987654"/><w:docPartObj><w:docPartGallery w:val="Table of Contents"/>' +
+      "<w:docPartUnique/></w:docPartObj></w:sdtPr>";
+    const boxed = await source.write(
+      new Map([
+        [
+          source.mainDocument,
+          new TextEncoder().encode(
+            `${main.slice(0, from)}<w:sdt>${gallery}<w:sdtContent>${main.slice(from, close)}` +
+              `</w:sdtContent></w:sdt>${main.slice(close)}`,
+          ),
+        ],
+      ]),
+    );
+    const read = await importDocx(boxed);
+    const control = createEditor({ document: read.document, author: "Foli Fields" });
+    const start = fieldsIn(control.state.doc)[0];
+    control.dispatch(control.state.tr.insertText("X", start.resultFrom + 1));
+    updateFields(control, {
+      layout: {
+        pages: word.pages,
+        pageAt: (pos) => ({
+          number: pages.get(control.state.doc.resolve(pos).parent.textContent) ?? 1,
+          sectionPages: word.pages,
+        }),
+      },
+    });
+    packages[`${base}-control`] = read.package;
+    out[`${base}-control`] = control;
 
     const inserted = open();
     const layout = () => wordLayout(inserted.state.doc, word);
@@ -244,12 +306,19 @@ if (mode === "make") {
       await exportDocx(change.document, pkg),
     );
     if (name.startsWith("00")) return;
-    for (const [file, editor] of Object.entries(fieldEdits(name, document))) {
+    const packages = {};
+    for (const [file, editor] of Object.entries(await fieldEdits(name, document, packages))) {
       expected[file] = { fields: heldFields(editor) };
-      writeFileSync(
-        join(dir, "foli", `${file}.docx`),
-        await exportDocx(editor.getDocument(), pkg, { trackRevisions: editor.trackingChanges }),
-      );
+      const bytes = await exportDocx(editor.getDocument(), packages[file] ?? pkg, {
+        trackRevisions: editor.trackingChanges,
+      });
+      writeFileSync(join(dir, "foli", `${file}.docx`), bytes);
+      // The rebuilt table of contents is one control still (Word does not list gallery ones).
+      if (file.endsWith("-control")) {
+        const written = await readPackage(bytes);
+        const sdts = written.text(written.mainDocument).match(/<w:sdt>/g)?.length;
+        if (sdts !== 1) throw new Error(`${sdts} content controls around the table of contents`);
+      }
     }
   }
 }

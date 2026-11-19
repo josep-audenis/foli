@@ -1198,7 +1198,8 @@ Each task is a PR on `phase-11/sections-fields`, the build green after each.
   selected field shaded, `view.print()` updating first; a Fields menu and cross-reference dialog.
   On the corpus with Word's pages every field works out to Word's result and nothing changes
   (`fields-word.test.ts`); `word-fields.spec.ts` in three engines; `field-roundtrip.mjs` has Word
-  read updated, rebuilt, merged (tracked) and inserted fields: all 22 files pass. Shortcuts: unknown
+  read updated, rebuilt (in a content control too), merged (tracked) and inserted fields: all 24
+  files pass; `\#` pictures match 558 cases read from Word. Shortcuts: unknown
   fields, unfollowed switches and missing bookmarks keep their result and are reported;
   `MERGEFORMAT` keeps the first run's look, not word by word; a multi-paragraph `REF` gets line
   breaks; table of contents entries are plain text; English date names; codes shown are not
@@ -1213,11 +1214,13 @@ Each task is a PR on `phase-11/sections-fields`, the build green after each.
   `w:sdtPr`, new ones written whole; frames, titles, lists, date picker and check boxes in the view,
   by keyboard too (Alt+Down, Space); a Controls menu and properties dialog.
   `word-controls.spec.ts` in three engines, T1 to T3 in a rich text control;
-  `control-roundtrip.mjs` has Word read 8 files, every control as Foli holds it. Word's rules are
+  `control-roundtrip.mjs` has Word read 9 files, every control as Foli holds it. Word's rules are
   in ADR-0007. Shortcuts: a bound control's content is read-only, the binding not evaluated;
-  dates typed are not parsed and date names are English; `w:temporary` is kept but does not remove
-  the control when edited; a group control's fixed content is editable; no picture chosen for a
-  picture control; a list's or date's button is mouse-only, Alt+Down its keyboard way.)
+  dates picked are written with English names and typed ones are not reformatted; `w:temporary` is
+  kept but does not remove the control when edited; a group control's fixed content is editable; no
+  picture chosen for a picture control; a custom placeholder of `insertControl` is lost on reload
+  (no glossary entry is written); a control's own tracked deletion is not written; a list's or
+  date's button is mouse-only, Alt+Down its keyboard way.)
 - [x] 11.10 Footnotes and endnotes: insert a note (numbered in Word's formats, restarting per
   section or page where set), its text edited in place; footnotes laid out at their reference's
   page foot (separator, continuation to the next page), endnotes at the end of the document or

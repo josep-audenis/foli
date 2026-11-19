@@ -58,6 +58,9 @@ const key = new PluginKey<TrackState>("track");
 /** Set this meta (true) on a transaction to keep it out of tracking. */
 export const untracked = "untracked";
 
+/** On a rebuilt transaction: the ranges it records as deleted, as `[from, to]` of the document before. */
+export const trackedDeletes = "trackedDeletes";
+
 /** Inline nodes a tracked change does not mark: they stand between runs in Word. */
 const MARKERS = new Set([
   "bookmarkStart",
@@ -285,6 +288,12 @@ function rebuild(
   deletion: MarkType,
 ): Transaction {
   const out = state.tr.copyMeta(tr);
+  out.setMeta(
+    trackedDeletes,
+    changedRanges(tr)
+      .filter((r) => r.b > r.a)
+      .map((r) => [r.a, r.b]),
+  );
   const date = now();
   let nextId = -1;
   const newId = () => {
