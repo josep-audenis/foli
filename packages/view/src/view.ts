@@ -1,4 +1,4 @@
-﻿import {
+import {
   AllSelection,
   arrowAcrossLeaf,
   autolinkHref,
@@ -61,6 +61,7 @@
   type StorySide,
   StoryStep,
   type StoryView,
+  sameSpot,
   sectionSettings,
   setColumnWidth,
   setComments,
@@ -733,6 +734,7 @@ export class EditorView {
       pages: () => view.pages,
       scale: () => view.scale(),
       rects: (range) => view.controlRects(range),
+      contentRects: (range) => view.controlContentRects(range),
       posFromDOM: (node, offset) => view.posFromDOM(node, offset),
       focus: () => view.focus(),
       injectStyles: () => injectStyles(host),
@@ -1998,6 +2000,11 @@ export class EditorView {
       }
       return [...byPage.values()];
     }
+    return this.controlContentRects(range);
+  }
+
+  /** Where what a control's content shows is on the screen. */
+  private controlContentRects(range: ControlRange): Box[] {
     const dom = this.host.ownerDocument.createRange();
     const start = this.domFromPos(range.contentFrom);
     const end = this.domFromPos(range.contentTo);
@@ -2100,26 +2107,35 @@ export class EditorView {
    * Prints what the document is now: fields updated (one undo step), then the browser's dialog.
    */
   print(): void {
-    this.updateFields();
-    this.host.ownerDocument.defaultView?.print();
+    try {
+      this.updateFields();
+    } finally {
+      this.host.ownerDocument.defaultView?.print();
+    }
   }
 
   /**
    * Left and Right next to a field's markers: the browser's move starts where something can be
-   * seen, or the markers (empty elements) cost WebKit a key press each.
+   * seen, or the markers (empty elements) cost WebKit a key press each. With codes shown the
+   * view makes the move itself, over the whole field; whether it did.
    */
-  private skipFieldParts(event: KeyboardEvent): void {
+  private skipFieldParts(event: KeyboardEvent): boolean {
     const forward = event.key === "ArrowRight";
     if ((!forward && event.key !== "ArrowLeft") || event.ctrlKey || event.altKey || event.metaKey)
-      return;
-    const { selection } = this.state;
+      return false;
+    const { selection, doc } = this.state;
     // Shift extends by itself: an extended DOM selection would lose its anchor to the same spot.
-    if (!(selection instanceof TextSelection) || event.shiftKey || !selection.empty) return;
+    if (!(selection instanceof TextSelection) || event.shiftKey || !selection.empty) return false;
     const stop = caretStop(this.state, selection.head, forward);
     const sel = this.host.ownerDocument.getSelection();
-    if (stop === selection.head || !sel) return;
+    if (stop === selection.head || !sel) return false;
+    if (this.fieldCodes) {
+      this.dispatch(this.state.tr.setSelection(TextSelection.create(doc, stop)));
+      return true;
+    }
     const { node, offset } = this.domFromPos(stop);
     sel.collapse(node, offset);
+    return false;
   }
 
   /** F9 and Alt+F9, as in Word. */
@@ -3097,9 +3113,15 @@ export class EditorView {
       selection instanceof AllSelection
         ? TextSelection.between(selection.$anchor, selection.$head)
         : selection;
-    // The two sides of a control's edge are one place to the browser.
+    if (dom.anchor === shown.anchor && dom.head === shown.head) return true;
+    // Field markers take no room, and a control's edge is one place to the browser: the DOM
+    // cannot tell their two sides apart.
     const { doc } = this.state;
-    return controlSpot(doc, dom.anchor, shown.anchor) && controlSpot(doc, dom.head, shown.head);
+    const texts = shown instanceof TextSelection && dom instanceof TextSelection;
+    const same = (a: number, b: number) =>
+      controlSpot(doc, a, b) ||
+      (texts && doc.resolve(a).parent.inlineContent && sameSpot(doc, a, b));
+    return same(dom.anchor, shown.anchor) && same(dom.head, shown.head);
   }
 
   private hasFocus(): boolean {
@@ -3694,7 +3716,7 @@ export class EditorView {
    */
   private onClick = (event: MouseEvent): void => {
     const target = event.target;
-    if (event.type === "click" && !event.shiftKey && this.controlChrome.click(target)) return;
+    if (event.type === "click" && !event.shiftKey && this.controlChrome.click(event)) return;
     const element = target instanceof Element ? target.closest("a") : null;
     if (!element || !this.host.contains(element)) return;
     event.preventDefault();
@@ -3730,7 +3752,10 @@ export class EditorView {
       event.preventDefault();
       return;
     }
-    this.skipFieldParts(event);
+    if (this.skipFieldParts(event)) {
+      event.preventDefault();
+      return;
+    }
     const name = keyName(event);
     if (
       this.documentEdgeKey(name) ||
@@ -4088,7 +4113,7 @@ export class EditorView {
       end--;
       domEnd--;
     }
-    // A pure insertion or deletion inside repeated text ("aa" â†’ "aaa") could sit at several
+    // A pure insertion or deletion inside repeated text ("aa" → "aaa") could sit at several
     // offsets; slide it back to where the DOM caret says it happened.
     const insertion = end === start;
     if (caret >= 0 && insertion !== (domEnd === start)) {

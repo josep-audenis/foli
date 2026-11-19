@@ -273,7 +273,7 @@ export function documentOutline(
     const level =
       headingLevel(word, node) ?? (outline !== null && outline < 9 ? outline + 1 : null);
     if (level === null || contents.some((f) => pos + 1 >= f.from && pos < f.to)) return [];
-    const text = entryTitle(tree, paragraph);
+    const text = entryTitle(tree, word, paragraph);
     if (!text.trim()) return [];
     const at = layout?.pageAt(pos + 1);
     return [

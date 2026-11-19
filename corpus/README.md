@@ -160,10 +160,11 @@ bookmarks) and edited (a field's result, a control's text, a block control split
 
 Since 11.8 it has Word read what `updateFields` and the insert commands write, Word's own pages as
 the layout: 01, 04 and 09 with every result spoiled and updated, 04's table of contents built again
-after an entry was spoiled, 03's merge fields filled from data while tracking, and 04 with a page
+after an entry was spoiled (and again while tracking, and inside a block content control, as Word's gallery has it),
+03's merge fields filled from data while tracking, and 04 with a page
 number, the date, two cross-references to a heading and a new table of contents. Word finds exactly
 the fields and results Foli holds (an unlocked `DATE` it recomputes; a `w:hyperlink` to a bookmark
-counts as a field in Word's list and is left out). All 22 files pass (2026-11-18, Word 16.0.20527).
+counts as a field in Word's list and is left out). All 24 files pass (2026-11-18, Word 16.0.20527).
 `packages/docx/src/fields-word.test.ts` does the arithmetic part on every run: on the corpus, with
 Word's pages from `reference/word/`, every field works out to Word's result and nothing changes.
 
@@ -171,7 +172,7 @@ Word's pages from `reference/word/`, every field works out to Word's result and 
 `word-reference.ps1` does for controls and their locks, check box state, list items and date format)
 has Word read what the editor makes of controls: 03 unchanged, filled through the API (also while
 tracking), typed into, filled and emptied, with changed properties and with a control copied, and a
-new document with every kind inserted and a repeating section grown. Word opens all 8 and finds
+new document with every kind inserted and a repeating section grown; a tracked fill rejected. Word opens all 9 and finds
 every control as Foli holds it, ids unique (2026-11-18, Word 16.0.20527).
 
 `scripts/corpus/find-roundtrip.mjs` (11.11, with `find-word.ps1`, which reads every story as it

@@ -1918,12 +1918,23 @@ function CrossReferenceDialog({
   return (
     <div
       role="dialog"
+      aria-modal="true"
       aria-label="Insert cross-reference"
       className="foli-link-dialog foli-table-dialog"
       onKeyDown={(event) => {
-        if (event.key !== "Escape") return;
+        if (event.key === "Escape") {
+          event.preventDefault();
+          onClose(false);
+        }
+        if (event.key !== "Tab") return;
+        // Tab goes round inside the dialog.
+        const stops = [
+          ...event.currentTarget.querySelectorAll<HTMLElement>("select, input, button"),
+        ];
+        const at = stops.indexOf(event.target as HTMLElement);
+        const next = (at + (event.shiftKey ? -1 : 1) + stops.length) % stops.length;
         event.preventDefault();
-        onClose(false);
+        stops[next]?.focus();
       }}
     >
       <form onSubmit={insert} noValidate>

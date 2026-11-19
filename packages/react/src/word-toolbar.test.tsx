@@ -770,6 +770,12 @@ describe("FoliCanvas's pictures", () => {
       pick("Cross-reference…");
       const dialog = screen.getByRole("dialog", { name: "Insert cross-reference" });
       expect(document.activeElement).toBe(screen.getByLabelText("Refer to"));
+      expect(dialog.getAttribute("aria-modal")).toBe("true");
+      // Tab stays in the dialog, round from its first control to its last.
+      fireEvent.keyDown(screen.getByLabelText("Refer to"), { key: "Tab", shiftKey: true });
+      expect(document.activeElement).toBe(screen.getByRole("button", { name: "Cancel" }));
+      fireEvent.keyDown(screen.getByRole("button", { name: "Cancel" }), { key: "Tab" });
+      expect(document.activeElement).toBe(screen.getByLabelText("Refer to"));
       fireEvent.keyDown(dialog, { key: "Escape" });
       expect(screen.queryByRole("dialog")).toBeNull();
       pick("Cross-reference…");

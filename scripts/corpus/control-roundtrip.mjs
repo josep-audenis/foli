@@ -6,7 +6,7 @@
 //   node scripts/corpus/control-roundtrip.mjs check <dir>
 //
 // `make` writes what the editor makes of the corpus's offer letter (03, five controls) and of a new
-// document: 03 unchanged, filled through the API, filled while tracking, typed into, filled and
+// document: 03 unchanged, filled through the API, filled while tracking (and rejected), typed into, filled and
 // emptied again, its properties changed, a control copied; a new document with every kind inserted,
 // some filled, a repeating section grown. `check` has Word's reading say what Foli holds: every file
 // opens, every control has its type, tag, title, placeholder state, text, locks, check box state,
@@ -21,6 +21,7 @@ import {
   createEditor,
   fitPaste,
   insertControl,
+  rejectAllChanges,
   setControlProperties,
   withEnvelope,
 } from "../../packages/core/dist/index.js";
@@ -106,6 +107,10 @@ if (mode === "make") {
   const tracked = open({ trackChanges: true });
   if (!fill(tracked)) throw new Error("not filled while tracking");
   cases["03-tracked"] = tracked;
+  const rejected = open({ trackChanges: true });
+  fill(rejected);
+  rejected.run(rejectAllChanges());
+  cases["03-rejected"] = rejected;
   const typed = open();
   typed.select(place(typed, "salary").contentFrom);
   typed.commands.insertText("Typed");

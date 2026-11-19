@@ -7,7 +7,7 @@ import { type ControlJSON, checkControl } from "@folijs/core";
 import type { DocxPackage } from "../package.js";
 import type { XmlElement } from "../xml.js";
 import { attr, child, deepText, elements, isW, W, W14, W15 } from "./ooxml.js";
-import { type Context, compactDefined, sourceOf } from "./properties.js";
+import { type Context, compactDefined, runProperties, sourceOf } from "./properties.js";
 
 const KINDS: readonly [string, string, ControlJSON["kind"]][] = [
   [W, "text", "text"],
@@ -87,6 +87,10 @@ export function controlProperties(
   const showing = find(W, "showingPlcHdr");
   const binding = find(W, "dataBinding");
   const docPart = placeholder && attr(child(placeholder, "docPart"), "val");
+  const section = find(W15, "repeatingSection");
+  const fixed =
+    section && elements(section).find((c) => c.local === "doNotAllowInsertDeleteSection");
+  const format = pr ? runProperties(child(pr, "rPr"), context) : [];
   const entry = docPart !== undefined ? context.pkg && glossaryTexts(context.pkg).get(docPart) : "";
   const control = compactDefined({
     kind,
@@ -110,6 +114,8 @@ export function controlProperties(
     uncheckedState: glyph("uncheckedState"),
     multiLine:
       text && attr(text, "multiLine") !== undefined ? on(attr(text, "multiLine")) : undefined,
+    format: format.length ? format : undefined,
+    noInsertDelete: fixed ? on(attr(fixed, "val") ?? attr(fixed, "val", W15)) : undefined,
     placeholder:
       showing || docPart !== undefined
         ? compactDefined({

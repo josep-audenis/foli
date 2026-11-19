@@ -270,6 +270,26 @@ test("a check box changes by click and by Space", async ({ page }) => {
   expect((await values(page)).box).toBe(true);
 });
 
+test("a click beside a block check box on its line does not change it", async ({ page }) => {
+  await load(page, documentOf([inBlock(paragraph(text("\u2610")), "box"), paragraph("after")]));
+  const line = await page.locator(".foli-page p").first().boundingBox();
+  await page.mouse.click((line?.x ?? 0) + (line?.width ?? 0) - 10, (line?.y ?? 0) + 5);
+  expect((await values(page)).box).toBe(false);
+  await page.getByText("\u2610").click();
+  expect((await values(page)).box).toBe(true);
+});
+
+test("a list open on the page breaks no axe rule, its landmarks included", async ({ page }) => {
+  await load(page);
+  await enter(page, "list");
+  await page.keyboard.press("Alt+ArrowDown");
+  const { violations } = await new AxeBuilder({ page })
+    .include("[data-foli-control-popup]")
+    .withRules(["region", "aria-required-children", "aria-input-field-name"])
+    .analyze();
+  expect(violations).toEqual([]);
+});
+
 test("a locked control takes nothing, and neither does a range over it", async ({ page }) => {
   await load(page);
   const before = await docText(page);
@@ -484,6 +504,16 @@ test("the toolbar inserts a control and edits its properties, by keyboard and ax
       { value: "l", display: "Large" },
     ],
   });
+});
+
+test("a repeating section that forbids new items offers none", async ({ page }) => {
+  await load(page, {
+    ...documentOf([inBlock(paragraph("item"), "r", "i"), paragraph("end")]),
+    controls: { r: { kind: "repeating", noInsertDelete: true }, i: { kind: "repeatingItem" } },
+  });
+  await enter(page, "i", 1);
+  await expect(page.locator('[data-foli-control-frame="active"]')).toHaveCount(1);
+  await expect(page.locator('[data-foli-control-tab="add"]')).toHaveCount(0);
 });
 
 test("a repeating section gets another item", async ({ page }) => {

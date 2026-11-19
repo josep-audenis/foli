@@ -82,14 +82,18 @@ writeFileSync(appEntry, `export { FoliEditor } from "${dist("react")}";\n`);
  * Core, view and React raised in 11.8 (66.6, 86.4 and 114.6 kB): fields (finding them, the
  * selection rules, every field Foli updates with Word's switches, tables of contents rebuilt,
  * the insert commands), hidden code ranges and shading in the view, the fields menu and dialog.
+ * Raised again after its review (68.8, 88.8 and 117.2 kB): Word's numeric pictures in full, self
+ * references, what a table of contents lists, results written a paragraph at a time.
  * Core and React raised in 11.9 (74.7 kB, 76.5 kB allowed; React with core): content controls (the
  * lock and text rules, placeholders, values, insert commands). Docx raised in 11.9 (55.1 kB, 57.0
  * allowed): controls' properties patched into the kept `w:sdtPr`, new controls, glossary text.
  * View and React raised in 11.9 (92.9 and 125.6 kB, 95.2 and 128.9 allowed): controls' frames,
- * lists and date picker in the view, the controls menu and properties dialog.
- * Core raised in 11.10 (75.6 kB, 77.1 allowed): notes (numbers from the settings and sections, the
+ * lists and date picker in the view, the controls menu and properties dialog. Core raised again
+ * in 11.9's review (77.3 kB, 79.6 allowed): rich values checked, dates read from their text, what
+ * tracked deletions and reviews do to a control.
+ * Core raised in 11.10 (80.2 kB, 82.0 allowed): notes (numbers from the settings and sections, the
  * insert, options and convert commands, keeping a note with its reference while tracking, notes
- * carried on the clipboard). View and React raised in 11.10 (100.9 and 135.2 kB, 102.5 and 137.7
+ * carried on the clipboard). View and React raised in 11.10 (103.8 and 139.9 kB, 105.5 and 141.6
  * allowed): footnotes and endnotes in the flow and both renderers, a note edited in place, the
  * notes menu and options dialog, and core's notes with them.
  * Core, view and React raised in 11.11 (79.6, 103.2 and 143.9 kB; 81.5, 105.5 and 147.0 allowed):
@@ -98,7 +102,7 @@ writeFileSync(appEntry, `export { FoliEditor } from "${dist("react")}";\n`);
  * `FoliEditor` includes so that Word's keys work out of the box.
  */
 const BUNDLES = [
-  { name: "@folijs/core", entry: dist("core"), budget: 83_500 },
+  { name: "@folijs/core", entry: dist("core"), budget: 84_000 },
   { name: "@folijs/view", entry: dist("view"), budget: 108_000 },
   { name: "@folijs/react", entry: dist("react"), budget: 150_500 },
   { name: "FoliEditor only", entry: appEntry, budget: 150_500 },

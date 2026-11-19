@@ -449,23 +449,23 @@ results out and writes them in one transaction, one undo step, recorded as track
 tracking is on (a story's change is a `StoryStep` of it), and returns `{ updated, unchanged, rebuilt,
 skipped }`. Locked fields stay; a field left as it was is in `skipped`, with its `instruction`, its
 `story` and why (`locked`, `unknown`, `no-layout`, `no-data`, `missing-bookmark`,
-`unsupported-switch`, `untrackable`). `layout` is a `FieldLayout` (`pages`, `pageAt(pos)`: `number`,
+`unsupported-switch`, `self-reference`, `failed`, `untrackable`). `layout` is a `FieldLayout` (`pages`, `pageAt(pos)`: `number`,
 `sectionPages`, `format`), what `view.updateFields` passes: without one, page fields keep their
 results. `data`: `MERGEFIELD` values by name (any case; left alone without it); `now`: for `DATE` and
 `TIME`; `only`: a range of the editor's tree (a caret: the field around it) or a function of the
 `Field`, else every field of the body and the stories. `PAGE`, `NUMPAGES` and `SECTIONPAGES` in a
 story are never written: the view draws them page by page.
 
-| Field                                     | Honours                                                                                                                                                                                                                            |
-| ----------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| every one                                 | `\*` `MERGEFORMAT` (the old result's first run's look; without it the code's), `CHARFORMAT`, `Arabic`, `ROMAN`, `roman`, `ALPHABETIC`, `alphabetic`, `Ordinal`, `Hex`, `Upper`, `Lower`, `FirstCap`, `Caps`; `\#` numeric pictures |
-| `PAGE`, `NUMPAGES`, `SECTIONPAGES`        | the section's number format for `PAGE`                                                                                                                                                                                             |
-| `DATE`, `TIME`                            | `\@` date pictures (English names)                                                                                                                                                                                                 |
-| `SEQ id [bookmark]`                       | `\c`, `\n`, `\r n`, `\s level`, `\h`                                                                                                                                                                                               |
-| `REF name` (or the bookmark's name alone) | `\h`, `\n`, `\r`, `\w`, `\p`, `\t`; without a number switch, the bookmark's text with its formatting                                                                                                                               |
-| `PAGEREF name`                            | `\h`, `\p`                                                                                                                                                                                                                         |
-| `TOC`                                     | `\o`, `\u`, `\t`, `\h`, `\z`, `\n`, `\b`, `\p`, `\w`, `\x`; styles `TOC1`-`TOC9` made as Word's when missing, `_Toc` bookmarks, a right tab with dots, nested `PAGEREF`s                                                           |
-| `MERGEFIELD name`                         | from `data`: `\b`, `\f` (only around a value), `\@`, `\#`                                                                                                                                                                          |
+| Field                                     | Honours                                                                                                                                                                                                                                                                                                      |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| every one                                 | `\*` `MERGEFORMAT` (the old result's first run's look; without it the code's), `CHARFORMAT`, `Arabic`, `ArabicDash`, `ROMAN`, `roman`, `ALPHABETIC`, `alphabetic`, `Ordinal`, `Hex`, `Upper`, `Lower`, `FirstCap`, `Caps`; `\#` numeric pictures (`0`, `#`, `x`, `,`, `.`, `+`, `-`, `'text'`, `;` sections) |
+| `PAGE`, `NUMPAGES`, `SECTIONPAGES`        | the section's number format for `PAGE`                                                                                                                                                                                                                                                                       |
+| `DATE`, `TIME`                            | `\@` date pictures (English names)                                                                                                                                                                                                                                                                           |
+| `SEQ id [bookmark]`                       | `\c`, `\n`, `\r n` (the first written counts), `\s level`, `\h` (shown again by a `\*` number format)                                                                                                                                                                                                        |
+| `REF name` (or the bookmark's name alone) | `\h`, `\n`, `\r`, `\w`, `\p`, `\t`; without a number switch, the bookmark's text with its formatting                                                                                                                                                                                                         |
+| `PAGEREF name`                            | `\h`, `\p`                                                                                                                                                                                                                                                                                                   |
+| `TOC`                                     | `\o`, `\u`, `\t`, `\h`, `\z`, `\n`, `\b`, `\p`, `\w`, `\x`; styles `TOC1`-`TOC9` made as Word's when missing, `_Toc` bookmarks, a right tab with dots, nested `PAGEREF`s                                                                                                                                     |
+| `MERGEFIELD name`                         | from `data`: `\b`, `\f` (only around a value), `\@`, `\#`                                                                                                                                                                                                                                                    |
 
 Inserting, each one undo step: `insertField(instruction, { result?, layout?, data?, now? })`,
 `insertPageNumber(options?)`, `insertDate(picture = "d MMMM yyyy", options?)`,
@@ -478,7 +478,10 @@ hyperlinks = true, layout? })` (in a paragraph of its own; not in a story). Read
 `parseFieldInstruction(text)`, `formatDatePicture(date, picture)`,
 `formatNumericPicture(value, picture)`; `fieldDisplay(paragraphs, codes)` (what a renderer hides),
 `fieldCodesShown(state)`, `toggleFieldCodes`. A selection crossing a field's markers takes the whole
-field; Backspace or Delete at its edge selects it first, as in Word.
+field; Backspace or Delete at its edge selects it first, as in Word. A caret put at the very start
+or end of a result goes just outside the field, so what is typed there is not lost to an update.
+A table of contents lists paragraphs by their style's level (a heading style, a style based on one,
+a style with an outline level) and, with `\u`, by their own outline level; hidden text is left out.
 
 Content controls (11.9, ADR-0007). `editor.commands.setControlValue(target, value)` fills the
 controls with that id or tag, in the body and, from the body's editor, the stories, as one undo

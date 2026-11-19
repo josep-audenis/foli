@@ -44,18 +44,24 @@ checklist in [testing/ime.md](testing/ime.md)):
   shortcut of its own). Headers are not dimmed while the body is edited, as they are in Word.
 - Content controls (11.9) follow Word's rules for locks, placeholders and what each kind holds. A
   control bound to data shows what the file stores and cannot be edited: bindings are kept, not
-  evaluated, and Word replaces such content with the bound value when it opens the file. Text typed
-  in a date control is kept as text (Word re-reads a date typed there); picked dates are written in
-  English whatever the control's language. A control that removes itself when edited
-  (`w:temporary`) stays; a group's fixed text can be edited; a picture control keeps its picture
-  (no way to choose another). An empty block control stays opaque.
+  evaluated, and Word replaces such content with the bound value when it opens the file. A date typed
+  in a date control is read but not reformatted; picked dates are written in English whatever the
+  control's language. A control that removes itself when edited (`w:temporary`) stays; a group's
+  fixed text can be edited; a picture control keeps its picture (no way to choose another). The
+  placeholder text given to `insertControl` does not survive a save (no glossary entry is written),
+  and a control's own tracked deletion is saved as its content's. An empty block control stays
+  opaque.
 - Fields (11.8) show their stored results until updated (F9, the Fields menu, `updateFields`,
   `view.print()`); the browser's own Print menu does not update them. Updated: `PAGE`, `NUMPAGES`,
   `SECTIONPAGES`, `DATE`, `TIME`, `SEQ`, `REF`, `PAGEREF`, `TOC`, `MERGEFIELD`. Any other field
   (`IF`, `STYLEREF`, formulas, form fields…), and a switch Foli does not follow (`TOC \c`, `\f`,
   `\l`, `\a`, `\s`, `\d`; `REF \f`, `\d`; the number words of `\* CardText`, `OrdText`,
-  `DollarText`), keeps its result and is reported; so does a reference to a missing bookmark, where
-  Word writes an error into the result. `\* MERGEFORMAT` keeps the old result's first run's look,
+  `DollarText`; a `\#` picture with backquotes, two points or a comma in its decimals), keeps its
+  result and is reported; so does a reference to a missing bookmark or to a bookmark holding the
+  field, where Word writes an error into the result, and bookmarks referring to each other, which
+  Word lets grow at every update. `REF \p` and `PAGEREF \p` say "above", "below" and "on page" in
+  English, whatever Word's language. A numbered table of contents entry's tab is 440 twips a level;
+  Word works it out from the number's width. `\* MERGEFORMAT` keeps the old result's first run's look,
   not word by word. A `REF` to text over several paragraphs gets line breaks between them. Table of
   contents entries are plain: a heading's own italics are not carried over. Date names are in
   English. Codes shown cannot be edited there (Word's code editing, Shift+F9 for one field and
@@ -262,6 +268,9 @@ Details in the [package README](../packages/docx/README.md).
 - Formatting thousands of paragraphs at once is slow: bold over 4,000 paragraphs takes about
   0.6 s, the next edit about 0.7 s, its undo about 0.5 s.
 - Undo history keeps the last 100 undo steps (a run of typing is one step).
+
+- Page numbers made of digits are taken to be equally wide when a header's height is measured:
+  with a font whose digits differ, a header on the verge of wrapping can overlap the text.
 
 ## Print
 

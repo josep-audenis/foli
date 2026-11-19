@@ -282,10 +282,11 @@ export const storyBodyKey = new PluginKey<StoryBody>("storyBody");
 export const storyBody = (state: EditorState): StoryBody | null =>
   storyBodyKey.getState(state) ?? null;
 
-/** A state over a story's `doc` for working on it, with `state`'s word context. */
-export function storyState(state: EditorState, doc: Node): EditorState {
+/** A state over a story's `doc` for working on it, with `state`'s word context (and `envelope`). */
+export function storyState(state: EditorState, doc: Node, envelope?: WordEnvelope): EditorState {
   const context = wordContext(state) as WordContext;
-  return EditorState.create({ doc, plugins: [wordPlugin(context.envelope, context)] });
+  const given = envelope ? { ...context, envelope } : context;
+  return EditorState.create({ doc, plugins: [wordPlugin(given.envelope, given)] });
 }
 
 /** Every tree of the document but `state`'s own: ids are allocated across them (ADR-0007). */
