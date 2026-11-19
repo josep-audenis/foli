@@ -16,13 +16,14 @@ const {
   report,
 } = await importDocx(new Uint8Array(await file.arrayBuffer()));
 document.content; // paragraphs with Word's properties, runs as text with marks, tables
+document.stories; // headers, footers, footnotes and endnotes, by id
 document.styles; // with basedOn, run and paragraph properties
-report.opaque; // { "w:fldChar": 3 }: content kept verbatim, not editable yet
+report.opaque; // { "w:annotationRef": 4 }: content kept verbatim, not editable
 ```
 
 **Import** (`importDocx`, `importPackage`) reads the main document, styles (with the document
 defaults), numbering, the theme's fonts and colors, comments (with replies and resolved state
-from `commentsExtended`) and sections:
+from `commentsExtended`), sections, headers, footers, footnotes, endnotes and settings:
 
 - **Paragraphs** with their properties (style, justification, indentation, spacing, keep rules,
   outline level, numbering, tab stops, borders, shading, the paragraph mark's formatting and
@@ -35,6 +36,14 @@ from `commentsExtended`) and sections:
   (`w:sectPrChange`), read and written; a section unchanged is exported byte for byte, a changed
   one rewrites only what changed. A recorded setup is written with every value spelled out: Word
   sees no change in what it leaves out.
+- **Headers, footers and notes** (11.4) become `stories` holding the body's kinds of blocks
+  (tables and pictures included), a note's reference a `noteReference` node and its number in the
+  note a `noteMark`. What a story may not hold (a section break, a note reference, a comment, a
+  page or column break in a note) stays verbatim there, reported.
+- **Fields** (11.5): complex fields (`w:fldChar`, `w:instrText`), nested and across runs and
+  paragraphs, become `fieldStart`, `fieldCode`, `fieldSeparator` and `fieldEnd` markers with their
+  result as ordinary content; `w:fldSimple` reads as the same markers and is written back as one.
+  Merge fields and form fields (`w:ffData` kept) are fields like the others.
 - **Content controls** (11.5, 11.9) at run, block, row and cell level are modeled with their
   properties (`controls`), `w:sdtPr` and `w:sdtEndPr` kept in `ext`: what changes is patched child
   by child, the rest stays byte for byte, a new control gets a whole `w:sdtPr`, and the glossary

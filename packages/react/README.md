@@ -37,8 +37,10 @@ export function App() {
 Browser-only as written; for server rendering (Next.js) and saving on page close, see
 [Getting started](https://github.com/josep-audenis/foli/blob/main/docs/getting-started.md).
 
-`FoliEditor` shows the pages with a formatting toolbar. For your own layout: `useFoliEditor`,
-`FoliEditorProvider`, `FoliCanvas`, `FoliToolbar`, `useCurrentEditor` and
+`FoliEditor` shows the pages with Word's toolbar (formatting, review, tables, pictures,
+sections, headers and footers, fields, notes, content controls) and the find, replace and go to
+panel (`FoliNavigation`). For your own layout: `useFoliEditor`, `FoliEditorProvider`,
+`FoliCanvas`, `FoliToolbar`, `FoliComments`, `FoliNavigation`, `useCurrentEditor` and
 `useEditorState(selector)`. React 18.2+ and 19; server rendering gives the editor's shell, the
 document appears on hydration.
 

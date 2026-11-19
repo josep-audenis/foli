@@ -29,15 +29,15 @@ This document describes **what exists** and **what is decided**. Planned parts a
 └──────────────────────────────────────────────────────────────┘
 ```
 
-| Subsystem           | Responsibility                                                                 | Status                                                                                                                                      |
-| ------------------- | ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| Document model      | Schema, immutable tree, marks, positions, JSON, validation                     | ✅ (Phase 2); schema v3 (Word model) current (8.3–8.7), v2 read and migrated                                                                |
-| Editing engine      | Steps, position mapping, selection, state, history, commands                   | ✅ headless (Phase 3)                                                                                                                       |
-| View                | Render state to DOM, DOM ↔ model mapping, `beforeinput`, IME, clipboard, focus | ✅ (G3 provisional; manual IME/SR checks open)                                                                                              |
-| Layout              | Measurement, line breaking, page flow, fragments, incremental reflow, print    | ✅ (Phase 5); sections with their own page setups (8.7d4); inside `@folijs/view` until the seam is proven                                   |
-| React integration   | Components, hooks, toolbar                                                     | Hooks, provider, canvas, `FoliEditor` ✅ (6.1); toolbar ✅ (6.2)                                                                            |
-| Document processing | DOCX import/export with lossless round trip (`@folijs/docx`)                   | Package and XML reading ✅ (8.2), import to v3 ✅ (8.4), lossless export ✅ (8.5) ([ADR-0005](decisions/ADR-0005-word-compatible-model.md)) |
-| PDF                 | A document printed to PDF from Foli's own pages (`@folijs/pdf`)                | ✅ (11.12, [ADR-0007](decisions/ADR-0007-stories-fields-controls.md)): Chromium's PDF through the app's headless page                       |
+| Subsystem           | Responsibility                                                                 | Status                                                                                                                                                                                                                             |
+| ------------------- | ------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Document model      | Schema, immutable tree, marks, positions, JSON, validation                     | ✅ (Phase 2); Word's model (schema v3, 8.3–8.7) current as schema v5 (tables and pictures 10.3, stories, fields and controls 11.3); v1–v4 read and migrated                                                                        |
+| Editing engine      | Steps, position mapping, selection, state, history, commands                   | ✅ headless (Phase 3)                                                                                                                                                                                                              |
+| View                | Render state to DOM, DOM ↔ model mapping, `beforeinput`, IME, clipboard, focus | ✅ (G3 provisional; manual IME/SR checks open)                                                                                                                                                                                     |
+| Layout              | Measurement, line breaking, page flow, fragments, incremental reflow, print    | ✅ (Phase 5); sections with their own page setups (8.7d4), tables and floats (Phase 10), columns, headers, footers and notes (Phase 11); inside `@folijs/view` until the seam is proven                                            |
+| React integration   | Components, hooks, toolbar                                                     | Hooks, provider, canvas, `FoliEditor` ✅ (6.1); toolbar ✅ (6.2); comments pane (9.7); Phase 11's menus and `FoliNavigation` (11.6–11.11)                                                                                          |
+| Document processing | DOCX import/export with lossless round trip (`@folijs/docx`)                   | Package and XML reading ✅ (8.2), import to v3 ✅ (8.4), lossless export ✅ (8.5) ([ADR-0005](decisions/ADR-0005-word-compatible-model.md)); tables, pictures (Phase 10), stories, fields, controls, sections, settings (Phase 11) |
+| PDF                 | A document printed to PDF from Foli's own pages (`@folijs/pdf`)                | ✅ (11.12, [ADR-0007](decisions/ADR-0007-stories-fields-controls.md)): Chromium's PDF through the app's headless page                                                                                                              |
 
 ## Editing data flow (target design)
 
@@ -1002,7 +1002,7 @@ foli/
 │   ├── core/  @folijs/core   Envelope, schema, immutable model, positions, slices. Pure TS, no DOM.
 │   ├── view/  @folijs/view   Editable DOM view (EditorView). Framework-agnostic.
 │   ├── react/ @folijs/react  React components + default stylesheet.
-│   ├── docx/  @folijs/docx   DOCX import to schema v3 and lossless export; package (zip, parts, relationships), XML keeping source text. No DOM.
+│   ├── docx/  @folijs/docx   DOCX import to Word's model (schema v5) and lossless export; package (zip, parts, relationships), XML keeping source text. No DOM.
 │   └── pdf/   @folijs/pdf    exportPdf: a document printed by the app's headless Chromium page; ships the read-only renderer as a page script.
 ├── spikes/two-page/     Phase 1 spike; throwaway, never published.
 ├── examples/            Vite and Next.js apps installing the packed packages (6.4); never published.
@@ -1129,6 +1129,14 @@ stable before 1.0):
   input matches what is on screen; the boxes are named by `aria-label`; every button has a
   `title`. Axe (scoped to the toolbar, editable and read-only) and keyboard-only flows run in
   Playwright in all three engines.
+- Phase 11 adds menus of the same kind: Section (breaks, columns, a Page setup dialog), Header
+  (open the header or footer, different first page and even pages, link to previous), Fields
+  (page number, date, cross-reference dialog, table of contents, update, show codes), Navigate,
+  Notes (insert, go between note and reference, a Note options dialog) and Controls (insert each
+  kind, a properties dialog). `FoliNavigation` (11.11, inside `FoliEditor`) is the find, replace
+  and go to panel, the bookmarks dialog and the outline, and takes Word's keys (Ctrl+F, Ctrl+H,
+  Ctrl+G, F3, Shift+F3, Ctrl+Shift+F5) while the focus is in the document or its panels. Each
+  menu and dialog is keyboard-usable and axe-clean in three engines.
 
 ## Styling
 
