@@ -1221,10 +1221,23 @@ Each task is a PR on `phase-11/sections-fields`, the build green after each.
   picture chosen for a picture control; a custom placeholder of `insertControl` is lost on reload
   (no glossary entry is written); a control's own tracked deletion is not written; a list's or
   date's button is mouse-only, Alt+Down its keyboard way.)
-- [ ] 11.10 Footnotes and endnotes: insert a note (numbered in Word's formats, restarting per
+- [x] 11.10 Footnotes and endnotes: insert a note (numbered in Word's formats, restarting per
   section or page where set), its text edited in place; footnotes laid out at their reference's
   page foot (separator, continuation to the next page), endnotes at the end of the document or
-  section; deleted with their reference; tracked; T1–T5 in a note; on Word's pages.
+  section; deleted with their reference; tracked; T1–T5 in a note; on Word's pages. (Done:
+  `noteNumbers` from the settings and sections, drawn and never stored; `insertNote`,
+  `setNoteProperties`, `convertNotes`; a plugin keeps a note with its reference, tracked as Word
+  records it; a copy carries the note and pastes a new one. The flow and both renderers place notes,
+  separators and continuations, `beneathText` and `sectEnd` too; a note opens in place by double
+  click, Shift+Alt+N or the Notes menu, with an options dialog. Page score 0.811 to 0.889: 09 from
+  0.391 to 0.999, 04 from 0.821 to 0.832 (the rest of 04 is not notes), none lower, all 158
+  paragraphs on Word's page; made documents with restarts, section endnotes, notes beneath the text
+  and most column cases match Word's PDFs. `word-notes.spec.ts` in three engines, T4 by CDP in
+  Chromium; T5 here is a note growing and pushing the text; `story-roundtrip.mjs` has Word read 24
+  files. Word's PDFs corrected the ADR: notes in columns are set across the columns' foot, not in
+  their reference's column. Shortcuts: no widow or orphan control in a note's lines,
+  `w:continuationNotice` not drawn, options for the whole document only, a reference in opaque
+  content not counted, Word sometimes ends an earlier column sooner than the notes need.)
 - [ ] 11.11 Navigation: bookmarks (insert, go to, used by cross-references), the document
   outline (headings, moving to them; a React panel), find and replace across every story (case
   and whole words, replace tracked while tracking, one undo step for replace all); keyboard

@@ -4,16 +4,28 @@
  * Word's spacing, keep rules, widow and orphan control and explicit breaks. Editing moves to
  * v3 in 8.7.
  */
-import { type FoliDocument, Resolver, type SectionJSON } from "@folijs/core";
+import {
+  type FoliDocument,
+  noteNumbers,
+  noteProperties,
+  noteTexts,
+  parseContent,
+  Resolver,
+  type SectionJSON,
+} from "@folijs/core";
 import {
   type BlockBox,
+  type FlowNote,
   type FlowSection,
   type Fragment,
   flowFrom,
+  notePieces,
   pagesOf,
+  spaceAfterText,
 } from "../layout/flow.js";
 import {
   type BlockOptions,
+  NOTE_REF_ATTR,
   PICTURE_ATTR,
   PX_PER_TWIP,
   renderBlocks,
@@ -22,9 +34,11 @@ import {
   type WordBlock,
 } from "./blocks.js";
 import { bandElement, type ColumnsPx, columnsPx } from "./columns.js";
+import { lineBottoms, type NoteGroup, PageNotes } from "./notes.js";
 import { PageRegions } from "./regions.js";
 
 export type { ReviewView } from "./blocks.js";
+export { lineBottoms };
 
 /** The class of each page element. */
 export const WORD_PAGE_CLASS = "foli-word-page";
@@ -127,54 +141,6 @@ export function measureLineRatio(container: HTMLElement): (family: string) => nu
 }
 
 /**
- * The bottom of each line of a rendered block, from its top. Lines are the vertical clusters of
- * its contents' client rects; a boundary is halfway between one line's content and the next's,
- * the last line ends at the block's bottom.
- *
- * shortcut: line boxes are inferred from content rects (exact for even line heights); a
- * superscript or a much larger run on a line moves that line's boundaries slightly.
- */
-export function lineBottoms(element: HTMLElement): number[] {
-  const box = element.getBoundingClientRect();
-  const doc = element.ownerDocument;
-  const range = doc.createRange();
-  const rects: { rect: DOMRect; text: boolean }[] = [];
-  // Text and line breaks only: a range over the whole block also has the boxes of the
-  // elements inside it (a table's), which span many lines.
-  const walker = doc.createTreeWalker(element, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT);
-  for (let node = walker.nextNode(); node; node = walker.nextNode()) {
-    if (node.nodeType === Node.TEXT_NODE) {
-      range.selectNodeContents(node);
-      for (const rect of range.getClientRects()) rects.push({ rect, text: true });
-    } else if (node.nodeName === "BR")
-      rects.push({ rect: (node as Element).getBoundingClientRect(), text: false });
-  }
-  rects.sort((a, b) => a.rect.top - b.rect.top);
-  type Line = { top: number; bottom: number; text: boolean };
-  const lines: Line[] = [];
-  for (const { rect, text } of rects) {
-    if (rect.height <= 0) continue;
-    const last = lines[lines.length - 1];
-    // Same line: it starts above the middle of the line so far.
-    if (last && rect.top < (last.top + last.bottom) / 2) {
-      // A line's text says where it is; a <br> only for a line without text (engines size
-      // its box differently).
-      if (text && !last.text) Object.assign(last, { top: rect.top, bottom: rect.bottom, text });
-      else if (text === last.text) {
-        last.top = Math.min(last.top, rect.top);
-        last.bottom = Math.max(last.bottom, rect.bottom);
-      }
-    } else lines.push({ top: rect.top, bottom: rect.bottom, text });
-  }
-  const bottoms = lines.slice(1).map((line, i) => {
-    const above = lines[i] as { bottom: number };
-    return (above.bottom + line.top) / 2 - box.top;
-  });
-  bottoms.push(box.height);
-  return bottoms;
-}
-
-/**
  * A table block's line ends without those inside a row that may not split (`cantSplit`), unless
  * the row is taller than a page.
  */
@@ -227,7 +193,7 @@ interface Section {
 /**
  * Lays a v3 document out on pages inside `container`: every section's page setup, its columns
  * (a band per section on a page), continuous sections, Word's blank pages, headers and footers
- * with their page fields. Footnotes are not laid out yet (11.10).
+ * with their page fields, footnotes at their columns' feet and endnotes after the text.
  */
 export function renderDocument(
   document: FoliDocument,
@@ -235,9 +201,21 @@ export function renderDocument(
   options: Omit<BlockOptions, "lineRatio"> = {},
 ): DocumentPages {
   const doc = container.ownerDocument;
+  // What notes show: numbers depend on the pages only where they restart on each.
+  const model = document.stories ? parseContent(document.content) : null;
+  const hideDeleted = (options.review ?? "markup") !== "markup";
+  const numbersOf = (pageOf?: (pos: number, story: string) => number | undefined) =>
+    model
+      ? noteNumbers(model, document, { hideDeleted, ...(pageOf ? { pageOf } : {}) }).filter(
+          (n) => !hideDeleted || !n.deleted,
+        )
+      : [];
+  let references = numbersOf();
+  const noteTextsNow = noteTexts(references);
   const blocks = renderBlocks(document, doc, {
     ...options,
     lineRatio: measureLineRatio(container),
+    notes: { references: noteTextsNow },
   });
   const sections: Section[] = [];
   const setups: SectionJSON[] = [];
@@ -247,7 +225,13 @@ export function renderDocument(
     { ...options, lineRatio, measureIn: () => container },
     new WeakMap(),
   );
-  regions.setDocument(document, setups, new Resolver(document));
+  const resolver = new Resolver(document);
+  regions.setDocument(document, setups, resolver);
+  const notes = new PageNotes(
+    doc,
+    { ...options, lineRatio, measureIn: () => container },
+    new WeakMap(),
+  );
   const geometryOf = new Map<FlowSection, Geometry>();
   const sectionOf = new Map<WordBlock, Section>();
   let current: WordBlock[] = [];
@@ -286,6 +270,7 @@ export function renderDocument(
     if (block.section) close(block.section);
   }
   if (current.length || !sections.length) close(document.section);
+  notes.setDocument(document, setups, resolver, references);
   sections.forEach((section, i) => {
     const next = sections[i + 1];
     section.flow.balanced =
@@ -300,6 +285,8 @@ export function renderDocument(
     shown(): number[];
     /** The lines, at this width, that end with a break `attr` marks. */
     breaks(attr: string): number[];
+    /** The footnotes referred to in the block, each with the line holding its reference. */
+    references(): { story: string; line: number }[];
   };
   const measured = new Map<WordBlock, Map<number, Measured>>();
   const inWidth = (block: WordBlock, width: number) => {
@@ -332,6 +319,19 @@ export function renderDocument(
       shown,
       lines: () => (kept ? [height] : shown()),
       breaks: (attr) => atWidth(() => breakLines(block.element, entry.lines(), attr)),
+      references: () =>
+        atWidth(() => {
+          const top = block.element.getBoundingClientRect().top;
+          const bottoms = entry.lines();
+          return [...block.element.querySelectorAll(`[${NOTE_REF_ATTR}]`)].map((element) => {
+            const y = element.getBoundingClientRect().bottom - top;
+            const line = bottoms.findIndex((bottom) => y <= bottom + 1);
+            return {
+              story: element.getAttribute(NOTE_REF_ATTR) as string,
+              line: line < 0 ? bottoms.length - 1 : line,
+            };
+          });
+        }),
     };
     widths.set(width, entry);
     return entry;
@@ -354,6 +354,9 @@ export function renderDocument(
     );
   }
   const headers = new Map<WordBlock, number>();
+  const endnotes = notes.endnotes();
+  const lastOfSection = (block: WordBlock, i: number) =>
+    !blocks[i + 1] || sectionOf.get(blocks[i + 1] as WordBlock) !== sectionOf.get(block);
   const boxes: BlockBox[] = blocks.map((block, i) => {
     const section = sectionOf.get(block) as Section;
     const { widths } = section.columns;
@@ -364,7 +367,19 @@ export function renderDocument(
     const has = (attr: string) => !!block.element.querySelector(`br[${attr}]`);
     const hasPageBreak = has(WORD_PAGE_BREAK_ATTR);
     const hasColumnBreak = has(WORD_COLUMN_BREAK_ATTR);
+    const index = section.flow.index ?? 0;
+    const refers = !!block.element.querySelector(`[${NOTE_REF_ATTR}]`);
     return {
+      notes: refers
+        ? (column: number) =>
+            inWidth(block, widths[column] as number)
+              .references()
+              .flatMap(({ story, line }) => {
+                const note: FlowNote | null = notes.footnote(story, index);
+                return note ? [{ line, note }] : [];
+              })
+        : undefined,
+      endnotes: lastOfSection(block, i) ? endnotes.get(index) : undefined,
       height: whole.height,
       marginTop: block.before,
       marginBottom: block.after,
@@ -402,6 +417,7 @@ export function renderDocument(
     spacing: "word",
     addSpacing: document.settings?.doNotUseHTMLParagraphAutoSpacing === true,
     evenAndOddHeaders: document.settings?.evenAndOddHeaders === true,
+    notes: notes.flowRules(),
   } as const;
   let flowed = flowFrom(boxes, 0, rules);
   let facts = pagesOf(boxes, flowed);
@@ -410,7 +426,22 @@ export function renderDocument(
     flowed = flowFrom(boxes, 0, rules);
     facts = pagesOf(boxes, flowed);
   }
+  // Numbers restarting on each page: known once flowed; a wider one is left as it is measured.
+  if (setups.some((setup) => noteProperties(document, "footnote", setup).restart === "eachPage")) {
+    const pages = new Map<string, number>();
+    for (const piece of notePieces(flowed))
+      if (!piece.fromLine && !pages.has(piece.id)) pages.set(piece.id, piece.page);
+    references = numbersOf((_pos, story) => pages.get(story));
+    const texts = noteTexts(references);
+    notes.setDocument(document, setups, resolver, references);
+    for (const block of blocks)
+      for (const element of block.element.querySelectorAll(`[${NOTE_REF_ATTR}]`))
+        element.textContent = texts.get(element.getAttribute(NOTE_REF_ATTR) as string) ?? "";
+    flowed = flowFrom(boxes, 0, rules);
+    facts = pagesOf(boxes, flowed);
+  }
   const { fragments, gaps } = flowed;
+  const pieces = notePieces(flowed);
   // What placing needs of the layout, read while the blocks are still laid out: split blocks' lines.
   blocks.forEach((block, b) => {
     const placed = fragments[b] ?? [];
@@ -430,7 +461,8 @@ export function renderDocument(
       bands[fragment.band ?? 0] ??= sectionOf.get(block) as Section;
     }
   });
-  const count = Math.max(1, bandsOf.length);
+  // A note can reach pages no text is on.
+  const count = Math.max(1, bandsOf.length, ...pieces.map((piece) => piece.page + 1));
   const pageSetups: Section[] = [];
   for (let p = count - 1; p >= 0; p--)
     pageSetups[p] = bandsOf[p]?.[0] ?? pageSetups[p + 1] ?? (sections.at(-1) as Section);
@@ -453,9 +485,12 @@ export function renderDocument(
   });
   const bandElements = new Map<string, { band: HTMLElement; columns: HTMLElement[] }>();
   /** Where a fragment goes: the page's body, or its column when the page has bands. */
-  const holder = (fragment: Fragment, section: Section): HTMLElement => {
+  const holder = (
+    fragment: Pick<Fragment, "page" | "band" | "column" | "lead">,
+    section: Section,
+  ) => {
     const { body } = created[fragment.page] as { body: HTMLElement };
-    const bands = bandsOf[fragment.page] as Section[];
+    const bands = bandsOf[fragment.page] ?? [section];
     if (bands.length === 1 && section.flow.columns === 1) return body;
     const band = fragment.band ?? 0;
     // Bands in order: one that nothing starts in yet still comes before the later ones.
@@ -473,6 +508,13 @@ export function renderDocument(
     if (fragment.lead) made.band.style.marginTop = `${fragment.lead}px`;
     return made.columns[fragment.column ?? 0] as HTMLElement;
   };
+
+  /** The section a page's band is in: the one of the page's blocks, or of the page. */
+  const sectionAt = (page: number, band: number) =>
+    (bandsOf[page]?.[band] ?? pageSetups[page])?.flow.index ?? 0;
+  const groupsOf = (list: Parameters<typeof notes.groups>[0]): NoteGroup[] =>
+    notes.groups(list, sectionAt);
+  const footGroups = groupsOf(pieces).filter((group) => !group.inFlow);
 
   const firstPage = new Map<number, number>();
   /** Every fragment placed, in order: its page and how many lines it shows (measured lazily). */
@@ -547,6 +589,36 @@ export function renderDocument(
     const first = placed[0];
     if (first) for (const index of block.nodes) firstPage.set(index, first.page);
   });
+  // Endnotes and footnotes set beneath the text come after the last block of their column.
+  for (const group of groupsOf(pieces))
+    if (group.inFlow)
+      holder(
+        { page: group.page, band: group.band, column: group.column },
+        sections[group.section] as Section,
+      ).append(
+        notes.groupElement(
+          group,
+          null,
+          undefined,
+          group.pieces[0]?.end
+            ? 0
+            : spaceAfterText(boxes, flowed, group.page, group.band, group.column),
+        ),
+      );
+  for (const group of groupsOf(pieces)) {
+    if (group.inFlow) continue;
+    const { page } = created[group.page] as { page: HTMLElement };
+    const section = sections[group.section] as Section;
+    const fact = facts[group.page];
+    const margin = fact?.sectionPages
+      ? regions.margins(fact.section, fact).bottom
+      : section.geometry.bottom;
+    const place = notes.footPlace(
+      { left: section.geometry.left, bottom: margin },
+      notes.stacked(group, footGroups),
+    );
+    page.append(notes.groupElement(group, place));
+  }
   const pages = created.map(({ page }) => {
     container.append(page);
     return page;

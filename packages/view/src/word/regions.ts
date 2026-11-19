@@ -194,7 +194,7 @@ function edgesOf(section: SectionJSON): Edges {
 }
 
 /** Lays `blocks` out as a story: spacing as between the paragraphs of a page. */
-function stack(blocks: readonly WordBlock[], parent: HTMLElement, adds: boolean): number {
+export function stack(blocks: readonly WordBlock[], parent: HTMLElement, adds: boolean): number {
   let previous = 0;
   blocks.forEach((block, i) => {
     const gap = !i

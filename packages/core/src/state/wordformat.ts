@@ -202,6 +202,42 @@ export function builtinStyle(context: HasEnvelope, name: string): StyleJSON | nu
       },
     };
   }
+  const note = /^(foot|end)note (text|reference)$/.exec(name);
+  const textChar = /^(Foot|End)note Text Char$/.exec(name);
+  if (note || textChar) {
+    // Word's: 10 pt text without space after, and a superscript reference.
+    const font = defaultParagraphStyleOf(context, "character");
+    const fontBased = font ? { basedOn: font } : {};
+    const size = { type: "fontSize", attrs: { value: 20, complexScript: 20 } };
+    const stem =
+      (note?.[1] ?? textChar?.[1] ?? "").toLowerCase() === "foot" ? "Footnote" : "Endnote";
+    if (textChar)
+      return {
+        id: `${stem}TextChar`,
+        type: "character",
+        name,
+        ...fontBased,
+        link: `${stem}Text`,
+        run: [size],
+      };
+    if (note?.[2] === "reference")
+      return {
+        id: `${stem}Reference`,
+        type: "character",
+        name,
+        ...fontBased,
+        run: [{ type: "verticalAlign", attrs: { value: "superscript" } }],
+      };
+    return {
+      id: `${stem}Text`,
+      type: "paragraph",
+      name,
+      ...based,
+      link: `${stem}TextChar`,
+      paragraph: { spacing: { after: 0, line: 240, lineRule: "auto" } },
+      run: [size],
+    };
+  }
   if (name === "Placeholder Text") {
     const font = defaultParagraphStyleOf(context, "character");
     return {
