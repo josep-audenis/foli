@@ -14,6 +14,8 @@
  * - From another document, a style or list the copy does not define is not one: the text is in
  *   the default style, not numbered (not the target's style or list of that id).
  * - Paragraph ids (`w14:paraId`, `w14:textId`) are left out: export makes the ones it needs.
+ * - A note reference brings its note, carried by the copy, as a new story with a new id: a copy
+ *   is a second note, and what was cut was removed with its reference (ADR-0007).
  * - A content control copied inside its document is a new control with the same properties while
  *   the original stays (cut and pasted, it is the same one). From elsewhere its content comes
  *   without it.
@@ -36,13 +38,22 @@ import {
   parseContent,
   parseDocument,
   SCHEMA_VERSION,
+  type StoryJSON,
   type StyleJSON,
 } from "../v3/document.js";
 import { migrateToV3 } from "../v3/migrate.js";
 import { Resolver } from "../v3/resolve.js";
 import { controlsIn, copiedControl, freshControlId } from "./controls.js";
+import { noteIds, noteKindOf } from "./notes.js";
 import type { EditorState } from "./state.js";
-import { otherTrees, storyBody, type WordContext, type WordEnvelope, wordContext } from "./word.js";
+import {
+  otherTrees,
+  type Story,
+  storyBody,
+  type WordContext,
+  type WordEnvelope,
+  wordContext,
+} from "./word.js";
 import { builtinStyle, levels } from "./wordformat.js";
 
 /** What a v3 copy carries beside its content: the definitions the content references. */
@@ -52,6 +63,16 @@ export interface WordDefinitions {
   styles: StyleJSON[];
   numbering: { abstracts: AbstractNumberingJSON[]; instances: NumberingInstanceJSON[] };
   comments: CommentJSON[];
+  /** The notes the content refers to, by story id. */
+  notes?: Record<string, StoryJSON>;
+}
+
+/** What a paste brings: the content, the envelope it needs, and new notes. */
+export interface FittedPaste {
+  doc: Node;
+  envelope: WordEnvelope;
+  /** The stories of the notes the references in `doc` now name, to add with it. */
+  notes?: { id: string; story: Story }[];
 }
 
 type Json = Record<string, unknown>;
@@ -74,7 +95,8 @@ type Properties = Pick<ParagraphPropertiesJSON, "style" | "numbering" | "markFor
  * comments; with the document's id.
  */
 export function copiedDefinitions(context: WordContext, content: Node): WordDefinitions {
-  const { styles, numbering, comments } = context.envelope;
+  const { styles, numbering, comments, stories } = context.envelope;
+  const noteStories = new Set<string>();
   const styleIds = new Set<string>();
   const numberingIds = new Set<number>();
   const commentIds = new Set<number>();
@@ -100,12 +122,23 @@ export function copiedDefinitions(context: WordContext, content: Node): WordDefi
     if (node.type === "table") properties(attrs);
     if (node.type === "tableRow") properties((attrs as { exceptions?: Properties }).exceptions);
     if (COMMENT_ANCHORS.has(node.type)) commentIds.add(attrs.id as number);
+    if (node.type === "noteReference") noteStories.add(String(node.attrs?.story));
     marks(node.marks);
   };
   visit([content.toJSON()], references);
   const copied = comments.filter((c) => commentIds.has(c.id));
   visit(
     copied.flatMap((c) => c.content),
+    references,
+  );
+  const notes = Object.fromEntries(
+    [...noteStories].flatMap((id) => {
+      const story = stories && Object.hasOwn(stories, id) ? stories[id] : undefined;
+      return story ? [[id, story] as const] : [];
+    }),
+  );
+  visit(
+    Object.values(notes).map((note) => note.content),
     references,
   );
   const instances = () => numbering.instances.filter((n) => numberingIds.has(n.id));
@@ -138,6 +171,7 @@ export function copiedDefinitions(context: WordContext, content: Node): WordDefi
     styles: styles.filter((s) => styleIds.has(s.id)),
     numbering: { abstracts: abstracts(), instances: instances() },
     comments: copied,
+    ...(Object.keys(notes).length ? { notes } : {}),
   };
 }
 
@@ -218,17 +252,13 @@ function safeLinks(json: NodeJSON): NodeJSON {
  * text, older copies). Returns the content to insert and the envelope with what it added (the
  * same object when nothing was added). Throws FoliDocumentError on invalid input.
  */
-export function fitPaste(
-  state: EditorState,
-  content: unknown,
-  definitions?: unknown,
-): { doc: Node; envelope: WordEnvelope } {
+export function fitPaste(state: EditorState, content: unknown, definitions?: unknown): FittedPaste {
   const context = wordContext(state) as WordContext;
   const target = context.envelope;
   // Taken as this document's own, but it cannot be told to be: no unsafe link comes in.
   if (definitions === undefined || definitions === null)
     return fit(state, target, safeLinks(parseContent(content, "content", true).toJSON()), true);
-  const { document, styles, numbering, comments } = definitions as Partial<WordDefinitions>;
+  const { document, styles, numbering, comments, notes } = definitions as Partial<WordDefinitions>;
   // Validated as a document's envelope: types, ranges, no style based on itself; the content
   // as content to paste (a table may end it).
   const checked = parseDocument({
@@ -238,10 +268,17 @@ export function fitPaste(
     styles,
     numbering,
     comments,
+    ...(notes ? { stories: notes } : {}),
     content: { type: "doc", content: [{ type: "paragraph" }] },
   });
   const json = parseContent(content, "content", true).toJSON();
-  return fit(state, checked, json, document === context.id);
+  const source: WordDefinitions = {
+    styles: checked.styles,
+    numbering: checked.numbering,
+    comments: checked.comments,
+    ...(checked.stories ? { notes: checked.stories } : {}),
+  };
+  return fit(state, source, json, document === context.id);
 }
 
 /**
@@ -292,7 +329,7 @@ function fit(
   source: WordDefinitions,
   json: NodeJSON,
   same: boolean,
-): { doc: Node; envelope: WordEnvelope } {
+): FittedPaste {
   const target = (wordContext(state) as WordContext).envelope;
   let styles = target.styles;
   let { abstracts, instances } = target.numbering;
@@ -462,19 +499,32 @@ function fit(
   });
   const noteAvailable = (story: string) =>
     same && Object.hasOwn(target.stories ?? {}, story) && !referredTo.has(story);
+  const carried = (story: string) =>
+    source.notes && Object.hasOwn(source.notes, story) ? source.notes[story] : undefined;
+  const newNoteId = noteIds(state);
+  /** The new note of each story a pasted reference was copied with. */
+  const pastedNotes = new Map<string, string>();
 
   // Half a field or control from elsewhere: its markers go, what it held stays.
   const unpaired = new Set<NodeJSON>();
   unpairedMarkers([json], unpaired);
   for (const comment of source.comments) unpairedMarkers(comment.content, unpaired);
+  for (const note of Object.values(source.notes ?? {})) unpairedMarkers([note.content], unpaired);
 
   const mapNode = (node: NodeJSON): NodeJSON | null => {
     if (unpaired.has(node)) return null;
     const attrs = node.attrs as Json | undefined;
     if (inStory && (COMMENT_ANCHORS.has(node.type) || node.type === "noteReference")) return null;
-    if (node.type === "noteReference" && !noteAvailable(String(attrs?.story))) return null;
     let next: Json | undefined = attrs;
-    if (node.type === "controlStart" || node.type === "controlEnd") {
+    if (node.type === "noteReference") {
+      const story = String(attrs?.story);
+      const kind = noteKindOf(story);
+      if (kind && carried(story)) {
+        const id = pastedNotes.get(story) ?? newNoteId(kind);
+        pastedNotes.set(story, id);
+        next = { ...attrs, story: id };
+      } else if (!noteAvailable(story)) return null;
+    } else if (node.type === "controlStart" || node.type === "controlEnd") {
       // From another document their definitions are not here: the content comes without them.
       const id = mapControl(attrs?.id);
       if (!id) return null;
@@ -550,6 +600,10 @@ function fit(
       }
     : mapped;
   const doc = parseContent(inPlace, "content", true);
+  const notes = [...pastedNotes].map(([from, id]) => {
+    const note = carried(from) as StoryJSON;
+    return { id, story: { kind: note.kind, doc: parseContent(mapNode(note.content)) } };
+  });
   let comments = target.comments;
   const copiedComments = source.comments.filter((c) => commentIds.has(c.id));
   if (copiedComments.length) {
@@ -585,5 +639,6 @@ function fit(
           ...(controls ? { controls } : {}),
         }
       : target,
+    ...(notes.length ? { notes } : {}),
   };
 }

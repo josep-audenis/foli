@@ -348,6 +348,35 @@ export interface BlockOptions {
   resource?: (key: string, resource: ResourceJSON) => string | null | undefined;
   /** The document's resolver, when the caller has one (a story of it, drawn per page). */
   resolver?: Resolver;
+  /** What note references show, by story, and what a note's own mark shows (never stored). */
+  notes?: { references?: ReadonlyMap<string, string>; mark?: string };
+}
+
+/** On the element showing a note reference's number: the note's story. */
+export const NOTE_REF_ATTR = "data-foli-note-ref";
+/** On a number drawn for a note, at its reference or its mark: not text of the document. */
+export const NOTE_NUMBER_ATTR = "data-foli-note-number";
+
+/** Word's footnote separator is two inches long; its continuation line here is the same. */
+const SEPARATOR_WIDTH = 192;
+
+/** The line a separator run draws, when `xml` is one (`w:separator`, `w:continuationSeparator`). */
+export function separatorElement(xml: Element | null, doc: Document): HTMLElement | null {
+  if (!xml) return null;
+  const found = [xml, ...xml.getElementsByTagName("*")].some(
+    (e) => e.localName === "separator" || e.localName === "continuationSeparator",
+  );
+  if (!found) return null;
+  const line = doc.createElement("span");
+  line.dataset.foliSeparator = "";
+  const { style } = line;
+  style.display = "inline-block";
+  style.width = `${SEPARATOR_WIDTH}px`;
+  style.maxWidth = "100%";
+  style.height = "0";
+  style.borderTop = "1px solid #000";
+  style.verticalAlign = "middle";
+  return line;
 }
 
 /** The source for a document's pictures: the app's URL, else the resource's own. */
@@ -647,7 +676,9 @@ export function renderBlocks(
 
   content.forEach((node, index) => {
     if (node.type !== "paragraph") {
-      blocks.push(opaqueBlock(node, index, resolver, doc, ratio, image, geometry, codes));
+      blocks.push(
+        opaqueBlock(node, index, resolver, doc, ratio, image, geometry, codes, options.notes),
+      );
       return;
     }
     const attrs = attrsOf(node);
@@ -685,6 +716,7 @@ export function renderBlocks(
       geometry,
       codes,
       display,
+      notes: options.notes,
     });
     if (display.gone) element.style.display = "none";
     if (
@@ -875,6 +907,7 @@ interface InlineContext {
   codes: boolean;
   /** What these nodes show of their fields. */
   display: FieldDisplay;
+  notes: BlockOptions["notes"] | undefined;
 }
 
 /** A paragraph's inline content: runs as spans, breaks, comment anchors, opaque inline content. */
@@ -939,8 +972,16 @@ function renderInline(
     if (code) text = code;
     else if (node.type === "text") text = node.text ?? "";
     else if (node.type === "tab") text = "\t";
+    else if (node.type === "noteReference")
+      text = context.notes?.references?.get(String(attrs.story)) ?? "";
+    else if (node.type === "noteMark") text = context.notes?.mark ?? "";
     else if (node.type === "opaqueInline") {
       const xml = parseOpaque(String(attrs.xml ?? ""), doc);
+      const separator = separatorElement(xml, doc);
+      if (separator) {
+        parent.append(separator);
+        continue;
+      }
       // A run's content (a drawing, a field character) shows as nothing; a content control or
       // simple field as its text.
       text = xml ? opaqueText(xml) : "";
@@ -955,6 +996,9 @@ function renderInline(
     let element: HTMLElement = doc.createElement("span");
     styleRun(element, run, lineHeight(paragraph, run, ratio(fontStack(latin(run)))));
     element.textContent = text;
+    if (node.type === "noteReference") element.setAttribute(NOTE_REF_ATTR, String(attrs.story));
+    if (node.type === "noteReference" || node.type === "noteMark")
+      element.setAttribute(NOTE_NUMBER_ATTR, "");
     const link = marks.find((m) => m.type === "link");
     if (link) element.dataset.href = String(link.attrs?.href ?? `#${String(link.attrs?.anchor)}`);
     if (comments.size) {
@@ -992,6 +1036,7 @@ export function opaqueBlock(
   /** The page floating pictures in its cells are placed against. */
   geometry: FloatGeometry = floatGeometry(undefined),
   codes = false,
+  notes?: BlockOptions["notes"],
 ): WordBlock {
   const attrs = (node.attrs ?? {}) as Record<string, unknown>;
   const element = doc.createElement("div");
@@ -1001,7 +1046,7 @@ export function opaqueBlock(
   const xml = node.type === "table" ? null : parseOpaque(String(attrs.xml ?? ""), doc);
   let after = 0;
   if (node.type === "table")
-    element.append(modelTable(node, resolver, doc, ratio, image, geometry, codes));
+    element.append(modelTable(node, resolver, doc, ratio, image, geometry, codes, notes));
   else if (xml?.localName === "tbl") element.append(opaqueTable(xml, resolver, doc, ratio));
   else if (xml) {
     const paragraphs = outermost(xml, PARAGRAPHS);
@@ -1250,6 +1295,7 @@ function modelTable(
   image: ImageSource | undefined,
   geometry: FloatGeometry,
   codes: boolean,
+  notes: BlockOptions["notes"],
 ): HTMLElement {
   const attrs = (node.attrs ?? {}) as Record<string, unknown>;
   const table = doc.createElement("table");
@@ -1311,12 +1357,14 @@ function modelTable(
       const displays = fieldDisplay(blocks.map(inlineTypes), codes);
       for (const [b, block] of blocks.entries()) {
         if (block.type === "table") {
-          cell.append(modelTable(block, resolver, doc, ratio, image, geometry, codes));
+          cell.append(modelTable(block, resolver, doc, ratio, image, geometry, codes, notes));
           above = 0;
           continue;
         }
         if (block.type !== "paragraph") {
-          cell.append(opaqueBlock(block, 0, resolver, doc, ratio, image, geometry, codes).element);
+          cell.append(
+            opaqueBlock(block, 0, resolver, doc, ratio, image, geometry, codes, notes).element,
+          );
           above = 0;
           continue;
         }
@@ -1327,7 +1375,11 @@ function modelTable(
         styleParagraph(element, paragraph);
         styleRun(element, run, lineHeight(paragraph, run, ratio(fontStack(latin(run)))));
         const display = displays[b] as FieldDisplay;
-        renderInline(element, block.content ?? [], run, paragraph, { ...context, display });
+        renderInline(element, block.content ?? [], run, paragraph, {
+          ...context,
+          display,
+          notes,
+        });
         if (display.gone) element.style.display = "none";
         if (!element.textContent) element.append(doc.createElement("br"));
         const before = paragraph.spacing.before * PX_PER_TWIP;

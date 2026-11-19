@@ -375,11 +375,20 @@ export function formatNumber(n: number, format: string | undefined): string {
       return letters(n).toLowerCase();
     case "ordinal":
       return ordinal(n);
+    case "chicago":
+      return chicago(n);
     case "numberInDash":
       return `- ${n} -`;
     default:
       return String(n);
   }
+}
+
+/** Word's `chicago` marks: `*`, `†`, `‡`, `§`, then the same doubled, tripled... */
+function chicago(n: number): string {
+  const marks = ["*", "†", "‡", "§"];
+  if (n < 1) return String(n);
+  return (marks[(n - 1) % 4] as string).repeat(Math.ceil(n / 4));
 }
 
 const ROMAN: [number, string][] = [
