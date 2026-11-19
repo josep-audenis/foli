@@ -492,16 +492,51 @@ const isEmpty = (range: ControlRange, tr: Transaction): boolean =>
 const formatOf = (state: EditorState, control: ControlJSON): readonly Mark[] =>
   (control.format ?? []).map((mark) => state.schema.markFromJSON(mark));
 
-/** Makes the text of `from..to` carry `marks`, tracked changes aside, and no others. */
-function setRunMarks(tr: Transaction, from: number, to: number, marks: readonly Mark[]): void {
+/**
+ * The text of `from..to`, put in place of a placeholder: without the placeholder's style (`style`),
+ * with the control's `format` where it says nothing of its own on the point.
+ */
+function leavePlaceholderLook(
+  tr: Transaction,
+  from: number,
+  to: number,
+  style: string | null,
+  format: readonly Mark[],
+): void {
   tr.doc.nodesBetween(from, to, (node, pos) => {
     if (!node.isText) return true;
     const end = pos + node.nodeSize;
-    for (const mark of node.marks)
-      if (!REVIEW.has(mark.type.name) && !mark.isInSet(marks)) tr.removeMark(pos, end, mark);
-    for (const mark of marks) if (!mark.isInSet(node.marks)) tr.addMark(pos, end, mark);
+    for (const mark of node.marks) {
+      const name = mark.type.name;
+      if (
+        style &&
+        ((name === "characterStyle" && mark.attrs.id === style) ||
+          (name === "runExt" && String(mark.attrs.xml).includes(`"${style}"`)))
+      )
+        tr.removeMark(pos, end, mark);
+    }
+    for (const mark of format)
+      if (!node.marks.some((m) => m.type === mark.type)) tr.addMark(pos, end, mark);
     return false;
   });
+}
+
+/** Whether what a check box shows is its checked state; null when it shows neither. */
+function boxShowsChecked(tree: Node, range: ControlRange, control: ControlJSON): boolean | null {
+  const checked = control.checkedState ?? CHECKED;
+  const unchecked = control.uncheckedState ?? UNCHECKED;
+  const shown = textIn(tree, range);
+  if (shown === glyph(checked)) return true;
+  if (shown === glyph(unchecked)) return false;
+  // A symbol font's character is kept as Word's `w:sym`: its code is the state's, moved to U+F0xx.
+  for (const node of inlineNodes(tree, range)) {
+    const code = /:char="([0-9a-f]+)"/i.exec(String(node.attrs.xml ?? ""))?.[1];
+    if (!code || isDeleted(node)) continue;
+    const low = Number.parseInt(code, 16) & 0xff;
+    if (low === (Number.parseInt(checked.value, 16) & 0xff)) return true;
+    if (low === (Number.parseInt(unchecked.value, 16) & 0xff)) return false;
+  }
+  return null;
 }
 
 /** The months' names in `locale`, long and short; `null` where the platform has none. */
@@ -533,10 +568,10 @@ function dateFromText(control: ControlJSON, text: string): string | null {
   const names = monthNames(locale || "en-US") ?? [];
   const fields: string[] = [];
   const pattern = (control.dateFormat ?? "d MMMM yyyy").replace(
-    /'[^']*'|d+|M+|y+|[Hhms]+|[AaPp]{2}|[.*+?^${}()|[\]\\/-]/g,
+    /'[^']*'|d+|M+|y+|[Hhms]+|[AaPp]{2}|[.*+?^${}()|[\]\\/]/g,
     (token) => {
       if (token[0] === "'") return token.slice(1, -1).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-      if (/^[.*+?^${}()|[\]\\/-]$/.test(token)) return `\\${token}`;
+      if (/^[.*+?^${}()|[\]\\/]$/.test(token)) return `\\${token}`;
       if (token[0] === "d" && token.length > 2) return "\\p{L}+\\.?";
       if (token[0] === "d" || token[0] === "y" || token[0] === "M") fields.push(token);
       if (token[0] === "M" && token.length > 2) return "(\\p{L}+)\\.?";
@@ -680,10 +715,11 @@ function reconcile(
     }
     if (wasShowing) {
       // The text put there takes the control's formatting, not the placeholder's.
-      setRunMarks(
+      leavePlaceholderLook(
         tr,
         tr.mapping.map(range.contentFrom, -1),
         tr.mapping.map(range.contentTo, 1),
+        placeholderId({ envelope }),
         formatOf(state, control),
       );
       if (control.placeholder?.showing) {
@@ -692,14 +728,8 @@ function reconcile(
       }
     }
     if (control.kind === "checkbox" && reviewed) {
-      const shown = textIn(state.doc, range);
-      const checked =
-        shown === glyph(control.checkedState ?? CHECKED)
-          ? true
-          : shown === glyph(control.uncheckedState ?? UNCHECKED)
-            ? false
-            : control.checked;
-      if (checked !== control.checked) set(range.id, { ...control, checked: checked === true });
+      const checked = boxShowsChecked(state.doc, range, control);
+      if (checked !== null && checked !== control.checked) set(range.id, { ...control, checked });
     }
     if (edit === "value" || edit === "fields") continue;
     if (control.kind === "date") {
@@ -960,7 +990,12 @@ export function controlValues(state: EditorState): ControlValue[] {
       text,
       value,
       ...(control.kind === "richText" && !showing
-        ? { content: contentOf(state.doc, range).toJSON() }
+        ? {
+            content: (range.level === "cell"
+              ? state.doc.slice(range.from + 1, range.to - 1).content
+              : contentOf(state.doc, range)
+            ).toJSON(),
+          }
         : {}),
     });
   }
@@ -1053,6 +1088,12 @@ function valueFor(
       if (typeof value !== "object" || value instanceof Date) return null;
       if (!Array.isArray(value.content) || !safeContent(state, range, value.content)) return null;
       if (!value.content.length) return { nodes: [], control };
+      if (range.level === "row") {
+        const rows = value.content.map((json) => state.schema.nodeFromJSON(json));
+        return rows.every((n) => n.type.name === "tableRow")
+          ? { nodes: rows, blocks: true, control: shown }
+          : null;
+      }
       const nodes = value.content.every((json) => state.schema.nodes[json.type]?.isInline)
         ? value.content.map((json) => state.schema.nodeFromJSON(json))
         : blocksFrom(value.content);
@@ -1067,7 +1108,7 @@ function valueFor(
         return { nodes: inner, control: shown };
       }
       // Word's rule for what ends a body or a cell.
-      if (range.level === "row" || nodes.at(-1)?.type.name === "table") return null;
+      if (nodes.at(-1)?.type.name === "table") return null;
       return { nodes, blocks: true, control: shown };
     }
     case "dropDown":
@@ -1102,6 +1143,12 @@ function valueFor(
     default:
       return null;
   }
+}
+
+/** The ids a block, row or cell of `range` lists, up to the control's own. */
+function controlChain(tree: Node, range: ControlRange): string[] {
+  const ids = (tree.nodeAt(range.from)?.attrs.controls ?? []) as string[];
+  return ids.slice(0, ids.indexOf(range.id) + 1);
 }
 
 /** The caret positions of a control's text are in sibling paragraphs: a value can go there. */
@@ -1147,6 +1194,8 @@ function safeContent(
   );
   const usable = (id: unknown) =>
     typeof id === "string" && Object.hasOwn(controls, id) && !elsewhere.has(id);
+  // What `controlValues` reads of a block control lists the controls it stands in.
+  const chain = range.level === "inline" ? [] : controlChain(state.doc, range);
   const $at = state.doc.resolve(range.contentFrom);
   let inCell = false;
   for (let d = $at.depth; d > 0; d--) inCell ||= $at.node(d).type.name === "tableCell";
@@ -1164,7 +1213,8 @@ function safeContent(
       open.set(id, (open.get(id) ?? 0) + (json.type === "controlStart" ? 1 : -1));
     }
     const ids = attrs?.controls;
-    if (ids != null && !(Array.isArray(ids) && ids.every(usable))) return false;
+    if (ids != null && !(Array.isArray(ids) && ids.every((c) => chain.includes(c) || usable(c))))
+      return false;
     if (json.marks?.some((m) => m.type === "link" && !isSafeLink(m.attrs))) return false;
     return json.content === undefined || (Array.isArray(json.content) && json.content.every(check));
   };
@@ -1211,14 +1261,21 @@ export function setControlValue(target: string, value: ControlValueInput, join =
       for (const { range, next } of [...found].reverse()) {
         controls[range.id] = next.control;
         if (next.blocks) {
-          const around = (state.doc.nodeAt(range.from)?.attrs.controls ?? []) as string[];
-          const prefix = around.slice(0, around.indexOf(range.id) + 1);
+          const prefix = controlChain(state.doc, range);
           const inCell = range.level === "cell";
           const nodes = next.nodes.map((n) =>
             inCell
               ? n
               : n.type.create(
-                  { ...n.attrs, controls: [...prefix, ...((n.attrs.controls as string[]) ?? [])] },
+                  {
+                    ...n.attrs,
+                    controls: [
+                      ...prefix,
+                      ...((n.attrs.controls as string[] | null) ?? []).filter(
+                        (id) => !prefix.includes(id),
+                      ),
+                    ],
+                  },
                   n.content,
                   n.marks,
                 ),

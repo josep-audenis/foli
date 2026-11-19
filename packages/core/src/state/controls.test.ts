@@ -969,6 +969,137 @@ describe("as Word's review of the rules has it", () => {
     expect(props(editor, "c").date).toBe(date);
   });
 
+  it.each([
+    ["yyyy-MM-dd", "2026-03-03", "2026-03-04"],
+    ["d-MMM-yy", "3-Mar-26", "4-Mar-26"],
+    ["dd/MM/yyyy", "03/03/2026", "04/03/2026"],
+  ])("reads a date in the format %s, typed and rejected", (dateFormat, shown, other) => {
+    const control: ControlJSON = {
+      kind: "date",
+      tag: "w",
+      dateFormat,
+      date: "2026-03-03T00:00:00Z",
+    };
+    const typed = editorOf([p(inline("c", text(shown)))], { c: control });
+    const { contentFrom, contentTo } = range(typed, "c");
+    typed.select(contentFrom, contentTo);
+    typed.commands.insertText(other);
+    expect(props(typed, "c").date).toBe("2026-03-04T00:00:00Z");
+    const tracked = editorOf([p(inline("c", text(shown)))], { c: control }, { track: true });
+    tracked.commands.setControlValue("w", "2026-03-04");
+    expect(tracked.run(rejectAllChanges())).toBe(true);
+    expect(textOf(tracked)).toBe(shown);
+    expect(props(tracked, "c").date).toBe("2026-03-03T00:00:00Z");
+  });
+
+  it("in locked content what shows stays: insertions accepted, deletions rejected", () => {
+    const of = (type: "insertion" | "deletion") =>
+      editorOf([p(inline("c", text("held"), text("new", [change(type, 1)])))], {
+        c: { kind: "richText", lock: "contentLocked" },
+      });
+    const inserted = of("insertion");
+    expect(inserted.run(rejectAllChanges())).toBe(false);
+    expect(textOf(inserted)).toBe("heldnew");
+    expect(inserted.run(acceptAllChanges())).toBe(true);
+    expect(textOf(inserted)).toBe("heldnew");
+    expect(JSON.stringify(inserted.state.doc.toJSON())).not.toContain("insertion");
+    const deleted = of("deletion");
+    expect(deleted.run(acceptAllChanges())).toBe(false);
+    expect(textOf(deleted)).toBe("heldnew");
+    expect(deleted.run(rejectAllChanges())).toBe(true);
+    expect(textOf(deleted)).toBe("heldnew");
+    expect(JSON.stringify(deleted.state.doc.toJSON())).not.toContain("deletion");
+  });
+
+  it("rich content filling a placeholder keeps its formatting and link", () => {
+    const link = { type: "link", attrs: { href: "https://example.com/" } };
+    const control: ControlJSON = {
+      kind: "richText",
+      tag: "r",
+      format: [{ type: "italic" }],
+      placeholder: { showing: true, text: "Type" },
+    };
+    const editor = editorOf([p(inline("c", hint("Type")))], { c: control });
+    const value = { content: [text("b", [{ type: "bold" }]), text("l", [link])] };
+    expect(editor.commands.setControlValue("r", value)).toBe(true);
+    const json = JSON.stringify(editor.state.doc.toJSON());
+    expect(json).toContain('"bold"');
+    expect(json).toContain("example.com");
+    expect(json).toContain('"italic"');
+    expect(json).not.toContain("characterStyle");
+  });
+
+  it("the placeholder's own run properties do not stay on text typed over it", () => {
+    const xml = '<w:rPr><w:rStyle w:val="PlaceholderText"/></w:rPr>';
+    const run = text("Type", [
+      { type: "characterStyle", attrs: { id: "PlaceholderText" } },
+      { type: "runExt", attrs: { xml } },
+    ]);
+    const editor = editorOf([p(inline("c", run))], {
+      c: { kind: "text", placeholder: { showing: true, text: "Type" } },
+    });
+    inside(editor, "c");
+    editor.commands.insertText("x");
+    expect(editor.state.doc.firstChild?.child(1).toJSON()).toEqual(text("x"));
+  });
+
+  it("rejecting a toggle gives a symbol check box its state back", () => {
+    const symbol: NodeJSON = {
+      type: "opaqueInline",
+      attrs: {
+        xml: '<w:r xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:sym w:font="Wingdings" w:char="F0A8"/></w:r>',
+      },
+    };
+    const editor = editorOf(
+      [p(inline("k", symbol))],
+      {
+        k: {
+          kind: "checkbox",
+          checked: false,
+          checkedState: { value: "00FE", font: "Wingdings" },
+          uncheckedState: { value: "00A8", font: "Wingdings" },
+        },
+      },
+      { track: true },
+    );
+    expect(editor.commands.setControlValue("k", true)).toBe(true);
+    expect(props(editor, "k").checked).toBe(true);
+    editor.run(rejectAllChanges());
+    expect(props(editor, "k").checked).toBe(false);
+    expect(JSON.stringify(editor.state.doc.toJSON())).toContain("F0A8");
+  });
+
+  it("what is read from a block, cell or row control can be written back", () => {
+    const cell = (controls?: string[]) => ({
+      type: "tableCell",
+      ...(controls ? { attrs: { controls } } : {}),
+      content: [p("in cell")],
+    });
+    const table = {
+      type: "table",
+      attrs: { grid: [2000] },
+      content: [
+        { type: "tableRow", content: [cell(["cell"])] },
+        { type: "tableRow", attrs: { controls: ["row"] }, content: [cell()] },
+      ],
+    } as unknown as NodeJSON;
+    const editor = editorOf(
+      [inBlock(p("one"), "outer", "b"), inBlock(p("two"), "outer", "b"), table, p("")],
+      {
+        outer: { kind: "richText" },
+        b: { kind: "richText", tag: "b" },
+        cell: { kind: "richText", tag: "cell" },
+        row: { kind: "richText", tag: "row" },
+      },
+    );
+    const before = editor.state.doc;
+    for (const tag of ["b", "cell", "row"]) {
+      const { content } = valueAt(editor, tag) as { content: NodeJSON[] };
+      expect(editor.commands.setControlValue(tag, { content })).toBe(true);
+      expect(editor.state.doc.eq(before)).toBe(true);
+    }
+  });
+
   it("refuses a day the calendar lacks, and a checked state's bad code does no harm", () => {
     const editor = editorOf([p(inline("d", text("x")), inline("k", text("\u2610")))], {
       d: { kind: "date", dateFormat: "d MMMM yyyy" },

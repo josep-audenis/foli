@@ -429,8 +429,11 @@ function command(
     const body = everywhere ? storyBody(state) : null;
     if (body) return dispatch ? body.run(run) : body.can(run);
     const controls = wordContext(state)?.envelope.controls;
-    // As Word: a change in content that may not be edited can be accepted, not rejected.
-    const open = (doc: Node) => (c: Change) => accept || !readOnlyAt(doc, controls, c.from, c.to);
+    // As Word, in content that may not be edited: what leaves its text as it shows goes through
+    // (accepting an insertion, rejecting a deletion); the opposite is refused.
+    const open = (doc: Node) => (c: Change) =>
+      c.kind.toLowerCase().includes("deletion") !== accept ||
+      !readOnlyAt(doc, controls, c.from, c.to);
     // A change around several selected cells (a row revision, a move's partner) counts once.
     const seen = new Set<string>();
     const changes = range(state)

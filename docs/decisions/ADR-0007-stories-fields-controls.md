@@ -273,7 +273,8 @@ content, ext? }`. `content` is a `doc` of the body's blocks. `noteType` is Word'
     deleted. `sdtContentLocked`: both. Properties and the locks themselves stay changeable. The
     filter compares what a transaction leaves with what was there (undo passes), so it does not
     depend on how the change came; what a control inside holds is that control's, so an unlocked
-    one in a locked one is edited. Tracked changes in locked content can be accepted, not rejected;
+    one in a locked one is edited. In locked content a tracked insertion can be accepted, not
+    rejected, and a tracked deletion rejected, not accepted: what shows stays;
     comments can be anchored in it and fields in it are updated. Formatting a range holding locked
     content does nothing at all; one holding a drop-down or check box formats them too.
   - **Deleting a control while tracking.** Refused when it is locked against deletion. Otherwise
