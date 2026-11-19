@@ -56,7 +56,7 @@ export interface FoliCommentsProps {
 export declare function FoliComments({ editor: editorProp, readOnly, label, className, hidden, }: FoliCommentsProps): import("react").JSX.Element;
 
 // FoliEditor.d.ts
-import type { Editor, EditorDocument, FoliDocument, Plugin, ReviewView, Transaction } from "@folijs/core";
+import type { Editor, EditorDocument, Extension, FoliDocument, Plugin, ReviewView, Transaction } from "@folijs/core";
 import { type ReactNode } from "react";
 import { type FoliCanvasHandle, type FoliCanvasProps } from "./FoliCanvas.js";
 /**
@@ -81,6 +81,8 @@ export interface FoliEditorProps extends Omit<FoliCanvasProps, "editor"> {
     initialContent?: EditorDocument | undefined;
     /** Read once on mount. */
     plugins?: readonly Plugin[] | undefined;
+    /** Read once on mount: custom nodes and marks with their view hooks (`ViewExtension`). */
+    extensions?: readonly Extension[] | undefined;
     /** Read once on mount: who edits (tracked changes are made in this name). */
     author?: string | undefined;
     /** Read once on mount: record edits as tracked changes (the toolbar turns it on and off). */
@@ -172,7 +174,7 @@ export interface FoliToolbarProps {
 export declare function FoliToolbar({ editor: given, disabled, onClickCommand, label, className, comments, upload, }: FoliToolbarProps): import("react").JSX.Element;
 
 // editor.d.ts
-import { type Editor, type EditorDocument, type EditorState, type Plugin, type ReviewView } from "@folijs/core";
+import { type Editor, type EditorDocument, type EditorState, type Extension, type Plugin, type ReviewView } from "@folijs/core";
 import { type ReactNode } from "react";
 export interface UseFoliEditorOptions {
     /**
@@ -183,6 +185,11 @@ export interface UseFoliEditorOptions {
     initialContent?: EditorDocument | undefined;
     /** Read once, when the editor is created. */
     plugins?: readonly Plugin[] | undefined;
+    /**
+     * Read once: custom nodes and marks, their plugins and view hooks (`ViewExtension` from
+     * `@folijs/view`), as `createEditor`'s `extensions`.
+     */
+    extensions?: readonly Extension[] | undefined;
     /** Read once: who edits (tracked changes are made in this name; `createEditor`'s `author`). */
     author?: string | undefined;
     /** Read once: record edits as tracked changes from the start (a `.docx`'s `trackRevisions`). */

@@ -243,6 +243,23 @@ A foreign node's text from a `.docx` control rides on its JSON in memory (a non-
 content controls and back on the document's JSON (`src/custom.ts`), after `parseDocument` on
 export and before it on import.
 
+View hooks (12.4, ADR-0008, `view/src/extension.ts`): a `ViewExtension` is an extension with
+`nodeViews`, `markViews`, `decorations(state)` and `view(editorView)`; the editor keeps its
+extensions (`editor.extensions`), and `EditorView` reads them when it is made. The renderer
+(`word/edit.ts`) draws a custom inline node's view inside its leaf span (one position, not
+editable) and a custom block's view in a `div` of its own, which the flow measures as any block.
+A block view that may split gives the flow its parts (`WordBlockDesc.parts`: the bottoms of its
+root's children) as lines, without widow or orphan control (`anyLine`); its `splits` are then the
+layout px where each page's part starts, and each part is the view drawn again in a clipping box
+shifted up (`aria-hidden` after the first). Mark views and the `data-foli-mark` name go on the
+run's span (`#run`). Decorations are asked on every update and compared as JSON; when they
+changed the view renders, and `decorationsByBlock` gives each block its own, relative to its
+content: they are part of the block's key, so only blocks whose decorations changed are drawn and
+measured again, and the flow restarts from the first of them as after an edit. Inline ones cut
+text runs at their ends. Plugin views are made after the first render, told after each update and
+destroyed first in `destroy`. Find's matches and the selected field's shading do not use
+decorations: the Custom Highlight API and one attribute draw them without redrawing a block.
+
 ## Editor view (`@folijs/view`)
 
 `packages/view/src/view.ts`, design per ADR-0003: one `contenteditable` host holding real pages.

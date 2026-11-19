@@ -24,6 +24,14 @@ import {
   referencesIn,
   type WordContext,
 } from "@folijs/core/internal";
+import {
+  applyAttrs,
+  type Decoration,
+  type NodeView,
+  type NodeViewDOM,
+  nodeViewDOM,
+  type Views,
+} from "../extension.js";
 import type { BlockDesc, LeafDesc } from "../render.js";
 import {
   CHANGE_BAR,
@@ -117,6 +125,12 @@ export interface WordBlockDesc extends BlockDesc {
   readonly word: WordInfo;
   /** What the rendering depends on besides the node (its marker, open comments). */
   readonly key: string;
+  /**
+   * A custom block's node view that may split: where it may break, as the bottoms of its root's
+   * children from its top (client px; the last is its height). Its `splits` are then the layout
+   * px from its top where each fragment after the first starts, not content offsets.
+   */
+  readonly parts?: () => number[];
 }
 
 /**
@@ -155,6 +169,12 @@ export class WordRenderer {
   #noteMark = "";
   /** The numbers each block shows. */
   #noteKeys: string[] = [];
+  /** Node and mark views (`ViewExtension`), none on the clipboard. */
+  views: Views | null = null;
+  readonly #dom: NodeViewDOM;
+  /** Each block's decorations, relative to its content (`decorationsByBlock`), and as keys. */
+  #decorations: readonly (readonly Decoration[] | undefined)[] = [];
+  #decorationKeys: string[] = [];
 
   constructor(
     context: WordContext,
@@ -168,6 +188,7 @@ export class WordRenderer {
     this.#codes = codes;
     this.#context = context;
     this.#doc = doc;
+    this.#dom = nodeViewDOM(doc);
     this.#ratio = ratio;
     this.#clipboard = clipboard;
     this.#review = review;
@@ -181,6 +202,12 @@ export class WordRenderer {
   /** The envelope moved on without touching what blocks look like (a story was edited). */
   set context(context: WordContext) {
     this.#context = context;
+  }
+
+  /** Decorations by block index (of those prepared): set before `key` and `render`. */
+  set decorations(list: readonly (readonly Decoration[] | undefined)[]) {
+    this.#decorations = list;
+    this.#decorationKeys = list.map((own) => (own ? JSON.stringify(own) : ""));
   }
 
   /** What notes show: set before `prepare`. */
@@ -245,7 +272,8 @@ export class WordRenderer {
     const field = this.#fields[index];
     const fields = field?.hidden.size || field?.gone ? `|${[...field.hidden]}${field.gone}` : "";
     const notes = this.#noteKeys[index] ? `|${this.#noteKeys[index]}` : "";
-    return `${this.#markers[index]?.text ?? ""}|${(this.#comments[index] ?? []).join(" ")}${inCell}${above}${fields}${notes}|${this.#noteMark}`;
+    const decorations = this.#decorationKeys[index] ? `|${this.#decorationKeys[index]}` : "";
+    return `${this.#markers[index]?.text ?? ""}|${(this.#comments[index] ?? []).join(" ")}${inCell}${above}${fields}${notes}|${this.#noteMark}${decorations}`;
   }
 
   /** A block; `cell` is the format of the table cell it is in, if any. */
@@ -255,7 +283,8 @@ export class WordRenderer {
     splits: readonly number[] = [],
     cell?: CellFormat | null,
   ): WordBlockDesc {
-    if (node.type.name !== "paragraph") return this.#opaque(node, index);
+    const decorations = this.#decorations[index] ?? [];
+    if (node.type.name !== "paragraph") return this.#opaque(node, index, splits, !!cell);
     const { resolver } = this.#context;
     const { paragraph, run } = resolver.paragraph(node.attrs, cell ?? undefined);
     const line = (r: RunFormat) => lineHeight(paragraph, r, this.#ratio(fontStack(latin(r))));
@@ -283,6 +312,7 @@ export class WordRenderer {
       }
       if (changed && !this.#clipboard) fragment.style.boxShadow = CHANGE_BAR;
       if (display.gone) fragment.style.display = "none";
+      for (const d of decorations) if (d.node && d.from < 0) applyAttrs(fragment, d.attrs);
       return fragment;
     });
     const dom = fragments[0] as HTMLElement;
@@ -305,6 +335,12 @@ export class WordRenderer {
     const floats = new Map<HTMLElement, HTMLElement[]>();
     let geometry: FloatGeometry | undefined;
     const comments = new Set(this.#comments[index] ?? []);
+    /** Inline decorations over content `from`..`to`, and node ones on a leaf there. */
+    const decorate = (element: HTMLElement, from: number, to: number, leaf: boolean) => {
+      for (const d of decorations)
+        if (d.node ? leaf && d.from === from : d.from <= from && d.to >= to)
+          applyAttrs(element, d.attrs);
+    };
     node.forEach((child, offset, childIndex) => {
       const name = child.type.name;
       if (name === "commentStart") comments.add(child.attrs.id as number);
@@ -320,6 +356,7 @@ export class WordRenderer {
         return span;
       };
       const leafElement = (element: HTMLElement) => {
+        decorate(element, offset, offset + child.nodeSize, true);
         leaves.push({ dom: element, offset, size: child.nodeSize });
         holder(offset).append(this.#wrap(element, child.marks, comments));
       };
@@ -339,6 +376,7 @@ export class WordRenderer {
         case "tab": {
           // A tab is text to the line layout (tab stops) and to the read-back.
           const span = this.#run(run, child.marks, line);
+          decorate(span, offset, offset + 1, true);
           const tab = doc.createTextNode("\t");
           span.append(tab);
           leaves.push({ dom: tab, offset, size: 1 });
@@ -386,9 +424,12 @@ export class WordRenderer {
         default: {
           const stands = child.type.spec.text;
           if (stands) {
-            // A custom or foreign node (ADR-0008): its text, one position, as opaque content.
+            // A custom or foreign node (ADR-0008): its node view or its text, one position, as
+            // opaque content.
             const span = this.#run(run, child.marks, line);
-            span.textContent = stands(child.attrs);
+            const view = this.#clipboard ? undefined : this.views?.nodes.get(name);
+            if (view) span.append(view.render(child, this.#dom));
+            else span.textContent = stands(child.attrs);
             span.dataset.foliCustom = String(child.attrs.type ?? name);
             span.setAttribute("contenteditable", "false");
             leafElement(span);
@@ -417,12 +458,19 @@ export class WordRenderer {
         }
       }
       const text = child.text ?? "";
-      const cuts = splits.filter((split) => split > offset && split < offset + text.length);
+      const inside = (at: number) => at > offset && at < offset + text.length;
+      const cuts = splits.filter(inside);
+      // Inline decorations start and end runs of their own.
+      for (const d of decorations)
+        if (!d.node)
+          for (const at of [d.from, d.to]) if (inside(at) && !cuts.includes(at)) cuts.push(at);
+      cuts.sort((a, b) => a - b);
       let from = offset;
       for (const to of [...cuts, offset + text.length]) {
         const leaf = doc.createTextNode(text.slice(from - offset, to - offset));
         leaves.push({ dom: leaf, offset: from, size: to - from });
         const span = this.#run(run, child.marks, line);
+        decorate(span, from, to, false);
         span.append(leaf);
         holder(from).append(this.#wrap(span, child.marks, comments));
         from = to;
@@ -502,6 +550,16 @@ export class WordRenderer {
     const run = this.#context.resolver.run(paragraphRun, json);
     const span = this.#doc.createElement("span");
     styleRun(span, run, line(run));
+    // Custom marks (ADR-0008): named for CSS, styled by their mark views.
+    const custom: string[] = [];
+    for (const mark of marks) {
+      const type = mark.type.name === "foreign" ? String(mark.attrs.type) : mark.type.name;
+      if (!type.includes(":")) continue;
+      custom.push(type);
+      const view = this.views?.marks.get(mark.type.name);
+      if (view) applyAttrs(span, view(mark));
+    }
+    if (custom.length) span.dataset.foliMark = custom.join(" ");
     return span;
   }
 
@@ -536,8 +594,79 @@ export class WordRenderer {
     return a;
   }
 
+  /**
+   * A custom block drawn by its node view (ADR-0008): one fragment, or one per page it is split
+   * across, each drawing the node again and showing its part (`splits`, layout px) through a clip.
+   */
+  #nodeView(
+    node: ModelNode,
+    index: number,
+    view: NodeView,
+    splits: readonly number[],
+    inCell: boolean,
+  ): WordBlockDesc {
+    const doc = this.#doc;
+    const tops = [0, ...splits];
+    let root: Node | undefined;
+    const fragments = tops.map((top, i) => {
+      const box = doc.createElement("div");
+      box.dataset.foliCustom = node.type.name;
+      box.setAttribute("contenteditable", "false");
+      // Its root's margins stay inside it: measured as the flow places it.
+      box.style.display = "flow-root";
+      const drawn = view.render(node, this.#dom);
+      root ??= drawn;
+      if (tops.length > 1) {
+        box.dataset.fragment = String(i);
+        box.style.overflow = "hidden";
+        const next = tops[i + 1];
+        if (next !== undefined) box.style.height = `${next - top}px`;
+        // The parts after the first are drawn again: read once.
+        if (i > 0) box.setAttribute("aria-hidden", "true");
+        const inner = doc.createElement("div");
+        inner.style.marginTop = `${-top}px`;
+        inner.append(drawn);
+        box.append(inner);
+      } else box.append(drawn);
+      for (const d of this.#decorations[index] ?? [])
+        if (d.node && d.from < 0) applyAttrs(box, d.attrs);
+      return box;
+    });
+    const dom = fragments[0] as HTMLElement;
+    // shortcut: a custom block in a table cell is kept whole (cells split at their lines); split it there when a node view needs it.
+    const split = view.split !== false && !inCell;
+    const parts = () => {
+      const { top, height } = dom.getBoundingClientRect();
+      const bottoms: number[] = [];
+      const children = root?.nodeType === Node.ELEMENT_NODE ? (root as Element).children : [];
+      for (const child of children) {
+        const bottom = child.getBoundingClientRect().bottom - top;
+        if (bottom > (bottoms[bottoms.length - 1] ?? 0) && bottom < height) bottoms.push(bottom);
+      }
+      bottoms.push(height);
+      return bottoms;
+    };
+    return {
+      node,
+      dom,
+      fragments,
+      splits,
+      leaves: [],
+      key: this.key(index),
+      word: leafInfo(!split),
+      ...(split ? { parts } : {}),
+    };
+  }
+
   /** An opaque block, shown from its XML: a block leaf, not editable inside. */
-  #opaque(node: ModelNode, index: number): WordBlockDesc {
+  #opaque(
+    node: ModelNode,
+    index: number,
+    splits: readonly number[],
+    inCell: boolean,
+  ): WordBlockDesc {
+    const view = this.#clipboard ? undefined : this.views?.nodes.get(node.type.name);
+    if (view) return this.#nodeView(node, index, view, splits, inCell);
     const shown = opaqueBlock(
       node.toJSON(),
       index,
@@ -555,6 +684,8 @@ export class WordRenderer {
       dom.textContent = stands(node.attrs);
       dom.dataset.foliCustom = String(node.attrs.type ?? node.type.name);
     }
+    for (const d of this.#decorations[index] ?? [])
+      if (d.node && d.from < 0) applyAttrs(dom, d.attrs);
     return {
       node,
       dom,
@@ -574,6 +705,20 @@ export class WordRenderer {
       },
     };
   }
+}
+
+/** What the flow needs of a block that is not a paragraph: no spacing, keep rules or breaks. */
+function leafInfo(keepLines: boolean): WordInfo {
+  return {
+    before: 0,
+    after: 0,
+    keepNext: false,
+    keepLines,
+    pageBreakBefore: false,
+    style: null,
+    contextual: false,
+    empty: false,
+  };
 }
 
 /** An element's style attribute, ready for one more declaration. */

@@ -1,4 +1,13 @@
 export { FOLI_MIME, htmlToDoc, textToDoc } from "./clipboard.js";
+export type {
+  Decoration,
+  DecorationAttrs,
+  MarkView,
+  NodeView,
+  NodeViewDOM,
+  PluginView,
+  ViewExtension,
+} from "./extension.js";
 export {
   EditorView,
   type EditorViewOptions,

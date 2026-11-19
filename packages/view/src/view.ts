@@ -89,6 +89,14 @@ import {
 } from "@folijs/core/internal";
 import { docFromClipboard, FOLI_MIME, serializeRange } from "./clipboard.js";
 import {
+  type Decoration,
+  decorationsByBlock,
+  type PluginView,
+  type ViewExtension,
+  type Views,
+  viewsOf,
+} from "./extension.js";
+import {
   type BlockBox,
   contentHeight,
   DEFAULT_RULES,
@@ -705,6 +713,12 @@ export class EditorView {
   private readonly listeners: [string, EventListener][] = [];
   /** The frames, titles and pop-ups of content controls. */
   private readonly controlChrome: ControlChrome;
+  /** The editor's view extensions' node and mark views, decorations and plugin views. */
+  private readonly views: Views;
+  private readonly decorators: ViewExtension["decorations"][];
+  private decorations: readonly Decoration[] = [];
+  private decorationKey = "";
+  private pluginViews: PluginView[] = [];
 
   constructor(
     readonly host: HTMLElement,
@@ -762,6 +776,10 @@ export class EditorView {
     this.observer.observe(host, { childList: true, characterData: true, subtree: true });
     // The picture resolver before the first render: no image drawn from a URL the app refuses.
     this.resource = options.resource ?? undefined;
+    const extensions = editor.extensions as readonly ViewExtension[];
+    this.views = viewsOf(extensions);
+    this.decorators = extensions.flatMap((e) => (e.decorations ? [e.decorations.bind(e)] : []));
+    this.decorate(this.state);
     this.render();
     this.setOptions(options);
 
@@ -786,6 +804,19 @@ export class EditorView {
     host.ownerDocument.addEventListener("selectionchange", this.onSelectionChange);
     host.ownerDocument.fonts?.addEventListener("loadingdone", this.onFontsLoaded);
     this.unsubscribe = editor.subscribe((state) => this.update(state));
+    for (const extension of extensions)
+      if (extension.view) this.pluginViews.push(extension.view(this));
+  }
+
+  /** Asks the extensions for `state`'s decorations; whether they changed. */
+  private decorate(state: EditorState): boolean {
+    if (!this.decorators.length) return false;
+    const decorations = this.decorators.flatMap((decorate) => decorate?.(state) ?? []);
+    const key = JSON.stringify(decorations);
+    if (key === this.decorationKey) return false;
+    this.decorations = decorations;
+    this.decorationKey = key;
+    return true;
   }
 
   /** Adds a listener for the body's events: a story open on a page has its own view. */
@@ -798,6 +829,7 @@ export class EditorView {
   }
 
   destroy(): void {
+    for (const view of this.pluginViews.splice(0)) view.destroy?.();
     this.closeStory(false);
     this.showFound(null);
     this.controlChrome.destroy();
@@ -934,15 +966,20 @@ export class EditorView {
     const selectionChanged = !state.selection.eq(this.state.selection);
     // Another document: the story being edited closes.
     const lost = !!this.mount && wordContext(state)?.id !== wordContext(this.state)?.id;
+    const previous = this.state;
     this.state = state;
-    if (docChanged || (storiesChanged && !this.redrawRegions())) this.render();
+    // Decorations that changed redraw their blocks (the others are reused).
+    const decorated = this.decorate(state);
+    if (docChanged || decorated || (storiesChanged && !this.redrawRegions())) this.render();
     if (lost) this.closeStory(true);
     // The open story has its own editor, which hears nothing of this.
     if (codesChanged) this.mount?.view.update(this.mount.view.editor.state);
     this.showSelectedNode();
-    this.writeSelection(docChanged);
+    // Redrawn blocks may have held the DOM selection.
+    this.writeSelection(docChanged || decorated);
     // shortcut: scrolls for every change while focused; once remote or plugin changes exist, scroll only for local input (a transaction flag).
     if (docChanged || selectionChanged) this.scrollToSelection();
+    for (const view of this.pluginViews) view.update?.(this, previous);
   }
 
   /**
@@ -1022,6 +1059,7 @@ export class EditorView {
         imageSource(context.envelope.resources, this.resource ?? undefined),
         this.fieldCodes,
       );
+      word.views = this.views;
       this.invalidateLayout();
     }
     const references = this.noteReferences();
@@ -1029,6 +1067,7 @@ export class EditorView {
     // The blocks the view renders (paragraphs in table cells among them) and the page flow's
     // items (top-level paragraphs and opaque blocks, and tables).
     const { units, items } = collect(doc, context.resolver);
+    word.decorations = this.decorations.length ? decorationsByBlock(units, this.decorations) : [];
     word.prepare(
       units.map((unit) => unit.node),
       (i) => {
@@ -1351,6 +1390,15 @@ export class EditorView {
           const desc = blocks[item.unit] as WordBlockDesc;
           const contentStart = ((units[item.unit] as Unit).pos as number) + 1;
           const { section } = layout[i] as BlockLayout;
+          // A node view splits where its part's line ends (layout px).
+          if (desc.parts) {
+            const { bottoms } = lines(desc);
+            splitsOf.set(
+              item.unit,
+              fragments.slice(1).map((fragment) => bottoms[fragment.fromLine - 1] as number),
+            );
+            return;
+          }
           splitsOf.set(
             item.unit,
             fragments.slice(1).map((fragment) => {
@@ -1957,7 +2005,10 @@ export class EditorView {
     search: for (const [i, desc] of this.blocks.entries()) {
       for (const [f, fragment] of desc.fragments.entries()) {
         if (fragment.closest(".foli-page") !== element) continue;
-        const start = (this.starts[i] as number) + 1 + (f ? (desc.splits[f - 1] as number) : 0);
+        // A block leaf's parts (a node view split across pages) are all before it.
+        const start = desc.node.isTextblock
+          ? (this.starts[i] as number) + 1 + (f ? (desc.splits[f - 1] as number) : 0)
+          : (this.starts[i] as number);
         const { doc } = this.state;
         this.editor.dispatch(
           this.state.tr.setSelection(
@@ -2877,7 +2928,7 @@ export class EditorView {
       const range = host.ownerDocument.createRange();
       range.setStart(node, offset);
       const posOf = (i: number, f: number) =>
-        f === 0
+        f === 0 || !(this.blocks[i] as BlockDesc).node.isTextblock
           ? (this.starts[i] as number)
           : (this.starts[i] as number) +
             1 +
@@ -4661,6 +4712,8 @@ function wordBox(
     marginTop: before,
     marginBottom: after,
     keepWithNext: desc.word.keepNext,
+    // A node view's parts are not lines: no widow or orphan control.
+    anyLine: !!desc.parts,
     pageHeight,
     section: section.flow,
     sectionMark: !!desc.node.attrs.section && desc.word.empty,
@@ -4818,6 +4871,16 @@ function measureLines(desc: BlockDesc, scale: number): Lines {
     )
       items.push({ offset: desc.node.content.size, rect: () => tail.getBoundingClientRect() });
     const from = f ? (desc.splits[f - 1] as number) : 0;
+    const parts = (desc as WordBlockDesc).parts;
+    if (!items.length && parts && desc.fragments.length === 1) {
+      // A node view drawn whole: it may break after each of its root's children.
+      for (const bottom of parts()) {
+        starts.push(0);
+        bottoms.push(bottom / scale);
+      }
+      base += box.height;
+      continue;
+    }
     if (!items.length) {
       starts.push(from);
       bottoms.push((base + box.height) / scale);

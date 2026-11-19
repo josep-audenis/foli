@@ -37,6 +37,7 @@ migrated (`parseDocument`), and what it reports is v5.
 | ---------------- | ------------------------------------------------ | ------------ | --------------------------------------------------------------------------------------------------- |
 | `initialContent` | `EditorDocument`                                 | empty A4     | Read once, on mount; any version (migrated). Later: `editor.setDocument()` or a new `key`.          |
 | `plugins`        | `readonly Plugin[]`                              | `[]`         | Read once, on mount. Unstable API.                                                                  |
+| `extensions`     | `readonly Extension[]`                           | `[]`         | Read once, on mount: custom nodes and marks, with their view hooks (`ViewExtension`).               |
 | `author`         | `string`                                         | `"Author"`   | Read once: who edits (tracked changes are made in this name).                                       |
 | `trackChanges`   | `boolean`                                        | `false`      | Read once: record edits as tracked changes (the toolbar turns it on and off).                       |
 | `reviewView`     | `ReviewView`                                     | `"markup"`   | Read once: how tracked changes show (the toolbar changes it).                                       |
@@ -186,7 +187,8 @@ it, and only one of the link and insert table dialogs is open at a time.
 
 ### Hooks and provider
 
-- `useFoliEditor({ initialContent?, plugins? }): Editor`: creates an editor on the first render
+- `useFoliEditor({ initialContent?, plugins?, extensions?, author?, trackChanges?, reviewView? }): Editor`:
+  creates an editor on the first render
   (`initialContent` of any version, migrated; default an empty document) and keeps it for the
   component's lifetime. Later option changes are
   ignored. Throws `FoliDocumentError` for invalid content.
@@ -251,7 +253,7 @@ An app adds its own node and mark types to the Word schema with an `Extension` (
 - A node (`ExtensionNodeSpec`) is a leaf: inline (`inline: true`, group `inline`) or a block
   (group `block`); no `content`. Its `attrs` are as in `NodeSpec` (`validate` each), and
   `text(attrs)` is the text it stands for: plain text on the clipboard, what find matches, its
-  text in `.docx`, how the view draws it until 12.4's node views. A mark is a `MarkSpec`.
+  text in `.docx`, how the view draws it without a node view. A mark is a `MarkSpec`.
 - Stored as ordinary node and mark JSON by type name ([document-model.md](document-model.md#custom-nodes-and-marks)).
   Custom types never change `SCHEMA_VERSION`.
 - **Without its extension** a custom type is never dropped: it loads as a foreign node
@@ -262,6 +264,8 @@ An app adds its own node and mark types to the Word schema with an `Extension` (
 - Find matches a custom node's `text(attrs)` as one position; replace leaves it (`locked`).
   Inserting or deleting one while tracking is a tracked change, accepted or rejected as text is.
 - Extensions' `plugins` run after `EditorOptions.plugins`, before the built-ins.
+- `editor.extensions` is the list the editor was made with (its stories' editors have it too):
+  how a view finds the view hooks of a `ViewExtension` ([`@folijs/view`](#view-extensions)).
 
 ### Formatting (internal)
 
@@ -404,6 +408,7 @@ definitions (the Word 2013 to 2019 template's) the first time they are applied, 
 | `story(id)`                    | An `Editor` over a story (header, footer or note), null when there is none: its own selection, every change a step of this editor's history. `getDocument` gives the story as the content; `undo` and `redo` are the document's.                                                                                              |
 | `storyView`                    | Set by the view showing the pages: `open` (the story open there: `id`, `side`, `variant`, `section`), `edit(side, page?)`, `editNote(id?)`, `toReference()`, `close()`, `fieldLayout` and `updateFields(options?, editor?)` (fields, from its pages). `storyChanged()` tells listeners it changed.                            |
 | `subscribe(listener)`          | `(state, transactions) => void` after every change (selection included); returns unsubscribe. `transactions.some(tr => tr.docChanged)` tells content changes apart.                                                                                                                                                           |
+| `extensions`                   | The extensions it was made with (`EditorOptions.extensions`); a view reads its node views, mark views, decorations and plugin views from them.                                                                                                                                                                                |
 
 Headers and footers: `ensureStory(side, variant, section)` makes one where none shows,
 `setStoryLinked(side, variant, linked, section?)` links a section's to the previous section's or
@@ -731,8 +736,7 @@ const view = new EditorView(host, editor, { editable: true, placeholder: "" });
   paragraph). A copy holding custom nodes or marks also carries its Foli JSON in the HTML (a
   `data-foli-clipboard` attribute on a wrapping `div`, read back before the HTML itself), since
   some browsers (Firefox) give a paste only HTML and text; plain text gets a node's
-  `text(attrs)`. Custom and foreign nodes are drawn as their text (`data-foli-custom` holds the
-  type) until node views (12.4).
+  `text(attrs)`; the HTML has a custom node's text, not its node view.
   Plain text that is one URL (`autolinkHref`) becomes a link: over selected text inside one
   block that text is linked, otherwise the URL is inserted as linked text; not on paste as
   plain text (Ctrl/Cmd+Shift+V), nor when the clipboard holds Foli JSON.
@@ -757,6 +761,60 @@ const view = new EditorView(host, editor, { editable: true, placeholder: "" });
   web page holding them alone), `destroy()`. Measures as it is called: render after the document's fonts have
   loaded (`document.fonts.ready`), into a container that is laid out and not scaled. See
   [architecture.md](architecture.md#word-pages-packagesviewsrcword-86b).
+
+### View extensions
+
+A `ViewExtension` is an `Extension` with view hooks (ADR-0008, 12.4). Give it to
+`createEditor({ extensions })` (React: the `extensions` prop) like any extension; every
+`EditorView` of that editor (a header, footer or note open on its page too) reads the hooks from
+`editor.extensions`.
+
+```ts
+const acme: ViewExtension = {
+  name: "acme",
+  nodes: { "acme:mention": { inline: true, attrs: { label: {} }, text: (a) => `@${a.label}` } },
+  nodeViews: {
+    "acme:mention": {
+      render: (node, { h }) => h("span", { class: "chip" }, `@${node.attrs.label}`),
+    },
+  },
+  markViews: { "acme:topic": (mark) => ({ class: "topic", title: String(mark.attrs.topic) }) },
+  decorations: (state) => [{ from: 1, to: 4, attrs: { class: "hit" } }],
+  view: (view) => ({ update(view, previous) {}, destroy() {} }),
+};
+```
+
+- `nodeViews: Record<type, NodeView>`: `NodeView` is `{ render(node, dom): Node; split? }`.
+  `render` is called whenever the node is drawn (again): a changed node, or a block split
+  differently. The view puts what it returns in an element with `data-foli-custom="<type>"` and
+  `contenteditable="false"`: one caret position, selected and deleted whole. Inline: in its line,
+  with the run's formatting, and the line wraps around it as the browser sizes it. Block: on the
+  pages, measured and placed by the flow; one that does not fit in what is left of a page splits
+  between its root element's children (each page's part drawn by `render` again and clipped to its
+  rows, the parts after the first `aria-hidden`), unless `split: false`, which keeps it whole on
+  the next page (one taller than a page is then cut by the page). Without a node view a custom
+  node is drawn as its `text(attrs)`.
+- `NodeViewDOM` (`dom`): `document` and `h(tag, attrs?, ...children)`, which makes an element with
+  attributes and children (strings become text nodes). **Never build a node view from HTML**
+  (`innerHTML`, `insertAdjacentHTML`) with the node's attributes: they come from documents and
+  pastes. `h` refuses `on*` handlers, `contenteditable`, `srcdoc`, the view's own `data-foli-*`
+  attributes, URL attributes (`href`, `src`…) that are not safe links (`isSafeHref`), and
+  `script`, `style`, `iframe`, `object` and `embed` elements (a `TypeError`).
+- `markViews: Record<type, MarkView>`: `MarkView` is `(mark) => DecorationAttrs`, put on every run
+  of the mark. Without one a run of a custom mark is still named for CSS: `data-foli-mark` holds
+  its custom marks' types, space separated (`[data-foli-mark~="acme:topic"]`); a foreign mark's
+  original type too.
+- `decorations(state): Decoration[]`: asked after every transaction, so keep it cheap (compute in
+  a plugin's state, as the playground's `/extension.html` does). `Decoration` is
+  `{ from, to, node?, attrs: DecorationAttrs }` in body positions: the text and inline leaves from
+  `from` to `to`, split into runs of their own, or with `node: true` the node at `from` (a
+  paragraph, on each page it is on, a custom block, or an inline leaf). `DecorationAttrs`:
+  `class` (added), `style` (appended) and any other attribute (set), checked as `h` checks them.
+  Decorations never change the document, the clipboard or what the view reads back. Only the
+  blocks whose decorations changed are drawn again (and measured, like an edited block).
+- `view(editorView): PluginView`: called when a view of the editor is made, after its first
+  render; `PluginView` is `{ update?(view, previous), destroy? }`: `update` after each change the
+  view has drawn (`previous` is the state before), `destroy` when the view is destroyed.
 
 ## `@folijs/docx`
 

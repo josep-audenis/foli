@@ -295,6 +295,11 @@ export interface Editor {
    * a key to the browser when it answers false, or when there is none.
    */
   navigation: ((request: NavigationRequest) => boolean) | null;
+  /**
+   * The extensions it was made with (`EditorOptions.extensions`), the same list on its stories'
+   * editors: a view reads its view hooks from them (`ViewExtension` in `@folijs/view`).
+   */
+  readonly extensions: readonly Extension[];
 }
 
 /** Word's page when a section leaves it out: Letter, 1 inch margins. */
@@ -349,6 +354,7 @@ interface EditorParts {
   /** The view opening stories, and the navigation UI: one for the body and its stories. */
   views: { current: StoryView | null; navigation: Editor["navigation"] };
   storyChanged(): void;
+  extensions: readonly Extension[];
 }
 
 function makeEditor(parts: EditorParts): Editor {
@@ -454,6 +460,7 @@ function makeEditor(parts: EditorParts): Editor {
       parts.views.current = view;
     },
     storyChanged: parts.storyChanged,
+    extensions: parts.extensions,
     get navigation() {
       return parts.views.navigation;
     },
@@ -566,6 +573,7 @@ export function createEditor({
       story,
       views,
       storyChanged,
+      extensions,
     });
     stories.set(id, { editing, editor });
     return editor;
@@ -593,5 +601,6 @@ export function createEditor({
     story,
     views,
     storyChanged,
+    extensions,
   });
 }

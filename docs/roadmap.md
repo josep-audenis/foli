@@ -1474,10 +1474,43 @@ Each task is a PR on `phase-12/ecosystem`, the build green after each.
   extension array (a WeakMap: an array given again must not have changed). Review of #123: no
   silent loss on `.docx` import, `onChange` and control values without foreign names, carried JSON
   only from a lone wrapper, `parseContent`'s options object, foreign types never read as Word's.)
-- [ ] 12.4 View extension: node views for custom nodes (measured and placed by the flow, split or
+- [x] 12.4 View extension: node views for custom nodes (measured and placed by the flow, split or
   kept whole across pages as declared), decorations (inline and node; find matches and the
   selected field move onto them where it is simpler), plugin views (mount, update, destroy) and
-  their CSS; T1–T3 with a custom node in three engines; axe.
+  their CSS; T1–T3 with a custom node in three engines; axe. (Done: `ViewExtension` in
+  `@folijs/view` (`view/src/extension.ts`) extends core's `Extension` with `nodeViews`
+  (`NodeView`: `render(node, { document, h })`, `split?`), `markViews` (`MarkView`: attributes on a
+  marked run), `decorations(state)` (`Decoration`: `{ from, to, node?, attrs }`,
+  `DecorationAttrs`) and `view(editorView)` (`PluginView`: `update(view, previous)`, `destroy()`);
+  it goes to `createEditor({ extensions })` like any extension and the editor keeps the list
+  (`editor.extensions`, new in core, the same on story editors), so every `EditorView` reads it;
+  React's `FoliEditor` and `useFoliEditor` take `extensions`. Inline node views sit in their leaf
+  span (one position, the line sized by the browser); block ones in a `div` the flow measures, and
+  one that may split (the default) gives its root's children as its lines (`anyLine`: no widow
+  control), each page's part drawn again and clipped, `aria-hidden` after the first; `split: false`
+  keeps it whole. `h` builds elements without HTML and refuses handlers, `contenteditable`,
+  `srcdoc`, the view's `data-foli-*`, unsafe URLs and script-like elements; decorations and mark
+  views are checked the same way. Every run of a custom mark gets `data-foli-mark`. Decorations
+  are asked on each update, compared as JSON, split per block relative to its content and made
+  part of each block's key, so only blocks whose decorations changed are drawn and measured again.
+  Find's matches and the selected field stay as they were (the Custom Highlight API and one
+  attribute draw them without redrawing blocks: decorations would not be simpler). No CSS added to
+  the view: extensions style their own classes (`docs/styling.md`). Tests: view
+  `extension.test.ts` (6, jsdom): node and mark views drawn, `h`'s refusals, decorations per
+  block, only changed blocks redrawn, refused attributes, the plugin view's mount, update and
+  destroy. e2e `extension.spec.ts` on `/extension.html` (now a chip, a card of twelve rows, a
+  topic style, "TODO" and caret-paragraph decorations, a word-count plugin view): T1 and T2 with a
+  custom node, T3 as the paste test (pasted content drawn by the views), a card split across the
+  page end (two parts on consecutive pages adding up to the card, broken between rows), decorations,
+  the plugin view's lifecycle, axe on the whole page: 29 passed, 1 skipped (WebKit paste, as
+  before) in Chromium, Firefox and WebKit; the renderers' smoke (`word-editing`, `clipboard`, `word-navigation`, `word-pages`, `word-tables`, `word-fields`): 205 passed, 8 skipped in the three engines. Keystroke cost (Chromium, 400 paragraphs, 60
+  `insertText`s, median): 5.0-5.4 ms without the extension, 6.4-6.7 ms with the page's
+  decorations (a "TODO" scan of the whole document per change, 400 decorations, and the word
+  count): an editor without decorations does no added work. Sizes within budgets (view 109.4 of
+  112.0 kB). Shortcuts: `renderDocument`, `exportPdf` and the pages' headers, footers and notes
+  (until opened on their page) draw no views; a custom block in a table cell is kept whole; a
+  split block's `render` runs per part; decorations cover body positions, not tables, rows or
+  cells, and a block whose decorations change is measured again even when only a color changed.)
 - [ ] 12.5 Commands and keymaps: commands registered by plugins and reachable through
   `editor.commands` and `editor.run`, typed; the view's own keys moved into keymaps or reserved as
   the ADR lists; a user keymap overrides each overridable built-in key; Word's keys documented per

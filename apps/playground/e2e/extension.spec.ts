@@ -1,10 +1,13 @@
+import AxeBuilder from "@axe-core/playwright";
 import type { FoliDocument, NodeJSON } from "@folijs/core";
 import { expect, type Page, test } from "@playwright/test";
 import type { ExtensionPage } from "../src/extension.js";
 
 // Custom nodes and marks (ADR-0008, 12.3) on /extension.html: `acme:mention` (inline),
 // `acme:card` (block) and `acme:topic` (a mark) typed, drawn on the pages, undone, copied and
-// pasted (also into an editor without the extension), saved and loaded, and through .docx.
+// pasted (also into an editor without the extension), saved and loaded, and through .docx. Their
+// view hooks (12.4): node views (a chip; a card of rows split across pages), a mark view,
+// decorations and a plugin view.
 
 const MOD = "ControlOrMeta";
 const editor = (page: Page) => page.getByRole("textbox", { name: "Document" });
@@ -96,6 +99,9 @@ test("copied and pasted, into an editor with and without the extension", async (
   await page.keyboard.press(`${MOD}+v`);
   await expect.poll(() => customs(page)).toEqual([MENTION, TOPIC, MENTION, TOPIC]);
   await expect(chip(page)).toHaveCount(2);
+  // Pasted content is drawn by the node and mark views too (T3).
+  await expect(editor(page).locator(".acme-chip")).toHaveCount(2);
+  await expect(editor(page).locator(".acme-topic")).toHaveCount(2);
   // Without the extension: kept, foreign, drawn as its type, saved back the same.
   const other = await context.newPage();
   await other.goto("/extension.html?extension=0");
@@ -133,8 +139,8 @@ test("saved and loaded as JSON, with a block node, on a later page; foreign with
     await expect(pages.last().locator("[data-foli-custom='acme:mention']")).toHaveText(
       known ? "@Ada Lovelace" : "[acme:mention]",
     );
-    await expect(pages.last().locator("[data-foli-custom='acme:card']")).toHaveText(
-      known ? "Card c-1" : "[acme:card]",
+    await expect(editor(page).locator("[data-foli-custom='acme:card']").first()).toContainText(
+      known ? "Card c-1, row 12" : "[acme:card]",
     );
     const again = await page.evaluate(() => JSON.stringify(window.__extension.save()));
     expect(JSON.parse(again)).toEqual(JSON.parse(stored));
@@ -152,4 +158,190 @@ test("through .docx and back", async ({ page }) => {
   await page.evaluate((b) => window.__extension.fromDocx(b), bytes);
   await expect.poll(() => customs(page)).toEqual([MENTION, TOPIC]);
   await expect(chip(page)).toHaveText("@Ada Lovelace");
+});
+
+/** Opens the page with `blocks` as the document. */
+async function load(page: Page, blocks: NodeJSON[]): Promise<void> {
+  await page.goto("/extension.html");
+  await page.evaluate(
+    (content) =>
+      window.__extension.load({
+        ...window.__extension.save(),
+        content: { type: "doc", content },
+      }),
+    blocks,
+  );
+}
+const para = (...content: NodeJSON[]): NodeJSON => ({ type: "paragraph", content });
+const text = (value: string, ...marks: string[]): NodeJSON => ({
+  type: "text",
+  text: value,
+  ...(marks.length ? { marks: marks.map((type) => ({ type })) } : {}),
+});
+const mention = (label: string, ...marks: string[]): NodeJSON => ({
+  type: "acme:mention",
+  attrs: { id: "u-1", label },
+  ...(marks.length ? { marks: marks.map((type) => ({ type })) } : {}),
+});
+const body = (page: Page) =>
+  page.evaluate(() => window.__extension.save().content.content as NodeJSON[]);
+
+test("T1 with a custom node: typing and formatting around it keep a valid document", async ({
+  page,
+}) => {
+  await load(page, [para(text("Hi "), mention("Ada"), text(" there"))]);
+  await editor(page).click();
+  await page.keyboard.press(`${MOD}+Home`);
+  for (let i = 0; i < 3; i++) await page.keyboard.press("ArrowRight");
+  // Typed right before the chip, then after it (the chip is one position).
+  await page.keyboard.type("dear ");
+  await page.keyboard.press("ArrowRight");
+  await page.keyboard.type("!");
+  await page.evaluate(() => window.__extension.check());
+  // Bold over the text and the chip together.
+  for (let i = 0; i < 7; i++) await page.keyboard.press("Shift+ArrowLeft");
+  await page.keyboard.press(`${MOD}+b`);
+  await page.evaluate(() => window.__extension.check());
+  expect(await body(page)).toEqual([
+    para(
+      text("Hi "),
+      text("dear ", "bold"),
+      mention("Ada", "bold"),
+      text("!", "bold"),
+      text(" there"),
+    ),
+  ]);
+  await expect(editor(page).locator(".acme-chip")).toHaveText("@Ada");
+});
+
+test("T2 with a custom node: a selection across it and mixed formatting is replaced and undone exactly", async ({
+  page,
+}) => {
+  await load(page, [
+    para(text("one "), text("two", "bold"), mention("Ada", "italic"), text(" three")),
+    para(text("four "), text("five", "italic")),
+  ]);
+  const original = await body(page);
+  await editor(page).click();
+  await page.keyboard.press(`${MOD}+Home`);
+  for (let i = 0; i < 5; i++) await page.keyboard.press("ArrowRight"); // "one t|wo"
+  for (let i = 0; i < 15; i++) await page.keyboard.press("Shift+ArrowRight"); // over the chip, to "four |five"
+  await expect
+    .poll(() => page.evaluate(() => window.__extension.selection()))
+    .toEqual({ anchor: 6, head: 22 });
+  await page.keyboard.type("X");
+  expect(await body(page)).toEqual([
+    para(text("one "), text("tX", "bold"), text("five", "italic")),
+  ]);
+  await expect(editor(page).locator(".acme-chip")).toHaveCount(0);
+  await page.keyboard.press(`${MOD}+z`);
+  expect(await body(page)).toEqual(original);
+  expect(await page.evaluate(() => window.__extension.selection())).toEqual({
+    anchor: 6,
+    head: 22,
+  });
+  await expect(editor(page).locator(".acme-chip")).toHaveText("@Ada");
+});
+
+test("a block node view taller than the room left splits across the page end, each part once", async ({
+  page,
+}) => {
+  const card: NodeJSON = { type: "acme:card", attrs: { id: "c-9" } };
+  const parts = editor(page).locator("[data-foli-custom='acme:card']");
+  // Fillers until the card no longer fits at the foot of the first page.
+  let split = false;
+  for (let n = 20; n <= 60 && !split; n += 2) {
+    await load(page, [
+      ...Array.from({ length: n }, (_, i) => para(text(`Filler ${i + 1}.`))),
+      card,
+      para(text("After")),
+    ]);
+    split = (await parts.count()) === 2;
+  }
+  expect(split).toBe(true);
+  const facts = await parts.evaluateAll((elements) =>
+    elements.map((el) => ({
+      page: [...document.querySelectorAll(".foli-page")].indexOf(
+        el.closest(".foli-page") as Element,
+      ),
+      hidden: el.getAttribute("aria-hidden"),
+      height: el.getBoundingClientRect().height,
+      whole: (el.querySelector(".acme-card") as Element).getBoundingClientRect().height,
+      clipped: getComputedStyle(el).overflow,
+    })),
+  );
+  const [first, second] = facts as [(typeof facts)[0], (typeof facts)[0]];
+  expect(second.page).toBe(first.page + 1);
+  expect([first.hidden, second.hidden]).toEqual([null, "true"]);
+  expect(first.clipped).toBe("hidden");
+  // The parts add up to the whole card, broken between two rows.
+  expect(Math.abs(first.height + second.height - first.whole)).toBeLessThan(1.5);
+  const rows = await parts
+    .first()
+    .locator(".acme-card-row")
+    .evaluateAll((elements) => elements.map((el) => el.getBoundingClientRect().height));
+  let sum = 0;
+  const ends = rows.map((h) => {
+    sum += h;
+    return sum;
+  });
+  expect(ends.some((end) => Math.abs(end - first.height) < 1.5)).toBe(true);
+  // Still one node: saved once, and the text after it on the next page.
+  expect((await body(page)).filter((node) => node.type === "acme:card")).toHaveLength(1);
+  await expect(editor(page).locator(".foli-page").nth(second.page)).toContainText("After");
+});
+
+test("decorations: every TODO and the paragraph holding the caret, never saved", async ({
+  page,
+}) => {
+  await page.goto("/extension.html");
+  await editor(page).click();
+  await page.keyboard.type("Fix TODO now and TODO later");
+  await expect(editor(page).locator(".acme-todo")).toHaveText(["TODO", "TODO"]);
+  const current = editor(page).locator(".acme-current");
+  await expect(current).toHaveCount(1);
+  await expect(current).toContainText("Fix TODO now");
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("Second");
+  await expect(current).toHaveText("Second");
+  await page.keyboard.press("ArrowUp");
+  await expect(current).toContainText("Fix TODO now");
+  const saved = await page.evaluate(() => JSON.stringify(window.__extension.save()));
+  expect(saved).not.toContain("acme-");
+});
+
+test("a plugin view: mounted with the view, updated by each change, destroyed with it", async ({
+  page,
+}) => {
+  await page.goto("/extension.html");
+  const status = page.getByRole("status");
+  await expect(status).toHaveText("0 words");
+  await editor(page).click();
+  await page.keyboard.type("one two three");
+  await expect(status).toHaveText("3 words");
+  expect(await page.evaluate(() => window.__extension.lifecycle.updates)).toBeGreaterThan(0);
+  await page.evaluate(() => window.__extension.destroy());
+  await expect(status).toHaveCount(0);
+  expect(await page.evaluate(() => window.__extension.lifecycle)).toMatchObject({
+    mounted: 1,
+    destroyed: 1,
+  });
+});
+
+test("the page with every view hook is axe-clean", async ({ page }) => {
+  await typeSample(page);
+  await page.keyboard.type(" TODO");
+  await page.evaluate(() => {
+    const saved = window.__extension.save();
+    window.__extension.load({
+      ...saved,
+      content: {
+        ...saved.content,
+        content: [...(saved.content.content ?? []), { type: "acme:card", attrs: { id: "c-2" } }],
+      },
+    });
+  });
+  await expect(editor(page).locator(".acme-card")).toHaveCount(1);
+  await expect(editor(page).locator(".acme-todo")).toHaveCount(1);
+  expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
 });
