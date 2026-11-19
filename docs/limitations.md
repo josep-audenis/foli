@@ -70,7 +70,9 @@ checklist in [testing/ime.md](testing/ime.md)):
 - Notes: a note's lines take no widow or orphan control and `w:continuationNotice` is not drawn. A
   reference kept verbatim in opaque content takes no number. Footnotes set beneath the text in a
   section with columns go to the foot. Options apply to the whole document, not to one section.
-  With columns Word sometimes ends an earlier column sooner than its notes require. Number formats
+  With columns Word sometimes ends an earlier column sooner than its notes require, and a
+  paragraph holding a reference at the end of a column can move to the next page where Word ends
+  the column with it. Number formats
   beyond Word's common ones show as decimal numbers. Shift+Alt+N is Foli's: Word has no such key.
 - No horizontal rule button (Word's rule is a paragraph's bottom border, kept and shown).
 - On Android, Backspace at a list paragraph's start may join it into the paragraph before
