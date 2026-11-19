@@ -115,7 +115,13 @@ import {
   useRef,
   useState,
 } from "react";
-import { useActiveEditor, useEditorOrContext, useEditorState } from "./editor.js";
+import {
+  development,
+  sameItems,
+  useActiveEditor,
+  useEditorOrContext,
+  useEditorState,
+} from "./editor.js";
 
 export interface FoliToolbarProps {
   /** Default: the editor of the nearest `FoliEditorProvider`. */
@@ -151,13 +157,8 @@ export interface FoliToolbarProps {
   className?: string | undefined;
 }
 
-/**
- * A toolbar button, built-in (`toolbarItems`) or the app's own: it runs `command`, or opens a
- * menu of `actions`. The toolbar keeps one tab stop for all its items (arrow keys, Home and End
- * move between them), gives toggles `aria-pressed` and a button that cannot apply now
- * `aria-disabled` (still focusable), and leaves the focus and selection in the document on click.
- */
-export interface ToolbarItem {
+/** What every toolbar item has. */
+interface ToolbarItemBase {
   /** Unique in the toolbar; also its class, `foli-toolbar-<key>`. */
   readonly key: string;
   /** What it does: the tooltip, and the accessible name when an `icon` stands for the text. */
@@ -167,26 +168,42 @@ export interface ToolbarItem {
   /** Shown instead of the text (a symbol or an SVG): `label` is then the accessible name. */
   readonly icon?: ReactNode | undefined;
   /**
+   * Whether it can be used now. Default: a button's dry run of its `command` (`editor.can`); for
+   * a menu, whether it has entries. Runs after every transaction: keep it cheap.
+   */
+  readonly enabled?: ((state: EditorState, editor: Editor) => boolean) | undefined;
+}
+
+/** A toolbar button that runs a command. */
+export interface ToolbarButton extends ToolbarItemBase {
+  /**
    * What a press runs, on the editor of the header, footer or note open on its page, else the
    * body's (as the built-in buttons do).
    */
-  readonly command?: Command | undefined;
+  readonly command: Command;
   /** A toggle: whether it shows as pressed (`aria-pressed`). Runs after every transaction. */
   readonly pressed?: ((state: EditorState, editor: Editor) => boolean) | undefined;
-  /**
-   * Whether it can be used now. Default: a dry run of `command` (`editor.can`), or true for a
-   * menu. Runs after every transaction: keep it cheap.
-   */
-  readonly enabled?: ((state: EditorState, editor: Editor) => boolean) | undefined;
-  /**
-   * A menu button: its entries, in order, or a function of the body's editor making them (as
-   * the built-in menus do). Each entry is dry-run when the menu opens.
-   */
-  readonly actions?:
-    | readonly ToolbarAction[]
-    | ((editor: Editor) => readonly ToolbarAction[])
-    | undefined;
+  readonly actions?: undefined;
 }
+
+/** A toolbar menu button: a WAI-ARIA menu of its `actions`. */
+export interface ToolbarMenu extends ToolbarItemBase {
+  /**
+   * Its entries, in order, or a function of the body's editor making them (as the built-in
+   * menus do). Each entry is dry-run when the menu opens; without entries the button is disabled.
+   */
+  readonly actions: readonly ToolbarAction[] | ((editor: Editor) => readonly ToolbarAction[]);
+  readonly command?: undefined;
+  readonly pressed?: undefined;
+}
+
+/**
+ * A toolbar item, built-in (`toolbarItems`) or the app's own: a button running a command, or a
+ * menu button. The toolbar keeps one tab stop for all its items (arrow keys, Home and End move
+ * between them), gives toggles `aria-pressed` and an item that cannot apply now `aria-disabled`
+ * (still focusable), and leaves the focus and selection in the document on click.
+ */
+export type ToolbarItem = ToolbarButton | ToolbarMenu;
 
 /** An entry of a toolbar menu (a `menuitem`, or a `menuitemcheckbox` when it has `checked`). */
 export interface ToolbarAction {
@@ -195,8 +212,8 @@ export interface ToolbarAction {
   readonly label: string;
   /** What it runs; a dry run when the menu opens decides whether it is enabled. */
   readonly command: Command;
-  /** A checkable entry: whether it is checked. */
-  readonly checked?: ((state: EditorState) => boolean) | undefined;
+  /** A checkable entry: whether it is checked (with the same arguments as `pressed`). */
+  readonly checked?: ((state: EditorState, editor: Editor) => boolean) | undefined;
 }
 
 /**
@@ -204,7 +221,9 @@ export interface ToolbarAction {
  * cheap `enabled`, not a dry run: that runs after every transaction, and a dry run builds the
  * whole transaction (for a block type over a large selection, quadratic in the number of blocks).
  */
-interface Item extends ToolbarItem {
+interface Item extends ToolbarItemBase {
+  command?: Command | undefined;
+  pressed?: ((state: EditorState, editor: Editor) => boolean) | undefined;
   /** A menu button: its options, the current value, and what picking one runs. */
   menu?: {
     options: readonly ColorOption[];
@@ -212,7 +231,7 @@ interface Item extends ToolbarItem {
     pick: (color: string | null) => Command;
   };
   /** An action menu button (the table menu): its commands, in order. */
-  actions?: readonly Action[] | ((editor: Editor) => readonly Action[]);
+  actions?: readonly Action[] | ((editor: Editor) => readonly Action[]) | undefined;
   /** A button opening a dialog (the picture's). */
   dialog?: "picture";
   /** A drop-down list (a `select`): its options, the current value, and what picking runs. */
@@ -1014,6 +1033,16 @@ export type ToolbarItemName =
   | "notes"
   | "controls";
 
+/** The built-in menu buttons of `actions` (the color menus and boxes are buttons to an app). */
+type ToolbarMenuName =
+  | "table"
+  | "section"
+  | "headerFooter"
+  | "fields"
+  | "navigate"
+  | "notes"
+  | "controls";
+
 /**
  * The built-in items by name, to place in `FoliToolbarProps.items` (an item's `key` is its name,
  * except the alignments: `align-start`, `align-center`, `align-end`, `align-justify`). A copy
@@ -1021,10 +1050,12 @@ export type ToolbarItemName =
  */
 export const toolbarItems = Object.fromEntries(
   GROUPS.flat().map((item) => [item.key.replace(/-(\w)/, (_, c: string) => c.toUpperCase()), item]),
-) as Readonly<Record<ToolbarItemName, ToolbarItem>>;
+) as unknown as {
+  readonly [Name in ToolbarItemName]: Name extends ToolbarMenuName ? ToolbarMenu : ToolbarButton;
+};
 
 /** The default toolbar: groups of `toolbarItems`, a separator between groups. */
-export const defaultToolbarItems: readonly (readonly ToolbarItem[])[] = GROUPS;
+export const defaultToolbarItems = GROUPS as unknown as readonly (readonly ToolbarItem[])[];
 
 interface LinkDialogState {
   /** The link at the selection when the dialog opened ("" for none). */
@@ -1056,18 +1087,31 @@ const sameStates = (a: ItemState[], b: ItemState[]) =>
  * an app's item without `enabled` gets a dry run of its command.
  */
 const statesOf =
-  (items: readonly Item[]) =>
+  (items: readonly Item[], body: Editor) =>
   (state: EditorState, editor: Editor): ItemState[] =>
     items.map((item) => ({
       pressed: item.pressed?.(state, editor),
       enabled: item.enabled
         ? item.enabled(state, editor)
-        : !item.command || item.actions !== undefined || editor.can(item.command),
+        : item.actions
+          ? actionsOf(item, body).length > 0
+          : !item.command || editor.can(item.command),
       value:
         item.menu?.value(state) ??
         item.select?.value(state) ??
         (item.dialog ? (selectedPicture(state) ? "edit" : "insert") : undefined),
     }));
+
+/** A menu button's entries (made from the body's editor when a function). */
+const actionsOf = (item: Item, body: Editor): readonly Action[] =>
+  typeof item.actions === "function" ? item.actions(body) : (item.actions ?? []);
+
+/** The same groups of the same items (an inline `items` array is not a change). */
+const sameGroups = (
+  a: readonly (readonly ToolbarItem[])[] | undefined,
+  b: readonly (readonly ToolbarItem[])[] | undefined,
+) =>
+  a === b || (!!a && !!b && a.length === b.length && a.every((group, i) => sameItems(group, b[i])));
 
 /**
  * Word's formatting controls for an editor (`defaultToolbarItems`, or `items`): paragraph
@@ -1093,15 +1137,22 @@ export function FoliToolbar({
   // A story open on its page takes the formatting commands; the body otherwise.
   const editor = useActiveEditor(body);
   // Without "New comment" where no comments pane lets a comment be written.
+  const lastGroups = useRef(itemGroups);
+  if (!sameGroups(lastGroups.current, itemGroups)) lastGroups.current = itemGroups;
+  const stableGroups = lastGroups.current;
   const { groups, items, selectStates } = useMemo(() => {
-    const groups = (itemGroups ?? GROUPS)
-      .map((group) =>
-        (group as readonly Item[]).filter((item) => comments || item.key !== "newComment"),
-      )
+    const groups = ((stableGroups ?? GROUPS) as readonly (readonly Item[])[])
+      .map((group) => group.filter((item) => comments || item.key !== "newComment"))
       .filter((group) => group.length > 0);
     const items = groups.flat();
-    return { groups, items, selectStates: statesOf(items) };
-  }, [itemGroups, comments]);
+    if (development()) {
+      const keys = items.map((item) => item.key);
+      const twice = keys.find((key, i) => keys.indexOf(key) !== i);
+      if (twice !== undefined)
+        console.warn(`FoliToolbar: two items have the key "${twice}"; each needs its own`);
+    }
+    return { groups, items, selectStates: statesOf(items, body) };
+  }, [stableGroups, comments, body]);
   const states = useEditorState(selectStates, { editor, isEqual: sameStates });
   const [focused, setActive] = useState(0);
   // The tab stop stays on the toolbar when items are taken away.
@@ -1131,6 +1182,7 @@ export function FoliToolbar({
       });
       return;
     }
+    if (item.actions && !actionsOf(item, body).length) return;
     if (item.menu || item.actions) {
       if (menu !== item.key) {
         setMenu(item.key);
@@ -1325,10 +1377,12 @@ export function FoliToolbar({
               const i = index++;
               const state = states[i];
               // Inserting a picture needs the app's upload; editing a selected one does not.
+              // A menu without entries cannot open, whatever its `enabled` says.
               const off =
                 disabled ||
                 !state?.enabled ||
-                (item.dialog === "picture" && state?.value === "insert" && !upload);
+                (item.dialog === "picture" && state?.value === "insert" && !upload) ||
+                (item.actions !== undefined && actionsOf(item, body).length === 0);
               if (item.select) {
                 const { select } = item;
                 const value = state?.value ?? "";
@@ -1414,15 +1468,15 @@ export function FoliToolbar({
                 </button>
               );
               if (item.actions) {
-                const actions =
-                  typeof item.actions === "function" ? item.actions(body) : item.actions;
+                const actions = actionsOf(item, body);
                 return (
                   <span key={item.key} className="foli-toolbar-menu">
                     {button}
-                    {menu === item.key && !disabled && (
+                    {menu === item.key && !disabled && actions.length > 0 && (
                       <ActionMenu
                         label={item.label}
                         actions={actions}
+                        editor={editor}
                         state={editor.state}
                         onPick={(action, pointer) => {
                           setMenu(null);
@@ -1788,12 +1842,15 @@ function LinkDialog({
 function ActionMenu({
   label,
   actions,
+  editor,
   state,
   onPick,
   onClose,
 }: {
   label: string;
   actions: readonly Action[];
+  /** For `checked`, with `state`. */
+  editor: Editor;
   state: EditorState;
   onPick: (action: Action, pointer: boolean) => void;
   onClose: (refocus: boolean) => void;
@@ -1856,7 +1913,7 @@ function ActionMenu({
             key={action.key}
             {...props}
             role="menuitemcheckbox"
-            aria-checked={action.checked(state)}
+            aria-checked={action.checked(state, editor)}
           >
             {action.label}
           </button>

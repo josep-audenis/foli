@@ -1572,14 +1572,12 @@ Each task is a PR on `phase-12/ecosystem`, the build green after each.
   `Item` extends `ToolbarItem`). App items share the built-ins' rendering: one tab stop (kept on
   the toolbar when items go away), arrows, Home, End, `aria-pressed`, `aria-disabled`, mousedown
   kept off the document's focus, `onClickCommand` on a click, ArrowDown opens a menu.
-  `useCommand(command, { editor? })` and `useCommand(name, ...args)` (a plugin's command, typed by
-  `FoliCommands`: names not in `BuiltInCommands`; the factory found in `state.plugins`, throws
-  when none has it) give `CommandState` `{ enabled, run }`. `plugins` and `extensions` stay read
+  `useCommand(command, { editor? })` and `useCommand(name, ...args)` (any named command, typed by `FoliCommands`; throws for an unknown name) give `CommandState` `{ enabled, run }`. `plugins` and `extensions` stay read
   once (ADR-0008: "take the same list once"): `useFoliEditor` compares them element by element
   and warns once outside production (`globalThis.process?.env?.NODE_ENV`, as ADR-0008's
   deprecation rule) that a new `key` is needed. Docs: api.md (toolbar items, hooks, props),
   getting started (a customized toolbar), React README, limitations. Tests: React
-  `items.test.tsx` (11, jsdom: names both ways, groups and roving tabindex, a custom item's dry
+  `items.test.tsx` (17 after the review, jsdom: names both ways, groups and roving tabindex, a custom item's dry
   run, `aria-pressed` and focus-keeping mousedown, an icon item, a custom menu and an entry added
   to Fields, `FoliEditor`'s `toolbar`, `useCommand` by command and by name, unknown name, the
   plugins and extensions warnings); e2e `toolbar-items.spec.ts` on `/toolbar.html` (new: built-in
@@ -1589,10 +1587,19 @@ Each task is a PR on `phase-12/ecosystem`, the build green after each.
   keyboard only (Shift+Tab in, End, wrapping arrows, visible focus, Enter runs and keeps focus,
   ArrowDown, Escape and Enter in the menu, Tab back to the caret): 9 passed in Chromium, Firefox
   and WebKit. No regression in the suites that use the toolbar or its menus (`toolbar`, `format`, `links`, `lists`, `lifecycle`, `view-options`, `visual`, `extension`, `word-columns`, `word-comments`, `word-controls`, `word-fields`, `word-format`, `word-headers`, `word-navigation`, `word-notes`, `word-pictures`, `word-review`, `word-sections`, `word-tables`): 534 passed, 18 skipped (the usual clipboard and IME skips) of 184 per engine in Chromium, Firefox and WebKit, visual snapshots unchanged. Sizes within budgets (React 154.4 of 157.0 kB). Shortcuts:
-  `useCommand(name)` dry-runs plugin commands only (built-in names have no factory to find);
   app items cannot be boxes, color menus or open dialogs; an item's dry run runs after every
   transaction, so its cost is the command's; changing `plugins` is warned about, not supported;
-  the warning reads `NODE_ENV` through `globalThis`, which bundlers do not replace statically.)
+  the warning reads `NODE_ENV` through `globalThis`, which bundlers do not replace statically, so
+  a bundle without `process` shows it in production too (documented as such). Review of #126:
+  `useCommand` acts on the story open on its page, as the toolbar does; it keeps one command and
+  selector per editor, target and arguments, so `useEditorState` keeps its answer across
+  renders; `useCommand(name)` takes any name of `editor.commands`, built-in too (core keeps each
+  editor's command factories; `editorCommand` in `@folijs/core/internal`; `setControlValue`'s
+  became a command that dry-runs over the body and its stories); `ToolbarItem` is a union of
+  `ToolbarButton` (`command`, `pressed`) and `ToolbarMenu` (`actions`), the built-in menus typed
+  as menus, and `checked` takes `(state, editor)` like `pressed`; a menu without entries is
+  disabled and never opens; inline `items` of the same items reuse the selector; two items with
+  one key warn in development; tests for each, and for no dry run by the default toolbar.)
 - [ ] 12.7 Performance tracking: the layout, keystroke, find, `.docx` import and export and PDF
   benchmarks with stored baselines per engine and machine, thresholds, a summary that fails on a
   regression, run where ADR-0008 says; `docs/benchmarks.md` rerun for 1.0 with method and hardware.

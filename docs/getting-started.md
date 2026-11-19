@@ -214,7 +214,7 @@ name from `toolbarItems`, and your own, enabled by their command's dry run. `use
 button of your own the same (`{ enabled, run }`):
 
 ```tsx
-import { toggleMark, undo } from "@folijs/core";
+import { toggleMark } from "@folijs/core";
 import { FoliEditor, type ToolbarItem, toolbarItems, useCommand } from "@folijs/react";
 
 const crossOut: ToolbarItem = {
@@ -226,7 +226,7 @@ const crossOut: ToolbarItem = {
 };
 
 function UndoButton() {
-  const { enabled, run } = useCommand(undo);
+  const { enabled, run } = useCommand("undo"); // or useCommand(undo); acts on an open header too
   return (
     <button type="button" disabled={!enabled} onMouseDown={(e) => e.preventDefault()} onClick={run}>
       Undo
@@ -252,7 +252,8 @@ export function App() {
 Your items keep the toolbar's keyboard use (one tab stop, arrow keys), `aria-pressed`, and the
 document's focus and selection on click. A menu of your own is an item with `actions` ([api.md](api.md#toolbar-items)).
 `plugins` and `extensions` are read once, when the editor is created: to change them, give
-`FoliEditor` a new `key` (a changed list is otherwise ignored, with a warning in development).
+`FoliEditor` a new `key` (a changed list is otherwise ignored, with a warning unless
+`process.env.NODE_ENV` is `"production"` at run time).
 
 ## Keyboard
 

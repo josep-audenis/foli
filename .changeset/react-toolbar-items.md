@@ -9,17 +9,20 @@ Toolbar items and command hooks (ADR-0008):
   `toolbarItems` (`toolbarItems.bold`, `toolbarItems.table`…) and the default toolbar as
   `defaultToolbarItems`, so an app adds, removes, reorders and regroups them. Without `items`
   the toolbar is as before.
-- An app's item (`ToolbarItem`) runs a command and is enabled by its dry run (`editor.can`), or by
-  its own `enabled`; `pressed` makes it a toggle; `icon` stands for its text. With `actions`
-  (`ToolbarAction`s) it is a menu button like the built-in menus, which take more entries the
-  same way. App items keep the toolbar's one tab stop, arrow keys, `aria-pressed`,
+- An app's item (`ToolbarItem`) is a `ToolbarButton` that runs a command, enabled by its dry run
+  (`editor.can`) or its own `enabled`, a toggle with `pressed`; or a `ToolbarMenu` of `actions`
+  (`ToolbarAction`s, `checked(state, editor)` for a checkbox entry) like the built-in menus,
+  which take more entries the same way (a menu without entries is disabled). `icon` stands for
+  the text. Two items with one `key` log a warning in development. App items keep the toolbar's one tab stop, arrow keys, `aria-pressed`,
   `aria-disabled` and the document's focus and selection on click.
 - `useCommand(command)` gives `{ enabled, run }` for a button of the app's own: a dry run after
-  every transaction, and a way to run it. `useCommand(name, ...args)` does the same for a
-  plugin's command by name, typed by `FoliCommands`.
+  every transaction, and a way to run it, on the header, footer or note open on its page, else
+  the editor. `useCommand(name, ...args)` does the same for any named command of
+  `editor.commands` (built-in or a plugin's), typed by `FoliCommands`.
 - `plugins` and `extensions` stay read once: changing them after mount now logs one warning
-  outside production (a new array of the same plugins is no change). Give the component a new
+  unless `process.env.NODE_ENV` is `"production"` at run time (a new array of the same plugins is no change). Give the component a new
   `key` to create an editor with them.
 
-New names: `toolbarItems`, `defaultToolbarItems`, `ToolbarItem`, `ToolbarAction`,
+New names: `toolbarItems`, `defaultToolbarItems`, `ToolbarItem`, `ToolbarButton`, `ToolbarMenu`,
+`ToolbarAction`,
 `ToolbarItemName`, `useCommand`, `UseCommandOptions`, `CommandState`.

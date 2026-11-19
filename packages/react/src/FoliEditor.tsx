@@ -42,8 +42,9 @@ export interface FoliEditorProps extends Omit<FoliCanvasProps, "editor"> {
    */
   initialContent?: EditorDocument | undefined;
   /**
-   * Read once on mount: a different list later is ignored, with a warning outside production
-   * (`useFoliEditor`). To change them, give `FoliEditor` a new `key`.
+   * Read once on mount: a different list later is ignored, with a warning unless
+   * `process.env.NODE_ENV` is `"production"` at run time (`useFoliEditor`). To change them, give
+   * `FoliEditor` a new `key`.
    */
   plugins?: readonly Plugin[] | undefined;
   /**

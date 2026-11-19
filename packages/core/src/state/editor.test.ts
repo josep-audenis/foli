@@ -13,6 +13,7 @@ import {
   deleteSelection,
   type Editor,
   EditorState,
+  editorCommand,
   insertText,
   Plugin,
   PluginKey,
@@ -351,6 +352,19 @@ describe("plugins", () => {
     expect(editor.commands.insertText("!")).toBe(true);
     expect(content(editor)).toEqual(docJSON(para("abab!")));
     expect(editor.can(repeat("x", 1))).toBe(true);
+
+    // The command a name stands for, for a dry run (React's `useCommand`): nothing runs.
+    const dry = (name: string, ...args: unknown[]) => {
+      const command = editorCommand(editor, name, args);
+      return command && editor.can(command);
+    };
+    expect(dry("repeat", "y", 1)).toBe(true);
+    expect(dry("never")).toBe(false);
+    expect(dry("undo")).toBe(true);
+    expect(dry("setControlValue", "missing", "x")).toBe(false);
+    expect(editorCommand(editor, "nothing", [])).toBeUndefined();
+    expect(editorCommand(editor, "toString", [])).toBeUndefined();
+    expect(content(editor)).toEqual(docJSON(para("abab!")));
   });
 
   it("refuse a command name taken twice or by a built-in command", () => {

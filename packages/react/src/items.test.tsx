@@ -4,13 +4,16 @@ import {
   createDocument,
   createEditor,
   deleteSelection,
+  type FoliDocument,
   insertText,
+  type OpenStory,
   Plugin,
   PluginKey,
   TextSelection,
   undo,
 } from "@folijs/core";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   defaultToolbarItems,
@@ -211,6 +214,45 @@ describe("toolbar items", () => {
     expect(names.at(-1)).toBe("Insert a greeting");
   });
 
+  it("disables a menu without entries and never opens it", () => {
+    const editor = createEditor({ document: doc() });
+    render(
+      <FoliToolbar
+        editor={editor}
+        items={[[{ key: "empty", label: "Empty", actions: [], enabled: () => true }]]}
+      />,
+    );
+    const button = screen.getByRole("button", { name: "Empty" });
+    expect(button.getAttribute("aria-disabled")).toBe("true");
+    fireEvent.click(button);
+    fireEvent.keyDown(button, { key: "ArrowDown" });
+    expect(screen.queryByRole("menu")).toBeNull();
+  });
+
+  it("warns once about two items with one key, outside production", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const editor = createEditor({ document: doc() });
+    render(<FoliToolbar editor={editor} items={[[clear], [{ ...clear, label: "Again" }]]} />);
+    expect(warn).toHaveBeenCalledOnce();
+    expect(warn.mock.calls[0]?.[0]).toContain('two items have the key "clear"');
+    warn.mockRestore();
+  });
+
+  it("dry-runs nothing for the built-in items, and keeps inline groups of the same items", () => {
+    const editor = createEditor({ document: doc() });
+    const can = vi.spyOn(editor, "can");
+    const { rerender } = render(<FoliToolbar editor={editor} />);
+    act(() => void editor.run(insertText("x")));
+    selectAll(editor);
+    expect(can).not.toHaveBeenCalled();
+
+    // An inline array of the same items: no new selector, so no dry run on a mere re-render.
+    rerender(<FoliToolbar editor={editor} items={[[clear]]} />);
+    const calls = can.mock.calls.length;
+    rerender(<FoliToolbar editor={editor} items={[[clear]]} />);
+    expect(can.mock.calls.length).toBe(calls);
+  });
+
   it("takes the items through FoliEditor's toolbar prop", () => {
     render(<FoliEditor initialContent={doc()} toolbar={[[toolbarItems.bold, clear]]} />);
     expect(
@@ -237,8 +279,102 @@ function ShoutButton() {
   );
 }
 
+function UndoByName() {
+  const { enabled, run } = useCommand("undo");
+  return (
+    <button type="button" disabled={!enabled} onClick={run}>
+      Undo
+    </button>
+  );
+}
+
+/** A document with a default header holding "Head". */
+const withHeader: FoliDocument = {
+  ...doc(),
+  section: { headers: { default: "h" } },
+  stories: {
+    h: {
+      kind: "header",
+      content: {
+        type: "doc",
+        content: [{ type: "paragraph", content: [{ type: "text", text: "Head" }] }],
+      },
+    },
+  },
+};
+
+/** Re-renders `ShoutParent` with nothing changed. */
+let bump = () => {};
+function ShoutParent() {
+  const [, set] = useState(0);
+  bump = () => set((n) => n + 1);
+  return <ShoutButton />;
+}
+
 describe("useCommand", () => {
   afterEach(cleanup);
+
+  it("runs a built-in command by name, typed by FoliCommands", () => {
+    const editor = createEditor({ document: doc() });
+    render(
+      <FoliEditorProvider editor={editor}>
+        <UndoByName />
+      </FoliEditorProvider>,
+    );
+    const button = screen.getByRole("button") as HTMLButtonElement;
+    expect(button.disabled).toBe(true);
+    act(() => void editor.commands.insertText("x"));
+    expect(button.disabled).toBe(false);
+    act(() => fireEvent.click(button));
+    expect(text(editor)).toBe("Hello");
+  });
+
+  it("acts on the header open on its page, as the toolbar does", () => {
+    const editor = createEditor({ document: withHeader });
+    let open: OpenStory | null = null;
+    editor.storyView = {
+      get open() {
+        return open;
+      },
+      edit: () => false,
+      close: () => {},
+      editNote: () => false,
+      toReference: () => false,
+      fieldLayout: null,
+      updateFields: () => ({ updated: 0, unchanged: 0, rebuilt: 0, skipped: [] }),
+      showMatches: () => {},
+      reveal: () => false,
+      goToPage: () => false,
+      focus: () => {},
+    };
+    const star = insertText("*");
+    render(
+      <FoliEditorProvider editor={editor}>
+        <CommandButton command={star} />
+      </FoliEditorProvider>,
+    );
+    act(() => {
+      open = { id: "h", side: "header", variant: "default", section: 0 };
+      editor.storyChanged();
+    });
+    act(() => fireEvent.click(screen.getByRole("button")));
+    expect(editor.story("h")?.state.doc.textContent).toBe("*Head");
+    expect(text(editor)).toBe("Hello");
+  });
+
+  it("keeps its dry run's answer across renders with the same command and arguments", () => {
+    const editor = createEditor({ document: doc(), plugins: [shouting] });
+    const can = vi.spyOn(editor, "can");
+    render(
+      <FoliEditorProvider editor={editor}>
+        <ShoutParent />
+      </FoliEditorProvider>,
+    );
+    const calls = can.mock.calls.length;
+    act(() => bump());
+    act(() => bump());
+    expect(can.mock.calls.length).toBe(calls);
+  });
 
   it("dry-runs a command after each transaction and runs it", () => {
     const editor = createEditor({ document: doc() });
@@ -271,7 +407,7 @@ describe("useCommand", () => {
     expect(button.disabled).toBe(true);
   });
 
-  it("throws for a name no plugin has", () => {
+  it("throws for a name the editor does not have", () => {
     const editor = createEditor({ document: doc() });
     vi.spyOn(console, "error").mockImplementation(() => {});
     expect(() =>
@@ -280,7 +416,7 @@ describe("useCommand", () => {
           <ShoutButton />
         </FoliEditorProvider>,
       ),
-    ).toThrow('no plugin has a command named "shout"');
+    ).toThrow('the editor has no command named "shout"');
     vi.restoreAllMocks();
   });
 });

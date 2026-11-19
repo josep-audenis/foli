@@ -56,6 +56,7 @@ export {
   type EditorDocument,
   type EditorListener,
   type EditorOptions,
+  editorCommand,
   type FoliCommands,
   type FoundMatches,
   type NavigationRequest,

@@ -23,7 +23,9 @@ export {
   FoliToolbar,
   type FoliToolbarProps,
   type ToolbarAction,
+  type ToolbarButton,
   type ToolbarItem,
   type ToolbarItemName,
+  type ToolbarMenu,
   toolbarItems,
 } from "./FoliToolbar.js";
