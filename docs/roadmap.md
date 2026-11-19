@@ -1270,8 +1270,8 @@ Each task is a PR on `phase-11/sections-fields`, the build green after each.
   sizes and text, and the same ink but where the renderers draw differently. Shortcuts: a field's
   page is its block's first page; the editor's print and the PDF differ in a table's repeated
   header rows (plain text in the editor), change bars (the editor's only) and a few words where a
-  paragraph continues in a column of another width (08); Puppeteer not tested; no dot leaders;
-  comments not printed.)
+  paragraph continues in a column of another width (08); Puppeteer typed, not run; pictures only
+  from bytes or `data:` URLs (the page loads nothing); no dot leaders; comments not printed.)
 - [ ] 11.13 Close: docs (ADR-0007 outcome, architecture, document model, pagination, api, docx
   README, limitations), size budgets, the acceptance above checked with the harness, the 0.6.0
   changeset (schema v5: 0.5.0 cannot read documents saved by 0.6.0), the version PR; publish

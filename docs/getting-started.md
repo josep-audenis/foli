@@ -321,7 +321,8 @@ const { pdf } = await exportPdf(document, { page: await browser.newPage() });
 await browser.close();
 ```
 
-The machine that prints needs the document's fonts (or `@font-face` rules in `styles`), and the
+The machine that prints needs the document's fonts (or `@font-face` rules with `data:` URLs in
+`styles`: the page loads nothing from the network), and the
 pictures' images come through `resources`: see the
 [package README](../packages/pdf/README.md).
 

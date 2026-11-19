@@ -45,6 +45,23 @@ function makeLinks(root: HTMLElement): void {
   }
 }
 
+/** How long the images may take to decode: one that has not by then prints without its image. */
+const IMAGE_WAIT = 10_000;
+
+/** Waits for the pages' images, at most `IMAGE_WAIT`; those still loading lose their source. */
+export async function imagesLoaded(doc: Document): Promise<void> {
+  const pending = [...doc.images].filter((image) => !image.complete);
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  await Promise.race([
+    Promise.all(pending.map((image) => image.decode().catch(() => null))),
+    new Promise((resolve) => {
+      timer = setTimeout(resolve, IMAGE_WAIT);
+    }),
+  ]);
+  clearTimeout(timer);
+  for (const image of pending) if (!image.complete) image.removeAttribute("src");
+}
+
 async function render({ document: json, images, review, styles }: RenderInput): Promise<Rendered> {
   const doc = window.document;
   const style = doc.createElement("style");
@@ -53,7 +70,8 @@ async function render({ document: json, images, review, styles }: RenderInput): 
   // Fonts first: the layout measures text in them.
   await Promise.all([...doc.fonts].map((face) => face.load().catch(() => null)));
   const container = doc.body;
-  const resource = (key: string) => images[key];
+  // Never the resource's own URL: only what `exportPdf` made into `data:` URLs (null: a box).
+  const resource = (key: string) => images[key] ?? null;
   const show = (document: RenderInput["document"]): DocumentPages =>
     renderDocument(document, container, { review, resource });
   const document = parseDocument(json);
@@ -78,9 +96,7 @@ async function render({ document: json, images, review, styles }: RenderInput): 
   const print = doc.createElement("style");
   print.textContent = pages.printStyles();
   doc.head.append(print);
-  await Promise.all(
-    [...doc.images].map((image) => (image.complete ? null : image.decode().catch(() => null))),
-  );
+  await imagesLoaded(doc);
   await doc.fonts.ready;
   return { pages: pages.pages.length, fields: report };
 }

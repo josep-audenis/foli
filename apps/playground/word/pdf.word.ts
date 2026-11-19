@@ -12,13 +12,11 @@ import { join } from "node:path";
 import { importDocx } from "@folijs/docx";
 import { exportPdf } from "@folijs/pdf";
 import { test } from "@playwright/test";
-import { cloudFaces, fontFaces } from "./fonts.js";
+import { cloudFaces, inlineFontFaces } from "./fonts.js";
 
 const ROOT = new URL("../../../", import.meta.url);
 const CORPUS = new URL("corpus/word/", ROOT);
 const PDF_DIR = process.env.FOLI_WORD_PDF;
-/** Another origin for the fonts: the PDF's page is `about:blank`. */
-const FONT_ORIGIN = "http://fonts.foli.localhost";
 
 interface Compared {
   sizes: number[][];
@@ -42,6 +40,8 @@ test.skip(!PDF_DIR, "FOLI_WORD_PDF names no folder of Word's PDFs");
 
 const names = readdirSync(CORPUS).filter((n) => n.endsWith(".docx"));
 const faces = cloudFaces();
+/** `exportPdf`'s page loads nothing: the fonts go in as `data:` URLs. */
+const fontStyles = PDF_DIR ? inlineFontFaces(faces) : "";
 
 for (const name of names) {
   test(name, async ({ page, context }) => {
@@ -55,7 +55,7 @@ for (const name of names) {
       page: printing,
       review: "final",
       resources: (_key, resource) => (resource.part ? pkg.part(`/${resource.part}`) : undefined),
-      styles: await fontFaces(printing, faces, FONT_ORIGIN),
+      styles: fontStyles,
     });
     await printing.close();
     await page.goto("/word.html");
