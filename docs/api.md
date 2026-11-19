@@ -505,13 +505,13 @@ value or shown text (a combo box takes any text, a drop-down list only its items
 
 Find and replace (11.11), by the rules Word was seen to follow (ADR-0007):
 
-| Function                                    | Does                                                                                                                                  |
-| ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| `findAll(editorOrDocument, query, options?)` | `FindMatch[]` (`story`, null for the body; `from`, `to`; `text`), the body then each story. `matchCase`, `wholeWord`                 |
-| `replace(editor, match, text, options?)`    | One match, the caret after it                                                                                                         |
-| `replaceAll(editor, query, text, options?)` | Every match, in every story: one undo step, tracked when tracking is on                                                               |
-| `nextMatch(editor, matches, backward?)`     | The match after (before) the selection, around the end                                                                                |
-| `findInText(text, query, options?)`         | The same matching over a plain string: `[from, to]` pairs                                                                             |
+| Function                                     | Does                                                                                                                 |
+| -------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `findAll(editorOrDocument, query, options?)` | `FindMatch[]` (`story`, null for the body; `from`, `to`; `text`), the body then each story. `matchCase`, `wholeWord` |
+| `replace(editor, match, text, options?)`     | One match, the caret after it                                                                                        |
+| `replaceAll(editor, query, text, options?)`  | Every match, in every story: one undo step, tracked when tracking is on                                              |
+| `nextMatch(editor, matches, backward?)`      | The match after (before) the selection, around the end                                                               |
+| `findInText(text, query, options?)`          | The same matching over a plain string: `[from, to]` pairs                                                            |
 
 What is found is what shows: a field's code only while codes are shown (its result then not), text
 deleted as a tracked change only in the `markup` review view, no control's placeholder, no hidden
@@ -527,15 +527,15 @@ Regular expressions are not offered: a pattern can hang the page.
 
 Bookmarks and the outline:
 
-| Function                                 | Does                                                                                                                  |
-| ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| `insertBookmark(editor, name, range?)`   | Over the selection or `range` of that editor's tree (a caret: a point). A name in use, in any case or story, moves it |
-| `renameBookmark(editor, name, next)`     | With the `REF`, `PAGEREF`, `NOTEREF` and links that point at it                                                       |
-| `deleteBookmark(editor, name)`           | Whichever tree it is in; true when it went                                                                            |
-| `listBookmarks(editorOrState, options?)` | `name`, `story`, `from`, `to`, `text`, `hidden`; `{ hidden: true }` adds Word's own (`_Toc…`, `_Ref…`)                |
-| `isBookmarkName(name)`                   | A letter, then letters, digits and `_`, 40 at most                                                                    |
-| `goTo(editor, { story, from, to }, options?)` | Selects it and shows it, through the view when there is one (`focus`: the document takes the focus)              |
-| `documentOutline(state, layout?)`        | `pos`, `level`, `text`, `number`, `page` (with `editor.storyView.fieldLayout`): the body's headings, by the rule of a table of contents with `\o` and `\u` |
+| Function                                      | Does                                                                                                                                                       |
+| --------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `insertBookmark(editor, name, range?)`        | Over the selection or `range` of that editor's tree (a caret: a point). A name in use, in any case or story, moves it                                      |
+| `renameBookmark(editor, name, next)`          | With the `REF`, `PAGEREF`, `NOTEREF` and links that point at it                                                                                            |
+| `deleteBookmark(editor, name)`                | Whichever tree it is in; true when it went                                                                                                                 |
+| `listBookmarks(editorOrState, options?)`      | `name`, `story`, `from`, `to`, `text`, `hidden`; `{ hidden: true }` adds Word's own (`_Toc…`, `_Ref…`)                                                     |
+| `isBookmarkName(name)`                        | A letter, then letters, digits and `_`, 40 at most                                                                                                         |
+| `goTo(editor, { story, from, to }, options?)` | Selects it and shows it, through the view when there is one (`focus`: the document takes the focus)                                                        |
+| `documentOutline(state, layout?)`             | `pos`, `level`, `text`, `number`, `page` (with `editor.storyView.fieldLayout`): the body's headings, by the rule of a table of contents with `\o` and `\u` |
 
 The first three return `{ ok: true, bookmark }` or `{ ok: false, reason }` (`invalid-name`,
 `no-place`, `missing`, `exists`, `refused`), except `deleteBookmark`. Bookmarks are not tracked, as

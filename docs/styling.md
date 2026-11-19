@@ -89,8 +89,8 @@ pages should print white.
 | `.foli-table-dialog`               | the insert table dialog (also `.foli-link-dialog`)                                                                                                       |
 | `.foli-picture-dialog`             | the picture dialog (also `.foli-link-dialog`); `.foli-picture-status` its status line while a picture uploads                                            |
 | `.foli-editor-body`                | `FoliEditor`'s row of pages and comments pane (make it, or a parent, the scroller: the pane scrolls with the pages)                                      |
-| `.foli-find-panel`                 | the find and replace panel and the bookmarks dialog (`.foli-bookmarks`), also `.foli-link-dialog`; fixed at the window's top right |
-| `.foli-outline`                    | the outline, a column beside the pages                                                            |
+| `.foli-find-panel`                 | the find and replace panel and the bookmarks dialog (`.foli-bookmarks`), also `.foli-link-dialog`; fixed at the window's top right                       |
+| `.foli-outline`                    | the outline, a column beside the pages                                                                                                                   |
 | `.foli-comments`                   | `FoliComments`, the pane (`className` is added here); `.foli-comment-thread` each thread (`[data-active]`, `[data-done]`), `.foli-comment` each comment  |
 | `.foli-comment-active`             | text of the comment whose thread has the focus (in the document)                                                                                         |
 
