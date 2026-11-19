@@ -9,21 +9,21 @@ leaves `main` green with a working playground.
 **Update this table in the same PR that starts, advances or finishes a phase.** It is the only
 place that says what is in progress; check it before starting work.
 
-| Phase                    | Status                   | Branch         | Notes                                                                                      |
-| ------------------------ | ------------------------ | -------------- | ------------------------------------------------------------------------------------------ |
-| 0 Foundation             | ✅ Done                  | —              |                                                                                            |
-| 1 Architecture spike     | ✅ Done (G1 provisional) | —              | Merged in #1; ADR-0003 accepted provisionally; IME, dead-key and screen-reader checks open |
-| 2 Document model         | ✅ Done                  | —              | Merged in #2                                                                               |
-| 3 Transactions & history | ✅ Done                  | —              | Merged in #4; gate G2 passed                                                               |
-| 4 Editor view            | ✅ Done (G3 provisional) | —              | Merged in #8–#13; manual checks (4.6) deferred, open risks in ADR-0003                     |
-| 5 Native pagination      | ✅ Done (G4 provisional) | —              | Merged in #15–#22; page-break manual checks open, risks in ADR-0003                        |
-| 6 React API & 0.1.0      | ✅ Done                  | —              | Merged in #23–#31; 0.1.0 on npm; manual checks shipped as known risks (ADR-0003)           |
-| 7 Rich content           | ✅ Done                  | —              | Merged in #33–#41; 0.2.0 on npm; list-document benchmark misses accepted (known limit)     |
-| 8 Word model & DOCX      | ✅ Done                  | —              | Merged in #44–#61; 0.3.0 on npm (`@folijs/docx` first released); gate G5 passed            |
-| 9 Review                 | ✅ Done                  | —              | Merged in #63–#72; 0.4.0 on npm                                                            |
-| 10 Tables & images       | ✅ Done                  | —              | Merged in #73–#97 (#90, the landing page, went to main); 0.5.0 on npm; two misses accepted |
-| 11 Sections & templates  | In review                | phase-11/close | Merged in #100–#116; close (11.13) in review; 0.6.0 waits for the owner                    |
-| 12 Ecosystem & 1.0       | Not started              |                |                                                                                            |
+| Phase                    | Status                   | Branch                   | Notes                                                                                                                           |
+| ------------------------ | ------------------------ | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------- |
+| 0 Foundation             | ✅ Done                  | —                        |                                                                                                                                 |
+| 1 Architecture spike     | ✅ Done (G1 provisional) | —                        | Merged in #1; ADR-0003 accepted provisionally; IME, dead-key and screen-reader checks open                                      |
+| 2 Document model         | ✅ Done                  | —                        | Merged in #2                                                                                                                    |
+| 3 Transactions & history | ✅ Done                  | —                        | Merged in #4; gate G2 passed                                                                                                    |
+| 4 Editor view            | ✅ Done (G3 provisional) | —                        | Merged in #8–#13; manual checks (4.6) deferred, open risks in ADR-0003                                                          |
+| 5 Native pagination      | ✅ Done (G4 provisional) | —                        | Merged in #15–#22; page-break manual checks open, risks in ADR-0003                                                             |
+| 6 React API & 0.1.0      | ✅ Done                  | —                        | Merged in #23–#31; 0.1.0 on npm; manual checks shipped as known risks (ADR-0003)                                                |
+| 7 Rich content           | ✅ Done                  | —                        | Merged in #33–#41; 0.2.0 on npm; list-document benchmark misses accepted (known limit)                                          |
+| 8 Word model & DOCX      | ✅ Done                  | —                        | Merged in #44–#61; 0.3.0 on npm (`@folijs/docx` first released); gate G5 passed                                                 |
+| 9 Review                 | ✅ Done                  | —                        | Merged in #63–#72; 0.4.0 on npm                                                                                                 |
+| 10 Tables & images       | ✅ Done                  | —                        | Merged in #73–#97 (#90, the landing page, went to main); 0.5.0 on npm; two misses accepted                                      |
+| 11 Sections & templates  | In review                | phase-11/sections-fields | Merged in #100–#116 (#106, #107, #110, #112 and #113, the site, went to main); close (11.13) in #117; 0.6.0 waits for the owner |
+| 12 Ecosystem & 1.0       | Not started              |                          |                                                                                                                                 |
 
 Status values: `Ready` (dependencies met, nobody on it) · `In progress` · `In review` (PR open) ·
 `✅ Done` (merged, acceptance criteria met) · `Blocked by …`.
@@ -1309,7 +1309,7 @@ Each task is a PR on `phase-11/sections-fields`, the build green after each.
 - [ ] 11.13 Close: docs (ADR-0007 outcome, architecture, document model, pagination, api, docx
   README, limitations), size budgets, the acceptance above checked with the harness, the 0.6.0
   changeset (schema v5: 0.5.0 cannot read documents saved by 0.6.0), the version PR; publish
-  with the owner's approval. (Done on `phase-11/close`: docs as of 0.6.0 (README, document model
+  with the owner's approval. (Done in #117: docs as of 0.6.0 (README, document model
   with schema v5's envelope, pagination, architecture, api, getting started, limitations,
   benchmarks' bundle sizes, ADR-0007's outcome and status, docx, React and corpus READMEs);
   budgets unchanged, every Phase 11 raise with its reason in a shorter `scripts/size.mjs` comment

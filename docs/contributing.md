@@ -60,7 +60,8 @@ of one of these alone is noise; anything else is a real failure.
 
 ## Releasing
 
-`@folijs/core`, `@folijs/view`, `@folijs/react` and `@folijs/docx` always share one version (a
+`@folijs/core`, `@folijs/view`, `@folijs/react`, `@folijs/docx` and `@folijs/pdf` always share one
+version (a
 Changesets `fixed` group, [`.changeset/config.json`](../.changeset/config.json)); the
 playground, spike and examples are never published.
 

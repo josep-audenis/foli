@@ -1052,8 +1052,9 @@ Planned, created only when needed:
 - `pnpm check` also runs `publint --strict` on every package (exports, `files`, types) and
   `pnpm size`: each package's published entry bundled as an app would (fully minified, its
   Foli dependencies included, React external), and an app importing only `FoliEditor`, against
-  gzip budgets in `scripts/size.mjs` (core 47.9 kB, view 57.1 kB, react 76.2 kB, docx 41.0 kB;
-  each raise and its reason is recorded there).
+  gzip budgets in `scripts/size.mjs` (as of 0.6.0: core 85.9 kB, view 107.9 kB, react 151.4 kB,
+  docx 57.0 kB, pdf 18.4 kB and its renderer bundle 95.2 kB; each raise and its reason is recorded
+  there).
 - `pnpm examples` installs the packed tarballs into `examples/vite` (React 18, strict
   TypeScript) and `examples/next` (React 19, server rendering) with npm, builds them, and runs
   the success criterion in Playwright; see [examples/README.md](../examples/README.md).

@@ -157,7 +157,7 @@ JSON: the style, then the defaults, decide (`Resolver` in `v3/resolve.ts`, 8.6).
 | `fieldStart` (`dirty`, `locked`, `simple`, `ext`), `fieldCode` (`text`, `attributes`), `fieldSeparator`, `fieldEnd` (v5) | a field as Word has it (ADR-0007): the code from the start to the separator (or the end), hidden with any field nested in it; the result as ordinary content after the separator, written by `updateFields`                                                                                                                      |
 | `controlStart`, `controlEnd` (`id`, v5)                                                                                  | an inline content control's ends; its properties are `controls[id]`. Blocks, rows and cells list theirs in `controls`, outermost first                                                                                                                                                                                           |
 | `noteReference` (`story`, `customMark`, `attributes`, v5), `noteMark` (v5)                                               | a note's reference, and where a note shows its number                                                                                                                                                                                                                                                                            |
-| `opaqueInline`                                                                                                           | `xml`, `label`, `run` (content of a run, written back inside one): fields, charts, shapes, symbols… until modeled                                                                                                                                                                                                                |
+| `opaqueInline`                                                                                                           | `xml`, `label`, `run` (content of a run, written back inside one): charts, shapes, symbols… until modeled                                                                                                                                                                                                                        |
 
 Marks, in canonical order: `link` (`href` as the file has it, `anchor`, `tooltip`,
 `attributes`), `insertion` and `deletion` (`id`, `author`, `date`, `move`: tracked changes and
@@ -445,7 +445,7 @@ Migrations never drop content. A published version never changes in place.
 | 2       | 0.2.0       | v2 → v3 (`migrateToV3`, 8.3): Word's model                                                                           |
 | 3       | 0.3.0       | v3 → v4 (`migrateToV4`): only the version changes (a table kept opaque stays so until its `.docx` is imported again) |
 | 4       | 0.5.0       | v4 → v5 (`migrateToV5`): only the version changes (what is opaque stays so until its `.docx` is imported again)      |
-| 5       | 0.6.0       | — (the current version: `stories`, `controls`, `settings`, fields, content controls, notes, columns)                 |
+| 5       | (0.6.0)     | — (the current version: `stories`, `controls`, `settings`, fields, content controls, notes, columns)                 |
 
 0.1.0 reads only version 1: it rejects documents saved by 0.2.0 ("Unsupported schemaVersion: 2").
 0.2.0 reads versions 1 and 2: it rejects documents saved by 0.3.0.
