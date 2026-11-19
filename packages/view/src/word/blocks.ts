@@ -940,7 +940,14 @@ function renderInline(
         parent.append(anchor);
         continue;
       }
-      case "bookmarkStart":
+      case "bookmarkStart": {
+        // Where a link to it goes (`@folijs/pdf`); out of the flow, so no line changes.
+        const mark = doc.createElement("span");
+        mark.dataset.foliBookmark = String(attrs.name ?? "");
+        mark.style.position = "absolute";
+        parent.append(mark);
+        continue;
+      }
       case "bookmarkEnd":
       case "controlStart":
       case "controlEnd":

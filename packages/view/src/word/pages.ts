@@ -5,6 +5,7 @@
  * v3 in 8.7.
  */
 import {
+  type FieldLayout,
   type FoliDocument,
   noteNumbers,
   noteProperties,
@@ -23,6 +24,7 @@ import {
   pagesOf,
   spaceAfterText,
 } from "../layout/flow.js";
+import { printStyles, SHEET_ATTR } from "../print.js";
 import {
   type BlockOptions,
   NOTE_REF_ATTR,
@@ -60,6 +62,18 @@ export interface DocumentPages {
    * a vertical merge covers, as Word lists none), with the page (0-based) it starts on.
    */
   cellParagraphs(): { page: number; text: string }[];
+  /**
+   * Where body positions are on these pages, for `updateFields` (`PAGE`, `NUMPAGES`, `PAGEREF`,
+   * a table of contents' page numbers).
+   * shortcut: a position's page is the one its top-level block starts on (a bookmark in a paragraph or table carried to the next page gets the page it starts on); use the lines when a document needs it.
+   */
+  readonly fieldLayout: FieldLayout;
+  /**
+   * Print rules for these pages, as the editor's: one sheet of its section's size per page (named
+   * pages where sections differ), no gaps. For a web page holding these pages only (`@page`
+   * applies to the whole web page).
+   */
+  printStyles(): string;
   /** Removes the pages. */
   destroy(): void;
 }
@@ -468,6 +482,7 @@ export function renderDocument(
     pageSetups[p] = bandsOf[p]?.[0] ?? pageSetups[p + 1] ?? (sections.at(-1) as Section);
   const created = pageSetups.map((section, p) => {
     const made = createPage(doc, section.geometry);
+    made.page.setAttribute(SHEET_ATTR, String(section.flow.index ?? 0));
     const page = facts[p];
     // Word's blank page before an even or odd page section has no header or footer (its PDF).
     if (!page?.sectionPages) return made;
@@ -624,8 +639,44 @@ export function renderDocument(
     return page;
   });
   let firstLine: Map<number, number> | null = null;
+  let starts: number[] | null = null;
+  const fieldLayout: FieldLayout = {
+    pages: facts.length,
+    pageAt: (pos) => {
+      if (!starts) {
+        const list: number[] = [];
+        (model ?? parseContent(document.content)).forEach((_node, offset) => {
+          list.push(offset);
+        });
+        starts = list;
+      }
+      // The top-level node holding `pos`, or the nearest one before it that is shown.
+      let index = starts.length - 1;
+      while (index > 0 && (starts[index] as number) > pos) index--;
+      while (index > 0 && !firstPage.has(index)) index--;
+      const fact = facts[firstPage.get(index) ?? -1];
+      if (!fact) return null;
+      const format = setups[fact.section]?.pageNumbers?.format;
+      return { number: fact.number, sectionPages: fact.sectionPages, format };
+    },
+  };
+  const px = (n: number) => `${n}px`;
   return {
     pages,
+    fieldLayout,
+    printStyles: () => {
+      const last = (sections.at(-1) as Section).geometry;
+      return printStyles(
+        `.${WORD_PAGE_CLASS}`,
+        { width: px(last.width), height: px(last.height) },
+        sections.map(({ geometry: g, flow }) => ({
+          width: px(g.width),
+          height: px(g.height),
+          index: flow.index ?? 0,
+        })),
+        "word",
+      );
+    },
     pageOf: (index) => firstPage.get(index),
     lineOf: (index) => {
       if (!firstLine) {

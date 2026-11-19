@@ -1,0 +1,11 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "dist",
+    "customConditions": []
+  },
+  // The page's renderer is bundled by Vite into dist/renderer.js (vite.config.ts).
+  "include": ["src"],
+  "exclude": ["src/**/*.test.ts", "src/renderer.ts"]
+}

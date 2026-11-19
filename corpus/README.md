@@ -375,6 +375,47 @@ Word, but page 3 scores 0.177 (0.203 before): the text beside it, being lower, i
 Word's (the chart is drawn as a box here, so its ink does not count). 07 (10.9, not in the table
 above): 0.123 and 0.665, its pictures as boxes against Word's ink, its floats where Word's are.
 
+## Foli's PDF against Word's PDF
+
+Since 11.12 the same run, given Word's PDFs, also prints every document to PDF with `exportPdf`
+(`@folijs/pdf`; build it first: `pnpm build`) through a page of the run's Chromium, tracked
+changes accepted, pictures from the package and Aptos served as on screen
+(`apps/playground/word/pdf.word.ts`), and scores each of its pages against Word's by ink: both
+PDFs rendered by pdf.js at 96 px per inch, the whole page (no "inside the margins" score: a PDF
+page carries no margins). Results in `test-results/word-pdf-export.json`, Foli's PDFs and the
+overlays in `test-results/word-pdf-export/`.
+
+```bash
+pnpm build
+FOLI_WORD_PDF=<pdf-folder> pnpm corpus:pages
+```
+
+2026-11-19, Word 16.0.20527, Chromium, with Aptos (the on-screen score from the same run):
+
+| Document | Pages | On screen | Foli's PDF | Foli's PDF, per page       |
+| -------- | ----: | --------: | ---------: | -------------------------- |
+| 01       |     2 |     0.994 |      0.994 | 0.989, 1.000               |
+| 02       |     3 |     0.858 |      0.853 | 0.980, 0.580, 1.000        |
+| 03       |     1 |     0.830 |      1.000 | 1.000                      |
+| 04       |     4 |     0.832 |      0.918 | 1.000, 0.704, 0.973, 0.996 |
+| 05       |     2 |     0.968 |      0.968 | 0.935, 1.000               |
+| 06       |     2 |     0.942 |      0.929 | 0.882, 0.976               |
+| 07       |     2 |     0.394 |      0.947 | 0.894, 1.000               |
+| 08       |     5 |     1.000 |      1.000 | 1.000 (every page)         |
+| 09       |     3 |     0.999 |      0.999 | 1.000, 0.998, 1.000        |
+| **All**  |    24 | **0.889** |  **0.954** |                            |
+
+Every PDF has Word's page count and Word's sheet sizes (04's landscape appendix on a landscape
+sheet), and every field `exportPdf` updated from its pages already showed Word's result (04's table
+of contents and its page numbers, 09's cross-references; 09's locked date is left, as Word does).
+The PDF scores higher than the screen where pictures count: the harness's screenshots draw a
+package's pictures as boxes, the PDF draws their images (03's letterhead, 04's chart, 07's charts
+and logo). What is left: 02's second page has one row of the fee table that Word moves to the next
+page and Foli does not, which moves the rest of the page; 04's second page is its table of contents
+without Word's dot leaders; 07's first page, everything below the second chart sits about 3 px
+lower than Word's (the line holding that picture is taller); 06 and 02 lose 0.01-0.02 against the
+screen because the printed table rows fall a pixel off where the screen draws them.
+
 ## Private documents
 
 Real documents (contracts, templates) are never committed. Keep them in a folder outside the

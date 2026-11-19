@@ -198,7 +198,8 @@ checklist in [testing/ime.md](testing/ime.md)):
   after it. In the review views that hide deleted text a match runs across it, as the reader sees
   the text; Word's does not.
 - While the document is edited with the panel open, the matches are looked for again once typing
-  pauses (300 ms): until then the marks follow the old positions.
+  pauses (300 ms): until then only the current match is marked, moved with the text, and none is
+  current once an edit touches it or its story.
 - Marks need the CSS Custom Highlight API (Chromium 105, Safari 17.2, Firefox 140); without it find
   still counts, goes to and selects matches. Only pages within a screen of the window are marked.
   In the drawn copies of a story that is not open, marks come from looking for the text there.
@@ -276,7 +277,7 @@ Details in the [package README](../packages/docx/README.md).
 - Page numbers made of digits are taken to be equally wide when a header's height is measured:
   with a font whose digits differ, a header on the verge of wrapping can overlap the text.
 
-## Print
+## Print and PDF
 
 - One `@page` size per web page: with several editors of different page sizes, the last one's
   sheet size wins.
@@ -284,6 +285,29 @@ Details in the [package README](../packages/docx/README.md).
   engines without named pages print every sheet at the last section's size.
 - Print-only CSS must not change text metrics. PDF output is checked in Chromium only.
 - Your page's other content prints too; hide it ([styling.md](styling.md#print)).
+- `exportPdf` (`@folijs/pdf`) is Chromium's PDF: it needs the app's headless Chromium page
+  (Playwright 1.42+ for the outline and tags; Puppeteer's page type fits but is not run in the
+  tests) and the document's fonts on that machine or in `styles` as `data:` URLs: a missing font
+  prints in a fallback with other line breaks. It replaces the page's content.
+- The page `exportPdf` prints in loads nothing from the network (its Content Security Policy
+  allows `data:` images and fonts only), so a document cannot make the exporting server request
+  an address: a picture known only by a web URL prints as its box, a web font in `styles` is not
+  loaded. Give images as bytes and fonts as `data:` URLs. An image not decoded after 10 seconds
+  prints without it.
+- `exportPdf` lays the document out with the read-only renderer, the editor's `print()` with the
+  editing one: the same pages (count, sizes, text), drawn alike but where the two differ. A
+  table's header rows repeated on a continuation page are plain text in the editor's print and
+  formatted in the PDF; the editor draws change bars beside tracked changes, the PDF does not;
+  where a paragraph continues in a column of another width, the PDF can repeat or lose a few
+  words there (08 in the corpus repeats two).
+- A field's page in `exportPdf` is the page its paragraph (or table) starts on: a `PAGEREF` to a
+  bookmark in a paragraph carried over to the next page gives the first page.
+- Links: absolute links with a safe target (`https:`, `http:`, `mailto:`, `tel:`) and links to a
+  bookmark of the document are PDF links; other targets (relative, `file:`) print as text. Headings (paragraphs with an outline
+  level 1-6) are the PDF's bookmarks; a table of contents' dot leaders are not drawn (on screen
+  neither).
+- Pictures in EMF, WMF or TIFF print as their box. Comments are not printed: with markup their
+  text is highlighted, without Word's balloons.
 
 ## React and the browser
 

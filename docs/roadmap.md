@@ -1254,9 +1254,24 @@ Each task is a PR on `phase-11/sections-fields`, the build green after each.
   replaced match and deleted text refused, unlike Word; marks only near the window and only where
   the browser has the API; Go to by place, not printed number; a reference split over runs not
   renamed; the cross-reference dialog lists the body's bookmarks.)
-- [ ] 11.12 PDF: `exportPdf` from the editor's own layout as decided in ADR-0007 (fields updated
+- [x] 11.12 PDF: `exportPdf` from the editor's own layout as decided in ADR-0007 (fields updated
   first, links and the outline as PDF bookmarks where the engine gives them), the page score
-  against Word's PDF for every corpus document; print uses the same pages.
+  against Word's PDF for every corpus document; print uses the same pages. (Done: `@folijs/pdf`,
+  depending on core only, ships `dist/renderer.js` (core and the read-only renderer, 82.9 kB gzip)
+  for the app's Playwright or Puppeteer page; `exportPdf(document, { page, resources, review,
+  styles })` validates, lays out, updates fields from `DocumentPages.fieldLayout` (twice more at
+  most, as the editor), makes safe absolute links and bookmark links PDF links, prints with the
+  editor's print rules (`print.ts`, now shared) and `preferCSSPageSize`, `outline`, `tagged`:
+  each section on its own sheet size, headings as PDF bookmarks. `pdf.word.ts` scores Foli's PDF
+  against Word's for every corpus document: 0.954 over 24 pages (on screen 0.889; pictures now
+  count), every page count and sheet size as Word's, every field already Word's result.
+  `e2e/pdf.spec.ts` (Chromium) reads the PDFs back with pdf.js: 04's pages, sizes, text, notes and
+  outline; fields updated, links; for all nine documents the editor's print has the same pages,
+  sizes and text, and the same ink but where the renderers draw differently. Shortcuts: a field's
+  page is its block's first page; the editor's print and the PDF differ in a table's repeated
+  header rows (plain text in the editor), change bars (the editor's only) and a few words where a
+  paragraph continues in a column of another width (08); Puppeteer typed, not run; pictures only
+  from bytes or `data:` URLs (the page loads nothing); no dot leaders; comments not printed.)
 - [ ] 11.13 Close: docs (ADR-0007 outcome, architecture, document model, pagination, api, docx
   README, limitations), size budgets, the acceptance above checked with the harness, the 0.6.0
   changeset (schema v5: 0.5.0 cannot read documents saved by 0.6.0), the version PR; publish

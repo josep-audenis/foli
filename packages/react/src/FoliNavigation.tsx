@@ -18,6 +18,8 @@ import {
   renameBookmark,
   replace,
   replaceAll,
+  StoryStep,
+  type Transaction,
   trackState,
   wordContext,
 } from "@folijs/core";
@@ -77,6 +79,31 @@ function isSelected(body: Editor, match: FindMatch): boolean {
   const { story, state } = activeState(body);
   const { from, to } = state.selection;
   return story === match.story && from === match.from && to === match.to;
+}
+
+/**
+ * `match` where `transactions` leave it, or null when they changed it or its story: until the next
+ * search the marks follow the text and Enter goes where they are.
+ */
+function mapMatch(
+  match: FindMatch,
+  transactions: readonly Transaction[],
+  stories: ReadonlySet<string>,
+): FindMatch | null {
+  if (match.story !== null) return stories.has(match.story) ? null : match;
+  let { from, to } = match;
+  for (const tr of transactions)
+    for (const map of tr.mapping.maps) {
+      // Anything a step changes inside it (an edit of the same length too) ends it as a match.
+      let touched = false;
+      map.forEach((start, end) => {
+        if (start < to && end > from) touched = true;
+      });
+      if (touched) return null;
+      from = map.map(from, 1);
+      to = map.map(to, -1);
+    }
+  return from === match.from ? match : { ...match, from, to };
 }
 
 /** What the document shows has changed: another search is due. */
@@ -246,6 +273,8 @@ interface Found {
   current: FindMatch | null;
   /** Whether the view goes to `current`: not when the document changed under the search. */
   scroll: boolean;
+  /** The document changed since `matches` were found: only `current` is known to be right. */
+  stale?: boolean;
 }
 
 /** How long typing in the document pauses before the matches are looked for again, in ms. */
@@ -286,8 +315,21 @@ function FindPanel({
   useEffect(() => {
     let key = searchKey(body.state);
     let timer: ReturnType<typeof setTimeout> | undefined;
-    const unsubscribe = body.subscribe((state) => {
+    const unsubscribe = body.subscribe((state, transactions) => {
       const next = searchKey(state);
+      if (transactions.some((tr) => tr.docChanged)) {
+        const stories = new Set<string>();
+        for (const tr of transactions)
+          for (const step of tr.steps) if (step instanceof StoryStep) stories.add(step.id);
+        // Only the current match follows the text at once: the rest waits for the search, and
+        // meanwhile is not marked where it no longer is.
+        setFound((found) => {
+          if (!found.matches.length) return found;
+          const current = found.current && mapMatch(found.current, transactions, stories);
+          if (found.stale && current === found.current) return found;
+          return { ...found, current, scroll: false, stale: true };
+        });
+      }
       if (next.some((value, i) => value !== key[i])) {
         clearTimeout(timer);
         timer = setTimeout(() => setVersion((n) => n + 1), RESEARCH_DELAY);
@@ -331,7 +373,9 @@ function FindPanel({
 
   // With the count shown, in the same frame.
   useIsomorphicLayoutEffect(() => {
-    body.storyView?.showMatches(query ? { query, ...options, ...found } : null);
+    const { stale, ...shown } = found;
+    const matches = stale ? (shown.current ? [shown.current] : []) : shown.matches;
+    body.storyView?.showMatches(query ? { query, ...options, ...shown, matches } : null);
   }, [body, query, options, found]);
   useEffect(() => () => body.storyView?.showMatches(null), [body]);
 
@@ -341,13 +385,24 @@ function FindPanel({
       setMessage(`This match is in a ${storyName(body, current)} no page shows.`);
     else setMessage("");
   };
+  /** The matches as the document is now, and the current one among them. */
+  const now = (): Found => {
+    if (!found.stale) return found;
+    const matches = findAll(body, query, options);
+    const was = found.current;
+    const current =
+      (was &&
+        matches.find((m) => m.story === was.story && m.from === was.from && m.to === was.to)) ??
+      null;
+    return { matches, current, scroll: false };
+  };
   const step = (backward: boolean) => {
-    const { matches, current } = found;
+    const { matches, current } = now();
     const first = !backward && current && !isSelected(body, current);
     show(matches, first ? current : nextMatch(body, matches, backward));
   };
   const replaceCurrent = () => {
-    const { matches, current } = found;
+    const { matches, current } = now();
     if (!current) return;
     if (!isSelected(body, current)) {
       show(matches, current);
@@ -360,6 +415,9 @@ function FindPanel({
   };
   const all = () => {
     const report = replaceAll(body, query, replacement, options);
+    // What is left at once, as after Replace: not the replaced text for a moment.
+    const fresh = findAll(body, query, options);
+    setFound({ matches: fresh, current: nextMatch(body, fresh), scroll: false });
     setMessage(reportText(report));
   };
 

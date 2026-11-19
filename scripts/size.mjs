@@ -4,7 +4,7 @@
 // bundle grows past its budget. Run: `pnpm size` (part of `pnpm check`). Numbers and method:
 // docs/benchmarks.md, "Bundle size".
 
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -101,6 +101,10 @@ writeFileSync(appEntry, `export { FoliEditor } from "${dist("react")}";\n`);
  * find and replace over every story, bookmarks and the outline; marks on the pages and going to a
  * match, a bookmark or a heading; the find panel, the bookmarks dialog and the outline panel, which
  * `FoliEditor` includes so that Word's keys work out of the box.
+ * `@folijs/pdf` added in 11.12 (Node's side 16.0 kB, 18.4 allowed: core's `parseDocument`, which
+ * checks the document before the page gets it; the page's renderer 82.9 kB, 95.2 allowed: core and
+ * the view's read-only renderer bundled into the script `exportPdf` adds to the headless page, never
+ * part of an app's own bundle).
  */
 const BUNDLES = [
   { name: "@folijs/core", entry: dist("core"), budget: 88_000 },
@@ -108,7 +112,26 @@ const BUNDLES = [
   { name: "@folijs/react", entry: dist("react"), budget: 155_000 },
   { name: "FoliEditor only", entry: appEntry, budget: 155_000 },
   { name: "@folijs/docx", entry: dist("docx"), budget: 58_400 },
+  { name: "@folijs/pdf", entry: dist("pdf"), budget: 18_800 },
 ];
+/** Bundles built as they ship (minified scripts): their gzipped bytes, with their budget. */
+const BUILT = [
+  {
+    name: "pdf's renderer",
+    file: join(root, "packages", "pdf", "dist", "renderer.js"),
+    budget: 97_500,
+  },
+];
+
+/**
+ * pdf's Node side reads its renderer by `new URL("../dist/renderer.js", import.meta.url)`, which a
+ * library build inlines: measured apart instead (`BUILT`), as an app's server never sends it.
+ */
+const RENDERER_APART = {
+  name: "pdf-renderer-apart",
+  enforce: "pre",
+  transform: (code) => code.replace('"../dist/renderer.js"', "globalThis.renderer"),
+};
 
 let failed = false;
 try {
@@ -117,12 +140,13 @@ try {
       root,
       configFile: false,
       logLevel: "silent",
+      plugins: [RENDERER_APART],
       build: {
         write: false,
         minify: true,
         lib: { entry, formats: ["es"], fileName: "bundle" },
         rollupOptions: {
-          external: [/^react($|\/)/, /^react-dom($|\/)/],
+          external: [/^react($|\/)/, /^react-dom($|\/)/, /^node:/],
           // Library mode only renames identifiers; an app's build also drops whitespace and comments.
           output: { minify: true },
         },
@@ -139,6 +163,15 @@ try {
     failed ||= over;
     console.log(
       `${name.padEnd(16)} ${(min / 1024).toFixed(1).padStart(6)} kB min  ${(gzip / 1024).toFixed(1).padStart(5)} kB gzip  budget ${(budget / 1024).toFixed(1)} kB${over ? "  OVER BUDGET" : ""}`,
+    );
+  }
+  for (const { name, file, budget } of BUILT) {
+    const code = readFileSync(file);
+    const gzip = gzipSync(code, { level: 9 }).length;
+    const over = gzip > budget;
+    failed ||= over;
+    console.log(
+      `${name.padEnd(16)} ${(code.length / 1024).toFixed(1).padStart(6)} kB min  ${(gzip / 1024).toFixed(1).padStart(5)} kB gzip  budget ${(budget / 1024).toFixed(1)} kB${over ? "  OVER BUDGET" : ""}`,
     );
   }
 } finally {
