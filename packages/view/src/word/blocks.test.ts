@@ -474,10 +474,20 @@ describe("renderBlocks: review", () => {
       ),
     ]);
     const spans = [...(block?.element.querySelectorAll("span") ?? [])];
-    expect(spans.map((s) => s.dataset.foliComments ?? null)).toEqual([null, "7", "7", null, null]);
+    expect(spans.map((s) => s.dataset.foliComments ?? null)).toEqual([
+      null,
+      "7",
+      "7",
+      null,
+      null,
+      null,
+    ]);
     expect(spans[1]?.style.backgroundColor).toBe("rgb(0, 255, 0)");
     expect(spans[2]?.style.backgroundColor).not.toBe("");
     expect(spans[3]?.dataset.foliCommentReference).toBe("7");
+    // A bookmark's start: where a link to it goes in a PDF, out of the flow.
+    expect(spans[5]?.dataset.foliBookmark).toBe("b");
+    expect(spans[5]?.style.position).toBe("absolute");
   });
 });
 

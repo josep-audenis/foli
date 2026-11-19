@@ -103,6 +103,7 @@ import {
   type Reuse,
   spaceAfterText,
 } from "./layout/flow.js";
+import { printStyles, SHEET_ATTR } from "./print.js";
 import { type BlockDesc, type LeafDesc, PAGE_BREAK_ATTR } from "./render.js";
 import {
   EMU_PER_PX,
@@ -263,34 +264,20 @@ const VIEW_ATTR = "data-foli-view";
 let viewCount = 0;
 
 /**
- * Print rules for the page settings of the view whose host has `VIEW_ATTR` = `id`: one sheet of
- * its section's size per page (the last section's where named pages are not supported), without
- * margins (the page's padding holds them). A page is exactly as tall as a sheet (the flow keeps content inside it; the exact height absorbs its
- * half-pixel slack), with no gap after it. Content taller than a page (a line taller than a
- * page) is not cut: it prints over the next sheet.
+ * Print rules for the page settings of the view whose host has `VIEW_ATTR` = `id` (`print.ts`,
+ * shared with the read-only renderer and so with `@folijs/pdf`).
  * shortcut: `@page` is per document: with several editors of different page sizes on one web page, the last one's sheet size wins (each keeps its own page rules); print one editor per document until that is needed.
  */
-function printStyles(settings: DocumentSettings, sheets: readonly Sheet[], id: string): string {
-  const { width, height } = settings.pageSize;
-  const last = sheetOf(settings, 0).css;
-  const pages = `[${VIEW_ATTR}="${id}"]>.foli-page`;
-  // Sections with other page setups: a named page each (engines without named pages print
-  // every sheet at the last section's size).
-  const named = sheets.every((sheet) => sheet.css === last)
-    ? ""
-    : sheets
-        .map(({ settings: { pageSize: size }, index }) => {
-          const name = `foli-${id}-${index}`;
-          return (
-            `@page ${name}{size:${size.width}mm ${size.height}mm;margin:0}` +
-            `${pages}[${SHEET_ATTR}="${index}"]{page:${name};height:${size.height}mm!important}`
-          );
-        })
-        .join("");
-  return (
-    `@media print{@page{size:${width}mm ${height}mm;margin:0}` +
-    `${pages}{height:${height}mm!important;margin-block:0!important;` +
-    `break-after:page;break-inside:avoid}${pages}:last-child{break-after:auto}${named}}`
+function viewPrintStyles(settings: DocumentSettings, sheets: readonly Sheet[], id: string): string {
+  const mm = ({ width, height }: { width: number; height: number }) => ({
+    width: `${width}mm`,
+    height: `${height}mm`,
+  });
+  return printStyles(
+    `[${VIEW_ATTR}="${id}"]>.foli-page`,
+    mm(settings.pageSize),
+    sheets.map(({ settings: { pageSize }, index }) => ({ ...mm(pageSize), index })),
+    id,
   );
 }
 
@@ -303,9 +290,6 @@ function hiddenIn(node: Node, stop: Node): boolean {
 
 /** The fields whose results depend on where things fall on the pages. */
 const PAGE_DEPENDENT = new Set(["PAGE", "NUMPAGES", "SECTIONPAGES", "PAGEREF"]);
-
-/** The attribute naming a page's page setup (its index among the document's) for print. */
-const SHEET_ATTR = "data-foli-sheet";
 
 /** A page setup: its settings (mm), the page style it gives, its index among the document's. */
 interface Sheet {
@@ -2725,7 +2709,7 @@ export class EditorView {
     this.printStyles = parents.map((parent) => {
       const style = doc.createElement("style");
       style.setAttribute("data-foli-print", "");
-      style.textContent = printStyles(this.editor.settings, sheets, this.id);
+      style.textContent = viewPrintStyles(this.editor.settings, sheets, this.id);
       parent.append(style);
       return style;
     });
