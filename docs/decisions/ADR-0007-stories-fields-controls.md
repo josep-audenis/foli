@@ -389,8 +389,9 @@ content, ext? }`. `content` is a `doc` of the body's blocks. `noteType` is Word'
     with `outline` and `tagged` (Playwright 1.42+) makes the headings (`h1`-`h6`) PDF bookmarks.
     Links are not in the read-only renderer's DOM (`data-href` only): the page script wraps safe,
     absolute ones and those to a bookmark in `a` elements.
-  - "The same pages" holds for count, sizes and text, not every pixel: the editor prints its own
-    renderer's drawing, which repeats a table's header rows as plain text and draws change bars;
+  - "The same pages" holds for their count, sizes and text (but the words below), not every
+    pixel: the editor prints its own renderer's drawing, which repeats a table's header rows as
+    plain text and draws change bars;
     the read-only renderer can repeat a few words where a paragraph continues in a column of
     another width. One renderer for both would remove that; the ADR keeps two until then.
   - Against Word's PDFs the PDF scores 0.954 over the corpus's 24 pages (on screen 0.889, where
