@@ -105,6 +105,10 @@ describe("exportPdf", () => {
       web: null,
       own: "data:image/gif;base64,R0lGOD",
     });
+    const boxed = fakePage();
+    await exportPdf(pictured(), { page: boxed.page, resources: () => null });
+    // null asks for the box, even for a resource with its own data URL.
+    expect((boxed.calls[2] as { arg: RenderInput }).arg.images.own).toBeNull();
     expect(input.review).toBe("final");
     expect(input.styles).toBe("@font-face{}");
   });

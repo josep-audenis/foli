@@ -110,7 +110,9 @@ function images(
 ): Record<string, string | null> {
   const out: Record<string, string | null> = {};
   for (const [key, resource] of Object.entries(document.resources ?? {})) {
-    const image = resources?.(key, resource) ?? resource.data ?? null;
+    // null from the app is the picture's box; only undefined falls back to the resource's own data.
+    const given = resources?.(key, resource);
+    const image = given === undefined ? (resource.data ?? null) : given;
     if (image === null || typeof image === "string")
       out[key] = image && DATA_IMAGE.test(image) ? image : null;
     else if (!SHOWN.has(image.contentType.toLowerCase())) out[key] = null;
