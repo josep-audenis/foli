@@ -438,7 +438,7 @@ function emptyStory(state: EditorState, side: StorySide): Story {
     type: "doc",
     content: [{ type: "paragraph", ...(style ? { attrs: { style: style.id } } : {}) }],
   };
-  return { kind: side, doc: parseContent(content) };
+  return { kind: side, doc: parseContent(content, "content", false, state.schema) };
 }
 
 /** Makes `tr` give section `index` the reference `id` for `side` and `variant` (null: none). */

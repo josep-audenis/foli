@@ -10,7 +10,7 @@
  * become the commands themselves.
  */
 import { deepEqual } from "../model/attrs.js";
-import type { Attrs, Mark, MarkType, Node } from "../model/index.js";
+import type { Attrs, Mark, MarkType, Node, Schema } from "../model/index.js";
 import { Step, StepResult } from "../transform/steps.js";
 import type { CommentJSON, FoliDocument, StoryJSON } from "../v3/document.js";
 import { parseContent } from "../v3/document.js";
@@ -324,12 +324,15 @@ export function otherTrees(state: EditorState): Node[] {
   return (body ? [body, ...trees] : trees).filter((tree) => tree !== state.doc);
 }
 
-/** The trees of `envelope`'s stories. */
-function storyTrees(envelope: WordEnvelope): Map<string, Story> {
+/** The trees of `envelope`'s stories, in the editor's `schema`. */
+function storyTrees(envelope: WordEnvelope, schema: Schema): Map<string, Story> {
   return new Map(
     Object.entries(envelope.stories ?? {}).map(([id, { content, ...rest }]) => [
       id,
-      { ...rest, doc: parseContent(content, `stories[${JSON.stringify(id)}].content`) },
+      {
+        ...rest,
+        doc: parseContent(content, `stories[${JSON.stringify(id)}].content`, false, schema),
+      },
     ]),
   );
 }
@@ -346,16 +349,16 @@ function storyTrees(envelope: WordEnvelope): Map<string, Story> {
 export function wordPlugin(envelope: WordEnvelope, context?: WordContext): Plugin<WordContext> {
   // Not a secret: only tells documents apart.
   const id = `${Date.now().toString(36)}${Math.random().toString(36).slice(2)}`;
-  const initial: WordContext = context ?? {
-    envelope,
-    resolver: new Resolver(envelope),
-    stories: storyTrees(envelope),
-    id,
-  };
   return new Plugin({
     key,
     state: {
-      init: () => initial,
+      init: (state) =>
+        context ?? {
+          envelope,
+          resolver: new Resolver(envelope),
+          stories: storyTrees(envelope, state.schema),
+          id,
+        },
       apply: (tr, value) => {
         const adopted = tr.getMeta(ADOPT) as WordContext | undefined;
         if (adopted) return adopted;
@@ -622,16 +625,14 @@ export function isMarker(context: WordContext | null, node: Node | null | undefi
   return context !== null && !!node && MARKERS.has(node.type.name);
 }
 
+const OPAQUE = new Set(["opaqueInline", "opaqueBlock", "foreignInline", "foreignBlock"]);
+
 /**
- * Opaque content: deleted only once selected, as Word selects a field before deleting it.
+ * Opaque content (and foreign nodes, ADR-0008): deleted only once selected, as Word selects a field before deleting it.
  * @internal
  */
 export function isOpaque(context: WordContext | null, node: Node | null | undefined): boolean {
-  return (
-    context !== null &&
-    !!node &&
-    (node.type.name === "opaqueInline" || node.type.name === "opaqueBlock")
-  );
+  return context !== null && !!node && OPAQUE.has(node.type.name);
 }
 
 /**

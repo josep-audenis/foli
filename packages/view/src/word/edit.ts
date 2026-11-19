@@ -384,6 +384,16 @@ export class WordRenderer {
           return;
         }
         default: {
+          const stands = child.type.spec.text;
+          if (stands) {
+            // A custom or foreign node (ADR-0008): its text, one position, as opaque content.
+            const span = this.#run(run, child.marks, line);
+            span.textContent = stands(child.attrs);
+            span.dataset.foliCustom = String(child.attrs.type ?? name);
+            span.setAttribute("contenteditable", "false");
+            leafElement(span);
+            return;
+          }
           // A field's code and braces, when codes show: drawn, not document text.
           const shown =
             display.braces.get(childIndex) ??
@@ -539,6 +549,12 @@ export class WordRenderer {
     );
     const dom = shown.element;
     dom.setAttribute("contenteditable", "false");
+    const stands = node.type.spec.text;
+    if (stands) {
+      // A custom or foreign block (ADR-0008): its text in a box.
+      dom.textContent = stands(node.attrs);
+      dom.dataset.foliCustom = String(node.attrs.type ?? node.type.name);
+    }
     return {
       node,
       dom,

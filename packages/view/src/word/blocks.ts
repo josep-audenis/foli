@@ -14,6 +14,8 @@ import {
   type SectionJSON,
 } from "@folijs/core";
 import {
+  CUSTOM_TYPE,
+  foreignTextOf,
   type ListMarker,
   type ParagraphFormat,
   Resolver,
@@ -1068,6 +1070,8 @@ function renderInline(
     else if (node.type === "noteReference")
       text = context.notes?.references?.get(String(attrs.story)) ?? "";
     else if (node.type === "noteMark") text = context.notes?.mark ?? "";
+    // A custom node without its extension here (ADR-0008): its `.docx` text, else its type.
+    else if (CUSTOM_TYPE.test(node.type)) text = foreignTextOf(node) ?? `[${node.type}]`;
     else if (node.type === "opaqueInline") {
       const xml = parseOpaque(String(attrs.xml ?? ""), doc);
       const separator = separatorElement(xml, doc);

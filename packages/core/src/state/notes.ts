@@ -278,21 +278,26 @@ export function insertNote(kind: NoteKind = "footnote", options: InsertNoteOptio
     const mark = { type: "characterStyle", attrs: { id: styles.reference } };
     const story: Story = {
       kind,
-      doc: parseContent({
-        type: "doc",
-        content: [
-          {
-            type: "paragraph",
-            attrs: { style: styles.text },
-            content: [
-              custom
-                ? { type: "text", text: custom, marks: [mark] }
-                : { type: "noteMark", marks: [mark] },
-              { type: "text", text: " " },
-            ],
-          },
-        ],
-      }),
+      doc: parseContent(
+        {
+          type: "doc",
+          content: [
+            {
+              type: "paragraph",
+              attrs: { style: styles.text },
+              content: [
+                custom
+                  ? { type: "text", text: custom, marks: [mark] }
+                  : { type: "noteMark", marks: [mark] },
+                { type: "text", text: " " },
+              ],
+            },
+          ],
+        },
+        "content",
+        false,
+        state.schema,
+      ),
     };
     tr.step(new StoryStep(id, null, story));
     if (styles.envelope !== context.envelope) withEnvelope(tr, styles.envelope);

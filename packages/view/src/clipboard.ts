@@ -27,6 +27,33 @@ import { clipboardBlocks } from "./word/edit.js";
 export const FOLI_MIME = "application/x-foli+json";
 
 /**
+ * The attribute on the clipboard HTML's wrapper that holds the Foli JSON when the copy has custom
+ * nodes or marks (ADR-0008): some browsers (Firefox) give a paste only `text/html` and
+ * `text/plain`, and HTML alone cannot say what a custom type is.
+ */
+const JSON_ATTR = "data-foli-clipboard";
+
+/** Whether `content` holds a custom or foreign node or mark. */
+function hasCustom(content: ModelNode): boolean {
+  let found = false;
+  content.descendants((node) => {
+    found ||=
+      !!node.type.spec.text ||
+      node.marks.some((m) => m.type.name.includes(":") || m.type.name === "foreign");
+    return !found;
+  });
+  return found;
+}
+
+/** The Foli JSON of the clipboard (`FOLI_MIME`'s), as a format to try. */
+function foliJSON(json: string): Found | null {
+  const value: unknown = JSON.parse(json);
+  if (typeof value !== "object" || value === null) return null;
+  const { open, content, word } = value as { open?: unknown; content?: unknown; word?: unknown };
+  return { content, open: open === true, word };
+}
+
+/**
  * One clipboard format's content, before validation.
  * @internal
  */
@@ -100,14 +127,21 @@ export function serializeRange(
   // How other apps (and print) recognize a page break; the editor itself does not need it.
   for (const br of container.querySelectorAll(`br[${PAGE_BREAK_ATTR}]`))
     (br as HTMLElement).style.cssText = "page-break-before: always; break-before: page";
+  const json = JSON.stringify({
+    open: $from.sharedDepth(to) > 0,
+    content: blocks.toJSON(),
+    word: copiedDefinitions(word.context, blocks),
+  });
+  let html = container.innerHTML;
+  if (hasCustom(blocks)) {
+    // An attribute (escaped by the DOM) on the wrapper, read back by `docFromClipboard`.
+    container.setAttribute(JSON_ATTR, json);
+    html = container.outerHTML;
+  }
   return {
     text: doc.textBetween(from, to, "\n", (leaf) => leafText(leaf, ownerDocument)),
-    html: container.innerHTML,
-    json: JSON.stringify({
-      open: $from.sharedDepth(to) > 0,
-      content: blocks.toJSON(),
-      word: copiedDefinitions(word.context, blocks),
-    }),
+    html,
+    json,
   };
 }
 
@@ -118,6 +152,8 @@ export function serializeRange(
 function leafText(leaf: ModelNode, doc: Document): string {
   const name = leaf.type.name;
   if (name === "tab") return "\t";
+  const stands = leaf.type.spec.text;
+  if (stands) return leaf.isBlock ? `\n${stands(leaf.attrs)}` : stands(leaf.attrs);
   if (name === "opaqueInline" || name === "opaqueBlock") {
     const xml = parseOpaque(String(leaf.attrs.xml ?? ""), doc);
     const text = xml ? opaqueParagraphsText(xml) : "";
@@ -144,16 +180,13 @@ export function docFromClipboard(
   const html = data.getData("text/html");
   const text = data.getData("text/plain");
   const candidates: (() => Found | null)[] = [
+    () => (json ? foliJSON(json) : null),
     () => {
-      if (!json) return null;
-      const value: unknown = JSON.parse(json);
-      if (typeof value !== "object" || value === null) return null;
-      const { open, content, word } = value as {
-        open?: unknown;
-        content?: unknown;
-        word?: unknown;
-      };
-      return { content, open: open === true, word };
+      // Foli's HTML with custom content carries its JSON (parsed inert, never inserted).
+      if (!html.includes(JSON_ATTR)) return null;
+      const parsed = new DOMParser().parseFromString(html, "text/html");
+      const carried = parsed.querySelector(`[${JSON_ATTR}]`)?.getAttribute(JSON_ATTR);
+      return carried ? foliJSON(carried) : null;
     },
     () => {
       const read = html ? readHTML(html) : null;

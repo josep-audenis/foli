@@ -7,6 +7,7 @@ import {
   type StoryJSON,
   type WordSettingsJSON,
 } from "@folijs/core";
+import { customFromWord } from "../custom.js";
 import {
   DocxError,
   type DocxPackage,
@@ -144,25 +145,28 @@ export function importPackage(pkg: DocxPackage): DocxImport {
 
   let document: FoliDocument;
   try {
-    document = parseDocument({
-      schemaVersion: SCHEMA_VERSION,
-      section: lastSection,
-      ...(settings ? { settings } : {}),
-      defaults: styled.defaults,
-      styles: styled.styles,
-      numbering: numbered,
-      ...(themed ? { theme: themed } : {}),
-      comments: commented,
-      ...(resources.size ? { resources: Object.fromEntries(resources) } : {}),
-      ...(Object.keys(stories).length ? { stories } : {}),
-      ...(settings ? { settings } : {}),
-      ...(usedControls.size
-        ? {
-            controls: Object.fromEntries([...controls].filter(([id]) => usedControls.has(id))),
-          }
-        : {}),
-      content: { type: "doc", content },
-    });
+    // Controls Foli tagged for custom nodes and marks are those again (ADR-0008).
+    document = parseDocument(
+      customFromWord({
+        schemaVersion: SCHEMA_VERSION,
+        section: lastSection,
+        ...(settings ? { settings } : {}),
+        defaults: styled.defaults,
+        styles: styled.styles,
+        numbering: numbered,
+        ...(themed ? { theme: themed } : {}),
+        comments: commented,
+        ...(resources.size ? { resources: Object.fromEntries(resources) } : {}),
+        ...(Object.keys(stories).length ? { stories } : {}),
+        ...(settings ? { settings } : {}),
+        ...(usedControls.size
+          ? {
+              controls: Object.fromEntries([...controls].filter(([id]) => usedControls.has(id))),
+            }
+          : {}),
+        content: { type: "doc", content },
+      } as FoliDocument),
+    );
   } catch (error) {
     // Each value was checked as it was read; what is left is beyond the model's limits (an
     // element over 16 MiB kept verbatim…). A DocxError like every other import failure.

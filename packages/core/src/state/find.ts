@@ -41,7 +41,7 @@ export interface FindMatch {
 
 /** Why a match was left as it is. */
 export type ReplaceRefusal =
-  /** In a content control that is locked or filled from bound data. */
+  /** In a content control that is locked or filled from bound data, or in a custom node. */
   | "locked"
   /** A control's kind does not take it, or the match runs over a control's edge. */
   | "control"
@@ -168,7 +168,7 @@ interface Piece {
   at: number;
   length: number;
   pos: number;
-  /** A field code: one node, however long its text. */
+  /** A field code or a custom node: one node, however long its text. */
   code: boolean;
 }
 
@@ -265,6 +265,8 @@ function linesOf(tree: Node, scope: Scope, story: boolean): Line[] {
       else if (name === "tab") add("\t", at);
       else if (name === "hardBreak") add("\n", at);
       else if (name === "fieldCode" && scope.codes) add(String(child.attrs.text ?? ""), at, true);
+      // A custom or foreign node (ADR-0008): found by its text, one position, never replaced.
+      else if (child.type.spec.text) add(child.type.spec.text(child.attrs), at, true);
       else if (!isUnseen(child)) text += BARRIER;
     });
     if (text) lines.push({ text, pieces });
@@ -380,7 +382,10 @@ function applyHit(tr: Transaction, { parts }: Hit, text: string): number {
 function refusalOf(state: EditorState, scope: Scope, hit: Hit, text: string) {
   const tree = state.doc;
   const { parts, match } = hit;
-  if (parts.some((part) => part.code)) return "field-code";
+  if (parts.some((part) => part.code))
+    return parts.some((part) => part.code && tree.nodeAt(part.from)?.type.spec.text)
+      ? "locked"
+      : "field-code";
   if (parts.some((part) => tree.nodeAt(part.from)?.marks.some((m) => m.type.name === "deletion")))
     return "deleted";
   const first = parts[0] as Hit["parts"][number];

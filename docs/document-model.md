@@ -318,6 +318,41 @@ sample yet: start overrides, `restart`, legal levels, numbering styles, the numb
 indent precedence, run formatting, theme colors and fonts. Rendering (8.6b) compares pages
 with Word.
 
+### Custom nodes and marks
+
+Apps add their own types with extensions (ADR-0008, 12.3; [api.md](api.md#custom-nodes-and-marks)):
+inline leaves, block leaves and marks named `<namespace>:<name>` (lowercase letters, digits and
+`-`: `acme:mention`). They are stored as ordinary node and mark JSON by type name, in the content,
+the stories and the comments, and nowhere else in the envelope:
+
+```json
+{
+  "type": "paragraph",
+  "content": [
+    { "type": "text", "text": "Ask " },
+    {
+      "type": "acme:mention",
+      "attrs": { "id": "u-42", "label": "Ada" },
+      "marks": [{ "type": "bold" }]
+    },
+    {
+      "type": "text",
+      "text": "budget",
+      "marks": [{ "type": "acme:topic", "attrs": { "topic": "finance" } }]
+    }
+  ]
+}
+```
+
+They never change `schemaVersion`: they are the app's, not the format's. An app that walks the
+JSON must ignore types it does not know. Read without their extension (`parseDocument` without
+`extensions`, an editor without them, `exportPdf`) a custom node or mark is kept: in memory a
+foreign node (`foreignInline`, `foreignBlock`) or a foreign mark holding the type and attributes
+(checked as plain JSON, at most 64 KiB), written back as it was. The foreign types live only in
+memory and are never saved; a saved document holding one by name is read as the custom type it
+names. The text a custom node stands for (`text(attrs)`) is not saved either. In `.docx` they are
+content controls tagged `foli:` and the type and attributes ([api.md](api.md#folijsdocx)).
+
 ## Schema v1 (0.1.0: read and migrated)
 
 v1 had `doc`, `paragraph` and `heading` (without `align`), `text`, `hardBreak`, `pageBreak` and
@@ -464,7 +499,8 @@ migration.
 Each added only when a feature needs it, with a migration:
 
 - `metadata` (title, author, timestamps, app-defined fields).
-- Extension-owned data under a namespaced key.
+- Extension-owned data under a namespaced key (custom node and mark types need none: they are
+  content, 12.3).
 
 ## Open questions
 

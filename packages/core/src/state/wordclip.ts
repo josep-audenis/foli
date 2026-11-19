@@ -230,7 +230,7 @@ export function fitPastedV2(
       else delete child.marks;
     }
   }
-  return { doc: parseContent(json), envelope: fitted.envelope };
+  return { doc: parseContent(json, "content", false, state.schema), envelope: fitted.envelope };
 }
 
 const equal = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
@@ -257,7 +257,12 @@ export function fitPaste(state: EditorState, content: unknown, definitions?: unk
   const target = context.envelope;
   // Taken as this document's own, but it cannot be told to be: no unsafe link comes in.
   if (definitions === undefined || definitions === null)
-    return fit(state, target, safeLinks(parseContent(content, "content", true).toJSON()), true);
+    return fit(
+      state,
+      target,
+      safeLinks(parseContent(content, "content", true, state.schema).toJSON()),
+      true,
+    );
   const { document, styles, numbering, comments, notes } = definitions as Partial<WordDefinitions>;
   // Validated as a document's envelope: types, ranges, no style based on itself; the content
   // as content to paste (a table may end it).
@@ -271,7 +276,7 @@ export function fitPaste(state: EditorState, content: unknown, definitions?: unk
     ...(notes ? { stories: notes } : {}),
     content: { type: "doc", content: [{ type: "paragraph" }] },
   });
-  const json = parseContent(content, "content", true).toJSON();
+  const json = parseContent(content, "content", true, state.schema).toJSON();
   const source: WordDefinitions = {
     styles: checked.styles,
     numbering: checked.numbering,
@@ -599,10 +604,16 @@ function fit(
         }),
       }
     : mapped;
-  const doc = parseContent(inPlace, "content", true);
+  const doc = parseContent(inPlace, "content", true, state.schema);
   const notes = [...pastedNotes].map(([from, id]) => {
     const note = carried(from) as StoryJSON;
-    return { id, story: { kind: note.kind, doc: parseContent(mapNode(note.content)) } };
+    return {
+      id,
+      story: {
+        kind: note.kind,
+        doc: parseContent(mapNode(note.content), "content", false, state.schema),
+      },
+    };
   });
   let comments = target.comments;
   const copiedComments = source.comments.filter((c) => commentIds.has(c.id));

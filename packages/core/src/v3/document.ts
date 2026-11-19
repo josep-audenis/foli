@@ -1,5 +1,11 @@
 import { DEFAULT_SETTINGS, parseDocumentV2 } from "../document.js";
-import { FoliDocumentError, type MarkJSON, type Node, type NodeJSON } from "../model/index.js";
+import {
+  FoliDocumentError,
+  type MarkJSON,
+  type Node,
+  type NodeJSON,
+  type Schema,
+} from "../model/index.js";
 import {
   bool,
   type Check,
@@ -15,6 +21,7 @@ import {
   token,
   xml,
 } from "./check.js";
+import { type ParseOptions, resolveCustom, schemaWith, writeCustom } from "./extensions.js";
 import { migrateToV3 } from "./migrate.js";
 import {
   checkCellProperties,
@@ -24,7 +31,7 @@ import {
   checkTableProperties,
   checkParagraphProperties as paragraphProperties,
   checkRunProperties as runProperties,
-  schema,
+  schema as wordSchema,
 } from "./schema.js";
 
 /**
@@ -456,23 +463,26 @@ export function createDocument(
  * and 2 are validated as such and migrated (`migrateToV3`). Throws FoliDocumentError instead
  * of dropping anything.
  *
+ * Custom types (ADR-0008) are validated by `options.extensions`; a namespaced type none of them
+ * declares is kept as it is, its attributes checked only as plain JSON (a foreign node or mark).
+ *
  * What Word opens is accepted: duplicate ids (the first wins), a numbering instance or a reply
  * whose target is missing, references to styles that do not exist. Rejected is only what the
  * engine cannot work with: wrong types, out-of-range values, and cycles (a style based on
  * itself, comments replying to each other) that would never end when followed.
  */
-export function parseDocument(input: unknown): FoliDocument {
+export function parseDocument(input: unknown, options: ParseOptions = {}): FoliDocument {
   if (!isRecord(input)) throw new FoliDocumentError("Document must be an object");
   const version = input.schemaVersion;
   if (version === 1 || version === 2) {
-    return parseDocument(migrateToV5(migrateToV4(migrateToV3(parseDocumentV2(input)))));
+    return parseDocument(migrateToV5(migrateToV4(migrateToV3(parseDocumentV2(input)))), options);
   }
   if (version === 3 || version === 4) {
     if (version === 3 && Object.hasOwn(input, "resources"))
       fail("resources", "unknown key (schema 4 and later)");
     for (const key of V5_KEYS)
       if (Object.hasOwn(input, key)) fail(key, "unknown key (schema 5 and later)");
-    const doc = parseDocument({ ...input, schemaVersion: SCHEMA_VERSION });
+    const doc = parseDocument({ ...input, schemaVersion: SCHEMA_VERSION }, options);
     // What a later schema added is not in a document that says it is of an earlier one.
     const later = laterSection(doc.section);
     if (later) fail("section", `${later} is of schema 5 (the document says schema ${version})`);
@@ -544,11 +554,12 @@ export function parseDocument(input: unknown): FoliDocument {
     (c) => `comment ${c.id} replies to itself`,
   );
 
-  const content = parseContent(input.content);
+  const schema = schemaWith(options.extensions);
+  const content = parseContent(input.content, "content", false, schema);
   const stories = Object.entries((input.stories ?? {}) as Record<string, StoryJSON>).map(
     ([id, story]) => {
       const path = `stories[${JSON.stringify(id)}].content`;
-      const tree = parseContent(story.content, path);
+      const tree = parseContent(story.content, path, false, schema);
       storyRules(tree, story.kind, path);
       return [id, { ...structuredClone({ ...story, content: null }), content: copied(tree) }];
     },
@@ -583,7 +594,7 @@ export function parseDocument(input: unknown): FoliDocument {
     ...(envelope.theme === undefined ? {} : { theme: envelope.theme }),
     comments: comments.map((c, i) => ({
       ...structuredClone({ ...c, content: [] }),
-      content: blocks(c.content, `comments[${i}].content`).map((block) => {
+      content: blocks(c.content, `comments[${i}].content`, schema).map((block) => {
         block.descendants((node) => {
           if (node.type.name === "noteReference")
             fail(`comments[${i}].content`, "a comment cannot hold a note reference");
@@ -600,18 +611,24 @@ export function parseDocument(input: unknown): FoliDocument {
   };
 }
 
-/** A node's JSON sharing nothing with the input its attributes came from. */
-const copied = (node: Node): NodeJSON => structuredClone(node.toJSON());
+/** A node's JSON sharing nothing with the input its attributes came from, foreign types written back. */
+const copied = (node: Node): NodeJSON => writeCustom(structuredClone(node.toJSON()));
 
 /**
  * Parses untrusted schema v4 content into a `doc` node, with Word's rules the content
  * expressions do not say (`fragment`: content to paste, which a table may end): a table is never
  * followed by a table (Word would merge them; tables in different content controls stay apart)
  * nor ends the document, and a paragraph in a cell ends no section and holds no page or column
- * break.
+ * break. `schema`: the Word schema or an editor's (with its extensions' types); a namespaced type
+ * it lacks becomes a foreign node or mark.
  */
-export function parseContent(value: unknown, path = "content", fragment = false): Node {
-  const doc = schema.nodeFromJSON(value, path);
+export function parseContent(
+  value: unknown,
+  path = "content",
+  fragment = false,
+  schema: Schema = wordSchema,
+): Node {
+  const doc = schema.nodeFromJSON(resolveCustom(value, schema), path);
   if (doc.type !== schema.topNodeType) fail(path, 'root node must be of type "doc"');
   if (doc.marks.length) fail(`${path}.marks`, "doc cannot have marks");
   wordRules(doc, path, false, fragment);
@@ -767,8 +784,8 @@ function noCycles<T>(
   });
 }
 
-function blocks(content: NodeJSON[], path: string): Node[] {
-  const doc = parseContent({ type: "doc", content }, path);
+function blocks(content: NodeJSON[], path: string, schema: Schema): Node[] {
+  const doc = parseContent({ type: "doc", content }, path, false, schema);
   const list: Node[] = [];
   doc.forEach((block) => {
     list.push(block);

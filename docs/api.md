@@ -213,12 +213,15 @@ Documents are schema v5, Word's model with tables, pictures, stories, fields and
   merged over that page (`pageSize` and `margins` part by part). Not validated. (0.2.0's took
   v2 content and millimetre settings; to start from those, pass
   `{ schemaVersion: 2, settings, content }` to `parseDocument` or the editor.)
-- `parseDocument(input: unknown): FoliDocument`: validates untrusted input (e.g. parsed JSON)
+- `parseDocument(input: unknown, options?: ParseOptions): FoliDocument`: validates untrusted input (e.g. parsed JSON)
   and returns a copy in canonical form; a document saved by 0.1.0 to 0.5.0 is validated as
   such and migrated (`migrateToV3`, `migrateToV4`, `migrateToV5`). Throws `FoliDocumentError`, whose message
   names the place (`content.content[2].marks[0].type: …`) and says when a newer Foli saved the
-  document; never drops content silently. `parseContent(json)` parses content alone into a
-  `doc` node, with Word's table rules.
+  document; never drops content silently. `ParseOptions`: `extensions`, the custom node and
+  mark types the document may hold ([below](#custom-nodes-and-marks)); a custom type none of them
+  declares is kept as it is. `parseContent(json, path?, fragment?, schema?)` parses content
+  alone into a `doc` node of `schema` (default: the Word schema; an editor's is `state.schema`),
+  with Word's table rules.
 - `FoliDocument`: `{ schemaVersion: 5, section, defaults, styles, numbering, theme?, comments,
   resources?, stories?, controls?, settings?, content }` and its parts (`SectionJSON`, `StyleJSON`, `TablePropertiesJSON`,
   `RowPropertiesJSON`, `CellPropertiesJSON`, `TableConditionJSON`, `MeasureJSON`,
@@ -235,6 +238,30 @@ Documents are schema v5, Word's model with tables, pictures, stories, fields and
 - Schema v2, kept to read 0.2.0 documents and pasted HTML: `FoliDocumentV2`, `parseContentV2`,
   `migrateToV3(document)`, and its JSON types (`DocJSON`, `ParagraphJSON`, `HeadingJSON`,
   `TextJSON`…, with `MARK_TYPES`, `SIMPLE_MARK_TYPES`, `HEADING_LEVELS`, `ALIGNMENTS`).
+
+### Custom nodes and marks
+
+An app adds its own node and mark types to the Word schema with an `Extension` (ADR-0008):
+`{ name, nodes?, marks?, plugins? }`, given to `createEditor({ extensions })`,
+`parseDocument(document, { extensions })` and `exportDocx(document, package, { extensions })`.
+
+- Type names have a namespace: `<namespace>:<name>`, lowercase letters, digits and `-`
+  (`acme:mention`). A name without one, or declared twice, throws a `RangeError` when the editor
+  is made. Word's types never have a colon.
+- A node (`ExtensionNodeSpec`) is a leaf: inline (`inline: true`, group `inline`) or a block
+  (group `block`); no `content`. Its `attrs` are as in `NodeSpec` (`validate` each), and
+  `text(attrs)` is the text it stands for: plain text on the clipboard, what find matches, its
+  text in `.docx`, how the view draws it until 12.4's node views. A mark is a `MarkSpec`.
+- Stored as ordinary node and mark JSON by type name ([document-model.md](document-model.md#custom-nodes-and-marks)).
+  Custom types never change `SCHEMA_VERSION`.
+- **Without its extension** a custom type is never dropped: it loads as a foreign node
+  (`foreignInline`, `foreignBlock`, drawn as its type in brackets, selected and deleted whole) or
+  a foreign mark, its attributes checked only as plain JSON (64 KiB at most), and is saved back
+  by `getDocument`, `parseDocument` and `exportDocx` as it was. Pasted into an editor that has the
+  extension, it is the custom type again.
+- Find matches a custom node's `text(attrs)` as one position; replace leaves it (`locked`).
+  Inserting or deleting one while tracking is a tracked change, accepted or rejected as text is.
+- Extensions' `plugins` run after `EditorOptions.plugins`, before the built-ins.
 
 ### Formatting (internal)
 
@@ -253,7 +280,7 @@ This whole section is internal (`@folijs/core/internal`): the renderers and `.do
 
 ### Editor
 
-`createEditor({ document?, plugins?, author?, trackChanges?, reviewView? }): Editor`: a headless editor (state, commands, undo
+`createEditor({ document?, plugins?, extensions?, author?, trackChanges?, reviewView? }): Editor`: a headless editor (state, commands, undo
 history, change notifications) of a Word's model document (schema v5). The document is
 validated and, when saved by 0.1.0 to 0.5.0, migrated (`parseDocument`; default:
 `createDocument()`); `setDocument` behaves the same way. `EditorDocument` is what both take:
@@ -576,7 +603,7 @@ Stable, for plugins and code that edits documents directly:
   transaction's `addToHistory`. The plugin's state is internal. Of the built-in plugins only
   `history()`, `baseKeymap()` and `listKeymap()` are exported (ADR-0008).
 - The option, result and JSON types of the functions on this page are stable with them:
-  `EditorOptions`, `EditorListener`, `DocumentTarget`, `NavigationRequest`, `FoundMatches`,
+  `EditorOptions`, `Extension`, `ExtensionNodeSpec`, `ParseOptions`, `EditorListener`, `DocumentTarget`, `NavigationRequest`, `FoundMatches`,
   `OpenStory`, `StoryView`, `DeleteUnit`, `CommentContent`, `CommentOptions`, `ChangeKind`,
   `ChangeFilter`, `ControlInsertOptions`, `ControlPropertiesPatch`, `ControlRange`,
   `ControlValue`, `ControlValueInput`, `CrossReference`, `CrossReferenceTargets`,
@@ -610,6 +637,8 @@ release may change it.
   `keepTablesApart`, `noteKindOf`, `referencesIn`, `typedMarks`, `deleteSelectionKeepingTables`.
 - The Word schema and validation, for `.docx`: `schema`, `checkSection`, `checkControl`, `Check`,
   `RUN_PROPERTY_MARKS`.
+- Custom types: `CUSTOM_TYPE` (the name pattern), `foreignTextOf` and `withForeignText` (the
+  text a `.docx` control showed for a custom node, carried on its JSON in memory, never saved).
 
 ## `@folijs/view`
 
@@ -697,7 +726,11 @@ const view = new EditorView(host, editor, { editable: true, placeholder: "" });
   Word and Google Docs lists, rules, safe links, colors, alignment; fitted with `fitPastedV2`),
   then text (`textToDoc`: one paragraph per line, fitted with `fitPaste`). Content with an
   opaque block at either end goes in as whole blocks at the caret (or replaces an empty
-  paragraph).
+  paragraph). A copy holding custom nodes or marks also carries its Foli JSON in the HTML (a
+  `data-foli-clipboard` attribute on a wrapping `div`, read back before the HTML itself), since
+  some browsers (Firefox) give a paste only HTML and text; plain text gets a node's
+  `text(attrs)`. Custom and foreign nodes are drawn as their text (`data-foli-custom` holds the
+  type) until node views (12.4).
   Plain text that is one URL (`autolinkHref`) becomes a link: over selected text inside one
   block that text is linked, otherwise the URL is inserted as linked text; not on paste as
   plain text (Ctrl/Cmd+Shift+V), nor when the clipboard holds Foli JSON.
@@ -742,7 +775,14 @@ Details (what import keeps, what export writes, limits): the
   to parts of its original package then fails). `ExportOptions`: `trackRevisions` (whether Word
   tracks changes in the file; left out, as the package has it), `resource(key, resource)` (the
   bytes of a picture's image the package does not hold and no `data:` URL gives: an app's
-  upload; without them the export fails).
+  upload; without them the export fails), `extensions` (the custom types: their `text(attrs)`
+  is what a node's control shows). Custom nodes and marks go out as content controls tagged
+  `foli:` and the type and attributes as JSON (ADR-0008): a node a plain text control, contents
+  locked, showing its text (a block node one around a paragraph); each run of a mark a rich text
+  control. A tag over 255 characters throws a `DocxError` naming the type. `importDocx` turns
+  such controls back into the nodes and marks, with or without the extension; a node read
+  without it keeps the control's text for the next export (in memory), one loaded from JSON
+  writes `[type]`.
 - `packageImages(pkg): PackageImages`: URLs for the pictures' images in a package
   (`url(key, resource?)`, made once each; `revoke()` frees them): `EditorView`'s `resource`
   option for a document imported from that package. Raster images (PNG, JPEG, GIF, WebP, BMP)

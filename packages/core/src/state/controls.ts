@@ -1099,7 +1099,7 @@ function valueFor(
       }
       const nodes = value.content.every((json) => state.schema.nodes[json.type]?.isInline)
         ? value.content.map((json) => state.schema.nodeFromJSON(json))
-        : blocksFrom(value.content);
+        : blocksFrom(state, value.content);
       if (nodes.every((n) => n.isInline)) return { nodes, control: shown };
       if (range.level === "inline") {
         const only = nodes.length === 1 ? nodes[0] : undefined;
@@ -1171,9 +1171,9 @@ function takesText(tree: Node, range: ControlRange): boolean {
 const isBlocks = (value: ControlValueInput) =>
   typeof value === "object" && value !== null && "content" in value;
 
-function blocksFrom(content: readonly NodeJSON[]): Node[] {
+function blocksFrom(state: EditorState, content: readonly NodeJSON[]): Node[] {
   const blocks: Node[] = [];
-  parseContent({ type: "doc", content }, "content", true).forEach((node) => {
+  parseContent({ type: "doc", content }, "content", true, state.schema).forEach((node) => {
     blocks.push(node);
   });
   return blocks;

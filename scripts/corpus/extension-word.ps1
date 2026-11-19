@@ -1,7 +1,7 @@
-# ADR-0008's spike, Word's side: opens every .docx of -In through COM, writes <name>.json to -Out
-# (whether it opened, and each content control: type, tag, text, locks), types "Word edit. " at the
-# start of the document and saves it as <name>.docx in -Out (Word's own file). Used by
-# src/word.test.ts; closes only what it opened.
+# Custom nodes and marks through Word (ADR-0008, 12.3): opens every .docx of -In through COM,
+# writes <name>.json to -Out (whether it opened, and each content control: type, tag, text, locks),
+# types " typed" at the end of the first marked run and "Word edit. " at the start of the document,
+# and saves it as <name>.docx in -Out (Word's own file). Used by extension-roundtrip.mjs; closes only what it opened.
 param([Parameter(Mandatory)][string]$In, [Parameter(Mandatory)][string]$Out)
 
 $ErrorActionPreference = "Stop"
@@ -29,6 +29,13 @@ try {
           })
       }
       $result.controls = $controls.ToArray()
+      # Typed into the first marked run (a rich text control): read back with the mark.
+      foreach ($control in $doc.ContentControls) {
+        if ([int]$control.Type -eq 0 -and ([string]$control.Tag).StartsWith("foli:")) {
+          $control.Range.InsertAfter(" typed")
+          break
+        }
+      }
       $start = $doc.Range(0, 0)
       $start.InsertBefore("Word edit. ")
       # FileName, FileFormat (wdFormatXMLDocument)

@@ -4,12 +4,6 @@ import { defineConfig, devices } from "@playwright/test";
 const APPS = [
   { name: "spike", dir: "spikes/two-page", filter: "@folijs/spike-two-page", port: 5174 },
   { name: "playground", dir: "apps/playground", filter: "@folijs/playground", port: 5175 },
-  {
-    name: "extension",
-    dir: "spikes/extension",
-    filter: "@folijs/spike-extension",
-    port: 5176,
-  },
 ];
 const BROWSERS = [
   { name: "chromium", device: devices["Desktop Chrome"] },

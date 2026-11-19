@@ -226,7 +226,22 @@ something else adds a barrier character. `replaceAll` builds one edit per tree a
 tracking, filters and appended transactions, so tracking, control locks and placeholders work as
 when typing and undo is one step. A floor on revision ids keeps the trees' new ids apart. A match is
 checked first: code, deleted text, a field's or control's edge, then, inside a control, a dry run
-through the filter. Bookmark changes go through `editTrees` untracked.
+through the filter. Bookmark changes go through `editTrees` untracked. A custom node adds its
+`text(attrs)` as one piece standing for one position, as a field code does.
+
+Custom nodes and marks (12.3, ADR-0008, `v3/extensions.ts`): `schemaWith(extensions)` builds the
+Word schema plus the extensions' types (checked: namespaced, not taken twice, leaves), cached for
+the last list given. An editor keeps that schema; every place that parses content inside it
+(`load`, stories, paste, notes, headers, rich control values) passes `state.schema` to
+`parseContent`. `parseContent` first rewrites the JSON (`resolveCustom`): a namespaced type the
+schema lacks becomes `foreignInline`/`foreignBlock`/the `foreign` mark (Word schema types holding
+the type and attributes), a foreign one whose type it has becomes that type. Output goes the other
+way (`writeCustom`) in `parseDocument` and `getDocument`; nothing else changes, so commands,
+history, tracking and the clipboard's JSON carry foreign content as ordinary leaves and marks.
+A foreign node's text from a `.docx` control rides on its JSON in memory (a non-enumerable symbol:
+`withForeignText`, `foreignTextOf`), never saved. `@folijs/docx` maps custom content to tagged
+content controls and back on the document's JSON (`src/custom.ts`), after `parseDocument` on
+export and before it on import.
 
 ## Editor view (`@folijs/view`)
 
@@ -947,6 +962,10 @@ must have loaded, and the container must not be scaled (`transform`, `zoom`).
   `{ open, content, word }`, the copied blocks as JSON, whether the copy was inside one block,
   and the definitions they reference (`copiedDefinitions`). Cut is copy plus
   `deleteSelection`, as its own undo step.
+- A copy holding custom or foreign content also puts its Foli JSON in the HTML, as the
+  `data-foli-clipboard` attribute of a wrapping `div` (set through the DOM, so escaped), because
+  some browsers (Firefox) give a paste only `text/html` and `text/plain`; paste reads it right
+  after the Foli type, parsing the HTML inert, and validates it the same way.
 - **Paste** reads, in order: Foli JSON, then HTML, then plain text (Ctrl/Cmd+Shift+V: plain
   text only). Foli JSON and plain text are fitted to the document by `fitPaste(state, content,
   word)`, HTML (read as schema v2) by `fitPastedV2` (see "Paste on v3" above), both validating
@@ -1005,7 +1024,6 @@ foli/
 │   ├── docx/  @folijs/docx   DOCX import to Word's model (schema v5) and lossless export; package (zip, parts, relationships), XML keeping source text. No DOM.
 │   └── pdf/   @folijs/pdf    exportPdf: a document printed by the app's headless Chromium page; ships the read-only renderer as a page script.
 ├── spikes/two-page/     Phase 1 spike; throwaway, never published.
-├── spikes/extension/    12.1 spike (ADR-0008): a custom node and mark; throwaway, never published.
 ├── examples/            Vite and Next.js apps installing the packed packages (6.4); never published.
 └── docs/
 ```

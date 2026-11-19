@@ -502,6 +502,53 @@ const themeFont = markAttr(nullable(oneOf(THEME_FONTS)), null);
 const hexByte = (v: unknown) =>
   typeof v === "string" && /^[0-9A-Fa-f]{2}$/.test(v) ? undefined : "must be a hex byte";
 
+/**
+ * The name of a custom node or mark type (ADR-0008): `<namespace>:<name>`, lowercase letters,
+ * digits and `-`. Word's types never have a colon.
+ */
+export const CUSTOM_TYPE = /^[a-z0-9-]+:[a-z0-9-]+$/;
+
+/** The largest custom attributes a foreign node or mark holds, as JSON text. */
+const MAX_FOREIGN_ATTRS = 65_536;
+
+/** Plain JSON (no `undefined`, functions, non-finite numbers or cycles), nested at most 32 deep. */
+function plainJSON(value: unknown, depth = 0): boolean {
+  if (depth > 32) return false;
+  if (value === null || typeof value === "string" || typeof value === "boolean") return true;
+  if (typeof value === "number") return Number.isFinite(value);
+  if (Array.isArray(value)) return value.every((v) => plainJSON(v, depth + 1));
+  return (
+    isRecord(value) &&
+    Object.getPrototypeOf(value) === Object.prototype &&
+    Object.values(value).every((v) => plainJSON(v, depth + 1))
+  );
+}
+
+/** A foreign type's attributes: a plain JSON object, size-limited. */
+const foreignAttrs: Check = (v) => {
+  if (!isRecord(v) || !plainJSON(v)) return "must be a plain JSON object";
+  return JSON.stringify(v).length <= MAX_FOREIGN_ATTRS
+    ? undefined
+    : `must be at most ${MAX_FOREIGN_ATTRS} characters as JSON`;
+};
+
+/**
+ * What a foreign node or mark holds: the custom type and attributes it was read as. `text` is
+ * a foreign node's text as a `.docx` control showed it: in memory only, never saved.
+ */
+const foreign = {
+  type: {
+    validate: (v: unknown) =>
+      typeof v === "string" && CUSTOM_TYPE.test(v) ? undefined : "must be a namespaced type",
+  },
+  attrs: nullableAttr(foreignAttrs),
+};
+const foreignNode = {
+  attrs: { ...foreign, text: nullableAttr(str(65_535)) },
+  text: (attrs: Record<string, unknown>) =>
+    typeof attrs.text === "string" ? attrs.text : `[${String(attrs.type)}]`,
+};
+
 export const schema = new Schema({
   nodes: {
     doc: { content: "block+" },
@@ -689,6 +736,12 @@ export const schema = new Schema({
         run: { default: false, validate: bool },
       },
     },
+    /**
+     * A custom node whose extension is not loaded (ADR-0008): kept whole, written back as the
+     * type and attributes it was read as. Only in memory: never saved under this name.
+     */
+    foreignInline: { group: "inline", inline: true, ...foreignNode },
+    foreignBlock: { group: "block", ...foreignNode },
   },
   marks: {
     // Order: the canonical order of mark sets, and of nesting when rendered (outermost first).
@@ -770,5 +823,7 @@ export const schema = new Schema({
     },
     /** The `w:rPr` these marks were read from, verbatim (see the module comment). */
     runExt: { attrs: { xml: markAttr(xml) } },
+    /** A custom mark whose extension is not loaded, as `foreignInline` is a node. Several combine. */
+    foreign: { attrs: foreign, excludes: "", inclusive: false },
   },
 });

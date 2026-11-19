@@ -1,5 +1,5 @@
 import type { DocumentSettings, FoliDocumentV2 } from "../document.js";
-import { type Attrs, type Node, Slice } from "../model/index.js";
+import { type Attrs, type Node, type Schema, Slice } from "../model/index.js";
 import type { Alignment } from "../schema.js";
 import {
   createDocument,
@@ -8,6 +8,7 @@ import {
   parseDocument,
   type SectionJSON,
 } from "../v3/document.js";
+import { type Extension, schemaWith, writeCustom } from "../v3/extensions.js";
 import { twipsToMm as mm } from "../v3/units.js";
 import {
   baseKeymap,
@@ -89,6 +90,12 @@ export interface EditorOptions {
   document?: EditorDocument;
   /** Run before the built-in plugins, so their keymaps take precedence. */
   plugins?: readonly Plugin[];
+  /**
+   * Custom node and mark types and their plugins (ADR-0008), added to the Word schema. Their
+   * plugins run after `plugins`, before the built-ins. Content of types none of them declares is
+   * kept as foreign nodes and marks and saved back unchanged.
+   */
+  extensions?: readonly Extension[];
   /** Who edits: tracked changes are made in this name. Default "Author". */
   author?: string;
   /**
@@ -310,9 +317,17 @@ interface Loaded {
 }
 
 /** Validates (and migrates) a document and reads what the editor keeps of it. */
-function load(document: EditorDocument): Loaded {
-  const { content, ...envelope } = parseDocument(document);
-  return { doc: parseContent(content), settings: sectionSettings(envelope.section), envelope };
+function loadDocument(
+  document: EditorDocument,
+  extensions: readonly Extension[],
+  schema: Schema,
+): Loaded {
+  const { content, ...envelope } = parseDocument(document, { extensions });
+  return {
+    doc: parseContent(content, "content", false, schema),
+    settings: sectionSettings(envelope.section),
+    envelope,
+  };
 }
 
 /** What differs between the editor of the body and of a story. */
@@ -445,14 +460,18 @@ function makeEditor(parts: EditorParts): Editor {
 export function createEditor({
   document = createDocument(),
   plugins = [],
+  extensions = [],
   author = "Author",
   trackChanges = false,
   reviewView = "markup",
 }: EditorOptions = {}): Editor {
+  const schema = schemaWith(extensions);
+  const own = [...plugins, ...extensions.flatMap((e) => e.plugins ?? [])];
+  const load = (next: EditorDocument) => loadDocument(next, extensions, schema);
   let loaded = load(document);
   let track: TrackState = { on: trackChanges, author, view: reviewView };
   const pluginsFor = ({ envelope }: Loaded) => [
-    ...plugins,
+    ...own,
     history(),
     wordPlugin(envelope),
     trackPlugin(track),
@@ -496,10 +515,22 @@ export function createEditor({
     if (section !== current.section) current = { section, settings: sectionSettings(section) };
     return current.settings;
   };
-  const getDocument = (): FoliDocument => ({
-    ...structuredClone(wordContext(state)?.envelope ?? loaded.envelope),
-    content: state.doc.toJSON(),
-  });
+  const getDocument = (): FoliDocument => {
+    const { stories, comments, ...rest } = structuredClone(
+      wordContext(state)?.envelope ?? loaded.envelope,
+    );
+    // Foreign nodes and marks go out as the custom types they stand for.
+    return {
+      ...rest,
+      comments: comments.map((c) => ({ ...c, content: c.content.map(writeCustom) })),
+      ...(stories && {
+        stories: Object.fromEntries(
+          Object.entries(stories).map(([id, s]) => [id, { ...s, content: writeCustom(s.content) }]),
+        ),
+      }),
+      content: writeCustom(state.doc.toJSON()),
+    };
+  };
 
   const storyEditor = (id: string): Editor => {
     const editing = new StoryEditing(id, {
@@ -510,7 +541,7 @@ export function createEditor({
       can: (command) => command(state),
       dispatch,
       plugins: (context: WordContext, value) => [
-        ...plugins,
+        ...own,
         wordPlugin(context.envelope, context),
         trackPlugin(value ?? track),
         fieldsPlugin(),
@@ -525,7 +556,7 @@ export function createEditor({
       state: () => editing.state,
       dispatch: editing.dispatch,
       settings,
-      getDocument: () => ({ ...getDocument(), content: editing.state.doc.toJSON() }),
+      getDocument: () => ({ ...getDocument(), content: writeCustom(editing.state.doc.toJSON()) }),
       setDocument(next) {
         const { doc } = load(next);
         const tr = editing.state.tr.replace(
