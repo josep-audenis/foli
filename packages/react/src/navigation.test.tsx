@@ -103,8 +103,10 @@ describe("find and replace panel", () => {
     act(() => {
       editor.commands.insertText(" cat");
     });
-    // Typing: nothing looked for yet.
-    expect(shown.length).toBe(count);
+    // Typing: nothing looked for yet, the marks moved with the text.
+    expect(shown.length).toBe(count + 1);
+    expect(shown[shown.length - 1]).toMatchObject({ scroll: false, current: { from: 3 } });
+    expect(shown[shown.length - 1]?.matches.length).toBe(3);
     await act(() => new Promise((resolve) => setTimeout(resolve, 400)));
     const last = shown[shown.length - 1];
     expect(last?.matches.length).toBe(4);
@@ -114,9 +116,54 @@ describe("find and replace panel", () => {
       editor.commands.insertText("An");
     });
     await act(() => new Promise((resolve) => setTimeout(resolve, 400)));
-    // The current match moved: none is current, and none is gone to.
+    // The current match moved with the text and stays current; nothing is gone to.
+    expect(shown[shown.length - 1]).toMatchObject({ scroll: false, current: { from: 4 } });
+    expect(screen.getByRole("status").textContent).toBe("1 of 4");
+    // Deleted, it is current no more.
+    act(() => editor.select(4, 7));
+    act(() => {
+      editor.commands.deleteSelection();
+    });
+    await act(() => new Promise((resolve) => setTimeout(resolve, 400)));
     expect(shown[shown.length - 1]).toMatchObject({ scroll: false, current: null });
-    expect(screen.getByRole("status").textContent).toBe("4 found");
+    expect(screen.getByRole("status").textContent).toBe("3 found");
+  });
+
+  it("searches again at once after its own Replace all", () => {
+    const { editor, shown } = setup(p("cat cat dog dog"));
+    ask(editor, "replace");
+    type("Find what", "cat");
+    type("Replace with", "dog");
+    type("Find what", "dog");
+    type("Replace with", "cow");
+    press("Replace all");
+    expect(text(editor)).toBe("cat cat cow cow");
+    const last = shown[shown.length - 1];
+    expect(last?.matches).toEqual([]);
+    expect(last?.current).toBeNull();
+  });
+
+  it("moves the marks with the text while typing, before the search comes again", () => {
+    const { editor, shown } = setup(p("A cat sat"));
+    ask(editor, "find");
+    type("Find what", "cat");
+    expect(shown[shown.length - 1]?.current).toMatchObject({ from: 3, to: 6 });
+    act(() => editor.select(1));
+    act(() => {
+      editor.commands.insertText("xyz");
+    });
+    const last = shown[shown.length - 1];
+    expect(last?.current).toMatchObject({ from: 6, to: 9, text: "cat" });
+    expect(editor.state.doc.textBetween(6, 9)).toBe("cat");
+    // Enter goes to it, not to where it was.
+    fireEvent.submit(screen.getByLabelText("Find what").closest("form") as HTMLFormElement);
+    expect(editor.state.selection).toMatchObject({ from: 6, to: 9 });
+    // Typing inside a match takes it away until the search comes again.
+    act(() => editor.select(7));
+    act(() => {
+      editor.commands.insertText("o");
+    });
+    expect(shown[shown.length - 1]?.matches.map((m) => m.story)).toEqual(["h"]);
   });
 
   it("takes the selection as the query", () => {

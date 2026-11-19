@@ -18,6 +18,8 @@ import {
   renameBookmark,
   replace,
   replaceAll,
+  StoryStep,
+  type Transaction,
   trackState,
   wordContext,
 } from "@folijs/core";
@@ -77,6 +79,28 @@ function isSelected(body: Editor, match: FindMatch): boolean {
   const { story, state } = activeState(body);
   const { from, to } = state.selection;
   return story === match.story && from === match.from && to === match.to;
+}
+
+/**
+ * `match` where `transactions` leave it, or null when they changed it or its story: until the next
+ * search the marks follow the text and Enter goes where they are.
+ */
+function mapMatch(
+  match: FindMatch,
+  transactions: readonly Transaction[],
+  stories: ReadonlySet<string>,
+): FindMatch | null {
+  if (match.story !== null) return stories.has(match.story) ? null : match;
+  let { from, to } = match;
+  for (const tr of transactions) {
+    const start = tr.mapping.mapResult(from, 1);
+    const end = tr.mapping.mapResult(to, -1);
+    if (start.deleted || end.deleted) return null;
+    from = start.pos;
+    to = end.pos;
+  }
+  if (to - from !== match.to - match.from) return null;
+  return from === match.from ? match : { ...match, from, to };
 }
 
 /** What the document shows has changed: another search is due. */
@@ -286,8 +310,25 @@ function FindPanel({
   useEffect(() => {
     let key = searchKey(body.state);
     let timer: ReturnType<typeof setTimeout> | undefined;
-    const unsubscribe = body.subscribe((state) => {
+    const unsubscribe = body.subscribe((state, transactions) => {
       const next = searchKey(state);
+      if (transactions.some((tr) => tr.docChanged)) {
+        const stories = new Set<string>();
+        for (const tr of transactions)
+          for (const step of tr.steps) if (step instanceof StoryStep) stories.add(step.id);
+        setFound((found) => {
+          if (!found.matches.length) return found;
+          const matches: FindMatch[] = [];
+          let current: FindMatch | null = null;
+          for (const match of found.matches) {
+            const mapped = mapMatch(match, transactions, stories);
+            if (!mapped) continue;
+            matches.push(mapped);
+            if (match === found.current) current = mapped;
+          }
+          return { matches, current, scroll: false };
+        });
+      }
       if (next.some((value, i) => value !== key[i])) {
         clearTimeout(timer);
         timer = setTimeout(() => setVersion((n) => n + 1), RESEARCH_DELAY);
@@ -360,6 +401,9 @@ function FindPanel({
   };
   const all = () => {
     const report = replaceAll(body, query, replacement, options);
+    // What is left at once, as after Replace: not the replaced text for a moment.
+    const fresh = findAll(body, query, options);
+    setFound({ matches: fresh, current: nextMatch(body, fresh), scroll: false });
     setMessage(reportText(report));
   };
 
