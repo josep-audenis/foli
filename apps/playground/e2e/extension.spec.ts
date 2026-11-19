@@ -83,6 +83,16 @@ test("typed, drawn on the page, undone and redone", async ({ page }) => {
   await expect.poll(() => customs(page)).toEqual([TOPIC]);
 });
 
+test("the plugin's command runs by name on editor.commands and is undone", async ({ page }) => {
+  await page.goto("/extension.html");
+  await editor(page).click();
+  await page.keyboard.type("Hi ");
+  expect(await page.evaluate(() => window.__extension.mention("u-42", "Ada Lovelace"))).toBe(true);
+  await expect(chip(page)).toHaveText("@Ada Lovelace");
+  expect(await customs(page)).toEqual([MENTION]);
+  await pressUntil(page, `${MOD}+z`, []);
+});
+
 test("copied and pasted, into an editor with and without the extension", async ({
   page,
   context,

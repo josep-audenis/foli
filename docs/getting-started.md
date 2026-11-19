@@ -360,5 +360,6 @@ theme ships in `@folijs/react` (which lists `react` as a peer dependency); witho
 ## Next
 
 - [API reference](api.md)
+- [Keyboard](keyboard.md): every key per platform, and which a plugin can take
 - [Styling](styling.md): CSS variables, dark theme, print
 - [Known limitations](limitations.md): read before shipping

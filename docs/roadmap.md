@@ -23,7 +23,7 @@ place that says what is in progress; check it before starting work.
 | 9 Review                 | ✅ Done                  | —                  | Merged in #63–#72; 0.4.0 on npm                                                                              |
 | 10 Tables & images       | ✅ Done                  | —                  | Merged in #73–#97 (#90, the landing page, went to main); 0.5.0 on npm; two misses accepted                   |
 | 11 Sections & templates  | ✅ Done                  | —                  | Merged in #100–#118 (#106, #107, #110, #112 and #113, the site, went to main); 0.6.0 on npm; misses accepted |
-| 12 Ecosystem & 1.0       | In progress              | phase-12/ecosystem | 12.1 to 12.3 done: ADR-0008, the public API by name with API reports, custom nodes and marks; 12.4 next      |
+| 12 Ecosystem & 1.0       | In progress              | phase-12/ecosystem | 12.1 to 12.5 done: ADR-0008, API reports, custom nodes and marks, view hooks, commands and keys; 12.6 next   |
 
 Status values: `Ready` (dependencies met, nobody on it) · `In progress` · `In review` (PR open) ·
 `✅ Done` (merged, acceptance criteria met) · `Blocked by …`.
@@ -1517,10 +1517,38 @@ Each task is a PR on `phase-12/ecosystem`, the build green after each.
   later DOM changes are not read back (no redraw loop); `NodeView.destroy(dom)` when a drawing is
   dropped; split copies are `inert`; a throwing hook or editor listener is reported and the rest
   goes on; tests for each.)
-- [ ] 12.5 Commands and keymaps: commands registered by plugins and reachable through
+- [x] 12.5 Commands and keymaps: commands registered by plugins and reachable through
   `editor.commands` and `editor.run`, typed; the view's own keys moved into keymaps or reserved as
   the ADR lists; a user keymap overrides each overridable built-in key; Word's keys documented per
-  platform (macOS included).
+  platform (macOS included). (Done: `PluginSpec.commands` (names to command factories) are added
+  to `editor.commands` by `createEditor`, on the body's and the stories' editors, beside the
+  built-in ones; `editor.run`/`editor.can` take the factory's command; `FoliCommands` (new, core)
+  is the interface of `editor.commands` that apps augment (`declare module "@folijs/core"`,
+  checked by the typecheck in view's `keys.test.ts` and the playground's extension page); a name
+  taken twice or by a built-in command throws a `RangeError` (`__proto__` is a name like any).
+  The view's overridable keys (Ctrl+Home/End with Shift, F9, Alt+F9, Alt+Down, Ctrl+Alt+F/D,
+  Shift+Alt+N, Ctrl+F/H/G, F3, Shift+F3, Ctrl+Shift+F5) run where a `viewKeys` marker plugin
+  (`@folijs/core/internal`) stands, after the user's and extensions' plugins and before every
+  core keymap, as before them; the reserved ones (caret fixes for arrows, Escape out of a story,
+  Tab after Escape or read-only, Ctrl+Shift+V, the keys of a column drag, a picture resize or a
+  control pop-up, IME) stay ahead of the keymaps; in a note, Shift+Alt+N back to the reference
+  yields to a binding the story's view ran. `keyName` names Alt (Option) + letter or digit by the
+  physical key, as with Mod, so Option+Shift+N is `Alt-Shift-n` on macOS. `docs/keyboard.md`:
+  every built-in key on Windows/Linux and macOS, its name, command and whether it is overridable
+  or reserved (all keymap keys are overridable), linked from the README, getting started, api and
+  architecture. Tests: core `editor.test.ts` (2: commands by name, collisions), view
+  `keys.test.ts` (20, jsdom: each overridable key taken by a user keymap with the built-in not
+  run, the built-ins without one, Tab after Escape reserved, a typed plugin command, `keyName`
+  with Option); e2e `keymaps.spec.ts` on `/edit.html?keys=override` (every overridable key
+  pressed where its built-in would act: header and footer, a drop-down control, a footnote, the
+  find panel; Shift+Alt+N inside an open note) and `extension.spec.ts` (the plugin's
+  `insertMention` by name, undone): 38 passed, 1 skipped (WebKit paste, as before) in Chromium, Firefox and WebKit. No regression in the suites that press keys (`word-editing`, `word-navigation`, `word-fields`, `word-controls`, `word-notes`, `word-headers`, `word-tables`, `lists`, `toolbar`, `clipboard`, `caret`, `editing`): 448 passed, 14 skipped (Chromium 154, Firefox 148, WebKit 146; the usual clipboard and IME skips), none of the known flaky ones failing. Sizes within budgets (core 82.8 of 85.9 kB, view
+  110.1 of 112.0 kB). Shortcuts: the view's keys are a table in `EditorView` run at the marker,
+  not a `Plugin` with a `keymap` (their commands need the view), so `editor.handleKey` does not
+  run them; plugin commands are untyped unless an app augments `FoliCommands`; the macOS mapping
+  (Cmd+H, Cmd+Option+D and F3 taken by the system) is documented, not checked on a Mac; ADR-0008's
+  table says "dragging or resizing a picture" where the view drags column borders and resizes
+  pictures.)
 - [ ] 12.6 React: toolbar items added, removed and grouped (built-in items exported, a custom item
   driven by a command's dry run and `useEditorState`), menus too where they share the code;
   `plugins` stable (changing it after mount documented or supported); hooks for commands; axe and

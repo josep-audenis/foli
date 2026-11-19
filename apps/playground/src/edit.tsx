@@ -2,7 +2,8 @@
  * The Word editing page (`/edit.html`, dev server only, 8.7a): a schema v3 document, imported
  * from a .docx or the sample below, edited in `EditorView` with `FoliToolbar` (8.7b) and saved
  * back as a .docx. The editing tests on schema v3 drive it (`e2e/word-editing.spec.ts`,
- * `e2e/word-format.spec.ts`).
+ * `e2e/word-format.spec.ts`). `?keys=override`: a user plugin binds every key the view handles
+ * itself and may give up (`docs/keyboard.md`), recording each it gets (`e2e/keymaps.spec.ts`).
  */
 import {
   createEditor,
@@ -11,6 +12,7 @@ import {
   insertControl,
   insertPicture,
   insertTable,
+  Plugin,
   parseDocument,
 } from "@folijs/core";
 import {
@@ -88,7 +90,24 @@ const upload = (file: File) =>
     reader.onerror = () => reject(reader.error);
     reader.readAsDataURL(file);
   });
-let editor: Editor = createEditor({ document: SAMPLE, author: "Foli user" });
+/** The keys `?keys=override` took, in order. */
+const overridden: string[] = [];
+const OVERRIDABLE = [
+  ...["Mod-Home", "Mod-End", "Mod-Shift-Home", "Mod-Shift-End", "F9", "Alt-F9", "Alt-ArrowDown"],
+  ...["Mod-Alt-f", "Mod-Alt-d", "Alt-Shift-n", "Mod-f", "Mod-h", "Mod-g", "F3", "Shift-F3"],
+  "Mod-Shift-F5",
+];
+const plugins =
+  new URLSearchParams(location.search).get("keys") === "override"
+    ? [
+        new Plugin({
+          keymap: Object.fromEntries(
+            OVERRIDABLE.map((key) => [key, () => overridden.push(key) > 0] as const),
+          ),
+        }),
+      ]
+    : [];
+let editor: Editor = createEditor({ document: SAMPLE, author: "Foli user", plugins });
 let view = new EditorView(host, editor, { upload });
 const toolbar = createRoot(document.getElementById("toolbar") as HTMLElement);
 const commentsPane = createRoot(document.getElementById("comments") as HTMLElement);
@@ -115,7 +134,12 @@ function load(document: FoliDocument, from?: DocxPackage, trackChanges = false):
   view.destroy();
   images?.revoke();
   images = from ? packageImages(from) : undefined;
-  editor = createEditor({ document: parseDocument(document), author: "Foli user", trackChanges });
+  editor = createEditor({
+    document: parseDocument(document),
+    author: "Foli user",
+    trackChanges,
+    plugins,
+  });
   view = new EditorView(host, editor, { upload, ...(images ? { resource: images.url } : {}) });
   original = from;
   showToolbar();
@@ -168,6 +192,8 @@ declare global {
         insertTable: typeof insertTable;
         insertControl: typeof insertControl;
       };
+      /** The keys the `?keys=override` plugin took. */
+      overridden: string[];
     };
   }
 }
@@ -191,4 +217,5 @@ window.foliEdit = {
     return true;
   },
   commands: { insertPicture, insertTable, insertControl },
+  overridden,
 };

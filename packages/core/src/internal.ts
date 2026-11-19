@@ -20,6 +20,7 @@ export {
   sameSpot,
   setComments,
   typedMarks,
+  viewKeys,
   type WordContext,
   type WordDefinitions,
   type WordEnvelope,

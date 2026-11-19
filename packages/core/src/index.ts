@@ -136,6 +136,7 @@ export {
   type FieldsReport,
   type FindMatch,
   type FindOptions,
+  type FoliCommands,
   type FoundMatches,
   fieldAround,
   fieldCodesShown,

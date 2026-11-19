@@ -6,12 +6,14 @@ import type { BlockJSON, DocJSON } from "../schema.js";
 import { testSchema } from "../testing/index.js";
 import { parseDocument } from "../v3/index.js";
 import {
+  type Command,
   createEditor,
   deleteBackward,
   deleteForward,
   deleteSelection,
   type Editor,
   EditorState,
+  insertText,
   Plugin,
   PluginKey,
   redoDepth,
@@ -330,6 +332,41 @@ describe("plugins", () => {
     editor.commands.insertText("?");
     expect(content(editor)).toEqual(docJSON(para("a?!")));
     expect(count.getState(editor.state)).toBe(3);
+  });
+
+  it("add named commands to editor.commands, beside the built-in ones", () => {
+    const repeat =
+      (value: string, times: number): Command =>
+      (state, dispatch) =>
+        insertText(value.repeat(times))(state, dispatch);
+    const never: Command = () => false;
+    const editor = createEditor({
+      plugins: [new Plugin({ commands: { repeat } })],
+      extensions: [{ name: "x", plugins: [new Plugin({ commands: { never: () => never } })] }],
+    });
+    // Untyped here: apps type them by augmenting FoliCommands (view's keys.test.ts does).
+    const commands = editor.commands as unknown as Record<string, (...args: unknown[]) => boolean>;
+    expect(commands.repeat?.("ab", 2)).toBe(true);
+    expect(commands.never?.()).toBe(false);
+    expect(editor.commands.insertText("!")).toBe(true);
+    expect(content(editor)).toEqual(docJSON(para("abab!")));
+    expect(editor.can(repeat("x", 1))).toBe(true);
+  });
+
+  it("refuse a command name taken twice or by a built-in command", () => {
+    const factory = () => insertText("x");
+    const twice = () =>
+      createEditor({
+        plugins: [
+          new Plugin({ commands: { mine: factory } }),
+          new Plugin({ commands: { mine: factory } }),
+        ],
+      });
+    expect(twice).toThrow(/Command "mine" is already defined/);
+    const builtIn = () => createEditor({ plugins: [new Plugin({ commands: { undo: factory } })] });
+    expect(builtIn).toThrow(/Command "undo" is already defined/);
+    const odd = createEditor({ plugins: [new Plugin({ commands: { __proto__: factory } })] });
+    expect(Object.getPrototypeOf(odd.commands)).toBe(Object.prototype);
   });
 });
 

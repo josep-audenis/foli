@@ -4,8 +4,9 @@
  * with keys to insert a mention (Ctrl+Shift+M) and toggle the topic (Ctrl+Shift+K); its view hooks
  * draw the mention as a chip and the card as a list of rows (split across pages), style the topic,
  * decorate every "TODO" and the paragraph holding the caret, and keep a word count beside the
- * editor (a plugin view). `?extension=0` loads the editor without it: the same content is then
- * foreign. Driven by `e2e/extension.spec.ts`.
+ * editor (a plugin view). Its plugin adds a command, `editor.commands.insertMention` (12.5),
+ * typed by augmenting `FoliCommands`. `?extension=0` loads the editor without it: the same
+ * content is then foreign. Driven by `e2e/extension.spec.ts`.
  */
 import {
   type Command,
@@ -22,6 +23,13 @@ import {
 } from "@folijs/core";
 import { exportDocx, importDocx } from "@folijs/docx";
 import { type Decoration, EditorView, type ViewExtension } from "@folijs/view";
+
+declare module "@folijs/core" {
+  interface FoliCommands {
+    /** Inserts a mention of user `id` at the selection (the acme extension's command). */
+    insertMention(id: string, label: string): boolean;
+  }
+}
 
 const id = (value: unknown) =>
   typeof value === "string" && /^[\w-]{1,64}$/.test(value) ? undefined : "must be an id";
@@ -73,6 +81,7 @@ const acme: ViewExtension = {
   plugins: [
     new Plugin({
       key: new PluginKey("acme"),
+      commands: { insertMention },
       keymap: {
         "Mod-Shift-m": insertMention("u-42", "Ada Lovelace"),
         "Mod-Shift-k": toggleMark("acme:topic", { topic: "finance" }),
@@ -169,6 +178,8 @@ const page = {
   check: () => void parseDocument(editor.getDocument(), { extensions }),
   selection: () => ({ anchor: editor.state.selection.anchor, head: editor.state.selection.head }),
   lifecycle,
+  /** Through the plugin's command, by name. */
+  mention: (mentionId: string, label: string) => editor.commands.insertMention(mentionId, label),
   destroy: () => view.destroy(),
 };
 Object.assign(window, { __extension: page });

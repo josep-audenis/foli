@@ -64,7 +64,7 @@ import {
 } from "./review.js";
 import type { StorySide, StoryVariant } from "./sections.js";
 import { Selection, TextSelection } from "./selection.js";
-import { type Command, EditorState, type Plugin, type Transaction } from "./state.js";
+import { type Command, EditorState, Plugin, PluginKey, type Transaction } from "./state.js";
 import { callListener, StoryEditing } from "./stories.js";
 import { tableKeymap } from "./tables.js";
 import {
@@ -182,6 +182,81 @@ export interface StoryView {
   focus(): void;
 }
 
+/**
+ * The commands on `editor.commands`. Apps add the names of their plugins' commands by augmenting
+ * it: `declare module "@folijs/core" { interface FoliCommands { insertMention(id: string): boolean } }`.
+ */
+export interface FoliCommands {
+  insertText(text: string): boolean;
+  deleteSelection(): boolean;
+  deleteBackward(unit?: DeleteUnit): boolean;
+  deleteForward(unit?: DeleteUnit): boolean;
+  joinBackward(): boolean;
+  joinForward(): boolean;
+  splitBlock(): boolean;
+  insertHardBreak(): boolean;
+  insertPageBreak(): boolean;
+  toggleMark(type: string, attrs?: Attrs | null): boolean;
+  setBlockType(type: string, attrs?: Attrs | null): boolean;
+  selectAll(): boolean;
+  undo(): boolean;
+  redo(): boolean;
+  /** Numbers the selected paragraphs as a list ("bulletList" or "orderedList"). */
+  wrapInList(kind: ListKind): boolean;
+  /** The list buttons: removes the selection's numbering when it is a list of `kind`, else numbers it. */
+  toggleList(kind: ListKind): boolean;
+  /** Tab in a list: one level deeper. */
+  indentListItem(): boolean;
+  /** Shift+Tab in a list: one level up (out of the list at the top). */
+  outdentListItem(): boolean;
+  /**
+   * Links the selection to `href` (normalized, then validated: unsafe hrefs do not apply); at
+   * a caret in a link, changes it; elsewhere inserts the href as linked text.
+   */
+  setLink(href: string): boolean;
+  /** Removes the links in the selection, or the link around the caret. */
+  removeLink(): boolean;
+  /** Aligns the selected paragraphs and headings ("start", "center", "end", "justify"). */
+  setAlign(align: Alignment): boolean;
+  /** Text color (lowercase `#rrggbb`) of the selected or next typed text; null removes it. */
+  setTextColor(color: string | null): boolean;
+  /** Highlight (`#rrggbb`) of the selected or next typed text; null removes it. */
+  setHighlight(color: string | null): boolean;
+  /** Turns tracked changes on or off (`author` changes who makes them). */
+  setTrackChanges(on: boolean, author?: string): boolean;
+  /** How the editor's views show tracked changes. */
+  setReviewView(view: ReviewView): boolean;
+  /** Accepts the change at the caret, or the changes in the selection. */
+  acceptChange(): boolean;
+  /** Rejects the change at the caret, or the changes in the selection. */
+  rejectChange(): boolean;
+  /** Accepts every change, or every change of `author`. */
+  acceptAllChanges(author?: string): boolean;
+  /** Rejects every change, or every change of `author`. */
+  rejectAllChanges(author?: string): boolean;
+  /** Selects the next change after the selection. */
+  nextChange(): boolean;
+  /** Selects the previous change before the selection. */
+  previousChange(): boolean;
+  /** Comments the selection (at a caret, the point there). */
+  addComment(content: CommentContent, options?: CommentOptions): boolean;
+  /** Replies to a comment's thread. */
+  replyToComment(id: number, content: CommentContent, options?: CommentOptions): boolean;
+  /** Replaces a comment's content. */
+  editComment(id: number, content: CommentContent): boolean;
+  /** Resolves (`done` false: reopens) a comment's thread. */
+  resolveComment(id: number, done?: boolean): boolean;
+  /** Deletes a comment, its replies and their anchors. */
+  deleteComment(id: number): boolean;
+  /** Deletes every comment. */
+  deleteAllComments(): boolean;
+  /**
+   * Fills the content controls with this id or tag, here and in the stories (from the body's
+   * editor): one undo step, tracked when tracking is on. False when none could take it.
+   */
+  setControlValue(target: string, value: ControlValueInput): boolean;
+}
+
 /** A headless editor: state, commands, history and change notifications, no DOM. */
 export interface Editor {
   readonly state: EditorState;
@@ -199,76 +274,11 @@ export interface Editor {
   handleKey(key: string): boolean;
   /** Places a text selection (positions are clamped into the document). */
   select(anchor: number, head?: number): void;
-  readonly commands: {
-    insertText(text: string): boolean;
-    deleteSelection(): boolean;
-    deleteBackward(unit?: DeleteUnit): boolean;
-    deleteForward(unit?: DeleteUnit): boolean;
-    joinBackward(): boolean;
-    joinForward(): boolean;
-    splitBlock(): boolean;
-    insertHardBreak(): boolean;
-    insertPageBreak(): boolean;
-    toggleMark(type: string, attrs?: Attrs | null): boolean;
-    setBlockType(type: string, attrs?: Attrs | null): boolean;
-    selectAll(): boolean;
-    undo(): boolean;
-    redo(): boolean;
-    /** Numbers the selected paragraphs as a list ("bulletList" or "orderedList"). */
-    wrapInList(kind: ListKind): boolean;
-    /** The list buttons: removes the selection's numbering when it is a list of `kind`, else numbers it. */
-    toggleList(kind: ListKind): boolean;
-    /** Tab in a list: one level deeper. */
-    indentListItem(): boolean;
-    /** Shift+Tab in a list: one level up (out of the list at the top). */
-    outdentListItem(): boolean;
-    /**
-     * Links the selection to `href` (normalized, then validated: unsafe hrefs do not apply); at
-     * a caret in a link, changes it; elsewhere inserts the href as linked text.
-     */
-    setLink(href: string): boolean;
-    /** Removes the links in the selection, or the link around the caret. */
-    removeLink(): boolean;
-    /** Aligns the selected paragraphs and headings ("start", "center", "end", "justify"). */
-    setAlign(align: Alignment): boolean;
-    /** Text color (lowercase `#rrggbb`) of the selected or next typed text; null removes it. */
-    setTextColor(color: string | null): boolean;
-    /** Highlight (`#rrggbb`) of the selected or next typed text; null removes it. */
-    setHighlight(color: string | null): boolean;
-    /** Turns tracked changes on or off (`author` changes who makes them). */
-    setTrackChanges(on: boolean, author?: string): boolean;
-    /** How the editor's views show tracked changes. */
-    setReviewView(view: ReviewView): boolean;
-    /** Accepts the change at the caret, or the changes in the selection. */
-    acceptChange(): boolean;
-    /** Rejects the change at the caret, or the changes in the selection. */
-    rejectChange(): boolean;
-    /** Accepts every change, or every change of `author`. */
-    acceptAllChanges(author?: string): boolean;
-    /** Rejects every change, or every change of `author`. */
-    rejectAllChanges(author?: string): boolean;
-    /** Selects the next change after the selection. */
-    nextChange(): boolean;
-    /** Selects the previous change before the selection. */
-    previousChange(): boolean;
-    /** Comments the selection (at a caret, the point there). */
-    addComment(content: CommentContent, options?: CommentOptions): boolean;
-    /** Replies to a comment's thread. */
-    replyToComment(id: number, content: CommentContent, options?: CommentOptions): boolean;
-    /** Replaces a comment's content. */
-    editComment(id: number, content: CommentContent): boolean;
-    /** Resolves (`done` false: reopens) a comment's thread. */
-    resolveComment(id: number, done?: boolean): boolean;
-    /** Deletes a comment, its replies and their anchors. */
-    deleteComment(id: number): boolean;
-    /** Deletes every comment. */
-    deleteAllComments(): boolean;
-    /**
-     * Fills the content controls with this id or tag, here and in the stories (from the body's
-     * editor): one undo step, tracked when tracking is on. False when none could take it.
-     */
-    setControlValue(target: string, value: ControlValueInput): boolean;
-  };
+  /**
+   * The named commands: the built-in ones and those plugins add (`PluginSpec.commands`), each
+   * run on this editor; whether it applied.
+   */
+  readonly commands: FoliCommands;
   /** The content controls' values, the stories' after the body's (from the body's editor). */
   controlValues(): ControlValue[];
   /** Whether edits are recorded as tracked changes. */
@@ -355,6 +365,8 @@ interface EditorParts {
   views: { current: StoryView | null; navigation: Editor["navigation"] };
   storyChanged(): void;
   extensions: readonly Extension[];
+  /** The user's and extensions' plugins: their `commands` join the built-in ones. */
+  plugins: readonly Plugin[];
 }
 
 function makeEditor(parts: EditorParts): Editor {
@@ -396,7 +408,7 @@ function makeEditor(parts: EditorParts): Editor {
       const clamp = (pos: number) => Math.max(0, Math.min(pos, size));
       dispatch(state.tr.setSelection(TextSelection.create(state.doc, clamp(anchor), clamp(head))));
     },
-    commands: {
+    commands: withPluginCommands(parts.plugins, run, {
       insertText: (text) => run(insertText(text)),
       deleteSelection: () => run(deleteSelection),
       deleteBackward: (unit) => run(deleteBackward(unit)),
@@ -440,7 +452,7 @@ function makeEditor(parts: EditorParts): Editor {
           if (editor.run(setControlValue(target, value, done))) done = true;
         return done;
       },
-    },
+    }),
     controlValues: () =>
       withStories().flatMap(({ editor, story }) =>
         controlValues(editor.state).map((value) => (story ? { ...value, story } : value)),
@@ -471,6 +483,39 @@ function makeEditor(parts: EditorParts): Editor {
   return self;
 }
 
+/**
+ * Adds the commands `plugins` name (`PluginSpec.commands`) to the built-in ones, each running on
+ * the editor through `run`. A name taken twice, or by a built-in command, throws.
+ */
+function withPluginCommands(
+  plugins: readonly Plugin[],
+  run: (command: Command) => boolean,
+  // Partial: an app's augmentation of FoliCommands (its own commands) is not built in.
+  commands: Partial<FoliCommands>,
+): FoliCommands {
+  for (const plugin of plugins)
+    for (const [name, factory] of Object.entries(plugin.spec.commands ?? {})) {
+      if (Object.hasOwn(commands, name))
+        throw new RangeError(
+          `Command "${name}" is already defined: plugin commands need names of their own`,
+        );
+      if (typeof factory !== "function")
+        throw new TypeError(`Command "${name}" is not a function returning a command`);
+      // defineProperty: a name such as "__proto__" is a command, not the object's prototype.
+      Object.defineProperty(commands, name, {
+        value: (...args: never[]) => run(factory(...args)),
+        enumerable: true,
+      });
+    }
+  return commands as FoliCommands;
+}
+
+/**
+ * Where the view's own overridable keys run (ADR-0008, `docs/keyboard.md`): a plugin
+ * with no keymap placed after the user's plugins and before the built-in ones.
+ */
+export const viewKeys = new PluginKey<never>("viewKeys");
+
 export function createEditor({
   document = createDocument(),
   plugins = [],
@@ -486,6 +531,7 @@ export function createEditor({
   let track: TrackState = { on: trackChanges, author, view: reviewView };
   const pluginsFor = ({ envelope }: Loaded) => [
     ...own,
+    new Plugin({ key: viewKeys }),
     history(),
     wordPlugin(envelope),
     trackPlugin(track),
@@ -542,6 +588,7 @@ export function createEditor({
       dispatch,
       plugins: (context: WordContext, value) => [
         ...own,
+        new Plugin({ key: viewKeys }),
         wordPlugin(context.envelope, context),
         trackPlugin(value ?? track),
         fieldsPlugin(),
@@ -574,6 +621,7 @@ export function createEditor({
       views,
       storyChanged,
       extensions,
+      plugins: own,
     });
     stories.set(id, { editing, editor });
     return editor;
@@ -602,5 +650,6 @@ export function createEditor({
     views,
     storyChanged,
     extensions,
+    plugins: own,
   });
 }

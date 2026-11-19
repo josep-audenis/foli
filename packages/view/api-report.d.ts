@@ -450,8 +450,8 @@ export declare class EditorView {
     /** Where what a control's content shows is on the screen. */
     private controlContentRects;
     /**
-     * The keys of content controls: Alt+Down opens a list or date picker, and Left and Right stop on
-     * each side of a control's edge, as Word's caret does (browsers cannot see the difference).
+     * Left and Right stop on each side of a content control's edge, as Word's caret does (browsers
+     * cannot see the difference). Alt+Down, which opens a list or date picker, is in `viewKey`.
      */
     private controlKey;
     /** The pages as last flowed, as fields need them; null without pages. */
@@ -603,8 +603,18 @@ export declare class EditorView {
     /** Selects the event's target range when the browser gives a non-empty one (spellcheck, deletes). */
     private selectTargetRange;
     private onBeforeInput;
-    /** Runs the first command bound to `name` that applies, through the view's dispatch. */
+    /**
+     * Runs the first command bound to `name` that applies, through the view's dispatch; the view's
+     * own keys where core's `viewKeys` plugin stands (after the user's plugins, before the
+     * built-in keymaps).
+     */
     private runKey;
+    /**
+     * The view's own overridable keys (ADR-0008, `docs/keyboard.md`): they need the pages, the
+     * stories or the app's navigation UI, so they are not core commands. A user keymap binding the
+     * same name runs first.
+     */
+    private viewKey;
     /** A column border being dragged: its table and column, the column's width, the press, the guide. */
     private drag;
     /** Whether this view set the host's cursor (an embedder's own cursor is left alone). */

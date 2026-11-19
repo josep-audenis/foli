@@ -18,7 +18,9 @@ checklist in [testing/ime.md](testing/ime.md)):
   iOS input methods.
 - **Screen readers** (NVDA, VoiceOver): not tried, including read-only mode, the placeholder,
   and a paragraph split across two pages (it may be read as two paragraphs).
-- **macOS key bindings** (Cmd/Option+arrows, Cmd/Option+Backspace, Ctrl+K/H/D).
+- **macOS key bindings** (Cmd/Option+arrows, Cmd/Option+Backspace, Ctrl+K/H/D), and Word's keys
+  as [keyboard.md](keyboard.md) maps them there (Cmd for Ctrl, Option for Alt): some are the
+  system's or the browser's before the page sees them (Cmd+H, Cmd+Option+D, F3).
 - **Spellcheck and autocorrect** replacing a word at the end or start of a page.
 - **Pastes from real Word, Google Docs and LibreOffice**: the test fixtures are hand-written
   approximations.
@@ -348,4 +350,10 @@ Details in the [package README](../packages/docx/README.md).
   or a file picker (which end the composition), not from a timer.
 - A Content Security Policy without `'unsafe-inline'` styles hides the placeholder and breaks
   print sheets ([styling.md](styling.md#content-security-policy)).
-- `Plugin`, `Transaction` metadata, steps and mapping are exported but not a stable API.
+- `Plugin`, `Transaction` metadata, steps and mapping are exported but not a stable API before
+  1.0 (`PluginSpec` is frozen for 1.x by ADR-0008).
+- Keys ([keyboard.md](keyboard.md)): `editor.handleKey` runs the plugins' keymaps only, not the
+  view's own keys (they need the pages). A keymap cannot take a reserved key, nor the browser's
+  editing commands that arrive without a key name (word and line deletion, the browser's undo
+  and bold from its menus): those come through `beforeinput`. Plugin commands are typed only
+  through `FoliCommands`: one an app does not declare there is reachable but untyped.

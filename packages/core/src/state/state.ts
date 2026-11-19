@@ -40,11 +40,21 @@ export interface PluginSpec<T> {
     oldState: EditorState,
     newState: EditorState,
   ): Transaction | null | undefined;
-  /** Key name (e.g. "Mod-b", "Shift-Enter") → command. The view normalizes key events to these names. */
+  /**
+   * Key name (e.g. "Mod-b", "Shift-Enter") → command. The view normalizes key events to these
+   * names. A user plugin's keymap runs before the built-in ones, so it can take any key that is
+   * not reserved (`docs/keyboard.md`).
+   */
   keymap?: Readonly<Record<string, Command>>;
+  /**
+   * Named command factories: `editor.commands.<name>(...args)` runs `factory(...args)`. Typed by
+   * augmenting `FoliCommands`. A name taken twice, or by a built-in command, throws in
+   * `createEditor`.
+   */
+  commands?: Readonly<Record<string, (...args: never[]) => Command>>;
 }
 
-/** Internal extension point; built-in features (history, keymap) use the same API. */
+/** A plugin: state, transaction hooks, keys and commands. Built-in features use the same API. */
 export class Plugin<T = unknown> {
   readonly key: PluginKey<T>;
 
