@@ -86,6 +86,7 @@ Using Foli:
 
 - [Getting started](docs/getting-started.md)
 - [API reference](docs/api.md)
+- [Keyboard](docs/keyboard.md) — every key per platform, which a plugin can override
 - [Styling](docs/styling.md) — CSS variables, dark theme, print
 - [Known limitations](docs/limitations.md)
 

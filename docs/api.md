@@ -36,7 +36,7 @@ migrated (`parseDocument`), and what it reports is v5.
 | Prop             | Type                                             | Default      | Notes                                                                                               |
 | ---------------- | ------------------------------------------------ | ------------ | --------------------------------------------------------------------------------------------------- |
 | `initialContent` | `EditorDocument`                                 | empty A4     | Read once, on mount; any version (migrated). Later: `editor.setDocument()` or a new `key`.          |
-| `plugins`        | `readonly Plugin[]`                              | `[]`         | Read once, on mount. Unstable API.                                                                  |
+| `plugins`        | `readonly Plugin[]`                              | `[]`         | Read once, on mount.                                                                                |
 | `extensions`     | `readonly Extension[]`                           | `[]`         | Read once, on mount: custom nodes and marks, with their view hooks (`ViewExtension`).               |
 | `author`         | `string`                                         | `"Author"`   | Read once: who edits (tracked changes are made in this name).                                       |
 | `trackChanges`   | `boolean`                                        | `false`      | Read once: record edits as tracked changes (the toolbar turns it on and off).                       |
@@ -393,22 +393,22 @@ definitions (the Word 2013 to 2019 template's) the first time they are applied, 
   the current one. `WordContext`, `WordEnvelope`, `FittedPaste`, `WordDefinitions`, `Story`,
   `StoryStep` and `EnvelopeStep`, named elsewhere on this page, are internal too.
 
-| Member                         | Notes                                                                                                                                                                                                                                                                                                                         |
-| ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `state`                        | Current immutable `EditorState` (`state.doc`, `state.selection`).                                                                                                                                                                                                                                                             |
-| `settings`                     | Page size and margins (mm) of the current document's last section (the view lays each section out with its own).                                                                                                                                                                                                              |
-| `commands.*`                   | Run a command, return whether it applied: `insertText(text)`, `deleteSelection()`, `deleteBackward(unit?)`, `deleteForward(unit?)`, `joinBackward()`, `joinForward()`, `splitBlock()`, `insertHardBreak()`, `insertPageBreak()`, `toggleMark(type, attrs?)`, `setBlockType(type, attrs?)`, `selectAll()`, `undo()`, `redo()`. |
-| `isMarkActive(type)`           | Whether the mark is active at the selection (or stored for the next typed text).                                                                                                                                                                                                                                              |
-| `select(anchor, head?)`        | Places a text selection (positions clamped into the document).                                                                                                                                                                                                                                                                |
-| `run(command)`, `can(command)` | Run any `Command`, or dry-run it. `can` builds the whole transaction: not per keystroke.                                                                                                                                                                                                                                      |
-| `handleKey(key)`               | Runs the first bound command for a key name such as `"Mod-b"`.                                                                                                                                                                                                                                                                |
-| `dispatch(tr)`                 | Applies a transaction (`state.tr`).                                                                                                                                                                                                                                                                                           |
-| `getDocument()`                | The current document (`FoliDocument`).                                                                                                                                                                                                                                                                                        |
-| `setDocument(doc)`             | Replaces the document and settings, clears undo history. Listeners get an empty transaction list.                                                                                                                                                                                                                             |
-| `story(id)`                    | An `Editor` over a story (header, footer or note), null when there is none: its own selection, every change a step of this editor's history. `getDocument` gives the story as the content; `undo` and `redo` are the document's.                                                                                              |
-| `storyView`                    | Set by the view showing the pages: `open` (the story open there: `id`, `side`, `variant`, `section`), `edit(side, page?)`, `editNote(id?)`, `toReference()`, `close()`, `fieldLayout` and `updateFields(options?, editor?)` (fields, from its pages). `storyChanged()` tells listeners it changed.                            |
-| `subscribe(listener)`          | `(state, transactions) => void` after every change (selection included); returns unsubscribe. `transactions.some(tr => tr.docChanged)` tells content changes apart.                                                                                                                                                           |
-| `extensions`                   | The extensions it was made with (`EditorOptions.extensions`); a view reads its node views, mark views, decorations and plugin views from them.                                                                                                                                                                                |
+| Member                         | Notes                                                                                                                                                                                                                                                                                                                                                                                                  |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `state`                        | Current immutable `EditorState` (`state.doc`, `state.selection`).                                                                                                                                                                                                                                                                                                                                      |
+| `settings`                     | Page size and margins (mm) of the current document's last section (the view lays each section out with its own).                                                                                                                                                                                                                                                                                       |
+| `commands.*`                   | Run a command, return whether it applied: `insertText(text)`, `deleteSelection()`, `deleteBackward(unit?)`, `deleteForward(unit?)`, `joinBackward()`, `joinForward()`, `splitBlock()`, `insertHardBreak()`, `insertPageBreak()`, `toggleMark(type, attrs?)`, `setBlockType(type, attrs?)`, `selectAll()`, `undo()`, `redo()`; and those plugins add ([Plugin commands](#plugin-commands-and-keymaps)). |
+| `isMarkActive(type)`           | Whether the mark is active at the selection (or stored for the next typed text).                                                                                                                                                                                                                                                                                                                       |
+| `select(anchor, head?)`        | Places a text selection (positions clamped into the document).                                                                                                                                                                                                                                                                                                                                         |
+| `run(command)`, `can(command)` | Run any `Command`, or dry-run it. `can` builds the whole transaction: not per keystroke.                                                                                                                                                                                                                                                                                                               |
+| `handleKey(key)`               | Runs the first bound command for a key name such as `"Mod-b"`: the plugins' keymaps, not the view's own keys ([keyboard.md](keyboard.md)).                                                                                                                                                                                                                                                             |
+| `dispatch(tr)`                 | Applies a transaction (`state.tr`).                                                                                                                                                                                                                                                                                                                                                                    |
+| `getDocument()`                | The current document (`FoliDocument`).                                                                                                                                                                                                                                                                                                                                                                 |
+| `setDocument(doc)`             | Replaces the document and settings, clears undo history. Listeners get an empty transaction list.                                                                                                                                                                                                                                                                                                      |
+| `story(id)`                    | An `Editor` over a story (header, footer or note), null when there is none: its own selection, every change a step of this editor's history. `getDocument` gives the story as the content; `undo` and `redo` are the document's.                                                                                                                                                                       |
+| `storyView`                    | Set by the view showing the pages: `open` (the story open there: `id`, `side`, `variant`, `section`), `edit(side, page?)`, `editNote(id?)`, `toReference()`, `close()`, `fieldLayout` and `updateFields(options?, editor?)` (fields, from its pages). `storyChanged()` tells listeners it changed.                                                                                                     |
+| `subscribe(listener)`          | `(state, transactions) => void` after every change (selection included); returns unsubscribe. `transactions.some(tr => tr.docChanged)` tells content changes apart.                                                                                                                                                                                                                                    |
+| `extensions`                   | The extensions it was made with (`EditorOptions.extensions`); a view reads its node views, mark views, decorations and plugin views from them.                                                                                                                                                                                                                                                         |
 
 Headers and footers: `ensureStory(side, variant, section)` makes one where none shows,
 `setStoryLinked(side, variant, linked, section?)` links a section's to the previous section's or
@@ -588,6 +588,34 @@ The first three return `{ ok: true, bookmark }` or `{ ok: false, reason }` (`inv
 `no-place`, `missing`, `exists`, `refused`), except `deleteBookmark`. Bookmarks are not tracked, as
 in Word; each change is one undo step.
 
+### Plugin commands and keymaps
+
+`PluginSpec` is frozen for 1.x (ADR-0008): `key`, `state` (`init`, `apply`),
+`filterTransaction`, `appendTransaction`, `keymap` and `commands`. User plugins
+(`createEditor({ plugins })`, then each extension's `plugins`) run before the built-in ones.
+
+- `commands`: names mapped to command factories, `(...args) => Command`. The editor adds each to
+  `editor.commands`: `editor.commands.insertMention("u-1", "Ada")` runs
+  `insertMention("u-1", "Ada")` on the editor (and on a story's editor, on the story) and returns
+  whether it applied; `editor.run(insertMention(…))` and `editor.can(insertMention(…))` take the
+  factory's command as for any command. A name taken twice, or by a built-in command
+  (`undo`, `toggleMark`…), makes `createEditor` throw a `RangeError`. The names are typed by
+  augmenting `FoliCommands`, the interface of `editor.commands`:
+
+  ```ts
+  declare module "@folijs/core" {
+    interface FoliCommands {
+      insertMention(id: string, label: string): boolean;
+    }
+  }
+  ```
+
+- `keymap`: key names (`keyName`, [keyboard.md](keyboard.md)) to commands. A user plugin's
+  binding runs before every built-in key, the view's own keys (Ctrl+Home, F9, Ctrl+F…) included;
+  a command returning false passes the key on. The keys the view keeps (reserved: the caret fixes
+  at page splits, Escape out of a story, Tab after Escape, keys while composing or in a pop-up)
+  are listed in [keyboard.md](keyboard.md#reserved).
+
 ### Model, state and plugins
 
 Stable, for plugins and code that edits documents directly:
@@ -597,7 +625,7 @@ Stable, for plugins and code that edits documents directly:
   `AttributeSpec`, `AttributeSpecs`, `Attrs`, `NodeJSON`, `MarkJSON`, `SliceJSON`,
   `ReplaceError`.
 - State: `EditorState`, `EditorStateConfig`, `Transaction`, `Command`, `Plugin`, `PluginKey`,
-  `PluginSpec`; selections: `Selection`, `TextSelection`, `NodeSelection`, `AllSelection`,
+  `PluginSpec`, `FoliCommands`, `BuiltInCommands`; selections: `Selection`, `TextSelection`, `NodeSelection`, `AllSelection`,
   `CellSelection`, `SelectionJSON`.
 - Transforms: `Transform`, `TransformError`, `Step`, `StepResult`, `ReplaceStep`,
   `ReplaceAroundStep`, `AddMarkStep`, `RemoveMarkStep`, `NodeMarkupStep`, `NodeMarkupBatchStep`,
@@ -744,7 +772,11 @@ const view = new EditorView(host, editor, { editable: true, placeholder: "" });
 - Links: a click places the caret (no navigation, read-only mode too); Ctrl+click (Cmd+click
   on Apple platforms) opens the link's href, read from the document, in a new tab with
   `noopener,noreferrer`.
-- `keyName(event)`: the key name `handleKey` expects (`"Mod-b"`, `"Shift-Enter"`).
+- `keyName(event)`: the key name `handleKey` expects (`"Mod-b"`, `"Shift-Enter"`); with Mod or Alt
+  a letter or digit is named by its physical key when the character is not a–z or 0–9
+  (`Alt-Shift-n` for Option+Shift+N on macOS), except a character AltGr types on Windows and Linux
+  (`Mod-Alt-[`).
+  Every built-in key: [keyboard.md](keyboard.md).
 - `measureImageFile(file, doc)`: an image file's natural size in CSS px from a local object URL
   (null when the browser cannot show it); `textWidthEmu(state)`: the widest a picture is
   inserted, in EMU (the last section's text width: shortcut, not the caret's section);

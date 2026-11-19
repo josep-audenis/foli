@@ -83,6 +83,7 @@ import {
   sameSpot,
   setComments,
   typedMarks,
+  viewKeys,
   type WordContext,
   withEnvelope,
   wordContext,
@@ -2143,11 +2144,10 @@ export class EditorView {
   }
 
   /**
-   * The keys of content controls: Alt+Down opens a list or date picker, and Left and Right stop on
-   * each side of a control's edge, as Word's caret does (browsers cannot see the difference).
+   * Left and Right stop on each side of a content control's edge, as Word's caret does (browsers
+   * cannot see the difference). Alt+Down, which opens a list or date picker, is in `viewKey`.
    */
   private controlKey(name: string): boolean {
-    if (name === "Alt-ArrowDown") return this.controlChrome.open();
     if (name !== "ArrowLeft" && name !== "ArrowRight") return false;
     const { selection, doc } = this.state;
     if (!(selection instanceof TextSelection) || !wordContext(this.state)?.envelope.controls)
@@ -2453,7 +2453,8 @@ export class EditorView {
     });
     wrapper.addEventListener("keydown", (event) => {
       if (event.isComposing || view.composing) return;
-      if (isNoteKey(event) && this.toReference()) {
+      // Unless the story's view ran a user's binding of the key.
+      if (!event.defaultPrevented && keyName(event) === NOTE_KEY && this.toReference()) {
         // Not on to the body, which would open the note again.
         event.preventDefault();
         event.stopPropagation();
@@ -3380,12 +3381,32 @@ export class EditorView {
     this.run(type.endsWith("Forward") ? deleteForward(unit) : deleteBackward(unit));
   };
 
-  /** Runs the first command bound to `name` that applies, through the view's dispatch. */
+  /**
+   * Runs the first command bound to `name` that applies, through the view's dispatch; the view's
+   * own keys where core's `viewKeys` plugin stands (after the user's plugins, before the
+   * built-in keymaps).
+   */
   private runKey(name: string): boolean {
     return this.state.plugins.some((plugin) => {
+      if (plugin.key === viewKeys) return this.viewKey(name);
       const command = plugin.spec.keymap?.[name];
       return command ? this.run(command) : false;
     });
+  }
+
+  /**
+   * The view's own overridable keys (ADR-0008, `docs/keyboard.md`): they need the pages, the
+   * stories or the app's navigation UI, so they are not core commands. A user keymap binding the
+   * same name runs first.
+   */
+  private viewKey(name: string): boolean {
+    return (
+      this.documentEdgeKey(name) ||
+      this.fieldKey(name) ||
+      (name === "Alt-ArrowDown" && this.controlChrome.open()) ||
+      this.noteKey(name) ||
+      this.navigationKey(name)
+    );
   }
 
   // ---------- column borders (10.7c) ----------
@@ -3877,13 +3898,7 @@ export class EditorView {
       return;
     }
     const name = keyName(event);
-    if (
-      this.documentEdgeKey(name) ||
-      this.fieldKey(name) ||
-      this.controlKey(name) ||
-      this.noteKey(event, name) ||
-      this.navigationKey(name)
-    ) {
+    if (this.controlKey(name)) {
       event.preventDefault();
       return;
     }
@@ -3940,8 +3955,8 @@ export class EditorView {
   };
 
   /** Word's keys for notes, and Shift+Alt+N from a reference to its note. */
-  private noteKey(event: KeyboardEvent, name: string): boolean {
-    if (isNoteKey(event)) return this.openNote();
+  private noteKey(name: string): boolean {
+    if (name === NOTE_KEY) return this.openNote();
     const kind = name === "Mod-Alt-f" ? "footnote" : name === "Mod-Alt-d" ? "endnote" : null;
     if (!kind || !this.editable || !this.notes) return false;
     return this.run(insertNote(kind)) && this.openNote();
@@ -5064,9 +5079,8 @@ const NAVIGATION_KEYS: Readonly<Record<string, NavigationRequest>> = {
   "Mod-Shift-F5": "bookmarks",
 };
 
-/** Shift+Alt+N: from a note's reference to the note, and back. */
-const isNoteKey = (event: KeyboardEvent) =>
-  event.altKey && event.shiftKey && !event.ctrlKey && !event.metaKey && event.code === "KeyN";
+/** Shift+Alt+N (Shift+Option+N): from a note's reference to the note, and back. */
+const NOTE_KEY = "Alt-Shift-n";
 
 /** Whether story `id` of `state`'s document exists (a number can outlive its note on screen). */
 const isNoteStory = (state: EditorState, id: string) => !!wordContext(state)?.stories.has(id);
@@ -5101,7 +5115,22 @@ export function keyName(event: KeyboardEvent): string {
   const mod = IS_MAC ? event.metaKey : event.ctrlKey;
   // Non-Latin layouts: Ctrl+B still means "b" (use the physical key when the character is not a-z);
   // with Shift, Ctrl+Shift+7 still means "7" (the character is "&" or "/" depending on layout).
-  if (mod && !/^[a-z0-9]$/.test(key) && /^(Key[A-Z]|Digit[0-9])$/.test(event.code))
+  // Option on macOS types a character (Option+N is a dead key): Alt+N still means "n". But AltGr
+  // (Ctrl+Alt on Windows) typing a character is that character: "[" is AltGr+F on a Hungarian
+  // layout, and must not be read as Ctrl+Alt+F (a footnote).
+  // (macOS has no AltGr: some browsers report Option as AltGraph, and Option is handled above.)
+  // shortcut: Ctrl+Alt giving any other character counts as AltGr (not all browsers report its
+  // state), so Ctrl+Alt+F on a non-Latin layout is not Mod-Alt-f; drop the guess if they all do.
+  const altGraph =
+    !IS_MAC &&
+    (event.getModifierState?.("AltGraph") ||
+      (event.ctrlKey && event.altKey && key.length === 1 && !/^[a-z0-9]$/i.test(key)));
+  if (
+    (mod || event.altKey) &&
+    !altGraph &&
+    !/^[a-z0-9]$/.test(key) &&
+    /^(Key[A-Z]|Digit[0-9])$/.test(event.code)
+  )
     key = event.code.slice(-1).toLowerCase();
   let name = key;
   if (event.shiftKey && key !== "Shift") name = `Shift-${name}`;

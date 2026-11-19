@@ -49,17 +49,20 @@ export {
   setControlValue,
 } from "./controls.js";
 export {
+  type BuiltInCommands,
   createEditor,
   type DocumentTarget,
   type Editor,
   type EditorDocument,
   type EditorListener,
   type EditorOptions,
+  type FoliCommands,
   type FoundMatches,
   type NavigationRequest,
   type OpenStory,
   type StoryView,
   sectionSettings,
+  viewKeys,
 } from "./editor.js";
 export {
   caretStop,

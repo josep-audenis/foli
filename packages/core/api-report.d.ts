@@ -42,12 +42,12 @@ export declare function parseContentV2(value: unknown, path?: string): Node;
 export { DEFAULT_SETTINGS, type DocumentSettings, type FoliDocumentV2, PAGE_SIZES, type PageMargins, type PageSize, parseContentV2, } from "./document.js";
 export { type AttributeSpec, type AttributeSpecs, type Attrs, ContentMatch, FoliDocumentError, Fragment, Mark, type MarkJSON, type MarkSpec, MarkType, Node, type NodeJSON, NodeRange, type NodeSpec, NodeType, ReplaceError, ResolvedPos, Schema, type SchemaSpec, Slice, type SliceJSON, TextNode, } from "./model/index.js";
 export { ALIGNMENTS, type Alignment, type BlockJSON, type BulletListJSON, type ColorMarkJSON, type DocJSON, type HardBreakJSON, HEADING_LEVELS, type HeadingJSON, type HeadingLevel, type HorizontalRuleJSON, type InlineJSON, isColor, isSafeHref, type LinkMarkJSON, type ListItemJSON, MARK_TYPES, type MarkName, type MarkNameJSON, type OrderedListJSON, type PageBreakJSON, type ParagraphJSON, SAFE_LINK_PROTOCOLS, SIMPLE_MARK_TYPES, type SimpleMarkJSON, type SimpleMarkName, type TextJSON, } from "./schema.js";
-export { AllSelection, acceptAllChanges, acceptChange, addComment, addRepeatingItem, alignAt, arrowAcrossLeaf, autolinkHref, type BookmarkInfo, type BookmarkResult, baseKeymap, CellSelection, type Change, type ChangeFilter, type ChangeKind, type Command, type CommentContent, type CommentOptions, type ControlInsertOptions, type ControlPropertiesPatch, type ControlRange, type ControlValue, type ControlValueInput, type CrossReference, type CrossReferenceTargets, canOutdent, cellsAsTable, changeIndent, closeHistory, colorAt, commentAnchors, controlAt, controlIsReadOnly, controlProperties, controlsIn, controlValues, convertNotes, createEditor, crossReferenceTargets, type DeleteUnit, type DocumentTarget, deleteAllComments, deleteBackward, deleteBookmark, deleteColumns, deleteComment, deleteForward, deleteRows, deleteSelection, deleteTable, documentOutline, documentSections, type Editor, type EditorDocument, type EditorListener, type EditorOptions, EditorState, type EditorStateConfig, editComment, ensureStory, extendCellSelection, type Field, type FieldDisplay, type FieldInstruction, type FieldLayout, type FieldPage, type FieldSkip, type FieldSkipReason, type FieldsReport, type FindMatch, type FindOptions, type FoundMatches, fieldAround, fieldCodesShown, fieldDisplay, fieldsIn, findAll, findInText, fontFamilyAt, fontSizeAt, formatDatePicture, formatNumericPicture, goTo, goToCell, goToCellVertically, HIGHLIGHT_HEX, type HistoryOptions, history, type InsertFieldOptions, type InsertNoteOptions, insertBookmark, insertColumn, insertColumnBreak, insertControl, insertControlText, insertCrossReference, insertDate, insertField, insertHardBreak, insertLink, insertNote, insertPageBreak, insertPageNumber, insertPicture, insertRow, insertSectionBreak, insertTab, insertTable, insertTableOfContents, insertText, isBookmarkName, isHeaderRow, isMarkActive, joinBackward, joinForward, joinHistory, type ListKind, liftListItem, liftListItemAtStart, lineSpacingAt, linkAt, linkEditorRequest, listBookmarks, listKeymap, listKindAt, marksAt, mergeCells, type NavigationRequest, type NewPicture, NodeSelection, type NoteKind, type NoteNumber, type NoteNumberOptions, nextChange, nextMatch, normalizeHref, noteAtSelection, noteNumbers, noteProperties, noteTexts, type OpenStory, type OutlineEntry, openLinkEditor, Plugin, PluginKey, type PluginSpec, pageVariant, paragraphStyleAt, paragraphStyles, parseFieldInstruction, pasteCells, previousChange, type ReplaceRefusal, type ReplaceReport, type ReviewView, redo, redoDepth, rejectAllChanges, rejectChange, removeLink, removeSectionBreak, renameBookmark, replace, replaceAll, replyToComment, requestsLinkEditor, resolveComment, type SectionAt, type SectionBreakKind, type SectionColumns, type SectionSetup, Selection, type SelectionJSON, type StorySide, type StoryVariant, type StoryView, sectionAt, sectionColumns, sectionSettings, selectAll, selectedPicture, setAlign, setBlockType, setCellShading, setColumnWidth, setControlProperties, setControlValue, setDifferentEvenPages, setDifferentFirstPage, setFontFamily, setFontSize, setHighlight, setLineSpacing, setLink, setNoteProperties, setParagraphSpacing, setParagraphStyle, setPictureAlt, setPictureSize, setReviewView, setSectionSetup, setStoryLinked, setTableStyle, setTextColor, setTrackChanges, sinkListItem, splitBlock, splitCell, splitListItem, storyOfSection, type TableOfContentsOptions, TextSelection, type TrackState, Transaction, tableStyleAt, tableStyles, toggleFieldCodes, toggleHeaderRow, toggleList, toggleMark, trackedChanges, trackState, trackTransaction, type UpdateFieldsOptions, undo, undoDepth, untracked, updateFields, wrapInList, } from "./state/index.js";
+export { AllSelection, acceptAllChanges, acceptChange, addComment, addRepeatingItem, alignAt, arrowAcrossLeaf, autolinkHref, type BookmarkInfo, type BookmarkResult, type BuiltInCommands, baseKeymap, CellSelection, type Change, type ChangeFilter, type ChangeKind, type Command, type CommentContent, type CommentOptions, type ControlInsertOptions, type ControlPropertiesPatch, type ControlRange, type ControlValue, type ControlValueInput, type CrossReference, type CrossReferenceTargets, canOutdent, cellsAsTable, changeIndent, closeHistory, colorAt, commentAnchors, controlAt, controlIsReadOnly, controlProperties, controlsIn, controlValues, convertNotes, createEditor, crossReferenceTargets, type DeleteUnit, type DocumentTarget, deleteAllComments, deleteBackward, deleteBookmark, deleteColumns, deleteComment, deleteForward, deleteRows, deleteSelection, deleteTable, documentOutline, documentSections, type Editor, type EditorDocument, type EditorListener, type EditorOptions, EditorState, type EditorStateConfig, editComment, ensureStory, extendCellSelection, type Field, type FieldDisplay, type FieldInstruction, type FieldLayout, type FieldPage, type FieldSkip, type FieldSkipReason, type FieldsReport, type FindMatch, type FindOptions, type FoliCommands, type FoundMatches, fieldAround, fieldCodesShown, fieldDisplay, fieldsIn, findAll, findInText, fontFamilyAt, fontSizeAt, formatDatePicture, formatNumericPicture, goTo, goToCell, goToCellVertically, HIGHLIGHT_HEX, type HistoryOptions, history, type InsertFieldOptions, type InsertNoteOptions, insertBookmark, insertColumn, insertColumnBreak, insertControl, insertControlText, insertCrossReference, insertDate, insertField, insertHardBreak, insertLink, insertNote, insertPageBreak, insertPageNumber, insertPicture, insertRow, insertSectionBreak, insertTab, insertTable, insertTableOfContents, insertText, isBookmarkName, isHeaderRow, isMarkActive, joinBackward, joinForward, joinHistory, type ListKind, liftListItem, liftListItemAtStart, lineSpacingAt, linkAt, linkEditorRequest, listBookmarks, listKeymap, listKindAt, marksAt, mergeCells, type NavigationRequest, type NewPicture, NodeSelection, type NoteKind, type NoteNumber, type NoteNumberOptions, nextChange, nextMatch, normalizeHref, noteAtSelection, noteNumbers, noteProperties, noteTexts, type OpenStory, type OutlineEntry, openLinkEditor, Plugin, PluginKey, type PluginSpec, pageVariant, paragraphStyleAt, paragraphStyles, parseFieldInstruction, pasteCells, previousChange, type ReplaceRefusal, type ReplaceReport, type ReviewView, redo, redoDepth, rejectAllChanges, rejectChange, removeLink, removeSectionBreak, renameBookmark, replace, replaceAll, replyToComment, requestsLinkEditor, resolveComment, type SectionAt, type SectionBreakKind, type SectionColumns, type SectionSetup, Selection, type SelectionJSON, type StorySide, type StoryVariant, type StoryView, sectionAt, sectionColumns, sectionSettings, selectAll, selectedPicture, setAlign, setBlockType, setCellShading, setColumnWidth, setControlProperties, setControlValue, setDifferentEvenPages, setDifferentFirstPage, setFontFamily, setFontSize, setHighlight, setLineSpacing, setLink, setNoteProperties, setParagraphSpacing, setParagraphStyle, setPictureAlt, setPictureSize, setReviewView, setSectionSetup, setStoryLinked, setTableStyle, setTextColor, setTrackChanges, sinkListItem, splitBlock, splitCell, splitListItem, storyOfSection, type TableOfContentsOptions, TextSelection, type TrackState, Transaction, tableStyleAt, tableStyles, toggleFieldCodes, toggleHeaderRow, toggleList, toggleMark, trackedChanges, trackState, trackTransaction, type UpdateFieldsOptions, undo, undoDepth, untracked, updateFields, wrapInList, } from "./state/index.js";
 export { AddMarkStep, canJoin, canSplit, findWrapping, liftTarget, type Mappable, Mapping, type MapResult, NodeMarkupBatchStep, NodeMarkupStep, type NodeTypeWithAttrs, RemoveMarkStep, ReplaceAroundStep, ReplaceStep, Step, StepMap, StepResult, Transform, TransformError, } from "./transform/index.js";
 export { type AbstractNumberingJSON, type BorderJSON, type CellPropertiesJSON, type CommentJSON, type ContentOptions, type ControlJSON, createDocument, type Extension, type ExtensionNodeSpec, type FoliDocument, type FoliDocumentV3, type FoliDocumentV4, HIGHLIGHT_COLORS, halfPointsToPt, JUSTIFICATIONS, type Justification, type MeasureJSON, migrateToV3, migrateToV4, migrateToV5, mmToTwips, type NotePropertiesJSON, type NumberingInstanceJSON, type NumberingLevelJSON, type ParagraphPropertiesJSON, type ParseOptions, parseContent, parseDocument, ptToTwips, type ResourceJSON, type RowPropertiesJSON, SCHEMA_VERSION, type SectionJSON, type StoryJSON, type StyleJSON, TABLE_CONDITIONS, type TableCondition, type TableConditionJSON, type TablePropertiesJSON, type ThemeJSON, TWIPS_PER_INCH, TWIPS_PER_POINT, twipsToMm, twipsToPt, twipsToPx, type WordSettingsJSON, } from "./v3/index.js";
 
 // internal.d.ts
-export { CommentStep, caretStop, controlSpot, copiedDefinitions, deleteSelectionKeepingTables, documentJSON, EnvelopeStep, type FittedPaste, fitPaste, fitPastedV2, keepTablesApart, noteKindOf, referencesIn, StoryStep, sameSpot, setComments, typedMarks, type WordContext, type WordDefinitions, type WordEnvelope, withEnvelope, wordContext, } from "./state/index.js";
+export { CommentStep, caretStop, controlSpot, copiedDefinitions, deleteSelectionKeepingTables, documentJSON, EnvelopeStep, type FittedPaste, fitPaste, fitPastedV2, keepTablesApart, noteKindOf, referencesIn, StoryStep, sameSpot, setComments, typedMarks, viewKeys, type WordContext, type WordDefinitions, type WordEnvelope, withEnvelope, wordContext, } from "./state/index.js";
 export type { EnvelopeKey, Story } from "./state/word.js";
 export type { Check } from "./v3/check.js";
 export { type CellFormat, type CellPlace, CUSTOM_TYPE, checkControl, checkSection, foreignTextOf, formatNumber, type ListMarker, type ParagraphFormat, Resolver, RUN_PROPERTY_MARKS, type RunFormat, schema, type TableFormat, tableConditions, withForeignText, } from "./v3/index.js";
@@ -926,7 +926,7 @@ import { type ControlValue, type ControlValueInput } from "./controls.js";
 import type { FieldLayout, FieldsReport, UpdateFieldsOptions } from "./fieldupdate.js";
 import type { FindMatch, FindOptions } from "./find.js";
 import type { StorySide, StoryVariant } from "./sections.js";
-import { type Command, EditorState, type Plugin, type Transaction } from "./state.js";
+import { type Command, EditorState, Plugin, PluginKey, type Transaction } from "./state.js";
 import { type ReviewView } from "./track.js";
 import type { ListKind } from "./wordformat.js";
 /**
@@ -1014,6 +1014,84 @@ export interface StoryView {
     /** Focuses the document, or the story open in it. */
     focus(): void;
 }
+/** The built-in commands on `editor.commands`. */
+export interface BuiltInCommands {
+    insertText(text: string): boolean;
+    deleteSelection(): boolean;
+    deleteBackward(unit?: DeleteUnit): boolean;
+    deleteForward(unit?: DeleteUnit): boolean;
+    joinBackward(): boolean;
+    joinForward(): boolean;
+    splitBlock(): boolean;
+    insertHardBreak(): boolean;
+    insertPageBreak(): boolean;
+    toggleMark(type: string, attrs?: Attrs | null): boolean;
+    setBlockType(type: string, attrs?: Attrs | null): boolean;
+    selectAll(): boolean;
+    undo(): boolean;
+    redo(): boolean;
+    /** Numbers the selected paragraphs as a list ("bulletList" or "orderedList"). */
+    wrapInList(kind: ListKind): boolean;
+    /** The list buttons: removes the selection's numbering when it is a list of `kind`, else numbers it. */
+    toggleList(kind: ListKind): boolean;
+    /** Tab in a list: one level deeper. */
+    indentListItem(): boolean;
+    /** Shift+Tab in a list: one level up (out of the list at the top). */
+    outdentListItem(): boolean;
+    /**
+     * Links the selection to `href` (normalized, then validated: unsafe hrefs do not apply); at
+     * a caret in a link, changes it; elsewhere inserts the href as linked text.
+     */
+    setLink(href: string): boolean;
+    /** Removes the links in the selection, or the link around the caret. */
+    removeLink(): boolean;
+    /** Aligns the selected paragraphs and headings ("start", "center", "end", "justify"). */
+    setAlign(align: Alignment): boolean;
+    /** Text color (lowercase `#rrggbb`) of the selected or next typed text; null removes it. */
+    setTextColor(color: string | null): boolean;
+    /** Highlight (`#rrggbb`) of the selected or next typed text; null removes it. */
+    setHighlight(color: string | null): boolean;
+    /** Turns tracked changes on or off (`author` changes who makes them). */
+    setTrackChanges(on: boolean, author?: string): boolean;
+    /** How the editor's views show tracked changes. */
+    setReviewView(view: ReviewView): boolean;
+    /** Accepts the change at the caret, or the changes in the selection. */
+    acceptChange(): boolean;
+    /** Rejects the change at the caret, or the changes in the selection. */
+    rejectChange(): boolean;
+    /** Accepts every change, or every change of `author`. */
+    acceptAllChanges(author?: string): boolean;
+    /** Rejects every change, or every change of `author`. */
+    rejectAllChanges(author?: string): boolean;
+    /** Selects the next change after the selection. */
+    nextChange(): boolean;
+    /** Selects the previous change before the selection. */
+    previousChange(): boolean;
+    /** Comments the selection (at a caret, the point there). */
+    addComment(content: CommentContent, options?: CommentOptions): boolean;
+    /** Replies to a comment's thread. */
+    replyToComment(id: number, content: CommentContent, options?: CommentOptions): boolean;
+    /** Replaces a comment's content. */
+    editComment(id: number, content: CommentContent): boolean;
+    /** Resolves (`done` false: reopens) a comment's thread. */
+    resolveComment(id: number, done?: boolean): boolean;
+    /** Deletes a comment, its replies and their anchors. */
+    deleteComment(id: number): boolean;
+    /** Deletes every comment. */
+    deleteAllComments(): boolean;
+    /**
+     * Fills the content controls with this id or tag, here and in the stories (from the body's
+     * editor): one undo step, tracked when tracking is on. False when none could take it.
+     */
+    setControlValue(target: string, value: ControlValueInput): boolean;
+}
+/**
+ * The commands on `editor.commands`: the built-in ones and those plugins add. Apps add the names
+ * of their plugins' commands by augmenting it:
+ * `declare module "@folijs/core" { interface FoliCommands { insertMention(id: string): boolean } }`.
+ */
+export interface FoliCommands extends BuiltInCommands {
+}
 /** A headless editor: state, commands, history and change notifications, no DOM. */
 export interface Editor {
     readonly state: EditorState;
@@ -1031,76 +1109,11 @@ export interface Editor {
     handleKey(key: string): boolean;
     /** Places a text selection (positions are clamped into the document). */
     select(anchor: number, head?: number): void;
-    readonly commands: {
-        insertText(text: string): boolean;
-        deleteSelection(): boolean;
-        deleteBackward(unit?: DeleteUnit): boolean;
-        deleteForward(unit?: DeleteUnit): boolean;
-        joinBackward(): boolean;
-        joinForward(): boolean;
-        splitBlock(): boolean;
-        insertHardBreak(): boolean;
-        insertPageBreak(): boolean;
-        toggleMark(type: string, attrs?: Attrs | null): boolean;
-        setBlockType(type: string, attrs?: Attrs | null): boolean;
-        selectAll(): boolean;
-        undo(): boolean;
-        redo(): boolean;
-        /** Numbers the selected paragraphs as a list ("bulletList" or "orderedList"). */
-        wrapInList(kind: ListKind): boolean;
-        /** The list buttons: removes the selection's numbering when it is a list of `kind`, else numbers it. */
-        toggleList(kind: ListKind): boolean;
-        /** Tab in a list: one level deeper. */
-        indentListItem(): boolean;
-        /** Shift+Tab in a list: one level up (out of the list at the top). */
-        outdentListItem(): boolean;
-        /**
-         * Links the selection to `href` (normalized, then validated: unsafe hrefs do not apply); at
-         * a caret in a link, changes it; elsewhere inserts the href as linked text.
-         */
-        setLink(href: string): boolean;
-        /** Removes the links in the selection, or the link around the caret. */
-        removeLink(): boolean;
-        /** Aligns the selected paragraphs and headings ("start", "center", "end", "justify"). */
-        setAlign(align: Alignment): boolean;
-        /** Text color (lowercase `#rrggbb`) of the selected or next typed text; null removes it. */
-        setTextColor(color: string | null): boolean;
-        /** Highlight (`#rrggbb`) of the selected or next typed text; null removes it. */
-        setHighlight(color: string | null): boolean;
-        /** Turns tracked changes on or off (`author` changes who makes them). */
-        setTrackChanges(on: boolean, author?: string): boolean;
-        /** How the editor's views show tracked changes. */
-        setReviewView(view: ReviewView): boolean;
-        /** Accepts the change at the caret, or the changes in the selection. */
-        acceptChange(): boolean;
-        /** Rejects the change at the caret, or the changes in the selection. */
-        rejectChange(): boolean;
-        /** Accepts every change, or every change of `author`. */
-        acceptAllChanges(author?: string): boolean;
-        /** Rejects every change, or every change of `author`. */
-        rejectAllChanges(author?: string): boolean;
-        /** Selects the next change after the selection. */
-        nextChange(): boolean;
-        /** Selects the previous change before the selection. */
-        previousChange(): boolean;
-        /** Comments the selection (at a caret, the point there). */
-        addComment(content: CommentContent, options?: CommentOptions): boolean;
-        /** Replies to a comment's thread. */
-        replyToComment(id: number, content: CommentContent, options?: CommentOptions): boolean;
-        /** Replaces a comment's content. */
-        editComment(id: number, content: CommentContent): boolean;
-        /** Resolves (`done` false: reopens) a comment's thread. */
-        resolveComment(id: number, done?: boolean): boolean;
-        /** Deletes a comment, its replies and their anchors. */
-        deleteComment(id: number): boolean;
-        /** Deletes every comment. */
-        deleteAllComments(): boolean;
-        /**
-         * Fills the content controls with this id or tag, here and in the stories (from the body's
-         * editor): one undo step, tracked when tracking is on. False when none could take it.
-         */
-        setControlValue(target: string, value: ControlValueInput): boolean;
-    };
+    /**
+     * The named commands: the built-in ones and those plugins add (`PluginSpec.commands`), each
+     * run on this editor; whether it applied.
+     */
+    readonly commands: FoliCommands;
     /** The content controls' values, the stories' after the body's (from the body's editor). */
     controlValues(): ControlValue[];
     /** Whether edits are recorded as tracked changes. */
@@ -1135,6 +1148,11 @@ export interface Editor {
 }
 /** A section's page setup as page settings (mm; the gutter added to the left margin, as Word does). */
 export declare function sectionSettings(section: SectionJSON): DocumentSettings;
+/**
+ * Where the view's own overridable keys run (ADR-0008, `docs/keyboard.md`): a plugin
+ * with no keymap placed after the user's plugins and before the built-in ones.
+ */
+export declare const viewKeys: PluginKey<never>;
 export declare function createEditor({ document, plugins, extensions, author, trackChanges, reviewView, }?: EditorOptions): Editor;
 
 // state/fields.d.ts
@@ -1448,7 +1466,7 @@ export declare function redoDepth(state: EditorState): number;
 export { arrowAcrossLeaf, baseKeymap, type DeleteUnit, deleteBackward, deleteForward, deleteSelection, deleteSelectionKeepingTables, insertColumnBreak, insertHardBreak, insertPageBreak, insertTab, insertText, isMarkActive, joinBackward, joinForward, selectAll, setBlockType, splitBlock, toggleMark, } from "./commands.js";
 export { addComment, type CommentContent, type CommentOptions, commentAnchors, deleteAllComments, deleteComment, editComment, replyToComment, resolveComment, } from "./comments.js";
 export { addRepeatingItem, type ControlInsertOptions, type ControlPropertiesPatch, type ControlRange, type ControlValue, type ControlValueInput, controlAt, controlIsReadOnly, controlProperties, controlSpot, controlsIn, controlValues, insertControl, insertControlText, setControlProperties, setControlValue, } from "./controls.js";
-export { createEditor, type DocumentTarget, type Editor, type EditorDocument, type EditorListener, type EditorOptions, type FoundMatches, type NavigationRequest, type OpenStory, type StoryView, sectionSettings, } from "./editor.js";
+export { type BuiltInCommands, createEditor, type DocumentTarget, type Editor, type EditorDocument, type EditorListener, type EditorOptions, type FoliCommands, type FoundMatches, type NavigationRequest, type OpenStory, type StoryView, sectionSettings, viewKeys, } from "./editor.js";
 export { caretStop, type Field, type FieldDisplay, fieldAround, fieldCodesShown, fieldDisplay, fieldsIn, sameSpot, toggleFieldCodes, } from "./fields.js";
 export { type CrossReference, type CrossReferenceTargets, crossReferenceTargets, type FieldInstruction, type FieldLayout, type FieldPage, type FieldSkip, type FieldSkipReason, type FieldsReport, formatDatePicture, formatNumericPicture, type InsertFieldOptions, insertCrossReference, insertDate, insertField, insertPageNumber, insertTableOfContents, parseFieldInstruction, type TableOfContentsOptions, type UpdateFieldsOptions, updateFields, } from "./fieldupdate.js";
 export { type FindMatch, type FindOptions, findAll, findInText, nextMatch, type ReplaceRefusal, type ReplaceReport, replace, replaceAll, } from "./find.js";
@@ -2003,10 +2021,20 @@ export interface PluginSpec<T> {
     filterTransaction?(tr: Transaction, state: EditorState): boolean;
     /** Runs after transactions are applied; may return a follow-up transaction. */
     appendTransaction?(transactions: readonly Transaction[], oldState: EditorState, newState: EditorState): Transaction | null | undefined;
-    /** Key name (e.g. "Mod-b", "Shift-Enter") → command. The view normalizes key events to these names. */
+    /**
+     * Key name (e.g. "Mod-b", "Shift-Enter") → command. The view normalizes key events to these
+     * names. A user plugin's keymap runs before the built-in ones, so it can take any key that is
+     * not reserved (`docs/keyboard.md`).
+     */
     keymap?: Readonly<Record<string, Command>>;
+    /**
+     * Named command factories: `editor.commands.<name>(...args)` runs `factory(...args)`. Typed by
+     * augmenting `FoliCommands`. A name taken twice, or by a built-in command, throws in
+     * `createEditor`.
+     */
+    commands?: Readonly<Record<string, (...args: never[]) => Command>>;
 }
-/** Internal extension point; built-in features (history, keymap) use the same API. */
+/** A plugin: state, transaction hooks, keys and commands. Built-in features use the same API. */
 export declare class Plugin<T = unknown> {
     readonly spec: PluginSpec<T>;
     readonly key: PluginKey<T>;

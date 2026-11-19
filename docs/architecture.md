@@ -93,8 +93,13 @@ Foli's own (see `THIRD_PARTY_NOTICES.md`).
   cannot lose (its only child) leaves an empty paragraph where the parent takes one; otherwise
   the delete does not apply. Typing over a node-selected block replaces it with a paragraph of
   the text; Enter adds a paragraph after it.
-- **Plugins** (internal API, used by history and keymaps): state fields, `filterTransaction`,
-  `appendTransaction`, `keymap`.
+- **Plugins** (the extension API, frozen for 1.x by ADR-0008; every built-in feature uses it):
+  state fields, `filterTransaction`, `appendTransaction`, `keymap`, `commands` (named command
+  factories the editor adds to `editor.commands`, typed by augmenting `FoliCommands`; a name
+  taken twice throws in `createEditor`). Order: the user's plugins, the extensions' plugins, a
+  `viewKeys` marker (`@folijs/core/internal`) where the view runs its own keys, then the
+  built-ins (history, the Word context, tracking, fields, controls, comments, notes, tables,
+  lists, the base keymap).
 - **History**: undo/redo of inverted steps.
   - Changes are grouped by time (500 ms) and adjacency; consecutive typing collapses into one step.
   - Formatting and block-type changes get their own undo steps.
@@ -380,10 +385,13 @@ and benchmarks (5.7, [benchmarks.md](benchmarks.md)); overview in [pagination.md
     follows a hard break lands before the `<br>`, which already is the one-character move. Backspace/Delete there need nothing:
     the browser's target range collapses to one model position and the character delete runs.
     Arrow up/down, Home/End and clicks are native.
-- **Input:** `keydown` → the plugin keymaps (as `editor.handleKey`, through the view's
-  dispatch). Names are normalized as
-  `Mod-Ctrl-Meta-Alt-Shift-key` (`Mod` = Cmd on Apple platforms, Ctrl elsewhere; non-Latin
-  layouts fall back to the physical key). Everything else arrives as `beforeinput` and is always
+- **Input:** `keydown` → first the reserved caret fixes (page splits, list numbers, field parts,
+  control edges), then the plugin keymaps in order (as `editor.handleKey`, through the view's
+  dispatch), the view running its own overridable keys (Ctrl+Home/End, F9, Alt+F9, Alt+Down,
+  note keys, Word's find and go-to keys) where the `viewKeys` marker stands, after the user's
+  plugins ([keyboard.md](keyboard.md)). Names are normalized as
+  `Mod-Ctrl-Meta-Alt-Shift-key` (`Mod` = Cmd on Apple platforms, Ctrl elsewhere; with Mod or Alt,
+  non-Latin layouts and macOS Option characters fall back to the physical key). Everything else arrives as `beforeinput` and is always
   prevented. It maps to commands: insertText, insertReplacementText (target range),
   insertParagraph, insertLineBreak, the delete types, historyUndo/Redo, and format*.
   - Deletes use the browser's target range. Without one, characters and words use the core's
