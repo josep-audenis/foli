@@ -192,7 +192,7 @@ export interface FieldDisplay {
 
 const NOTHING: FieldDisplay = { hidden: new Set(), braces: new Map(), gone: false };
 /** Inline nodes with nothing to draw of their own. */
-const UNSEEN = new Set([
+const UNSEEN: ReadonlySet<string> = new Set([
   ...FIELD_PARTS,
   "bookmarkStart",
   "bookmarkEnd",
@@ -202,6 +202,9 @@ const UNSEEN = new Set([
   "controlStart",
   "controlEnd",
 ]);
+
+/** @internal Whether an inline node draws nothing: text runs on across it. */
+export const isUnseen = (node: Node): boolean => UNSEEN.has(node.type.name);
 
 /**
  * What a view draws of paragraphs in document order, each given as its inline nodes' type names.

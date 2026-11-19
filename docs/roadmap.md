@@ -1238,10 +1238,22 @@ Each task is a PR on `phase-11/sections-fields`, the build green after each.
   their reference's column. Shortcuts: no widow or orphan control in a note's lines,
   `w:continuationNotice` not drawn, options for the whole document only, a reference in opaque
   content not counted, Word sometimes ends an earlier column sooner than the notes need.)
-- [ ] 11.11 Navigation: bookmarks (insert, go to, used by cross-references), the document
+- [x] 11.11 Navigation: bookmarks (insert, go to, used by cross-references), the document
   outline (headings, moving to them; a React panel), find and replace across every story (case
   and whole words, replace tracked while tracking, one undo step for replace all); keyboard
-  shortcuts as Word's; axe.
+  shortcuts as Word's; axe. (Done: `findAll`, `replace`, `replaceAll` with the rules Word showed
+  through its object model (ADR-0007), refusals returned with their reason; `insertBookmark`,
+  `renameBookmark`, `deleteBookmark`, `listBookmarks`, `goTo`, `documentOutline`; matches marked with
+  the CSS Custom Highlight API, a story opened for its match and left for the body's;
+  `FoliNavigation` in `FoliEditor`: find, replace and go to panel, bookmarks dialog, outline, a
+  Navigate menu; Ctrl+F, Ctrl+H, Ctrl+G, F3, Shift+F3, Ctrl+Shift+F5, only with the focus in the
+  document or the panels. `word-navigation.spec.ts` in three engines, axe included; on 107 pages a
+  key takes 14 to 55 ms in Chromium, 14 to 37 in Firefox, 57 to 78 in WebKit, `findAll` itself 1 ms
+  or two; `find-roundtrip.mjs` has Word read 9 files. Shortcuts: no regular expressions, no search
+  in comments or opaque content, no match across paragraphs; bookmarks and comment anchors kept in a
+  replaced match and deleted text refused, unlike Word; marks only near the window and only where
+  the browser has the API; Go to by place, not printed number; a reference split over runs not
+  renamed; the cross-reference dialog lists the body's bookmarks.)
 - [ ] 11.12 PDF: `exportPdf` from the editor's own layout as decided in ADR-0007 (fields updated
   first, links and the outline as PDF bookmarks where the engine gives them), the page score
   against Word's PDF for every corpus document; print uses the same pages.

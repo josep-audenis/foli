@@ -175,6 +175,13 @@ tracking), typed into, filled and emptied, with changed properties and with a co
 new document with every kind inserted and a repeating section grown; a tracked fill rejected. Word opens all 9 and finds
 every control as Foli holds it, ids unique (2026-11-18, Word 16.0.20527).
 
+`scripts/corpus/find-roundtrip.mjs` (11.11, with `find-word.ps1`, which reads every story as it
+stands, accepted and rejected, and the bookmarks) replaces a word over the body and every story of
+05, 09 and a new document with a header, a footer and both kinds of note, untracked and tracked, and
+adds, renames, moves and deletes bookmarks. Word opens all 9, finds the new text where Foli put it,
+records the changes in every story, and accepting and rejecting give the new and the old text; the
+bookmarks hold the text Foli says (2026-11-19, Word 16.0.20527).
+
 `scripts/corpus/section-roundtrip.mjs` (11.6) has Word read Foli's sections back: 08 exported
 unchanged (Word's own pages and sections), edited through the editor's commands (a continuous
 break, three columns in one section, a line between columns in the last), the same edits while

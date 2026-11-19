@@ -188,6 +188,28 @@ checklist in [testing/ime.md](testing/ime.md)):
   in 0.3.0 before the chart was laid out; 101 of 115 for the corpus). Accepted as a known
   limit (2026-11-17).
 
+## Finding and going places
+
+- Find reads the body and the stories, table cells included: not comments, text boxes or other
+  content kept opaque. A match stays inside a paragraph; `^p`-style codes, wildcards and regular
+  expressions are not offered (a pattern could hang the page), nor replacing formatting.
+- Replacing keeps bookmarks and comment anchors found inside the match, where Word loses them; text
+  already deleted as a tracked change is refused and reported, where Word adds the replacement
+  after it. In the review views that hide deleted text a match runs across it, as the reader sees
+  the text; Word's does not.
+- While the document is edited with the panel open, the matches are looked for again once typing
+  pauses (300 ms): until then the marks follow the old positions.
+- Marks need the CSS Custom Highlight API (Chromium 105, Safari 17.2, Firefox 140); without it find
+  still counts, goes to and selects matches. Only pages within a screen of the window are marked.
+  In the drawn copies of a story that is not open, marks come from looking for the text there.
+- A match in a header no page shows (an unused first-page or even-page variant) is found and
+  replaced but cannot be gone to. A read-only view does not open stories.
+- Go to takes a page's place in the document, not the number printed on it. Renaming a bookmark
+  does not reach a reference whose name is split over two `w:instrText` runs. The cross-reference
+  dialog offers the body's bookmarks.
+- Ctrl+H, Ctrl+G, F3 and Ctrl+Shift+F5 are browser keys too: they are taken only while the focus
+  is in the document or in the panels, and only where `FoliNavigation` is mounted.
+
 ## Tracked changes and comments
 
 - While tracking, an edit that would delete or insert content Foli keeps verbatim (an opaque

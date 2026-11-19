@@ -18,6 +18,9 @@ import {
 import type { FlowPage, PageFacts } from "../layout/flow.js";
 import { type BlockOptions, PX_PER_TWIP, renderBlocks, type WordBlock } from "./blocks.js";
 
+/** On what shows a page field's number in a drawn copy of a story. */
+export const PAGE_FIELD_ATTR = "data-foli-page-field";
+
 /** The class of a page's header or footer element. */
 export const REGION_CLASS = "foli-region";
 export const REGION_CONTENT_CLASS = "foli-region-content";
@@ -129,6 +132,9 @@ function filledCopy(template: HTMLElement, texts: readonly string[]): HTMLElemen
   const walker = template.ownerDocument.createTreeWalker(copy, NodeFilter.SHOW_TEXT);
   for (let node = walker.nextNode(); node; node = walker.nextNode()) {
     const text = node as Text;
+    // A page's own number: not document text (find leaves it alone).
+    if (text.data.replace(SLOT_TEXT, "") === "" && text.data)
+      text.parentElement?.setAttribute(PAGE_FIELD_ATTR, "");
     if (text.data.includes(SLOT_MARK))
       text.data = text.data.replace(
         SLOT_TEXT,
