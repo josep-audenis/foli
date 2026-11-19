@@ -5,6 +5,8 @@
  * pages. Chromium only: `page.pdf()` is Chromium's.
  */
 import { readdirSync, readFileSync } from "node:fs";
+import { createServer } from "node:http";
+import type { AddressInfo } from "node:net";
 import { importDocx } from "@folijs/docx";
 import { exportPdf } from "@folijs/pdf";
 import { type BrowserContext, expect, type Page, test } from "@playwright/test";
@@ -83,6 +85,53 @@ test("04 exported: Word's four pages, the landscape one too, its text and headin
     { title: "Decisions requested", depth: 0 },
     { title: "Appendix: capital expenditure", depth: 0 },
   ]);
+});
+
+test("a document makes the exporting page request nothing: no picture, font or style URL", async ({
+  context,
+}) => {
+  const requests: string[] = [];
+  const server = createServer((request, response) => {
+    requests.push(request.url ?? "");
+    response.end();
+  });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const { port } = server.address() as AddressInfo;
+  const local = (path: string) => `http://127.0.0.1:${port}/${path}`;
+  const picture = (resource: string) => ({
+    type: "picture",
+    attrs: { resource, width: 914400, height: 457200 },
+  });
+  const document = {
+    schemaVersion: 5,
+    section: { pageSize: { width: 11906, height: 16838 } },
+    defaults: {},
+    styles: [{ id: "Normal", type: "paragraph", name: "Normal", isDefault: true }],
+    numbering: { abstracts: [], instances: [] },
+    comments: [],
+    resources: {
+      own: { contentType: "image/png", url: local("own.png") },
+      given: { contentType: "image/png", part: "word/media/image1.png" },
+    },
+    content: {
+      type: "doc",
+      content: [{ type: "paragraph", content: [picture("own"), picture("given")] }],
+    },
+  };
+  const printing = await context.newPage();
+  try {
+    const exported = await exportPdf(document as never, {
+      page: printing,
+      // A URL given for a picture is refused as the document's own is.
+      resources: (key) => (key === "given" ? local("given.png") : undefined),
+      styles: `@import url("${local("import.css")}"); @font-face { font-family: X; src: url("${local("font.ttf")}"); } body { background: url("${local("bg.png")}"); font-family: X; }`,
+    });
+    expect(exported.pages).toBe(1);
+  } finally {
+    await printing.close();
+    await new Promise((resolve) => server.close(resolve));
+  }
+  expect(requests).toEqual([]);
 });
 
 test("fields are updated from the pages first; links are links, internal ones too", async ({

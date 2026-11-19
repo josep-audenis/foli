@@ -899,7 +899,10 @@ Word lays it out, read-only and without an editor (`EditorView` edits on the sam
   `data-foli-bookmark` mark: where `@folijs/pdf` points a link to it.
 
 PDF (11.12, `packages/pdf`): `exportPdf` (Node's side) validates the document, builds the pictures'
-`data:` URLs from `resources`, and drives the app's page: `setContent` of an empty document,
+`data:` URLs from `resources` (any other URL becomes the picture's box), and drives the app's page:
+`setContent` of an empty document whose Content Security Policy allows `data:` images and fonts
+and inline scripts and styles only (nothing is requested: a document cannot make the server
+fetch an address),
 `addScriptTag` of `dist/renderer.js` (Vite bundles `src/renderer.ts` with core and the view from
 source into one classic script at build; the Node side reads it from `../dist/renderer.js`
 relative to itself), `evaluate` of `foliPdf.render`, and `pdf`. In the page: the app's `styles`,

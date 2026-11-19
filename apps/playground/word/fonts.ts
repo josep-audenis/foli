@@ -53,26 +53,29 @@ export function cloudFaces(): Face[] {
   return faces;
 }
 
-/**
- * Serves `faces` to `page` and gives their `@font-face` rules, the font URLs under `origin` (""
- * for the page's own). Fonts from another origin are served with CORS, as browsers ask.
- */
-export async function fontFaces(page: Page, faces: Face[], origin = ""): Promise<string> {
+/** Serves `faces` to `page` and gives their `@font-face` rules. */
+async function fontFaces(page: Page, faces: Face[]): Promise<string> {
   if (!faces.length) return "";
   await page.route(`**${FONT_PATH}*`, (route) => {
     const index = Number(new URL(route.request().url()).pathname.slice(FONT_PATH.length));
     const face = faces[index];
     if (!face) return route.abort();
-    return route.fulfill({
-      contentType: "font/ttf",
-      headers: { "access-control-allow-origin": "*" },
-      body: readFileSync(face.file),
-    });
+    return route.fulfill({ contentType: "font/ttf", body: readFileSync(face.file) });
   });
   return faces
     .map(
       (f, i) =>
-        `@font-face { font-family: "${f.family}"; src: url("${origin}${FONT_PATH}${i}") format("truetype"); font-weight: ${f.weight}; font-style: ${f.italic ? "italic" : "normal"}; font-display: block; }`,
+        `@font-face { font-family: "${f.family}"; src: url("${FONT_PATH}${i}") format("truetype"); font-weight: ${f.weight}; font-style: ${f.italic ? "italic" : "normal"}; font-display: block; }`,
+    )
+    .join("\n");
+}
+
+/** `@font-face` rules for `faces` with their files as `data:` URLs (`exportPdf`'s `styles`). */
+export function inlineFontFaces(faces: Face[]): string {
+  return faces
+    .map(
+      (f) =>
+        `@font-face { font-family: "${f.family}"; src: url("data:font/ttf;base64,${readFileSync(f.file).toString("base64")}") format("truetype"); font-weight: ${f.weight}; font-style: ${f.italic ? "italic" : "normal"}; }`,
     )
     .join("\n");
 }

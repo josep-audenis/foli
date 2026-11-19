@@ -385,6 +385,10 @@ content, ext? }`. `content` is a `doc` of the body's blocks. `noteType` is Word'
     fonts the machine lacks reach the page, since `setContent` replaces whatever the app had added.
     `resources` gives bytes with their type (a `.docx` part as it is), turned into `data:` URLs:
     an object URL made in Node means nothing to the page.
+  - The page loads nothing (its review found a document's picture URL reaching a server on the
+    exporting machine's network): images and fonts only as `data:` URLs, a Content Security
+    Policy blocking every other request, a web URL printing the picture's box. An image not
+    decoded within 10 seconds prints without it.
   - The renderer bundle (`dist/renderer.js`, core and the view's read-only renderer, 82.9 kB gzip)
     is built by Vite into one classic script and read from beside the package's code.
   - Fields are updated by core's `updateFields` on an editor of the document, with the read-only
@@ -401,8 +405,8 @@ content, ext? }`. `content` is a `doc` of the body's blocks. `noteType` is Word'
     the read-only renderer can repeat a few words where a paragraph continues in a column of
     another width. One renderer for both would remove that; the ADR keeps two until then.
   - Against Word's PDFs the PDF scores 0.954 over the corpus's 24 pages (on screen 0.889, where
-    pictures are boxes). Tested with Playwright's Chromium; Puppeteer's page has the four methods
-    but is not tested.
+    pictures are boxes). Tested with Playwright's Chromium; Puppeteer's page type fits `PdfPage`
+    but is not run.
 
 ### Format
 

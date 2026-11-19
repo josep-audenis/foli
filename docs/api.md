@@ -698,10 +698,13 @@ ADR-0007). No browser dependency of its own. Details: the
   page size, headings as PDF bookmarks. `ExportedPdf`: `{ pdf, pages, fields }` (the bytes, the
   page count, the `FieldsReport`).
 - `ExportPdfOptions`: `page` (a `PdfPage`), `resources(key, resource)` (a picture's image:
-  `{ data, contentType }`, as a `.docx` package part is, a URL, `null` for its box, `undefined`
-  for the resource's own URL), `review` (`"markup"`, the default; `"simple"`; `"final"`),
-  `styles` (CSS added first, such as `@font-face` rules; every face declared is loaded before the
-  layout).
+  `{ data, contentType }`, as a `.docx` package part is, an image `data:` URL, `null` for its
+  box, `undefined` for the resource's own `data:` URL; a web URL prints the box), `review`
+  (`"markup"`, the default; `"simple"`; `"final"`), `styles` (CSS added first, such as
+  `@font-face` rules with `data:` URLs; every face declared is loaded before the layout).
+- The page loads nothing from the network: its Content Security Policy allows `data:` images and
+  fonts, inline scripts and styles only, so a document cannot make the exporting server request
+  an address. An image not decoded after 10 seconds prints without it.
 - `PdfPage`: `setContent(html)`, `addScriptTag({ content })`, `evaluate(fn, arg)`,
-  `pdf(options)`: Playwright's `Page` (1.42+ for the outline and tags); Puppeteer's has the same
-  methods (not tested).
+  `pdf(options)`: Playwright's `Page` (1.42+ for the outline and tags) and Puppeteer's fit it;
+  run with Playwright only.

@@ -52,20 +52,33 @@ The document is validated first (`parseDocument`): an invalid one throws before 
 Chromium lays the text out with the fonts it has: the machine's, and those the page loads. A
 document in fonts the machine lacks (Office's cloud fonts, such as Aptos, are not installed
 system-wide) prints in a fallback, with other line breaks than Word's. Install the fonts on the
-machine that prints, or give `@font-face` rules in `styles` (each face declared is loaded before
-the layout; a font from another origin needs CORS headers). Only fonts you may embed in a PDF.
+machine that prints, or give `@font-face` rules in `styles` with the font files as `data:` URLs
+(`src: url("data:font/ttf;base64,…")`; each face declared is loaded before the layout). A web
+font's URL is not loaded (below). Only fonts you may embed in a PDF.
 
 ## Pictures
 
 `resources(key, resource)` gives each picture's image: `{ data, contentType }` (a package part
-is one), a URL the page can load (`data:`, `https:`), `null` for the picture's box, `undefined`
-for the resource's own `data:` or web URL. PNG, JPEG, GIF, WebP, BMP and SVG are drawn; EMF, WMF
-and TIFF print as the picture's box.
+is one), an image `data:` URL, `null` for the picture's box, `undefined` for the resource's own
+`data:` URL. PNG, JPEG, GIF, WebP, BMP and SVG are drawn; EMF, WMF and TIFF print as the
+picture's box. A picture whose image has not decoded after 10 seconds prints without it.
+
+## Nothing leaves the page
+
+A document is often a user's, and the server that exports it is inside your network: a picture
+or font URL in it would make that server request any address it names. So the page loads nothing:
+`exportPdf` hands it images and fonts as `data:` URLs only, a web URL (a resource's own `url`, or
+one `resources` returns) prints the picture's box, and the page's Content Security Policy
+(`default-src 'none'; img-src data:; font-src data:; style-src 'unsafe-inline'; script-src
+'unsafe-inline'`) blocks every other request, those of `styles` included (`@import`, a web font).
+To print a web image, fetch it yourself (checking the address) and give its bytes. Links are kept
+in the PDF but never followed.
 
 ## Puppeteer
 
 `PdfPage` is the part of a page `exportPdf` uses (`setContent`, `addScriptTag`, `evaluate`,
-`pdf`), which Puppeteer's `Page` has too. It is tested with Playwright's Chromium only.
+`pdf`). Playwright's and Puppeteer's (24) `Page` types fit it; it is run with Playwright's
+Chromium only.
 
 ## In the browser
 

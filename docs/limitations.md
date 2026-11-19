@@ -286,9 +286,14 @@ Details in the [package README](../packages/docx/README.md).
 - Print-only CSS must not change text metrics. PDF output is checked in Chromium only.
 - Your page's other content prints too; hide it ([styling.md](styling.md#print)).
 - `exportPdf` (`@folijs/pdf`) is Chromium's PDF: it needs the app's headless Chromium page
-  (Playwright 1.42+ for the outline and tags; Puppeteer's page has the same methods but is not
-  tested) and the document's fonts on that machine or in `styles`: a missing font prints in a
-  fallback with other line breaks. It replaces the page's content.
+  (Playwright 1.42+ for the outline and tags; Puppeteer's page type fits but is not run in the
+  tests) and the document's fonts on that machine or in `styles` as `data:` URLs: a missing font
+  prints in a fallback with other line breaks. It replaces the page's content.
+- The page `exportPdf` prints in loads nothing from the network (its Content Security Policy
+  allows `data:` images and fonts only), so a document cannot make the exporting server request
+  an address: a picture known only by a web URL prints as its box, a web font in `styles` is not
+  loaded. Give images as bytes and fonts as `data:` URLs. An image not decoded after 10 seconds
+  prints without it.
 - `exportPdf` lays the document out with the read-only renderer, the editor's `print()` with the
   editing one: the same pages (count, sizes, text), drawn alike but where the two differ. A
   table's header rows repeated on a continuation page are plain text in the editor's print and

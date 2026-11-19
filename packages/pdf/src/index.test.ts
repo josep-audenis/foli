@@ -14,9 +14,9 @@ function fakePage() {
   const page: PdfPage = {
     setContent: async (html) => calls.push({ method: "setContent", arg: html }),
     addScriptTag: async (options) => calls.push({ method: "addScriptTag", arg: options }),
-    evaluate: async <R, A>(_fn: (arg: A) => R | Promise<R>, arg: A) => {
+    evaluate: async (_fn, arg) => {
       calls.push({ method: "evaluate", arg });
-      return { pages: 3, fields: FIELDS } satisfies Rendered as R;
+      return { pages: 3, fields: FIELDS } satisfies Rendered;
     },
     pdf: async (options) => {
       calls.push({ method: "pdf", arg: options });
@@ -55,7 +55,36 @@ describe("exportPdf", () => {
     expect(result).toEqual({ pdf: PDF, pages: 3, fields: FIELDS });
   });
 
-  it("gives the page the pictures' images: bytes as data URLs, URLs as given", async () => {
+  it("keeps the page off the network: its policy, and no web URL for a picture", async () => {
+    const { page, calls } = fakePage();
+    await exportPdf(pictured(), { page });
+    expect(calls[0]?.arg).toContain(
+      `content="default-src 'none'; img-src data:; font-src data:; style-src 'unsafe-inline'; script-src 'unsafe-inline'"`,
+    );
+    // Without `resources`: a resource's own data URL, else the picture's box; never its web URL.
+    const images = (recorded: typeof calls) =>
+      (recorded[2]?.arg as RenderInput | undefined)?.images;
+    expect(images(calls)).toEqual({
+      png: null,
+      emf: null,
+      web: null,
+      own: "data:image/gif;base64,R0lGOD",
+    });
+    const given = fakePage();
+    await exportPdf(pictured(), {
+      page: given.page,
+      resources: (key) =>
+        key === "png" ? "http://127.0.0.1:9/a.png" : key === "web" ? "data:text/html,x" : undefined,
+    });
+    expect(images(given.calls)).toEqual({
+      png: null,
+      emf: null,
+      web: null,
+      own: "data:image/gif;base64,R0lGOD",
+    });
+  });
+
+  it("gives the page the pictures' images: bytes and data URLs", async () => {
     const { page, calls } = fakePage();
     const parts: Record<string, { data: Uint8Array; contentType: string }> = {
       "word/media/image1.png": { data: new Uint8Array([1, 2, 3]), contentType: "image/png" },
@@ -70,7 +99,12 @@ describe("exportPdf", () => {
     });
     const input = calls[2]?.arg as RenderInput;
     // An EMF is not an image Chromium shows: the picture's box. `own` keeps its own data URL.
-    expect(input.images).toEqual({ png: "data:image/png;base64,AQID", emf: null, web: null });
+    expect(input.images).toEqual({
+      png: "data:image/png;base64,AQID",
+      emf: null,
+      web: null,
+      own: "data:image/gif;base64,R0lGOD",
+    });
     expect(input.review).toBe("final");
     expect(input.styles).toBe("@font-face{}");
   });

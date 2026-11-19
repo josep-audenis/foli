@@ -21,7 +21,8 @@ import {
 export interface PdfPage {
   setContent(html: string): Promise<unknown>;
   addScriptTag(options: { content: string }): Promise<unknown>;
-  evaluate<R, A>(fn: (arg: A) => R | Promise<R>, arg: A): Promise<R>;
+  // Not generic: Playwright's and Puppeteer's typings of `evaluate` both fit this one.
+  evaluate(fn: (arg: RenderInput) => Promise<Rendered>, arg: RenderInput): Promise<unknown>;
   pdf(options: PdfPrintOptions): Promise<Uint8Array>;
 }
 
@@ -37,9 +38,9 @@ export interface PdfPrintOptions {
 }
 
 /**
- * A picture's image: bytes with their type (a `.docx` package part is one), a URL the page can
- * load (`data:`, `https:`), `null` for the picture's box, `undefined` for the resource's own
- * `data:` or web URL.
+ * A picture's image: bytes with their type (a `.docx` package part is one), an image `data:` URL,
+ * `null` for the picture's box, `undefined` for the resource's own `data:` URL. The page loads
+ * nothing from the network: a web URL, given here or in the resource, prints the picture's box.
  */
 export type PdfImage = { data: Uint8Array; contentType: string } | string | null | undefined;
 
@@ -47,7 +48,7 @@ export interface ExportPdfOptions {
   /** The page that prints: the app's Chromium page (headless), with the document's fonts. */
   page: PdfPage;
   /**
-   * The images of the document's pictures, by resource (for a `.docx`:
+   * The images of the document's pictures, by resource, as bytes or `data:` URLs (for a `.docx`:
    * `(key, r) => (r.part ? pkg.part(`/${r.part}`) : undefined)`).
    */
   resources?: ((key: string, resource: ResourceJSON) => PdfImage) | undefined;
@@ -55,7 +56,8 @@ export interface ExportPdfOptions {
   review?: ReviewView | undefined;
   /**
    * CSS added to the page before the document is laid out: `@font-face` rules for fonts the
-   * machine does not have. Each face declared is loaded first.
+   * machine does not have, their `src` as `data:` URLs (the page loads nothing from the network).
+   * Each face declared is loaded first.
    */
   styles?: string | undefined;
 }
@@ -95,17 +97,22 @@ const SHOWN = new Set([
   "image/svg+xml",
 ]);
 
-/** The URLs the page shows pictures from. An SVG is an `img`'s `data:` URL: its scripts never run. */
+const DATA_IMAGE = /^data:image\//i;
+
+/**
+ * Every resource's image as the page shows it: a `data:` URL, or null for the picture's box.
+ * Never a web URL: a document could make the server exporting it fetch any address, its own
+ * network's included. An SVG is an `img`'s `data:` URL: its scripts never run.
+ */
 function images(
   document: FoliDocument,
   resources: ExportPdfOptions["resources"],
 ): Record<string, string | null> {
   const out: Record<string, string | null> = {};
-  if (!resources) return out;
   for (const [key, resource] of Object.entries(document.resources ?? {})) {
-    const image = resources(key, resource);
-    if (image === undefined) continue;
-    if (image === null || typeof image === "string") out[key] = image;
+    const image = resources?.(key, resource) ?? resource.data ?? null;
+    if (image === null || typeof image === "string")
+      out[key] = image && DATA_IMAGE.test(image) ? image : null;
     else if (!SHOWN.has(image.contentType.toLowerCase())) out[key] = null;
     else {
       const { data, contentType } = image;
@@ -115,6 +122,15 @@ function images(
   }
   return out;
 }
+
+/**
+ * The page's document. Its policy keeps everything inside the page: images and fonts from
+ * `data:` URLs only, no other request, inline scripts (the renderer) and styles.
+ */
+const PAGE =
+  '<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" ' +
+  `content="default-src 'none'; img-src data:; font-src data:; style-src 'unsafe-inline'; ` +
+  `script-src 'unsafe-inline'"></head><body></body></html>`;
 
 let bundle: Promise<string> | null = null;
 
@@ -154,17 +170,15 @@ export async function exportPdf(
     styles: options.styles ?? "",
   };
   const script = await rendererBundle();
-  await page.setContent(
-    '<!doctype html><html><head><meta charset="utf-8"></head><body></body></html>',
-  );
+  await page.setContent(PAGE);
   await page.addScriptTag({ content: script });
-  const rendered = await page.evaluate(
+  const rendered = (await page.evaluate(
     (arg: RenderInput) =>
       (
         window as unknown as { foliPdf: { render(input: RenderInput): Promise<Rendered> } }
       ).foliPdf.render(arg),
     input,
-  );
+  )) as Rendered;
   const pdf = await page.pdf({
     preferCSSPageSize: true,
     printBackground: true,
