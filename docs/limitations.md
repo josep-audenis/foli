@@ -356,4 +356,6 @@ Details in the [package README](../packages/docx/README.md).
   view's own keys (they need the pages). A keymap cannot take a reserved key, nor the browser's
   editing commands that arrive without a key name (word and line deletion, the browser's undo
   and bold from its menus): those come through `beforeinput`. Plugin commands are typed only
-  through `FoliCommands`: one an app does not declare there is reachable but untyped.
+  through `FoliCommands`: one an app does not declare there is reachable but untyped. Ctrl+Alt
+  typing a character other than a–z or 0–9 is taken for AltGr (not every browser reports AltGr),
+  so on a non-Latin layout Ctrl+Alt+F and Ctrl+Alt+D do not insert notes.

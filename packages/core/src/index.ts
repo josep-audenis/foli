@@ -75,6 +75,7 @@ export {
   autolinkHref,
   type BookmarkInfo,
   type BookmarkResult,
+  type BuiltInCommands,
   baseKeymap,
   CellSelection,
   type Change,

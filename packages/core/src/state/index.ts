@@ -49,6 +49,7 @@ export {
   setControlValue,
 } from "./controls.js";
 export {
+  type BuiltInCommands,
   createEditor,
   type DocumentTarget,
   type Editor,

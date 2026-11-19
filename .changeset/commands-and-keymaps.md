@@ -17,8 +17,10 @@ Commands and keymaps (ADR-0008):
   page splits, Escape out of a story, Tab after Escape, Ctrl+Shift+V, keys of a drag or a pop-up,
   keys while composing) stay the view's.
 - `keyName` names a letter or digit pressed with Alt (Option) by its physical key, as it already
-  did with Mod: Option+Shift+N on macOS is `Alt-Shift-n`, not the character it types.
+  did with Mod: Option+Shift+N on macOS is `Alt-Shift-n`, not the character it types. A character
+  typed with AltGr (Ctrl+Alt on Windows) is named by itself: AltGr+F types `[` on a Hungarian
+  layout instead of inserting a footnote as Ctrl+Alt+F (a fix).
 - `docs/keyboard.md` lists every built-in key per platform (Windows and Linux, macOS), its
   command and whether a keymap can take it.
 
-New name: `FoliCommands` (`@folijs/core`).
+New names: `FoliCommands`, `BuiltInCommands` (`@folijs/core`).

@@ -1548,7 +1548,12 @@ Each task is a PR on `phase-12/ecosystem`, the build green after each.
   run them; plugin commands are untyped unless an app augments `FoliCommands`; the macOS mapping
   (Cmd+H, Cmd+Option+D and F3 taken by the system) is documented, not checked on a Mac; ADR-0008's
   table says "dragging or resizing a picture" where the view drags column borders and resizes
-  pictures.)
+  pictures. Review of #125: AltGr typing a character (AltGr+F is `[` on Hungarian Windows) is
+  named by the character, so it types instead of inserting a footnote (AltGraph state, or Ctrl+Alt
+  giving a character other than a–z/0–9; unit-tested, no e2e: Playwright cannot press AltGr on
+  another layout); keyboard.md warns against binding Option and AltGr combos and places the
+  view's after-keymap arrows apart; `BuiltInCommands` (public) holds the built-in commands and
+  `FoliCommands` extends it, so a forgotten built-in fails to compile.)
 - [ ] 12.6 React: toolbar items added, removed and grouped (built-in items exported, a custom item
   driven by a command's dry run and `useEditorState`), menus too where they share the code;
   `plugins` stable (changing it after mount documented or supported); hooks for commands; axe and

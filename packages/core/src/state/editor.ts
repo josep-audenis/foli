@@ -182,11 +182,8 @@ export interface StoryView {
   focus(): void;
 }
 
-/**
- * The commands on `editor.commands`. Apps add the names of their plugins' commands by augmenting
- * it: `declare module "@folijs/core" { interface FoliCommands { insertMention(id: string): boolean } }`.
- */
-export interface FoliCommands {
+/** The built-in commands on `editor.commands`. */
+export interface BuiltInCommands {
   insertText(text: string): boolean;
   deleteSelection(): boolean;
   deleteBackward(unit?: DeleteUnit): boolean;
@@ -256,6 +253,13 @@ export interface FoliCommands {
    */
   setControlValue(target: string, value: ControlValueInput): boolean;
 }
+
+/**
+ * The commands on `editor.commands`: the built-in ones and those plugins add. Apps add the names
+ * of their plugins' commands by augmenting it:
+ * `declare module "@folijs/core" { interface FoliCommands { insertMention(id: string): boolean } }`.
+ */
+export interface FoliCommands extends BuiltInCommands {}
 
 /** A headless editor: state, commands, history and change notifications, no DOM. */
 export interface Editor {
@@ -490,8 +494,7 @@ function makeEditor(parts: EditorParts): Editor {
 function withPluginCommands(
   plugins: readonly Plugin[],
   run: (command: Command) => boolean,
-  // Partial: an app's augmentation of FoliCommands (its own commands) is not built in.
-  commands: Partial<FoliCommands>,
+  commands: BuiltInCommands,
 ): FoliCommands {
   for (const plugin of plugins)
     for (const [name, factory] of Object.entries(plugin.spec.commands ?? {})) {

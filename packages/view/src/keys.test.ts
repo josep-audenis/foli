@@ -114,6 +114,24 @@ describe("the view's keys and user keymaps", () => {
     expect(fieldCodesShown(editor.state)).toBe(true);
   });
 
+  it('lets AltGr type its character: AltGr+F is "[" on Hungarian Windows, not a footnote', () => {
+    const { host, editor } = mount();
+    const before = JSON.stringify(editor.getDocument());
+    for (const key of ["[", "Đ"]) {
+      const event = new KeyboardEvent("keydown", {
+        key,
+        code: key === "[" ? "KeyF" : "KeyD",
+        ctrlKey: true,
+        altKey: true,
+        cancelable: true,
+      });
+      host.dispatchEvent(event);
+      // Not taken: the browser's beforeinput types it.
+      expect(event.defaultPrevented).toBe(false);
+    }
+    expect(JSON.stringify(editor.getDocument())).toBe(before);
+  });
+
   it("keeps Tab after Escape reserved: it leaves the editor even when a keymap binds Tab", () => {
     const tab = vi.fn(() => true);
     const { host } = mount([new Plugin({ keymap: { Tab: tab } })]);
@@ -145,5 +163,19 @@ describe("keyName with Alt", () => {
     expect(key({ key: "Dead", code: "KeyE", altKey: true })).toBe("Alt-e");
     expect(key({ key: "n", code: "KeyN", altKey: true })).toBe("Alt-n");
     expect(key({ key: "F9", code: "F9", altKey: true })).toBe("Alt-F9");
+  });
+
+  it("names an AltGr character by the character, Ctrl+Alt+letter by the letter", () => {
+    expect(key({ key: "[", code: "KeyF", ctrlKey: true, altKey: true })).toBe("Mod-Alt-[");
+    expect(key({ key: "Đ", code: "KeyD", ctrlKey: true, altKey: true, shiftKey: true })).toBe(
+      "Mod-Alt-Shift-đ",
+    );
+    expect(
+      key({ key: "@", code: "KeyQ", ctrlKey: true, altKey: true, modifierAltGraph: true }),
+    ).toBe("Mod-Alt-@");
+    expect(key({ key: "f", code: "KeyF", ctrlKey: true, altKey: true })).toBe("Mod-Alt-f");
+    expect(key({ key: "F", code: "KeyF", ctrlKey: true, altKey: true, shiftKey: true })).toBe(
+      "Mod-Alt-Shift-f",
+    );
   });
 });

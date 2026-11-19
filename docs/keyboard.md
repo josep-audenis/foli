@@ -9,9 +9,17 @@ leaves alone, the clipboard keys) are the browser's and are not listed.
 A keymap (`PluginSpec.keymap`, `editor.handleKey`) names a key as `keyName(event)` does
 (`@folijs/view`): modifiers in the order `Mod-Ctrl-Meta-Alt-Shift-`, then the key; a single
 character lower-cased (`Mod-b`, `Mod-Shift-z`), other keys by `KeyboardEvent.key` (`Enter`,
-`ArrowDown`, `F9`). With Mod or Alt, a letter or digit is named by the physical key, whatever
-character the layout or Option gives (`Mod-Shift-7`, `Alt-Shift-n` on macOS, where Option+Shift+N
-types a character).
+`ArrowDown`, `F9`). With Mod or Alt, when the character is not a–z or 0–9, the key is named by
+its physical key instead: `Mod-Shift-7` whatever Ctrl+Shift+7 types on the layout, `Mod-b` for
+Ctrl+B on a Cyrillic layout, `Alt-Shift-n` for Option+Shift+N on macOS (which types a character).
+A layout's own letters keep their name (Ctrl+A on AZERTY is `Mod-a`). On Windows and Linux, AltGr
+(Ctrl+Alt on Windows) typing a character is named by that character (`Mod-Alt-[` for AltGr+F on a
+Hungarian layout), so it types.
+
+Option on macOS and AltGr (Ctrl+Alt) on Windows type characters on many layouts (`@`, `[`, `€`,
+accented letters): an app should not bind `Alt-` plus a letter or digit, nor `Mod-Alt-` plus one,
+or those users cannot type the character. The built-in `Mod-Alt-f`, `Mod-Alt-d` and `Alt-Shift-n`
+are Word's; AltGr characters pass them by.
 
 | Name          | Windows and Linux         | macOS                                                       |
 | ------------- | ------------------------- | ----------------------------------------------------------- |
@@ -82,19 +90,23 @@ and the like), as it takes the browser's undo, redo and bold, italic, underline 
 They need the pages, the stories or the app's UI, so they are the view's (`@folijs/view`), not
 core commands; they run after the user's plugins and before the core keymaps above.
 
-| Windows and Linux                     | macOS                      | Name                                                     | What it does                                                                                                   |
-| ------------------------------------- | -------------------------- | -------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| Ctrl+Home, Ctrl+End (Shift extends)   | Cmd+Fn+Left, Cmd+Fn+Right  | `Mod-Home`, `Mod-End`, `Mod-Shift-Home`, `Mod-Shift-End` | to the document's start or end on pages with headers or footers (elsewhere the browser's move)                 |
-| F9                                    | Fn+F9                      | `F9`                                                     | `view.updateFields()`: the selection's fields (all with Ctrl+A first)                                          |
-| Alt+F9                                | Option+Fn+F9               | `Alt-F9`                                                 | `toggleFieldCodes`                                                                                             |
-| Alt+Down                              | Option+Down                | `Alt-ArrowDown`                                          | opens the list or date picker of the content control at the caret                                              |
-| Ctrl+Alt+F, Ctrl+Alt+D                | Cmd+Option+F, Cmd+Option+D | `Mod-Alt-f`, `Mod-Alt-d`                                 | `insertNote("footnote")`, `insertNote("endnote")`, then opens the note                                         |
-| Shift+Alt+N                           | Shift+Option+N             | `Alt-Shift-n`                                            | from a note reference to its note (`storyView.editNote()`), and back (`storyView.toReference()`)               |
-| Ctrl+F, Ctrl+H, Ctrl+G                | Cmd+F, Cmd+H, Cmd+G        | `Mod-f`, `Mod-h`, `Mod-g`                                | `editor.navigation("find" \| "replace" \| "goTo")`: what the app shows (`FoliNavigation`); none, the browser's |
-| F3, Shift+F3                          | Fn+F3, Shift+Fn+F3         | `F3`, `Shift-F3`                                         | `editor.navigation("next" \| "previous")`                                                                      |
-| Ctrl+Shift+F5                         | Cmd+Shift+Fn+F5            | `Mod-Shift-F5`                                           | `editor.navigation("bookmarks")`                                                                               |
-| Up, Down beside a rule or a cell edge | the same                   | `ArrowUp`, `ArrowDown`                                   | selects the rule, or goes to the cell above or below (`goToCellVertically`), when no keymap took the key       |
-| Shift+arrows in a table               | the same                   | `Shift-ArrowUp` …                                        | grows a cell selection (`extendCellSelection`), when no keymap took the key                                    |
+| Windows and Linux                   | macOS                      | Name                                                     | What it does                                                                                                   |
+| ----------------------------------- | -------------------------- | -------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| Ctrl+Home, Ctrl+End (Shift extends) | Cmd+Fn+Left, Cmd+Fn+Right  | `Mod-Home`, `Mod-End`, `Mod-Shift-Home`, `Mod-Shift-End` | to the document's start or end on pages with headers or footers (elsewhere the browser's move)                 |
+| F9                                  | Fn+F9                      | `F9`                                                     | `view.updateFields()`: the selection's fields (all with Ctrl+A first)                                          |
+| Alt+F9                              | Option+Fn+F9               | `Alt-F9`                                                 | `toggleFieldCodes`                                                                                             |
+| Alt+Down                            | Option+Down                | `Alt-ArrowDown`                                          | opens the list or date picker of the content control at the caret                                              |
+| Ctrl+Alt+F, Ctrl+Alt+D              | Cmd+Option+F, Cmd+Option+D | `Mod-Alt-f`, `Mod-Alt-d`                                 | `insertNote("footnote")`, `insertNote("endnote")`, then opens the note                                         |
+| Shift+Alt+N                         | Shift+Option+N             | `Alt-Shift-n`                                            | from a note reference to its note (`storyView.editNote()`), and back (`storyView.toReference()`)               |
+| Ctrl+F, Ctrl+H, Ctrl+G              | Cmd+F, Cmd+H, Cmd+G        | `Mod-f`, `Mod-h`, `Mod-g`                                | `editor.navigation("find" \| "replace" \| "goTo")`: what the app shows (`FoliNavigation`); none, the browser's |
+| F3, Shift+F3                        | Fn+F3, Shift+Fn+F3         | `F3`, `Shift-F3`                                         | `editor.navigation("next" \| "previous")`                                                                      |
+| Ctrl+Shift+F5                       | Cmd+Shift+Fn+F5            | `Mod-Shift-F5`                                           | `editor.navigation("bookmarks")`                                                                               |
+
+After every keymap (core's included) has passed a key on, the view also moves the caret where
+the browser cannot: Up and Down beside a rule or across a table cell's edge (`ArrowUp`,
+`ArrowDown`: selects the rule, or the cell above or below with `goToCellVertically`), and
+Shift+arrows in a table (`Shift-ArrowUp` …: grows a cell selection, `extendCellSelection`). A
+keymap binding those names runs first, so they are overridable too.
 
 Shift+Alt+N is Foli's (Word has none). On macOS some of these are the system's or the browser's
 before the page sees them (Cmd+H hides the browser, Cmd+Option+D the Dock, F3 is often Mission

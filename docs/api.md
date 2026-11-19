@@ -625,7 +625,7 @@ Stable, for plugins and code that edits documents directly:
   `AttributeSpec`, `AttributeSpecs`, `Attrs`, `NodeJSON`, `MarkJSON`, `SliceJSON`,
   `ReplaceError`.
 - State: `EditorState`, `EditorStateConfig`, `Transaction`, `Command`, `Plugin`, `PluginKey`,
-  `PluginSpec`, `FoliCommands`; selections: `Selection`, `TextSelection`, `NodeSelection`, `AllSelection`,
+  `PluginSpec`, `FoliCommands`, `BuiltInCommands`; selections: `Selection`, `TextSelection`, `NodeSelection`, `AllSelection`,
   `CellSelection`, `SelectionJSON`.
 - Transforms: `Transform`, `TransformError`, `Step`, `StepResult`, `ReplaceStep`,
   `ReplaceAroundStep`, `AddMarkStep`, `RemoveMarkStep`, `NodeMarkupStep`, `NodeMarkupBatchStep`,
@@ -773,7 +773,9 @@ const view = new EditorView(host, editor, { editable: true, placeholder: "" });
   on Apple platforms) opens the link's href, read from the document, in a new tab with
   `noopener,noreferrer`.
 - `keyName(event)`: the key name `handleKey` expects (`"Mod-b"`, `"Shift-Enter"`); with Mod or Alt
-  a letter or digit is named by its physical key (`Alt-Shift-n` for Option+Shift+N on macOS).
+  a letter or digit is named by its physical key when the character is not a–z or 0–9
+  (`Alt-Shift-n` for Option+Shift+N on macOS), except a character AltGr types on Windows and Linux
+  (`Mod-Alt-[`).
   Every built-in key: [keyboard.md](keyboard.md).
 - `measureImageFile(file, doc)`: an image file's natural size in CSS px from a local object URL
   (null when the browser cannot show it); `textWidthEmu(state)`: the widest a picture is

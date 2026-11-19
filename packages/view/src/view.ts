@@ -5115,9 +5115,19 @@ export function keyName(event: KeyboardEvent): string {
   const mod = IS_MAC ? event.metaKey : event.ctrlKey;
   // Non-Latin layouts: Ctrl+B still means "b" (use the physical key when the character is not a-z);
   // with Shift, Ctrl+Shift+7 still means "7" (the character is "&" or "/" depending on layout).
-  // Option on macOS types a character (Option+N is a dead key): Alt+N still means "n".
+  // Option on macOS types a character (Option+N is a dead key): Alt+N still means "n". But AltGr
+  // (Ctrl+Alt on Windows) typing a character is that character: "[" is AltGr+F on a Hungarian
+  // layout, and must not be read as Ctrl+Alt+F (a footnote).
+  // (macOS has no AltGr: some browsers report Option as AltGraph, and Option is handled above.)
+  // shortcut: Ctrl+Alt giving any other character counts as AltGr (not all browsers report its
+  // state), so Ctrl+Alt+F on a non-Latin layout is not Mod-Alt-f; drop the guess if they all do.
+  const altGraph =
+    !IS_MAC &&
+    (event.getModifierState?.("AltGraph") ||
+      (event.ctrlKey && event.altKey && key.length === 1 && !/^[a-z0-9]$/i.test(key)));
   if (
     (mod || event.altKey) &&
+    !altGraph &&
     !/^[a-z0-9]$/.test(key) &&
     /^(Key[A-Z]|Digit[0-9])$/.test(event.code)
   )
