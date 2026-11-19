@@ -1,6 +1,6 @@
 # API reference
 
-The public API of the five packages, as of 0.3.0 (`@folijs/pdf` since 11.12). Not stable before 1.0: anything may change
+The public API of the five packages, as of 0.6.0 (`@folijs/pdf` first released in 0.6.0). Not stable before 1.0: anything may change
 in a minor version until then (changes are listed in each package's changelog). Exports not
 listed here (model classes, steps, `Transform`, `Plugin`, `Transaction` metadata, mapping) are
 public for advanced use but are not a stable API yet.
@@ -19,9 +19,9 @@ Peer dependencies: `react` and `react-dom` 18.2+ or 19. Stylesheet: `@folijs/rea
 ### `<FoliEditor>`
 
 An editable document on pages, with a toolbar. Creates its own editor and provides it to its
-`children`. Uncontrolled: the editor owns the document. Since 8.7d1 it edits schema v3 (Word's
-model, with Word's toolbar): a 0.1.0 or 0.2.0 document given to it is migrated
-(`parseDocument`), and what it reports is v3.
+`children`. Uncontrolled: the editor owns the document. Since 8.7d1 it edits Word's model (with
+Word's toolbar; schema v5 since 0.6.0): a document saved by 0.1.0 to 0.5.0 given to it is
+migrated (`parseDocument`), and what it reports is v5.
 
 | Prop             | Type                                             | Default      | Notes                                                                                               |
 | ---------------- | ------------------------------------------------ | ------------ | --------------------------------------------------------------------------------------------------- |
@@ -204,17 +204,17 @@ Documents are schema v5, Word's model with tables, pictures, stories, fields and
   v2 content and millimetre settings; to start from those, pass
   `{ schemaVersion: 2, settings, content }` to `parseDocument` or the editor.)
 - `parseDocument(input: unknown): FoliDocument`: validates untrusted input (e.g. parsed JSON)
-  and returns a copy in canonical form; a document saved by 0.1.0 to 0.4.0 is validated as
-  such and migrated (`migrateToV3`, `migrateToV4`). Throws `FoliDocumentError`, whose message
+  and returns a copy in canonical form; a document saved by 0.1.0 to 0.5.0 is validated as
+  such and migrated (`migrateToV3`, `migrateToV4`, `migrateToV5`). Throws `FoliDocumentError`, whose message
   names the place (`content.content[2].marks[0].type: …`) and says when a newer Foli saved the
   document; never drops content silently. `parseContent(json)` parses content alone into a
   `doc` node, with Word's table rules.
-- `FoliDocument`: `{ schemaVersion: 4, section, defaults, styles, numbering, theme?, comments,
-  resources?, content }` and its parts (`SectionJSON`, `StyleJSON`, `TablePropertiesJSON`,
+- `FoliDocument`: `{ schemaVersion: 5, section, defaults, styles, numbering, theme?, comments,
+  resources?, stories?, controls?, settings?, content }` and its parts (`SectionJSON`, `StyleJSON`, `TablePropertiesJSON`,
   `RowPropertiesJSON`, `CellPropertiesJSON`, `TableConditionJSON`, `MeasureJSON`,
-  `ResourceJSON`…), in Word's units (twips; EMU for pictures). `FoliDocumentV3`: a schema 3
-  document.
-- `SCHEMA_VERSION` (4), `schema` (the content schema), `checkSection`, `RUN_PROPERTY_MARKS`,
+  `ResourceJSON`, `StoryJSON`, `ControlJSON`, `WordSettingsJSON`…), in Word's units (twips; EMU
+  for pictures). `FoliDocumentV3` and `FoliDocumentV4`: schema 3 and 4 documents.
+- `SCHEMA_VERSION` (5), `schema` (the content schema), `checkSection`, `RUN_PROPERTY_MARKS`,
   `HIGHLIGHT_COLORS`, `JUSTIFICATIONS`, `TABLE_CONDITIONS`, the unit conversions (`twipsToMm`,
   `mmToTwips`…).
 - `isSafeHref(href)` and `isColor(color)`: the rules links and colors from outside a document
@@ -241,11 +241,11 @@ Documents are schema v5, Word's model with tables, pictures, stories, fields and
 ### Editor
 
 `createEditor({ document?, plugins?, author?, trackChanges?, reviewView? }): Editor`: a headless editor (state, commands, undo
-history, change notifications) of a schema v3 document (Word's model). The document is
-validated and, when saved by 0.1.0 or 0.2.0, migrated (`parseDocument`; default:
+history, change notifications) of a Word's model document (schema v5). The document is
+validated and, when saved by 0.1.0 to 0.5.0, migrated (`parseDocument`; default:
 `createDocument()`); `setDocument` behaves the same way. `EditorDocument` is what both take:
 `FoliDocument | FoliDocumentV2`. The editor keeps its styles, numbering and sections,
-`getDocument()` returns a v3 document (a copy) and `settings` are its last section's page (`sectionSettings(section)`; Word's Letter page with
+`getDocument()` returns a v5 document (a copy) and `settings` are its last section's page (`sectionSettings(section)`; Word's Letter page with
 inch margins where the section leaves them out). The commands edit as Word does: Enter
 leaves the section break and the paragraph's own attributes on the second paragraph, and at the
 end of a paragraph whose style names a next style (a heading: Normal) starts that style;

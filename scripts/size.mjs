@@ -68,43 +68,21 @@ writeFileSync(appEntry, `export { FoliEditor } from "${dist("react")}";\n`);
  * image files through the upload hook. React raised in 10.8e (87.9 kB): the toolbar's picture
  * dialog (insert from a file, alt text, size). Docx raised in 10.9b (44.9 kB): floating pictures
  * read and written (`wp:anchor` positions and wrapping, new anchors). View raised in 10.9c
- * (63.5 kB): floating pictures drawn as CSS floats at their paragraphs' start. All raised in
- * 11.3 (core 53.7, view 65.4, React 89.8, docx 46.9 kB): schema v5 (the field, control and note
- * nodes, the checks of stories, controls and settings), carried by every package. Docx raised
- * in 11.4 (50.8 kB): headers, footers and notes read and written as stories, checked. Raised
- * in 11.5 (52.7 kB): fields and content controls read and written. Core, view and React raised
- * in 11.6 (55.7, 68.8 and 95.7 kB): section commands, `EnvelopeStep` and tracked setups; columns,
- * bands and balancing in the flow and both renderers; the section menu and page setup dialog.
- * Core and React raised in 11.7 (57.1 and 96.0 kB so far): story editors, `StoryStep`, the header
- * and footer commands. Docx raised in 11.7 (53.5 kB): `word/settings.xml` read and written back.
- * View and React raised in 11.7 (73.6 and 102.5 kB): headers and footers on pages in both
- * renderers, a story edited in place (a second view mounted on its page), the header menu.
- * Core, view and React raised in 11.8 (66.6, 86.4 and 114.6 kB): fields (finding them, the
- * selection rules, every field Foli updates with Word's switches, tables of contents rebuilt,
- * the insert commands), hidden code ranges and shading in the view, the fields menu and dialog.
- * Raised again after its review (68.8, 88.8 and 117.2 kB): Word's numeric pictures in full, self
- * references, what a table of contents lists, results written a paragraph at a time.
- * Core and React raised in 11.9 (74.7 kB, 76.5 kB allowed; React with core): content controls (the
- * lock and text rules, placeholders, values, insert commands). Docx raised in 11.9 (55.1 kB, 57.0
- * allowed): controls' properties patched into the kept `w:sdtPr`, new controls, glossary text.
- * View and React raised in 11.9 (92.9 and 125.6 kB, 95.2 and 128.9 allowed): controls' frames,
- * lists and date picker in the view, the controls menu and properties dialog. Core raised again
- * in 11.9's review (77.3 kB, 79.6 allowed): rich values checked, dates read from their text, what
- * tracked deletions and reviews do to a control.
- * Core raised in 11.10 (80.2 kB, 82.0 allowed): notes (numbers from the settings and sections, the
- * insert, options and convert commands, keeping a note with its reference while tracking, notes
- * carried on the clipboard). View and React raised in 11.10 (103.8 and 139.9 kB, 105.5 and 141.6
- * allowed): footnotes and endnotes in the flow and both renderers, a note edited in place, the
- * notes menu and options dialog, and core's notes with them.
- * Core, view and React raised in 11.11 (84.1, 106.1 and 148.7 kB with 11.8 and 11.9 final; 85.9,
- * 107.9 and 151.4 allowed):
- * find and replace over every story, bookmarks and the outline; marks on the pages and going to a
- * match, a bookmark or a heading; the find panel, the bookmarks dialog and the outline panel, which
- * `FoliEditor` includes so that Word's keys work out of the box.
- * `@folijs/pdf` added in 11.12 (Node's side 16.0 kB, 18.4 allowed: core's `parseDocument`, which
- * checks the document before the page gets it; the page's renderer 82.9 kB, 95.2 allowed: core and
- * the view's read-only renderer bundled into the script `exportPdf` adds to the headless page, never
- * part of an app's own bundle).
+ * (63.5 kB): floating pictures drawn as CSS floats at their paragraphs' start.
+ * Phase 11 (at its close core 84.6, view 106.6, React 149.9, docx 55.3 kB): all raised in 11.3
+ * for schema v5 (field, control and note nodes; the checks of stories, controls and settings),
+ * which every package carries. Docx raised in 11.4, 11.5, 11.7 and 11.9 (57.0 kB allowed):
+ * stories, fields and controls read and written, `word/settings.xml`, controls' properties
+ * patched into the kept `w:sdtPr`. Core, view and React raised in each of 11.6 to 11.11 (85.9,
+ * 107.9 and 151.4 kB allowed), each time with the task's toolbar menu: section commands and
+ * columns in the flow (11.6); story editors, `StoryStep`, headers and footers on pages and edited
+ * in place (11.7); fields, their selection rules and updates, tables of contents (11.8); content
+ * controls' rules, frames, lists and date picker (11.9); notes in the flow and both renderers
+ * (11.10); find and replace over every story, bookmarks, the outline and `FoliNavigation`, which
+ * `FoliEditor` includes (11.11). `@folijs/pdf` added in 11.12 (16.2 kB, 18.4 allowed: core's
+ * `parseDocument` checks the document before the page gets it; its page renderer 83.1 kB, 95.2
+ * allowed: core and the read-only renderer bundled into the script `exportPdf` adds to the
+ * headless page, never part of an app's own bundle).
  */
 const BUNDLES = [
   { name: "@folijs/core", entry: dist("core"), budget: 88_000 },

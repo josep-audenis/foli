@@ -1,9 +1,10 @@
 # Document model
 
-> Status: the Word model (`packages/core/src/v3/`) is the current schema (`SCHEMA_VERSION` 4:
-> schema v3 plus tables, pictures and `resources`, ADR-0006; 0.5.0): the editor and view edit
-> it, tables and pictures included, and `@folijs/docx` reads and writes them. 0.4.0 cannot read
-> documents saved by 0.5.0. Schema v2 (0.2.0, `packages/core/src/document.ts`,
+> Status: the Word model (`packages/core/src/v3/`) is the current schema (`SCHEMA_VERSION` 5:
+> schema v3 plus tables, pictures and `resources`, ADR-0006, 0.5.0; plus stories (headers,
+> footers, notes), fields, content controls, note references, columns and `settings`, ADR-0007,
+> 0.6.0): the editor and view edit all of it, and `@folijs/docx` reads and writes it. 0.5.0
+> cannot read documents saved by 0.6.0. Schema v2 (0.2.0, `packages/core/src/document.ts`,
 > `packages/core/src/schema.ts`) and v1 (0.1.0) are kept to read and migrate documents saved
 > with them, and v2 to read pasted HTML. The document model (schema from specs, immutable nodes,
 > positions, slices, JSON in/out) is `packages/core/src/model/`. Steps, transactions, history and
@@ -15,7 +16,7 @@ A persisted Foli document is a versioned **envelope** around a JSON content tree
 
 ```ts
 interface FoliDocument {
-  schemaVersion: 4; // 1 to 3: documents saved by 0.1.0 to 0.4.0, migrated on load
+  schemaVersion: 5; // 1 to 4: documents saved by 0.1.0 to 0.5.0, migrated on load
   section: SectionJSON; // page setup, in twips
   defaults: { paragraph?: ParagraphPropertiesJSON; run?: MarkJSON[] };
   styles: StyleJSON[];
@@ -23,6 +24,9 @@ interface FoliDocument {
   theme?: ThemeJSON;
   comments: CommentJSON[];
   resources?: Record<string, ResourceJSON>; // pictures' bytes, by key
+  stories?: Record<string, StoryJSON>; // headers, footers and notes, by id
+  controls?: Record<string, ControlJSON>; // content controls' properties, by id
+  settings?: WordSettingsJSON; // even and odd headers, note options
   content: NodeJSON; // root node of type "doc"
 }
 ```
@@ -153,7 +157,7 @@ JSON: the style, then the defaults, decide (`Resolver` in `v3/resolve.ts`, 8.6).
 | `fieldStart` (`dirty`, `locked`, `simple`, `ext`), `fieldCode` (`text`, `attributes`), `fieldSeparator`, `fieldEnd` (v5) | a field as Word has it (ADR-0007): the code from the start to the separator (or the end), hidden with any field nested in it; the result as ordinary content after the separator, written by `updateFields`                                                                                                                      |
 | `controlStart`, `controlEnd` (`id`, v5)                                                                                  | an inline content control's ends; its properties are `controls[id]`. Blocks, rows and cells list theirs in `controls`, outermost first                                                                                                                                                                                           |
 | `noteReference` (`story`, `customMark`, `attributes`, v5), `noteMark` (v5)                                               | a note's reference, and where a note shows its number                                                                                                                                                                                                                                                                            |
-| `opaqueInline`                                                                                                           | `xml`, `label`, `run` (content of a run, written back inside one): fields, charts, shapes, symbols… until modeled                                                                                                                                                                                                                |
+| `opaqueInline`                                                                                                           | `xml`, `label`, `run` (content of a run, written back inside one): charts, shapes, symbols… until modeled                                                                                                                                                                                                                        |
 
 Marks, in canonical order: `link` (`href` as the file has it, `anchor`, `tooltip`,
 `attributes`), `insertion` and `deletion` (`id`, `author`, `date`, `move`: tracked changes and
@@ -176,7 +180,9 @@ properties may hold only the marks that describe how text looks (`RUN_PROPERTY_M
   section (a section's first). New notes take the next number of their kind. New headers and
   footers get ids `rIdFoli` and a random part, never reused. In the editor a story changes through `StoryStep`s of the body's history.
 - **Settings** (v5): `settings.evenAndOddHeaders` (absent: as the file says; `false` is written
-  back as off), `footnotes` and `endnotes`, from `word/settings.xml`. They change through
+  back as off), `footnotes` and `endnotes`, and `doNotUseHTMLParagraphAutoSpacing` (`w:compat`:
+  a paragraph's space after and the next one's space before add up; without it Word takes the
+  larger), from `word/settings.xml`, whose other content is kept verbatim. They change through
   `EnvelopeStep`s.
 - **Sections:** a paragraph's `section` ends a section with that page setup (Word's `w:sectPr`
   in the paragraph's properties); the envelope's `section` is the last one. Every part of a
@@ -186,10 +192,6 @@ properties may hold only the marks that describe how text looks (`RUN_PROPERTY_M
   read and written since 11.6. `change` (`w:sectPrChange`: `id`, `author`, `date`, `previous`) is
   a tracked change of the setup; accepting drops it, rejecting restores `previous` with the
   section's header and footer references.
-- **Settings** (v5): `settings.doNotUseHTMLParagraphAutoSpacing` (`w:compat` in
-  `word/settings.xml`) says a paragraph's space after and the next one's space before add up;
-  without it Word takes the larger. Import reads it, a new package writes it, an export over its
-  package keeps the part as it is. The other settings arrive with 11.7.
 - **Links:** `href` keeps the target as the file has it (`file:` and network paths included):
   whether a link may be opened is decided where it is opened (`isSafeHref`, at rendering), so
   real documents load and keep their links.
@@ -431,8 +433,9 @@ takes points.
 `schemaVersion` is bumped whenever the envelope or the content schema changes (new types
 included: an older Foli cannot read them). `parseDocument` accepts every version from 1 to the
 current one: a v1 or v2 document is validated as v2 (v1 → v2 by `MIGRATIONS` in
-`packages/core/src/document.ts`), migrated to v3 (`migrateToV3`) and v4 (`migrateToV4`), then
-validated as v4; a v3 document is validated as v4 holding no v4 node and no `resources`. A document from a
+`packages/core/src/document.ts`), migrated to v3 (`migrateToV3`), v4 (`migrateToV4`) and v5 (`migrateToV5`), then validated as
+v5; a v3 or v4 document is validated as v5 holding nothing its version did not have (no
+`resources` in v3; no `stories`, `controls` or `settings` in either). A document from a
 newer Foli is rejected with a message saying so; versions below 1 or not integers are invalid.
 Migrations never drop content. A published version never changes in place.
 
@@ -450,7 +453,8 @@ Migrations never drop content. A published version never changes in place.
 same schema 3: it writes the marks and attributes 0.3.0 already reads (`insertion`, `deletion`,
 `formatChange`, a paragraph's `revision` and `formatChange`, comment anchors and `comments`), so
 0.3.0 and 0.4.0 read each other's documents. Whether tracking is on is not in the document: the
-editor option and a `.docx`'s `w:trackRevisions` carry it. 0.4.0 cannot read schema 4.
+editor option and a `.docx`'s `w:trackRevisions` carry it. 0.4.0 cannot read schema 4; 0.5.0
+cannot read schema 5.
 Tests load a document exactly as 0.1.0 saved it (`document.test.ts`); in the browser, the
 page-break e2e (`pages.spec.ts`) and the examples' smoke test load v1 documents through the
 migration.

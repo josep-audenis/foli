@@ -169,7 +169,7 @@ test("a click or the arrows into a placeholder select it; text typed at an edge 
 }) => {
   await load(page);
   await page.getByText("Enter it").click();
-  expect(await selected(page)).toBe("Enter it");
+  await expect.poll(() => selected(page)).toBe("Enter it");
   await page.keyboard.type("Ada");
   await page.keyboard.type(" B");
   expect((await values(page)).name).toBe("Ada B");

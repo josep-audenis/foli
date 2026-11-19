@@ -2,8 +2,9 @@
 
 - **Status:** Accepted when merged, task 11.1 (2026-11-18): the owner asked that day for Phase 11
   to be built task by task, each task merged after an agent's review, so this record is accepted
-  by that review and not by the owner reading it. A change of mind costs what has been built on
-  it by then.
+  by that review and not by the owner reading it. Implemented in Phase 11 (11.3-11.12; 0.6.0
+  once published); the "Built in" notes say where building it settled or corrected a point, and
+  the [outcome](#outcome-1113-2026-11-19) what holds at the phase's close.
 - **Context:** schema v4 keeps a section's headers and footers as relationship ids into the
   original package and notes as parts of it: exported verbatim, never shown. A note reference,
   a simple field, a content control are `opaqueInline` or `opaqueBlock` nodes; a complex field's
@@ -54,7 +55,7 @@ read-only one, inside a `contenteditable="false"` wrapper, in three engines:
   asserted: a copy event carries the story's text in Chromium and WebKit (Firefox ignores a
   synthetic event's `clipboardData`).
 - A render of the main view while the story is mounted still removes the wrapper, so mounting
-  **does not work yet**: `place` has to change, in 11.7.
+  **did not work yet**: `place` had to change, and did in 11.7 (it keeps the wrapper).
 
 The two editors there are independent: no `StoryStep`, no `paged: false`. Not in the spike either:
 a note split across pages, and tables or pictures in a story.
@@ -242,7 +243,7 @@ content, ext? }`. `content` is a `doc` of the body's blocks. `noteType` is Word'
   by the view and never written to the tree; elsewhere they update on demand like the rest. While
   its story is open for editing they show the stored result (11.7: the open view's text is the
   model's), and the other occurrences go on showing their page's.
-- **Update.** `updateFields(editor, { layout, data, now })` in core recomputes `PAGE`, `NUMPAGES`,
+- **Update.** `updateFields` in core (its signature as built: below) recomputes `PAGE`, `NUMPAGES`,
   `SECTIONPAGES`, `DATE`, `TIME`, `REF`, `PAGEREF`, `SEQ`, `TOC` and, from `data`, `MERGEFIELD`, in
   one transaction; `layout` (from the view) gives a position's page. Locked fields stay.
   Unknown instructions keep their result, reported. Tracked when tracking is on.
@@ -350,9 +351,10 @@ content, ext? }`. `content` is a `doc` of the body's blocks. `noteType` is Word'
   `endnotes` (position, number format, start, restart), from `word/settings.xml`, which is
   otherwise kept verbatim. Sections gain `columns`, `pageNumbers` (`w:pgNumType`) and their own
   note properties.
-- **Find:** core's `findAll(doc, query)` over the body and each story; results carry the story id.
-  **Built in 11.11:** `findAll(editorOrDocument, query, { matchCase, wholeWord })`, which depends on
-  what the document shows (codes shown, review view, placeholders), hence the editor. `replace` and
+- **Find:** core's `findAll` over the body and each story; results carry the story id.
+  **Built in 11.11:** `findAll(editorOrDocument, query, { matchCase, wholeWord })`, taking the
+  editor because a match depends on what the document shows (codes shown, review view,
+  placeholders). `replace` and
   `replaceAll` make one body transaction over all trees (`editTrees`), one undo step. Word 16.0.20527,
   read through its object model:
   - A match runs across runs and field markers, and over a comment's anchor, not over a note's
@@ -374,7 +376,7 @@ content, ext? }`. `content` is a `doc` of the body's blocks. `noteType` is Word'
 - **Slices with half a field or control** are repaired on paste (`fitPaste`, built in 11.8):
   markers without partners are dropped, a field that lost its end losing its code too, their
   content kept.
-- **PDF.** A new `@folijs/pdf`, no browser dependency: `exportPdf(document, { page, resources })`
+- **PDF.** A new `@folijs/pdf`, no browser dependency: `exportPdf` (its options as built: below)
   drives a page the app supplies (Playwright's or Puppeteer's: `setContent`, `addScriptTag`,
   `evaluate`, `pdf`), loads the read-only renderer's bundle, updates page fields, and prints with
   the print CSS already used by the editor. In a browser, the editor's `print()` does the same
@@ -412,7 +414,7 @@ content, ext? }`. `content` is a `doc` of the body's blocks. `noteType` is Word'
 
 Schema v5 adds `stories`, `controls`, `settings`, the new nodes and attributes. The v4 → v5
 migration changes the version only; what is opaque stays so until the `.docx` is imported again.
-0.5.0 cannot read v5 documents, which the 0.6.0 changeset says.
+0.5.0 cannot read v5 documents, which the 0.6.0 changeset says (`.changeset/sections-fields.md`).
 
 ## Options rejected
 
@@ -439,5 +441,32 @@ migration changes the version only; what is opaque stays so until the `.docx` is
   a story outside history (none exists today) would block older undo steps of that story.
 - `exportPdf` depends on the app's headless browser and its fonts, and prints the read-only
   renderer's drawing, where the editor prints its own (11.12).
-- Word's rules above come from the format as documented and the corpus; those not yet checked
-  against Word are checked when their task builds them.
+- Word's rules above come from the format as documented and the corpus, and were checked against
+  Word 16 as each task built them (the "Built in" notes, the round trips in corpus/README.md).
+
+## Outcome (11.13, 2026-11-19)
+
+- The model is as decided: stories in the envelope with `StoryStep` and `EnvelopeStep` in one
+  history, fields as markers, content controls as markers and block attributes, note references
+  and settings, schema v5 with a v4 migration of the version only. Every corpus header, footer,
+  note, field, content control and bookmark is modeled (`scripts/corpus/import-report.mjs`: only
+  02's four comment reference marks stay opaque). The spike's experiments became e2e tests of the
+  real view (`word-headers.spec.ts`, `word-notes.spec.ts`, three engines), the story mounted in
+  place once `place` kept its wrapper (11.7).
+- Layout as decided, corrected by Word's PDFs where the decision guessed (notes across the columns'
+  foot, the blank page without header or footer, the larger of space after and before). On the
+  corpus all 158 paragraphs outside tables are on Word's page and 142 on Word's line; the page
+  score, headers, footers and notes included, is 0.889 over 24 pages on screen and 0.954 for
+  `exportPdf`'s PDF (`pnpm corpus:pages`, corpus/README.md).
+- Word reads back what Foli writes: sections, headers and footers, notes, fields, content controls,
+  replacements and bookmarks, unchanged, edited and tracked (`section-`, `story-`, `field-`,
+  `control-` and `find-roundtrip.mjs`).
+- Shortcuts taken, in [limitations](../limitations.md): an open header shows its page fields'
+  stored results; codes shown are not editable; unknown fields and switches keep their result,
+  reported; a bound control's content is read-only, the binding not evaluated; no widow or orphan
+  control in a note's lines; find stays inside a paragraph and has no regular expressions; the
+  editor's print and the PDF differ where their two renderers draw differently; a field's page in
+  the PDF is its block's first page.
+- Not done, as decided or left: one renderer for the editor and the PDF, Shift+F9 and Ctrl+F9,
+  per-section note options, picture controls' picture choice, Puppeteer run in the tests, IME
+  (T4) in a header or note outside Chromium.

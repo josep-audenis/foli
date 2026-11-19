@@ -36,10 +36,11 @@ default theme; see [styling.md](styling.md) to change it.
 
 ## Load and save
 
-A saved document is a schema v3 document (`FoliDocument`, Word's model): its content tree
-with the styles, numbering, comments and page setup beside it
-([document-model.md](document-model.md)). Store it as JSON. Documents saved by 0.1.0 and 0.2.0
-(`FoliDocumentV2`, schema v1 and v2) still load: `parseDocument` and `FoliEditor` migrate them.
+A saved document is a schema v5 document (`FoliDocument`, Word's model): its content tree
+with the styles, numbering, comments, page setup, headers, footers, notes and content controls'
+properties beside it ([document-model.md](document-model.md)). Store it as JSON. Documents saved
+by 0.1.0 to 0.5.0 still load: `parseDocument` and `FoliEditor` migrate them. 0.5.0 cannot read
+documents saved by 0.6.0.
 
 ```tsx
 import { createDocument, type EditorDocument, parseDocument } from "@folijs/core";

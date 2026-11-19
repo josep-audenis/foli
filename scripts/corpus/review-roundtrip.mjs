@@ -33,12 +33,15 @@ const AUTHOR = "Foli Reviewer";
 const REPLIER = "Foli Replier";
 const INSERTED = "Foli inserted. ";
 
-/** A paragraph's text as Word's Range.Text gives it. */
+/** A paragraph's text as Word's Range.Text gives it (an inline picture is "/"). */
 const textOf = (p) =>
   (p.content ?? [])
-    .map((n) =>
-      n.type === "text" ? n.text : n.type === "tab" ? "\t" : n.type === "hardBreak" ? "\n" : "",
-    )
+    .map((n) => {
+      if (n.type === "text") return n.text;
+      if (n.type === "tab") return "\t";
+      if (n.type === "hardBreak") return "\n";
+      return n.type === "picture" && !n.attrs?.float ? "/" : "";
+    })
     .join("");
 const paragraphs = (document) =>
   (document.content.content ?? []).filter((b) => b.type === "paragraph");

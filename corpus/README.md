@@ -117,7 +117,9 @@ Word finds Foli's insertion, deletion, formatting and paragraph formatting by th
 their text, the comment with its initials, the reply in its thread and both resolved; Word's
 accepted and rejected text equals Foli's in 01, 02, 04 and 05 (paragraphs with fields aside;
 03 has a content control around paragraphs); Foli reads back Word's tracked insertion and reply
-in all 5.
+in all 5. 2026-11-19, Word 16.0.20625, on all nine corpus documents: all 9 pass, once the script
+reads an inline picture as Word's `/` (07 failed without: its pictures were opaque when the script
+was written).
 
 ```bash
 pnpm build
@@ -135,14 +137,15 @@ there (and UTC in `w16du:dateUtc`), so Word shows Foli's times shifted by the ti
 `scripts/corpus/import-report.mjs` (after `pnpm build`) imports each document and prints what
 became editable and what stayed opaque; counts and element names only, never text, so it runs
 on a private folder too (`node scripts/corpus/import-report.mjs <folder>`). On the corpus
-(2026-11-18, after 11.9: tables, pictures, headers, footers, notes, fields and content controls are modeled, and what stays
-opaque is counted in those parts too; paragraphs count the body's, those in table cells included):
+(2026-11-19, for 0.6.0: tables, pictures, headers, footers, notes, fields and content controls are
+modeled, and what stays opaque is counted in those parts too; paragraphs count the body's, those in
+table cells included):
 
 | Document                       | Paragraphs | Tables | Opaque                    | Unmodeled values |
 | ------------------------------ | ---------: | -----: | ------------------------- | ---------------: |
 | 01-mutual-nda                  |         37 |      1 | none                      |                0 |
 | 02-services-agreement-redlined |         98 |      1 | comment reference marks 4 |                0 |
-| 03-offer-letter-template       |         14 |      0 | none                      |                0 |
+| 03-offer-letter-template       |         15 |      0 | none                      |                0 |
 | 04-board-report                |         59 |      1 | none                      |                0 |
 | 05-business-letter             |         17 |      0 | none                      |                0 |
 | 06-price-schedule              |        202 |      2 | none                      |                0 |
@@ -415,6 +418,11 @@ page and Foli does not, which moves the rest of the page; 04's second page is it
 without Word's dot leaders; 07's first page, everything below the second chart sits about 3 px
 lower than Word's (the line holding that picture is taller); 06 and 02 lose 0.01-0.02 against the
 screen because the printed table rows fall a pixel off where the screen draws them.
+
+Checked again for 0.6.0 (2026-11-19, Word 16.0.20625: the reference data it records is the same
+as 16.0.20527's but for the build number): the same numbers on screen and in the PDF, and every
+round trip passes again (sections 4, stories 24, fields 24, controls 9, find 9, tables 10,
+pictures 4, review 9 files).
 
 ## Private documents
 

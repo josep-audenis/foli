@@ -4,7 +4,9 @@
 > the page-break manual checks are open risks in
 > [ADR-0003](decisions/ADR-0003-rendering-and-input.md)); since 8.7d2 the editor lays out
 > schema v3's flat blocks with Word's paragraph spacing and keep rules (nested blocks, ADR-0004,
-> went with v2's editing). This page describes what is built and
+> went with v2's editing); since Phase 11 (0.6.0) pages hold sections' bands and columns,
+> headers, footers, footnotes and endnotes (ADR-0007), and `@folijs/pdf` prints the same
+> pages. This page describes what is built and
 > why; the implementation details are in "Editor view" in [architecture.md](architecture.md),
 > the numbers in [benchmarks.md](benchmarks.md).
 
@@ -145,6 +147,9 @@ editor state ──► measure the blocks without a cached measurement (DOM read
   section's page size without margins, a named `@page` for each other setup (engines without
   named pages print every sheet at the last section's size), each page exactly one sheet tall
   with `break-after: page`. A print shows the screen's pagination; it does not re-flow.
+  `view.print()` updates the fields first. The print rules are one function (`print.ts`) for
+  both renderers; `exportPdf` (`@folijs/pdf`, 11.12) prints the read-only renderer's pages with
+  them in a headless Chromium page, each section on its own sheet size.
 
 ## Evidence
 
@@ -166,7 +171,11 @@ All in Playwright on Chromium, Firefox and WebKit (Windows 11), plus unit and pr
   numbering continues, nested lists nested); typing in an item on page 2; a split item shows
   its marker once; a split justified paragraph stays justified up to the break.
 - **Print** (`print.spec.ts`): in print media every page fits its sheet (all engines); a PDF has
-  one sheet of the page size per page (Chromium).
+  one sheet of the page size per page (Chromium). `pdf.spec.ts` (Chromium) reads `exportPdf`'s
+  PDFs back: for the nine corpus documents the editor's print has the same pages, sizes and text.
+- **Against Word** (`pnpm corpus:pages`, [corpus/README.md](../corpus/README.md)): paragraphs on
+  Word's page and line, and every page scored by ink against Word's PDF, headers, footers and
+  notes included; Foli's own PDF scored the same way.
 - **Performance** ([benchmarks.md](benchmarks.md)): at 100 pages, initial layout ~40-45 ms,
   a keystroke's handler 3-5 ms, keystroke-to-paint p95 8-19 ms, a re-flow after a font change
   ~60 ms (Chromium and Firefox). A 100-section document of lists (114 pages): typing within the
