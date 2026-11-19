@@ -1,6 +1,6 @@
 # API reference
 
-The public API of the five packages, as of 0.6.0 (`@folijs/pdf` first released then). Not stable before 1.0: anything may change
+The public API of the five packages, as of 0.6.0 (`@folijs/pdf` first released in 0.6.0). Not stable before 1.0: anything may change
 in a minor version until then (changes are listed in each package's changelog). Exports not
 listed here (model classes, steps, `Transform`, `Plugin`, `Transaction` metadata, mapping) are
 public for advanced use but are not a stable API yet.
