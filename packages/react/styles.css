@@ -284,6 +284,155 @@
   outline-offset: 1px;
 }
 
+/* Find and replace, bookmarks (FoliNavigation): over the pages, not moving them. */
+.foli-navigation {
+  display: contents;
+}
+
+.foli-find-panel {
+  position: fixed;
+  top: 8px;
+  right: 16px;
+  z-index: 20;
+  box-sizing: border-box;
+  width: min(30rem, calc(100vw - 32px));
+  max-height: calc(100vh - 16px);
+  overflow: auto;
+  border: 1px solid var(--foli-border-color);
+  border-radius: 6px;
+  box-shadow: var(--foli-page-shadow);
+}
+
+.foli-bookmarks {
+  top: 64px;
+}
+
+.foli-find-modes {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.foli-find-modes [role="tablist"] {
+  display: flex;
+  gap: 4px;
+  margin-inline-end: auto;
+}
+
+.foli-find-modes [aria-selected="true"] {
+  background: var(--foli-toolbar-pressed);
+}
+
+.foli-find-panel label:not(.foli-find-option) {
+  flex: 0 0 7em;
+}
+
+.foli-find-panel input[type="text"],
+.foli-find-panel select {
+  flex: 1 1 14em;
+  min-width: 0;
+  font: inherit;
+}
+
+.foli-find-panel select {
+  min-height: 32px;
+}
+
+.foli-find-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.foli-find-option input {
+  flex: none;
+  height: auto;
+}
+
+.foli-find-panel button:disabled {
+  color: GrayText;
+  cursor: default;
+}
+
+.foli-find-status {
+  flex-basis: 100%;
+  min-height: 1.4em;
+  margin: 0;
+}
+
+@media (forced-colors: active) {
+  .foli-find-modes [aria-selected="true"] {
+    outline: 2px solid Highlight;
+    outline-offset: -2px;
+  }
+}
+
+/* The outline (FoliNavigation): a column beside the pages. */
+.foli-outline {
+  position: sticky;
+  top: 0;
+  flex: 0 0 16rem;
+  box-sizing: border-box;
+  max-height: 100vh;
+  overflow: auto;
+  padding: 8px;
+  border-inline-end: 1px solid var(--foli-border-color);
+  background: var(--foli-toolbar-background);
+  color: var(--foli-toolbar-color);
+  font:
+    13px / 1.4 system-ui,
+    sans-serif;
+}
+
+.foli-outline-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.foli-outline h2 {
+  margin: 0;
+  font-size: 14px;
+}
+
+.foli-outline ol {
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.foli-outline button {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  padding: 3px 4px;
+  border: none;
+  border-radius: 3px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+.foli-outline-head button {
+  width: auto;
+}
+
+.foli-outline button:hover {
+  background: var(--foli-toolbar-hover);
+}
+
+.foli-outline button[aria-current] {
+  background: var(--foli-toolbar-pressed);
+}
+
+.foli-outline :focus-visible {
+  outline: 2px solid var(--foli-focus-ring);
+  outline-offset: -2px;
+}
+
 .foli-link-error {
   flex-basis: 100%;
   margin: 0;
@@ -423,6 +572,7 @@
   }
   .foli-toolbar,
   .foli-link-dialog,
+  .foli-outline,
   .foli-comments {
     display: none;
   }

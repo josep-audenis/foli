@@ -8,10 +8,13 @@
 import { FoliDocumentError, type Node } from "../model/index.js";
 import type { StoryJSON } from "../v3/document.js";
 import { storyRules } from "../v3/document.js";
+import type { Editor } from "./editor.js";
 import { closeHistory, joinHistory, type StoryEdit, storyEdit } from "./history.js";
 import { Selection, type SelectionJSON } from "./selection.js";
 import { EditorState, Plugin, type Transaction } from "./state.js";
 import {
+  maxRevisionIn,
+  revisionFloor,
   type TrackState,
   trackState,
   trackTransaction,
@@ -25,6 +28,7 @@ import {
   type Story,
   type StoryBody,
   StoryStep,
+  storyBody,
   storyBodyKey,
   type WordContext,
   withContext,
@@ -34,9 +38,110 @@ import {
 
 /** What a story's editor needs of the body's. */
 export interface StoryHost extends StoryBody {
-  dispatch(tr: Transaction): void;
   /** The plugins of a story's state (keymaps, tracking, the word context). */
   plugins(context: WordContext, track: TrackState | null): Plugin[];
+}
+
+/** Puts on `bodyTr` what `transactions` did to story `id`, from `before` to `next`. */
+function carryStoryChange(
+  bodyTr: Transaction,
+  bodyContext: WordContext,
+  id: string,
+  before: EditorState,
+  next: EditorState,
+  transactions: readonly Transaction[],
+): { after: Story; patched: boolean } {
+  const story = bodyContext.stories.get(id) as Story;
+  let after = story;
+  if (next.doc !== before.doc) {
+    after = { ...story, doc: next.doc };
+    bodyTr.step(
+      new StoryStep(id, story, after, before.selection.toJSON(), next.selection.toJSON()),
+    );
+  }
+  let patched = false;
+  for (const t of transactions) {
+    // What belongs to the document, not to the story: the body takes it.
+    for (const step of t.steps)
+      if (step instanceof CommentStep || step instanceof EnvelopeStep) bodyTr.step(step);
+    patched ||= envelopeChange(t) !== undefined;
+  }
+  // Only these: the story's copy of the rest of the envelope may be behind the body's.
+  if (patched) {
+    const { numbering, styles, resources, controls } = (wordContext(next) as WordContext).envelope;
+    const {
+      resources: _resources,
+      controls: _controls,
+      ...rest
+    } = envelopeChange(bodyTr) ?? bodyContext.envelope;
+    withEnvelope(bodyTr, {
+      ...rest,
+      numbering,
+      styles,
+      ...(resources ? { resources } : {}),
+      ...(controls ? { controls } : {}),
+    });
+  }
+  return { after, patched };
+}
+
+/** What changes one tree of the document: its id (null: the body) and the edit. */
+export type TreeEdits = ReadonlyMap<string | null, (tr: Transaction) => void>;
+
+/**
+ * Edits several trees as one transaction of the body, so one undo step. `tracked`: as tracked
+ * changes when tracking is on. Returns the trees whose edit was refused; the others are made.
+ */
+export function editTrees(
+  editor: Editor,
+  edits: TreeEdits,
+  { tracked }: { tracked: boolean },
+): Set<string | null> {
+  const host = storyBody(editor.state) ?? editor;
+  const state = host.state;
+  const context = wordContext(state) as WordContext;
+  const failed = new Set<string | null>();
+  const keep = (tr: Transaction) => (tracked ? trackTransaction(state, tr) : tr);
+  let out = state.tr;
+  const bodyEdit = edits.get(null);
+  if (bodyEdit) {
+    bodyEdit(out);
+    const made = keep(out);
+    if (made) out = made;
+    else {
+      failed.add(null);
+      out = state.tr;
+    }
+  }
+  let floor = tracked ? maxRevisionIn(out.doc) + 1 : 0;
+  for (const [id, edit] of edits) {
+    if (id === null) continue;
+    const story = editor.story(id);
+    if (!story) {
+      failed.add(id);
+      continue;
+    }
+    const before = story.state;
+    const tr = before.tr;
+    edit(tr);
+    if (!tr.docChanged) continue;
+    const made = tracked
+      ? trackTransaction(before, tr.setMeta(revisionFloor, floor))
+      : tr.setMeta(untracked, true);
+    const result = made ? before.applyTransaction(made) : null;
+    if (!result?.transactions.length) {
+      failed.add(id);
+      continue;
+    }
+    carryStoryChange(out, context, id, before, result.state, result.transactions);
+    if (tracked) floor = Math.max(floor, maxRevisionIn(result.state.doc) + 1);
+  }
+  if (!out.docChanged) return failed;
+  host.dispatch(out.setMeta(untracked, true).setMeta(closeHistory, true));
+  // Refused by the body's filters: nothing happened, in any tree.
+  if (wordContext(host.state) === context && host.state.doc === state.doc)
+    for (const id of edits.keys()) failed.add(id);
+  return failed;
 }
 
 export type StoryListener = (state: EditorState, transactions: readonly Transaction[]) => void;
@@ -118,33 +223,14 @@ export class StoryEditing {
     const bodyContext = wordContext(bodyState) as WordContext;
     const story = bodyContext.stories.get(id) as Story;
     const bodyTr = bodyState.tr;
-    let after = story;
-    if (next.doc !== before.doc) {
-      after = { ...story, doc: next.doc };
-      bodyTr.step(
-        new StoryStep(id, story, after, before.selection.toJSON(), next.selection.toJSON()),
-      );
-    }
-    let patched = false;
-    for (const t of result.transactions) {
-      // What belongs to the document, not to the story: the body takes it.
-      for (const step of t.steps)
-        if (step instanceof CommentStep || step instanceof EnvelopeStep) bodyTr.step(step);
-      patched ||= envelopeChange(t) !== undefined;
-    }
-    // Only these: the story's copy of the rest of the envelope may be behind the body's.
-    if (patched) {
-      const { numbering, styles, resources, controls } = (wordContext(next) as WordContext)
-        .envelope;
-      const { resources: _resources, controls: _controls, ...rest } = bodyContext.envelope;
-      withEnvelope(bodyTr, {
-        ...rest,
-        numbering,
-        styles,
-        ...(resources ? { resources } : {}),
-        ...(controls ? { controls } : {}),
-      });
-    }
+    const { after, patched } = carryStoryChange(
+      bodyTr,
+      bodyContext,
+      id,
+      before,
+      next,
+      result.transactions,
+    );
     const track = trackState(next);
     const trackChanged = !!track && track !== trackState(before);
     if (trackChanged) withTrackState(bodyTr, track);

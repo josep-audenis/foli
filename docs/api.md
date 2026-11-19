@@ -76,6 +76,29 @@ editable here. `FoliToolbar`'s `comments` prop shows New comment (only with a pa
 `.foli-editor-body`): it finds the commented text (`data-foli-comments` in the view) in the
 nearest ancestor that holds them.
 
+### `<FoliNavigation>`
+
+Finding and going places, as in Word (`FoliEditor` includes it; alone, render it next to the view
+of the same editor). Props: `editor` (default: the nearest provider's), `readOnly` (no replacing,
+no changing bookmarks).
+
+- **Find and replace** (`.foli-find-panel`, a dialog that is not modal, with Find, Replace and Go to
+  tabs): Ctrl+F, Ctrl+H, Ctrl+G (Cmd on Apple platforms). Typing marks the matches of the body and
+  of every story and scrolls to the next one, moving nothing in the document; Enter goes to it and
+  on, Shift+Enter back, F3 and Shift+F3 too, with the panel closed as well. A match in a header,
+  footer or note opens it where it is, and a match in the body leaves it. Match case, Whole words.
+  Replace shows a match first and replaces it on the second press; Replace all is one undo step and
+  says what it left and why. Go to takes a page, a bookmark or a heading. Escape closes it and
+  gives the focus back.
+- **Bookmarks** (`.foli-bookmarks`): Ctrl+Shift+F5. Add at the selection (a name in use moves that
+  bookmark, as in Word), Go to, Rename, Delete; Hidden bookmarks lists Word's own.
+- **Outline** (`.foli-outline`, a `nav` beside the pages): the headings with their pages, the one
+  the caret is under marked `aria-current`; Up and Down move, Enter goes there.
+
+**The keys are taken only while the focus is in the document or in these panels.** Elsewhere on the
+page Ctrl+F is the browser's, and so it is everywhere when no `FoliNavigation` is mounted. The
+toolbar's Navigate menu opens the same panels.
+
 ### `<FoliToolbar>`
 
 Word's controls: paragraph style (with Word's Heading 1 to 3 when the document has not used
@@ -480,6 +503,44 @@ value or shown text (a combo box takes any text, a drop-down list only its items
 `controlsIn(tree)`, `controlAt(tree, pos)` (`id`, `level`, `from`, `to`, `contentFrom`, `contentTo`),
 `controlProperties(state, id)` and `controlIsReadOnly(control)` find them.
 
+Find and replace (11.11), by the rules Word was seen to follow (ADR-0007):
+
+| Function                                     | Does                                                                                                                 |
+| -------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `findAll(editorOrDocument, query, options?)` | `FindMatch[]` (`story`, null for the body; `from`, `to`; `text`), the body then each story. `matchCase`, `wholeWord` |
+| `replace(editor, match, text, options?)`     | One match, the caret after it                                                                                        |
+| `replaceAll(editor, query, text, options?)`  | Every match, in every story: one undo step, tracked when tracking is on                                              |
+| `nextMatch(editor, matches, backward?)`      | The match after (before) the selection, around the end                                                               |
+| `findInText(text, query, options?)`          | The same matching over a plain string: `[from, to]` pairs                                                            |
+
+What is found is what shows: a field's code only while codes are shown (its result then not), text
+deleted as a tracked change only in the `markup` review view, no control's placeholder, no hidden
+text, no page number a story's page draws. A match runs across runs, formatting, field markers,
+bookmarks and comment anchors, not across a note reference, a picture or a paragraph end. Both
+replacing functions return `{ replaced, refused: [{ match, reason }] }`; nothing is skipped silently.
+`reason`: `locked` (a locked or bound control), `control` (what the control's kind does not take, or
+over its edge), `field` (over the edge of a field's result), `field-code`, `deleted`, `stale`,
+`refused`. The replacement takes the first matched character's formatting and, unless `matchCase`,
+its capitals (`hello` over `Hello` gives `World` for `world`, over `HELLO` `WORLD`). A tab and a line
+feed in it make a tab and a line break. Bookmarks and comment anchors inside a match stay.
+Regular expressions are not offered: a pattern can hang the page.
+
+Bookmarks and the outline:
+
+| Function                                      | Does                                                                                                                                                       |
+| --------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `insertBookmark(editor, name, range?)`        | Over the selection or `range` of that editor's tree (a caret: a point). A name in use, in any case or story, moves it                                      |
+| `renameBookmark(editor, name, next)`          | With the `REF`, `PAGEREF`, `NOTEREF` and links that point at it                                                                                            |
+| `deleteBookmark(editor, name)`                | Whichever tree it is in; true when it went                                                                                                                 |
+| `listBookmarks(editorOrState, options?)`      | `name`, `story`, `from`, `to`, `text`, `hidden`; `{ hidden: true }` adds Word's own (`_Toc…`, `_Ref…`)                                                     |
+| `isBookmarkName(name)`                        | A letter, then letters, digits and `_`, 40 at most                                                                                                         |
+| `goTo(editor, { story, from, to }, options?)` | Selects it and shows it, through the view when there is one (`focus`: the document takes the focus)                                                        |
+| `documentOutline(state, layout?)`             | `pos`, `level`, `text`, `number`, `page` (with `editor.storyView.fieldLayout`): the body's headings, by the rule of a table of contents with `\o` and `\u` |
+
+The first three return `{ ok: true, bookmark }` or `{ ok: false, reason }` (`invalid-name`,
+`no-place`, `missing`, `exists`, `refused`), except `deleteBookmark`. Bookmarks are not tracked, as
+in Word; each change is one undo step.
+
 ## `@folijs/view`
 
 The editable view without a framework. Needs a browser DOM. Content controls: it draws the frame
@@ -545,6 +606,14 @@ const view = new EditorView(host, editor, { editable: true, placeholder: "" });
   from code: `updateFields` with this view's pages, then once more for what depends on the pages
   those results moved, in one undo step. `view.print()` updates every field and opens the browser's
   print dialog; a browser's own Print menu does not update them.
+- Finding (11.11): `view.showMatches({ query, matchCase, wholeWord, matches, current })` marks
+  matches (null: none) with the CSS Custom Highlight API (`::highlight(foli-find)` and
+  `foli-find-current`): nothing is added to the DOM or the document, and it does not print. Only
+  pages near the window carry marks. `view.reveal({ story, from, to }, { focus })` selects and
+  scrolls there, opening a header, footer or note where it is and leaving it for the body;
+  `view.goToPage(n, { focus })`. All three are on `editor.storyView` too. Ctrl+F, Ctrl+H, Ctrl+G,
+  F3, Shift+F3 and Ctrl+Shift+F5 go to `editor.navigation` when something has set it, and are
+  otherwise left to the browser.
 - `view.focus()`: focuses the host, shows the editor's selection, scrolls it into view.
 - `view.destroy()`: removes listeners, injected styles and the attributes it added; empties the
   host.

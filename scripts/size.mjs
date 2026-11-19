@@ -96,12 +96,17 @@ writeFileSync(appEntry, `export { FoliEditor } from "${dist("react")}";\n`);
  * carried on the clipboard). View and React raised in 11.10 (103.8 and 139.9 kB, 105.5 and 141.6
  * allowed): footnotes and endnotes in the flow and both renderers, a note edited in place, the
  * notes menu and options dialog, and core's notes with them.
+ * Core, view and React raised in 11.11 (84.1, 106.1 and 148.7 kB with 11.8 and 11.9 final; 85.9,
+ * 107.9 and 151.4 allowed):
+ * find and replace over every story, bookmarks and the outline; marks on the pages and going to a
+ * match, a bookmark or a heading; the find panel, the bookmarks dialog and the outline panel, which
+ * `FoliEditor` includes so that Word's keys work out of the box.
  */
 const BUNDLES = [
-  { name: "@folijs/core", entry: dist("core"), budget: 84_000 },
-  { name: "@folijs/view", entry: dist("view"), budget: 108_000 },
-  { name: "@folijs/react", entry: dist("react"), budget: 145_000 },
-  { name: "FoliEditor only", entry: appEntry, budget: 145_000 },
+  { name: "@folijs/core", entry: dist("core"), budget: 88_000 },
+  { name: "@folijs/view", entry: dist("view"), budget: 110_500 },
+  { name: "@folijs/react", entry: dist("react"), budget: 155_000 },
+  { name: "FoliEditor only", entry: appEntry, budget: 155_000 },
   { name: "@folijs/docx", entry: dist("docx"), budget: 58_400 },
 ];
 

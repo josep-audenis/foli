@@ -50,10 +50,13 @@ export {
 } from "./controls.js";
 export {
   createEditor,
+  type DocumentTarget,
   type Editor,
   type EditorDocument,
   type EditorListener,
   type EditorOptions,
+  type FoundMatches,
+  type NavigationRequest,
   type OpenStory,
   type StoryView,
   sectionSettings,
@@ -93,6 +96,17 @@ export {
   updateFields,
 } from "./fieldupdate.js";
 export {
+  type FindMatch,
+  type FindOptions,
+  findAll,
+  findInText,
+  nextMatch,
+  type ReplaceRefusal,
+  type ReplaceReport,
+  replace,
+  replaceAll,
+} from "./find.js";
+export {
   alignAt,
   colorAt,
   setAlign,
@@ -131,6 +145,18 @@ export {
   wrapInList,
 } from "./lists.js";
 export { typedMarks } from "./mark.js";
+export {
+  type BookmarkInfo,
+  type BookmarkResult,
+  deleteBookmark,
+  documentOutline,
+  goTo,
+  insertBookmark,
+  isBookmarkName,
+  listBookmarks,
+  type OutlineEntry,
+  renameBookmark,
+} from "./navigation.js";
 export {
   convertNotes,
   type InsertNoteOptions,

@@ -216,6 +216,17 @@ Known limits:
   them (the toolbar uses cheap checks).
 - Plugins, `Transaction` metadata and mapping internals are exported but not yet a stable API.
 
+Find and navigation (11.11, `state/find.ts`, `state/navigation.ts`): each tree is read once into
+lines, a paragraph's searchable text with the pieces of the tree behind it, kept per tree in a
+`WeakMap` while what shows stays the same (codes, review view, controls), so a keystroke in the panel
+is an `indexOf` per line. What draws nothing adds no text, so a match runs across it; what draws
+something else adds a barrier character. `replaceAll` builds one edit per tree and `editTrees` (in
+`state/stories.ts`) makes them one body transaction, each story's as a `StoryStep` after its own
+tracking, filters and appended transactions, so tracking, control locks and placeholders work as
+when typing and undo is one step. A floor on revision ids keeps the trees' new ids apart. A match is
+checked first: code, deleted text, a field's or control's edge, then, inside a control, a dry run
+through the filter. Bookmark changes go through `editTrees` untracked.
+
 ## Editor view (`@folijs/view`)
 
 `packages/view/src/view.ts`, design per ADR-0003: one `contenteditable` host holding real pages.
@@ -877,6 +888,13 @@ Word lays it out, read-only and without an editor (`EditorView` edits on the sam
 - `pageOf(index)` and `lineOf(index)` give where a top-level node starts (the page, and the
   line on it as Word numbers lines); the corpus harness compares them with Word's, and each
   page's ink with Word's PDF of it (`pnpm corpus:pages`, numbers in corpus/README.md).
+
+Marks of find (11.11, `word/matches.ts`): ranges in two `Highlight` objects shared by a document's
+views, so the pages' DOM never changes and the mutation observer has nothing to read back. They
+are made for the pages within a screen of the window (from `itemPages`), again after each placement
+and when scrolling brings other pages near; an open story's view marks its own tree, and the drawn
+copies of other stories are searched as text. `reveal` opens a story through the same path as a
+double click, without moving the focus, so the panel keeps it.
 
 Footnotes and endnotes (11.10, `word/notes.ts`, both renderers): `PageNotes` draws each note from
 its story with its number and measures it as lines for the flow (`BlockBox.notes`, `endnotes`,
