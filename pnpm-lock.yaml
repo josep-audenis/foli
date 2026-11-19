@@ -161,6 +161,22 @@ importers:
         specifier: workspace:^
         version: link:../core
 
+  spikes/extension:
+    dependencies:
+      '@folijs/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@folijs/docx':
+        specifier: workspace:*
+        version: link:../../packages/docx
+      '@folijs/view':
+        specifier: workspace:*
+        version: link:../../packages/view
+    devDependencies:
+      '@types/node':
+        specifier: ^20.19.43
+        version: 20.19.43
+
   spikes/two-page: {}
 
 packages:

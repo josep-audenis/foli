@@ -1005,6 +1005,7 @@ foli/
 │   ├── docx/  @folijs/docx   DOCX import to Word's model (schema v5) and lossless export; package (zip, parts, relationships), XML keeping source text. No DOM.
 │   └── pdf/   @folijs/pdf    exportPdf: a document printed by the app's headless Chromium page; ships the read-only renderer as a page script.
 ├── spikes/two-page/     Phase 1 spike; throwaway, never published.
+├── spikes/extension/    12.1 spike (ADR-0008): a custom node and mark; throwaway, never published.
 ├── examples/            Vite and Next.js apps installing the packed packages (6.4); never published.
 └── docs/
 ```
