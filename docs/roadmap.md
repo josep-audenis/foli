@@ -9,21 +9,21 @@ leaves `main` green with a working playground.
 **Update this table in the same PR that starts, advances or finishes a phase.** It is the only
 place that says what is in progress; check it before starting work.
 
-| Phase                    | Status                   | Branch | Notes                                                                                                        |
-| ------------------------ | ------------------------ | ------ | ------------------------------------------------------------------------------------------------------------ |
-| 0 Foundation             | ✅ Done                  | —      |                                                                                                              |
-| 1 Architecture spike     | ✅ Done (G1 provisional) | —      | Merged in #1; ADR-0003 accepted provisionally; IME, dead-key and screen-reader checks open                   |
-| 2 Document model         | ✅ Done                  | —      | Merged in #2                                                                                                 |
-| 3 Transactions & history | ✅ Done                  | —      | Merged in #4; gate G2 passed                                                                                 |
-| 4 Editor view            | ✅ Done (G3 provisional) | —      | Merged in #8–#13; manual checks (4.6) deferred, open risks in ADR-0003                                       |
-| 5 Native pagination      | ✅ Done (G4 provisional) | —      | Merged in #15–#22; page-break manual checks open, risks in ADR-0003                                          |
-| 6 React API & 0.1.0      | ✅ Done                  | —      | Merged in #23–#31; 0.1.0 on npm; manual checks shipped as known risks (ADR-0003)                             |
-| 7 Rich content           | ✅ Done                  | —      | Merged in #33–#41; 0.2.0 on npm; list-document benchmark misses accepted (known limit)                       |
-| 8 Word model & DOCX      | ✅ Done                  | —      | Merged in #44–#61; 0.3.0 on npm (`@folijs/docx` first released); gate G5 passed                              |
-| 9 Review                 | ✅ Done                  | —      | Merged in #63–#72; 0.4.0 on npm                                                                              |
-| 10 Tables & images       | ✅ Done                  | —      | Merged in #73–#97 (#90, the landing page, went to main); 0.5.0 on npm; two misses accepted                   |
-| 11 Sections & templates  | ✅ Done                  | —      | Merged in #100–#118 (#106, #107, #110, #112 and #113, the site, went to main); 0.6.0 on npm; misses accepted |
-| 12 Ecosystem & 1.0       | Not started              |        |                                                                                                              |
+| Phase                    | Status                   | Branch             | Notes                                                                                                        |
+| ------------------------ | ------------------------ | ------------------ | ------------------------------------------------------------------------------------------------------------ |
+| 0 Foundation             | ✅ Done                  | —                  |                                                                                                              |
+| 1 Architecture spike     | ✅ Done (G1 provisional) | —                  | Merged in #1; ADR-0003 accepted provisionally; IME, dead-key and screen-reader checks open                   |
+| 2 Document model         | ✅ Done                  | —                  | Merged in #2                                                                                                 |
+| 3 Transactions & history | ✅ Done                  | —                  | Merged in #4; gate G2 passed                                                                                 |
+| 4 Editor view            | ✅ Done (G3 provisional) | —                  | Merged in #8–#13; manual checks (4.6) deferred, open risks in ADR-0003                                       |
+| 5 Native pagination      | ✅ Done (G4 provisional) | —                  | Merged in #15–#22; page-break manual checks open, risks in ADR-0003                                          |
+| 6 React API & 0.1.0      | ✅ Done                  | —                  | Merged in #23–#31; 0.1.0 on npm; manual checks shipped as known risks (ADR-0003)                             |
+| 7 Rich content           | ✅ Done                  | —                  | Merged in #33–#41; 0.2.0 on npm; list-document benchmark misses accepted (known limit)                       |
+| 8 Word model & DOCX      | ✅ Done                  | —                  | Merged in #44–#61; 0.3.0 on npm (`@folijs/docx` first released); gate G5 passed                              |
+| 9 Review                 | ✅ Done                  | —                  | Merged in #63–#72; 0.4.0 on npm                                                                              |
+| 10 Tables & images       | ✅ Done                  | —                  | Merged in #73–#97 (#90, the landing page, went to main); 0.5.0 on npm; two misses accepted                   |
+| 11 Sections & templates  | ✅ Done                  | —                  | Merged in #100–#118 (#106, #107, #110, #112 and #113, the site, went to main); 0.6.0 on npm; misses accepted |
+| 12 Ecosystem & 1.0       | In progress              | phase-12/ecosystem | Plan below; ADR-0008 (1.0 contract, extension API) first                                                     |
 
 Status values: `Ready` (dependencies met, nobody on it) · `In progress` · `In review` (PR open) ·
 `✅ Done` (merged, acceptance criteria met) · `Blocked by …`.
@@ -1324,6 +1324,104 @@ Each task is a PR on `phase-11/sections-fields`, the build green after each.
 Freeze the extension API (custom nodes, marks, commands, keymaps, plugins), docs site, examples,
 theming guide, deprecation policy, contributor onboarding, performance tracking in CI. Rust/WASM
 only where a benchmark shows the need.
+
+**Starts from (Phase 11):** the generic model is open (`NodeSpec`, `MarkSpec`, `Schema` exported)
+but the editor is bound to the one Word schema (schema v5): `EditorOptions` takes no schema,
+`parseContent` validates against it, and unknown Word content becomes `opaqueBlock` or
+`opaqueInline`, drawn as boxes. Plugins exist (`Plugin`, `PluginKey`, `PluginSpec` with state,
+`filterTransaction`, `appendTransaction` and `keymap`; `createEditor({ plugins })` and
+`FoliEditor`'s `plugins` prop, user plugins before the built-ins) and every built-in feature uses
+them, but they are documented as unstable and most built-ins (`fieldsPlugin`, `controlsPlugin`,
+`notesPlugin`, `trackPlugin`…) are not exported. Commands are free functions
+(`(state, dispatch?) => boolean`); `editor.commands` is a fixed object. Keymaps are plugin maps
+over `keyName`, but the view handles some keys before them (fields, controls, notes, document
+edges, Ctrl+F/H/G, F3, Escape, Tab, Shift+arrows in tables), so those cannot be overridden. The
+view has no node views, decorations or plugin views (`EditorViewOptions`: `editable`,
+`placeholder`, `resource`, `upload`, `paged`, `noteMark`); theming is 13 `--foli-*` CSS
+variables. `FoliToolbar` cannot be extended, only replaced. Core's root re-exports `model`,
+`state`, `transform` and `v3` whole (about 300 names); 29 `@internal` tags, no API report or
+`stripInternal`; `docs/api.md` says nothing is stable before 1.0. `apps/site` is the landing page
+and a test page, not docs; `examples/` has a Vite and a Next.js app installed from tarballs
+(`pnpm examples`). Benchmarks (`pnpm bench:layout`, find) run by hand, numbers in
+`docs/benchmarks.md`; only bundle sizes are checked (`pnpm size`). There is no CI by design:
+`pnpm check` runs in the pre-push hook and GitHub Actions only publishes. The manual checks of
+ADR-0003 (IME, screen readers, macOS keys, real pastes, Safari) are still open risks.
+
+**Acceptance:** ADR-0008 records what 1.0 promises (the public API per package, the persisted
+format, semver and the deprecation policy) and the owner accepts it; an API report per package is
+checked in `pnpm check` and changes only with a reviewed report; a custom node and a custom mark
+defined outside the packages are typed, rendered on pages, undone, copied and pasted, saved and
+loaded, and go through `.docx` as ADR-0008 decides, without losing content (an example app does it
+from tarballs); a plugin adds a command, a keymap that overrides a built-in key, a decoration and a
+toolbar item; every key the view handles itself is overridable or listed as reserved; the
+benchmarks run with stored baselines and fail on a regression past their threshold where
+ADR-0008 decides (no hosted CI unless the owner chooses it); the docs site is published with
+getting started, guides (extensions, theming, styling, DOCX, PDF, migration from 0.x), the API
+reference from the reports, live examples and the limitations; contributing covers setup, the
+architecture tour and the release; every 0.x document format (v1–v5) loads in 1.0; the manual
+checks are run or accepted again by the owner as 1.0 risks; 1.0.0 published with the owner's
+approval.
+
+### Tasks
+
+Each task is a PR on `phase-12/ecosystem`, the build green after each.
+
+- [x] Claim phase, branch `phase-12/ecosystem`
+- [ ] 12.1 ADR-0008, the 1.0 contract and the extension API: what is public and stable per package
+  (what leaves core's `export *`, what becomes `@internal` and is stripped), the persisted format
+  promise (schema v5 frozen for 1.x, new content only through a new major or as content 1.x
+  ignores safely), semver and the deprecation policy (warn for a minor, remove in the next major);
+  custom nodes and marks on the Word schema (how they are declared, validated, stored in the
+  envelope, laid out and drawn, and what `.docx` gets: refused, a content control with a tag, or
+  custom XML, read back as the same node); the plugin spec frozen (plus view-side hooks:
+  decorations, node views, plugin views); commands and keymaps (a registry behind
+  `editor.commands`, which built-in keys become overridable, which stay reserved); toolbar
+  extension; where the history plugin's state stands with collaboration left optional; where
+  performance is tracked without CI (pre-push, a bench command with baselines, or a workflow the
+  owner turns on); the docs site's tool and host; Rust/WASM not planned unless a benchmark asks.
+  Spike: one custom inline node and one mark end to end in the editor and through `.docx`. The
+  owner accepts it before 12.2.
+- [ ] 12.2 Public API surface: core's exports listed by name (no `export *`), internals marked and
+  stripped from the published types, the built-in plugins and keys exported where ADR-0008 says;
+  an API report per package (`.d.ts` of `dist` compared with a committed report, no new tool
+  unless the ADR picks one) in `pnpm check`; `docs/api.md` marks every name stable or internal.
+- [ ] 12.3 Custom nodes and marks in `@folijs/core`: the schema extension from ADR-0008
+  (`createEditor` and `parseDocument` take it), validation, JSON, copy and paste between editors
+  with and without the extension (never dropped: opaque when unknown), find and review over them;
+  `@folijs/docx` writes and reads them as decided; tests and a round trip that Word opens.
+- [ ] 12.4 View extension: node views for custom nodes (measured and placed by the flow, split or
+  kept whole across pages as declared), decorations (inline and node; find matches and the
+  selected field move onto them where it is simpler), plugin views (mount, update, destroy) and
+  their CSS; T1–T3 with a custom node in three engines; axe.
+- [ ] 12.5 Commands and keymaps: commands registered by plugins and reachable through
+  `editor.commands` and `editor.run`, typed; the view's own keys moved into keymaps or reserved as
+  the ADR lists; a user keymap overrides each overridable built-in key; Word's keys documented per
+  platform (macOS included).
+- [ ] 12.6 React: toolbar items added, removed and grouped (built-in items exported, a custom item
+  driven by a command's dry run and `useEditorState`), menus too where they share the code;
+  `plugins` stable (changing it after mount documented or supported); hooks for commands; axe and
+  keyboard tests on a customized toolbar.
+- [ ] 12.7 Performance tracking: the layout, keystroke, find, `.docx` import and export and PDF
+  benchmarks with stored baselines per engine and machine, thresholds, a summary that fails on a
+  regression, run where ADR-0008 says; `docs/benchmarks.md` rerun for 1.0 with method and hardware.
+- [ ] 12.8 Docs site: `apps/site` gets the docs (getting started, guides, API reference from the
+  12.2 reports, limitations, changelog), built from `docs/` so they do not drift, with live
+  examples (the editor, a custom node, a plugin) and search if the tool gives it; keyboard-usable
+  and axe-clean; deployed where ADR-0008 says, with the owner's approval.
+- [ ] 12.9 Guides: extensions (a custom node, a mark, a plugin, a command, a keymap, a toolbar
+  item), theming (CSS variables, dark, print, forced colors; a theme example), migration from 0.x,
+  the deprecation policy, contributing (setup, architecture tour, where things live, tests and
+  harnesses, the release), `docs/limitations.md` reviewed for 1.0.
+- [ ] 12.10 Examples: an extension example (custom node, mark, plugin, toolbar item, saved to
+  `.docx` and read back) and a framework-free one (`@folijs/view` without React) in `pnpm examples`
+  from tarballs in three engines; the Next.js and Vite examples updated to the stable API.
+- [ ] 12.11 1.0 readiness: every 0.x format (v1–v5 fixtures) loads and saves without loss; the
+  limitations the owner picks as 1.0 blockers fixed, the rest listed; a security pass (paste,
+  links, `.docx` and zip limits, pictures, `exportPdf` input); the ADR-0003 manual checks run or
+  accepted again by the owner as 1.0 risks; `pnpm examples`, the corpus harnesses and the e2e
+  suite green in three engines.
+- [ ] 12.12 Close: docs as of 1.0 (README, architecture, api, ADR-0008's outcome), size budgets,
+  the acceptance checked, the 1.0.0 changeset and version PR; publish with the owner's approval.
 
 ## Optional
 
