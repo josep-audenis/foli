@@ -17,8 +17,100 @@ export declare function textToDoc(text: string, marks?: readonly MarkJSON[]): Do
  */
 export declare function htmlToDoc(html: string): DocJSON | null;
 
+// extension.d.ts
+/**
+ * The view's side of extensions (ADR-0008, 12.4): node views draw custom nodes, mark views style
+ * runs of custom marks, decorations put classes and attributes on drawn ranges, and plugin views
+ * live as long as the `EditorView`. Core has no DOM: these hooks are on `ViewExtension`, which an
+ * app gives to `createEditor` as an ordinary extension; the view reads them from
+ * `editor.extensions`.
+ *
+ * Everything here is drawn with DOM calls, never parsed from HTML: attribute names are checked
+ * (no `on*` handlers, no `contenteditable`, none of the view's own `data-foli-*`), and URL
+ * attributes must be safe links (`isSafeHref`).
+ */
+import { type EditorState, type Extension, type Mark, type Node as ModelNode } from "@folijs/core";
+import type { EditorView } from "./view.js";
+/**
+ * Attributes put on a drawn element: `class` is added to its classes, `style` to its style, any
+ * other name set (`aria-*`, `data-*`, `title`…).
+ */
+export interface DecorationAttrs {
+    class?: string;
+    style?: string;
+    [name: string]: string | undefined;
+}
+/**
+ * Attributes on a range of the document as drawn, never content: the text and inline leaves
+ * from `from` to `to` (body positions of the state the decorations are for), or with `node` the
+ * node at `from`: a block (its element on every page it is on) or an inline leaf. A table, row
+ * or cell takes none.
+ */
+export interface Decoration {
+    from: number;
+    to: number;
+    node?: boolean;
+    attrs: DecorationAttrs;
+}
+/**
+ * What a node view draws with: its document, and `h`, which makes elements safely. A node view may
+ * build its DOM by other means: what `render` returns is used as it is, unchecked (extension code
+ * is trusted, the node's attributes are not: never put them through HTML).
+ */
+export interface NodeViewDOM {
+    readonly document: Document;
+    /**
+     * An element `tag` (from an allowlist of content elements: no `script`, `style`, `base`,
+     * `form`, frames…) with attributes `attrs` (checked as decorations' are) and children, strings
+     * as text nodes: data from the document never goes through HTML.
+     */
+    h(tag: string, attrs?: Readonly<Record<string, string>> | null, ...children: readonly (Node | string)[]): HTMLElement;
+}
+/**
+ * How a custom node is drawn. Inline: in its line, which wraps around it as the browser sizes it.
+ * Block: on the pages, measured by the flow; one taller than the room left on a page splits
+ * between its root element's children (each part drawn again by `render`, clipped), unless
+ * `split` is false, which keeps it whole on one page.
+ */
+export interface NodeView {
+    /**
+     * Called whenever the node is drawn again: a changed node, or a block split differently. Its
+     * DOM may change later (content loaded, a chart drawn): the view does not read it back.
+     */
+    render(node: ModelNode, dom: NodeViewDOM): Node;
+    split?: boolean;
+    /** Called with what `render` returned once the view no longer shows it (or is destroyed). */
+    destroy?(dom: Node): void;
+}
+/** How a run of a custom mark is drawn: attributes on the run's element. */
+export type MarkView = (mark: Mark) => DecorationAttrs;
+/** What a view extension keeps beside an `EditorView`: told of each update, destroyed with it. */
+export interface PluginView {
+    /** After the view drew a new state; `previous` is the state before. */
+    update?(view: EditorView, previous: EditorState): void;
+    destroy?(): void;
+}
+/**
+ * An extension with view hooks (ADR-0008), given to `createEditor({ extensions })` (and React's
+ * `extensions` prop) like any extension.
+ */
+export interface ViewExtension extends Extension {
+    /** By node type: one of the extension's (or another extension's) custom nodes. */
+    nodeViews?: Readonly<Record<string, NodeView>>;
+    /** By mark type. */
+    markViews?: Readonly<Record<string, MarkView>>;
+    /**
+     * The decorations for a state, asked on every update: keep it cheap (plugin state is a good
+     * place to keep them). Only blocks whose decorations changed are drawn again.
+     */
+    decorations?(state: EditorState): readonly Decoration[];
+    /** Called when a view of the editor is made (a story open on its page has a view too). */
+    view?(view: EditorView): PluginView;
+}
+
 // index.d.ts
 export { FOLI_MIME, htmlToDoc, textToDoc } from "./clipboard.js";
+export type { Decoration, DecorationAttrs, MarkView, NodeView, NodeViewDOM, PluginView, ViewExtension, } from "./extension.js";
 export { EditorView, type EditorViewOptions, keyName, measureImageFile, textWidthEmu, } from "./view.js";
 export { EMU_PER_PX } from "./word/blocks.js";
 export { type DocumentPages, type RenderDocumentOptions, type ReviewView, renderDocument, WORD_PAGE_CLASS, } from "./word/pages.js";
@@ -245,7 +337,21 @@ export declare class EditorView {
     private readonly listeners;
     /** The frames, titles and pop-ups of content controls. */
     private readonly controlChrome;
+    /** The editor's view extensions' node and mark views, decorations and plugin views. */
+    private readonly views;
+    private readonly decorators;
+    private decorations;
+    private decorationKey;
+    private pluginViews;
+    /** What node views drew and the view still shows (their `destroy` when it no longer does). */
+    private readonly drawn;
     constructor(host: HTMLElement, editor: Editor, options?: EditorViewOptions);
+    /** Calls `hook` for each plugin view, reporting what throws. */
+    private eachPluginView;
+    /** Destroys node views' drawings the host no longer holds (all of them: `all`). */
+    private dropDrawn;
+    /** Asks the extensions for `state`'s decorations; whether they changed. */
+    private decorate;
     /** Adds a listener for the body's events: a story open on a page has its own view. */
     private listen;
     destroy(): void;

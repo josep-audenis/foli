@@ -1,6 +1,7 @@
 import type {
   Editor,
   EditorDocument,
+  Extension,
   FoliDocument,
   Plugin,
   ReviewView,
@@ -42,6 +43,8 @@ export interface FoliEditorProps extends Omit<FoliCanvasProps, "editor"> {
   initialContent?: EditorDocument | undefined;
   /** Read once on mount. */
   plugins?: readonly Plugin[] | undefined;
+  /** Read once on mount: custom nodes and marks with their view hooks (`ViewExtension`). */
+  extensions?: readonly Extension[] | undefined;
   /** Read once on mount: who edits (tracked changes are made in this name). */
   author?: string | undefined;
   /** Read once on mount: record edits as tracked changes (the toolbar turns it on and off). */
@@ -79,6 +82,7 @@ export const FoliEditor = forwardRef<FoliEditorHandle, FoliEditorProps>(function
   {
     initialContent,
     plugins,
+    extensions,
     author,
     trackChanges,
     reviewView,
@@ -90,7 +94,14 @@ export const FoliEditor = forwardRef<FoliEditorHandle, FoliEditorProps>(function
   },
   ref,
 ) {
-  const editor = useFoliEditor({ initialContent, plugins, author, trackChanges, reviewView });
+  const editor = useFoliEditor({
+    initialContent,
+    plugins,
+    extensions,
+    author,
+    trackChanges,
+    reviewView,
+  });
   const hasComments = useEditorState(
     (state) => (wordContext(state)?.envelope.comments.length ?? 0) > 0,
     { editor },

@@ -8,7 +8,7 @@
 import { FoliDocumentError, type Node } from "../model/index.js";
 import type { StoryJSON } from "../v3/document.js";
 import { storyRules } from "../v3/document.js";
-import type { Editor } from "./editor.js";
+import type { Editor, EditorListener } from "./editor.js";
 import { closeHistory, joinHistory, type StoryEdit, storyEdit } from "./history.js";
 import { Selection, type SelectionJSON } from "./selection.js";
 import { EditorState, Plugin, type Transaction } from "./state.js";
@@ -35,6 +35,22 @@ import {
   withEnvelope,
   wordContext,
 } from "./word.js";
+
+/**
+ * Calls a listener; one that throws is reported (`console.error`) and the others still run.
+ * @internal
+ */
+export function callListener(
+  listener: EditorListener,
+  state: EditorState,
+  transactions: readonly Transaction[],
+): void {
+  try {
+    listener(state, transactions);
+  } catch (error) {
+    console.error("Foli: an editor listener failed", error);
+  }
+}
 
 /**
  * What a story's editor needs of the body's.
@@ -209,7 +225,7 @@ export class StoryEditing {
   }
 
   private notify(transactions: readonly Transaction[]): void {
-    for (const listener of this.listeners) listener(this.state, transactions);
+    for (const listener of this.listeners) callListener(listener, this.state, transactions);
   }
 
   /** `state` with the body's context and tracking; its plugins keep their state. */

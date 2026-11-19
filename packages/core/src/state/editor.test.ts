@@ -290,6 +290,20 @@ describe("commands", () => {
     type(editor, "b");
     expect(seen).toEqual([1]);
   });
+
+  it("tells every subscriber when one throws, and reports it", () => {
+    const editor = createEditor();
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    const seen: string[] = [];
+    editor.subscribe(() => {
+      throw new Error("broken");
+    });
+    editor.subscribe((state) => seen.push(state.doc.textContent));
+    type(editor, "a");
+    expect(seen).toEqual(["a"]);
+    expect(error).toHaveBeenCalledTimes(1);
+    error.mockRestore();
+  });
 });
 
 describe("plugins", () => {

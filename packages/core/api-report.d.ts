@@ -1127,6 +1127,11 @@ export interface Editor {
      * a key to the browser when it answers false, or when there is none.
      */
     navigation: ((request: NavigationRequest) => boolean) | null;
+    /**
+     * The extensions it was made with (`EditorOptions.extensions`), the same list on its stories'
+     * editors: a view reads its view hooks from them (`ViewExtension` in `@folijs/view`).
+     */
+    readonly extensions: readonly Extension[];
 }
 /** A section's page setup as page settings (mm; the gutter added to the left margin, as Word does). */
 export declare function sectionSettings(section: SectionJSON): DocumentSettings;
