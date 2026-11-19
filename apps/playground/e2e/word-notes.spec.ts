@@ -529,6 +529,31 @@ test("T5 with a note: growing, it moves text across the page end, caret and undo
   expect(await bodyText(page)).toBe(body);
 });
 
+test("the read-only pages put notes beneath the text after the column's last paragraph", async ({
+  page,
+}) => {
+  await page.goto("/word.html");
+  await page.waitForFunction(() => "foliWord" in window);
+  const order = await page.evaluate(
+    (doc) => {
+      window.foliWord.show(doc, "markup");
+      const first = document.querySelector(".foli-word-page > div") as HTMLElement;
+      return [...first.children].map((c) =>
+        c.classList.contains("foli-notes") ? "notes" : (c.textContent ?? ""),
+      );
+    },
+    documentOf(
+      [paragraph("One", reference("footnote:1")), paragraph("Two"), paragraph("Three")],
+      {
+        "footnote:1": note("footnote", "Beneath"),
+      },
+      { settings: { footnotes: { position: "beneathText" } } },
+    ),
+  );
+  expect(order.at(-1)).toBe("notes");
+  expect(order.slice(0, 3).map((t) => t.replace(/\d/g, ""))).toEqual(["One", "Two", "Three"]);
+});
+
 // ---------- the menu and the dialog ----------
 
 test("the notes menu and options dialog work from the keyboard and pass axe", async ({ page }) => {

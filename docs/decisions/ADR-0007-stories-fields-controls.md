@@ -170,7 +170,8 @@ content, ext? }`. `content` is a `doc` of the body's blocks. `noteType` is Word'
 - **Notes.** A line holding a reference goes on a page only if it, the separator and the note's
   **first line** fit; the rest of the note fills the space left at the foot and continues on the
   next page under the continuation separator, so a note taller than a page works. What carries
-  over is placed first on the next page and leaves room for at least one line of text; what still
+  over is placed first on the next page, as much as fits (corrected in 11.10's review: Word gives a
+  long note whole pages, it leaves no line of text room); what still
   does not fit carries on, so both advance. A note's use of a page comes from the lines that end
   up on it: when widow, orphan or keep rules take a line back, its notes go with it and the page
   is measured again. A line forced onto an empty page because nothing else can take it keeps its
@@ -204,6 +205,11 @@ content, ext? }`. `content` is a `doc` of the body's blocks. `noteType` is Word'
     reference settles the note too; a note whose reference goes is removed (a plugin, in the same
     undo step). A copy is a new note with a new id, in Word too.
   - The open note is one line to the flow: whole on its reference's page.
+  - From the review of 11.10, on Word's PDFs of documents Foli made: a note does not push its own
+    paragraph off the page, the lines the widow and orphan rules keep with the reference stay above
+    it; a continuous break into another column count below notes starts a page; separators sit the
+    same whatever their paragraph's spacing (Foli writes Word's single spacing and nothing after,
+    and measures them so).
 - **Columns.** A section has `columns` (`count`, `space`, `widths`, `separator`); a page holds
   **bands** (one per section on it, for continuous sections), a band holds columns, and `flow`
   fills columns where it filled pages. A band above a continuous break is balanced. A

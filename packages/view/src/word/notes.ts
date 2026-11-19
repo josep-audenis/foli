@@ -88,6 +88,23 @@ const defaultSeparator = (type: "separator" | "continuationSeparator"): StoryJSO
   },
 });
 const DEFAULT_SEPARATOR = defaultSeparator("separator");
+
+/**
+ * What a story shows: a separator single spaced with nothing before or after it, whatever its
+ * paragraph says (Word's PDFs: a bare separator and one with that spacing sit alike).
+ */
+function asWordSets(story: StoryJSON): StoryJSON["content"] {
+  if ((story.noteType ?? "normal") === "normal") return story.content;
+  const spacing = { before: 0, after: 0, line: 240, lineRule: "auto" };
+  return {
+    ...story.content,
+    content: (story.content.content ?? []).map((block) =>
+      block.type === "paragraph"
+        ? { ...block, attrs: { ...block.attrs, spacing: { ...spacing } } }
+        : block,
+    ),
+  };
+}
 const DEFAULT_CONTINUATION = defaultSeparator("continuationSeparator");
 
 /** A note at a width, with its number, as drawn and measured. */
@@ -189,7 +206,7 @@ export class PageNotes {
         ...(this.resolver ? { resolver: this.resolver } : {}),
       };
       const blocks = renderBlocks(
-        { ...this.document, content: story.content } as FoliDocument,
+        { ...this.document, content: asWordSets(story) } as FoliDocument,
         this.doc,
         options,
       );

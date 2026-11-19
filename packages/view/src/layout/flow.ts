@@ -226,8 +226,7 @@ export interface FlowState {
  * - Footnotes (ADR-0007, on Word's PDFs): a line with a reference goes on a page only if it, the
  *   separator and the note's first line fit. The note then takes the room down to the text, up to
  *   all of it, so a long one fills the page; the rest is carried to the foot of the next page,
- *   under the continuation separator, before any text is placed there but leaving room for the
- *   next line. Lines a widow, orphan or keep rule takes back take their notes with them. In a
+ *   under the continuation separator, before any text is placed there, as much as fits. Lines a widow, orphan or keep rule takes back take their notes with them. In a
  *   section with columns the notes are set in those columns across the foot of the band, whichever
  *   column refers to them, and every column's text ends above them.
  * - Endnotes (`BlockBox.endnotes`) follow their block in the text, over as many pages as they need.
@@ -433,15 +432,16 @@ export function flowFrom(
   const noteHeight = (note: FlowNote) => note.lines(0).at(-1) ?? 0;
   const separatorPiece = (note: FlowNote) => footPiece(note, 0, note.lines(0).length);
   /**
-   * On a page or band with no notes yet: what is carried over goes to its foot first, leaving
-   * `reserve` for text. `force`: a page with nothing else on it takes at least a line.
+   * On a page or band with no notes yet: what is carried over goes to its foot first, as much as
+   * fits, before any text (Word's PDFs: a long note takes whole pages). `force`: a page with
+   * nothing else on it takes at least a line.
    */
-  const placeCarried = (box: BlockBox, reserve: number, force = false) => {
+  const placeCarried = (box: BlockBox, force = false) => {
     if (!state.carry.length || state.notes || state.onPage || !rules.notes) return;
     const { continuation } = rules.notes;
     const columns = box.section?.columns ?? 1;
     const above = noteHeight(continuation);
-    const free = pageRoom(box) - state.used - reserve - above;
+    const free = pageRoom(box) - state.used - above;
     const placed: NotePiece[] = [];
     const left: FlowState["carry"][number][] = [];
     let parts: readonly number[] = [];
@@ -472,14 +472,20 @@ export function flowFrom(
   };
   /** Whether what does not fit here can go elsewhere: not from an empty last column at the top. */
   const canMove = (box: BlockBox) =>
-    state.onPage > 0 || state.bandTop > 0 || state.column + 1 < (box.section?.columns ?? 1);
+    state.onPage > 0 ||
+    state.notes > 0 ||
+    state.bandTop > 0 ||
+    state.column + 1 < (box.section?.columns ?? 1);
 
   /** Moves to where `section` starts; the space above a new band when it opens one. */
   const enterSection = (section: FlowSection, previous: FlowSection | undefined) => {
     const pageBroken = state.breakPending;
     state.breakPending = false;
     state.columnPending = false;
-    const samePage = !previous || section.samePage(previous);
+    // Word's PDFs: notes on the page and a continuous break into other columns start a page.
+    const notesAbove =
+      (state.notes > 0 || state.pageNotes > 0) && section.columns !== previous?.columns;
+    const samePage = !previous || (section.samePage(previous) && !notesAbove);
     if (!pageBroken && samePage && section.start === "continuous") {
       state.owner ??= {
         section: previous ?? section,
@@ -542,7 +548,7 @@ export function flowFrom(
         const lines = note.lines(state.column);
         if (from >= lines.length) break;
         const top = from ? (lines[from - 1] as number) : 0;
-        placeCarried(box, (lines[from] as number) - top);
+        placeCarried(box);
         const gap = state.onPage ? (lead ?? 0) : 0;
         let fit = linesIn(note, from, room(box) - state.used - gap);
         if (fit.to === from) {
@@ -621,8 +627,7 @@ export function flowFrom(
       return byLine;
     };
     let notesOf = referred();
-    if (state.carry.length && !state.onPage)
-      placeCarried(box, gap() + ((measured.lines()[0] as number | undefined) ?? measured.height));
+    if (state.carry.length && !state.onPage) placeCarried(box);
     if (
       !forced &&
       !notesOf.size &&
@@ -682,13 +687,15 @@ export function flowFrom(
       // Only the block's first fragment has the gap above it; the others repeat its header.
       const spacing = line === 0 ? gap() : (box.repeat ?? 0);
       notesOf = referred();
-      placeCarried(box, spacing + (lines[line] as number) - top);
+      placeCarried(box);
       const limit = pageRoom(box);
       /**
        * The footnotes of lines `line` to `to - 1` at the band's foot, each taking the room down
        * to the text after its line; null when one's first line does not fit (`force`: it goes in).
        * With columns the notes share the foot of them all: above them goes the tallest column.
        */
+      // A block kept whole is one line to the flow already.
+      const keepAll = count === 1;
       const planNotes = (to: number, force = false) => {
         const plan = {
           notes: state.notes,
@@ -710,9 +717,16 @@ export function flowFrom(
             const above = first
               ? noteHeight(separator)
               : plan.notes - notesHeight(plan.parts, columns);
-            // The paragraph's space after stays between its last line and the notes (Word's PDF).
-            const after = at + 1 === count ? box.marginBottom : 0;
-            const own = state.used + spacing + (lines[at] as number) - top + after;
+            // Word's PDFs: the lines that the widow and orphan rules keep with this one stay above
+            // the note, and the paragraph's space after stays between its last line and the notes.
+            let kept = at + 1;
+            if (!box.anyLine && !keepAll) {
+              kept = Math.max(kept, line + rules.orphans);
+              if (count - kept < rules.widows) kept = count;
+              kept = Math.min(kept, segmentEnd);
+            }
+            const after = kept === count ? box.marginBottom : 0;
+            const own = state.used + spacing + (lines[kept - 1] as number) - top + after;
             const text = Math.max(own, columns > 1 && state.column ? state.bandBottom : 0);
             let fit = fitNote(note, 0, limit - text - above, plan.parts, columns);
             if (
@@ -970,7 +984,7 @@ export function flowFrom(
     state = { ...state };
     while (state.carry.length) {
       newPage();
-      placeCarried(box, 0, true);
+      placeCarried(box, true);
     }
     const notes = [
       ...(last.notes ?? []).filter((p) => !p.tail),

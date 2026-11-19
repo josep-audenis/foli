@@ -537,17 +537,20 @@ export function commentsXml(
   return wrapPart(part, "w:comments", context.namespaces, body + added);
 }
 
-/** The separators a new notes part starts with, as Word writes them (unless it has its own). */
+/**
+ * The separators a new notes part starts with, as Word writes them (unless it has its own): single
+ * spaced, nothing after.
+ */
 const noteSeparators = (
   kind: "footnote" | "endnote",
   stories: Readonly<Record<string, StoryJSON>>,
 ) =>
   (Object.hasOwn(stories, `${kind}:-1`)
     ? ""
-    : `<w:${kind} w:type="separator" w:id="-1"><w:p><w:r><w:separator/></w:r></w:p></w:${kind}>`) +
+    : `<w:${kind} w:type="separator" w:id="-1"><w:p><w:pPr><w:spacing w:after="0" w:line="240" w:lineRule="auto"/></w:pPr><w:r><w:separator/></w:r></w:p></w:${kind}>`) +
   (Object.hasOwn(stories, `${kind}:0`)
     ? ""
-    : `<w:${kind} w:type="continuationSeparator" w:id="0"><w:p><w:r><w:continuationSeparator/></w:r></w:p></w:${kind}>`);
+    : `<w:${kind} w:type="continuationSeparator" w:id="0"><w:p><w:pPr><w:spacing w:after="0" w:line="240" w:lineRule="auto"/></w:pPr><w:r><w:continuationSeparator/></w:r></w:p></w:${kind}>`);
 
 /**
  * A footnotes or endnotes part: a note unchanged from `originals` keeps its bytes, a changed one

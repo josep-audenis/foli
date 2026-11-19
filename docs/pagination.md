@@ -75,10 +75,12 @@ editor state ──► measure the blocks without a cached measurement (DOM read
   separator and the note's first line fit; lines a widow, orphan or keep rule takes back take their
   notes with them. The note takes the room down to its line, up to all of it, so a long one fills
   the page and the rest goes to the foot of the next, first thing there, under the continuation
-  separator, leaving room for the next line of text; what is left after the last block gets pages
+  separator, as much of it as fits (a long note takes whole pages, as in Word's PDFs); the lines the
+  widow and orphan rules keep with the reference stay above the note; what is left after the last block gets pages
   of its own. In a section with columns the notes are set in the columns across the band's foot, in
   order and whole, under one separator, and every column's text ends above them; a note a later
-  column refers to has the band flowed again with its room kept. Footnotes beneath the text
+  column refers to has the band flowed again with its room kept. A continuous break into another
+  column count starts a page when notes are on it, as in Word. Footnotes beneath the text
   (`beneathText`) and endnotes follow the text, endnotes at the end of the document or of each
   section (`sectEnd`). `FlowState` holds what the notes take and what is carried, so incremental
   reflow stops only where they agree too. A note's height changing starts the flow from the top.
