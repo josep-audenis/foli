@@ -31,6 +31,14 @@ export {
   type ThemeJSON,
   type WordSettingsJSON,
 } from "./document.js";
+export {
+  type ContentOptions,
+  type Extension,
+  type ExtensionNodeSpec,
+  foreignTextOf,
+  type ParseOptions,
+  withForeignText,
+} from "./extensions.js";
 export { migrateToV3 } from "./migrate.js";
 export {
   type CellFormat,
@@ -44,6 +52,7 @@ export {
   tableConditions,
 } from "./resolve.js";
 export {
+  CUSTOM_TYPE,
   checkSection,
   HIGHLIGHT_COLORS,
   JUSTIFICATIONS,

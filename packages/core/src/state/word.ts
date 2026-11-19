@@ -10,10 +10,11 @@
  * become the commands themselves.
  */
 import { deepEqual } from "../model/attrs.js";
-import type { Attrs, Mark, MarkType, Node } from "../model/index.js";
+import type { Attrs, Mark, MarkType, Node, Schema } from "../model/index.js";
 import { Step, StepResult } from "../transform/steps.js";
 import type { CommentJSON, FoliDocument, StoryJSON } from "../v3/document.js";
 import { parseContent } from "../v3/document.js";
+import { writeCustom } from "../v3/extensions.js";
 import { Resolver, type RunFormat } from "../v3/resolve.js";
 import { MARK_ATTRS } from "./mark.js";
 import { NodeSelection, type SelectionJSON, TextSelection } from "./selection.js";
@@ -21,6 +22,24 @@ import { type Command, EditorState, Plugin, PluginKey, type Transaction } from "
 
 /** A v3 document without its content: what the editor keeps beside the edited tree. */
 export type WordEnvelope = Omit<FoliDocument, "content">;
+
+/**
+ * The document of an editor's `envelope` and tree `doc`, as apps get it (`getDocument`, React's
+ * `onChange`): a copy, foreign nodes and marks written back as the custom types they stand for.
+ */
+export function documentJSON(envelope: WordEnvelope, doc: Node): FoliDocument {
+  const { stories, comments, ...rest } = structuredClone(envelope);
+  return {
+    ...rest,
+    comments: comments.map((c) => ({ ...c, content: c.content.map(writeCustom) })),
+    ...(stories && {
+      stories: Object.fromEntries(
+        Object.entries(stories).map(([id, s]) => [id, { ...s, content: writeCustom(s.content) }]),
+      ),
+    }),
+    content: writeCustom(doc.toJSON()),
+  };
+}
 
 /** A story as the editor holds it: its tree, and what the envelope says beside it. */
 export interface Story extends Omit<StoryJSON, "content"> {
@@ -324,12 +343,15 @@ export function otherTrees(state: EditorState): Node[] {
   return (body ? [body, ...trees] : trees).filter((tree) => tree !== state.doc);
 }
 
-/** The trees of `envelope`'s stories. */
-function storyTrees(envelope: WordEnvelope): Map<string, Story> {
+/** The trees of `envelope`'s stories, in the editor's `schema`. */
+function storyTrees(envelope: WordEnvelope, schema: Schema): Map<string, Story> {
   return new Map(
     Object.entries(envelope.stories ?? {}).map(([id, { content, ...rest }]) => [
       id,
-      { ...rest, doc: parseContent(content, `stories[${JSON.stringify(id)}].content`) },
+      {
+        ...rest,
+        doc: parseContent(content, { path: `stories[${JSON.stringify(id)}].content`, schema }),
+      },
     ]),
   );
 }
@@ -346,16 +368,16 @@ function storyTrees(envelope: WordEnvelope): Map<string, Story> {
 export function wordPlugin(envelope: WordEnvelope, context?: WordContext): Plugin<WordContext> {
   // Not a secret: only tells documents apart.
   const id = `${Date.now().toString(36)}${Math.random().toString(36).slice(2)}`;
-  const initial: WordContext = context ?? {
-    envelope,
-    resolver: new Resolver(envelope),
-    stories: storyTrees(envelope),
-    id,
-  };
   return new Plugin({
     key,
     state: {
-      init: () => initial,
+      init: (state) =>
+        context ?? {
+          envelope,
+          resolver: new Resolver(envelope),
+          stories: storyTrees(envelope, state.schema),
+          id,
+        },
       apply: (tr, value) => {
         const adopted = tr.getMeta(ADOPT) as WordContext | undefined;
         if (adopted) return adopted;
@@ -622,16 +644,14 @@ export function isMarker(context: WordContext | null, node: Node | null | undefi
   return context !== null && !!node && MARKERS.has(node.type.name);
 }
 
+const OPAQUE = new Set(["opaqueInline", "opaqueBlock", "foreignInline", "foreignBlock"]);
+
 /**
- * Opaque content: deleted only once selected, as Word selects a field before deleting it.
+ * Opaque content (and foreign nodes, ADR-0008): deleted only once selected, as Word selects a field before deleting it.
  * @internal
  */
 export function isOpaque(context: WordContext | null, node: Node | null | undefined): boolean {
-  return (
-    context !== null &&
-    !!node &&
-    (node.type.name === "opaqueInline" || node.type.name === "opaqueBlock")
-  );
+  return context !== null && !!node && OPAQUE.has(node.type.name);
 }
 
 /**

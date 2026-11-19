@@ -7,6 +7,7 @@
 
 import {
   type ControlJSON,
+  type Extension,
   type FoliDocument,
   type NodeJSON,
   parseDocument,
@@ -14,6 +15,7 @@ import {
   type SectionJSON,
   type StoryJSON,
 } from "@folijs/core";
+import { customToWord } from "../custom.js";
 import { controlsUsed, packageStories } from "../import/index.js";
 import { child, isW, REL, W } from "../import/ooxml.js";
 import { noteIds } from "../import/stories.js";
@@ -198,6 +200,12 @@ export interface ExportOptions {
     key: string,
     resource: ResourceJSON,
   ) => Promise<Uint8Array | undefined> | Uint8Array | undefined;
+  /**
+   * The custom node and mark types the document may hold (ADR-0008): validated by them, and a
+   * node's text in its content control is their `text(attrs)`. A custom type none declares is
+   * written as it was read (a `.docx` control's text, else `[type]`).
+   */
+  extensions?: readonly Extension[];
 }
 
 /**
@@ -209,7 +217,9 @@ export async function exportDocx(
   original?: DocxPackage,
   options: ExportOptions = {},
 ): Promise<Uint8Array> {
-  const doc = balanced(withThreadIds(parseDocument(document), original), original);
+  // Custom nodes and marks become tagged content controls first (ADR-0008).
+  const parsed = parseDocument(document, { extensions: options.extensions ?? [] });
+  const doc = balanced(withThreadIds(customToWord(parsed, options.extensions), original), original);
   // Before the app is asked for any picture's bytes.
   const reference = original ? undefined : packageReference(doc);
   if (reference) {

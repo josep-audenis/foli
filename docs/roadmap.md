@@ -23,7 +23,7 @@ place that says what is in progress; check it before starting work.
 | 9 Review                 | ✅ Done                  | —                  | Merged in #63–#72; 0.4.0 on npm                                                                              |
 | 10 Tables & images       | ✅ Done                  | —                  | Merged in #73–#97 (#90, the landing page, went to main); 0.5.0 on npm; two misses accepted                   |
 | 11 Sections & templates  | ✅ Done                  | —                  | Merged in #100–#118 (#106, #107, #110, #112 and #113, the site, went to main); 0.6.0 on npm; misses accepted |
-| 12 Ecosystem & 1.0       | In progress              | phase-12/ecosystem | 12.1 and 12.2 done: ADR-0008, the public API listed by name with API reports; 12.3 next                      |
+| 12 Ecosystem & 1.0       | In progress              | phase-12/ecosystem | 12.1 to 12.3 done: ADR-0008, the public API by name with API reports, custom nodes and marks; 12.4 next      |
 
 Status values: `Ready` (dependencies met, nobody on it) · `In progress` · `In review` (PR open) ·
 `✅ Done` (merged, acceptance criteria met) · `Blocked by …`.
@@ -1433,11 +1433,47 @@ Each task is a PR on `phase-12/ecosystem`, the build green after each.
   examples' smoke test expected schema v3 (stale since 11.3). `pnpm examples` run on 2026-11-19:
   both apps install the tarballs with the exact peers and build, the SSR and DOCX checks pass,
   15 passed and 3 skipped (the Next.js server-rendering test outside Next) in three engines.)
-- [ ] 12.3 Custom nodes and marks in `@folijs/core`: the schema extension from ADR-0008
+- [x] 12.3 Custom nodes and marks in `@folijs/core`: the schema extension from ADR-0008
   (`createEditor` and `parseDocument` take it), validation, JSON, copy and paste between editors
   with and without the extension (never dropped: opaque when unknown), find and review over them;
   `@folijs/docx` writes and reads them as decided; tests and a round trip that Word opens; delete
-  `spikes/extension` and its Playwright project once the real API replaces it.
+  `spikes/extension` and its Playwright project once the real API replaces it. (Done: `Extension`
+  (`{ name, nodes?, marks?, plugins? }`), `ExtensionNodeSpec` (a leaf with `text(attrs)`) and
+  `ParseOptions` in core; `createEditor({ extensions })`, `parseDocument(json, { extensions })`,
+  `exportDocx(…, { extensions })`; `NodeSpec.text`; `parseContent(json, { path?, fragment?,
+  extensions? })` (`ContentOptions`) in place of its positional parameters.
+  `schemaWith` builds the Word schema plus the types (namespaced, not taken twice, leaves only,
+  else a `RangeError`) and every parse inside an editor uses `state.schema`, so Word's table rules
+  still apply. Unknown namespaced types become `foreignInline`, `foreignBlock` and the `foreign`
+  mark (in the Word schema, holding the type and attributes, plain JSON up to 64 KiB) and are
+  written back by `parseDocument`, `getDocument`, React's `onChange` and control values (one
+  helper, `documentJSON`); opaque for deletion (selected first); a foreign
+  node's `.docx` text rides on its JSON in memory only. Find matches a node's text as one position
+  and replace refuses it (`locked`); tracked insertions and deletions of custom and foreign inline
+  nodes are accepted and rejected as text. The view draws custom and foreign nodes as their text
+  (`data-foli-custom`); a copy holding them carries its Foli JSON in the HTML
+  (`data-foli-clipboard`) as well, read back only when that wrapper is all the pasted HTML holds.
+  `@folijs/docx` maps them to `foli:`-tagged controls and back (`src/custom.ts`), a control only
+  when nothing would be lost (else it stays a content control). The saved-format rule needs nothing here: custom types never change the
+  version and v5 is the lowest. Tests: core `v3/extensions.test.ts` (12), docx `custom.test.ts` (6),
+  view `custom.test.ts` (2), React `onChange` (1); e2e `apps/playground/e2e/extension.spec.ts` on `/extension.html`
+  (typed, drawn on a later page, undone, copied and pasted into editors with and without the
+  extension, a block node, saved and loaded, `.docx` both ways): 11 passed, the paste skipped in
+  WebKit as the other clipboard tests, Firefox's paste now passing through the HTML. Word:
+  `scripts/corpus/extension-roundtrip.mjs` with `extension-word.ps1` (the spike's harness moved),
+  4 files (the sample with a block card, a 255-character tag, the sample re-exported without the
+  extension, one typed through commands): Word 16.0 lists every control as written, types into a
+  marked run and saves, Foli reads every node and mark back with the typed text under the mark: 4
+  of 4 (2026-11-19). The spike and its Playwright project are deleted. Size: view, React and docx
+  budgets raised (`scripts/size.mjs`). Shortcuts: custom marks are not drawn and custom nodes only
+  as their text until 12.4's views; `renderDocument` and `exportPdf` take no extensions (a custom
+  node shows its `.docx` text or `[type]`); a custom block node cannot be tracked as inserted or
+  deleted; a foreign node's `.docx` text is kept in memory only (JSON saved and loaded writes
+  `[type]`: keeping it would change the format); the HTML carries the whole copy's JSON on a wrapper instead of per-element `data-foli-node`/
+  `data-foli-mark` attributes (simpler, and full fidelity in Firefox); schemas are cached per
+  extension array (a WeakMap: an array given again must not have changed). Review of #123: no
+  silent loss on `.docx` import, `onChange` and control values without foreign names, carried JSON
+  only from a lone wrapper, `parseContent`'s options object, foreign types never read as Word's.)
 - [ ] 12.4 View extension: node views for custom nodes (measured and placed by the flow, split or
   kept whole across pages as declared), decorations (inline and node; find matches and the
   selected field move onto them where it is simpler), plugin views (mount, update, destroy) and

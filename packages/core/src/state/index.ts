@@ -265,6 +265,7 @@ export {
 } from "./track.js";
 export {
   CommentStep,
+  documentJSON,
   EnvelopeStep,
   StoryStep,
   setComments,

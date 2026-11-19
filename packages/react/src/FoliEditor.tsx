@@ -6,7 +6,7 @@ import type {
   ReviewView,
   Transaction,
 } from "@folijs/core";
-import { wordContext } from "@folijs/core/internal";
+import { documentJSON, wordContext } from "@folijs/core/internal";
 import { forwardRef, type ReactNode, useImperativeHandle, useRef } from "react";
 import {
   FoliEditorProvider,
@@ -115,10 +115,10 @@ export const FoliEditor = forwardRef<FoliEditorHandle, FoliEditorProps>(function
           editor,
           transactions,
           get document() {
-            document ??= {
-              ...(structuredClone(wordContext(state)?.envelope) as Omit<FoliDocument, "content">),
-              content: state.doc.toJSON(),
-            };
+            const envelope = wordContext(state)?.envelope;
+            document ??= envelope
+              ? documentJSON(envelope, state.doc)
+              : ({ content: state.doc.toJSON() } as FoliDocument);
             return document;
           },
         });

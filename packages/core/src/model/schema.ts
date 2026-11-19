@@ -26,6 +26,11 @@ export interface NodeSpec {
   atom?: boolean;
   /** Whether a NodeSelection may select this node (default true; text is never selectable). */
   selectable?: boolean;
+  /**
+   * The text a leaf stands for in plain text, find, the clipboard and `.docx` (custom nodes,
+   * ADR-0008). Not saved: the attributes are.
+   */
+  text?: (attrs: Attrs) => string;
 }
 
 export interface MarkSpec {

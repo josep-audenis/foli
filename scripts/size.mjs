@@ -83,13 +83,17 @@ writeFileSync(appEntry, `export { FoliEditor } from "${dist("react")}";\n`);
  * `parseDocument` checks the document before the page gets it; its page renderer 83.1 kB, 95.2
  * allowed: core and the read-only renderer bundled into the script `exportPdf` adds to the
  * headless page, never part of an app's own bundle).
+ * Phase 12: view, React and docx raised in 12.3 (112.0, 157.0 and 60.0 KiB allowed): custom nodes
+ * and marks, which every package carries (the extended schema, foreign nodes and their JSON
+ * mapping in core; their drawing and the clipboard HTML carrying their JSON in the view; their
+ * tagged content controls in docx).
  */
 const BUNDLES = [
   { name: "@folijs/core", entry: dist("core"), budget: 88_000 },
-  { name: "@folijs/view", entry: dist("view"), budget: 110_500 },
-  { name: "@folijs/react", entry: dist("react"), budget: 155_000 },
-  { name: "FoliEditor only", entry: appEntry, budget: 155_000 },
-  { name: "@folijs/docx", entry: dist("docx"), budget: 58_400 },
+  { name: "@folijs/view", entry: dist("view"), budget: 114_700 },
+  { name: "@folijs/react", entry: dist("react"), budget: 160_800 },
+  { name: "FoliEditor only", entry: appEntry, budget: 160_800 },
+  { name: "@folijs/docx", entry: dist("docx"), budget: 61_440 },
   { name: "@folijs/pdf", entry: dist("pdf"), budget: 18_800 },
 ];
 /** Bundles built as they ship (minified scripts): their gzipped bytes, with their budget. */

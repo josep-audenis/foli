@@ -8,6 +8,7 @@ export {
   controlSpot,
   copiedDefinitions,
   deleteSelectionKeepingTables,
+  documentJSON,
   EnvelopeStep,
   type FittedPaste,
   fitPaste,
@@ -30,8 +31,10 @@ export type { Check } from "./v3/check.js";
 export {
   type CellFormat,
   type CellPlace,
+  CUSTOM_TYPE,
   checkControl,
   checkSection,
+  foreignTextOf,
   formatNumber,
   type ListMarker,
   type ParagraphFormat,
@@ -41,4 +44,5 @@ export {
   schema,
   type TableFormat,
   tableConditions,
+  withForeignText,
 } from "./v3/index.js";

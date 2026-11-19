@@ -111,6 +111,12 @@ checklist in [testing/ime.md](testing/ime.md)):
   discarded with a `Foli:` console warning.
 - Documents in `schemaVersion: 1` load in later versions: they migrate without dropping
   content.
+- Custom nodes and marks (12.3): a custom node is drawn as its `text(attrs)` and a custom mark
+  not at all until node and mark views (12.4); `renderDocument` and `exportPdf` take no
+  extensions, so they draw a custom node as its `.docx` text or its type in brackets. Custom types
+  are leaves and marks only (no custom containers in 1.x). A custom block node cannot be inserted
+  or deleted as a tracked change (block content is tracked through paragraph marks).
+  `setControlValue` with rich content holding an unknown custom type is refused.
 
 ## Tables
 
@@ -253,6 +259,18 @@ Details in the [package README](../packages/docx/README.md).
   (read as U+2011 and U+00AD), XML comments, processing instructions and whitespace between
   elements. Spelling marks, rendered page breaks, editing session ids and runs with no content
   are not imported (Word recomputes them or they show nothing).
+- Custom nodes and marks are content controls tagged with their type and attributes: a tag holds
+  at most 255 characters, so larger attributes are refused at export (`DocxError`), never cut.
+  A tagged control is read back as its node or mark only when nothing would be lost: a node's
+  control holding anything but text runs formatted alike (a bookmark, a field, a comment anchor),
+  a block node's paragraph with properties, a section, a tracked change, formatting or another
+  control around it, an empty mark control, or one Word split in two stays an ordinary content
+  control, its tag kept.
+- A foreign node (its extension not loaded) shows its control's text in the next `.docx` only
+  while the document stays in memory: saved as JSON and loaded again it writes `[type]`. Keeping
+  the text in the JSON would change the saved format (a key `parseDocument` refuses today, or an
+  attribute the extension's own validation would refuse), which ADR-0008 rules out for custom
+  types.
 
 ## Pages
 

@@ -178,6 +178,15 @@ tracking), typed into, filled and emptied, with changed properties and with a co
 new document with every kind inserted and a repeating section grown; a tracked fill rejected. Word opens all 9 and finds
 every control as Foli holds it, ids unique (2026-11-18, Word 16.0.20527).
 
+`scripts/corpus/extension-roundtrip.mjs` (12.3, with `extension-word.ps1`) has Word read custom
+nodes and marks (ADR-0008) as Foli writes them: mentions (one bold, one in a table cell), topic marks
+and a block card exported with the extension, a mention whose tag is 255 characters, the same file
+read back and exported by an editor without the extension (foreign nodes keeping their controls'
+text), and one made through the editor's commands. Word lists each file's controls as Foli wrote
+them (a node a locked plain text control showing its text, a marked run a rich text control around
+it, every tag as written), types into the first marked run and at the start, and saves; Foli reads
+every node and mark back, the typed text under the mark. All 4 pass (2026-11-19, Word 16.0).
+
 `scripts/corpus/find-roundtrip.mjs` (11.11, with `find-word.ps1`, which reads every story as it
 stands, accepted and rejected, and the bookmarks) replaces a word over the body and every story of
 05, 09 and a new document with a header, a footer and both kinds of note, untracked and tracked, and
