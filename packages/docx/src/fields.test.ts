@@ -167,17 +167,6 @@ describe("fields and controls as edits leave them", () => {
 });
 
 describe("content controls kept verbatim", () => {
-  const pr = (inner: string) => `<w:sdtPr>${inner}<w:text/></w:sdtPr>`;
-  it.each([
-    ["bound", '<w:dataBinding w:xpath="/a" w:storeItemID="{1}"/>'],
-    ["showing its placeholder", "<w:showingPlcHdr/>"],
-    ["with locked content", '<w:lock w:val="contentLocked"/>'],
-  ])("one %s, until 11.9 honours it", async (_name, inner) => {
-    const { document, report } = await read(p(sdt(run("x"), pr(inner))));
-    expect(document.controls).toBeUndefined();
-    expect(report.opaque["w:sdt"]).toBe(1);
-  });
-
   it("one with two contents", async () => {
     const twice = `<w:sdt>${SDT_PR}<w:sdtContent>${run("x")}</w:sdtContent><w:sdtContent>${run("y")}</w:sdtContent></w:sdt>`;
     const { report } = await read(p(twice));
@@ -259,17 +248,153 @@ describe("content controls", () => {
     expect(out).not.toContain("<w:sdt>");
   });
 
-  it("refuses a changed control, for now, and one without properties", async () => {
+  it("refuses a control without properties", async () => {
     const { document, package: pkg } = await read(p(sdt(run("a"))));
-    const id = Object.keys(document.controls ?? {})[0] as string;
-    const changed = structuredClone(document);
-    (changed.controls as NonNullable<FoliDocument["controls"]>)[id] = {
-      ...(document.controls?.[id] as NonNullable<FoliDocument["controls"]>[string]),
-      tag: "other",
-    };
-    await expect(exportDocx(changed, pkg)).rejects.toThrow(/changed content control/);
     const { controls: _controls, ...without } = document;
     await expect(exportDocx(without, pkg)).rejects.toThrow(/has no properties/);
+  });
+
+  it.each([
+    ["bound", '<w:dataBinding w:xpath="/a" w:storeItemID="{1}"/>', { binding: { xpath: "/a" } }],
+    ["showing its placeholder", "<w:showingPlcHdr/>", { placeholder: { showing: true } }],
+    ["with locked content", '<w:lock w:val="contentLocked"/>', { lock: "contentLocked" }],
+  ])("models one %s", async (_name, inner, expected) => {
+    const pr = `<w:sdtPr>${inner}<w:text/></w:sdtPr>`;
+    const { document, report } = await read(p(sdt(run("x"), pr)));
+    expect(Object.values(document.controls ?? {})[0]).toMatchObject(expected);
+    expect(report.opaque["w:sdt"]).toBeUndefined();
+  });
+
+  type Controls = NonNullable<FoliDocument["controls"]>;
+  /** Exports the first control changed as `change` says; what `w:sdtPr` comes out. */
+  async function patchedPr(pr: string, change: Partial<Controls[string]>, content = run("a")) {
+    const { document, package: pkg } = await read(p(sdt(content, pr)));
+    const id = Object.keys(document.controls ?? {})[0] as string;
+    const changed = structuredClone(document);
+    const controls = changed.controls as Controls;
+    controls[id] = { ...(controls[id] as Controls[string]), ...change };
+    const out = await written(changed, pkg);
+    return /<w:sdtPr[\s\S]*?<\/w:sdtPr>/.exec(out)?.[0];
+  }
+
+  it("patches what changed and keeps every other child as it was", async () => {
+    const pr =
+      '<w:sdtPr><w:rPr><w:b w:val="1"/></w:rPr><w:alias w:val="A"/><w:id w:val="9"/><w:placeholder><w:docPart w:val="P"/></w:placeholder><w:temporary/><w:showingPlcHdr/><w:text/></w:sdtPr>';
+    expect(
+      await patchedPr(pr, {
+        alias: "B",
+        tag: "t",
+        lock: "sdtLocked",
+        placeholder: { docPart: "P", showing: false },
+        multiLine: true,
+      }),
+    ).toBe(
+      '<w:sdtPr><w:rPr><w:b w:val="1"/></w:rPr><w:alias w:val="B"/><w:tag w:val="t"/><w:id w:val="9"/><w:lock w:val="sdtLocked"/><w:placeholder><w:docPart w:val="P"/></w:placeholder><w:temporary/><w:text w:multiLine="1"/></w:sdtPr>',
+    );
+  });
+
+  it("writes showing the placeholder, a date, a check box and a list", async () => {
+    expect(
+      await patchedPr('<w:sdtPr><w:id w:val="1"/></w:sdtPr>', { placeholder: { showing: true } }),
+    ).toBe('<w:sdtPr><w:id w:val="1"/><w:showingPlcHdr/></w:sdtPr>');
+    expect(
+      await patchedPr(
+        '<w:sdtPr><w:date><w:dateFormat w:val="d"/><w:lid w:val="en-GB"/></w:date></w:sdtPr>',
+        { date: "2026-03-03T00:00:00Z", dateFormat: "yyyy" },
+      ),
+    ).toBe(
+      '<w:sdtPr><w:date w:fullDate="2026-03-03T00:00:00Z"><w:dateFormat w:val="yyyy"/><w:lid w:val="en-GB"/></w:date></w:sdtPr>',
+    );
+    expect(
+      await patchedPr(
+        '<w:sdtPr><w14:checkbox><w14:checked w14:val="0"/><w14:checkedState w14:val="2612" w14:font="X"/></w14:checkbox></w:sdtPr>',
+        { checked: true },
+      ),
+    ).toBe(
+      '<w:sdtPr><w14:checkbox><w14:checked w14:val="1"/><w14:checkedState w14:val="2612" w14:font="X"/></w14:checkbox></w:sdtPr>',
+    );
+    expect(
+      await patchedPr("<w:sdtPr><w:comboBox/></w:sdtPr>", {
+        items: [{ value: "1", display: "One" }],
+      }),
+    ).toBe(
+      '<w:sdtPr><w:comboBox><w:listItem w:displayText="One" w:value="1"/></w:comboBox></w:sdtPr>',
+    );
+  });
+
+  it("writes a date's format inside an empty w:date, and a title before a tag", async () => {
+    expect(
+      await patchedPr('<w:sdtPr><w:id w:val="1"/><w:date/></w:sdtPr>', {
+        alias: "A",
+        tag: "t",
+        dateFormat: "yyyy",
+      }),
+    ).toBe(
+      '<w:sdtPr><w:alias w:val="A"/><w:tag w:val="t"/><w:id w:val="1"/><w:date><w:dateFormat w:val="yyyy"/></w:date></w:sdtPr>',
+    );
+  });
+
+  it("reads w:sdtPr/w:rPr and a section that forbids new items, and keeps them", async () => {
+    const pr =
+      '<w:sdtPr><w:rPr><w:b/></w:rPr><w15:repeatingSection xmlns:w15="http://schemas.microsoft.com/office/word/2012/wordml"><w15:doNotAllowInsertDeleteSection w:val="1"/></w15:repeatingSection></w:sdtPr>';
+    const { document, package: pkg } = await read(sdt(p(run("x")), pr) + p(""));
+    const control = Object.values(document.controls ?? {})[0];
+    expect(control).toMatchObject({
+      kind: "repeating",
+      noInsertDelete: true,
+      format: [{ type: "bold" }],
+    });
+    expect(await written(document, pkg)).toContain("doNotAllowInsertDeleteSection");
+  });
+
+  it("does not write that a control's deletion is being tracked", async () => {
+    expect(await patchedPr('<w:sdtPr><w:id w:val="1"/></w:sdtPr>', { deleted: true })).toBe(
+      '<w:sdtPr><w:id w:val="1"/></w:sdtPr>',
+    );
+  });
+
+  it.each([
+    ["text", "<w:text/>"],
+    ["richText", ""],
+    ["dropDown", "<w:dropDownList/>"],
+    ["comboBox", "<w:comboBox/>"],
+    ["date", "<w:date "],
+    ["checkbox", "<w14:checkbox"],
+    ["repeating", "<w15:repeatingSection"],
+    ["repeatingItem", "<w15:repeatingSectionItem"],
+  ] as const)("writes a new %s control, which reads back", async (kind, xml) => {
+    const { document, package: pkg } = await read(p(run("x")));
+    const control = { kind, tag: "new", alias: "New", checked: true, date: "2026-03-03T00:00:00Z" };
+    const block = kind === "repeating" || kind === "repeatingItem";
+    const content = structuredClone(document.content);
+    const first = content.content?.[0] as NodeJSON;
+    if (block) first.attrs = { ...first.attrs, controls: ["n"] };
+    else
+      first.content = [
+        { type: "controlStart", attrs: { id: "n" } },
+        ...(first.content ?? []),
+        { type: "controlEnd", attrs: { id: "n" } },
+      ];
+    const out = await written({ ...document, content, controls: { n: control } }, pkg);
+    expect(out).toContain(xml);
+    expect(out).toMatch(/<w:id w:val="\d+"\/>/);
+    const again = await importDocx(
+      await exportDocx({ ...document, content, controls: { n: control } }, pkg),
+    );
+    expect(Object.values(again.document.controls ?? {})[0]).toMatchObject({ kind, tag: "new" });
+  });
+
+  it("writes a copy without a w:id", async () => {
+    const { document, package: pkg } = await read(p(sdt(run("a")) + sdt(run("b"))));
+    const out = await written(document, pkg);
+    expect(out.match(/<w:id /g)).toHaveLength(2);
+    const [a] = Object.keys(document.controls ?? {}) as [string];
+    const controls = structuredClone(document.controls) as Controls;
+    controls[a] = {
+      ...(controls[a] as Controls[string]),
+      ext: String(controls[a]?.ext).replace(/<w:id[^>]*\/>/, ""),
+    };
+    expect((await written({ ...document, controls }, pkg)).match(/<w:id /g)).toHaveLength(1);
   });
 
   it.each(names)("%s: keeps its controls through a round trip", async (name) => {

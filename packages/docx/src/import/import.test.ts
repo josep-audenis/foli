@@ -158,12 +158,20 @@ describe("importing the Word corpus", () => {
 
   it("reads content controls and fields (template)", async () => {
     const { document, report } = await load("03-offer-letter-template.docx");
-    // Those showing their placeholder stay verbatim until 11.9.
     expect(report.opaque["w:fldSimple"]).toBeUndefined();
-    const held = Object.keys(document.controls ?? {}).length;
-    expect(held + (report.opaque["w:sdt"] ?? 0)).toBe(5);
-    for (const control of Object.values(document.controls ?? {}))
-      expect(control.placeholder?.showing).not.toBe(true);
+    expect(report.opaque["w:sdt"]).toBeUndefined();
+    const controls = Object.values(document.controls ?? {});
+    expect(controls.map((c) => c.kind)).toEqual([
+      "date",
+      "dropDown",
+      "text",
+      "checkbox",
+      "richText",
+    ]);
+    expect(controls.filter((c) => c.placeholder?.showing)).toHaveLength(3);
+    // What emptying them brings back, from the glossary.
+    expect(controls[1]?.placeholder?.text).toBe("Choose an item.");
+    expect(controls[3]?.checkedState).toEqual({ value: "2612", font: "MS Gothic" });
     const nodes = JSON.stringify(document.content);
     expect(nodes).toContain('"fieldCode"');
     expect(nodes).toContain("MERGEFIELD CandidateFirstName");

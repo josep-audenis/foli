@@ -111,7 +111,7 @@ const builtinName = (id: string) =>
 
 /**
  * Word's definition of built-in style `name` ("heading 1"–"heading 9", "List Paragraph",
- * "Hyperlink"), as Word adds it to a document the first time it is used (the Word 2013–2019
+ * "Hyperlink", "Placeholder Text"), as Word adds it to a document the first time it is used (the Word 2013–2019
  * template's values; not checked against newer Word).
  */
 export function builtinStyle(context: HasEnvelope, name: string): StyleJSON | null {
@@ -200,6 +200,16 @@ export function builtinStyle(context: HasEnvelope, name: string): StyleJSON | nu
           insideV: line,
         },
       },
+    };
+  }
+  if (name === "Placeholder Text") {
+    const font = defaultParagraphStyleOf(context, "character");
+    return {
+      id: "PlaceholderText",
+      type: "character",
+      name,
+      ...(font ? { basedOn: font } : {}),
+      run: [{ type: "color", attrs: { value: "666666" } }],
     };
   }
   if (name === "Hyperlink") {

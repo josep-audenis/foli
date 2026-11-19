@@ -229,7 +229,8 @@ interface FoliDocument {
   comments: CommentJSON[]; // id, author, initials, date, content (blocks), parent, done
   resources?: Record<string, ResourceJSON>; // contentType, size, part | url | data
   stories?: Record<string, StoryJSON>; // kind, noteType, content (a doc), ext: headers, footers, notes
-  controls?: Record<string, ControlJSON>; // kind, tag, alias, lock, items, placeholder, binding, ext
+  controls?: Record<string, ControlJSON>; // kind, tag, alias, lock, items, dateFormat, date, checked,
+  //   checkedState, uncheckedState, multiLine, placeholder (showing, docPart, text), binding, ext
   settings?: WordSettingsJSON; // evenAndOddHeaders, footnotes, endnotes
   content: NodeJSON; // a doc
 }

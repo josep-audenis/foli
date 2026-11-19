@@ -105,8 +105,7 @@ paragraphs with every change accepted and with every change rejected, as Word re
 the corpus, it is the reference `packages/docx/src/review-word.test.ts` compares Foli with: the
 same kinds of changes by the same authors, the same comments, threads and resolved state, and
 Foli's accept-all and reject-all text equal to Word's paragraph by paragraph (those with fields
-or content controls aside: Foli keeps them verbatim, without text; 03 is not compared, its content
-control around paragraphs is one block in Foli). Documents other than the corpus: `-Out` and
+aside; 03 is not compared, its content control around paragraphs is one block in Foli). Documents other than the corpus: `-Out` and
 `-Edit` outside the repository; `-Edit` copies are saved as new files, never over one.
 
 `scripts/corpus/review-roundtrip.mjs` checks both directions. `make` opens every document in
@@ -136,14 +135,14 @@ there (and UTC in `w16du:dateUtc`), so Word shows Foli's times shifted by the ti
 `scripts/corpus/import-report.mjs` (after `pnpm build`) imports each document and prints what
 became editable and what stayed opaque; counts and element names only, never text, so it runs
 on a private folder too (`node scripts/corpus/import-report.mjs <folder>`). On the corpus
-(2026-11-18, after 11.5: tables, pictures, headers, footers, notes, fields and content controls are modeled, and what stays
+(2026-11-18, after 11.9: tables, pictures, headers, footers, notes, fields and content controls are modeled, and what stays
 opaque is counted in those parts too; paragraphs count the body's, those in table cells included):
 
 | Document                       | Paragraphs | Tables | Opaque                    | Unmodeled values |
 | ------------------------------ | ---------: | -----: | ------------------------- | ---------------: |
 | 01-mutual-nda                  |         37 |      1 | none                      |                0 |
 | 02-services-agreement-redlined |         98 |      1 | comment reference marks 4 |                0 |
-| 03-offer-letter-template       |         14 |      0 | content controls 3        |                0 |
+| 03-offer-letter-template       |         14 |      0 | none                      |                0 |
 | 04-board-report                |         59 |      1 | none                      |                0 |
 | 05-business-letter             |         17 |      0 | none                      |                0 |
 | 06-price-schedule              |        202 |      2 | none                      |                0 |
@@ -151,7 +150,7 @@ opaque is counted in those parts too; paragraphs count the body's, those in tabl
 | 08-newsletter                  |         22 |      0 | none                      |                0 |
 | 09-pump-test-memo              |         15 |      0 | none                      |                0 |
 
-Comment reference marks have nothing to show. The content controls are those that show their placeholder (kept verbatim until 11.9). The tests check every imported paragraph's text
+Comment reference marks have nothing to show. The tests check every imported paragraph's text
 against Word's (`reference/word/`), table cells included (a cell a vertical merge covers has none in
 Word's list: 06 counts 32 of them).
 
@@ -168,6 +167,13 @@ the fields and results Foli holds (an unlocked `DATE` it recomputes; a `w:hyperl
 counts as a field in Word's list and is left out). All 24 files pass (2026-11-18, Word 16.0.20527).
 `packages/docx/src/fields-word.test.ts` does the arithmetic part on every run: on the corpus, with
 Word's pages from `reference/word/`, every field works out to Word's result and nothing changes.
+
+`scripts/corpus/control-roundtrip.mjs` (11.9, with `control-word.ps1`, which records what
+`word-reference.ps1` does for controls and their locks, check box state, list items and date format)
+has Word read what the editor makes of controls: 03 unchanged, filled through the API (also while
+tracking), typed into, filled and emptied, with changed properties and with a control copied, and a
+new document with every kind inserted and a repeating section grown; a tracked fill rejected. Word opens all 9 and finds
+every control as Foli holds it, ids unique (2026-11-18, Word 16.0.20527).
 
 `scripts/corpus/section-roundtrip.mjs` (11.6) has Word read Foli's sections back: 08 exported
 unchanged (Word's own pages and sections), edited through the editor's commands (a continuous

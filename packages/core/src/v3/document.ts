@@ -335,9 +335,25 @@ export interface ControlJSON {
   lock?: "sdtLocked" | "contentLocked" | "sdtContentLocked" | "unlocked";
   items?: { value: string; display?: string }[];
   dateFormat?: string;
+  /** `w:date/@w:fullDate`: the date picked, as Word writes it (`2026-03-03T00:00:00Z`). */
+  date?: string;
   checked?: boolean;
-  /** `showing`: the content is the placeholder. `docPart`: the glossary entry it comes from. */
-  placeholder?: { showing?: boolean; docPart?: string };
+  /** A check box's glyphs (`w14:checkedState`, `w14:uncheckedState`): hex code and font. */
+  checkedState?: { value: string; font?: string };
+  uncheckedState?: { value: string; font?: string };
+  /** `w:text/@w:multiLine`: a plain text control that takes line breaks. */
+  multiLine?: boolean;
+  /** `w:sdtPr/w:rPr` as marks: how text put in place of the placeholder looks. */
+  format?: MarkJSON[];
+  /** `w15:doNotAllowInsertDeleteSection`: a repeating section's items are fixed. */
+  noInsertDelete?: boolean;
+  /** Deleted whole while tracking (in the editor: not written): accepting removes the control. */
+  deleted?: boolean;
+  /**
+   * `showing`: the content is the placeholder. `docPart`: the glossary entry it comes from.
+   * `text`: that entry's text, what emptying the control brings back.
+   */
+  placeholder?: { showing?: boolean; docPart?: string; text?: string };
   /** `w:dataBinding`: kept, not evaluated. */
   binding?: { xpath?: string; storeItemId?: string; prefixMappings?: string };
   /** `w:sdtPr` and `w:sdtEndPr`, verbatim. */
@@ -888,8 +904,15 @@ export const checkControl: Check = shape(
     lock: oneOf(["sdtLocked", "contentLocked", "sdtContentLocked", "unlocked"]),
     items: listOf(shape({ value: str(), display: str() }, ["value"])),
     dateFormat: str(),
+    date: str(),
     checked: bool,
-    placeholder: shape({ showing: bool, docPart: str() }, [], true),
+    checkedState: shape({ value: str(), font: str() }, ["value"]),
+    uncheckedState: shape({ value: str(), font: str() }, ["value"]),
+    multiLine: bool,
+    format: runProperties,
+    noInsertDelete: bool,
+    deleted: bool,
+    placeholder: shape({ showing: bool, docPart: str(), text: str(65_535) }, [], true),
     binding: shape(
       { xpath: str(65_535), storeItemId: str(), prefixMappings: str(65_535) },
       [],
