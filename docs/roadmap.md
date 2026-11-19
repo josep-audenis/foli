@@ -23,7 +23,7 @@ place that says what is in progress; check it before starting work.
 | 9 Review                 | ✅ Done                  | —                  | Merged in #63–#72; 0.4.0 on npm                                                                              |
 | 10 Tables & images       | ✅ Done                  | —                  | Merged in #73–#97 (#90, the landing page, went to main); 0.5.0 on npm; two misses accepted                   |
 | 11 Sections & templates  | ✅ Done                  | —                  | Merged in #100–#118 (#106, #107, #110, #112 and #113, the site, went to main); 0.6.0 on npm; misses accepted |
-| 12 Ecosystem & 1.0       | In progress              | phase-12/ecosystem | Plan below; ADR-0008 (1.0 contract, extension API) first                                                     |
+| 12 Ecosystem & 1.0       | In progress              | phase-12/ecosystem | 12.1 done: ADR-0008 (1.0 contract, extension API); 12.2 next                                                 |
 
 Status values: `Ready` (dependencies met, nobody on it) · `In progress` · `In review` (PR open) ·
 `✅ Done` (merged, acceptance criteria met) · `Blocked by …`.
@@ -98,7 +98,7 @@ Foli's engine is not credible until all five pass in Chromium, Firefox and WebKi
 | 9     | Review                    | Tracked changes and comments, Word-compatible               | 0.4.0        | XL   |
 | 10    | Tables & images           | Word tables across pages, inline and floating images        | 0.5.0        | XL   |
 | 11    | Sections & templates      | Headers/footers, fields, content controls, notes, PDF       | 0.6.0        | L    |
-| 12    | Ecosystem & 1.0           | Extension API freeze, docs site, performance in CI          | **1.0.0**    | L    |
+| 12    | Ecosystem & 1.0           | Extension API freeze, docs site, performance tracking       | **1.0.0**    | L    |
 | —     | Optional                  | Real-time collaboration, AI-assisted editing                | —            | —    |
 
 ```
@@ -1322,8 +1322,8 @@ Each task is a PR on `phase-11/sections-fields`, the build green after each.
 ## Phase 12 — Ecosystem & 1.0 · L
 
 Freeze the extension API (custom nodes, marks, commands, keymaps, plugins), docs site, examples,
-theming guide, deprecation policy, contributor onboarding, performance tracking in CI. Rust/WASM
-only where a benchmark shows the need.
+theming guide, deprecation policy, contributor onboarding, performance tracking (ADR-0008: by hand
+with stored baselines, no hosted CI). Rust/WASM only where a benchmark shows the need.
 
 **Starts from (Phase 11):** the generic model is open (`NodeSpec`, `MarkSpec`, `Schema` exported)
 but the editor is bound to the one Word schema (schema v5): `EditorOptions` takes no schema,
@@ -1335,7 +1335,7 @@ them, but they are documented as unstable and most built-ins (`fieldsPlugin`, `c
 `notesPlugin`, `trackPlugin`…) are not exported. Commands are free functions
 (`(state, dispatch?) => boolean`); `editor.commands` is a fixed object. Keymaps are plugin maps
 over `keyName`, but the view handles some keys before them (fields, controls, notes, document
-edges, Ctrl+F/H/G, F3, Escape, Tab, Shift+arrows in tables), so those cannot be overridden. The
+edges, Ctrl+F/H/G, F3, Escape, Tab), so those cannot be overridden (Shift+arrows in tables can). The
 view has no node views, decorations or plugin views (`EditorViewOptions`: `editable`,
 `placeholder`, `resource`, `upload`, `paged`, `noteMark`); theming is 13 `--foli-*` CSS
 variables. `FoliToolbar` cannot be extended, only replaced. Core's root re-exports `model`,
@@ -1367,7 +1367,7 @@ approval.
 Each task is a PR on `phase-12/ecosystem`, the build green after each.
 
 - [x] Claim phase, branch `phase-12/ecosystem`
-- [ ] 12.1 ADR-0008, the 1.0 contract and the extension API: what is public and stable per package
+- [x] 12.1 ADR-0008, the 1.0 contract and the extension API: what is public and stable per package
   (what leaves core's `export *`, what becomes `@internal` and is stripped), the persisted format
   promise (schema v5 frozen for 1.x, new content only through a new major or as content 1.x
   ignores safely), semver and the deprecation policy (warn for a minor, remove in the next major);
@@ -1380,7 +1380,28 @@ Each task is a PR on `phase-12/ecosystem`, the build green after each.
   performance is tracked without CI (pre-push, a bench command with baselines, or a workflow the
   owner turns on); the docs site's tool and host; Rust/WASM not planned unless a benchmark asks.
   Spike: one custom inline node and one mark end to end in the editor and through `.docx`. The
-  owner accepts it before 12.2.
+  owner accepts it before 12.2. (Done:
+  [ADR-0008](decisions/ADR-0008-1.0-contract-and-extensions.md), accepted by review as the owner
+  asked for Phase 12. Decided: indexes list exports by name, internals `@internal` and stripped
+  (`stripInternal` works in TypeScript 7.0.2), what the other packages need from core on
+  `@folijs/core/internal`, an API report per package (`dist` `.d.ts` joined, compared in
+  `pnpm check` by a script that also catches forgotten exports); core as an exact peer dependency of
+  the other packages; every 1.x reads every earlier format, a minor may add a schema version with a
+  migration and a document is saved at the lowest version it needs (not v5 frozen: Word's opaque
+  content still has to be modeled; this one point awaits the owner's OK, open until 12.12), an older
+  1.x refuses a document that needs a newer one; `@deprecated`, a dev warning where cheap, removal
+  in the next major; custom inline and block leaves and marks as namespaced extensions on the Word
+  schema, foreign nodes when the extension is missing, in `.docx` a content control tagged `foli:`
+  and the JSON (255 characters at most, longer refused); `PluginSpec` frozen plus `commands`, view
+  hooks in `@folijs/view`, every key the view takes itself listed as overridable or reserved;
+  toolbar `items`; history's state internal, collaboration not in 1.0; `pnpm bench` with baselines
+  per machine before each release, no hosted CI; the docs site in `apps/site` from `docs/*.md` with
+  `marked`, hosted with the landing page by the owner; no Rust. Spike `spikes/extension`: a mention
+  and a topic mark typed, drawn on pages, undone, saved and loaded, through `.docx` in Chromium,
+  Firefox and WebKit; copy and paste in Chromium only (Playwright's Firefox pastes HTML, which drops
+  them: 12.3 carries them in the HTML; WebKit skipped); Word 16 opened, edited and saved 5 files and
+  Foli read every node and mark back. Shortcuts: the packages are patched as the spike's dev server
+  serves them (no package changes); block nodes, find, tracking and foreign nodes not exercised.)
 - [ ] 12.2 Public API surface: core's exports listed by name (no `export *`), internals marked and
   stripped from the published types, the built-in plugins and keys exported where ADR-0008 says;
   an API report per package (`.d.ts` of `dist` compared with a committed report, no new tool
@@ -1388,7 +1409,8 @@ Each task is a PR on `phase-12/ecosystem`, the build green after each.
 - [ ] 12.3 Custom nodes and marks in `@folijs/core`: the schema extension from ADR-0008
   (`createEditor` and `parseDocument` take it), validation, JSON, copy and paste between editors
   with and without the extension (never dropped: opaque when unknown), find and review over them;
-  `@folijs/docx` writes and reads them as decided; tests and a round trip that Word opens.
+  `@folijs/docx` writes and reads them as decided; tests and a round trip that Word opens; delete
+  `spikes/extension` and its Playwright project once the real API replaces it.
 - [ ] 12.4 View extension: node views for custom nodes (measured and placed by the flow, split or
   kept whole across pages as declared), decorations (inline and node; find matches and the
   selected field move onto them where it is simpler), plugin views (mount, update, destroy) and
@@ -1422,6 +1444,8 @@ Each task is a PR on `phase-12/ecosystem`, the build green after each.
   suite green in three engines.
 - [ ] 12.12 Close: docs as of 1.0 (README, architecture, api, ADR-0008's outcome), size budgets,
   the acceptance checked, the 1.0.0 changeset and version PR; publish with the owner's approval.
+  The owner's yes or no on ADR-0008's open point (1.x minors may add a schema version, saved at
+  the lowest version a document needs) before 1.0.0 is published.
 
 ## Optional
 
