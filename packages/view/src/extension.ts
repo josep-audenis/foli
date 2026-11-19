@@ -41,11 +41,16 @@ export interface Decoration {
   attrs: DecorationAttrs;
 }
 
-/** What a node view draws with: its document, and `h`, which makes elements safely. */
+/**
+ * What a node view draws with: its document, and `h`, which makes elements safely. A node view may
+ * build its DOM by other means: what `render` returns is used as it is, unchecked (extension code
+ * is trusted, the node's attributes are not: never put them through HTML).
+ */
 export interface NodeViewDOM {
   readonly document: Document;
   /**
-   * An element `tag` with attributes `attrs` (checked as decorations' are) and children, strings
+   * An element `tag` (from an allowlist of content elements: no `script`, `style`, `base`,
+   * `form`, frames…) with attributes `attrs` (checked as decorations' are) and children, strings
    * as text nodes: data from the document never goes through HTML.
    */
   h(
@@ -62,9 +67,14 @@ export interface NodeViewDOM {
  * `split` is false, which keeps it whole on one page.
  */
 export interface NodeView {
-  /** Called whenever the node is drawn again: a changed node, or a block split differently. */
+  /**
+   * Called whenever the node is drawn again: a changed node, or a block split differently. Its
+   * DOM may change later (content loaded, a chart drawn): the view does not read it back.
+   */
   render(node: ModelNode, dom: NodeViewDOM): Node;
   split?: boolean;
+  /** Called with what `render` returned once the view no longer shows it (or is destroyed). */
+  destroy?(dom: Node): void;
 }
 
 /** How a run of a custom mark is drawn: attributes on the run's element. */
@@ -101,6 +111,13 @@ export interface Views {
   marks: ReadonlyMap<string, MarkView>;
 }
 
+/** A node view's drawing, in its box, until the view drops it. @internal */
+export interface Drawn {
+  view: NodeView;
+  root: Node;
+  box: Element;
+}
+
 /** @internal */
 export function viewsOf(extensions: readonly ViewExtension[]): Views {
   return {
@@ -110,7 +127,32 @@ export function viewsOf(extensions: readonly ViewExtension[]): Views {
 }
 
 const NAME = /^[a-z_][\w.:-]*$/i;
-const URL_ATTRS = new Set(["href", "src", "xlink:href", "action", "formaction", "poster"]);
+const URL_ATTRS = new Set([
+  "href",
+  "src",
+  "xlink:href",
+  "action",
+  "formaction",
+  "poster",
+  "background",
+]);
+/** Attributes holding several URLs: `srcset` (comma separated, each before its size), `ping`. */
+const URL_LISTS: Record<string, (value: string) => string[]> = {
+  srcset: (value) => value.split(",").map((part) => part.trim().split(/\s+/)[0] ?? ""),
+  ping: (value) => value.split(/\s+/).filter(Boolean),
+};
+/** Style that fetches or runs something (escapes could spell it otherwise). */
+const UNSAFE_STYLE = /url\s*\(|image-set|expression|@import|-moz-binding|behavior|\\/i;
+/** Content elements a node view may make with `h` (no scripts, styles, forms, frames, `base`). */
+const TAGS = new Set(
+  (
+    "a abbr address article aside audio b bdi bdo blockquote br button canvas caption cite code " +
+    "col colgroup data dd del details dfn div dl dt em figcaption figure footer h1 h2 h3 h4 h5 h6 " +
+    "header hgroup hr i img ins kbd label li mark meter ol p picture pre progress q rp rt ruby s " +
+    "samp section small source span strong sub summary sup table tbody td tfoot th thead time tr " +
+    "track u ul var video wbr"
+  ).split(" "),
+);
 
 /** Throws on an attribute a view must not set: handlers, editing, the view's own, unsafe URLs. */
 function check(name: string, value: string): void {
@@ -121,9 +163,20 @@ function check(name: string, value: string): void {
     lower === "contenteditable" ||
     lower === "srcdoc" ||
     lower.startsWith("data-foli-") ||
-    (URL_ATTRS.has(lower) && !isSafeHref(value))
+    (URL_ATTRS.has(lower) && !isSafeHref(value)) ||
+    URL_LISTS[lower]?.(value).some((url) => !isSafeHref(url)) ||
+    (lower === "style" && UNSAFE_STYLE.test(value)) ||
+    (lower === "class" && /(^|\s)foli-/.test(value))
   )
     throw new TypeError(`Foli: attribute ${name} is not allowed on drawn content`);
+}
+
+/**
+ * Throws when `attrs` holds one an extension must not set (`check`).
+ * @internal
+ */
+export function checkAttrs(attrs: DecorationAttrs): void {
+  for (const [name, value] of Object.entries(attrs)) if (value !== undefined) check(name, value);
 }
 
 /**
@@ -131,6 +184,7 @@ function check(name: string, value: string): void {
  * @internal
  */
 export function applyAttrs(element: HTMLElement, attrs: DecorationAttrs): void {
+  checkAttrs(attrs);
   for (const [name, value] of Object.entries(attrs)) {
     if (value === undefined) continue;
     if (name === "class") element.classList.add(...value.split(/\s+/).filter(Boolean));
@@ -140,11 +194,16 @@ export function applyAttrs(element: HTMLElement, attrs: DecorationAttrs): void {
         "style",
         style && !style.endsWith(";") ? `${style};${value}` : style + value,
       );
-    } else {
-      check(name, value);
-      element.setAttribute(name, value);
-    }
+    } else element.setAttribute(name, value);
   }
+}
+
+/**
+ * Reports an extension's failure without stopping the editor.
+ * @internal
+ */
+export function reportError(error: unknown): void {
+  console.error("Foli: an extension failed", error);
 }
 
 /** The DOM API node views draw with. @internal */
@@ -152,7 +211,7 @@ export function nodeViewDOM(document: Document): NodeViewDOM {
   return {
     document,
     h(tag, attrs, ...children) {
-      if (!/^[a-z][a-z0-9-]*$/i.test(tag) || /^(script|style|iframe|object|embed)$/i.test(tag))
+      if (!TAGS.has(tag.toLowerCase()))
         throw new TypeError(`Foli: element ${tag} is not allowed in a node view`);
       const element = document.createElement(tag);
       if (attrs) applyAttrs(element, attrs);

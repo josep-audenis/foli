@@ -89,9 +89,12 @@ import {
 } from "@folijs/core/internal";
 import { docFromClipboard, FOLI_MIME, serializeRange } from "./clipboard.js";
 import {
+  checkAttrs,
   type Decoration,
+  type Drawn,
   decorationsByBlock,
   type PluginView,
+  reportError,
   type ViewExtension,
   type Views,
   viewsOf,
@@ -719,6 +722,8 @@ export class EditorView {
   private decorations: readonly Decoration[] = [];
   private decorationKey = "";
   private pluginViews: PluginView[] = [];
+  /** What node views drew and the view still shows (their `destroy` when it no longer does). */
+  private readonly drawn: Drawn[] = [];
 
   constructor(
     readonly host: HTMLElement,
@@ -804,14 +809,63 @@ export class EditorView {
     host.ownerDocument.addEventListener("selectionchange", this.onSelectionChange);
     host.ownerDocument.fonts?.addEventListener("loadingdone", this.onFontsLoaded);
     this.unsubscribe = editor.subscribe((state) => this.update(state));
-    for (const extension of extensions)
-      if (extension.view) this.pluginViews.push(extension.view(this));
+    for (const extension of extensions) {
+      try {
+        if (extension.view) this.pluginViews.push(extension.view(this));
+      } catch (error) {
+        reportError(error);
+      }
+    }
+  }
+
+  /** Calls `hook` for each plugin view, reporting what throws. */
+  private eachPluginView(hook: (view: PluginView) => void): void {
+    for (const view of this.pluginViews) {
+      try {
+        hook(view);
+      } catch (error) {
+        reportError(error);
+      }
+    }
+  }
+
+  /** Destroys node views' drawings the host no longer holds (all of them: `all`). */
+  private dropDrawn(all: boolean): void {
+    let kept = 0;
+    for (const drawn of this.drawn) {
+      if (!all && this.host.contains(drawn.box)) {
+        this.drawn[kept++] = drawn;
+        continue;
+      }
+      try {
+        drawn.view.destroy?.(drawn.root);
+      } catch (error) {
+        reportError(error);
+      }
+    }
+    this.drawn.length = kept;
   }
 
   /** Asks the extensions for `state`'s decorations; whether they changed. */
   private decorate(state: EditorState): boolean {
     if (!this.decorators.length) return false;
-    const decorations = this.decorators.flatMap((decorate) => decorate?.(state) ?? []);
+    // A failing extension, or a decoration with a refused attribute, is reported and left out.
+    const decorations = this.decorators.flatMap((decorate) => {
+      try {
+        return (decorate?.(state) ?? []).filter((decoration) => {
+          try {
+            checkAttrs(decoration.attrs);
+            return true;
+          } catch (error) {
+            reportError(error);
+            return false;
+          }
+        });
+      } catch (error) {
+        reportError(error);
+        return [];
+      }
+    });
     const key = JSON.stringify(decorations);
     if (key === this.decorationKey) return false;
     this.decorations = decorations;
@@ -829,7 +883,8 @@ export class EditorView {
   }
 
   destroy(): void {
-    for (const view of this.pluginViews.splice(0)) view.destroy?.();
+    this.eachPluginView((view) => view.destroy?.());
+    this.pluginViews = [];
     this.closeStory(false);
     this.showFound(null);
     this.controlChrome.destroy();
@@ -859,6 +914,7 @@ export class EditorView {
     host.style.removeProperty("overflow-wrap");
     if (!host.getAttribute("style")) host.removeAttribute("style");
     host.replaceChildren();
+    this.dropDrawn(true);
   }
 
   /** Focuses the host, shows the model selection in it and scrolls it into view. */
@@ -979,7 +1035,7 @@ export class EditorView {
     this.writeSelection(docChanged || decorated);
     // shortcut: scrolls for every change while focused; once remote or plugin changes exist, scroll only for local input (a transaction flag).
     if (docChanged || selectionChanged) this.scrollToSelection();
-    for (const view of this.pluginViews) view.update?.(this, previous);
+    this.eachPluginView((view) => view.update?.(this, previous));
   }
 
   /**
@@ -1019,6 +1075,7 @@ export class EditorView {
   private render(): void {
     try {
       this.renderPages();
+      if (this.drawn.length) this.dropDrawn(false);
     } catch (error) {
       // What it had changed is not input: read back, it would render and fail again, for ever.
       this.observer.takeRecords();
@@ -1060,6 +1117,7 @@ export class EditorView {
         this.fieldCodes,
       );
       word.views = this.views;
+      word.drawn = this.drawn;
       this.invalidateLayout();
     }
     const references = this.noteReferences();
@@ -4056,13 +4114,16 @@ export class EditorView {
   };
 
   private onMutations = (records: MutationRecord[]): void => {
-    this.pending.push(...records.filter((r) => !handleOnly(r)));
+    this.pending.push(...records.filter((r) => !handleOnly(r) && !inNodeView(r)));
     if (!this.composing && this.pending.length) this.flush();
   };
 
   /** Reads back every DOM change recorded so far. */
   private flush(): void {
-    const records = [...this.pending, ...this.observer.takeRecords().filter((r) => !handleOnly(r))];
+    const records = [
+      ...this.pending,
+      ...this.observer.takeRecords().filter((r) => !handleOnly(r) && !inNodeView(r)),
+    ];
     this.pending = [];
     if (records.length) this.readBack(records);
   }
@@ -5111,6 +5172,16 @@ function holdsFloat(node: ModelNode): boolean {
     floats.set(node, found);
   }
   return found;
+}
+
+/**
+ * A change a node view made to its own drawing (content loaded later, a chart drawn): not input,
+ * never read back. Inside a custom node's box, which is not editable.
+ */
+function inNodeView(record: MutationRecord): boolean {
+  const { target } = record;
+  const element = target.nodeType === 1 ? (target as Element) : target.parentElement;
+  return !!element?.closest('[data-foli-custom][contenteditable="false"]');
 }
 
 /** A change that only adds or removes the view's own marks (a resize handle, a control's frame). */

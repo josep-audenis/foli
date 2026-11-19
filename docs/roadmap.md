@@ -1510,7 +1510,13 @@ Each task is a PR on `phase-12/ecosystem`, the build green after each.
   112.0 kB). Shortcuts: `renderDocument`, `exportPdf` and the pages' headers, footers and notes
   (until opened on their page) draw no views; a custom block in a table cell is kept whole; a
   split block's `render` runs per part; decorations cover body positions, not tables, rows or
-  cells, and a block whose decorations change is measured again even when only a color changed.)
+  cells, and a block whose decorations change is measured again even when only a color changed.
+  Review of #124: `h` makes only allowlisted content elements and checks `style` (no `url(`,
+  `expression`, `@import`, escapes), `foli-` classes and URL lists (`srcset`, `ping`,
+  `background`); decorations with refused attributes are left out and reported; a node view's
+  later DOM changes are not read back (no redraw loop); `NodeView.destroy(dom)` when a drawing is
+  dropped; split copies are `inert`; a throwing hook or editor listener is reported and the rest
+  goes on; tests for each.)
 - [ ] 12.5 Commands and keymaps: commands registered by plugins and reachable through
   `editor.commands` and `editor.run`, typed; the view's own keys moved into keymaps or reserved as
   the ADR lists; a user keymap overrides each overridable built-in key; Word's keys documented per

@@ -65,7 +65,7 @@ import {
 import type { StorySide, StoryVariant } from "./sections.js";
 import { Selection, TextSelection } from "./selection.js";
 import { type Command, EditorState, type Plugin, type Transaction } from "./state.js";
-import { StoryEditing } from "./stories.js";
+import { callListener, StoryEditing } from "./stories.js";
 import { tableKeymap } from "./tables.js";
 import {
   type ReviewView,
@@ -504,7 +504,7 @@ export function createEditor({
   const stories = new Map<string, { editing: StoryEditing; editor: Editor }>();
 
   const notify = (transactions: readonly Transaction[]) => {
-    for (const listener of listeners) listener(state, transactions);
+    for (const listener of listeners) callListener(listener, state, transactions);
   };
   const storyChanged = () => notify([]);
   const dispatch = (tr: Transaction) => {

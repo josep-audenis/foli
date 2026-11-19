@@ -52,11 +52,16 @@ export interface Decoration {
     node?: boolean;
     attrs: DecorationAttrs;
 }
-/** What a node view draws with: its document, and `h`, which makes elements safely. */
+/**
+ * What a node view draws with: its document, and `h`, which makes elements safely. A node view may
+ * build its DOM by other means: what `render` returns is used as it is, unchecked (extension code
+ * is trusted, the node's attributes are not: never put them through HTML).
+ */
 export interface NodeViewDOM {
     readonly document: Document;
     /**
-     * An element `tag` with attributes `attrs` (checked as decorations' are) and children, strings
+     * An element `tag` (from an allowlist of content elements: no `script`, `style`, `base`,
+     * `form`, frames…) with attributes `attrs` (checked as decorations' are) and children, strings
      * as text nodes: data from the document never goes through HTML.
      */
     h(tag: string, attrs?: Readonly<Record<string, string>> | null, ...children: readonly (Node | string)[]): HTMLElement;
@@ -68,9 +73,14 @@ export interface NodeViewDOM {
  * `split` is false, which keeps it whole on one page.
  */
 export interface NodeView {
-    /** Called whenever the node is drawn again: a changed node, or a block split differently. */
+    /**
+     * Called whenever the node is drawn again: a changed node, or a block split differently. Its
+     * DOM may change later (content loaded, a chart drawn): the view does not read it back.
+     */
     render(node: ModelNode, dom: NodeViewDOM): Node;
     split?: boolean;
+    /** Called with what `render` returned once the view no longer shows it (or is destroyed). */
+    destroy?(dom: Node): void;
 }
 /** How a run of a custom mark is drawn: attributes on the run's element. */
 export type MarkView = (mark: Mark) => DecorationAttrs;
@@ -333,7 +343,13 @@ export declare class EditorView {
     private decorations;
     private decorationKey;
     private pluginViews;
+    /** What node views drew and the view still shows (their `destroy` when it no longer does). */
+    private readonly drawn;
     constructor(host: HTMLElement, editor: Editor, options?: EditorViewOptions);
+    /** Calls `hook` for each plugin view, reporting what throws. */
+    private eachPluginView;
+    /** Destroys node views' drawings the host no longer holds (all of them: `all`). */
+    private dropDrawn;
     /** Asks the extensions for `state`'s decorations; whether they changed. */
     private decorate;
     /** Adds a listener for the body's events: a story open on a page has its own view. */

@@ -265,6 +265,7 @@ test("a block node view taller than the room left splits across the page end, ea
         el.closest(".foli-page") as Element,
       ),
       hidden: el.getAttribute("aria-hidden"),
+      inert: el.hasAttribute("inert"),
       height: el.getBoundingClientRect().height,
       whole: (el.querySelector(".acme-card") as Element).getBoundingClientRect().height,
       clipped: getComputedStyle(el).overflow,
@@ -273,6 +274,8 @@ test("a block node view taller than the room left splits across the page end, ea
   const [first, second] = facts as [(typeof facts)[0], (typeof facts)[0]];
   expect(second.page).toBe(first.page + 1);
   expect([first.hidden, second.hidden]).toEqual([null, "true"]);
+  // The copy's link is not a second tab stop.
+  expect([first.inert, second.inert]).toEqual([false, true]);
   expect(first.clipped).toBe("hidden");
   // The parts add up to the whole card, broken between two rows.
   expect(Math.abs(first.height + second.height - first.whole)).toBeLessThan(1.5);
@@ -289,6 +292,7 @@ test("a block node view taller than the room left splits across the page end, ea
   // Still one node: saved once, and the text after it on the next page.
   expect((await body(page)).filter((node) => node.type === "acme:card")).toHaveLength(1);
   await expect(editor(page).locator(".foli-page").nth(second.page)).toContainText("After");
+  expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
 });
 
 test("decorations: every TODO and the paragraph holding the caret, never saved", async ({

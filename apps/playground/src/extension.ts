@@ -92,13 +92,21 @@ const acme: ViewExtension = {
         h("span", { class: "acme-chip", title: `User ${node.attrs.id}` }, `@${node.attrs.label}`),
     },
     "acme:card": {
-      // Twelve rows: taller than what is left at the foot of a page, it splits between them.
+      // Twelve rows: taller than what is left at the foot of a page, it splits between them. The
+      // last holds a link: focusable content, in each page's part.
       render: (node, { h }) =>
         h(
           "div",
           { class: "acme-card", role: "group", "aria-label": `Card ${node.attrs.id}` },
           ...Array.from({ length: 12 }, (_, i) =>
-            h("div", { class: "acme-card-row" }, `Card ${node.attrs.id}, row ${i + 1}`),
+            h(
+              "div",
+              { class: "acme-card-row" },
+              `Card ${node.attrs.id}, row ${i + 1}`,
+              ...(i === 11
+                ? [" ", h("a", { href: `https://example.com/cards/${node.attrs.id}` }, "Open")]
+                : []),
+            ),
           ),
         ),
     },

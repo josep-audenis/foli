@@ -116,7 +116,9 @@ checklist in [testing/ime.md](testing/ime.md)):
   custom node as its `.docx` text or its type in brackets and a custom mark not at all; the same
   for headers, footers and notes as the pages show them, until one is opened for editing on its
   page. A custom block in a table cell is kept whole (it does not split between pages); a split
-  block node view is drawn once per page (its `render` runs per part). Decorations take body
+  block node view is drawn once per page (its `render` runs per part, each part's `destroy` when
+  dropped). A node view's DOM is never read back: what it changes later is not checked, and
+  `h`'s checks cover only what `h` makes. Decorations take body
   positions and nothing in tables' own nodes (tables, rows, cells); a decoration changing a
   block redraws and measures that block again. Find's marks and the selected field's shading stay
   on the Custom Highlight API and an attribute: decorations would redraw blocks for each match. Custom types

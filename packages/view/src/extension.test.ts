@@ -7,7 +7,7 @@ import {
   Plugin,
   PluginKey,
 } from "@folijs/core";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   type Decoration,
   decorationsByBlock,
@@ -75,6 +75,9 @@ const acme: ViewExtension = {
   },
 };
 
+/** The extension without its plugin view (which logs). */
+const { view: _logs, ...withoutView } = acme;
+
 const views: EditorView[] = [];
 afterEach(() => {
   for (const view of views.splice(0)) {
@@ -84,12 +87,12 @@ afterEach(() => {
   log.length = 0;
 });
 
-function mount(blocks: NodeJSON[] = content) {
+function mount(blocks: NodeJSON[] = content, extensions: ViewExtension[] = [acme]) {
   const host = document.createElement("div");
   document.body.append(host);
   const editor = createEditor({
     document: createDocument({ type: "doc", content: blocks }),
-    extensions: [acme],
+    extensions,
   });
   const view = new EditorView(host, editor);
   views.push(view);
@@ -119,7 +122,78 @@ describe("node and mark views", () => {
     expect(() => h("span", { onclick: "alert(1)" })).toThrow(TypeError);
     expect(() => h("a", { href: "javascript:alert(1)" })).toThrow(TypeError);
     expect(() => h("span", { contenteditable: "true" })).toThrow(TypeError);
-    expect(() => h("script")).toThrow(TypeError);
+    // Only content elements: none that loads, runs, submits or rebases anything.
+    for (const tag of ["script", "style", "iframe", "object", "embed", "base", "meta", "link"])
+      expect(() => h(tag), tag).toThrow(TypeError);
+    for (const tag of ["form", "frame", "frameset", "portal", "template", "svg", "math", "x-y"])
+      expect(() => h(tag), tag).toThrow(TypeError);
+    expect(h("IMG", { src: "a.png", srcset: "a.png 1x, https://x/b.png 2x" }).tagName).toBe("IMG");
+    // URL lists, styles that fetch, the view's own classes.
+    expect(() => h("img", { srcset: "a.png 1x, javascript:x 2x" })).toThrow(TypeError);
+    expect(() => h("a", { ping: "https://x javascript:x" })).toThrow(TypeError);
+    expect(() => h("td", { background: "javascript:x" })).toThrow(TypeError);
+    expect(() => h("span", { style: "background: url(https://x/t.png)" })).toThrow(TypeError);
+    expect(() => h("span", { style: "background: u\\72l(x)" })).toThrow(TypeError);
+    expect(() => h("span", { style: "width: expression(alert(1))" })).toThrow(TypeError);
+    expect(() => h("span", { style: "@import 'x'" })).toThrow(TypeError);
+    expect(() => h("span", { class: "chip foli-page" })).toThrow(TypeError);
+    expect(h("span", { class: "chip", style: "color: red" }).outerHTML).toBe(
+      '<span class="chip" style="color: red"></span>',
+    );
+  });
+
+  it("leave a node view's own later changes alone, and destroy what is no longer shown", async () => {
+    const renders: string[] = [];
+    const destroyed: string[] = [];
+    const lazy: ViewExtension = {
+      ...withoutView,
+      nodeViews: {
+        "acme:mention": {
+          render(node, { h }) {
+            renders.push(String(node.attrs.label));
+            const chip = h("span", { class: "chip" }, "…");
+            // Content arriving later, as a fetch or a chart library would add it.
+            setTimeout(() => chip.replaceChildren(`@${node.attrs.label} (loaded)`), 0);
+            return chip;
+          },
+          destroy: (dom) => destroyed.push(dom.textContent ?? ""),
+        },
+      },
+    };
+    const { host, editor } = mount(content, [lazy]);
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(host.querySelector(".chip")?.textContent).toBe("@Ada (loaded)");
+    // Not read back as input: drawn once, the document as it was.
+    expect(renders).toEqual(["Ada"]);
+    expect(editor.getDocument().content.content).toEqual(content);
+    // Deleted: its drawing is destroyed.
+    editor.dispatch(editor.state.tr.delete(5, 6));
+    expect(destroyed).toEqual(["@Ada (loaded)"]);
+    expect(host.querySelector(".chip")).toBeNull();
+  });
+
+  it("fall back to the node's text when a node view throws, and report it", () => {
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    const broken: ViewExtension = {
+      ...withoutView,
+      nodeViews: {
+        "acme:mention": {
+          render: () => {
+            throw new Error("broken");
+          },
+        },
+      },
+      markViews: {
+        "acme:topic": () => {
+          throw new Error("broken");
+        },
+      },
+    };
+    const { host } = mount(content, [broken]);
+    expect(host.querySelector("[data-foli-custom='acme:mention']")?.textContent).toBe("@Ada");
+    expect(host.querySelector("[data-foli-mark='acme:topic']")?.textContent).toBe("budget");
+    expect(error).toHaveBeenCalledTimes(2);
+    error.mockRestore();
   });
 });
 
@@ -178,13 +252,19 @@ describe("decorations", () => {
     expect(host.querySelector(".picked")).toBeNull();
   });
 
-  it("refuse attributes that would run code", () => {
-    const { editor } = mount();
-    expect(() =>
-      editor.dispatch(
-        editor.state.tr.setMeta(decorationKey, [{ from: 1, to: 3, attrs: { onmouseover: "x()" } }]),
-      ),
-    ).toThrow(TypeError);
+  it("leave out, and report, those with attributes that would run code", () => {
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    const { editor, host } = mount();
+    editor.dispatch(
+      editor.state.tr.setMeta(decorationKey, [
+        { from: 1, to: 3, attrs: { onmouseover: "x()" } },
+        { from: 1, to: 3, attrs: { class: "ok" } },
+      ]),
+    );
+    expect(host.querySelector("[onmouseover]")).toBeNull();
+    expect(host.querySelector(".ok")?.textContent).toBe("As");
+    expect(error).toHaveBeenCalledTimes(1);
+    error.mockRestore();
   });
 });
 
@@ -201,5 +281,34 @@ describe("plugin views", () => {
     // Destroyed: no more updates.
     editor.commands.insertText("y");
     expect(log.length).toBe(3);
+  });
+
+  it("that throw are reported; the editor, the view and other listeners go on", () => {
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    const fail = () => {
+      throw new Error("broken");
+    };
+    const failing = (hook: "view" | "update" | "destroy" | "decorations"): ViewExtension => ({
+      name: `fail-${hook}`,
+      ...(hook === "decorations" ? { decorations: fail } : {}),
+      view: hook === "view" ? fail : () => (hook === "decorations" ? {} : { [hook]: fail }),
+    });
+    for (const hook of ["view", "update", "destroy", "decorations"] as const) {
+      error.mockClear();
+      const { editor, host, view } = mount(content, [acme, failing(hook)]);
+      const seen: string[] = [];
+      editor.subscribe((state) => seen.push(state.doc.firstChild?.textContent ?? ""));
+      editor.select(1);
+      editor.commands.insertText("x");
+      expect(seen.at(-1), hook).toBe("xAsk  about the budget");
+      expect(host.textContent, hook).toContain("xAsk");
+      view.destroy();
+      views.splice(0);
+      expect(host.childElementCount, hook).toBe(0);
+      expect(log.at(-1), hook).toBe("destroy");
+      expect(error, hook).toHaveBeenCalled();
+      host.remove();
+    }
+    error.mockRestore();
   });
 });

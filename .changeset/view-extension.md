@@ -9,11 +9,15 @@ hooks, given to `createEditor({ extensions })` or React's new `extensions` prop 
 `useFoliEditor`). The editor keeps its extensions (`editor.extensions`) and every `EditorView` of
 it reads the hooks from there.
 
-- `nodeViews`: how a custom node is drawn (`NodeView`: `render(node, { document, h })`, `split?`).
+- `nodeViews`: how a custom node is drawn (`NodeView`: `render(node, { document, h })`, `split?`,
+  `destroy?(dom)`).
   Inline ones sit in their line as the browser sizes them; block ones are measured and placed by
   the page flow and split between their root element's children across a page end, unless
-  `split: false` keeps them whole. `h` makes elements without HTML and refuses event handlers and
-  unsafe links.
+  `split: false` keeps them whole. `h` makes only content elements, without HTML, and refuses
+  event handlers, unsafe links and fetching styles. A node view may change its DOM later (it is
+  never read back).
+- A hook that throws is reported (`console.error`) and left out; so is an editor listener that
+  throws: the others still get the change.
 - `markViews`: classes and attributes on every run of a custom mark. Runs of custom marks are now
   named for CSS too (`data-foli-mark`), with or without a mark view.
 - `decorations(state)`: classes and attributes on ranges (`{ from, to, attrs }`) or nodes

@@ -784,22 +784,34 @@ const acme: ViewExtension = {
 };
 ```
 
-- `nodeViews: Record<type, NodeView>`: `NodeView` is `{ render(node, dom): Node; split? }`.
-  `render` is called whenever the node is drawn (again): a changed node, or a block split
-  differently. The view puts what it returns in an element with `data-foli-custom="<type>"` and
+- `nodeViews: Record<type, NodeView>`: `NodeView` is `{ render(node, dom): Node; split?;
+  destroy?(dom) }`. `render` is called whenever the node is drawn (again): a changed node, or a
+  block split differently; `destroy` gets what `render` returned once the view no longer shows it
+  (the node changed, was deleted or split again, or the view was destroyed). The drawing may
+  change after `render` (content loaded later, a chart library drawing): the view never reads a
+  node view's DOM back, so such changes are not input. The view puts what it returns in an element with `data-foli-custom="<type>"` and
   `contenteditable="false"`: one caret position, selected and deleted whole. Inline: in its line,
   with the run's formatting, and the line wraps around it as the browser sizes it. Block: on the
   pages, measured and placed by the flow; one that does not fit in what is left of a page splits
   between its root element's children (each page's part drawn by `render` again and clipped to its
-  rows, the parts after the first `aria-hidden`), unless `split: false`, which keeps it whole on
+  rows, the parts after the first `aria-hidden` and `inert`: their links and controls are not
+  second tab stops), unless `split: false`, which keeps it whole on
   the next page (one taller than a page is then cut by the page). Without a node view a custom
   node is drawn as its `text(attrs)`.
 - `NodeViewDOM` (`dom`): `document` and `h(tag, attrs?, ...children)`, which makes an element with
   attributes and children (strings become text nodes). **Never build a node view from HTML**
   (`innerHTML`, `insertAdjacentHTML`) with the node's attributes: they come from documents and
-  pastes. `h` refuses `on*` handlers, `contenteditable`, `srcdoc`, the view's own `data-foli-*`
-  attributes, URL attributes (`href`, `src`…) that are not safe links (`isSafeHref`), and
-  `script`, `style`, `iframe`, `object` and `embed` elements (a `TypeError`).
+  pastes. `h` makes only content elements (an allowlist: text-level and flow elements, lists,
+  tables, `details`, `figure`, `img`, `picture`, `video`, `audio`, `canvas`, `button`; no
+  `script`, `style`, `base`, `meta`, `link`, `form`, frames, `template` or SVG) and refuses (a
+  `TypeError`) `on*` handlers, `contenteditable`, `srcdoc`, the view's own `data-foli-*`
+  attributes, URL attributes (`href`, `src`, `action`, `formaction`, `poster`, `background`, each
+  URL of `srcset` and `ping`) that are not safe links (`isSafeHref`), a `style` that fetches or
+  runs anything (`url(`, `image-set`, `expression`, `@import`, backslash escapes) and classes
+  starting with `foli-`. What `render` returns is used as it is: a node built another way is not
+  checked (extension code is trusted; the node's attributes are not). Do not put attribute values
+  in `id` or `name`: an element with a document-chosen `id` or `name` can shadow globals and
+  `document` properties (DOM clobbering).
 - `markViews: Record<type, MarkView>`: `MarkView` is `(mark) => DecorationAttrs`, put on every run
   of the mark. Without one a run of a custom mark is still named for CSS: `data-foli-mark` holds
   its custom marks' types, space separated (`[data-foli-mark~="acme:topic"]`); a foreign mark's
@@ -810,11 +822,16 @@ const acme: ViewExtension = {
   `from` to `to`, split into runs of their own, or with `node: true` the node at `from` (a
   paragraph, on each page it is on, a custom block, or an inline leaf). `DecorationAttrs`:
   `class` (added), `style` (appended) and any other attribute (set), checked as `h` checks them.
-  Decorations never change the document, the clipboard or what the view reads back. Only the
+  A decoration with a refused attribute is left out and reported. Decorations never change the
+  document, the clipboard or what the view reads back. Only the
   blocks whose decorations changed are drawn again (and measured, like an edited block).
 - `view(editorView): PluginView`: called when a view of the editor is made, after its first
   render; `PluginView` is `{ update?(view, previous), destroy? }`: `update` after each change the
   view has drawn (`previous` is the state before), `destroy` when the view is destroyed.
+- A hook that throws (`render`, a mark view, `decorations`, `view`, `update`, `destroy`) is
+  reported with `console.error` and left out (a node view's node is then drawn as its text); the
+  editor and the view go on. The same for an editor's `subscribe` listeners: one that throws does
+  not keep the others from the change.
 
 ## `@folijs/docx`
 

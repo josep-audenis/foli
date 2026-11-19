@@ -27,9 +27,11 @@ import {
 import {
   applyAttrs,
   type Decoration,
+  type Drawn,
   type NodeView,
   type NodeViewDOM,
   nodeViewDOM,
+  reportError,
   type Views,
 } from "../extension.js";
 import type { BlockDesc, LeafDesc } from "../render.js";
@@ -171,6 +173,8 @@ export class WordRenderer {
   #noteKeys: string[] = [];
   /** Node and mark views (`ViewExtension`), none on the clipboard. */
   views: Views | null = null;
+  /** Where node views' drawings are recorded, for their `destroy` (the view's list). */
+  drawn: Drawn[] | null = null;
   readonly #dom: NodeViewDOM;
   /** Each block's decorations, relative to its content (`decorationsByBlock`), and as keys. */
   #decorations: readonly (readonly Decoration[] | undefined)[] = [];
@@ -428,7 +432,8 @@ export class WordRenderer {
             // opaque content.
             const span = this.#run(run, child.marks, line);
             const view = this.#clipboard ? undefined : this.views?.nodes.get(name);
-            if (view) span.append(view.render(child, this.#dom));
+            const drawn = view && this.#draw(view, child, span);
+            if (drawn) span.append(drawn);
             else span.textContent = stands(child.attrs);
             span.dataset.foliCustom = String(child.attrs.type ?? name);
             span.setAttribute("contenteditable", "false");
@@ -557,7 +562,11 @@ export class WordRenderer {
       if (!type.includes(":")) continue;
       custom.push(type);
       const view = this.views?.marks.get(mark.type.name);
-      if (view) applyAttrs(span, view(mark));
+      try {
+        if (view) applyAttrs(span, view(mark));
+      } catch (error) {
+        reportError(error);
+      }
     }
     if (custom.length) span.dataset.foliMark = custom.join(" ");
     return span;
@@ -594,6 +603,18 @@ export class WordRenderer {
     return a;
   }
 
+  /** A node view's drawing of `node` in `box`, recorded; null (reported) when `render` throws. */
+  #draw(view: NodeView, node: ModelNode, box: HTMLElement): Node | null {
+    try {
+      const root = view.render(node, this.#dom);
+      this.drawn?.push({ view, root, box });
+      return root;
+    } catch (error) {
+      reportError(error);
+      return null;
+    }
+  }
+
   /**
    * A custom block drawn by its node view (ADR-0008): one fragment, or one per page it is split
    * across, each drawing the node again and showing its part (`splits`, layout px) through a clip.
@@ -614,7 +635,8 @@ export class WordRenderer {
       box.setAttribute("contenteditable", "false");
       // Its root's margins stay inside it: measured as the flow places it.
       box.style.display = "flow-root";
-      const drawn = view.render(node, this.#dom);
+      const drawn =
+        this.#draw(view, node, box) ?? doc.createTextNode(node.type.spec.text?.(node.attrs) ?? "");
       root ??= drawn;
       if (tops.length > 1) {
         box.dataset.fragment = String(i);
@@ -622,7 +644,10 @@ export class WordRenderer {
         const next = tops[i + 1];
         if (next !== undefined) box.style.height = `${next - top}px`;
         // The parts after the first are drawn again: read once.
-        if (i > 0) box.setAttribute("aria-hidden", "true");
+        if (i > 0) {
+          box.setAttribute("aria-hidden", "true");
+          box.setAttribute("inert", "");
+        }
         const inner = doc.createElement("div");
         inner.style.marginTop = `${-top}px`;
         inner.append(drawn);
