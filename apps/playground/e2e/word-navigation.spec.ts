@@ -240,7 +240,8 @@ test("typing in the document with a search open stays at the caret, and quick", 
   console.log(`typing 10 keys (${info.project.name}):`, JSON.stringify({ closed, open, matches }));
   expect(open.moved).toBe(0);
   expect(after - (await page.evaluate(() => scrollY))).toBe(0);
-  expect(open.ms).toBeLessThan(closed.ms * 3 + 1500);
+  // A key with the panel open costs about what one without it does (mapping every match did not).
+  expect(open.ms).toBeLessThan(closed.ms * 1.5 + 300);
 });
 
 test("Enter walks the matches through the stories and back to the body", async ({ page }) => {

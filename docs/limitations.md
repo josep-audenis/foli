@@ -198,8 +198,8 @@ checklist in [testing/ime.md](testing/ime.md)):
   after it. In the review views that hide deleted text a match runs across it, as the reader sees
   the text; Word's does not.
 - While the document is edited with the panel open, the matches are looked for again once typing
-  pauses (300 ms): until then the marks move with the text, and a match an edit touches, or one in
-  a story being edited, is left out.
+  pauses (300 ms): until then only the current match is marked, moved with the text, and none is
+  current once an edit touches it or its story.
 - Marks need the CSS Custom Highlight API (Chromium 105, Safari 17.2, Firefox 140); without it find
   still counts, goes to and selects matches. Only pages within a screen of the window are marked.
   In the drawn copies of a story that is not open, marks come from looking for the text there.

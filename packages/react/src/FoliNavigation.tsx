@@ -92,14 +92,17 @@ function mapMatch(
 ): FindMatch | null {
   if (match.story !== null) return stories.has(match.story) ? null : match;
   let { from, to } = match;
-  for (const tr of transactions) {
-    const start = tr.mapping.mapResult(from, 1);
-    const end = tr.mapping.mapResult(to, -1);
-    if (start.deleted || end.deleted) return null;
-    from = start.pos;
-    to = end.pos;
-  }
-  if (to - from !== match.to - match.from) return null;
+  for (const tr of transactions)
+    for (const map of tr.mapping.maps) {
+      // Anything a step changes inside it (an edit of the same length too) ends it as a match.
+      let touched = false;
+      map.forEach((start, end) => {
+        if (start < to && end > from) touched = true;
+      });
+      if (touched) return null;
+      from = map.map(from, 1);
+      to = map.map(to, -1);
+    }
   return from === match.from ? match : { ...match, from, to };
 }
 
@@ -270,6 +273,8 @@ interface Found {
   current: FindMatch | null;
   /** Whether the view goes to `current`: not when the document changed under the search. */
   scroll: boolean;
+  /** The document changed since `matches` were found: only `current` is known to be right. */
+  stale?: boolean;
 }
 
 /** How long typing in the document pauses before the matches are looked for again, in ms. */
@@ -316,17 +321,13 @@ function FindPanel({
         const stories = new Set<string>();
         for (const tr of transactions)
           for (const step of tr.steps) if (step instanceof StoryStep) stories.add(step.id);
+        // Only the current match follows the text at once: the rest waits for the search, and
+        // meanwhile is not marked where it no longer is.
         setFound((found) => {
           if (!found.matches.length) return found;
-          const matches: FindMatch[] = [];
-          let current: FindMatch | null = null;
-          for (const match of found.matches) {
-            const mapped = mapMatch(match, transactions, stories);
-            if (!mapped) continue;
-            matches.push(mapped);
-            if (match === found.current) current = mapped;
-          }
-          return { matches, current, scroll: false };
+          const current = found.current && mapMatch(found.current, transactions, stories);
+          if (found.stale && current === found.current) return found;
+          return { ...found, current, scroll: false, stale: true };
         });
       }
       if (next.some((value, i) => value !== key[i])) {
@@ -372,7 +373,9 @@ function FindPanel({
 
   // With the count shown, in the same frame.
   useIsomorphicLayoutEffect(() => {
-    body.storyView?.showMatches(query ? { query, ...options, ...found } : null);
+    const { stale, ...shown } = found;
+    const matches = stale ? (shown.current ? [shown.current] : []) : shown.matches;
+    body.storyView?.showMatches(query ? { query, ...options, ...shown, matches } : null);
   }, [body, query, options, found]);
   useEffect(() => () => body.storyView?.showMatches(null), [body]);
 
@@ -382,13 +385,24 @@ function FindPanel({
       setMessage(`This match is in a ${storyName(body, current)} no page shows.`);
     else setMessage("");
   };
+  /** The matches as the document is now, and the current one among them. */
+  const now = (): Found => {
+    if (!found.stale) return found;
+    const matches = findAll(body, query, options);
+    const was = found.current;
+    const current =
+      (was &&
+        matches.find((m) => m.story === was.story && m.from === was.from && m.to === was.to)) ??
+      null;
+    return { matches, current, scroll: false };
+  };
   const step = (backward: boolean) => {
-    const { matches, current } = found;
+    const { matches, current } = now();
     const first = !backward && current && !isSelected(body, current);
     show(matches, first ? current : nextMatch(body, matches, backward));
   };
   const replaceCurrent = () => {
-    const { matches, current } = found;
+    const { matches, current } = now();
     if (!current) return;
     if (!isSelected(body, current)) {
       show(matches, current);

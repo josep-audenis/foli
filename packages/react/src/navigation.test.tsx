@@ -103,10 +103,10 @@ describe("find and replace panel", () => {
     act(() => {
       editor.commands.insertText(" cat");
     });
-    // Typing: nothing looked for yet, the marks moved with the text.
+    // Typing: nothing looked for yet; only the current match is marked, moved with the text.
     expect(shown.length).toBe(count + 1);
     expect(shown[shown.length - 1]).toMatchObject({ scroll: false, current: { from: 3 } });
-    expect(shown[shown.length - 1]?.matches.length).toBe(3);
+    expect(shown[shown.length - 1]?.matches.length).toBe(1);
     await act(() => new Promise((resolve) => setTimeout(resolve, 400)));
     const last = shown[shown.length - 1];
     expect(last?.matches.length).toBe(4);
@@ -154,6 +154,8 @@ describe("find and replace panel", () => {
     });
     const last = shown[shown.length - 1];
     expect(last?.current).toMatchObject({ from: 6, to: 9, text: "cat" });
+    // Only it is marked until the search comes again.
+    expect(last?.matches).toEqual([last?.current]);
     expect(editor.state.doc.textBetween(6, 9)).toBe("cat");
     // Enter goes to it, not to where it was.
     fireEvent.submit(screen.getByLabelText("Find what").closest("form") as HTMLFormElement);
@@ -163,7 +165,23 @@ describe("find and replace panel", () => {
     act(() => {
       editor.commands.insertText("o");
     });
-    expect(shown[shown.length - 1]?.matches.map((m) => m.story)).toEqual(["h"]);
+    expect(shown[shown.length - 1]?.matches).toEqual([]);
+    expect(shown[shown.length - 1]?.current).toBeNull();
+  });
+
+  it("drops a match an edit of the same length changes", () => {
+    const { editor, shown } = setup(p("A cat sat"));
+    ask(editor, "find");
+    type("Find what", "cat");
+    act(() => editor.select(4, 5));
+    act(() => {
+      editor.commands.insertText("o");
+    });
+    expect(editor.state.doc.textBetween(3, 6)).toBe("cot");
+    expect(shown[shown.length - 1]?.current).toBeNull();
+    // Enter goes to what is there now: the header's.
+    fireEvent.submit(screen.getByLabelText("Find what").closest("form") as HTMLFormElement);
+    expect(screen.getByRole("status").textContent).toBe("1 of 1, in a header");
   });
 
   it("takes the selection as the query", () => {

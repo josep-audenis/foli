@@ -281,9 +281,10 @@ After the review's fixes (marks made in the same commit as the count, near match
 the same queries take 14 to 55 ms in Chromium, 14 to 37 ms in Firefox and 57 to 78 ms in WebKit.
 
 **Typing in the document with a search open** (the same spec: 4,000 paragraphs, 84,009 matches of
-`e`, ten keys pressed by Playwright, round trips included): Chromium 1.18 s against 0.98 s with no
-panel, Firefox 2.55 against 1.04 s, WebKit 1.68 against 1.46 s. Each key moves the matches with
-the text (one mapping per match); the panel looks again 300 ms after typing pauses, keeps the current match if it is still there and does not scroll; each render marks
+`e`, ten keys pressed by Playwright, round trips included): Chromium 1.05 s against 1.08 s with no
+panel, Firefox 1.28 against 1.03 s, WebKit 1.67 against 1.35 s. Each key moves only the current
+match with the text (moving all 84,009 took Firefox to 2.55 s), and only it is marked until the
+search comes again; the panel looks again 300 ms after typing pauses, keeps the current match if it is still there and does not scroll; each render marks
 only the matches of the pages near the window, found by halving the sorted list. Before this, every
 key searched again and marked every match: 8.2 s for ten keys in the reviewer's run.
 
