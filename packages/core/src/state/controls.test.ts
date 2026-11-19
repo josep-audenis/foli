@@ -1043,6 +1043,25 @@ describe("as Word's review of the rules has it", () => {
     expect(editor.state.doc.firstChild?.child(1).toJSON()).toEqual(text("x"));
   });
 
+  it("text typed over a placeholder takes the control's character style, as Word", () => {
+    const strong = { type: "characterStyle", attrs: { id: "Strong" } };
+    const editor = editorOf(
+      [p(inline("c", hint("Type")))],
+      { c: { kind: "text", format: [strong], placeholder: { showing: true, text: "Type" } } },
+      {
+        more: {
+          styles: [
+            ...documentOf([p("x")], {}).styles,
+            { id: "Strong", type: "character", name: "Strong" },
+          ],
+        },
+      },
+    );
+    inside(editor, "c");
+    editor.commands.insertText("Typed");
+    expect(editor.state.doc.firstChild?.child(1).toJSON()).toEqual(text("Typed", [strong]));
+  });
+
   it("rejecting a toggle gives a symbol check box its state back", () => {
     const symbol: NodeJSON = {
       type: "opaqueInline",

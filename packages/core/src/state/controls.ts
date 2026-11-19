@@ -506,17 +506,15 @@ function leavePlaceholderLook(
   tr.doc.nodesBetween(from, to, (node, pos) => {
     if (!node.isText) return true;
     const end = pos + node.nodeSize;
-    for (const mark of node.marks) {
-      const name = mark.type.name;
-      if (
-        style &&
-        ((name === "characterStyle" && mark.attrs.id === style) ||
-          (name === "runExt" && String(mark.attrs.xml).includes(`"${style}"`)))
-      )
-        tr.removeMark(pos, end, mark);
-    }
+    const placeholder = (mark: Mark) =>
+      !!style &&
+      ((mark.type.name === "characterStyle" && mark.attrs.id === style) ||
+        (mark.type.name === "runExt" && String(mark.attrs.xml).includes(`"${style}"`)));
+    for (const mark of node.marks) if (placeholder(mark)) tr.removeMark(pos, end, mark);
+    // The text's own marks, the placeholder's style not among them, win over the control's.
+    const own = node.marks.filter((m) => !placeholder(m));
     for (const mark of format)
-      if (!node.marks.some((m) => m.type === mark.type)) tr.addMark(pos, end, mark);
+      if (!own.some((m) => m.type === mark.type)) tr.addMark(pos, end, mark);
     return false;
   });
 }
