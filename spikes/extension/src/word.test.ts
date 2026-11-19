@@ -22,7 +22,7 @@ import type { FoliDocument, NodeJSON } from "@folijs/core";
 import { exportDocx, importDocx } from "@folijs/docx";
 import { describe, expect, it } from "vitest";
 import { fromWord, toWord } from "./docx.js";
-import { customs, longTag, sample } from "./sample.js";
+import { controlsOf, customs, longTag, sample } from "./sample.js";
 import { mentionText } from "./spec.js";
 
 const ROOT = join(import.meta.dirname, "..", "..", "..");
@@ -37,12 +37,16 @@ describe.skipIf(!process.env.FOLI_WORD)("custom nodes and marks through Word (sp
     const word = join(DIR, "word");
     mkdirSync(foli, { recursive: true });
     const expected = new Map<string, unknown[]>();
+    /** What Word must list: the controls as Foli wrote them, in order. */
+    const controls = new Map<string, ReturnType<typeof controlsOf>>();
     for (const [name, doc] of [
       ["sample", sample()],
       ["long-tag", longTag()],
     ] as [string, FoliDocument][]) {
-      writeFileSync(join(foli, `${name}.docx`), await exportDocx(toWord(doc, nodeText)));
+      const out = toWord(doc, nodeText);
+      writeFileSync(join(foli, `${name}.docx`), await exportDocx(out));
       expected.set(name, customs(doc.content));
+      controls.set(name, controlsOf(out));
     }
     const typed = [
       { node: "acme:mention", attrs: { id: "u-42", label: "Ada Lovelace" }, marks: [] },
@@ -50,7 +54,11 @@ describe.skipIf(!process.env.FOLI_WORD)("custom nodes and marks through Word (sp
     ];
     for (const file of existsSync(EDITOR) ? readdirSync(EDITOR) : []) {
       copyFileSync(join(EDITOR, file), join(foli, file));
-      expected.set(file.replace(/\.docx$/, ""), typed);
+      const name = file.replace(/\.docx$/, "");
+      expected.set(name, typed);
+      // The editor's file as Foli reads it, without the mapping.
+      const read = await importDocx(readFileSync(join(EDITOR, file)));
+      controls.set(name, controlsOf(read.document));
     }
     execFileSync(
       "powershell",
@@ -70,8 +78,10 @@ describe.skipIf(!process.env.FOLI_WORD)("custom nodes and marks through Word (sp
     for (const [name, wanted] of expected) {
       const report = json(join(word, `${name}.json`));
       expect(report.error, name).toBeNull();
-      // Word sees each one as a content control with its tag, the node's text locked.
-      for (const control of report.controls) expect(control.tag, name).toMatch(/^foli:\{/);
+      // Word lists each one as a content control: a node as plain text (1), contents locked,
+      // showing `@label`; a marked run as rich text (0) around its text; every tag as written.
+      expect(report.controls.length, name).toBeGreaterThan(0);
+      expect(report.controls, name).toEqual(controls.get(name));
       const { document } = await importDocx(readFileSync(join(word, `${name}.docx`)));
       const back = fromWord(document);
       expect(customs(back.content), name).toEqual(wanted);

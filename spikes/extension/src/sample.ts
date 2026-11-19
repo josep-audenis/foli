@@ -1,4 +1,5 @@
 /** Documents for the spike's tests and Word round trip, built as JSON as an app would. */
+import type { ControlJSON } from "@folijs/core";
 import { createDocument, type FoliDocument, type NodeJSON } from "@folijs/core";
 import { isCustom } from "./docx.js";
 import { MENTION, TOPIC } from "./spec.js";
@@ -55,13 +56,17 @@ export function sample(): FoliDocument {
   });
 }
 
-/** The custom nodes and the text under custom marks, in order: what must come back. */
+/**
+ * The custom nodes and the text under custom marks, in order, with all their marks (bold on a
+ * mention too): what must come back.
+ */
 export function customs(tree: NodeJSON): unknown[] {
   const found: unknown[] = [];
   const walk = (node: NodeJSON) => {
-    const marks = (node.marks ?? []).filter((m) => isCustom(m.type));
+    // `runExt` is the `w:rPr` an import keeps verbatim, not formatting of its own.
+    const marks = (node.marks ?? []).filter((m) => m.type !== "runExt");
     if (isCustom(node.type)) found.push({ node: node.type, attrs: node.attrs, marks });
-    else if (marks.length) found.push({ text: node.text, marks });
+    else if (marks.some((m) => isCustom(m.type))) found.push({ text: node.text, marks });
     node.content?.forEach(walk);
   };
   walk(tree);
@@ -76,4 +81,35 @@ export function longTag(): FoliDocument {
     type: "doc",
     content: [{ type: "paragraph", content: [text("Tag "), mention("u-1", label)] }],
   });
+}
+
+/** A document's inline content controls in order, as Word's `ContentControls` reports them. */
+export function controlsOf(document: FoliDocument): {
+  type: number;
+  tag: string | undefined;
+  text: string;
+  lockContents: boolean;
+}[] {
+  const controls: Record<string, ControlJSON> = document.controls ?? {};
+  const found: ReturnType<typeof controlsOf> = [];
+  const open = new Map<string, number>();
+  const walk = (node: NodeJSON) => {
+    const id = String(node.attrs?.id);
+    if (node.type === "controlStart") {
+      const control = controls[id];
+      open.set(id, found.length);
+      found.push({
+        // Word's WdContentControlType: 0 rich text, 1 plain text.
+        type: control?.kind === "text" ? 1 : 0,
+        tag: control?.tag,
+        text: "",
+        lockContents: control?.lock === "contentLocked" || control?.lock === "sdtContentLocked",
+      });
+    } else if (node.type === "controlEnd") open.delete(id);
+    else if (node.text)
+      for (const i of open.values()) (found[i] as { text: string }).text += node.text;
+    node.content?.forEach(walk);
+  };
+  walk(document.content);
+  return found;
 }

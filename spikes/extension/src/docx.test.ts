@@ -2,7 +2,7 @@ import { createDocument, FoliDocumentError, type NodeJSON, parseDocument } from 
 import { exportDocx, importDocx } from "@folijs/docx";
 import { describe, expect, it } from "vitest";
 import { fromWord, toWord } from "./docx.js";
-import { customs, mention, sample } from "./sample.js";
+import { controlsOf, customs, mention, sample } from "./sample.js";
 import { mentionText } from "./spec.js";
 
 const nodeText = (node: NodeJSON) => mentionText(node.attrs ?? {});
@@ -25,12 +25,23 @@ describe("custom nodes and marks in .docx (spike)", () => {
     ]);
     const bytes = await exportDocx(word);
     const { document } = await importDocx(bytes);
-    // Without the mapping the controls stay: their text and tags are kept.
-    expect(Object.values(document.controls ?? {}).map((c) => c.tag)).toEqual(
-      controls.map((c) => c.tag),
-    );
+    // Without the mapping the controls stay: their kind, tag, lock and text are kept.
+    expect(controlsOf(document)).toEqual(controlsOf(word));
+    expect(controlsOf(word).map((c) => c.text)).toEqual([
+      "@Ada Lovelace",
+      "budget",
+      "plan",
+      "@Grace",
+      "roadmap",
+    ]);
     const back = fromWord(document);
     expect(customs(back.content)).toEqual(customs(original.content));
+    // Bold on a mention comes back too.
+    expect(customs(back.content)).toContainEqual({
+      node: "acme:mention",
+      attrs: { id: "u-7", label: "Grace" },
+      marks: [{ type: "bold" }],
+    });
     expect(back.controls).toEqual({});
   });
 

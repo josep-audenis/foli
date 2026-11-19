@@ -6,7 +6,7 @@ import type { Spike } from "../src/main.js";
 
 // ADR-0008's spike: a custom inline node (`acme:mention`) and a custom mark (`acme:topic`)
 // declared outside the packages, typed, drawn on the pages, undone, copied and pasted, saved and
-// loaded as JSON, and through .docx (Foli to Foli here; Word in word.ps1 / word.mjs).
+// loaded as JSON, and through .docx (Foli to Foli here; Word in src/word.test.ts and word.ps1).
 
 const MOD = "ControlOrMeta";
 const editor = (page: Page) => page.getByRole("textbox", { name: "Document" });

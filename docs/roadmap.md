@@ -1382,26 +1382,26 @@ Each task is a PR on `phase-12/ecosystem`, the build green after each.
   Spike: one custom inline node and one mark end to end in the editor and through `.docx`. The
   owner accepts it before 12.2. (Done:
   [ADR-0008](decisions/ADR-0008-1.0-contract-and-extensions.md), accepted by review as the owner
-  asked for Phase 12. Decided: indexes list exports by name,
-  internals `@internal` and stripped (`stripInternal` works in TypeScript 7.0.2), what the other
-  packages need from core on `@folijs/core/internal` with exact versions between the packages, an
-  API report per package (`dist` `.d.ts` joined, compared in `pnpm check` by a script that also
-  catches forgotten exports); every 1.x reads every earlier format, a minor may add a schema
-  version with a migration (not v5 frozen: Word's opaque content still has to be modeled), an
-  older 1.x refuses a newer document; `@deprecated`, a dev warning where cheap, removal in the next
-  major; custom inline and block leaves and marks as namespaced extensions on the Word schema,
-  foreign nodes when the extension is missing, in `.docx` a content control tagged `foli:` and the
-  JSON (255 characters at most, longer refused); `PluginSpec` frozen plus `commands`, view hooks in
-  `@folijs/view`, every key the view takes itself listed as overridable or reserved; toolbar
-  `items`; history's state internal, collaboration not in 1.0; `pnpm bench` with baselines per
-  machine before each release, no hosted CI; the docs site in `apps/site` from `docs/*.md` with
+  asked for Phase 12. Decided: indexes list exports by name, internals `@internal` and stripped
+  (`stripInternal` works in TypeScript 7.0.2), what the other packages need from core on
+  `@folijs/core/internal`, an API report per package (`dist` `.d.ts` joined, compared in
+  `pnpm check` by a script that also catches forgotten exports); core as an exact peer dependency of
+  the other packages; every 1.x reads every earlier format, a minor may add a schema version with a
+  migration and a document is saved at the lowest version it needs (not v5 frozen: Word's opaque
+  content still has to be modeled; this one point awaits the owner's OK, open until 12.12), an older
+  1.x refuses a document that needs a newer one; `@deprecated`, a dev warning where cheap, removal
+  in the next major; custom inline and block leaves and marks as namespaced extensions on the Word
+  schema, foreign nodes when the extension is missing, in `.docx` a content control tagged `foli:`
+  and the JSON (255 characters at most, longer refused); `PluginSpec` frozen plus `commands`, view
+  hooks in `@folijs/view`, every key the view takes itself listed as overridable or reserved;
+  toolbar `items`; history's state internal, collaboration not in 1.0; `pnpm bench` with baselines
+  per machine before each release, no hosted CI; the docs site in `apps/site` from `docs/*.md` with
   `marked`, hosted with the landing page by the owner; no Rust. Spike `spikes/extension`: a mention
   and a topic mark typed, drawn on pages, undone, saved and loaded, through `.docx` in Chromium,
-  Firefox and WebKit; copy and paste in Chromium only (Playwright's Firefox pastes HTML, which
-  drops them: 12.3 carries them in the HTML; WebKit skipped); Word 16 opened, edited and saved 5
-  files and Foli read every node and mark back. Shortcuts: the packages are patched as the
-  spike's dev server serves them (no package changes); block nodes, find, tracking and foreign
-  nodes not exercised.)
+  Firefox and WebKit; copy and paste in Chromium only (Playwright's Firefox pastes HTML, which drops
+  them: 12.3 carries them in the HTML; WebKit skipped); Word 16 opened, edited and saved 5 files and
+  Foli read every node and mark back. Shortcuts: the packages are patched as the spike's dev server
+  serves them (no package changes); block nodes, find, tracking and foreign nodes not exercised.)
 - [ ] 12.2 Public API surface: core's exports listed by name (no `export *`), internals marked and
   stripped from the published types, the built-in plugins and keys exported where ADR-0008 says;
   an API report per package (`.d.ts` of `dist` compared with a committed report, no new tool
@@ -1409,7 +1409,8 @@ Each task is a PR on `phase-12/ecosystem`, the build green after each.
 - [ ] 12.3 Custom nodes and marks in `@folijs/core`: the schema extension from ADR-0008
   (`createEditor` and `parseDocument` take it), validation, JSON, copy and paste between editors
   with and without the extension (never dropped: opaque when unknown), find and review over them;
-  `@folijs/docx` writes and reads them as decided; tests and a round trip that Word opens.
+  `@folijs/docx` writes and reads them as decided; tests and a round trip that Word opens; delete
+  `spikes/extension` and its Playwright project once the real API replaces it.
 - [ ] 12.4 View extension: node views for custom nodes (measured and placed by the flow, split or
   kept whole across pages as declared), decorations (inline and node; find matches and the
   selected field move onto them where it is simpler), plugin views (mount, update, destroy) and
@@ -1443,6 +1444,8 @@ Each task is a PR on `phase-12/ecosystem`, the build green after each.
   suite green in three engines.
 - [ ] 12.12 Close: docs as of 1.0 (README, architecture, api, ADR-0008's outcome), size budgets,
   the acceptance checked, the 1.0.0 changeset and version PR; publish with the owner's approval.
+  The owner's yes or no on ADR-0008's open point (1.x minors may add a schema version, saved at
+  the lowest version a document needs) before 1.0.0 is published.
 
 ## Optional
 
