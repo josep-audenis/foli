@@ -117,6 +117,9 @@ it:
 }
 ```
 
+The same rules print the read-only renderer's pages (`DocumentPages.printStyles()`), and so
+`@folijs/pdf`'s `exportPdf`: the editor's print and the PDF have the same sheets.
+
 Print-only CSS must not change text metrics (font, size, line height), or the printed lines
 no longer match the computed page breaks. `@page` applies to the whole web page: with several
 editors of different page sizes, print one at a time.

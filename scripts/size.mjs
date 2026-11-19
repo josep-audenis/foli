@@ -102,7 +102,7 @@ writeFileSync(appEntry, `export { FoliEditor } from "${dist("react")}";\n`);
  * match, a bookmark or a heading; the find panel, the bookmarks dialog and the outline panel, which
  * `FoliEditor` includes so that Word's keys work out of the box.
  * `@folijs/pdf` added in 11.12 (Node's side 16.0 kB, 18.4 allowed: core's `parseDocument`, which
- * checks the document before the page gets it; the page's renderer 82.8 kB, 95.2 allowed: core and
+ * checks the document before the page gets it; the page's renderer 82.9 kB, 95.2 allowed: core and
  * the view's read-only renderer bundled into the script `exportPdf` adds to the headless page, never
  * part of an app's own bundle).
  */

@@ -128,6 +128,8 @@ test("fields are updated from the pages first; links are links, internal ones to
             text("terms", link(null, "terms")),
             text(" and "),
             text("this", link("javascript:alert(1)")),
+            text(" or "),
+            text("that", link("relative/page.html")),
             { type: "pageBreak" },
           ],
         },
@@ -168,7 +170,7 @@ test("fields are updated from the pages first; links are links, internal ones to
   const pdf = await read(page, exported.pdf);
   expect(pdf.pages).toHaveLength(2);
   expect(words(pdf.pages[1]?.text ?? "")).toContain("This is page 2 of 2.");
-  // The web link and the bookmark's; a script is no link.
+  // The web link and the bookmark's; a script, or a relative target, is no link.
   expect(pdf.links).toEqual([
     { page: 1, url: "https://example.com/", internal: false },
     { page: 1, url: null, internal: true },

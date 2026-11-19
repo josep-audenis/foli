@@ -272,7 +272,7 @@ Details in the [package README](../packages/docx/README.md).
 - Page numbers made of digits are taken to be equally wide when a header's height is measured:
   with a font whose digits differ, a header on the verge of wrapping can overlap the text.
 
-## Print
+## Print and PDF
 
 - One `@page` size per web page: with several editors of different page sizes, the last one's
   sheet size wins.
@@ -280,6 +280,24 @@ Details in the [package README](../packages/docx/README.md).
   engines without named pages print every sheet at the last section's size.
 - Print-only CSS must not change text metrics. PDF output is checked in Chromium only.
 - Your page's other content prints too; hide it ([styling.md](styling.md#print)).
+- `exportPdf` (`@folijs/pdf`) is Chromium's PDF: it needs the app's headless Chromium page
+  (Playwright 1.42+ for the outline and tags; Puppeteer's page has the same methods but is not
+  tested) and the document's fonts on that machine or in `styles`: a missing font prints in a
+  fallback with other line breaks. It replaces the page's content.
+- `exportPdf` lays the document out with the read-only renderer, the editor's `print()` with the
+  editing one: the same pages (count, sizes, text), drawn alike but where the two differ. A
+  table's header rows repeated on a continuation page are plain text in the editor's print and
+  formatted in the PDF; the editor draws change bars beside tracked changes, the PDF does not;
+  where a paragraph continues in a column of another width, the PDF can repeat or lose a few
+  words there (08 in the corpus repeats two).
+- A field's page in `exportPdf` is the page its paragraph (or table) starts on: a `PAGEREF` to a
+  bookmark in a paragraph carried over to the next page gives the first page.
+- Links: absolute links with a safe target (`https:`, `http:`, `mailto:`, `tel:`) and links to a
+  bookmark of the document are PDF links; other targets (relative, `file:`) print as text. Headings (paragraphs with an outline
+  level 1-6) are the PDF's bookmarks; a table of contents' dot leaders are not drawn (on screen
+  neither).
+- Pictures in EMF, WMF or TIFF print as their box. Comments are not printed: with markup their
+  text is highlighted, without Word's balloons.
 
 ## React and the browser
 

@@ -373,6 +373,29 @@ content, ext? }`. `content` is a `doc` of the body's blocks. `noteType` is Word'
   `evaluate`, `pdf`), loads the read-only renderer's bundle, updates page fields, and prints with
   the print CSS already used by the editor. In a browser, the editor's `print()` does the same
   with the user's dialog. It is Chromium's PDF: fonts must be available to that page.
+- **Built in 11.12** as decided, with what building it showed:
+  - `exportPdf(document, { page, resources, review, styles })` returns `{ pdf, pages, fields }`.
+    `review` is needed to print as Word's PDFs do (`final`); `styles` (`@font-face` rules) is how
+    fonts the machine lacks reach the page, since `setContent` replaces whatever the app had added.
+    `resources` gives bytes with their type (a `.docx` part as it is), turned into `data:` URLs:
+    an object URL made in Node means nothing to the page.
+  - The renderer bundle (`dist/renderer.js`, core and the view's read-only renderer, 82.9 kB gzip)
+    is built by Vite into one classic script and read from beside the package's code.
+  - Fields are updated by core's `updateFields` on an editor of the document, with the read-only
+    renderer's pages as its layout (`DocumentPages.fieldLayout`: the page a top-level block starts
+    on), then laid out again, twice at most, as the editor's update does.
+  - Print rules are one function (`print.ts`) for both renderers. Chromium's `page.pdf` with
+    `preferCSSPageSize` gives each named page its own sheet size (04's landscape appendix), and
+    with `outline` and `tagged` (Playwright 1.42+) makes the headings (`h1`-`h6`) PDF bookmarks.
+    Links are not in the read-only renderer's DOM (`data-href` only): the page script wraps safe,
+    absolute ones and those to a bookmark in `a` elements.
+  - "The same pages" holds for count, sizes and text, not every pixel: the editor prints its own
+    renderer's drawing, which repeats a table's header rows as plain text and draws change bars;
+    the read-only renderer can repeat a few words where a paragraph continues in a column of
+    another width. One renderer for both would remove that; the ADR keeps two until then.
+  - Against Word's PDFs the PDF scores 0.954 over the corpus's 24 pages (on screen 0.889, where
+    pictures are boxes). Tested with Playwright's Chromium; Puppeteer's page has the four methods
+    but is not tested.
 
 ### Format
 
@@ -403,6 +426,7 @@ migration changes the version only; what is opaque stays so until the `.docx` is
   treatment in Backspace, Delete, arrows and clipboard.
 - A story's whole tree is the unit of its undo: cheap with shared structure, but a change made to
   a story outside history (none exists today) would block older undo steps of that story.
-- `exportPdf` depends on the app's headless browser and its fonts.
+- `exportPdf` depends on the app's headless browser and its fonts, and prints the read-only
+  renderer's drawing, where the editor prints its own (11.12).
 - Word's rules above come from the format as documented and the corpus; those not yet checked
   against Word are checked when their task builds them.

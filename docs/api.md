@@ -1,6 +1,6 @@
 # API reference
 
-The public API of the four packages, as of 0.3.0. Not stable before 1.0: anything may change
+The public API of the five packages, as of 0.3.0 (`@folijs/pdf` since 11.12). Not stable before 1.0: anything may change
 in a minor version until then (changes are listed in each package's changelog). Exports not
 listed here (model classes, steps, `Transform`, `Plugin`, `Transaction` metadata, mapping) are
 public for advanced use but are not a stable API yet.
@@ -9,6 +9,7 @@ public for advanced use but are not a stable API yet.
 - [`@folijs/core`](#folijscore): documents, the headless editor, commands
 - [`@folijs/view`](#folijsview): the editable DOM view without React
 - [`@folijs/docx`](#folijsdocx): `.docx` import and export
+- [`@folijs/pdf`](#folijspdf): PDF from Foli's pages, through a headless Chromium page
 
 ## `@folijs/react`
 
@@ -605,7 +606,8 @@ const view = new EditorView(host, editor, { editable: true, placeholder: "" });
   paragraphs wholly inside them then take no room). `view.updateFields(options?, editor?)` does it
   from code: `updateFields` with this view's pages, then once more for what depends on the pages
   those results moved, in one undo step. `view.print()` updates every field and opens the browser's
-  print dialog; a browser's own Print menu does not update them.
+  print dialog, which prints the pages `@folijs/pdf`'s `exportPdf` gives (the same print rules); a
+  browser's own Print menu does not update them.
 - Finding (11.11): `view.showMatches({ query, matchCase, wholeWord, matches, current })` marks
   matches (null: none) with the CSS Custom Highlight API (`::highlight(foli-find)` and
   `foli-find-current`): nothing is added to the DOM or the document, and it does not print. Only
@@ -642,7 +644,9 @@ const view = new EditorView(host, editor, { editable: true, placeholder: "" });
   in the author's color, titled "Inserted/Deleted by …, date"), `"simple"` or `"final"` (as if
   accepted; no change bar here: the editor's view draws it). `DocumentPages`: `pages`, `pageOf(index)` and `lineOf(index)`
   (where the top-level node at `index` starts: the page, 0-based, and the line on that page,
-  1-based), `destroy()`. Measures as it is called: render after the document's fonts have
+  1-based), `fieldLayout` (the pages as `updateFields` takes them: a position's page is the one
+  its top-level block starts on), `printStyles()` (the editor's print rules for these pages, for a
+  web page holding them alone), `destroy()`. Measures as it is called: render after the document's fonts have
   loaded (`document.fonts.ready`), into a container that is laid out and not scaled. See
   [architecture.md](architecture.md#word-pages-packagesviewsrcword-86b).
 
@@ -677,3 +681,26 @@ Details (what import keeps, what export writes, limits): the
   the source.
 - Errors: `DocxError` (not a WordprocessingML document, Strict Open XML, content export cannot
   write), `ZipError` (the container), `XmlError` (with the `offset`).
+
+## `@folijs/pdf`
+
+PDF from Foli's own page layout, printed by a headless Chromium page the app supplies (11.12,
+ADR-0007). No browser dependency of its own. Details: the
+[package README](../packages/pdf/README.md).
+
+- `exportPdf(document, options): Promise<ExportedPdf>`: validates `document` (`parseDocument`:
+  an invalid one throws before the page is used), replaces `options.page`'s content with the
+  package's renderer (`dist/renderer.js`), lays the document out with `renderDocument`, updates
+  its fields from those pages (`updateFields`, then again for what depends on the pages), makes
+  safe links and links to bookmarks PDF links, adds the editor's print rules and calls
+  `page.pdf({ preferCSSPageSize, printBackground, outline, tagged })`: each sheet its section's
+  page size, headings as PDF bookmarks. `ExportedPdf`: `{ pdf, pages, fields }` (the bytes, the
+  page count, the `FieldsReport`).
+- `ExportPdfOptions`: `page` (a `PdfPage`), `resources(key, resource)` (a picture's image:
+  `{ data, contentType }`, as a `.docx` package part is, a URL, `null` for its box, `undefined`
+  for the resource's own URL), `review` (`"markup"`, the default; `"simple"`; `"final"`),
+  `styles` (CSS added first, such as `@font-face` rules; every face declared is loaded before the
+  layout).
+- `PdfPage`: `setContent(html)`, `addScriptTag({ content })`, `evaluate(fn, arg)`,
+  `pdf(options)`: Playwright's `Page` (1.42+ for the outline and tags); Puppeteer's has the same
+  methods (not tested).

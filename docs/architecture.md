@@ -37,6 +37,7 @@ This document describes **what exists** and **what is decided**. Planned parts a
 | Layout              | Measurement, line breaking, page flow, fragments, incremental reflow, print    | ✅ (Phase 5); sections with their own page setups (8.7d4); inside `@folijs/view` until the seam is proven                                   |
 | React integration   | Components, hooks, toolbar                                                     | Hooks, provider, canvas, `FoliEditor` ✅ (6.1); toolbar ✅ (6.2)                                                                            |
 | Document processing | DOCX import/export with lossless round trip (`@folijs/docx`)                   | Package and XML reading ✅ (8.2), import to v3 ✅ (8.4), lossless export ✅ (8.5) ([ADR-0005](decisions/ADR-0005-word-compatible-model.md)) |
+| PDF                 | A document printed to PDF from Foli's own pages (`@folijs/pdf`)                | ✅ (11.12, [ADR-0007](decisions/ADR-0007-stories-fields-controls.md)): Chromium's PDF through the app's headless page                       |
 
 ## Editing data flow (target design)
 
@@ -311,7 +312,9 @@ and benchmarks (5.7, [benchmarks.md](benchmarks.md)); overview in [pagination.md
     theme drops the canvas and shadows in print; everything else on the web page prints too
     and must be hidden by the app (the playground hides its bar), or it adds sheets. `@page`
     is per document: with several editors of different page sizes, the last one's sheet
-    size wins.
+    size wins. The rules are made by `print.ts`, shared with the read-only renderer
+    (`DocumentPages.printStyles()`), so that `@folijs/pdf` prints its pages as the editor does
+    (11.12).
   - **Incremental reflow (5.4):** measurements (height, margins, and lines once needed) are
     cached by model node: an unchanged node (same identity) renders the same at the same page
     width, so an edit reads the DOM only for the blocks it changed. The flow (`flowFrom`)
@@ -888,6 +891,25 @@ Word lays it out, read-only and without an editor (`EditorView` edits on the sam
 - `pageOf(index)` and `lineOf(index)` give where a top-level node starts (the page, and the
   line on it as Word numbers lines); the corpus harness compares them with Word's, and each
   page's ink with Word's PDF of it (`pnpm corpus:pages`, numbers in corpus/README.md).
+- `fieldLayout` gives the pages to `updateFields` (11.12): a body position's page is the page its
+  top-level block starts on (shortcut: a bookmark in a paragraph split across pages gets the
+  first), its number with the section's restart and format, and its section's page count.
+  `printStyles()` gives the editor's print rules for these pages (each page carries its
+  section's `data-foli-sheet`). A bookmark's start is an empty, absolutely positioned
+  `data-foli-bookmark` mark: where `@folijs/pdf` points a link to it.
+
+PDF (11.12, `packages/pdf`): `exportPdf` (Node's side) validates the document, builds the pictures'
+`data:` URLs from `resources`, and drives the app's page: `setContent` of an empty document,
+`addScriptTag` of `dist/renderer.js` (Vite bundles `src/renderer.ts` with core and the view from
+source into one classic script at build; the Node side reads it from `../dist/renderer.js`
+relative to itself), `evaluate` of `foliPdf.render`, and `pdf`. In the page: the app's `styles`,
+every declared font face loaded, `renderDocument` into the body, `updateFields` on an editor of the
+document with `fieldLayout`, laid out again when a result changed and once more for what depends on
+the pages (as `view.updateFields` does), spans with a safe `data-href` or one naming a bookmark on
+the pages wrapped in `a` (the bookmark's mark given an id), `printStyles()` added, images decoded.
+Chromium's `page.pdf` with `preferCSSPageSize` prints each named page at its own size, and with
+`outline` and `tagged` (Playwright 1.42+) turns `h1`-`h6` (paragraphs with an outline level; the
+hidden copies of split blocks are `aria-hidden`) into PDF bookmarks.
 
 Marks of find (11.11, `word/matches.ts`): ranges in two `Highlight` objects shared by a document's
 views, so the pages' DOM never changes and the mutation observer has nothing to read back. They
@@ -977,14 +999,16 @@ foli/
 │   ├── core/  @folijs/core   Envelope, schema, immutable model, positions, slices. Pure TS, no DOM.
 │   ├── view/  @folijs/view   Editable DOM view (EditorView). Framework-agnostic.
 │   ├── react/ @folijs/react  React components + default stylesheet.
-│   └── docx/  @folijs/docx   DOCX import to schema v3 and lossless export; package (zip, parts, relationships), XML keeping source text. No DOM.
+│   ├── docx/  @folijs/docx   DOCX import to schema v3 and lossless export; package (zip, parts, relationships), XML keeping source text. No DOM.
+│   └── pdf/   @folijs/pdf    exportPdf: a document printed by the app's headless Chromium page; ships the read-only renderer as a page script.
 ├── spikes/two-page/     Phase 1 spike; throwaway, never published.
 ├── examples/            Vite and Next.js apps installing the packed packages (6.4); never published.
 └── docs/
 ```
 
-Dependency direction: `playground → react → view → core`, `docx → core`, and
-`playground → docx`. Never the reverse.
+Dependency direction: `playground → react → view → core`, `docx → core`, `pdf → core`
+(and `view`, bundled at build time into `pdf`'s page script, `dist/renderer.js`), and
+`playground → docx, pdf`. Never the reverse.
 
 Planned, created only when needed:
 
@@ -1001,11 +1025,12 @@ Planned, created only when needed:
 - **Allowed:** general-purpose libraries under permissive licenses (MIT, Apache-2.0, BSD, ISC),
   after checking size and whether existing code already covers the need.
 - **Copied code:** only with provenance in `THIRD_PARTY_NOTICES.md` and preserved notices.
-- Runtime dependencies today: none besides React (peer) and our own packages.
+- Runtime dependencies today: none besides React (peer) and our own packages. `@folijs/pdf`
+  needs the app's headless Chromium (Playwright or Puppeteer), which it does not depend on.
 - Dev-only exception: `@axe-core/playwright` / `axe-core` (MPL-2.0) for the accessibility check
   in Playwright. Test tooling, never bundled or published.
 - Dev-only: `pdfjs-dist` (Apache-2.0) renders Word's PDF pages in the corpus harness
-  (`pnpm corpus:pages`, playground only). Never bundled or published. Its optional Node
+  (`pnpm corpus:pages`, playground only) and Foli's own PDFs there and in `e2e/pdf.spec.ts`. Never bundled or published. Its optional Node
   canvas (`@napi-rs/canvas`, native binaries) is not installed (`ignoredOptionalDependencies`):
   the harness renders in the browser.
 

@@ -300,7 +300,30 @@ Complete apps: [examples/vite](../examples/vite) (React 18, TypeScript) and
 
 `window.print()` prints one sheet per page at the document's page size; the stylesheet hides
 the toolbar and page shadows in print. Hide the rest of your page in print yourself
-([styling.md](styling.md#print)).
+([styling.md](styling.md#print)). The view's `print()` updates the fields first (page numbers,
+tables of contents) and then opens the dialog.
+
+## PDF on a server
+
+`@folijs/pdf` prints a document to PDF from the same pages, with a headless Chromium page you
+supply (Playwright 1.42+ or Puppeteer), without a browser dependency of its own:
+
+```bash
+npm install @folijs/pdf @folijs/core playwright
+```
+
+```ts
+import { exportPdf } from "@folijs/pdf";
+import { chromium } from "playwright";
+
+const browser = await chromium.launch();
+const { pdf } = await exportPdf(document, { page: await browser.newPage() });
+await browser.close();
+```
+
+The machine that prints needs the document's fonts (or `@font-face` rules in `styles`), and the
+pictures' images come through `resources`: see the
+[package README](../packages/pdf/README.md).
 
 ## Using the view without React
 

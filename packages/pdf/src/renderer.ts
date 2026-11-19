@@ -30,7 +30,10 @@ function makeLinks(root: HTMLElement): void {
         target.id ||= `foli-bookmark-${ids++}`;
         url = `#${target.id}`;
       }
-    } else if (isSafeHref(href)) url = href;
+    } else if (/^[a-z][a-z0-9+.-]*:/i.test(href) && isSafeHref(href)) {
+      // Absolute only: a relative target has nothing to resolve against in a PDF.
+      url = href;
+    }
     if (!url) continue;
     const link = doc.createElement("a");
     link.href = url;
