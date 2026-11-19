@@ -142,29 +142,69 @@ export interface FoliToolbarProps {
    * inserts one from a file; without it, it only edits a selected picture.
    */
   upload?: EditorViewOptions["upload"] | undefined;
+  /**
+   * The items, in groups (a separator between groups), in place of `defaultToolbarItems`: the
+   * built-in ones from `toolbarItems`, and the app's own. "New comment" shows only with
+   * `comments`; an empty group is left out.
+   */
+  items?: readonly (readonly ToolbarItem[])[] | undefined;
   className?: string | undefined;
 }
 
-interface Item {
-  key: string;
-  /** Tooltip: what the button does. */
-  label: string;
-  /** Visible text: the accessible name, unless it is a symbol (then the label is). */
-  text: string;
-  symbol?: boolean;
-  /** Shown instead of `text` (a symbol: the label is the name). */
-  icon?: ReactNode;
-  /** Whether the button shows as pressed (toggle buttons only). */
-  pressed?: (state: EditorState, editor: Editor) => boolean;
+/**
+ * A toolbar button, built-in (`toolbarItems`) or the app's own: it runs `command`, or opens a
+ * menu of `actions`. The toolbar keeps one tab stop for all its items (arrow keys, Home and End
+ * move between them), gives toggles `aria-pressed` and a button that cannot apply now
+ * `aria-disabled` (still focusable), and leaves the focus and selection in the document on click.
+ */
+export interface ToolbarItem {
+  /** Unique in the toolbar; also its class, `foli-toolbar-<key>`. */
+  readonly key: string;
+  /** What it does: the tooltip, and the accessible name when an `icon` stands for the text. */
+  readonly label: string;
+  /** Visible text, which is then the accessible name (default `label`). */
+  readonly text?: string | undefined;
+  /** Shown instead of the text (a symbol or an SVG): `label` is then the accessible name. */
+  readonly icon?: ReactNode | undefined;
   /**
-   * Whether the command can run now (default: always; a paragraph takes every mark and a page
-   * break). A cheap check, not a dry
-   * run: it runs after every transaction, and a dry run builds the whole transaction (for a
-   * block type over a large selection, quadratic in the number of blocks).
+   * What a press runs, on the editor of the header, footer or note open on its page, else the
+   * body's (as the built-in buttons do).
    */
-  enabled?: (state: EditorState) => boolean;
-  /** The command a press runs (not for a menu button). */
-  command?: (state: EditorState) => Command;
+  readonly command?: Command | undefined;
+  /** A toggle: whether it shows as pressed (`aria-pressed`). Runs after every transaction. */
+  readonly pressed?: ((state: EditorState, editor: Editor) => boolean) | undefined;
+  /**
+   * Whether it can be used now. Default: a dry run of `command` (`editor.can`), or true for a
+   * menu. Runs after every transaction: keep it cheap.
+   */
+  readonly enabled?: ((state: EditorState, editor: Editor) => boolean) | undefined;
+  /**
+   * A menu button: its entries, in order, or a function of the body's editor making them (as
+   * the built-in menus do). Each entry is dry-run when the menu opens.
+   */
+  readonly actions?:
+    | readonly ToolbarAction[]
+    | ((editor: Editor) => readonly ToolbarAction[])
+    | undefined;
+}
+
+/** An entry of a toolbar menu (a `menuitem`, or a `menuitemcheckbox` when it has `checked`). */
+export interface ToolbarAction {
+  /** Unique in its menu. */
+  readonly key: string;
+  readonly label: string;
+  /** What it runs; a dry run when the menu opens decides whether it is enabled. */
+  readonly command: Command;
+  /** A checkable entry: whether it is checked. */
+  readonly checked?: ((state: EditorState) => boolean) | undefined;
+}
+
+/**
+ * A built-in item: boxes, color menus and dialogs are only the toolbar's own. Each has its own
+ * cheap `enabled`, not a dry run: that runs after every transaction, and a dry run builds the
+ * whole transaction (for a block type over a large selection, quadratic in the number of blocks).
+ */
+interface Item extends ToolbarItem {
   /** A menu button: its options, the current value, and what picking one runs. */
   menu?: {
     options: readonly ColorOption[];
@@ -183,14 +223,10 @@ interface Item {
   };
 }
 
-/** A command in an action menu (a menuitem, or a menuitemcheckbox when it has `checked`). */
-interface Action {
-  key: string;
-  label: string;
-  /** The command it runs; with `dialog`, whether it applies: the dialog does the rest. */
-  command: Command;
+/** A built-in menu's entry: it may open a dialog or move the focus. */
+interface Action extends ToolbarAction {
+  /** With `dialog`, `command` says whether it applies: the dialog does the rest. */
   dialog?: "insertTable" | "pageSetup" | "crossReference" | "controlProperties" | "noteOptions";
-  checked?: (state: EditorState) => boolean;
   /** It takes the focus where it belongs (into a story, or back to the body). */
   movesFocus?: boolean;
 }
@@ -550,24 +586,25 @@ const alignIcon = (bars: readonly [number, number][]) => (
   </svg>
 );
 
+/** A paragraph takes every mark and a page break: no need for a dry run after each change. */
+const always = () => true;
+
 const align = (value: Alignment, label: string, bars: readonly [number, number][]): Item => ({
   key: `align-${value}`,
   label,
-  text: label,
-  symbol: true,
   icon: alignIcon(bars),
   pressed: (state) => alignAt(state) === value,
   enabled: hasTextblock,
-  command: () => setAlign(value),
+  command: setAlign(value),
 });
 
-const mark = (key: string, label: string, text: string): Item => ({
+const mark = (key: string, label: string, icon: string): Item => ({
   key,
   label,
-  text,
-  symbol: true,
+  icon,
   pressed: (_state, editor) => editor.isMarkActive(key),
-  command: () => toggleMark(key),
+  enabled: always,
+  command: toggleMark(key),
 });
 
 const capitalized = (name: string) => name.charAt(0).toUpperCase() + name.slice(1);
@@ -650,13 +687,12 @@ const GROUPS: Item[][] = [
       pressed: (state) => linkAt(state) !== null,
       enabled: (state) => openLinkEditor(state),
       // Asks for the link dialog, as Mod-K does: the toolbar listens for that request.
-      command: () => openLinkEditor,
+      command: openLinkEditor,
     },
     {
       key: "textColor",
       label: "Text color",
-      text: "A",
-      symbol: true,
+      icon: "A",
       enabled: hasTextblock,
       menu: {
         options: TEXT_COLORS,
@@ -667,8 +703,7 @@ const GROUPS: Item[][] = [
     {
       key: "highlight",
       label: "Highlight",
-      text: "H",
-      symbol: true,
+      icon: "H",
       enabled: hasTextblock,
       menu: {
         options: HIGHLIGHTS,
@@ -722,37 +757,33 @@ const GROUPS: Item[][] = [
     {
       key: "bulletList",
       label: "Bulleted list",
-      text: "•",
-      symbol: true,
+      icon: "•",
       pressed: (state) => listKindAt(state) === "bulletList",
       enabled: hasTextblock,
-      command: () => toggleList("bulletList"),
+      command: toggleList("bulletList"),
     },
     {
       key: "orderedList",
       label: "Numbered list",
       // A symbol, not "1.": visible text that is not part of the name fails WCAG 2.5.3.
-      text: "№",
-      symbol: true,
+      icon: "№",
       pressed: (state) => listKindAt(state) === "orderedList",
       enabled: hasTextblock,
-      command: () => toggleList("orderedList"),
+      command: toggleList("orderedList"),
     },
     {
       key: "outdent",
       label: "Decrease indent",
-      text: "⇤",
-      symbol: true,
+      icon: "⇤",
       enabled: canOutdent,
-      command: () => changeIndent(-1),
+      command: changeIndent(-1),
     },
     {
       key: "indent",
       label: "Increase indent",
-      text: "⇥",
-      symbol: true,
+      icon: "⇥",
       enabled: hasTextblock,
-      command: () => changeIndent(1),
+      command: changeIndent(1),
     },
   ],
   [
@@ -761,7 +792,7 @@ const GROUPS: Item[][] = [
       label: "New comment on the selection",
       text: "New comment",
       enabled: (state) => wordContext(state) !== null && hasTextblock(state),
-      command: () => addComment(""),
+      command: addComment(""),
     },
     {
       key: "trackChanges",
@@ -769,7 +800,7 @@ const GROUPS: Item[][] = [
       text: "Track changes",
       pressed: (state) => trackState(state)?.on === true,
       enabled: (state) => trackState(state) !== null,
-      command: (state) => setTrackChanges(!trackState(state)?.on),
+      command: (state, dispatch) => setTrackChanges(!trackState(state)?.on)(state, dispatch),
     },
     {
       key: "reviewView",
@@ -789,42 +820,42 @@ const GROUPS: Item[][] = [
       label: "Previous change",
       text: "Previous change",
       enabled: (state) => trackState(state) !== null,
-      command: () => previousChange,
+      command: previousChange,
     },
     {
       key: "nextChange",
       label: "Next change",
       text: "Next change",
       enabled: (state) => trackState(state) !== null,
-      command: () => nextChange,
+      command: nextChange,
     },
     {
       key: "acceptChange",
       label: "Accept the change here, or the changes selected",
       text: "Accept",
       enabled: (state) => trackState(state) !== null,
-      command: () => acceptChange,
+      command: acceptChange,
     },
     {
       key: "rejectChange",
       label: "Reject the change here, or the changes selected",
       text: "Reject",
       enabled: (state) => trackState(state) !== null,
-      command: () => rejectChange,
+      command: rejectChange,
     },
     {
       key: "acceptAll",
       label: "Accept all changes",
       text: "Accept all",
       enabled: (state) => trackState(state) !== null,
-      command: () => acceptAllChanges(),
+      command: acceptAllChanges(),
     },
     {
       key: "rejectAll",
       label: "Reject all changes",
       text: "Reject all",
       enabled: (state) => trackState(state) !== null,
-      command: () => rejectAllChanges(),
+      command: rejectAllChanges(),
     },
   ],
   [
@@ -833,14 +864,14 @@ const GROUPS: Item[][] = [
       label: "Undo",
       text: "Undo",
       enabled: (state) => undoDepth(state) > 0,
-      command: () => undo,
+      command: undo,
     },
     {
       key: "redo",
       label: "Redo",
       text: "Redo",
       enabled: (state) => redoDepth(state) > 0,
-      command: () => redo,
+      command: redo,
     },
   ],
   [
@@ -887,7 +918,13 @@ const GROUPS: Item[][] = [
       // With a picture selected the dialog edits it.
       dialog: "picture",
     },
-    { key: "pageBreak", label: "Page break", text: "Page break", command: () => insertPageBreak },
+    {
+      key: "pageBreak",
+      label: "Page break",
+      text: "Page break",
+      enabled: always,
+      command: insertPageBreak,
+    },
     {
       key: "section",
       label: "Section",
@@ -933,10 +970,61 @@ const GROUPS: Item[][] = [
   ],
 ];
 
-const ITEMS = GROUPS.flat();
-/** Without "New comment": where no comments pane lets a comment be written. */
-const GROUPS_NO_COMMENT = GROUPS.map((group) => group.filter((i) => i.key !== "newComment"));
-const ITEMS_NO_COMMENT = GROUPS_NO_COMMENT.flat();
+/** The names of the built-in items in `toolbarItems`. */
+export type ToolbarItemName =
+  | "style"
+  | "font"
+  | "size"
+  | "bold"
+  | "italic"
+  | "underline"
+  | "strike"
+  | "link"
+  | "textColor"
+  | "highlight"
+  | "alignStart"
+  | "alignCenter"
+  | "alignEnd"
+  | "alignJustify"
+  | "lineSpacing"
+  | "bulletList"
+  | "orderedList"
+  | "outdent"
+  | "indent"
+  | "newComment"
+  | "trackChanges"
+  | "reviewView"
+  | "previousChange"
+  | "nextChange"
+  | "acceptChange"
+  | "rejectChange"
+  | "acceptAll"
+  | "rejectAll"
+  | "undo"
+  | "redo"
+  | "table"
+  | "tableStyle"
+  | "cellShading"
+  | "picture"
+  | "pageBreak"
+  | "section"
+  | "headerFooter"
+  | "fields"
+  | "navigate"
+  | "notes"
+  | "controls";
+
+/**
+ * The built-in items by name, to place in `FoliToolbarProps.items` (an item's `key` is its name,
+ * except the alignments: `align-start`, `align-center`, `align-end`, `align-justify`). A copy
+ * with another `label` or `icon` keeps what the built-in does.
+ */
+export const toolbarItems = Object.fromEntries(
+  GROUPS.flat().map((item) => [item.key.replace(/-(\w)/, (_, c: string) => c.toUpperCase()), item]),
+) as Readonly<Record<ToolbarItemName, ToolbarItem>>;
+
+/** The default toolbar: groups of `toolbarItems`, a separator between groups. */
+export const defaultToolbarItems: readonly (readonly ToolbarItem[])[] = GROUPS;
 
 interface LinkDialogState {
   /** The link at the selection when the dialog opened ("" for none). */
@@ -963,26 +1051,30 @@ const sameStates = (a: ItemState[], b: ItemState[]) =>
       item.value === b[i]?.value,
   );
 
-/** Runs after every transaction: O(selection), no transactions built. */
+/**
+ * Runs after every transaction: the built-ins' checks are O(selection), no transactions built;
+ * an app's item without `enabled` gets a dry run of its command.
+ */
 const statesOf =
   (items: readonly Item[]) =>
   (state: EditorState, editor: Editor): ItemState[] =>
     items.map((item) => ({
       pressed: item.pressed?.(state, editor),
-      enabled: item.enabled?.(state) ?? true,
+      enabled: item.enabled
+        ? item.enabled(state, editor)
+        : !item.command || item.actions !== undefined || editor.can(item.command),
       value:
         item.menu?.value(state) ??
         item.select?.value(state) ??
         (item.dialog ? (selectedPicture(state) ? "edit" : "insert") : undefined),
     }));
-const selectStates = statesOf(ITEMS);
-const selectStatesNoComment = statesOf(ITEMS_NO_COMMENT);
 
 /**
- * Word's formatting controls for an editor: paragraph style, font and size boxes, marks, link (a
- * dialog, also on Mod-K in the document), text color and highlight menus, alignment and line
- * spacing, lists (bulleted, numbered, decrease and increase indent), undo, redo, tables (a Table
- * menu with an insert table dialog, a table style box, a cell shading menu), page break.
+ * Word's formatting controls for an editor (`defaultToolbarItems`, or `items`): paragraph
+ * style, font and size boxes, marks, link (a dialog, also on Mod-K in the document), text color
+ * and highlight menus, alignment and line spacing, lists (bulleted, numbered, decrease and
+ * increase indent), undo, redo, tables (a Table menu with an insert table dialog, a table style
+ * box, a cell shading menu), page break.
  * One tab stop (arrow keys, Home and End move between buttons); toggles carry
  * `aria-pressed`; a button whose command cannot run now is `aria-disabled` (still focusable).
  * Clicks leave the focus and selection in the document.
@@ -995,17 +1087,25 @@ export function FoliToolbar({
   className,
   comments = false,
   upload,
+  items: itemGroups,
 }: FoliToolbarProps) {
   const body = useEditorOrContext(given, "FoliToolbar");
   // A story open on its page takes the formatting commands; the body otherwise.
   const editor = useActiveEditor(body);
-  const groups = comments ? GROUPS : GROUPS_NO_COMMENT;
-  const items = comments ? ITEMS : ITEMS_NO_COMMENT;
-  const states = useEditorState(comments ? selectStates : selectStatesNoComment, {
-    editor,
-    isEqual: sameStates,
-  });
-  const [active, setActive] = useState(0);
+  // Without "New comment" where no comments pane lets a comment be written.
+  const { groups, items, selectStates } = useMemo(() => {
+    const groups = (itemGroups ?? GROUPS)
+      .map((group) =>
+        (group as readonly Item[]).filter((item) => comments || item.key !== "newComment"),
+      )
+      .filter((group) => group.length > 0);
+    const items = groups.flat();
+    return { groups, items, selectStates: statesOf(items) };
+  }, [itemGroups, comments]);
+  const states = useEditorState(selectStates, { editor, isEqual: sameStates });
+  const [focused, setActive] = useState(0);
+  // The tab stop stays on the toolbar when items are taken away.
+  const active = focused < items.length ? focused : 0;
   const buttons = useRef<(HTMLButtonElement | HTMLSelectElement | null)[]>([]);
   // Whether a select box was last used with the pointer (its pick then goes back to the document).
   const pointer = useRef(false);
@@ -1043,7 +1143,7 @@ export function FoliToolbar({
       return;
     }
     if (!item.command) return;
-    editor.run(item.command(editor.state));
+    editor.run(item.command);
     // `detail` counts pointer clicks; Enter and Space on a button give 0.
     if (event.detail > 0) onClickCommand?.();
   };
@@ -1283,7 +1383,7 @@ export function FoliToolbar({
                   type="button"
                   className={`foli-toolbar-button foli-toolbar-${item.key}`}
                   // Speech input users say what they see: "H1", "Undo"; symbols get a name.
-                  aria-label={item.symbol ? item.label : undefined}
+                  aria-label={item.icon !== undefined ? item.label : undefined}
                   title={item.label}
                   aria-pressed={item.pressed ? Boolean(state?.pressed) : undefined}
                   aria-haspopup={
@@ -1303,7 +1403,7 @@ export function FoliToolbar({
                     setMenu(item.key);
                   }}
                 >
-                  {item.icon ?? item.text}
+                  {item.icon ?? item.text ?? item.label}
                   {item.menu && (
                     <span
                       className="foli-toolbar-swatch"

@@ -1,7 +1,10 @@
 export {
+  type CommandState,
   FoliEditorProvider,
+  type UseCommandOptions,
   type UseEditorStateOptions,
   type UseFoliEditorOptions,
+  useCommand,
   useCurrentEditor,
   useEditorState,
   useFoliEditor,
@@ -15,4 +18,12 @@ export {
   type FoliEditorProps,
 } from "./FoliEditor.js";
 export { FoliNavigation, type FoliNavigationProps } from "./FoliNavigation.js";
-export { FoliToolbar, type FoliToolbarProps } from "./FoliToolbar.js";
+export {
+  defaultToolbarItems,
+  FoliToolbar,
+  type FoliToolbarProps,
+  type ToolbarAction,
+  type ToolbarItem,
+  type ToolbarItemName,
+  toolbarItems,
+} from "./FoliToolbar.js";

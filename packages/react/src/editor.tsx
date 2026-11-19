@@ -1,9 +1,12 @@
 import {
+  type BuiltInCommands,
+  type Command,
   createEditor,
   type Editor,
   type EditorDocument,
   type EditorState,
   type Extension,
+  type FoliCommands,
   type Plugin,
   type ReviewView,
 } from "@folijs/core";
@@ -34,11 +37,15 @@ export interface UseFoliEditorOptions {
    * load another document, `editor.setDocument()`.
    */
   initialContent?: EditorDocument | undefined;
-  /** Read once, when the editor is created. */
+  /**
+   * Read once, when the editor is created. A different list later (other plugins, not a new
+   * array of the same ones) is ignored, with a warning outside production: give the component a
+   * new `key` to make a new editor with it.
+   */
   plugins?: readonly Plugin[] | undefined;
   /**
    * Read once: custom nodes and marks, their plugins and view hooks (`ViewExtension` from
-   * `@folijs/view`), as `createEditor`'s `extensions`.
+   * `@folijs/view`), as `createEditor`'s `extensions`. Changed later: as `plugins`.
    */
   extensions?: readonly Extension[] | undefined;
   /** Read once: who edits (tracked changes are made in this name; `createEditor`'s `author`). */
@@ -73,8 +80,30 @@ export function useFoliEditor(options: UseFoliEditorOptions = {}): Editor {
       ...(reviewView !== undefined && { reviewView }),
     });
   });
+  // ADR-0008: the editor takes its plugins and extensions once; say so when an app changes them.
+  const first = useRef(options);
+  const warned = useRef(false);
+  useEffect(() => {
+    if (warned.current || !development()) return;
+    const changed = (["plugins", "extensions"] as const).find(
+      (name) => !sameItems(first.current[name], options[name]),
+    );
+    if (!changed) return;
+    warned.current = true;
+    console.warn(
+      `Foli: \`${changed}\` changed after the editor was created and is ignored. Give the component a new \`key\` to create an editor with the new list.`,
+    );
+  });
   return editor;
 }
+
+const development = () =>
+  (globalThis as { process?: { env?: { NODE_ENV?: string } } }).process?.env?.NODE_ENV !==
+  "production";
+
+/** The same elements (an inline array of the same plugins is not a change). */
+const sameItems = (a: readonly unknown[] = [], b: readonly unknown[] = []) =>
+  a.length === b.length && a.every((item, i) => item === b[i]);
 
 const EditorContext = createContext<Editor | null>(null);
 
@@ -152,4 +181,50 @@ export function useEditorState<T>(
     return kept;
   };
   return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
+}
+
+/** What `useCommand` gives: whether the command applies now, and a way to run it. */
+export interface CommandState {
+  /** A dry run (`editor.can`), again after every transaction. */
+  readonly enabled: boolean;
+  /** Runs the command on the editor; whether it applied. */
+  run(): boolean;
+}
+
+export interface UseCommandOptions {
+  /** Default: the context's editor. */
+  editor?: Editor | undefined;
+}
+
+/**
+ * A command's state for a button of the app's own: `enabled` re-renders the component when a dry
+ * run's answer changes, `run` runs it, e.g. `useCommand(toggleMark("bold"))`. The dry run runs
+ * after every transaction: keep the command cheap to ask.
+ */
+export function useCommand(command: Command, options?: UseCommandOptions): CommandState;
+/**
+ * A plugin's command by name (`PluginSpec.commands`), typed by `FoliCommands`, on the context's
+ * editor: `useCommand("insertMention", "u-1", "Ada")`. Throws when no plugin has it. Built-in
+ * commands have no factory to dry-run by name: pass their command (`useCommand(undo)`).
+ */
+export function useCommand<K extends Exclude<keyof FoliCommands, keyof BuiltInCommands>>(
+  name: K,
+  ...args: Parameters<FoliCommands[K]>
+): CommandState;
+export function useCommand(target: Command | string, ...rest: unknown[]): CommandState {
+  const named = typeof target === "string";
+  const editor = useEditorOrContext(
+    named ? undefined : (rest[0] as UseCommandOptions | undefined)?.editor,
+    "useCommand",
+  );
+  const command = (state: EditorState): Command => {
+    if (!named) return target;
+    const factory = state.plugins.find((plugin) =>
+      Object.hasOwn(plugin.spec.commands ?? {}, target),
+    )?.spec.commands?.[target];
+    if (!factory) throw new RangeError(`useCommand: no plugin has a command named "${target}"`);
+    return (factory as (...args: unknown[]) => Command)(...rest);
+  };
+  const enabled = useEditorState((state, editor) => editor.can(command(state)), { editor });
+  return { enabled, run: () => editor.run(command(editor.state)) };
 }

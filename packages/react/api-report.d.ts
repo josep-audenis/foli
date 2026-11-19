@@ -59,6 +59,7 @@ export declare function FoliComments({ editor: editorProp, readOnly, label, clas
 import type { Editor, EditorDocument, Extension, FoliDocument, Plugin, ReviewView, Transaction } from "@folijs/core";
 import { type ReactNode } from "react";
 import { type FoliCanvasHandle, type FoliCanvasProps } from "./FoliCanvas.js";
+import { type ToolbarItem } from "./FoliToolbar.js";
 /**
  * A change to the document's content, as `FoliEditor` reports it. `document` is a getter:
  * spreading the object or `JSON.stringify(change)` serializes the document (and walks `editor`).
@@ -79,9 +80,15 @@ export interface FoliEditorProps extends Omit<FoliCanvasProps, "editor"> {
      * schema v3). To load another document later: `editor.setDocument()` or a new `key`.
      */
     initialContent?: EditorDocument | undefined;
-    /** Read once on mount. */
+    /**
+     * Read once on mount: a different list later is ignored, with a warning outside production
+     * (`useFoliEditor`). To change them, give `FoliEditor` a new `key`.
+     */
     plugins?: readonly Plugin[] | undefined;
-    /** Read once on mount: custom nodes and marks with their view hooks (`ViewExtension`). */
+    /**
+     * Read once on mount, as `plugins`: custom nodes and marks with their view hooks
+     * (`ViewExtension`).
+     */
     extensions?: readonly Extension[] | undefined;
     /** Read once on mount: who edits (tracked changes are made in this name). */
     author?: string | undefined;
@@ -95,8 +102,11 @@ export interface FoliEditorProps extends Omit<FoliCanvasProps, "editor"> {
      * caller already has the document.
      */
     onChange?: ((change: FoliChange) => void) | undefined;
-    /** Show the default `FoliToolbar` above the pages (default true). */
-    toolbar?: boolean | undefined;
+    /**
+     * Show `FoliToolbar` above the pages (default true): with `defaultToolbarItems`, or with these
+     * groups of items (`FoliToolbarProps.items`).
+     */
+    toolbar?: boolean | readonly (readonly ToolbarItem[])[] | undefined;
     /**
      * Show the comments pane (`FoliComments`) beside the pages: `"auto"` (the default) while the
      * document has comments, `true` always, `false` never.
@@ -133,8 +143,9 @@ export interface FoliNavigationProps {
 export declare function FoliNavigation({ editor: given, readOnly }: FoliNavigationProps): import("react").JSX.Element;
 
 // FoliToolbar.d.ts
-import { type Editor } from "@folijs/core";
+import { type Command, type Editor, type EditorState } from "@folijs/core";
 import { type EditorViewOptions } from "@folijs/view";
+import { type ReactNode } from "react";
 export interface FoliToolbarProps {
     /** Default: the editor of the nearest `FoliEditorProvider`. */
     editor?: Editor | undefined;
@@ -160,21 +171,81 @@ export interface FoliToolbarProps {
      * inserts one from a file; without it, it only edits a selected picture.
      */
     upload?: EditorViewOptions["upload"] | undefined;
+    /**
+     * The items, in groups (a separator between groups), in place of `defaultToolbarItems`: the
+     * built-in ones from `toolbarItems`, and the app's own. "New comment" shows only with
+     * `comments`; an empty group is left out.
+     */
+    items?: readonly (readonly ToolbarItem[])[] | undefined;
     className?: string | undefined;
 }
 /**
- * Word's formatting controls for an editor: paragraph style, font and size boxes, marks, link (a
- * dialog, also on Mod-K in the document), text color and highlight menus, alignment and line
- * spacing, lists (bulleted, numbered, decrease and increase indent), undo, redo, tables (a Table
- * menu with an insert table dialog, a table style box, a cell shading menu), page break.
+ * A toolbar button, built-in (`toolbarItems`) or the app's own: it runs `command`, or opens a
+ * menu of `actions`. The toolbar keeps one tab stop for all its items (arrow keys, Home and End
+ * move between them), gives toggles `aria-pressed` and a button that cannot apply now
+ * `aria-disabled` (still focusable), and leaves the focus and selection in the document on click.
+ */
+export interface ToolbarItem {
+    /** Unique in the toolbar; also its class, `foli-toolbar-<key>`. */
+    readonly key: string;
+    /** What it does: the tooltip, and the accessible name when an `icon` stands for the text. */
+    readonly label: string;
+    /** Visible text, which is then the accessible name (default `label`). */
+    readonly text?: string | undefined;
+    /** Shown instead of the text (a symbol or an SVG): `label` is then the accessible name. */
+    readonly icon?: ReactNode | undefined;
+    /**
+     * What a press runs, on the editor of the header, footer or note open on its page, else the
+     * body's (as the built-in buttons do).
+     */
+    readonly command?: Command | undefined;
+    /** A toggle: whether it shows as pressed (`aria-pressed`). Runs after every transaction. */
+    readonly pressed?: ((state: EditorState, editor: Editor) => boolean) | undefined;
+    /**
+     * Whether it can be used now. Default: a dry run of `command` (`editor.can`), or true for a
+     * menu. Runs after every transaction: keep it cheap.
+     */
+    readonly enabled?: ((state: EditorState, editor: Editor) => boolean) | undefined;
+    /**
+     * A menu button: its entries, in order, or a function of the body's editor making them (as
+     * the built-in menus do). Each entry is dry-run when the menu opens.
+     */
+    readonly actions?: readonly ToolbarAction[] | ((editor: Editor) => readonly ToolbarAction[]) | undefined;
+}
+/** An entry of a toolbar menu (a `menuitem`, or a `menuitemcheckbox` when it has `checked`). */
+export interface ToolbarAction {
+    /** Unique in its menu. */
+    readonly key: string;
+    readonly label: string;
+    /** What it runs; a dry run when the menu opens decides whether it is enabled. */
+    readonly command: Command;
+    /** A checkable entry: whether it is checked. */
+    readonly checked?: ((state: EditorState) => boolean) | undefined;
+}
+/** The names of the built-in items in `toolbarItems`. */
+export type ToolbarItemName = "style" | "font" | "size" | "bold" | "italic" | "underline" | "strike" | "link" | "textColor" | "highlight" | "alignStart" | "alignCenter" | "alignEnd" | "alignJustify" | "lineSpacing" | "bulletList" | "orderedList" | "outdent" | "indent" | "newComment" | "trackChanges" | "reviewView" | "previousChange" | "nextChange" | "acceptChange" | "rejectChange" | "acceptAll" | "rejectAll" | "undo" | "redo" | "table" | "tableStyle" | "cellShading" | "picture" | "pageBreak" | "section" | "headerFooter" | "fields" | "navigate" | "notes" | "controls";
+/**
+ * The built-in items by name, to place in `FoliToolbarProps.items` (an item's `key` is its name,
+ * except the alignments: `align-start`, `align-center`, `align-end`, `align-justify`). A copy
+ * with another `label` or `icon` keeps what the built-in does.
+ */
+export declare const toolbarItems: Readonly<Record<ToolbarItemName, ToolbarItem>>;
+/** The default toolbar: groups of `toolbarItems`, a separator between groups. */
+export declare const defaultToolbarItems: readonly (readonly ToolbarItem[])[];
+/**
+ * Word's formatting controls for an editor (`defaultToolbarItems`, or `items`): paragraph
+ * style, font and size boxes, marks, link (a dialog, also on Mod-K in the document), text color
+ * and highlight menus, alignment and line spacing, lists (bulleted, numbered, decrease and
+ * increase indent), undo, redo, tables (a Table menu with an insert table dialog, a table style
+ * box, a cell shading menu), page break.
  * One tab stop (arrow keys, Home and End move between buttons); toggles carry
  * `aria-pressed`; a button whose command cannot run now is `aria-disabled` (still focusable).
  * Clicks leave the focus and selection in the document.
  */
-export declare function FoliToolbar({ editor: given, disabled, onClickCommand, label, className, comments, upload, }: FoliToolbarProps): import("react").JSX.Element;
+export declare function FoliToolbar({ editor: given, disabled, onClickCommand, label, className, comments, upload, items: itemGroups, }: FoliToolbarProps): import("react").JSX.Element;
 
 // editor.d.ts
-import { type Editor, type EditorDocument, type EditorState, type Extension, type Plugin, type ReviewView } from "@folijs/core";
+import { type BuiltInCommands, type Command, type Editor, type EditorDocument, type EditorState, type Extension, type FoliCommands, type Plugin, type ReviewView } from "@folijs/core";
 import { type ReactNode } from "react";
 export interface UseFoliEditorOptions {
     /**
@@ -183,11 +254,15 @@ export interface UseFoliEditorOptions {
      * load another document, `editor.setDocument()`.
      */
     initialContent?: EditorDocument | undefined;
-    /** Read once, when the editor is created. */
+    /**
+     * Read once, when the editor is created. A different list later (other plugins, not a new
+     * array of the same ones) is ignored, with a warning outside production: give the component a
+     * new `key` to make a new editor with it.
+     */
     plugins?: readonly Plugin[] | undefined;
     /**
      * Read once: custom nodes and marks, their plugins and view hooks (`ViewExtension` from
-     * `@folijs/view`), as `createEditor`'s `extensions`.
+     * `@folijs/view`), as `createEditor`'s `extensions`. Changed later: as `plugins`.
      */
     extensions?: readonly Extension[] | undefined;
     /** Read once: who edits (tracked changes are made in this name; `createEditor`'s `author`). */
@@ -222,11 +297,34 @@ export interface UseEditorStateOptions<T> {
  * every transaction: keep it cheap.
  */
 export declare function useEditorState<T>(selector: (state: EditorState, editor: Editor) => T, { editor: given, isEqual }?: UseEditorStateOptions<T>): T;
+/** What `useCommand` gives: whether the command applies now, and a way to run it. */
+export interface CommandState {
+    /** A dry run (`editor.can`), again after every transaction. */
+    readonly enabled: boolean;
+    /** Runs the command on the editor; whether it applied. */
+    run(): boolean;
+}
+export interface UseCommandOptions {
+    /** Default: the context's editor. */
+    editor?: Editor | undefined;
+}
+/**
+ * A command's state for a button of the app's own: `enabled` re-renders the component when a dry
+ * run's answer changes, `run` runs it, e.g. `useCommand(toggleMark("bold"))`. The dry run runs
+ * after every transaction: keep the command cheap to ask.
+ */
+export declare function useCommand(command: Command, options?: UseCommandOptions): CommandState;
+/**
+ * A plugin's command by name (`PluginSpec.commands`), typed by `FoliCommands`, on the context's
+ * editor: `useCommand("insertMention", "u-1", "Ada")`. Throws when no plugin has it. Built-in
+ * commands have no factory to dry-run by name: pass their command (`useCommand(undo)`).
+ */
+export declare function useCommand<K extends Exclude<keyof FoliCommands, keyof BuiltInCommands>>(name: K, ...args: Parameters<FoliCommands[K]>): CommandState;
 
 // index.d.ts
-export { FoliEditorProvider, type UseEditorStateOptions, type UseFoliEditorOptions, useCurrentEditor, useEditorState, useFoliEditor, } from "./editor.js";
+export { type CommandState, FoliEditorProvider, type UseCommandOptions, type UseEditorStateOptions, type UseFoliEditorOptions, useCommand, useCurrentEditor, useEditorState, useFoliEditor, } from "./editor.js";
 export { FoliCanvas, type FoliCanvasHandle, type FoliCanvasProps } from "./FoliCanvas.js";
 export { FoliComments, type FoliCommentsProps } from "./FoliComments.js";
 export { type FoliChange, FoliEditor, type FoliEditorHandle, type FoliEditorProps, } from "./FoliEditor.js";
 export { FoliNavigation, type FoliNavigationProps } from "./FoliNavigation.js";
-export { FoliToolbar, type FoliToolbarProps } from "./FoliToolbar.js";
+export { defaultToolbarItems, FoliToolbar, type FoliToolbarProps, type ToolbarAction, type ToolbarItem, type ToolbarItemName, toolbarItems, } from "./FoliToolbar.js";

@@ -352,6 +352,13 @@ Details in the [package README](../packages/docx/README.md).
   print sheets ([styling.md](styling.md#content-security-policy)).
 - `Plugin`, `Transaction` metadata, steps and mapping are exported but not a stable API before
   1.0 (`PluginSpec` is frozen for 1.x by ADR-0008).
+- `plugins` and `extensions` (of `FoliEditor` and `useFoliEditor`) are read once: changing them
+  after mount does not reconfigure the editor (a warning outside production; a new `key` makes a
+  new editor, losing undo history and the selection).
+- Toolbar items of an app are buttons and menus of `ToolbarAction`s: the boxes (style, font),
+  color menus and dialogs are only the built-in items'. An app item's state without `enabled` is
+  a dry run of its command after every transaction, which costs what the command costs.
+  `useCommand(name)` dry-runs plugin commands only: the built-in ones by their command.
 - Keys ([keyboard.md](keyboard.md)): `editor.handleKey` runs the plugins' keymaps only, not the
   view's own keys (they need the pages). A keymap cannot take a reserved key, nor the browser's
   editing commands that arrive without a key name (word and line deletion, the browser's undo

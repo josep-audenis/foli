@@ -9,21 +9,21 @@ leaves `main` green with a working playground.
 **Update this table in the same PR that starts, advances or finishes a phase.** It is the only
 place that says what is in progress; check it before starting work.
 
-| Phase                    | Status                   | Branch             | Notes                                                                                                        |
-| ------------------------ | ------------------------ | ------------------ | ------------------------------------------------------------------------------------------------------------ |
-| 0 Foundation             | ✅ Done                  | —                  |                                                                                                              |
-| 1 Architecture spike     | ✅ Done (G1 provisional) | —                  | Merged in #1; ADR-0003 accepted provisionally; IME, dead-key and screen-reader checks open                   |
-| 2 Document model         | ✅ Done                  | —                  | Merged in #2                                                                                                 |
-| 3 Transactions & history | ✅ Done                  | —                  | Merged in #4; gate G2 passed                                                                                 |
-| 4 Editor view            | ✅ Done (G3 provisional) | —                  | Merged in #8–#13; manual checks (4.6) deferred, open risks in ADR-0003                                       |
-| 5 Native pagination      | ✅ Done (G4 provisional) | —                  | Merged in #15–#22; page-break manual checks open, risks in ADR-0003                                          |
-| 6 React API & 0.1.0      | ✅ Done                  | —                  | Merged in #23–#31; 0.1.0 on npm; manual checks shipped as known risks (ADR-0003)                             |
-| 7 Rich content           | ✅ Done                  | —                  | Merged in #33–#41; 0.2.0 on npm; list-document benchmark misses accepted (known limit)                       |
-| 8 Word model & DOCX      | ✅ Done                  | —                  | Merged in #44–#61; 0.3.0 on npm (`@folijs/docx` first released); gate G5 passed                              |
-| 9 Review                 | ✅ Done                  | —                  | Merged in #63–#72; 0.4.0 on npm                                                                              |
-| 10 Tables & images       | ✅ Done                  | —                  | Merged in #73–#97 (#90, the landing page, went to main); 0.5.0 on npm; two misses accepted                   |
-| 11 Sections & templates  | ✅ Done                  | —                  | Merged in #100–#118 (#106, #107, #110, #112 and #113, the site, went to main); 0.6.0 on npm; misses accepted |
-| 12 Ecosystem & 1.0       | In progress              | phase-12/ecosystem | 12.1 to 12.5 done: ADR-0008, API reports, custom nodes and marks, view hooks, commands and keys; 12.6 next   |
+| Phase                    | Status                   | Branch             | Notes                                                                                                                     |
+| ------------------------ | ------------------------ | ------------------ | ------------------------------------------------------------------------------------------------------------------------- |
+| 0 Foundation             | ✅ Done                  | —                  |                                                                                                                           |
+| 1 Architecture spike     | ✅ Done (G1 provisional) | —                  | Merged in #1; ADR-0003 accepted provisionally; IME, dead-key and screen-reader checks open                                |
+| 2 Document model         | ✅ Done                  | —                  | Merged in #2                                                                                                              |
+| 3 Transactions & history | ✅ Done                  | —                  | Merged in #4; gate G2 passed                                                                                              |
+| 4 Editor view            | ✅ Done (G3 provisional) | —                  | Merged in #8–#13; manual checks (4.6) deferred, open risks in ADR-0003                                                    |
+| 5 Native pagination      | ✅ Done (G4 provisional) | —                  | Merged in #15–#22; page-break manual checks open, risks in ADR-0003                                                       |
+| 6 React API & 0.1.0      | ✅ Done                  | —                  | Merged in #23–#31; 0.1.0 on npm; manual checks shipped as known risks (ADR-0003)                                          |
+| 7 Rich content           | ✅ Done                  | —                  | Merged in #33–#41; 0.2.0 on npm; list-document benchmark misses accepted (known limit)                                    |
+| 8 Word model & DOCX      | ✅ Done                  | —                  | Merged in #44–#61; 0.3.0 on npm (`@folijs/docx` first released); gate G5 passed                                           |
+| 9 Review                 | ✅ Done                  | —                  | Merged in #63–#72; 0.4.0 on npm                                                                                           |
+| 10 Tables & images       | ✅ Done                  | —                  | Merged in #73–#97 (#90, the landing page, went to main); 0.5.0 on npm; two misses accepted                                |
+| 11 Sections & templates  | ✅ Done                  | —                  | Merged in #100–#118 (#106, #107, #110, #112 and #113, the site, went to main); 0.6.0 on npm; misses accepted              |
+| 12 Ecosystem & 1.0       | In progress              | phase-12/ecosystem | 12.1 to 12.6 done: ADR-0008, API reports, custom nodes and marks, view hooks, commands and keys, toolbar items; 12.7 next |
 
 Status values: `Ready` (dependencies met, nobody on it) · `In progress` · `In review` (PR open) ·
 `✅ Done` (merged, acceptance criteria met) · `Blocked by …`.
@@ -1554,10 +1554,45 @@ Each task is a PR on `phase-12/ecosystem`, the build green after each.
   another layout); keyboard.md warns against binding Option and AltGr combos and places the
   view's after-keymap arrows apart; `BuiltInCommands` (public) holds the built-in commands and
   `FoliCommands` extends it, so a forgotten built-in fails to compile.)
-- [ ] 12.6 React: toolbar items added, removed and grouped (built-in items exported, a custom item
+- [x] 12.6 React: toolbar items added, removed and grouped (built-in items exported, a custom item
   driven by a command's dry run and `useEditorState`), menus too where they share the code;
   `plugins` stable (changing it after mount documented or supported); hooks for commands; axe and
-  keyboard tests on a customized toolbar.
+  keyboard tests on a customized toolbar. (Done: `FoliToolbar` takes `items`, groups of
+  `ToolbarItem`s (a separator between groups, an empty one left out, New comment only with
+  `comments`), and `FoliEditor`'s `toolbar` takes the same groups in place of `true`. The 41
+  built-in items are exported by name in `toolbarItems` (`ToolbarItemName`; camelCase names, the
+  alignments' keys and classes stay `align-start`…) and the default toolbar as
+  `defaultToolbarItems`; without `items` the toolbar renders as before. `ToolbarItem` (public):
+  `key`, `label`, `text`, `icon` (then `label` names it), `command` (a `Command`: the built-ins'
+  `(state) => Command` factories became commands), `pressed`, `enabled` (default: the command's dry
+  run, `editor.can`, in the toolbar's one `useEditorState` selector; the built-ins keep their cheap
+  checks), `actions` (`ToolbarAction`s: `{ key, label, command, checked? }`, the same
+  `ActionMenu` as the built-in menus, dry-run on opening; a built-in menu gets more entries
+  through its own `actions`). The boxes, color menus and dialogs stay the built-ins' (an internal
+  `Item` extends `ToolbarItem`). App items share the built-ins' rendering: one tab stop (kept on
+  the toolbar when items go away), arrows, Home, End, `aria-pressed`, `aria-disabled`, mousedown
+  kept off the document's focus, `onClickCommand` on a click, ArrowDown opens a menu.
+  `useCommand(command, { editor? })` and `useCommand(name, ...args)` (a plugin's command, typed by
+  `FoliCommands`: names not in `BuiltInCommands`; the factory found in `state.plugins`, throws
+  when none has it) give `CommandState` `{ enabled, run }`. `plugins` and `extensions` stay read
+  once (ADR-0008: "take the same list once"): `useFoliEditor` compares them element by element
+  and warns once outside production (`globalThis.process?.env?.NODE_ENV`, as ADR-0008's
+  deprecation rule) that a new `key` is needed. Docs: api.md (toolbar items, hooks, props),
+  getting started (a customized toolbar), React README, limitations. Tests: React
+  `items.test.tsx` (11, jsdom: names both ways, groups and roving tabindex, a custom item's dry
+  run, `aria-pressed` and focus-keeping mousedown, an icon item, a custom menu and an entry added
+  to Fields, `FoliEditor`'s `toolbar`, `useCommand` by command and by name, unknown name, the
+  plugins and extensions warnings); e2e `toolbar-items.spec.ts` on `/toolbar.html` (new: built-in
+  items cut down and regrouped, a plugin's command as an item, a custom toggle, a custom menu,
+  a `useCommand` button): items in order and axe clean with the menu open, mouse (dry run
+  disables over a selection, focus and selection kept, pressed toggle, undo, the hook's button),
+  keyboard only (Shift+Tab in, End, wrapping arrows, visible focus, Enter runs and keeps focus,
+  ArrowDown, Escape and Enter in the menu, Tab back to the caret): 9 passed in Chromium, Firefox
+  and WebKit. No regression in the suites that use the toolbar or its menus (`toolbar`, `format`, `links`, `lists`, `lifecycle`, `view-options`, `visual`, `extension`, `word-columns`, `word-comments`, `word-controls`, `word-fields`, `word-format`, `word-headers`, `word-navigation`, `word-notes`, `word-pictures`, `word-review`, `word-sections`, `word-tables`): 534 passed, 18 skipped (the usual clipboard and IME skips) of 184 per engine in Chromium, Firefox and WebKit, visual snapshots unchanged. Sizes within budgets (React 154.4 of 157.0 kB). Shortcuts:
+  `useCommand(name)` dry-runs plugin commands only (built-in names have no factory to find);
+  app items cannot be boxes, color menus or open dialogs; an item's dry run runs after every
+  transaction, so its cost is the command's; changing `plugins` is warned about, not supported;
+  the warning reads `NODE_ENV` through `globalThis`, which bundlers do not replace statically.)
 - [ ] 12.7 Performance tracking: the layout, keystroke, find, `.docx` import and export and PDF
   benchmarks with stored baselines per engine and machine, thresholds, a summary that fails on a
   regression, run where ADR-0008 says; `docs/benchmarks.md` rerun for 1.0 with method and hardware.

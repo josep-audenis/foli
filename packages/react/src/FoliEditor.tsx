@@ -18,7 +18,7 @@ import {
 import { FoliCanvas, type FoliCanvasHandle, type FoliCanvasProps } from "./FoliCanvas.js";
 import { FoliComments } from "./FoliComments.js";
 import { FoliNavigation } from "./FoliNavigation.js";
-import { FoliToolbar } from "./FoliToolbar.js";
+import { FoliToolbar, type ToolbarItem } from "./FoliToolbar.js";
 
 /**
  * A change to the document's content, as `FoliEditor` reports it. `document` is a getter:
@@ -41,9 +41,15 @@ export interface FoliEditorProps extends Omit<FoliCanvasProps, "editor"> {
    * schema v3). To load another document later: `editor.setDocument()` or a new `key`.
    */
   initialContent?: EditorDocument | undefined;
-  /** Read once on mount. */
+  /**
+   * Read once on mount: a different list later is ignored, with a warning outside production
+   * (`useFoliEditor`). To change them, give `FoliEditor` a new `key`.
+   */
   plugins?: readonly Plugin[] | undefined;
-  /** Read once on mount: custom nodes and marks with their view hooks (`ViewExtension`). */
+  /**
+   * Read once on mount, as `plugins`: custom nodes and marks with their view hooks
+   * (`ViewExtension`).
+   */
   extensions?: readonly Extension[] | undefined;
   /** Read once on mount: who edits (tracked changes are made in this name). */
   author?: string | undefined;
@@ -57,8 +63,11 @@ export interface FoliEditorProps extends Omit<FoliCanvasProps, "editor"> {
    * caller already has the document.
    */
   onChange?: ((change: FoliChange) => void) | undefined;
-  /** Show the default `FoliToolbar` above the pages (default true). */
-  toolbar?: boolean | undefined;
+  /**
+   * Show `FoliToolbar` above the pages (default true): with `defaultToolbarItems`, or with these
+   * groups of items (`FoliToolbarProps.items`).
+   */
+  toolbar?: boolean | readonly (readonly ToolbarItem[])[] | undefined;
   /**
    * Show the comments pane (`FoliComments`) beside the pages: `"auto"` (the default) while the
    * document has comments, `true` always, `false` never.
@@ -145,6 +154,7 @@ export const FoliEditor = forwardRef<FoliEditorHandle, FoliEditorProps>(function
           disabled={canvas.readOnly}
           comments={comments !== false}
           upload={canvas.upload}
+          items={toolbar === true ? undefined : toolbar}
           onClickCommand={() => canvasRef.current?.focus()}
         />
       )}

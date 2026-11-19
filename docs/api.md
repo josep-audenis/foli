@@ -23,8 +23,10 @@ Peer dependencies: `react` and `react-dom` 18.2+ or 19, and `@folijs/core` and `
 exactly its own version (after 0.6.0). Stylesheet: `@folijs/react/styles.css`
 ([styling.md](styling.md)). Stable with the components: their props and handles
 (`FoliEditorProps`, `FoliEditorHandle`, `FoliChange`, `FoliCanvasProps`, `FoliCanvasHandle`,
-`FoliCommentsProps`, `FoliNavigationProps`, `FoliToolbarProps`) and the hooks' options
-(`UseFoliEditorOptions`, `UseEditorStateOptions`).
+`FoliCommentsProps`, `FoliNavigationProps`, `FoliToolbarProps`), the toolbar's items
+(`ToolbarItem`, `ToolbarAction`, `ToolbarItemName`, `toolbarItems`, `defaultToolbarItems`), the
+hooks and their options and results (`UseFoliEditorOptions`, `UseEditorStateOptions`,
+`UseCommandOptions`, `CommandState`).
 
 ### `<FoliEditor>`
 
@@ -36,13 +38,13 @@ migrated (`parseDocument`), and what it reports is v5.
 | Prop             | Type                                             | Default      | Notes                                                                                               |
 | ---------------- | ------------------------------------------------ | ------------ | --------------------------------------------------------------------------------------------------- |
 | `initialContent` | `EditorDocument`                                 | empty A4     | Read once, on mount; any version (migrated). Later: `editor.setDocument()` or a new `key`.          |
-| `plugins`        | `readonly Plugin[]`                              | `[]`         | Read once, on mount.                                                                                |
-| `extensions`     | `readonly Extension[]`                           | `[]`         | Read once, on mount: custom nodes and marks, with their view hooks (`ViewExtension`).               |
+| `plugins`        | `readonly Plugin[]`                              | `[]`         | Read once, on mount. Other plugins later: ignored, a warning outside production; use a new `key`.   |
+| `extensions`     | `readonly Extension[]`                           | `[]`         | Read once, on mount, as `plugins`: custom nodes and marks, with their view hooks (`ViewExtension`). |
 | `author`         | `string`                                         | `"Author"`   | Read once: who edits (tracked changes are made in this name).                                       |
 | `trackChanges`   | `boolean`                                        | `false`      | Read once: record edits as tracked changes (the toolbar turns it on and off).                       |
 | `reviewView`     | `ReviewView`                                     | `"markup"`   | Read once: how tracked changes show (the toolbar changes it).                                       |
 | `onChange`       | `(change: FoliChange) => void`                   | —            | After every content change made through transactions. Not for selection changes or `setDocument`.   |
-| `toolbar`        | `boolean`                                        | `true`       | Show `FoliToolbar` above the pages.                                                                 |
+| `toolbar`        | `boolean \| readonly (readonly ToolbarItem[])[]` | `true`       | Show `FoliToolbar` above the pages; groups of items in place of the default ones (its `items`).     |
 | `comments`       | `boolean \| "auto"`                              | `"auto"`     | The comments pane beside the pages: while the document has comments (`"auto"`), always, never.      |
 | `readOnly`       | `boolean`                                        | `false`      | Read, select, copy; no editing. Disables the toolbar.                                               |
 | `placeholder`    | `string`                                         | `""`         | Shown while the document is empty.                                                                  |
@@ -177,13 +179,53 @@ closes it and calls `onClickCommand` (the focus goes to the document, where the 
 Cancel returns the focus to the Table button. A change to the document or the selection closes
 it, and only one of the link and insert table dialogs is open at a time.
 
-| Prop             | Type         | Default        | Notes                                                               |
-| ---------------- | ------------ | -------------- | ------------------------------------------------------------------- |
-| `editor`         | `Editor`     | context        |                                                                     |
-| `disabled`       | `boolean`    | `false`        | Pass it whenever the canvas is `readOnly`.                          |
-| `onClickCommand` | `() => void` | —              | After a click ran a command (`FoliEditor` focuses its canvas here). |
-| `label`          | `string`     | `"Formatting"` | Accessible name.                                                    |
-| `className`      | `string`     | —              | Added to `.foli-toolbar`.                                           |
+| Prop             | Type                                  | Default               | Notes                                                                     |
+| ---------------- | ------------------------------------- | --------------------- | ------------------------------------------------------------------------- |
+| `editor`         | `Editor`                              | context               |                                                                           |
+| `disabled`       | `boolean`                             | `false`               | Pass it whenever the canvas is `readOnly`.                                |
+| `onClickCommand` | `() => void`                          | —                     | After a click ran a command (`FoliEditor` focuses its canvas here).       |
+| `label`          | `string`                              | `"Formatting"`        | Accessible name.                                                          |
+| `comments`       | `boolean`                             | `false`               | Show New comment (only with a comments pane; `FoliEditor` passes it).     |
+| `upload`         | `(file) => Promise<…>`                | —                     | Where Picture… puts an inserted image file (`FoliEditor` passes its own). |
+| `items`          | `readonly (readonly ToolbarItem[])[]` | `defaultToolbarItems` | The items, in groups (a separator between groups).                        |
+| `className`      | `string`                              | —                     | Added to `.foli-toolbar`.                                                 |
+
+#### Toolbar items
+
+The built-in items are exported by name in `toolbarItems` (`ToolbarItemName`: `style`, `font`,
+`size`, `bold`, `italic`, `underline`, `strike`, `link`, `textColor`, `highlight`, `alignStart`,
+`alignCenter`, `alignEnd`, `alignJustify`, `lineSpacing`, `bulletList`, `orderedList`, `outdent`,
+`indent`, `newComment`, `trackChanges`, `reviewView`, `previousChange`, `nextChange`,
+`acceptChange`, `rejectChange`, `acceptAll`, `rejectAll`, `undo`, `redo`, `table`, `tableStyle`,
+`cellShading`, `picture`, `pageBreak`, `section`, `headerFooter`, `fields`, `navigate`, `notes`,
+`controls`), and the default toolbar is `defaultToolbarItems`, groups of them. `items` (or
+`FoliEditor`'s `toolbar`) takes groups of items to add, remove, reorder and regroup them; an
+empty group is left out, and New comment shows only with `comments`. An item's `key` is its
+class, `foli-toolbar-<key>` (the alignments' keys are `align-start`, `align-center`, `align-end`,
+`align-justify`).
+
+An app's item is a `ToolbarItem`:
+
+- `key`: unique in the toolbar. `label`: the tooltip, and the accessible name when `icon` is
+  given. `text`: the visible text and accessible name (default `label`). `icon`: a `ReactNode`
+  shown instead of the text.
+- `command: Command`: what a press runs, on the editor of the story open on its page, else the
+  body's. Enabled by its dry run (`editor.can(command)`) after every transaction, unless
+  `enabled(state, editor)` says otherwise (keep either cheap).
+- `pressed(state, editor)`: a toggle (`aria-pressed`).
+- `actions`: a menu button instead, its entries `ToolbarAction`s (`{ key, label, command,
+  checked? }`, a `menuitemcheckbox` with `checked(state)`), or a function of the body's editor
+  making them. Each entry is dry-run when the menu opens; `aria-disabled` when it cannot apply. A
+  built-in menu takes more entries through its own `actions` (a list for Table, Section and
+  Controls, a function of the editor for Header, Fields, Navigate and Notes):
+  `const fields = toolbarItems.fields.actions as (editor: Editor) => readonly ToolbarAction[]`,
+  then `{ ...toolbarItems.fields, actions: (editor) => [...fields(editor), mine] }`.
+
+App items behave as the built-in buttons: one tab stop for the whole toolbar, the focus visible,
+a click keeps the document's focus and selection and calls `onClickCommand`, Enter or Space keeps
+the focus on the item, ArrowDown opens a menu. A copy of a built-in item with another `label`,
+`text` or `icon` does what the built-in does. The boxes, color menus and dialogs of the built-in
+items are not available to app items.
 
 ### Hooks and provider
 
@@ -191,7 +233,10 @@ it, and only one of the link and insert table dialogs is open at a time.
   creates an editor on the first render
   (`initialContent` of any version, migrated; default an empty document) and keeps it for the
   component's lifetime. Later option changes are
-  ignored. Throws `FoliDocumentError` for invalid content.
+  ignored; other `plugins` or `extensions` than the first (compared element by element, so an
+  inline array of the same plugins is no change) log one warning outside production
+  (`NODE_ENV`): give the component a new `key` to create an editor with them. Throws
+  `FoliDocumentError` for invalid content.
 - `<FoliEditorProvider editor={editor}>`: makes `editor` the one the components and hooks
   below it use.
 - `useCurrentEditor(): Editor`: the nearest provider's (or `FoliEditor`'s) editor. Throws
@@ -199,6 +244,14 @@ it, and only one of the link and insert table dialogs is open at a time.
 - `useEditorState(selector, { editor?, isEqual? })`: a slice of the state; the component
   re-renders only when it changes (`isEqual`, default `Object.is`). The selector
   `(state, editor) => T` runs after every transaction: keep it cheap.
+- `useCommand(command, { editor? }): CommandState`: `{ enabled, run() }` for a button of the
+  app's own: `enabled` is the command's dry run (`editor.can`), again after every transaction
+  (the component re-renders when it changes); `run()` runs it and says whether it applied, e.g.
+  `useCommand(toggleMark("bold"))`.
+- `useCommand(name, ...args): CommandState`: a plugin's command by name (`PluginSpec.commands`),
+  on the context's editor, typed by `FoliCommands` (only plugin commands: the built-in ones have
+  no factory to dry-run by name; pass their command, `useCommand(undo)`). Throws when no plugin
+  of the editor has it.
 
 ## `@folijs/core`
 
