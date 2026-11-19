@@ -70,7 +70,9 @@ checklist in [testing/ime.md](testing/ime.md)):
 - Notes: a note's lines take no widow or orphan control and `w:continuationNotice` is not drawn. A
   reference kept verbatim in opaque content takes no number. Footnotes set beneath the text in a
   section with columns go to the foot. Options apply to the whole document, not to one section.
-  With columns Word sometimes ends an earlier column sooner than its notes require. Number formats
+  With columns Word sometimes ends an earlier column sooner than its notes require, and a
+  paragraph holding a reference at the end of a column can move to the next page where Word ends
+  the column with it. Number formats
   beyond Word's common ones show as decimal numbers. Shift+Alt+N is Foli's: Word has no such key.
 - No horizontal rule button (Word's rule is a paragraph's bottom border, kept and shown).
 - On Android, Backspace at a list paragraph's start may join it into the paragraph before
@@ -195,6 +197,8 @@ checklist in [testing/ime.md](testing/ime.md)):
   already deleted as a tracked change is refused and reported, where Word adds the replacement
   after it. In the review views that hide deleted text a match runs across it, as the reader sees
   the text; Word's does not.
+- While the document is edited with the panel open, the matches are looked for again once typing
+  pauses (300 ms): until then the marks follow the old positions.
 - Marks need the CSS Custom Highlight API (Chromium 105, Safari 17.2, Firefox 140); without it find
   still counts, goes to and selects matches. Only pages within a screen of the window are marked.
   In the drawn copies of a story that is not open, marks come from looking for the text there.

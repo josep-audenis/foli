@@ -93,6 +93,32 @@ describe("find and replace panel", () => {
     expect(within(dialog).getByRole("status").textContent).toBe("No results");
   });
 
+  it("leaves the view where it is when the document changes, and searches again after a pause", async () => {
+    const { editor, shown } = setup(p("a cat, a cat"));
+    ask(editor, "find");
+    type("Find what", "cat");
+    expect(shown[shown.length - 1]).toMatchObject({ scroll: true, current: { from: 3 } });
+    const count = shown.length;
+    act(() => editor.select(13));
+    act(() => {
+      editor.commands.insertText(" cat");
+    });
+    // Typing: nothing looked for yet.
+    expect(shown.length).toBe(count);
+    await act(() => new Promise((resolve) => setTimeout(resolve, 400)));
+    const last = shown[shown.length - 1];
+    expect(last?.matches.length).toBe(4);
+    expect(last).toMatchObject({ scroll: false, current: { from: 3 } });
+    act(() => editor.select(1, 2));
+    act(() => {
+      editor.commands.insertText("An");
+    });
+    await act(() => new Promise((resolve) => setTimeout(resolve, 400)));
+    // The current match moved: none is current, and none is gone to.
+    expect(shown[shown.length - 1]).toMatchObject({ scroll: false, current: null });
+    expect(screen.getByRole("status").textContent).toBe("4 found");
+  });
+
   it("takes the selection as the query", () => {
     const { editor } = setup(p("a cat"));
     act(() => editor.select(3, 6));

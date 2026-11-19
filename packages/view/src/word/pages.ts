@@ -603,24 +603,23 @@ export function renderDocument(
     }
     const first = placed[0];
     if (first) for (const index of block.nodes) firstPage.set(index, first.page);
-    // Endnotes and footnotes set beneath the text come after the blocks they follow.
-    for (const fragment of placed)
-      for (const group of groupsOf(fragment.notes ?? []))
-        if (group.inFlow)
-          holder(
-            { page: group.page, band: group.band, column: group.column },
-            sections[group.section] as Section,
-          ).append(
-            notes.groupElement(
-              group,
-              null,
-              undefined,
-              group.pieces[0]?.end
-                ? 0
-                : spaceAfterText(boxes, flowed, group.page, group.band, group.column),
-            ),
-          );
   });
+  // Endnotes and footnotes set beneath the text come after the last block of their column.
+  for (const group of groupsOf(pieces))
+    if (group.inFlow)
+      holder(
+        { page: group.page, band: group.band, column: group.column },
+        sections[group.section] as Section,
+      ).append(
+        notes.groupElement(
+          group,
+          null,
+          undefined,
+          group.pieces[0]?.end
+            ? 0
+            : spaceAfterText(boxes, flowed, group.page, group.band, group.column),
+        ),
+      );
   for (const group of groupsOf(pieces)) {
     if (group.inFlow) continue;
     const { page } = created[group.page] as { page: HTMLElement };

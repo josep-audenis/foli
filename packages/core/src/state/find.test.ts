@@ -101,6 +101,11 @@ describe("findInText, Word's rules", () => {
     expect(findInText("İx cat", "cat")).toEqual([[3, 6]]);
   });
 
+  it("folds capitals outside the basic plane on such a line too", () => {
+    expect(findInText("İ \u{10400}", "\u{10428}")).toEqual([[2, 4]]);
+    expect(findInText("\u{10400}", "\u{10428}")).toEqual([[0, 2]]);
+  });
+
   it("finds curly quotes and no-break spaces from the plain ones only", () => {
     const text = "it’s it's a b a b “q”";
     expect(words(text, "it's").length).toBe(2);

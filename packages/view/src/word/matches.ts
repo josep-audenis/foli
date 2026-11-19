@@ -5,6 +5,7 @@
  * scrolled to on Next); draw boxes if one that matters lacks it.
  */
 import { type FindOptions, findInText } from "@folijs/core";
+import { PAGE_FIELD_ATTR } from "./regions.js";
 
 const ALL = "foli-find";
 const CURRENT = "foli-find-current";
@@ -71,7 +72,14 @@ export function rangesInText(root: Element, query: string, options: FindOptions)
   }
   const out: Range[] = [];
   for (const nodes of groups.values()) {
-    const text = nodes.map((node) => node.data).join("");
+    // A page number drawn there is no text of the story: nothing runs across it.
+    const text = nodes
+      .map((node) =>
+        node.parentElement?.closest(`[${PAGE_FIELD_ATTR}]`)
+          ? "\uFFFC".repeat(node.length)
+          : node.data,
+      )
+      .join("");
     for (const [from, to] of findInText(text, query, options)) {
       let at = 0;
       for (const node of nodes) {

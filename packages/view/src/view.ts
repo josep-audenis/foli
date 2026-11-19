@@ -24,6 +24,7 @@ import {
   type Field,
   type FieldLayout,
   type FieldsReport,
+  type FindMatch,
   type FoundMatches,
   fieldCodesShown,
   fieldsIn,
@@ -1768,8 +1769,8 @@ export class EditorView {
    */
   showMatches(found: FoundMatches | null): void {
     this.showFound(found);
-    const { current } = found ?? {};
-    if (!current) return;
+    const { current, scroll } = found ?? {};
+    if (!current || !scroll) return;
     if (current.story === this.matchStory) this.scrollToRange(current.from, current.to);
     else if (current.story === this.mount?.id)
       this.mount?.view.scrollToRange(current.from, current.to);
@@ -1826,18 +1827,39 @@ export class EditorView {
     const { doc } = this.state;
     const near = this.pagesNearView();
     this.matchPages = [...near].join();
-    const shown = (from: number) => {
-      if (!this.paged || from > doc.content.size) return true;
-      const pages = this.itemPages.get(doc.resolve(from).node(1));
-      return !pages || pages.some((page) => near.has(page));
-    };
-    const all: Range[] = [];
-    const others = new Set<string>();
-    for (const { story, from, to } of found.matches) {
-      if (story === this.matchStory) {
-        if (shown(from)) all.push(...this.rangesOf(from, to));
-      } else if (story !== null && story !== mount?.id) others.add(story);
+    // What the near pages hold, as positions: of the body's top-level nodes on them.
+    let low = 0;
+    let high = doc.content.size;
+    if (this.paged) {
+      low = high + 1;
+      high = -1;
+      doc.forEach((node, offset) => {
+        const pages = this.itemPages.get(node);
+        if (pages && !pages.some((page) => near.has(page))) return;
+        low = Math.min(low, offset);
+        high = Math.max(high, offset + node.nodeSize);
+      });
     }
+    // A tree's matches stand together, in order: those near are found by halving.
+    const { matches } = found;
+    let start = matches.findIndex((m) => m.story === this.matchStory);
+    if (start < 0) start = matches.length;
+    let end = start;
+    while (end < matches.length && matches[end]?.story === this.matchStory) end++;
+    let first = start;
+    for (let last = end; first < last; ) {
+      const mid = (first + last) >> 1;
+      if ((matches[mid] as FindMatch).to <= low) first = mid + 1;
+      else last = mid;
+    }
+    const all: Range[] = [];
+    for (let i = first; i < end && (matches[i] as FindMatch).from < high; i++) {
+      const { from, to } = matches[i] as FindMatch;
+      all.push(...this.rangesOf(from, to));
+    }
+    const others = new Set<string>();
+    for (const [i, { story }] of matches.entries())
+      if ((i < start || i >= end) && story !== null && story !== mount?.id) others.add(story);
     const { current, query, matchCase, wholeWord } = found;
     const here = current?.story === this.matchStory ? current : null;
     if (others.size) {

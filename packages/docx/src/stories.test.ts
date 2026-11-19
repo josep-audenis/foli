@@ -202,6 +202,13 @@ describe("writing stories", () => {
     expect(textOf(stories.h1?.content as NodeJSON)).toBe("Head");
     expect(textOf(stories.f1?.content as NodeJSON)).toBe("Foot");
     expect(stories["footnote:-1"]?.noteType).toBe("separator");
+    // Written as Word writes them: single spaced, nothing after.
+    for (const id of ["footnote:-1", "footnote:0", "endnote:-1", "endnote:0"])
+      expect(stories[id]?.content.content?.[0]?.attrs?.spacing).toEqual({
+        after: 0,
+        line: 240,
+        lineRule: "auto",
+      });
     expect(JSON.stringify(stories["footnote:1"]?.content)).toContain("noteMark");
     expect(textOf(stories["endnote:1"]?.content as NodeJSON)).toBe("End");
 

@@ -114,4 +114,13 @@ describe("marks", () => {
     expect(rangesInText(root, "cat", {}).map(String)).toEqual(["c", "at", "Cat"]);
     expect(rangesInText(root, "cat", { matchCase: true }).map(String)).toEqual(["c", "at"]);
   });
+
+  it("leave a page's number alone", () => {
+    const root = document.createElement("div");
+    root.innerHTML = '<p>Page <span data-foli-page-field="">2</span> of 2</p>';
+    expect(rangesInText(root, "2", {}).map((r) => r.startContainer.parentElement?.tagName)).toEqual(
+      ["P"],
+    );
+    expect(rangesInText(root, "e 2", {})).toEqual([]);
+  });
 });

@@ -63,21 +63,57 @@ describe("flow: footnotes", () => {
     expect(shown(notePieces(result))).toEqual(["1:sep:0-1", "1:a:0-3"]);
   });
 
-  it("carries the rest of a long note to the next page, under the continuation separator", () => {
+  it("carries the rest of a long note to the next pages, before any text, as Word does", () => {
     const result = flowed([block(1, { 0: note("a", 30) }), block(3)]);
     expect(shown(notePieces(result))).toEqual([
       "0:sep:0-1",
       "0:a:0-8",
       "1:cont:0-1",
-      "1:a:8-16",
+      "1:a:8-17",
       "2:cont:0-1",
-      "2:a:16-24",
+      "2:a:17-26",
       "3:cont:0-1",
-      "3:a:24-30",
+      "3:a:26-30",
     ]);
-    // The note fills its page, so the next block waits; a line of text is left on each after it.
-    expect(result.fragments[1]?.map((f) => f.page)).toEqual([1, 2, 3]);
+    // Pages the note takes whole have no text: the next block waits for the page with room.
+    expect(result.fragments[1]?.map((f) => f.page)).toEqual([3]);
     expect(pagesOf([inOne(block(1)), inOne(block(3))], result).length).toBe(4);
+  });
+
+  it("keeps the lines the orphan and widow rules hold with the reference above its note", () => {
+    const rules = { ...RULES, orphans: 2, widows: 2 };
+    // A two-line paragraph referring on its first line to a note longer than the page.
+    const result = flowed([block(4), block(2, { 0: note("a", 30) }), block(3)], rules);
+    expect(result.fragments[1]?.map((f) => [f.page, f.fromLine, f.toLine])).toEqual([
+      [0, 0, Infinity],
+    ]);
+    // 100 - 60 text - 4 separator: three lines of the note under the paragraph.
+    expect(notePieces(result).filter((p) => p.id === "a")[0]).toMatchObject({ page: 0, toLine: 3 });
+  });
+
+  it("starts a page for a continuous break into other columns below notes", () => {
+    const one = {
+      start: "nextPage",
+      columns: 1,
+      box: () => ({ height: 100 }),
+      samePage: () => true,
+    } as const;
+    const two = {
+      start: "continuous",
+      columns: 2,
+      box: () => ({ height: 100 }),
+      samePage: () => true,
+    } as const;
+    const withNote = flowed([
+      { ...block(2, { 0: note("a", 1) }), section: one },
+      { ...block(2), section: two },
+    ]);
+    expect(withNote.fragments[1]?.[0]?.page).toBe(1);
+    const without = flowed([
+      { ...block(2), section: one },
+      { ...block(2), section: two },
+    ]);
+    expect(without.fragments[1]?.[0]?.page).toBe(0);
   });
 
   it("goes on to pages of its own after the last block", () => {

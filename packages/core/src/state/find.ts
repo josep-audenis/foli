@@ -82,10 +82,11 @@ const WORD_CHAR = /^[\p{L}\p{N}\p{M}]/u;
 function fold(text: string): string {
   let out = text.toLowerCase();
   if (out.length !== text.length) {
+    // By code point, so a capital outside the BMP still folds; one that grows stays as it is.
     out = "";
-    for (let i = 0; i < text.length; i++) {
-      const lower = (text[i] as string).toLowerCase();
-      out += lower.length === 1 ? lower : text[i];
+    for (const char of text) {
+      const lower = char.toLowerCase();
+      out += lower.length === char.length ? lower : char;
     }
   }
   return out.replace(/ς/g, "σ"); // a final sigma is a sigma

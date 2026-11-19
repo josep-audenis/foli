@@ -156,6 +156,20 @@ export function insertBookmark(
 
 const escaped = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
+/** Word's field names: a code starting with one is that field, never a bookmark standing for `REF`. */
+const FIELD_NAMES = new Set(
+  (
+    "ADDRESSBLOCK ADVANCE ASK AUTHOR AUTONUM AUTONUMLGL AUTONUMOUT AUTOTEXT AUTOTEXTLIST BARCODE " +
+    "BIBLIOGRAPHY BIDIOUTLINE CITATION COMMENTS COMPARE CREATEDATE DATABASE DATE DISPLAYBARCODE " +
+    "DOCPROPERTY DOCVARIABLE EDITTIME EQ FILENAME FILESIZE FILLIN FORMCHECKBOX FORMDROPDOWN " +
+    "FORMTEXT GOTOBUTTON GREETINGLINE HYPERLINK IF INCLUDEPICTURE INCLUDETEXT INDEX INFO KEYWORDS " +
+    "LASTSAVEDBY LINK LISTNUM MACROBUTTON MERGEBARCODE MERGEFIELD MERGEREC MERGESEQ NEXT NEXTIF " +
+    "NOTEREF NUMCHARS NUMPAGES NUMWORDS PAGE PAGEREF PRINT PRINTDATE PRIVATE QUOTE RD REF REVNUM " +
+    "SAVEDATE SECTION SECTIONPAGES SEQ SET SKIPIF STYLEREF SUBJECT SYMBOL TA TC TEMPLATE TIME " +
+    "TITLE TOA TOC USERADDRESS USERINITIALS USERNAME XE"
+  ).split(" "),
+);
+
 /** Renames a bookmark, and what refers to it: `REF`, `PAGEREF`, `NOTEREF` and links. */
 export function renameBookmark(editor: Editor, name: string, next: string): BookmarkResult {
   if (!isBookmarkName(next)) return { ok: false, reason: "invalid-name" };
@@ -165,7 +179,9 @@ export function renameBookmark(editor: Editor, name: string, next: string): Book
   if (taken && !same(taken.name, name)) return { ok: false, reason: "exists" };
   const old = escaped(current.name);
   // shortcut: a reference whose name is split over two `w:instrText` runs is not followed.
-  const reference = new RegExp(`^(\\s*(?:(?:REF|PAGEREF|NOTEREF)\\s+)?)${old}(?=\\s|$)`, "i");
+  // A bare name stands for `REF` only when it is no field's name: `{ TITLE }` is the title.
+  const bare = FIELD_NAMES.has(current.name.toUpperCase()) ? "" : "?";
+  const reference = new RegExp(`^(\\s*(?:(?:REF|PAGEREF|NOTEREF)\\s+)${bare})${old}(?=\\s|$)`, "i");
   const edits = new Map<string | null, (tr: Transaction) => void>();
   for (const { id, tree } of treesOf(editor.state))
     edits.set(id, (tr) => {

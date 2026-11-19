@@ -139,10 +139,11 @@ test("matches are marked on the pages and nowhere in the document", async ({ pag
   await page.keyboard.press(`${MOD}+f`);
   await query(page).fill("cat");
   await expect(status(page)).toContainText("of 4");
-  // The pages near the window: the body's first, the header's copies, the note.
+  // The pages near the window: the body's first, the header's copies, the note. (WebKit could
+  // paint the count before the marks were made: they are made in the same commit now.)
+  await expect.poll(async () => (await marks(page)).length).toBeGreaterThanOrEqual(3);
   const shown = await marks(page);
   expect(shown.every((t) => t.toLowerCase() === "cat")).toBe(true);
-  expect(shown.length).toBeGreaterThanOrEqual(3);
   expect(await page.locator(".foli-page").count()).toBeGreaterThan(1);
   // Those further on when they come near.
   const onScreen = () =>
@@ -173,6 +174,73 @@ test("matches are marked on the pages and nowhere in the document", async ({ pag
   await expect(panel(page)).toHaveCount(0);
   await expect(editor(page)).toBeFocused();
   expect(await marks(page)).toEqual([]);
+});
+
+test("a page's number drawn in a header is not marked", async ({ page }) => {
+  const document = sample() as { stories: Record<string, Json> };
+  document.stories.h1 = {
+    kind: "header",
+    content: storyDoc({
+      type: "paragraph",
+      content: [
+        text("Page "),
+        { type: "fieldStart" },
+        { type: "fieldCode", attrs: { text: " PAGE " } },
+        { type: "fieldSeparator" },
+        text("1"),
+        { type: "fieldEnd" },
+      ],
+    }),
+  };
+  await load(page, document);
+  await page.keyboard.press(`${MOD}+f`);
+  await query(page).fill("1");
+  await expect(status(page)).toContainText("of");
+  const inRegions = await page.evaluate(() => {
+    const registry = (CSS as unknown as { highlights: Map<string, Set<Range>> }).highlights;
+    return [...(registry.get("foli-find") ?? [])].filter((r) =>
+      r.startContainer.parentElement?.closest(".foli-region"),
+    ).length;
+  });
+  expect(inRegions).toBe(0);
+  expect((await marks(page)).length).toBeGreaterThan(0);
+});
+
+test("typing in the document with a search open stays at the caret, and quick", async ({
+  page,
+}, info) => {
+  test.setTimeout(180_000);
+  const line = "There were seven eggs here, every one the same, left near the edge of the shelf.";
+  const content = Array.from({ length: 4000 }, (_, i) => paragraph(`${i} ${line}`));
+  await load(page, documentOf(content));
+  const typeTen = async () => {
+    await editor(page).click({ position: { x: 200, y: 200 } });
+    await page.keyboard.press("End");
+    const before = await page.evaluate(() => scrollY);
+    const start = Date.now();
+    for (const key of "abcdefghij") await page.keyboard.press(key);
+    await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(resolve)));
+    return { ms: Date.now() - start, moved: (await page.evaluate(() => scrollY)) - before };
+  };
+  const closed = await typeTen();
+  await page.keyboard.press(`${MOD}+f`);
+  await query(page).fill("e");
+  await expect(status(page)).toContainText("of");
+  await page.keyboard.press("Escape");
+  // The panel open again over the document, the focus in the document.
+  await page.keyboard.press(`${MOD}+f`);
+  await expect(status(page)).toContainText("of");
+  await editor(page).evaluate((host) => window.scrollTo(0, host.getBoundingClientRect().top));
+  const open = await typeTen();
+  // After the pause the matches are looked for again: the view stays.
+  await page.waitForTimeout(600);
+  const after = await page.evaluate(() => scrollY);
+  const matches = await status(page).textContent();
+  await info.attach("typing", { body: JSON.stringify({ closed, open, matches }) });
+  console.log(`typing 10 keys (${info.project.name}):`, JSON.stringify({ closed, open, matches }));
+  expect(open.moved).toBe(0);
+  expect(after - (await page.evaluate(() => scrollY))).toBe(0);
+  expect(open.ms).toBeLessThan(closed.ms * 3 + 1500);
 });
 
 test("Enter walks the matches through the stories and back to the body", async ({ page }) => {

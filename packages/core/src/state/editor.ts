@@ -122,8 +122,10 @@ export interface DocumentTarget {
 export interface FoundMatches extends FindOptions {
   query: string;
   matches: readonly FindMatch[];
-  /** The one marked apart and scrolled to, if any. */
+  /** The one marked apart, if any. */
   current: FindMatch | null;
+  /** Scroll to `current`: on a search or a step, not when the document changed under it. */
+  scroll?: boolean;
 }
 
 /** The commands Word has keys for, answered by what the app shows for them. */
