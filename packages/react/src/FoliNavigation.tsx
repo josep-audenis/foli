@@ -18,11 +18,10 @@ import {
   renameBookmark,
   replace,
   replaceAll,
-  StoryStep,
   type Transaction,
   trackState,
-  wordContext,
 } from "@folijs/core";
+import { StoryStep, wordContext } from "@folijs/core/internal";
 import { keyName } from "@folijs/view";
 import {
   type FormEvent,

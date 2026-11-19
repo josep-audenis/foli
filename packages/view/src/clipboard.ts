@@ -1,8 +1,6 @@
 import {
   type Alignment,
-  copiedDefinitions,
   type DocJSON,
-  type FittedPaste,
   Fragment,
   type InlineJSON,
   isSafeHref,
@@ -10,9 +8,13 @@ import {
   type Node as ModelNode,
   type ParagraphJSON,
   type SimpleMarkName,
+} from "@folijs/core";
+import {
+  copiedDefinitions,
+  type FittedPaste,
   type WordContext,
   type WordEnvelope,
-} from "@folijs/core";
+} from "@folijs/core/internal";
 import { PAGE_BREAK_ATTR } from "./render.js";
 import { opaqueParagraphsText, parseOpaque } from "./word/blocks.js";
 import { clipboardBlocks } from "./word/edit.js";
@@ -24,7 +26,10 @@ import { clipboardBlocks } from "./word/edit.js";
  */
 export const FOLI_MIME = "application/x-foli+json";
 
-/** One clipboard format's content, before validation. */
+/**
+ * One clipboard format's content, before validation.
+ * @internal
+ */
 export interface Found {
   content: unknown;
   open: boolean;
@@ -34,7 +39,10 @@ export interface Found {
   word?: unknown;
 }
 
-/** Validated clipboard content. */
+/**
+ * Validated clipboard content.
+ * @internal
+ */
 export interface Pasted {
   doc: ModelNode;
   /** The target's envelope with what the content needs (styles, lists...), when it changed. */
@@ -49,6 +57,7 @@ export interface Pasted {
   open: boolean;
 }
 
+/** @internal */
 export interface ClipboardContent {
   text: string;
   html: string;
@@ -59,6 +68,7 @@ export interface ClipboardContent {
  * Serializes `from..to` of `doc` for the clipboard. Hard breaks and block ends become "\n". The
  * HTML is the document as its Word renderer draws it (`word`: its context and the fonts' line
  * height ratios): resolved formatting as inline CSS, list numbers as Word's HTML has them.
+ * @internal
  */
 export function serializeRange(
   doc: ModelNode,
@@ -123,6 +133,7 @@ function leafText(leaf: ModelNode, doc: Document): string {
  * text. Every format is validated and fitted to the document by `parse` (`fitPaste`,
  * `fitPastedV2`); a format that fails falls through to the next. `marks` are given to plain text
  * (the marks typing would get at the insertion point).
+ * @internal
  */
 export function docFromClipboard(
   data: Pick<DataTransfer, "getData">,
@@ -286,6 +297,7 @@ const hex2 = (n: number) =>
  * A CSS color as the schema stores it (lowercase `#rrggbb`), or null: transparent, unknown
  * (system colors such as Word's `windowtext`) or empty. Hex (3 or 6 digits), `rgb()`/`rgba()`
  * and the basic named colors.
+ * @internal
  */
 export function parseColor(value: string): string | null {
   const color = value.trim().toLowerCase();

@@ -7,7 +7,10 @@
  * replaced entries are compressed again.
  */
 
-/** A file in the zip. `raw` is its data as stored (compressed when `method` is 8). */
+/**
+ * A file in the zip. `raw` is its data as stored (compressed when `method` is 8).
+ * @internal
+ */
 export interface ZipEntry {
   readonly name: string;
   /** The name's bytes as stored, written back unchanged. */
@@ -57,6 +60,7 @@ const textDecoder = new TextDecoder();
  * Lists the entries of a zip from its central directory, in the directory's order. Nothing is
  * decompressed: see {@link inflateEntry}. Every entry is checked against its local header, and
  * entries may not overlap: Foli reads what any other zip reader would.
+ * @internal
  */
 export function readZip(bytes: Uint8Array, limits: ZipLimits = {}): ZipEntry[] {
   const maxEntries = limits.maxEntries ?? 10_000;
@@ -227,7 +231,10 @@ function findEnd(view: DataView): number {
   throw new ZipError("Not a zip archive");
 }
 
-/** The entry's data, decompressed, checked against its size and CRC-32. */
+/**
+ * The entry's data, decompressed, checked against its size and CRC-32.
+ * @internal
+ */
 export async function inflateEntry(entry: ZipEntry): Promise<Uint8Array> {
   const data =
     entry.method === 0
@@ -265,6 +272,7 @@ async function inflateRaw(raw: Uint8Array, size: number, name: string): Promise<
 /**
  * A new deflated entry holding `data`. With `like` (the entry it replaces) it keeps that entry's
  * name bytes, name encoding flag, time and date.
+ * @internal
  */
 export async function deflateEntry(
   name: string,
@@ -296,6 +304,7 @@ export async function deflateEntry(
  * The zip of `entries`, in order; each entry's data written as it is in `raw`. An entry read
  * from a zip keeps its headers byte for byte (only its offset in the directory changes), so a
  * zip written back with its entries unchanged is the same file, short of a trailing comment.
+ * @internal
  */
 export function writeZip(entries: readonly ZipEntry[]): Uint8Array {
   const parts: Uint8Array[] = [];
@@ -383,7 +392,10 @@ function concat(chunks: readonly Uint8Array[]): Uint8Array {
 
 let table: Uint32Array | undefined;
 
-/** CRC-32 (IEEE), as zip stores it. */
+/**
+ * CRC-32 (IEEE), as zip stores it.
+ * @internal
+ */
 export function crc32(data: Uint8Array): number {
   if (!table) {
     table = new Uint32Array(256);

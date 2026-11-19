@@ -8,7 +8,10 @@ export class ReplaceError extends Error {
   override name = "ReplaceError";
 }
 
-/** Throws a FoliDocumentError whose message starts with a JSON path. */
+/**
+ * Throws a FoliDocumentError whose message starts with a JSON path.
+ * @internal
+ */
 export function fail(path: string, message: string): never {
   throw new FoliDocumentError(`${path}: ${message}`);
 }

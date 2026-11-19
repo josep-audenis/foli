@@ -61,7 +61,9 @@ export const JUSTIFICATIONS = [
 ] as const;
 export type Justification = (typeof JUSTIFICATIONS)[number];
 
+/** @internal */
 export const LINE_RULES = ["auto", "exact", "atLeast"] as const;
+/** @internal */
 export const TAB_KINDS = [
   "left",
   "center",
@@ -73,7 +75,9 @@ export const TAB_KINDS = [
   "start",
   "end",
 ] as const;
+/** @internal */
 export const TAB_LEADERS = ["none", "dot", "hyphen", "underscore", "heavy", "middleDot"] as const;
+/** @internal */
 export const SECTION_TYPES = [
   "nextPage",
   "continuous",
@@ -81,6 +85,7 @@ export const SECTION_TYPES = [
   "oddPage",
   "nextColumn",
 ] as const;
+/** @internal */
 export const VERTICAL_ALIGNS = ["baseline", "superscript", "subscript"] as const;
 /** Word's highlight colors (ST_HighlightColor); any other color is shading. */
 export const HIGHLIGHT_COLORS = [
@@ -102,6 +107,7 @@ export const HIGHLIGHT_COLORS = [
   "lightGray",
   "none",
 ] as const;
+/** @internal */
 export const THEME_FONTS = [
   "majorAscii",
   "majorHAnsi",
@@ -136,7 +142,10 @@ const ID = int(0, 2_147_483_647);
 const revisionFields = { id: ID, author: str(), date: nullable(date) };
 const revision = shape(revisionFields, ["id", "author"]);
 
-/** How notes are placed and numbered (`w:footnotePr`, `w:endnotePr`), for a document or section. */
+/**
+ * How notes are placed and numbered (`w:footnotePr`, `w:endnotePr`), for a document or section.
+ * @internal
+ */
 export const checkNoteProperties: Check = shape({
   position: oneOf(["pageBottom", "beneathText", "sectEnd", "docEnd"]),
   format: token,
@@ -294,9 +303,14 @@ const propertiesCheck =
     return undefined;
   };
 
-/** Table, row and cell properties as a table style or a row's exceptions give them. */
+/**
+ * Table, row and cell properties as a table style or a row's exceptions give them.
+ * @internal
+ */
 export const checkTableProperties: Check = propertiesCheck(tableProperties);
+/** @internal */
 export const checkRowProperties: Check = propertiesCheck(rowProperties);
+/** @internal */
 export const checkCellProperties: Check = propertiesCheck(cellProperties);
 
 /** EMU (English Metric Units: 914 400 per inch), as DrawingML measures pictures. */
@@ -341,7 +355,10 @@ export const RUN_PROPERTY_MARKS = [
   "characterSpacing",
 ];
 
-/** Run properties given as marks JSON (a style's, a paragraph mark's, a recorded change's previous). */
+/**
+ * Run properties given as marks JSON (a style's, a paragraph mark's, a recorded change's previous).
+ * @internal
+ */
 export const checkRunProperties: Check = (v) => {
   if (!Array.isArray(v)) return "must be an array of marks";
   for (const mark of v) {
@@ -416,10 +433,16 @@ const paragraphProperties: Record<string, AttributeSpec> = {
   ext: nullableAttr(xml),
 };
 
-/** The names of the paragraph properties (`w:pPr`) among a paragraph's attributes. */
+/**
+ * The names of the paragraph properties (`w:pPr`) among a paragraph's attributes.
+ * @internal
+ */
 export const PARAGRAPH_PROPERTY_KEYS: readonly string[] = Object.keys(paragraphProperties);
 
-/** Paragraph properties as a style, a numbering level, the defaults or a recorded change give them. */
+/**
+ * Paragraph properties as a style, a numbering level, the defaults or a recorded change give them.
+ * @internal
+ */
 export const checkParagraphProperties: Check = (v) => {
   if (!isRecord(v)) return "must be an object";
   for (const [key, value] of Object.entries(v)) {

@@ -327,6 +327,7 @@ function removesReference(tr: Transaction): boolean {
  * Keeps comments with their text: a comment whose reference mark an edit removed (its range
  * deleted) is removed with its replies and the rest of their anchors, in the same undo step.
  * Only references the edit removed count: a comment without one from the start stays.
+ * @internal
  */
 export function commentsPlugin(): Plugin {
   return new Plugin({

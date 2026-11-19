@@ -5,19 +5,27 @@
  * table, row and cell elements around its units, built from the model for the rows a page holds.
  * Built with createElement only.
  */
-import type { CellFormat, Node as ModelNode, Resolver } from "@folijs/core";
+import type { Node as ModelNode } from "@folijs/core";
+import type { CellFormat, Resolver } from "@folijs/core/internal";
 import { borderJsonCss, PX_PER_TWIP } from "./blocks.js";
 
-/** A block the view renders: its node, the position before it, and the cell format it is in. */
+/**
+ * A block the view renders: its node, the position before it, and the cell format it is in.
+ * @internal
+ */
 export interface Unit {
   readonly node: ModelNode;
   readonly pos: number;
   readonly cell: CellFormat | null;
 }
 
-/** What a cell holds, in order: units (by index) and nested tables. */
+/**
+ * What a cell holds, in order: units (by index) and nested tables.
+ * @internal
+ */
 export type CellItem = { unit: number } | { frame: Frame };
 
+/** @internal */
 export interface FrameCell {
   readonly node: ModelNode;
   /** The first grid column it covers, and how many. */
@@ -28,6 +36,7 @@ export interface FrameCell {
   readonly items: readonly CellItem[];
 }
 
+/** @internal */
 export interface FrameRow {
   readonly node: ModelNode;
   readonly header: boolean;
@@ -37,7 +46,10 @@ export interface FrameRow {
   readonly cells: readonly FrameCell[];
 }
 
-/** A table as the view draws it. */
+/**
+ * A table as the view draws it.
+ * @internal
+ */
 export interface Frame {
   readonly node: ModelNode;
   readonly pos: number;
@@ -52,10 +64,16 @@ export interface Frame {
   readonly end: number;
 }
 
-/** A top-level item of the page flow: a unit (paragraph, opaque block) or a table. */
+/**
+ * A top-level item of the page flow: a unit (paragraph, opaque block) or a table.
+ * @internal
+ */
 export type FlowItem = { unit: number; frame?: undefined } | { frame: Frame; unit?: undefined };
 
-/** The units and flow items of `doc`, in document order. */
+/**
+ * The units and flow items of `doc`, in document order.
+ * @internal
+ */
 export function collect(doc: ModelNode, resolver: Resolver): { units: Unit[]; items: FlowItem[] } {
   const units: Unit[] = [];
   const items: FlowItem[] = [];
@@ -142,9 +160,15 @@ function frameOf(table: ModelNode, pos: number, resolver: Resolver, units: Unit[
   };
 }
 
-/** Marks a table's elements (wrapper, table, rows, cells): they hold blocks, not content. */
+/**
+ * Marks a table's elements (wrapper, table, rows, cells): they hold blocks, not content.
+ * @internal
+ */
 export const FRAME_ATTR = "data-foli-frame";
-/** Marks a repeated header row: shown, not document content. */
+/**
+ * Marks a repeated header row: shown, not document content.
+ * @internal
+ */
 export const REPEATED_ATTR = "data-foli-repeated";
 
 /**
@@ -152,6 +176,7 @@ export const REPEATED_ATTR = "data-foli-repeated";
  * header rows drawn again above them, not editable). `content(row, cell)` gives what a cell
  * shows on this page; a cell a vertical merge covers is drawn by the merge's first cell when
  * that is on the page (spanning the rows it covers here), else as an empty cell of its own.
+ * @internal
  */
 export function frameElement(
   frame: Frame,

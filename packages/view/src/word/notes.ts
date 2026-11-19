@@ -6,20 +6,25 @@
 import {
   type FoliDocument,
   type NoteNumber,
-  noteKindOf,
   noteProperties,
-  type Resolver,
   type SectionJSON,
   type StoryJSON,
 } from "@folijs/core";
+import { noteKindOf, type Resolver } from "@folijs/core/internal";
 import { arrangeNotes, type FlowNote, type FlowRules, type NotePiece } from "../layout/flow.js";
 import { type BlockOptions, renderBlocks } from "./blocks.js";
 import { columnsPx } from "./columns.js";
 import { REGION_CLASS, REGION_CONTENT_CLASS, type RegionOptions, stack } from "./regions.js";
 
-/** On a piece of a note drawn on a page: the story. */
+/**
+ * On a piece of a note drawn on a page: the story.
+ * @internal
+ */
 export const NOTE_ATTR = "data-foli-note";
-/** The class of what holds a column's notes. */
+/**
+ * The class of what holds a column's notes.
+ * @internal
+ */
 export const NOTES_CLASS = "foli-notes";
 
 /**
@@ -29,6 +34,7 @@ export const NOTES_CLASS = "foli-notes";
  *
  * shortcut: line boxes are inferred from content rects (exact for even line heights); a
  * superscript or a much larger run on a line moves that line's boundaries slightly.
+ * @internal
  */
 export function lineBottoms(element: HTMLElement): number[] {
   const box = element.getBoundingClientRect();
@@ -115,11 +121,15 @@ interface Drawn {
   lines: number[];
 }
 
+/** @internal */
 export type NoteCache = WeakMap<StoryJSON, Map<string, Drawn>>;
 
 let serial = 0;
 
-/** The notes at a band's foot, or after the text of one of its columns. */
+/**
+ * The notes at a band's foot, or after the text of one of its columns.
+ * @internal
+ */
 export interface NoteGroup {
   page: number;
   band: number;
@@ -132,7 +142,10 @@ export interface NoteGroup {
   section: number;
 }
 
-/** What a document's pages need to know of its notes. */
+/**
+ * What a document's pages need to know of its notes.
+ * @internal
+ */
 export class PageNotes {
   private document: Omit<FoliDocument, "content"> | null = null;
   private sections: readonly SectionJSON[] = [];

@@ -23,10 +23,35 @@ is not installed when `core.hooksPath` is set or a foreign `pre-push` hook exist
 | `pnpm typecheck`                | `tsc --noEmit` in every workspace project                                                                            |
 | `pnpm lint` / `pnpm format`     | Biome check / auto-fix                                                                                               |
 | `pnpm build`                    | Build packages to `dist/` and the playground                                                                         |
-| `pnpm check`                    | lint + typecheck + test + build + package checks (`publint`) + bundle size budgets; the pre-push hook                |
+| `pnpm check`                    | lint + typecheck + test + build + package checks (`publint`) + API reports + bundle sizes; the pre-push hook         |
+| `pnpm api` / `pnpm api:update`  | Check each package's built types against its API report / rewrite the reports (after build)                          |
 | `pnpm size`                     | Bundle size per package against its budget (after `pnpm build`)                                                      |
 | `pnpm changeset`                | Record a change to a published package (bump type and changelog line)                                                |
 | `pnpm examples`                 | Pack the packages, install them into `examples/` (Vite + React 18, Next.js + React 19), build, Playwright smoke test |
+
+## API reports
+
+What each package publishes is its API ([ADR-0008](decisions/ADR-0008-1.0-contract-and-extensions.md)):
+the names its entry lists by name (`src/index.ts`; core also `src/internal.ts`, published as
+`@folijs/core/internal`, with no promise). The published types are kept in a report,
+`packages/<name>/api-report.d.ts`: the package's built `dist/**/*.d.ts` joined in path order,
+source-map comments removed. `pnpm api` (`scripts/api.mjs`, in `pnpm check`) fails when
+
+- the built types differ from the committed report (the new one is written to a temporary file,
+  named in the message, to diff against);
+- a module exports a name that no entry exports and that is not tagged `@internal` (a
+  forgotten export: export it from the index, or tag it);
+- an entry uses `export *`;
+- the published types do not compile on their own (`skipLibCheck` off): for example a public
+  type that uses a name tagged `@internal`.
+
+Names only one package uses are tagged `@internal` (a JSDoc tag) and left out of the published
+types by `stripInternal`. TypeScript drops a declaration whose leading comment contains the tag
+anywhere, so never write it in the prose of a public declaration's comment (a stripped public
+name fails the last check). Names other packages need from core without promising them go on
+`@folijs/core/internal`. A change to a report (a new export, a changed signature, an edited doc
+comment) is a change to the API: run `pnpm build && pnpm api:update`, review the report's diff
+with the change and commit both; a changeset says what changed for users.
 
 ## Known flaky tests
 

@@ -76,9 +76,13 @@ function common<T>(values: readonly T[]): T | null {
 
 // ---------- paragraph styles ----------
 
+/** @internal */
 export type HasEnvelope = Pick<WordContext, "envelope">;
 
-/** The id of the document's style of `type` named `name` (Word's names: "heading 1"), if any. */
+/**
+ * The id of the document's style of `type` named `name` (Word's names: "heading 1"), if any.
+ * @internal
+ */
 export function styleNamed(
   context: HasEnvelope,
   name: string,
@@ -91,7 +95,10 @@ export function styleNamed(
   );
 }
 
-/** The id of the default style of `type` (Normal, Default Paragraph Font), if the document has one. */
+/**
+ * The id of the default style of `type` (Normal, Default Paragraph Font), if the document has one.
+ * @internal
+ */
 export function defaultParagraphStyleOf(
   context: HasEnvelope,
   type: StyleJSON["type"] = "paragraph",
@@ -113,6 +120,7 @@ const builtinName = (id: string) =>
  * Word's definition of built-in style `name` ("heading 1"–"heading 9", "List Paragraph",
  * "Hyperlink", "Placeholder Text"), as Word adds it to a document the first time it is used (the Word 2013–2019
  * template's values; not checked against newer Word).
+ * @internal
  */
 export function builtinStyle(context: HasEnvelope, name: string): StyleJSON | null {
   const normal = defaultParagraphStyleOf(context);
@@ -267,6 +275,7 @@ export function builtinStyle(context: HasEnvelope, name: string): StyleJSON | nu
 /**
  * The id of the document's style named `name`, adding Word's built-in definition when the
  * document does not have it yet (with the envelope that has it; unchanged if it was there).
+ * @internal
  */
 export function ensureStyle(
   context: HasEnvelope,
@@ -337,6 +346,7 @@ export function setParagraphStyle(id: string): Command {
 /**
  * Puts the selected paragraphs in the paragraph style named `name` ("heading 2"), adding Word's
  * definition of a built-in one the document does not have yet.
+ * @internal
  */
 export function setStyleNamed(name: string): Command {
   return (state, dispatch) => {
@@ -523,6 +533,7 @@ export const HIGHLIGHT_HEX: Readonly<Record<string, string>> = {
 /**
  * Text color on a v3 document (`#rrggbb`); null is Word's "Automatic": no direct color, or an
  * explicit `auto` where a style colors the text.
+ * @internal
  */
 export function setWordTextColor(color: string | null): Command {
   return setRunMark("color", (_existing, inherited, type) => {
@@ -536,6 +547,7 @@ export function setWordTextColor(color: string | null): Command {
  * other as shading; null removes the highlight (an explicit `none` where a style highlights)
  * and a plain shading fill, the kind a color outside Word's highlights gives. Patterned shading
  * stays, and picking a highlight keeps any shading (Word's highlight and shading are apart).
+ * @internal
  */
 export function setWordHighlight(color: string | null): Command {
   return (state, dispatch) => {
@@ -593,12 +605,18 @@ function chain(
   return true;
 }
 
-/** The text color the selection shows (`#rrggbb`; null: automatic, or mixed). */
+/**
+ * The text color the selection shows (`#rrggbb`; null: automatic, or mixed).
+ * @internal
+ */
 export function wordTextColorAt(state: EditorState): string | null {
   return runValueAt(state, (run) => (run.color ? `#${run.color.toLowerCase()}` : null));
 }
 
-/** The highlight (or shading) the selection shows (`#rrggbb`), or null. */
+/**
+ * The highlight (or shading) the selection shows (`#rrggbb`), or null.
+ * @internal
+ */
 export function wordHighlightAt(state: EditorState): string | null {
   return runValueAt(state, (run) =>
     run.highlight
@@ -644,7 +662,10 @@ function direct(
   return shows(inherited) ? without : { ...node.attrs, [key]: value };
 }
 
-/** Aligns the selected paragraphs (`setAlign` on a v3 document). */
+/**
+ * Aligns the selected paragraphs (`setAlign` on a v3 document).
+ * @internal
+ */
 export function setWordAlign(align: Alignment): Command {
   return (state, dispatch) => {
     const context = wordContext(state);
@@ -661,7 +682,10 @@ export function setWordAlign(align: Alignment): Command {
   };
 }
 
-/** The alignment all selected paragraphs show (`alignAt` on a v3 document). */
+/**
+ * The alignment all selected paragraphs show (`alignAt` on a v3 document).
+ * @internal
+ */
 export function wordAlignAt(state: EditorState): Alignment | null {
   const context = wordContext(state);
   if (!context) return null;
@@ -800,7 +824,10 @@ function kindOf(context: WordContext, attrs: Attrs): ListKind | null {
   return format === "bullet" ? "bulletList" : "orderedList";
 }
 
-/** The kind of list all selected paragraphs are in, or null (none, or mixed). */
+/**
+ * The kind of list all selected paragraphs are in, or null (none, or mixed).
+ * @internal
+ */
 export function wordListKindAt(state: EditorState): ListKind | null {
   const context = wordContext(state);
   if (!context) return null;
@@ -817,7 +844,10 @@ function withoutNumbering(context: WordContext, node: Node): Attrs {
   return { ...base, style, numbering: styled ? { id: 0 } : null };
 }
 
-/** Word's levels for a new list: bullets (Symbol, Courier New, Wingdings) or numbers. */
+/**
+ * Word's levels for a new list: bullets (Symbol, Courier New, Wingdings) or numbers.
+ * @internal
+ */
 export function levels(kind: ListKind): NumberingLevelJSON[] {
   const bullets = [
     ["", "Symbol"],
@@ -921,6 +951,7 @@ function newList(envelope: WordEnvelope, kind: ListKind): { id: number; envelope
  * them out; otherwise numbers them as `kind` (a numbered paragraph keeps its level). A list of
  * that kind right before the selection goes on; otherwise a new one starts. Paragraphs in the
  * default style go to "List Paragraph" where the document has it, as in Word.
+ * @internal
  */
 export function toggleWordList(kind: ListKind): Command {
   return (state, dispatch) => {
@@ -932,7 +963,10 @@ export function toggleWordList(kind: ListKind): Command {
   };
 }
 
-/** Numbers the selected paragraphs as a list of `kind` (`wrapInList` on a v3 document). */
+/**
+ * Numbers the selected paragraphs as a list of `kind` (`wrapInList` on a v3 document).
+ * @internal
+ */
 export function wrapInWordList(kind: ListKind): Command {
   return (state, dispatch) => {
     const context = wordContext(state);
@@ -990,6 +1024,7 @@ function caretInList(state: EditorState, context: WordContext, atStart: boolean)
  * Tab on a v3 document: at the start of a numbered paragraph, one level deeper; over several
  * paragraphs, indents them (list levels, half-inch stops), as Word does. Elsewhere it does not
  * apply (Tab types a tab).
+ * @internal
  */
 export const sinkWordList: Command = (state, dispatch) => {
   const context = wordContext(state);
@@ -998,7 +1033,10 @@ export const sinkWordList: Command = (state, dispatch) => {
   return changeIndent(1)(state, dispatch);
 };
 
-/** Shift+Tab in a list on a v3 document: one level up (out of the list at the top). */
+/**
+ * Shift+Tab in a list on a v3 document: one level up (out of the list at the top).
+ * @internal
+ */
 export const liftWordList: Command = (state, dispatch) => {
   const context = wordContext(state);
   if (!context) return false;
@@ -1011,6 +1049,7 @@ export const liftWordList: Command = (state, dispatch) => {
 /**
  * Enter in an empty numbered paragraph on a v3 document: one level up, or at the top level ends
  * the list there, as in Word.
+ * @internal
  */
 export const endWordList: Command = (state, dispatch) => {
   const context = wordContext(state);
@@ -1022,6 +1061,7 @@ export const endWordList: Command = (state, dispatch) => {
 /**
  * Backspace at the start of a numbered paragraph on a v3 document: removes its number, keeping
  * the text where it was (the level's indent as the paragraph's own); the next Backspace joins.
+ * @internal
  */
 export const removeWordListNumber: Command = (state, dispatch) => {
   const context = wordContext(state);
@@ -1041,6 +1081,7 @@ export const removeWordListNumber: Command = (state, dispatch) => {
 /**
  * Gives newly linked text Word's "Hyperlink" character style (blue, underlined), adding Word's
  * definition where the document does not have it yet.
+ * @internal
  */
 export function styleLink(tr: Transaction, state: EditorState, from: number, to: number): void {
   const context = wordContext(state);
@@ -1051,7 +1092,10 @@ export function styleLink(tr: Transaction, state: EditorState, from: number, to:
   if (style.envelope !== context.envelope) withEnvelope(tr, style.envelope);
 }
 
-/** Takes the "Hyperlink" character style off text whose link is removed. */
+/**
+ * Takes the "Hyperlink" character style off text whose link is removed.
+ * @internal
+ */
 export function unstyleLink(tr: Transaction, state: EditorState, from: number, to: number): void {
   const context = wordContext(state);
   const type = state.schema.marks.characterStyle;

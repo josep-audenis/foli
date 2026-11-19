@@ -57,6 +57,7 @@ const NODE_KEYS = ["type", "attrs", "content", "text", "marks"];
 /**
  * How deep parsed JSON may nest: far beyond real documents (a table in a cell is three levels;
  * Word nests tables a few dozen deep at most), well within the call stack.
+ * @internal
  */
 export const MAX_NODE_DEPTH = 300;
 const MARK_KEYS = ["type", "attrs"];
@@ -123,7 +124,7 @@ export class NodeType {
 
   /**
    * Creates a node without checking its content. Attributes are still validated.
-   * @internal For transforms whose node ends up complete: a wrapper the wrapped blocks fill
+   * For transforms whose node ends up complete: a wrapper the wrapped blocks fill
    * (validated when they are inserted) or the open half of a split (validated when the replace
    * joins it). Steps do not validate closed nodes inside a slice: a node left incomplete here
    * would make an invalid document.

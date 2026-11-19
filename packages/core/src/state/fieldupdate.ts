@@ -475,6 +475,7 @@ function resultMarks(field: Field, instruction: FieldInstruction): readonly Mark
  * What a bookmark holds, as inline nodes. Field codes and markers stay behind.
  * shortcut: a paragraph end inside the bookmark becomes a line break, where Word's result has the
  * paragraph; make it a slice when a document needs it.
+ * @internal
  */
 export function bookmarkContent(tree: Node, mark: Bookmark): Node[] {
   const schema = tree.type.schema;

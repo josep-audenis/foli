@@ -7,9 +7,8 @@ import {
   NodeSelection,
   parseDocument,
   TextSelection,
-  type WordContext,
-  wordContext,
 } from "@folijs/core";
+import { type WordContext, wordContext } from "@folijs/core/internal";
 import { afterEach, describe, expect, it } from "vitest";
 import { EditorView, FOLI_MIME } from "../index.js";
 import type { BlockDesc } from "../render.js";

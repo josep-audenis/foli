@@ -1040,17 +1040,23 @@ Planned, created only when needed:
 
 ## Build and dev wiring
 
-- Each package exports an `@folijs/source` condition pointing at `src/index.ts`. Vite, Vitest and
-  `tsc --noEmit` resolve it, so dev and tests run on source while importing by package name.
+- Each package exports an `@folijs/source` condition pointing at `src/index.ts` (and core's
+  `./internal` at `src/internal.ts`). Vite, Vitest and `tsc --noEmit` resolve it, so dev and tests
+  run on source while importing by package name.
 - `pnpm build` runs `tsc` per package (topological) to `dist/` with `.d.ts`; build configs drop
   the condition so published types point at `dist`.
-- ESM-only, `sideEffects` declared (`@folijs/react`: its CSS only), React and React DOM the only
-  peer dependencies (18.2+ or 19), `repository` per package (npm provenance checks that it
-  matches the repository that built the package; `directory` links the package's folder).
-  Exports: `.` (`types`, `default`) and `@folijs/react/styles.css`; inside the workspace the
+- ESM-only, `sideEffects` declared (`@folijs/react`: its CSS only), `repository` per package (npm
+  provenance checks that it matches the repository that built the package; `directory` links the
+  package's folder). Peer dependencies: React and React DOM (18.2+ or 19) for `@folijs/react`, and
+  since 12.2 (ADR-0008) `@folijs/core` for the other four and `@folijs/view` for `@folijs/react`,
+  as `workspace:*` (published as the exact version), so an app has one copy of core.
+  Exports: `.` (`types`, `default`), `@folijs/core/internal` (what the other packages need from
+  core without a promise) and `@folijs/react/styles.css`; inside the workspace the
   `@folijs/source` condition also maps them to `src`, and `publishConfig.exports` leaves it out of
   the published packages. `build` empties `dist` first, so deleted modules are not shipped.
-- `pnpm check` also runs `publint --strict` on every package (exports, `files`, types) and
+- `pnpm check` also runs `publint --strict` on every package (exports, `files`, types), `pnpm api`
+  (each package's built `.d.ts` against its committed `api-report.d.ts`, forgotten exports, the
+  published types compiled alone: [contributing.md](contributing.md#api-reports)) and
   `pnpm size`: each package's published entry bundled as an app would (fully minified, its
   Foli dependencies included, React external), and an app importing only `FoliEditor`, against
   gzip budgets in `scripts/size.mjs` (as of 0.6.0: core 85.9 kB, view 107.9 kB, react 151.4 kB,

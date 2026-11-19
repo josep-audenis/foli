@@ -9,9 +9,8 @@ import {
   parseContentV2,
   parseDocument,
   type StyleJSON,
-  type WordContext,
-  wordContext,
 } from "@folijs/core";
+import { type WordContext, wordContext } from "@folijs/core/internal";
 import { afterEach, describe, expect, it } from "vitest";
 import googleDocs from "../../fixtures/clipboard/google-docs.html?raw";
 import googleDocsLists from "../../fixtures/clipboard/google-docs-lists.html?raw";

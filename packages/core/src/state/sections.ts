@@ -96,7 +96,10 @@ function holderFrom(doc: Node, from: number): { pos: number; node: Node } | null
   return found;
 }
 
-/** The last section's setup as `tr` leaves it. */
+/**
+ * The last section's setup as `tr` leaves it.
+ * @internal
+ */
 export function lastSection(state: EditorState, tr: Transaction): SectionJSON {
   let section = wordContext(state)?.envelope.section ?? {};
   for (const step of tr.steps)
@@ -214,6 +217,7 @@ export function insertSectionBreak(kind: SectionBreakKind = "nextPage"): Command
  * After the section `removed` ended (its break went): the section that follows `from` takes over
  * its text, keeping its own setup, starting as `removed` started, with the header and footer
  * references it inherited.
+ * @internal
  */
 export function absorbSection(
   state: EditorState,
@@ -558,7 +562,10 @@ export function setDifferentEvenPages(on: boolean): Command {
   return command;
 }
 
-/** `section` once its tracked setup change is accepted, or rejected. */
+/**
+ * `section` once its tracked setup change is accepted, or rejected.
+ * @internal
+ */
 export function resolveSectionChange(section: SectionJSON, accept: boolean): SectionJSON {
   const { change, ...rest } = section;
   if (accept || !change) return rest;

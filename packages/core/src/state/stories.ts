@@ -36,7 +36,10 @@ import {
   wordContext,
 } from "./word.js";
 
-/** What a story's editor needs of the body's. */
+/**
+ * What a story's editor needs of the body's.
+ * @internal
+ */
 export interface StoryHost extends StoryBody {
   /** The plugins of a story's state (keymaps, tracking, the word context). */
   plugins(context: WordContext, track: TrackState | null): Plugin[];
@@ -85,12 +88,16 @@ function carryStoryChange(
   return { after, patched };
 }
 
-/** What changes one tree of the document: its id (null: the body) and the edit. */
+/**
+ * What changes one tree of the document: its id (null: the body) and the edit.
+ * @internal
+ */
 export type TreeEdits = ReadonlyMap<string | null, (tr: Transaction) => void>;
 
 /**
  * Edits several trees as one transaction of the body, so one undo step. `tracked`: as tracked
  * changes when tracking is on. Returns the trees whose edit was refused; the others are made.
+ * @internal
  */
 export function editTrees(
   editor: Editor,
@@ -144,9 +151,13 @@ export function editTrees(
   return failed;
 }
 
+/** @internal */
 export type StoryListener = (state: EditorState, transactions: readonly Transaction[]) => void;
 
-/** A story's editing state, kept in step with the body. */
+/**
+ * A story's editing state, kept in step with the body.
+ * @internal
+ */
 export class StoryEditing {
   state: EditorState;
   /** Set while the story's own transaction goes through the body. */

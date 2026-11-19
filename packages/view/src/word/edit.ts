@@ -10,18 +10,20 @@
  * opaque inline node a leaf element.
  */
 import {
-  type CellFormat,
   type FieldDisplay,
   fieldDisplay,
   isSafeHref,
-  type ListMarker,
   type Mark,
   type MarkJSON,
   type Node as ModelNode,
+} from "@folijs/core";
+import {
+  type CellFormat,
+  type ListMarker,
   type RunFormat,
   referencesIn,
   type WordContext,
-} from "@folijs/core";
+} from "@folijs/core/internal";
 import type { BlockDesc, LeafDesc } from "../render.js";
 import {
   CHANGE_BAR,
@@ -79,7 +81,10 @@ function hasChanges(node: ModelNode): boolean {
   return found;
 }
 
-/** What the page flow needs to know about a v3 block. */
+/**
+ * What the page flow needs to know about a v3 block.
+ * @internal
+ */
 export interface WordInfo {
   /** Space before and after in CSS px (Word adds them: the flow places them). */
   before: number;
@@ -104,7 +109,10 @@ function childTypes(node: ModelNode): string[] {
   return types;
 }
 
-/** A rendered v3 block: a view block plus its flow information and what it was rendered for. */
+/**
+ * A rendered v3 block: a view block plus its flow information and what it was rendered for.
+ * @internal
+ */
 export interface WordBlockDesc extends BlockDesc {
   readonly word: WordInfo;
   /** What the rendering depends on besides the node (its marker, open comments). */
@@ -114,12 +122,14 @@ export interface WordBlockDesc extends BlockDesc {
 /**
  * A floating picture's holder (drawn first in its paragraph, the view's own DOM) to its anchor:
  * the empty, non-editable span at the picture's place in the text, which positions map to.
+ * @internal
  */
 export const FLOAT_ANCHORS = new WeakMap<Element, HTMLElement>();
 
 /**
  * Renders the blocks of one v3 document for the editable view. `prepare` runs before each
  * render: list numbers and comment ranges depend on the blocks before.
+ * @internal
  */
 export class WordRenderer {
   #context: WordContext;
@@ -560,6 +570,7 @@ function styleOf(element: Element): string {
  * The HTML of copied v3 blocks `nodes`: drawn as the editor draws them, with their list numbers
  * in `doc` (from top-level block `first`; -1 for text from inside one paragraph, which takes no
  * number), without what only the editor needs (comment shading, `contenteditable`).
+ * @internal
  */
 export function clipboardBlocks(
   context: WordContext,
@@ -593,6 +604,7 @@ export function clipboardBlocks(
  * paragraphs of the same style that ask for it (contextual spacing). When only the first asks,
  * its space after still eats into the second's space before, unless the document adds the two
  * (`adds`).
+ * @internal
  */
 export function spacing(
   above: WordInfo | undefined,

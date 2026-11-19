@@ -7,6 +7,7 @@ import { parseXml, type XmlElement } from "../xml.js";
 /**
  * Throws when `text` has a character XML 1.0 cannot hold (control characters other than tab
  * and line ends, lone surrogates, U+FFFE, U+FFFF): no file Word opens could carry it.
+ * @internal
  */
 export function checkCharacters(text: string, where: string): void {
   for (let i = 0; i < text.length; i++) {
@@ -26,21 +27,31 @@ export function checkCharacters(text: string, where: string): void {
   }
 }
 
-/** Character data: `&`, `<`, `>` escaped (characters XML cannot hold refused). */
+/**
+ * Character data: `&`, `<`, `>` escaped (characters XML cannot hold refused).
+ * @internal
+ */
 export function escapeText(text: string): string {
   checkCharacters(text, "text");
   return text.replace(/[&<>]/g, (c) => (c === "&" ? "&amp;" : c === "<" ? "&lt;" : "&gt;"));
 }
 
-/** An attribute value: also `"`, and tabs and line ends as references (XML normalizes them). */
+/**
+ * An attribute value: also `"`, and tabs and line ends as references (XML normalizes them).
+ * @internal
+ */
 export function escapeAttribute(value: string): string {
   checkCharacters(value, "attribute");
   return value.replace(/[&<>"\t\n\r]/g, (c) => `&#${c.charCodeAt(0)};`);
 }
 
+/** @internal */
 export type Attrs = Readonly<Record<string, string | number | boolean | undefined | null>>;
 
-/** `<name a="1">children</name>`, or `<name a="1"/>` without children; undefined attributes left out. */
+/**
+ * `<name a="1">children</name>`, or `<name a="1"/>` without children; undefined attributes left out.
+ * @internal
+ */
 export function el(name: string, attrs: Attrs = {}, children = ""): string {
   let out = `<${name}`;
   for (const [key, value] of Object.entries(attrs)) {
@@ -50,12 +61,18 @@ export function el(name: string, attrs: Attrs = {}, children = ""): string {
   return children ? `${out}>${children}</${name}>` : `${out}/>`;
 }
 
-/** `w:` element with a `w:val`. */
+/**
+ * `w:` element with a `w:val`.
+ * @internal
+ */
 export function val(local: string, value: string | number | undefined): string {
   return value === undefined ? "" : el(`w:${local}`, { "w:val": value });
 }
 
-/** An on/off property: `<w:b/>`, or `<w:b w:val="0"/>` when off. */
+/**
+ * An on/off property: `<w:b/>`, or `<w:b w:val="0"/>` when off.
+ * @internal
+ */
 export function onOff(local: string, value: boolean | null | undefined): string {
   if (value === undefined || value === null) return "";
   return value ? el(`w:${local}`) : el(`w:${local}`, { "w:val": "0" });
@@ -64,6 +81,7 @@ export function onOff(local: string, value: boolean | null | undefined): string 
 /**
  * Namespace declarations in scope for a part's verbatim fragments: its root's `xmlns`
  * attributes, written on a wrapper so a fragment such as `<w:pPr>…</w:pPr>` parses.
+ * @internal
  */
 export interface Namespaces {
   readonly declarations: string;
@@ -99,6 +117,7 @@ const WORD_NAMESPACES: Record<string, string> = {
   pic: "http://schemas.openxmlformats.org/drawingml/2006/picture",
 };
 
+/** @internal */
 export const DEFAULT_NAMESPACES: Namespaces = {
   declarations: Object.entries(WORD_NAMESPACES)
     .map(([prefix, uri]) => `xmlns:${prefix}="${uri}"`)
@@ -106,9 +125,13 @@ export const DEFAULT_NAMESPACES: Namespaces = {
   prefixes: new Set(Object.keys(WORD_NAMESPACES)),
 };
 
-/** Attributes of a new part's root: Word's namespaces, its extensions ignorable. */
+/**
+ * Attributes of a new part's root: Word's namespaces, its extensions ignorable.
+ * @internal
+ */
 export const NEW_ROOT_ATTRIBUTES = `${DEFAULT_NAMESPACES.declarations} mc:Ignorable="w14 w15 w16se w16cid w16 w16cex w16sdtdh w16du wp14"`;
 
+/** @internal */
 export function namespacesOf(root: XmlElement, source: string): Namespaces {
   const declared = root.attributes.filter((a) => a.name === "xmlns" || a.prefix === "xmlns");
   if (!declared.length) return DEFAULT_NAMESPACES;
@@ -122,6 +145,7 @@ export function namespacesOf(root: XmlElement, source: string): Namespaces {
  * A verbatim fragment (`ext`, `runExt`, an opaque node's XML) parsed in the part's namespaces:
  * exactly one element (named `expected` when given), with its offsets into the returned
  * source. Anything else could not be written into the part as well-formed XML: DocxError.
+ * @internal
  */
 export function fragment(
   xml: string,
@@ -152,6 +176,7 @@ export function fragment(
  * An element's `attributes` bag as written (` name="value"`…). A name the writer already
  * writes, or a prefix not declared in the part (nor by the bag itself), would make the element
  * ill-formed: DocxError.
+ * @internal
  */
 export function bagXml(
   bag: unknown,
@@ -189,6 +214,7 @@ export function bagXml(
  * not come back from the original). Every other child of `original` (unknown to Foli) is kept
  * verbatim at its place in `order`, or at the end when `order` does not name it (extensions
  * such as `w14:ligatures`, which Word writes last).
+ * @internal
  */
 export function merged(
   order: readonly string[],
@@ -213,7 +239,10 @@ export function merged(
   return out + tail.join("");
 }
 
-/** The original element's own attributes, as written (`w:rsidR`… on `w:pPr` is rare but kept). */
+/**
+ * The original element's own attributes, as written (`w:rsidR`… on `w:pPr` is rare but kept).
+ * @internal
+ */
 export function attributesOf(
   original: { element: XmlElement; source: string } | undefined,
 ): string {

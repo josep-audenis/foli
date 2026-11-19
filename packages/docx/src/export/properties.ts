@@ -6,7 +6,8 @@
  * does not model stay where Word requires them.
  */
 
-import { type MarkJSON, schema } from "@folijs/core";
+import type { MarkJSON } from "@folijs/core";
+import { schema } from "@folijs/core/internal";
 import { W } from "../import/ooxml.js";
 import {
   paragraphProperties,
@@ -20,7 +21,10 @@ import { attributesOf, el, fragment, merged, type Namespaces, onOff, val } from 
 type Original = { element: XmlElement; source: string } | undefined;
 type Json = Record<string, unknown>;
 
-/** Structural equality of JSON values, key order aside. */
+/**
+ * Structural equality of JSON values, key order aside.
+ * @internal
+ */
 export function same(a: unknown, b: unknown): boolean {
   if (a === b) return true;
   if (a === null || b === null || typeof a !== "object" || typeof b !== "object") {
@@ -32,7 +36,8 @@ export function same(a: unknown, b: unknown): boolean {
   return ka.length === kb.length && ka.every((k) => same((a as Json)[k], (b as Json)[k]));
 }
 
-const reading = (original: NonNullable<Original>) => ({
+/** @internal */
+export const reading = (original: NonNullable<Original>) => ({
   source: original.source,
   report: new Recorder(),
 });
@@ -52,8 +57,9 @@ function canonicalMarks(marks: readonly MarkJSON[]): MarkJSON[] {
 /**
  * Children of `original` named `locals`, as written, when `unchanged`; otherwise `fresh()`.
  * One property may span several children (`w:b` and `w:bCs`).
+ * @internal
  */
-function child(
+export function keptOrFresh(
   original: Original,
   unchanged: boolean,
   locals: readonly string[],
@@ -66,11 +72,6 @@ function child(
       out += original.source.slice(c.start, c.end);
   }
   return out;
-}
-
-function wrap(name: string, original: Original, children: string): string {
-  const attributes = attributesOf(original);
-  return children || attributes ? `<${name}${attributes}>${children}</${name}>` : "";
 }
 
 // ---- w:rPr -------------------------------------------------------------------------------
@@ -230,6 +231,7 @@ const RUN_MODELED = new Set(Object.values(MARK_CHILDREN).flat());
  * writes `<w:rPr/>` even when empty. With `properties` (a style's, a level's, the defaults', a
  * paragraph mark's, a recorded change's previous properties) the model holds no formatting
  * change: a `w:rPrChange` stays as the original has it.
+ * @internal
  */
 export function runPropertiesXml(
   marks: readonly MarkJSON[],
@@ -255,7 +257,9 @@ export function runPropertiesXml(
     if (!owned(type)) continue;
     const now = current.find((m) => m.type === type);
     const before = reread.find((m) => m.type === type);
-    const text = child(original, same(now, before), locals, () => markChildren(now, type, ns));
+    const text = keptOrFresh(original, same(now, before), locals, () =>
+      markChildren(now, type, ns),
+    );
     generated.set(locals[0] as string, text);
     for (const local of locals.slice(1)) generated.set(local, "");
   }
@@ -443,7 +447,7 @@ function markRunProperties(attrs: Json, original: Original, ns: Namespaces): str
     for (const local of ["ins", "del", "moveFrom", "moveTo"])
       generated.set(
         local,
-        child(sub, true, [local], () => ""),
+        keptOrFresh(sub, true, [local], () => ""),
       );
   } else {
     generated.set("ins", change("ins", revision.insertion as Json | undefined));
@@ -470,6 +474,7 @@ const PARAGRAPH_ONLY = new Set(["section", "formatChange", "revision", "markForm
  * read from. With `properties` (a style's, a level's, the defaults', a recorded change's
  * previous properties) the model does not hold the mark's run properties, a section or a
  * formatting change there: those stay as the original has them.
+ * @internal
  */
 export function paragraphPropertiesXml(
   attrs: Json,
@@ -498,7 +503,7 @@ export function paragraphPropertiesXml(
     if (properties && PARAGRAPH_ONLY.has(prop)) continue;
     generated.set(
       local,
-      child(original, same(current[prop], reread[prop]), [local], () =>
+      keptOrFresh(original, same(current[prop], reread[prop]), [local], () =>
         paragraphChild(prop, current[prop], ns),
       ),
     );
@@ -651,7 +656,10 @@ function sectionChild(name: string, value: unknown, ns: Namespaces): string {
   }
 }
 
-/** A section as `w:sectPr` (always written: an empty one is a section break with Word's defaults). */
+/**
+ * A section as `w:sectPr` (always written: an empty one is a section break with Word's defaults).
+ * @internal
+ */
 export function sectionXml(section: Json, ns: Namespaces): string {
   const ext = section.ext as string | undefined;
   const original = ext ? fragment(ext, ns, "sectPr") : undefined;
@@ -662,7 +670,7 @@ export function sectionXml(section: Json, ns: Namespaces): string {
   for (const [prop, locals] of Object.entries(SECTION_CHILDREN)) {
     generated.set(
       locals[0] as string,
-      child(original, same(section[prop], reread[prop]), locals, () =>
+      keptOrFresh(original, same(section[prop], reread[prop]), locals, () =>
         sectionChild(prop, section[prop], ns),
       ),
     );
@@ -670,5 +678,3 @@ export function sectionXml(section: Json, ns: Namespaces): string {
   const children = merged(SECT_ORDER, SECTION_MODELED, generated, original);
   return `<w:sectPr${attributesOf(original)}>${children}</w:sectPr>`;
 }
-
-export { child as keptOrFresh, reading, wrap };

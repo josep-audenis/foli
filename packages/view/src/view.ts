@@ -5,18 +5,15 @@ import {
   CellSelection,
   type Command,
   type ControlRange,
-  caretStop,
   cellsAsTable,
   closeHistory,
   controlAt,
   controlProperties,
-  controlSpot,
   type DocumentSettings,
   type DocumentTarget,
   deleteBackward,
   deleteForward,
   deleteSelection,
-  deleteSelectionKeepingTables,
   type Editor,
   type EditorState,
   ensureStory,
@@ -28,8 +25,6 @@ import {
   type FoundMatches,
   fieldCodesShown,
   fieldsIn,
-  fitPaste,
-  fitPastedV2,
   goToCellVertically,
   insertControlText,
   insertHardBreak,
@@ -38,7 +33,6 @@ import {
   insertPicture,
   insertText,
   isSafeHref,
-  keepTablesApart,
   type Node as ModelNode,
   marksAt,
   type NavigationRequest,
@@ -55,17 +49,13 @@ import {
   type ResourceJSON,
   type ReviewView,
   redo,
-  referencesIn,
   type SectionJSON,
   Selection,
   Slice,
   type StorySide,
-  StoryStep,
   type StoryView,
-  sameSpot,
   sectionSettings,
   setColumnWidth,
-  setComments,
   setLink,
   setPictureSize,
   splitBlock,
@@ -76,15 +66,27 @@ import {
   toggleFieldCodes,
   toggleMark,
   trackState,
-  typedMarks,
   type UpdateFieldsOptions,
   undo,
   updateFields,
-  type WordContext,
   type WordSettingsJSON,
+} from "@folijs/core";
+import {
+  caretStop,
+  controlSpot,
+  deleteSelectionKeepingTables,
+  fitPaste,
+  fitPastedV2,
+  keepTablesApart,
+  referencesIn,
+  StoryStep,
+  sameSpot,
+  setComments,
+  typedMarks,
+  type WordContext,
   withEnvelope,
   wordContext,
-} from "@folijs/core";
+} from "@folijs/core/internal";
 import { docFromClipboard, FOLI_MIME, serializeRange } from "./clipboard.js";
 import {
   type BlockBox,
@@ -176,7 +178,10 @@ interface FrameState {
   key: string;
 }
 
-/** A table's measurement, in layout px from the table's top (drawn whole). */
+/**
+ * A table's measurement, in layout px from the table's top (drawn whole).
+ * @internal
+ */
 export interface TableMeasure {
   rows: { top: number; bottom: number }[];
   /** The top of each of its units (by index into the units), null for one not shown (covered). */
@@ -4356,7 +4361,10 @@ function layoutScale(page: HTMLElement, settings: DocumentSettings): number {
   return page.getBoundingClientRect().width / (settings.pageSize.width * PX_PER_MM) || 1;
 }
 
-/** A block's measurement: border-box height across its fragments (layout px), margins, lines. */
+/**
+ * A block's measurement: border-box height across its fragments (layout px), margins, lines.
+ * @internal
+ */
 export interface Measure {
   height: number;
   marginTop: number;
@@ -4437,6 +4445,7 @@ function measureTable(
  * at its cells' line ends, unless the row may not split (`cantSplit`, unless taller than a
  * page), is part of a vertical merge or holds a nested table (shortcut: those split only
  * between rows; a nested table stays whole within its row).
+ * @internal
  */
 export function breaksOf(
   frame: Frame,
@@ -4498,6 +4507,7 @@ function tableBox(
  * A flowed table cut into its fragments: the rows each shows (a row split across pages in
  * both), the header rows drawn again above a continuation, the fragment of the table each
  * block's fragments go in, and where a block of a split row splits (content offsets).
+ * @internal
  */
 export function cutTable(
   frame: Frame,
@@ -4746,6 +4756,7 @@ function reuseOf(
   };
 }
 
+/** @internal */
 export interface Lines {
   /** Content offset where each line starts. */
   starts: number[];

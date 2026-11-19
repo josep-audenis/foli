@@ -111,11 +111,10 @@ importers:
         version: 4.10.2
 
   packages/docx:
-    dependencies:
-      '@folijs/core':
-        specifier: workspace:^
-        version: link:../core
     devDependencies:
+      '@folijs/core':
+        specifier: workspace:*
+        version: link:../core
       '@types/node':
         specifier: ^20.19.43
         version: 20.19.43
@@ -124,13 +123,12 @@ importers:
         version: 4.10.2
 
   packages/pdf:
-    dependencies:
-      '@folijs/core':
-        specifier: workspace:^
-        version: link:../core
     devDependencies:
+      '@folijs/core':
+        specifier: workspace:*
+        version: link:../core
       '@folijs/view':
-        specifier: workspace:^
+        specifier: workspace:*
         version: link:../view
       '@types/node':
         specifier: ^20.19.43
@@ -140,14 +138,13 @@ importers:
         version: 8.3.5(@types/node@20.19.43)(yaml@2.9.1)
 
   packages/react:
-    dependencies:
+    devDependencies:
       '@folijs/core':
-        specifier: workspace:^
+        specifier: workspace:*
         version: link:../core
       '@folijs/view':
-        specifier: workspace:^
+        specifier: workspace:*
         version: link:../view
-    devDependencies:
       react:
         specifier: ^19.3.1
         version: 19.3.1
@@ -156,9 +153,9 @@ importers:
         version: 19.3.1(react@19.3.1)
 
   packages/view:
-    dependencies:
+    devDependencies:
       '@folijs/core':
-        specifier: workspace:^
+        specifier: workspace:*
         version: link:../core
 
   spikes/extension:

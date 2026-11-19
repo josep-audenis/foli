@@ -6,7 +6,7 @@ export {
   measureImageFile,
   textWidthEmu,
 } from "./view.js";
-export { EMU_PER_PX } from "./word/blocks.js";
+export { type BlockOptions, EMU_PER_PX } from "./word/blocks.js";
 export {
   type DocumentPages,
   type ReviewView,

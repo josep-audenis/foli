@@ -10,6 +10,7 @@ import type { Transform } from "../transform/transform.js";
  * Attributes the paragraph mark carries in Word (schema v3): the section break, the mark's
  * tracked change and the paragraph's own attributes (`w14:paraId`). Whichever paragraph keeps
  * the mark keeps them.
+ * @internal
  */
 export const MARK_ATTRS = ["section", "revision", "formatChange", "attributes"] as const;
 
@@ -30,6 +31,7 @@ const MARKERS = new Set([
  * (it was empty, or deleted from its start), it is gone: the last one stays whole, as in Word.
  * `tail` is where the content kept of the last one starts in it (a deletion into it). Nothing for
  * a schema without them (v2).
+ * @internal
  */
 export function keepLastMark(tr: Transform, pos: number, last: Node, tail = 0): void {
   const merged = tr.doc.nodeAt(pos);

@@ -14,8 +14,9 @@ import {
   type SectionJSON,
   type StoryJSON,
 } from "@folijs/core";
-import { controlsUsed, noteIds, packageStories } from "../import/index.js";
+import { controlsUsed, packageStories } from "../import/index.js";
 import { child, isW, REL, W } from "../import/ooxml.js";
+import { noteIds } from "../import/stories.js";
 import { DocxError, type DocxPackage, type NewPart } from "../package.js";
 import { newSettingsXml, withSettings, withTrackRevisions } from "../settings.js";
 import { parseXml, type XmlElement } from "../xml.js";

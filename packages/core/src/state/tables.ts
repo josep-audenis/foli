@@ -13,7 +13,10 @@ import { type Command, type EditorState, Plugin, type Transaction } from "./stat
 
 const isTable = (node: Node) => node.type.name === "table";
 
-/** The depth of the innermost table cell around `$pos`, or -1. */
+/**
+ * The depth of the innermost table cell around `$pos`, or -1.
+ * @internal
+ */
 export function cellDepth($pos: ResolvedPos): number {
   for (let d = $pos.depth; d > 0; d--) if ($pos.node(d).type.name === "tableCell") return d;
   return -1;
@@ -30,6 +33,7 @@ function tableBelow($pos: ResolvedPos, shared: number): number {
 /**
  * Deletes `from..to` in `tr` keeping tables valid; returns false (and does nothing) when an
  * ordinary delete keeps them valid (no end of the range inside a table it leaves).
+ * @internal
  */
 export function deleteAcrossTables(tr: Transaction, from: number, to: number): boolean {
   const doc = tr.doc;
@@ -135,6 +139,7 @@ function clearCells(tr: Transaction, from: number, to: number, start: number, en
  * Empties the cells at positions (positions before them, any order): their text deleted
  * (paragraphs in a cell joined), so a tracked clear can be rejected; a cell holding other blocks
  * (a nested table) gets one empty paragraph instead.
+ * @internal
  */
 export function emptyCells(tr: Transaction, positions: readonly number[]): void {
   for (const pos of [...positions].sort((a, b) => b - a)) {
@@ -260,6 +265,7 @@ export function goToCell(dir: 1 | -1): Command {
  * A new row like `last`: its properties, not its identity (`w14:paraId`…) or revisions; its
  * cells empty, unmerged, their paragraph with the first one's properties, without what only one
  * paragraph has. Null when the schema has no paragraph.
+ * @internal
  */
 export function emptyRowLike(last: Node): Node | null {
   const paragraph = last.type.schema.nodes.paragraph;
@@ -362,14 +368,20 @@ function cellAtColumn(table: Node, tableStart: number, r: number, column: number
   }
   return null;
 }
-/** Tab and Shift+Tab between cells: before the lists' Tab (in a cell Word moves, numbered or not). */
+/**
+ * Tab and Shift+Tab between cells: before the lists' Tab (in a cell Word moves, numbered or not).
+ * @internal
+ */
 export function tableKeymap(): Plugin {
   return new Plugin({ keymap: { Tab: goToCell(1), "Shift-Tab": goToCell(-1) } });
 }
 
 // ---- Cell selections (10.6c) ---------------------------------------------------------------------
 
-/** A cell where a table's grid has it: its position and the rows and grid columns it covers. */
+/**
+ * A cell where a table's grid has it: its position and the rows and grid columns it covers.
+ * @internal
+ */
 export interface GridCell {
   pos: number;
   row: number;
@@ -378,7 +390,10 @@ export interface GridCell {
   span: number;
 }
 
-/** A table's cells on its grid (a merge's first cell spans the rows its merge covers). */
+/**
+ * A table's cells on its grid (a merge's first cell spans the rows its merge covers).
+ * @internal
+ */
 export function gridOf(table: Node, start: number): GridCell[] {
   const out: GridCell[] = [];
   const open = new Map<number, GridCell>();
@@ -473,7 +488,10 @@ export class CellSelection extends Selection {
   }
 }
 
-/** The grid cell covering the cell at `pos` of `table` (at `start`): a merge's, for a covered one. */
+/**
+ * The grid cell covering the cell at `pos` of `table` (at `start`): a merge's, for a covered one.
+ * @internal
+ */
 export function coveringCell(
   table: Node,
   start: number,
@@ -496,7 +514,10 @@ export function coveringCell(
   return undefined;
 }
 
-/** The grid cell covering `row` and `column`. */
+/**
+ * The grid cell covering `row` and `column`.
+ * @internal
+ */
 export const coveringAt = (grid: readonly GridCell[], row: number, column: number) =>
   grid.find(
     (c) =>

@@ -43,6 +43,7 @@ import {
 } from "./xmlout.js";
 
 type Json = Record<string, unknown>;
+/** @internal */
 export interface OriginalPart {
   readonly root: XmlElement;
   readonly source: string;
@@ -76,7 +77,10 @@ function childSource(
   return c && o ? o.source.slice(c.start, c.end) : undefined;
 }
 
-/** A part's text: the original's prolog and root around `children`, or a new root. */
+/**
+ * A part's text: the original's prolog and root around `children`, or a new root.
+ * @internal
+ */
 export function wrapPart(
   part: OriginalPart | undefined,
   rootName: string,
@@ -272,6 +276,7 @@ function defaultsXml(defaults: FoliDocument["defaults"], ns: Namespaces): string
   return `<w:docDefaults${attributesOf(o)}>${rPr ? `<w:rPrDefault>${rPr}</w:rPrDefault>` : "<w:rPrDefault/>"}${pPr ? `<w:pPrDefault>${pPr}</w:pPrDefault>` : "<w:pPrDefault/>"}</w:docDefaults>`;
 }
 
+/** @internal */
 export function stylesXml(
   doc: FoliDocument,
   part: OriginalPart | undefined,
@@ -414,6 +419,7 @@ function instanceXml(instance: NumberingInstanceJSON, ns: Namespaces): string {
   return `${open}>${children}</w:num>`;
 }
 
+/** @internal */
 export function numberingXml(
   doc: FoliDocument,
   part: OriginalPart | undefined,
@@ -512,6 +518,7 @@ function commentStart(comment: CommentJSON, ns: Namespaces): string {
   }).replace(/\/>$/, ">");
 }
 
+/** @internal */
 export function commentsXml(
   doc: FoliDocument,
   part: OriginalPart | undefined,
@@ -556,6 +563,7 @@ const noteSeparators = (
  * A footnotes or endnotes part: a note unchanged from `originals` keeps its bytes, a changed one
  * is written from its story, and new ones go at the end. One whose story is gone is removed,
  * unless Word needs it: a separator, or a note something still refers to (`isReferenced`).
+ * @internal
  */
 export function notesXml(
   kind: "footnote" | "endnote",
@@ -615,6 +623,7 @@ export function notesXml(
 /**
  * `commentsExtended.xml` for the comments' replies and resolved state, keyed by the `w14:paraId`
  * of each comment's last paragraph (comments without one cannot be listed).
+ * @internal
  */
 export function commentsExtendedXml(doc: FoliDocument, part: OriginalPart | undefined): string {
   const paraId = (c: CommentJSON) => {

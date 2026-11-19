@@ -55,7 +55,10 @@ export const DEFAULT_SETTINGS: DocumentSettings = {
   margins: { top: 25.4, right: 25.4, bottom: 25.4, left: 25.4 },
 };
 
-/** A schema v2 document, for tests of migration and of editing migrated documents. */
+/**
+ * A schema v2 document, for tests of migration and of editing migrated documents.
+ * @internal
+ */
 export function createDocumentV2(
   content: DocJSON = { type: "doc", content: [{ type: "paragraph" }] },
   settings: Partial<DocumentSettings> = {},
@@ -66,6 +69,7 @@ export function createDocumentV2(
 /**
  * Validates a schema v1 or v2 document against schema v2 and returns it as v2, content in
  * canonical form. Throws FoliDocumentError instead of silently dropping invalid content.
+ * @internal
  */
 export function parseDocumentV2(input: unknown): FoliDocumentV2 {
   if (!isRecord(input)) throw new FoliDocumentError("Document must be an object");

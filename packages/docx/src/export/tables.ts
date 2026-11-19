@@ -351,20 +351,29 @@ function propertiesXml(spec: Spec, attrs: Json, ns: Namespaces, always: boolean)
     : "";
 }
 
-/** A table's `w:tblPr` (always written: Word requires it). */
+/**
+ * A table's `w:tblPr` (always written: Word requires it).
+ * @internal
+ */
 export const tablePropertiesXml = (attrs: Json, ns: Namespaces) =>
   propertiesXml(TABLE, attrs, ns, true);
 
+/** @internal */
 export const exceptionsXml = (exceptions: unknown, ns: Namespaces) =>
   exceptions ? propertiesXml(EXCEPTIONS, exceptions as Json, ns, false) : "";
 
+/** @internal */
 export const rowPropertiesXml = (attrs: Json, ns: Namespaces) =>
   propertiesXml(ROW, attrs, ns, false);
 
+/** @internal */
 export const cellPropertiesXml = (attrs: Json, ns: Namespaces) =>
   propertiesXml(CELL, attrs, ns, false);
 
-/** A new table style's `w:tblPr`, `w:trPr` and `w:tcPr` (empty for a part it does not set). */
+/**
+ * A new table style's `w:tblPr`, `w:trPr` and `w:tcPr` (empty for a part it does not set).
+ * @internal
+ */
 export const stylePartsXml = (
   style: { table?: unknown; row?: unknown; cell?: unknown },
   ns: Namespaces,
@@ -374,7 +383,10 @@ export const stylePartsXml = (
   tcPr: style.cell ? propertiesXml(CELL, style.cell as Json, ns, false) : "",
 });
 
-/** `w:tblGrid`: as read while the widths are the same, else written from them. */
+/**
+ * `w:tblGrid`: as read while the widths are the same, else written from them.
+ * @internal
+ */
 export function gridXml(attrs: Json, ns: Namespaces): string {
   const widths = (attrs.grid ?? []) as number[];
   const ext = attrs.gridExt as string | undefined;

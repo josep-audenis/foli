@@ -21,6 +21,7 @@ import {
 /**
  * `useLayoutEffect` in the browser, `useEffect` on the server, where neither runs: React 18
  * warns about a layout effect in server rendering.
+ * @internal
  */
 export const useIsomorphicLayoutEffect =
   typeof document === "undefined" ? useEffect : useLayoutEffect;
@@ -81,7 +82,10 @@ export function useCurrentEditor(): Editor {
   return editor;
 }
 
-/** `editor` if given, else the context's. */
+/**
+ * `editor` if given, else the context's.
+ * @internal
+ */
 export function useEditorOrContext(editor: Editor | undefined, caller: string): Editor {
   const context = useContext(EditorContext);
   const found = editor ?? context;
@@ -89,7 +93,10 @@ export function useEditorOrContext(editor: Editor | undefined, caller: string): 
   return found;
 }
 
-/** The editor commands go to: the story open on its page, if any, else `editor`. */
+/**
+ * The editor commands go to: the story open on its page, if any, else `editor`.
+ * @internal
+ */
 export function useActiveEditor(editor: Editor): Editor {
   const subscribe = useCallback((notify: () => void) => editor.subscribe(notify), [editor]);
   const id = useSyncExternalStore(

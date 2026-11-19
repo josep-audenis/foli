@@ -49,7 +49,10 @@ export function noteKindOf(id: string): NoteKind | null {
   return id.startsWith("footnote:") ? "footnote" : id.startsWith("endnote:") ? "endnote" : null;
 }
 
-/** Whether `story` is a note with a text: not one of the separators. */
+/**
+ * Whether `story` is a note with a text: not one of the separators.
+ * @internal
+ */
 export const isNote = (story: Pick<StoryJSON, "kind" | "noteType"> | undefined): boolean =>
   (story?.kind === "footnote" || story?.kind === "endnote") &&
   (story.noteType ?? "normal") === "normal";
@@ -210,7 +213,10 @@ function freshNoteId(state: EditorState, kind: NoteKind, taken: ReadonlySet<stri
   return `${kind}:${max + 1}`;
 }
 
-/** Makes the story ids of new notes, none used before. */
+/**
+ * Makes the story ids of new notes, none used before.
+ * @internal
+ */
 export function noteIds(state: EditorState): (kind: NoteKind) => string {
   const taken = new Set<string>();
   return (kind) => {
@@ -480,6 +486,7 @@ function referenceMap(doc: Node): Map<string, BlockReference> {
  * Keeps notes with their references, in the transaction's undo step: a reference that goes takes
  * its note; one recorded as inserted or deleted has what the note holds recorded too; and a
  * recorded reference accepted or rejected, and staying, settles the note's record with it.
+ * @internal
  */
 export function notesPlugin(): Plugin {
   return new Plugin({

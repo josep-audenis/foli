@@ -45,8 +45,10 @@ export const joinHistory = "joinHistory";
 /**
  * On a body transaction carrying a story's change: the story's id and its own transaction, which
  * decides what typing joins, as the body's does for body typing.
+ * @internal
  */
 export const storyEdit = "storyEdit";
+/** @internal */
 export interface StoryEdit {
   id: string;
   tr: Transaction;

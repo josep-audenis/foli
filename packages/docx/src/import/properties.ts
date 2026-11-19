@@ -5,21 +5,27 @@
  * element's verbatim `ext`, so nothing is lost.
  */
 
-import { checkSection, type MarkJSON, RUN_PROPERTY_MARKS, schema } from "@folijs/core";
+import type { MarkJSON } from "@folijs/core";
+import { checkSection, RUN_PROPERTY_MARKS, schema } from "@folijs/core/internal";
 import type { XmlElement } from "../xml.js";
 import { attr, child, compact, elements, integer, isW, R, toggle, W } from "./ooxml.js";
 import type { Recorder } from "./report.js";
 
+/** @internal */
 export interface Context {
   readonly source: string;
   readonly report: Recorder;
 }
 
+/** @internal */
 export function sourceOf(context: Context, element: XmlElement): string {
   return context.source.slice(element.start, element.end);
 }
 
-/** `object` without its undefined values. */
+/**
+ * `object` without its undefined values.
+ * @internal
+ */
 export function compactDefined<T extends Record<string, unknown>>(object: T): Partial<T> {
   return Object.fromEntries(
     Object.entries(object).filter(([, value]) => value !== undefined),
@@ -31,6 +37,7 @@ const ATTRIBUTE_NAME = /^[A-Za-z_][\w.-]*(:[A-Za-z_][\w.-]*)?$/;
 /**
  * An element's attributes not in `modeled`, as an `attributes` bag (undefined when none). One
  * the bag cannot hold (a name outside its pattern, a value over 64 KiB, past 64) is reported.
+ * @internal
  */
 export function attributeBag(
   element: XmlElement,
@@ -58,7 +65,10 @@ export function attributeBag(
 
 const PARAGRAPH_ATTRS = schema.nodes.paragraph?.spec.attrs ?? {};
 
-/** Keeps `value` as paragraph attribute `name` if the schema accepts it; reports it otherwise. */
+/**
+ * Keeps `value` as paragraph attribute `name` if the schema accepts it; reports it otherwise.
+ * @internal
+ */
 export function setParagraph(
   out: Record<string, unknown>,
   name: string,
@@ -72,7 +82,10 @@ export function setParagraph(
   else out[name] = value;
 }
 
-/** The mark if the schema accepts it; reported and left out otherwise. */
+/**
+ * The mark if the schema accepts it; reported and left out otherwise.
+ * @internal
+ */
 export function mark(json: MarkJSON, element: string, context: Context): MarkJSON | undefined {
   try {
     schema.markFromJSON(json);
@@ -83,7 +96,10 @@ export function mark(json: MarkJSON, element: string, context: Context): MarkJSO
   }
 }
 
-/** Who and when, for tracked changes (`w:ins`, `w:del`, `w:rPrChange`…). */
+/**
+ * Who and when, for tracked changes (`w:ins`, `w:del`, `w:rPrChange`…).
+ * @internal
+ */
 export function revisionOf(element: XmlElement): {
   id: number | undefined;
   author: string;
@@ -99,6 +115,7 @@ export function revisionOf(element: XmlElement): {
 /**
  * A tracked change's mark (`insertion`, `deletion`, with `move` for `w:moveFrom`/`w:moveTo`).
  * An invalid date is left out rather than losing the change.
+ * @internal
  */
 export function revisionMark(
   type: "insertion" | "deletion",
@@ -131,6 +148,7 @@ const TOGGLES: Record<string, string> = {
  * `w:rPr`'s run properties as marks (without `runExt`, the caller's). Tracked changes of the
  * paragraph mark (`w:ins`/`w:del` in a paragraph's `w:rPr`) are not run properties: see
  * `paragraphRevision`.
+ * @internal
  */
 export function runProperties(rPr: XmlElement | undefined, context: Context): MarkJSON[] {
   if (!rPr) return [];
@@ -312,7 +330,10 @@ function whole(
   return n;
 }
 
-/** An ST_OnOff attribute (`w:beforeAutospacing="1"`); another value is reported, read as missing. */
+/**
+ * An ST_OnOff attribute (`w:beforeAutospacing="1"`); another value is reported, read as missing.
+ * @internal
+ */
 export function onOff(
   element: XmlElement | undefined,
   local: string,
@@ -332,6 +353,7 @@ const toggleProperty = (el: XmlElement | undefined) => (el ? toggle(el) : undefi
 /**
  * `w:pPr` as paragraph attributes. With `paragraph`, also what only a paragraph has (its
  * section, the paragraph mark's revisions, a formatting change, the verbatim `ext`).
+ * @internal
  */
 export function paragraphProperties(
   pPr: XmlElement | undefined,
@@ -509,7 +531,10 @@ function sectionChange(element: XmlElement | undefined, context: Context) {
   });
 }
 
-/** `w:sectPr` as a section; every part checked on its own. */
+/**
+ * `w:sectPr` as a section; every part checked on its own.
+ * @internal
+ */
 export function section(sectPr: XmlElement, context: Context): Record<string, unknown> {
   const pgSz = child(sectPr, "pgSz");
   const pgNumType = child(sectPr, "pgNumType");

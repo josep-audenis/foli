@@ -1,11 +1,15 @@
 import type { Node as ModelNode } from "@folijs/core";
 
-/** Marks the <br> of an explicit page break. */
+/**
+ * Marks the <br> of an explicit page break.
+ * @internal
+ */
 export const PAGE_BREAK_ATTR = "data-page-break";
 
 /**
  * A rendered inline leaf (a text node or hard break) and where it sits in its block's content.
  * A text node split across fragments is two leaves, one per fragment.
+ * @internal
  */
 export interface LeafDesc {
   readonly dom: Node;
@@ -16,6 +20,7 @@ export interface LeafDesc {
 /**
  * View descriptor of one block: the model node, its elements and its leaves. A block split
  * across pages has one element per page (its fragments, in order); `dom` is the first.
+ * @internal
  */
 export interface BlockDesc {
   readonly node: ModelNode;

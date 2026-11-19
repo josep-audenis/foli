@@ -9,6 +9,7 @@ export default defineConfig({
       "packages/*/src/**/*.test.{ts,tsx}",
       "spikes/*/src/**/*.test.ts",
       "apps/*/src/**/*.test.ts",
+      "scripts/*.test.mjs",
     ],
   },
 });

@@ -1,12 +1,12 @@
-import {
-  type Editor,
-  type EditorDocument,
-  type FoliDocument,
-  type Plugin,
-  type ReviewView,
-  type Transaction,
-  wordContext,
+import type {
+  Editor,
+  EditorDocument,
+  FoliDocument,
+  Plugin,
+  ReviewView,
+  Transaction,
 } from "@folijs/core";
+import { wordContext } from "@folijs/core/internal";
 import { forwardRef, type ReactNode, useImperativeHandle, useRef } from "react";
 import {
   FoliEditorProvider,

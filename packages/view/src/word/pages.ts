@@ -11,9 +11,9 @@ import {
   noteProperties,
   noteTexts,
   parseContent,
-  Resolver,
   type SectionJSON,
 } from "@folijs/core";
+import { Resolver } from "@folijs/core/internal";
 import {
   type BlockBox,
   type FlowNote,
@@ -40,7 +40,6 @@ import { lineBottoms, type NoteGroup, PageNotes } from "./notes.js";
 import { PageRegions } from "./regions.js";
 
 export type { ReviewView } from "./blocks.js";
-export { lineBottoms };
 
 /** The class of each page element. */
 export const WORD_PAGE_CLASS = "foli-word-page";
@@ -135,6 +134,7 @@ function createPage(doc: Document, g: Geometry): { page: HTMLElement; body: HTML
 /**
  * The ratio of a font's normal line height to its size, measured: a line of 100 px text with
  * `line-height: normal` (the font's own ascent, descent and gap, as Word's single spacing).
+ * @internal
  */
 export function measureLineRatio(container: HTMLElement): (family: string) => number {
   return (family) => {

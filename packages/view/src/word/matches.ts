@@ -10,6 +10,7 @@ import { PAGE_FIELD_ATTR } from "./regions.js";
 const ALL = "foli-find";
 const CURRENT = "foli-find-current";
 
+/** @internal */
 export const MATCH_STYLES =
   `::highlight(${ALL}){background-color:#ffe17a}` +
   `::highlight(${CURRENT}){background-color:#f5a04a}` +
@@ -22,7 +23,10 @@ interface HighlightWindow {
   Highlight?: new () => Set<Range> & { priority: number };
 }
 
-/** One view's marks; views share the document's two highlights. */
+/**
+ * One view's marks; views share the document's two highlights.
+ * @internal
+ */
 export class MatchMarks {
   private all: Range[] = [];
   private current: Range[] = [];
@@ -58,6 +62,7 @@ export class MatchMarks {
 /**
  * Where `query` is in drawn copies of a story (read-only, with their pages' numbers filled in):
  * looked for in each paragraph's text, as the text shown there has no positions.
+ * @internal
  */
 export function rangesInText(root: Element, query: string, options: FindOptions): Range[] {
   const doc = root.ownerDocument;

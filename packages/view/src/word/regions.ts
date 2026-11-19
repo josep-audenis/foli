@@ -6,29 +6,38 @@
  */
 import {
   type FoliDocument,
-  formatNumber,
   type NodeJSON,
   pageVariant,
-  type Resolver,
   type SectionJSON,
   type StoryJSON,
   type StorySide,
   storyOfSection,
 } from "@folijs/core";
+import { formatNumber, type Resolver } from "@folijs/core/internal";
 import type { FlowPage, PageFacts } from "../layout/flow.js";
 import { type BlockOptions, PX_PER_TWIP, renderBlocks, type WordBlock } from "./blocks.js";
 
-/** On what shows a page field's number in a drawn copy of a story. */
+/**
+ * On what shows a page field's number in a drawn copy of a story.
+ * @internal
+ */
 export const PAGE_FIELD_ATTR = "data-foli-page-field";
 
-/** The class of a page's header or footer element. */
+/**
+ * The class of a page's header or footer element.
+ * @internal
+ */
 export const REGION_CLASS = "foli-region";
+/** @internal */
 export const REGION_CONTENT_CLASS = "foli-region-content";
 
 /** Word's distance from the page's edge when a section does not give one: half an inch. */
 const EDGE = 720;
 
-/** What the page fields of a page show. */
+/**
+ * What the page fields of a page show.
+ * @internal
+ */
 export interface FieldValues {
   page: string;
   pages: string;
@@ -160,7 +169,10 @@ interface StoryDrawing {
   heights: Map<string, number>;
 }
 
-/** Per story (an object replaced when the story changes), what was measured and drawn of it. */
+/**
+ * Per story (an object replaced when the story changes), what was measured and drawn of it.
+ * @internal
+ */
 export type RegionCache = WeakMap<StoryJSON, StoryDrawing>;
 
 /** A section's page as the regions need it, in CSS px. */
@@ -199,7 +211,10 @@ function edgesOf(section: SectionJSON): Edges {
   };
 }
 
-/** Lays `blocks` out as a story: spacing as between the paragraphs of a page. */
+/**
+ * Lays `blocks` out as a story: spacing as between the paragraphs of a page.
+ * @internal
+ */
 export function stack(blocks: readonly WordBlock[], parent: HTMLElement, adds: boolean): number {
   let previous = 0;
   blocks.forEach((block, i) => {
@@ -216,6 +231,7 @@ export function stack(blocks: readonly WordBlock[], parent: HTMLElement, adds: b
   return previous;
 }
 
+/** @internal */
 export interface RegionOptions extends Omit<BlockOptions, "resolver"> {
   /** Where stories are measured (hidden, for a moment). */
   measureIn(): HTMLElement;
@@ -223,7 +239,10 @@ export interface RegionOptions extends Omit<BlockOptions, "resolver"> {
   scale?(): number;
 }
 
-/** What the layout of a document's pages needs to know of their headers and footers. */
+/**
+ * What the layout of a document's pages needs to know of their headers and footers.
+ * @internal
+ */
 export class PageRegions {
   /** The page count and each section's, as of the last flow (the fields' values). */
   private pages = 1;

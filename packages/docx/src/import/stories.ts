@@ -12,7 +12,10 @@ import { attr, elements, integer, isW, REL } from "./ooxml.js";
 
 const NOTE_TYPES = new Set(["normal", "separator", "continuationSeparator", "continuationNotice"]);
 
-/** The notes of a footnotes or endnotes part that the model holds, by story id. */
+/**
+ * The notes of a footnotes or endnotes part that the model holds, by story id.
+ * @internal
+ */
 export function notesOf(root: XmlElement, kind: "footnote" | "endnote"): Map<string, XmlElement> {
   const out = new Map<string, XmlElement>();
   for (const el of elements(root)) {
@@ -31,7 +34,10 @@ const docOf = (content: StoryJSON["content"]["content"]): StoryJSON["content"] =
   content: content?.length ? content : [{ type: "paragraph" }],
 });
 
-/** Every story of the package, by id. `contextFor` gives the reading context of a part. */
+/**
+ * Every story of the package, by id. `contextFor` gives the reading context of a part.
+ * @internal
+ */
 export function readStories(
   pkg: DocxPackage,
   contextFor: (part: string, source: string) => ContentContext,
@@ -88,7 +94,10 @@ export function readStories(
   return stories;
 }
 
-/** The ids of every note in the package's notes parts, those the model does not hold too. */
+/**
+ * The ids of every note in the package's notes parts, those the model does not hold too.
+ * @internal
+ */
 export function noteIds(pkg: DocxPackage): Set<string> {
   const ids = new Set<string>();
   for (const [type, kind] of [
@@ -111,7 +120,10 @@ export function noteIds(pkg: DocxPackage): Set<string> {
   return ids;
 }
 
-/** The stories in the form a validated document holds them, to compare with one. */
+/**
+ * The stories in the form a validated document holds them, to compare with one.
+ * @internal
+ */
 export function canonicalStories(
   pkg: DocxPackage,
   contextFor: (part: string, source: string) => ContentContext,

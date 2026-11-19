@@ -9,7 +9,9 @@ import type { XmlElement } from "../xml.js";
 import { A, attr, integer, R, textOf } from "./ooxml.js";
 import { type Context, sourceOf } from "./properties.js";
 
+/** @internal */
 export const WP = "http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing";
+/** @internal */
 export const PIC = "http://schemas.openxmlformats.org/drawingml/2006/picture";
 const ADEC = "http://schemas.microsoft.com/office/drawing/2017/decorative";
 const IMAGE = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image";
@@ -24,6 +26,7 @@ const WRAPS: Record<string, string> = {
 };
 const SIDES = new Set(["bothSides", "left", "right", "largest"]);
 
+/** @internal */
 export interface PictureContext extends Context {
   /** The part's relationship with this id. */
   readonly relationship: (
@@ -74,7 +77,10 @@ function position(el: XmlElement | undefined) {
   return undefined;
 }
 
-/** The `float` of a `wp:anchor`: undefined for one the model cannot hold (kept opaque). */
+/**
+ * The `float` of a `wp:anchor`: undefined for one the model cannot hold (kept opaque).
+ * @internal
+ */
 export function floatOf(anchor: XmlElement): Record<string, unknown> | undefined {
   const horizontal = position(kid(anchor, WP, "positionH"));
   const vertical = position(kid(anchor, WP, "positionV"));
@@ -130,6 +136,7 @@ export function floatOf(anchor: XmlElement): Record<string, unknown> | undefined
 /**
  * The picture node's attributes for `drawing`, its image added to `resources`; undefined for
  * a drawing Foli keeps opaque (not one inline picture, no embedded image part).
+ * @internal
  */
 export function pictureAttrs(
   drawing: XmlElement,

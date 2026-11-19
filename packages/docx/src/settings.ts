@@ -21,7 +21,10 @@ function isOn(settings: XmlElement | undefined, local: string): boolean {
   return value === undefined || !["false", "0", "off"].includes(value);
 }
 
-/** Whether `settings` (the `w:settings` root) turns tracked changes on. */
+/**
+ * Whether `settings` (the `w:settings` root) turns tracked changes on.
+ * @internal
+ */
 export const trackRevisionsOf = (settings: XmlElement | undefined): boolean =>
   isOn(settings, "trackRevisions");
 
@@ -47,7 +50,10 @@ function noteProperties(element: XmlElement | undefined): NotePropertiesJSON {
   };
 }
 
-/** What the document's `settings` model holds of the part, undefined when nothing. */
+/**
+ * What the document's `settings` model holds of the part, undefined when nothing.
+ * @internal
+ */
 export function readSettings(settings: XmlElement | undefined): WordSettingsJSON | undefined {
   if (!settings) return undefined;
   const notes = (local: string) => noteProperties(elementsOf(settings).find((c) => isW(c, local)));
@@ -166,7 +172,10 @@ function placed(source: string, root: XmlElement, local: string, element: string
 
 const prefixOf = (root: XmlElement) => (root.prefix ? `${root.prefix}:` : "");
 
-/** `source` (a settings part, `root` its `w:settings`) with tracked changes `on`. */
+/**
+ * `source` (a settings part, `root` its `w:settings`) with tracked changes `on`.
+ * @internal
+ */
 export function withTrackRevisions(source: string, root: XmlElement, on: boolean): string {
   if (trackRevisionsOf(root) === on) return source;
   return placed(source, root, "trackRevisions", on ? `<${prefixOf(root)}trackRevisions/>` : "");
@@ -200,6 +209,7 @@ const sameNotes = (a: NotePropertiesJSON, b: NotePropertiesJSON) =>
 /**
  * `source` saying what `settings` says. What they leave out stays as the file has it, and a part
  * that already says it is returned as it is.
+ * @internal
  */
 export function withSettings(source: string, root: XmlElement, settings: WordSettingsJSON): string {
   let text = source;
@@ -226,7 +236,10 @@ export function withSettings(source: string, root: XmlElement, settings: WordSet
   return text;
 }
 
-/** A new settings part. */
+/**
+ * A new settings part.
+ * @internal
+ */
 export function newSettingsXml(trackRevisions: boolean, settings: WordSettingsJSON = {}): string {
   const children =
     (trackRevisions ? "<w:trackRevisions/>" : "") +

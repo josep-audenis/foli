@@ -55,6 +55,7 @@ export interface ControlRange {
 /**
  * On a transaction: `value` fills a control, `accept` and `reject` resolve tracked changes, `fields`
  * updates fields: what Word lets through where typing is refused.
+ * @internal
  */
 export const controlEdit = "controlEdit";
 
@@ -222,6 +223,7 @@ export function controlSpot(tree: Node, a: number, b: number): boolean {
 /**
  * Whether a change at `from..to` is in content that may not be edited: it touches such a control and
  * is not all inside an editable one within it. One whose own deletion is tracked does not count.
+ * @internal
  */
 export function readOnlyAt(
   tree: Node,
@@ -889,7 +891,10 @@ const spaceKey: Command = (state, dispatch) => {
   return true;
 };
 
-/** The rules of content controls (ADR-0007), in every editor of a document. */
+/**
+ * The rules of content controls (ADR-0007), in every editor of a document.
+ * @internal
+ */
 export function controlsPlugin(): Plugin {
   return new Plugin({
     filterTransaction: allowed,
@@ -1312,14 +1317,20 @@ export interface ControlInsertOptions {
   multiLine?: boolean;
 }
 
-/** A control's properties for a copy of it: Word gives the copy a `w:id` of its own. */
+/**
+ * A control's properties for a copy of it: Word gives the copy a `w:id` of its own.
+ * @internal
+ */
 export function copiedControl(control: ControlJSON): ControlJSON {
   return control.ext
     ? { ...control, ext: control.ext.replace(/<[\w.-]+:id\b[^>]*\/>/, "") }
     : control;
 }
 
-/** An id no control of `controls` has. */
+/**
+ * An id no control of `controls` has.
+ * @internal
+ */
 export function freshControlId(controls: Controls | undefined): string {
   let n = Object.keys(controls ?? {}).length + 1;
   while (Object.hasOwn(controls ?? {}, `control-${n}`)) n++;
