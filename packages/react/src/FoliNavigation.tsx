@@ -32,7 +32,12 @@ import {
   useRef,
   useState,
 } from "react";
-import { useActiveEditor, useEditorOrContext, useEditorState } from "./editor.js";
+import {
+  useActiveEditor,
+  useEditorOrContext,
+  useEditorState,
+  useIsomorphicLayoutEffect,
+} from "./editor.js";
 
 export interface FoliNavigationProps {
   /** Default: the editor of the nearest `FoliEditorProvider`. */
@@ -239,7 +244,12 @@ interface FindPanelProps {
 interface Found {
   matches: readonly FindMatch[];
   current: FindMatch | null;
+  /** Whether the view goes to `current`: not when the document changed under the search. */
+  scroll: boolean;
 }
+
+/** How long typing in the document pauses before the matches are looked for again, in ms. */
+const RESEARCH_DELAY = 300;
 
 /** The find, replace and go to panel: not modal, the document stays usable beside it. */
 function FindPanel({
@@ -260,7 +270,7 @@ function FindPanel({
   const id = useId();
   const input = useRef<HTMLInputElement>(null);
   const [replacement, setReplacement] = useState("");
-  const [found, setFound] = useState<Found>({ matches: [], current: null });
+  const [found, setFound] = useState<Found>({ matches: [], current: null, scroll: false });
   const [message, setMessage] = useState("");
   const [version, setVersion] = useState(0);
   const options = useMemo(() => ({ matchCase, wholeWord }), [matchCase, wholeWord]);
@@ -272,34 +282,61 @@ function FindPanel({
     input.current?.select();
   }, [request, focusing]);
 
-  // Searched again when what the document shows changes.
+  // Searched again when what the document shows changes, once typing there pauses.
   useEffect(() => {
     let key = searchKey(body.state);
-    return body.subscribe((state) => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const unsubscribe = body.subscribe((state) => {
       const next = searchKey(state);
-      if (next.some((value, i) => value !== key[i])) setVersion((n) => n + 1);
+      if (next.some((value, i) => value !== key[i])) {
+        clearTimeout(timer);
+        timer = setTimeout(() => setVersion((n) => n + 1), RESEARCH_DELAY);
+      }
       key = next;
     });
+    return () => {
+      clearTimeout(timer);
+      unsubscribe();
+    };
   }, [body]);
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: `version` stands for the document
+  // A new search goes to the match at or after the selection.
   useEffect(() => {
     const matches = findAll(body, query, options);
     setFound({
       matches,
       current: matches.find((m) => isSelected(body, m)) ?? nextMatch(body, matches),
+      scroll: true,
     });
-  }, [body, query, options, version]);
+  }, [body, query, options]);
+  // The document changed: the same search again, the current match kept if it is still there,
+  // and the view left where the person typing has it.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `version` stands for the document
+  useEffect(() => {
+    if (!version) return;
+    const matches = findAll(body, query, options);
+    setFound(({ current }) => ({
+      matches,
+      current:
+        (current &&
+          matches.find(
+            (m) => m.story === current.story && m.from === current.from && m.to === current.to,
+          )) ??
+        null,
+      scroll: false,
+    }));
+  }, [version]);
   // biome-ignore lint/correctness/useExhaustiveDependencies: a new search says nothing of the last
   useEffect(() => setMessage(""), [query, options]);
 
-  useEffect(() => {
+  // With the count shown, in the same frame.
+  useIsomorphicLayoutEffect(() => {
     body.storyView?.showMatches(query ? { query, ...options, ...found } : null);
   }, [body, query, options, found]);
   useEffect(() => () => body.storyView?.showMatches(null), [body]);
 
   const show = (matches: readonly FindMatch[], current: FindMatch | null) => {
-    setFound({ matches, current });
+    setFound({ matches, current, scroll: true });
     if (current && !goTo(body, current))
       setMessage(`This match is in a ${storyName(body, current)} no page shows.`);
     else setMessage("");
@@ -357,11 +394,13 @@ function FindPanel({
     message ||
     (!query
       ? ""
-      : found.matches.length
-        ? `${position} of ${found.matches.length}${
-            found.current?.story ? `, in a ${storyName(body, found.current)}` : ""
-          }`
-        : "No results");
+      : found.matches.length && !position
+        ? `${found.matches.length} found`
+        : found.matches.length
+          ? `${position} of ${found.matches.length}${
+              found.current?.story ? `, in a ${storyName(body, found.current)}` : ""
+            }`
+          : "No results");
   const tabs: [PanelMode, string][] = [
     ["find", "Find"],
     ...(readOnly ? [] : ([["replace", "Replace"]] as [PanelMode, string][])),

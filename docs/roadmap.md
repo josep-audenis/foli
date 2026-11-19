@@ -1248,7 +1248,7 @@ Each task is a PR on `phase-11/sections-fields`, the build green after each.
   `FoliNavigation` in `FoliEditor`: find, replace and go to panel, bookmarks dialog, outline, a
   Navigate menu; Ctrl+F, Ctrl+H, Ctrl+G, F3, Shift+F3, Ctrl+Shift+F5, only with the focus in the
   document or the panels. `word-navigation.spec.ts` in three engines, axe included; on 107 pages a
-  key takes 18 to 85 ms in Chromium, 42 to 226 in Firefox, 80 to 206 in WebKit, `findAll` itself 1 ms
+  key takes 14 to 55 ms in Chromium, 14 to 37 in Firefox, 57 to 78 in WebKit, `findAll` itself 1 ms
   or two; `find-roundtrip.mjs` has Word read 9 files. Shortcuts: no regular expressions, no search
   in comments or opaque content, no match across paragraphs; bookmarks and comment anchors kept in a
   replaced match and deleted text refused, unlike Word; marks only near the window and only where

@@ -606,7 +606,8 @@ const view = new EditorView(host, editor, { editable: true, placeholder: "" });
   from code: `updateFields` with this view's pages, then once more for what depends on the pages
   those results moved, in one undo step. `view.print()` updates every field and opens the browser's
   print dialog; a browser's own Print menu does not update them.
-- Finding (11.11): `view.showMatches({ query, matchCase, wholeWord, matches, current })` marks
+- Finding (11.11): `view.showMatches({ query, matchCase, wholeWord, matches, current, scroll })`
+  marks
   matches (null: none) with the CSS Custom Highlight API (`::highlight(foli-find)` and
   `foli-find-current`): nothing is added to the DOM or the document, and it does not print. Only
   pages near the window carry marks. `view.reveal({ story, from, to }, { focus })` selects and

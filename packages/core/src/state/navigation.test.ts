@@ -199,6 +199,44 @@ describe("bookmarks", () => {
     expect(names(editor)).toEqual(["Mine", "Other"]);
   });
 
+  it("leave a field named as the bookmark is alone: a bare name is a REF only if no field has it", () => {
+    const field = (code: string) => [
+      atom("fieldStart"),
+      atom("fieldCode", { text: code }),
+      atom("fieldSeparator"),
+      t("x"),
+      atom("fieldEnd"),
+    ];
+    const editor = open([
+      p(
+        "x",
+        undefined,
+        ...mark(1, "Title"),
+        ...mark(2, "Date"),
+        ...mark(3, "Chapter"),
+        ...field(" TITLE \\* MERGEFORMAT "),
+        ...field(" REF Title \\h "),
+        ...field(" DATE "),
+        ...field(" PAGEREF date "),
+        ...field(" Chapter "),
+      ),
+    ]);
+    expect(renameBookmark(editor, "Title", "Titulo")).toMatchObject({ ok: true });
+    expect(renameBookmark(editor, "Date", "Fecha")).toMatchObject({ ok: true });
+    expect(renameBookmark(editor, "Chapter", "Part")).toMatchObject({ ok: true });
+    const codes: string[] = [];
+    editor.state.doc.descendants((node) => {
+      if (node.type.name === "fieldCode") codes.push(String(node.attrs.text));
+    });
+    expect(codes).toEqual([
+      " TITLE \\* MERGEFORMAT ",
+      " REF Titulo \\h ",
+      " DATE ",
+      " PAGEREF Fecha ",
+      " Part ",
+    ]);
+  });
+
   it("are refused where the content is locked", () => {
     const editor = open(
       [
