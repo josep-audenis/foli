@@ -28,7 +28,7 @@ export class Node {
   /** Set only on text nodes. */
   declare readonly text?: string;
 
-  /** @internal Use NodeType.create, Schema.node/text or Schema.nodeFromJSON. */
+  /** Use NodeType.create, Schema.node/text or Schema.nodeFromJSON. */
   constructor(
     readonly type: NodeType,
     readonly attrs: Attrs,
@@ -254,7 +254,7 @@ export class Node {
 }
 
 export class TextNode extends Node {
-  /** @internal Use Schema.text. */
+  /** Use Schema.text. */
   constructor(
     type: NodeType,
     override readonly text: string,

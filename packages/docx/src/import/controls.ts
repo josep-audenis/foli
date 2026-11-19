@@ -3,7 +3,8 @@
  * elements they were read from kept verbatim in `ext`. Export reads the same way, to tell what a
  * control says differently from its `ext`.
  */
-import { type ControlJSON, checkControl } from "@folijs/core";
+import type { ControlJSON } from "@folijs/core";
+import { checkControl } from "@folijs/core/internal";
 import type { DocxPackage } from "../package.js";
 import type { XmlElement } from "../xml.js";
 import { attr, child, deepText, elements, isW, W, W14, W15 } from "./ooxml.js";
@@ -55,7 +56,10 @@ function glossaryTexts(pkg: DocxPackage): ReadonlyMap<string, string> {
   return texts;
 }
 
-/** The properties of `sdt`'s `w:sdtPr` and `w:sdtEndPr`, or undefined if the model cannot hold them. */
+/**
+ * The properties of `sdt`'s `w:sdtPr` and `w:sdtEndPr`, or undefined if the model cannot hold them.
+ * @internal
+ */
 export function controlProperties(
   sdt: XmlElement,
   context: Context & { pkg?: DocxPackage },

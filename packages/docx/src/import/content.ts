@@ -4,13 +4,8 @@
  * for markers that have nothing to show: field characters, range ends).
  */
 
-import {
-  type ControlJSON,
-  type MarkJSON,
-  type NodeJSON,
-  type ResourceJSON,
-  schema,
-} from "@folijs/core";
+import type { ControlJSON, MarkJSON, NodeJSON, ResourceJSON } from "@folijs/core";
+import { schema } from "@folijs/core/internal";
 import type { DocxPackage, Relationship } from "../package.js";
 import type { XmlElement, XmlNode } from "../xml.js";
 import { controlProperties } from "./controls.js";
@@ -28,6 +23,7 @@ import {
 } from "./properties.js";
 import { cellProperties, grid, rowProperties, tableProperties } from "./tables.js";
 
+/** @internal */
 export interface ContentContext extends Context {
   readonly pkg: DocxPackage;
   /** The part the content is in: relationship ids (hyperlinks) resolve against it. */
@@ -117,6 +113,7 @@ function label(table: Record<string, string | null>, element: XmlElement): strin
 /**
  * Block content: paragraphs, and every other block element as an opaque block. `section` is the
  * body's last `w:sectPr` (the envelope's): any other one stays as an opaque block.
+ * @internal
  */
 export function blocks(
   nodes: readonly XmlNode[],
@@ -329,6 +326,7 @@ function withLabel(attrs: Record<string, unknown>, value: string | null): Record
   return value === null ? attrs : { ...attrs, label: value.slice(0, 255) || null };
 }
 
+/** @internal */
 export function paragraph(p: XmlElement, context: ContentContext): NodeJSON {
   // A story ends no section: such a paragraph stays as it is.
   const pPr = child(p, "pPr");
@@ -496,6 +494,7 @@ function valid(json: NodeJSON, el: XmlElement, context: Context): NodeJSON | und
 /**
  * The tracked moves open at a point (`w:moveFromRangeStart` … `End`, by range id): the innermost
  * open one names the moved content. Amortized constant time per operation.
+ * @internal
  */
 export class Moves {
   readonly #stacks = {

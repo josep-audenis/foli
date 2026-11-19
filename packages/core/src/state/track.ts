@@ -64,7 +64,10 @@ export const untracked = "untracked";
  */
 export const revisionFloor = "revisionFloor";
 
-/** On a rebuilt transaction: the ranges it records as deleted, as `[from, to]` of the document before. */
+/**
+ * On a rebuilt transaction: the ranges it records as deleted, as `[from, to]` of the document before.
+ * @internal
+ */
 export const trackedDeletes = "trackedDeletes";
 
 /** Inline nodes a tracked change does not mark: they stand between runs in Word. */
@@ -103,6 +106,7 @@ interface ParagraphRevision {
   deletion?: Revision;
 }
 
+/** @internal */
 export function trackPlugin(state: TrackState): Plugin<TrackState> {
   return new Plugin({
     key,
@@ -118,7 +122,10 @@ export function trackState(state: EditorState): TrackState | null {
   return key.getState(state) ?? null;
 }
 
-/** Makes `tr` set the tracking state (a story's editor passes its change to the body). */
+/**
+ * Makes `tr` set the tracking state (a story's editor passes its change to the body).
+ * @internal
+ */
 export const withTrackState = (tr: Transaction, state: TrackState): Transaction =>
   tr.setMeta(key, state);
 

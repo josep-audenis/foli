@@ -1,5 +1,6 @@
 import { readdirSync, readFileSync } from "node:fs";
-import { type NodeJSON, Resolver } from "@folijs/core";
+import type { NodeJSON } from "@folijs/core";
+import { Resolver } from "@folijs/core/internal";
 import { describe, expect, it } from "vitest";
 import { importDocx } from "../index.js";
 

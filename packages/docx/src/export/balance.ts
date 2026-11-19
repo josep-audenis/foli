@@ -92,6 +92,7 @@ function holdsVerbatimField(nodes: readonly NodeJSON[]): boolean {
  * parts are only repaired where an edit can be what broke them: not in a package holding broken
  * fields of its own (Word reads those in its way), nor where verbatim content holds field
  * characters, whose partners the model cannot see.
+ * @internal
  */
 export function balanced(doc: FoliDocument, original?: DocxPackage): FoliDocument {
   const packageWhole =

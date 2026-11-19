@@ -171,7 +171,10 @@ export class Transaction extends Transform {
   }
 }
 
-/** The first textblock type of the schema (the "normal paragraph"). */
+/**
+ * The first textblock type of the schema (the "normal paragraph").
+ * @internal
+ */
 export function defaultTextblockType(schema: Schema): NodeType {
   const type = Object.values(schema.nodes).find((t) => t.isTextblock);
   if (!type) throw new RangeError("Schema has no textblock type");

@@ -22,6 +22,7 @@ export interface ImportReport {
   readonly picturesWithoutAlt: number;
 }
 
+/** @internal */
 export class Recorder {
   // Maps, not objects: element names such as `constructor` are only names.
   readonly #opaque = new Map<string, number>();

@@ -161,7 +161,6 @@ export {
   convertNotes,
   type InsertNoteOptions,
   insertNote,
-  isNote,
   type NoteKind,
   type NoteNumber,
   type NoteNumberOptions,
@@ -222,7 +221,6 @@ export {
 } from "./selection.js";
 export {
   type Command,
-  defaultTextblockType,
   EditorState,
   type EditorStateConfig,
   Plugin,
@@ -268,10 +266,8 @@ export {
 export {
   CommentStep,
   EnvelopeStep,
-  type Story,
   StoryStep,
   setComments,
-  storyBody,
   type WordContext,
   type WordEnvelope,
   withEnvelope,

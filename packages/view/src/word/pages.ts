@@ -11,9 +11,11 @@ import {
   noteProperties,
   noteTexts,
   parseContent,
-  Resolver,
+  type ResourceJSON,
+  type ReviewView,
   type SectionJSON,
 } from "@folijs/core";
+import { Resolver } from "@folijs/core/internal";
 import {
   type BlockBox,
   type FlowNote,
@@ -40,7 +42,6 @@ import { lineBottoms, type NoteGroup, PageNotes } from "./notes.js";
 import { PageRegions } from "./regions.js";
 
 export type { ReviewView } from "./blocks.js";
-export { lineBottoms };
 
 /** The class of each page element. */
 export const WORD_PAGE_CLASS = "foli-word-page";
@@ -135,6 +136,7 @@ function createPage(doc: Document, g: Geometry): { page: HTMLElement; body: HTML
 /**
  * The ratio of a font's normal line height to its size, measured: a line of 100 px text with
  * `line-height: normal` (the font's own ascent, descent and gap, as Word's single spacing).
+ * @internal
  */
 export function measureLineRatio(container: HTMLElement): (family: string) => number {
   return (family) => {
@@ -204,6 +206,20 @@ interface Section {
   column: HTMLElement;
 }
 
+/** `renderDocument`'s options. */
+export interface RenderDocumentOptions {
+  /** `markup` (the default): insertions underlined, deletions struck through; `simple`, `final`: as if accepted. */
+  review?: ReviewView;
+  /** Fields show their codes instead of their results (Word's Alt+F9). */
+  fieldCodes?: boolean;
+  /**
+   * The URL to show a picture's image from (`key` in `resources`): the app's (a package part's
+   * object URL…); `null` (or "") shows the picture's box. Left out, or undefined for a key: the
+   * resource's own image `data:` URL or web URL (fetched as it is shown).
+   */
+  resource?: (key: string, resource: ResourceJSON) => string | null | undefined;
+}
+
 /**
  * Lays a v3 document out on pages inside `container`: every section's page setup, its columns
  * (a band per section on a page), continuous sections, Word's blank pages, headers and footers
@@ -212,7 +228,7 @@ interface Section {
 export function renderDocument(
   document: FoliDocument,
   container: HTMLElement,
-  options: Omit<BlockOptions, "lineRatio"> = {},
+  options: RenderDocumentOptions = {},
 ): DocumentPages {
   const doc = container.ownerDocument;
   // What notes show: numbers depend on the pages only where they restart on each.

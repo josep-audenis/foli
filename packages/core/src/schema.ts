@@ -45,6 +45,7 @@ export function isSafeHref(href: unknown): href is string {
  * Whether a link's attributes may come in from outside the document (a command, a paste from
  * elsewhere): a safe `href`, or none with a bookmark (`anchor`, schema v3: Word's table of
  * contents and cross-references).
+ * @internal
  */
 export function isSafeLink(
   attrs: { href?: unknown; anchor?: unknown } | null | undefined,
@@ -71,6 +72,7 @@ const color = {
     isColor(value) ? undefined : "color must be a lowercase #rrggbb value",
 };
 
+/** @internal */
 export const schemaV2 = new Schema({
   nodes: {
     doc: { content: "block+" },

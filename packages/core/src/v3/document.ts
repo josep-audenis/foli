@@ -649,7 +649,10 @@ function wordRules(parent: Node, path: string, inCell: boolean, fragment = false
   });
 }
 
-/** What a story may not hold (ADR-0007): import keeps such content opaque instead. */
+/**
+ * What a story may not hold (ADR-0007): import keeps such content opaque instead.
+ * @internal
+ */
 export function storyRules(tree: Node, kind: StoryJSON["kind"], path: string): void {
   tree.descendants((node) => {
     const name = node.type.name;
@@ -820,6 +823,7 @@ function protocolOf(url: string): string {
 /** Pictures only: `image/png`, `image/svg+xml`… */
 const IMAGE_TYPE = /^image\/[A-Za-z0-9][\w.+-]{0,126}$/;
 
+/** @internal */
 export const checkResource: Check = (v) => {
   const error = shape(
     {

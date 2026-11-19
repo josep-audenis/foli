@@ -16,6 +16,7 @@ import {
 } from "./tables.js";
 import { bagXml, el, escapeAttribute, escapeText, fragment, type Namespaces } from "./xmlout.js";
 
+/** @internal */
 export interface WriteContext {
   readonly namespaces: Namespaces;
   /**
@@ -63,6 +64,7 @@ function inControls(
   );
 }
 
+/** @internal */
 export function blocksXml(blocks: readonly NodeJSON[], context: WriteContext): string {
   return inControls(blocks, 0, context, (block) => {
     if (block.type === "paragraph") return paragraphXml(block, context);
@@ -93,6 +95,7 @@ function notYet(node: NodeJSON): never {
   throw new DocxError(`A ${node.type} cannot be exported to .docx yet`);
 }
 
+/** @internal */
 export function paragraphXml(p: NodeJSON, context: WriteContext): string {
   const attrs = (p.attrs ?? {}) as Json;
   const own = bagXml(attrs.attributes, context.namespaces);

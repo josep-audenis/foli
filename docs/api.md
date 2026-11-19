@@ -1,9 +1,15 @@
 # API reference
 
-The public API of the five packages, as of 0.6.0 (`@folijs/pdf` first released in 0.6.0). Not stable before 1.0: anything may change
-in a minor version until then (changes are listed in each package's changelog). Exports not
-listed here (model classes, steps, `Transform`, `Plugin`, `Transaction` metadata, mapping) are
-public for advanced use but are not a stable API yet.
+The public API of the five packages, as of 0.6.0 (`@folijs/pdf` first released in 0.6.0), with
+the export lists of 12.2 ([ADR-0008](decisions/ADR-0008-1.0-contract-and-extensions.md)).
+
+**Stable or internal.** Every name on this page is **stable** unless marked **internal**: the
+package's entry exports it, and from 1.0 it changes only as ADR-0008's semver rules allow (before
+1.0, 0.x minors may still break it; changes are listed in each package's changelog). Internal
+names are on `@folijs/core/internal`, the entry the other Foli packages use, with no promise at
+all: any release may change them. Each package's exact surface is its API report,
+`packages/<name>/api-report.d.ts` ([contributing.md](contributing.md#api-reports)); a module
+export that is in neither entry is left out of the published types.
 
 - [`@folijs/react`](#folijsreact): components and hooks
 - [`@folijs/core`](#folijscore): documents, the headless editor, commands
@@ -13,8 +19,12 @@ public for advanced use but are not a stable API yet.
 
 ## `@folijs/react`
 
-Peer dependencies: `react` and `react-dom` 18.2+ or 19. Stylesheet: `@folijs/react/styles.css`
-([styling.md](styling.md)).
+Peer dependencies: `react` and `react-dom` 18.2+ or 19, and `@folijs/core` and `@folijs/view` at
+exactly its own version (after 0.6.0). Stylesheet: `@folijs/react/styles.css`
+([styling.md](styling.md)). Stable with the components: their props and handles
+(`FoliEditorProps`, `FoliEditorHandle`, `FoliChange`, `FoliCanvasProps`, `FoliCanvasHandle`,
+`FoliCommentsProps`, `FoliNavigationProps`, `FoliToolbarProps`) and the hooks' options
+(`UseFoliEditorOptions`, `UseEditorStateOptions`).
 
 ### `<FoliEditor>`
 
@@ -214,9 +224,10 @@ Documents are schema v5, Word's model with tables, pictures, stories, fields and
   `RowPropertiesJSON`, `CellPropertiesJSON`, `TableConditionJSON`, `MeasureJSON`,
   `ResourceJSON`, `StoryJSON`, `ControlJSON`, `WordSettingsJSON`…), in Word's units (twips; EMU
   for pictures). `FoliDocumentV3` and `FoliDocumentV4`: schema 3 and 4 documents.
-- `SCHEMA_VERSION` (5), `schema` (the content schema), `checkSection`, `RUN_PROPERTY_MARKS`,
-  `HIGHLIGHT_COLORS`, `JUSTIFICATIONS`, `TABLE_CONDITIONS`, the unit conversions (`twipsToMm`,
-  `mmToTwips`…).
+- `SCHEMA_VERSION` (5), `HIGHLIGHT_COLORS`, `JUSTIFICATIONS`, `TABLE_CONDITIONS`, the unit
+  conversions (`twipsToMm`, `mmToTwips`, `twipsToPt`, `ptToTwips`, `twipsToPx`,
+  `halfPointsToPt`, `TWIPS_PER_INCH`, `TWIPS_PER_POINT`). Internal: `schema` (the Word content
+  schema; an editor's is `state.schema`), `checkSection`, `checkControl`, `RUN_PROPERTY_MARKS`.
 - `isSafeHref(href)` and `isColor(color)`: the rules links and colors from outside a document
   must follow.
 - `PAGE_SIZES` (`A4`, `Letter`), `DEFAULT_SETTINGS` and `DocumentSettings`: page geometry in
@@ -225,7 +236,9 @@ Documents are schema v5, Word's model with tables, pictures, stories, fields and
   `migrateToV3(document)`, and its JSON types (`DocJSON`, `ParagraphJSON`, `HeadingJSON`,
   `TextJSON`…, with `MARK_TYPES`, `SIMPLE_MARK_TYPES`, `HEADING_LEVELS`, `ALIGNMENTS`).
 
-### Formatting
+### Formatting (internal)
+
+This whole section is internal (`@folijs/core/internal`): the renderers and `.docx` use it.
 
 - `new Resolver(document)`: a document's effective formatting, as Word computes it.
   `paragraph(attrs)` gives a paragraph's properties (`ParagraphFormat`) and the formatting of its
@@ -336,7 +349,7 @@ definitions (the Word 2013 to 2019 template's) the first time they are applied, 
   Tab types a tab (`insertTab`); in the view, Escape then Tab (or Shift+Tab) moves the focus on
   instead, and a read-only view leaves Tab to the browser.
 - Links get the document's "Hyperlink" character style, removed with the link.
-- Clipboard (the view uses these): `copiedDefinitions(context, content)` gives the styles,
+- Clipboard (internal; the view uses these): `copiedDefinitions(context, content)` gives the styles,
   numbering and comments copied content references, with the document's id
   (`wordContext(state).id`, which tells a copy inside the document from one from another); `fitPaste(state, content, definitions?)`
   validates pasted v3 content and definitions (none: the document's own, but unsafe links are
@@ -346,7 +359,8 @@ definitions (the Word 2013 to 2019 template's) the first time they are applied, 
   envelope with `withEnvelope(tr, envelope)` and its comments with
   `setComments(tr, current.comments, envelope.comments)` (`withEnvelope` ignores comments: they
   change only through `CommentStep`s, which undo and redo take back); `wordContext(state)` gives
-  the current one.
+  the current one. `WordContext`, `WordEnvelope`, `FittedPaste`, `WordDefinitions`, `Story`,
+  `StoryStep` and `EnvelopeStep`, named elsewhere on this page, are internal too.
 
 | Member                         | Notes                                                                                                                                                                                                                                                                                                                         |
 | ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -542,15 +556,73 @@ The first three return `{ ok: true, bookmark }` or `{ ok: false, reason }` (`inv
 `no-place`, `missing`, `exists`, `refused`), except `deleteBookmark`. Bookmarks are not tracked, as
 in Word; each change is one undo step.
 
+### Model, state and plugins
+
+Stable, for plugins and code that edits documents directly:
+
+- Model: `Node` (and `TextNode`), `Fragment`, `Slice`, `Mark`, `ResolvedPos`, `NodeRange`,
+  `Schema`, `NodeType`, `MarkType`, `ContentMatch`, `NodeSpec`, `MarkSpec`, `SchemaSpec`,
+  `AttributeSpec`, `AttributeSpecs`, `Attrs`, `NodeJSON`, `MarkJSON`, `SliceJSON`,
+  `ReplaceError`.
+- State: `EditorState`, `EditorStateConfig`, `Transaction`, `Command`, `Plugin`, `PluginKey`,
+  `PluginSpec`; selections: `Selection`, `TextSelection`, `NodeSelection`, `AllSelection`,
+  `CellSelection`, `SelectionJSON`.
+- Transforms: `Transform`, `TransformError`, `Step`, `StepResult`, `ReplaceStep`,
+  `ReplaceAroundStep`, `AddMarkStep`, `RemoveMarkStep`, `NodeMarkupStep`, `NodeMarkupBatchStep`,
+  `StepMap`, `Mapping`, `Mappable`, `MapResult`; `canJoin`, `canSplit`, `findWrapping`,
+  `liftTarget`, `NodeTypeWithAttrs`.
+- History: `history(options?)` (`HistoryOptions`: `newGroupDelay`, `depth`), the `closeHistory`
+  and `joinHistory` transaction metadata, `undo`, `redo`, `undoDepth`, `redoDepth`; a
+  transaction's `addToHistory`. The plugin's state is internal. Of the built-in plugins only
+  `history()`, `baseKeymap()` and `listKeymap()` are exported (ADR-0008).
+- The option, result and JSON types of the functions on this page are stable with them:
+  `EditorOptions`, `EditorListener`, `DocumentTarget`, `NavigationRequest`, `FoundMatches`,
+  `OpenStory`, `StoryView`, `DeleteUnit`, `CommentContent`, `CommentOptions`, `ChangeKind`,
+  `ChangeFilter`, `ControlInsertOptions`, `ControlPropertiesPatch`, `ControlRange`,
+  `ControlValue`, `ControlValueInput`, `CrossReference`, `CrossReferenceTargets`,
+  `FieldDisplay`, `FieldInstruction`, `FieldPage`, `FieldSkip`, `FieldSkipReason`,
+  `FindOptions`, `ReplaceRefusal`, `ReplaceReport`, `InsertFieldOptions`,
+  `TableOfContentsOptions`, `UpdateFieldsOptions`, `InsertNoteOptions`, `NoteKind`,
+  `NoteNumber`, `NoteNumberOptions`, `NewPicture`, `BookmarkInfo`, `BookmarkResult`,
+  `OutlineEntry`, `SectionAt`, `SectionBreakKind`, `SectionColumns`, `SectionSetup`,
+  `StorySide`, `StoryVariant`, `TrackState`, `ListKind`, `Alignment`, `Justification`,
+  `PageSize`, `PageMargins`, `TableCondition`; the document's parts `AbstractNumberingJSON`,
+  `BorderJSON`, `CommentJSON`, `NotePropertiesJSON`, `NumberingInstanceJSON`,
+  `NumberingLevelJSON`, `ParagraphPropertiesJSON`, `ThemeJSON`; schema v2's `BlockJSON`,
+  `InlineJSON`, `BulletListJSON`, `OrderedListJSON`, `ListItemJSON`, `HorizontalRuleJSON`,
+  `PageBreakJSON`, `HardBreakJSON`, `TextJSON`, `SimpleMarkJSON`, `LinkMarkJSON`,
+  `ColorMarkJSON`, `MarkName`, `MarkNameJSON`, `SimpleMarkName`, `HeadingLevel` and
+  `SAFE_LINK_PROTOCOLS`. `addComment` is the command behind `editor.commands.addComment`.
+
+### Internal: `@folijs/core/internal`
+
+What the other Foli packages need from core without a promise (they are installed at one version,
+as exact peer dependencies, so each runs with the core it was built with). Not for apps: any
+release may change it.
+
+- The Word context and envelope: `wordContext`, `WordContext`, `WordEnvelope`, `withEnvelope`,
+  `setComments`, `Story`, `StoryStep`, `CommentStep`, `EnvelopeStep`, `EnvelopeKey`.
+- The formatting resolver: `Resolver`, `ParagraphFormat`, `RunFormat`, `ListMarker`,
+  `TableFormat`, `CellFormat`, `CellPlace`, `tableConditions`, `formatNumber`.
+- Clipboard fitting: `copiedDefinitions`, `fitPaste`, `fitPastedV2`, `FittedPaste`,
+  `WordDefinitions`.
+- The view's layout and editing helpers: `caretStop`, `sameSpot`, `controlSpot`,
+  `keepTablesApart`, `noteKindOf`, `referencesIn`, `typedMarks`, `deleteSelectionKeepingTables`.
+- The Word schema and validation, for `.docx`: `schema`, `checkSection`, `checkControl`, `Check`,
+  `RUN_PROPERTY_MARKS`.
+
 ## `@folijs/view`
 
-The editable view without a framework. Needs a browser DOM. Content controls: it draws the frame
+The editable view without a framework. Needs a browser DOM. Peer dependency: `@folijs/core` at
+exactly its own version (after 0.6.0). Content controls: it draws the frame
 and title of the control the caret is in or the pointer is over; Alt+Down (or its button) opens a
 list or date picker, Space or a click changes a check box, Left and Right stop at a control's edges.
 
 ```ts
 const view = new EditorView(host, editor, { editable: true, placeholder: "" });
 ```
+
+`EditorViewOptions`: `editable`, `placeholder`, `resource`, `upload`, `paged`, `noteMark`.
 
 - Makes `host` a `contenteditable` textbox (`role="textbox"`, `aria-multiline`) and renders the
   editor's state into it as `section.foli-page` elements sized from their section's page setup.
@@ -639,7 +711,7 @@ const view = new EditorView(host, editor, { editable: true, placeholder: "" });
   inserted, in EMU (the last section's text width: shortcut, not the caret's section);
   `EMU_PER_PX` (9525). For an app's own picture insert, as the toolbar's dialog does it.
 - `renderDocument(document, container, { review?, resource?, fieldCodes? }): DocumentPages` (a read-only view, no
-  editor): lays a schema v3 document out on
+  editor; `RenderDocumentOptions`): lays a schema v3 document out on
   pages (`.foli-word-page`, `WORD_PAGE_CLASS`) appended to `container`, formatted as Word
   formats it. `review`: `"markup"` (default: insertions underlined, deletions struck through,
   in the author's color, titled "Inserted/Deleted by …, date"), `"simple"` or `"final"` (as if
@@ -653,7 +725,8 @@ const view = new EditorView(host, editor, { editable: true, placeholder: "" });
 
 ## `@folijs/docx`
 
-`.docx` import and lossless export. No DOM: runs in the browser, workers and Node 20.12+.
+`.docx` import and lossless export. No DOM: runs in the browser, workers and Node 20.12+. Peer
+dependency: `@folijs/core` at exactly its own version (after 0.6.0).
 Details (what import keeps, what export writes, limits): the
 [package README](../packages/docx/README.md).
 
@@ -676,17 +749,19 @@ Details (what import keeps, what export writes, limits): the
   get object URLs; an SVG a `data:` URL (a `blob:` SVG opened on its own would run its scripts
   as the app's origin); EMF, WMF and TIFF none (their box is shown).
 - `readPackage(bytes, options?): Promise<DocxPackage>`: the zip, parts, content types and
-  relationships (`ReadPackageOptions`: the zip limits `maxEntries` and `maxSize`, and
-  `maxDepth`).
+  relationships (`ReadPackageOptions`: the zip limits `maxEntries` and `maxSize`, `ZipLimits`,
+  and `maxDepth`); `DocxPackage`, `DocxPart`, `NewPart`, `Relationship`.
 - `parseXml(source, options?): XmlDocument`: the XML reader that keeps every node's offsets in
-  the source.
+  the source (`ParseXmlOptions`; `XmlNode`: `XmlElement`, `XmlText` or `XmlOther`, with `XmlName`
+  and `XmlAttribute`).
 - Errors: `DocxError` (not a WordprocessingML document, Strict Open XML, content export cannot
   write), `ZipError` (the container), `XmlError` (with the `offset`).
 
 ## `@folijs/pdf`
 
 PDF from Foli's own page layout, printed by a headless Chromium page the app supplies (11.12,
-ADR-0007). No browser dependency of its own. Details: the
+ADR-0007). No browser dependency of its own. Peer dependency: `@folijs/core` at exactly its own
+version (after 0.6.0). Details: the
 [package README](../packages/pdf/README.md).
 
 - `exportPdf(document, options): Promise<ExportedPdf>`: validates `document` (`parseDocument`:
@@ -707,4 +782,5 @@ ADR-0007). No browser dependency of its own. Details: the
   an address. An image not decoded after 10 seconds prints without it.
 - `PdfPage`: `setContent(html)`, `addScriptTag({ content })`, `evaluate(fn, arg)`,
   `pdf(options)`: Playwright's `Page` (1.42+ for the outline and tags) and Puppeteer's fit it;
-  run with Playwright only.
+  run with Playwright only. With it: `PdfPrintOptions`, `PdfImage`, and `RenderInput` and
+  `Rendered` (what `evaluate` gives the page's renderer and gets back).

@@ -421,6 +421,7 @@ function join(tr: Transaction, pos: number, keepFirst: boolean): void {
 /**
  * Accepts or rejects every insertion or deletion recorded in story `id`, in `tr`: a note's, when
  * the reference's own record is settled and the note stays.
+ * @internal
  */
 export function resolveStoryChanges(
   state: EditorState,

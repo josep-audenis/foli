@@ -70,7 +70,10 @@ export class CommentStep extends Step {
   }
 }
 
-/** `comments` after the comment steps among `steps`. */
+/**
+ * `comments` after the comment steps among `steps`.
+ * @internal
+ */
 export function applyCommentSteps(
   comments: readonly CommentJSON[],
   steps: readonly Step[],
@@ -194,7 +197,10 @@ export class StoryStep extends Step {
   }
 }
 
-/** Whether two stories are the same: identical trees are the usual case. */
+/**
+ * Whether two stories are the same: identical trees are the usual case.
+ * @internal
+ */
 export function sameStory(a: Story | null | undefined, b: Story | null | undefined): boolean {
   if (a === b || (!a && !b)) return true;
   return (
@@ -224,7 +230,10 @@ function afterEnvelopeSteps<K extends EnvelopeKey>(
   return current;
 }
 
-/** Makes `tr` set the envelope's `key` to `value`, from what it holds after `tr` so far. */
+/**
+ * Makes `tr` set the envelope's `key` to `value`, from what it holds after `tr` so far.
+ * @internal
+ */
 export function setEnvelopeValue<K extends EnvelopeKey>(
   state: EditorState,
   tr: Transaction,
@@ -239,6 +248,7 @@ export function setEnvelopeValue<K extends EnvelopeKey>(
 /**
  * Whether stored `steps` can apply to `context`: every `EnvelopeStep` and `StoryStep` finds what
  * it expects, given the ones before it. A change made outside history makes them stale.
+ * @internal
  */
 export function storedStepsApply(context: WordContext, steps: readonly Step[]): boolean {
   const values = new Map<EnvelopeKey, unknown>();
@@ -260,14 +270,20 @@ export function storedStepsApply(context: WordContext, steps: readonly Step[]): 
   return true;
 }
 
-/** The story as `tr` leaves it (`state`'s, after the story steps `tr` already has). */
+/**
+ * The story as `tr` leaves it (`state`'s, after the story steps `tr` already has).
+ * @internal
+ */
 export function storyAfter(state: EditorState, tr: Transaction, id: string): Story | null {
   let story = wordContext(state)?.stories.get(id) ?? null;
   for (const step of tr.steps) if (step instanceof StoryStep && step.id === id) story = step.after;
   return story;
 }
 
-/** What a story's editor knows of the body's: undo, and the trees it allocates ids across. */
+/**
+ * What a story's editor knows of the body's: undo, and the trees it allocates ids across.
+ * @internal
+ */
 export interface StoryBody {
   readonly state: EditorState;
   dispatch(tr: Transaction): void;
@@ -275,21 +291,33 @@ export interface StoryBody {
   can(command: Command): boolean;
 }
 
-/** On the state of a story's editor: the body it belongs to. */
+/**
+ * On the state of a story's editor: the body it belongs to.
+ * @internal
+ */
 export const storyBodyKey = new PluginKey<StoryBody>("storyBody");
 
-/** The body of the story `state` edits; null when `state` is the body's. */
+/**
+ * The body of the story `state` edits; null when `state` is the body's.
+ * @internal
+ */
 export const storyBody = (state: EditorState): StoryBody | null =>
   storyBodyKey.getState(state) ?? null;
 
-/** A state over a story's `doc` for working on it, with `state`'s word context (and `envelope`). */
+/**
+ * A state over a story's `doc` for working on it, with `state`'s word context (and `envelope`).
+ * @internal
+ */
 export function storyState(state: EditorState, doc: Node, envelope?: WordEnvelope): EditorState {
   const context = wordContext(state) as WordContext;
   const given = envelope ? { ...context, envelope } : context;
   return EditorState.create({ doc, plugins: [wordPlugin(given.envelope, given)] });
 }
 
-/** Every tree of the document but `state`'s own: ids are allocated across them (ADR-0007). */
+/**
+ * Every tree of the document but `state`'s own: ids are allocated across them (ADR-0007).
+ * @internal
+ */
 export function otherTrees(state: EditorState): Node[] {
   const trees = [...(wordContext(state)?.stories.values() ?? [])].map((story) => story.doc);
   const body = storyBody(state)?.state.doc;
@@ -313,6 +341,7 @@ function storyTrees(envelope: WordEnvelope): Map<string, Story> {
  * properties through `EnvelopeStep`s and stories through `StoryStep`s, which undo takes back (a
  * paste adds the properties of the controls it copies with `withEnvelope`). A story's editor is
  * given its body's `context` as it stands.
+ * @internal
  */
 export function wordPlugin(envelope: WordEnvelope, context?: WordContext): Plugin<WordContext> {
   // Not a secret: only tells documents apart.
@@ -388,11 +417,17 @@ export function withEnvelope(tr: Transaction, envelope: WordEnvelope): Transacti
 
 const ADOPT = "adoptWordContext";
 
-/** Makes `tr` give a story's state the body's context as it now is. */
+/**
+ * Makes `tr` give a story's state the body's context as it now is.
+ * @internal
+ */
 export const withContext = (tr: Transaction, context: WordContext): Transaction =>
   tr.setMeta(ADOPT, context);
 
-/** The envelope `tr` gives the document through `withEnvelope`, if any. */
+/**
+ * The envelope `tr` gives the document through `withEnvelope`, if any.
+ * @internal
+ */
 export const envelopeChange = (tr: Transaction): WordEnvelope | undefined =>
   tr.getMeta(key) as WordEnvelope | undefined;
 
@@ -420,6 +455,7 @@ function defaultParagraphStyle(envelope: WordEnvelope): string | undefined {
  * with the same properties; the second keeps the original mark. At the end of a paragraph whose
  * style names another as the next (a heading: Normal), the second paragraph is in that style,
  * without the first's direct formatting. `before` is null when the first keeps every attribute.
+ * @internal
  */
 export function splitAttrs(
   context: WordContext,
@@ -451,7 +487,10 @@ const TOGGLES: Record<string, (run: RunFormat) => boolean> = {
   hidden: (run) => run.hidden,
 };
 
-/** Whether `type` is a run property the toggles handle on a v3 document. */
+/**
+ * Whether `type` is a run property the toggles handle on a v3 document.
+ * @internal
+ */
 export function isWordToggle(context: WordContext | null, type: MarkType): boolean {
   return context !== null && Object.hasOwn(TOGGLES, type.name);
 }
@@ -498,7 +537,10 @@ function inlineIn(state: EditorState, from: number, to: number, type: MarkType) 
   return text.length ? { all: found, judged: text } : { all: found, judged: found };
 }
 
-/** Whether all the selected text (or the text typed at a caret) shows the toggle `type`. */
+/**
+ * Whether all the selected text (or the text typed at a caret) shows the toggle `type`.
+ * @internal
+ */
 export function wordToggleActive(
   context: WordContext,
   state: EditorState,
@@ -514,6 +556,7 @@ export function wordToggleActive(
 /**
  * The stored marks for a toggle at a caret: what makes the next typed text show the opposite of
  * what text typed there would show now.
+ * @internal
  */
 export function toggledCaretMarks(
   context: WordContext,
@@ -531,6 +574,7 @@ export function toggledCaretMarks(
 /**
  * The mark changes that make every inline node in `from..to` show the toggle `type` as `on`:
  * per node, a direct mark where its style does not already give that, none where it does.
+ * @internal
  */
 export function toggleRanges(
   context: WordContext,
@@ -570,12 +614,18 @@ const MARKERS = new Set([
   "commentReference",
 ]);
 
-/** Whether `node` is an invisible marker of a v3 document. */
+/**
+ * Whether `node` is an invisible marker of a v3 document.
+ * @internal
+ */
 export function isMarker(context: WordContext | null, node: Node | null | undefined): boolean {
   return context !== null && !!node && MARKERS.has(node.type.name);
 }
 
-/** Opaque content: deleted only once selected, as Word selects a field before deleting it. */
+/**
+ * Opaque content: deleted only once selected, as Word selects a field before deleting it.
+ * @internal
+ */
 export function isOpaque(context: WordContext | null, node: Node | null | undefined): boolean {
   return (
     context !== null &&
@@ -584,7 +634,10 @@ export function isOpaque(context: WordContext | null, node: Node | null | undefi
   );
 }
 
-/** A node selection of the node at `pos`, or a text selection when it cannot be selected. */
+/**
+ * A node selection of the node at `pos`, or a text selection when it cannot be selected.
+ * @internal
+ */
 export function selectionAt(state: EditorState, pos: number): NodeSelection | TextSelection {
   const node = state.doc.nodeAt(pos);
   return node && NodeSelection.isSelectable(node)

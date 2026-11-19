@@ -16,11 +16,13 @@ import {
   type EditorState,
   setControlValue,
   TextSelection,
-  wordContext,
 } from "@folijs/core";
+import { wordContext } from "@folijs/core/internal";
 
+/** @internal */
 export const CONTROL_UI_ATTR = "data-foli-control-ui";
 
+/** @internal */
 export const CONTROL_STYLES =
   `[${CONTROL_UI_ATTR}]{font:11px/16px system-ui,sans-serif;color:#1f3a5f;white-space:nowrap;user-select:none;-webkit-user-select:none}` +
   `[data-foli-control-frame]{position:absolute;box-sizing:border-box;border:1px solid #8aa4c8;pointer-events:none}` +
@@ -33,8 +35,12 @@ export const CONTROL_STYLES =
   `[data-foli-control-status]{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}` +
   `@media print{[${CONTROL_UI_ATTR}]{display:none}}`;
 
-/** A rectangle of the screen. */
+/**
+ * A rectangle of the screen.
+ * @internal
+ */
 export type Box = Pick<DOMRect, "left" | "top" | "right" | "bottom" | "width" | "height">;
+/** @internal */
 export const boxOf = (left: number, top: number, width: number, height: number): Box => ({
   left,
   top,
@@ -44,7 +50,10 @@ export const boxOf = (left: number, top: number, width: number, height: number):
   bottom: top + height,
 });
 
-/** What the chrome needs of its view. */
+/**
+ * What the chrome needs of its view.
+ * @internal
+ */
 export interface ControlChromeHost {
   readonly host: HTMLElement;
   readonly editor: Editor;
@@ -94,6 +103,7 @@ function lines(rects: readonly Box[]): Box[] {
   return out;
 }
 
+/** @internal */
 export class ControlChrome {
   private drawn: HTMLElement[] = [];
   private hovered: ControlRange | null = null;

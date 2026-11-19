@@ -163,7 +163,10 @@ export function fieldAround(tree: Node, pos: number): Field | null {
   return found;
 }
 
-/** The innermost field holding the node at `pos`: the field a marker there belongs to. */
+/**
+ * The innermost field holding the node at `pos`: the field a marker there belongs to.
+ * @internal
+ */
 export function fieldOfPart(tree: Node, pos: number): Field | null {
   let found: Field | null = null;
   for (const field of fieldsIn(tree)) {
@@ -173,7 +176,10 @@ export function fieldOfPart(tree: Node, pos: number): Field | null {
   return found;
 }
 
-/** Field markers a caret walking over a paragraph meets. */
+/**
+ * Field markers a caret walking over a paragraph meets.
+ * @internal
+ */
 export const isFieldPart = (node: Node | null | undefined): boolean =>
   !!node && FIELD_PARTS.has(node.type.name);
 const FIELD_PARTS = new Set(["fieldStart", "fieldCode", "fieldSeparator", "fieldEnd"]);
@@ -406,7 +412,10 @@ export function caretStop(state: EditorState, pos: number, forward: boolean): nu
   }
 }
 
-/** The fields' state, and the selection kept to their rules. */
+/**
+ * The fields' state, and the selection kept to their rules.
+ * @internal
+ */
 export function fieldsPlugin(): Plugin<boolean> {
   return new Plugin({
     key,
@@ -427,6 +436,9 @@ export function fieldsPlugin(): Plugin<boolean> {
   });
 }
 
-/** The whole of `field` as a selection. */
+/**
+ * The whole of `field` as a selection.
+ * @internal
+ */
 export const fieldSelection = (tree: Node, field: Field): Selection =>
   TextSelection.create(tree, field.from, field.to);

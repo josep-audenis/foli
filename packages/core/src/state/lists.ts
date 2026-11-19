@@ -1,4 +1,4 @@
-import { type Command, Plugin } from "./state.js";
+import { type Command, type EditorState, Plugin } from "./state.js";
 import {
   endWordList,
   type ListKind,
@@ -11,7 +11,7 @@ import {
 } from "./wordformat.js";
 
 /** The kind of list all selected paragraphs are in ("bulletList", "orderedList"), or null. */
-export const listKindAt = wordListKindAt;
+export const listKindAt: (state: EditorState) => ListKind | null = wordListKindAt;
 
 /** Numbers the selected paragraphs as a list of `kind` (one right before goes on). */
 export const wrapInList: (kind: ListKind) => Command = wrapInWordList;

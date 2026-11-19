@@ -4,7 +4,8 @@
  * against the schema: one the model cannot hold is reported and stays in the element's `ext`.
  */
 
-import { type AttributeSpec, schema, TABLE_CONDITIONS } from "@folijs/core";
+import { type AttributeSpec, TABLE_CONDITIONS } from "@folijs/core";
+import { schema } from "@folijs/core/internal";
 import type { XmlElement } from "../xml.js";
 import { attr, child, compact, elements, integer, toggle } from "./ooxml.js";
 import { type Context, onOff, revisionOf, sourceOf } from "./properties.js";
@@ -37,6 +38,7 @@ function set(
 /**
  * A measure (`w:tblW`, `w:tcW`, `w:tblInd`, a margin): `w:w` in twips or fiftieths of a percent
  * (`pct`, which Strict files may write as `50%`). Undefined, reported, when unreadable.
+ * @internal
  */
 export function measure(el: XmlElement | undefined, context: Context): Json | undefined {
   if (!el) return undefined;
@@ -56,7 +58,10 @@ export function measure(el: XmlElement | undefined, context: Context): Json | un
   return { value, type };
 }
 
-/** A border element's attributes. */
+/**
+ * A border element's attributes.
+ * @internal
+ */
 export function border(el: XmlElement, context: Context): Json | undefined {
   const whole = (local: string) => {
     const value = attr(el, local);
@@ -88,6 +93,7 @@ function margins(el: XmlElement | undefined, context: Context): Json | undefined
   );
 }
 
+/** @internal */
 export function shading(el: XmlElement | undefined): Json | undefined {
   if (!el) return undefined;
   return compact({
@@ -126,6 +132,7 @@ const on = (el: XmlElement | undefined) => (el ? toggle(el) : undefined);
 /**
  * `w:tblPr` (or `w:tblPrEx`) as table properties. With `ext`, the element itself is kept
  * verbatim (a table's and a row's exceptions; a style's are in its own `ext`).
+ * @internal
  */
 export function tableProperties(el: XmlElement | undefined, context: Context, ext: boolean): Json {
   const out: Json = {};
@@ -149,7 +156,10 @@ export function tableProperties(el: XmlElement | undefined, context: Context, ex
   return out;
 }
 
-/** `w:tblGrid`'s column widths. */
+/**
+ * `w:tblGrid`'s column widths.
+ * @internal
+ */
 export function grid(el: XmlElement | undefined, context: Context): number[] {
   if (!el) return [];
   const widths = elements(el)
@@ -163,7 +173,10 @@ export function grid(el: XmlElement | undefined, context: Context): number[] {
   return widths;
 }
 
-/** `w:trPr` as row properties; with `node`, also the row's revision and the element verbatim. */
+/**
+ * `w:trPr` as row properties; with `node`, also the row's revision and the element verbatim.
+ * @internal
+ */
 export function rowProperties(el: XmlElement | undefined, context: Context, node: boolean): Json {
   const out: Json = {};
   if (!el) return out;
@@ -196,7 +209,10 @@ export function rowProperties(el: XmlElement | undefined, context: Context, node
   return out;
 }
 
-/** `w:tcPr` as cell properties; with `node`, also the element verbatim. */
+/**
+ * `w:tcPr` as cell properties; with `node`, also the element verbatim.
+ * @internal
+ */
 export function cellProperties(el: XmlElement | undefined, context: Context, node: boolean): Json {
   const out: Json = {};
   if (!el) return out;
@@ -220,7 +236,10 @@ export function cellProperties(el: XmlElement | undefined, context: Context, nod
 
 const nonEmpty = (json: Json) => (Object.keys(json).length ? json : undefined);
 
-/** A table style's parts (`w:tblPr`, `w:trPr`, `w:tcPr`, `w:tblStylePr`) for its `StyleJSON`. */
+/**
+ * A table style's parts (`w:tblPr`, `w:trPr`, `w:tcPr`, `w:tblStylePr`) for its `StyleJSON`.
+ * @internal
+ */
 export function tableStyleParts(
   style: XmlElement,
   context: Context,

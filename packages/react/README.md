@@ -7,7 +7,7 @@ editing engine, no ProseMirror or similar underneath.
 > Early release: the API may change in any 0.x minor version (changes in `CHANGELOG.md`).
 
 ```bash
-npm install @folijs/react @folijs/core react react-dom
+npm install @folijs/react @folijs/view @folijs/core react react-dom
 ```
 
 Keep all `@folijs/*` packages on the same version.

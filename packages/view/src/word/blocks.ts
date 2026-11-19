@@ -8,38 +8,59 @@ import {
   type FieldDisplay,
   type FoliDocument,
   fieldDisplay,
-  type ListMarker,
   type MarkJSON,
   type NodeJSON,
-  type ParagraphFormat,
-  Resolver,
   type ResourceJSON,
-  type RunFormat,
   type SectionJSON,
 } from "@folijs/core";
+import {
+  type ListMarker,
+  type ParagraphFormat,
+  Resolver,
+  type RunFormat,
+} from "@folijs/core/internal";
 
-/** Marks the <br> of an explicit page break (the page flow ends the page after its line). */
+/**
+ * Marks the <br> of an explicit page break (the page flow ends the page after its line).
+ * @internal
+ */
 export const WORD_PAGE_BREAK_ATTR = "data-page-break";
-/** Marks the <br> of an explicit column break (the flow ends the column after its line). */
+/**
+ * Marks the <br> of an explicit column break (the flow ends the column after its line).
+ * @internal
+ */
 export const WORD_COLUMN_BREAK_ATTR = "data-column-break";
 
-/** CSS px per twip (1/1440 inch; CSS: 96 px per inch). */
+/**
+ * CSS px per twip (1/1440 inch; CSS: 96 px per inch).
+ * @internal
+ */
 export const PX_PER_TWIP = 96 / 1440;
 /** EMU (DrawingML's unit: 914 400 per inch) per CSS px. */
 export const EMU_PER_PX = 914_400 / 96;
 
-/** The URL to show a picture's image from (its resource key), if one is known. */
+/**
+ * The URL to show a picture's image from (its resource key), if one is known.
+ * @internal
+ */
 export type ImageSource = (key: string) => string | undefined;
 
-/** Marks a picture's element (its resource key). */
+/**
+ * Marks a picture's element (its resource key).
+ * @internal
+ */
 export const PICTURE_ATTR = "data-foli-picture";
 
-/** The accessible name of a picture with no alt text that is not decorative. */
+/**
+ * The accessible name of a picture with no alt text that is not decorative.
+ * @internal
+ */
 export const NO_ALT_LABEL = "Picture without alt text";
 
 /**
  * The URL a resource gives on its own: an image `data:` URL, or a web or `blob:` URL; none for
  * an image in a package part (the app's resolver gives one) or anything else.
+ * @internal
  */
 export function ownImageUrl(resource: ResourceJSON | undefined): string | undefined {
   const data = resource?.data;
@@ -52,6 +73,7 @@ export function ownImageUrl(resource: ResourceJSON | undefined): string | undefi
  * A picture as shown: its image at its size, or, when no URL is known for it, a box of that size
  * with its alt text. A picture with no alt text that is not decorative is marked (`data-foli-
  * no-alt`); a decorative one has an empty alt.
+ * @internal
  */
 export function pictureElement(
   attrs: Record<string, unknown>,
@@ -97,10 +119,16 @@ export function pictureElement(
   return element;
 }
 
-/** Marks the element holding a floating picture (its wrapping), drawn at its paragraph's start. */
+/**
+ * Marks the element holding a floating picture (its wrapping), drawn at its paragraph's start.
+ * @internal
+ */
 export const FLOAT_ATTR = "data-foli-float";
 
-/** A section's page, in CSS px: what a floating picture is positioned against. */
+/**
+ * A section's page, in CSS px: what a floating picture is positioned against.
+ * @internal
+ */
 export interface FloatGeometry {
   readonly pageWidth: number;
   readonly pageHeight: number;
@@ -110,7 +138,10 @@ export interface FloatGeometry {
   readonly textHeight: number;
 }
 
-/** The page geometry of `section` (Word's Letter page and margins where it does not say). */
+/**
+ * The page geometry of `section` (Word's Letter page and margins where it does not say).
+ * @internal
+ */
 export function floatGeometry(section: SectionJSON | undefined): FloatGeometry {
   const m = section?.margins ?? {};
   const width = section?.pageSize?.width ?? 12_240;
@@ -206,6 +237,7 @@ function floatTop(
  * earlier float's (CSS), and `clear` stacks it below earlier floats on its side: several floats
  * in a paragraph, or one above a float of an earlier paragraph, add their offsets down and do
  * not sit side by side.
+ * @internal
  */
 export function floatElements(
   attrs: Record<string, unknown>,
@@ -294,20 +326,27 @@ const AUTHOR_COLORS = [
   "#5D4037",
 ];
 
-/** The color of `author`'s changes: always the same for a name. */
+/**
+ * The color of `author`'s changes: always the same for a name.
+ * @internal
+ */
 export function authorColor(author: string): string {
   let hash = 0;
   for (const c of author) hash = (hash * 31 + (c.codePointAt(0) ?? 0)) >>> 0;
   return AUTHOR_COLORS[hash % AUTHOR_COLORS.length] as string;
 }
 
-/** The bar beside a paragraph with changes (`markup` and `simple`), drawn in the margin. */
+/**
+ * The bar beside a paragraph with changes (`markup` and `simple`), drawn in the margin.
+ * @internal
+ */
 export const CHANGE_BAR = "-4px 0 0 0 #6B6B6B";
 
 /**
  * The element around an inserted or deleted run: `ins` or `del` (named for screen readers by
  * its title), styled for `review`. Deleted text not shown is hidden, not left out: the editable
  * view maps positions through it.
+ * @internal
  */
 export function changeElement(
   doc: Document,
@@ -329,6 +368,7 @@ export function changeElement(
   return element;
 }
 
+/** @internal */
 export interface BlockOptions {
   /** `markup` (the default): insertions underlined, deletions struck through; `simple`, `final`: as if accepted. */
   review?: ReviewView;
@@ -352,15 +392,24 @@ export interface BlockOptions {
   notes?: { references?: ReadonlyMap<string, string>; mark?: string };
 }
 
-/** On the element showing a note reference's number: the note's story. */
+/**
+ * On the element showing a note reference's number: the note's story.
+ * @internal
+ */
 export const NOTE_REF_ATTR = "data-foli-note-ref";
-/** On a number drawn for a note, at its reference or its mark: not text of the document. */
+/**
+ * On a number drawn for a note, at its reference or its mark: not text of the document.
+ * @internal
+ */
 export const NOTE_NUMBER_ATTR = "data-foli-note-number";
 
 /** Word's footnote separator is two inches long; its continuation line here is the same. */
 const SEPARATOR_WIDTH = 192;
 
-/** The line a separator run draws, when `xml` is one (`w:separator`, `w:continuationSeparator`). */
+/**
+ * The line a separator run draws, when `xml` is one (`w:separator`, `w:continuationSeparator`).
+ * @internal
+ */
 export function separatorElement(xml: Element | null, doc: Document): HTMLElement | null {
   if (!xml) return null;
   const found = [xml, ...xml.getElementsByTagName("*")].some(
@@ -379,7 +428,10 @@ export function separatorElement(xml: Element | null, doc: Document): HTMLElemen
   return line;
 }
 
-/** The source for a document's pictures: the app's URL, else the resource's own. */
+/**
+ * The source for a document's pictures: the app's URL, else the resource's own.
+ * @internal
+ */
 export function imageSource(
   resources: Readonly<Record<string, ResourceJSON>> | undefined,
   resolve?: (key: string, resource: ResourceJSON) => string | null | undefined,
@@ -393,7 +445,10 @@ export function imageSource(
   };
 }
 
-/** A rendered block and what the page flow needs to know about it. */
+/**
+ * A rendered block and what the page flow needs to know about it.
+ * @internal
+ */
 export interface WordBlock {
   element: HTMLElement;
   /** Indices in the document's content of the nodes it shows (several when paragraphs merged). */
@@ -423,7 +478,10 @@ const SUBSTITUTES: Record<string, string[]> = {
 const SERIF = new Set(["cambria", "times new roman", "georgia", "garamond", "book antiqua"]);
 const MONOSPACE = new Set(["courier new", "consolas", "courier"]);
 
-/** A CSS font-family list for a Word font name: the font, its substitutes, a generic family. */
+/**
+ * A CSS font-family list for a Word font name: the font, its substitutes, a generic family.
+ * @internal
+ */
 export function fontStack(name: string | null): string {
   const font = name ?? "Times New Roman";
   const key = font.toLowerCase();
@@ -484,10 +542,16 @@ const BORDER_STYLES: Record<string, string> = {
   nil: "none",
 };
 
-/** The one font name a run shows for Latin text. */
+/**
+ * The one font name a run shows for Latin text.
+ * @internal
+ */
 export const latin = (run: RunFormat) => run.font.ascii ?? run.font.hAnsi;
 
-/** A line height in CSS for text in `run` (`ratio`: its font's normal line height ratio). */
+/**
+ * A line height in CSS for text in `run` (`ratio`: its font's normal line height ratio).
+ * @internal
+ */
 export function lineHeight(paragraph: ParagraphFormat, run: RunFormat, ratio: number): string {
   const sizePx = (run.size / 2) * (96 / 72);
   const { line, lineRule } = paragraph.spacing;
@@ -497,7 +561,10 @@ export function lineHeight(paragraph: ParagraphFormat, run: RunFormat, ratio: nu
   return String((ratio * line) / 240);
 }
 
-/** Run formatting as inline CSS on `element`. */
+/**
+ * Run formatting as inline CSS on `element`.
+ * @internal
+ */
 export function styleRun(element: HTMLElement, run: RunFormat, line: string): void {
   const { style } = element;
   style.fontFamily = fontStack(latin(run));
@@ -531,7 +598,10 @@ export function styleRun(element: HTMLElement, run: RunFormat, line: string): vo
   if (run.hidden) style.display = "none";
 }
 
-/** Paragraph properties as inline CSS on `element` (spacing is the flow's). */
+/**
+ * Paragraph properties as inline CSS on `element` (spacing is the flow's).
+ * @internal
+ */
 export function styleParagraph(element: HTMLElement, paragraph: ParagraphFormat): void {
   const { style } = element;
   style.margin = "0";
@@ -565,7 +635,10 @@ export function styleParagraph(element: HTMLElement, paragraph: ParagraphFormat)
  */
 const NOT_INLINE = new Set(["txbxContent", "Fallback"]);
 
-/** Text a run of opaque XML shows: its `w:t` elements (field results, content controls). */
+/**
+ * Text a run of opaque XML shows: its `w:t` elements (field results, content controls).
+ * @internal
+ */
 export function opaqueText(element: Element): string {
   let text = "";
   for (const node of element.children) {
@@ -577,7 +650,10 @@ export function opaqueText(element: Element): string {
   return text;
 }
 
-/** Opaque XML's text, a line per paragraph (`w:p`), or its runs' text when it has none. */
+/**
+ * Opaque XML's text, a line per paragraph (`w:p`), or its runs' text when it has none.
+ * @internal
+ */
 export function opaqueParagraphsText(element: Element): string {
   const paragraphs = [...element.getElementsByTagName("*")].filter((e) => e.localName === "p");
   if (element.localName === "p") paragraphs.unshift(element);
@@ -605,6 +681,7 @@ const CELL_CONTENT = new Set(["p", "tbl"]);
 /**
  * Parses verbatim WordprocessingML (opaque content) into an inert XML document, declaring the
  * prefixes it uses; null when it is not well-formed.
+ * @internal
  */
 export function parseOpaque(xml: string, doc: Document): Element | null {
   const view = doc.defaultView;
@@ -627,6 +704,7 @@ export function parseOpaque(xml: string, doc: Document): Element | null {
 /**
  * Renders a document's blocks. `final` review merges a paragraph whose mark was deleted into
  * the next one, as accepting the deletion does.
+ * @internal
  */
 export function renderBlocks(
   document: FoliDocument,
@@ -779,6 +857,7 @@ function joinDisplays(before: FieldDisplay, length: number, after: FieldDisplay)
 /**
  * Whether a paragraph's line holds nothing but inline pictures: Word's line then ends at the
  * picture's foot (its PDFs of the corpus: no room below it for the text it does not have).
+ * @internal
  */
 export function onlyPictures<T>(
   inline: Iterable<T>,
@@ -813,12 +892,16 @@ const INVISIBLE = new Set([
  * flow does not lay out (a table cell). Adjacent margins collapse to the larger: Word's rule. In
  * a document where the two spaces add up this margin holds both, so the collapse gives the sum
  * and no paragraph's shading or border grows.
+ * @internal
  */
 export function marginAbove(before: number, above: number, resolver: Resolver): number {
   return resolver.addsParagraphSpacing ? before + above : before;
 }
 
-/** A paragraph's element: a heading of its outline level (1-6), else a paragraph. */
+/**
+ * A paragraph's element: a heading of its outline level (1-6), else a paragraph.
+ * @internal
+ */
 export function tagOf(paragraph: ParagraphFormat): string {
   const level = paragraph.outlineLevel;
   return level !== null && level >= 0 && level < 6 ? `h${level + 1}` : "p";
@@ -857,7 +940,10 @@ const SYMBOLS: Record<string, string> = {
   "\uF0FC": "\u2713", // Wingdings: check mark
 };
 
-/** A list marker: its text, then what follows it (a tab to the text's indent, a space). */
+/**
+ * A list marker: its text, then what follows it (a tab to the text's indent, a space).
+ * @internal
+ */
 export function markerElement(
   marker: ListMarker,
   paragraph: ParagraphFormat,
@@ -1032,6 +1118,7 @@ function renderInline(
  * A block the model keeps opaque (tables until Phase 10, block content controls), shown from
  * its XML: a table as a table of its cells' paragraphs, anything else as its paragraphs. Only
  * text is read: no formatting beyond the paragraph styles.
+ * @internal
  */
 export function opaqueBlock(
   node: NodeJSON,
@@ -1275,7 +1362,10 @@ function opaqueTable(
   return table;
 }
 
-/** A border of the model (`BorderJSON`) as CSS; undefined when it says none. */
+/**
+ * A border of the model (`BorderJSON`) as CSS; undefined when it says none.
+ * @internal
+ */
 export function borderJsonCss(
   border: { style?: string; size?: number; color?: string } | undefined,
 ) {

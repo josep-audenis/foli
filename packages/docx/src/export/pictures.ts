@@ -68,7 +68,10 @@ function ownPart(resource: ResourceJSON, pkg: DocxPackage | undefined): boolean 
   return !!part && part.contentType.startsWith("image/") && part.data.length === resource.size;
 }
 
-/** The bytes of each picture's image the package does not hold, before anything is written. */
+/**
+ * The bytes of each picture's image the package does not hold, before anything is written.
+ * @internal
+ */
 export async function pictureBytes(
   doc: FoliDocument,
   pkg: DocxPackage | undefined,
@@ -105,7 +108,10 @@ export async function pictureBytes(
 const docPrIds = (xml: string) =>
   [...xml.matchAll(/<(?:[\w.-]+:)?docPr\b[^>]*?\bid="(\d+)"/g)].map((m) => Number(m[1]));
 
-/** The media parts pictures need, allocated as they are written, and the drawings' ids. */
+/**
+ * The media parts pictures need, allocated as they are written, and the drawings' ids.
+ * @internal
+ */
 export class Media {
   readonly added: { name: string; data: Uint8Array; contentType: string }[] = [];
   /** The document's content controls, written once across its parts. */
@@ -228,7 +234,10 @@ function setAttr(
   }
 }
 
-/** A part's relationships as a picture's drawing needs them. */
+/**
+ * A part's relationships as a picture's drawing needs them.
+ * @internal
+ */
 export interface PictureRelations {
   /** The id relating image part `part` (`current` when it already does). */
   image(part: string, current: string | undefined): string;
@@ -310,6 +319,7 @@ function wrapXml(float: Json): string {
  * has none, when its position or wrapping changed, or when it was read in another part or
  * package and refers to other relationships (an SVG's PNG fallback, a click link) that mean
  * something else here.
+ * @internal
  */
 export function drawingXml(
   attrs: Json,

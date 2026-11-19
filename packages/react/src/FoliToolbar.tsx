@@ -100,8 +100,8 @@ import {
   undo,
   undoDepth,
   updateFields,
-  wordContext,
 } from "@folijs/core";
+import { wordContext } from "@folijs/core/internal";
 import { type EditorViewOptions, EMU_PER_PX, measureImageFile, textWidthEmu } from "@folijs/view";
 import {
   type FormEvent,

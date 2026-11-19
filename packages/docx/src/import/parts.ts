@@ -1,16 +1,15 @@
 /** The parts beside the document: styles, numbering, theme, comments. */
 
-import {
-  type AbstractNumberingJSON,
-  type CommentJSON,
-  type MarkJSON,
-  type NumberingInstanceJSON,
-  type NumberingLevelJSON,
-  RUN_PROPERTY_MARKS,
-  type StyleJSON,
-  schema,
-  type ThemeJSON,
+import type {
+  AbstractNumberingJSON,
+  CommentJSON,
+  MarkJSON,
+  NumberingInstanceJSON,
+  NumberingLevelJSON,
+  StyleJSON,
+  ThemeJSON,
 } from "@folijs/core";
+import { RUN_PROPERTY_MARKS, schema } from "@folijs/core/internal";
 import type { XmlElement } from "../xml.js";
 import { blocks, type ContentContext } from "./content.js";
 import { A, attr, child, compact, elements, integer, isW, toggle, W14, W15 } from "./ooxml.js";
@@ -46,7 +45,10 @@ function id(
   return n;
 }
 
-/** `w:styles`: the document defaults and the styles (each with its element verbatim). */
+/**
+ * `w:styles`: the document defaults and the styles (each with its element verbatim).
+ * @internal
+ */
 export function styles(
   root: XmlElement,
   context: Context,
@@ -71,7 +73,10 @@ export function styles(
   return { defaults, styles: list };
 }
 
-/** `w:docDefaults` as the envelope's defaults (with the element verbatim). */
+/**
+ * `w:docDefaults` as the envelope's defaults (with the element verbatim).
+ * @internal
+ */
 export function defaultsOf(docDefaults: XmlElement, context: Context): Record<string, unknown> {
   const pPr = child(child(docDefaults, "pPrDefault") ?? docDefaults, "pPr");
   const rPr = child(child(docDefaults, "rPrDefault") ?? docDefaults, "rPr");
@@ -84,7 +89,10 @@ export function defaultsOf(docDefaults: XmlElement, context: Context): Record<st
   };
 }
 
-/** Whether import keeps a `w:style` (it has a usable id and type); others stay in the part only. */
+/**
+ * Whether import keeps a `w:style` (it has a usable id and type); others stay in the part only.
+ * @internal
+ */
 export function usableStyle(el: XmlElement): boolean {
   const styleId = attr(el, "styleId");
   return (
@@ -92,7 +100,10 @@ export function usableStyle(el: XmlElement): boolean {
   );
 }
 
-/** A `w:style` as a style (with the element verbatim); undefined (reported) when unusable. */
+/**
+ * A `w:style` as a style (with the element verbatim); undefined (reported) when unusable.
+ * @internal
+ */
 export function styleOf(el: XmlElement, context: Context): StyleJSON | undefined {
   const styleId = attr(el, "styleId");
   const type = attr(el, "type") ?? "paragraph";
@@ -170,6 +181,7 @@ function breakCycles<T>(
   });
 }
 
+/** @internal */
 export function level(lvl: XmlElement, context: Context): NumberingLevelJSON | undefined {
   const index = integer(attr(lvl, "ilvl"));
   if (index === undefined || index < 0 || index > 8) {
@@ -226,7 +238,10 @@ function checked(
   return out;
 }
 
-/** `w:numbering`: abstract definitions and instances (each with its element verbatim). */
+/**
+ * `w:numbering`: abstract definitions and instances (each with its element verbatim).
+ * @internal
+ */
 export function numbering(
   root: XmlElement,
   context: Context,
@@ -245,7 +260,10 @@ export function numbering(
   return { abstracts, instances };
 }
 
-/** A `w:abstractNum` as a definition (with the element verbatim); undefined (reported) when unusable. */
+/**
+ * A `w:abstractNum` as a definition (with the element verbatim); undefined (reported) when unusable.
+ * @internal
+ */
 export function abstractOf(el: XmlElement, context: Context): AbstractNumberingJSON | undefined {
   const abstractId = id(attr(el, "abstractNumId"), 0, "w:abstractNum", context);
   if (abstractId === undefined) return undefined;
@@ -278,7 +296,10 @@ export function abstractOf(el: XmlElement, context: Context): AbstractNumberingJ
   }) as AbstractNumberingJSON;
 }
 
-/** A `w:num` as an instance (with the element verbatim); undefined (reported) when unusable. */
+/**
+ * A `w:num` as an instance (with the element verbatim); undefined (reported) when unusable.
+ * @internal
+ */
 export function instanceOf(el: XmlElement, context: Context): NumberingInstanceJSON | undefined {
   const numId = id(attr(el, "numId"), 1, "w:num", context);
   const abstract = id(attr(child(el, "abstractNumId"), "val"), 0, "w:num/w:abstractNumId", context);
@@ -332,7 +353,10 @@ const THEME_COLORS = [
   "folHlink",
 ];
 
-/** `a:theme`'s fonts and colors; undefined (reported) when its fonts are missing or unusable. */
+/**
+ * `a:theme`'s fonts and colors; undefined (reported) when its fonts are missing or unusable.
+ * @internal
+ */
 export function theme(root: XmlElement, context: Context): ThemeJSON | undefined {
   const a = (el: XmlElement | undefined, local: string) =>
     el?.children.find(
@@ -374,6 +398,7 @@ export function theme(root: XmlElement, context: Context): ThemeJSON | undefined
  * `w:comments`, with replies and resolved state from `commentsExtended` (keyed by the
  * `w14:paraId` of each comment's last paragraph). Each comment keeps its start tag verbatim
  * (`ext`): values the model cannot hold (a long author, a date without a time) stay there.
+ * @internal
  */
 export function comments(
   root: XmlElement,

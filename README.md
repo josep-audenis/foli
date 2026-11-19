@@ -39,7 +39,7 @@ integration.
 ## Usage
 
 ```bash
-npm install @folijs/react @folijs/core react react-dom
+npm install @folijs/react @folijs/view @folijs/core react react-dom
 ```
 
 ```tsx

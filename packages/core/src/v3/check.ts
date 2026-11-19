@@ -7,12 +7,15 @@
 
 export type Check = (value: unknown) => string | undefined;
 
+/** @internal */
 export function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+/** @internal */
 export const bool: Check = (v) => (typeof v === "boolean" ? undefined : "must be true or false");
 
+/** @internal */
 export const int =
   (min: number, max: number): Check =>
   (v) =>
@@ -20,7 +23,10 @@ export const int =
       ? undefined
       : `must be an integer from ${min} to ${max}`;
 
-/** A string of at most `max` characters, empty allowed (Word's ST_String: authors, initials). */
+/**
+ * A string of at most `max` characters, empty allowed (Word's ST_String: authors, initials).
+ * @internal
+ */
 export const str =
   (max = 255): Check =>
   (v) =>
@@ -28,7 +34,10 @@ export const str =
       ? undefined
       : `must be a string of at most ${max} characters`;
 
-/** A non-empty string: ids and names things are referenced by. */
+/**
+ * A non-empty string: ids and names things are referenced by.
+ * @internal
+ */
 export const text =
   (max = 255): Check =>
   (v) =>
@@ -36,35 +45,51 @@ export const text =
       ? undefined
       : `must be a non-empty string of at most ${max} characters`;
 
+/** @internal */
 export const oneOf =
   (values: readonly string[]): Check =>
   (v) =>
     values.includes(v as string) ? undefined : `must be one of ${values.join(", ")}`;
 
-/** A token of one of Word's long enumerations (border styles, number formats…). */
+/**
+ * A token of one of Word's long enumerations (border styles, number formats…).
+ * @internal
+ */
 export const token: Check = (v) =>
   typeof v === "string" && /^[A-Za-z][A-Za-z0-9-]{0,63}$/.test(v)
     ? undefined
     : "must be a Word token";
 
-/** `RRGGBB` (any case, as Word writes it) or `auto`. */
+/**
+ * `RRGGBB` (any case, as Word writes it) or `auto`.
+ * @internal
+ */
 export const color: Check = (v) =>
   typeof v === "string" && /^([0-9A-Fa-f]{6}|auto)$/.test(v) ? undefined : "must be RRGGBB or auto";
 
-/** An ISO 8601 date-time, as Word stores revision and comment dates. */
+/**
+ * An ISO 8601 date-time, as Word stores revision and comment dates.
+ * @internal
+ */
 export const date: Check = (v) =>
   typeof v === "string" &&
   /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:\d{2})?$/.test(v)
     ? undefined
     : "must be an ISO 8601 date-time";
 
-/** Verbatim XML kept for export: never parsed by the engine. */
+/**
+ * Verbatim XML kept for export: never parsed by the engine.
+ * @internal
+ */
 export const xml: Check = (v) =>
   typeof v === "string" && v.length > 0 && v.length <= 16_777_216
     ? undefined
     : "must be an XML string";
 
-/** An element's own attributes Foli does not model, by qualified name (`w14:paraId`). */
+/**
+ * An element's own attributes Foli does not model, by qualified name (`w14:paraId`).
+ * @internal
+ */
 export const attributes: Check = (v) => {
   if (!isRecord(v)) return "must be an object";
   const entries = Object.entries(v);
@@ -78,11 +103,13 @@ export const attributes: Check = (v) => {
   return undefined;
 };
 
+/** @internal */
 export const nullable =
   (check: Check): Check =>
   (v) =>
     v === null ? undefined : check(v);
 
+/** @internal */
 export const listOf =
   (check: Check, max = 100_000): Check =>
   (v) => {
@@ -98,6 +125,7 @@ export const listOf =
 /**
  * An object with only the given keys, each optional unless listed in `required`. Unless
  * `allowEmpty`, at least one key is present (an empty object means "not set": use null).
+ * @internal
  */
 export const shape =
   (

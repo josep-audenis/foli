@@ -1,9 +1,15 @@
 import type { DocumentSettings } from "@folijs/core";
 
-/** CSS pixels per millimetre (CSS fixes 1in = 96px = 25.4mm). */
+/**
+ * CSS pixels per millimetre (CSS fixes 1in = 96px = 25.4mm).
+ * @internal
+ */
 export const PX_PER_MM = 96 / 25.4;
 
-/** A rendered block's border-box height and vertical margins, in CSS px. */
+/**
+ * A rendered block's border-box height and vertical margins, in CSS px.
+ * @internal
+ */
 export interface BlockBox {
   height: number;
   marginTop: number;
@@ -48,7 +54,10 @@ export interface BlockBox {
   endnotes?: readonly FlowNote[] | undefined;
 }
 
-/** A note, or a separator, as the flow sees it: lines, split between pages like a block's. */
+/**
+ * A note, or a separator, as the flow sees it: lines, split between pages like a block's.
+ * @internal
+ */
 export interface FlowNote {
   /** Its story. */
   id: string;
@@ -56,7 +65,10 @@ export interface FlowNote {
   lines(column: number): readonly number[];
 }
 
-/** Lines `[fromLine, toLine)` of a note on a page, at the foot or (`end`) after the text. */
+/**
+ * Lines `[fromLine, toLine)` of a note on a page, at the foot or (`end`) after the text.
+ * @internal
+ */
 export interface NotePiece {
   id: string;
   page: number;
@@ -71,7 +83,10 @@ export interface NotePiece {
   tail?: boolean;
 }
 
-/** What a page's layout depends on: first page, odd or even, by displayed number. */
+/**
+ * What a page's layout depends on: first page, odd or even, by displayed number.
+ * @internal
+ */
 export interface FlowPage {
   /** The page's place in the document, from 0. */
   index: number;
@@ -81,7 +96,10 @@ export interface FlowPage {
   first: boolean;
 }
 
-/** A page as flowed: what decides its header and footer (its first section's). */
+/**
+ * A page as flowed: what decides its header and footer (its first section's).
+ * @internal
+ */
 export interface PageFacts extends FlowPage {
   /** The first section on it, by its `index` (a page nothing is on: the next page's). */
   section: number;
@@ -89,7 +107,10 @@ export interface PageFacts extends FlowPage {
   sectionPages: number;
 }
 
-/** A section as the flow sees it. */
+/**
+ * A section as the flow sees it.
+ * @internal
+ */
 export interface FlowSection {
   /** Its place among the document's sections, from 0. */
   index?: number;
@@ -112,6 +133,7 @@ export interface FlowSection {
 /**
  * The lines `[fromLine, toLine)` of a block, placed on one page (`toLine` Infinity: to the end).
  * Line numbers are those of the column it is in, when columns' widths differ.
+ * @internal
  */
 export interface Fragment {
   page: number;
@@ -129,6 +151,7 @@ export interface Fragment {
   notes?: NotePiece[];
 }
 
+/** @internal */
 export interface FlowRules {
   /** Fewest lines of a split block left at the bottom of a page. */
   orphans: number;
@@ -153,9 +176,13 @@ export interface FlowRules {
   notes?: { separator: FlowNote; continuation: FlowNote } | undefined;
 }
 
+/** @internal */
 export const DEFAULT_RULES: FlowRules = { orphans: 2, widows: 2 };
 
-/** Height of a page's content box (page height minus top and bottom margins), in CSS px. */
+/**
+ * Height of a page's content box (page height minus top and bottom margins), in CSS px.
+ * @internal
+ */
 export function contentHeight({ pageSize, margins }: DocumentSettings): number {
   return (pageSize.height - margins.top - margins.bottom) * PX_PER_MM;
 }
@@ -163,7 +190,10 @@ export function contentHeight({ pageSize, margins }: DocumentSettings): number {
 // Half a pixel of slack: measured heights are fractional and rounding must not add a page.
 const SLACK = 0.5;
 
-/** Where the flow stands before a block: shared by a full and an incremental flow. */
+/**
+ * Where the flow stands before a block: shared by a full and an incremental flow.
+ * @internal
+ */
 export interface FlowState {
   page: number;
   /** The page's displayed number. */
@@ -238,6 +268,7 @@ export interface FlowState {
  * no top margin.
  *
  * shortcut: positive margins only (negative margins collapse differently).
+ * @internal
  */
 export function flow(
   boxes: readonly BlockBox[],
@@ -247,7 +278,10 @@ export function flow(
   return flowFrom(boxes, pageHeight, rules).fragments;
 }
 
-/** A flow with the state before each block (and after the last), for the next incremental one. */
+/**
+ * A flow with the state before each block (and after the last), for the next incremental one.
+ * @internal
+ */
 export interface FlowResult {
   fragments: Fragment[][];
   states: FlowState[];
@@ -255,7 +289,10 @@ export interface FlowResult {
   gaps: number[];
 }
 
-/** What an incremental flow may reuse from the previous one. */
+/**
+ * What an incremental flow may reuse from the previous one.
+ * @internal
+ */
 export interface Reuse {
   previous: FlowResult;
   /** Blocks before this index are the previous flow's first blocks, with the same boxes. */
@@ -277,6 +314,7 @@ const slot = (f: Fragment | undefined) =>
  * section, whose columns depend on all of it) with the previous state there, and once the state
  * before an unchanged block equals the previous state before it, the rest is the previous flow's.
  * The result is the same as a full flow.
+ * @internal
  */
 export function flowFrom(
   boxes: readonly BlockBox[],
@@ -1008,6 +1046,7 @@ export function flowFrom(
 /**
  * Each page of a flow: its number, its first section and whether that section starts on it. A page
  * nothing is on (the blank page before an even or odd page section) has the next page's section.
+ * @internal
  */
 export function pagesOf(boxes: readonly BlockBox[], result: FlowResult): PageFacts[] {
   const pages: (PageFacts | undefined)[] = [];
@@ -1050,6 +1089,7 @@ export function pagesOf(boxes: readonly BlockBox[], result: FlowResult): PageFac
  * Notes of heights `parts` set in `columns` columns, as Word sets those of a section with columns
  * (its PDFs): whole, in order, each column as full as the height the set needs. That height and
  * the column of each. One column: their sum.
+ * @internal
  */
 export function arrangeNotes(
   parts: readonly number[],
@@ -1092,7 +1132,10 @@ export function arrangeNotes(
 const notesHeight = (parts: readonly number[], columns: number) =>
   arrangeNotes(parts, columns).height;
 
-/** The space after the last block of a column of a page, as flowed (what ends its text). */
+/**
+ * The space after the last block of a column of a page, as flowed (what ends its text).
+ * @internal
+ */
 export function spaceAfterText(
   boxes: readonly BlockBox[],
   result: Pick<FlowResult, "fragments">,
@@ -1107,7 +1150,10 @@ export function spaceAfterText(
   return 0;
 }
 
-/** Every note piece of a flow, in order. */
+/**
+ * Every note piece of a flow, in order.
+ * @internal
+ */
 export const notePieces = (result: Pick<FlowResult, "fragments">): NotePiece[] =>
   result.fragments.flatMap((fragments) => fragments.flatMap((f) => f.notes ?? []));
 

@@ -473,7 +473,10 @@ export function replaceAll(
   return replaceHits(editor, hits, text, options.matchCase === true, false);
 }
 
-/** The story `editor` edits; null for the body's. */
+/**
+ * The story `editor` edits; null for the body's.
+ * @internal
+ */
 export function storyOfEditor(editor: Editor): string | null {
   const body = storyBody(editor.state)?.state;
   return body ? storyIdOf(body, editor.state.doc) : null;

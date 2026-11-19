@@ -3,10 +3,16 @@
  * that the editor's `print()` and `@folijs/pdf`'s `exportPdf` print pages the same way (11.12).
  */
 
-/** The attribute naming a page's page setup (its index among the document's) for print. */
+/**
+ * The attribute naming a page's page setup (its index among the document's) for print.
+ * @internal
+ */
 export const SHEET_ATTR = "data-foli-sheet";
 
-/** A page setup as print sees it: its sheet's size (CSS lengths) and its `SHEET_ATTR` value. */
+/**
+ * A page setup as print sees it: its sheet's size (CSS lengths) and its `SHEET_ATTR` value.
+ * @internal
+ */
 export interface PrintSheet {
   readonly width: string;
   readonly height: string;
@@ -20,6 +26,7 @@ export interface PrintSheet {
  * inside it; the exact height absorbs its half-pixel slack), with no gap after it. Content taller
  * than a page (a line taller than a page) is not cut: it prints over the next sheet. `name` makes
  * the named pages unique on the web page.
+ * @internal
  */
 export function printStyles(
   pages: string,

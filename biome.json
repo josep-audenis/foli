@@ -11,7 +11,8 @@
       "!packages/view/fixtures/clipboard/*.html",
       "!**/*-snapshots",
       "!.changeset/*.md",
-      "!corpus/reference/**"
+      "!corpus/reference",
+      "!packages/*/api-report.d.ts"
     ]
   },
   "formatter": {

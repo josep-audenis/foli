@@ -23,7 +23,7 @@ place that says what is in progress; check it before starting work.
 | 9 Review                 | ✅ Done                  | —                  | Merged in #63–#72; 0.4.0 on npm                                                                              |
 | 10 Tables & images       | ✅ Done                  | —                  | Merged in #73–#97 (#90, the landing page, went to main); 0.5.0 on npm; two misses accepted                   |
 | 11 Sections & templates  | ✅ Done                  | —                  | Merged in #100–#118 (#106, #107, #110, #112 and #113, the site, went to main); 0.6.0 on npm; misses accepted |
-| 12 Ecosystem & 1.0       | In progress              | phase-12/ecosystem | 12.1 done: ADR-0008 (1.0 contract, extension API); 12.2 next                                                 |
+| 12 Ecosystem & 1.0       | In progress              | phase-12/ecosystem | 12.1 and 12.2 done: ADR-0008, the public API listed by name with API reports; 12.3 next                      |
 
 Status values: `Ready` (dependencies met, nobody on it) · `In progress` · `In review` (PR open) ·
 `✅ Done` (merged, acceptance criteria met) · `Blocked by …`.
@@ -1402,10 +1402,37 @@ Each task is a PR on `phase-12/ecosystem`, the build green after each.
   them: 12.3 carries them in the HTML; WebKit skipped); Word 16 opened, edited and saved 5 files and
   Foli read every node and mark back. Shortcuts: the packages are patched as the spike's dev server
   serves them (no package changes); block nodes, find, tracking and foreign nodes not exercised.)
-- [ ] 12.2 Public API surface: core's exports listed by name (no `export *`), internals marked and
+- [x] 12.2 Public API surface: core's exports listed by name (no `export *`), internals marked and
   stripped from the published types, the built-in plugins and keys exported where ADR-0008 says;
   an API report per package (`.d.ts` of `dist` compared with a committed report, no new tool
-  unless the ADR picks one) in `pnpm check`; `docs/api.md` marks every name stable or internal.
+  unless the ADR picks one) in `pnpm check`; `docs/api.md` marks every name stable or internal. (Done: core's index lists its 346 public names by name, no `export *`;
+  `@folijs/core/internal` (`src/internal.ts`, an `exports` entry with the `@folijs/source`
+  condition; publint passes) holds 37 the other packages use without a promise: the Word context,
+  envelope and their steps, the resolver and its formats, clipboard fitting, the view's layout
+  helpers, the Word schema and its checks. `defaultTextblockType`, `isNote` and `storyBody` left the
+  API. Public per package: core 346, view 14 (`RenderDocumentOptions` added: `renderDocument`'s `review`, `fieldCodes`, `resource`),
+  React 19, docx 27, PDF 8. Every other module export is tagged `@internal` (362 tags: core 123,
+  view 119, docx 117, React 3) and stripped (`stripInternal` in `tsconfig.base.json`). Built-in
+  plugins: only `history()`, `baseKeymap()` and `listKeymap()` are exported, as ADR-0008 says.
+  View, docx and PDF take core, React core and view, as `workspace:*` peer dependencies (and
+  devDependencies, for the workspace); `changeset status` still plans 0.7.0 for all, no major from
+  the peers. `scripts/api.mjs` (`pnpm api` in `pnpm check`, `pnpm api:update`) joins each package's
+  `dist/**/*.d.ts` into `packages/<name>/api-report.d.ts` (core 3,445 lines, view 749, docx 385,
+  React 225, PDF 81) and fails on a difference, a forgotten export, `export *` in an entry, or
+  published types that do not compile alone with `skipLibCheck` off, and on a public entry's types
+  importing `@folijs/core/internal` (after the review of #122); the compile check found public
+  types using stripped names (`Story`, `EnvelopeKey`, `Check` went to the internal entry, the
+  structure helpers `canJoin`, `canSplit`, `findWrapping`, `liftTarget` stayed public with
+  `Transform`, and `NodeType.createOpen`, used by the view's clipboard, lost its tag). Tested in
+  `scripts/api.test.mjs`. `docs/api.md` marks internal names (the rest is stable) and lists the
+  model, state, transform and option types; contributing documents the reports; the install
+  lines name `@folijs/view`. Shortcuts: the checks read `.d.ts` text with regular expressions and
+  match names, not symbols (two modules exporting one name count once); doc comments are in the
+  reports, so editing one changes them. Review of #122: the model classes' constructors are no
+  longer tagged (stripped, they left an implicit public `new Node()` in the types), and the
+  examples' smoke test expected schema v3 (stale since 11.3). `pnpm examples` run on 2026-11-19:
+  both apps install the tarballs with the exact peers and build, the SSR and DOCX checks pass,
+  15 passed and 3 skipped (the Next.js server-rendering test outside Next) in three engines.)
 - [ ] 12.3 Custom nodes and marks in `@folijs/core`: the schema extension from ADR-0008
   (`createEditor` and `parseDocument` take it), validation, JSON, copy and paste between editors
   with and without the extension (never dropped: opaque when unknown), find and review over them;

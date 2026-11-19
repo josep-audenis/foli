@@ -4,16 +4,22 @@
 import { type SectionJSON, sectionColumns } from "@folijs/core";
 import { PX_PER_TWIP } from "./blocks.js";
 
+/** @internal */
 export const BAND_CLASS = "foli-band";
+/** @internal */
 export const COLUMN_CLASS = "foli-column";
 
-/** A section's columns in CSS px. */
+/**
+ * A section's columns in CSS px.
+ * @internal
+ */
 export interface ColumnsPx {
   widths: number[];
   gaps: number[];
   separator: boolean;
 }
 
+/** @internal */
 export function columnsPx(section: SectionJSON): ColumnsPx {
   const { widths, gaps, separator } = sectionColumns(section);
   return {
@@ -23,11 +29,17 @@ export function columnsPx(section: SectionJSON): ColumnsPx {
   };
 }
 
-/** What identifies a band's look: the same key, the same elements can stay. */
+/**
+ * What identifies a band's look: the same key, the same elements can stay.
+ * @internal
+ */
 export const columnsKey = ({ widths, gaps, separator }: ColumnsPx) =>
   `${widths.join(" ")}|${gaps.join(" ")}|${separator}`;
 
-/** Gives `band` and its `columns` their widths, spaces and the lines between them. */
+/**
+ * Gives `band` and its `columns` their widths, spaces and the lines between them.
+ * @internal
+ */
 export function styleBand(band: HTMLElement, columns: readonly HTMLElement[], c: ColumnsPx): void {
   band.className = BAND_CLASS;
   band.style.display = "flex";
@@ -53,7 +65,10 @@ export function styleBand(band: HTMLElement, columns: readonly HTMLElement[], c:
   });
 }
 
-/** A new band of `c`'s columns. */
+/**
+ * A new band of `c`'s columns.
+ * @internal
+ */
 export function bandElement(
   doc: Document,
   c: ColumnsPx,

@@ -8,8 +8,8 @@ import {
   type NodeJSON,
   replyToComment,
   resolveComment,
-  wordContext,
 } from "@folijs/core";
+import { wordContext } from "@folijs/core/internal";
 import { type FormEvent, type KeyboardEvent, useEffect, useId, useRef, useState } from "react";
 import { useEditorOrContext, useEditorState, useIsomorphicLayoutEffect } from "./editor.js";
 

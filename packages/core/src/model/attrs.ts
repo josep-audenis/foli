@@ -11,9 +11,13 @@ export interface AttributeSpec {
 
 export type AttributeSpecs = Readonly<Record<string, AttributeSpec>>;
 
+/** @internal */
 export const NO_ATTRS: Attrs = Object.freeze({});
 
-/** Fills defaults and validates. Unknown or missing required attributes are errors. */
+/**
+ * Fills defaults and validates. Unknown or missing required attributes are errors.
+ * @internal
+ */
 export function computeAttrs(
   specs: AttributeSpecs | undefined,
   given: Attrs | undefined,
@@ -40,6 +44,7 @@ export function computeAttrs(
 /**
  * The persisted form of `attrs`: only attributes that differ from their default (required ones
  * always). Undefined when none remain, so a paragraph with default alignment has no `attrs`.
+ * @internal
  */
 export function attrsToJSON(
   specs: AttributeSpecs | undefined,
@@ -56,7 +61,10 @@ export function attrsToJSON(
   return json;
 }
 
-/** Structural equality for JSON-like attribute values. */
+/**
+ * Structural equality for JSON-like attribute values.
+ * @internal
+ */
 export function deepEqual(a: unknown, b: unknown): boolean {
   if (a === b) return true;
   if (typeof a !== "object" || typeof b !== "object" || a === null || b === null) return false;

@@ -2,14 +2,23 @@
 
 import type { XmlElement, XmlNode } from "../xml.js";
 
+/** @internal */
 export const W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
-/** Strict Open XML's WordprocessingML namespace (not supported yet: other units and names). */
+/**
+ * Strict Open XML's WordprocessingML namespace (not supported yet: other units and names).
+ * @internal
+ */
 export const W_STRICT = "http://purl.oclc.org/ooxml/wordprocessingml/main";
+/** @internal */
 export const R = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
+/** @internal */
 export const W14 = "http://schemas.microsoft.com/office/word/2010/wordml";
+/** @internal */
 export const W15 = "http://schemas.microsoft.com/office/word/2012/wordml";
+/** @internal */
 export const A = "http://schemas.openxmlformats.org/drawingml/2006/main";
 
+/** @internal */
 export const REL = {
   styles: "http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles",
   numbering: "http://schemas.openxmlformats.org/officeDocument/2006/relationships/numbering",
@@ -24,31 +33,47 @@ export const REL = {
   endnotes: "http://schemas.openxmlformats.org/officeDocument/2006/relationships/endnotes",
 };
 
-/** Whether `node` is the WordprocessingML element `local`. */
+/**
+ * Whether `node` is the WordprocessingML element `local`.
+ * @internal
+ */
 export function isW(node: XmlNode, local?: string): boolean {
   return node.kind === "element" && node.ns === W && (local === undefined || node.local === local);
 }
 
+/** @internal */
 export function elements(element: XmlElement): XmlElement[] {
   return element.children.filter((child): child is XmlElement => child.kind === "element");
 }
 
-/** The first WordprocessingML child named `local`. */
+/**
+ * The first WordprocessingML child named `local`.
+ * @internal
+ */
 export function child(element: XmlElement, local: string): XmlElement | undefined {
   return element.children.find((c): c is XmlElement => c.kind === "element" && isW(c, local));
 }
 
-/** A WordprocessingML attribute (`w:val`) of `element`. */
+/**
+ * A WordprocessingML attribute (`w:val`) of `element`.
+ * @internal
+ */
 export function attr(element: XmlElement | undefined, local: string, ns = W): string | undefined {
   return element?.attributes.find((a) => a.local === local && a.ns === ns)?.value;
 }
 
-/** The text of an element's character data children (`w:t`, `w:delText`, `w:instrText`). */
+/**
+ * The text of an element's character data children (`w:t`, `w:delText`, `w:instrText`).
+ * @internal
+ */
 export function textOf(element: XmlElement): string {
   return element.children.map((c) => (c.kind === "text" ? c.text : "")).join("");
 }
 
-/** Every `w:t` and `w:delText` of an element's descendants, in order (the text it shows). */
+/**
+ * Every `w:t` and `w:delText` of an element's descendants, in order (the text it shows).
+ * @internal
+ */
 export function deepText(element: XmlElement): string {
   let out = "";
   for (const c of element.children) {
@@ -58,7 +83,10 @@ export function deepText(element: XmlElement): string {
   return out;
 }
 
-/** An integer as Word writes it; undefined for anything else (universal measures, decimals). */
+/**
+ * An integer as Word writes it; undefined for anything else (universal measures, decimals).
+ * @internal
+ */
 export function integer(value: string | undefined): number | undefined {
   return value !== undefined && /^-?\d+$/.test(value) ? Number.parseInt(value, 10) : undefined;
 }
@@ -66,6 +94,7 @@ export function integer(value: string | undefined): number | undefined {
 /**
  * An on/off property (ST_OnOff): absent value is on. Undefined for a value that is not one of
  * Word's spellings.
+ * @internal
  */
 export function toggle(element: XmlElement): boolean | undefined {
   const value = attr(element, "val");
@@ -74,7 +103,10 @@ export function toggle(element: XmlElement): boolean | undefined {
   return undefined;
 }
 
-/** `{ key: value }` without the undefined values; undefined when none remain. */
+/**
+ * `{ key: value }` without the undefined values; undefined when none remain.
+ * @internal
+ */
 export function compact<T extends Record<string, unknown>>(object: T): Partial<T> | undefined {
   const out: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(object)) if (value !== undefined) out[key] = value;

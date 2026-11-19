@@ -202,6 +202,7 @@ function patched(source: string, pr: XmlElement, control: ControlJSON, kept: Con
   return out;
 }
 
+/** @internal */
 export class ControlWriter {
   readonly #written = new Set<string>();
   /** Every `w:id` the document's controls hold. */

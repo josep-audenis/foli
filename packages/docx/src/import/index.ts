@@ -23,8 +23,6 @@ import { section } from "./properties.js";
 import { type ImportReport, Recorder } from "./report.js";
 import { canonicalStories, readStories } from "./stories.js";
 
-export { noteIds } from "./stories.js";
-
 export interface DocxImport {
   /** The document in the current schema (v5), validated. */
   readonly document: FoliDocument;
@@ -173,7 +171,10 @@ export function importPackage(pkg: DocxPackage): DocxImport {
   return { document, package: pkg, report: report.report(), trackRevisions };
 }
 
-/** The ids of the controls `content` holds (one read but kept verbatim after all has none). */
+/**
+ * The ids of the controls `content` holds (one read but kept verbatim after all has none).
+ * @internal
+ */
 export function controlsUsed(content: unknown): Set<string> {
   const used = new Set<string>();
   JSON.stringify(content, (key, value) => {
@@ -186,7 +187,10 @@ export function controlsUsed(content: unknown): Set<string> {
   return used;
 }
 
-/** The package's stories and their controls, as a validated document holds them. */
+/**
+ * The package's stories and their controls, as a validated document holds them.
+ * @internal
+ */
 export function packageStories(pkg: DocxPackage): {
   stories: Record<string, StoryJSON>;
   controls: Map<string, ControlJSON>;
