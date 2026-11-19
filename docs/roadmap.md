@@ -9,21 +9,21 @@ leaves `main` green with a working playground.
 **Update this table in the same PR that starts, advances or finishes a phase.** It is the only
 place that says what is in progress; check it before starting work.
 
-| Phase                    | Status                   | Branch             | Notes                                                                                                                     |
-| ------------------------ | ------------------------ | ------------------ | ------------------------------------------------------------------------------------------------------------------------- |
-| 0 Foundation             | ✅ Done                  | —                  |                                                                                                                           |
-| 1 Architecture spike     | ✅ Done (G1 provisional) | —                  | Merged in #1; ADR-0003 accepted provisionally; IME, dead-key and screen-reader checks open                                |
-| 2 Document model         | ✅ Done                  | —                  | Merged in #2                                                                                                              |
-| 3 Transactions & history | ✅ Done                  | —                  | Merged in #4; gate G2 passed                                                                                              |
-| 4 Editor view            | ✅ Done (G3 provisional) | —                  | Merged in #8–#13; manual checks (4.6) deferred, open risks in ADR-0003                                                    |
-| 5 Native pagination      | ✅ Done (G4 provisional) | —                  | Merged in #15–#22; page-break manual checks open, risks in ADR-0003                                                       |
-| 6 React API & 0.1.0      | ✅ Done                  | —                  | Merged in #23–#31; 0.1.0 on npm; manual checks shipped as known risks (ADR-0003)                                          |
-| 7 Rich content           | ✅ Done                  | —                  | Merged in #33–#41; 0.2.0 on npm; list-document benchmark misses accepted (known limit)                                    |
-| 8 Word model & DOCX      | ✅ Done                  | —                  | Merged in #44–#61; 0.3.0 on npm (`@folijs/docx` first released); gate G5 passed                                           |
-| 9 Review                 | ✅ Done                  | —                  | Merged in #63–#72; 0.4.0 on npm                                                                                           |
-| 10 Tables & images       | ✅ Done                  | —                  | Merged in #73–#97 (#90, the landing page, went to main); 0.5.0 on npm; two misses accepted                                |
-| 11 Sections & templates  | ✅ Done                  | —                  | Merged in #100–#118 (#106, #107, #110, #112 and #113, the site, went to main); 0.6.0 on npm; misses accepted              |
-| 12 Ecosystem & 1.0       | In progress              | phase-12/ecosystem | 12.1 to 12.6 done: ADR-0008, API reports, custom nodes and marks, view hooks, commands and keys, toolbar items; 12.7 next |
+| Phase                    | Status                   | Branch             | Notes                                                                                                                                   |
+| ------------------------ | ------------------------ | ------------------ | --------------------------------------------------------------------------------------------------------------------------------------- |
+| 0 Foundation             | ✅ Done                  | —                  |                                                                                                                                         |
+| 1 Architecture spike     | ✅ Done (G1 provisional) | —                  | Merged in #1; ADR-0003 accepted provisionally; IME, dead-key and screen-reader checks open                                              |
+| 2 Document model         | ✅ Done                  | —                  | Merged in #2                                                                                                                            |
+| 3 Transactions & history | ✅ Done                  | —                  | Merged in #4; gate G2 passed                                                                                                            |
+| 4 Editor view            | ✅ Done (G3 provisional) | —                  | Merged in #8–#13; manual checks (4.6) deferred, open risks in ADR-0003                                                                  |
+| 5 Native pagination      | ✅ Done (G4 provisional) | —                  | Merged in #15–#22; page-break manual checks open, risks in ADR-0003                                                                     |
+| 6 React API & 0.1.0      | ✅ Done                  | —                  | Merged in #23–#31; 0.1.0 on npm; manual checks shipped as known risks (ADR-0003)                                                        |
+| 7 Rich content           | ✅ Done                  | —                  | Merged in #33–#41; 0.2.0 on npm; list-document benchmark misses accepted (known limit)                                                  |
+| 8 Word model & DOCX      | ✅ Done                  | —                  | Merged in #44–#61; 0.3.0 on npm (`@folijs/docx` first released); gate G5 passed                                                         |
+| 9 Review                 | ✅ Done                  | —                  | Merged in #63–#72; 0.4.0 on npm                                                                                                         |
+| 10 Tables & images       | ✅ Done                  | —                  | Merged in #73–#97 (#90, the landing page, went to main); 0.5.0 on npm; two misses accepted                                              |
+| 11 Sections & templates  | ✅ Done                  | —                  | Merged in #100–#118 (#106, #107, #110, #112 and #113, the site, went to main); 0.6.0 on npm; misses accepted                            |
+| 12 Ecosystem & 1.0       | In progress              | phase-12/ecosystem | 12.1 to 12.7 done: ADR-0008, API reports, custom nodes and marks, view hooks, commands and keys, toolbar items, `pnpm bench`; 12.8 next |
 
 Status values: `Ready` (dependencies met, nobody on it) · `In progress` · `In review` (PR open) ·
 `✅ Done` (merged, acceptance criteria met) · `Blocked by …`.
@@ -1600,9 +1600,40 @@ Each task is a PR on `phase-12/ecosystem`, the build green after each.
   as menus, and `checked` takes `(state, editor)` like `pressed`; a menu without entries is
   disabled and never opens; inline `items` of the same items reuse the selector; two items with
   one key warn in development; tests for each, and for no dry run by the default toolbar.)
-- [ ] 12.7 Performance tracking: the layout, keystroke, find, `.docx` import and export and PDF
+- [x] 12.7 Performance tracking: the layout, keystroke, find, `.docx` import and export and PDF
   benchmarks with stored baselines per engine and machine, thresholds, a summary that fails on a
   regression, run where ADR-0008 says; `docs/benchmarks.md` rerun for 1.0 with method and hardware.
+  (Done: `pnpm bench` (`scripts/bench.mjs`) builds, runs each benchmark 3 times (`--runs`) and
+  compares each metric's median with `bench/baselines/<machine>.json`: per engine and metric the
+  median, a relative `threshold` and a `floor` in ms (both must be passed: whole-millisecond clocks,
+  a frame of waiting), the hardware and browser versions; prints a table, writes
+  `test-results/bench.json`, exits 1 on a regression; `--update` records (keeping tuned
+  thresholds, merging when `--engines` runs some), no baseline prints the numbers and how to record
+  one. The machine is its platform plus a hash of host name, CPU, cores and memory (`--machine` or
+  `FOLI_BENCH_MACHINE` to name it). Metrics, 51 in all: layout, re-flow and the keystroke handlers'
+  p50 at 100 and 200 sections in Chromium, Firefox and WebKit, paint p95 in Chromium and Firefox
+  (WebKit's software painting swung 2× between runs); the find panel (new
+  `apps/playground/bench/find.bench.ts`, the 11.11 document and queries) in the three engines;
+  `findAll`, `.docx` import and export of the 9 corpus files in Node (built packages); `exportPdf` of
+  them in Chromium. Thresholds from two full runs of the same code: browser medians within ±30%,
+  so paint and handlers ±50% (8 and 1.5 ms floors), layout and re-flow ±40%, find ±50%, `findAll`
+  ±100%, `.docx` and PDF ±40%. Not in `pnpm check`; contributing's release steps run it before each
+  release. The bench config has its own port (5177) and never reuses a server. Tests:
+  `scripts/bench.test.mjs` (9: medians, machine id, options, `BENCH` lines to metrics, WebKit
+  paint left out, comparison with threshold and floor, table, update keeping thresholds). Baseline
+  `win32-54922355` (the owner's i7-13700H laptop, on battery): Chromium at 100 pages layout 242 ms,
+  type handler p50 28 ms, Enter 31 ms, re-flow 280 ms; find panel 16 ms (Chromium) to 118 ms
+  (WebKit); `findAll` ≤ 1 ms; the corpus imports in 167 ms, exports in 188 ms, prints to PDF in
+  1.26 s. Found: a keystroke costs 2.5-4× and the first layout 2.9× what 0.2.0 did on the same
+  machine in the same state (each release's checkout run in one session: about half from Phase 8,
+  the rest from 9-11, none from Phase 12), so the Phase 5 targets are missed; not investigated
+  here. Rust/WASM: no benchmark shows a need (the cost is the view's DOM work and the browsers'
+  layout). Shortcuts: the baseline was recorded on battery, where the same code measured 1.5-1.9×
+  slower an hour later as the charge fell (past every threshold), so it must be recorded again on
+  mains before 12.11 (`pnpm bench --update`); the browser benchmarks run on the dev server as
+  before; the 1-50-section and list documents stay in `pnpm bench:layout` only; model build and
+  block type change stay in core's Vitest bench, untracked. No changeset: no published package
+  changed.)
 - [ ] 12.8 Docs site: `apps/site` gets the docs (getting started, guides, API reference from the
   12.2 reports, limitations, changelog), built from `docs/` so they do not drift, with live
   examples (the editor, a custom node, a plugin) and search if the tool gives it; keyboard-usable

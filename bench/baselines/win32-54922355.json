@@ -1,0 +1,283 @@
+{
+  "machine": "win32-54922355",
+  "recorded": "2026-11-19",
+  "runs": 3,
+  "note": "Recorded on the owner's laptop on battery (Windows Balanced power plan), other sessions using the machine at times. On battery the same code measured up to 1.9x slower an hour later as the charge fell: compare in the same state, or record again on mains power (pnpm bench --update).",
+  "hardware": {
+    "cpu": "13th Gen Intel(R) Core(TM) i7-13700H",
+    "cores": 20,
+    "memoryGB": 16,
+    "os": "Windows_NT 10.0.26200 x64",
+    "node": "v25.3.0",
+    "browsers": {
+      "chromium": "156.0.8078.4",
+      "firefox": "157.0",
+      "webkit": "27.2"
+    }
+  },
+  "metrics": {
+    "node": {
+      "findAll \"th\"": {
+        "median": 0.96,
+        "threshold": 1,
+        "floor": 1
+      },
+      "findAll \"the \"": {
+        "median": 0.92,
+        "threshold": 1,
+        "floor": 1
+      },
+      "findAll \"the la\"": {
+        "median": 0.25,
+        "threshold": 1,
+        "floor": 1
+      },
+      "findAll \"zebra\"": {
+        "median": 0.13,
+        "threshold": 1,
+        "floor": 1
+      },
+      "docx import (corpus)": {
+        "median": 166.64,
+        "threshold": 0.4,
+        "floor": 10
+      },
+      "docx export (corpus)": {
+        "median": 187.83,
+        "threshold": 0.4,
+        "floor": 10
+      }
+    },
+    "chromium": {
+      "pdf (corpus)": {
+        "median": 1262.54,
+        "threshold": 0.4,
+        "floor": 100
+      },
+      "find \"th\"": {
+        "median": 16.2,
+        "threshold": 0.5,
+        "floor": 10
+      },
+      "find \"the \"": {
+        "median": 16.5,
+        "threshold": 0.5,
+        "floor": 10
+      },
+      "find \"the la\"": {
+        "median": 16.5,
+        "threshold": 0.5,
+        "floor": 10
+      },
+      "find \"zebra\"": {
+        "median": 15.6,
+        "threshold": 0.5,
+        "floor": 10
+      },
+      "layout 100": {
+        "median": 241.5,
+        "threshold": 0.4,
+        "floor": 5
+      },
+      "typeHandlerP50 100": {
+        "median": 28.1,
+        "threshold": 0.5,
+        "floor": 1.5
+      },
+      "typePaintP95 100": {
+        "median": 40.4,
+        "threshold": 0.5,
+        "floor": 8
+      },
+      "enterHandlerP50 100": {
+        "median": 30.5,
+        "threshold": 0.5,
+        "floor": 1.5
+      },
+      "enterPaintP95 100": {
+        "median": 78.6,
+        "threshold": 0.5,
+        "floor": 8
+      },
+      "reflow 100": {
+        "median": 280.3,
+        "threshold": 0.4,
+        "floor": 5
+      },
+      "layout 200": {
+        "median": 443.2,
+        "threshold": 0.4,
+        "floor": 5
+      },
+      "typeHandlerP50 200": {
+        "median": 57.4,
+        "threshold": 0.5,
+        "floor": 1.5
+      },
+      "typePaintP95 200": {
+        "median": 83.3,
+        "threshold": 0.5,
+        "floor": 8
+      },
+      "enterHandlerP50 200": {
+        "median": 60.7,
+        "threshold": 0.5,
+        "floor": 1.5
+      },
+      "enterPaintP95 200": {
+        "median": 150.4,
+        "threshold": 0.5,
+        "floor": 8
+      },
+      "reflow 200": {
+        "median": 580.9,
+        "threshold": 0.4,
+        "floor": 5
+      }
+    },
+    "firefox": {
+      "find \"th\"": {
+        "median": 24,
+        "threshold": 0.5,
+        "floor": 10
+      },
+      "find \"the \"": {
+        "median": 22,
+        "threshold": 0.5,
+        "floor": 10
+      },
+      "find \"the la\"": {
+        "median": 13,
+        "threshold": 0.5,
+        "floor": 10
+      },
+      "find \"zebra\"": {
+        "median": 14,
+        "threshold": 0.5,
+        "floor": 10
+      },
+      "layout 100": {
+        "median": 299,
+        "threshold": 0.4,
+        "floor": 5
+      },
+      "typeHandlerP50 100": {
+        "median": 29,
+        "threshold": 0.5,
+        "floor": 1.5
+      },
+      "typePaintP95 100": {
+        "median": 61,
+        "threshold": 0.5,
+        "floor": 8
+      },
+      "enterHandlerP50 100": {
+        "median": 31,
+        "threshold": 0.5,
+        "floor": 1.5
+      },
+      "enterPaintP95 100": {
+        "median": 98,
+        "threshold": 0.5,
+        "floor": 8
+      },
+      "reflow 100": {
+        "median": 322.2,
+        "threshold": 0.4,
+        "floor": 5
+      },
+      "layout 200": {
+        "median": 551,
+        "threshold": 0.4,
+        "floor": 5
+      },
+      "typeHandlerP50 200": {
+        "median": 51,
+        "threshold": 0.5,
+        "floor": 1.5
+      },
+      "typePaintP95 200": {
+        "median": 100,
+        "threshold": 0.5,
+        "floor": 8
+      },
+      "enterHandlerP50 200": {
+        "median": 54,
+        "threshold": 0.5,
+        "floor": 1.5
+      },
+      "enterPaintP95 200": {
+        "median": 173,
+        "threshold": 0.5,
+        "floor": 8
+      },
+      "reflow 200": {
+        "median": 650.6,
+        "threshold": 0.4,
+        "floor": 5
+      }
+    },
+    "webkit": {
+      "find \"th\"": {
+        "median": 85,
+        "threshold": 0.5,
+        "floor": 10
+      },
+      "find \"the \"": {
+        "median": 118,
+        "threshold": 0.5,
+        "floor": 10
+      },
+      "find \"the la\"": {
+        "median": 116,
+        "threshold": 0.5,
+        "floor": 10
+      },
+      "find \"zebra\"": {
+        "median": 113,
+        "threshold": 0.5,
+        "floor": 10
+      },
+      "layout 100": {
+        "median": 563,
+        "threshold": 0.4,
+        "floor": 5
+      },
+      "typeHandlerP50 100": {
+        "median": 58,
+        "threshold": 0.5,
+        "floor": 1.5
+      },
+      "enterHandlerP50 100": {
+        "median": 68,
+        "threshold": 0.5,
+        "floor": 1.5
+      },
+      "reflow 100": {
+        "median": 657,
+        "threshold": 0.4,
+        "floor": 5
+      },
+      "layout 200": {
+        "median": 1299,
+        "threshold": 0.4,
+        "floor": 5
+      },
+      "typeHandlerP50 200": {
+        "median": 101,
+        "threshold": 0.5,
+        "floor": 1.5
+      },
+      "enterHandlerP50 200": {
+        "median": 110,
+        "threshold": 0.5,
+        "floor": 1.5
+      },
+      "reflow 200": {
+        "median": 1398,
+        "threshold": 0.4,
+        "floor": 5
+      }
+    }
+  }
+}

@@ -1,7 +1,8 @@
 /**
  * Pagination benchmarks (Phase 5.7): initial layout, keystroke-to-paint and full re-flow for
  * documents of 1 to 200 pages, in each engine. Not part of `pnpm check` or `pnpm test:e2e`:
- * run with `pnpm bench:layout` and read docs/benchmarks.md for the method.
+ * run with `pnpm bench:layout` (`pnpm bench` runs the 100- and 200-section documents and compares
+ * them with a baseline) and read docs/benchmarks.md for the method.
  */
 import { expect, test } from "@playwright/test";
 import { benchDocument, loadTestFont, routeTestFont } from "../e2e/fixtures.js";
@@ -84,6 +85,7 @@ for (const { sections, lists } of CASES) {
     const paint = (samples: { paintMs: number }[]) => samples.map((sample) => sample.paintMs);
     const handler = (samples: { handlerMs: number }[]) => samples.map((s) => s.handlerMs);
     const result = {
+      bench: "layout",
       browser: browserName,
       sections,
       lists,
