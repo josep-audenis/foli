@@ -47,7 +47,7 @@ export { AddMarkStep, canJoin, canSplit, findWrapping, liftTarget, type Mappable
 export { type AbstractNumberingJSON, type BorderJSON, type CellPropertiesJSON, type CommentJSON, type ContentOptions, type ControlJSON, createDocument, type Extension, type ExtensionNodeSpec, type FoliDocument, type FoliDocumentV3, type FoliDocumentV4, HIGHLIGHT_COLORS, halfPointsToPt, JUSTIFICATIONS, type Justification, type MeasureJSON, migrateToV3, migrateToV4, migrateToV5, mmToTwips, type NotePropertiesJSON, type NumberingInstanceJSON, type NumberingLevelJSON, type ParagraphPropertiesJSON, type ParseOptions, parseContent, parseDocument, ptToTwips, type ResourceJSON, type RowPropertiesJSON, SCHEMA_VERSION, type SectionJSON, type StoryJSON, type StyleJSON, TABLE_CONDITIONS, type TableCondition, type TableConditionJSON, type TablePropertiesJSON, type ThemeJSON, TWIPS_PER_INCH, TWIPS_PER_POINT, twipsToMm, twipsToPt, twipsToPx, type WordSettingsJSON, } from "./v3/index.js";
 
 // internal.d.ts
-export { CommentStep, caretStop, controlSpot, copiedDefinitions, deleteSelectionKeepingTables, documentJSON, EnvelopeStep, type FittedPaste, fitPaste, fitPastedV2, keepTablesApart, noteKindOf, referencesIn, StoryStep, sameSpot, setComments, typedMarks, viewKeys, type WordContext, type WordDefinitions, type WordEnvelope, withEnvelope, wordContext, } from "./state/index.js";
+export { CommentStep, caretStop, controlSpot, copiedDefinitions, deleteSelectionKeepingTables, documentJSON, EnvelopeStep, editorCommand, type FittedPaste, fitPaste, fitPastedV2, keepTablesApart, noteKindOf, referencesIn, StoryStep, sameSpot, setComments, typedMarks, viewKeys, type WordContext, type WordDefinitions, type WordEnvelope, withEnvelope, wordContext, } from "./state/index.js";
 export type { EnvelopeKey, Story } from "./state/word.js";
 export type { Check } from "./v3/check.js";
 export { type CellFormat, type CellPlace, CUSTOM_TYPE, checkControl, checkSection, foreignTextOf, formatNumber, type ListMarker, type ParagraphFormat, Resolver, RUN_PROPERTY_MARKS, type RunFormat, schema, type TableFormat, tableConditions, withForeignText, } from "./v3/index.js";
@@ -1149,6 +1149,11 @@ export interface Editor {
 /** A section's page setup as page settings (mm; the gutter added to the left margin, as Word does). */
 export declare function sectionSettings(section: SectionJSON): DocumentSettings;
 /**
+ * The command `editor.commands[name](...args)` would run, for a dry run (`editor.can`): built-in
+ * or a plugin's; undefined when the editor has no command of that name.
+ */
+export declare function editorCommand(editor: Editor, name: string, args: readonly unknown[]): Command | undefined;
+/**
  * Where the view's own overridable keys run (ADR-0008, `docs/keyboard.md`): a plugin
  * with no keymap placed after the user's plugins and before the built-in ones.
  */
@@ -1466,7 +1471,7 @@ export declare function redoDepth(state: EditorState): number;
 export { arrowAcrossLeaf, baseKeymap, type DeleteUnit, deleteBackward, deleteForward, deleteSelection, deleteSelectionKeepingTables, insertColumnBreak, insertHardBreak, insertPageBreak, insertTab, insertText, isMarkActive, joinBackward, joinForward, selectAll, setBlockType, splitBlock, toggleMark, } from "./commands.js";
 export { addComment, type CommentContent, type CommentOptions, commentAnchors, deleteAllComments, deleteComment, editComment, replyToComment, resolveComment, } from "./comments.js";
 export { addRepeatingItem, type ControlInsertOptions, type ControlPropertiesPatch, type ControlRange, type ControlValue, type ControlValueInput, controlAt, controlIsReadOnly, controlProperties, controlSpot, controlsIn, controlValues, insertControl, insertControlText, setControlProperties, setControlValue, } from "./controls.js";
-export { type BuiltInCommands, createEditor, type DocumentTarget, type Editor, type EditorDocument, type EditorListener, type EditorOptions, type FoliCommands, type FoundMatches, type NavigationRequest, type OpenStory, type StoryView, sectionSettings, viewKeys, } from "./editor.js";
+export { type BuiltInCommands, createEditor, type DocumentTarget, type Editor, type EditorDocument, type EditorListener, type EditorOptions, editorCommand, type FoliCommands, type FoundMatches, type NavigationRequest, type OpenStory, type StoryView, sectionSettings, viewKeys, } from "./editor.js";
 export { caretStop, type Field, type FieldDisplay, fieldAround, fieldCodesShown, fieldDisplay, fieldsIn, sameSpot, toggleFieldCodes, } from "./fields.js";
 export { type CrossReference, type CrossReferenceTargets, crossReferenceTargets, type FieldInstruction, type FieldLayout, type FieldPage, type FieldSkip, type FieldSkipReason, type FieldsReport, formatDatePicture, formatNumericPicture, type InsertFieldOptions, insertCrossReference, insertDate, insertField, insertPageNumber, insertTableOfContents, parseFieldInstruction, type TableOfContentsOptions, type UpdateFieldsOptions, updateFields, } from "./fieldupdate.js";
 export { type FindMatch, type FindOptions, findAll, findInText, nextMatch, type ReplaceRefusal, type ReplaceReport, replace, replaceAll, } from "./find.js";

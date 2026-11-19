@@ -10,6 +10,7 @@ export {
   deleteSelectionKeepingTables,
   documentJSON,
   EnvelopeStep,
+  editorCommand,
   type FittedPaste,
   fitPaste,
   fitPastedV2,

@@ -389,6 +389,58 @@ function makeEditor(parts: EditorParts): Editor {
       }),
     ];
   };
+  // Each named command as a factory, so `editorCommand` can give it for a dry run.
+  const factories = withPluginFactories(parts.plugins, {
+    insertText: (text) => insertText(text),
+    deleteSelection: () => deleteSelection,
+    deleteBackward: (unit) => deleteBackward(unit),
+    deleteForward: (unit) => deleteForward(unit),
+    joinBackward: () => joinBackward,
+    joinForward: () => joinForward,
+    splitBlock: () => splitBlock,
+    insertHardBreak: () => insertHardBreak,
+    insertPageBreak: () => insertPageBreak,
+    toggleMark: (type, attrs) => toggleMark(type, attrs),
+    setBlockType: (type, attrs) => setBlockType(type, attrs),
+    selectAll: () => selectAll,
+    undo: () => undo,
+    redo: () => redo,
+    wrapInList: (kind) => wrapInList(kind),
+    toggleList: (kind) => toggleList(kind),
+    indentListItem: () => sinkListItem,
+    outdentListItem: () => liftListItem,
+    setLink: (href) => setLink(href),
+    removeLink: () => removeLink,
+    setAlign: (align) => setAlign(align),
+    setTextColor: (color) => setTextColor(color),
+    setHighlight: (color) => setHighlight(color),
+    setTrackChanges: (on, name) => setTrackChanges(on, name),
+    setReviewView: (view) => setReviewView(view),
+    acceptChange: () => acceptChange,
+    rejectChange: () => rejectChange,
+    acceptAllChanges: (name) => acceptAllChanges(name),
+    rejectAllChanges: (name) => rejectAllChanges(name),
+    nextChange: () => nextChange,
+    previousChange: () => previousChange,
+    addComment: (content, options) => addComment(content, options),
+    replyToComment: (id, content, options) => replyToComment(id, content, options),
+    editComment: (id, content) => editComment(id, content),
+    resolveComment: (id, done) => resolveComment(id, done),
+    deleteComment: (id) => deleteComment(id),
+    deleteAllComments: () => deleteAllComments,
+    // Across the body and its stories: `state` is the body's; a dry run asks each editor.
+    setControlValue: (target, value) => (_state, dispatch) => {
+      let done = false;
+      for (const { editor } of withStories())
+        if (
+          dispatch
+            ? editor.run(setControlValue(target, value, done))
+            : editor.can(setControlValue(target, value, done))
+        )
+          done = true;
+      return done;
+    },
+  });
   const self: Editor = {
     get settings() {
       return parts.settings();
@@ -412,51 +464,7 @@ function makeEditor(parts: EditorParts): Editor {
       const clamp = (pos: number) => Math.max(0, Math.min(pos, size));
       dispatch(state.tr.setSelection(TextSelection.create(state.doc, clamp(anchor), clamp(head))));
     },
-    commands: withPluginCommands(parts.plugins, run, {
-      insertText: (text) => run(insertText(text)),
-      deleteSelection: () => run(deleteSelection),
-      deleteBackward: (unit) => run(deleteBackward(unit)),
-      deleteForward: (unit) => run(deleteForward(unit)),
-      joinBackward: () => run(joinBackward),
-      joinForward: () => run(joinForward),
-      splitBlock: () => run(splitBlock),
-      insertHardBreak: () => run(insertHardBreak),
-      insertPageBreak: () => run(insertPageBreak),
-      toggleMark: (type, attrs) => run(toggleMark(type, attrs)),
-      setBlockType: (type, attrs) => run(setBlockType(type, attrs)),
-      selectAll: () => run(selectAll),
-      undo: () => run(undo),
-      redo: () => run(redo),
-      wrapInList: (kind) => run(wrapInList(kind)),
-      toggleList: (kind) => run(toggleList(kind)),
-      indentListItem: () => run(sinkListItem),
-      outdentListItem: () => run(liftListItem),
-      setLink: (href) => run(setLink(href)),
-      removeLink: () => run(removeLink),
-      setAlign: (align) => run(setAlign(align)),
-      setTextColor: (color) => run(setTextColor(color)),
-      setHighlight: (color) => run(setHighlight(color)),
-      setTrackChanges: (on, name) => run(setTrackChanges(on, name)),
-      setReviewView: (view) => run(setReviewView(view)),
-      acceptChange: () => run(acceptChange),
-      rejectChange: () => run(rejectChange),
-      acceptAllChanges: (name) => run(acceptAllChanges(name)),
-      rejectAllChanges: (name) => run(rejectAllChanges(name)),
-      nextChange: () => run(nextChange),
-      previousChange: () => run(previousChange),
-      addComment: (content, options) => run(addComment(content, options)),
-      replyToComment: (id, content, options) => run(replyToComment(id, content, options)),
-      editComment: (id, content) => run(editComment(id, content)),
-      resolveComment: (id, done) => run(resolveComment(id, done)),
-      deleteComment: (id) => run(deleteComment(id)),
-      deleteAllComments: () => run(deleteAllComments),
-      setControlValue(target, value) {
-        let done = false;
-        for (const { editor } of withStories())
-          if (editor.run(setControlValue(target, value, done))) done = true;
-        return done;
-      },
-    }),
+    commands: commandsOf(factories, run),
     controlValues: () =>
       withStories().flatMap(({ editor, story }) =>
         controlValues(editor.state).map((value) => (story ? { ...value, story } : value)),
@@ -484,33 +492,61 @@ function makeEditor(parts: EditorParts): Editor {
       parts.views.navigation = handler;
     },
   };
+  commandFactories.set(self, factories);
   return self;
 }
 
+/** The built-in commands as factories of the commands they run. */
+type BuiltInFactories = {
+  [K in keyof BuiltInCommands]: (...args: Parameters<BuiltInCommands[K]>) => Command;
+};
+type Factories = Record<string, (...args: never[]) => Command>;
+
 /**
- * Adds the commands `plugins` name (`PluginSpec.commands`) to the built-in ones, each running on
- * the editor through `run`. A name taken twice, or by a built-in command, throws.
+ * Adds the command factories `plugins` name (`PluginSpec.commands`) to the built-in ones. A name
+ * taken twice, or by a built-in command, throws.
  */
-function withPluginCommands(
-  plugins: readonly Plugin[],
-  run: (command: Command) => boolean,
-  commands: BuiltInCommands,
-): FoliCommands {
+function withPluginFactories(plugins: readonly Plugin[], builtIns: BuiltInFactories): Factories {
+  const factories: Factories = { ...builtIns };
   for (const plugin of plugins)
     for (const [name, factory] of Object.entries(plugin.spec.commands ?? {})) {
-      if (Object.hasOwn(commands, name))
+      if (Object.hasOwn(factories, name))
         throw new RangeError(
           `Command "${name}" is already defined: plugin commands need names of their own`,
         );
       if (typeof factory !== "function")
         throw new TypeError(`Command "${name}" is not a function returning a command`);
       // defineProperty: a name such as "__proto__" is a command, not the object's prototype.
-      Object.defineProperty(commands, name, {
-        value: (...args: never[]) => run(factory(...args)),
-        enumerable: true,
-      });
+      Object.defineProperty(factories, name, { value: factory, enumerable: true });
     }
+  return factories;
+}
+
+/** `editor.commands`: each factory's command run on the editor. */
+function commandsOf(factories: Factories, run: (command: Command) => boolean): FoliCommands {
+  const commands = {};
+  for (const [name, factory] of Object.entries(factories))
+    Object.defineProperty(commands, name, {
+      value: (...args: never[]) => run(factory(...args)),
+      enumerable: true,
+    });
   return commands as FoliCommands;
+}
+
+const commandFactories = new WeakMap<Editor, Factories>();
+
+/**
+ * The command `editor.commands[name](...args)` would run, for a dry run (`editor.can`): built-in
+ * or a plugin's; undefined when the editor has no command of that name.
+ */
+export function editorCommand(
+  editor: Editor,
+  name: string,
+  args: readonly unknown[],
+): Command | undefined {
+  const factories = commandFactories.get(editor);
+  const factory = factories && Object.hasOwn(factories, name) ? factories[name] : undefined;
+  return factory?.(...(args as never[]));
 }
 
 /**

@@ -1,12 +1,15 @@
 import {
+  type Command,
   createEditor,
   type Editor,
   type EditorDocument,
   type EditorState,
   type Extension,
+  type FoliCommands,
   type Plugin,
   type ReviewView,
 } from "@folijs/core";
+import { editorCommand } from "@folijs/core/internal";
 import {
   createContext,
   type ReactNode,
@@ -34,11 +37,15 @@ export interface UseFoliEditorOptions {
    * load another document, `editor.setDocument()`.
    */
   initialContent?: EditorDocument | undefined;
-  /** Read once, when the editor is created. */
+  /**
+   * Read once, when the editor is created. A different list later (other plugins, not a new
+   * array of the same ones) is ignored, with a warning unless `process.env.NODE_ENV` is
+   * `"production"` at run time: give the component a new `key` to make a new editor with it.
+   */
   plugins?: readonly Plugin[] | undefined;
   /**
    * Read once: custom nodes and marks, their plugins and view hooks (`ViewExtension` from
-   * `@folijs/view`), as `createEditor`'s `extensions`.
+   * `@folijs/view`), as `createEditor`'s `extensions`. Changed later: as `plugins`.
    */
   extensions?: readonly Extension[] | undefined;
   /** Read once: who edits (tracked changes are made in this name; `createEditor`'s `author`). */
@@ -73,8 +80,38 @@ export function useFoliEditor(options: UseFoliEditorOptions = {}): Editor {
       ...(reviewView !== undefined && { reviewView }),
     });
   });
+  // ADR-0008: the editor takes its plugins and extensions once; say so when an app changes them.
+  const first = useRef(options);
+  const warned = useRef(false);
+  useEffect(() => {
+    if (warned.current || !development()) return;
+    const changed = (["plugins", "extensions"] as const).find(
+      (name) => !sameItems(first.current[name], options[name]),
+    );
+    if (!changed) return;
+    warned.current = true;
+    console.warn(
+      `Foli: \`${changed}\` changed after the editor was created and is ignored. Give the component a new \`key\` to create an editor with the new list.`,
+    );
+  });
   return editor;
 }
+
+/**
+ * Dev-only checks run unless `process.env.NODE_ENV` is "production" at run time: read through
+ * `globalThis`, so a bundle that defines no `process` runs them too.
+ * @internal
+ */
+export const development = () =>
+  (globalThis as { process?: { env?: { NODE_ENV?: string } } }).process?.env?.NODE_ENV !==
+  "production";
+
+/**
+ * The same elements (an inline array of the same plugins is not a change).
+ * @internal
+ */
+export const sameItems = (a: readonly unknown[] = [], b: readonly unknown[] = []) =>
+  a.length === b.length && a.every((item, i) => item === b[i]);
 
 const EditorContext = createContext<Editor | null>(null);
 
@@ -152,4 +189,69 @@ export function useEditorState<T>(
     return kept;
   };
   return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
+}
+
+/** What `useCommand` gives: whether the command applies now, and a way to run it. */
+export interface CommandState {
+  /** A dry run (`editor.can`), again after every transaction. */
+  readonly enabled: boolean;
+  /** Runs the command on the editor; whether it applied. */
+  run(): boolean;
+}
+
+export interface UseCommandOptions {
+  /** Default: the context's editor. */
+  editor?: Editor | undefined;
+}
+
+/**
+ * A command's state for a button of the app's own: `enabled` re-renders the component when a dry
+ * run's answer changes, `run` runs it, e.g. `useCommand(toggleMark("bold"))`. Both act on the
+ * editor of the header, footer or note open on its page, else on `editor` (default: the
+ * context's), as the toolbar's items do. The dry run runs after every transaction (and on a
+ * render with another command: keep the command's identity, e.g. made outside the component).
+ */
+export function useCommand(command: Command, options?: UseCommandOptions): CommandState;
+/**
+ * A named command of `editor.commands` (built-in, or a plugin's `PluginSpec.commands`), typed by
+ * `FoliCommands`, on the context's editor (or the story open on its page):
+ * `useCommand("toggleMark", "bold")`, `useCommand("insertMention", "u-1", "Ada")`. Throws when
+ * the editor has no command of that name.
+ */
+export function useCommand<K extends keyof FoliCommands>(
+  name: K,
+  ...args: Parameters<FoliCommands[K]>
+): CommandState;
+export function useCommand(target: Command | string, ...rest: unknown[]): CommandState {
+  const named = typeof target === "string";
+  const editor = useActiveEditor(
+    useEditorOrContext(
+      named ? undefined : (rest[0] as UseCommandOptions | undefined)?.editor,
+      "useCommand",
+    ),
+  );
+  const args = named ? rest : [];
+  // One command and selector per editor, target and arguments: useEditorState keeps its answer.
+  const memo = useRef<{
+    editor: Editor;
+    target: Command | string;
+    args: readonly unknown[];
+    command: Command;
+    selector: (state: EditorState, editor: Editor) => boolean;
+  } | null>(null);
+  let current = memo.current;
+  if (
+    !current ||
+    current.editor !== editor ||
+    current.target !== target ||
+    !sameItems(current.args, args)
+  ) {
+    const command = typeof target === "string" ? editorCommand(editor, target, args) : target;
+    if (!command) throw new RangeError(`useCommand: the editor has no command named "${target}"`);
+    current = { editor, target, args, command, selector: (_state, e) => e.can(command) };
+    memo.current = current;
+  }
+  const { command, selector } = current;
+  const enabled = useEditorState(selector, { editor });
+  return { enabled, run: () => editor.run(command) };
 }
