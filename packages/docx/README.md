@@ -124,7 +124,9 @@ included). Within the parts it writes:
 - Headers, footers, footnotes and endnotes are the document's `stories`. An unchanged one keeps
   its part (or, for a note, its element) byte for byte; a changed one is written from the model;
   a new one gets its part, relationship and content type. A note whose story is gone is removed
-  from its part. A document without `stories` leaves those parts as they are.
+  from its part. A document without `stories` leaves those parts as they are. Notes inserted,
+  deleted, tracked, converted or given new options in the editor are written as Word writes them,
+  and Word reads them back (`scripts/corpus/story-roundtrip.mjs`).
 - Tables are written from the model: each properties element as paragraphs' are (verbatim
   while unchanged, else child by child), the grid as read while its widths are, rows and cells
   in order; Word reads every corpus table back with Foli's text, unchanged and edited

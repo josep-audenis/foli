@@ -175,6 +175,13 @@ tracking), typed into, filled and emptied, with changed properties and with a co
 new document with every kind inserted and a repeating section grown; a tracked fill rejected. Word opens all 9 and finds
 every control as Foli holds it, ids unique (2026-11-18, Word 16.0.20527).
 
+`scripts/corpus/find-roundtrip.mjs` (11.11, with `find-word.ps1`, which reads every story as it
+stands, accepted and rejected, and the bookmarks) replaces a word over the body and every story of
+05, 09 and a new document with a header, a footer and both kinds of note, untracked and tracked, and
+adds, renames, moves and deletes bookmarks. Word opens all 9, finds the new text where Foli put it,
+records the changes in every story, and accepting and rejecting give the new and the old text; the
+bookmarks hold the text Foli says (2026-11-19, Word 16.0.20527).
+
 `scripts/corpus/section-roundtrip.mjs` (11.6) has Word read Foli's sections back: 08 exported
 unchanged (Word's own pages and sections), edited through the editor's commands (a continuous
 break, three columns in one section, a line between columns in the last), the same edits while
@@ -301,6 +308,28 @@ for its footnotes and 07 for its pictures' ink.
 | 08       |      0.989 |      1.000 |                     1.000 |
 | 09       |      0.387 |      0.391 |                     0.388 |
 | **All**  |  **0.768** |  **0.811** |                 **0.816** |
+
+After 11.10 (2026-11-18, the same setup): footnotes and endnotes are on the pages, drawn from their
+stories under their separators. All 158 paragraphs outside tables are on Word's page (150 before),
+142 on Word's line (134). 09 goes from 2 pages to Word's 3, its long footnote continuing where
+Word's does. 04's notes are where Word's are; what it still loses is its table of contents' tab
+leaders and its chart's ink. No document is lower.
+
+| Document | After 11.7 | After 11.10 | Inside the margins, after |
+| -------- | ---------: | ----------: | ------------------------: |
+| 01       |      0.994 |       0.994 |                     0.994 |
+| 02       |      0.858 |       0.858 |                     0.861 |
+| 03       |      0.830 |       0.830 |                     1.000 |
+| 04       |      0.821 |       0.832 |                     0.822 |
+| 05       |      0.968 |       0.968 |                     0.968 |
+| 06       |      0.942 |       0.942 |                     0.942 |
+| 07       |      0.394 |       0.394 |                     0.394 |
+| 08       |      1.000 |       1.000 |                     1.000 |
+| 09       |      0.391 |       0.999 |                     0.999 |
+| **All**  |  **0.811** |   **0.889** |                 **0.894** |
+
+`scripts/corpus/story-roundtrip.mjs` (with `note-word.ps1`) has Word read notes inserted, deleted,
+tracked, rejected, converted and renumbered: all 24 files pass.
 
 ## Pages against Word's PDF
 

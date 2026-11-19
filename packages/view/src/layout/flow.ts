@@ -42,6 +42,33 @@ export interface BlockBox {
   sectionMark?: boolean;
   /** Its height and lines in column `column` of its section, when the columns' widths differ. */
   inColumn?: ((column: number) => Pick<BlockBox, "height" | "lines">) | undefined;
+  /** The footnotes referred to, with the line (of `column`'s lines) holding each reference. */
+  notes?: ((column: number) => readonly { line: number; note: FlowNote }[]) | undefined;
+  /** What follows this block in the text: the endnotes ending its section or the document. */
+  endnotes?: readonly FlowNote[] | undefined;
+}
+
+/** A note, or a separator, as the flow sees it: lines, split between pages like a block's. */
+export interface FlowNote {
+  /** Its story. */
+  id: string;
+  /** The bottom of each of its lines from its top, in column `column`'s width. */
+  lines(column: number): readonly number[];
+}
+
+/** Lines `[fromLine, toLine)` of a note on a page, at the foot or (`end`) after the text. */
+export interface NotePiece {
+  id: string;
+  page: number;
+  band?: number;
+  column?: number;
+  fromLine: number;
+  toLine: number;
+  /** An endnote, in the text's flow: the space above it when it starts there. */
+  end?: boolean;
+  lead?: number;
+  /** On a page after the last block's, for what was still to come. */
+  tail?: boolean;
 }
 
 /** What a page's layout depends on: first page, odd or even, by displayed number. */
@@ -98,6 +125,8 @@ export interface Fragment {
   lead?: number;
   /** A `sectionMark` block given no room. */
   mark?: boolean;
+  /** The notes this fragment brought onto their pages: those it refers to, what was carried. */
+  notes?: NotePiece[];
 }
 
 export interface FlowRules {
@@ -120,6 +149,8 @@ export interface FlowRules {
   addSpacing?: boolean;
   /** The document has even and odd headers: a section restarting its numbers still keeps sides. */
   evenAndOddHeaders?: boolean;
+  /** What goes above footnotes: on a page they start on, and on one they continue on. */
+  notes?: { separator: FlowNote; continuation: FlowNote } | undefined;
 }
 
 export const DEFAULT_RULES: FlowRules = { orphans: 2, widows: 2 };
@@ -160,6 +191,16 @@ export interface FlowState {
   forcedPage: boolean;
   /** On a page shared by sections: the first of them, which gives the page its box. */
   owner: { section: FlowSection; first: boolean } | null;
+  /** The height footnotes take at the foot of the band, their separator included. */
+  notes: number;
+  /** The height of each of those notes. */
+  noteParts: readonly number[];
+  /** What the notes of the page's earlier bands take. */
+  pageNotes: number;
+  /** Footnotes still to be placed, from the line each has got to. */
+  carry: readonly { note: FlowNote; from: number }[];
+  /** Room kept at the foot of a band (by page and band) for notes its later columns refer to. */
+  reserves: Readonly<Record<string, number>>;
 }
 
 /**
@@ -181,6 +222,15 @@ export interface FlowState {
  *   same page opens a band below the last; each band has its section's columns. A band of a
  *   `balanced` section ends with its columns level: its last page's columns take the shortest
  *   height that holds them.
+ *
+ * - Footnotes (ADR-0007, on Word's PDFs): a line with a reference goes on a page only if it, the
+ *   separator and the note's first line fit. The note then takes the room down to the text, up to
+ *   all of it, so a long one fills the page; the rest is carried to the foot of the next page,
+ *   under the continuation separator, before any text is placed there but leaving room for the
+ *   next line. Lines a widow, orphan or keep rule takes back take their notes with them. In a
+ *   section with columns the notes are set in those columns across the foot of the band, whichever
+ *   column refers to them, and every column's text ends above them.
+ * - Endnotes (`BlockBox.endnotes`) follow their block in the text, over as many pages as they need.
  *
  * Spacing follows CSS inside a padded page: the first block keeps its top margin, adjacent
  * margins collapse to the larger, and the last block's bottom margin stays inside the page
@@ -265,6 +315,11 @@ export function flowFrom(
           columnPending: false,
           forcedPage: true,
           owner: null,
+          notes: 0,
+          noteParts: [],
+          pageNotes: 0,
+          carry: [],
+          reserves: {},
         }
   ) as FlowState;
   /** Blocks that start a column because the keep-with-next rule moved them. */
@@ -272,6 +327,12 @@ export function flowFrom(
   const word = rules.spacing === "word";
   /** While a section is balanced: the page whose columns are limited, and to what height. */
   let balancing: { page: number; height: number } | null = null;
+  /** Note pieces placed and not yet held by a fragment. */
+  let pending: NotePiece[] = [];
+  /** Asked for by a later column: the band is flowed again with this kept at its foot. */
+  let retry: { key: string; height: number } | null = null;
+  const bandKey = () => `${state.page}|${state.band}`;
+  const reserved = () => state.reserves[bandKey()] ?? 0;
 
   const newPage = (forced = false) => {
     state.page++;
@@ -285,6 +346,14 @@ export function flowFrom(
     state.onPage = 0;
     state.forcedPage = forced;
     state.owner = null;
+    state.notes = 0;
+    state.noteParts = [];
+    state.pageNotes = 0;
+    // What was kept on earlier pages is done with.
+    if (Object.keys(state.reserves).length)
+      state.reserves = Object.fromEntries(
+        Object.entries(state.reserves).filter(([key]) => Number.parseInt(key, 10) >= state.page),
+      );
   };
   /** The next column of the band, or the next page after its last. */
   const nextColumn = (box: BlockBox, forced = false) => {
@@ -300,7 +369,9 @@ export function flowFrom(
     state.forcedPage = forced;
   };
   /** The height a block may reach in the column, from the band's top. */
-  const room = (box: BlockBox) => {
+  const room = (box: BlockBox) => pageRoom(box) - Math.max(state.notes, reserved());
+  /** The height a block may reach in the column, whatever notes take. */
+  const pageRoom = (box: BlockBox) => {
     const section = state.owner?.section ?? box.section;
     const page =
       (section
@@ -309,8 +380,95 @@ export function flowFrom(
             number: state.number,
             first: state.owner?.first ?? state.page === state.sectionPage,
           }).height
-        : (box.pageHeight ?? flowHeight)) - state.bandTop;
+        : (box.pageHeight ?? flowHeight)) -
+      state.bandTop -
+      state.pageNotes;
     return balancing?.page === state.page ? Math.min(page, balancing.height) : page;
+  };
+  const piece = (note: FlowNote, fromLine: number, toLine: number): NotePiece => ({
+    id: note.id,
+    page: state.page,
+    ...(state.band ? { band: state.band } : {}),
+    ...(state.column ? { column: state.column } : {}),
+    fromLine,
+    toLine,
+  });
+  /** A piece of the notes at a band's foot: they are the band's, not one column's. */
+  const footPiece = (note: FlowNote, fromLine: number, toLine: number): NotePiece => ({
+    id: note.id,
+    page: state.page,
+    ...(state.band ? { band: state.band } : {}),
+    fromLine,
+    toLine,
+  });
+  /** How much of an endnote, from line `from`, fits in `free`. */
+  const linesIn = (note: FlowNote, from: number, free: number) => {
+    const lines = note.lines(state.column);
+    const top = from ? (lines[from - 1] as number) : 0;
+    let to = from;
+    while (to < lines.length && (lines[to] as number) - top <= free + SLACK) to++;
+    return { to, height: to > from ? (lines[to - 1] as number) - top : 0, all: lines.length };
+  };
+  /** How much of a footnote fits in `free` beside the notes `parts` of the band's foot. */
+  const fitNote = (
+    note: FlowNote,
+    from: number,
+    free: number,
+    parts: readonly number[],
+    columns: number,
+  ) => {
+    const lines = note.lines(0);
+    const top = from ? (lines[from - 1] as number) : 0;
+    const beside = columns > 1 ? 0 : notesHeight(parts, 1);
+    const height = (to: number) => (lines[to] as number) - top;
+    let to = from;
+    while (
+      to < lines.length &&
+      (columns > 1 ? notesHeight([...parts, height(to)], columns) : beside + height(to)) <=
+        free + SLACK
+    )
+      to++;
+    return { to, height: to > from ? height(to - 1) : 0, all: lines.length };
+  };
+  const noteHeight = (note: FlowNote) => note.lines(0).at(-1) ?? 0;
+  const separatorPiece = (note: FlowNote) => footPiece(note, 0, note.lines(0).length);
+  /**
+   * On a page or band with no notes yet: what is carried over goes to its foot first, leaving
+   * `reserve` for text. `force`: a page with nothing else on it takes at least a line.
+   */
+  const placeCarried = (box: BlockBox, reserve: number, force = false) => {
+    if (!state.carry.length || state.notes || state.onPage || !rules.notes) return;
+    const { continuation } = rules.notes;
+    const columns = box.section?.columns ?? 1;
+    const above = noteHeight(continuation);
+    const free = pageRoom(box) - state.used - reserve - above;
+    const placed: NotePiece[] = [];
+    const left: FlowState["carry"][number][] = [];
+    let parts: readonly number[] = [];
+    for (const item of state.carry) {
+      if (left.length) {
+        left.push(item);
+        continue;
+      }
+      let fit = fitNote(item.note, item.from, free, parts, columns);
+      if (fit.to === item.from && force && !placed.length)
+        fit = fitNote(item.note, item.from, lineHeightOf(item), parts, 1);
+      if (fit.to > item.from) {
+        placed.push(footPiece(item.note, item.from, fit.to));
+        parts = [...parts, fit.height];
+      }
+      if (fit.to < fit.all) left.push({ note: item.note, from: fit.to });
+    }
+    if (!placed.length) return;
+    pending.push(separatorPiece(continuation), ...placed);
+    state.notes = above + notesHeight(parts, columns);
+    state.noteParts = parts;
+    state.carry = left;
+  };
+  /** The height of the next line of a carried note. */
+  const lineHeightOf = ({ note, from }: FlowState["carry"][number]) => {
+    const lines = note.lines(0);
+    return (lines[from] as number) - (from ? (lines[from - 1] as number) : 0);
   };
   /** Whether what does not fit here can go elsewhere: not from an empty last column at the top. */
   const canMove = (box: BlockBox) =>
@@ -337,6 +495,9 @@ export function flowFrom(
       state.onPage = 0;
       state.forcedPage = true;
       state.sectionPage = state.page;
+      state.pageNotes += state.notes;
+      state.notes = 0;
+      state.noteParts = [];
       return lead;
     }
     if (
@@ -367,6 +528,48 @@ export function flowFrom(
   };
 
   const place = (box: BlockBox, index: number): Fragment[] => {
+    const fragments = placeBlock(box, index);
+    if (box.endnotes?.length) placeEndnotes(box, fragments);
+    return fragments;
+  };
+
+  /** A block's endnotes, after it in the text; lines that do not fit go on to the next column. */
+  const placeEndnotes = (box: BlockBox, fragments: Fragment[]) => {
+    let lead: number | undefined = state.onPage ? state.previousMargin : 0;
+    for (const note of box.endnotes ?? []) {
+      let from = 0;
+      for (;;) {
+        const lines = note.lines(state.column);
+        if (from >= lines.length) break;
+        const top = from ? (lines[from - 1] as number) : 0;
+        placeCarried(box, (lines[from] as number) - top);
+        const gap = state.onPage ? (lead ?? 0) : 0;
+        let fit = linesIn(note, from, room(box) - state.used - gap);
+        if (fit.to === from) {
+          if (canMove(box)) {
+            nextColumn(box);
+            continue;
+          }
+          fit = { ...fit, to: from + 1, height: (lines[from] as number) - top };
+        }
+        const part = piece(note, from, fit.to);
+        part.end = true;
+        if (gap) part.lead = gap;
+        pending.push(part);
+        lead = undefined;
+        state.used += gap + fit.height;
+        state.onPage++;
+        from = fit.to;
+        if (from < lines.length) nextColumn(box);
+      }
+    }
+    state.previousMargin = 0;
+    const last = fragments[fragments.length - 1];
+    if (last && pending.length) last.notes = [...(last.notes ?? []), ...pending];
+    if (last) pending = [];
+  };
+
+  const placeBlock = (box: BlockBox, index: number): Fragment[] => {
     const previous = boxes[index - 1];
     let lead: number | undefined;
     if (index > 0 && box.section && previous?.section !== box.section)
@@ -384,6 +587,10 @@ export function flowFrom(
       // Moved on to the next page, the block opens no band below anything.
       if (lead !== undefined && state.page === leadPage) fragment.lead = lead;
       lead = undefined;
+      if (pending.length) {
+        fragment.notes = pending;
+        pending = [];
+      }
       return fragment;
     };
     if (box.sectionMark && state.onPage) {
@@ -406,7 +613,21 @@ export function flowFrom(
     const columnBreaks = box.columnBreaksAfter?.(state.column) ?? [];
     const forced = pageBreaks.length + columnBreaks.length > 0;
     let measured: Pick<BlockBox, "height" | "lines"> = box.inColumn?.(state.column) ?? box;
-    if (!forced && state.used + gap() + measured.height + below <= room(box) + SLACK) {
+    /** The notes referred to on each line, in the column it is in now. */
+    const referred = () => {
+      const byLine = new Map<number, FlowNote[]>();
+      for (const { line, note } of box.notes?.(state.column) ?? [])
+        byLine.set(line, [...(byLine.get(line) ?? []), note]);
+      return byLine;
+    };
+    let notesOf = referred();
+    if (state.carry.length && !state.onPage)
+      placeCarried(box, gap() + ((measured.lines()[0] as number | undefined) ?? measured.height));
+    if (
+      !forced &&
+      !notesOf.size &&
+      state.used + gap() + measured.height + below <= room(box) + SLACK
+    ) {
       const space = gap();
       gaps[index] = space;
       state.used += space + measured.height;
@@ -460,11 +681,75 @@ export function flowFrom(
       const top = line ? (lines[line - 1] as number) : 0;
       // Only the block's first fragment has the gap above it; the others repeat its header.
       const spacing = line === 0 ? gap() : (box.repeat ?? 0);
-      const available = room(box);
+      notesOf = referred();
+      placeCarried(box, spacing + (lines[line] as number) - top);
+      const limit = pageRoom(box);
+      /**
+       * The footnotes of lines `line` to `to - 1` at the band's foot, each taking the room down
+       * to the text after its line; null when one's first line does not fit (`force`: it goes in).
+       * With columns the notes share the foot of them all: above them goes the tallest column.
+       */
+      const planNotes = (to: number, force = false) => {
+        const plan = {
+          notes: state.notes,
+          parts: state.noteParts,
+          carry: state.carry,
+          pieces: [] as NotePiece[],
+        };
+        if (!notesOf.size || !rules.notes) return plan;
+        const columns = box.section?.columns ?? 1;
+        for (let at = line; at < to; at++)
+          for (const note of notesOf.get(at) ?? []) {
+            // Behind a note already cut, it waits its turn.
+            if (plan.carry.length) {
+              plan.carry = [...plan.carry, { note, from: 0 }];
+              continue;
+            }
+            const { separator } = rules.notes;
+            const first = !plan.notes;
+            const above = first
+              ? noteHeight(separator)
+              : plan.notes - notesHeight(plan.parts, columns);
+            // The paragraph's space after stays between its last line and the notes (Word's PDF).
+            const after = at + 1 === count ? box.marginBottom : 0;
+            const own = state.used + spacing + (lines[at] as number) - top + after;
+            const text = Math.max(own, columns > 1 && state.column ? state.bandBottom : 0);
+            let fit = fitNote(note, 0, limit - text - above, plan.parts, columns);
+            if (
+              columns > 1 &&
+              state.column &&
+              !force &&
+              (!fit.to || (fit.to < fit.all && text > own))
+            ) {
+              // A later column's note, cut short by what the earlier columns hold: in Word they
+              // end above it. They are flowed again with its room kept, whole if the page can.
+              const lines = note.lines(0);
+              const whole = above + notesHeight([...plan.parts, lines.at(-1) as number], columns);
+              const one = above + notesHeight([...plan.parts, lines[0] as number], columns);
+              const height = whole < limit / 2 ? whole : one;
+              if (height > reserved() + SLACK && height < limit) retry = { key: bandKey(), height };
+            }
+            if (!fit.to) {
+              if (!force) return null;
+              fit = fitNote(note, 0, lineHeightOf({ note, from: 0 }), [], 1);
+            }
+            if (first) plan.pieces.push(separatorPiece(separator));
+            plan.pieces.push(footPiece(note, 0, fit.to));
+            plan.parts = [...plan.parts, fit.height];
+            plan.notes = above + notesHeight(plan.parts, columns);
+            if (fit.to < fit.all) plan.carry = [{ note, from: fit.to }];
+          }
+        return plan;
+      };
       let end = line;
       while (end < segmentEnd) {
         const bottom = (lines[end] as number) - top + (end + 1 === count ? below : 0);
-        if (state.used + spacing + bottom > available + SLACK) break;
+        const plan = planNotes(end + 1);
+        if (
+          !plan ||
+          state.used + spacing + bottom + Math.max(plan.notes, reserved()) > limit + SLACK
+        )
+          break;
         end++;
       }
       if (end < segmentEnd && end > line && !box.anyLine) {
@@ -480,6 +765,14 @@ export function flowFrom(
           continue;
         }
         end = line + 1; // a line taller than a page is placed anyway
+      }
+      // What the lines kept refer to: lines taken back take their notes with them.
+      const kept = planNotes(end, true);
+      if (kept) {
+        state.notes = kept.notes;
+        state.noteParts = kept.parts;
+        state.carry = kept.carry;
+        pending.push(...kept.pieces);
       }
       if (line === 0) gaps[index] = spacing;
       fragments.push(at(line, end));
@@ -553,6 +846,28 @@ export function flowFrom(
       }
       snapshots[index] = { ...state };
       const fragments = place(boxes[index] as BlockBox, index);
+      if (retry) {
+        const { key, height } = retry;
+        retry = null;
+        const [page, band] = key.split("|").map(Number) as [number, number];
+        // Back to the first block on that band: it may have started on an earlier page.
+        let first = index;
+        while (
+          first > from &&
+          result[first - 1]?.some((f) => f.page === page && (f.band ?? 0) === band)
+        )
+          first--;
+        const before = snapshots[first] as FlowState;
+        state = { ...before, reserves: { ...before.reserves, [key]: height } };
+        result.length = first;
+        snapshots.length = first;
+        gaps.length = first;
+        attempts.clear();
+        for (const moved of breakBefore) if (moved >= first) breakBefore.delete(moved);
+        pending = [];
+        index = first;
+        continue;
+      }
       result[index] = fragments;
       const previous = result[index - 1];
       const startsLater =
@@ -645,8 +960,30 @@ export function flowFrom(
     balancing = null;
   };
 
+  /** What is still carried after the last block goes on pages of its own. */
+  const finishNotes = () => {
+    const held = result[result.length - 1];
+    const last = held?.[held.length - 1];
+    const box = boxes[boxes.length - 1];
+    if (!held || !last || !box || (!state.carry.length && !last.notes?.some((p) => p.tail))) return;
+    const end = state;
+    state = { ...state };
+    while (state.carry.length) {
+      newPage();
+      placeCarried(box, 0, true);
+    }
+    const notes = [
+      ...(last.notes ?? []).filter((p) => !p.tail),
+      ...pending.map((p) => ({ ...p, tail: true })),
+    ];
+    pending = [];
+    state = end;
+    result[result.length - 1] = [...held.slice(0, -1), { ...last, notes }];
+  };
+
   const reused = run(start, boxes.length);
   if (reused) return reused;
+  finishNotes();
   return {
     fragments: result,
     states: [...snapshots.slice(0, boxes.length), { ...state }],
@@ -668,7 +1005,8 @@ export function pagesOf(boxes: readonly BlockBox[], result: FlowResult): PageFac
     const after = result.states[i + 1] as FlowState;
     const own = onPages.get(section) ?? new Set<number>();
     onPages.set(section, own);
-    for (const { page } of fragments) {
+    const places = [...fragments, ...fragments.flatMap((fragment) => fragment.notes ?? [])];
+    for (const { page } of places) {
       own.add(page);
       if (!pages[page]) {
         owners[page] = section;
@@ -694,8 +1032,82 @@ export function pagesOf(boxes: readonly BlockBox[], result: FlowResult): PageFac
   return pages as PageFacts[];
 }
 
+/**
+ * Notes of heights `parts` set in `columns` columns, as Word sets those of a section with columns
+ * (its PDFs): whole, in order, each column as full as the height the set needs. That height and
+ * the column of each. One column: their sum.
+ */
+export function arrangeNotes(
+  parts: readonly number[],
+  columns: number,
+): { height: number; columnOf: number[] } {
+  const total = parts.reduce((sum, part) => sum + part, 0);
+  if (columns <= 1 || parts.length <= 1) return { height: total, columnOf: parts.map(() => 0) };
+  const pack = (height: number) => {
+    const columnOf: number[] = [];
+    let column = 0;
+    let used = 0;
+    let tallest = 0;
+    for (const part of parts) {
+      if (used && used + part > height + 0.01) {
+        column++;
+        used = 0;
+      }
+      used += part;
+      tallest = Math.max(tallest, used);
+      columnOf.push(column);
+    }
+    return column < columns ? { height: tallest, columnOf } : null;
+  };
+  let low = Math.max(...parts, total / columns);
+  let best = pack(low);
+  if (best) return best;
+  let high = total;
+  best = pack(high) as NonNullable<ReturnType<typeof pack>>;
+  while (high - low > 0.25) {
+    const middle = (low + high) / 2;
+    const tried = pack(middle);
+    if (tried) {
+      best = tried;
+      high = middle;
+    } else low = middle;
+  }
+  return best;
+}
+
+const notesHeight = (parts: readonly number[], columns: number) =>
+  arrangeNotes(parts, columns).height;
+
+/** The space after the last block of a column of a page, as flowed (what ends its text). */
+export function spaceAfterText(
+  boxes: readonly BlockBox[],
+  result: Pick<FlowResult, "fragments">,
+  page: number,
+  band: number,
+  column: number,
+): number {
+  for (let i = result.fragments.length - 1; i >= 0; i--)
+    for (const f of result.fragments[i] ?? [])
+      if (f.page === page && (f.band ?? 0) === band && (f.column ?? 0) === column)
+        return boxes[i]?.marginBottom ?? 0;
+  return 0;
+}
+
+/** Every note piece of a flow, in order. */
+export const notePieces = (result: Pick<FlowResult, "fragments">): NotePiece[] =>
+  result.fragments.flatMap((fragments) => fragments.flatMap((f) => f.notes ?? []));
+
 function sameState(a: FlowState, b: FlowState): boolean {
   return (
+    a.notes === b.notes &&
+    JSON.stringify(a.reserves) === JSON.stringify(b.reserves) &&
+    a.noteParts.length === b.noteParts.length &&
+    a.noteParts.every((part, i) => part === b.noteParts[i]) &&
+    a.pageNotes === b.pageNotes &&
+    a.carry.length === b.carry.length &&
+    a.carry.every(
+      (item, i) => item.note.id === b.carry[i]?.note.id && item.from === b.carry[i]?.from,
+    ) &&
     a.page === b.page &&
     a.number === b.number &&
     a.sectionPage === b.sectionPage &&

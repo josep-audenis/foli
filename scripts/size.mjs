@@ -91,12 +91,22 @@ writeFileSync(appEntry, `export { FoliEditor } from "${dist("react")}";\n`);
  * lists and date picker in the view, the controls menu and properties dialog. Core raised again
  * in 11.9's review (77.3 kB, 79.6 allowed): rich values checked, dates read from their text, what
  * tracked deletions and reviews do to a control.
+ * Core raised in 11.10 (80.2 kB, 82.0 allowed): notes (numbers from the settings and sections, the
+ * insert, options and convert commands, keeping a note with its reference while tracking, notes
+ * carried on the clipboard). View and React raised in 11.10 (103.8 and 139.9 kB, 105.5 and 141.6
+ * allowed): footnotes and endnotes in the flow and both renderers, a note edited in place, the
+ * notes menu and options dialog, and core's notes with them.
+ * Core, view and React raised in 11.11 (84.1, 106.1 and 148.7 kB with 11.8 and 11.9 final; 85.9,
+ * 107.9 and 151.4 allowed):
+ * find and replace over every story, bookmarks and the outline; marks on the pages and going to a
+ * match, a bookmark or a heading; the find panel, the bookmarks dialog and the outline panel, which
+ * `FoliEditor` includes so that Word's keys work out of the box.
  */
 const BUNDLES = [
-  { name: "@folijs/core", entry: dist("core"), budget: 81_500 },
-  { name: "@folijs/view", entry: dist("view"), budget: 99_000 },
-  { name: "@folijs/react", entry: dist("react"), budget: 136_000 },
-  { name: "FoliEditor only", entry: appEntry, budget: 136_000 },
+  { name: "@folijs/core", entry: dist("core"), budget: 88_000 },
+  { name: "@folijs/view", entry: dist("view"), budget: 110_500 },
+  { name: "@folijs/react", entry: dist("react"), budget: 155_000 },
+  { name: "FoliEditor only", entry: appEntry, budget: 155_000 },
   { name: "@folijs/docx", entry: dist("docx"), budget: 58_400 },
 ];
 

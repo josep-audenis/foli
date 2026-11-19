@@ -12,6 +12,7 @@ import {
   controlProperties,
   controlSpot,
   type DocumentSettings,
+  type DocumentTarget,
   deleteBackward,
   deleteForward,
   deleteSelection,
@@ -23,6 +24,7 @@ import {
   type Field,
   type FieldLayout,
   type FieldsReport,
+  type FoundMatches,
   fieldCodesShown,
   fieldsIn,
   fitPaste,
@@ -31,13 +33,20 @@ import {
   insertControlText,
   insertHardBreak,
   insertLink,
+  insertNote,
   insertPicture,
   insertText,
   isSafeHref,
   keepTablesApart,
   type Node as ModelNode,
   marksAt,
+  type NavigationRequest,
   NodeSelection,
+  type NoteNumber,
+  noteAtSelection,
+  noteNumbers,
+  noteProperties,
+  noteTexts,
   type OpenStory,
   pageVariant,
   parseContentV2,
@@ -45,10 +54,12 @@ import {
   type ResourceJSON,
   type ReviewView,
   redo,
+  referencesIn,
   type SectionJSON,
   Selection,
   Slice,
   type StorySide,
+  StoryStep,
   type StoryView,
   sameSpot,
   sectionSettings,
@@ -78,19 +89,29 @@ import {
   type BlockBox,
   contentHeight,
   DEFAULT_RULES,
+  type FlowNote,
   type FlowPage,
   type FlowResult,
   type FlowRules,
   type FlowSection,
   type Fragment,
   flowFrom,
+  notePieces,
   type PageFacts,
   PX_PER_MM,
   pagesOf,
   type Reuse,
+  spaceAfterText,
 } from "./layout/flow.js";
 import { type BlockDesc, type LeafDesc, PAGE_BREAK_ATTR } from "./render.js";
-import { EMU_PER_PX, imageSource, PICTURE_ATTR, WORD_COLUMN_BREAK_ATTR } from "./word/blocks.js";
+import {
+  EMU_PER_PX,
+  imageSource,
+  NOTE_NUMBER_ATTR,
+  NOTE_REF_ATTR,
+  PICTURE_ATTR,
+  WORD_COLUMN_BREAK_ATTR,
+} from "./word/blocks.js";
 import {
   BAND_CLASS,
   bandElement,
@@ -113,6 +134,8 @@ import {
   type WordInfo,
   WordRenderer,
 } from "./word/edit.js";
+import { MATCH_STYLES, MatchMarks, rangesInText } from "./word/matches.js";
+import { NOTE_ATTR, type NoteGroup, PageNotes } from "./word/notes.js";
 import { measureLineRatio } from "./word/pages.js";
 import { PageRegions, REGION_CONTENT_CLASS } from "./word/regions.js";
 import {
@@ -202,6 +225,8 @@ export interface EditorViewOptions {
    * on its page, ADR-0007). Set when the view is made. Default true.
    */
   paged?: boolean;
+  /** What a note's own mark shows, for the view of a note being edited. */
+  noteMark?: () => string;
 }
 
 const PLACEHOLDER_ATTR = "data-foli-placeholder";
@@ -213,7 +238,7 @@ const FIELD_SELECTED_ATTR = "data-foli-field-selected";
 const MIN_PICTURE = 8;
 // Generated content is not document text: no caret stops inside it, a zero-height float keeps
 // the caret at the line start, and the empty alt text keeps screen readers on aria-placeholder.
-const STYLES = `[${FIELD_SELECTED_ATTR}]{background-color:rgba(0,0,0,.14)}@media print{[${FIELD_SELECTED_ATTR}]{background-color:transparent}}.foli-in-story>.foli-page>:not(.foli-region){opacity:.45}.foli-story-mount{pointer-events:auto;outline:1px dashed GrayText;outline-offset:2px}.foli-story-mount>[contenteditable=true]:focus{outline:none}@media print{.foli-in-story>.foli-page>:not(.foli-region){opacity:1}.foli-story-mount{outline:none}}.${CELL_CLASS}{box-shadow:inset 0 0 0 9999px rgba(0,120,215,.22)}[${CELLS_ATTR}] ::selection{background:transparent}[data-foli-no-alt]{outline:2px dashed #b45309;outline-offset:-2px}@media print{[data-foli-no-alt]{outline:none}}[${PICTURE_SELECTED_ATTR}]{position:relative;outline:2px solid Highlight}[${PICTURE_SELECTED_ATTR}] [data-foli-resize]{position:absolute;right:-5px;bottom:-5px;width:10px;height:10px;box-sizing:border-box;border:1px solid Canvas;background:Highlight;cursor:nwse-resize;forced-color-adjust:none}@media print{[${PICTURE_SELECTED_ATTR}]{outline:none}[${PICTURE_SELECTED_ATTR}] [data-foli-resize]{display:none}}[${PLACEHOLDER_ATTR}]::before{content:attr(${PLACEHOLDER_ATTR});content:attr(${PLACEHOLDER_ATTR}) / "";float:inline-start;height:0;pointer-events:none;color:GrayText}${CONTROL_STYLES}`;
+const STYLES = `[${FIELD_SELECTED_ATTR}]{background-color:rgba(0,0,0,.14)}@media print{[${FIELD_SELECTED_ATTR}]{background-color:transparent}}.foli-in-story>.foli-page>:not(.foli-region){opacity:.45}.foli-story-mount{pointer-events:auto;outline:1px dashed GrayText;outline-offset:2px}.foli-story-mount>[contenteditable=true]:focus{outline:none}@media print{.foli-in-story>.foli-page>:not(.foli-region){opacity:1}.foli-story-mount{outline:none}}.${CELL_CLASS}{box-shadow:inset 0 0 0 9999px rgba(0,120,215,.22)}[${CELLS_ATTR}] ::selection{background:transparent}[data-foli-no-alt]{outline:2px dashed #b45309;outline-offset:-2px}@media print{[data-foli-no-alt]{outline:none}}[${PICTURE_SELECTED_ATTR}]{position:relative;outline:2px solid Highlight}[${PICTURE_SELECTED_ATTR}] [data-foli-resize]{position:absolute;right:-5px;bottom:-5px;width:10px;height:10px;box-sizing:border-box;border:1px solid Canvas;background:Highlight;cursor:nwse-resize;forced-color-adjust:none}@media print{[${PICTURE_SELECTED_ATTR}]{outline:none}[${PICTURE_SELECTED_ATTR}] [data-foli-resize]{display:none}}[${PLACEHOLDER_ATTR}]::before{content:attr(${PLACEHOLDER_ATTR});content:attr(${PLACEHOLDER_ATTR}) / "";float:inline-start;height:0;pointer-events:none;color:GrayText}${CONTROL_STYLES}${MATCH_STYLES}`;
 
 /**
  * Adds the view's stylesheet once per document or shadow root, when a placeholder is first shown
@@ -335,6 +360,12 @@ interface RegionElement {
   id: string;
 }
 
+/** What a page shows of notes: at its feet, and after the text of each column. */
+interface PageNoteElements {
+  foot: HTMLElement[];
+  flow: Map<string, HTMLElement[]>;
+}
+
 /** A story being edited on its page. */
 interface StoryMount extends OpenStory {
   /** The page and the region it is open in. */
@@ -345,6 +376,9 @@ interface StoryMount extends OpenStory {
   /** Moved to another page by a new layout: the focus went with the DOM. */
   moved: boolean;
 }
+
+/** A header or footer being edited. */
+type HeaderMount = StoryMount & { side: StorySide };
 
 /** A fragment's place on its page. */
 interface Slot {
@@ -585,6 +619,8 @@ export class EditorView {
   composing = false;
   /** Set by Ctrl/Cmd+Shift+V for the paste event it triggers. */
   private plainPaste = false;
+  /** How deep `renumberNotes` has rendered again. */
+  private renumbering = 0;
   /** Blocks whose DOM the browser changed: the next render rebuilds them. */
   private readonly dirty = new Set<BlockDesc>();
   /** DOM mutations not yet read back (kept while a composition is running). */
@@ -647,10 +683,32 @@ export class EditorView {
   /** What `regionsKey` was computed from. */
   private regionsFor: { stories: unknown; settings: unknown; sections: SectionJSON[] } | null =
     null;
+  /** Footnotes and endnotes on the pages; none without pages. */
+  private readonly notes: PageNotes | null;
+  /** What each page shows of them. */
+  private pageNotes: PageNoteElements[] = [];
+  /** Their elements by what they show. */
+  private noteElements = new Map<string, HTMLElement>();
+  /** The page each note starts on, as last flowed: numbers can restart on each. */
+  private notePages = new Map<string, number>();
+  /** What the note references showed when last drawn. */
+  private shownNotes = "";
+  /** The layout and boxes of the last flow, to draw notes again from. */
+  private flowLayout: readonly BlockLayout[] = [];
+  private flowBoxes: readonly BlockBox[] = [];
+  /** What this view's note mark shows (`EditorViewOptions.noteMark`). */
+  private readonly noteMark: (() => string) | undefined;
   /** Puts everything on its page again, as the last render left it. */
   private placeAgain: (() => void) | null = null;
   /** The story being edited on its page, if any (ADR-0007). */
   private mount: StoryMount | null = null;
+  /** What find shows, and which tree this view draws of it (a mounted story's view: its own). */
+  private found: FoundMatches | null = null;
+  private matchStory: string | null = null;
+  private readonly matchMarks: MatchMarks;
+  /** The pages marked, as a key; the frame waiting to look again. */
+  private matchPages = "";
+  private matchFrame = 0;
   /** The body's selection before the press of a double click in a page's margin. */
   private pressSelection: Selection | null = null;
   /** The listeners on the host, to remove them. */
@@ -664,7 +722,9 @@ export class EditorView {
     options: EditorViewOptions = {},
   ) {
     this.state = editor.state;
+    this.matchMarks = new MatchMarks(host.ownerDocument);
     this.paged = options.paged !== false;
+    this.noteMark = options.noteMark;
     const view = this;
     this.controlChrome = new ControlChrome({
       host,
@@ -679,24 +739,22 @@ export class EditorView {
       focus: () => view.focus(),
       injectStyles: () => injectStyles(host),
     });
+    const storyOptions = {
+      get review() {
+        return view.review;
+      },
+      get fieldCodes() {
+        return view.fieldCodes;
+      },
+      lineRatio: (family: string) => this.lineRatio(family),
+      resource: (key: string, resource: ResourceJSON) => this.resource?.(key, resource),
+      measureIn: () => this.pages[0] ?? host,
+      scale: () => this.scale(),
+    };
     this.regions = this.paged
-      ? new PageRegions(
-          host.ownerDocument,
-          {
-            get review() {
-              return view.review;
-            },
-            get fieldCodes() {
-              return view.fieldCodes;
-            },
-            lineRatio: (family) => this.lineRatio(family),
-            resource: (key, resource) => this.resource?.(key, resource),
-            measureIn: () => this.pages[0] ?? host,
-            scale: () => this.scale(),
-          },
-          new WeakMap(),
-        )
+      ? new PageRegions(host.ownerDocument, storyOptions, new WeakMap())
       : null;
+    this.notes = this.paged ? new PageNotes(host.ownerDocument, storyOptions, new WeakMap()) : null;
     host.setAttribute("role", "textbox");
     host.setAttribute("aria-multiline", "true");
     host.setAttribute(VIEW_ATTR, this.id);
@@ -751,6 +809,7 @@ export class EditorView {
 
   destroy(): void {
     this.closeStory(false);
+    this.showFound(null);
     this.controlChrome.destroy();
     if (this.editor.storyView === this.stories) this.editor.storyView = null;
     this.destroyed = true;
@@ -975,6 +1034,8 @@ export class EditorView {
       );
       this.invalidateLayout();
     }
+    const references = this.noteReferences();
+    word.setNotes(noteTexts(references), this.noteMark?.());
     // The blocks the view renders (paragraphs in table cells among them) and the page flow's
     // items (top-level paragraphs and opaque blocks, and tables).
     const { units, items } = collect(doc, context.resolver);
@@ -996,6 +1057,13 @@ export class EditorView {
       context.envelope,
       spans.map((span) => span.setup),
       context.resolver,
+    );
+    const { notes } = this;
+    notes?.setDocument(
+      context.envelope,
+      spans.map((span) => span.setup),
+      context.resolver,
+      references,
     );
     const layout = sectionLayouts(
       spans,
@@ -1223,36 +1291,50 @@ export class EditorView {
       const words = items.map((item) =>
         item.frame ? TABLE_WORD : (blocks[item.unit] as WordBlockDesc).word,
       );
+      const endnotes = notes?.endnotes();
       const boxes = items.map((item, i) => {
         const own = layout[i] as BlockLayout;
         const pageHeight = contentHeight(own.sheet.settings);
+        const index = own.section.flow.index ?? 0;
+        const noteOf = (story: string) => notes?.footnote(story, index) ?? null;
+        // Endnotes follow the last block of their section, or of the document.
+        const after =
+          (layout[i + 1] as BlockLayout | undefined)?.section !== own.section
+            ? { endnotes: endnotes?.get(index) }
+            : {};
         if (item.frame) {
           const frame = item.frame;
           const measure = tableOf(frame, i);
+          const breaks = () => breaksOf(frame, measure, blocks, pageHeight, lines);
           // A page break before the next paragraph ends its page.
           return {
-            ...tableBox(frame, measure, pageHeight, !!words[i + 1]?.pageBreakBefore, () =>
-              breaksOf(frame, measure, blocks, pageHeight, lines),
-            ),
+            ...tableBox(frame, measure, pageHeight, !!words[i + 1]?.pageBreakBefore, breaks),
             section: own.section.flow,
+            notes: tableNotes(frame, measure, blocks, lines, breaks, noteOf),
+            ...after,
           };
         }
         const desc = blocks[item.unit] as WordBlockDesc;
-        return wordBox(
-          words,
-          i,
-          desc,
-          measureOf(desc),
-          () => lines(desc),
-          own,
-          atWidth,
-          context.resolver.addsParagraphSpacing,
-        );
+        return {
+          ...wordBox(
+            words,
+            i,
+            desc,
+            measureOf(desc),
+            () => lines(desc),
+            own,
+            atWidth,
+            context.resolver.addsParagraphSpacing,
+            noteOf,
+          ),
+          ...after,
+        };
       });
       const rules = {
         ...WORD_RULES,
         addSpacing: context.resolver.addsParagraphSpacing,
         evenAndOddHeaders: context.envelope.settings?.evenAndOddHeaders === true,
+        notes: notes?.flowRules(),
       };
       const flowHeight = contentHeight(this.editor.settings);
       let result = flowFrom(boxes, flowHeight, rules, reuse);
@@ -1264,6 +1346,8 @@ export class EditorView {
       }
       this.facts = facts;
       this.flowed = { nodes, result };
+      this.flowLayout = layout;
+      this.flowBoxes = boxes;
       this.stale.clear();
       const flowed = result.fragments;
       slots = flowed.map((fragments) => fragments.map(slotOf));
@@ -1342,6 +1426,7 @@ export class EditorView {
       );
       applyGaps(firsts, result.gaps);
       this.drawRegions();
+      this.drawNotes();
       this.place(
         items.map((item, i) => elementsOf(item, i)),
         pages,
@@ -1382,6 +1467,122 @@ export class EditorView {
     // changed before this render: the touched blocks are read back at compositionend.
     const records = this.observer.takeRecords();
     if (this.composing) this.pending.push(...records);
+    this.renumberNotes();
+  }
+
+  /** The note references shown, with their numbers as the last flow's pages make them. */
+  private noteReferences(): NoteNumber[] {
+    if (!this.paged) return [];
+    const { doc } = this.state;
+    const { envelope } = wordContext(this.state) as WordContext;
+    const hideDeleted = this.review !== "markup";
+    const all = noteNumbers(doc, envelope, {
+      hideDeleted,
+      pageOf: (_pos, story) => this.notePages.get(story),
+    });
+    this.shownNotes = JSON.stringify(all.map((n) => n.text));
+    return hideDeleted ? all.filter((n) => !n.deleted) : all;
+  }
+
+  /**
+   * Numbers that restart on each page depend on the flow just made: when they came out otherwise,
+   * once more with them (their width can move a line), at most twice.
+   */
+  private renumberNotes(): void {
+    if (!this.notes || this.composing || this.renumbering > 1) return;
+    const { envelope } = wordContext(this.state) as WordContext;
+    const each = this.sections().some(
+      (section) => noteProperties(envelope, "footnote", section).restart === "eachPage",
+    );
+    if (!each) return;
+    const shown = this.shownNotes;
+    this.noteReferences();
+    if (this.shownNotes === shown) return;
+    this.renumbering++;
+    try {
+      this.renderPages();
+    } finally {
+      this.renumbering = 0;
+    }
+  }
+
+  /** The section of each page's bands in the last flow, and each note's place on the pages. */
+  private drawNotes(): void {
+    const { notes, flowed, facts, mount } = this;
+    if (!notes) return;
+    const pieces = flowed ? notePieces(flowed.result) : [];
+    const notePages = new Map<string, number>();
+    for (const piece of pieces)
+      if (!piece.fromLine && !notePages.has(piece.id)) notePages.set(piece.id, piece.page);
+    this.notePages = notePages;
+    const bandSections = new Map<string, number>();
+    flowed?.result.fragments.forEach((fragments, i) => {
+      const index = (this.flowLayout[i] as BlockLayout | undefined)?.section.flow.index ?? 0;
+      for (const f of fragments) bandSections.set(`${f.page}|${f.band ?? 0}`, index);
+    });
+    const groups: NoteGroup[] = notes.groups(
+      pieces,
+      (page, band) =>
+        bandSections.get(`${page}|${band}`) ??
+        bandSections.get(`${page}|0`) ??
+        facts[page]?.section ??
+        0,
+    );
+    const foot = groups.filter((group) => !group.inFlow);
+    const known = this.noteElements;
+    const elements = new Map<string, HTMLElement>();
+    const shown: PageNoteElements[] = [];
+    const note = mount?.side === "note" ? mount : null;
+    for (const group of groups) {
+      const { settings } = this.sheetOfPage(group.page);
+      const fact = facts[group.page];
+      const bottom = fact?.sectionPages
+        ? (this.regions as PageRegions).margins(fact.section, fact).bottom
+        : settings.margins.bottom * PX_PER_MM;
+      const place = group.inFlow
+        ? null
+        : notes.footPlace(
+            { left: settings.margins.left * PX_PER_MM, bottom },
+            notes.stacked(group, foot),
+          );
+      // Footnotes beneath the text keep the space after the paragraph above them.
+      const lead =
+        group.inFlow && !group.pieces[0]?.end && flowed
+          ? spaceAfterText(this.flowBoxes, flowed.result, group.page, group.band, group.column)
+          : 0;
+      const key = `${group.page}|${group.band}|${group.column}|${group.inFlow}|${place?.left}|${place?.bottom}|${lead}|${notes.keyOf(group)}`;
+      let element = known.get(key);
+      if (!element) {
+        element = notes.groupElement(
+          group,
+          place,
+          (piece) =>
+            piece.id === note?.id && !piece.fromLine
+              ? note.region.element
+              : notes.pieceElement(piece, group),
+          lead,
+        );
+        if (note && element.contains(note.wrapper)) note.moved = true;
+      }
+      elements.set(key, element);
+      const page = shown[group.page] ?? { foot: [], flow: new Map<string, HTMLElement[]>() };
+      shown[group.page] = page;
+      if (!group.inFlow) page.foot.push(element);
+      else {
+        const slot = `${group.band}|${group.column}`;
+        page.flow.set(slot, [...(page.flow.get(slot) ?? []), element]);
+      }
+    }
+    this.noteElements = elements;
+    this.pageNotes = Array.from(
+      { length: shown.length },
+      (_, p) => shown[p] ?? { foot: [], flow: new Map() },
+    );
+    if (!note) return;
+    // Its reference went (undone, or hidden with the changes): the note closes.
+    const page = notePages.get(note.id);
+    if (page === undefined) queueMicrotask(() => this.closeStory(true));
+    else note.page = page;
   }
 
   /** Layout px per px on screen: what a scaled ancestor (`transform`, `zoom`) multiplies by. */
@@ -1407,7 +1608,7 @@ export class EditorView {
     )
       return false;
     this.regionsFor = { stories, settings, sections };
-    const key = regions.key();
+    const key = `${regions.key()}|${this.notes?.key() ?? ""}`;
     // Even and odd headers also decide the blank pages: the flow depends on them.
     const changed =
       key !== this.regionsKey ||
@@ -1423,7 +1624,9 @@ export class EditorView {
    * one holding the story being edited stays; it follows the story if its page no longer shows it.
    */
   private drawRegions(): void {
-    const { regions, facts, mount } = this;
+    const { regions, facts } = this;
+    // A note open for editing is `drawNotes`' to look after.
+    const mount = this.mount?.side === "note" ? null : (this.mount as HeaderMount | null);
     if (!regions) return;
     const sides = ["header", "footer"] as const;
     const wanted = facts.map((page) =>
@@ -1513,11 +1716,18 @@ export class EditorView {
       spans.map((span) => span.setup),
       context.resolver,
     );
+    this.notes?.setDocument(
+      context.envelope,
+      spans.map((span) => span.setup),
+      context.resolver,
+      this.noteReferences(),
+    );
     if (this.regionsChanged(regions, spans)) {
       this.flowed = null;
       return false;
     }
     this.drawRegions();
+    this.drawNotes();
     this.placeAgain?.();
     this.afterPlace();
     this.observer.takeRecords();
@@ -1527,6 +1737,7 @@ export class EditorView {
   /** The story being edited, moved with its region: the focus goes back to it. */
   private afterPlace(): void {
     this.drawControls();
+    this.drawMatches();
     if (!this.mount?.moved) return;
     this.mount.moved = false;
     this.mount.view.focus();
@@ -1543,11 +1754,17 @@ export class EditorView {
         : null;
     },
     edit: (side, page) => view.openStory(side, page),
+    editNote: (id) => view.openNote(id),
+    toReference: () => view.toReference(),
     close: () => view.closeStory(),
     get fieldLayout() {
       return view.fieldLayout();
     },
     updateFields: (options, editor) => view.updateFields(options, editor),
+    showMatches: (found) => view.showMatches(found),
+    reveal: (target, options) => view.reveal(target, options),
+    goToPage: (page, options) => view.goToPage(page, options),
+    focus: () => view.focus(),
   }))(this);
 
   /** Makes this view the one `Editor.storyView` speaks for, telling listeners if it was not. */
@@ -1556,6 +1773,198 @@ export class EditorView {
     const first = !this.editor.storyView;
     this.editor.storyView = this.stories;
     if (!first) this.editor.storyChanged();
+  }
+
+  // ---------- find, and going places (11.11) ----------
+
+  /**
+   * Marks what find found: on the pages, in the story open, and in the drawn copies of the others.
+   * Nothing of it is in the document or the pages' DOM, and it does not print. The current match is
+   * scrolled to when it is where the view can show it.
+   */
+  showMatches(found: FoundMatches | null): void {
+    this.showFound(found);
+    const { current } = found ?? {};
+    if (!current) return;
+    if (current.story === this.matchStory) this.scrollToRange(current.from, current.to);
+    else if (current.story === this.mount?.id)
+      this.mount?.view.scrollToRange(current.from, current.to);
+  }
+
+  /** The screen ranges of `from..to` in one paragraph: one per text node it covers. */
+  private rangesOf(from: number, to: number): Range[] {
+    const { doc } = this.state;
+    if (to > doc.content.size) return [];
+    const $from = doc.resolve(from);
+    if (!$from.parent.isTextblock) return [];
+    const desc = this.blocks[this.blockFrom($from.before())];
+    if (!desc) return [];
+    const start = $from.start();
+    const out: Range[] = [];
+    for (const leaf of desc.leaves) {
+      const at = start + leaf.offset;
+      const a = Math.max(from, at);
+      const b = Math.min(to, at + leaf.size);
+      if (a >= b || hiddenIn(leaf.dom, desc.dom)) continue;
+      const range = this.host.ownerDocument.createRange();
+      if (leaf.dom.nodeType === Node.TEXT_NODE) {
+        range.setStart(leaf.dom, a - at);
+        range.setEnd(leaf.dom, b - at);
+      } else range.selectNodeContents(leaf.dom);
+      out.push(range);
+    }
+    return out;
+  }
+
+  /** The pages on the screen and a screen around it: only these carry marks. */
+  private pagesNearView(): Set<number> {
+    const height = this.host.ownerDocument.defaultView?.innerHeight ?? 0;
+    const near = new Set<number>();
+    this.pages.forEach((page, i) => {
+      const { top, bottom } = page.getBoundingClientRect();
+      if (bottom >= -height && top <= 2 * height) near.add(i);
+    });
+    return near;
+  }
+
+  private drawMatches(): void {
+    const { found, mount } = this;
+    if (mount) {
+      mount.view.matchStory = mount.id;
+      mount.view.showFound(found);
+    }
+    if (!found) {
+      this.matchMarks.set([], []);
+      this.matchPages = "";
+      return;
+    }
+    injectStyles(this.host);
+    const { doc } = this.state;
+    const near = this.pagesNearView();
+    this.matchPages = [...near].join();
+    const shown = (from: number) => {
+      if (!this.paged || from > doc.content.size) return true;
+      const pages = this.itemPages.get(doc.resolve(from).node(1));
+      return !pages || pages.some((page) => near.has(page));
+    };
+    const all: Range[] = [];
+    const others = new Set<string>();
+    for (const { story, from, to } of found.matches) {
+      if (story === this.matchStory) {
+        if (shown(from)) all.push(...this.rangesOf(from, to));
+      } else if (story !== null && story !== mount?.id) others.add(story);
+    }
+    const { current, query, matchCase, wholeWord } = found;
+    const here = current?.story === this.matchStory ? current : null;
+    if (others.size) {
+      const options = { matchCase, wholeWord };
+      const add = (root: Element | null | undefined) => {
+        if (root) all.push(...rangesInText(root, query, options));
+      };
+      for (const p of near) {
+        const { header, footer } = this.pageRegions[p] ?? {};
+        for (const region of [header, footer])
+          if (region && others.has(region.id))
+            add(region.element.querySelector(`:scope > .${REGION_CONTENT_CLASS}`));
+        for (const note of this.pages[p]?.querySelectorAll(`[${NOTE_ATTR}]`) ?? [])
+          if (others.has(note.getAttribute(NOTE_ATTR) as string)) add(note);
+      }
+    }
+    this.matchMarks.set(all, here ? this.rangesOf(here.from, here.to) : []);
+  }
+
+  /** Scrolling brings other pages near: their marks are drawn, once per frame. */
+  private readonly onMatchScroll = (): void => {
+    const win = this.host.ownerDocument.defaultView;
+    if (this.matchFrame || !win) return;
+    this.matchFrame = win.requestAnimationFrame(() => {
+      this.matchFrame = 0;
+      if (this.found && [...this.pagesNearView()].join() !== this.matchPages) this.drawMatches();
+    });
+  };
+
+  /** What find shows here, marked; a story's view is told by its page's view. */
+  private showFound(found: FoundMatches | null): void {
+    const doc = this.host.ownerDocument;
+    if (this.paged && !this.found !== !found) {
+      if (found) doc.addEventListener("scroll", this.onMatchScroll, SCROLL_OPTIONS);
+      else doc.removeEventListener("scroll", this.onMatchScroll, SCROLL_OPTIONS);
+    }
+    this.found = found;
+    this.drawMatches();
+  }
+
+  private scrollToRange(from: number, to: number): void {
+    let rect = this.rangesOf(from, to)[0]?.getClientRects?.()[0];
+    if (!rect) {
+      // A place, not a stretch of text: what holds it.
+      const { node } = this.domFromPos(from);
+      rect = (node instanceof Element ? node : node.parentElement)?.getBoundingClientRect();
+    }
+    // With room around it: a panel may float over the top of the window.
+    if (rect)
+      scrollRectIntoView(this.host, { top: rect.top - REVEAL_ABOVE, bottom: rect.bottom + 48 });
+  }
+
+  /** Opens story `id` where a page shows it, leaving the focus where it is. */
+  private openForReveal(id: string): boolean {
+    const kind = wordContext(this.state)?.stories.get(id)?.kind;
+    if (kind === "footnote" || kind === "endnote") return this.openNote(id, false);
+    if (kind !== "header" && kind !== "footer") return false;
+    const page = this.pageRegions.findIndex((regions) => regions[kind]?.id === id);
+    return page >= 0 && this.openStory(kind, page, false, false);
+  }
+
+  /**
+   * Selects `target` and scrolls to it: in the body (leaving a story that is open), or in its story,
+   * opened where it is. `focus`: the document takes the focus. False when no page shows it.
+   */
+  reveal({ story, from, to }: DocumentTarget, { focus = false } = {}): boolean {
+    if (story === null) {
+      this.closeStory(false);
+      const { doc } = this.state;
+      if (to > doc.content.size) return false;
+      this.editor.dispatch(this.state.tr.setSelection(TextSelection.create(doc, from, to)));
+      if (focus) this.focus();
+      this.scrollToRange(from, to);
+      return true;
+    }
+    if (this.mount?.id !== story && !this.openForReveal(story)) return false;
+    const { mount } = this;
+    if (!mount) return false;
+    mount.view.editor.select(from, to);
+    if (focus) mount.view.focus();
+    mount.view.scrollToRange(from, to);
+    return true;
+  }
+
+  /** The caret to the start of page `page` (1-based) and the page into view. */
+  goToPage(page: number, { focus = false } = {}): boolean {
+    const element = this.pages[page - 1];
+    if (!element) return false;
+    this.closeStory(false);
+    search: for (const [i, desc] of this.blocks.entries()) {
+      for (const [f, fragment] of desc.fragments.entries()) {
+        if (fragment.closest(".foli-page") !== element) continue;
+        const start = (this.starts[i] as number) + 1 + (f ? (desc.splits[f - 1] as number) : 0);
+        const { doc } = this.state;
+        this.editor.dispatch(
+          this.state.tr.setSelection(
+            Selection.near(doc.resolve(Math.min(start, doc.content.size))),
+          ),
+        );
+        break search;
+      }
+    }
+    if (focus) this.focus();
+    scrollRectIntoView(this.host, element.getBoundingClientRect());
+    return true;
+  }
+
+  /** Word's keys for finding and going places, when the app shows something for them. */
+  private navigationKey(name: string): boolean {
+    const request = Object.hasOwn(NAVIGATION_KEYS, name) ? NAVIGATION_KEYS[name] : undefined;
+    return !!request && this.editor.navigation?.(request) === true;
   }
 
   // ---------- content controls ----------
@@ -1796,7 +2205,7 @@ export class EditorView {
    * Opens the header or footer of page `at` (by default the selection's) for editing where it is;
    * made first when the page has none. Whether it is open now.
    */
-  openStory(side: StorySide, at = this.selectionPage(), create = true): boolean {
+  openStory(side: StorySide, at = this.selectionPage(), create = true, focus = true): boolean {
     if (!this.regions || !this.editable || this.composing) return false;
     // Word's blank page has none: the next page's.
     let p = at;
@@ -1809,7 +2218,7 @@ export class EditorView {
     const variant = pageVariant(setup, page, even);
     const before = storyOfSection(this.sections(), page.section, side, variant);
     if (this.mount?.id === before?.id && this.mount?.side === side && this.mount?.page === p) {
-      this.mount?.view.focus();
+      if (focus) this.mount?.view.focus();
       return true;
     }
     this.closeStory(false);
@@ -1819,7 +2228,83 @@ export class EditorView {
     const editor = found && this.editor.story(found.id);
     const region = this.pageRegions[p]?.[side];
     if (!found || !editor || !region) return false;
+    this.mountStory(
+      editor,
+      { id: found.id, side, variant, section: page.section, page: p, region },
+      side === "header" ? "Header" : "Footer",
+      undefined,
+      focus,
+    );
+    return true;
+  }
 
+  /**
+   * Opens note `id`, or the one whose reference is at the selection, in place: shown whole at its
+   * reference's page. Whether it is open now.
+   */
+  openNote(id?: string, focus = true): boolean {
+    const { notes } = this;
+    if (!notes || !this.editable || this.composing) return false;
+    const story = id ?? noteAtSelection(this.state)?.story;
+    if (!story) return false;
+    if (this.mount?.id === story) {
+      if (focus) this.mount.view.focus();
+      return true;
+    }
+    this.closeStory(false);
+    const editor = this.editor.story(story);
+    if (!editor) return false;
+    notes.open = story;
+    this.flowed = null;
+    this.render();
+    const element = this.host.querySelector<HTMLElement>(`[${NOTE_ATTR}="${CSS.escape(story)}"]`);
+    const page = this.notePages.get(story);
+    if (!element || page === undefined) {
+      notes.open = null;
+      this.flowed = null;
+      this.render();
+      return false;
+    }
+    const region = { element, drawing: {}, section: 0, id: story };
+    const texts = () =>
+      noteTexts(noteNumbers(this.state.doc, (wordContext(this.state) as WordContext).envelope));
+    this.mountStory(
+      editor,
+      { id: story, side: "note", variant: "default", section: 0, page, region },
+      "Note",
+      () => texts().get(story) ?? "",
+      focus,
+    );
+    editor.select(Selection.atEnd(editor.state.doc).from);
+    return true;
+  }
+
+  /** From the note being edited back to its reference, the caret after it. */
+  private toReference(): boolean {
+    const { mount } = this;
+    if (mount?.side !== "note") return false;
+    const reference = noteNumbers(
+      this.state.doc,
+      (wordContext(this.state) as WordContext).envelope,
+    ).find((n) => n.story === mount.id);
+    this.closeStory(false);
+    if (reference)
+      this.dispatch(
+        this.state.tr.setSelection(TextSelection.create(this.state.doc, reference.pos + 1)),
+      );
+    this.focus();
+    return true;
+  }
+
+  /** Puts `editor`'s story on its page, in `place`, the body read-only and dimmed around it. */
+  private mountStory(
+    editor: Editor,
+    place: Omit<StoryMount, "wrapper" | "view" | "moved">,
+    label: string,
+    noteMark?: () => string,
+    focus = true,
+  ): void {
+    const { region } = place;
     injectStyles(this.host);
     this.observer.disconnect();
     this.host.setAttribute("contenteditable", "false");
@@ -1832,7 +2317,7 @@ export class EditorView {
     wrapper.style.userSelect = "text";
     wrapper.style.setProperty("-webkit-user-select", "text");
     const inner = doc.createElement("div");
-    inner.setAttribute("aria-label", side === "header" ? "Header" : "Footer");
+    inner.setAttribute("aria-label", label);
     wrapper.append(inner);
     const shown = region.element.querySelector<HTMLElement>(`:scope > .${REGION_CONTENT_CLASS}`);
     if (shown) {
@@ -1844,29 +2329,27 @@ export class EditorView {
       paged: false,
       upload: this.upload ?? null,
       resource: this.resource ?? null,
+      ...(noteMark ? { noteMark } : {}),
     });
     wrapper.addEventListener("keydown", (event) => {
-      if (event.key !== "Escape" || event.isComposing || view.composing) return;
+      if (event.isComposing || view.composing) return;
+      if (isNoteKey(event) && this.toReference()) {
+        // Not on to the body, which would open the note again.
+        event.preventDefault();
+        event.stopPropagation();
+        return;
+      }
+      if (event.key !== "Escape") return;
       event.preventDefault();
       this.closeStory(true);
     });
-    this.mount = {
-      id: found.id,
-      side,
-      variant,
-      section: page.section,
-      page: p,
-      region,
-      wrapper,
-      view,
-      moved: false,
-    };
+    this.mount = { ...place, wrapper, view, moved: false };
     // With several views of the editor, the one in use answers for its story.
     wrapper.addEventListener("focusin", () => this.claimStories());
     this.claimStories();
-    view.focus();
+    if (focus) view.focus();
+    this.drawMatches();
     this.editor.storyChanged();
-    return true;
   }
 
   /** Finishes a running composition, its text going into the model. */
@@ -1886,19 +2369,25 @@ export class EditorView {
       `:scope > .${REGION_CONTENT_CLASS}`,
     );
     if (shown) shown.style.display = "";
+    if (mount.side === "note" && this.notes) {
+      this.notes.open = null;
+      this.flowed = null;
+      if (!this.destroyed) this.render();
+    }
     this.host.classList.remove("foli-in-story");
     this.host.setAttribute("contenteditable", String(this.editable));
     if (this.editable) this.host.removeAttribute("aria-readonly");
     this.observer.takeRecords();
     this.observer.observe(this.host, { childList: true, characterData: true, subtree: true });
     if (focus && !this.destroyed) this.focus();
+    if (!this.destroyed) this.drawMatches();
     this.editor.storyChanged();
   }
 
   /** The page's own story, after what was open is shown nowhere any more. */
   private reopenStory = (): void => {
     const { mount } = this;
-    if (!mount || this.facts.length === 0) return;
+    if (!mount || mount.side === "note" || this.facts.length === 0) return;
     const { side, page, id } = mount;
     // A story that went (undone) is not made again.
     const create = !!wordContext(this.state)?.stories.has(id);
@@ -1928,6 +2417,21 @@ export class EditorView {
    */
   private onPress = (event: MouseEvent): void => {
     this.closeStory(false);
+    // A note on the page, or the number of its reference: the second press opens the note.
+    const target = event.target instanceof Element ? event.target : null;
+    const onNote = target?.closest(`[${NOTE_ATTR}]`);
+    const number = target?.closest(`[${NOTE_REF_ATTR}]`);
+    const story = onNote?.getAttribute(NOTE_ATTR) ?? number?.getAttribute(NOTE_REF_ATTR);
+    if (story && event.button === 0 && !event.shiftKey) {
+      const opens = event.detail === 2 && this.editable && isNoteStory(this.state, story);
+      if (onNote || opens) event.preventDefault();
+      if (opens) {
+        if (this.openNote(story) && onNote)
+          this.mount?.view.placeCaret(event.clientX, event.clientY);
+        return;
+      }
+      if (onNote) return;
+    }
     const margin = event.button === 0 && !event.shiftKey ? this.marginAt(event) : null;
     if (margin && event.detail > 1) {
       event.preventDefault();
@@ -2051,7 +2555,8 @@ export class EditorView {
         section: (layout[i] as BlockLayout).section,
       })),
     );
-    const count = (items[items.length - 1]?.page ?? 0) + 1;
+    // A note can reach pages no text is on.
+    const count = Math.max((items[items.length - 1]?.page ?? 0) + 1, this.pageNotes.length);
     const sheets: Sheet[] = [];
     pages.forEach((list, i) => {
       for (const p of list) sheets[p] ??= (layout[i] as BlockLayout).sheet;
@@ -2094,10 +2599,14 @@ export class EditorView {
       while (i < items.length && items[i]?.page === p) i++;
       const onPage = items.slice(first, i);
       const { header, footer } = this.pageRegions[p] ?? {};
-      /** A page's children: its header, what it holds, its footer. */
+      const notes = this.pageNotes[p];
+      /** What follows the text of a column: its endnotes. */
+      const after = (band: number, column: number) => notes?.flow.get(`${band}|${column}`) ?? [];
+      /** A page's children: its header, what it holds, its notes, its footer. */
       const framed = (list: readonly HTMLElement[]) => [
         ...(header ? [header.element] : []),
         ...list,
+        ...(notes?.foot ?? []),
         ...(footer ? [footer.element] : []),
       ];
       for (const { dom, slot } of onPage) {
@@ -2107,7 +2616,11 @@ export class EditorView {
       // One section in one column: the blocks are the page's children.
       const last = onPage[onPage.length - 1];
       if (!last || (!last.slot.band && last.section.columns.widths.length === 1)) {
-        fillElement(page, framed(onPage.map((item) => item.dom)), this.viewRemoved);
+        fillElement(
+          page,
+          framed([...onPage.map((item) => item.dom), ...after(0, 0)]),
+          this.viewRemoved,
+        );
         this.bands.delete(page);
         continue;
       }
@@ -2132,7 +2645,10 @@ export class EditorView {
         band.columns.forEach((column, c) => {
           fillElement(
             column,
-            inBand.filter((item) => item.slot.column === c).map((item) => item.dom),
+            [
+              ...inBand.filter((item) => item.slot.column === c).map((item) => item.dom),
+              ...after(b, c),
+            ],
             this.viewRemoved,
           );
         });
@@ -2221,6 +2737,7 @@ export class EditorView {
     this.flowed = null;
     this.regionsFor = null;
     if (this.regions) this.regions.cache = new WeakMap();
+    if (this.notes) this.notes.cache = new WeakMap();
   }
 
   /** Re-flows the pages once web fonts have loaded: line heights and wrapping change. */
@@ -3240,7 +3757,13 @@ export class EditorView {
       return;
     }
     const name = keyName(event);
-    if (this.documentEdgeKey(name) || this.fieldKey(name) || this.controlKey(name)) {
+    if (
+      this.documentEdgeKey(name) ||
+      this.fieldKey(name) ||
+      this.controlKey(name) ||
+      this.noteKey(event, name) ||
+      this.navigationKey(name)
+    ) {
       event.preventDefault();
       return;
     }
@@ -3295,6 +3818,14 @@ export class EditorView {
       event.preventDefault();
     }
   };
+
+  /** Word's keys for notes, and Shift+Alt+N from a reference to its note. */
+  private noteKey(event: KeyboardEvent, name: string): boolean {
+    if (isNoteKey(event)) return this.openNote();
+    const kind = name === "Mod-Alt-f" ? "footnote" : name === "Mod-Alt-d" ? "endnote" : null;
+    if (!kind || !this.editable || !this.notes) return false;
+    return this.run(insertNote(kind)) && this.openNote();
+  }
 
   /**
    * Ctrl+Home and Ctrl+End (with Shift, extending) on pages with headers and footers: the browser
@@ -3721,7 +4252,7 @@ export class EditorView {
     // One empty paragraph: nothing to paste (a lone opaque block is something).
     const only = pasted?.doc.childCount === 1 ? pasted.doc.firstChild : null;
     if (!pasted || (only?.isTextblock && !only.content.size)) return false;
-    const { doc, open, envelope } = pasted;
+    const { doc, open, envelope, notes } = pasted;
     // As a slice (text joins the text around the caret); where that cannot be (an opaque block
     // at an end), as whole blocks at the caret.
     const asSlice = (tr: Transaction) => {
@@ -3762,6 +4293,7 @@ export class EditorView {
           withEnvelope(tr, envelope);
           setComments(tr, current.comments, envelope.comments);
         }
+        for (const { id, story } of notes ?? []) tr.step(new StoryStep(id, null, story));
       } catch (error) {
         if (error instanceof TransformError) continue;
         throw error;
@@ -4061,6 +4593,7 @@ function wordBox(
   layout: BlockLayout,
   atWidth: (desc: BlockDesc, width: number, kept: boolean) => WidthMeasure,
   adds: boolean,
+  noteOf: (story: string) => FlowNote | null,
 ): BlockBox {
   const pageHeight = contentHeight(layout.sheet.settings);
   const { section } = layout;
@@ -4091,7 +4624,23 @@ function wordBox(
       return line;
     });
   };
+  const references = referencesIn(desc.node);
+  const notes = references.flatMap((ref) => {
+    const note = noteOf(ref.story);
+    return note ? [{ note, offset: ref.offset - 1 }] : [];
+  });
   return {
+    notes: notes.length
+      ? (column) => {
+          if (kept) return notes.map(({ note }) => ({ line: 0, note }));
+          const { starts } = section.unequal ? inColumn(column).all() : lines();
+          return notes.map(({ note, offset }) => {
+            let line = starts.length - 1;
+            while (line > 0 && (starts[line] as number) > offset) line--;
+            return { line, note };
+          });
+        }
+      : undefined,
     height: measure.height,
     marginTop: before,
     marginBottom: after,
@@ -4109,6 +4658,36 @@ function wordBox(
         breaks.push((section.unequal ? inColumn(column).lines() : bottoms()).length - 1);
       return breaks;
     },
+  };
+}
+
+/** The footnotes a table refers to, each on the break at or after its reference's line. */
+function tableNotes(
+  frame: Frame,
+  measure: Measure,
+  blocks: readonly WordBlockDesc[],
+  lines: (desc: BlockDesc) => Lines,
+  breaks: () => number[],
+  noteOf: (story: string) => FlowNote | null,
+): BlockBox["notes"] {
+  const t = measure.table as TableMeasure;
+  const found: { note: FlowNote; unit: number; offset: number }[] = [];
+  for (let unit = frame.first; unit < frame.end; unit++)
+    for (const ref of referencesIn((blocks[unit] as WordBlockDesc).node)) {
+      const note = noteOf(ref.story);
+      if (note && t.tops.get(unit) != null) found.push({ note, unit, offset: ref.offset - 1 });
+    }
+  if (!found.length) return undefined;
+  return () => {
+    const list = breaks();
+    return found.map(({ note, unit, offset }) => {
+      const { starts, bottoms } = lines(blocks[unit] as WordBlockDesc);
+      let k = starts.length - 1;
+      while (k > 0 && (starts[k] as number) > offset) k--;
+      const y = (t.tops.get(unit) as number) + (bottoms[k] as number);
+      const line = list.findIndex((b) => b >= y - 0.5);
+      return { line: line < 0 ? list.length - 1 : line, note };
+    });
   };
 }
 
@@ -4196,6 +4775,8 @@ function measureLines(desc: BlockDesc, scale: number): Lines {
       if (!fragment.contains(leaf.dom)) continue;
       if (leaf.dom.nodeType !== Node.TEXT_NODE) {
         const br = leaf.dom as Element;
+        // A raised number says nothing about where its line is.
+        if (br.hasAttribute(NOTE_NUMBER_ATTR)) continue;
         items.push({ offset: leaf.offset, rect: () => br.getBoundingClientRect() });
         continue;
       }
@@ -4300,7 +4881,7 @@ function clusterBoundary(doc: ModelNode, pos: number, forward: boolean): number 
  * Scrolls every scrollable ancestor of `from`, then the window, so that `rect` is inside its
  * visible area (minus `scroll-padding`, e.g. for a sticky toolbar). Vertical only: text wraps.
  */
-function scrollRectIntoView(from: HTMLElement, rect: DOMRect): void {
+function scrollRectIntoView(from: HTMLElement, rect: Pick<DOMRect, "top" | "bottom">): void {
   const doc = from.ownerDocument;
   const win = doc.defaultView;
   if (!win) return;
@@ -4327,6 +4908,27 @@ function scrollRectIntoView(from: HTMLElement, rect: DOMRect): void {
   );
   if (move) win.scrollBy(0, move);
 }
+
+const SCROLL_OPTIONS = { capture: true, passive: true };
+/** Room kept above what is scrolled to for find, in px. */
+const REVEAL_ABOVE = 200;
+
+/** Word's keys for finding and going places. */
+const NAVIGATION_KEYS: Readonly<Record<string, NavigationRequest>> = {
+  "Mod-f": "find",
+  "Mod-h": "replace",
+  "Mod-g": "goTo",
+  F3: "next",
+  "Shift-F3": "previous",
+  "Mod-Shift-F5": "bookmarks",
+};
+
+/** Shift+Alt+N: from a note's reference to the note, and back. */
+const isNoteKey = (event: KeyboardEvent) =>
+  event.altKey && event.shiftKey && !event.ctrlKey && !event.metaKey && event.code === "KeyN";
+
+/** Whether story `id` of `state`'s document exists (a number can outlive its note on screen). */
+const isNoteStory = (state: EditorState, id: string) => !!wordContext(state)?.stories.has(id);
 
 function before(node: Node): DomPoint {
   const parent = node.parentNode as Node;

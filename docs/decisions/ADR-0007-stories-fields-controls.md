@@ -121,7 +121,8 @@ content, ext? }`. `content` is a `doc` of the body's blocks. `noteType` is Word'
 - **Notes and the clipboard.** Deleting the last reference removes the story in the same
   transaction; undo restores both. A slice holding a reference carries its note's content, so cut
   and paste keep the note, and every paste makes a new story with a fresh id (a copy never gives
-  two references to one note). Without Foli's clipboard format the reference is dropped.
+  two references to one note). Without Foli's clipboard format the reference is dropped. Built in
+  11.10: `WordDefinitions.notes`, and `fitPaste` returns the new stories for the paste to add.
 
 ### In place on the page
 
@@ -175,9 +176,34 @@ content, ext? }`. `content` is a `doc` of the body's blocks. `noteType` is Word'
   is measured again. A line forced onto an empty page because nothing else can take it keeps its
   note's first line, and the page grows as for any line taller than a page. `FlowState` gains the
   notes' use of the page and what carries over (`sameState` compares them, or incremental reflow
-  would stop too early). Lines are measured for blocks with references. Endnotes are blocks after
-  the body (or the section). In a section with columns a footnote sits at the foot of its
-  reference's **column**.
+  would stop too early). Lines are measured for blocks with references. Endnotes follow the text of
+  the body (or the section). In a section with columns the notes are set **in the section's
+  columns across the band's foot**, whichever column refers to them (corrected in 11.10: this
+  said the foot of the reference's column; Word's PDFs show otherwise).
+- **Built in 11.10**, Word 16.0.20527's behaviour read from its PDFs and saved files
+  (`scripts/corpus/story-roundtrip.mjs` has it read what Foli writes):
+  - A note takes all the room down to its reference's line, up to its whole height: a long one
+    fills the page, the text after it goes to the next. The space after the paragraph holding the
+    reference stays between its last line and the separator, and above notes set beneath the text.
+  - The separator and the continuation separator are both drawn two inches long in Word's PDF.
+    They are the document's stories, their heights their paragraphs'.
+  - Endnotes follow the last text with the paragraph's space after between, under their separator;
+    a footnote carried to that page keeps to the foot.
+  - With columns: every note whole, in order, in as many columns as fit the height of the tallest,
+    the columns' tops level, one separator over the first column; every column's text ends above.
+    A note a later column refers to makes the earlier columns end above it: the band is flowed again
+    with that room kept (`FlowState.reserves`).
+  - Numbers: a custom mark takes none. A reference deleted while tracking keeps its number until
+    accepted (the views showing changes as accepted skip it). Word refuses a start other than 1 when
+    numbers restart. Its options dialog writes the settings and every section; an endnote's position
+    only the settings.
+  - Inserted: the reference a run in the reference style; the note a paragraph in the note text
+    style, the mark in the reference style, a space. Tracked: `w:ins` around the reference and all
+    the note holds, its paragraph mark not recorded. A reference deleted while tracking: `w:del`
+    around it, and all the note holds deleted, paragraph mark included. Accepting or rejecting the
+    reference settles the note too; a note whose reference goes is removed (a plugin, in the same
+    undo step). A copy is a new note with a new id, in Word too.
+  - The open note is one line to the flow: whole on its reference's page.
 - **Columns.** A section has `columns` (`count`, `space`, `widths`, `separator`); a page holds
   **bands** (one per section on it, for continuous sections), a band holds columns, and `flow`
   fills columns where it filled pages. A band above a continuous break is balanced. A
@@ -319,6 +345,26 @@ content, ext? }`. `content` is a `doc` of the body's blocks. `noteType` is Word'
   otherwise kept verbatim. Sections gain `columns`, `pageNumbers` (`w:pgNumType`) and their own
   note properties.
 - **Find:** core's `findAll(doc, query)` over the body and each story; results carry the story id.
+  **Built in 11.11:** `findAll(editorOrDocument, query, { matchCase, wholeWord })`, which depends on
+  what the document shows (codes shown, review view, placeholders), hence the editor. `replace` and
+  `replaceAll` make one body transaction over all trees (`editTrees`), one undo step. Word 16.0.20527,
+  read through its object model:
+  - A match runs across runs and field markers, and over a comment's anchor, not over a note's
+    reference. Straight quotes find curly ones and a space a no-break space, not the reverse; accents
+    count; `ss` does not find `ß`. A query of several words ignores whole words; a word ends at
+    anything but a letter or digit (`_` and `'` end it).
+  - The replacement takes the first matched character's formatting and, without match case, follows
+    its capitals: all capitals, or the first letter when the match starts with a capital.
+  - Tracked: the old text deleted, then the new inserted. Inside a field's result it replaces; over
+    the result's edge Word changes nothing, and likewise over a control's edge and in locked content.
+  - With codes shown Word finds the code and not the result. A bookmark's name takes letters, digits
+    and `_`, starts with a letter, and is the same in any case: using it again moves the bookmark.
+  - **Foli differs on purpose:** bookmarks and comment anchors inside a replaced match stay (Word
+    loses them); text already deleted is refused, reported (Word adds the replacement after it); a
+    view hiding deleted text matches across it (Word does not); what is refused is returned, where
+    Word says nothing.
+  - **Marks** use the CSS Custom Highlight API instead of a decoration in the pages: nothing to keep
+    away from the read-back, and no layout.
 - **Slices with half a field or control** are repaired on paste (`fitPaste`, built in 11.8):
   markers without partners are dropped, a field that lost its end losing its code too, their
   content kept.

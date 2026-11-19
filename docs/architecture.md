@@ -216,6 +216,17 @@ Known limits:
   them (the toolbar uses cheap checks).
 - Plugins, `Transaction` metadata and mapping internals are exported but not yet a stable API.
 
+Find and navigation (11.11, `state/find.ts`, `state/navigation.ts`): each tree is read once into
+lines, a paragraph's searchable text with the pieces of the tree behind it, kept per tree in a
+`WeakMap` while what shows stays the same (codes, review view, controls), so a keystroke in the panel
+is an `indexOf` per line. What draws nothing adds no text, so a match runs across it; what draws
+something else adds a barrier character. `replaceAll` builds one edit per tree and `editTrees` (in
+`state/stories.ts`) makes them one body transaction, each story's as a `StoryStep` after its own
+tracking, filters and appended transactions, so tracking, control locks and placeholders work as
+when typing and undo is one step. A floor on revision ids keeps the trees' new ids apart. A match is
+checked first: code, deleted text, a field's or control's edge, then, inside a control, a dry run
+through the filter. Bookmark changes go through `editTrees` untracked.
+
 ## Editor view (`@folijs/view`)
 
 `packages/view/src/view.ts`, design per ADR-0003: one `contenteditable` host holding real pages.
@@ -590,6 +601,10 @@ A stale `StoryStep` or `EnvelopeStep` drops its whole event (`storedStepsApply`)
 bookmark ids are allocated over every tree (`otherTrees`), and accepting or rejecting all changes
 reaches every story.
 
+A note opens the same way (`openNote`: double click on it or its number, Shift+Alt+N, the Notes
+menu), mounted in its piece at the foot of its reference's page, whole. A plugin in core
+(`notesPlugin`) keeps a note with its reference: removed with it, tracked with it, settled with it.
+
 The main view shows every header and footer read-only (`word/regions.ts`, both renderers). To edit
 one, `EditorView.openStory(side, page?)` (a double click in the page's margin, or
 `editor.storyView.edit` from the toolbar) makes the host read-only, stops its mutation observer,
@@ -874,7 +889,20 @@ Word lays it out, read-only and without an editor (`EditorView` edits on the sam
   line on it as Word numbers lines); the corpus harness compares them with Word's, and each
   page's ink with Word's PDF of it (`pnpm corpus:pages`, numbers in corpus/README.md).
 
-Not yet: footnotes, floating objects other than pictures (10.9: drawn as
+Marks of find (11.11, `word/matches.ts`): ranges in two `Highlight` objects shared by a document's
+views, so the pages' DOM never changes and the mutation observer has nothing to read back. They
+are made for the pages within a screen of the window (from `itemPages`), again after each placement
+and when scrolling brings other pages near; an open story's view marks its own tree, and the drawn
+copies of other stories are searched as text. `reveal` opens a story through the same path as a
+double click, without moving the focus, so the panel keeps it.
+
+Footnotes and endnotes (11.10, `word/notes.ts`, both renderers): `PageNotes` draws each note from
+its story with its number and measures it as lines for the flow (`BlockBox.notes`, `endnotes`,
+`FlowRules.notes`); the flow's `NotePiece`s, held by the fragments that brought them, say which
+lines go where, and the renderers put them at the band's foot (absolute, above the bottom margin)
+or after the text. Numbers come from `noteNumbers` in core and are drawn, never stored.
+
+Not yet: floating objects other than pictures (10.9: drawn as
 in the editing view; the blocks are measured on one long page without the space between
 paragraphs, so the lines after a floating picture may go around it a little differently than
 on the page), custom tab stops (default

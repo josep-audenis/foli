@@ -346,7 +346,8 @@ const emptyReport = (): FieldsReport => ({ updated: 0, unchanged: 0, rebuilt: 0,
 
 // ---------- helpers over a tree ----------
 
-interface Bookmark {
+/** @internal */
+export interface Bookmark {
   name: string;
   /** After its start marker, before its end marker. */
   from: number;
@@ -355,8 +356,10 @@ interface Bookmark {
 
 const knownBookmarks = new WeakMap<Node, Map<string, Bookmark>>();
 
-/** A tree's bookmarks by name in lower case: Word's names do not differ by case alone. */
-function bookmarksIn(tree: Node): Map<string, Bookmark> {
+/**
+ * @internal A tree's bookmarks by name in lower case: Word's names do not differ by case alone.
+ */
+export function bookmarksIn(tree: Node): Map<string, Bookmark> {
   const known = knownBookmarks.get(tree);
   if (known) return known;
   const starts = new Map<unknown, { name: string; from: number }>();
@@ -430,7 +433,8 @@ interface ParagraphAt {
   pos: number;
 }
 
-function paragraphsOf(tree: Node): ParagraphAt[] {
+/** @internal */
+export function paragraphsOf(tree: Node): ParagraphAt[] {
   const out: ParagraphAt[] = [];
   tree.descendants((node, pos) => {
     if (node.type.name === "paragraph") out.push({ node, pos });
@@ -440,11 +444,13 @@ function paragraphsOf(tree: Node): ParagraphAt[] {
 }
 
 const REVIEW = new Set(["insertion", "deletion", "formatChange"]);
-const withoutReview = (marks: readonly Mark[]) => marks.filter((m) => !REVIEW.has(m.type.name));
+/** @internal */
+export const withoutReview = (marks: readonly Mark[]) =>
+  marks.filter((m) => !REVIEW.has(m.type.name));
 const isGone = (node: Node) => node.marks.some((m) => m.type.name === "deletion");
 
-/** Text as inline nodes: tabs and line feeds become their nodes. */
-function inlineText(schema: Schema, text: string, marks: readonly Mark[]): Node[] {
+/** @internal Text as inline nodes: tabs and line feeds become their nodes. */
+export function inlineText(schema: Schema, text: string, marks: readonly Mark[]): Node[] {
   const nodes = schema.nodes as Record<string, NodeType>;
   const out: Node[] = [];
   for (const part of text.split(/(\t|\r\n|\r|\n)/)) {
@@ -470,7 +476,7 @@ function resultMarks(field: Field, instruction: FieldInstruction): readonly Mark
  * shortcut: a paragraph end inside the bookmark becomes a line break, where Word's result has the
  * paragraph; make it a slice when a document needs it.
  */
-function bookmarkContent(tree: Node, mark: Bookmark): Node[] {
+export function bookmarkContent(tree: Node, mark: Bookmark): Node[] {
   const schema = tree.type.schema;
   const out: Node[] = [];
   const hardBreak = schema.nodes.hardBreak as NodeType;
@@ -664,7 +670,8 @@ function headingsOf(tree: Node, word: WordContext): { pos: number; level: number
   });
 }
 
-function headingLevel(word: WordContext, paragraph: Node): number | null {
+/** @internal A paragraph's level from its heading style's name. */
+export function headingLevel(word: WordContext, paragraph: Node): number | null {
   const id = word.resolver.paragraph(paragraph.attrs).paragraph.style;
   const name = word.envelope.styles.find((s) => s.id === id)?.name ?? "";
   const match = /^heading ([1-9])$/i.exec(name);
@@ -1142,7 +1149,8 @@ function entryParts(tree: Node, word: WordContext, { node, pos }: ParagraphAt): 
 }
 
 /** A paragraph's text as a heading to refer to. */
-const entryTitle = (tree: Node, word: WordContext, paragraph: ParagraphAt) =>
+/** @internal A paragraph's text as its entry. */
+export const entryTitle = (tree: Node, word: WordContext, paragraph: ParagraphAt) =>
   entryParts(tree, word, paragraph)
     .map((part) => part.title)
     .join(" ");
@@ -1430,8 +1438,8 @@ function rebuildContents(run: Run, index: number): void {
   }
 }
 
-/** A bookmark id no tree of the document uses yet. */
-function nextBookmarkId(state: EditorState, tr: Transaction): number {
+/** @internal A bookmark id no tree of the document uses yet. */
+export function nextBookmarkId(state: EditorState, tr: Transaction): number {
   let max = -1;
   for (const tree of [tr.doc, ...otherTrees(state)])
     tree.descendants((node) => {
@@ -1483,8 +1491,8 @@ function storyRun(editor: Editor, id: string, story: Story, body: Run, out: Tran
   );
 }
 
-/** The id of the story whose tree `doc` is. */
-function storyIdOf(body: EditorState, doc: Node): string {
+/** @internal The id of the story whose tree `doc` is. */
+export function storyIdOf(body: EditorState, doc: Node): string {
   for (const [id, story] of wordContext(body)?.stories ?? []) if (story.doc === doc) return id;
   return "";
 }

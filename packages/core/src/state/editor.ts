@@ -47,10 +47,12 @@ import {
 } from "./controls.js";
 import { fieldsPlugin } from "./fields.js";
 import type { FieldLayout, FieldsReport, UpdateFieldsOptions } from "./fieldupdate.js";
+import type { FindMatch, FindOptions } from "./find.js";
 import { setAlign, setHighlight, setTextColor } from "./format.js";
 import { history, redo, undo } from "./history.js";
 import { removeLink, setLink } from "./links.js";
 import { liftListItem, listKeymap, sinkListItem, toggleList, wrapInList } from "./lists.js";
+import { notesPlugin } from "./notes.js";
 import {
   acceptAllChanges,
   acceptChange,
@@ -100,20 +102,49 @@ export interface EditorOptions {
 
 export type EditorListener = (state: EditorState, transactions: readonly Transaction[]) => void;
 
-/** A header or footer open for editing on its page. */
+/** A header, footer or note open for editing on its page. */
 export interface OpenStory {
   id: string;
-  side: StorySide;
+  side: StorySide | "note";
   variant: StoryVariant;
   /** The section it was opened from (a linked one shows an earlier section's story). */
   section: number;
 }
+
+/** A place to show: `from..to` of the body (`story` null) or of a story. */
+export interface DocumentTarget {
+  story: string | null;
+  from: number;
+  to: number;
+}
+
+/** What find shows on the pages. */
+export interface FoundMatches extends FindOptions {
+  query: string;
+  matches: readonly FindMatch[];
+  /** The one marked apart and scrolled to, if any. */
+  current: FindMatch | null;
+}
+
+/** The commands Word has keys for, answered by what the app shows for them. */
+export type NavigationRequest =
+  | "find"
+  | "replace"
+  | "goTo"
+  | "next"
+  | "previous"
+  | "bookmarks"
+  | "outline";
 
 /** What opens stories on the pages: the view of the editor's document. */
 export interface StoryView {
   readonly open: OpenStory | null;
   /** Opens the header or footer of a page (default: the selection's). Whether it is open now. */
   edit(side: StorySide, page?: number): boolean;
+  /** Opens a note where it is: `id`, or the one whose reference is at the selection. */
+  editNote(id?: string): boolean;
+  /** Back from the note being edited to its reference, the caret after it. */
+  toReference(): boolean;
   close(): void;
   /** The pages as last laid out, for fields; null when there are none. */
   readonly fieldLayout: FieldLayout | null;
@@ -122,6 +153,17 @@ export interface StoryView {
    * that moved them. One undo step.
    */
   updateFields(options?: UpdateFieldsOptions, editor?: Editor): FieldsReport;
+  /** Marks what find found on the pages (never in the document, not printed); null: nothing. */
+  showMatches(found: FoundMatches | null): void;
+  /**
+   * Selects `target` and scrolls to it, opening its story where it is, or leaving the open one.
+   * `focus`: the document takes the focus. False when no page shows it.
+   */
+  reveal(target: DocumentTarget, options?: { focus?: boolean }): boolean;
+  /** The caret to the start of page `page` (1-based), scrolled to. False when there is none. */
+  goToPage(page: number, options?: { focus?: boolean }): boolean;
+  /** Focuses the document, or the story open in it. */
+  focus(): void;
 }
 
 /** A headless editor: state, commands, history and change notifications, no DOM. */
@@ -232,6 +274,11 @@ export interface Editor {
   storyView: StoryView | null;
   /** The view opened or closed a story: tells the editor's listeners (no transaction). */
   storyChanged(): void;
+  /**
+   * Set by the app's navigation UI: what Word's keys for it do. The view asks it first and leaves
+   * a key to the browser when it answers false, or when there is none.
+   */
+  navigation: ((request: NavigationRequest) => boolean) | null;
 }
 
 /** Word's page when a section leaves it out: Letter, 1 inch margins. */
@@ -275,8 +322,8 @@ interface EditorParts {
   setDocument(document: EditorDocument): void;
   subscribe(listener: EditorListener): () => void;
   story(id: string): Editor | null;
-  /** The view opening stories, one for the body and its stories. */
-  views: { current: StoryView | null };
+  /** The view opening stories, and the navigation UI: one for the body and its stories. */
+  views: { current: StoryView | null; navigation: Editor["navigation"] };
   storyChanged(): void;
 }
 
@@ -383,6 +430,12 @@ function makeEditor(parts: EditorParts): Editor {
       parts.views.current = view;
     },
     storyChanged: parts.storyChanged,
+    get navigation() {
+      return parts.views.navigation;
+    },
+    set navigation(handler) {
+      parts.views.navigation = handler;
+    },
   };
   return self;
 }
@@ -404,13 +457,14 @@ export function createEditor({
     fieldsPlugin(),
     controlsPlugin(),
     commentsPlugin(),
+    notesPlugin(),
     tableKeymap(),
     listKeymap(),
     baseKeymap(),
   ];
   let state = EditorState.create({ doc: loaded.doc, plugins: pluginsFor(loaded) });
   const listeners = new Set<EditorListener>();
-  const views: EditorParts["views"] = { current: null };
+  const views: EditorParts["views"] = { current: null, navigation: null };
   /** The stories being edited, by id. */
   const stories = new Map<string, { editing: StoryEditing; editor: Editor }>();
 

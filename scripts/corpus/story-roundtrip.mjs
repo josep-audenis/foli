@@ -3,6 +3,8 @@
 //   node scripts/corpus/story-roundtrip.mjs make <dir>
 //   powershell -ExecutionPolicy Bypass -File scripts/corpus/word-reference.ps1 `
 //     -In <dir>/foli -Out <dir>/word
+//   powershell -NoProfile -ExecutionPolicy Bypass -File scripts/corpus/note-word.ps1 `
+//     -In <dir>/foli -Out <dir>/notes
 //   node scripts/corpus/story-roundtrip.mjs check <dir>
 //
 // `make` exports every corpus document with stories to <dir>/foli twice: as imported (<name>.docx)
@@ -13,6 +15,11 @@
 // commands: 08 without even pages or a first page and with its last section's header unlinked
 // (08-newsletter-commands), 05 with even pages on and a header typed in through `editor.story`
 // (05-business-letter-commands), and a new package with even and odd headers (00-new-settings).
+// 11.10 adds notes through the commands: 04 with a note inserted and typed into and another's
+// reference deleted (04-board-report-notes); 09 with the same done while tracking, as it stands and
+// with every change rejected (09-pump-test-memo-tracked, -rejected); a new document with footnotes
+// and an endnote and their options set (00-new-notes), the same read back and set to Word's
+// defaults (00-new-renumbered), and its footnotes converted (00-new-converted).
 // `check` needs Word's data for every file made: each
 // opened; an unchanged one has the original's pages, sections and notes; an edited one every
 // header and footer with its original text, the edit and (headers) one more table, its pictures
@@ -22,10 +29,14 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import {
+  convertNotes,
   createDocument,
   createEditor,
+  insertNote,
+  rejectAllChanges,
   setDifferentEvenPages,
   setDifferentFirstPage,
+  setNoteProperties,
   setStoryLinked,
 } from "../../packages/core/dist/index.js";
 import { exportDocx, importDocx } from "../../packages/docx/dist/index.js";
@@ -71,6 +82,34 @@ const note = (text) =>
     content: [{ type: "noteMark" }, { type: "text", text: ` ${text}` }],
   });
 const names = readdirSync(corpus).filter((n) => n.endsWith(".docx"));
+const NOTE_TEXT = "A note typed in Foli";
+/** The end of the first paragraph with text. */
+function firstEnd(editor) {
+  let end = -1;
+  editor.state.doc.forEach((node, pos) => {
+    if (end < 0 && node.type.name === "paragraph" && node.textContent)
+      end = pos + node.nodeSize - 1;
+  });
+  return end;
+}
+/** A new note of `kind` at the end of the first paragraph, with `text` typed into it. */
+function addNote(editor, kind = "footnote", text = NOTE_TEXT) {
+  editor.select(firstEnd(editor));
+  editor.run(insertNote(kind));
+  const ids = Object.keys(editor.getDocument().stories).filter((id) => id.startsWith(`${kind}:`));
+  const id = ids.sort((a, b) => Number(a.split(":")[1]) - Number(b.split(":")[1])).at(-1);
+  const note = editor.story(id);
+  note.select(note.state.doc.content.size - 1);
+  note.commands.insertText(text);
+}
+function deleteReference(editor, story) {
+  let at = -1;
+  editor.state.doc.descendants((node, pos) => {
+    if (node.type.name === "noteReference" && node.attrs.story === story) at = pos;
+    return true;
+  });
+  editor.dispatch(editor.state.tr.delete(at, at + 1));
+}
 
 function edited(document) {
   const copy = structuredClone(document);
@@ -128,14 +167,37 @@ if (mode === "make") {
     await write(name, await exportDocx(document, pkg));
     await write(name.replace(".docx", "-edited.docx"), await exportDocx(edited(document), pkg));
   }
-  const commands = async (name, change) => {
+  const commands = async (name, change, suffix = "commands", options = {}) => {
     const { document, package: pkg } = await importDocx(
       new Uint8Array(readFileSync(join(corpus, `${name}.docx`))),
     );
-    const editor = createEditor({ document });
+    const editor = createEditor({ document, ...options });
     change(editor);
-    await write(`${name}-commands.docx`, await exportDocx(editor.getDocument(), pkg));
+    await write(`${name}-${suffix}.docx`, await exportDocx(editor.getDocument(), pkg));
   };
+  await commands(
+    "04-board-report",
+    (editor) => {
+      addNote(editor);
+      deleteReference(editor, "footnote:2");
+    },
+    "notes",
+  );
+  const tracked = { trackChanges: true, author: "Foli" };
+  const trackedNotes = (editor) => {
+    addNote(editor);
+    deleteReference(editor, "footnote:1");
+  };
+  await commands("09-pump-test-memo", trackedNotes, "tracked", tracked);
+  await commands(
+    "09-pump-test-memo",
+    (editor) => {
+      trackedNotes(editor);
+      editor.run(rejectAllChanges());
+    },
+    "rejected",
+    tracked,
+  );
   await commands("08-newsletter", (editor) => {
     editor.run(setDifferentEvenPages(false));
     editor.run(setDifferentFirstPage(false, 0));
@@ -182,6 +244,25 @@ if (mode === "make") {
       },
     }),
   );
+  const noted = createEditor({
+    document: createDocument(doc(paragraph("Body"), paragraph("More"))),
+  });
+  addNote(noted, "footnote", "First");
+  addNote(noted, "footnote", "Second");
+  addNote(noted, "endnote", "Last");
+  noted.run(
+    setNoteProperties("footnote", { format: "upperRoman", start: 3, position: "beneathText" }),
+  );
+  noted.run(setNoteProperties("endnote", { format: "lowerLetter", position: "sectEnd" }));
+  const newNotes = await exportDocx(noted.getDocument());
+  await write("00-new-notes.docx", newNotes);
+  const again = await importDocx(newNotes);
+  const back = createEditor({ document: again.document });
+  back.run(setNoteProperties("footnote", { format: "decimal", start: 1, position: "pageBottom" }));
+  back.run(setNoteProperties("endnote", { restart: "eachSect", format: "lowerRoman" }));
+  await write("00-new-renumbered.docx", await exportDocx(back.getDocument(), again.package));
+  noted.run(convertNotes("endnote"));
+  await write("00-new-converted.docx", await exportDocx(noted.getDocument()));
   process.exit(0);
 }
 
@@ -206,6 +287,63 @@ for (const file of readdirSync(join(dir, "foli")).filter((n) => n.endsWith(".doc
     continue;
   }
   const notes = word.notes.map((n) => n.text);
+  const options = existsSync(join(dir, "notes", `${name}.json`))
+    ? json(join(dir, "notes", `${name}.json`))
+    : null;
+  /** Word's reading of `kind`'s options against what was set. */
+  const expectOptions = (kind, wanted) => {
+    for (const [key, value] of Object.entries(wanted))
+      if (options?.[kind]?.[key] !== value)
+        problems.push(`${kind} ${key}: ${options?.[kind]?.[key]}, not ${value}`);
+  };
+  if (name === "04-board-report-notes") {
+    const base = json(join(reference, "04-board-report.json"));
+    if (word.notes.length !== base.notes.length) problems.push(`${word.notes.length} notes`);
+    if (!notes.some((t) => t.includes(NOTE_TEXT))) problems.push("the inserted note");
+    if (notes.some((t) => t.includes("risk register"))) problems.push("the deleted note is there");
+    if (word.pages !== base.pages) problems.push(`${word.pages} pages`);
+    report(name, problems);
+    continue;
+  }
+  if (name === "09-pump-test-memo-tracked") {
+    // Word's reference data has the changes accepted: the deleted note gone, the new one kept.
+    const base = json(join(reference, "09-pump-test-memo.json"));
+    if (word.notes.length !== base.notes.length) problems.push(`${word.notes.length} notes`);
+    const added = word.notes.find((n) => n.text.includes(NOTE_TEXT));
+    if (!added?.revisions) problems.push("the new note is not tracked");
+    if (notes.some((t) => t.includes("Procedure P-14"))) problems.push("the deleted note stayed");
+    if (word.revisionsAccepted < 2) problems.push(`${word.revisionsAccepted} revisions`);
+    report(name, problems);
+    continue;
+  }
+  if (name === "09-pump-test-memo-rejected") {
+    const base = json(join(reference, "09-pump-test-memo.json"));
+    if (JSON.stringify(notes) !== JSON.stringify(base.notes.map((n) => n.text)))
+      problems.push("the notes are not the original's");
+    if (word.revisionsAccepted) problems.push(`${word.revisionsAccepted} revisions left`);
+    report(name, problems);
+    continue;
+  }
+  if (name === "00-new-notes") {
+    expectOptions("footnotes", { numberStyle: 1, startingNumber: 3, location: 1 });
+    expectOptions("endnotes", { numberStyle: 4, location: 0 });
+    if (options?.footnotes.texts.length !== 2)
+      problems.push(`footnotes: ${options?.footnotes.texts}`);
+    report(name, problems);
+    continue;
+  }
+  if (name === "00-new-renumbered") {
+    expectOptions("footnotes", { numberStyle: 0, startingNumber: 1, location: 0 });
+    expectOptions("endnotes", { numberStyle: 2, numberingRule: 1 });
+    report(name, problems);
+    continue;
+  }
+  if (name === "00-new-converted") {
+    if (options?.footnotes.texts.length) problems.push("footnotes are left");
+    if (options?.endnotes.texts.length !== 3) problems.push(`${options?.endnotes.texts} endnotes`);
+    report(name, problems);
+    continue;
+  }
   if (name === "00-new-stories") {
     if (!storyTexts(word, "headers").includes("New header")) problems.push("header");
     if (!storyTexts(word, "footers").includes("New footer")) problems.push("footer");

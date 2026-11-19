@@ -2,6 +2,7 @@ import {
   type Alignment,
   copiedDefinitions,
   type DocJSON,
+  type FittedPaste,
   Fragment,
   type InlineJSON,
   isSafeHref,
@@ -38,6 +39,8 @@ export interface Pasted {
   doc: ModelNode;
   /** The target's envelope with what the content needs (styles, lists...), when it changed. */
   envelope?: WordEnvelope;
+  /** New notes for the references in `doc`: added with it. */
+  notes?: FittedPaste["notes"];
   /**
    * True when no block boundary was copied (text from inside one block, plain text, inline
    * HTML): the content always joins the block it is pasted into, which keeps its type. Closed

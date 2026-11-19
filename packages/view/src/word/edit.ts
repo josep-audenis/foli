@@ -19,6 +19,7 @@ import {
   type MarkJSON,
   type Node as ModelNode,
   type RunFormat,
+  referencesIn,
   type WordContext,
 } from "@folijs/core";
 import type { BlockDesc, LeafDesc } from "../render.js";
@@ -35,6 +36,8 @@ import {
   lineHeight,
   marginAbove,
   markerElement,
+  NOTE_NUMBER_ATTR,
+  NOTE_REF_ATTR,
   onlyPictures,
   opaqueBlock,
   opaqueText,
@@ -62,8 +65,6 @@ const NOT_IN_LINE = new Set([
   "fieldCode",
   "fieldSeparator",
   "fieldEnd",
-  "noteReference",
-  "noteMark",
 ]);
 
 const REVIEW_MARKS = new Set(["insertion", "deletion", "formatChange"]);
@@ -139,6 +140,11 @@ export class WordRenderer {
   readonly #codes: boolean;
   /** What each block shows of its fields. */
   #fields: FieldDisplay[] = [];
+  /** What note references show, by story, and what a note's own mark shows. */
+  #notes: ReadonlyMap<string, string> = new Map();
+  #noteMark = "";
+  /** The numbers each block shows. */
+  #noteKeys: string[] = [];
 
   constructor(
     context: WordContext,
@@ -165,6 +171,12 @@ export class WordRenderer {
   /** The envelope moved on without touching what blocks look like (a story was edited). */
   set context(context: WordContext) {
     this.#context = context;
+  }
+
+  /** What notes show: set before `prepare`. */
+  setNotes(references: ReadonlyMap<string, string>, mark = ""): void {
+    this.#notes = references;
+    this.#noteMark = mark;
   }
 
   /**
@@ -201,6 +213,13 @@ export class WordRenderer {
     this.#markers = this.#context.resolver.markers(attrs);
     this.#comments = comments;
     this.#fields = fieldDisplay(blocks.map(childTypes), this.#codes);
+    this.#noteKeys = this.#notes.size
+      ? blocks.map((node) =>
+          referencesIn(node)
+            .map((ref) => this.#notes.get(ref.story) ?? "")
+            .join(" "),
+        )
+      : [];
   }
 
   /** Whether the block at `index` (of those prepared) shows a list number. */
@@ -215,7 +234,8 @@ export class WordRenderer {
     // A field opened or closed in an earlier block changes what shows here.
     const field = this.#fields[index];
     const fields = field?.hidden.size || field?.gone ? `|${[...field.hidden]}${field.gone}` : "";
-    return `${this.#markers[index]?.text ?? ""}|${(this.#comments[index] ?? []).join(" ")}${inCell}${above}${fields}`;
+    const notes = this.#noteKeys[index] ? `|${this.#noteKeys[index]}` : "";
+    return `${this.#markers[index]?.text ?? ""}|${(this.#comments[index] ?? []).join(" ")}${inCell}${above}${fields}${notes}|${this.#noteMark}`;
   }
 
   /** A block; `cell` is the format of the table cell it is in, if any. */
@@ -329,6 +349,18 @@ export class WordRenderer {
             const fragment = fragmentAt(offset);
             floats.set(fragment, [...(floats.get(fragment) ?? []), ...nodes]);
           } else span.append(pictureElement(child.attrs, doc, this.#image));
+          leafElement(span);
+          return;
+        }
+        case "noteReference":
+        case "noteMark": {
+          // Drawn, never document text: the number comes from where the note is.
+          const span = this.#run(run, child.marks, line);
+          const story = String(child.attrs.story);
+          span.textContent = name === "noteMark" ? this.#noteMark : (this.#notes.get(story) ?? "");
+          span.setAttribute("contenteditable", "false");
+          span.setAttribute(NOTE_NUMBER_ATTR, "");
+          if (name === "noteReference") span.setAttribute(NOTE_REF_ATTR, story);
           leafElement(span);
           return;
         }

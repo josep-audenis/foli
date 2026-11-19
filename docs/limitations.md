@@ -67,8 +67,11 @@ checklist in [testing/ime.md](testing/ime.md)):
   English. Codes shown cannot be edited there (Word's code editing, Shift+F9 for one field and
   Ctrl+F9 are not built); the last paragraph of a table of contents stays as an empty line under
   its code. A field's own `w:dirty` is kept after an update.
-- Imported footnotes and endnotes are in the document (`stories`) and exported, but the editor does
-  not show or lay them out yet, and a note's reference shows nothing.
+- Notes: a note's lines take no widow or orphan control and `w:continuationNotice` is not drawn. A
+  reference kept verbatim in opaque content takes no number. Footnotes set beneath the text in a
+  section with columns go to the foot. Options apply to the whole document, not to one section.
+  With columns Word sometimes ends an earlier column sooner than its notes require. Number formats
+  beyond Word's common ones show as decimal numbers. Shift+Alt+N is Foli's: Word has no such key.
 - No horizontal rule button (Word's rule is a paragraph's bottom border, kept and shown).
 - On Android, Backspace at a list paragraph's start may join it into the paragraph before
   instead of removing its number (untested on a device).
@@ -182,6 +185,26 @@ checklist in [testing/ime.md](testing/ime.md)):
   layout: `pnpm corpus:pages` reports fewer paragraphs on Word's line there (04: 25 of 35, 33
   in 0.3.0 before the chart was laid out; 101 of 115 for the corpus). Accepted as a known
   limit (2026-11-17).
+
+## Finding and going places
+
+- Find reads the body and the stories, table cells included: not comments, text boxes or other
+  content kept opaque. A match stays inside a paragraph; `^p`-style codes, wildcards and regular
+  expressions are not offered (a pattern could hang the page), nor replacing formatting.
+- Replacing keeps bookmarks and comment anchors found inside the match, where Word loses them; text
+  already deleted as a tracked change is refused and reported, where Word adds the replacement
+  after it. In the review views that hide deleted text a match runs across it, as the reader sees
+  the text; Word's does not.
+- Marks need the CSS Custom Highlight API (Chromium 105, Safari 17.2, Firefox 140); without it find
+  still counts, goes to and selects matches. Only pages within a screen of the window are marked.
+  In the drawn copies of a story that is not open, marks come from looking for the text there.
+- A match in a header no page shows (an unused first-page or even-page variant) is found and
+  replaced but cannot be gone to. A read-only view does not open stories.
+- Go to takes a page's place in the document, not the number printed on it. Renaming a bookmark
+  does not reach a reference whose name is split over two `w:instrText` runs. The cross-reference
+  dialog offers the body's bookmarks.
+- Ctrl+H, Ctrl+G, F3 and Ctrl+Shift+F5 are browser keys too: they are taken only while the focus
+  is in the document or in the panels, and only where `FoliNavigation` is mounted.
 
 ## Tracked changes and comments
 

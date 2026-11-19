@@ -20,7 +20,7 @@ import {
   type PackageImages,
   packageImages,
 } from "@folijs/docx";
-import { FoliComments, FoliToolbar } from "@folijs/react";
+import { FoliComments, FoliNavigation, FoliToolbar } from "@folijs/react";
 import "@folijs/react/styles.css";
 import { EditorView } from "@folijs/view";
 import { createRoot } from "react-dom/client";
@@ -92,6 +92,7 @@ let editor: Editor = createEditor({ document: SAMPLE, author: "Foli user" });
 let view = new EditorView(host, editor, { upload });
 const toolbar = createRoot(document.getElementById("toolbar") as HTMLElement);
 const commentsPane = createRoot(document.getElementById("comments") as HTMLElement);
+const navigation = createRoot(document.getElementById("navigation") as HTMLElement);
 /**
  * The formatting toolbar for the current editor (a click puts the focus back in the document)
  * and the comments pane.
@@ -101,6 +102,7 @@ const showToolbar = () => {
     <FoliToolbar editor={editor} comments upload={upload} onClickCommand={() => view.focus()} />,
   );
   commentsPane.render(<FoliComments editor={editor} />);
+  navigation.render(<FoliNavigation editor={editor} />);
 };
 showToolbar();
 /** The package the document came from: export writes what Foli does not edit back from it. */

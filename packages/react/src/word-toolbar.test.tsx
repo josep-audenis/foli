@@ -77,8 +77,14 @@ describe("FoliToolbar on a schema v3 document", () => {
         open = null;
         editor.storyChanged();
       },
+      editNote: () => false,
+      toReference: () => false,
       fieldLayout: null,
       updateFields: () => ({ updated: 0, unchanged: 0, rebuilt: 0, skipped: [] }),
+      showMatches: () => {},
+      reveal: () => false,
+      goToPage: () => false,
+      focus: () => {},
     };
     render(<FoliToolbar editor={editor} />);
     const menu = screen.getByRole("button", { name: "Header" });
@@ -701,9 +707,15 @@ describe("FoliCanvas's pictures", () => {
       editor.storyView = {
         open: null,
         edit: () => false,
+        editNote: () => false,
+        toReference: () => false,
         close: () => {},
         fieldLayout: { pages: 7, pageAt: () => ({ number: 7, sectionPages: 7 }) },
         updateFields: updates,
+        showMatches: () => {},
+        reveal: () => false,
+        goToPage: () => false,
+        focus: () => {},
       };
       render(<FoliToolbar editor={editor} />);
       act(() => editor.select(1));

@@ -71,6 +71,20 @@ editor state ──► measure the blocks without a cached measurement (DOM read
   page), a page shared by sections having the first one's. The page counts are those of the flow
   before; when they change a text height the flow runs again, twice at most. Word's blank page
   before an even or odd page section has neither.
+- **Footnotes and endnotes (11.10):** a line holding a reference goes on a page only if it, the
+  separator and the note's first line fit; lines a widow, orphan or keep rule takes back take their
+  notes with them. The note takes the room down to its line, up to all of it, so a long one fills
+  the page and the rest goes to the foot of the next, first thing there, under the continuation
+  separator, leaving room for the next line of text; what is left after the last block gets pages
+  of its own. In a section with columns the notes are set in the columns across the band's foot, in
+  order and whole, under one separator, and every column's text ends above them; a note a later
+  column refers to has the band flowed again with its room kept. Footnotes beneath the text
+  (`beneathText`) and endnotes follow the text, endnotes at the end of the document or of each
+  section (`sectEnd`). `FlowState` holds what the notes take and what is carried, so incremental
+  reflow stops only where they agree too. A note's height changing starts the flow from the top.
+  Notes are drawn from their stories by the read-only renderer (`word/notes.ts`), the note being
+  edited whole at its reference's page. Numbers restarting on each page come from the flow: when
+  they change, the page is laid out again, twice at most.
 - **Geometry:** each page gets its first section's size (`width`, `min-height`) and margins
   (`padding`) inline in mm (px where a header or footer pushes them). The content box is `height − top − bottom` by `width − left − right`. A scaled
   ancestor (`transform`, `zoom`) is divided out of every measurement. The React theme
@@ -163,8 +177,9 @@ All in Playwright on Chromium, Firefox and WebKit (Windows 11), plus unit and pr
   flow's units, split at a line, header rows repeated). Floating pictures are laid out by the
   browser around their paragraph, not by the flow: one reaching past its page's text makes the
   page taller instead of moving to the next page ([limitations](limitations.md#pictures)).
-- Footnotes are not on the pages yet (11.10). While a header is being edited its page fields show
-  their stored results.
+- While a header is being edited its page fields show their stored results. A note's lines take
+  no widow or orphan control, an endnote splits at any line, and `w:continuationNotice` is not
+  drawn. With columns Word sometimes ends an earlier column sooner than its notes require.
 - A paragraph split between columns of different widths continues by its share of the text (a
   line either way; [limitations](limitations.md)). Keep with next stops at a section's start.
 - Line measurement assumes left-to-right text without vertical-align offsets. A split block's

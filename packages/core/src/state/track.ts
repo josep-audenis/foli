@@ -58,6 +58,12 @@ const key = new PluginKey<TrackState>("track");
 /** Set this meta (true) on a transaction to keep it out of tracking. */
 export const untracked = "untracked";
 
+/**
+ * @internal On a transaction: the lowest id its tracked changes may take, for one operation over
+ * several trees (each is rebuilt before the body holds the others' new ids).
+ */
+export const revisionFloor = "revisionFloor";
+
 /** On a rebuilt transaction: the ranges it records as deleted, as `[from, to]` of the document before. */
 export const trackedDeletes = "trackedDeletes";
 
@@ -143,6 +149,27 @@ export function now(): string {
 
 const REVIEW_MARKS = new Set(["insertion", "deletion", "formatChange"]);
 
+/** @internal The largest change id on a tree's nodes, or -1. */
+export function maxRevisionIn(doc: Node): number {
+  let max = -1;
+  const see = (value: unknown) => {
+    const id = (value as { id?: unknown } | null | undefined)?.id;
+    if (typeof id === "number" && id > max) max = id;
+  };
+  doc.descendants((node) => {
+    for (const mark of node.marks) if (REVIEW_MARKS.has(mark.type.name)) see(mark.attrs);
+    if (node.isTextblock) {
+      const revision = node.attrs.revision as ParagraphRevision | null | undefined;
+      see(revision?.insertion);
+      see(revision?.deletion);
+      see(node.attrs.formatChange);
+      see((node.attrs.section as SectionJSON | null | undefined)?.change);
+    }
+    return true;
+  });
+  return max;
+}
+
 /**
  * The largest change id in the document's trees (the body and every story: ids are allocated
  * across them), the comments' content (marks, paragraph revisions) and the sections' tracked
@@ -158,21 +185,7 @@ function maxRevisionId(state: EditorState): number {
     if (typeof id === "number" && id > max) max = id;
   };
   see(last?.change);
-  for (const doc of [state.doc, ...otherTrees(state)])
-    doc.descendants((node) => {
-      for (const mark of node.marks) {
-        const name = mark.type.name;
-        if (REVIEW_MARKS.has(name)) see(mark.attrs);
-      }
-      if (node.isTextblock) {
-        const revision = node.attrs.revision as ParagraphRevision | null | undefined;
-        see(revision?.insertion);
-        see(revision?.deletion);
-        see(node.attrs.formatChange);
-        see((node.attrs.section as SectionJSON | null | undefined)?.change);
-      }
-      return true;
-    });
+  for (const doc of [state.doc, ...otherTrees(state)]) max = Math.max(max, maxRevisionIn(doc));
   // Comments hold paragraphs too, which can carry changes (JSON: walked as it is).
   const walk = (value: unknown): void => {
     if (Array.isArray(value)) value.forEach(walk);
@@ -297,7 +310,8 @@ function rebuild(
   const date = now();
   let nextId = -1;
   const newId = () => {
-    if (nextId < 0) nextId = maxRevisionId(state) + 1;
+    if (nextId < 0)
+      nextId = Math.max(maxRevisionId(state) + 1, (tr.getMeta(revisionFloor) as number) ?? 0);
     return nextId++;
   };
   const at = (x: At, assoc: number) => out.mapping.slice(x.step).map(x.pos, assoc);
