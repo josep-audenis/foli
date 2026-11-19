@@ -445,7 +445,7 @@ Migrations never drop content. A published version never changes in place.
 | 2       | 0.2.0       | v2 → v3 (`migrateToV3`, 8.3): Word's model                                                                           |
 | 3       | 0.3.0       | v3 → v4 (`migrateToV4`): only the version changes (a table kept opaque stays so until its `.docx` is imported again) |
 | 4       | 0.5.0       | v4 → v5 (`migrateToV5`): only the version changes (what is opaque stays so until its `.docx` is imported again)      |
-| 5       | (0.6.0)     | — (the current version: `stories`, `controls`, `settings`, fields, content controls, notes, columns)                 |
+| 5       | 0.6.0       | — (the current version: `stories`, `controls`, `settings`, fields, content controls, notes, columns)                 |
 
 0.1.0 reads only version 1: it rejects documents saved by 0.2.0 ("Unsupported schemaVersion: 2").
 0.2.0 reads versions 1 and 2: it rejects documents saved by 0.3.0.
