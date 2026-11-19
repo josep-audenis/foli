@@ -21,7 +21,13 @@ import {
   token,
   xml,
 } from "./check.js";
-import { type ParseOptions, resolveCustom, schemaWith, writeCustom } from "./extensions.js";
+import {
+  type ContentOptions,
+  type ParseOptions,
+  resolveCustom,
+  schemaWith,
+  writeCustom,
+} from "./extensions.js";
 import { migrateToV3 } from "./migrate.js";
 import {
   checkCellProperties,
@@ -31,7 +37,6 @@ import {
   checkTableProperties,
   checkParagraphProperties as paragraphProperties,
   checkRunProperties as runProperties,
-  schema as wordSchema,
 } from "./schema.js";
 
 /**
@@ -555,11 +560,11 @@ export function parseDocument(input: unknown, options: ParseOptions = {}): FoliD
   );
 
   const schema = schemaWith(options.extensions);
-  const content = parseContent(input.content, "content", false, schema);
+  const content = parseContent(input.content, { schema });
   const stories = Object.entries((input.stories ?? {}) as Record<string, StoryJSON>).map(
     ([id, story]) => {
       const path = `stories[${JSON.stringify(id)}].content`;
-      const tree = parseContent(story.content, path, false, schema);
+      const tree = parseContent(story.content, { path, schema });
       storyRules(tree, story.kind, path);
       return [id, { ...structuredClone({ ...story, content: null }), content: copied(tree) }];
     },
@@ -619,15 +624,12 @@ const copied = (node: Node): NodeJSON => writeCustom(structuredClone(node.toJSON
  * expressions do not say (`fragment`: content to paste, which a table may end): a table is never
  * followed by a table (Word would merge them; tables in different content controls stay apart)
  * nor ends the document, and a paragraph in a cell ends no section and holds no page or column
- * break. `schema`: the Word schema or an editor's (with its extensions' types); a namespaced type
- * it lacks becomes a foreign node or mark.
+ * break. With `extensions` their types are read as themselves; a namespaced type they do not
+ * declare becomes a foreign node or mark.
  */
-export function parseContent(
-  value: unknown,
-  path = "content",
-  fragment = false,
-  schema: Schema = wordSchema,
-): Node {
+export function parseContent(value: unknown, options: ContentOptions = {}): Node {
+  const { path = "content", fragment = false } = options;
+  const schema = options.schema ?? schemaWith(options.extensions);
   const doc = schema.nodeFromJSON(resolveCustom(value, schema), path);
   if (doc.type !== schema.topNodeType) fail(path, 'root node must be of type "doc"');
   if (doc.marks.length) fail(`${path}.marks`, "doc cannot have marks");
@@ -785,7 +787,7 @@ function noCycles<T>(
 }
 
 function blocks(content: NodeJSON[], path: string, schema: Schema): Node[] {
-  const doc = parseContent({ type: "doc", content }, path, false, schema);
+  const doc = parseContent({ type: "doc", content }, { path, schema });
   const list: Node[] = [];
   doc.forEach((block) => {
     list.push(block);

@@ -14,6 +14,7 @@ import type { Attrs, Mark, MarkType, Node, Schema } from "../model/index.js";
 import { Step, StepResult } from "../transform/steps.js";
 import type { CommentJSON, FoliDocument, StoryJSON } from "../v3/document.js";
 import { parseContent } from "../v3/document.js";
+import { writeCustom } from "../v3/extensions.js";
 import { Resolver, type RunFormat } from "../v3/resolve.js";
 import { MARK_ATTRS } from "./mark.js";
 import { NodeSelection, type SelectionJSON, TextSelection } from "./selection.js";
@@ -21,6 +22,24 @@ import { type Command, EditorState, Plugin, PluginKey, type Transaction } from "
 
 /** A v3 document without its content: what the editor keeps beside the edited tree. */
 export type WordEnvelope = Omit<FoliDocument, "content">;
+
+/**
+ * The document of an editor's `envelope` and tree `doc`, as apps get it (`getDocument`, React's
+ * `onChange`): a copy, foreign nodes and marks written back as the custom types they stand for.
+ */
+export function documentJSON(envelope: WordEnvelope, doc: Node): FoliDocument {
+  const { stories, comments, ...rest } = structuredClone(envelope);
+  return {
+    ...rest,
+    comments: comments.map((c) => ({ ...c, content: c.content.map(writeCustom) })),
+    ...(stories && {
+      stories: Object.fromEntries(
+        Object.entries(stories).map(([id, s]) => [id, { ...s, content: writeCustom(s.content) }]),
+      ),
+    }),
+    content: writeCustom(doc.toJSON()),
+  };
+}
 
 /** A story as the editor holds it: its tree, and what the envelope says beside it. */
 export interface Story extends Omit<StoryJSON, "content"> {
@@ -331,7 +350,7 @@ function storyTrees(envelope: WordEnvelope, schema: Schema): Map<string, Story> 
       id,
       {
         ...rest,
-        doc: parseContent(content, `stories[${JSON.stringify(id)}].content`, false, schema),
+        doc: parseContent(content, { path: `stories[${JSON.stringify(id)}].content`, schema }),
       },
     ]),
   );

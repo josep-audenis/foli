@@ -294,9 +294,7 @@ export function insertNote(kind: NoteKind = "footnote", options: InsertNoteOptio
             },
           ],
         },
-        "content",
-        false,
-        state.schema,
+        { schema: state.schema },
       ),
     };
     tr.step(new StoryStep(id, null, story));

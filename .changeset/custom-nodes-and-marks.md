@@ -19,6 +19,7 @@ plain JSON, at most 64 KiB), drawn as its type in brackets, and is saved back un
   (`data-foli-clipboard`), so pasting in Firefox keeps it.
 - `@folijs/docx` writes a custom node as a locked plain text content control tagged `foli:` with
   its type and attributes (a block node around a paragraph), each run of a custom mark as a rich
-  text control, and reads them back with or without the extension. A tag over 255 characters
-  throws a `DocxError`. Checked through Word 16 (open, edit, save, read back).
-- `NodeSpec` takes an optional `text(attrs)`; `parseContent` takes the schema to parse with.
+  text control, and reads them back with or without the extension (a control holding anything
+  more stays a content control). A tag over 255 characters throws a `DocxError`. Checked through Word 16 (open, edit, save, read back).
+- `NodeSpec` takes an optional `text(attrs)`. `parseContent(json, path?, fragment?)` becomes
+  `parseContent(json, { path?, fragment?, extensions? })` (`ContentOptions`).

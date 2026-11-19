@@ -1440,20 +1440,23 @@ Each task is a PR on `phase-12/ecosystem`, the build green after each.
   `spikes/extension` and its Playwright project once the real API replaces it. (Done: `Extension`
   (`{ name, nodes?, marks?, plugins? }`), `ExtensionNodeSpec` (a leaf with `text(attrs)`) and
   `ParseOptions` in core; `createEditor({ extensions })`, `parseDocument(json, { extensions })`,
-  `exportDocx(…, { extensions })`; `NodeSpec.text` and `parseContent`'s `schema` parameter added.
+  `exportDocx(…, { extensions })`; `NodeSpec.text`; `parseContent(json, { path?, fragment?,
+  extensions? })` (`ContentOptions`) in place of its positional parameters.
   `schemaWith` builds the Word schema plus the types (namespaced, not taken twice, leaves only,
   else a `RangeError`) and every parse inside an editor uses `state.schema`, so Word's table rules
   still apply. Unknown namespaced types become `foreignInline`, `foreignBlock` and the `foreign`
   mark (in the Word schema, holding the type and attributes, plain JSON up to 64 KiB) and are
-  written back by `parseDocument` and `getDocument`; opaque for deletion (selected first); a foreign
+  written back by `parseDocument`, `getDocument`, React's `onChange` and control values (one
+  helper, `documentJSON`); opaque for deletion (selected first); a foreign
   node's `.docx` text rides on its JSON in memory only. Find matches a node's text as one position
   and replace refuses it (`locked`); tracked insertions and deletions of custom and foreign inline
   nodes are accepted and rejected as text. The view draws custom and foreign nodes as their text
   (`data-foli-custom`); a copy holding them carries its Foli JSON in the HTML
-  (`data-foli-clipboard`) as well. `@folijs/docx` maps them to `foli:`-tagged controls and back
-  (`src/custom.ts`). The saved-format rule needs nothing here: custom types never change the
-  version and v5 is the lowest. Tests: core `v3/extensions.test.ts` (9), docx `custom.test.ts` (5),
-  view `custom.test.ts` (2); e2e `apps/playground/e2e/extension.spec.ts` on `/extension.html`
+  (`data-foli-clipboard`) as well, read back only when that wrapper is all the pasted HTML holds.
+  `@folijs/docx` maps them to `foli:`-tagged controls and back (`src/custom.ts`), a control only
+  when nothing would be lost (else it stays a content control). The saved-format rule needs nothing here: custom types never change the
+  version and v5 is the lowest. Tests: core `v3/extensions.test.ts` (12), docx `custom.test.ts` (6),
+  view `custom.test.ts` (2), React `onChange` (1); e2e `apps/playground/e2e/extension.spec.ts` on `/extension.html`
   (typed, drawn on a later page, undone, copied and pasted into editors with and without the
   extension, a block node, saved and loaded, `.docx` both ways): 11 passed, the paste skipped in
   WebKit as the other clipboard tests, Firefox's paste now passing through the HTML. Word:
@@ -1465,10 +1468,12 @@ Each task is a PR on `phase-12/ecosystem`, the build green after each.
   budgets raised (`scripts/size.mjs`). Shortcuts: custom marks are not drawn and custom nodes only
   as their text until 12.4's views; `renderDocument` and `exportPdf` take no extensions (a custom
   node shows its `.docx` text or `[type]`); a custom block node cannot be tracked as inserted or
-  deleted; a custom block inside another block control loses that outer control on reading back;
-  the HTML carries the whole copy's JSON on a wrapper instead of per-element `data-foli-node`/
-  `data-foli-mark` attributes (simpler, and full fidelity in Firefox); the schema cache keeps only
-  the last extension list.)
+  deleted; a foreign node's `.docx` text is kept in memory only (JSON saved and loaded writes
+  `[type]`: keeping it would change the format); the HTML carries the whole copy's JSON on a wrapper instead of per-element `data-foli-node`/
+  `data-foli-mark` attributes (simpler, and full fidelity in Firefox); schemas are cached per
+  extension array (a WeakMap: an array given again must not have changed). Review of #123: no
+  silent loss on `.docx` import, `onChange` and control values without foreign names, carried JSON
+  only from a lone wrapper, `parseContent`'s options object, foreign types never read as Word's.)
 - [ ] 12.4 View extension: node views for custom nodes (measured and placed by the flow, split or
   kept whole across pages as declared), decorations (inline and node; find matches and the
   selected field move onto them where it is simpler), plugin views (mount, update, destroy) and

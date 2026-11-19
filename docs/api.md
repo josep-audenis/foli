@@ -219,9 +219,9 @@ Documents are schema v5, Word's model with tables, pictures, stories, fields and
   names the place (`content.content[2].marks[0].type: …`) and says when a newer Foli saved the
   document; never drops content silently. `ParseOptions`: `extensions`, the custom node and
   mark types the document may hold ([below](#custom-nodes-and-marks)); a custom type none of them
-  declares is kept as it is. `parseContent(json, path?, fragment?, schema?)` parses content
-  alone into a `doc` node of `schema` (default: the Word schema; an editor's is `state.schema`),
-  with Word's table rules.
+  declares is kept as it is. `parseContent(json, { path?, fragment?, extensions? })` parses
+  content alone into a `doc` node, with Word's table rules (`ContentOptions`: `ParseOptions` plus
+  the path errors name and whether it is content to paste, which a table may end).
 - `FoliDocument`: `{ schemaVersion: 5, section, defaults, styles, numbering, theme?, comments,
   resources?, stories?, controls?, settings?, content }` and its parts (`SectionJSON`, `StyleJSON`, `TablePropertiesJSON`,
   `RowPropertiesJSON`, `CellPropertiesJSON`, `TableConditionJSON`, `MeasureJSON`,
@@ -603,7 +603,7 @@ Stable, for plugins and code that edits documents directly:
   transaction's `addToHistory`. The plugin's state is internal. Of the built-in plugins only
   `history()`, `baseKeymap()` and `listKeymap()` are exported (ADR-0008).
 - The option, result and JSON types of the functions on this page are stable with them:
-  `EditorOptions`, `Extension`, `ExtensionNodeSpec`, `ParseOptions`, `EditorListener`, `DocumentTarget`, `NavigationRequest`, `FoundMatches`,
+  `EditorOptions`, `Extension`, `ExtensionNodeSpec`, `ParseOptions`, `ContentOptions`, `EditorListener`, `DocumentTarget`, `NavigationRequest`, `FoundMatches`,
   `OpenStory`, `StoryView`, `DeleteUnit`, `CommentContent`, `CommentOptions`, `ChangeKind`,
   `ChangeFilter`, `ControlInsertOptions`, `ControlPropertiesPatch`, `ControlRange`,
   `ControlValue`, `ControlValueInput`, `CrossReference`, `CrossReferenceTargets`,
@@ -637,6 +637,8 @@ release may change it.
   `keepTablesApart`, `noteKindOf`, `referencesIn`, `typedMarks`, `deleteSelectionKeepingTables`.
 - The Word schema and validation, for `.docx`: `schema`, `checkSection`, `checkControl`, `Check`,
   `RUN_PROPERTY_MARKS`.
+- `documentJSON(envelope, doc)`: an editor's document as apps get it (`getDocument`, React's
+  `onChange`), foreign types written back.
 - Custom types: `CUSTOM_TYPE` (the name pattern), `foreignTextOf` and `withForeignText` (the
   text a `.docx` control showed for a custom node, carried on its JSON in memory, never saved).
 
@@ -780,9 +782,11 @@ Details (what import keeps, what export writes, limits): the
   `foli:` and the type and attributes as JSON (ADR-0008): a node a plain text control, contents
   locked, showing its text (a block node one around a paragraph); each run of a mark a rich text
   control. A tag over 255 characters throws a `DocxError` naming the type. `importDocx` turns
-  such controls back into the nodes and marks, with or without the extension; a node read
-  without it keeps the control's text for the next export (in memory), one loaded from JSON
-  writes `[type]`.
+  such controls back into the nodes and marks, with or without the extension, when nothing else
+  is in them (a node's control: text runs formatted alike; a block node's: one plain paragraph
+  with nothing of its own; a mark's: anything, not empty); otherwise they stay content controls.
+  A node read without its extension keeps the control's text for the next export while in
+  memory; one loaded from JSON writes `[type]`.
 - `packageImages(pkg): PackageImages`: URLs for the pictures' images in a package
   (`url(key, resource?)`, made once each; `revoke()` frees them): `EditorView`'s `resource`
   option for a document imported from that package. Raster images (PNG, JPEG, GIF, WebP, BMP)

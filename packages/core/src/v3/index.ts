@@ -32,6 +32,7 @@ export {
   type WordSettingsJSON,
 } from "./document.js";
 export {
+  type ContentOptions,
   type Extension,
   type ExtensionNodeSpec,
   foreignTextOf,

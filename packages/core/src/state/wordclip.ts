@@ -230,7 +230,7 @@ export function fitPastedV2(
       else delete child.marks;
     }
   }
-  return { doc: parseContent(json, "content", false, state.schema), envelope: fitted.envelope };
+  return { doc: parseContent(json, { schema: state.schema }), envelope: fitted.envelope };
 }
 
 const equal = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
@@ -260,7 +260,7 @@ export function fitPaste(state: EditorState, content: unknown, definitions?: unk
     return fit(
       state,
       target,
-      safeLinks(parseContent(content, "content", true, state.schema).toJSON()),
+      safeLinks(parseContent(content, { fragment: true, schema: state.schema }).toJSON()),
       true,
     );
   const { document, styles, numbering, comments, notes } = definitions as Partial<WordDefinitions>;
@@ -276,7 +276,7 @@ export function fitPaste(state: EditorState, content: unknown, definitions?: unk
     ...(notes ? { stories: notes } : {}),
     content: { type: "doc", content: [{ type: "paragraph" }] },
   });
-  const json = parseContent(content, "content", true, state.schema).toJSON();
+  const json = parseContent(content, { fragment: true, schema: state.schema }).toJSON();
   const source: WordDefinitions = {
     styles: checked.styles,
     numbering: checked.numbering,
@@ -604,14 +604,14 @@ function fit(
         }),
       }
     : mapped;
-  const doc = parseContent(inPlace, "content", true, state.schema);
+  const doc = parseContent(inPlace, { fragment: true, schema: state.schema });
   const notes = [...pastedNotes].map(([from, id]) => {
     const note = carried(from) as StoryJSON;
     return {
       id,
       story: {
         kind: note.kind,
-        doc: parseContent(mapNode(note.content), "content", false, state.schema),
+        doc: parseContent(mapNode(note.content), { schema: state.schema }),
       },
     };
   });

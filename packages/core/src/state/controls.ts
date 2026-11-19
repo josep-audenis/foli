@@ -21,6 +21,7 @@ import { Mapping } from "../transform/stepmap.js";
 import { TransformError } from "../transform/transform.js";
 import type { ControlJSON } from "../v3/document.js";
 import { parseContent } from "../v3/document.js";
+import { writeCustom } from "../v3/extensions.js";
 import { attempt } from "./attempt.js";
 import { insertHardBreak, insertText } from "./commands.js";
 import { formatDatePicture } from "./fieldupdate.js";
@@ -997,7 +998,9 @@ export function controlValues(state: EditorState): ControlValue[] {
             content: (range.level === "cell"
               ? state.doc.slice(range.from + 1, range.to - 1).content
               : contentOf(state.doc, range)
-            ).toJSON(),
+            )
+              .toJSON()
+              .map(writeCustom),
           }
         : {}),
     });
@@ -1173,9 +1176,11 @@ const isBlocks = (value: ControlValueInput) =>
 
 function blocksFrom(state: EditorState, content: readonly NodeJSON[]): Node[] {
   const blocks: Node[] = [];
-  parseContent({ type: "doc", content }, "content", true, state.schema).forEach((node) => {
-    blocks.push(node);
-  });
+  parseContent({ type: "doc", content }, { fragment: true, schema: state.schema }).forEach(
+    (node) => {
+      blocks.push(node);
+    },
+  );
   return blocks;
 }
 

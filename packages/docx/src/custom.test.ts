@@ -188,4 +188,98 @@ describe("custom nodes and marks in .docx (ADR-0008)", () => {
       expect(tagged(read)).toEqual([["richText", null, tag]]);
     }
   });
+
+  it("leave a tagged control as a control when converting it would lose anything", async () => {
+    const node = 'foli:{"node":"acme:mention","attrs":{"id":"u-1","label":"A"}}';
+    const card = 'foli:{"node":"acme:card","attrs":{"id":"c-1"}}';
+    const mark = 'foli:{"mark":"acme:topic","attrs":{"topic":"t"}}';
+    const start = (id: string): NodeJSON => ({ type: "controlStart", attrs: { id } });
+    const end = (id: string): NodeJSON => ({ type: "controlEnd", attrs: { id } });
+    const p = (content: NodeJSON[], attrs?: Record<string, unknown>): NodeJSON => ({
+      type: "paragraph",
+      ...(attrs ? { attrs } : {}),
+      ...(content.length ? { content } : {}),
+    });
+    const kept = async (
+      blocks: NodeJSON[],
+      controls: NonNullable<FoliDocument["controls"]>,
+      extra: Partial<FoliDocument> = {},
+    ) => {
+      const doc = {
+        ...createDocument({ type: "doc", content: [...blocks, p([])] }),
+        controls,
+        ...extra,
+      };
+      const read = (await importDocx(await exportDocx(doc))).document;
+      expect(customs(read.content)).toEqual([]);
+      expect(
+        tagged(read)
+          .map((t) => t[2])
+          .sort(),
+      ).toEqual(
+        Object.values(controls)
+          .map((c) => c.tag)
+          .sort(),
+      );
+      return read;
+    };
+    const textControl = (tag: string) => ({
+      kind: "text" as const,
+      lock: "contentLocked" as const,
+      tag,
+    });
+    // A node's control holding a bookmark, or text formatted two ways.
+    const bookmarked = await kept(
+      [
+        p([
+          start("1"),
+          { type: "bookmarkStart", attrs: { id: 0, name: "here" } },
+          text("@A"),
+          { type: "bookmarkEnd", attrs: { id: 0 } },
+          end("1"),
+        ]),
+      ],
+      { "1": textControl(node) },
+    );
+    expect(JSON.stringify(bookmarked.content)).toContain("bookmarkStart");
+    await kept([p([start("1"), text("@"), text("A", [bold]), end("1")])], {
+      "1": textControl(node),
+    });
+    // A mark's control with nothing in it.
+    await kept([p([text("x"), start("1"), end("1")])], { "1": { kind: "richText", tag: mark } });
+    // A block node's control: inside another control, with properties, a section, a tracked
+    // insertion, formatted text, a comment anchor, or around two paragraphs.
+    const outer = { kind: "richText" as const, tag: "outer" };
+    await kept([p([text("Card c-1")], { controls: ["2", "1"] })], {
+      "2": outer,
+      "1": textControl(card),
+    });
+    await kept([p([text("Card c-1")], { controls: ["1"], justification: "center" })], {
+      "1": textControl(card),
+    });
+    await kept([p([text("Card c-1")], { controls: ["1"], section: {} }), p([text("next")])], {
+      "1": textControl(card),
+    });
+    const revision = { insertion: { id: 1, author: "A", date: null } };
+    await kept([p([text("Card c-1")], { controls: ["1"], revision })], { "1": textControl(card) });
+    await kept([p([text("Card c-1", [bold])], { controls: ["1"] })], { "1": textControl(card) });
+    const comment = { id: 0, author: "A", content: [p([text("note")])] };
+    await kept(
+      [
+        p(
+          [
+            { type: "commentStart", attrs: { id: 0 } },
+            text("Card c-1"),
+            { type: "commentEnd", attrs: { id: 0 } },
+          ],
+          { controls: ["1"] },
+        ),
+      ],
+      { "1": textControl(card) },
+      { comments: [comment] },
+    );
+    await kept([p([text("Card")], { controls: ["1"] }), p([text("c-1")], { controls: ["1"] })], {
+      "1": textControl(card),
+    });
+  });
 });

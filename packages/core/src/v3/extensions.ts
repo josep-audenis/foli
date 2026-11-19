@@ -32,7 +32,21 @@ export interface ParseOptions {
   extensions?: readonly Extension[];
 }
 
-let last: { extensions: readonly Extension[]; schema: Schema } | null = null;
+/** Options of `parseContent`. */
+export interface ContentOptions extends ParseOptions {
+  /** Where the content is, for error messages (default `content`). */
+  path?: string;
+  /** Content to paste, which a table may end. */
+  fragment?: boolean;
+  /**
+   * The schema to parse with (an editor's `state.schema`), in place of `extensions`.
+   * @internal
+   */
+  schema?: Schema;
+}
+
+/** Schemas by extension list: an array given again gets the same schema (do not mutate it). */
+const schemas = new WeakMap<readonly Extension[], Schema>();
 
 /**
  * The Word schema with `extensions`' types (the Word schema itself when there are none). Throws
@@ -41,12 +55,8 @@ let last: { extensions: readonly Extension[]; schema: Schema } | null = null;
  */
 export function schemaWith(extensions: readonly Extension[] | undefined): Schema {
   if (!extensions?.length) return wordSchema;
-  if (
-    last &&
-    last.extensions.length === extensions.length &&
-    last.extensions.every((e, i) => e === extensions[i])
-  )
-    return last.schema;
+  const known = schemas.get(extensions);
+  if (known) return known;
   const nodes: Record<string, NodeSpec> = { ...wordSchema.spec.nodes };
   const marks: Record<string, MarkSpec> = { ...wordSchema.spec.marks };
   const add = (into: Record<string, unknown>, name: string, from: string) => {
@@ -69,7 +79,7 @@ export function schemaWith(extensions: readonly Extension[] | undefined): Schema
       add(marks, name, extension.name)[name] = spec;
   }
   const schema = new Schema({ nodes, marks });
-  last = { extensions: [...extensions], schema };
+  schemas.set(extensions, schema);
   return schema;
 }
 
@@ -106,6 +116,7 @@ function resolveMarks(marks: unknown, schema: Schema): unknown {
       else if (
         mark.type === "foreign" &&
         typeof attrs?.type === "string" &&
+        CUSTOM_TYPE.test(attrs.type) &&
         schema.marks[attrs.type]
       )
         next = { type: attrs.type, ...(isRecord(attrs.attrs) ? { attrs: attrs.attrs } : {}) };
@@ -137,7 +148,7 @@ export function resolveCustom(value: unknown, schema: Schema, inline = false, de
   }
   if (typeof type === "string" && FOREIGN.has(type) && isRecord(value.attrs)) {
     const custom = value.attrs.type;
-    if (typeof custom === "string" && schema.nodes[custom] && !FOREIGN.has(custom)) {
+    if (typeof custom === "string" && CUSTOM_TYPE.test(custom) && schema.nodes[custom]) {
       const attrs = value.attrs.attrs;
       return {
         type: custom,

@@ -140,12 +140,28 @@ export function customToWord(
  */
 export function customFromWord(document: FoliDocument): FoliDocument {
   const controls = { ...document.controls };
-  const read = (id: unknown): Tagged | null => {
-    const tag = typeof id === "string" && Object.hasOwn(controls, id) ? controls[id]?.tag : null;
-    if (!tag?.startsWith(PREFIX)) return null;
+  // How often each control id is used: one used twice (a control split by an edit) stays.
+  const uses = new Map<string, number>();
+  const count = (node: NodeJSON) => {
+    const ids =
+      node.type === "controlStart"
+        ? [node.attrs?.id]
+        : ((node.attrs?.controls as unknown[] | null | undefined) ?? []);
+    for (const id of ids) if (typeof id === "string") uses.set(id, (uses.get(id) ?? 0) + 1);
+    node.content?.forEach(count);
+  };
+  mapTrees(document, (tree) => {
+    count(tree);
+    return tree;
+  });
+  const read = (id: unknown, kind: ControlJSON["kind"]): Tagged | null => {
+    if (typeof id !== "string" || !Object.hasOwn(controls, id) || uses.get(id) !== 1) return null;
+    const control = controls[id] as ControlJSON;
+    if (control.kind !== kind || control.placeholder?.showing || !control.tag?.startsWith(PREFIX))
+      return null;
     try {
-      const value = JSON.parse(tag.slice(PREFIX.length)) as Tagged;
-      const type = value.node ?? value.mark;
+      const value = JSON.parse(control.tag.slice(PREFIX.length)) as Tagged;
+      const type = kind === "text" ? value.node : value.mark;
       const attrs = value.attrs;
       const plain =
         attrs === undefined ||
@@ -156,49 +172,65 @@ export function customFromWord(document: FoliDocument): FoliDocument {
     }
   };
   const used = new Set<string>();
+  const nodeOf = (value: Tagged, text: string, marks: readonly MarkJSON[] = []) =>
+    withForeignText(
+      withMarks(
+        { type: value.node as string, ...(value.attrs ? { attrs: value.attrs } : {}) },
+        marks,
+      ),
+      text,
+    );
+  /** Text runs alone, all formatted alike: what a node's control holds when nothing else is in it. */
+  const plainText = (items: readonly NodeJSON[]) =>
+    items.every(
+      (n) => n.type === "text" && JSON.stringify(n.marks) === JSON.stringify(items[0]?.marks),
+    );
   const inlines = (items: readonly NodeJSON[]): NodeJSON[] => {
     const out: NodeJSON[] = [];
     for (let i = 0; i < items.length; i++) {
       const item = items[i] as NodeJSON;
       const id = item.type === "controlStart" ? item.attrs?.id : undefined;
-      const value = read(id);
-      const end = value
+      const end = id
         ? items.findIndex((n, j) => j > i && n.type === "controlEnd" && n.attrs?.id === id)
         : -1;
-      if (!value || end < 0) {
+      const inner = items.slice(i + 1, end);
+      // A node's control with text runs only, or a mark's around something: anything else (a
+      // bookmark or a field in a node's control, an empty control) stays the control it is.
+      const node = end > 0 && plainText(inner) ? read(id, "text") : null;
+      const mark = end > 0 && !node && inner.length ? read(id, "richText") : null;
+      if (node) {
+        out.push(nodeOf(node, inner.map((n) => n.text ?? "").join(""), inner[0]?.marks));
+      } else if (mark) {
+        const type: MarkJSON = {
+          type: mark.mark as string,
+          ...(mark.attrs && { attrs: mark.attrs }),
+        };
+        out.push(...inlines(inner).map((n) => withMarks(n, [...(n.marks ?? []), type])));
+      } else {
         out.push(item);
         continue;
       }
       used.add(id as string);
-      const inner = inlines(items.slice(i + 1, end));
-      if (value.node) {
-        const text = inner.map((n) => n.text ?? "").join("");
-        const node = withMarks(
-          { type: value.node, ...(value.attrs ? { attrs: value.attrs } : {}) },
-          inner[0]?.marks ?? [],
-        );
-        out.push(withForeignText(node, text));
-      } else {
-        const mark: MarkJSON = {
-          type: value.mark as string,
-          ...(value.attrs && { attrs: value.attrs }),
-        };
-        out.push(...inner.map((n) => withMarks(n, [...(n.marks ?? []), mark])));
-      }
       i = end;
     }
     return out;
   };
   const blocks = (node: NodeJSON): NodeJSON => {
-    const own = (node.attrs?.controls as string[] | undefined)?.at(-1);
-    const value = node.type === "paragraph" ? read(own) : null;
+    const own = node.attrs?.controls as string[] | null | undefined;
+    // A block node's control holds one paragraph of plain text and nothing of its own: no other
+    // control around it, no properties, section or tracked change (Word's ids aside).
+    const { controls: _, attributes, ...rest } = (node.attrs ?? {}) as Record<string, unknown>;
+    const value =
+      node.type === "paragraph" &&
+      own?.length === 1 &&
+      Object.values(rest).every((v) => v === null || v === undefined) &&
+      Object.keys((attributes as object | null) ?? {}).every((k) => WORD_IDS.test(k)) &&
+      (node.content ?? []).every((n) => n.type === "text" && !n.marks?.length)
+        ? read(own[0], "text")
+        : null;
     if (value?.node) {
-      used.add(own as string);
-      const text = (node.content ?? []).map((n) => n.text ?? "").join("");
-      return withForeignText(
-        { type: value.node, ...(value.attrs ? { attrs: value.attrs } : {}) },
-        text,
-      );
+      used.add(own?.[0] as string);
+      return nodeOf(value, (node.content ?? []).map((n) => n.text ?? "").join(""));
     }
     if (!node.content) return node;
     if (node.type === "paragraph") return { ...node, content: inlines(node.content) };
@@ -210,3 +242,6 @@ export function customFromWord(document: FoliDocument): FoliDocument {
   const { controls: _, ...rest } = mapped;
   return Object.keys(controls).length ? { ...rest, controls } : rest;
 }
+
+/** A paragraph's attributes Word sets on every paragraph it saves: ids that say nothing of it. */
+const WORD_IDS = /^(w14:paraId|w14:textId|w:rsid\w*)$/;

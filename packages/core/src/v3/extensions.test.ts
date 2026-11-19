@@ -6,7 +6,7 @@ import { acceptAllChanges, rejectAllChanges } from "../state/review.js";
 import { NodeSelection, TextSelection } from "../state/selection.js";
 import { type Command, Plugin, PluginKey } from "../state/state.js";
 import { fitPaste } from "../state/wordclip.js";
-import { createDocument, type FoliDocument, parseDocument } from "./document.js";
+import { createDocument, type FoliDocument, parseContent, parseDocument } from "./document.js";
 import { type Extension, foreignTextOf, withForeignText } from "./extensions.js";
 
 const id = (v: unknown) => (typeof v === "string" && /^[\w-]{1,64}$/.test(v) ? undefined : "id");
@@ -220,5 +220,52 @@ describe("custom nodes and marks (ADR-0008)", () => {
       editor.run(acceptAllChanges());
       expect(JSON.stringify(editor.getDocument().content)).not.toContain("acme:mention");
     }
+  });
+
+  it("give a rich text control's value with custom types, not foreign ones", () => {
+    const document = {
+      ...createDocument({
+        type: "doc",
+        content: [
+          {
+            type: "paragraph",
+            content: [
+              { type: "controlStart", attrs: { id: "1" } },
+              mention("Ada"),
+              { type: "controlEnd", attrs: { id: "1" } },
+            ],
+          },
+        ],
+      }),
+      controls: { "1": { kind: "richText" as const } },
+    };
+    const value = editorOf(document).controlValues()[0];
+    expect(JSON.stringify(value?.content)).toContain('"type":"acme:mention"');
+    expect(JSON.stringify(value?.content)).not.toContain("foreign");
+  });
+
+  it("never read a foreign node or mark as a Word type", () => {
+    const doc = (inline: NodeJSON) =>
+      createDocument({ type: "doc", content: [{ type: "paragraph", content: [inline] }] });
+    const fake = { type: "foreignInline", attrs: { type: "hardBreak" } } as NodeJSON;
+    expect(() => parseDocument(doc(fake))).toThrow(FoliDocumentError);
+    const mark = { type: "foreign", attrs: { type: "bold" } };
+    expect(() => parseDocument(doc({ type: "text", text: "x", marks: [mark] }))).toThrow(
+      FoliDocumentError,
+    );
+  });
+
+  it("parse content with options: path, fragment and extensions", () => {
+    const content = sample().content;
+    expect(parseContent(content, { extensions: [acme] }).child(1).type.name).toBe("acme:card");
+    expect(parseContent(content).child(1).type.name).toBe("foreignBlock");
+    expect(() => parseContent({ type: "doc", content: [{ type: "x" }] }, { path: "here" })).toThrow(
+      /^here\.content\[0\]\.type/,
+    );
+    // The same extension list gives the same schema.
+    const list = [acme];
+    expect(parseContent(content, { extensions: list }).type.schema).toBe(
+      parseContent(content, { extensions: list }).type.schema,
+    );
   });
 });

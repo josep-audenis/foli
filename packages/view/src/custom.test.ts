@@ -92,6 +92,26 @@ describe("custom nodes and marks in the view (ADR-0008)", () => {
         expect(target.editor.getDocument().content.content).toEqual(content);
       }
     }
+    // A Foli copy inside other HTML (an email quoting it): read as HTML, the text around it kept.
+    const quoted = mount([{ type: "paragraph" }], [acme]);
+    quoted.view.paste(
+      data({ "text/html": `<p>Before</p>${copied["text/html"] ?? ""}<!-- c --> <p>After</p>` }),
+    );
+    const text = JSON.stringify(quoted.editor.getDocument().content);
+    expect(text).toContain("Before");
+    expect(text).toContain("After");
+    expect(text).toContain("@Ada");
+    expect(text).not.toContain("acme:");
+    // Whitespace and comments around the wrapper (as browsers add them) do not count.
+    const wrapped = mount([{ type: "paragraph" }], [acme]);
+    wrapped.view.paste(
+      data({
+        "text/html": `<html><body>
+<!--StartFragment-->${copied["text/html"]}<!--EndFragment-->
+</body></html>`,
+      }),
+    );
+    expect(wrapped.editor.getDocument().content.content).toEqual(content);
     // HTML without custom content stays as it was: no JSON in it.
     const plain = mount([{ type: "paragraph", content: [{ type: "text", text: "x" }] }]);
     expect(copyAll(plain.view, plain.host)["text/html"]).not.toContain("data-foli-clipboard");

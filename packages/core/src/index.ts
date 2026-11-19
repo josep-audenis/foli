@@ -321,6 +321,7 @@ export {
   type BorderJSON,
   type CellPropertiesJSON,
   type CommentJSON,
+  type ContentOptions,
   type ControlJSON,
   createDocument,
   type Extension,

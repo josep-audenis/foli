@@ -261,8 +261,16 @@ Details in the [package README](../packages/docx/README.md).
   are not imported (Word recomputes them or they show nothing).
 - Custom nodes and marks are content controls tagged with their type and attributes: a tag holds
   at most 255 characters, so larger attributes are refused at export (`DocxError`), never cut.
-  A custom block node inside another block content control loses that outer control around it
-  when read back (the control's other paragraphs keep it).
+  A tagged control is read back as its node or mark only when nothing would be lost: a node's
+  control holding anything but text runs formatted alike (a bookmark, a field, a comment anchor),
+  a block node's paragraph with properties, a section, a tracked change, formatting or another
+  control around it, an empty mark control, or one Word split in two stays an ordinary content
+  control, its tag kept.
+- A foreign node (its extension not loaded) shows its control's text in the next `.docx` only
+  while the document stays in memory: saved as JSON and loaded again it writes `[type]`. Keeping
+  the text in the JSON would change the saved format (a key `parseDocument` refuses today, or an
+  attribute the extension's own validation would refuse), which ADR-0008 rules out for custom
+  types.
 
 ## Pages
 

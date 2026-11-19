@@ -76,7 +76,14 @@ import {
   trackState,
   trackTransaction,
 } from "./track.js";
-import { storyBody, type WordContext, type WordEnvelope, wordContext, wordPlugin } from "./word.js";
+import {
+  documentJSON,
+  storyBody,
+  type WordContext,
+  type WordEnvelope,
+  wordContext,
+  wordPlugin,
+} from "./word.js";
 import type { ListKind } from "./wordformat.js";
 
 /**
@@ -324,7 +331,7 @@ function loadDocument(
 ): Loaded {
   const { content, ...envelope } = parseDocument(document, { extensions });
   return {
-    doc: parseContent(content, "content", false, schema),
+    doc: parseContent(content, { schema }),
     settings: sectionSettings(envelope.section),
     envelope,
   };
@@ -515,22 +522,8 @@ export function createEditor({
     if (section !== current.section) current = { section, settings: sectionSettings(section) };
     return current.settings;
   };
-  const getDocument = (): FoliDocument => {
-    const { stories, comments, ...rest } = structuredClone(
-      wordContext(state)?.envelope ?? loaded.envelope,
-    );
-    // Foreign nodes and marks go out as the custom types they stand for.
-    return {
-      ...rest,
-      comments: comments.map((c) => ({ ...c, content: c.content.map(writeCustom) })),
-      ...(stories && {
-        stories: Object.fromEntries(
-          Object.entries(stories).map(([id, s]) => [id, { ...s, content: writeCustom(s.content) }]),
-        ),
-      }),
-      content: writeCustom(state.doc.toJSON()),
-    };
-  };
+  const getDocument = (): FoliDocument =>
+    documentJSON(wordContext(state)?.envelope ?? loaded.envelope, state.doc);
 
   const storyEditor = (id: string): Editor => {
     const editing = new StoryEditing(id, {

@@ -8,6 +8,7 @@ export {
   controlSpot,
   copiedDefinitions,
   deleteSelectionKeepingTables,
+  documentJSON,
   EnvelopeStep,
   type FittedPaste,
   fitPaste,

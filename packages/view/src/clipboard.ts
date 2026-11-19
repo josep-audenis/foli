@@ -184,8 +184,19 @@ export function docFromClipboard(
     () => {
       // Foli's HTML with custom content carries its JSON (parsed inert, never inserted).
       if (!html.includes(JSON_ATTR)) return null;
-      const parsed = new DOMParser().parseFromString(html, "text/html");
-      const carried = parsed.querySelector(`[${JSON_ATTR}]`)?.getAttribute(JSON_ATTR);
+      const { body } = new DOMParser().parseFromString(html, "text/html");
+      // Only when the wrapper is all there is: a Foli copy inside other content (an email
+      // quoting it) is read as HTML, so the text around it is kept.
+      const alone = [...body.childNodes].every(
+        (n) =>
+          n.nodeType === 8 ||
+          (n.nodeType === 3 && !n.textContent?.trim()) ||
+          n === body.firstElementChild,
+      );
+      const carried =
+        alone && body.childElementCount === 1
+          ? body.firstElementChild?.getAttribute(JSON_ATTR)
+          : null;
       return carried ? foliJSON(carried) : null;
     },
     () => {

@@ -153,6 +153,20 @@ describe("FoliEditor", () => {
     expect(changes).toHaveLength(1);
   });
 
+  it("reports custom content by its own type, never as the foreign node it is in memory", () => {
+    const changes: FoliChange[] = [];
+    const mention = { type: "acme:mention", attrs: { id: "u-1" } };
+    const content = { type: "doc", content: [{ type: "paragraph", content: [mention] }] };
+    renderEditor({
+      initialContent: createDocument(content),
+      onChange: (change) => changes.push(change),
+    });
+    type("Hi");
+    const saved = JSON.stringify(changes[0]?.document);
+    expect(saved).toContain('{"type":"acme:mention","attrs":{"id":"u-1"}}');
+    expect(saved).not.toContain("foreign");
+  });
+
   it("serializes the document only when a change's document is read, once", () => {
     const changes: FoliChange[] = [];
     const { editor } = renderEditor({ onChange: (change) => changes.push(change) });
