@@ -1,6 +1,6 @@
 {
   "name": "@folijs/pdf",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "PDF for the Foli document engine: a document printed by a headless Chromium page the app supplies (Playwright or Puppeteer), from Foli's own page layout, fields updated, links and the outline kept.",
   "license": "MIT",
   "repository": {

@@ -1125,7 +1125,7 @@ editor's print gives the same pages, sizes and text for the nine documents (`pdf
 Chromium); v4 → v5 changes the version only (`v5.test.ts`); the section, header, fields, notes,
 controls and navigation menus, dialogs and panels are keyboard-usable and axe-clean in three
 engines. The whole playground e2e suite passes in three engines (762 tests, 75 skipped where an
-engine cannot run them). Misses, for the owner to accept or not: T4 (IME) in a header and in a
+engine cannot run them). Misses, accepted by the owner as known limits on 2026-11-19: T4 (IME) in a header and in a
 footnote runs in Chromium only (CDP), as everywhere in the editor; filling a control from the UI
 is not itself exported to Word (the UI runs the commands the round trip exports); on Word's line
 04 stays at 25 of 35, the limit accepted for 0.5.0; on screen 07 scores 0.394 and 02's second

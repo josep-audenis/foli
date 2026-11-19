@@ -1,6 +1,6 @@
 {
   "name": "@folijs/docx",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "DOCX for the Foli document engine: import to Foli's Word model (schema v3) and lossless export, the package (zip, parts, relationships) and an XML reader that keeps the exact source text. No DOM.",
   "license": "MIT",
   "repository": {
