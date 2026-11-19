@@ -23,6 +23,7 @@ import {
   setControlValue,
 } from "./controls.js";
 import { createEditor, type Editor } from "./editor.js";
+import { updateFields } from "./fieldupdate.js";
 import { redo, undo, undoDepth } from "./history.js";
 import { acceptAllChanges, rejectAllChanges } from "./review.js";
 import { TextSelection } from "./selection.js";
@@ -697,5 +698,360 @@ describe("copy and paste", () => {
     editor.dispatch(editor.state.tr.setSelection(TextSelection.create(editor.state.doc, from, to)));
     const { doc } = paste(editor, content);
     expect(doc.content?.[0]?.content?.[0]?.attrs?.id).toBe("c");
+  });
+});
+
+describe("as Word's review of the rules has it", () => {
+  const change = (type: "insertion" | "deletion", id: number) => ({
+    type,
+    attrs: { id, author: "A", date: "2026-01-01T00:00:00Z" },
+  });
+  const font = [{ type: "font", attrs: { ascii: "MS Gothic" } }];
+  const LIST = [
+    { value: "a", display: "Alpha" },
+    { value: "b", display: "Beta" },
+  ];
+
+  it("reject all restores a list, a check box and a date, with the other changes", () => {
+    const controls: Record<string, ControlJSON> = {
+      drop: { kind: "dropDown", tag: "drop", items: LIST },
+      box: { kind: "checkbox", tag: "box", checked: false },
+      when: { kind: "date", tag: "when", dateFormat: "d MMMM yyyy", date: "2026-03-03T00:00:00Z" },
+    };
+    const editor = editorOf(
+      [
+        p(
+          inline("drop", text("Alpha")),
+          inline("box", text("\u2610", font)),
+          inline("when", text("3 March 2026")),
+          "x",
+        ),
+      ],
+      controls,
+      { track: true },
+    );
+    editor.commands.setControlValue("drop", "b");
+    editor.commands.setControlValue("box", true);
+    editor.commands.setControlValue("when", "2026-04-04");
+    editor.select(editor.state.doc.content.size - 1);
+    editor.commands.insertText("y");
+    expect(props(editor, "when").date).toBe("2026-04-04T00:00:00Z");
+    expect(editor.run(rejectAllChanges())).toBe(true);
+    expect(textOf(editor)).toBe("Alpha\u26103 March 2026x");
+    expect(props(editor, "box").checked).toBe(false);
+    expect(props(editor, "when").date).toBe("2026-03-03T00:00:00Z");
+    expect(JSON.stringify(editor.state.doc.toJSON())).not.toContain("insertion");
+  });
+
+  it("accept all keeps the new choice", () => {
+    const editor = editorOf(
+      [p(inline("box", text("\u2610", font)))],
+      { box: { kind: "checkbox", checked: false } },
+      { track: true },
+    );
+    editor.commands.setControlValue("box", true);
+    editor.run(acceptAllChanges());
+    expect(textOf(editor)).toBe("\u2612");
+    expect(props(editor, "box").checked).toBe(true);
+  });
+
+  it("reject all reaches a check box in a story", () => {
+    const editor = editorOf(
+      [p("body")],
+      { box: { kind: "checkbox", tag: "box", checked: false } },
+      {
+        track: true,
+        more: {
+          stories: {
+            h: {
+              kind: "header",
+              content: { type: "doc", content: [p(inline("box", text("\u2610", font)))] },
+            },
+          },
+        },
+      },
+    );
+    editor.commands.setControlValue("box", true);
+    editor.run(rejectAllChanges());
+    expect(editor.controlValues()[0]).toMatchObject({ story: "h", value: false, text: "\u2610" });
+  });
+
+  it("fields are updated in locked content and in a list", () => {
+    const field = (result: string): NodeJSON[] => [
+      { type: "fieldStart" },
+      { type: "fieldCode", attrs: { text: " MERGEFIELD x " } },
+      { type: "fieldSeparator" },
+      text(result),
+      { type: "fieldEnd" },
+    ];
+    const editor = editorOf([p(inline("l", ...field("old"))), p(inline("d", ...field("old")))], {
+      l: { kind: "richText", lock: "sdtContentLocked" },
+      d: { kind: "dropDown", items: [] },
+    });
+    const report = updateFields(editor, { data: { x: "new" } });
+    expect(report.updated).toBe(2);
+    expect(textOf(editor)).toBe("newnew");
+  });
+
+  it("a control inside a locked one is filled; the locked text around it is not touched", () => {
+    const editor = editorOf(
+      [p(inline("outer", text("a"), ...inline("in", text("b")), text("c")))],
+      { outer: { kind: "richText", lock: "contentLocked" }, in: { kind: "text", tag: "in" } },
+    );
+    expect(editor.commands.setControlValue("in", "new")).toBe(true);
+    expect(textOf(editor)).toBe("anewc");
+    editor.select(range(editor, "outer").contentFrom + 1);
+    editor.commands.insertText("x");
+    expect(textOf(editor)).toBe("anewc");
+    inside(editor, "in", 1);
+    editor.commands.insertText("!");
+    expect(textOf(editor)).toBe("an!ewc");
+  });
+
+  it("while tracking, a control that cannot be deleted refuses a deletion over it", () => {
+    const editor = editorOf(
+      [p("a", inline("c", text("held")), "b")],
+      {
+        c: { kind: "richText", lock: "sdtLocked" },
+      },
+      { track: true },
+    );
+    const before = editor.state.doc;
+    editor.select(1, editor.state.doc.content.size - 1);
+    editor.run(deleteSelection);
+    expect(editor.state.doc.eq(before)).toBe(true);
+    // Its content can still be deleted, recorded.
+    const { contentFrom, contentTo } = range(editor, "c");
+    editor.select(contentFrom, contentTo);
+    editor.run(deleteSelection);
+    expect(JSON.stringify(editor.state.doc.toJSON())).toContain("deletion");
+  });
+
+  it.each(["contentLocked", undefined] as const)(
+    "while tracking, deleting a whole control (%s) is recorded; accepting takes it",
+    (lock) => {
+      const of = () =>
+        editorOf(
+          [p("a", inline("c", text("held")), "b")],
+          {
+            c: { kind: "richText", ...(lock ? { lock } : {}) },
+          },
+          { track: true },
+        );
+      const editor = of();
+      const { from, to } = range(editor, "c");
+      editor.select(from, to);
+      editor.run(deleteSelection);
+      expect(JSON.stringify(editor.state.doc.toJSON())).toContain("deletion");
+      expect(props(editor, "c").deleted).toBe(true);
+      editor.run(acceptAllChanges());
+      expect(controlsIn(editor.state.doc)).toHaveLength(0);
+      expect(textOf(editor)).toBe("ab");
+      const back = of();
+      back.select(range(back, "c").from, range(back, "c").to);
+      back.run(deleteSelection);
+      back.run(rejectAllChanges());
+      expect(textOf(back)).toBe("aheldb");
+      expect(props(back, "c").deleted).toBeUndefined();
+    },
+  );
+
+  it.each([
+    ["locked", { kind: "richText", lock: "contentLocked" }],
+    ["plain text", { kind: "text" }],
+    ["drop-down", { kind: "dropDown", items: [] }],
+  ] as [string, ControlJSON][])("a comment can be anchored in a %s control", (_name, control) => {
+    const editor = editorOf([p(inline("c", text("held")))], { c: control });
+    const { contentFrom } = range(editor, "c");
+    editor.select(contentFrom + 1, contentFrom + 3);
+    expect(editor.commands.addComment("note")).toBe(true);
+    expect(editor.getDocument().comments).toHaveLength(1);
+    expect(textOf(editor)).toBe("held");
+    expect(JSON.stringify(editor.state.doc.toJSON())).toContain("commentStart");
+  });
+
+  it("bold takes in a drop-down and a check box, not locked content", () => {
+    const bolded = (control: ControlJSON) => {
+      const editor = editorOf([p("a", inline("c", text("v")), "b")], { c: control });
+      editor.select(1, editor.state.doc.content.size - 1);
+      editor.run(toggleMark("bold"));
+      return JSON.stringify(editor.state.doc.toJSON()).match(/"bold"/g)?.length ?? 0;
+    };
+    expect(bolded({ kind: "dropDown", items: [] })).toBe(3);
+    expect(bolded({ kind: "checkbox" })).toBe(3);
+    expect(bolded({ kind: "richText", lock: "contentLocked" })).toBe(0);
+  });
+
+  it("text replacing a placeholder takes w:sdtPr/w:rPr, typed or set", () => {
+    const control: ControlJSON = {
+      kind: "text",
+      tag: "t",
+      format: [{ type: "bold" }],
+      placeholder: { showing: true, text: "Type" },
+    };
+    const typed = editorOf([p(inline("c", hint("Type")))], { c: control });
+    inside(typed, "c");
+    typed.commands.insertText("x");
+    const set = editorOf([p(inline("c", hint("Type")))], { c: control });
+    set.commands.setControlValue("t", "x");
+    for (const editor of [typed, set]) {
+      const run = editor.state.doc.firstChild?.child(1).toJSON();
+      expect(run).toEqual(text("x", [{ type: "bold" }]));
+    }
+  });
+
+  it("rich content is checked at the door", () => {
+    const of = () =>
+      editorOf([p(inline("c", text("v"))), p(inline("other", text("w")))], {
+        c: { kind: "richText" },
+        other: { kind: "richText" },
+        spare: { kind: "text" },
+      });
+    const link = [{ type: "link", attrs: { href: "javascript:alert(1)" } }];
+    const refused: unknown[] = [
+      {},
+      { content: "x" },
+      { content: [{}] },
+      { content: [null] },
+      { content: [text("x", link)] },
+      { content: inline("unknown", text("x")) },
+      { content: inline("other", text("x")) },
+      { content: [{ type: "controlStart", attrs: { id: "spare" } }] },
+      { content: [{ type: "commentReference", attrs: { id: 9 } }] },
+      { content: [{ type: "noteReference", attrs: { story: "nope" } }] },
+      { content: [p("one"), p("two")] },
+    ];
+    for (const value of refused)
+      expect(of().commands.setControlValue("c", value as never)).toBe(false);
+    expect(of().commands.setControlValue("c", { content: inline("spare", text("x")) })).toBe(true);
+  });
+
+  it("says false when the rules refuse the value", () => {
+    const editor = editorOf(
+      [inBlock(p("v"), "c")],
+      { c: { kind: "richText" } },
+      {
+        more: {
+          stories: {
+            h: { kind: "header", content: { type: "doc", content: [inBlock(p("w"), "s")] } },
+          },
+        },
+      },
+    );
+    const story = editor.story("h") as Editor;
+    expect(
+      story.run(
+        setControlValue("s", {
+          content: [{ type: "paragraph", content: [{ type: "columnBreak" }] }],
+        }),
+      ),
+    ).toBe(false);
+  });
+
+  it("a date keeps its value through formatting, and re-reads what is typed", () => {
+    const date = "2026-03-03T00:00:00Z";
+    const control: ControlJSON = {
+      kind: "date",
+      tag: "w",
+      dateFormat: "d MMMM yyyy",
+      date,
+      ext: '<w:sdt><w:sdtPr><w:date><w:lid w:val="es-ES"/></w:date></w:sdtPr></w:sdt>',
+    };
+    const editor = editorOf([p(inline("c", text("3 marzo 2026")))], { c: control });
+    const { contentFrom, contentTo } = range(editor, "c");
+    editor.select(contentFrom, contentTo);
+    editor.run(toggleMark("bold"));
+    expect(props(editor, "c").date).toBe(date);
+    editor.select(contentFrom + 1);
+    editor.commands.insertText("9");
+    expect(props(editor, "c").date).toBeUndefined();
+    editor.run(deleteBackward());
+    expect(props(editor, "c").date).toBe(date);
+  });
+
+  it("refuses a day the calendar lacks, and a checked state's bad code does no harm", () => {
+    const editor = editorOf([p(inline("d", text("x")), inline("k", text("\u2610")))], {
+      d: { kind: "date", dateFormat: "d MMMM yyyy" },
+      k: { kind: "checkbox", checkedState: { value: "zzzz" } },
+    });
+    editor.commands.setControlValue("d", "2026-02-31");
+    expect(props(editor, "d").date).toBeUndefined();
+    expect(textOf(editor)).toContain("2026-02-31");
+    expect(editor.commands.setControlValue("k", true)).toBe(true);
+  });
+
+  it("a repeating section may forbid more items; copies leave bookmarks and comments", () => {
+    const item = inBlock(
+      p({ type: "bookmarkStart", attrs: { id: 1, name: "b" } }, "x", {
+        type: "bookmarkEnd",
+        attrs: { id: 1 },
+      }),
+      "r",
+      "i",
+    );
+    const controls = (noInsertDelete: boolean): Record<string, ControlJSON> => ({
+      r: { kind: "repeating", noInsertDelete },
+      i: { kind: "repeatingItem" },
+    });
+    const fixed = editorOf([item, p("end")], controls(true));
+    fixed.select(3);
+    expect(fixed.run(addRepeatingItem())).toBe(false);
+    const open = editorOf([item, p("end")], controls(false));
+    open.select(3);
+    expect(open.run(addRepeatingItem())).toBe(true);
+    expect(JSON.stringify(open.state.doc.toJSON()).match(/bookmarkStart/g)).toHaveLength(1);
+  });
+
+  it("a cell's control takes text; one tag fills an inline and a cell control", () => {
+    const cell = {
+      type: "tableCell",
+      attrs: { controls: ["cell"] },
+      content: [p("old")],
+    };
+    const table = {
+      type: "table",
+      attrs: { grid: [2000] },
+      content: [{ type: "tableRow", content: [cell] }],
+    } as unknown as NodeJSON;
+    const editor = editorOf([p(inline("in", text("x"))), table, p("")], {
+      in: { kind: "text", tag: "t" },
+      cell: { kind: "text", tag: "t" },
+    });
+    expect(editor.commands.setControlValue("t", "new")).toBe(true);
+    expect(textOf(editor)).toBe("newnew");
+  });
+
+  it("rich blocks fill a control that is all its document or cell holds", () => {
+    const blocks = { content: [p("one"), p("two")] };
+    const alone = editorOf([inBlock(p("v"), "c")], { c: { kind: "richText" } });
+    expect(alone.commands.setControlValue("c", blocks)).toBe(true);
+    expect(textOf(alone)).toBe("onetwo");
+    expect(alone.state.doc.childCount).toBe(2);
+    expect(range(alone, "c").to).toBe(alone.state.doc.content.size);
+    const table = {
+      type: "table",
+      attrs: { grid: [2000] },
+      content: [
+        {
+          type: "tableRow",
+          content: [{ type: "tableCell", attrs: { controls: ["c"] }, content: [p("v")] }],
+        },
+      ],
+    } as unknown as NodeJSON;
+    const inCell = editorOf([table, p("")], { c: { kind: "richText" } });
+    expect(inCell.commands.setControlValue("c", blocks)).toBe(true);
+    expect(textOf(inCell)).toBe("onetwo");
+  });
+
+  it("a keystroke stays cheap with many controls", () => {
+    const blocks = Array.from({ length: 3000 }, (_, i) => p(inline(`c${i}`, text("v"))));
+    const controls = Object.fromEntries(
+      blocks.map((_, i): [string, ControlJSON] => [`c${i}`, { kind: "richText" }]),
+    );
+    const editor = editorOf(blocks, controls);
+    editor.select(2);
+    const started = performance.now();
+    for (let i = 0; i < 5; i++) editor.commands.insertText("x");
+    expect((performance.now() - started) / 5).toBeLessThan(250);
   });
 });

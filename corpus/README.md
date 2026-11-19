@@ -172,7 +172,7 @@ Word's pages from `reference/word/`, every field works out to Word's result and 
 `word-reference.ps1` does for controls and their locks, check box state, list items and date format)
 has Word read what the editor makes of controls: 03 unchanged, filled through the API (also while
 tracking), typed into, filled and emptied, with changed properties and with a control copied, and a
-new document with every kind inserted and a repeating section grown. Word opens all 8 and finds
+new document with every kind inserted and a repeating section grown; a tracked fill rejected. Word opens all 9 and finds
 every control as Foli holds it, ids unique (2026-11-18, Word 16.0.20527).
 
 `scripts/corpus/section-roundtrip.mjs` (11.6) has Word read Foli's sections back: 08 exported

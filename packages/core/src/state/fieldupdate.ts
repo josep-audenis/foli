@@ -17,6 +17,7 @@ import { TransformError } from "../transform/transform.js";
 import type { SectionJSON } from "../v3/document.js";
 import { formatNumber, type ListMarker } from "../v3/resolve.js";
 import { attempt } from "./attempt.js";
+import { controlEdit } from "./controls.js";
 import type { Editor } from "./editor.js";
 import { type Field, fieldAround, fieldsIn } from "./fields.js";
 import { closeHistory, joinHistory } from "./history.js";
@@ -1458,7 +1459,7 @@ function storyRun(editor: Editor, id: string, story: Story, body: Run, out: Tran
   const storyEditor = editor.story(id);
   if (!storyEditor || !fieldsIn(story.doc).length) return;
   const { state } = storyEditor;
-  const tr = state.tr;
+  const tr = state.tr.setMeta(controlEdit, "fields");
   const { updated, unchanged } = body.report;
   updateTree({ ...body, state, tr, story: id, bodyTr: body.tr });
   if (!tr.docChanged) return;
@@ -1502,7 +1503,8 @@ export function updateFields(editor: Editor, options: UpdateFieldsOptions = {}):
   const picks =
     only && typeof only !== "function" ? fieldsInRange(state.doc, only.from, only.to) : null;
   const attempt = (contents: boolean) => {
-    const tr = state.tr;
+    // Word updates fields in locked content and in lists.
+    const tr = state.tr.setMeta(controlEdit, "fields");
     const run: Run = {
       state,
       tr,

@@ -272,7 +272,14 @@ content, ext? }`. `content` is a `doc` of the body's blocks. `noteType` is Word'
     range over it. `contentLocked`: no text or formatting change, but the whole control can be
     deleted. `sdtContentLocked`: both. Properties and the locks themselves stay changeable. The
     filter compares what a transaction leaves with what was there (undo passes), so it does not
-    depend on how the change came. Tracked changes in locked content can be accepted, not rejected.
+    depend on how the change came; what a control inside holds is that control's, so an unlocked
+    one in a locked one is edited. Tracked changes in locked content can be accepted, not rejected;
+    comments can be anchored in it and fields in it are updated. Formatting a range holding locked
+    content does nothing at all; one holding a drop-down or check box formats them too.
+  - **Deleting a control while tracking.** Refused when it is locked against deletion. Otherwise
+    Word records it (`w:customXmlDelRange*` around the `w:sdt`), locked content included; accepting
+    removes the control, rejecting restores it. Foli holds that as `deleted` beside the marked
+    content and does not write it: after a reload accepting leaves the emptied control.
   - **Placeholder.** Typing replaces it and removes `w:showingPlcHdr`; the text loses the
     `PlaceholderText` style. While tracking Word records the insertion only, not the placeholder's
     deletion. Emptying a control (by typing or code) brings back its `w:docPart`'s text, not what
@@ -282,8 +289,9 @@ content, ext? }`. `content` is a `doc` of the body's blocks. `noteType` is Word'
     control's inner edges; from outside they select its content.
   - **What a kind takes.** Plain text: one paragraph, no Enter, no line break unless `w:multiLine`;
     formatting part of it formats all of it. Drop-down and check box: no typing. Combo box and date:
-    typing. No paragraph mark inside an inline control. Typed text that is not the picked date drops
-    `w:fullDate` (Word also re-reads a date typed; Foli does not parse them).
+    typing. No paragraph mark inside an inline control. A date's text is read in its format and
+    language for `w:fullDate`, typed or brought back by rejecting a change; text that is no date
+    drops it, formatting leaves it. Text replacing a placeholder takes `w:sdtPr/w:rPr`.
   - **Check box.** `w14:checked` and the glyph are separate: Word does not re-sync them on opening.
     Toggling while tracking is an insertion and a deletion of the glyph.
   - **Lists.** A choice writes the shown text only; Word writes no `w:lastValue` and drops one it
@@ -293,7 +301,8 @@ content, ext? }`. `content` is a `doc` of the body's blocks. `noteType` is Word'
     stay unevaluated, so editing one here would be lost in Word without notice: **a bound control's
     content is read-only**, in the editor and through `setControlValue`.
   - **Ids.** Word gives a control with no `w:id`, or a repeated one, an id of its own: a copy made
-    here drops it. A copied repeating item holds its source's content, as Word's does.
+    here drops it. A copied repeating item holds its source's content, as Word's does, without its
+    bookmarks and comments; `w15:doNotAllowInsertDeleteSection` forbids adding one.
   - **The caret.** The two sides of a marker are one place to a browser: the view treats them so
     when reading the selection, and Left and Right step across each edge, as Word's caret does.
   - Frames and titles are the view's own elements on the page, `contenteditable="false"`; the lists

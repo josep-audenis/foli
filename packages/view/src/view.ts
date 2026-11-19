@@ -674,6 +674,7 @@ export class EditorView {
       pages: () => view.pages,
       scale: () => view.scale(),
       rects: (range) => view.controlRects(range),
+      contentRects: (range) => view.controlContentRects(range),
       posFromDOM: (node, offset) => view.posFromDOM(node, offset),
       focus: () => view.focus(),
       injectStyles: () => injectStyles(host),
@@ -1590,6 +1591,11 @@ export class EditorView {
       }
       return [...byPage.values()];
     }
+    return this.controlContentRects(range);
+  }
+
+  /** Where what a control's content shows is on the screen. */
+  private controlContentRects(range: ControlRange): Box[] {
     const dom = this.host.ownerDocument.createRange();
     const start = this.domFromPos(range.contentFrom);
     const end = this.domFromPos(range.contentTo);
@@ -3193,7 +3199,7 @@ export class EditorView {
    */
   private onClick = (event: MouseEvent): void => {
     const target = event.target;
-    if (event.type === "click" && !event.shiftKey && this.controlChrome.click(target)) return;
+    if (event.type === "click" && !event.shiftKey && this.controlChrome.click(event)) return;
     const element = target instanceof Element ? target.closest("a") : null;
     if (!element || !this.host.contains(element)) return;
     event.preventDefault();

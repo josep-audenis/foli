@@ -44,11 +44,13 @@ checklist in [testing/ime.md](testing/ime.md)):
   shortcut of its own). Headers are not dimmed while the body is edited, as they are in Word.
 - Content controls (11.9) follow Word's rules for locks, placeholders and what each kind holds. A
   control bound to data shows what the file stores and cannot be edited: bindings are kept, not
-  evaluated, and Word replaces such content with the bound value when it opens the file. Text typed
-  in a date control is kept as text (Word re-reads a date typed there); picked dates are written in
-  English whatever the control's language. A control that removes itself when edited
-  (`w:temporary`) stays; a group's fixed text can be edited; a picture control keeps its picture
-  (no way to choose another). An empty block control stays opaque.
+  evaluated, and Word replaces such content with the bound value when it opens the file. A date typed
+  in a date control is read but not reformatted; picked dates are written in English whatever the
+  control's language. A control that removes itself when edited (`w:temporary`) stays; a group's
+  fixed text can be edited; a picture control keeps its picture (no way to choose another). The
+  placeholder text given to `insertControl` does not survive a save (no glossary entry is written),
+  and a control's own tracked deletion is saved as its content's. An empty block control stays
+  opaque.
 - Fields (11.8) show their stored results until updated (F9, the Fields menu, `updateFields`,
   `view.print()`); the browser's own Print menu does not update them. Updated: `PAGE`, `NUMPAGES`,
   `SECTIONPAGES`, `DATE`, `TIME`, `SEQ`, `REF`, `PAGEREF`, `TOC`, `MERGEFIELD`. Any other field
