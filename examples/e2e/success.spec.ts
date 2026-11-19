@@ -42,7 +42,7 @@ test("type, format with a shortcut, undo, save, reload without loss", async ({ p
     (await page.evaluate(() => localStorage.getItem("foli-example"))) ?? "null",
   );
   // Schema v3: Word's model, the page in twips (A4).
-  expect(saved).toMatchObject({ schemaVersion: 3, section: { pageSize: { width: 11906 } } });
+  expect(saved).toMatchObject({ schemaVersion: 5, section: { pageSize: { width: 11906 } } });
   await page.reload();
   await expect(editor(page)).toHaveText("Hello Foli");
   await expect.poll(() => bold(page)).toBe("Foli");
@@ -91,7 +91,7 @@ test("a document saved by 0.1.0 loads (schema v1 → v3); lists from the keyboar
   const saved = JSON.parse(
     (await page.evaluate(() => localStorage.getItem("foli-example"))) ?? "null",
   );
-  expect(saved.schemaVersion).toBe(3);
+  expect(saved.schemaVersion).toBe(5);
   expect(saved.content.content[0]).toMatchObject({
     attrs: { numbering: { level: 0 } },
     content: [{ type: "text", text: "from 0.1.0" }],

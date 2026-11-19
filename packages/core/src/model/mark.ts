@@ -13,7 +13,7 @@ export interface MarkJSON {
 export class Mark {
   static readonly none: readonly Mark[] = Object.freeze([]);
 
-  /** @internal Use MarkType.create or Schema.mark. */
+  /** Use MarkType.create or Schema.mark. */
   constructor(
     readonly type: MarkType,
     readonly attrs: Attrs,

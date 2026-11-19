@@ -711,8 +711,7 @@ const view = new EditorView(host, editor, { editable: true, placeholder: "" });
   inserted, in EMU (the last section's text width: shortcut, not the caret's section);
   `EMU_PER_PX` (9525). For an app's own picture insert, as the toolbar's dialog does it.
 - `renderDocument(document, container, { review?, resource?, fieldCodes? }): DocumentPages` (a read-only view, no
-  editor; the options are `BlockOptions` without `lineRatio`, whose `resolver` and `notes` are for
-  Foli's own renderers): lays a schema v3 document out on
+  editor; `RenderDocumentOptions`): lays a schema v3 document out on
   pages (`.foli-word-page`, `WORD_PAGE_CLASS`) appended to `container`, formatted as Word
   formats it. `review`: `"markup"` (default: insertions underlined, deletions struck through,
   in the author's color, titled "Inserted/Deleted by …, date"), `"simple"` or `"final"` (as if

@@ -2,20 +2,21 @@
 // comments removed, compared with the committed `packages/<name>/api-report.d.ts`, so a change to
 // a published type is a reviewed diff. Also fails on a forgotten export (a name a module's `.d.ts`
 // declares that no entry point exports and that is not `@internal`, which `stripInternal` drops),
-// on `export *` in an entry, and on published types that do not compile (an `@internal` name a
-// public type still uses). Run after `pnpm build`: `pnpm api` (part of `pnpm check`);
+// on `export *` in an entry, on a public entry's types importing `@folijs/core/internal` (an
+// unpromised type in a stable signature), and on published types that do not compile (an
+// `@internal` name a public type still uses). Run after `pnpm build`: `pnpm api` (part of `pnpm check`);
 // `pnpm api:update` rewrites the reports. Method: docs/contributing.md, "API reports".
 
 import { spawnSync } from "node:child_process";
-import { readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, relative } from "node:path";
+import { join, posix, relative } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 export const PACKAGES = ["core", "view", "react", "docx", "pdf"];
 
 const DECLARED =
-  /^export (?:declare )?(?:abstract )?(?:function|class|const|let|var|interface|type|enum|namespace) ([\w$]+)/gm;
+  /^export (?:declare )?(?:const )?(?:abstract )?(?:function|class|const|let|var|interface|type|enum|namespace) ([\w$]+)/gm;
 const LISTED = /^export (?:type )?\{([^}]*)\}(?: from "[^"]+")?;/gm;
 
 /** The report: each `.d.ts` (`{ path, text }`, posix paths) under its path, in path order. */
@@ -87,6 +88,27 @@ export function problems(files, entries) {
   return out;
 }
 
+/**
+ * The files reachable from a public entry (`entry`, through relative imports and re-exports) that
+ * import `@folijs/core/internal`: their types would put unpromised names in stable signatures.
+ */
+export function internalImports(files, entry) {
+  const byPath = new Map(files.map((f) => [f.path, f]));
+  const seen = new Set();
+  const out = [];
+  const visit = (path) => {
+    const file = byPath.get(path);
+    if (!file || seen.has(path)) return;
+    seen.add(path);
+    const text = stripComments(file.text);
+    if (/["']@folijs\/core\/internal["']/.test(text)) out.push(path);
+    for (const m of text.matchAll(/(?:from\s+|import\()["'](\.{1,2}\/[^"']+)\.js["']/g))
+      visit(posix.join(posix.dirname(path), `${m[1]}.d.ts`));
+  };
+  visit(entry);
+  return out;
+}
+
 function dtsFiles(dir, base = dir) {
   return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
     const path = join(dir, entry.name);
@@ -110,6 +132,12 @@ function main() {
   const update = process.argv.includes("--update");
   const failures = [];
   const entryPaths = [];
+  const missing = PACKAGES.filter((pkg) => !existsSync(join(root, "packages", pkg, "dist")));
+  if (missing.length) {
+    console.error(`No dist in ${missing.join(", ")}: run \`pnpm build\` first.`);
+    process.exit(1);
+  }
+  const temp = mkdtempSync(join(tmpdir(), "foli-api-"));
   for (const pkg of PACKAGES) {
     const dir = join(root, "packages", pkg);
     const manifest = JSON.parse(readFileSync(join(dir, "package.json"), "utf8"));
@@ -117,6 +145,13 @@ function main() {
     const entries = entryFiles(manifest);
     entryPaths.push(...entries.map((e) => join(dir, "dist", e)));
     failures.push(...problems(files, entries).map((p) => `${manifest.name} ${p}`));
+    for (const path of internalImports(
+      files,
+      entryFiles({ exports: { ".": manifest.exports["."] } })[0],
+    ))
+      failures.push(
+        `${manifest.name} ${path}: a public type imports @folijs/core/internal; give the public signature its own type`,
+      );
     const text = report(manifest.name, files);
     const committed = join(dir, "api-report.d.ts");
     let previous = null;
@@ -127,16 +162,16 @@ function main() {
       if (previous !== text) writeFileSync(committed, text);
       console.log(`${manifest.name.padEnd(14)} ${previous === text ? "unchanged" : "written"}`);
     } else if (previous !== text) {
-      const temp = join(tmpdir(), `foli-api-${pkg}.d.ts`);
-      writeFileSync(temp, text);
+      const built = join(temp, `${pkg}.d.ts`);
+      writeFileSync(built, text);
       failures.push(
-        `${manifest.name}: its API differs from packages/${pkg}/api-report.d.ts (built: ${temp}). ` +
+        `${manifest.name}: its API differs from packages/${pkg}/api-report.d.ts (built: ${built}). ` +
           "Review the change, then run `pnpm api:update` and commit the report.",
       );
     } else console.log(`${manifest.name.padEnd(14)} matches its report`);
   }
   // The published types must compile on their own (skipLibCheck off), as an app's strict build reads them.
-  const config = join(tmpdir(), "foli-api-tsconfig.json");
+  const config = join(temp, "tsconfig.json");
   writeFileSync(
     config,
     JSON.stringify({
@@ -164,6 +199,7 @@ function main() {
     failures.push(`the published types do not compile:\n${tsc.stdout}${tsc.stderr}`);
   for (const failure of failures) console.error(failure);
   if (failures.length) process.exit(1);
+  rmSync(temp, { recursive: true, force: true });
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) main();

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { declared, problems, report } from "./api.mjs";
+import { declared, internalImports, problems, report } from "./api.mjs";
 
 describe("api report", () => {
   it("joins the .d.ts files in path order without source-map comments", () => {
@@ -22,11 +22,12 @@ describe("api report", () => {
       "export interface I {}",
       "export type T = 1;",
       "export declare abstract class C {}",
+      "export declare const enum E { A }",
       "declare const local = 1;",
       "export { local as renamed };",
       'export { other } from "./other.js";',
     ].join("\n");
-    expect(declared(text)).toEqual(["f", "f", "I", "T", "C", "renamed"]);
+    expect(declared(text)).toEqual(["f", "f", "I", "T", "C", "E", "renamed"]);
   });
 
   it("finds forgotten exports and `export *` in an entry", () => {
@@ -45,5 +46,21 @@ describe("api report", () => {
       "index.d.ts: `export *` in an entry; list the names",
       "mod.d.ts: `d` is exported by its module but by no entry; export it from an entry or tag it @internal",
     ]);
+  });
+
+  it("finds public types that import the internal entry, through relative imports", () => {
+    const files = [
+      { path: "index.d.ts", text: 'export { render, type Options } from "./word/pages.js";' },
+      {
+        path: "word/pages.d.ts",
+        text: 'import type { Options } from "./blocks.js";\nexport declare function render(o: Options): void;',
+      },
+      {
+        path: "word/blocks.d.ts",
+        text: 'import type { Resolver } from "@folijs/core/internal";\nexport interface Options { resolver?: Resolver }',
+      },
+      { path: "clipboard.d.ts", text: 'import type { WordContext } from "@folijs/core/internal";' },
+    ];
+    expect(internalImports(files, "index.d.ts")).toEqual(["word/blocks.d.ts"]);
   });
 });

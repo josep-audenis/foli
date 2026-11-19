@@ -74,7 +74,7 @@ export class NodeType {
   /** Allowed child marks; null means all. */
   markSet!: readonly MarkType[] | null;
 
-  /** @internal Created by Schema. */
+  /** Created by Schema. */
   constructor(
     readonly name: string,
     readonly schema: Schema,
@@ -186,7 +186,7 @@ export class MarkType {
   readonly groups: readonly string[];
   private readonly instance: Mark | null;
 
-  /** @internal Created by Schema. */
+  /** Created by Schema. */
   constructor(
     readonly name: string,
     readonly schema: Schema,

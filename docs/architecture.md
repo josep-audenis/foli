@@ -778,7 +778,7 @@ the change yet); `setPictureAlt` does (Word does not track alt text either).
 Pictures in the views (10.8b, `pictureElement` in `word/blocks.ts`): an inline picture is drawn
 in its line at its size (EMU / 9525 px) as an `img` with its alt text (empty when decorative),
 from the URL `imageSource` gives for its resource: the app's (`EditorViewOptions.resource`,
-`BlockOptions.resource`, its `null` showing the box; `packageImages` in `@folijs/docx` makes
+`RenderDocumentOptions.resource`, its `null` showing the box; `packageImages` in `@folijs/docx` makes
 object URLs for a package's raster images and `data:` URLs for its SVGs, never same-origin
 `blob:` SVGs), else the resource's own image `data:` URL or web or `blob:` URL, fetched with no
 referrer (nothing else: a `javascript:` URL is no image); with none, a box of its size with the

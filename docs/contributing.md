@@ -35,13 +35,15 @@ What each package publishes is its API ([ADR-0008](decisions/ADR-0008-1.0-contra
 the names its entry lists by name (`src/index.ts`; core also `src/internal.ts`, published as
 `@folijs/core/internal`, with no promise). The published types are kept in a report,
 `packages/<name>/api-report.d.ts`: the package's built `dist/**/*.d.ts` joined in path order,
-source-map comments removed. `pnpm api` (`scripts/api.mjs`, in `pnpm check`) fails when
+source-map comments removed. `pnpm api` (`scripts/api.mjs`, in `pnpm check`; build first) fails when
 
 - the built types differ from the committed report (the new one is written to a temporary file,
   named in the message, to diff against);
 - a module exports a name that no entry exports and that is not tagged `@internal` (a
   forgotten export: export it from the index, or tag it);
 - an entry uses `export *`;
+- a type reachable from a package's public entry imports `@folijs/core/internal` (an unpromised
+  type in a stable signature: give the public function its own options type);
 - the published types do not compile on their own (`skipLibCheck` off): for example a public
   type that uses a name tagged `@internal`.
 

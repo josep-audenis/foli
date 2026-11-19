@@ -65,6 +65,27 @@ export type AttributeSpecs = Readonly<Record<string, AttributeSpec>>;
 // model/content.d.ts
 import type { Fragment } from "./fragment.js";
 import type { NodeType } from "./schema.js";
+/**
+ * Content expressions, a deliberately small subset: a space-separated sequence of terms; a term
+ * is a node name or group, or a choice `(a | b)`, optionally followed by `*`, `+` or `?`.
+ * Examples: `block+`, `inline*`, `heading paragraph*`, `(paragraph | heading)+`.
+ * Compiled to an NFA whose state sets are interned, so matching allocates nothing once warm.
+ */
+interface Element {
+    readonly types: readonly NodeType[];
+    readonly optional: boolean;
+    readonly repeat: boolean;
+}
+declare class Program {
+    readonly expr: string;
+    readonly elements: readonly Element[];
+    readonly matches: Map<string, ContentMatch>;
+    constructor(expr: string, elements: readonly Element[]);
+    /** The interned match for a state set (sorted, epsilon-closed). */
+    match(states: number[]): ContentMatch;
+    /** Adds the states reachable by skipping optional elements; returns them sorted. */
+    close(states: Iterable<number>): number[];
+}
 /** A position inside a content expression: which node types may come next, and whether it may end. */
 export declare class ContentMatch {
     private readonly program;
@@ -72,6 +93,8 @@ export declare class ContentMatch {
     private readonly next;
     /** True when the content may end here. */
     readonly validEnd: boolean;
+    /** Use NodeType.contentMatch. */
+    constructor(program: Program, states: readonly number[]);
     /** The match after a node of `type`, or null if `type` is not allowed here. */
     matchType(type: NodeType): ContentMatch | null;
     /** Matches `fragment.child(start)` up to `end`; null as soon as a child is not allowed. */
@@ -91,6 +114,7 @@ export declare class ContentMatch {
     toString(): string;
     static compile(expr: string, types: readonly NodeType[]): ContentMatch;
 }
+export {};
 
 // model/errors.d.ts
 /** Invalid document content: unknown types, bad attributes, content that breaks the schema. */
@@ -178,6 +202,8 @@ export declare class Mark {
     readonly type: MarkType;
     readonly attrs: Attrs;
     static readonly none: readonly Mark[];
+    /** Use MarkType.create or Schema.mark. */
+    constructor(type: MarkType, attrs: Attrs);
     /**
      * Adds this mark to a set: replaces marks it excludes, does nothing if a mark in the set
      * excludes it or it is already there, and keeps canonical order. Returns `set` if unchanged.
@@ -222,6 +248,8 @@ export declare class Node {
     readonly marks: readonly Mark[];
     /** Set only on text nodes. */
     readonly text?: string;
+    /** Use NodeType.create, Schema.node/text or Schema.nodeFromJSON. */
+    constructor(type: NodeType, attrs: Attrs, content: Fragment, marks: readonly Mark[]);
     get nodeSize(): number;
     get childCount(): number;
     get firstChild(): Node | null;
@@ -282,6 +310,8 @@ export declare class Node {
 }
 export declare class TextNode extends Node {
     readonly text: string;
+    /** Use Schema.text. */
+    constructor(type: NodeType, text: string, marks: readonly Mark[]);
     get nodeSize(): number;
     get textContent(): string;
     eq(other: Node): boolean;
@@ -440,6 +470,8 @@ export declare class NodeType {
     contentMatch: ContentMatch;
     /** Allowed child marks; null means all. */
     markSet: readonly MarkType[] | null;
+    /** Created by Schema. */
+    constructor(name: string, schema: Schema, spec: NodeSpec);
     get inlineContent(): boolean;
     get isTextblock(): boolean;
     /** Edited as one unit (leaf nodes, and nodes whose spec says `atom`). */
@@ -475,6 +507,10 @@ export declare class MarkType {
     excluded: readonly MarkType[];
     readonly groups: readonly string[];
     private readonly instance;
+    /** Created by Schema. */
+    constructor(name: string, schema: Schema, spec: MarkSpec, 
+    /** Position in the canonical mark order. */
+    rank: number);
     /** Creates a mark; marks without attributes are shared instances. */
     create(attrs?: Attrs | null): Mark;
     get inclusive(): boolean;

@@ -1410,16 +1410,17 @@ Each task is a PR on `phase-12/ecosystem`, the build green after each.
   condition; publint passes) holds 37 the other packages use without a promise: the Word context,
   envelope and their steps, the resolver and its formats, clipboard fitting, the view's layout
   helpers, the Word schema and its checks. `defaultTextblockType`, `isNote` and `storyBody` left the
-  API. Public per package: core 346, view 14 (`BlockOptions` added: `renderDocument`'s options),
+  API. Public per package: core 346, view 14 (`RenderDocumentOptions` added: `renderDocument`'s `review`, `fieldCodes`, `resource`),
   React 19, docx 27, PDF 8. Every other module export is tagged `@internal` (362 tags: core 123,
   view 119, docx 117, React 3) and stripped (`stripInternal` in `tsconfig.base.json`). Built-in
   plugins: only `history()`, `baseKeymap()` and `listKeymap()` are exported, as ADR-0008 says.
   View, docx and PDF take core, React core and view, as `workspace:*` peer dependencies (and
   devDependencies, for the workspace); `changeset status` still plans 0.7.0 for all, no major from
   the peers. `scripts/api.mjs` (`pnpm api` in `pnpm check`, `pnpm api:update`) joins each package's
-  `dist/**/*.d.ts` into `packages/<name>/api-report.d.ts` (core 3,409 lines, view 771, docx 385,
+  `dist/**/*.d.ts` into `packages/<name>/api-report.d.ts` (core 3,445 lines, view 749, docx 385,
   React 225, PDF 81) and fails on a difference, a forgotten export, `export *` in an entry, or
-  published types that do not compile alone with `skipLibCheck` off; that last check found public
+  published types that do not compile alone with `skipLibCheck` off, and on a public entry's types
+  importing `@folijs/core/internal` (after the review of #122); the compile check found public
   types using stripped names (`Story`, `EnvelopeKey`, `Check` went to the internal entry, the
   structure helpers `canJoin`, `canSplit`, `findWrapping`, `liftTarget` stayed public with
   `Transform`, and `NodeType.createOpen`, used by the view's clipboard, lost its tag). Tested in
@@ -1427,8 +1428,11 @@ Each task is a PR on `phase-12/ecosystem`, the build green after each.
   model, state, transform and option types; contributing documents the reports; the install
   lines name `@folijs/view`. Shortcuts: the checks read `.d.ts` text with regular expressions and
   match names, not symbols (two modules exporting one name count once); doc comments are in the
-  reports, so editing one changes them; the model classes' constructors, tagged before 12.2,
-  leave an implicit no-argument constructor in the published types; `pnpm examples` not run.)
+  reports, so editing one changes them. Review of #122: the model classes' constructors are no
+  longer tagged (stripped, they left an implicit public `new Node()` in the types), and the
+  examples' smoke test expected schema v3 (stale since 11.3). `pnpm examples` run on 2026-11-19:
+  both apps install the tarballs with the exact peers and build, the SSR and DOCX checks pass,
+  15 passed and 3 skipped (the Next.js server-rendering test outside Next) in three engines.)
 - [ ] 12.3 Custom nodes and marks in `@folijs/core`: the schema extension from ADR-0008
   (`createEditor` and `parseDocument` take it), validation, JSON, copy and paste between editors
   with and without the extension (never dropped: opaque when unknown), find and review over them;

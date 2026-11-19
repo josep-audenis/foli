@@ -49,7 +49,7 @@ export class ContentMatch {
   /** True when the content may end here. */
   readonly validEnd: boolean;
 
-  /** @internal Use NodeType.contentMatch. */
+  /** Use NodeType.contentMatch. */
   constructor(
     private readonly program: Program,
     private readonly states: readonly number[],

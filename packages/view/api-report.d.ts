@@ -20,8 +20,8 @@ export declare function htmlToDoc(html: string): DocJSON | null;
 // index.d.ts
 export { FOLI_MIME, htmlToDoc, textToDoc } from "./clipboard.js";
 export { EditorView, type EditorViewOptions, keyName, measureImageFile, textWidthEmu, } from "./view.js";
-export { type BlockOptions, EMU_PER_PX } from "./word/blocks.js";
-export { type DocumentPages, type ReviewView, renderDocument, WORD_PAGE_CLASS, } from "./word/pages.js";
+export { EMU_PER_PX } from "./word/blocks.js";
+export { type DocumentPages, type RenderDocumentOptions, type ReviewView, renderDocument, WORD_PAGE_CLASS, } from "./word/pages.js";
 
 // layout/flow.d.ts
 export {};
@@ -657,45 +657,11 @@ export declare function measureImageFile(file: File, doc: Document): Promise<{
 export {};
 
 // word/blocks.d.ts
-/**
- * Schema v3 blocks as DOM, formatted as Word formats them (8.6b): every paragraph's and run's
- * effective formatting from `Resolver` as inline CSS, list markers, tracked changes, comment
- * anchors, and content the model keeps opaque shown as text. Read-only: built with
- * createElement/textContent only (never innerHTML); the page layout is in `pages.ts`.
- */
-import { type ResourceJSON } from "@folijs/core";
-import { Resolver } from "@folijs/core/internal";
 /** EMU (DrawingML's unit: 914 400 per inch) per CSS px. */
 export declare const EMU_PER_PX: number;
 /** Which version of tracked changes to show. */
 /** How tracked changes show (`@folijs/core`'s, for `renderDocument` too). */
 export type { ReviewView } from "@folijs/core";
-import type { ReviewView } from "@folijs/core";
-export interface BlockOptions {
-    /** `markup` (the default): insertions underlined, deletions struck through; `simple`, `final`: as if accepted. */
-    review?: ReviewView;
-    /** Fields show their codes instead of their results (Word's Alt+F9). */
-    fieldCodes?: boolean;
-    /**
-     * The ratio of a font's normal line height to its size (`fontFamily`: a CSS font-family
-     * list). Word's single line spacing is the font's own line height; multiples scale it.
-     * Measured by the page layout; 1.2 when nothing measures (no layout engine).
-     */
-    lineRatio?: (fontFamily: string) => number;
-    /**
-     * The URL to show a picture's image from (`key` in `resources`): the app's (a package part's
-     * object URL…); `null` (or "") shows the picture's box. Left out, or undefined for a key: the
-     * resource's own image `data:` URL or web URL (fetched as it is shown).
-     */
-    resource?: (key: string, resource: ResourceJSON) => string | null | undefined;
-    /** The document's resolver, when the caller has one (a story of it, drawn per page). */
-    resolver?: Resolver;
-    /** What note references show, by story, and what a note's own mark shows (never stored). */
-    notes?: {
-        references?: ReadonlyMap<string, string>;
-        mark?: string;
-    };
-}
 
 // word/columns.d.ts
 export {};
@@ -719,8 +685,7 @@ export {};
  * Word's spacing, keep rules, widow and orphan control and explicit breaks. Editing moves to
  * v3 in 8.7.
  */
-import { type FieldLayout, type FoliDocument } from "@folijs/core";
-import { type BlockOptions } from "./blocks.js";
+import { type FieldLayout, type FoliDocument, type ResourceJSON, type ReviewView } from "@folijs/core";
 export type { ReviewView } from "./blocks.js";
 /** The class of each page element. */
 export declare const WORD_PAGE_CLASS = "foli-word-page";
@@ -757,12 +722,25 @@ export interface DocumentPages {
     /** Removes the pages. */
     destroy(): void;
 }
+/** `renderDocument`'s options. */
+export interface RenderDocumentOptions {
+    /** `markup` (the default): insertions underlined, deletions struck through; `simple`, `final`: as if accepted. */
+    review?: ReviewView;
+    /** Fields show their codes instead of their results (Word's Alt+F9). */
+    fieldCodes?: boolean;
+    /**
+     * The URL to show a picture's image from (`key` in `resources`): the app's (a package part's
+     * object URL…); `null` (or "") shows the picture's box. Left out, or undefined for a key: the
+     * resource's own image `data:` URL or web URL (fetched as it is shown).
+     */
+    resource?: (key: string, resource: ResourceJSON) => string | null | undefined;
+}
 /**
  * Lays a v3 document out on pages inside `container`: every section's page setup, its columns
  * (a band per section on a page), continuous sections, Word's blank pages, headers and footers
  * with their page fields, footnotes at their columns' feet and endnotes after the text.
  */
-export declare function renderDocument(document: FoliDocument, container: HTMLElement, options?: Omit<BlockOptions, "lineRatio">): DocumentPages;
+export declare function renderDocument(document: FoliDocument, container: HTMLElement, options?: RenderDocumentOptions): DocumentPages;
 
 // word/regions.d.ts
 export {};

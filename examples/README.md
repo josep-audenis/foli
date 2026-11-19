@@ -10,7 +10,9 @@ the pnpm workspace, and build for production.
 | [`next`](next) | Next.js 16 (App Router, Turbopack), React 19 | server rendering and hydration                                                                                   |
 
 Both show `FoliEditor` with its toolbar and save the document to `localStorage` once typing
-pauses.
+pauses. Both list `@folijs/core` and `@folijs/view` in their dependencies beside `@folijs/react`
+(as `docs/getting-started.md` says to install them), so they do not show npm installing those
+peer dependencies itself for an app that lists `@folijs/react` alone.
 
 ## Run
 

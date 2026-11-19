@@ -368,6 +368,7 @@ export function changeElement(
   return element;
 }
 
+/** @internal */
 export interface BlockOptions {
   /** `markup` (the default): insertions underlined, deletions struck through; `simple`, `final`: as if accepted. */
   review?: ReviewView;
