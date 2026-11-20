@@ -634,9 +634,16 @@ describe("import accepts what Word opens, and fails only with DocxError", () => 
 
   it("fails with DocxError past what the model holds at all", async () => {
     const huge = `<w:tbl>${"<w:tr/>".repeat(2_400_000)}</w:tbl>`;
-    await expect(importDocx(await docx(huge))).rejects.toMatchObject({
+    // Past the node limit too (its own DocxError); lifted to reach the model's.
+    await expect(
+      importDocx(await docx(huge), { maxNodes: Number.POSITIVE_INFINITY }),
+    ).rejects.toMatchObject({
       name: "DocxError",
       message: expect.stringMatching(/^Cannot import: /),
+    });
+    await expect(importDocx(await docx(huge), { maxNodes: 2_000_000 })).rejects.toMatchObject({
+      name: "DocxError",
+      message: expect.stringMatching(/more than 2000000 XML nodes/),
     });
     // A 16 MiB part: slow when everything runs at once.
   }, 60_000);
@@ -678,7 +685,9 @@ describe("import accepts what Word opens, and fails only with DocxError", () => 
   });
 });
 
-describe("import takes linear time on crafted files", () => {
+// The bounds are in the tests (each import under 6 s); the timeout only has to let them run: the
+// default 5 s cut the second test, which imports twice, under load (12.11).
+describe("import takes linear time on crafted files", { timeout: 30_000 }, () => {
   const timed = async (body: string, options?: Parameters<typeof docx>[1]) => {
     const bytes = await docx(body, options);
     const started = performance.now();
@@ -699,6 +708,11 @@ describe("import takes linear time on crafted files", () => {
     });
     // Quadratic took about 15 s here; the bound leaves room for a loaded machine.
     expect(ms).toBeLessThan(6000);
+  });
+
+  it("a paragraph of many runs", async () => {
+    // Each run copied the rest of the paragraph (custom controls' scan): 18 s here before 12.11.
+    expect(await timed(`<w:p>${"<w:r><w:br/></w:r>".repeat(200_000)}</w:p>`)).toBeLessThan(6000);
   });
 
   it("many open moves and many hyperlinks", async () => {

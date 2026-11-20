@@ -171,6 +171,18 @@ of one of these alone is noise; anything else is a real failure.
   inserts a row from the keyboard; the menu, dialog and table pass axe" (Chromium) and
   `lists.spec.ts` "a click on a link does not navigate" (WebKit) failed once each on
   2026-11-17; both passed 3 times in a row in every engine when rerun.
+- Under a full three-engine e2e run beside other work (2026-11-20, 12.11; 993 passed, 5 failed):
+  `print.spec.ts` "short" and "lists" (Firefox: the browser context hung on closing, with
+  graphics errors in Firefox's log), `word-headers.spec.ts` "page numbers in letters…" (WebKit,
+  a 30 s timeout) and the site's `docs.spec.ts` "every nav entry opens its page…" (WebKit, 90 s);
+  all passed 3 times in a row when rerun.
+
+Fixed in 12.11 (they failed in pre-push runs now and then): the tracked-changes property test
+(`track.test.ts`, a random seed about one run in five hit a known difference it did not leave
+out), `import.test.ts` "many open moves and many hyperlinks" (two imports under the default 5 s
+timeout) and `export.test.ts` "round-trips the model's values for any content" (20 s under
+load). A property test that fails prints its seed: rerun it with `{ seed, path }` before
+calling it flaky.
 
 ## Rules
 

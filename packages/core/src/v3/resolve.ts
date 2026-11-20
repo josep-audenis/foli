@@ -866,6 +866,11 @@ export class Resolver {
     const counters = new Map<number, (number | undefined)[]>();
     const overridden = new Set<string>();
     return paragraphs.map((attrs) => {
+      // Not numbered (most paragraphs): no number without resolving the whole paragraph, which
+      // the view does for every block on every change (12.11). As `#resolve` merges numbering.
+      const numbering = (attrs as ParagraphPropertiesJSON).numbering;
+      const style = (attrs as ParagraphPropertiesJSON).style ?? undefined;
+      if (!(numbering?.id ?? this.#paragraphStyle(style).paragraph.numbering?.id)) return null;
       const { run, level: found } = this.#resolve(attrs);
       if (!found) return null;
       const { instance, abstract, index, level } = found;

@@ -10,8 +10,9 @@ and the reasons are in [architecture.md](architecture.md), [pagination.md](pagin
 
 The editor is tested in Chromium, Firefox and WebKit (Playwright on Windows), but the manual
 checks below have not been run yet, and some automated parts cover one engine only (IME
-emulation exists only in Chromium; paste is not automated in WebKit). The project owner accepted them as open risks
-([ADR-0003](decisions/ADR-0003-rendering-and-input.md#gate-g4-passed-provisionally-2026-11-07);
+emulation exists only in Chromium; paste is not automated in WebKit). The project owner accepted them as open risks for 0.x
+and again for 1.0 on 2026-11-20
+([ADR-0003](decisions/ADR-0003-rendering-and-input.md#release-10-with-the-manual-checks-open-decided-2026-11-20);
 checklist in [testing/ime.md](testing/ime.md)):
 
 - **IME and dead keys** (Japanese, Chinese, Korean; accented letters): tested only through
@@ -223,7 +224,14 @@ Custom nodes and marks, plugins and toolbar items ([extensions](guides/extension
   in the other engines).
 - No cropping, rotation or touch resizing; resizing is refused while tracking (Foli does not
   record a size change yet). Alt text changes are not tracked.
-- Pictures copied to another document lose their images (their resources stay behind); Word's
+- A picture copied into another document brings its image (12.11): its own `data:` or web URL,
+  else the image the source view shows, as a `data:` URL; one shown from an object URL (a
+  `.docx` package's JPEG or PNG) is read from the drawn image and comes as PNG, the same pixels
+  in another encoding. One whose image lives only in the source (a package part the source view
+  does not show, or an object URL not drawn yet) comes without its image: a box with its alt
+  text, as Word shows a missing image, which `.docx` export refuses until an image is given; a
+  paste never takes another package's part name or a page's object URL. Copying in WebKit is not
+  automated (as every clipboard test). Word's
   picture-and-text paste brings the text only. The clipboard writes a floating picture inline.
 - `renderDocument` measures blocks on one long page: the lines after a floating picture may
   wrap a little differently than on the editing view's pages.
@@ -263,7 +271,10 @@ Custom nodes and marks, plugins and toolbar items ([extensions](guides/extension
 - Accepting removes a paragraph whose text and mark are both deleted whole, as Word does; the
   same edits made untracked, one after another, may have kept its properties on the joined
   paragraph. Enter in a paragraph next to a deleted paragraph mark splits that paragraph as it
-  is, not the paragraph accepting would make.
+  is, not the paragraph accepting would make. A paragraph whose mark was deleted while it was
+  empty and that was typed into afterwards keeps its own properties when accepting joins it to
+  the next; the same edits untracked joined an empty paragraph and kept the next one's (found
+  by the tracked-changes property test in 12.11).
 - In the simple and no-markup views, a paragraph whose mark is deleted is not shown joined with
   the next while editing (`renderDocument` joins it).
 - Changes' and comments' dates are written in UTC; Word writes local time there, so Word shows
@@ -280,6 +291,11 @@ Details in the [package README](../packages/docx/README.md).
 
 - Strict Open XML documents are refused (`DocxError`) until a real file needs them. Encrypted
   zip entries, ZIP64 and compression methods other than stored and deflate are refused too.
+- A package may hold at most 10 000 entries, 512 MiB uncompressed and 4 000 000 XML nodes in the
+  parts read, a paragraph counting four (`maxEntries`, `maxSize`, `maxNodes`; lower them on a
+  server). A 659-page document of dense tables counts 1.9 million and takes about 0.8 GB to
+  import; at the limit a crafted file can still take about 2.3 GB and 12-28 s depending on heap headroom
+  ([security.md](security.md)).
 - Keep the imported `package` with the document: a document that refers to parts of its
   original package (headers, footers, pictures, content kept verbatim with relationship ids)
   cannot be exported without it (`DocxError`).
@@ -318,10 +334,14 @@ Details in the [package README](../packages/docx/README.md).
 - A CSS change that only alters block margins, or rewraps text without changing any block's
   height, is noticed only at the next height change.
 - No virtualization: every page is in the DOM and measured on load. Fine up to a few hundred
-  pages, but past the speed targets at 100 pages ([benchmarks.md](benchmarks.md#10-numbers),
-  the owner's laptop on mains): 104 pages lay out in about 110 ms in Chromium, 151 ms in Firefox
-  and 204 ms in WebKit, and handling a keystroke takes about 11 ms (p50, Chromium), 3.3-3.5 times
-  what 0.2.0 took (most of it added in Phases 8 to 11; to be investigated before 1.0).
+  pages, but 1.0 misses Phase 5's speed targets at 100 pages ([benchmarks.md](benchmarks.md#10-numbers),
+  the owner's laptop on mains; accepted by the owner for 1.0, the incremental redraw left for a
+  1.x minor): 104 pages lay out in about 110 ms in Chromium, 151 ms in Firefox and 204 ms in
+  WebKit (target 60 ms); a full re-flow takes 131-150 ms (target 100); Enter's paint p95 is 32-45
+  ms (target 25). Handling a keystroke cost 11-13 ms in 0.6.0 (p50, Chromium), 3.3-3.5 times what
+  0.2.0 took; 12.11 halved typing's (measured A/B: 17.1 → 8.0 ms on a slowed machine, at the
+  8 ms target) and took a third off Enter's (22.8 → 14.8 ms). The first layout is unchanged,
+  mostly the browser's own layout of every page.
 - Long documents made of lists were slower in 0.2.0 (schema v2, where lists were nested
   blocks; not measured on schema v3 yet): in a 114-page list document, Enter near the top took
   about 9-24 ms to handle (p50) and up to ~65 ms to paint (p95), and the first layout ~85-95 ms,

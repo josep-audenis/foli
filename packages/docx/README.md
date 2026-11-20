@@ -221,7 +221,15 @@ const bytes = await pkg.write(new Map([["/word/document.xml", new TextEncoder().
   ends and attribute whitespace normalized as XML defines; characters XML forbids, `--` in
   comments and `]]>` in text refused. No DTD: a document type declaration is refused (OOXML
   forbids one), so no entity expansion. Nesting limited (`maxDepth`, default 1000) so code
-  walking the tree recursively is safe; linear time in the input.
+  walking the tree recursively is safe; linear time in the input. Nodes limited (`maxNodes`:
+  elements, attributes, text, comments and processing instructions, one each; no limit by
+  default for `parseXml` itself).
+- **Memory:** a package's parts read together hold at most `maxNodes` nodes (default
+  4 000 000; a paragraph counts four, as it costs that much more once imported), else a
+  `DocxError` naming the limit. A 659-page document of dense tables counts 1.9 million and
+  takes about 0.8 GB to import in Node; at the limit, the costliest crafted file (a few tens of
+  kilobytes) takes about 2.3 GB and 12-28 s depending on heap headroom. On a server, lower `maxSize` and `maxNodes` to what
+  your documents need and import in a worker with a time limit.
 - **Package:** part names compare case-insensitively and percent-decoded (never decoding a
   `/`), content types by override then default extension, relationship targets resolved
   against their source part (a target that is a full URI is not a part). The main part must be

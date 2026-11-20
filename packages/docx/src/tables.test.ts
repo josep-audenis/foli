@@ -309,4 +309,29 @@ describe("table styles", () => {
       /changed table style \(cell\) cannot be exported yet/,
     );
   });
+
+  it("from a schema 3 document (no parts in the model) are written as read; a change still refused", async () => {
+    const original = await load("06-price-schedule.docx");
+    // MediumList1-Accent1 has conditional formats (banding, first row): v3 kept them in `ext`.
+    const v3 = structuredClone(original.document);
+    const style = v3.styles.find((s) => s.id === "MediumList1-Accent1");
+    if (!style?.conditions?.length) throw new Error("no conditional formats");
+    for (const s of v3.styles) {
+      if (s.type !== "table") continue;
+      delete s.table;
+      delete s.row;
+      delete s.cell;
+      delete s.conditions;
+    }
+    const written = await readPackage(await exportDocx(parseDocument(v3), original.package));
+    expect(written.text("/word/styles.xml")).toBe(original.package.text("/word/styles.xml"));
+    // One part given (even changed) means the model holds the style: compared, and refused.
+    const changed = structuredClone(v3);
+    const target = changed.styles.find((s) => s.id === "MediumList1-Accent1");
+    if (!target) throw new Error("no style");
+    target.conditions = (style.conditions ?? []).slice(1);
+    await expect(exportDocx(parseDocument(changed), original.package)).rejects.toThrow(
+      /changed table style \(\w+\) cannot be exported yet/,
+    );
+  });
 });

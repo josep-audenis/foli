@@ -93,6 +93,7 @@ Using Foli:
 - [Migrating from 0.x](docs/guides/migrating-from-0x.md)
 - [Versions and deprecation](docs/deprecation.md) — what 1.0 promises, the saved format
 - [Known limitations](docs/limitations.md)
+- [Security](docs/security.md) — what is checked, what is the app's job, how to report a vulnerability
 
 Design and development:
 

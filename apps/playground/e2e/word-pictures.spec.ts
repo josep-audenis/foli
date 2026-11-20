@@ -91,6 +91,52 @@ test("text typed beside a picture goes around it, the picture kept", async ({ pa
   expect(await page.evaluate(() => window.foliEdit.validate())).toBe(true);
 });
 
+test("pictures copied into another document bring their images (12.11)", async ({
+  page,
+  context,
+  browserName,
+}) => {
+  // As the other clipboard tests: Playwright's WebKit on Windows gives no clipboard data.
+  test.skip(browserName === "webkit", "no clipboard contents in Playwright WebKit paste events");
+  await open(page, "07-picture-report.docx");
+  await expect(pictures(page)).toHaveCount(2);
+  await editor(page).click();
+  await page.keyboard.press("ControlOrMeta+a");
+  await page.keyboard.press("ControlOrMeta+c");
+  // Another document, another page: the source's object URLs are not for it.
+  const other = await context.newPage();
+  await other.goto("/edit.html");
+  await other.waitForFunction(() => "foliEdit" in window);
+  await editor(other).click();
+  await other.keyboard.press("ControlOrMeta+End");
+  await other.keyboard.press("ControlOrMeta+v");
+  await expect(pictures(other)).toHaveCount(2);
+  await page.close();
+  // Drawn after the source is gone, at their size, from data the document keeps.
+  await expect
+    .poll(() =>
+      pictures(other).evaluateAll((imgs) =>
+        (imgs as HTMLImageElement[]).map((img) => ({
+          loaded: img.complete && img.naturalWidth > 0,
+          width: Math.round(img.getBoundingClientRect().width),
+          data: img.src.startsWith("data:image/"),
+        })),
+      ),
+    )
+    .toEqual([
+      { loaded: true, width: 480, data: true },
+      { loaded: true, width: 480, data: true },
+    ]);
+  const resources = await other.evaluate(() => {
+    const doc = window.foliEdit.editor.getDocument();
+    window.foliEdit.validate();
+    return Object.values(doc.resources ?? {}).map((r) => [!!r.data, r.part ?? null]);
+  });
+  expect(resources.filter(([data]) => data)).toHaveLength(2);
+  // None names a part of a package the target does not have.
+  expect(resources.every(([, part]) => part === null)).toBe(true);
+});
+
 test("pages with pictures have no axe violations", async ({ page }) => {
   test.slow(); // axe takes several seconds per run in Firefox
   await open(page, "07-picture-report.docx");

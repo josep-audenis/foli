@@ -4,7 +4,13 @@
  * was not asked to replace copied from the original file byte for byte.
  */
 
-import { type ParseXmlOptions, parseXml, type XmlDocument, type XmlElement } from "./xml.js";
+import {
+  type ParseXmlOptions,
+  parseXmlCosting,
+  type XmlDocument,
+  type XmlElement,
+  XmlLimitError,
+} from "./xml.js";
 import {
   deflateEntry,
   inflateEntry,
@@ -37,7 +43,30 @@ export interface Relationship {
   readonly partName?: string;
 }
 
-export interface ReadPackageOptions extends ZipLimits, ParseXmlOptions {}
+/**
+ * Measured in 12.11 (Node, built packages): a 659-page Word document of dense tables (250 tables
+ * of 30 × 5 cells, 46 000 paragraphs) counts 1.9 million and takes 0.8 GB at its peak to import;
+ * 4 million of the costliest crafted content (empty paragraphs, or paragraphs of one tab) about
+ * 2.3 GB and 12-28 s depending on heap headroom. Far below a file's 512 MiB `maxSize`.
+ */
+const DEFAULT_MAX_NODES = 4_000_000;
+const W_MAIN = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+/**
+ * A paragraph costs about four times what other nodes do once imported (its node, properties
+ * and JSON: 1.4 KB at the peak against 0.1-0.5 KB), so a file of empty paragraphs is no cheaper
+ * way past the limit.
+ */
+const PARAGRAPH_COST = 4;
+const cost = (ns: string, local: string) => (local === "p" && ns === W_MAIN ? PARAGRAPH_COST : 1);
+
+export interface ReadPackageOptions extends ZipLimits, ParseXmlOptions {
+  /**
+   * Most XML nodes in all the parts read, together: each element, attribute, text, comment and
+   * processing instruction counts one, a paragraph (`w:p`) four. Default 4 000 000: a 659-page
+   * document of dense tables counts 1.9 million; at the limit an import can take about 2.3 GB.
+   */
+  readonly maxNodes?: number;
+}
 
 /** A file that is not a `.docx` package, or is damaged. */
 export class DocxError extends Error {
@@ -69,6 +98,10 @@ export class DocxPackage {
   readonly mainDocument: string;
   readonly #entries: readonly ZipEntry[];
   readonly #options: ParseXmlOptions;
+  /** `maxNodes`: for the whole package, every part read counting towards it. */
+  readonly #maxNodes: number;
+  /** Nodes the parts parsed from now on may still hold. */
+  #nodes: number;
   readonly #byName = new Map<string, DocxPart>();
   readonly #relationships = new Map<string, readonly Relationship[]>();
   readonly #xml = new Map<string, XmlDocument>();
@@ -80,9 +113,11 @@ export class DocxPackage {
   constructor(entries: readonly ZipEntry[], data: readonly Uint8Array[], options: ParseXmlOptions) {
     this.#entries = entries;
     this.#options = options.maxDepth === undefined ? {} : { maxDepth: options.maxDepth };
+    this.#maxNodes = options.maxNodes ?? DEFAULT_MAX_NODES;
+    this.#nodes = this.#maxNodes;
     const index = entries.findIndex((e) => key(partName(e.name)) === key(CONTENT_TYPES));
     if (index === -1) throw new DocxError("Not a .docx: no [Content_Types].xml");
-    const typesXml = xml(data[index] as Uint8Array, CONTENT_TYPES, this.#options);
+    const typesXml = this.#parse(data[index] as Uint8Array, CONTENT_TYPES);
     const types = contentTypes(typesXml.root);
     this.#defaults = types.defaults;
     this.#overridden = new Set(types.overrides.keys());
@@ -138,13 +173,28 @@ export class DocxPackage {
     return text(part.data, part.name);
   }
 
+  #parse(data: Uint8Array, name: string): XmlDocument {
+    try {
+      const doc = xml(data, name, { ...this.#options, maxNodes: this.#nodes });
+      this.#nodes -= doc.nodes;
+      return doc;
+    } catch (error) {
+      if (!((error as Error).cause instanceof XmlLimitError)) throw error;
+      throw new DocxError(
+        `${name}: the package holds more than ${this.#maxNodes} XML nodes, the limit ` +
+          "(maxNodes) of elements, attributes, text and comments read",
+        { cause: (error as Error).cause },
+      );
+    }
+  }
+
   /** The part parsed as XML (once); every node keeps its offsets into the part's text. */
   xml(name: string): XmlDocument {
     const part = this.part(name);
     if (!part) throw new DocxError(`No part ${name}`);
     let doc = this.#xml.get(key(part.name));
     if (!doc) {
-      doc = xml(part.data, part.name, this.#options);
+      doc = this.#parse(part.data, part.name);
       this.#xml.set(key(part.name), doc);
     }
     return doc;
@@ -320,7 +370,7 @@ function text(data: Uint8Array, name: string): string {
 function xml(data: Uint8Array, name: string, options: ParseXmlOptions): XmlDocument {
   const source = text(data, name);
   try {
-    return parseXml(source, options);
+    return parseXmlCosting(source, options, cost);
   } catch (error) {
     // The XmlError (with its offset) stays reachable as the cause.
     throw new DocxError(`${name}: ${(error as Error).message}`, { cause: error });

@@ -106,6 +106,21 @@ describe("parseXml", () => {
     expect(parseXml("<a><b/></a>", { maxDepth: 2 }).root.children).toHaveLength(1);
   });
 
+  it("counts every node against its limit: elements, attributes, text, comments (memory)", () => {
+    // <a x="1"> 2, "t" 1, comment 1, <?pi?> 1, <b/> 1, CDATA 1.
+    const source = '<a x="1">t<!--c--><?pi x?><b/><![CDATA[d]]></a>';
+    expect(parseXml(source, { maxNodes: 7 }).nodes).toBe(7);
+    expect(() => parseXml(source, { maxNodes: 6 })).toThrow(/More than 6 nodes/);
+    // A file of comments only, or of attributes, is no way around it.
+    expect(() => parseXml(`<a>${"<!---->".repeat(11)}</a>`, { maxNodes: 10 })).toThrow(
+      /More than 10 nodes/,
+    );
+    const attributes = Array.from({ length: 40 }, (_, i) => `a${i}=""`).join(" ");
+    expect(() => parseXml(`<a ${attributes}/>`, { maxNodes: 40 })).toThrow(/More than 40/);
+    // No limit unless one is given (the package sets one).
+    expect(parseXml(`<a>${"<b/>".repeat(100_000)}</a>`).nodes).toBe(100_001);
+  });
+
   it("parses many attributes in linear time", () => {
     const attributes = Array.from({ length: 60_000 }, (_, i) => `p:a${i}="${i}"`).join(" ");
     const started = performance.now();

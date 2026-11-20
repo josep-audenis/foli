@@ -251,6 +251,12 @@ export interface Relationship {
     readonly partName?: string;
 }
 export interface ReadPackageOptions extends ZipLimits, ParseXmlOptions {
+    /**
+     * Most XML nodes in all the parts read, together: each element, attribute, text, comment and
+     * processing instruction counts one, a paragraph (`w:p`) four. Default 4 000 000: a 659-page
+     * document of dense tables counts 1.9 million; at the limit an import can take about 2.3 GB.
+     */
+    readonly maxNodes?: number;
 }
 /** A file that is not a `.docx` package, or is damaged. */
 export declare class DocxError extends Error {
@@ -356,6 +362,8 @@ export interface XmlDocument {
     /** Everything at the top level in order: declaration, comments, whitespace, the root. */
     readonly children: readonly XmlNode[];
     readonly root: XmlElement;
+    /** How many nodes the source holds: elements, attributes, text, comments, instructions. */
+    readonly nodes: number;
 }
 /** Source that is not well-formed XML; `offset` is where in the source. */
 export declare class XmlError extends Error {
@@ -369,6 +377,12 @@ export interface ParseXmlOptions {
      * tables, content controls) stay far below, and code walking the tree recursively is safe.
      */
     readonly maxDepth?: number;
+    /**
+     * Most nodes accepted: elements, attributes, text, comments and processing instructions, each
+     * one, since each costs memory. No limit by default here; `readPackage` and `importDocx` set
+     * one for a package (its `maxNodes`).
+     */
+    readonly maxNodes?: number;
 }
 /** Parses `source`; throws {@link XmlError} where it is not well-formed. */
 export declare function parseXml(source: string, options?: ParseXmlOptions): XmlDocument;

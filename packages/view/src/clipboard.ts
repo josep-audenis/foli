@@ -7,6 +7,7 @@ import {
   type MarkJSON,
   type Node as ModelNode,
   type ParagraphJSON,
+  type ResourceJSON,
   type SimpleMarkName,
 } from "@folijs/core";
 import {
@@ -39,6 +40,8 @@ function hasCustom(content: ModelNode): boolean {
   content.descendants((node) => {
     found ||=
       !!node.type.spec.text ||
+      // Pictures too: an HTML-only paste (Firefox) would lose their images.
+      node.type.name === "picture" ||
       node.marks.some((m) => m.type.name.includes(":") || m.type.name === "foreign");
     return !found;
   });
@@ -102,7 +105,12 @@ export function serializeRange(
   from: number,
   to: number,
   ownerDocument: Document,
-  word: { context: WordContext; ratio: (family: string) => number },
+  word: {
+    context: WordContext;
+    ratio: (family: string) => number;
+    /** A copied picture's image as another document can show it (the view's own source). */
+    portable?: (key: string, resource: ResourceJSON) => ResourceJSON;
+  },
 ): ClipboardContent {
   // A slice inside one textblock holds only inline content: wrap it back in its ancestors.
   const $from = doc.resolve(from);
@@ -127,10 +135,16 @@ export function serializeRange(
   // How other apps (and print) recognize a page break; the editor itself does not need it.
   for (const br of container.querySelectorAll(`br[${PAGE_BREAK_ATTR}]`))
     (br as HTMLElement).style.cssText = "page-break-before: always; break-before: page";
+  const definitions = copiedDefinitions(word.context, blocks);
+  const { portable } = word;
+  if (definitions.resources && portable)
+    definitions.resources = Object.fromEntries(
+      Object.entries(definitions.resources).map(([key, r]) => [key, portable(key, r)]),
+    );
   const json = JSON.stringify({
     open: $from.sharedDepth(to) > 0,
     content: blocks.toJSON(),
-    word: copiedDefinitions(word.context, blocks),
+    word: definitions,
   });
   let html = container.innerHTML;
   if (hasCustom(blocks)) {

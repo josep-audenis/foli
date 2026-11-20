@@ -2394,7 +2394,7 @@ export declare function wordContext(state: EditorState): WordContext | null;
 
 // state/wordclip.d.ts
 import type { Node } from "../model/index.js";
-import { type AbstractNumberingJSON, type CommentJSON, type NumberingInstanceJSON, type StoryJSON, type StyleJSON } from "../v3/document.js";
+import { type AbstractNumberingJSON, type CommentJSON, type NumberingInstanceJSON, type ResourceJSON, type StoryJSON, type StyleJSON } from "../v3/document.js";
 import type { EditorState } from "./state.js";
 import { type Story, type WordContext, type WordEnvelope } from "./word.js";
 /** What a v3 copy carries beside its content: the definitions the content references. */
@@ -2409,6 +2409,8 @@ export interface WordDefinitions {
     comments: CommentJSON[];
     /** The notes the content refers to, by story id. */
     notes?: Record<string, StoryJSON>;
+    /** The resources (pictures' images) the content uses, by key. */
+    resources?: Record<string, ResourceJSON>;
 }
 /** What a paste brings: the content, the envelope it needs, and new notes. */
 export interface FittedPaste {

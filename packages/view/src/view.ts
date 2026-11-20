@@ -4298,6 +4298,37 @@ export class EditorView {
 
   // ---------- clipboard ----------
 
+  /**
+   * A copied picture's image as another document can show and save it: its own `data:` or web
+   * URL, else the image this view shows, as a `data:` URL (read from the drawn image when it is
+   * an object URL: its bytes live in this page only). Nothing lasting known (an image not loaded
+   * yet): as it is, and the paste brings the picture without its image.
+   */
+  private portableResource(context: WordContext) {
+    const shown = imageSource(context.envelope.resources, this.resource ?? undefined);
+    return (key: string, resource: ResourceJSON): ResourceJSON => {
+      if (resource.data !== undefined || /^https?:/i.test(resource.url ?? "")) return resource;
+      const url = shown(key);
+      if (url?.startsWith("data:image/")) return { contentType: resource.contentType, data: url };
+      const img = [...this.host.querySelectorAll(`img[${PICTURE_ATTR}]`)].find(
+        (element) => element.getAttribute(PICTURE_ATTR) === key,
+      ) as HTMLImageElement | undefined;
+      if (img?.complete && img.naturalWidth > 0) {
+        try {
+          const canvas = this.host.ownerDocument.createElement("canvas");
+          canvas.width = img.naturalWidth;
+          canvas.height = img.naturalHeight;
+          canvas.getContext("2d")?.drawImage(img, 0, 0);
+          // PNG: the browser's encoding, the same pixels (JPEG's own bytes cannot be read here).
+          return { contentType: "image/png", data: canvas.toDataURL("image/png") };
+        } catch {} // a cross-origin image taints the canvas: keep what is known
+      }
+      // An image the page shows over the web lasts; an object URL does not (the paste then comes
+      // without its image).
+      return url && /^https?:/i.test(url) ? { contentType: resource.contentType, url } : resource;
+    };
+  }
+
   /** Copy writes the model's content (plain text, HTML, Foli JSON), never the browser's DOM. */
   private onCopy = (event: ClipboardEvent): void => {
     this.syncSelection();
@@ -4313,7 +4344,7 @@ export class EditorView {
       table ? 0 : selection.from,
       table ? source.content.size : selection.to,
       this.host.ownerDocument,
-      { context, ratio: this.lineRatio },
+      { context, ratio: this.lineRatio, portable: this.portableResource(context) },
     );
     event.clipboardData.setData("text/plain", table ? cellsText(table) : text);
     event.clipboardData.setData("text/html", html);
