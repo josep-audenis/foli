@@ -161,7 +161,7 @@ function load(document: FoliDocument, from?: DocxPackage, trackChanges = false):
     trackRevisions: editor.trackingChanges,
   });
   const url = URL.createObjectURL(
-    new Blob([bytes as BlobPart], {
+    new Blob([bytes], {
       type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     }),
   );

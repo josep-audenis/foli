@@ -1,0 +1,28 @@
+/* The extension's look: the view puts its classes on the content, the app styles them. */
+.acme-mention {
+  padding: 0 2px;
+  border-radius: 3px;
+  background: #e4ecfb;
+  color: #1a4fa8;
+}
+.acme-topic {
+  text-decoration: underline dotted #8a5a00;
+}
+.acme-todo {
+  background: #fff1b8;
+}
+h1 {
+  margin: 12px 16px;
+  font:
+    600 18px system-ui,
+    sans-serif;
+}
+.files {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin: 12px 16px;
+  font:
+    14px system-ui,
+    sans-serif;
+}

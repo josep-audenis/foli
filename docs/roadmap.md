@@ -9,21 +9,21 @@ leaves `main` green with a working playground.
 **Update this table in the same PR that starts, advances or finishes a phase.** It is the only
 place that says what is in progress; check it before starting work.
 
-| Phase                    | Status                   | Branch             | Notes                                                                                                                                                                          |
-| ------------------------ | ------------------------ | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 0 Foundation             | ✅ Done                  | —                  |                                                                                                                                                                                |
-| 1 Architecture spike     | ✅ Done (G1 provisional) | —                  | Merged in #1; ADR-0003 accepted provisionally; IME, dead-key and screen-reader checks open                                                                                     |
-| 2 Document model         | ✅ Done                  | —                  | Merged in #2                                                                                                                                                                   |
-| 3 Transactions & history | ✅ Done                  | —                  | Merged in #4; gate G2 passed                                                                                                                                                   |
-| 4 Editor view            | ✅ Done (G3 provisional) | —                  | Merged in #8–#13; manual checks (4.6) deferred, open risks in ADR-0003                                                                                                         |
-| 5 Native pagination      | ✅ Done (G4 provisional) | —                  | Merged in #15–#22; page-break manual checks open, risks in ADR-0003                                                                                                            |
-| 6 React API & 0.1.0      | ✅ Done                  | —                  | Merged in #23–#31; 0.1.0 on npm; manual checks shipped as known risks (ADR-0003)                                                                                               |
-| 7 Rich content           | ✅ Done                  | —                  | Merged in #33–#41; 0.2.0 on npm; list-document benchmark misses accepted (known limit)                                                                                         |
-| 8 Word model & DOCX      | ✅ Done                  | —                  | Merged in #44–#61; 0.3.0 on npm (`@folijs/docx` first released); gate G5 passed                                                                                                |
-| 9 Review                 | ✅ Done                  | —                  | Merged in #63–#72; 0.4.0 on npm                                                                                                                                                |
-| 10 Tables & images       | ✅ Done                  | —                  | Merged in #73–#97 (#90, the landing page, went to main); 0.5.0 on npm; two misses accepted                                                                                     |
-| 11 Sections & templates  | ✅ Done                  | —                  | Merged in #100–#118 (#106, #107, #110, #112 and #113, the site, went to main); 0.6.0 on npm; misses accepted                                                                   |
-| 12 Ecosystem & 1.0       | In progress              | phase-12/ecosystem | 12.1 to 12.9 done: ADR-0008, API reports, custom nodes and marks, view hooks, commands and keys, toolbar items, `pnpm bench`, the docs site (not deployed), guides; 12.10 next |
+| Phase                    | Status                   | Branch             | Notes                                                                                                                                                                                     |
+| ------------------------ | ------------------------ | ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0 Foundation             | ✅ Done                  | —                  |                                                                                                                                                                                           |
+| 1 Architecture spike     | ✅ Done (G1 provisional) | —                  | Merged in #1; ADR-0003 accepted provisionally; IME, dead-key and screen-reader checks open                                                                                                |
+| 2 Document model         | ✅ Done                  | —                  | Merged in #2                                                                                                                                                                              |
+| 3 Transactions & history | ✅ Done                  | —                  | Merged in #4; gate G2 passed                                                                                                                                                              |
+| 4 Editor view            | ✅ Done (G3 provisional) | —                  | Merged in #8–#13; manual checks (4.6) deferred, open risks in ADR-0003                                                                                                                    |
+| 5 Native pagination      | ✅ Done (G4 provisional) | —                  | Merged in #15–#22; page-break manual checks open, risks in ADR-0003                                                                                                                       |
+| 6 React API & 0.1.0      | ✅ Done                  | —                  | Merged in #23–#31; 0.1.0 on npm; manual checks shipped as known risks (ADR-0003)                                                                                                          |
+| 7 Rich content           | ✅ Done                  | —                  | Merged in #33–#41; 0.2.0 on npm; list-document benchmark misses accepted (known limit)                                                                                                    |
+| 8 Word model & DOCX      | ✅ Done                  | —                  | Merged in #44–#61; 0.3.0 on npm (`@folijs/docx` first released); gate G5 passed                                                                                                           |
+| 9 Review                 | ✅ Done                  | —                  | Merged in #63–#72; 0.4.0 on npm                                                                                                                                                           |
+| 10 Tables & images       | ✅ Done                  | —                  | Merged in #73–#97 (#90, the landing page, went to main); 0.5.0 on npm; two misses accepted                                                                                                |
+| 11 Sections & templates  | ✅ Done                  | —                  | Merged in #100–#118 (#106, #107, #110, #112 and #113, the site, went to main); 0.6.0 on npm; misses accepted                                                                              |
+| 12 Ecosystem & 1.0       | In progress              | phase-12/ecosystem | 12.1 to 12.10 done: ADR-0008, API reports, custom nodes and marks, view hooks, commands and keys, toolbar items, `pnpm bench`, the docs site (not deployed), guides, examples; 12.11 next |
 
 Status values: `Ready` (dependencies met, nobody on it) · `In progress` · `In review` (PR open) ·
 `✅ Done` (merged, acceptance criteria met) · `Blocked by …`.
@@ -1711,9 +1711,50 @@ Each task is a PR on `phase-12/ecosystem`, the build green after each.
   (WebKit's Tab, as before) in three engines, the extensions guide added to the axe pages.
   Shortcuts: CSS samples are not checked beyond the variable names; the React sample is
   typechecked, not run. No changeset: no published code changed (`@folijs/docx`'s README only).)
-- [ ] 12.10 Examples: an extension example (custom node, mark, plugin, toolbar item, saved to
+- [x] 12.10 Examples: an extension example (custom node, mark, plugin, toolbar item, saved to
   `.docx` and read back) and a framework-free one (`@folijs/view` without React) in `pnpm examples`
-  from tarballs in three engines; the Next.js and Vite examples updated to the stable API.
+  from tarballs in three engines; the Next.js and Vite examples updated to the stable API. (Done:
+  `examples/extension` (Vite 8, React 18.3, TypeScript 5.9 strict): a mention (custom inline node
+  with a node view), a topic (custom mark with a mark view), a plugin with the `insertMention`
+  command (typed through `FoliCommands`), Ctrl+Shift+M and "TODO" decorations, two toolbar items
+  after `defaultToolbarItems`, Save `.docx` (`exportDocx` with the extensions, in the browser, a
+  download) and Open `.docx` (`importDocx`, `editor.setDocument` through `FoliEditor`'s handle).
+  `examples/vanilla` (Vite 8, TypeScript 5.9 strict, no framework; only `@folijs/core` and
+  `@folijs/view` installed): `EditorView` on a `div`, buttons for bold, italic, bullets, undo and
+  redo (commands, `aria-pressed`, undo and redo disabled by dry runs), autosave to `localStorage`,
+  JSON saved to and loaded from a text box (a bad document refused). Both in `pnpm examples`
+  (installed from the tarballs with npm, typechecked over the published types, built) and in
+  `playwright.examples.config.ts` (ports 5182, 5183; each app runs only its specs). e2e:
+  `extension.spec.ts` (type, a mention by the toolbar item and by the key, undo, the mark from its
+  item, the decoration, axe, `.docx` saved, the page reloaded and the file opened: mention, mark
+  and decoration back, no console errors); `success.spec.ts` now also on the vanilla app (its
+  toolbar check is a Bold button, in either app); `vanilla.spec.ts` (the buttons, JSON save and
+  load, a bad document refused, axe). The Vite and Next.js apps already used only stable public
+  API (`FoliEditor`, `initialContent`, `onChange`, `placeholder`, `createDocument`,
+  `parseDocument`, the stylesheet; `@folijs/view` and the exact peers installed); the smoke test's
+  stale "schema v3" wording fixed. `pnpm examples` on 2026-11-20: the four apps install and
+  build, the SSR and DOCX checks pass, 27 passed and 6 skipped (the Next.js server-HTML test
+  outside Next) in Chromium, Firefox and WebKit. Found: with TypeScript 5.9 (strict) the
+  guide's decorations pattern did not compile, `doc.descendants` taking a callback typed
+  `boolean | undefined` (TypeScript 7, used in the repository, accepts one without `return`);
+  fixed in core (`Node.descendants`, `Node.nodesBetween`, `Fragment.nodesBetween` take
+  `boolean | void`; API report updated, changeset `node-callbacks-void`). Docs: examples README (a table of
+  the apps and their tests), getting started, the extensions guide, architecture, contributing
+  and README link the new apps. Shortcuts: the vanilla app styles pages with a few rules of its
+  own instead of `@folijs/react`'s `styles.css`; no copy and paste, block node or
+  built-in key override in the example (the playground's `extension` and `keymaps` specs cover
+  them); the `.docx` is checked by reading it back in Foli, not in Word. Review of #130: Save
+  `.docx` reports a failed export instead of an unhandled rejection, and a file that is no
+  `.docx` is refused with the document kept (tested); `exportDocx`, `DocxPackage.write` and
+  `exportPdf`'s `pdf` are typed `Uint8Array<ArrayBuffer>` (TypeScript 5.7+'s `Blob` refused
+  `Uint8Array<ArrayBufferLike>`: the `as BlobPart` casts in the site, playground and example
+  are gone; `DocxPart.data` stays `Uint8Array`, as it may view the caller's buffer), the
+  published types need TypeScript 5.7+ (getting started, migration guide; changeset
+  `bytes-array-buffer`); the migration test also fails on console errors; `insertMention` sets
+  `closeHistory` so the mention is its own undo step (the guide's sample too), in place of a
+  600 ms wait; the vanilla app reads storage inside its `try`. `pnpm examples` again: 27 passed,
+  6 skipped (one run before it lost both vite-firefox tests to Firefox hanging on a reload, with
+  Juggler and graphics errors in its log; the app was unchanged and the next run passed).)
 - [ ] 12.11 1.0 readiness: every 0.x format (v1–v5 fixtures) loads and saves without loss; the
   limitations the owner picks as 1.0 blockers fixed, the rest listed; a security pass (paste,
   links, `.docx` and zip limits, pictures, `exportPdf` input); the ADR-0003 manual checks run or

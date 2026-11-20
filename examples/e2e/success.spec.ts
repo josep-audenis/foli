@@ -1,7 +1,8 @@
 /**
  * The success criterion on apps that install Foli from its packed tarballs (`pnpm examples`):
- * type, format with a shortcut, undo, serialize, reload without loss. Also: no console errors
- * (hydration included), and the server HTML of the Next.js app holds the editor's shell.
+ * type, format with a shortcut, undo, serialize, reload without loss. Also: no console errors in
+ * the tests that open the page (hydration included), and the server HTML of the Next.js app holds the editor's shell. Runs on
+ * the React apps (`vite`, `next`) and the framework-free one (`vanilla`, its own buttons).
  */
 import { expect, type Page, test } from "@playwright/test";
 
@@ -13,17 +14,23 @@ const bold = (page: Page) =>
       .map((span) => span.textContent)
       .join(""),
   );
-
-test("type, format with a shortcut, undo, save, reload without loss", async ({ page }) => {
+/** The page's console errors and uncaught exceptions, collected as they happen. */
+function consoleErrors(page: Page): string[] {
   const errors: string[] = [];
   page.on("console", (message) => {
     if (message.type() === "error") errors.push(message.text());
   });
   page.on("pageerror", (error) => errors.push(error.message));
+  return errors;
+}
+
+test("type, format with a shortcut, undo, save, reload without loss", async ({ page }) => {
+  const errors = consoleErrors(page);
 
   await page.goto("/");
   await expect(editor(page)).toHaveAttribute("contenteditable", "true");
-  await expect(page.getByRole("toolbar", { name: "Formatting" })).toBeVisible();
+  // FoliToolbar's (React) or the vanilla app's own buttons.
+  await expect(page.getByRole("button", { name: "Bold", exact: true })).toBeVisible();
   await editor(page).click();
   await page.keyboard.type("Hello Foli");
   for (let i = 0; i < 4; i++) await page.keyboard.press("Shift+ArrowLeft");
@@ -41,7 +48,7 @@ test("type, format with a shortcut, undo, save, reload without loss", async ({ p
   const saved = JSON.parse(
     (await page.evaluate(() => localStorage.getItem("foli-example"))) ?? "null",
   );
-  // Schema v3: Word's model, the page in twips (A4).
+  // Schema v5: Word's model, the page in twips (A4).
   expect(saved).toMatchObject({ schemaVersion: 5, section: { pageSize: { width: 11906 } } });
   await page.reload();
   await expect(editor(page)).toHaveText("Hello Foli");
@@ -57,9 +64,10 @@ test("the server HTML holds the editor's shell (Next.js)", async ({ request }, i
   expect(html).toContain('aria-label="Document"');
 });
 
-test("a document saved by 0.1.0 loads (schema v1 → v3); lists from the keyboard save as v3", async ({
+test("a document saved by 0.1.0 loads (schema v1 → v5); lists from the keyboard save as v5", async ({
   page,
 }) => {
+  const errors = consoleErrors(page);
   await page.goto("/");
   // What 0.1.0 saved: schema v1, which the packages migrate on load.
   await page.evaluate(() =>
@@ -96,4 +104,5 @@ test("a document saved by 0.1.0 loads (schema v1 → v3); lists from the keyboar
     attrs: { numbering: { level: 0 } },
     content: [{ type: "text", text: "from 0.1.0" }],
   });
+  expect(errors).toEqual([]);
 });

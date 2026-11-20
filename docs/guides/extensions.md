@@ -9,7 +9,10 @@ The samples build one extension set, `acme`, step by step. They are the files of
 [`apps/site/src/guides/`](../../apps/site/src/guides/), typechecked with the docs site and
 run by its tests, so they compile against the current API. The site's
 [custom node](../../apps/site/src/examples/custom-node.md) and
-[plugin](../../apps/site/src/examples/plugin.md) examples run similar code live.
+[plugin](../../apps/site/src/examples/plugin.md) examples run similar code live, and
+[`examples/extension`](../../examples/extension) is an app doing it from the published packages
+(a mention, a topic mark, a plugin's command, key and decorations, toolbar items, `.docx` both
+ways).
 
 ## What an extension is
 
@@ -36,7 +39,7 @@ a block leaf or a mark: no custom containers. Names have a namespace, `<namespac
 deleted whole, and undone, copied, pasted and saved like Word's own content.
 
 ```ts
-import { type Command, Fragment, Slice } from "@folijs/core";
+import { type Command, closeHistory, Fragment, Slice } from "@folijs/core";
 import type { ViewExtension } from "@folijs/view";
 
 // Attributes come from documents, pastes and .docx files: validate every one.
@@ -74,7 +77,9 @@ export const insertMention =
     const type = state.schema.nodes["acme:mention"];
     if (!type || !state.selection.$from.parent.isTextblock) return false;
     const node = type.create({ id, label: name }, null, state.storedMarks ?? []);
-    dispatch?.(state.tr.replaceSelection(new Slice(Fragment.from(node), 0, 0)));
+    // An undo step of its own, not merged with the typing around it.
+    const tr = state.tr.replaceSelection(new Slice(Fragment.from(node), 0, 0));
+    dispatch?.(tr.setMeta(closeHistory, true));
     return true;
   };
 ```
@@ -86,7 +91,8 @@ export const insertMention =
   replace leaves it alone), its text in `.docx`, and how the view draws it without a node view.
 - A command is `(state, dispatch?) => boolean`. Without `dispatch` it is a dry run: the toolbar
   and `editor.can` call it so. Use `state.schema`, never a schema of your own: the editor's schema
-  is Word's plus the extensions'.
+  is Word's plus the extensions'. Typing within half a second of a change joins its undo step;
+  the `closeHistory` meta makes the insertion an undo step of its own.
 - The view puts what `render` returns in an element with `data-foli-custom="acme:mention"` and
   `contenteditable="false"`. An inline node view sits in its line, which wraps around it as the
   browser sizes it.

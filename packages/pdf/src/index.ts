@@ -64,7 +64,7 @@ export interface ExportPdfOptions {
 
 export interface ExportedPdf {
   /** The PDF file. */
-  pdf: Uint8Array;
+  pdf: Uint8Array<ArrayBuffer>;
   /** Its pages. */
   pages: number;
   /** The fields updated before printing, and those left as they were and why. */
@@ -187,5 +187,6 @@ export async function exportPdf(
     outline: true,
     tagged: true,
   });
-  return { pdf, pages: rendered.pages, fields: rendered.fields };
+  // Playwright's Buffer and Puppeteer's Uint8Array are never over a SharedArrayBuffer.
+  return { pdf: pdf as Uint8Array<ArrayBuffer>, pages: rendered.pages, fields: rendered.fields };
 }

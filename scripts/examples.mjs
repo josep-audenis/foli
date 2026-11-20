@@ -33,7 +33,7 @@ for (const file of readdirSync(packs)) {
   renameSync(`${packs}/${file}`, `${packs}/${file.replace(/-\d+\.\d+\.\d+.*\.tgz$/, ".tgz")}`);
 }
 
-for (const example of ["vite", "next"]) {
+for (const example of ["vite", "next", "extension", "vanilla"]) {
   const dir = `${root}examples/${example}`;
   // A fresh install: the tarballs change on every pack, and a lockfile would pin old ones.
   rmSync(`${dir}/node_modules`, { recursive: true, force: true });

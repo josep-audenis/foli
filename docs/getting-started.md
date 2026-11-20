@@ -22,6 +22,9 @@ dependencies at exactly their own version, so the app has one copy of the engine
 `@folijs/*` packages at the same version and upgrade them together (npm 7+ and pnpm install
 peers themselves; with other package managers list them as above).
 
+With TypeScript, the published types need 5.7 or later (`exportDocx` gives a
+`Uint8Array<ArrayBuffer>`, ready for a `Blob`).
+
 ## Show an editor
 
 ```tsx
@@ -344,8 +347,10 @@ export function Editor() {
 import "@folijs/react/styles.css";
 ```
 
-Complete apps: [examples/vite](../examples/vite) (React 18, TypeScript) and
-[examples/next](../examples/next) (Next.js 16, React 19).
+Complete apps: [examples/vite](../examples/vite) (React 18, TypeScript),
+[examples/next](../examples/next) (Next.js 16, React 19) and
+[examples/extension](../examples/extension) (a custom node, mark, plugin and toolbar items, saved
+to `.docx` and read back).
 
 ## Printing
 
@@ -403,7 +408,8 @@ editor.subscribe((_state, transactions) => {
 The view makes `host` a `contenteditable` textbox and renders `.foli-page` sections into it.
 It does not name the textbox: set `aria-label` (or `aria-labelledby`) yourself. The default
 theme ships in `@folijs/react` (which lists `react` as a peer dependency); without React, copy its
-`styles.css` into your project instead. See [api.md](api.md#folijsview).
+`styles.css` into your project instead. See [api.md](api.md#folijsview). A complete app with
+buttons and JSON save and load: [examples/vanilla](../examples/vanilla).
 
 ## Next
 

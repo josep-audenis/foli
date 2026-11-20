@@ -160,7 +160,7 @@ export class DocxPackage {
   async write(
     replace: ReadonlyMap<string, Uint8Array> = new Map(),
     add: readonly NewPart[] = [],
-  ): Promise<Uint8Array> {
+  ): Promise<Uint8Array<ArrayBuffer>> {
     const pending = new Map<string, Uint8Array>();
     for (const [name, data] of replace) {
       const part = this.part(name);

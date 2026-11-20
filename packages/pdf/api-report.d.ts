@@ -52,7 +52,7 @@ export interface ExportPdfOptions {
 }
 export interface ExportedPdf {
     /** The PDF file. */
-    pdf: Uint8Array;
+    pdf: Uint8Array<ArrayBuffer>;
     /** Its pages. */
     pages: number;
     /** The fields updated before printing, and those left as they were and why. */

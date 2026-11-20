@@ -216,7 +216,7 @@ export async function exportDocx(
   document: FoliDocument,
   original?: DocxPackage,
   options: ExportOptions = {},
-): Promise<Uint8Array> {
+): Promise<Uint8Array<ArrayBuffer>> {
   // Custom nodes and marks become tagged content controls first (ADR-0008).
   const parsed = parseDocument(document, { extensions: options.extensions ?? [] });
   const doc = balanced(withThreadIds(customToWord(parsed, options.extensions), original), original);
@@ -394,7 +394,7 @@ async function intoPackage(
   isReferenced: (key: string) => boolean,
   options: ExportOptions,
   media: Media,
-): Promise<Uint8Array> {
+): Promise<Uint8Array<ArrayBuffer>> {
   const mainName = pkg.mainDocument;
   const main = pkg.xml(mainName);
   const body = child(main.root, "body");
@@ -632,7 +632,7 @@ async function newPackage(
   isReferenced: (key: string) => boolean,
   options: ExportOptions,
   media: Media,
-): Promise<Uint8Array> {
+): Promise<Uint8Array<ArrayBuffer>> {
   const rels = new Relationships([]);
   const context = contextFor(DEFAULT_NAMESPACES, rels, media, "/word/document.xml");
   const main = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\r\n<w:document ${NEW_ROOT_ATTRIBUTES}><w:body>${blocksXml(doc.content.content ?? [], context)}${bodySection(doc, DEFAULT_NAMESPACES)}</w:body></w:document>`;

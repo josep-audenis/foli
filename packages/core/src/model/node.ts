@@ -103,14 +103,16 @@ export class Node {
   nodesBetween(
     from: number,
     to: number,
-    f: (node: Node, pos: number, parent: Node | null, index: number) => boolean | undefined,
+    // biome-ignore lint/suspicious/noConfusingVoidType: a callback without a return (TypeScript 5 refuses one for `undefined`)
+    f: (node: Node, pos: number, parent: Node | null, index: number) => boolean | void,
   ): void {
     this.content.nodesBetween(from, to, f, 0, this);
   }
 
   /** Calls `f` for every descendant. Return false to skip a node's children. */
   descendants(
-    f: (node: Node, pos: number, parent: Node | null, index: number) => boolean | undefined,
+    // biome-ignore lint/suspicious/noConfusingVoidType: a callback without a return (TypeScript 5 refuses one for `undefined`)
+    f: (node: Node, pos: number, parent: Node | null, index: number) => boolean | void,
   ): void {
     this.nodesBetween(0, this.content.size, f);
   }
