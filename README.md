@@ -87,7 +87,11 @@ Using Foli:
 - [Getting started](docs/getting-started.md)
 - [API reference](docs/api.md)
 - [Keyboard](docs/keyboard.md) — every key per platform, which a plugin can override
-- [Styling](docs/styling.md) — CSS variables, dark theme, print
+- [Styling](docs/styling.md) — CSS variables, classes, print
+- [Theming](docs/guides/theming.md) — a complete theme, dark, print colors, forced colors
+- [Extensions](docs/guides/extensions.md) — custom nodes and marks, plugins, commands, keys, toolbar items
+- [Migrating from 0.x](docs/guides/migrating-from-0x.md)
+- [Versions and deprecation](docs/deprecation.md) — what 1.0 promises, the saved format
 - [Known limitations](docs/limitations.md)
 
 Design and development:
@@ -106,7 +110,7 @@ Design and development:
 ```bash
 pnpm install
 pnpm dev     # playground
-pnpm check   # lint + typecheck + test + build
+pnpm check   # lint, typecheck, tests, build, package checks, API reports, sizes
 ```
 
 ## License

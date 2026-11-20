@@ -5,7 +5,8 @@ the export lists of 12.2 ([ADR-0008](decisions/ADR-0008-1.0-contract-and-extensi
 
 **Stable or internal.** Every name on this page is **stable** unless marked **internal**: the
 package's entry exports it, and from 1.0 it changes only as ADR-0008's semver rules allow (before
-1.0, 0.x minors may still break it; changes are listed in each package's changelog). Internal
+1.0, 0.x minors may still break it; changes are listed in each package's changelog; the rules:
+[versions and deprecation](deprecation.md)). Internal
 names are on `@folijs/core/internal`, the entry the other Foli packages use, with no promise at
 all: any release may change them. Each package's exact surface is its API report,
 `packages/<name>/api-report.d.ts` ([contributing.md](contributing.md#api-reports)); a module

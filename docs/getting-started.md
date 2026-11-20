@@ -5,7 +5,9 @@ edited in the browser, stored as JSON. This guide uses the React package. Withou
 [Using the view without React](#using-the-view-without-react).
 
 > **0.x:** the API may change in any minor version (0.1 → 0.2); changes are listed in each
-> package's `CHANGELOG.md`. Read the [known limitations](limitations.md) before you ship.
+> package's `CHANGELOG.md`. What 1.0 will promise: [versions and deprecation](deprecation.md);
+> upgrading: [migrating from 0.x](guides/migrating-from-0x.md). Read the
+> [known limitations](limitations.md) before you ship.
 
 ## Install
 
@@ -407,5 +409,9 @@ theme ships in `@folijs/react` (which lists `react` as a peer dependency); witho
 
 - [API reference](api.md)
 - [Keyboard](keyboard.md): every key per platform, and which a plugin can take
-- [Styling](styling.md): CSS variables, dark theme, print
+- [Styling](styling.md): CSS variables, classes, print; [theming](guides/theming.md): a complete
+  theme, dark, forced colors
+- [Extensions](guides/extensions.md): custom nodes and marks, plugins, commands, keys, toolbar
+  items
+- [Migrating from 0.x](guides/migrating-from-0x.md)
 - [Known limitations](limitations.md): read before shipping

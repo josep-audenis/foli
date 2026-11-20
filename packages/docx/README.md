@@ -3,7 +3,8 @@
 DOCX for [Foli](https://github.com/josep-audenis/foli): imports a `.docx` into Foli's Word model
 (schema v5 of `@folijs/core`), exports it back losslessly (`exportDocx`), and reads its package
 (zip, parts, content types, relationships) and XML keeping every byte it does not change. No DOM:
-runs in the browser, workers and Node 20.12+. Depends only on `@folijs/core`.
+runs in the browser, workers and Node 20.12+. Its only dependency is `@folijs/core`, a peer at
+exactly its own version: `npm install @folijs/docx @folijs/core`.
 
 > Early release: the API may change in any 0.x minor version (changes in `CHANGELOG.md`).
 
