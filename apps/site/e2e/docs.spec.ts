@@ -106,6 +106,7 @@ for (const path of [
   "/docs/",
   "/docs/limitations/",
   "/docs/keyboard/",
+  "/docs/guides/extensions/",
   "/docs/benchmarks/",
   "/docs/changelog/",
   "/docs/api/react/",

@@ -24,8 +24,8 @@ This document describes **what exists** and **what is decided**. Planned parts a
 └──────────────────────────────▲───────────────────────────────┘
                                │ same JSON format
 ┌──────────────────────────────┴───────────────────────────────┐
-│ Rust (later)  DOCX import/export · batch processing · WASM   │
-│               never on the keystroke path                    │
+│ @folijs/docx  .docx import · lossless export    (no DOM)     │
+│ @folijs/pdf   PDF of the pages, by a headless Chromium       │
 └──────────────────────────────────────────────────────────────┘
 ```
 
@@ -39,7 +39,7 @@ This document describes **what exists** and **what is decided**. Planned parts a
 | Document processing | DOCX import/export with lossless round trip (`@folijs/docx`)                   | Package and XML reading ✅ (8.2), import to v3 ✅ (8.4), lossless export ✅ (8.5) ([ADR-0005](decisions/ADR-0005-word-compatible-model.md)); tables, pictures (Phase 10), stories, fields, controls, sections, settings (Phase 11) |
 | PDF                 | A document printed to PDF from Foli's own pages (`@folijs/pdf`)                | ✅ (11.12, [ADR-0007](decisions/ADR-0007-stories-fields-controls.md)): Chromium's PDF through the app's headless page                                                                                                              |
 
-## Editing data flow (target design)
+## Editing data flow
 
 ```
 DOM event (beforeinput / keydown / composition / paste)
@@ -53,6 +53,7 @@ DOM event (beforeinput / keydown / composition / paste)
   → subscribers (React, onChange) notified
 ```
 
+The same flow with the file and function names: [contributing.md](contributing.md#how-a-keystroke-flows).
 The DOM is never parsed as the source of truth. The one exception is IME composition and
 Android input, where the browser must mutate the DOM; the view reads those changes back and
 converts them into steps immediately.

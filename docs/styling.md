@@ -37,35 +37,10 @@ Page breaks follow the text's real line boxes: a font, size or line-height chang
 document's, or CSS over it) re-flows the pages. The document's fonts must be available (loaded web fonts or installed ones); the view
 re-flows when a web font finishes loading.
 
-## Dark theme
+## Themes
 
-Pages are paper: the default keeps them white. To darken everything:
-
-```css
-@media (prefers-color-scheme: dark) {
-  /* On the editor's elements, not :root: the stylesheet's own :root defaults would win
-     whenever it loads after this rule. */
-  .foli-canvas,
-  .foli-toolbar,
-  .foli-editor-body,
-  .foli-comments {
-    --foli-canvas-background: #1b1b1a;
-    --foli-page-background: #2a2a28;
-    --foli-page-shadow: 0 0 0 1px #3a3a37;
-    --foli-text-color: #e8e8e4;
-    --foli-selection-color: rgb(110 160 255 / 0.35);
-    --foli-border-color: #3a3a37;
-    --foli-toolbar-background: #222220;
-    --foli-toolbar-color: #e8e8e4;
-    --foli-toolbar-hover: #33332f;
-    --foli-toolbar-pressed: #2c3f63;
-    --foli-focus-ring: #7aa7ff;
-  }
-}
-```
-
-Print uses the same variables: reset the page and text colors under `@media print` if dark
-pages should print white.
+A complete theme, a dark one, print colors, forced colors and the look of extension content:
+the [theming guide](guides/theming.md). This page is the reference it builds on.
 
 ## Elements and classes
 
@@ -96,12 +71,9 @@ pages should print white.
 | `[data-foli-custom]`               | a custom (or foreign) node, its type as the value: its node view inside, else its text; a block split across pages is one per page, after the first `aria-hidden` |
 | `[data-foli-mark]`                 | a run under custom marks, their types space separated (`[data-foli-mark~="acme:topic"]`); a mark view adds its own classes and attributes                         |
 
-Extensions style their own content (ADR-0008): node views, mark views and decorations put
-classes and attributes on what they draw, and the app's CSS gives them their look; the view adds
-no rules for them. Pagination measures them as it measures text, so a decoration that changes a
-size (padding, font size) re-flows the pages; prefer backgrounds, outlines and `box-shadow`
-for marks that come and go (a caret's paragraph, search hits). Hide decorations in print with
-`@media print` if they are not part of the document.
+Extensions style their own content (ADR-0008): the view adds no rules for what node views, mark
+views and decorations draw. How to style it without re-flowing the pages:
+[theming](guides/theming.md#extension-content).
 
 CSS over the document's own formatting needs `!important` (it is inline), and pagination
 follows it: margins and padding on blocks are measured. A paragraph split across two pages is
@@ -132,12 +104,6 @@ The same rules print the read-only renderer's pages (`DocumentPages.printStyles(
 Print-only CSS must not change text metrics (font, size, line height), or the printed lines
 no longer match the computed page breaks. `@page` applies to the whole web page: with several
 editors of different page sizes, print one at a time.
-
-## Forced colors and contrast
-
-In forced-colors mode (Windows High Contrast) the toolbar marks pressed buttons with a
-`Highlight` outline, since backgrounds are dropped. When you override colors, check the text
-and focus ring contrast against your backgrounds.
 
 ## Content Security Policy
 

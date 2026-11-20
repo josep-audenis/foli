@@ -2,11 +2,13 @@
 
 ## Setup
 
-Requirements: Node ≥ 20.19, pnpm 10 (`corepack enable`).
+Requirements: Node ≥ 20.19, pnpm 10 (`corepack enable`). The Word harnesses also need Windows
+with desktop Word.
 
 ```bash
 pnpm install
-pnpm dev        # playground at http://localhost:5173
+pnpm exec playwright install   # Chromium, Firefox and WebKit, for the browser tests
+pnpm dev                       # playground at http://localhost:5173
 ```
 
 `pnpm install` also installs a git pre-push hook that runs `pnpm check` on the working tree
@@ -14,19 +16,97 @@ pnpm dev        # playground at http://localhost:5173
 ([Releasing](#releasing)). Skip once with `git push --no-verify`. The hook
 is not installed when `core.hooksPath` is set or a foreign `pre-push` hook exists.
 
+Packages import each other by name; the `@folijs/source` export condition maps the names to
+`src/` in dev, tests and typecheck, so nothing needs building first. `pnpm build` writes each
+package's `dist/`: what is published, and what `pnpm api`, `pnpm size`, `pnpm examples` and the
+corpus scripts read.
+
+## Where things live
+
+[architecture.md](architecture.md) describes the design and every subsystem; this is the map.
+
+| Path                           | What                                                                                                                    |
+| ------------------------------ | ----------------------------------------------------------------------------------------------------------------------- |
+| `packages/core/src/model/`     | Schema, immutable nodes, fragments, marks, positions, slices, JSON. No DOM, no Word                                     |
+| `packages/core/src/transform/` | Steps, mapping, `Transform`                                                                                             |
+| `packages/core/src/state/`     | `EditorState`, `Transaction`, plugins, `createEditor` (`editor.ts`), history, commands, Word's editing features         |
+| `packages/core/src/v3/`        | The saved document: Word's schema, `parseDocument`, migrations, the formatting resolver, custom types (`extensions.ts`) |
+| `packages/view/src/view.ts`    | `EditorView`: input, keys, selection, stories, the drawing and layout passes                                            |
+| `packages/view/src/word/`      | Word's blocks, tables, headers, notes and fields drawn on pages; `renderDocument` (`pages.ts`)                          |
+| `packages/view/src/layout/`    | The page flow (`flow.ts`): blocks and lines onto pages                                                                  |
+| `packages/view/src/`           | Also the clipboard (`clipboard.ts`), print rules (`print.ts`), view extensions (`extension.ts`)                         |
+| `packages/react/`              | Components, hooks, the toolbar and its items (`src/`); the default theme (`styles.css`)                                 |
+| `packages/docx/src/`           | Zip, XML, the package, `import/`, `export/`, custom types (`custom.ts`)                                                 |
+| `packages/pdf/src/`            | `exportPdf` and the page script it runs (`renderer.ts`)                                                                 |
+| `apps/playground/`             | Pages the e2e tests drive (`e2e/`), benchmarks (`bench/`), the Word corpus pages (`word/`). No engine logic             |
+| `apps/site/`                   | The landing page, `/test/`, the docs site (`src/docs/`), its live examples and the guides' samples (`src/guides/`)      |
+| `corpus/`, `scripts/corpus/`   | Word-written documents, Word's reference data, the harnesses that compare Foli with Word                                |
+| `examples/`                    | A Vite and a Next.js app that install the packed packages (`pnpm examples`)                                             |
+| `spikes/two-page/`             | Phase 1's spike; never published                                                                                        |
+
+### How a keystroke flows
+
+Typing a letter, end to end:
+
+1. **Key.** `EditorView`'s keydown handler names the key (`keyName`) and asks the plugins'
+   keymaps in order. The view's overridable keys run where the `viewKeys` marker plugin stands,
+   the reserved ones before every keymap ([keyboard.md](keyboard.md)). A plain letter has no
+   binding, so the event goes on.
+2. **Input.** The view prevents `beforeinput` (`insertText`): the browser never edits the DOM,
+   except during IME composition, which the view reads back when it ends. It reads the DOM
+   selection into the model and runs the `insertText(text)` command.
+3. **Transaction.** A command (`(state, dispatch?) => boolean`) builds a `Transaction` from the
+   state: steps, the mapped selection, stored marks, metadata.
+4. **Editor.** `editor.dispatch` rebuilds it as tracked changes when tracking is on
+   (`trackTransaction`). `EditorState.applyTransaction` runs the plugins' filters, computes their
+   states (history keeps the inverted steps there) and lets them append transactions. The
+   stories' editors are synced, then the listeners called.
+5. **View.** The view, a listener, draws again only the blocks that changed (or whose
+   decorations changed) and measures them; the flow re-paginates from the first change, reusing
+   the pages before it. Then the selection is written back to the DOM.
+6. **App.** React's `useEditorState` selectors run and re-render what changed; `FoliEditor`'s
+   `onChange` gets the transactions.
+
+The document is never read from the DOM: the model is the truth.
+
+## Tests and harnesses
+
+| What                     | Run                                                                        | Where                                                                                                |
+| ------------------------ | -------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| Unit and property tests  | `pnpm test` (in `pnpm check`)                                              | `*.test.ts[x]` next to the code; jsdom per file (`// @vitest-environment jsdom`); `fast-check`       |
+| Browser tests            | `pnpm test:e2e`, one project: `pnpm test:e2e --project=playground-firefox` | `apps/playground/e2e/`, `apps/site/e2e/`, `apps/site/e2e-build/`, `spikes/two-page/e2e/`             |
+| Visual regression        | in `pnpm test:e2e` (`visual.spec.ts`)                                      | [testing/visual-regression.md](testing/visual-regression.md)                                         |
+| Examples from tarballs   | `pnpm examples`                                                            | [examples/README.md](../examples/README.md)                                                          |
+| API reports, sizes       | `pnpm api`, `pnpm size` (in `pnpm check`, after build)                     | [API reports](#api-reports); budgets in `scripts/size.mjs`                                           |
+| Benchmarks               | `pnpm bench`, `pnpm bench:layout`                                          | [benchmarks.md](benchmarks.md)                                                                       |
+| Pages against Word       | `pnpm corpus:pages` (`FOLI_WORD_PDF=<folder>` adds Word's PDFs)            | [corpus/README.md](../corpus/README.md#page-agreement-with-word)                                     |
+| Round trips through Word | `node scripts/corpus/<feature>-roundtrip.mjs`, then its PowerShell script  | [corpus/README.md](../corpus/README.md#checking-folis-writing-with-word) (Windows with desktop Word) |
+| Import coverage          | `node scripts/corpus/import-report.mjs [folder]` (after build)             | [corpus/README.md](../corpus/README.md#import-coverage)                                              |
+| IME, screen readers      | by hand                                                                    | [testing/ime.md](testing/ime.md)                                                                     |
+
+The e2e projects are `<app>-<engine>`: `spike`, `playground`, `site` and `site-build` (the built
+site under `vite preview`) in `chromium`, `firefox` and `webkit` (`playwright.config.ts`), each
+app on its own dev server port. The whole suite takes a while: run the projects and files your
+change touches, in the three engines. The guides' code samples are files of
+`apps/site/src/guides/`: `pnpm typecheck` compiles them, `pnpm test` runs most of them and fails
+when a `ts` or `tsx` block of `docs/guides/*.md` is not found in one of them.
+
 ## Commands
 
 | Command                            | What it does                                                                                                         |
 | ---------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
 | `pnpm dev`                         | Playground with HMR, packages consumed from source                                                                   |
 | `pnpm test` / `pnpm test:watch`    | Vitest (all packages)                                                                                                |
+| `pnpm test:e2e`                    | Playwright, every project (`--project=<app>-<engine>` for one)                                                       |
 | `pnpm typecheck`                   | `tsc --noEmit` in every workspace project                                                                            |
 | `pnpm lint` / `pnpm format`        | Biome check / auto-fix                                                                                               |
-| `pnpm build`                       | Build packages to `dist/` and the playground                                                                         |
+| `pnpm build`                       | Build the packages to `dist/`, the playground and the site                                                           |
 | `pnpm check`                       | lint + typecheck + test + build + package checks (`publint`) + API reports + bundle sizes; the pre-push hook         |
 | `pnpm api` / `pnpm api:update`     | Check each package's built types against its API report / rewrite the reports (after build)                          |
 | `pnpm size`                        | Bundle size per package against its budget (after `pnpm build`)                                                      |
 | `pnpm bench`                       | Benchmarks against this machine's baseline; fails on a regression (minutes; not in `pnpm check`; `--update` records) |
+| `pnpm bench:layout`                | The pagination benchmarks alone (`playwright.bench.config.ts`)                                                       |
+| `pnpm corpus:pages`                | The Word corpus laid out and compared with Word's pages, in Chromium (`playwright.word.config.ts`)                   |
 | `pnpm changeset`                   | Record a change to a published package (bump type and changelog line)                                                |
 | `pnpm --filter @folijs/site build` | Build the site (landing, `/test/`, docs) to `apps/site/dist/` ([The site](#the-site))                                |
 | `pnpm examples`                    | Pack the packages, install them into `examples/` (Vite + React 18, Next.js + React 19), build, Playwright smoke test |
@@ -115,11 +195,12 @@ of one of these alone is noise; anything else is a real failure.
 `@folijs/core`, `@folijs/view`, `@folijs/react`, `@folijs/docx` and `@folijs/pdf` always share one
 version (a
 Changesets `fixed` group, [`.changeset/config.json`](../.changeset/config.json)); the
-playground, spike and examples are never published.
+playground, site, spike and examples are never published.
 
 1. **With each change to a published package**, run `pnpm changeset`: pick the bump (before
-   1.0: `minor` for breaking changes and features, `patch` for fixes) and write the changelog
-   line for users. Commit the `.changeset/*.md` file with the change.
+   1.0: `minor` for breaking changes and features, `patch` for fixes; from 1.0 the rules of
+   [versions and deprecation](deprecation.md), a removal deprecated first) and write the
+   changelog line for users. Commit the `.changeset/*.md` file with the change.
 2. **Before each release**, run `pnpm bench` on a quiet machine on mains power
    ([benchmarks.md](benchmarks.md#performance-tracking-127)): it compares the layout,
    keystroke, find, `.docx` and PDF benchmarks with the committed baseline of the machine

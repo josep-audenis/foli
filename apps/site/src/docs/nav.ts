@@ -20,9 +20,12 @@ export const NAV: Group[] = [
     title: "Guides",
     entries: [
       { md: "docs/styling.md" },
+      { md: "docs/guides/theming.md" },
+      { md: "docs/guides/extensions.md" },
       { md: "docs/keyboard.md" },
       { md: "docs/document-model.md" },
       { md: "docs/pagination.md" },
+      { md: "docs/guides/migrating-from-0x.md" },
     ],
   },
   {
@@ -33,6 +36,7 @@ export const NAV: Group[] = [
     title: "Reference",
     entries: [
       { md: "docs/api.md" },
+      { md: "docs/deprecation.md" },
       { api: "react" },
       { api: "core" },
       { api: "view" },

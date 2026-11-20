@@ -1,6 +1,7 @@
 # Known limitations
 
-What Foli does not do yet, or does with caveats, as of 0.6.0. Read it before you ship. Details
+What Foli does not do yet, or does with caveats, as of the 1.0 work on `main` (after 0.6.0).
+Read it before you ship. Details
 and the reasons are in [architecture.md](architecture.md), [pagination.md](pagination.md) and
 [ADR-0003](decisions/ADR-0003-rendering-and-input.md); what comes next is in the
 [roadmap](roadmap.md).
@@ -35,7 +36,8 @@ checklist in [testing/ime.md](testing/ime.md)):
   content controls and bookmarks (see below); everything else Word has (charts, shapes...) is
   kept as opaque content, selected and deleted whole. Documents saved by 0.1.0 to 0.5.0 are
   migrated when loaded (a v4 document's opaque headers, notes and fields stay so until its
-  `.docx` is imported again); 0.5.0 cannot read documents saved by 0.6.0. Sections are laid out with their own page
+  `.docx` is imported again); 0.5.0 cannot read documents saved by 0.6.0, and 0.6.0 cannot read
+  one holding custom node or mark types. Sections are laid out with their own page
   setups and columns (11.6); a continuous section with another page setup starts a new page, and
   a next-column section with another number of columns too. A paragraph split between columns of
   different widths is measured there by its share of the text, so a line can differ, and on
@@ -111,10 +113,11 @@ checklist in [testing/ime.md](testing/ime.md)):
 - Drag and drop of text does nothing.
 - Some Android keyboards insert paragraphs without the events the editor needs; such an edit is
   discarded with a `Foli:` console warning.
-- Documents in `schemaVersion: 1` load in later versions: they migrate without dropping
-  content.
-- Custom nodes and marks (12.3, 12.4): node views, mark views and decorations draw only in the
-  editor (`EditorView`): `renderDocument` and `exportPdf` take no extensions, so they draw a
+## Extensions, keys and the toolbar
+
+Custom nodes and marks, plugins and toolbar items ([extensions](guides/extensions.md)).
+
+- Node views, mark views and decorations draw only in the editor (`EditorView`): `renderDocument` and `exportPdf` take no extensions, so they draw a
   custom node as its `.docx` text or its type in brackets and a custom mark not at all; the same
   for headers, footers and notes as the pages show them, until one is opened for editing on its
   page. A custom block in a table cell is kept whole (it does not split between pages); a split
@@ -127,6 +130,28 @@ checklist in [testing/ime.md](testing/ime.md)):
   are leaves and marks only (no custom containers in 1.x). A custom block node cannot be inserted
   or deleted as a tracked change (block content is tracked through paragraph marks).
   `setControlValue` with rich content holding an unknown custom type is refused.
+- A copy holding custom content carries its Foli JSON in the HTML too, on one wrapping `div`
+  (`data-foli-clipboard`), read back only when that wrapper is all the pasted HTML holds. An
+  application that rewrites the HTML on the way (wrapping it in its own markup) loses the
+  custom types: they paste as their text.
+- An editor's schema is built once per extensions array and kept for it: do not change an array
+  after giving it to `createEditor`, `parseDocument` or `exportDocx`; make a new one.
+- `PluginSpec` is frozen for 1.x; the history plugin's state is internal, and collaboration is
+  not part of 1.0 (steps, maps and mapping are public, which a later package needs).
+- `plugins` and `extensions` (of `FoliEditor` and `useFoliEditor`) are read once: changing them
+  after mount does not reconfigure the editor (a warning unless `process.env.NODE_ENV` is `"production"` at run time, which a bundle without `process` always shows; a new `key` makes a
+  new editor, losing undo history and the selection).
+- Toolbar items of an app are buttons and menus of `ToolbarAction`s: the boxes (style, font),
+  color menus and dialogs are only the built-in items'. An app item's state without `enabled` is
+  a dry run of its command after every transaction, which costs what the command costs.
+  `useCommand(command)` with a command made anew on each render dry-runs it on each render.
+- Keys ([keyboard.md](keyboard.md)): `editor.handleKey` runs the plugins' keymaps only, not the
+  view's own keys (they need the pages). A keymap cannot take a reserved key, nor the browser's
+  editing commands that arrive without a key name (word and line deletion, the browser's undo
+  and bold from its menus): those come through `beforeinput`. Plugin commands are typed only
+  through `FoliCommands`: one an app does not declare there is reachable but untyped. Ctrl+Alt
+  typing a character other than a–z or 0–9 is taken for AltGr (not every browser reports AltGr),
+  so on a non-Latin layout Ctrl+Alt+F and Ctrl+Alt+D do not insert notes.
 
 ## Tables
 
@@ -293,8 +318,10 @@ Details in the [package README](../packages/docx/README.md).
 - A CSS change that only alters block margins, or rewraps text without changing any block's
   height, is noticed only at the next height change.
 - No virtualization: every page is in the DOM and measured on load. Fine up to a few hundred
-  pages ([benchmarks.md](benchmarks.md): 100 pages lay out in about 40–85 ms, a keystroke
-  paints within 8–19 ms at p95 in Chromium and Firefox).
+  pages, but past the speed targets at 100 pages ([benchmarks.md](benchmarks.md#10-numbers),
+  the owner's laptop on mains): 104 pages lay out in about 110 ms in Chromium, 151 ms in Firefox
+  and 204 ms in WebKit, and handling a keystroke takes about 11 ms (p50, Chromium), 3.3-3.5 times
+  what 0.2.0 took (most of it added in Phases 8 to 11; to be investigated before 1.0).
 - Long documents made of lists were slower in 0.2.0 (schema v2, where lists were nested
   blocks; not measured on schema v3 yet): in a 114-page list document, Enter near the top took
   about 9-24 ms to handle (p50) and up to ~65 ms to paint (p95), and the first layout ~85-95 ms,
@@ -304,7 +331,6 @@ Details in the [package README](../packages/docx/README.md).
 - Formatting thousands of paragraphs at once is slow: bold over 4,000 paragraphs takes about
   0.6 s, the next edit about 0.7 s, its undo about 0.5 s.
 - Undo history keeps the last 100 undo steps (a run of typing is one step).
-
 - Page numbers made of digits are taken to be equally wide when a header's height is measured:
   with a font whose digits differ, a header on the verge of wrapping can overlap the text.
 
@@ -350,19 +376,12 @@ Details in the [package README](../packages/docx/README.md).
   or a file picker (which end the composition), not from a timer.
 - A Content Security Policy without `'unsafe-inline'` styles hides the placeholder and breaks
   print sheets ([styling.md](styling.md#content-security-policy)).
-- `Plugin`, `Transaction` metadata, steps and mapping are exported but not a stable API before
-  1.0 (`PluginSpec` is frozen for 1.x by ADR-0008).
-- `plugins` and `extensions` (of `FoliEditor` and `useFoliEditor`) are read once: changing them
-  after mount does not reconfigure the editor (a warning unless `process.env.NODE_ENV` is `"production"` at run time, which a bundle without `process` always shows; a new `key` makes a
-  new editor, losing undo history and the selection).
-- Toolbar items of an app are buttons and menus of `ToolbarAction`s: the boxes (style, font),
-  color menus and dialogs are only the built-in items'. An app item's state without `enabled` is
-  a dry run of its command after every transaction, which costs what the command costs.
-  `useCommand(command)` with a command made anew on each render dry-runs it on each render.
-- Keys ([keyboard.md](keyboard.md)): `editor.handleKey` runs the plugins' keymaps only, not the
-  view's own keys (they need the pages). A keymap cannot take a reserved key, nor the browser's
-  editing commands that arrive without a key name (word and line deletion, the browser's undo
-  and bold from its menus): those come through `beforeinput`. Plugin commands are typed only
-  through `FoliCommands`: one an app does not declare there is reachable but untyped. Ctrl+Alt
-  typing a character other than a–z or 0–9 is taken for AltGr (not every browser reports AltGr),
-  so on a non-Latin layout Ctrl+Alt+F and Ctrl+Alt+D do not insert notes.
+
+## Docs and tooling
+
+- The docs site's search matches headings and API names, not body text. The API pages show
+  each declaration's `.d.ts` text; code is not highlighted.
+- The guides' TypeScript samples are compiled and mostly run by `pnpm test`; their CSS samples
+  are not checked, beyond the variable names existing.
+- Benchmarks run by hand on the owner's machine against its baseline (`pnpm bench`), not in a
+  hosted CI; the browser ones run on the dev server.
