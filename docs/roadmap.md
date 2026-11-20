@@ -1878,10 +1878,52 @@ Each task is a PR on `phase-12/ecosystem`, the build green after each.
   guide); `changeset status` plans 1.0.0 for all five. The version PR (#133); 1.0.0 published
   2026-11-20 by the Release workflow with the owner's approval, README's status switched after.)
 
-## Optional
+## After 1.0
 
-Real-time collaboration (steps and mapping enable a central-authority protocol; a CRDT binding
-evaluated separately), AI-assisted editing on the programmatic transaction API, headless
+Not a phase yet: the backlog written down on 2026-11-21, from [limitations.md](limitations.md),
+[benchmarks.md](benchmarks.md) and ADR-0003's open risks. Nothing here is started. GitHub has
+no open issues, so there is no bug intake yet; real-world bugs are expected to come from the
+first group and from .docx files the corpus does not cover.
+
+**Checks accepted as risks for 1.0** ([limitations.md](limitations.md#not-verified-by-hand)):
+
+- IME and dead keys on real input methods (Windows, macOS, Android, iOS), not only Chromium's
+  emulation; next to a page break and in table cells.
+- Screen readers (NVDA, VoiceOver), including a paragraph split across two pages.
+- macOS key bindings and Word's keys as mapped there; Safari on macOS and iOS (tests run on
+  Playwright's WebKit on Windows).
+- Pastes from real Word, Google Docs and LibreOffice (fixtures are hand-written); spellcheck and
+  autocorrect at a page's start or end.
+
+**Robustness:**
+
+- The corpus is 9 documents. Run import → export → compare over a large set of real .docx files
+  and report what is lost or refused.
+- Bug intake: an issue template that asks for the .docx (or a reduced one) and the browser.
+
+**Speed** ([benchmarks.md](benchmarks.md)): Phase 5's targets at 100 pages, missed at 1.0. In
+Chromium: Enter's handler 9.9 ms and paint p95 35 ms (≤ 25), first layout 118 ms (≤ 60), full
+re-flow 148 ms (≤ 100). Firefox misses each. Chromium's re-flow at 200 sections was +110% over
+its baseline in 12.12.
+
+**Gaps users will meet** ([limitations.md](limitations.md)):
+
+- Dragging text does nothing; on Android, Backspace at a list paragraph's start may join it into
+  the paragraph before; some Android keyboards insert paragraphs without the events the editor
+  needs.
+- `renderDocument` and `exportPdf` take no extensions, so custom nodes do not draw there.
+- Tables: autofit keeps Word's saved widths (no fitting to content); no keyboard way to set a
+  column's width.
+- Pictures: no cropping, rotation or touch resizing; resizing is refused while tracking.
+- Find does not look in comments or text boxes.
+- No horizontal rule button; colors only from the toolbar's fixed palette.
+
+**Agent editing:** a facade an LLM can use without positions, an MCP server over it, and maybe a
+sandboxed `run(code)` tool (code mode). Explored, nothing built:
+[explorations/agent-editing.md](explorations/agent-editing.md).
+
+**Optional, later:** real-time collaboration (steps and mapping enable a central-authority
+protocol; a CRDT binding evaluated separately; steps have no JSON form yet), headless
 server-side processing.
 
 ---
