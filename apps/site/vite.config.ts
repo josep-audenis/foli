@@ -30,7 +30,12 @@ const docsWatch: Plugin = {
           posix(relative(root, file)),
         )
       )
-        buildDocs(root, out);
+        try {
+          buildDocs(root, out);
+        } catch (error) {
+          // A broken link in a file being edited: say so and keep serving the last pages.
+          server.config.logger.error(String(error));
+        }
     });
   },
 };

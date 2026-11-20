@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { GITHUB, markdown, parseReport, resolveLink, slug } from "./build.js";
+import { GITHUB, markdown, parseReport, resolveImage, resolveLink, slug } from "./build.js";
 
 describe("docs build", () => {
   it("makes GitHub's heading ids, numbering repeats", () => {
@@ -41,6 +41,10 @@ describe("docs build", () => {
       "https://example.com/a.md",
     );
     expect(resolveLink("#top", from, urls)).toEqual({ href: "#top", hash: "top" });
+    expect(resolveLink("mailto:a@example.com", from, urls)?.href).toBe("mailto:a@example.com");
+    expect(resolveLink("JavaScript:alert(1)", from, urls)).toBeNull();
+    expect(resolveLink("data:text/html,<b>x</b>", from, urls)).toBeNull();
+    expect(() => resolveLink("%E0%A4%A.md", from, urls)).toThrow(/ADR-0005.*malformed/);
   });
 
   it("renders headings with ids, rewrites links, and shows raw HTML as text", () => {
@@ -61,6 +65,42 @@ describe("docs build", () => {
     expect(html).toContain("&lt;script&gt;alert(1)&lt;/script&gt;");
     expect(html).not.toContain("<script>");
     expect(ctx.anchors).toEqual([{ from: "/docs/api/", url: "/docs/keyboard/", hash: "reserved" }]);
+  });
+
+  it("shows links and images with unsafe URLs as text; relative images come from GitHub", () => {
+    const ctx = {
+      from: "docs/styling.md",
+      url: "/docs/styling/",
+      urls: new Map(),
+      headings: [],
+      anchors: [],
+      seen: new Map(),
+    };
+    const html = markdown(
+      "[x](javascript:alert(1)) <javascript:alert(2)> [d](data:text/html,hi) " +
+        "![i](javascript:alert(3)) ![shot](../corpus/a.png) ![web](https://example.com/b.png)",
+      ctx,
+    );
+    expect(html).not.toMatch(/href="(javascript|data):|src="javascript:/i);
+    expect(html).toContain(">x ");
+    expect(html).toContain("javascript:alert(2)");
+    expect(html).toContain(
+      '<img src="https://raw.githubusercontent.com/josep-audenis/foli/main/corpus/a.png" alt="shot" />',
+    );
+    expect(html).toContain('<img src="https://example.com/b.png" alt="web" />');
+    expect(resolveImage("data:image/png;base64,AAAA", "docs/a.md")).toBeNull();
+  });
+
+  it("gives a heading with inline HTML GitHub's id", () => {
+    const ctx = {
+      from: "docs/a.md",
+      url: "/docs/a/",
+      urls: new Map(),
+      headings: [],
+      anchors: [],
+      seen: new Map(),
+    };
+    expect(markdown("## Pages <br> and notes", ctx)).toContain('id="pages--and-notes"');
   });
 
   it("splits an API report into declarations with their docs, overloads together", () => {

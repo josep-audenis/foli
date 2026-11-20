@@ -1129,7 +1129,9 @@ which become Vite inputs:
   page is a markdown file and one entry in `nav.ts`.
 - Markdown by `marked` at build time: heading ids as GitHub makes them, so `file.md#heading`
   links work on both; a relative link to a page of the site goes there, to any other file to
-  GitHub (`blob/main`); raw HTML in the markdown is shown as text. The build fails on a link to a
+  GitHub (`blob/main`), a relative image to its raw file; a link or image whose scheme is not
+  `http`, `https` (or `mailto` for links) is shown as text; raw HTML in the markdown is shown as
+  text. The build fails on a link to a
   heading that does not exist.
 - Search: the build writes `docs/search.json` (headings h1–h3 and API names, about 67 kB, 11 kB
   gzipped), fetched on the first search; results are built with `textContent`.
@@ -1139,7 +1141,9 @@ which become Vite inputs:
   the pages again (a new page needs a restart).
 - Tests: `src/docs/build.test.ts` (ids, links, raw HTML, report parsing) and `apps/site/e2e`
   (every nav page, links, API pages, search, keyboard, axe on the pages and the examples, light
-  and dark, no sideways scroll at 375px), in three engines (`pnpm test:e2e --project=site-*`).
+  and dark, no sideways scroll at 375px), and `apps/site/e2e-build` (a docs page, an API page and
+  an example from `vite build` served by `vite preview`, without console errors), in three engines
+  (`pnpm test:e2e --project=site-*`).
 
 Deploying it is the owner's step ([contributing.md](contributing.md#the-site)).
 

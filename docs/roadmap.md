@@ -1672,7 +1672,12 @@ Each task is a PR on `phase-12/ecosystem`, the build green after each.
   headings and API names only, not body text; the API pages show each declaration's `.d.ts`
   text, not a typed model of it (two doc comments in a row would merge into the code); a page
   dropped from the nav stays in `apps/site/docs/` in dev until deleted (never built); a new page
-  needs the dev server restarted. No changeset: no published package changed.)
+  needs the dev server restarted. No changeset: no published package changed. Review of #128:
+  links and images with a scheme other than http, https or mailto render as text, relative images
+  link GitHub's raw file; a broken link saved in dev is logged, not fatal to the server; a
+  malformed relative URL names its file; headings with inline HTML get GitHub's ids; the skip link
+  tested in WebKit too (focused directly); a `site-build` project runs three pages on the built
+  site (`vite preview`, port 5179); 6 unit tests; 77 passed and 1 skipped in three engines.)
 - [ ] 12.9 Guides: extensions (a custom node, a mark, a plugin, a command, a keymap, a toolbar
   item), theming (CSS variables, dark, print, forced colors; a theme example), migration from 0.x,
   the deprecation policy, contributing (setup, architecture tour, where things live, tests and

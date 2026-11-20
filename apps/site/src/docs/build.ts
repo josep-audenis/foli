@@ -10,6 +10,7 @@ import { Marked, type Token, type Tokens } from "marked";
 import { type Entry, NAV } from "./nav.js";
 
 export const GITHUB = "https://github.com/josep-audenis/foli/blob/main/";
+const RAW = "https://raw.githubusercontent.com/josep-audenis/foli/main/";
 
 interface Heading {
   depth: number;
@@ -56,7 +57,15 @@ const esc = (text: string) =>
 /** The heading's text without markup. */
 const plain = (tokens: readonly Token[]): string =>
   tokens
-    .map((t) => ("tokens" in t && t.tokens ? plain(t.tokens) : "text" in t ? String(t.text) : ""))
+    .map((t) =>
+      t.type === "html"
+        ? ""
+        : "tokens" in t && t.tokens
+          ? plain(t.tokens)
+          : "text" in t
+            ? String(t.text)
+            : "",
+    )
     .join("");
 
 /** GitHub's heading ids (github-slugger), so `file.md#heading` links work here as there. */
@@ -71,21 +80,43 @@ export function slug(text: string, seen: Map<string, number>): string {
   return count ? `${base}-${count}` : base;
 }
 
-/** A link as written in `from`: into the site when it names a page, else to the file on GitHub. */
+/** The repository path a relative URL written in `from` names. */
+function repoPath(path: string, from: string): string {
+  try {
+    return posix.normalize(posix.join(posix.dirname(from), decodeURI(path)));
+  } catch (error) {
+    throw new Error(`Docs: ${from} links to a malformed URL, ${path}`, { cause: error });
+  }
+}
+
+/** Only these schemes are links; `javascript:`, `data:` and the rest are shown as text. */
+const SAFE = /^(https?:|mailto:)/i;
+const SCHEME = /^([a-z][a-z\d+.-]*:|\/\/)/i;
+
+/**
+ * A link as written in `from`: into the site when it names a page, else to the file on GitHub;
+ * null for a scheme other than http, https and mailto.
+ */
 export function resolveLink(
   href: string,
   from: string,
   urls: ReadonlyMap<string, string>,
-): { href: string; page?: string; hash: string } {
-  if (/^([a-z][a-z\d+.-]*:|\/\/)/i.test(href)) return { href, hash: "" };
+): { href: string; page?: string; hash: string } | null {
+  if (SCHEME.test(href)) return SAFE.test(href) ? { href, hash: "" } : null;
   const at = href.indexOf("#");
   const path = at < 0 ? href : href.slice(0, at);
   const hash = at < 0 ? "" : href.slice(at + 1);
   if (!path) return { href, hash };
-  const target = posix.normalize(posix.join(posix.dirname(from), decodeURI(path)));
+  const target = repoPath(path, from);
   const page = urls.get(target);
   if (page) return { href: page + (hash ? `#${hash}` : ""), page, hash };
   return { href: GITHUB + encodeURI(target) + (hash ? `#${hash}` : ""), hash };
+}
+
+/** An image's URL: http(s) as it is, a relative path to the file on GitHub; else null. */
+export function resolveImage(href: string, from: string): string | null {
+  if (SCHEME.test(href)) return /^https?:/i.test(href) ? href : null;
+  return RAW + encodeURI(repoPath(href, from));
 }
 
 /** Markdown to HTML: GitHub's heading ids, links resolved, raw HTML shown as text. */
@@ -102,11 +133,18 @@ export function markdown(source: string, ctx: Context): string {
       },
       link({ href, title, tokens }: Tokens.Link) {
         const link = resolveLink(href, ctx.from, ctx.urls);
+        if (!link) return this.parser.parseInline(tokens);
         if (link.page) ctx.anchors.push({ from: ctx.url, url: link.page, hash: link.hash });
         else if (href.startsWith("#"))
           ctx.anchors.push({ from: ctx.url, url: ctx.url, hash: link.hash });
         const t = title ? ` title="${esc(title)}"` : "";
         return `<a href="${esc(link.href)}"${t}>${this.parser.parseInline(tokens)}</a>`;
+      },
+      image({ href, title, text }: Tokens.Image) {
+        const src = resolveImage(href, ctx.from);
+        if (!src) return esc(text);
+        const t = title ? ` title="${esc(title)}"` : "";
+        return `<img src="${esc(src)}" alt="${esc(text)}"${t} />`;
       },
       html: ({ text }: Tokens.HTML | Tokens.Tag) => esc(text),
     },
@@ -231,7 +269,7 @@ function apiPage(pkg: string, ctx: Context, root: string): string {
         ? "<p>For the other Foli packages, with no promise: any release may change them.</p>"
         : "",
       `<ul class="api-index">${[...names]
-        .sort((a, b) => a.localeCompare(b))
+        .sort((a, b) => a.localeCompare(b, "en"))
         .map((n) => {
           const target = ids.get(n);
           return `<li>${target ? `<a href="#${target}"><code>${esc(n)}</code></a>` : `<code>${esc(n)}</code>`}</li>`;

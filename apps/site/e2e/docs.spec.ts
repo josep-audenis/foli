@@ -73,15 +73,21 @@ test("search finds headings and API names", async ({ page }) => {
   await expect(page.locator("[data-search-status]")).toHaveText("0 results");
 });
 
-test("the skip link and the docs nav work from the keyboard", async ({ page, browserName }) => {
-  // Safari's default; Playwright's WebKit reached no link with Alt+Tab either. Its search box
-  // and results are driven from the keyboard in the search test.
-  test.skip(browserName === "webkit", "WebKit's Tab skips links");
+test("the skip link moves the focus to the page", async ({ page, browserName }) => {
   await page.goto("/docs/");
-  await page.keyboard.press("Tab");
-  await expect(page.getByRole("link", { name: "Skip to content" })).toBeFocused();
+  const skip = page.getByRole("link", { name: "Skip to content" });
+  // WebKit's Tab skips links (Safari's default), so there it is focused directly.
+  if (browserName === "webkit") await skip.focus();
+  else await page.keyboard.press("Tab");
+  await expect(skip).toBeFocused();
   await page.keyboard.press("Enter");
   await expect(page.locator("#main")).toBeFocused();
+});
+
+test("the docs nav works from the keyboard", async ({ page, browserName }) => {
+  // Playwright's WebKit reached no link with Tab or Alt+Tab. Its search box and results are
+  // driven from the keyboard in the search test.
+  test.skip(browserName === "webkit", "WebKit's Tab skips links");
 
   await page.goto("/docs/");
   const styling = docsNav(page).getByRole("link", { name: "Styling" });
