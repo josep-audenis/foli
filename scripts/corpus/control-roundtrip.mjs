@@ -19,12 +19,12 @@ import {
   controlsIn,
   createDocument,
   createEditor,
-  fitPaste,
   insertControl,
   rejectAllChanges,
   setControlProperties,
-  withEnvelope,
 } from "../../packages/core/dist/index.js";
+// Not public since 12.2: the paste fitting and envelope step are core's internals.
+import { fitPaste, withEnvelope } from "../../packages/core/dist/internal.js";
 import { exportDocx, importDocx } from "../../packages/docx/dist/index.js";
 
 const [mode, dir] = process.argv.slice(2);
