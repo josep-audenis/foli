@@ -92,4 +92,32 @@ describe("pictures copied into another document", () => {
       expect(shown(target.host)).toEqual([PNG, GIF]);
     }
   });
+
+  it("come without their image when it lives only in the source (an object URL not drawn yet)", () => {
+    const source = mount(
+      documentOf([{ type: "paragraph", content: [picture("rId1")] }], {
+        rId1: { contentType: "image/png", part: "word/media/image1.png" },
+      }),
+      { resource: () => "blob:http://localhost/not-loaded" },
+    );
+    const store = copyAll(source.host, source.editor);
+    // The target's package has its own word/media/image1.png: never named by the paste.
+    const target = mount(
+      documentOf([{ type: "paragraph" }], {
+        rId1: { contentType: "image/png", part: "word/media/image1.png" },
+      }),
+    );
+    target.editor.select(1);
+    target.view.paste({ getData: (type: string) => store.get(type) ?? "" });
+    const saved = target.editor.getDocument();
+    expect(saved.resources).toEqual({
+      rId1: { contentType: "image/png", part: "word/media/image1.png" },
+    });
+    const pasted = saved.content.content?.[0]?.content?.[0];
+    expect(pasted?.attrs?.resource).toBe("rId1-missing");
+    // Drawn as a box with its alt text, as Word shows a missing image.
+    const box = target.host.querySelector('[data-foli-picture="rId1-missing"]');
+    expect(box?.localName).toBe("span");
+    expect(box?.getAttribute("aria-label")).toBe("rId1");
+  });
 });

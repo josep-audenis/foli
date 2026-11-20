@@ -308,7 +308,8 @@ describe("readPackage", () => {
       }),
     );
     expect(() => pkg.xml(pkg.mainDocument)).toThrow(/more than 4000000 XML nodes/);
-  });
+    // 28 MB of XML built, zipped and read: seconds alone, more beside the whole suite.
+  }, 60_000);
 
   it("limits the nodes of all parts together, naming the limit", async () => {
     const bytes = (corpus[0] as { bytes: Uint8Array }).bytes;

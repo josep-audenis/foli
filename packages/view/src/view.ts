@@ -4301,7 +4301,8 @@ export class EditorView {
   /**
    * A copied picture's image as another document can show and save it: its own `data:` or web
    * URL, else the image this view shows, as a `data:` URL (read from the drawn image when it is
-   * an object URL: its bytes live in this page only). Nothing better known: as it is.
+   * an object URL: its bytes live in this page only). Nothing lasting known (an image not loaded
+   * yet): as it is, and the paste brings the picture without its image.
    */
   private portableResource(context: WordContext) {
     const shown = imageSource(context.envelope.resources, this.resource ?? undefined);
@@ -4322,7 +4323,9 @@ export class EditorView {
           return { contentType: "image/png", data: canvas.toDataURL("image/png") };
         } catch {} // a cross-origin image taints the canvas: keep what is known
       }
-      return url ? { contentType: resource.contentType, url } : resource;
+      // An image the page shows over the web lasts; an object URL does not (the paste then comes
+      // without its image).
+      return url && /^https?:/i.test(url) ? { contentType: resource.contentType, url } : resource;
     };
   }
 

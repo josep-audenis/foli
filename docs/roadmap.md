@@ -1782,7 +1782,7 @@ Each task is a PR on `phase-12/ecosystem`, the build green after each.
   package, a paragraph four (the review of #131 found comments and attributes uncounted), default
   4 000 000 from measurements: a 659-page Word document of dense tables (made with Word, 250
   tables of 30 × 5) counts 1.9 million and peaks at 0.8 GB, the costliest crafted file at the
-  limit at 2.3 GB and 12 s; and an import quadratic in a paragraph's length (custom controls'
+  limit at 2.3 GB and 12-28 s depending on heap headroom; and an import quadratic in a paragraph's length (custom controls'
   scan: 200 000 line breaks took 18 s, now under a second). Pictures copied into another document
   bring their images (a copy carries its pictures' resources, an object URL's as a `data:` URL
   read from the drawn image; a paste adds them under keys of their own; the HTML carries them for

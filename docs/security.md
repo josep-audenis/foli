@@ -48,7 +48,7 @@ with document or pasted data (the clipboard reads back markup it built itself).
   documents need, and run imports with a time limit in a worker or a separate process. Measured
   in Node (12.11): a 659-page document of dense tables takes about 0.8 GB at its peak; at the
   default limit the costliest crafted file found (a few tens of kilobytes of one-tab paragraphs)
-  about 2.3 GB and 12 s, comment-only and attribute-heavy files less (0.4 and 0.8 GB). That bounds
+  about 2.3 GB and 12-28 s depending on heap headroom, comment-only and attribute-heavy files less (0.4 and 0.8 GB). That bounds
   a crash, not what a shared server can afford.
 - **Fetching resources** in a `resource` or `resources` callback is the app's code: check the
   URL there (server-side request forgery).

@@ -47,7 +47,7 @@ export interface Relationship {
  * Measured in 12.11 (Node, built packages): a 659-page Word document of dense tables (250 tables
  * of 30 × 5 cells, 46 000 paragraphs) counts 1.9 million and takes 0.8 GB at its peak to import;
  * 4 million of the costliest crafted content (empty paragraphs, or paragraphs of one tab) about
- * 2.3 GB and 12 s. Far below a file's 512 MiB `maxSize`.
+ * 2.3 GB and 12-28 s depending on heap headroom. Far below a file's 512 MiB `maxSize`.
  */
 const DEFAULT_MAX_NODES = 4_000_000;
 const W_MAIN = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";

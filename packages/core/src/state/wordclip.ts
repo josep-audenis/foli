@@ -511,28 +511,41 @@ function fit(
     return copy;
   };
   // Pictures from another document bring their images: under a key of their own here (the same
-  // image already here is reused), without a package part, which would name one of this
-  // document's package (a part is all a resource has only when no view gave its bytes).
+  // image already here is reused), as bytes or a web URL only. A package part's name would name
+  // this document's part of that name, and a blob: URL dies with the page it was made in: such a
+  // picture comes without its image, under a key no resource has (drawn as a box, as Word shows
+  // a missing image; refused by `.docx` export until an image is given).
   let resources = target.resources;
   const resourceKeys = new Map<string, string>();
+  const takenKeys = new Set<string>();
+  const freeKey = (key: string) => {
+    let next = key;
+    for (let i = 2; (resources && Object.hasOwn(resources, next)) || takenKeys.has(next); i++)
+      next = `${key}-${i}`;
+    takenKeys.add(next);
+    return next;
+  };
   const mapResource = (key: string): string => {
-    const carriedResource =
-      !same && source.resources && Object.hasOwn(source.resources, key)
-        ? source.resources[key]
-        : undefined;
-    if (!carriedResource) return key;
+    if (same) return key;
     const known = resourceKeys.get(key);
     if (known !== undefined) return known;
-    const { part, size, ...rest } = carriedResource;
-    const resource: ResourceJSON =
-      rest.data !== undefined || rest.url !== undefined
-        ? { ...rest, ...(rest.data === undefined && size !== undefined ? { size } : {}) }
-        : carriedResource;
-    const existing = Object.entries(resources ?? {}).find(([, r]) => equal(r, resource))?.[0];
-    let next = existing ?? key;
-    for (let i = 2; !existing && resources && Object.hasOwn(resources, next); i++)
-      next = `${key}-${i}`;
-    if (!existing) resources = { ...resources, [next]: resource };
+    const carried =
+      source.resources && Object.hasOwn(source.resources, key) ? source.resources[key] : undefined;
+    const { part: _part, size, url, ...rest } = carried ?? { contentType: "" };
+    const web = url !== undefined && !/^\s*blob:/i.test(url) ? url : undefined;
+    let next: string;
+    if (!carried || (rest.data === undefined && web === undefined))
+      next = freeKey(`${key}-missing`);
+    else {
+      const resource: ResourceJSON = {
+        ...rest,
+        ...(web === undefined ? {} : { url: web }),
+        ...(rest.data === undefined && size !== undefined ? { size } : {}),
+      };
+      const existing = Object.entries(resources ?? {}).find(([, r]) => equal(r, resource))?.[0];
+      next = existing ?? freeKey(key);
+      if (!existing) resources = { ...resources, [next]: resource };
+    }
     resourceKeys.set(key, next);
     return next;
   };

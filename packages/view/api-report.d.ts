@@ -740,7 +740,8 @@ export declare class EditorView {
     /**
      * A copied picture's image as another document can show and save it: its own `data:` or web
      * URL, else the image this view shows, as a `data:` URL (read from the drawn image when it is
-     * an object URL: its bytes live in this page only). Nothing better known: as it is.
+     * an object URL: its bytes live in this page only). Nothing lasting known (an image not loaded
+     * yet): as it is, and the paste brings the picture without its image.
      */
     private portableResource;
     /** Copy writes the model's content (plain text, HTML, Foli JSON), never the browser's DOM. */

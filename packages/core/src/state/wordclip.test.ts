@@ -672,16 +672,19 @@ describe("fitPaste", () => {
       type: "picture",
       attrs: { resource, width: 914400, height: 914400 },
     });
-    const source = editorOf([p({}, picture("rId5"), picture("rId6"), picture("rId7"))], {
+    const pictures = ["rId5", "rId6", "rId7", "rId8", "rId9"].map(picture);
+    const source = editorOf([p({}, ...pictures)], {
       resources: {
         rId5: { contentType: "image/png", data: PNG, part: "word/media/image1.png", size: 9 },
         rId6: { contentType: "image/gif", data: GIF },
-        rId7: { contentType: "image/png", part: "word/media/image2.png" },
+        rId7: { contentType: "image/png", part: "word/media/image1.png" },
+        rId8: { contentType: "image/png", url: "blob:http://localhost/1234" },
+        rId9: { contentType: "image/png", url: "https://example.com/web.png", size: 3 },
         unused: { contentType: "image/png", data: PNG },
       },
     });
     const defs = copiedDefinitions(contextOf(source), source.state.doc);
-    expect(Object.keys(defs.resources ?? {})).toEqual(["rId5", "rId6", "rId7"]);
+    expect(Object.keys(defs.resources ?? {})).toEqual(["rId5", "rId6", "rId7", "rId8", "rId9"]);
     // The target has another image as rId5, and the GIF already (as "same").
     const target = editorOf([p({}, text("x"))], {
       resources: {
@@ -695,14 +698,15 @@ describe("fitPaste", () => {
     fitted.doc.descendants((node) => {
       if (node.type.name === "picture") keys.push(String(node.attrs.resource));
     });
-    expect(keys).toEqual(["rId5-2", "same", "rId7"]);
+    // Only a part (it would name the target's own word/media/image1.png) or an object URL (gone
+    // with its page): without an image, under keys no resource has.
+    expect(keys).toEqual(["rId5-2", "same", "rId7-missing", "rId8-missing", "rId9"]);
     expect(fitted.envelope.resources).toEqual({
       rId5: { contentType: "image/png", url: "https://example.com/other.png" },
       same: { contentType: "image/gif", data: GIF },
       // Its bytes, not the source package's part (nor that part's size).
       "rId5-2": { contentType: "image/png", data: PNG },
-      // Only a part known: kept as it is (the target's package may lack it).
-      rId7: { contentType: "image/png", part: "word/media/image2.png" },
+      rId9: { contentType: "image/png", url: "https://example.com/web.png", size: 3 },
     });
     // Within one document nothing is added: the picture keeps its own.
     const own = fitPaste(source.state, json.content, json.word);

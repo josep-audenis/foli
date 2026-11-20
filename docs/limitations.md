@@ -227,8 +227,11 @@ Custom nodes and marks, plugins and toolbar items ([extensions](guides/extension
 - A picture copied into another document brings its image (12.11): its own `data:` or web URL,
   else the image the source view shows, as a `data:` URL; one shown from an object URL (a
   `.docx` package's JPEG or PNG) is read from the drawn image and comes as PNG, the same pixels
-  in another encoding. One the source view does not show (no image resolver) still comes without
-  its image. Copying in WebKit is not automated (as every clipboard test). Word's
+  in another encoding. One whose image lives only in the source (a package part the source view
+  does not show, or an object URL not drawn yet) comes without its image: a box with its alt
+  text, as Word shows a missing image, which `.docx` export refuses until an image is given; a
+  paste never takes another package's part name or a page's object URL. Copying in WebKit is not
+  automated (as every clipboard test). Word's
   picture-and-text paste brings the text only. The clipboard writes a floating picture inline.
 - `renderDocument` measures blocks on one long page: the lines after a floating picture may
   wrap a little differently than on the editing view's pages.
@@ -291,7 +294,7 @@ Details in the [package README](../packages/docx/README.md).
 - A package may hold at most 10 000 entries, 512 MiB uncompressed and 4 000 000 XML nodes in the
   parts read, a paragraph counting four (`maxEntries`, `maxSize`, `maxNodes`; lower them on a
   server). A 659-page document of dense tables counts 1.9 million and takes about 0.8 GB to
-  import; at the limit a crafted file can still take about 2.3 GB and 12 s
+  import; at the limit a crafted file can still take about 2.3 GB and 12-28 s depending on heap headroom
   ([security.md](security.md)).
 - Keep the imported `package` with the document: a document that refers to parts of its
   original package (headers, footers, pictures, content kept verbatim with relationship ids)

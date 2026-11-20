@@ -228,7 +228,7 @@ const bytes = await pkg.write(new Map([["/word/document.xml", new TextEncoder().
   4 000 000; a paragraph counts four, as it costs that much more once imported), else a
   `DocxError` naming the limit. A 659-page document of dense tables counts 1.9 million and
   takes about 0.8 GB to import in Node; at the limit, the costliest crafted file (a few tens of
-  kilobytes) takes about 2.3 GB and 12 s. On a server, lower `maxSize` and `maxNodes` to what
+  kilobytes) takes about 2.3 GB and 12-28 s depending on heap headroom. On a server, lower `maxSize` and `maxNodes` to what
   your documents need and import in a worker with a time limit.
 - **Package:** part names compare case-insensitively and percent-decoded (never decoding a
   `/`), content types by override then default extension, relationship targets resolved
