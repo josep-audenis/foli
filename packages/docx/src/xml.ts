@@ -67,8 +67,8 @@ export interface XmlDocument {
   /** Everything at the top level in order: declaration, comments, whitespace, the root. */
   readonly children: readonly XmlNode[];
   readonly root: XmlElement;
-  /** How many elements the source holds. */
-  readonly elements: number;
+  /** How many nodes the source holds: elements, attributes, text, comments, instructions. */
+  readonly nodes: number;
 }
 
 /** Source that is not well-formed XML; `offset` is where in the source. */
@@ -81,6 +81,12 @@ export class XmlError extends Error {
     super(`${message} (at ${offset})`);
   }
 }
+
+/**
+ * More nodes than `maxNodes` allows.
+ * @internal
+ */
+export class XmlLimitError extends XmlError {}
 
 const XML_NS = "http://www.w3.org/XML/1998/namespace";
 const XMLNS_NS = "http://www.w3.org/2000/xmlns/";
@@ -106,11 +112,11 @@ export interface ParseXmlOptions {
    */
   readonly maxDepth?: number;
   /**
-   * Most elements accepted. Default 1 000 000: a long Word document holds a few hundred thousand,
-   * and each element read costs memory (a small file of empty paragraphs would otherwise exhaust
-   * it).
+   * Most nodes accepted: elements, attributes, text, comments and processing instructions, each
+   * one, since each costs memory. No limit by default here; `readPackage` and `importDocx` set
+   * one for a package (its `maxNodes`).
    */
-  readonly maxElements?: number;
+  readonly maxNodes?: number;
 }
 
 /** The first character XML 1.0 does not allow (outside its Char production), or -1. */
@@ -132,9 +138,26 @@ function illegalCharacter(source: string): number {
 
 /** Parses `source`; throws {@link XmlError} where it is not well-formed. */
 export function parseXml(source: string, options: ParseXmlOptions = {}): XmlDocument {
+  return parseXmlCosting(source, options);
+}
+
+/**
+ * `parseXml`, an element costing `cost(namespace, local name)` nodes of `maxNodes` (default 1).
+ * @internal
+ */
+export function parseXmlCosting(
+  source: string,
+  options: ParseXmlOptions,
+  cost?: (ns: string, local: string) => number,
+): XmlDocument {
   const maxDepth = options.maxDepth ?? 1000;
-  const maxElements = options.maxElements ?? 1_000_000;
-  let elements = 0;
+  const maxNodes = options.maxNodes ?? Number.POSITIVE_INFINITY;
+  let nodes = 0;
+  /** Every node read costs memory, whatever its kind: counted before it is kept. */
+  const charge = (offset: number, n = 1) => {
+    nodes += n;
+    if (nodes > maxNodes) throw new XmlLimitError(`More than ${maxNodes} nodes`, offset);
+  };
   if (source.charCodeAt(0) === 0xfeff) {
     throw new XmlError("Byte order mark in the text: decode the bytes without it", 0);
   }
@@ -161,6 +184,7 @@ export function parseXml(source: string, options: ParseXmlOptions = {}): XmlDocu
       }
       const cdataEnd = raw.indexOf("]]>");
       if (cdataEnd !== -1) throw new XmlError('"]]>" in text', at + cdataEnd);
+      charge(at);
       siblings().push({
         kind: "text",
         text: decode(raw, false, at),
@@ -177,12 +201,14 @@ export function parseXml(source: string, options: ParseXmlOptions = {}): XmlDocu
       if (close === -1) throw new XmlError("Unclosed comment", at);
       const dashes = source.indexOf("--", at + 4);
       if (dashes < close) throw new XmlError('"--" in a comment', dashes);
+      charge(at);
       siblings().push({ kind: "comment", start: at, end: close + 3 });
       at = close + 3;
     } else if (source.startsWith("<![CDATA[", at)) {
       if (stack.length === 0) throw new XmlError("CDATA outside the root element", at);
       const close = source.indexOf("]]>", at + 9);
       if (close === -1) throw new XmlError("Unclosed CDATA section", at);
+      charge(at);
       siblings().push({
         kind: "text",
         text: source.slice(at + 9, close).replace(/\r\n?/g, "\n"),
@@ -202,6 +228,7 @@ export function parseXml(source: string, options: ParseXmlOptions = {}): XmlDocu
       if (declaration && (at !== 0 || target !== "xml")) {
         throw new XmlError("XML declaration not at the start", at);
       }
+      charge(at);
       siblings().push({
         kind: declaration ? "declaration" : "instruction",
         start: at,
@@ -229,7 +256,7 @@ export function parseXml(source: string, options: ParseXmlOptions = {}): XmlDocu
   const unclosed = stack[stack.length - 1];
   if (unclosed) throw new XmlError(`Unclosed element <${unclosed.name}>`, unclosed.start);
   if (!root) throw new XmlError("No root element", 0);
-  return { source, children: top, root, elements };
+  return { source, children: top, root, nodes };
 
   function finish(element: XmlElement, start: number): void {
     if (stack.length === 0) {
@@ -275,6 +302,7 @@ export function parseXml(source: string, options: ParseXmlOptions = {}): XmlDocu
       if (value.includes("<")) throw new XmlError(`"<" in attribute ${attrName}`, open);
       if (names.has(attrName)) throw new XmlError(`Duplicate attribute ${attrName}`, next);
       names.add(attrName);
+      charge(next);
       raw.push({
         name: attrName,
         value: decode(value, true, open + 1),
@@ -329,11 +357,12 @@ export function parseXml(source: string, options: ParseXmlOptions = {}): XmlDocu
     if (stack.length >= maxDepth) {
       throw new XmlError(`Elements nested deeper than ${maxDepth}`, start);
     }
-    if (++elements > maxElements) throw new XmlError(`More than ${maxElements} elements`, start);
+    const ns = resolve(scope, qualified.prefix, start);
+    charge(start, cost?.(ns, qualified.local) ?? 1);
     const element = {
       kind: "element" as const,
       ...qualified,
-      ns: resolve(scope, qualified.prefix, start),
+      ns,
       attributes,
       start,
       openEnd: at,

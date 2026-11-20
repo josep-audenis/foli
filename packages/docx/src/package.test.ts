@@ -297,17 +297,32 @@ describe("readPackage", () => {
     expect(() => pkg.xml(pkg.mainDocument)).toThrow(/nested deeper than 3/);
   });
 
-  it("limits the elements of all parts together", async () => {
+  it("refuses a package past 4 000 000 nodes by default, comments included", async () => {
+    const W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+    const comments = "<!---->".repeat(4_000_000);
+    const pkg = await readPackage(
+      await zip({
+        "[Content_Types].xml": TYPES,
+        "_rels/.rels": ROOT_RELS,
+        "word/document.xml": `<w:document xmlns:w="${W}"><w:body>${comments}</w:body></w:document>`,
+      }),
+    );
+    expect(() => pkg.xml(pkg.mainDocument)).toThrow(/more than 4000000 XML nodes/);
+  });
+
+  it("limits the nodes of all parts together, naming the limit", async () => {
     const bytes = (corpus[0] as { bytes: Uint8Array }).bytes;
-    const all = await readPackage(bytes);
-    const main = all.xml(all.mainDocument).elements;
-    const styles = all.xml("/word/styles.xml").elements;
+    const all = await readPackage(bytes, { maxNodes: Number.POSITIVE_INFINITY });
+    const main = all.xml(all.mainDocument).nodes;
+    const styles = all.xml("/word/styles.xml").nodes;
     // [Content_Types].xml, read first, takes its share.
-    const short = await readPackage(bytes, { maxElements: main });
-    expect(() => short.xml(short.mainDocument)).toThrow(/More than \d+ elements/);
-    const pkg = await readPackage(bytes, { maxElements: main + styles });
-    expect(pkg.xml(pkg.mainDocument).elements).toBe(main);
-    expect(() => pkg.xml("/word/styles.xml")).toThrow(/More than \d+ elements/);
+    const short = await readPackage(bytes, { maxNodes: main });
+    expect(() => short.xml(short.mainDocument)).toThrow(
+      new RegExp(`more than ${main} XML nodes.*\\(maxNodes\\)`),
+    );
+    const pkg = await readPackage(bytes, { maxNodes: main + styles });
+    expect(pkg.xml(pkg.mainDocument).nodes).toBe(main);
+    expect(() => pkg.xml("/word/styles.xml")).toThrow(/more than \d+ XML nodes/);
   });
 
   it("replaces only parts it has", async () => {

@@ -187,13 +187,20 @@ export function customFromWord(document: FoliDocument): FoliDocument {
     );
   const inlines = (items: readonly NodeJSON[]): NodeJSON[] => {
     const out: NodeJSON[] = [];
+    // Where each control ends, found once: scanning (or copying) the rest of a paragraph per
+    // node took minutes on a long one (12.11).
+    const ends = new Map<unknown, number[]>();
+    items.forEach((n, j) => {
+      if (n.type !== "controlEnd") return;
+      const list = ends.get(n.attrs?.id);
+      if (list) list.push(j);
+      else ends.set(n.attrs?.id, [j]);
+    });
     for (let i = 0; i < items.length; i++) {
       const item = items[i] as NodeJSON;
       const id = item.type === "controlStart" ? item.attrs?.id : undefined;
-      const end = id
-        ? items.findIndex((n, j) => j > i && n.type === "controlEnd" && n.attrs?.id === id)
-        : -1;
-      const inner = items.slice(i + 1, end);
+      const end = id ? (ends.get(id)?.find((j) => j > i) ?? -1) : -1;
+      const inner = end > 0 ? items.slice(i + 1, end) : [];
       // A node's control with text runs only, or a mark's around something: anything else (a
       // bookmark or a field in a node's control, an empty control) stays the control it is.
       const node = end > 0 && plainText(inner) ? read(id, "text") : null;
