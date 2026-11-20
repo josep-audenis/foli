@@ -449,8 +449,9 @@ describe("exporting without a package", () => {
       }),
       { numRuns: 100 },
     );
-    // 100 zip round trips: about half a second alone, past 5s beside the whole suite.
-  }, 20_000);
+    // 100 zip round trips: about half a second alone, past 5s beside the whole suite and 20s
+    // beside the e2e suite (12.11).
+  }, 60_000);
 });
 
 describe("schema v5 content not written yet", () => {

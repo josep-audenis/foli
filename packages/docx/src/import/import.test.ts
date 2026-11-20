@@ -678,7 +678,9 @@ describe("import accepts what Word opens, and fails only with DocxError", () => 
   });
 });
 
-describe("import takes linear time on crafted files", () => {
+// The bounds are in the tests (each import under 6 s); the timeout only has to let them run: the
+// default 5 s cut the second test, which imports twice, under load (12.11).
+describe("import takes linear time on crafted files", { timeout: 30_000 }, () => {
   const timed = async (body: string, options?: Parameters<typeof docx>[1]) => {
     const bytes = await docx(body, options);
     const started = performance.now();
