@@ -1,7 +1,7 @@
 /**
  * The success criterion on apps that install Foli from its packed tarballs (`pnpm examples`):
- * type, format with a shortcut, undo, serialize, reload without loss. Also: no console errors
- * (hydration included), and the server HTML of the Next.js app holds the editor's shell. Runs on
+ * type, format with a shortcut, undo, serialize, reload without loss. Also: no console errors in
+ * the tests that open the page (hydration included), and the server HTML of the Next.js app holds the editor's shell. Runs on
  * the React apps (`vite`, `next`) and the framework-free one (`vanilla`, its own buttons).
  */
 import { expect, type Page, test } from "@playwright/test";
@@ -14,13 +14,18 @@ const bold = (page: Page) =>
       .map((span) => span.textContent)
       .join(""),
   );
-
-test("type, format with a shortcut, undo, save, reload without loss", async ({ page }) => {
+/** The page's console errors and uncaught exceptions, collected as they happen. */
+function consoleErrors(page: Page): string[] {
   const errors: string[] = [];
   page.on("console", (message) => {
     if (message.type() === "error") errors.push(message.text());
   });
   page.on("pageerror", (error) => errors.push(error.message));
+  return errors;
+}
+
+test("type, format with a shortcut, undo, save, reload without loss", async ({ page }) => {
+  const errors = consoleErrors(page);
 
   await page.goto("/");
   await expect(editor(page)).toHaveAttribute("contenteditable", "true");
@@ -62,6 +67,7 @@ test("the server HTML holds the editor's shell (Next.js)", async ({ request }, i
 test("a document saved by 0.1.0 loads (schema v1 → v5); lists from the keyboard save as v5", async ({
   page,
 }) => {
+  const errors = consoleErrors(page);
   await page.goto("/");
   // What 0.1.0 saved: schema v1, which the packages migrate on load.
   await page.evaluate(() =>
@@ -98,4 +104,5 @@ test("a document saved by 0.1.0 loads (schema v1 → v5); lists from the keyboar
     attrs: { numbering: { level: 0 } },
     content: [{ type: "text", text: "from 0.1.0" }],
   });
+  expect(errors).toEqual([]);
 });

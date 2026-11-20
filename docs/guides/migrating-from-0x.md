@@ -89,6 +89,11 @@ A plugin command whose name is taken twice, or by a built-in command, makes `cre
 **Listeners and hooks.** An editor listener (`editor.subscribe`) that throws no longer keeps the
 others from the change: the error is reported with `console.error`.
 
+**TypeScript 5.7 or later** for the published types: `exportDocx`, `DocxPackage.write` and
+`exportPdf`'s `pdf` are typed `Uint8Array<ArrayBuffer>`, so they go into a `Blob` or a `Response`
+without a cast (`as BlobPart` can go). Before 5.7, `Uint8Array` takes no type argument. The same
+release lets `descendants` and `nodesBetween` callbacks return nothing.
+
 **React.** `plugins` and `extensions` are still read once; changing them after mount now logs a
 warning in development (give the component a new `key`). `FoliEditor`'s `toolbar` takes groups of
 items as well as `true` and `false`. Without `items` the toolbar is as in 0.6.0.

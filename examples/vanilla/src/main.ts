@@ -10,12 +10,17 @@ import { EditorView } from "@folijs/view";
 import "./style.css";
 
 const KEY = "foli-example";
-const $ = <T extends HTMLElement>(selector: string) => document.querySelector(selector) as T;
+function $<T extends HTMLElement>(selector: string): T {
+  const element = document.querySelector<T>(selector);
+  if (!element) throw new Error(`${selector} missing`);
+  return element;
+}
 
 /** The saved document, or a new one (also when the saved one no longer parses). */
 function load(): EditorDocument {
-  const saved = localStorage.getItem(KEY);
   try {
+    // Storage may be blocked (private windows, site settings): then a new document.
+    const saved = localStorage.getItem(KEY);
     if (saved) return parseDocument(JSON.parse(saved));
   } catch (error) {
     console.warn("Ignoring the saved document:", error);

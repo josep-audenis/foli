@@ -128,7 +128,7 @@ function Try() {
       const bytes = await exportDocx(editor.getDocument(), opened.pkg, {
         trackRevisions: editor.trackingChanges,
       });
-      const url = URL.createObjectURL(new Blob([bytes as BlobPart], { type: DOCX_TYPE }));
+      const url = URL.createObjectURL(new Blob([bytes], { type: DOCX_TYPE }));
       const link = document.createElement("a");
       link.href = url;
       link.download = opened.name.endsWith(".docx") ? opened.name : `${opened.name}.docx`;

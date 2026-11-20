@@ -1738,15 +1738,23 @@ Each task is a PR on `phase-12/ecosystem`, the build green after each.
   guide's decorations pattern did not compile, `doc.descendants` taking a callback typed
   `boolean | undefined` (TypeScript 7, used in the repository, accepts one without `return`);
   fixed in core (`Node.descendants`, `Node.nodesBetween`, `Fragment.nodesBetween` take
-  `boolean | void`; API report updated, changeset `node-callbacks-void`). Also seen: TypeScript
-  5.7+'s `Uint8Array<ArrayBufferLike>` is no `BlobPart`, so `new Blob([await exportDocx(…)])`
-  needs a cast (as the site and playground do); not changed. Docs: examples README (a table of
+  `boolean | void`; API report updated, changeset `node-callbacks-void`). Docs: examples README (a table of
   the apps and their tests), getting started, the extensions guide, architecture, contributing
   and README link the new apps. Shortcuts: the vanilla app styles pages with a few rules of its
-  own instead of `@folijs/react`'s `styles.css`; the extension test waits 600 ms so the key's
-  mention is its own undo step (history's 500 ms grouping); no copy and paste, block node or
+  own instead of `@folijs/react`'s `styles.css`; no copy and paste, block node or
   built-in key override in the example (the playground's `extension` and `keymaps` specs cover
-  them); the `.docx` is checked by reading it back in Foli, not in Word.)
+  them); the `.docx` is checked by reading it back in Foli, not in Word. Review of #130: Save
+  `.docx` reports a failed export instead of an unhandled rejection, and a file that is no
+  `.docx` is refused with the document kept (tested); `exportDocx`, `DocxPackage.write` and
+  `exportPdf`'s `pdf` are typed `Uint8Array<ArrayBuffer>` (TypeScript 5.7+'s `Blob` refused
+  `Uint8Array<ArrayBufferLike>`: the `as BlobPart` casts in the site, playground and example
+  are gone; `DocxPart.data` stays `Uint8Array`, as it may view the caller's buffer), the
+  published types need TypeScript 5.7+ (getting started, migration guide; changeset
+  `bytes-array-buffer`); the migration test also fails on console errors; `insertMention` sets
+  `closeHistory` so the mention is its own undo step (the guide's sample too), in place of a
+  600 ms wait; the vanilla app reads storage inside its `try`. `pnpm examples` again: 27 passed,
+  6 skipped (one run before it lost both vite-firefox tests to Firefox hanging on a reload, with
+  Juggler and graphics errors in its log; the app was unchanged and the next run passed).)
 - [ ] 12.11 1.0 readiness: every 0.x format (v1–v5 fixtures) loads and saves without loss; the
   limitations the owner picks as 1.0 blockers fixed, the rest listed; a security pass (paste,
   links, `.docx` and zip limits, pictures, `exportPdf` input); the ADR-0003 manual checks run or

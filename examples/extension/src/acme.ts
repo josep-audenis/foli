@@ -3,6 +3,7 @@
 // decorations. The same list goes to the editor and to `exportDocx`.
 import {
   type Command,
+  closeHistory,
   Fragment,
   type Node,
   Plugin,
@@ -53,7 +54,9 @@ export const insertMention =
     const type = state.schema.nodes["acme:mention"];
     if (!type || !state.selection.$from.parent.isTextblock) return false;
     const node = type.create({ id, label: name }, null, state.storedMarks ?? []);
-    dispatch?.(state.tr.replaceSelection(new Slice(Fragment.from(node), 0, 0)));
+    // An undo step of its own, not merged with the typing around it.
+    const tr = state.tr.replaceSelection(new Slice(Fragment.from(node), 0, 0));
+    dispatch?.(tr.setMeta(closeHistory, true));
     return true;
   };
 

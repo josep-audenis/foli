@@ -47,7 +47,7 @@ export interface ExportOptions {
  * The document as a `.docx`. With `original` (the package it was imported from), the parts
  * Foli does not edit come back byte for byte and unchanged elements verbatim.
  */
-export declare function exportDocx(document: FoliDocument, original?: DocxPackage, options?: ExportOptions): Promise<Uint8Array>;
+export declare function exportDocx(document: FoliDocument, original?: DocxPackage, options?: ExportOptions): Promise<Uint8Array<ArrayBuffer>>;
 
 // export/parts.d.ts
 /**
@@ -279,7 +279,7 @@ export declare class DocxPackage {
      * is copied from the original file as it was stored. Entries keep their order; added ones
      * come last.
      */
-    write(replace?: ReadonlyMap<string, Uint8Array>, add?: readonly NewPart[]): Promise<Uint8Array>;
+    write(replace?: ReadonlyMap<string, Uint8Array>, add?: readonly NewPart[]): Promise<Uint8Array<ArrayBuffer>>;
 }
 /** A part to add to a package. */
 export interface NewPart {

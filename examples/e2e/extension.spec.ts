@@ -31,8 +31,6 @@ test("custom node, mark, plugin and toolbar items, through .docx and back", asyn
   await expect(mentions(page)).toHaveCount(1);
   await expect(mentions(page)).toHaveText("@Ada Lovelace");
   await page.keyboard.type(" and ");
-  // Past the history's grouping delay (500 ms): the key's mention is an undo step of its own.
-  await page.waitForTimeout(600);
   await page.keyboard.press("ControlOrMeta+Shift+m");
   await expect(mentions(page)).toHaveCount(2);
   await page.keyboard.press("ControlOrMeta+z");
@@ -63,5 +61,14 @@ test("custom node, mark, plugin and toolbar items, through .docx and back", asyn
   await expect(topics(page)).toHaveText("budget");
   await expect(todos(page)).toHaveText("TODO");
   await expect(editor(page)).toContainText("Ask @Ada Lovelace");
+
+  // A file that is no .docx: refused, the document kept.
+  await page.getByLabel("Open .docx").setInputFiles({
+    name: "bad.docx",
+    mimeType: "application/octet-stream",
+    buffer: Buffer.from("not a zip"),
+  });
+  await expect(page.locator(".files").getByRole("status")).toContainText("Not opened");
+  await expect(mentions(page)).toHaveCount(1);
   expect(errors).toEqual([]);
 });

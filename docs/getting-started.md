@@ -22,6 +22,9 @@ dependencies at exactly their own version, so the app has one copy of the engine
 `@folijs/*` packages at the same version and upgrade them together (npm 7+ and pnpm install
 peers themselves; with other package managers list them as above).
 
+With TypeScript, the published types need 5.7 or later (`exportDocx` gives a
+`Uint8Array<ArrayBuffer>`, ready for a `Blob`).
+
 ## Show an editor
 
 ```tsx

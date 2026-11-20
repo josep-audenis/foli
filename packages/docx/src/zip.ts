@@ -306,7 +306,7 @@ export async function deflateEntry(
  * zip written back with its entries unchanged is the same file, short of a trailing comment.
  * @internal
  */
-export function writeZip(entries: readonly ZipEntry[]): Uint8Array {
+export function writeZip(entries: readonly ZipEntry[]): Uint8Array<ArrayBuffer> {
   const parts: Uint8Array[] = [];
   const directory: Uint8Array[] = [];
   let offset = 0;
@@ -380,7 +380,7 @@ function streamOf(data: Uint8Array): ReadableStream<BufferSource> {
   });
 }
 
-function concat(chunks: readonly Uint8Array[]): Uint8Array {
+function concat(chunks: readonly Uint8Array[]): Uint8Array<ArrayBuffer> {
   const out = new Uint8Array(chunks.reduce((sum, chunk) => sum + chunk.length, 0));
   let at = 0;
   for (const chunk of chunks) {

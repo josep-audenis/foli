@@ -12,7 +12,8 @@ the pnpm workspace, and build for production. They import only the packages' pub
 | [`vanilla`](vanilla)     | Vite 8, TypeScript 5.9 (strict), no framework | `EditorView` from `@folijs/view` on a `div`, buttons running commands, JSON saved to and loaded from a text box                                                                                                | `success.spec.ts`; `vanilla.spec.ts`: the buttons, JSON save and load, a bad document refused, axe                                               |
 
 `success.spec.ts` is the success criterion: type, format with a shortcut, undo, serialize, reload
-without loss, a document saved by 0.1.0 loads; every test also fails on a console error. The
+without loss, a document saved by 0.1.0 loads; the tests that open the page also fail on a console error or
+an uncaught exception (the server-HTML one only fetches it). The
 React apps list `@folijs/core` and `@folijs/view` in their dependencies beside `@folijs/react`
 (as `docs/getting-started.md` says to install them), so they do not show npm installing those
 peer dependencies itself for an app that lists `@folijs/react` alone. The vanilla app lists only

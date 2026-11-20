@@ -38,14 +38,16 @@ function App() {
   async function save(): Promise<void> {
     const editor = ref.current?.editor;
     if (!editor) return;
-    // Each mention and topic run becomes a content control tagged with its JSON.
-    const bytes = await exportDocx(editor.getDocument(), original.current, { extensions: acme });
-    // TypeScript 5.7+ types a Uint8Array over any buffer, which Blob's types refuse: the bytes are
-    // an ordinary ArrayBuffer's.
-    const url = URL.createObjectURL(new Blob([bytes as BlobPart], { type: DOCX }));
-    Object.assign(document.createElement("a"), { href: url, download: "acme.docx" }).click();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-    setStatus("Saved acme.docx.");
+    try {
+      // Each mention and topic run becomes a content control tagged with its JSON.
+      const bytes = await exportDocx(editor.getDocument(), original.current, { extensions: acme });
+      const url = URL.createObjectURL(new Blob([bytes], { type: DOCX }));
+      Object.assign(document.createElement("a"), { href: url, download: "acme.docx" }).click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      setStatus("Saved acme.docx.");
+    } catch (error) {
+      setStatus(`Not saved: ${error instanceof Error ? error.message : String(error)}`);
+    }
   }
 
   async function open(event: ChangeEvent<HTMLInputElement>): Promise<void> {
