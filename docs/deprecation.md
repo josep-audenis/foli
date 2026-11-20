@@ -62,8 +62,8 @@ bundlers do not replace: a bundle that defines no `process` shows the warnings i
   its extension is kept as a foreign node or mark and saved back unchanged.
 - **Apps that read the JSON** must ignore node and mark types they do not know: other apps'
   custom types reach them, and so may new Word types.
-
-**Open:** whether a 1.x minor may add a schema version (only adding node types, attributes or
-envelope keys, with a migration, saved only by documents that use what it adds) waits for the
-owner's decision before 1.0.0 ([ADR-0008](decisions/ADR-0008-1.0-contract-and-extensions.md#the-saved-format)).
-If not, 1.x saves v5 throughout and new Word content stays opaque until 2.0.
+- **A 1.x minor may add a schema version**, only by adding node types, attributes or envelope
+  keys, with a migration from the version before; a document is saved with the lowest version its
+  content needs, so one that uses nothing new still says v5 and every 1.x reads it (decided by
+  the owner on 2026-11-20, [ADR-0008](decisions/ADR-0008-1.0-contract-and-extensions.md#the-saved-format)).
+  The changeset of such a minor says what older 1.x cannot read.

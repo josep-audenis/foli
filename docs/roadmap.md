@@ -1388,7 +1388,7 @@ Each task is a PR on `phase-12/ecosystem`, the build green after each.
   `pnpm check` by a script that also catches forgotten exports); core as an exact peer dependency of
   the other packages; every 1.x reads every earlier format, a minor may add a schema version with a
   migration and a document is saved at the lowest version it needs (not v5 frozen: Word's opaque
-  content still has to be modeled; this one point awaits the owner's OK, open until 12.12), an older
+  content still has to be modeled; this one point the owner accepted on 2026-11-20, in 12.11), an older
   1.x refuses a document that needs a newer one; `@deprecated`, a dev warning where cheap, removal
   in the next major; custom inline and block leaves and marks as namespaced extensions on the Word
   schema, foreign nodes when the extension is missing, in `.docx` a content control tagged `foli:`
@@ -1763,8 +1763,7 @@ Each task is a PR on `phase-12/ecosystem`, the build green after each.
   8–11 (12.7) and decide with the owner whether it blocks 1.0.
 - [ ] 12.12 Close: docs as of 1.0 (README, architecture, api, ADR-0008's outcome), size budgets,
   the acceptance checked, the 1.0.0 changeset and version PR; publish with the owner's approval.
-  The owner's yes or no on ADR-0008's open point (1.x minors may add a schema version, saved at
-  the lowest version a document needs) before 1.0.0 is published.
+  Fold `docs/release-1.0-decisions.md` (12.11) into the roadmap, limitations and release notes.
 
 ## Optional
 

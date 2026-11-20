@@ -121,6 +121,31 @@ pages the pagination targets below are missed in Chromium and Firefox: handler p
 (≤ 60), re-flow 131-150 ms (≤ 100). Not investigated in 12.7 (12.11 decides whether it blocks
 1.0); the baseline catches further regressions from here.
 
+**Investigated in 12.11** (Chromium CPU profiles through the DevTools protocol of the bench page
+at 100 sections: 3 mounts and 88 typed keys, 100 µs sampling). A keystroke's handler was mostly
+the view redrawing the pages (`renderPages`, about 70%), and nearly half of that was list numbers:
+the renderer's `prepare` asked the resolver for every block's marker on every change, each a
+whole style cascade (`#resolve`), numbered or not. Now a paragraph that neither its attributes nor
+its style number is skipped first. Same machine, profiler on, alternating three times: handler
+p50 37-41 ms before, 23-25 ms after (a loaded machine), `renderPages` 2.0-2.7 s → 0.95-1.03 s per
+88 keys. `pnpm bench --engines chromium` afterwards (2026-11-20, on mains, other work running:
+layout, re-flow and PDF came out 13-33% slower than the baseline with no change to them): type
+handler p50 8.9 ms (baseline 11.4, -22%), Enter 9.9 ms (12.9, -23%), at 200 sections 18.2 and
+20.5 ms (-21%, -20%); the rest within thresholds. The baseline was not updated: that run's other
+metrics were slower from the machine, and recording them would loosen the baseline.
+
+What a keystroke still costs (same profile, after the fix): placing every block of every page
+again (`renderPages`, about 55%), the selection written back with a forced layout
+(`setBaseAndExtent`, about 20%), and in the bench page the app reading `change.document` (the
+whole document serialized, about 16%; an app that saves later skips it). The first layout
+is mostly the browser's own layout of the hundred pages (`getBoundingClientRect` forcing it,
+about 40% of a mount), then building the model (`parseDocument`, `createEditor`, about 20%) and
+the paragraphs' DOM with their resolved formatting. Options, none built: redraw only the pages
+from the edited block on (a few ms a key, a change to `renderPages`' bookkeeping), reuse unchanged
+nodes' JSON in `documentJSON` (2-3 ms a key for apps that read the document on each change;
+callers must not mutate it), page virtualization (the first layout, a large change: pages must
+still be measured), fewer forced layouts when the selection is written.
+
 **Rust and WebAssembly:** no benchmark shows a need. The slow paths are the view's work per
 keystroke and the browsers' own layout of the pages (DOM, measuring, painting), which WebAssembly
 does not speed up; the computing parts are small (`findAll` at most 0.5 ms on 107 pages, a `.docx`

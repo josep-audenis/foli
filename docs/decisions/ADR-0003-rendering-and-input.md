@@ -199,6 +199,12 @@ The project owner decided to release 0.1.0 without running the G3 and G4 manual 
 [docs/limitations.md](../limitations.md). They stay open here; a failure found later is fixed
 in a 0.x release or, if the fragment edge cannot fix it, triggers the fallback below.
 
+### Release 1.0 with the manual checks open (decided 2026-11-20)
+
+For 1.0 (roadmap 12.11) the owner accepted the same manual checks again as known risks instead of
+running them: they stay listed in [docs/limitations.md](../limitations.md) and go into the 1.0.0
+release notes. A failure found later is fixed in a 1.x patch.
+
 ## Decision
 
 **Option A: `contenteditable` with page fragments** (provisional). Every automated experiment
