@@ -1,10 +1,14 @@
 # 1.0: decisions for the owner
 
 Prepared in roadmap task 12.11 (2026-11-20) so the owner can decide quickly; folded into the
-roadmap, `limitations.md` and the 1.0.0 release notes and deleted in 12.12. Items 1 and 2 are
-open; 3 and 4 were decided by the owner on 2026-11-20.
+roadmap, `limitations.md` and the 1.0.0 release notes and deleted in 12.12. The owner decided
+all four on 2026-11-20.
 
-## 1. Known limitations: block 1.0 or ship as known limits (open)
+## 1. Known limitations: block 1.0 or ship as known limits (decided 2026-11-20)
+
+**Decided:** fix pictures losing their images when copied into another document before 1.0
+(done in 12.11: the copy carries the images, see `limitations.md` for what remains); ship every
+other limitation as a documented known limit.
 
 From [limitations.md](limitations.md). Effort: S (a day or less), M (a few days), L (a week or
 more), XL (a phase). Only the ones that could plausibly block are listed; the rest are edge cases
@@ -27,7 +31,14 @@ or documented trade-offs.
 | Server rendering gives the shell, not the content                                                                             | No SEO for documents                                                                                      | -      | Ship (an editor)                                                                           |
 | A tracked paragraph typed into after its mark was deleted keeps its properties on accept (found in 12.11)                     | A paragraph style can differ from doing the same edits untracked, in a rare sequence                      | S-M    | Ship as a known limit (listed); Word's own behavior not checked                            |
 
-## 2. Performance: does the keystroke and first-layout cost block 1.0? (open)
+## 2. Performance: does the keystroke and first-layout cost block 1.0? (decided 2026-11-20)
+
+**Decided:** it does not block 1.0. The missed Phase 5 targets are stated in `limitations.md` and
+go into the 1.0.0 release notes; the incremental redraw is for a 1.x minor.
+After the review of #131 the fix was measured A/B on the same machine (before and after 12.11,
+one right after the other): Chromium's handler p50 at 100 sections 17.1 → 8.0 ms typing and
+22.8 → 14.8 ms Enter, at 200 sections 34.9 → 17.8 and 40.6 → 19.2; Firefox's 18 → 11 and
+19 → 14 at 100 ([benchmarks.md](benchmarks.md)).
 
 Findings (details and method in [benchmarks.md](benchmarks.md), "Against earlier numbers" and
 "Investigated in 12.11"):
@@ -72,7 +83,7 @@ in [ADR-0008](decisions/ADR-0008-1.0-contract-and-extensions.md#the-saved-format
 version so far, and the fixtures of 12.11 (`packages/core/fixtures/formats/`) check that every
 0.x format loads and saves.
 
-## Also for the owner
+## Also done
 
-- [security.md](security.md) points reporters to GitHub's private vulnerability reporting:
-  check that it is enabled on the repository (Settings → Code security), or name another channel.
+- GitHub's private vulnerability reporting is enabled on the repository (2026-11-20, with the
+  owner's approval); [security.md](security.md) points reporters to it.

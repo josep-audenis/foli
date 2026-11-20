@@ -134,6 +134,25 @@ handler p50 8.9 ms (baseline 11.4, -22%), Enter 9.9 ms (12.9, -23%), at 200 sect
 20.5 ms (-21%, -20%); the rest within thresholds. The baseline was not updated: that run's other
 metrics were slower from the machine, and recording them would loosen the baseline.
 
+Again after the review of #131 (2026-11-20 evening, on mains): the machine itself was 25-45%
+slower than when the baseline was recorded (the code before 12.11 measured so too: `findAll`
++38%, `.docx` import +26%), so the fix was measured A/B, the code before 12.11 (`20d8576`) and
+after, one right after the other, `pnpm bench --engines chromium,firefox`, 3 runs each (handler
+p50, ms):
+
+| Code         | Chromium type 100 | Enter 100 | type 200 | Enter 200 | Firefox type 100 | Enter 100 | type 200 | Enter 200 |
+| ------------ | ----------------: | --------: | -------: | --------: | ---------------: | --------: | -------: | --------: |
+| before 12.11 |              17.1 |      22.8 |     34.9 |      40.6 |               18 |        19 |       36 |        42 |
+| after 12.11  |               8.0 |      14.8 |     17.8 |      19.2 |               11 |        14 |       31 |        37 |
+
+Layout, re-flow and paint moved together in both (the machine), unchanged by the fix. The
+baseline was not updated: recorded now, every metric would take the slow machine's numbers.
+Record it again with `pnpm bench --update` on a quiet machine before 1.0.0 is published.
+
+**Decided by the owner (2026-11-20):** the cost does not block 1.0; the missed targets are stated
+in [limitations.md](limitations.md) and the release notes, and the incremental redraw is for a 1.x
+minor.
+
 What a keystroke still costs (same profile, after the fix): placing every block of every page
 again (`renderPages`, about 55%), the selection written back with a forced layout
 (`setBaseAndExtent`, about 20%), and in the bench page the app reading `change.document` (the

@@ -331,12 +331,14 @@ Details in the [package README](../packages/docx/README.md).
 - A CSS change that only alters block margins, or rewraps text without changing any block's
   height, is noticed only at the next height change.
 - No virtualization: every page is in the DOM and measured on load. Fine up to a few hundred
-  pages, but past the speed targets at 100 pages ([benchmarks.md](benchmarks.md#10-numbers),
-  the owner's laptop on mains): 104 pages lay out in about 110 ms in Chromium, 151 ms in Firefox
-  and 204 ms in WebKit, and handling a keystroke took about 11 ms (p50, Chromium), 3.3-3.5 times
-  what 0.2.0 took (most of it added in Phases 8 to 11). 12.11 took about a fifth to a third off
-  the keystroke (9 ms measured on a busier machine than the baseline's); the first layout is
-  unchanged, mostly the browser's own layout of every page.
+  pages, but 1.0 misses Phase 5's speed targets at 100 pages ([benchmarks.md](benchmarks.md#10-numbers),
+  the owner's laptop on mains; accepted by the owner for 1.0, the incremental redraw left for a
+  1.x minor): 104 pages lay out in about 110 ms in Chromium, 151 ms in Firefox and 204 ms in
+  WebKit (target 60 ms); a full re-flow takes 131-150 ms (target 100); Enter's paint p95 is 32-45
+  ms (target 25). Handling a keystroke cost 11-13 ms in 0.6.0 (p50, Chromium), 3.3-3.5 times what
+  0.2.0 took; 12.11 halved typing's (measured A/B: 17.1 → 8.0 ms on a slowed machine, at the
+  8 ms target) and took a third off Enter's (22.8 → 14.8 ms). The first layout is unchanged,
+  mostly the browser's own layout of every page.
 - Long documents made of lists were slower in 0.2.0 (schema v2, where lists were nested
   blocks; not measured on schema v3 yet): in a 114-page list document, Enter near the top took
   about 9-24 ms to handle (p50) and up to ~65 ms to paint (p95), and the first layout ~85-95 ms,
