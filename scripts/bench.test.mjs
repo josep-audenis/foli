@@ -58,6 +58,7 @@ describe("bench", () => {
     expect(() => parseArgs(["--runs", "0"])).toThrow();
     expect(() => parseArgs(["--engines", "edge"])).toThrow("edge");
     expect(() => parseArgs(["--machine", "../x"])).toThrow();
+    expect(() => parseArgs(["--machine", "-x"])).toThrow();
   });
 
   it("reads BENCH lines and turns records into tracked metrics", () => {
@@ -124,6 +125,26 @@ describe("bench", () => {
     ]);
   });
 
+  it("fails a baseline metric that was not measured or gave no number", () => {
+    const base = { median: 10, threshold: 0.5, floor: 2 };
+    const baseline = { metrics: { node: { a: base, gone: base, nan: base }, webkit: { w: base } } };
+    // webkit did not run: its metrics are not asked for.
+    const rows = compare(baseline, { node: { a: 10, nan: Number.NaN, fresh: Number.NaN } }, [
+      "node",
+    ]);
+    expect(rows.map((row) => [row.name, row.status])).toEqual([
+      ["gone", "missing"],
+      ["a", "ok"],
+      ["nan", "missing"],
+      ["fresh", "missing"],
+    ]);
+    // An engine that ran and measured nothing at all.
+    expect(compare(baseline, {}, ["webkit"])).toEqual([
+      { engine: "webkit", name: "w", status: "missing" },
+    ]);
+    expect(table(rows)).toMatch(/gone\s+-\s+-\s+-\s+-\s+MISSING/);
+  });
+
   it("prints a summary table with the change and the allowance", () => {
     const rows = compare(
       { metrics: { node: { a: { median: 10, threshold: 0.3, floor: 5 } } } },
@@ -141,19 +162,36 @@ describe("bench", () => {
     const old = {
       note: "on battery",
       machine: "m",
-      metrics: { node: { "docx import": { median: 9, threshold: 0.9, floor: 1 } } },
+      recorded: "2026-11-01",
+      runs: 3,
+      engines: { webkit: { recorded: "2026-11-01", runs: 3 } },
+      metrics: {
+        node: {
+          "docx import": { median: 9, threshold: 0.9, floor: 1 },
+          renamed: { median: 1, threshold: 1, floor: 1 },
+        },
+        webkit: { "layout 100": { median: 70, threshold: 0.4, floor: 5 } },
+      },
     };
+    const run = { recorded: "2026-11-19", runs: 5 };
     const next = updated(
       old,
       { node: { "docx import": 10, "findAll x": 1 }, chromium: { "layout 100": 40 } },
-      { machine: "m", recorded: "2026-11-19" },
+      { machine: "m" },
+      run,
     );
     expect(next.note).toBe("on battery");
-    expect(next.recorded).toBe("2026-11-19");
+    expect(next.recorded).toBeUndefined();
+    expect(next.runs).toBeUndefined();
+    // Per engine: those that ran get this run's date; webkit keeps its own, and its metrics.
+    expect(next.engines).toEqual({ webkit: old.engines.webkit, node: run, chromium: run });
+    expect(next.metrics.webkit).toEqual(old.metrics.webkit);
+    expect(next.metrics.node.renamed).toBeUndefined();
     expect(next.metrics.node["docx import"]).toEqual({ median: 10, threshold: 0.9, floor: 1 });
     expect(next.metrics.node["findAll x"]).toEqual({ median: 1, ...tolerance("findAll x") });
     expect(next.metrics.chromium["layout 100"]).toEqual({ median: 40, ...tolerance("layout 100") });
     expect(old.metrics.node["docx import"].median).toBe(9);
+    expect(() => updated(old, { node: { a: Number.NaN } }, {}, run)).toThrow("node a");
   });
 
   it("gives paint times a frame of slack and handlers a millisecond or so", () => {

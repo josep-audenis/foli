@@ -11,17 +11,20 @@ release ([contributing](contributing.md#releasing)) and on any change meant to b
 ([ADR-0008](decisions/ADR-0008-1.0-contract-and-extensions.md)). It builds the packages, runs
 every benchmark below `--runs` times (default 3), takes the median of each metric over the runs,
 prints a table against this machine's baseline, writes `test-results/bench.json` and exits
-non-zero when a metric is past its threshold. Each benchmark prints `BENCH {…}` lines (JSON).
-Options: `--update` writes the medians as the baseline (thresholds already in it are kept),
-`--engines node,chromium,firefox,webkit` runs some of them (an `--update` then merges),
-`--machine NAME` (or `FOLI_BENCH_MACHINE`) names the machine, `--no-build` skips `pnpm build`.
+non-zero when a metric is past its threshold, or when a metric of the baseline was not measured
+by an engine that ran or came out as no number (`MISSING`: a renamed test, a query that found
+nothing to time). Each benchmark prints `BENCH {…}` lines (JSON). Options: `--update` writes the
+medians as the baseline (thresholds already in it are kept; refused while a median is no number),
+`--engines node,chromium,firefox,webkit` runs some of them (an `--update` then replaces only those
+engines' metrics and dates), `--machine NAME` (or `FOLI_BENCH_MACHINE`) names the machine,
+`--no-build` skips `pnpm build`.
 
-**Baselines:** `bench/baselines/<machine>.json`, committed: per engine and metric the median, its
-`threshold` and `floor`, and the hardware, Node.js and browser versions it was measured with. The
-machine is named by its platform and a hash of host name, CPU, cores and memory
-(`win32-54922355` is the owner's laptop), so the host name stays out of the repository. With no
-baseline for the machine the table shows the numbers alone, nothing fails, and the message says
-how to record one.
+**Baselines:** `bench/baselines/<machine>.json`, committed: per engine the date and number of runs
+it was recorded with, per engine and metric the median, its `threshold` and `floor`, and the
+hardware, Node.js and browser versions. The machine is named by its platform and a hash of host
+name, CPU, cores and memory in GB (`win32-5f39f6c2` is the owner's laptop), so the host name stays
+out of the repository. With no baseline for the machine the table shows the numbers alone and the
+run fails, saying how to record one (`pnpm bench --update`).
 
 **Metrics** (milliseconds; engine `node` is Node.js):
 
@@ -31,7 +34,7 @@ how to record one.
 | Chromium, Firefox, WebKit | `typeHandlerP50`, `enterHandlerP50` at 100 and 200 sections | the same keystrokes                                                                                                                                       |
 | Chromium, Firefox         | `typePaintP95`, `enterPaintP95` at 100 and 200 sections     | the same keystrokes; not WebKit's (software painting on Windows, 2× apart between runs)                                                                   |
 | Chromium, Firefox, WebKit | `find "th"`, `"the "`, `"the la"`, `"zebra"`                | the [find](#find-on-a-long-document-1111) panel (`apps/playground/bench/find.bench.ts`) on the 1,640-paragraph document, each query typed 5 times, median |
-| Node                      | `findAll "th"`, `"the "`, `"the la"`, `"zebra"`             | `findAll` on the same document's editor (built packages), median of 50 after 5 warm-up calls                                                              |
+| Node                      | `findAll "th" x20`, `"the "`, `"the la"`, `"zebra"`         | `findAll` on the same document's editor (built packages), 20 calls per sample, median of 30 samples after 3 warm-up ones                                  |
 | Node                      | `docx import (corpus)`, `docx export (corpus)`              | `importDocx`, and `exportDocx(document, package)`, of the 9 `corpus/word` files: the sum of each file's median of 10 (after 2 warm-up calls)              |
 | Chromium                  | `pdf (corpus)`                                              | `exportPdf` of the 9 imported corpus files through Playwright's Chromium, tracked changes accepted, no added fonts: the sum of each file's median of 3    |
 
@@ -42,9 +45,12 @@ running (which could be another checkout's).
 **Thresholds:** a metric fails when its median is past the baseline by more than `threshold`
 (relative) **and** by more than `floor` (milliseconds: for whole-millisecond clocks and a frame of
 waiting); as far the other way it is reported `faster`. The defaults (`TOLERANCES` in the
-script) were set from two full runs of the same code an hour apart (on battery), whose browser medians stayed
-within ±30% of each other (WebKit's paint p95 aside, now not tracked) and whose sub-millisecond
-`findAll` medians moved by up to +150%:
+script) were set from two full runs of the same code an hour apart (on battery), whose browser
+medians stayed within ±30% of each other (WebKit's paint p95 aside, now not tracked), and from
+Node runs on mains: within one invocation `findAll` and `.docx` medians stay within ±10%, but
+between invocations on the shared laptop the `.docx` corpus import took 53 to 92 ms on a quiet
+machine (up to 140 ms with other work running). `findAll` is timed 20 calls at a time, since one
+call (0.05-0.5 ms) is too close to the clock's noise to catch anything:
 
 | Metric                    | Threshold |  Floor |
 | ------------------------- | --------: | -----: |
@@ -52,8 +58,8 @@ within ±30% of each other (WebKit's paint p95 aside, now not tracked) and whose
 | keystroke handler p50     |     ± 50% | 1.5 ms |
 | layout, re-flow           |     ± 40% |   5 ms |
 | find (panel)              |     ± 50% |  10 ms |
-| `findAll`                 |    ± 100% |   1 ms |
-| `.docx` import and export |     ± 40% |  10 ms |
+| `findAll` (20 calls)      |     ± 60% |   2 ms |
+| `.docx` import and export |     ± 60% |  20 ms |
 | PDF                       |     ± 40% | 100 ms |
 
 **Compare on mains power.** On battery (Windows' Balanced plan) the same code measured 1.5-2×
@@ -64,8 +70,9 @@ before believing a regression.
 
 **Environment:** Intel Core i7-13700H (14 cores, 20 threads), 16 GB RAM, Windows 11 (10.0.26200),
 **on mains power**; Node.js 25.3.0; Playwright 1.64.1 with Chromium 156.0.8078.4, Firefox 157.0
-and WebKit 27.2 (headless, 1280×720); 2026-11-20, the code of 12.6. Medians of 3 runs
-(`bench/baselines/win32-54922355.json`); milliseconds.
+and WebKit 27.2 (headless, 1280×720); 2026-11-20, the code of 12.6. Medians of 3 runs (Node's of
+5, recorded again with the review's changes) (`bench/baselines/win32-5f39f6c2.json`);
+milliseconds.
 
 | Engine   | Sections (pages) | layout | type handler p50 | type paint p95 | Enter handler p50 | Enter paint p95 | re-flow |
 | -------- | ---------------: | -----: | ---------------: | -------------: | ----------------: | --------------: | ------: |
@@ -76,17 +83,17 @@ and WebKit 27.2 (headless, 1280×720); 2026-11-20, the code of 12.6. Medians of 
 | WebKit   |        100 (104) |    204 |               17 |              - |                20 |               - |     219 |
 | WebKit   |        200 (208) |    388 |               33 |              - |                35 |               - |     451 |
 
-| Find (107 pages) | `findAll` (Node) | Chromium panel | Firefox panel | WebKit panel |
-| ---------------- | ---------------: | -------------: | ------------: | -----------: |
-| `th`             |          0.41 ms |          16 ms |         17 ms |        46 ms |
-| `the `           |          0.39 ms |          17 ms |         16 ms |        47 ms |
-| `the la`         |          0.15 ms |          17 ms |         16 ms |        62 ms |
-| `zebra`          |          0.05 ms |          16 ms |         16 ms |        61 ms |
+| Find (107 pages) | `findAll` (Node, per call) | Chromium panel | Firefox panel | WebKit panel |
+| ---------------- | -------------------------: | -------------: | ------------: | -----------: |
+| `th`             |                    0.48 ms |          16 ms |         17 ms |        46 ms |
+| `the `           |                    0.48 ms |          17 ms |         16 ms |        47 ms |
+| `the la`         |                    0.20 ms |          17 ms |         16 ms |        62 ms |
+| `zebra`          |                    0.06 ms |          16 ms |         16 ms |        61 ms |
 
 The panel's figures are medians of later searches (the first after loading reads the trees, see
 "Find" below); Chromium's and Firefox's are about one frame. `.docx`, the 9 corpus files together
-(18-32 kB each): import 53 ms, export 65 ms (Node); `exportPdf` 537 ms (Chromium, about 60 ms per
-document).
+(18-32 kB each): import 72 ms, export 80 ms (Node; 53 and 65 ms in the full run of the same day);
+`exportPdf` 537 ms (Chromium, about 60 ms per document).
 
 **Against earlier numbers.** Pagination was last measured for 0.2.0 (7.9): Chromium laid 100
 pages out in 41 ms and handled a key in 4-6 ms; 1.0 takes 110 ms and 11-13 ms. To separate the
@@ -101,7 +108,8 @@ in one session on mains, one after the other, 3 runs each (medians):
 | 0.6.0 (Phase 11) |   104 |    107 |             12.0 |           19.9 |              13.1 |              30 |     129 |
 | 12.6             |   104 |    109 |             12.2 |           19.0 |              14.5 |              37 |     146 |
 
-0.2.0's row agrees with what 7.9 measured, so the machine has not changed. (An earlier pass of
+0.2.0's row is within run-to-run noise (±30%) of what 7.9 measured (layout 41 ms then, 50 now;
+handlers 4.1 and 5.7 then, 3.7 and 4.2 now). (An earlier pass of
 single runs on battery gave the same picture at about twice the times.)
 
 **A regression since 0.2.0, not from Phase 12:** a keystroke's handler costs 3.3-3.5× what it
@@ -115,8 +123,8 @@ pages the pagination targets below are missed in Chromium and Firefox: handler p
 
 **Rust and WebAssembly:** no benchmark shows a need. The slow paths are the view's work per
 keystroke and the browsers' own layout of the pages (DOM, measuring, painting), which WebAssembly
-does not speed up; the computing parts are small (`findAll` at most 0.4 ms on 107 pages, a `.docx`
-import about 6 ms per document).
+does not speed up; the computing parts are small (`findAll` at most 0.5 ms on 107 pages, a `.docx`
+import 6-8 ms per document).
 
 ## Document model: build and serialize (Phase 2)
 

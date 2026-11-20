@@ -21,16 +21,18 @@ export const ENGINES = ["node", "chromium", "firefox", "webkit"];
  * more than `floor` ms, both. The floor covers whole-millisecond clocks (Firefox, WebKit) and a
  * frame of waiting in paint times. First match wins. Set in 12.7 from the spread of medians
  * between runs of the same code on the owner's laptop (docs/benchmarks.md): browser medians
- * within ±30%, sub-millisecond `findAll` medians up to +150%. A baseline keeps its own per
- * metric, so they can be tuned per machine.
+ * within ±30% of each other. Node's medians (`findAll` 20 calls at a time, the `.docx` corpus)
+ * stay within ±10% inside one invocation, but between invocations on the shared laptop the
+ * `.docx` corpus took 53 to 92 ms on a quiet machine (and up to 140 ms with other work running),
+ * hence ±60% for them. A baseline keeps its own per metric, so they can be tuned per machine.
  */
 export const TOLERANCES = [
   [/Paint/, { threshold: 0.5, floor: 8 }],
   [/Handler/, { threshold: 0.5, floor: 1.5 }],
   [/^layout|^reflow/, { threshold: 0.4, floor: 5 }],
   [/^find /, { threshold: 0.5, floor: 10 }],
-  [/^findAll /, { threshold: 1, floor: 1 }],
-  [/^docx /, { threshold: 0.4, floor: 10 }],
+  [/^findAll /, { threshold: 0.6, floor: 2 }],
+  [/^docx /, { threshold: 0.6, floor: 20 }],
   [/^pdf /, { threshold: 0.4, floor: 100 }],
 ];
 const DEFAULT_TOLERANCE = { threshold: 0.5, floor: 5 };
@@ -71,8 +73,8 @@ export function parseArgs(argv) {
   const unknown = engines.filter((engine) => !ENGINES.includes(engine));
   if (unknown.length) throw new Error(`Unknown engines: ${unknown.join(", ")}`);
   const machine = value("--machine") ?? process.env.FOLI_BENCH_MACHINE;
-  if (machine !== undefined && !/^[\w.-]+$/.test(machine))
-    throw new Error("--machine takes letters, digits, '.', '_' and '-'");
+  if (machine !== undefined && !/^[\w.][\w.-]*$/.test(machine))
+    throw new Error("--machine takes letters, digits, '.', '_' and '-', not first");
   return {
     update: argv.includes("--update"),
     build: !argv.includes("--no-build"),
@@ -142,13 +144,22 @@ export function medians(records) {
 
 /**
  * Each current median against the baseline: `regression` past its threshold and floor, `faster`
- * past them the other way, `new` when the baseline lacks it.
+ * past them the other way, `new` when the baseline lacks it, `missing` when a metric of the
+ * baseline was not measured by an engine that ran (`engines`) or came out as no number. A missing
+ * metric fails like a regression: a renamed test or a broken query must not pass silently.
  */
-export function compare(baseline, current) {
+export function compare(baseline, current, engines = Object.keys(current)) {
   const rows = [];
-  for (const [engine, metrics] of Object.entries(current)) {
+  for (const engine of engines) {
+    const metrics = current[engine] ?? {};
+    for (const name of Object.keys(baseline?.metrics?.[engine] ?? {}))
+      if (!(name in metrics)) rows.push({ engine, name, status: "missing" });
     for (const [name, value] of Object.entries(metrics)) {
       const base = baseline?.metrics?.[engine]?.[name];
+      if (!Number.isFinite(value)) {
+        rows.push({ engine, name, status: "missing" });
+        continue;
+      }
       if (!base) {
         rows.push({ engine, name, value, status: "new" });
         continue;
@@ -169,13 +180,13 @@ export function table(rows) {
   const lines = rows.map((row) => [
     row.engine,
     row.name,
-    String(row.value),
+    row.value === undefined ? "-" : String(row.value),
     row.base === undefined ? "-" : String(row.base),
-    row.base === undefined
+    row.base === undefined || row.value === undefined
       ? "-"
       : `${row.value >= row.base ? "+" : ""}${Math.round(((row.value - row.base) / row.base) * 100)}%`,
     row.base === undefined ? "-" : `±${Math.round(row.threshold * 100)}%, ${row.floor} ms`,
-    row.status === "regression" ? "REGRESSION" : row.status,
+    row.status === "regression" || row.status === "missing" ? row.status.toUpperCase() : row.status,
   ]);
   const widths = header.map((h, i) => Math.max(h.length, ...lines.map((line) => line[i].length)));
   const format = (cells) =>
@@ -185,21 +196,30 @@ export function table(rows) {
   );
 }
 
-/** The baseline with the current medians; thresholds (and a hand-written `note`) are kept. */
-export function updated(baseline, current, about) {
+/**
+ * The baseline with the current medians of the engines that ran (`run`: `{ recorded, runs }`, kept
+ * per engine), each such engine's metrics replaced whole (a renamed metric goes); other engines,
+ * thresholds already set and a hand-written `note` are kept. Refuses a median that is no number.
+ */
+export function updated(baseline, current, about, run) {
   const metrics = structuredClone(baseline?.metrics ?? {});
+  const engines = { ...baseline?.engines };
   for (const [engine, values] of Object.entries(current)) {
-    metrics[engine] ??= {};
+    const bad = Object.keys(values).filter((name) => !Number.isFinite(values[name]));
+    if (bad.length) throw new Error(`No number for ${engine} ${bad.join(", ")}: nothing written`);
+    const kept = metrics[engine] ?? {};
+    metrics[engine] = {};
     for (const [name, value] of Object.entries(values)) {
-      const kept = metrics[engine][name];
       metrics[engine][name] = {
         median: value,
-        threshold: kept?.threshold ?? tolerance(name).threshold,
-        floor: kept?.floor ?? tolerance(name).floor,
+        threshold: kept[name]?.threshold ?? tolerance(name).threshold,
+        floor: kept[name]?.floor ?? tolerance(name).floor,
       };
     }
+    engines[engine] = run;
   }
-  return { ...baseline, ...about, metrics };
+  const { recorded: _recorded, runs: _runs, ...rest } = baseline ?? {};
+  return { ...rest, ...about, engines, metrics };
 }
 
 // --- Running the benchmarks ---
@@ -255,8 +275,12 @@ async function nodeRecords(engines) {
     }));
     const editor = createEditor({ document: createDocument({ type: "doc", content }) });
     const metrics = {};
+    // 20 calls per sample: one call is well under a millisecond, too close to the clock's noise.
+    const twenty = (query) => () => {
+      for (let i = 0; i < 20; i++) findAll(editor, query);
+    };
     for (const query of FIND_QUERIES)
-      metrics[`findAll "${query}"`] = round(await time(() => findAll(editor, query), 50, 5));
+      metrics[`findAll "${query}" x20`] = round(await time(twenty(query), 30, 3));
     let imports = 0;
     let exports = 0;
     for (const bytes of files) {
@@ -327,7 +351,7 @@ async function main() {
       hostname: os.hostname(),
       cpu: cpus[0]?.model ?? "",
       cores: cpus.length,
-      memory: os.totalmem(),
+      memory: Math.round(os.totalmem() / 2 ** 30),
     });
   const file = join(root, "bench", "baselines", `${machine}.json`);
   const baseline = existsSync(file) ? JSON.parse(readFileSync(file, "utf8")) : null;
@@ -360,7 +384,7 @@ async function main() {
   }
 
   const current = medians(records);
-  const rows = compare(baseline, current);
+  const rows = compare(baseline, current, options.engines);
   mkdirSync(join(root, "test-results"), { recursive: true });
   writeFileSync(
     join(root, "test-results", "bench.json"),
@@ -370,16 +394,15 @@ async function main() {
   console.log(table(rows));
 
   if (options.update) {
-    const about = {
-      machine,
-      recorded: new Date().toISOString().slice(0, 10),
-      runs: options.runs,
-      hardware: await hardware(browsers),
-    };
+    const about = { machine, hardware: await hardware(browsers) };
     // Engines not run this time keep the versions their numbers were measured with.
     about.hardware.browsers = { ...baseline?.hardware?.browsers, ...about.hardware.browsers };
+    const run = { recorded: new Date().toISOString().slice(0, 10), runs: options.runs };
+    const next = updated(baseline, current, about, run);
+    const dropped = rows.filter((row) => row.status === "missing" && row.value === undefined);
+    for (const row of dropped) console.log(`Not measured, left out: ${row.engine} ${row.name}`);
     mkdirSync(join(root, "bench", "baselines"), { recursive: true });
-    writeFileSync(file, `${JSON.stringify(updated(baseline, current, about), null, 2)}\n`);
+    writeFileSync(file, `${JSON.stringify(next, null, 2)}\n`);
     console.log(`\nBaseline written: bench/baselines/${machine}.json (commit it).`);
     return;
   }
@@ -387,16 +410,22 @@ async function main() {
     console.log(
       `\nNo baseline for machine ${machine}: nothing compared. Record one with \`pnpm bench --update${options.machine ? ` --machine ${machine}` : ""}\` and commit it.`,
     );
+    process.exitCode = 1;
     return;
   }
+  const missing = rows.filter((row) => row.status === "missing");
   const regressions = rows.filter((row) => row.status === "regression");
   const faster = rows.filter((row) => row.status === "faster");
   if (faster.length)
     console.log(`\n${faster.length} faster than the baseline: \`pnpm bench --update\` to keep.`);
-  if (regressions.length) {
+  if (missing.length)
+    console.log(
+      `\n${missing.length} not measured: a benchmark failed, was renamed or gave no number.`,
+    );
+  if (regressions.length)
     console.log(`\n${regressions.length} past their threshold. Rerun on a quiet machine first.`);
-    process.exitCode = 1;
-  } else console.log("\nNo regression past a threshold.");
+  if (missing.length || regressions.length) process.exitCode = 1;
+  else console.log("\nNo regression past a threshold.");
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href)

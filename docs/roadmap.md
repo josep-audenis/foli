@@ -1608,23 +1608,24 @@ Each task is a PR on `phase-12/ecosystem`, the build green after each.
   median, a relative `threshold` and a `floor` in ms (both must be passed: whole-millisecond clocks,
   a frame of waiting), the hardware and browser versions; prints a table, writes
   `test-results/bench.json`, exits 1 on a regression; `--update` records (keeping tuned
-  thresholds, merging when `--engines` runs some), no baseline prints the numbers and how to record
-  one. The machine is its platform plus a hash of host name, CPU, cores and memory (`--machine` or
+  thresholds, replacing only the engines run, with their dates), no baseline prints the numbers and
+  how to record one and fails. The machine is its platform plus a hash of host name, CPU, cores and memory (`--machine` or
   `FOLI_BENCH_MACHINE` to name it). Metrics, 51 in all: layout, re-flow and the keystroke handlers'
   p50 at 100 and 200 sections in Chromium, Firefox and WebKit, paint p95 in Chromium and Firefox
   (WebKit's software painting swung 2× between runs); the find panel (new
   `apps/playground/bench/find.bench.ts`, the 11.11 document and queries) in the three engines;
-  `findAll`, `.docx` import and export of the 9 corpus files in Node (built packages); `exportPdf` of
-  them in Chromium. Thresholds from two full runs of the same code: browser medians within ±30%,
-  so paint and handlers ±50% (8 and 1.5 ms floors), layout and re-flow ±40%, find ±50%, `findAll`
-  ±100%, `.docx` and PDF ±40%. Not in `pnpm check`; contributing's release steps run it before each
+  `findAll` (20 calls per sample), `.docx` import and export of the 9 corpus files in Node (built
+  packages); `exportPdf` of them in Chromium. Thresholds from two full runs of the same code:
+  browser medians within ±30%, so paint and handlers ±50% (8 and 1.5 ms floors), layout and
+  re-flow ±40%, find ±50%, PDF ±40%; Node's `.docx` medians took 53-92 ms between invocations, so
+  `.docx` and `findAll` ±60%. Not in `pnpm check`; contributing's release steps run it before each
   release. The bench config has its own port (5177) and never reuses a server. Tests:
   `scripts/bench.test.mjs` (9: medians, machine id, options, `BENCH` lines to metrics, WebKit
   paint left out, comparison with threshold and floor, table, update keeping thresholds). Baseline
-  `win32-54922355` (the owner's i7-13700H laptop, on mains power, 2026-11-20): Chromium at 100
+  `win32-5f39f6c2` (the owner's i7-13700H laptop, on mains power, 2026-11-20): Chromium at 100
   pages layout 110 ms, type handler p50 11.4 ms, Enter 12.9 ms, re-flow 131 ms (Firefox layout
   151 ms, WebKit 204 ms); find panel 16 ms (Chromium, Firefox) to 46-62 ms (WebKit); `findAll`
-  ≤ 0.4 ms; the corpus imports in 53 ms, exports in 65 ms, prints to PDF in 537 ms. On battery the
+  ≤ 0.5 ms; the corpus imports in 53-72 ms, exports in 65-80 ms, prints to PDF in 537 ms. On battery the
   same code measured 1.5-2× slower. Found: a keystroke's handler costs 3.3-3.5× and the first
   layout and re-flow about 2.2× what 0.2.0 did (each release's checkout run in one session on
   mains, 3 runs each: mostly from Phase 8, the layout's in 8-10, none from Phase 12), so the
@@ -1632,7 +1633,10 @@ Each task is a PR on `phase-12/ecosystem`, the build green after each.
   shows a need (the cost is the view's DOM work and the browsers' layout). Shortcuts: the browser
   benchmarks run on the dev server as before; the 1-50-section and list documents stay in
   `pnpm bench:layout` only; model build and block type change stay in core's Vitest bench, untracked. No changeset: no published package
-  changed.)
+  changed. Review of #127: a baseline metric not measured, or a median that is no number, fails
+  (`MISSING`) and `--update` refuses no number; `findAll` timed 20 calls at a time; the machine id
+  hashes memory in GB (the baseline renamed); no baseline fails; dates and runs kept per engine;
+  `--machine` may not start with `-`; tests for each (10).)
 - [ ] 12.8 Docs site: `apps/site` gets the docs (getting started, guides, API reference from the
   12.2 reports, limitations, changelog), built from `docs/` so they do not drift, with live
   examples (the editor, a custom node, a plugin) and search if the tool gives it; keyboard-usable

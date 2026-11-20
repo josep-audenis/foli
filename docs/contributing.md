@@ -99,9 +99,10 @@ playground, spike and examples are never published.
 2. **Before each release**, run `pnpm bench` on a quiet machine on mains power
    ([benchmarks.md](benchmarks.md#performance-tracking-127)): it compares the layout,
    keystroke, find, `.docx` and PDF benchmarks with the committed baseline of the machine
-   (`bench/baselines/<machine>.json`) and exits non-zero on a regression past a threshold. Rerun
-   once before believing a regression; explain a real one in the release PR, or fix it. With no
-   baseline for the machine it compares nothing: `pnpm bench --update` records one, commit it.
+   (`bench/baselines/<machine>.json`) and exits non-zero on a regression past a threshold or a
+   baseline metric not measured. Rerun once before believing a regression; explain a real one in
+   the release PR, or fix it. With no baseline for the machine it compares nothing and fails:
+   `pnpm bench --update` records one, commit it.
    Run it too on a change meant to be faster, then `--update` to keep the new numbers.
 3. **To release**, on a branch: `pnpm changeset version` applies every pending changeset (new
    version in each `package.json`, `CHANGELOG.md` entries) and deletes the changeset files.

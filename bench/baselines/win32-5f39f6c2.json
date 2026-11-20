@@ -1,7 +1,5 @@
 {
-  "machine": "win32-54922355",
-  "recorded": "2026-11-20",
-  "runs": 3,
+  "machine": "win32-5f39f6c2",
   "note": "Recorded on the owner's laptop on mains power (Windows Balanced power plan). On battery the same code measured 1.5-2x slower and drifted as the charge fell: compare on mains.",
   "hardware": {
     "cpu": "13th Gen Intel(R) Core(TM) i7-13700H",
@@ -15,37 +13,55 @@
       "webkit": "27.2"
     }
   },
+  "engines": {
+    "node": {
+      "recorded": "2026-11-20",
+      "runs": 5
+    },
+    "chromium": {
+      "recorded": "2026-11-20",
+      "runs": 3
+    },
+    "firefox": {
+      "recorded": "2026-11-20",
+      "runs": 3
+    },
+    "webkit": {
+      "recorded": "2026-11-20",
+      "runs": 3
+    }
+  },
   "metrics": {
     "node": {
-      "findAll \"th\"": {
-        "median": 0.41,
-        "threshold": 1,
-        "floor": 1
+      "findAll \"th\" x20": {
+        "median": 9.63,
+        "threshold": 0.6,
+        "floor": 2
       },
-      "findAll \"the \"": {
-        "median": 0.39,
-        "threshold": 1,
-        "floor": 1
+      "findAll \"the \" x20": {
+        "median": 9.64,
+        "threshold": 0.6,
+        "floor": 2
       },
-      "findAll \"the la\"": {
-        "median": 0.15,
-        "threshold": 1,
-        "floor": 1
+      "findAll \"the la\" x20": {
+        "median": 4.04,
+        "threshold": 0.6,
+        "floor": 2
       },
-      "findAll \"zebra\"": {
-        "median": 0.05,
-        "threshold": 1,
-        "floor": 1
+      "findAll \"zebra\" x20": {
+        "median": 1.26,
+        "threshold": 0.6,
+        "floor": 2
       },
       "docx import (corpus)": {
-        "median": 52.71,
-        "threshold": 0.4,
-        "floor": 10
+        "median": 71.54,
+        "threshold": 0.6,
+        "floor": 20
       },
       "docx export (corpus)": {
-        "median": 64.59,
-        "threshold": 0.4,
-        "floor": 10
+        "median": 79.79,
+        "threshold": 0.6,
+        "floor": 20
       }
     },
     "chromium": {
