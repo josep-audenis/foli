@@ -16,19 +16,20 @@ is not installed when `core.hooksPath` is set or a foreign `pre-push` hook exist
 
 ## Commands
 
-| Command                         | What it does                                                                                                         |
-| ------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| `pnpm dev`                      | Playground with HMR, packages consumed from source                                                                   |
-| `pnpm test` / `pnpm test:watch` | Vitest (all packages)                                                                                                |
-| `pnpm typecheck`                | `tsc --noEmit` in every workspace project                                                                            |
-| `pnpm lint` / `pnpm format`     | Biome check / auto-fix                                                                                               |
-| `pnpm build`                    | Build packages to `dist/` and the playground                                                                         |
-| `pnpm check`                    | lint + typecheck + test + build + package checks (`publint`) + API reports + bundle sizes; the pre-push hook         |
-| `pnpm api` / `pnpm api:update`  | Check each package's built types against its API report / rewrite the reports (after build)                          |
-| `pnpm size`                     | Bundle size per package against its budget (after `pnpm build`)                                                      |
-| `pnpm bench`                    | Benchmarks against this machine's baseline; fails on a regression (minutes; not in `pnpm check`; `--update` records) |
-| `pnpm changeset`                | Record a change to a published package (bump type and changelog line)                                                |
-| `pnpm examples`                 | Pack the packages, install them into `examples/` (Vite + React 18, Next.js + React 19), build, Playwright smoke test |
+| Command                            | What it does                                                                                                         |
+| ---------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `pnpm dev`                         | Playground with HMR, packages consumed from source                                                                   |
+| `pnpm test` / `pnpm test:watch`    | Vitest (all packages)                                                                                                |
+| `pnpm typecheck`                   | `tsc --noEmit` in every workspace project                                                                            |
+| `pnpm lint` / `pnpm format`        | Biome check / auto-fix                                                                                               |
+| `pnpm build`                       | Build packages to `dist/` and the playground                                                                         |
+| `pnpm check`                       | lint + typecheck + test + build + package checks (`publint`) + API reports + bundle sizes; the pre-push hook         |
+| `pnpm api` / `pnpm api:update`     | Check each package's built types against its API report / rewrite the reports (after build)                          |
+| `pnpm size`                        | Bundle size per package against its budget (after `pnpm build`)                                                      |
+| `pnpm bench`                       | Benchmarks against this machine's baseline; fails on a regression (minutes; not in `pnpm check`; `--update` records) |
+| `pnpm changeset`                   | Record a change to a published package (bump type and changelog line)                                                |
+| `pnpm --filter @folijs/site build` | Build the site (landing, `/test/`, docs) to `apps/site/dist/` ([The site](#the-site))                                |
+| `pnpm examples`                    | Pack the packages, install them into `examples/` (Vite + React 18, Next.js + React 19), build, Playwright smoke test |
 
 ## API reports
 
@@ -55,6 +56,29 @@ name fails the last check). Names other packages need from core without promisin
 `@folijs/core/internal`. A change to a report (a new export, a changed signature, an edited doc
 comment) is a change to the API: run `pnpm build && pnpm api:update`, review the report's diff
 with the change and commit both; a changeset says what changed for users.
+
+## The site
+
+`apps/site` is the site at `foli.josepaudenis.com`: the landing page, the editor at `/test/` and
+the docs at `/docs/`, built from `docs/*.md`, the API reports and the changelogs at build time
+([architecture.md](architecture.md#docs-site-appssite-128)). To add a docs page, add the
+markdown file and one entry in `apps/site/src/docs/nav.ts`; a link to a heading that does not
+exist fails the build.
+
+```bash
+pnpm --filter @folijs/site dev      # http://localhost:5173, the pages rewritten on save
+pnpm --filter @folijs/site build    # static files in apps/site/dist/
+pnpm --filter @folijs/site preview  # serve the build locally
+```
+
+Nothing in the repository deploys it. The site is served through Cloudflare (its response
+headers say so); how the files get there (Cloudflare Pages connected to the repository, a
+direct upload, or another host behind Cloudflare's proxy) is set up outside the repository and
+not recorded here. To publish, the owner builds and uploads `apps/site/dist/` as the site's
+root, for example with Wrangler for a Pages project:
+`npx wrangler pages deploy apps/site/dist --project-name <project>`. Pages are folders with an
+`index.html` (`/docs/styling/` → `docs/styling/index.html`), which every static host serves; no
+rewrites are needed.
 
 ## Known flaky tests
 

@@ -1042,6 +1042,7 @@ must have loaded, and the container must not be scaled (`transform`, `zoom`).
 ```
 foli/
 ├── apps/playground/     Vite demo; consumes packages by name; no engine logic.
+├── apps/site/           foli.josepaudenis.com: landing, the editor at /test/, the docs at /docs/ (private).
 ├── packages/
 │   ├── core/  @folijs/core   Envelope, schema, immutable model, positions, slices. Pure TS, no DOM.
 │   ├── view/  @folijs/view   Editable DOM view (EditorView). Framework-agnostic.
@@ -1080,6 +1081,8 @@ Planned, created only when needed:
   (`pnpm corpus:pages`, playground only) and Foli's own PDFs there and in `e2e/pdf.spec.ts`. Never bundled or published. Its optional Node
   canvas (`@napi-rs/canvas`, native binaries) is not installed (`ignoredOptionalDependencies`):
   the harness renders in the browser.
+- Dev-only: `marked` (MIT, no dependencies) renders the docs site's markdown at build time, in
+  the private `apps/site` only.
 
 ## Build and dev wiring
 
@@ -1108,6 +1111,41 @@ Planned, created only when needed:
 - `pnpm examples` installs the packed tarballs into `examples/vite` (React 18, strict
   TypeScript) and `examples/next` (React 19, server rendering) with npm, builds them, and runs
   the success criterion in Playwright; see [examples/README.md](../examples/README.md).
+
+## Docs site (`apps/site`, 12.8)
+
+The site (private, never published) is a Vite multi-page app: the landing page (`index.html`),
+the real editor (`test/index.html`) and the docs under `/docs/`. The docs are not written for the
+site: `src/docs/build.ts`, called by `vite.config.ts` before Vite reads its inputs (dev and
+build), renders the repository's files to static HTML pages in `apps/site/docs/` (git-ignored),
+which become Vite inputs:
+
+- the pages listed in `src/docs/nav.ts`, in nav order: markdown files of `docs/` (getting
+  started, guides, limitations, API, keyboard, architecture, contributing, ADRs…), one page per
+  package's API report (`packages/<name>/api-report.d.ts`: each entry's exports, then each
+  declaration by source file with its doc comment, tagged `internal` or `not exported` when it is
+  not in the package's public entry), the five changelogs on one page, and the live examples
+  (`src/examples/<name>.md` and `<name>.tsx`: the page shows the script that runs on it). A new
+  page is a markdown file and one entry in `nav.ts`.
+- Markdown by `marked` at build time: heading ids as GitHub makes them, so `file.md#heading`
+  links work on both; a relative link to a page of the site goes there, to any other file to
+  GitHub (`blob/main`), a relative image to its raw file; a link or image whose scheme is not
+  `http`, `https` (or `mailto` for links) is shown as text; raw HTML in the markdown is shown as
+  text. The build fails on a link to a
+  heading that does not exist.
+- Search: the build writes `docs/search.json` (headings h1–h3 and API names, about 67 kB, 11 kB
+  gzipped), fetched on the first search; results are built with `textContent`.
+- The examples (`FoliEditor`, a custom node with a node view and a toolbar button, a plugin with a
+  command, a key and decorations) run the packages from source like the rest of the site; they
+  use only the public API. In dev a changed markdown file, changelog, API report or example writes
+  the pages again (a new page needs a restart).
+- Tests: `src/docs/build.test.ts` (ids, links, raw HTML, report parsing) and `apps/site/e2e`
+  (every nav page, links, API pages, search, keyboard, axe on the pages and the examples, light
+  and dark, no sideways scroll at 375px), and `apps/site/e2e-build` (a docs page, an API page and
+  an example from `vite build` served by `vite preview`, without console errors), in three engines
+  (`pnpm test:e2e --project=site-*`).
+
+Deploying it is the owner's step ([contributing.md](contributing.md#the-site)).
 
 ## React integration (`@folijs/react`)
 
