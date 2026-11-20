@@ -9,21 +9,21 @@ leaves `main` green with a working playground.
 **Update this table in the same PR that starts, advances or finishes a phase.** It is the only
 place that says what is in progress; check it before starting work.
 
-| Phase                    | Status                   | Branch             | Notes                                                                                                                                                                                     |
-| ------------------------ | ------------------------ | ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 0 Foundation             | ✅ Done                  | —                  |                                                                                                                                                                                           |
-| 1 Architecture spike     | ✅ Done (G1 provisional) | —                  | Merged in #1; ADR-0003 accepted provisionally; IME, dead-key and screen-reader checks open                                                                                                |
-| 2 Document model         | ✅ Done                  | —                  | Merged in #2                                                                                                                                                                              |
-| 3 Transactions & history | ✅ Done                  | —                  | Merged in #4; gate G2 passed                                                                                                                                                              |
-| 4 Editor view            | ✅ Done (G3 provisional) | —                  | Merged in #8–#13; manual checks (4.6) deferred, open risks in ADR-0003                                                                                                                    |
-| 5 Native pagination      | ✅ Done (G4 provisional) | —                  | Merged in #15–#22; page-break manual checks open, risks in ADR-0003                                                                                                                       |
-| 6 React API & 0.1.0      | ✅ Done                  | —                  | Merged in #23–#31; 0.1.0 on npm; manual checks shipped as known risks (ADR-0003)                                                                                                          |
-| 7 Rich content           | ✅ Done                  | —                  | Merged in #33–#41; 0.2.0 on npm; list-document benchmark misses accepted (known limit)                                                                                                    |
-| 8 Word model & DOCX      | ✅ Done                  | —                  | Merged in #44–#61; 0.3.0 on npm (`@folijs/docx` first released); gate G5 passed                                                                                                           |
-| 9 Review                 | ✅ Done                  | —                  | Merged in #63–#72; 0.4.0 on npm                                                                                                                                                           |
-| 10 Tables & images       | ✅ Done                  | —                  | Merged in #73–#97 (#90, the landing page, went to main); 0.5.0 on npm; two misses accepted                                                                                                |
-| 11 Sections & templates  | ✅ Done                  | —                  | Merged in #100–#118 (#106, #107, #110, #112 and #113, the site, went to main); 0.6.0 on npm; misses accepted                                                                              |
-| 12 Ecosystem & 1.0       | In progress              | phase-12/ecosystem | 12.1 to 12.10 done: ADR-0008, API reports, custom nodes and marks, view hooks, commands and keys, toolbar items, `pnpm bench`, the docs site (not deployed), guides, examples; 12.11 next |
+| Phase                    | Status                   | Branch             | Notes                                                                                                                                                                                                                                                 |
+| ------------------------ | ------------------------ | ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0 Foundation             | ✅ Done                  | —                  |                                                                                                                                                                                                                                                       |
+| 1 Architecture spike     | ✅ Done (G1 provisional) | —                  | Merged in #1; ADR-0003 accepted provisionally; IME, dead-key and screen-reader checks open                                                                                                                                                            |
+| 2 Document model         | ✅ Done                  | —                  | Merged in #2                                                                                                                                                                                                                                          |
+| 3 Transactions & history | ✅ Done                  | —                  | Merged in #4; gate G2 passed                                                                                                                                                                                                                          |
+| 4 Editor view            | ✅ Done (G3 provisional) | —                  | Merged in #8–#13; manual checks (4.6) deferred, open risks in ADR-0003                                                                                                                                                                                |
+| 5 Native pagination      | ✅ Done (G4 provisional) | —                  | Merged in #15–#22; page-break manual checks open, risks in ADR-0003                                                                                                                                                                                   |
+| 6 React API & 0.1.0      | ✅ Done                  | —                  | Merged in #23–#31; 0.1.0 on npm; manual checks shipped as known risks (ADR-0003)                                                                                                                                                                      |
+| 7 Rich content           | ✅ Done                  | —                  | Merged in #33–#41; 0.2.0 on npm; list-document benchmark misses accepted (known limit)                                                                                                                                                                |
+| 8 Word model & DOCX      | ✅ Done                  | —                  | Merged in #44–#61; 0.3.0 on npm (`@folijs/docx` first released); gate G5 passed                                                                                                                                                                       |
+| 9 Review                 | ✅ Done                  | —                  | Merged in #63–#72; 0.4.0 on npm                                                                                                                                                                                                                       |
+| 10 Tables & images       | ✅ Done                  | —                  | Merged in #73–#97 (#90, the landing page, went to main); 0.5.0 on npm; two misses accepted                                                                                                                                                            |
+| 11 Sections & templates  | ✅ Done                  | —                  | Merged in #100–#118 (#106, #107, #110, #112 and #113, the site, went to main); 0.6.0 on npm; misses accepted                                                                                                                                          |
+| 12 Ecosystem & 1.0       | In progress              | phase-12/ecosystem | 12.1 to 12.10 done: ADR-0008, API reports, custom nodes and marks, view hooks, commands and keys, toolbar items, `pnpm bench`, the docs site (not deployed), guides, examples; 12.11 in progress (two owner decisions open: release-1.0-decisions.md) |
 
 Status values: `Ready` (dependencies met, nobody on it) · `In progress` · `In review` (PR open) ·
 `✅ Done` (merged, acceptance criteria met) · `Blocked by …`.
@@ -1760,7 +1760,37 @@ Each task is a PR on `phase-12/ecosystem`, the build green after each.
   links, `.docx` and zip limits, pictures, `exportPdf` input); the ADR-0003 manual checks run or
   accepted again by the owner as 1.0 risks; `pnpm examples`, the corpus harnesses and the e2e
   suite green in three engines; investigate the keystroke and first-layout cost added in Phases
-  8–11 (12.7) and decide with the owner whether it blocks 1.0.
+  8–11 (12.7) and decide with the owner whether it blocks 1.0. (In progress: the owner's two
+  open decisions, the limitations that block and whether the performance does, are prepared with
+  recommendations in [release-1.0-decisions.md](release-1.0-decisions.md); the ADR-0003 manual
+  checks were accepted again as 1.0 risks and ADR-0008's format point accepted, both by the owner
+  on 2026-11-20 (ADR-0003, ADR-0008, deprecation.md, limitations). Formats: a fixture per 0.x
+  version saved by the release that wrote it (`packages/core/fixtures/formats/`: v1 by 0.1.0, v2
+  by 0.2.0, v3 by 0.3.0, v4 by 0.5.0, v5 by 0.6.0, each release's core and docx compiled from its
+  tag; v3 to v5 are corpus files that release imported), loaded, saved through an editor
+  (canonically equal; v3 to v5 equal to the file but for the version, v1 and v2 every character)
+  and through `.docx` (`formats.test.ts` in core and docx, 13 tests). Found: a v3 document read
+  from a `.docx` could not be exported (its table styles' properties were never in the model;
+  fixed, changeset `v3-table-styles-export`). Security: `docs/security.md` (threat model, what is
+  checked where, the app's part, reporting); found and fixed a tiny `.docx` of empty paragraphs
+  exhausting memory (13 KB took 2 GB; 64 MB of XML crashed Node) with `maxElements` (1 000 000
+  across a package, changeset `docx-element-limit`); no XSS found (paste, clipboard JSON, links,
+  zip, XML entities, pictures, `exportPdf`, `h`, the site checked). Performance: profiled in
+  Chromium at 100 sections; list numbers resolved every paragraph's formatting on each keystroke,
+  now only numbered ones (and `FoliComments` skips its scan without comments; changeset
+  `keystroke-list-markers`): type handler p50 11.4 → 8.9 ms, Enter 12.9 → 9.9 ms (-20 to -23% at
+  100 and 200 sections, measured on a busier machine than the baseline's, which was not
+  updated); first layout and re-flow unchanged (the browser's layout of every page; options in
+  `benchmarks.md`). Flaky: five unit runs beside the e2e suite found the tracked-changes property
+  test failing on a seed (a known difference not left out; fixed) and two `.docx` tests past their
+  timeouts (raised); the full e2e run's five failures (Firefox print, WebKit) passed when rerun
+  (contributing.md). Runs on 2026-11-20: `pnpm test:e2e` 993 passed, 82 skipped, 5 failed then
+  passed 3 of 3 (1,080 tests, three engines, 4 workers, 24 min); `pnpm examples` 27 passed, 6
+  skipped; the Word harnesses: extension 4 of 4, find 9, fields 24, pictures 4, sections 4,
+  tables 10, stories 24, review 9 checked, controls 9 of 9 after its imports were fixed (it
+  imported names 12.2 made internal), rewrite 37 opened, the 27 without edits equal to Word's
+  reference; `pnpm corpus:pages` as 0.6.0: 158 of 158 paragraphs on Word's page, 142 on its line,
+  277 of 280 cell paragraphs (Word's PDFs not given, so no page score).)
 - [ ] 12.12 Close: docs as of 1.0 (README, architecture, api, ADR-0008's outcome), size budgets,
   the acceptance checked, the 1.0.0 changeset and version PR; publish with the owner's approval.
   Fold `docs/release-1.0-decisions.md` (12.11) into the roadmap, limitations and release notes.
