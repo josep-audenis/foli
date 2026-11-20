@@ -46,7 +46,7 @@ describe("0.x formats", () => {
   });
 
   for (const { name, json } of fixtures) {
-    it(`loads and saves ${name} without loss`, () => {
+    it(`loads and saves ${name} without loss`, async () => {
       const loaded = parseDocument(structuredClone(json));
       expect(loaded.schemaVersion).toBe(SCHEMA_VERSION);
       const saved = createEditor({ document: loaded }).getDocument();
@@ -57,9 +57,12 @@ describe("0.x formats", () => {
         // v3 → v4 → v5 change the version only.
         expect(canonical({ ...saved, schemaVersion: json.schemaVersion })).toBe(canonical(json));
       } else {
-        // v1 and v2 are migrated to Word's model: every character stays.
+        // v1 and v2 are migrated to Word's model: every character stays, and the whole result
+        // (styles, lists, marks per run) is the one reviewed when 12.11 recorded it.
         expect(text(saved.content)).toBe(text(json.content as NodeJSON));
         expect(text(saved.content).length).toBeGreaterThan(20);
+        await expect(`${JSON.stringify(saved, null, 2)}
+`).toMatchFileSnapshot(`../../fixtures/formats/migrated/${name}.json`);
       }
     });
   }

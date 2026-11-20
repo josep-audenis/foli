@@ -12,6 +12,7 @@
       "!**/*-snapshots",
       "!.changeset/*.md",
       "!corpus/reference",
+      "!packages/core/fixtures/formats/migrated",
       "!packages/*/api-report.d.ts"
     ]
   },

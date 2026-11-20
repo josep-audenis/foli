@@ -194,7 +194,10 @@ function styleXml(style: StyleJSON, ns: Namespaces): string {
   const o = original(style.ext, ns);
   let reread = o ? styleOf(o.element, reading(o.source)) : undefined;
   // A schema 3 document (0.3.0, 0.4.0) kept a table style's parts in `ext` only: none of them
-  // in the model means they were never read, not removed, so they are written as read.
+  // in the model means they were never read, not removed, so they are written as read. Not
+  // gated on the version: a v3 document loaded and saved again says v5, and would then never
+  // export. An app that clears all four of a read style's parts gets them written as read (one
+  // part changed or left is compared, and refused when changed).
   if (reread && TABLE_STYLE_KEYS.every((key) => style[key] === undefined)) {
     reread = { ...reread };
     for (const key of TABLE_STYLE_KEYS) delete reread[key];

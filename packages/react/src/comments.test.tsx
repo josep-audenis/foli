@@ -105,6 +105,18 @@ describe("FoliComments in FoliEditor", () => {
     ]);
   });
 
+  it("shows a comment added by a command to a document that had none", () => {
+    const editor = setup([]);
+    expect(screen.queryByRole("article")).toBeNull();
+    act(() => {
+      editor.select(2, 4);
+      editor.commands.addComment("From the API");
+    });
+    expect(within(pane()).getByRole("article", { name: "Comment by Me" }).textContent).toContain(
+      "From the API",
+    );
+  });
+
   it("does not open or delete an empty comment the document came with", () => {
     const empty = [{ type: "paragraph", attrs: { style: "CommentText" } }];
     const editor = setup([{ id: 0, author: "Ana", content: empty }]);

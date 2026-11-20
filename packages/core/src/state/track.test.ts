@@ -583,7 +583,7 @@ function removedWhole(doc: Node): boolean {
  * Known: a paragraph whose mark was deleted while it was empty, then typed into, keeps its own
  * properties when accepting joins it to the next one, while the same edits untracked joined an
  * empty paragraph and kept the next one's (found by a random seed in 12.11, about 1 run in 5).
- * Not compared with the mirror then.
+ * Compared with the mirror without paragraph properties then: the text must still agree.
  */
 function typedIntoJoined(doc: Node): boolean {
   let found = false;
@@ -598,6 +598,10 @@ function typedIntoJoined(doc: Node): boolean {
   });
   return found;
 }
+
+/** `project`'s lines without the paragraphs' style and justification. */
+const textOnly = (lines: string[]) =>
+  lines.map((line) => line.replace(/^(\(\w+\))?(\[\w+\])?/, ""));
 
 describe("tracked changes (property)", () => {
   it("accept all = the same edits untracked; reject all = the original; undo all = exact", () => {
@@ -619,7 +623,11 @@ describe("tracked changes (property)", () => {
           });
           apply(editor, o);
           apply(mirror, o);
-          if (!removedWhole(editor.state.doc) && !typedIntoJoined(editor.state.doc))
+          if (typedIntoJoined(editor.state.doc))
+            expect(textOnly(project(editor.state.doc, true))).toEqual(
+              textOnly(project(mirror.state.doc, true)),
+            );
+          else if (!removedWhole(editor.state.doc))
             expect(project(editor.state.doc, true)).toEqual(project(mirror.state.doc, true));
           expect(project(editor.state.doc, false)).toEqual(project(start, true));
         }
