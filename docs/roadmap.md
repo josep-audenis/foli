@@ -9,21 +9,21 @@ leaves `main` green with a working playground.
 **Update this table in the same PR that starts, advances or finishes a phase.** It is the only
 place that says what is in progress; check it before starting work.
 
-| Phase                    | Status                   | Branch             | Notes                                                                                                                                   |
-| ------------------------ | ------------------------ | ------------------ | --------------------------------------------------------------------------------------------------------------------------------------- |
-| 0 Foundation             | ✅ Done                  | —                  |                                                                                                                                         |
-| 1 Architecture spike     | ✅ Done (G1 provisional) | —                  | Merged in #1; ADR-0003 accepted provisionally; IME, dead-key and screen-reader checks open                                              |
-| 2 Document model         | ✅ Done                  | —                  | Merged in #2                                                                                                                            |
-| 3 Transactions & history | ✅ Done                  | —                  | Merged in #4; gate G2 passed                                                                                                            |
-| 4 Editor view            | ✅ Done (G3 provisional) | —                  | Merged in #8–#13; manual checks (4.6) deferred, open risks in ADR-0003                                                                  |
-| 5 Native pagination      | ✅ Done (G4 provisional) | —                  | Merged in #15–#22; page-break manual checks open, risks in ADR-0003                                                                     |
-| 6 React API & 0.1.0      | ✅ Done                  | —                  | Merged in #23–#31; 0.1.0 on npm; manual checks shipped as known risks (ADR-0003)                                                        |
-| 7 Rich content           | ✅ Done                  | —                  | Merged in #33–#41; 0.2.0 on npm; list-document benchmark misses accepted (known limit)                                                  |
-| 8 Word model & DOCX      | ✅ Done                  | —                  | Merged in #44–#61; 0.3.0 on npm (`@folijs/docx` first released); gate G5 passed                                                         |
-| 9 Review                 | ✅ Done                  | —                  | Merged in #63–#72; 0.4.0 on npm                                                                                                         |
-| 10 Tables & images       | ✅ Done                  | —                  | Merged in #73–#97 (#90, the landing page, went to main); 0.5.0 on npm; two misses accepted                                              |
-| 11 Sections & templates  | ✅ Done                  | —                  | Merged in #100–#118 (#106, #107, #110, #112 and #113, the site, went to main); 0.6.0 on npm; misses accepted                            |
-| 12 Ecosystem & 1.0       | In progress              | phase-12/ecosystem | 12.1 to 12.7 done: ADR-0008, API reports, custom nodes and marks, view hooks, commands and keys, toolbar items, `pnpm bench`; 12.8 next |
+| Phase                    | Status                   | Branch             | Notes                                                                                                                                                                 |
+| ------------------------ | ------------------------ | ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0 Foundation             | ✅ Done                  | —                  |                                                                                                                                                                       |
+| 1 Architecture spike     | ✅ Done (G1 provisional) | —                  | Merged in #1; ADR-0003 accepted provisionally; IME, dead-key and screen-reader checks open                                                                            |
+| 2 Document model         | ✅ Done                  | —                  | Merged in #2                                                                                                                                                          |
+| 3 Transactions & history | ✅ Done                  | —                  | Merged in #4; gate G2 passed                                                                                                                                          |
+| 4 Editor view            | ✅ Done (G3 provisional) | —                  | Merged in #8–#13; manual checks (4.6) deferred, open risks in ADR-0003                                                                                                |
+| 5 Native pagination      | ✅ Done (G4 provisional) | —                  | Merged in #15–#22; page-break manual checks open, risks in ADR-0003                                                                                                   |
+| 6 React API & 0.1.0      | ✅ Done                  | —                  | Merged in #23–#31; 0.1.0 on npm; manual checks shipped as known risks (ADR-0003)                                                                                      |
+| 7 Rich content           | ✅ Done                  | —                  | Merged in #33–#41; 0.2.0 on npm; list-document benchmark misses accepted (known limit)                                                                                |
+| 8 Word model & DOCX      | ✅ Done                  | —                  | Merged in #44–#61; 0.3.0 on npm (`@folijs/docx` first released); gate G5 passed                                                                                       |
+| 9 Review                 | ✅ Done                  | —                  | Merged in #63–#72; 0.4.0 on npm                                                                                                                                       |
+| 10 Tables & images       | ✅ Done                  | —                  | Merged in #73–#97 (#90, the landing page, went to main); 0.5.0 on npm; two misses accepted                                                                            |
+| 11 Sections & templates  | ✅ Done                  | —                  | Merged in #100–#118 (#106, #107, #110, #112 and #113, the site, went to main); 0.6.0 on npm; misses accepted                                                          |
+| 12 Ecosystem & 1.0       | In progress              | phase-12/ecosystem | 12.1 to 12.8 done: ADR-0008, API reports, custom nodes and marks, view hooks, commands and keys, toolbar items, `pnpm bench`, the docs site (not deployed); 12.9 next |
 
 Status values: `Ready` (dependencies met, nobody on it) · `In progress` · `In review` (PR open) ·
 `✅ Done` (merged, acceptance criteria met) · `Blocked by …`.
@@ -1637,10 +1637,42 @@ Each task is a PR on `phase-12/ecosystem`, the build green after each.
   (`MISSING`) and `--update` refuses no number; `findAll` timed 20 calls at a time; the machine id
   hashes memory in GB (the baseline renamed); no baseline fails; dates and runs kept per engine;
   `--machine` may not start with `-`; tests for each (10).)
-- [ ] 12.8 Docs site: `apps/site` gets the docs (getting started, guides, API reference from the
+- [x] 12.8 Docs site: `apps/site` gets the docs (getting started, guides, API reference from the
   12.2 reports, limitations, changelog), built from `docs/` so they do not drift, with live
   examples (the editor, a custom node, a plugin) and search if the tool gives it; keyboard-usable
   and axe-clean; deployed where ADR-0008 says, with the owner's approval.
+  (Done: `apps/site/src/docs/build.ts`, called by `vite.config.ts` before Vite reads its inputs,
+  renders the 30 pages of `src/docs/nav.ts` with `marked` 18.2.1 (MIT, no dependencies, a
+  devDependency of the private site) to static HTML in `apps/site/docs/` (git-ignored), each a Vite
+  input at `/docs/…/`: getting started, limitations, styling, keyboard, document model,
+  pagination, `api.md`, architecture, contributing, benchmarks, roadmap, the testing notes and the
+  eight ADRs from `docs/`; one API page per package from its `api-report.d.ts` (each entry's
+  exports, then every declaration by source file with its doc comment, tagged `internal` or `not
+  exported`); the five changelogs on one page; three live examples (`src/examples/*.md` + `.tsx`,
+  the page showing the script it runs): `FoliEditor`, a custom inline node with a node view and a
+  toolbar button inserting it, a plugin with a command, a key (Ctrl+Shift+O), a toolbar button and
+  decorations. Heading ids as GitHub makes them; a relative link to a page goes to the site, to any
+  other file to GitHub; a link to a missing heading fails the build (found one:
+  `document-model.md` → `architecture.md#editing-engine-folicore`, fixed); raw HTML in the
+  markdown is shown as text. Search: the build
+  writes `search.json` (headings h1–h3 and API names, 67 kB, 11 kB gzipped), fetched on first use,
+  results built with `textContent`.
+  Dev rewrites the pages when a markdown file, changelog, API report or example changes. The
+  landing's Docs and limitations links now go to `/docs/`. Bundle: `dist` 0.95 → 2.4 MB, of which
+  1.35 MB the 30 pages (`/docs/api/core/` 240 kB, 55 kB gzipped); docs script 1.2 kB, CSS 4.6 kB;
+  the examples (1 kB each) share the editor chunk with `/test/`; the landing unchanged. Tests:
+  `src/docs/build.test.ts` (4: ids, links, raw HTML, report parsing) and `apps/site/e2e/docs.spec.ts`
+  (a `site` project on port 5178 in `playwright.config.ts`; 22 tests: every nav page opens marked
+  current, links, API pages, search, skip link and nav by keyboard, axe on 7 pages and the 3
+  examples, light and dark, no sideways scroll at 375px, the nav folded there): 65 passed, 1
+  skipped (WebKit's Tab reaches no link, Safari's default) in Chromium, Firefox and WebKit. Not
+  deployed: contributing.md "The site" says how the owner builds and uploads `apps/site/dist/`
+  (how Cloudflare gets the files is set up outside the repository and not known here).
+  Shortcuts: no syntax highlighting; code wraps instead of scrolling; search matches substrings of
+  headings and API names only, not body text; the API pages show each declaration's `.d.ts`
+  text, not a typed model of it (two doc comments in a row would merge into the code); a page
+  dropped from the nav stays in `apps/site/docs/` in dev until deleted (never built); a new page
+  needs the dev server restarted. No changeset: no published package changed.)
 - [ ] 12.9 Guides: extensions (a custom node, a mark, a plugin, a command, a keymap, a toolbar
   item), theming (CSS variables, dark, print, forced colors; a theme example), migration from 0.x,
   the deprecation policy, contributing (setup, architecture tour, where things live, tests and

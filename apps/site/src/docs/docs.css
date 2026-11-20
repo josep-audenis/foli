@@ -1,0 +1,359 @@
+/*
+ * The docs pages: the landing's desk and tokens (site.css), the nav on the desk, each page a sheet
+ * of paper. Wide content (tables, code, the live examples) scrolls in its own box, never the page.
+ */
+.masthead {
+  background: var(--desk);
+  backdrop-filter: none;
+  border-bottom-color: var(--rule);
+}
+
+.nav .nav-try {
+  margin-left: 8px;
+  background: var(--ink);
+  color: var(--desk);
+  font-weight: 700;
+}
+
+.nav .nav-try:hover {
+  background: var(--ink);
+  color: var(--desk);
+}
+
+.docs-layout {
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr);
+  gap: 32px;
+  align-items: start;
+  padding-top: 24px;
+  padding-bottom: 64px;
+}
+
+/* Nav */
+.docs-nav {
+  position: sticky;
+  top: 80px;
+  max-height: calc(100vh - 96px);
+  overflow-y: auto;
+  font-size: 0.98rem;
+}
+
+.docs-nav > summary {
+  display: none;
+}
+
+.docs-nav h2 {
+  margin: 20px 0 4px;
+  font: 400 var(--step--1) / 1.4 var(--font-mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+}
+
+.docs-nav ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.docs-nav a {
+  display: block;
+  padding: 4px 10px;
+  border-radius: var(--radius);
+  color: var(--ink-2);
+  line-height: 1.3;
+  text-decoration: none;
+}
+
+.docs-nav a:hover {
+  background: var(--desk-deep);
+  color: var(--ink);
+}
+
+.docs-nav a[aria-current="page"] {
+  background: var(--paper);
+  box-shadow: var(--shadow);
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.docs-search {
+  display: grid;
+  gap: 4px;
+}
+
+.docs-search label {
+  font-size: var(--step--1);
+  color: var(--ink-2);
+}
+
+.docs-search input {
+  width: 100%;
+  height: 38px;
+  padding: 0 10px;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  background: var(--paper);
+  color: var(--ink);
+  font: inherit;
+}
+
+.docs-search input::placeholder {
+  color: var(--ink-3);
+}
+
+.docs-search-status {
+  font-size: var(--step--1);
+  color: var(--ink-2);
+}
+
+.docs-search-status:empty {
+  display: none;
+}
+
+.docs-search-results span {
+  display: block;
+  font-size: var(--step--1);
+  color: var(--ink-2);
+}
+
+/* The page */
+.docs-main {
+  min-width: 0;
+}
+
+.docs-main:focus {
+  outline: none;
+}
+
+.prose {
+  padding: clamp(20px, 4vw, 56px);
+  background: var(--paper);
+  box-shadow: var(--shadow);
+  border-radius: var(--radius);
+  overflow-wrap: break-word;
+}
+
+.prose > :first-child {
+  margin-top: 0;
+}
+
+.prose h1 {
+  font-size: var(--step-2);
+  line-height: 1.15;
+  margin: 0 0 0.6em;
+}
+
+.prose h2 {
+  font-size: 1.6rem;
+  line-height: 1.2;
+  margin: 1.8em 0 0.5em;
+  padding-top: 0.6em;
+  border-top: 1px solid var(--rule);
+}
+
+.prose h3 {
+  font-size: 1.3rem;
+  margin: 1.5em 0 0.4em;
+}
+
+.prose h4,
+.prose h5,
+.prose h6 {
+  font: 700 1.05rem / 1.3 var(--font-text);
+  margin: 1.3em 0 0.3em;
+}
+
+.prose :is(h1, h2, h3, h4, h5, h6) {
+  scroll-margin-top: 80px;
+}
+
+.prose p,
+.prose ul,
+.prose ol,
+.prose blockquote,
+.prose pre,
+.prose .table {
+  margin: 0 0 1em;
+}
+
+.prose li + li {
+  margin-top: 0.25em;
+}
+
+.prose blockquote {
+  padding: 4px 0 4px 16px;
+  border-left: 3px solid var(--accent);
+  color: var(--ink-2);
+}
+
+.prose code {
+  padding: 0.1em 0.3em;
+  border-radius: 2px;
+  background: var(--desk);
+  overflow-wrap: anywhere;
+}
+
+.prose pre {
+  padding: 14px 16px;
+  border-radius: var(--radius);
+  background: var(--code-bg);
+  color: var(--code-ink);
+  font-size: 0.9rem;
+  line-height: 1.5;
+  /* Wrapped, not scrolled: no scroll box to reach by keyboard, no page scroll at 375px. */
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.prose pre code {
+  padding: 0;
+  background: none;
+  font-size: inherit;
+}
+
+.prose .table {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.prose table {
+  border-collapse: collapse;
+  font-size: 0.95rem;
+}
+
+.prose th,
+.prose td {
+  padding: 6px 10px;
+  border: 1px solid var(--rule);
+  text-align: left;
+  vertical-align: top;
+}
+
+.prose th {
+  background: var(--desk);
+}
+
+.prose hr {
+  border: 0;
+  border-top: 1px solid var(--rule);
+  margin: 2em 0;
+}
+
+.docs-source {
+  margin-top: 12px;
+  font-size: var(--step--1);
+  color: var(--ink-2);
+}
+
+/* API pages */
+.prose .api-index {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 6px;
+  padding: 0;
+  list-style: none;
+}
+
+.api-index li + li {
+  margin: 0;
+}
+
+.prose h2.api-file {
+  font-size: 1.15rem;
+}
+
+.prose .api-decl h3 {
+  margin-top: 1.2em;
+}
+
+.api-tag {
+  padding: 1px 6px;
+  border-radius: 2px;
+  background: var(--accent-wash);
+  color: var(--ink);
+  font: 400 var(--step--1) / 1.4 var(--font-mono);
+  vertical-align: middle;
+}
+
+/* Live examples: the editor in a box of its own, scrolling inside it. */
+.example {
+  height: 560px;
+  margin: 0 0 1.5em;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: var(--desk-deep);
+  font-size: 1rem;
+}
+
+.example .foli-editor {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  height: 100%;
+}
+
+.example .foli-toolbar {
+  --foli-toolbar-background: var(--paper);
+  --foli-toolbar-color: var(--ink);
+  --foli-border-color: var(--rule);
+  --foli-toolbar-hover: var(--desk);
+  --foli-toolbar-pressed: var(--accent-wash);
+  --foli-focus-ring: var(--accent);
+  font-family: var(--font-text);
+  font-size: 15px;
+}
+
+.example .foli-editor-body {
+  min-height: 0;
+  overflow: auto;
+}
+
+.example .foli-canvas {
+  --foli-canvas-background: var(--desk-deep);
+  padding: 24px 16px;
+}
+
+.example .foli-content:focus-visible {
+  outline: none;
+}
+
+.example-chip {
+  padding: 0 0.3em;
+  border-radius: 0.6em;
+  background: #dbeafe;
+  color: #1e3a8a;
+}
+
+.example-todo {
+  background: #fde68a;
+}
+
+@media (max-width: 900px) {
+  .docs-layout {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 16px;
+    padding-top: 12px;
+  }
+
+  .docs-nav {
+    position: static;
+    max-height: none;
+    overflow: visible;
+  }
+
+  .docs-nav > summary {
+    display: list-item;
+    width: fit-content;
+    padding: 6px 10px;
+    border: 1px solid var(--rule);
+    border-radius: var(--radius);
+    background: var(--paper);
+    cursor: pointer;
+    font-weight: 700;
+  }
+
+  .example {
+    height: 480px;
+  }
+}

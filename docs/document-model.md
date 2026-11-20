@@ -8,7 +8,7 @@
 > `packages/core/src/schema.ts`) and v1 (0.1.0) are kept to read and migrate documents saved
 > with them, and v2 to read pasted HTML. The document model (schema from specs, immutable nodes,
 > positions, slices, JSON in/out) is `packages/core/src/model/`. Steps, transactions, history and
-> commands (Phase 3) are described in [architecture.md](architecture.md#editing-engine-folicore).
+> commands (Phase 3) are described in [architecture.md](architecture.md#editing-engine-folijscore).
 
 ## Canonical form
 

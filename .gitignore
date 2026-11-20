@@ -19,3 +19,6 @@ playwright-report/
 # Local secrets (e.g. an npm token): never committed
 .env
 .env.*
+
+# Docs site pages, written from docs/ at build time (apps/site/src/docs/build.ts)
+apps/site/docs/
