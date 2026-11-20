@@ -1380,12 +1380,13 @@ every key the view takes itself is overridable or reserved, listed per platform 
 fails past a threshold: its first run in 12.12 failed 12 metrics on a busy machine (exit 1), the
 rerun passed all 51, and the baseline was recorded from that run ([benchmarks](benchmarks.md#10-numbers));
 no hosted CI, as ADR-0008 decides; the docs site is published at
-[foli.josepaudenis.com/docs](https://foli.josepaudenis.com/docs/) (all 35 built pages answer,
-12.11's content live) with getting started, the extensions, theming and migration guides,
+[foli.josepaudenis.com/docs](https://foli.josepaudenis.com/docs/) (the 35 pages built before the DOCX
+and PDF guides each serve their own title, 12.11's content live; Cloudflare Pages builds every push and publishes `main`) with getting started, the extensions, theming and migration guides,
 styling, the API reference per package from the reports, three live examples, the limitations
-and the changelogs (PDF: getting started's "PDF on a server"; DOCX and PDF in detail: the
-package READMEs, linked from api.md to GitHub, and their API pages); site e2e 72 and the built site's 9 in three
-engines (`site-*` projects); contributing covers setup, where things live, the keystroke tour,
+and the changelogs; the DOCX and PDF guides are the packages' READMEs, published as
+`/docs/guides/docx/` and `/docs/guides/pdf/` (one text for npm and the site; links to them from
+other pages stay on the site); site e2e 75 and the built site's 9 in three engines (`site-*`
+projects, 83 passed, 1 skipped: WebKit's Tab); contributing covers setup, where things live, the keystroke tour,
 tests and harnesses, the site and releasing; every 0.x format (v1–v5 fixtures saved by
 0.1.0–0.6.0) loads and saves, in core and through `.docx` (`formats.test.ts`, in `pnpm check`);
 the manual checks were accepted again by the owner as 1.0 risks on 2026-11-20 (ADR-0003,
@@ -1396,8 +1397,7 @@ skipped where an engine cannot run them, 2 failed under load then passed 3 of 3 
 cell paragraphs). Misses: Phase 5's speed targets at 100 pages (first layout, re-flow, Enter;
 typing meets them in Chromium only), accepted by the owner on 2026-11-20 as not blocking 1.0;
 the manual checks not run on real devices, accepted by the owner as 1.0 risks. Awaiting the
-owner: no DOCX guide page on the site (the `@folijs/docx` README on GitHub is the guide; add a
-page or accept it); 1.0.0 published (the version PR and the publish).)
+owner: 1.0.0 published (the version PR and the publish).)
 
 ### Tasks
 
@@ -1704,7 +1704,9 @@ Each task is a PR on `phase-12/ecosystem`, the build green after each.
   examples, light and dark, no sideways scroll at 375px, the nav folded there): 65 passed, 1
   skipped (WebKit's Tab reaches no link, Safari's default) in Chromium, Firefox and WebKit. Not
   deployed: contributing.md "The site" says how the owner builds and uploads `apps/site/dist/`
-  (how Cloudflare gets the files is set up outside the repository and not known here).
+  (how Cloudflare gets the files is set up outside the repository and not known here; corrected
+  in 12.12: a Cloudflare Pages project connected to the repository builds every push and
+  publishes `main`, so the site went live with each merge).
   Shortcuts: no syntax highlighting; code wraps instead of scrolling; search matches substrings of
   headings and API names only, not body text; the API pages show each declaration's `.d.ts`
   text, not a typed model of it (two doc comments in a row would merge into the code); a page
@@ -1855,7 +1857,10 @@ Each task is a PR on `phase-12/ecosystem`, the build green after each.
   published site, React's API stable), ADR-0008's status and outcome, limitations (the owner's
   decision that every limit ships, 1.0's speed numbers), benchmarks (1.0 numbers, bundle sizes),
   getting started and the migration guide, contributing (the site published, two flaky tests),
-  the five package READMEs (stable since 1.0.0, the docs site); `release-1.0-decisions.md` folded
+  the five package READMEs (stable since 1.0.0, the docs site), `@folijs/docx`'s and
+  `@folijs/pdf`'s published as the site's DOCX and PDF guides (`nav.ts` takes a `title`; a
+  package README's page is `/docs/guides/<name>/`); the deploy documented as it is (Cloudflare
+  Pages builds every push and publishes `main`); `release-1.0-decisions.md` folded
   into ADR-0003 and ADR-0008 (already recorded there), limitations, benchmarks and the release
   notes, and deleted (the site's nav never had it). Budgets unchanged: the only Phase 12 raise
   (12.3: view, React, docx) has its reason in `scripts/size.mjs`, now with the sizes at the close

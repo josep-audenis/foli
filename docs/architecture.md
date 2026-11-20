@@ -1148,8 +1148,11 @@ which become Vite inputs:
   an example from `vite build` served by `vite preview`, without console errors), in three engines
   (`pnpm test:e2e --project=site-*`).
 
-Published at [foli.josepaudenis.com/docs](https://foli.josepaudenis.com/docs/); deploying it is the
-owner's step ([contributing.md](contributing.md#the-site)).
+Published at [foli.josepaudenis.com/docs](https://foli.josepaudenis.com/docs/): a Cloudflare
+Pages project connected to the repository builds every pushed commit and publishes `main`, other
+branches as previews; its build settings are in Cloudflare, not here
+([contributing.md](contributing.md#the-site)). The DOCX and PDF guides are the packages' READMEs
+(`packages/<name>/README.md` → `/docs/guides/<name>/`), so npm and the site show one text.
 
 ## React integration (`@folijs/react`)
 

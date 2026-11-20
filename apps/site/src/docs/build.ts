@@ -315,9 +315,12 @@ function pages(root: string): Page[] {
   return NAV.flatMap((group) =>
     group.entries.map((entry): Page => {
       if ("md" in entry) {
-        const rel = entry.md.replace(/^docs\//, "").replace(/\.md$/, "");
+        const rel = entry.md
+          .replace(/^docs\//, "")
+          .replace(/^packages\/([^/]+)\/README\.md$/, "guides/$1")
+          .replace(/\.md$/, "");
         const url = rel === "getting-started" ? "/docs/" : `/docs/${rel}/`;
-        return { url, title: title(entry.md), source: entry.md, entry };
+        return { url, title: entry.title ?? title(entry.md), source: entry.md, entry };
       }
       if ("api" in entry)
         return {

@@ -151,16 +151,20 @@ pnpm --filter @folijs/site build    # static files in apps/site/dist/
 pnpm --filter @folijs/site preview  # serve the build locally
 ```
 
-It is published at [foli.josepaudenis.com/docs](https://foli.josepaudenis.com/docs/) (checked
-2026-11-20: every page of the nav answers, with 12.11's content). Nothing in the repository
-deploys it. The site is served through Cloudflare (its response
-headers say so); how the files get there (Cloudflare Pages connected to the repository, a
-direct upload, or another host behind Cloudflare's proxy) is set up outside the repository and
-not recorded here. To publish, the owner builds and uploads `apps/site/dist/` as the site's
-root, for example with Wrangler for a Pages project:
-`npx wrangler pages deploy apps/site/dist --project-name <project>`. Pages are folders with an
-`index.html` (`/docs/styling/` → `docs/styling/index.html`), which every static host serves; no
-rewrites are needed.
+It is published at [foli.josepaudenis.com/docs](https://foli.josepaudenis.com/docs/) and
+**deploys itself: every push builds it.** Known (2026-11-20, 12.12): a Cloudflare Pages project
+named `foli`, connected to the repository through Cloudflare's GitHub app
+(`cloudflare-workers-and-pages`), builds every pushed commit and reports a "Cloudflare Pages"
+check on it: on `main`'s commits "Deployed successfully" (a production deployment on
+`foli-8c6.pages.dev`), on other branches a preview at `<branch>.foli-8c6.pages.dev` (for
+example `phase-12-ecosystem.foli-8c6.pages.dev`). foli.josepaudenis.com serves the same files as
+`main`'s deployment. Inferred, not visible from the repository: the production branch is `main`
+and the custom domain points at it; the build command and output directory (presumably the
+site's build into `apps/site/dist/`) are set in Cloudflare's dashboard, as nothing in the
+repository configures them (no `wrangler.toml`, no workflow). So merging to `main` publishes the
+docs; nothing else is needed. Pages are folders with an `index.html` (`/docs/styling/` →
+`docs/styling/index.html`); an unknown path gets the landing page with status 200 (there is no
+`404.html`), so check a page by its title, not its status.
 
 ## Known flaky tests
 
