@@ -1906,6 +1906,20 @@ Chromium: Enter's handler 9.9 ms and paint p95 35 ms (≤ 25), first layout 118 
 re-flow 148 ms (≤ 100). Firefox misses each. Chromium's re-flow at 200 sections was +110% over
 its baseline in 12.12.
 
+Large `.docx` files are not the bottleneck; the editor's pages are. Measured 2026-11-21 (the
+corpus NDA's body repeated, Node 25 on the shared laptop, median of 3, pages estimated as 2 per
+copy, not laid out): import / export took 29 / 26 ms at 2 pages, 107 / 219 ms at ~50, 240 /
+605 ms at ~200, 646 ms / 1.6 s at ~500, 1.1 / 2.7 s at ~1000. Export is ~2.5× slower than
+import, the first place to look if file speed ever matters.
+
+**Rust and WebAssembly** (checked against this list 2026-11-21): none of the items here needs
+them. Input, accessibility and the missed targets are the browser's work (`renderPages`, forced
+layouts, the browser's own layout of the pages; [benchmarks.md](benchmarks.md)); autofit needs
+fonts measured. WebAssembly is useful only as a portable sandbox (QuickJS, in
+[explorations/agent-editing.md](explorations/agent-editing.md)) and, much later, for a PDF
+writer that does not need Chromium (`exportPdf` prints through a headless Chromium page the app
+supplies, so a server without a browser cannot make PDFs).
+
 **Gaps users will meet** ([limitations.md](limitations.md)):
 
 - Dragging text does nothing; on Android, Backspace at a list paragraph's start may join it into
@@ -1917,6 +1931,19 @@ its baseline in 12.12.
 - Pictures: no cropping, rotation or touch resizing; resizing is refused while tracking.
 - Find does not look in comments or text boxes.
 - No horizontal rule button; colors only from the toolbar's fixed palette.
+
+**Hint: show a place for a few seconds** (wanted by the owner, nothing built). An app, or an agent
+citing what it changed, points at a range, a block or a bookmark; the editor scrolls there and
+marks it briefly, then the mark fades, without changing the document or the selection. Pieces
+that exist: `view.reveal({ story, from, to })` and `goTo(editor, range)` scroll to any range,
+`findAll` reads the model (not the DOM), so it finds matches on every page, and find already
+marks with the CSS Custom Highlight API (`::highlight(foli-find)`). To build: a
+`view.hint(range, { ms })` with its own highlight name (`foli-hint`) and a style apps can theme,
+the range mapped through edits while it shows, targets by bookmark name and block handle, and
+reduced motion respected (no fade, no smooth scroll). A requirement if pages are ever virtualized
+(an option for the first layout's speed, above): `reveal` and `hint` must lay out the target
+page before scrolling. Today every page is in the DOM, so a far page is reached. (An editor
+compared before 1.0 failed exactly there: pages not yet rendered could not be gone to.)
 
 **Agent editing:** a facade an LLM can use without positions, an MCP server over it, and maybe a
 sandboxed `run(code)` tool (code mode). Explored, nothing built:
