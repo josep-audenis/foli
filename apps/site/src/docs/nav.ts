@@ -50,6 +50,7 @@ export const NAV: Group[] = [
     entries: [
       { md: "docs/architecture.md" },
       { md: "docs/contributing.md" },
+      { md: "docs/security.md" },
       { md: "docs/benchmarks.md" },
       { md: "docs/roadmap.md" },
       { md: "docs/testing/ime.md" },

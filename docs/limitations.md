@@ -10,8 +10,9 @@ and the reasons are in [architecture.md](architecture.md), [pagination.md](pagin
 
 The editor is tested in Chromium, Firefox and WebKit (Playwright on Windows), but the manual
 checks below have not been run yet, and some automated parts cover one engine only (IME
-emulation exists only in Chromium; paste is not automated in WebKit). The project owner accepted them as open risks
-([ADR-0003](decisions/ADR-0003-rendering-and-input.md#gate-g4-passed-provisionally-2026-11-07);
+emulation exists only in Chromium; paste is not automated in WebKit). The project owner accepted them as open risks for 0.x
+and again for 1.0 on 2026-11-20
+([ADR-0003](decisions/ADR-0003-rendering-and-input.md#release-10-with-the-manual-checks-open-decided-2026-11-20);
 checklist in [testing/ime.md](testing/ime.md)):
 
 - **IME and dead keys** (Japanese, Chinese, Korean; accented letters): tested only through
@@ -263,7 +264,10 @@ Custom nodes and marks, plugins and toolbar items ([extensions](guides/extension
 - Accepting removes a paragraph whose text and mark are both deleted whole, as Word does; the
   same edits made untracked, one after another, may have kept its properties on the joined
   paragraph. Enter in a paragraph next to a deleted paragraph mark splits that paragraph as it
-  is, not the paragraph accepting would make.
+  is, not the paragraph accepting would make. A paragraph whose mark was deleted while it was
+  empty and that was typed into afterwards keeps its own properties when accepting joins it to
+  the next; the same edits untracked joined an empty paragraph and kept the next one's (found
+  by the tracked-changes property test in 12.11).
 - In the simple and no-markup views, a paragraph whose mark is deleted is not shown joined with
   the next while editing (`renderDocument` joins it).
 - Changes' and comments' dates are written in UTC; Word writes local time there, so Word shows
@@ -280,6 +284,9 @@ Details in the [package README](../packages/docx/README.md).
 
 - Strict Open XML documents are refused (`DocxError`) until a real file needs them. Encrypted
   zip entries, ZIP64 and compression methods other than stored and deflate are refused too.
+- A package may hold at most 10 000 entries, 512 MiB uncompressed and 1 000 000 XML elements in
+  the parts read (`maxEntries`, `maxSize`, `maxElements`; lower them on a server). At the element
+  limit an import can still take about 1.5 GB and 6 s ([security.md](security.md)).
 - Keep the imported `package` with the document: a document that refers to parts of its
   original package (headers, footers, pictures, content kept verbatim with relationship ids)
   cannot be exported without it (`DocxError`).
@@ -320,8 +327,10 @@ Details in the [package README](../packages/docx/README.md).
 - No virtualization: every page is in the DOM and measured on load. Fine up to a few hundred
   pages, but past the speed targets at 100 pages ([benchmarks.md](benchmarks.md#10-numbers),
   the owner's laptop on mains): 104 pages lay out in about 110 ms in Chromium, 151 ms in Firefox
-  and 204 ms in WebKit, and handling a keystroke takes about 11 ms (p50, Chromium), 3.3-3.5 times
-  what 0.2.0 took (most of it added in Phases 8 to 11; to be investigated before 1.0).
+  and 204 ms in WebKit, and handling a keystroke took about 11 ms (p50, Chromium), 3.3-3.5 times
+  what 0.2.0 took (most of it added in Phases 8 to 11). 12.11 took about a fifth to a third off
+  the keystroke (9 ms measured on a busier machine than the baseline's); the first layout is
+  unchanged, mostly the browser's own layout of every page.
 - Long documents made of lists were slower in 0.2.0 (schema v2, where lists were nested
   blocks; not measured on schema v3 yet): in a 114-page list document, Enter near the top took
   about 9-24 ms to handle (p50) and up to ~65 ms to paint (p95), and the first layout ~85-95 ms,
