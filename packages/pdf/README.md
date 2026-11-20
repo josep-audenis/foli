@@ -5,7 +5,7 @@ v5 of `@folijs/core`) to PDF with a headless Chromium page your app supplies, fr
 layout: the pages the editor shows and prints. No browser dependency of its own: bring
 Playwright (1.42+) or Puppeteer.
 
-> Early release: the API may change in any 0.x minor version (changes in `CHANGELOG.md`).
+> Stable since 1.0.0: the public API and the saved format follow semver ([versions and deprecation](https://foli.josepaudenis.com/docs/deprecation/)); changes in `CHANGELOG.md`. Docs: [foli.josepaudenis.com/docs](https://foli.josepaudenis.com/docs/).
 
 ```bash
 npm install @folijs/pdf @folijs/core

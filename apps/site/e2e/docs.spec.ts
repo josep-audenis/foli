@@ -17,7 +17,8 @@ test("every nav entry opens its page, marked as the current one", async ({ page 
   expect(links.length).toBeGreaterThan(25);
   for (const { href, text } of links) {
     await page.goto(href ?? "");
-    await expect(page.locator("main h1").first()).toHaveText(text ?? "");
+    // The page title, not its h1: a package README keeps its package name as its heading.
+    await expect(page).toHaveTitle(`${text} · Foli docs`);
     await expect(docsNav(page).locator('[aria-current="page"]')).toHaveText(text ?? "");
   }
 });
@@ -107,6 +108,7 @@ for (const path of [
   "/docs/limitations/",
   "/docs/keyboard/",
   "/docs/guides/extensions/",
+  "/docs/guides/docx/",
   "/docs/benchmarks/",
   "/docs/changelog/",
   "/docs/api/react/",

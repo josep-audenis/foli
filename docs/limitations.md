@@ -1,7 +1,9 @@
 # Known limitations
 
-What Foli does not do yet, or does with caveats, as of the 1.0 work on `main` (after 0.6.0).
-Read it before you ship. Details
+What Foli does not do yet, or does with caveats, as of 1.0.0. Read it before you ship. The
+owner decided on 2026-11-20 that each of these ships in 1.0 as a known limit (the one picked as a
+blocker, pictures losing their images when copied into another document, was fixed first, in
+12.11); 1.x minors may lift them. Details
 and the reasons are in [architecture.md](architecture.md), [pagination.md](pagination.md) and
 [ADR-0003](decisions/ADR-0003-rendering-and-input.md); what comes next is in the
 [roadmap](roadmap.md).
@@ -336,12 +338,13 @@ Details in the [package README](../packages/docx/README.md).
 - No virtualization: every page is in the DOM and measured on load. Fine up to a few hundred
   pages, but 1.0 misses Phase 5's speed targets at 100 pages ([benchmarks.md](benchmarks.md#10-numbers),
   the owner's laptop on mains; accepted by the owner for 1.0, the incremental redraw left for a
-  1.x minor): 104 pages lay out in about 110 ms in Chromium, 151 ms in Firefox and 204 ms in
-  WebKit (target 60 ms); a full re-flow takes 131-150 ms (target 100); Enter's paint p95 is 32-45
-  ms (target 25). Handling a keystroke cost 11-13 ms in 0.6.0 (p50, Chromium), 3.3-3.5 times what
-  0.2.0 took; 12.11 halved typing's (measured A/B: 17.1 → 8.0 ms on a slowed machine, at the
-  8 ms target) and took a third off Enter's (22.8 → 14.8 ms). The first layout is unchanged,
-  mostly the browser's own layout of every page.
+  1.x minor): 104 pages lay out in about 118 ms in Chromium, 146 ms in Firefox and 194 ms in
+  WebKit (target 60 ms); a full re-flow takes 148-164 ms in Chromium and Firefox (target 100);
+  Enter's paint p95 is 35-49 ms (target 25). Handling a keystroke cost 11-13 ms in 0.6.0 (p50,
+  Chromium), 3.3-3.5 times what 0.2.0 took; 1.0 takes 7.9 ms typing (at the 8 ms target) and
+  9.9 ms for Enter (Firefox 11 and 14 ms), after 12.11's fix to list numbers: typing meets the
+  targets in Chromium (paint p95 14 ms), not in Firefox (28 ms). The first layout
+  is mostly the browser's own layout of every page.
 - Long documents made of lists were slower in 0.2.0 (schema v2, where lists were nested
   blocks; not measured on schema v3 yet): in a 114-page list document, Enter near the top took
   about 9-24 ms to handle (p50) and up to ~65 ms to paint (p95), and the first layout ~85-95 ms,

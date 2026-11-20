@@ -151,14 +151,20 @@ pnpm --filter @folijs/site build    # static files in apps/site/dist/
 pnpm --filter @folijs/site preview  # serve the build locally
 ```
 
-Nothing in the repository deploys it. The site is served through Cloudflare (its response
-headers say so); how the files get there (Cloudflare Pages connected to the repository, a
-direct upload, or another host behind Cloudflare's proxy) is set up outside the repository and
-not recorded here. To publish, the owner builds and uploads `apps/site/dist/` as the site's
-root, for example with Wrangler for a Pages project:
-`npx wrangler pages deploy apps/site/dist --project-name <project>`. Pages are folders with an
-`index.html` (`/docs/styling/` → `docs/styling/index.html`), which every static host serves; no
-rewrites are needed.
+It is published at [foli.josepaudenis.com/docs](https://foli.josepaudenis.com/docs/) and
+**deploys itself: every push builds it.** Known (2026-11-20, 12.12): a Cloudflare Pages project
+named `foli`, connected to the repository through Cloudflare's GitHub app
+(`cloudflare-workers-and-pages`), builds every pushed commit and reports a "Cloudflare Pages"
+check on it: on `main`'s commits "Deployed successfully" (a production deployment on
+`foli-8c6.pages.dev`), on other branches a preview at `<branch>.foli-8c6.pages.dev` (for
+example `phase-12-ecosystem.foli-8c6.pages.dev`). foli.josepaudenis.com serves the same files as
+`main`'s deployment. Inferred, not visible from the repository: the production branch is `main`
+and the custom domain points at it; the build command and output directory (presumably the
+site's build into `apps/site/dist/`) are set in Cloudflare's dashboard, as nothing in the
+repository configures them (no `wrangler.toml`, no workflow). So merging to `main` publishes the
+docs; nothing else is needed. Pages are folders with an `index.html` (`/docs/styling/` →
+`docs/styling/index.html`); an unknown path gets the landing page with status 200 (there is no
+`404.html`), so check a page by its title, not its status.
 
 ## Known flaky tests
 
@@ -176,6 +182,11 @@ of one of these alone is noise; anything else is a real failure.
   graphics errors in Firefox's log), `word-headers.spec.ts` "page numbers in letters…" (WebKit,
   a 30 s timeout) and the site's `docs.spec.ts` "every nav entry opens its page…" (WebKit, 90 s);
   all passed 3 times in a row when rerun.
+- Under a full three-engine run beside Word harnesses (2026-11-20, 12.12; 997 passed, 2 failed):
+  `word-tables.spec.ts` "T5 in a table: cells selected across the page break…" (Firefox:
+  `NS_ERROR_CONNECTION_REFUSED` on `page.goto`, the dev server not answering for a moment) and
+  `word-navigation.spec.ts` "typing in the document with a search open…" (WebKit: its timing
+  check, 8.4 s against 6.6 s allowed); both passed 3 times in a row when rerun.
 
 Fixed in 12.11 (they failed in pre-push runs now and then): the tracked-changes property test
 (`track.test.ts`, a random seed about one run in five hit a known difference it did not leave

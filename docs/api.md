@@ -1,12 +1,12 @@
 # API reference
 
-The public API of the five packages, as of 0.6.0 (`@folijs/pdf` first released in 0.6.0), with
+The public API of the five packages, as of 1.0.0, with
 the export lists of 12.2 ([ADR-0008](decisions/ADR-0008-1.0-contract-and-extensions.md)).
 
 **Stable or internal.** Every name on this page is **stable** unless marked **internal**: the
-package's entry exports it, and from 1.0 it changes only as ADR-0008's semver rules allow (before
-1.0, 0.x minors may still break it; changes are listed in each package's changelog; the rules:
-[versions and deprecation](deprecation.md)). Internal
+package's entry exports it, and in 1.x it changes only as ADR-0008's semver rules allow (nothing
+removed or changed before 2.0, a removal deprecated first; changes are listed in each package's
+changelog; the rules: [versions and deprecation](deprecation.md)). Internal
 names are on `@folijs/core/internal`, the entry the other Foli packages use, with no promise at
 all: any release may change them. Each package's exact surface is its API report,
 `packages/<name>/api-report.d.ts` ([contributing.md](contributing.md#api-reports)); a module
@@ -21,7 +21,7 @@ export that is in neither entry is left out of the published types.
 ## `@folijs/react`
 
 Peer dependencies: `react` and `react-dom` 18.2+ or 19, and `@folijs/core` and `@folijs/view` at
-exactly its own version (after 0.6.0). Stylesheet: `@folijs/react/styles.css`
+exactly its own version (since 1.0.0). Stylesheet: `@folijs/react/styles.css`
 ([styling.md](styling.md)). Stable with the components: their props and handles
 (`FoliEditorProps`, `FoliEditorHandle`, `FoliChange`, `FoliCanvasProps`, `FoliCanvasHandle`,
 `FoliCommentsProps`, `FoliNavigationProps`, `FoliToolbarProps`), the toolbar's items
@@ -742,7 +742,7 @@ release may change it.
 ## `@folijs/view`
 
 The editable view without a framework. Needs a browser DOM. Peer dependency: `@folijs/core` at
-exactly its own version (after 0.6.0). Content controls: it draws the frame
+exactly its own version (since 1.0.0). Content controls: it draws the frame
 and title of the control the caret is in or the pointer is over; Alt+Down (or its button) opens a
 list or date picker, Space or a click changes a check box, Left and Right stop at a control's edges.
 
@@ -932,7 +932,7 @@ const acme: ViewExtension = {
 ## `@folijs/docx`
 
 `.docx` import and lossless export. No DOM: runs in the browser, workers and Node 20.12+. Peer
-dependency: `@folijs/core` at exactly its own version (after 0.6.0).
+dependency: `@folijs/core` at exactly its own version (since 1.0.0).
 Details (what import keeps, what export writes, limits): the
 [package README](../packages/docx/README.md).
 
@@ -976,7 +976,7 @@ Details (what import keeps, what export writes, limits): the
 
 PDF from Foli's own page layout, printed by a headless Chromium page the app supplies (11.12,
 ADR-0007). No browser dependency of its own. Peer dependency: `@folijs/core` at exactly its own
-version (after 0.6.0). Details: the
+version (since 1.0.0). Details: the
 [package README](../packages/pdf/README.md).
 
 - `exportPdf(document, options): Promise<ExportedPdf>`: validates `document` (`parseDocument`:

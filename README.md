@@ -4,7 +4,8 @@ An open-source document-editing engine for the web, built from the ground up: it
 model, transactions, view and layout, designed around native pagination, with first-class React
 integration.
 
-> **Status: 0.6.0 ([npm](https://www.npmjs.com/package/@folijs/react)).** Foli edits documents
+> **Status: 0.6.0 on [npm](https://www.npmjs.com/package/@folijs/react); 1.0.0 is prepared on `main`, published
+> with the owner's approval ([docs](https://foli.josepaudenis.com/docs/)).** Foli edits documents
 > with its own model, engine and view (no ProseMirror/Tiptap/Lexical) on real pages: paragraphs
 > split across pages at a line, explicit page breaks, widow/orphan, keep-with-next and
 > keep-lines-together rules, incremental reflow, print with one sheet per page. Documents use
@@ -30,11 +31,22 @@ integration.
 > text, drop-down, combo box, date, check box, repeating sections) filled from the UI or the API;
 > bookmarks, the document outline, find and replace across every story; `exportPdf`
 > (`@folijs/pdf`) prints Foli's own pages to PDF with a headless Chromium. React components
-> with a toolbar and server rendering. Documents saved by 0.1.0 to 0.5.0 are migrated on load;
-> 0.5.0 cannot read documents saved by 0.6.0. The API may change in any 0.x version. Manual IME,
-> screen-reader and real-paste checks are not run yet: read the
-> [known limitations](docs/limitations.md). Next: the extension API, docs site and 1.0
-> (Phase 12, [roadmap](docs/roadmap.md)).
+> with a toolbar and server rendering. Extensions (1.0): custom nodes and marks on Word's schema,
+> drawn by node and mark views, saved in the JSON and through `.docx` as tagged content controls;
+> plugins with commands, keymaps (the view's own keys overridable or listed as reserved),
+> decorations and plugin views; toolbar items.
+>
+> **What 1.0 promises** ([ADR-0008](docs/decisions/ADR-0008-1.0-contract-and-extensions.md),
+> [versions and deprecation](docs/deprecation.md)): each package's public API, as its entry
+> exports it and its API report records it, changes only by semver: nothing removed or changed
+> before 2.0, a removal deprecated first (`@deprecated`, a development warning where cheap). Every
+> 1.x reads every saved format, v1 to v5 (0.1.0 to 0.6.0) and any a 1.x minor adds (only by
+> adding, with a migration); a document is saved with the lowest version its content needs, and an
+> older 1.x refuses, never drops, a document that needs a newer one. Known risks: the manual IME,
+> screen-reader, macOS, real-paste and Safari checks were never run on real devices (accepted by
+> the owner for 1.0), and at 100 pages the first layout, the re-flow and Enter miss Phase 5's speed
+> targets (typing meets them in Chromium, not in Firefox): read the [known limitations](docs/limitations.md). Moving from 0.x:
+> [migration guide](docs/guides/migrating-from-0x.md).
 
 ## Usage
 
@@ -82,7 +94,9 @@ toolbar, Next.js and using the view without React. Before using Foli, read the
 
 ## Documentation
 
-Using Foli:
+The docs site, [foli.josepaudenis.com/docs](https://foli.josepaudenis.com/docs/), has these
+pages, the API reference per package (from the API reports), live examples, search and the
+changelogs. Using Foli:
 
 - [Getting started](docs/getting-started.md)
 - [API reference](docs/api.md)

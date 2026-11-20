@@ -4,7 +4,7 @@ The document model and headless editing engine of [Foli](https://github.com/jose
 document format and validation, schema, transactions, undo history and commands. No DOM: runs
 in the browser, Node and workers.
 
-> Early release: the API may change in any 0.x minor version (changes in `CHANGELOG.md`).
+> Stable since 1.0.0: the public API and the saved format follow semver ([versions and deprecation](https://foli.josepaudenis.com/docs/deprecation/)); changes in `CHANGELOG.md`. Docs: [foli.josepaudenis.com/docs](https://foli.josepaudenis.com/docs/).
 
 ```bash
 npm install @folijs/core

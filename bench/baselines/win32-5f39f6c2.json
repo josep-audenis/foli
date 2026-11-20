@@ -16,7 +16,7 @@
   "engines": {
     "node": {
       "recorded": "2026-11-20",
-      "runs": 5
+      "runs": 3
     },
     "chromium": {
       "recorded": "2026-11-20",
@@ -34,119 +34,119 @@
   "metrics": {
     "node": {
       "findAll \"th\" x20": {
-        "median": 9.63,
+        "median": 9.53,
         "threshold": 0.6,
         "floor": 2
       },
       "findAll \"the \" x20": {
-        "median": 9.64,
+        "median": 9.58,
         "threshold": 0.6,
         "floor": 2
       },
       "findAll \"the la\" x20": {
-        "median": 4.04,
+        "median": 4.01,
         "threshold": 0.6,
         "floor": 2
       },
       "findAll \"zebra\" x20": {
-        "median": 1.26,
+        "median": 1.45,
         "threshold": 0.6,
         "floor": 2
       },
       "docx import (corpus)": {
-        "median": 71.54,
+        "median": 76.94,
         "threshold": 0.6,
         "floor": 20
       },
       "docx export (corpus)": {
-        "median": 79.79,
+        "median": 86.86,
         "threshold": 0.6,
         "floor": 20
       }
     },
     "chromium": {
       "pdf (corpus)": {
-        "median": 536.77,
+        "median": 674.59,
         "threshold": 0.4,
         "floor": 100
       },
       "find \"th\"": {
-        "median": 16,
+        "median": 16.4,
         "threshold": 0.5,
         "floor": 10
       },
       "find \"the \"": {
-        "median": 16.5,
+        "median": 16.8,
         "threshold": 0.5,
         "floor": 10
       },
       "find \"the la\"": {
-        "median": 17,
+        "median": 16.8,
         "threshold": 0.5,
         "floor": 10
       },
       "find \"zebra\"": {
-        "median": 16.2,
+        "median": 16.3,
         "threshold": 0.5,
         "floor": 10
       },
       "layout 100": {
-        "median": 110.1,
+        "median": 118.4,
         "threshold": 0.4,
         "floor": 5
       },
       "typeHandlerP50 100": {
-        "median": 11.4,
+        "median": 7.9,
         "threshold": 0.5,
         "floor": 1.5
       },
       "typePaintP95 100": {
-        "median": 17.1,
+        "median": 13.7,
         "threshold": 0.5,
         "floor": 8
       },
       "enterHandlerP50 100": {
-        "median": 12.9,
+        "median": 9.9,
         "threshold": 0.5,
         "floor": 1.5
       },
       "enterPaintP95 100": {
-        "median": 31.6,
+        "median": 35.3,
         "threshold": 0.5,
         "floor": 8
       },
       "reflow 100": {
-        "median": 131.1,
+        "median": 147.9,
         "threshold": 0.4,
         "floor": 5
       },
       "layout 200": {
-        "median": 205.5,
+        "median": 228.1,
         "threshold": 0.4,
         "floor": 5
       },
       "typeHandlerP50 200": {
-        "median": 22.9,
+        "median": 18.1,
         "threshold": 0.5,
         "floor": 1.5
       },
       "typePaintP95 200": {
-        "median": 31.9,
+        "median": 28.2,
         "threshold": 0.5,
         "floor": 8
       },
       "enterHandlerP50 200": {
-        "median": 25.6,
+        "median": 18.5,
         "threshold": 0.5,
         "floor": 1.5
       },
       "enterPaintP95 200": {
-        "median": 62.4,
+        "median": 64.7,
         "threshold": 0.5,
         "floor": 8
       },
       "reflow 200": {
-        "median": 263.8,
+        "median": 294.8,
         "threshold": 0.4,
         "floor": 5
       }
@@ -158,7 +158,7 @@
         "floor": 10
       },
       "find \"the \"": {
-        "median": 16,
+        "median": 17,
         "threshold": 0.5,
         "floor": 10
       },
@@ -173,62 +173,62 @@
         "floor": 10
       },
       "layout 100": {
-        "median": 151,
+        "median": 146,
         "threshold": 0.4,
         "floor": 5
       },
       "typeHandlerP50 100": {
-        "median": 13,
+        "median": 11,
         "threshold": 0.5,
         "floor": 1.5
       },
       "typePaintP95 100": {
-        "median": 30,
+        "median": 28,
         "threshold": 0.5,
         "floor": 8
       },
       "enterHandlerP50 100": {
-        "median": 16,
+        "median": 14,
         "threshold": 0.5,
         "floor": 1.5
       },
       "enterPaintP95 100": {
-        "median": 45,
+        "median": 49,
         "threshold": 0.5,
         "floor": 8
       },
       "reflow 100": {
-        "median": 149.8,
+        "median": 164.1,
         "threshold": 0.4,
         "floor": 5
       },
       "layout 200": {
-        "median": 285,
+        "median": 298,
         "threshold": 0.4,
         "floor": 5
       },
       "typeHandlerP50 200": {
-        "median": 31,
+        "median": 24,
         "threshold": 0.5,
         "floor": 1.5
       },
       "typePaintP95 200": {
-        "median": 59,
+        "median": 52,
         "threshold": 0.5,
         "floor": 8
       },
       "enterHandlerP50 200": {
-        "median": 34,
+        "median": 26,
         "threshold": 0.5,
         "floor": 1.5
       },
       "enterPaintP95 200": {
-        "median": 104,
+        "median": 94,
         "threshold": 0.5,
         "floor": 8
       },
       "reflow 200": {
-        "median": 329.6,
+        "median": 330.4,
         "threshold": 0.4,
         "floor": 5
       }
@@ -240,7 +240,7 @@
         "floor": 10
       },
       "find \"the \"": {
-        "median": 47,
+        "median": 62,
         "threshold": 0.5,
         "floor": 10
       },
@@ -250,47 +250,47 @@
         "floor": 10
       },
       "find \"zebra\"": {
-        "median": 61,
+        "median": 62,
         "threshold": 0.5,
         "floor": 10
       },
       "layout 100": {
-        "median": 204,
+        "median": 194,
         "threshold": 0.4,
         "floor": 5
       },
       "typeHandlerP50 100": {
-        "median": 17,
+        "median": 13,
         "threshold": 0.5,
         "floor": 1.5
       },
       "enterHandlerP50 100": {
-        "median": 20,
+        "median": 17,
         "threshold": 0.5,
         "floor": 1.5
       },
       "reflow 100": {
-        "median": 219,
+        "median": 217,
         "threshold": 0.4,
         "floor": 5
       },
       "layout 200": {
-        "median": 388,
+        "median": 380,
         "threshold": 0.4,
         "floor": 5
       },
       "typeHandlerP50 200": {
-        "median": 33,
+        "median": 27,
         "threshold": 0.5,
         "floor": 1.5
       },
       "enterHandlerP50 200": {
-        "median": 35,
+        "median": 26,
         "threshold": 0.5,
         "floor": 1.5
       },
       "reflow 200": {
-        "median": 451,
+        "median": 436,
         "threshold": 0.4,
         "floor": 5
       }

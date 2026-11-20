@@ -1,10 +1,12 @@
 /**
  * The docs site's pages, in nav order (`build.ts` renders them at build time). A page is a
  * markdown file of the repository, an API report, the changelogs, or a live example
- * (`src/examples/<name>.md` beside `<name>.tsx`). Adding a page: add the file, then one entry here.
+ * (`src/examples/<name>.md` beside `<name>.tsx`); a package's README is the guide
+ * `/docs/guides/<package>/`. Adding a page: add the file, then one entry here.
  */
 export type Entry =
-  | { md: string }
+  /** `title` in place of the file's first heading (a package README's is its package name). */
+  | { md: string; title?: string }
   | { api: "core" | "view" | "react" | "docx" | "pdf" }
   | { changelog: true }
   | { example: string };
@@ -25,6 +27,8 @@ export const NAV: Group[] = [
       { md: "docs/keyboard.md" },
       { md: "docs/document-model.md" },
       { md: "docs/pagination.md" },
+      { md: "packages/docx/README.md", title: "DOCX" },
+      { md: "packages/pdf/README.md", title: "PDF" },
       { md: "docs/guides/migrating-from-0x.md" },
     ],
   },
