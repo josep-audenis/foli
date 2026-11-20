@@ -634,9 +634,14 @@ describe("import accepts what Word opens, and fails only with DocxError", () => 
 
   it("fails with DocxError past what the model holds at all", async () => {
     const huge = `<w:tbl>${"<w:tr/>".repeat(2_400_000)}</w:tbl>`;
-    await expect(importDocx(await docx(huge))).rejects.toMatchObject({
+    // Past the element limit too (its own DocxError); raised to reach the model's.
+    await expect(importDocx(await docx(huge), { maxElements: 3_000_000 })).rejects.toMatchObject({
       name: "DocxError",
       message: expect.stringMatching(/^Cannot import: /),
+    });
+    await expect(importDocx(await docx(huge))).rejects.toMatchObject({
+      name: "DocxError",
+      message: expect.stringMatching(/More than \d+ elements/),
     });
     // A 16 MiB part: slow when everything runs at once.
   }, 60_000);
