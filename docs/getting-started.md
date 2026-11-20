@@ -4,8 +4,8 @@ Foli is a document editor for the web: a document on real pages (A4 or Letter, w
 edited in the browser, stored as JSON. This guide uses the React package. Without React, see
 [Using the view without React](#using-the-view-without-react).
 
-> **0.x:** the API may change in any minor version (0.1 → 0.2); changes are listed in each
-> package's `CHANGELOG.md`. What 1.0 will promise: [versions and deprecation](deprecation.md);
+> **1.x:** the public API and the saved format change only as semver allows; changes are listed
+> in each package's `CHANGELOG.md`. What 1.0 promises: [versions and deprecation](deprecation.md);
 > upgrading: [migrating from 0.x](guides/migrating-from-0x.md). Read the
 > [known limitations](limitations.md) before you ship.
 

@@ -9,21 +9,21 @@ leaves `main` green with a working playground.
 **Update this table in the same PR that starts, advances or finishes a phase.** It is the only
 place that says what is in progress; check it before starting work.
 
-| Phase                    | Status                   | Branch             | Notes                                                                                                                                                                                                                                                                                                                         |
-| ------------------------ | ------------------------ | ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 0 Foundation             | ✅ Done                  | —                  |                                                                                                                                                                                                                                                                                                                               |
-| 1 Architecture spike     | ✅ Done (G1 provisional) | —                  | Merged in #1; ADR-0003 accepted provisionally; IME, dead-key and screen-reader checks open                                                                                                                                                                                                                                    |
-| 2 Document model         | ✅ Done                  | —                  | Merged in #2                                                                                                                                                                                                                                                                                                                  |
-| 3 Transactions & history | ✅ Done                  | —                  | Merged in #4; gate G2 passed                                                                                                                                                                                                                                                                                                  |
-| 4 Editor view            | ✅ Done (G3 provisional) | —                  | Merged in #8–#13; manual checks (4.6) deferred, open risks in ADR-0003                                                                                                                                                                                                                                                        |
-| 5 Native pagination      | ✅ Done (G4 provisional) | —                  | Merged in #15–#22; page-break manual checks open, risks in ADR-0003                                                                                                                                                                                                                                                           |
-| 6 React API & 0.1.0      | ✅ Done                  | —                  | Merged in #23–#31; 0.1.0 on npm; manual checks shipped as known risks (ADR-0003)                                                                                                                                                                                                                                              |
-| 7 Rich content           | ✅ Done                  | —                  | Merged in #33–#41; 0.2.0 on npm; list-document benchmark misses accepted (known limit)                                                                                                                                                                                                                                        |
-| 8 Word model & DOCX      | ✅ Done                  | —                  | Merged in #44–#61; 0.3.0 on npm (`@folijs/docx` first released); gate G5 passed                                                                                                                                                                                                                                               |
-| 9 Review                 | ✅ Done                  | —                  | Merged in #63–#72; 0.4.0 on npm                                                                                                                                                                                                                                                                                               |
-| 10 Tables & images       | ✅ Done                  | —                  | Merged in #73–#97 (#90, the landing page, went to main); 0.5.0 on npm; two misses accepted                                                                                                                                                                                                                                    |
-| 11 Sections & templates  | ✅ Done                  | —                  | Merged in #100–#118 (#106, #107, #110, #112 and #113, the site, went to main); 0.6.0 on npm; misses accepted                                                                                                                                                                                                                  |
-| 12 Ecosystem & 1.0       | In review                | phase-12/ecosystem | 12.1 to 12.12 done: ADR-0008, API reports, custom nodes and marks, view hooks, commands and keys, toolbar items, `pnpm bench` (baseline recorded for 1.0), the docs site (published), guides, examples, 1.0 readiness, acceptance checked; the 1.0.0 changeset ready, version PR and publish follow with the owner's approval |
+| Phase                    | Status                   | Branch | Notes                                                                                                        |
+| ------------------------ | ------------------------ | ------ | ------------------------------------------------------------------------------------------------------------ |
+| 0 Foundation             | ✅ Done                  | —      |                                                                                                              |
+| 1 Architecture spike     | ✅ Done (G1 provisional) | —      | Merged in #1; ADR-0003 accepted provisionally; IME, dead-key and screen-reader checks open                   |
+| 2 Document model         | ✅ Done                  | —      | Merged in #2                                                                                                 |
+| 3 Transactions & history | ✅ Done                  | —      | Merged in #4; gate G2 passed                                                                                 |
+| 4 Editor view            | ✅ Done (G3 provisional) | —      | Merged in #8–#13; manual checks (4.6) deferred, open risks in ADR-0003                                       |
+| 5 Native pagination      | ✅ Done (G4 provisional) | —      | Merged in #15–#22; page-break manual checks open, risks in ADR-0003                                          |
+| 6 React API & 0.1.0      | ✅ Done                  | —      | Merged in #23–#31; 0.1.0 on npm; manual checks shipped as known risks (ADR-0003)                             |
+| 7 Rich content           | ✅ Done                  | —      | Merged in #33–#41; 0.2.0 on npm; list-document benchmark misses accepted (known limit)                       |
+| 8 Word model & DOCX      | ✅ Done                  | —      | Merged in #44–#61; 0.3.0 on npm (`@folijs/docx` first released); gate G5 passed                              |
+| 9 Review                 | ✅ Done                  | —      | Merged in #63–#72; 0.4.0 on npm                                                                              |
+| 10 Tables & images       | ✅ Done                  | —      | Merged in #73–#97 (#90, the landing page, went to main); 0.5.0 on npm; two misses accepted                   |
+| 11 Sections & templates  | ✅ Done                  | —      | Merged in #100–#118 (#106, #107, #110, #112 and #113, the site, went to main); 0.6.0 on npm; misses accepted |
+| 12 Ecosystem & 1.0       | ✅ Done                  | —      | Merged in #120–#133; 1.0.0 on npm (2026-11-20); Phase 5 speed misses and manual checks accepted as 1.0 risks |
 
 Status values: `Ready` (dependencies met, nobody on it) · `In progress` · `In review` (PR open) ·
 `✅ Done` (merged, acceptance criteria met) · `Blocked by …`.
@@ -1399,8 +1399,8 @@ skipped where an engine cannot run them, 2 failed under load then passed 3 of 3 
 `pnpm corpus:pages` as 0.6.0 (158 of 158 paragraphs on Word's page, 142 on its line, 277 of 280
 cell paragraphs). Misses: Phase 5's speed targets at 100 pages (first layout, re-flow, Enter;
 typing meets them in Chromium only), accepted by the owner on 2026-11-20 as not blocking 1.0;
-the manual checks not run on real devices, accepted by the owner as 1.0 risks. Awaiting the
-owner: 1.0.0 published (the version PR and the publish).)
+the manual checks not run on real devices, accepted by the owner as 1.0 risks. The version PR
+(#133); 1.0.0 published 2026-11-20 with the owner's approval.)
 
 ### Tasks
 
@@ -1875,8 +1875,8 @@ Each task is a PR on `phase-12/ecosystem`, the build green after each.
   medians; that metric's tolerance kept (benchmarks.md, "Thresholds"). Acceptance checked
   (above). The 1.0.0 changeset (`.changeset/release-1-0.md`, major for the five packages: the
   promise, Phase 12's highlights, the known risks, the missed targets with numbers, the migration
-  guide); `changeset status` plans 1.0.0 for all five. README's status stays 0.6.0 until then:
-  the version PR switches it to 1.0.0. Version PR and publish follow with the owner's approval.)
+  guide); `changeset status` plans 1.0.0 for all five. The version PR (#133); 1.0.0 published
+  2026-11-20 by the Release workflow with the owner's approval, README's status switched after.)
 
 ## Optional
 

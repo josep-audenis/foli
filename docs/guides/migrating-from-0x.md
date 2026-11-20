@@ -1,8 +1,7 @@
 # Migrating from 0.x
 
 What an app changes to move from a 0.x release (0.1.0 to 0.6.0) to 1.0. The changes since
-0.6.0 below ship in 1.0.0; each package's `CHANGELOG.md` lists them in full (until 1.0.0 is
-versioned, the pending changesets in [`.changeset/`](../../.changeset/README.md)). From 1.0 on, the rules for what may
+0.6.0 below shipped in 1.0.0; each package's `CHANGELOG.md` lists them in full. From 1.0 on, the rules for what may
 change are in [Versions and deprecation](../deprecation.md).
 
 ## Documents
