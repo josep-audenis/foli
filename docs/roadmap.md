@@ -1362,9 +1362,10 @@ architecture tour and the release; every 0.x document format (v1–v5) loads in 
 checks are run or accepted again by the owner as 1.0 risks; 1.0.0 published with the owner's
 approval. (Checked 2026-11-20, Word 16.0.20625, Chromium, Firefox and WebKit on Windows, the
 owner's laptop on mains: ADR-0008 records the public API per package, the saved format, semver
-and deprecation, accepted by the review the owner asked for Phase 12 and its one open point (a
-1.x minor may add a schema version, saved at the lowest version needed) by the owner on
-2026-11-20; `pnpm check` (1,699 unit tests) compares the five API reports and fails on a forgotten
+and deprecation; its acceptance was delegated to an agent's review by the owner's instruction of
+2026-11-19 (Phase 12 built task by task, each merged after review), and only its one open point
+(a 1.x minor may add a schema version, saved at the lowest version needed) was decided by the
+owner explicitly, on 2026-11-20; `pnpm check` (1,699 unit tests) compares the five API reports and fails on a forgotten
 export (`scripts/api.mjs`, tested in `api.test.mjs`); a mention (custom inline node), a card
 (custom block node) and a topic (custom mark) are typed, drawn on pages (the card split across a
 page end), undone, copied and pasted into editors with and without the extension (Chromium and Firefox;
@@ -1377,8 +1378,10 @@ taking a built-in key (`keymaps.spec.ts` presses every overridable key with a us
 it), decorations and a toolbar item (`extension.spec.ts`, `toolbar-items.spec.ts`, the example);
 every key the view takes itself is overridable or reserved, listed per platform in
 `keyboard.md` (`keys.test.ts`); `pnpm bench` compares 51 metrics with the committed baseline and
-fails past a threshold: its first run in 12.12 failed 12 metrics on a busy machine (exit 1), the
-rerun passed all 51, and the baseline was recorded from that run ([benchmarks](benchmarks.md#10-numbers));
+fails past a threshold: of three runs in 12.12 the first failed 12 metrics on a busy machine
+(exit 1), the second passed all 51, the third (`--update`) passed all but Chromium's re-flow at
+200 sections (+110%, noise: that metric is noisy), and the baseline was recorded from the
+second's medians ([benchmarks](benchmarks.md#10-numbers));
 no hosted CI, as ADR-0008 decides; the docs site is published at
 [foli.josepaudenis.com/docs](https://foli.josepaudenis.com/docs/) (the 35 pages built before the DOCX
 and PDF guides each serve their own title, 12.11's content live; Cloudflare Pages builds every push and publishes `main`) with getting started, the extensions, theming and migration guides,
@@ -1868,11 +1871,12 @@ Each task is a PR on `phase-12/ecosystem`, the build green after each.
   `pnpm bench` on mains with no heavy process, first run 12 regressions in Node and Chromium only
   (2-3× throughout: the machine), rerun passed all 51 metrics (keystroke handlers 15-31% faster
   than 12.7's baseline), `--update` run again with Chromium's re-flow at 200 sections past its
-  threshold, so the baseline was written from the passing run's medians. Acceptance checked
+  threshold (+110%, the rest within), so the baseline was written from the passing run's
+  medians; that metric's tolerance kept (benchmarks.md, "Thresholds"). Acceptance checked
   (above). The 1.0.0 changeset (`.changeset/release-1-0.md`, major for the five packages: the
   promise, Phase 12's highlights, the known risks, the missed targets with numbers, the migration
-  guide); `changeset status` plans 1.0.0 for all five. Version PR and publish follow with the
-  owner's approval.)
+  guide); `changeset status` plans 1.0.0 for all five. README's status stays 0.6.0 until then:
+  the version PR switches it to 1.0.0. Version PR and publish follow with the owner's approval.)
 
 ## Optional
 

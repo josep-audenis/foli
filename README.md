@@ -4,7 +4,8 @@ An open-source document-editing engine for the web, built from the ground up: it
 model, transactions, view and layout, designed around native pagination, with first-class React
 integration.
 
-> **Status: 1.0.0 ([npm](https://www.npmjs.com/package/@folijs/react), [docs](https://foli.josepaudenis.com/docs/)).** Foli edits documents
+> **Status: 0.6.0 on [npm](https://www.npmjs.com/package/@folijs/react); 1.0.0 is prepared on `main`, published
+> with the owner's approval ([docs](https://foli.josepaudenis.com/docs/)).** Foli edits documents
 > with its own model, engine and view (no ProseMirror/Tiptap/Lexical) on real pages: paragraphs
 > split across pages at a line, explicit page breaks, widow/orphan, keep-with-next and
 > keep-lines-together rules, incremental reflow, print with one sheet per page. Documents use
@@ -43,8 +44,8 @@ integration.
 > adding, with a migration); a document is saved with the lowest version its content needs, and an
 > older 1.x refuses, never drops, a document that needs a newer one. Known risks: the manual IME,
 > screen-reader, macOS, real-paste and Safari checks were never run on real devices (accepted by
-> the owner for 1.0), and typing and the first layout of 100 pages miss Phase 5's speed targets:
-> read the [known limitations](docs/limitations.md). Moving from 0.x:
+> the owner for 1.0), and at 100 pages the first layout, the re-flow and Enter miss Phase 5's speed
+> targets (typing meets them in Chromium, not in Firefox): read the [known limitations](docs/limitations.md). Moving from 0.x:
 > [migration guide](docs/guides/migrating-from-0x.md).
 
 ## Usage

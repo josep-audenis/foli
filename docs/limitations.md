@@ -342,7 +342,8 @@ Details in the [package README](../packages/docx/README.md).
   WebKit (target 60 ms); a full re-flow takes 148-164 ms in Chromium and Firefox (target 100);
   Enter's paint p95 is 35-49 ms (target 25). Handling a keystroke cost 11-13 ms in 0.6.0 (p50,
   Chromium), 3.3-3.5 times what 0.2.0 took; 1.0 takes 7.9 ms typing (at the 8 ms target) and
-  9.9 ms for Enter (Firefox 11 and 14 ms), after 12.11's fix to list numbers. The first layout
+  9.9 ms for Enter (Firefox 11 and 14 ms), after 12.11's fix to list numbers: typing meets the
+  targets in Chromium (paint p95 14 ms), not in Firefox (28 ms). The first layout
   is mostly the browser's own layout of every page.
 - Long documents made of lists were slower in 0.2.0 (schema v2, where lists were nested
   blocks; not measured on schema v3 yet): in a 114-page list document, Enter near the top took

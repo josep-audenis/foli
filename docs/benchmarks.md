@@ -62,6 +62,11 @@ call (0.05-0.5 ms) is too close to the clock's noise to catch anything:
 | `.docx` import and export |     ± 60% |  20 ms |
 | PDF                       |     ± 40% | 100 ms |
 
+**Chromium's re-flow at 200 sections is noisy:** in 12.12's three runs on mains it measured 486 (a busy machine),
+295 and 555 ms (12.7's baseline 264, now 295), the third past its threshold while every other metric of that run
+passed. Its tolerance is kept at ± 40%: raising it to cover a doubling would hide real
+regressions, and the 100-section re-flow tracks the same code. A failure of it alone: rerun.
+
 **Compare on mains power.** On battery (Windows' Balanced plan) the same code measured 1.5-2×
 slower than on mains, and drifted further as the charge fell, past every threshold. Rerun once
 before believing a regression.
