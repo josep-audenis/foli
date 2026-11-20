@@ -6,7 +6,7 @@ DOCX for [Foli](https://github.com/josep-audenis/foli): imports a `.docx` into F
 runs in the browser, workers and Node 20.12+. Its only dependency is `@folijs/core`, a peer at
 exactly its own version: `npm install @folijs/docx @folijs/core`.
 
-> Early release: the API may change in any 0.x minor version (changes in `CHANGELOG.md`).
+> Stable since 1.0.0: the public API and the saved format follow semver ([versions and deprecation](https://foli.josepaudenis.com/docs/deprecation/)); changes in `CHANGELOG.md`. Docs: [foli.josepaudenis.com/docs](https://foli.josepaudenis.com/docs/).
 
 ```ts
 import { importDocx } from "@folijs/docx";

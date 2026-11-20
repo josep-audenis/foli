@@ -1106,8 +1106,8 @@ Planned, created only when needed:
   published types compiled alone: [contributing.md](contributing.md#api-reports)) and
   `pnpm size`: each package's published entry bundled as an app would (fully minified, its
   Foli dependencies included, React external), and an app importing only `FoliEditor`, against
-  gzip budgets in `scripts/size.mjs` (as of 0.6.0: core 85.9 kB, view 107.9 kB, react 151.4 kB,
-  docx 57.0 kB, pdf 18.4 kB and its renderer bundle 95.2 kB; each raise and its reason is recorded
+  gzip budgets in `scripts/size.mjs` (as of 1.0.0: core 85.9 kB, view 112.0 kB, react 157.0 kB,
+  docx 60.0 kB, pdf 18.4 kB and its renderer bundle 95.2 kB; each raise and its reason is recorded
   there).
 - `pnpm examples` installs the packed tarballs into `examples/vite` (React 18, strict
   TypeScript), `examples/next` (React 19, server rendering), `examples/extension` (a custom
@@ -1148,15 +1148,16 @@ which become Vite inputs:
   an example from `vite build` served by `vite preview`, without console errors), in three engines
   (`pnpm test:e2e --project=site-*`).
 
-Deploying it is the owner's step ([contributing.md](contributing.md#the-site)).
+Published at [foli.josepaudenis.com/docs](https://foli.josepaudenis.com/docs/); deploying it is the
+owner's step ([contributing.md](contributing.md#the-site)).
 
 ## React integration (`@folijs/react`)
 
 Uncontrolled: the engine owns document state; React observes. `initialContent` is read once;
 external replacement goes through an imperative `setDocument()`. No fully controlled `value`
 prop: feeding the whole document back on every keystroke defeats incremental rendering.
-The view owns its DOM subtree; React never renders children into it. Built in 6.1 (API not
-stable before 1.0):
+The view owns its DOM subtree; React never renders children into it. Built in 6.1 (API stable
+since 1.0.0):
 
 - `useFoliEditor({ initialContent, plugins })`: a headless `Editor` (`initialContent` of any
   version, migrated by `createEditor`) created on the first render and kept for the component's lifetime (later options are ignored; StrictMode's extra

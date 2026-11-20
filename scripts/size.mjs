@@ -83,7 +83,8 @@ writeFileSync(appEntry, `export { FoliEditor } from "${dist("react")}";\n`);
  * `parseDocument` checks the document before the page gets it; its page renderer 83.1 kB, 95.2
  * allowed: core and the read-only renderer bundled into the script `exportPdf` adds to the
  * headless page, never part of an app's own bundle).
- * Phase 12: view, React and docx raised in 12.3 (112.0, 157.0 and 60.0 KiB allowed): custom nodes
+ * Phase 12 (at its close core 82.9, view 110.8, React 155.3, docx 58.0, pdf 17.2 kB): only
+ * view, React and docx raised, in 12.3 (112.0, 157.0 and 60.0 KiB allowed): custom nodes
  * and marks, which every package carries (the extended schema, foreign nodes and their JSON
  * mapping in core; their drawing and the clipboard HTML carrying their JSON in the view; their
  * tagged content controls in docx).

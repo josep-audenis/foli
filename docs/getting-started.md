@@ -16,7 +16,7 @@ npm install @folijs/react @folijs/view @folijs/core react react-dom
 ```
 
 `@folijs/react` works with React 18.2+ and 19. `@folijs/core` holds the document functions
-(`createDocument`, `parseDocument`). After 0.6.0, `@folijs/react`, `@folijs/view`, `@folijs/docx`
+(`createDocument`, `parseDocument`). Since 1.0.0, `@folijs/react`, `@folijs/view`, `@folijs/docx`
 and `@folijs/pdf` take `@folijs/core` (and `@folijs/react` also `@folijs/view`) as peer
 dependencies at exactly their own version, so the app has one copy of the engine: install all
 `@folijs/*` packages at the same version and upgrade them together (npm 7+ and pnpm install

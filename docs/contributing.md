@@ -151,7 +151,9 @@ pnpm --filter @folijs/site build    # static files in apps/site/dist/
 pnpm --filter @folijs/site preview  # serve the build locally
 ```
 
-Nothing in the repository deploys it. The site is served through Cloudflare (its response
+It is published at [foli.josepaudenis.com/docs](https://foli.josepaudenis.com/docs/) (checked
+2026-11-20: every page of the nav answers, with 12.11's content). Nothing in the repository
+deploys it. The site is served through Cloudflare (its response
 headers say so); how the files get there (Cloudflare Pages connected to the repository, a
 direct upload, or another host behind Cloudflare's proxy) is set up outside the repository and
 not recorded here. To publish, the owner builds and uploads `apps/site/dist/` as the site's
@@ -176,6 +178,11 @@ of one of these alone is noise; anything else is a real failure.
   graphics errors in Firefox's log), `word-headers.spec.ts` "page numbers in letters…" (WebKit,
   a 30 s timeout) and the site's `docs.spec.ts` "every nav entry opens its page…" (WebKit, 90 s);
   all passed 3 times in a row when rerun.
+- Under a full three-engine run beside Word harnesses (2026-11-20, 12.12; 997 passed, 2 failed):
+  `word-tables.spec.ts` "T5 in a table: cells selected across the page break…" (Firefox:
+  `NS_ERROR_CONNECTION_REFUSED` on `page.goto`, the dev server not answering for a moment) and
+  `word-navigation.spec.ts` "typing in the document with a search open…" (WebKit: its timing
+  check, 8.4 s against 6.6 s allowed); both passed 3 times in a row when rerun.
 
 Fixed in 12.11 (they failed in pre-push runs now and then): the tracked-changes property test
 (`track.test.ts`, a random seed about one run in five hit a known difference it did not leave
