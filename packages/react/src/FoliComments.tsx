@@ -39,6 +39,8 @@ const EMPTY: readonly CommentJSON[] = [];
 
 /** The comments of the editor's document, as threads in document order. */
 function threadsOf(state: EditorState, comments: readonly CommentJSON[]): Thread[] {
+  // No document scan per change when there is nothing to anchor (12.11).
+  if (!comments.length) return [];
   const anchors = commentAnchors(state.doc);
   const byId = new Map(comments.map((c) => [c.id, c]));
   const rootOf = (c: CommentJSON) => {

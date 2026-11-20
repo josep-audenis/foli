@@ -248,6 +248,27 @@ describe("Resolver: paragraphs", () => {
     expect(level.paragraph?.shading?.fill).toBe("FF0000");
     expect(level.paragraph?.tabs?.[0]?.position).toBe(9);
   });
+
+  it("numbers paragraphs whatever gives the number, and only those (markers' shortcut)", () => {
+    const own = new Resolver(
+      envelope({
+        styles: [{ id: "Numbered", type: "paragraph", paragraph: { numbering: { id: 5 } } }],
+        numbering: {
+          abstracts: [{ id: 1, levels: [lvl(0), lvl(1)] }],
+          instances: [{ id: 5, abstract: 1 }],
+        },
+      }),
+    );
+    const markers = own.markers([
+      { style: "Numbered" },
+      { style: "Numbered", numbering: { level: 1 } },
+      { style: "Numbered", numbering: { id: 0 } },
+      { numbering: null },
+      {},
+      { numbering: { id: 5, level: 0 } },
+    ]);
+    expect(markers.map((m) => m && m.level)).toEqual([0, 1, null, null, null, 0]);
+  });
 });
 
 describe("Resolver: runs", () => {
