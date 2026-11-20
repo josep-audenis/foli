@@ -101,7 +101,7 @@ Design and development:
 - [ADR-0002: Foli owns its editing engine](docs/decisions/ADR-0002-own-editing-engine.md)
 - [Document model](docs/document-model.md) — persisted format, schema v5 (Word's model), units, migrations from v1 to v4
 - [Benchmarks](docs/benchmarks.md) — model build/serialize and pagination (layout, keystroke, re-flow) timings, bundle sizes, with method
-- [Examples](examples/README.md) — Vite + React 18 and Next.js + React 19 apps installing the packed packages
+- [Examples](examples/README.md) — Vite + React 18, Next.js + React 19, an extension and a framework-free app installing the packed packages
 - [Pagination](docs/pagination.md) — native multi-page editing: design and what is built (Phase 5 on; sections, columns, headers, footers and notes in Phase 11)
 - [Contributing](docs/contributing.md)
 

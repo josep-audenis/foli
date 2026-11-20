@@ -76,7 +76,8 @@ export class Fragment {
   nodesBetween(
     from: number,
     to: number,
-    f: (node: Node, pos: number, parent: Node | null, index: number) => boolean | undefined,
+    // biome-ignore lint/suspicious/noConfusingVoidType: a callback without a return (TypeScript 5 refuses one for `undefined`)
+    f: (node: Node, pos: number, parent: Node | null, index: number) => boolean | void,
     nodeStart = 0,
     parent: Node | null = null,
   ): void {

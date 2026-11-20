@@ -1,7 +1,8 @@
 /**
  * The success criterion on apps that install Foli from its packed tarballs (`pnpm examples`):
  * type, format with a shortcut, undo, serialize, reload without loss. Also: no console errors
- * (hydration included), and the server HTML of the Next.js app holds the editor's shell.
+ * (hydration included), and the server HTML of the Next.js app holds the editor's shell. Runs on
+ * the React apps (`vite`, `next`) and the framework-free one (`vanilla`, its own buttons).
  */
 import { expect, type Page, test } from "@playwright/test";
 
@@ -23,7 +24,8 @@ test("type, format with a shortcut, undo, save, reload without loss", async ({ p
 
   await page.goto("/");
   await expect(editor(page)).toHaveAttribute("contenteditable", "true");
-  await expect(page.getByRole("toolbar", { name: "Formatting" })).toBeVisible();
+  // FoliToolbar's (React) or the vanilla app's own buttons.
+  await expect(page.getByRole("button", { name: "Bold", exact: true })).toBeVisible();
   await editor(page).click();
   await page.keyboard.type("Hello Foli");
   for (let i = 0; i < 4; i++) await page.keyboard.press("Shift+ArrowLeft");
@@ -41,7 +43,7 @@ test("type, format with a shortcut, undo, save, reload without loss", async ({ p
   const saved = JSON.parse(
     (await page.evaluate(() => localStorage.getItem("foli-example"))) ?? "null",
   );
-  // Schema v3: Word's model, the page in twips (A4).
+  // Schema v5: Word's model, the page in twips (A4).
   expect(saved).toMatchObject({ schemaVersion: 5, section: { pageSize: { width: 11906 } } });
   await page.reload();
   await expect(editor(page)).toHaveText("Hello Foli");
@@ -57,7 +59,7 @@ test("the server HTML holds the editor's shell (Next.js)", async ({ request }, i
   expect(html).toContain('aria-label="Document"');
 });
 
-test("a document saved by 0.1.0 loads (schema v1 → v3); lists from the keyboard save as v3", async ({
+test("a document saved by 0.1.0 loads (schema v1 → v5); lists from the keyboard save as v5", async ({
   page,
 }) => {
   await page.goto("/");

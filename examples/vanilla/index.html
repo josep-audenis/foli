@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Foli without a framework</title>
+  </head>
+  <body>
+    <main>
+      <h1>Foli without a framework</h1>
+      <div class="buttons">
+        <button type="button" data-command="bold" aria-pressed="false">Bold</button>
+        <button type="button" data-command="italic" aria-pressed="false">Italic</button>
+        <button type="button" data-command="bullets">Bullets</button>
+        <button type="button" data-command="undo">Undo</button>
+        <button type="button" data-command="redo">Redo</button>
+      </div>
+      <div class="canvas"><div id="editor"></div></div>
+      <section class="json" aria-labelledby="json-heading">
+        <h2 id="json-heading">Document JSON</h2>
+        <div class="buttons">
+          <button type="button" id="save">Save JSON</button>
+          <button type="button" id="load">Load JSON</button>
+        </div>
+        <label for="json">JSON</label>
+        <textarea id="json" rows="8" spellcheck="false"></textarea>
+        <p id="status" role="status"></p>
+      </section>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

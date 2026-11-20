@@ -1051,7 +1051,7 @@ foli/
 │   ├── docx/  @folijs/docx   DOCX import to Word's model (schema v5) and lossless export; package (zip, parts, relationships), XML keeping source text. No DOM.
 │   └── pdf/   @folijs/pdf    exportPdf: a document printed by the app's headless Chromium page; ships the read-only renderer as a page script.
 ├── spikes/two-page/     Phase 1 spike; throwaway, never published.
-├── examples/            Vite and Next.js apps installing the packed packages (6.4); never published.
+├── examples/            Example apps installing the packed packages (6.4, 12.10); never published.
 └── docs/
 ```
 
@@ -1110,8 +1110,10 @@ Planned, created only when needed:
   docx 57.0 kB, pdf 18.4 kB and its renderer bundle 95.2 kB; each raise and its reason is recorded
   there).
 - `pnpm examples` installs the packed tarballs into `examples/vite` (React 18, strict
-  TypeScript) and `examples/next` (React 19, server rendering) with npm, builds them, and runs
-  the success criterion in Playwright; see [examples/README.md](../examples/README.md).
+  TypeScript), `examples/next` (React 19, server rendering), `examples/extension` (a custom
+  node, mark, plugin and toolbar items through `.docx`) and `examples/vanilla` (`@folijs/view`
+  without React) with npm, builds them, and runs their Playwright tests; see
+  [examples/README.md](../examples/README.md).
 
 ## Docs site (`apps/site`, 12.8)
 

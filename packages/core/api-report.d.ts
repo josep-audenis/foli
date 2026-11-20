@@ -152,7 +152,7 @@ export declare class Fragment {
      * Calls `f` for every node overlapping `from..to`, depth first, with its absolute position
      * (`nodeStart` is the position of this fragment's start). Return false to skip a node's children.
      */
-    nodesBetween(from: number, to: number, f: (node: Node, pos: number, parent: Node | null, index: number) => boolean | undefined, nodeStart?: number, parent?: Node | null): void;
+    nodesBetween(from: number, to: number, f: (node: Node, pos: number, parent: Node | null, index: number) => boolean | void, nodeStart?: number, parent?: Node | null): void;
     /**
      * Text between two positions; `blockSeparator` goes between textblocks, `leafText` for leaves
      * (a string, or one per leaf).
@@ -269,9 +269,9 @@ export declare class Node {
     maybeChild(index: number): Node | null;
     forEach(f: (node: Node, offset: number, index: number) => void): void;
     /** See Fragment.nodesBetween; positions are relative to this node's content start. */
-    nodesBetween(from: number, to: number, f: (node: Node, pos: number, parent: Node | null, index: number) => boolean | undefined): void;
+    nodesBetween(from: number, to: number, f: (node: Node, pos: number, parent: Node | null, index: number) => boolean | void): void;
     /** Calls `f` for every descendant. Return false to skip a node's children. */
-    descendants(f: (node: Node, pos: number, parent: Node | null, index: number) => boolean | undefined): void;
+    descendants(f: (node: Node, pos: number, parent: Node | null, index: number) => boolean | void): void;
     textBetween(from: number, to: number, blockSeparator?: string, leafText?: string | ((leaf: Node) => string)): string;
     /** Same type, attrs and marks. */
     sameMarkup(other: Node): boolean;

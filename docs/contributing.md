@@ -41,7 +41,7 @@ corpus scripts read.
 | `apps/playground/`             | Pages the e2e tests drive (`e2e/`), benchmarks (`bench/`), the Word corpus pages (`word/`). No engine logic             |
 | `apps/site/`                   | The landing page, `/test/`, the docs site (`src/docs/`), its live examples and the guides' samples (`src/guides/`)      |
 | `corpus/`, `scripts/corpus/`   | Word-written documents, Word's reference data, the harnesses that compare Foli with Word                                |
-| `examples/`                    | A Vite and a Next.js app that install the packed packages (`pnpm examples`)                                             |
+| `examples/`                    | Vite, Next.js, extension and framework-free apps that install the packed packages (`pnpm examples`)                     |
 | `spikes/two-page/`             | Phase 1's spike; never published                                                                                        |
 
 ### How a keystroke flows
@@ -109,7 +109,7 @@ when a `ts` or `tsx` block of `docs/guides/*.md` is not found in one of them.
 | `pnpm corpus:pages`                | The Word corpus laid out and compared with Word's pages, in Chromium (`playwright.word.config.ts`)                   |
 | `pnpm changeset`                   | Record a change to a published package (bump type and changelog line)                                                |
 | `pnpm --filter @folijs/site build` | Build the site (landing, `/test/`, docs) to `apps/site/dist/` ([The site](#the-site))                                |
-| `pnpm examples`                    | Pack the packages, install them into `examples/` (Vite + React 18, Next.js + React 19), build, Playwright smoke test |
+| `pnpm examples`                    | Pack the packages, install them into the four `examples/` apps, build, Playwright smoke test                         |
 
 ## API reports
 

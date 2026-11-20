@@ -9,7 +9,10 @@ The samples build one extension set, `acme`, step by step. They are the files of
 [`apps/site/src/guides/`](../../apps/site/src/guides/), typechecked with the docs site and
 run by its tests, so they compile against the current API. The site's
 [custom node](../../apps/site/src/examples/custom-node.md) and
-[plugin](../../apps/site/src/examples/plugin.md) examples run similar code live.
+[plugin](../../apps/site/src/examples/plugin.md) examples run similar code live, and
+[`examples/extension`](../../examples/extension) is an app doing it from the published packages
+(a mention, a topic mark, a plugin's command, key and decorations, toolbar items, `.docx` both
+ways).
 
 ## What an extension is
 
