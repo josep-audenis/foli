@@ -31,13 +31,13 @@ describe("docs build", () => {
       page: "/docs/limitations/",
       hash: "pictures",
     });
-    expect(resolveLink("ADR-0002-own-editing-engine.md", from, urls).href).toBe(
+    expect(resolveLink("ADR-0002-own-editing-engine.md", from, urls)?.href).toBe(
       "/docs/decisions/ADR-0002-own-editing-engine/",
     );
-    expect(resolveLink("../../packages/docx/README.md", from, urls).href).toBe(
+    expect(resolveLink("../../packages/docx/README.md", from, urls)?.href).toBe(
       `${GITHUB}packages/docx/README.md`,
     );
-    expect(resolveLink("https://example.com/a.md", from, urls).href).toBe(
+    expect(resolveLink("https://example.com/a.md", from, urls)?.href).toBe(
       "https://example.com/a.md",
     );
     expect(resolveLink("#top", from, urls)).toEqual({ href: "#top", hash: "top" });
