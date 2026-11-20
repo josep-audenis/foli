@@ -18,16 +18,52 @@ const sources = readdirSync(here)
   .filter((name) => /\.tsx?$/.test(name) && !name.endsWith(".test.ts"))
   .map((name) => read(new URL(name, here)));
 
+/** Fenced blocks as `[language, code]`; the language is the whole info string. */
+function fences(markdown: string): [string, string][] {
+  const found: [string, string][] = [];
+  let open: { lang: string; lines: string[] } | null = null;
+  for (const line of markdown.split("\n")) {
+    const fence = /^```(.*)$/.exec(line);
+    if (open && fence && fence[1] === "") {
+      found.push([open.lang, open.lines.map((l) => `${l}\n`).join("")]);
+      open = null;
+    } else if (open) open.lines.push(line);
+    else if (fence) open = { lang: fence[1] as string, lines: [] };
+  }
+  return found;
+}
+
+/** `code` at the start of a line of a sample file, not inside a block comment. */
+const inSample = (code: string) =>
+  sources.some((source) => {
+    for (let i = source.indexOf(code); i >= 0; i = source.indexOf(code, i + 1))
+      if (
+        (i === 0 || source[i - 1] === "\n") &&
+        source.lastIndexOf("/*", i - 1) <= source.lastIndexOf("*/", i - 1)
+      )
+        return true;
+    return false;
+  });
+
 describe("guides", () => {
+  it("finds a sample only in code, at a line start", () => {
+    expect(fences("```ts\na\n```\n```bash\nb\n```\n")).toEqual([
+      ["ts", "a\n"],
+      ["bash", "b\n"],
+    ]);
+    expect(inSample("export const mention")).toBe(true);
+    expect(inSample("mention: ViewExtension")).toBe(false);
+    expect(inSample("Inserts a mention at the selection")).toBe(false);
+  });
+
   for (const name of readdirSync(guides).filter((n) => n.endsWith(".md")))
     it(`${name}: every ts and tsx sample is a file of apps/site/src/guides`, () => {
-      const blocks = [...read(new URL(name, guides)).matchAll(/^```tsx?\n([\s\S]*?)^```$/gm)];
-      expect(blocks.length).toBeGreaterThan(0);
-      for (const [, code] of blocks)
-        expect(
-          sources.some((source) => source.includes(code as string)),
-          code,
-        ).toBe(true);
+      const blocks = fences(read(new URL(name, guides)));
+      // Another language (`typescript`, `js`, `ts title=…`) would escape the check.
+      for (const [lang] of blocks) expect(["ts", "tsx", "css", "bash"], name).toContain(lang);
+      const code = blocks.filter(([lang]) => lang === "ts" || lang === "tsx");
+      expect(code.length).toBeGreaterThan(0);
+      for (const [, sample] of code) expect(inSample(sample), sample).toBe(true);
     });
 
   it("theming.md names only CSS variables the stylesheet defines", () => {

@@ -549,8 +549,9 @@ attributes. Anyone with the file can read the tags: put no secrets in attributes
 **Without the extension** (another app, an older build, a server without it) a custom type is
 never dropped and does not stop the document from loading. `parseDocument` and the editor keep a
 namespaced type they do not know as a foreign node (`foreignInline`, `foreignBlock`) or a
-foreign mark, its attributes checked only as plain JSON (64 KiB at most). It is drawn as its
-type in brackets (`[acme:mention]`), selected and deleted whole, and written back exactly by
+foreign mark, its attributes checked only as plain JSON (65,536 characters of JSON at most). A
+foreign node is drawn as its `.docx` text, or as its type in brackets (`[acme:mention]`) when it
+came from JSON; it is selected and deleted whole, and written back exactly by
 `getDocument`, `onChange` and `exportDocx`. Pasted into an editor that has the extension, it is
 the custom type again. In `.docx` a foreign node shows the text its control had when it was
 imported, while the document stays in memory; one loaded from JSON shows `[acme:mention]`.

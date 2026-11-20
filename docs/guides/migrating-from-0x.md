@@ -34,11 +34,12 @@ packages you use together, at one version, and upgrade them together:
 npm install @folijs/react @folijs/view @folijs/core react react-dom   # React
 npm install @folijs/view @folijs/core                                 # the view without React
 npm install @folijs/docx @folijs/core                                 # .docx
-npm install @folijs/pdf @folijs/core                                  # PDF (plus playwright)
+npm install @folijs/pdf @folijs/core                                  # PDF (plus Playwright or Puppeteer)
 ```
 
 npm 7+ and pnpm install peers themselves; other package managers need them listed. Two versions
-of `@folijs/core` in one app now fail at install instead of breaking at run time.
+of `@folijs/core` in one app now show at install instead of breaking at run time: npm 7+ refuses
+them (`ERESOLVE`), pnpm and Yarn warn about the peer.
 
 ## From 0.6 to 1.0
 
@@ -65,7 +66,8 @@ export const pasted = (json: unknown) => parseContent(json, { path: "clip", frag
 
 **Namespaced types load as foreign content.** 0.6.0 refused a document holding a node or mark
 type it did not know. A type with a namespace (`acme:mention`) now loads as a foreign node or
-mark, drawn as its type in brackets and saved back unchanged; a type without one is still refused
+mark, drawn as its `.docx` text (or its type in brackets when it came from JSON) and saved back
+unchanged; a type without one is still refused
 with a `FoliDocumentError`. A document holding custom types is still schema v5, but 0.6.0 refuses
 it. See [extensions](extensions.md#saving-loading-and-docx).
 
