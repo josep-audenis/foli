@@ -106,6 +106,14 @@ describe("parseXml", () => {
     expect(parseXml("<a><b/></a>", { maxDepth: 2 }).root.children).toHaveLength(1);
   });
 
+  it("refuses more elements than its limit (memory)", () => {
+    expect(parseXml(`<a>${"<b/>".repeat(9)}</a>`, { maxElements: 10 }).elements).toBe(10);
+    expect(() => parseXml(`<a>${"<b/>".repeat(10)}</a>`, { maxElements: 10 })).toThrow(
+      /More than 10 elements/,
+    );
+    expect(() => parseXml(`<a>${"<b/>".repeat(1_000_000)}</a>`)).toThrow(/More than 1000000/);
+  });
+
   it("parses many attributes in linear time", () => {
     const attributes = Array.from({ length: 60_000 }, (_, i) => `p:a${i}="${i}"`).join(" ");
     const started = performance.now();

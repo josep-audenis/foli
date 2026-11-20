@@ -297,6 +297,19 @@ describe("readPackage", () => {
     expect(() => pkg.xml(pkg.mainDocument)).toThrow(/nested deeper than 3/);
   });
 
+  it("limits the elements of all parts together", async () => {
+    const bytes = (corpus[0] as { bytes: Uint8Array }).bytes;
+    const all = await readPackage(bytes);
+    const main = all.xml(all.mainDocument).elements;
+    const styles = all.xml("/word/styles.xml").elements;
+    // [Content_Types].xml, read first, takes its share.
+    const short = await readPackage(bytes, { maxElements: main });
+    expect(() => short.xml(short.mainDocument)).toThrow(/More than \d+ elements/);
+    const pkg = await readPackage(bytes, { maxElements: main + styles });
+    expect(pkg.xml(pkg.mainDocument).elements).toBe(main);
+    expect(() => pkg.xml("/word/styles.xml")).toThrow(/More than \d+ elements/);
+  });
+
   it("replaces only parts it has", async () => {
     const pkg = await readPackage((corpus[0] as { bytes: Uint8Array }).bytes);
     await expect(pkg.write(new Map([["/word/new.xml", encode("<n/>")]]))).rejects.toThrow(

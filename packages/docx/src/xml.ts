@@ -67,6 +67,8 @@ export interface XmlDocument {
   /** Everything at the top level in order: declaration, comments, whitespace, the root. */
   readonly children: readonly XmlNode[];
   readonly root: XmlElement;
+  /** How many elements the source holds. */
+  readonly elements: number;
 }
 
 /** Source that is not well-formed XML; `offset` is where in the source. */
@@ -103,6 +105,12 @@ export interface ParseXmlOptions {
    * tables, content controls) stay far below, and code walking the tree recursively is safe.
    */
   readonly maxDepth?: number;
+  /**
+   * Most elements accepted. Default 1 000 000: a long Word document holds a few hundred thousand,
+   * and each element read costs memory (a small file of empty paragraphs would otherwise exhaust
+   * it).
+   */
+  readonly maxElements?: number;
 }
 
 /** The first character XML 1.0 does not allow (outside its Char production), or -1. */
@@ -125,6 +133,8 @@ function illegalCharacter(source: string): number {
 /** Parses `source`; throws {@link XmlError} where it is not well-formed. */
 export function parseXml(source: string, options: ParseXmlOptions = {}): XmlDocument {
   const maxDepth = options.maxDepth ?? 1000;
+  const maxElements = options.maxElements ?? 1_000_000;
+  let elements = 0;
   if (source.charCodeAt(0) === 0xfeff) {
     throw new XmlError("Byte order mark in the text: decode the bytes without it", 0);
   }
@@ -219,7 +229,7 @@ export function parseXml(source: string, options: ParseXmlOptions = {}): XmlDocu
   const unclosed = stack[stack.length - 1];
   if (unclosed) throw new XmlError(`Unclosed element <${unclosed.name}>`, unclosed.start);
   if (!root) throw new XmlError("No root element", 0);
-  return { source, children: top, root };
+  return { source, children: top, root, elements };
 
   function finish(element: XmlElement, start: number): void {
     if (stack.length === 0) {
@@ -319,6 +329,7 @@ export function parseXml(source: string, options: ParseXmlOptions = {}): XmlDocu
     if (stack.length >= maxDepth) {
       throw new XmlError(`Elements nested deeper than ${maxDepth}`, start);
     }
+    if (++elements > maxElements) throw new XmlError(`More than ${maxElements} elements`, start);
     const element = {
       kind: "element" as const,
       ...qualified,

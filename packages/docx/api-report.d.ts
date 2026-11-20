@@ -356,6 +356,8 @@ export interface XmlDocument {
     /** Everything at the top level in order: declaration, comments, whitespace, the root. */
     readonly children: readonly XmlNode[];
     readonly root: XmlElement;
+    /** How many elements the source holds. */
+    readonly elements: number;
 }
 /** Source that is not well-formed XML; `offset` is where in the source. */
 export declare class XmlError extends Error {
@@ -369,6 +371,12 @@ export interface ParseXmlOptions {
      * tables, content controls) stay far below, and code walking the tree recursively is safe.
      */
     readonly maxDepth?: number;
+    /**
+     * Most elements accepted. Default 1 000 000: a long Word document holds a few hundred thousand,
+     * and each element read costs memory (a small file of empty paragraphs would otherwise exhaust
+     * it).
+     */
+    readonly maxElements?: number;
 }
 /** Parses `source`; throws {@link XmlError} where it is not well-formed. */
 export declare function parseXml(source: string, options?: ParseXmlOptions): XmlDocument;

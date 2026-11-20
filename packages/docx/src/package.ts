@@ -69,6 +69,8 @@ export class DocxPackage {
   readonly mainDocument: string;
   readonly #entries: readonly ZipEntry[];
   readonly #options: ParseXmlOptions;
+  /** Elements the parts parsed from now on may still hold: `maxElements` is for the package. */
+  #elements: number;
   readonly #byName = new Map<string, DocxPart>();
   readonly #relationships = new Map<string, readonly Relationship[]>();
   readonly #xml = new Map<string, XmlDocument>();
@@ -80,9 +82,10 @@ export class DocxPackage {
   constructor(entries: readonly ZipEntry[], data: readonly Uint8Array[], options: ParseXmlOptions) {
     this.#entries = entries;
     this.#options = options.maxDepth === undefined ? {} : { maxDepth: options.maxDepth };
+    this.#elements = options.maxElements ?? 1_000_000;
     const index = entries.findIndex((e) => key(partName(e.name)) === key(CONTENT_TYPES));
     if (index === -1) throw new DocxError("Not a .docx: no [Content_Types].xml");
-    const typesXml = xml(data[index] as Uint8Array, CONTENT_TYPES, this.#options);
+    const typesXml = this.#parse(data[index] as Uint8Array, CONTENT_TYPES);
     const types = contentTypes(typesXml.root);
     this.#defaults = types.defaults;
     this.#overridden = new Set(types.overrides.keys());
@@ -138,13 +141,19 @@ export class DocxPackage {
     return text(part.data, part.name);
   }
 
+  #parse(data: Uint8Array, name: string): XmlDocument {
+    const doc = xml(data, name, { ...this.#options, maxElements: this.#elements });
+    this.#elements -= doc.elements;
+    return doc;
+  }
+
   /** The part parsed as XML (once); every node keeps its offsets into the part's text. */
   xml(name: string): XmlDocument {
     const part = this.part(name);
     if (!part) throw new DocxError(`No part ${name}`);
     let doc = this.#xml.get(key(part.name));
     if (!doc) {
-      doc = xml(part.data, part.name, this.#options);
+      doc = this.#parse(part.data, part.name);
       this.#xml.set(key(part.name), doc);
     }
     return doc;
