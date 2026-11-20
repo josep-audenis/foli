@@ -1,5 +1,12 @@
-import { readdirSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import v1 from "../../fixtures/formats/v1.json" with { type: "json" };
+import v2 from "../../fixtures/formats/v2.json" with { type: "json" };
+import v3 from "../../fixtures/formats/v3-02-services-agreement-redlined.json" with {
+  type: "json",
+};
+import v4 from "../../fixtures/formats/v4-04-board-report.json" with { type: "json" };
+import v5Offer from "../../fixtures/formats/v5-03-offer-letter-template.json" with { type: "json" };
+import v5Memo from "../../fixtures/formats/v5-09-pump-test-memo.json" with { type: "json" };
 import type { NodeJSON } from "../model/index.js";
 import { createEditor } from "../state/index.js";
 import { parseDocument, SCHEMA_VERSION } from "./document.js";
@@ -8,12 +15,16 @@ import { parseDocument, SCHEMA_VERSION } from "./document.js";
  * One document per 0.x format (ADR-0008: every 1.x reads every earlier format), each saved by
  * the release that wrote that version: v1 by 0.1.0, v2 by 0.2.0, v3 by 0.3.0, v4 by 0.5.0, v5
  * by 0.6.0 (v3 to v5 are corpus files read by that release's `@folijs/docx`). Never regenerate
- * them with the current code: they stand for documents already saved.
+ * them with the current code: they stand for documents already saved. A new format adds one.
  */
-const dir = new URL("../../fixtures/formats/", import.meta.url);
-const fixtures = readdirSync(dir)
-  .filter((name) => name.endsWith(".json"))
-  .map((name) => ({ name, json: JSON.parse(readFileSync(new URL(name, dir), "utf8")) }));
+const fixtures: { name: string; json: { schemaVersion: number; content: unknown } }[] = [
+  { name: "v1", json: v1 },
+  { name: "v2", json: v2 },
+  { name: "v3 (02)", json: v3 },
+  { name: "v4 (04)", json: v4 },
+  { name: "v5 (03)", json: v5Offer },
+  { name: "v5 (09)", json: v5Memo },
+];
 
 /** JSON with sorted keys, so key order does not count. */
 const canonical = (value: unknown): string =>
@@ -47,7 +58,7 @@ describe("0.x formats", () => {
         expect(canonical({ ...saved, schemaVersion: json.schemaVersion })).toBe(canonical(json));
       } else {
         // v1 and v2 are migrated to Word's model: every character stays.
-        expect(text(saved.content)).toBe(text(json.content));
+        expect(text(saved.content)).toBe(text(json.content as NodeJSON));
         expect(text(saved.content).length).toBeGreaterThan(20);
       }
     });
