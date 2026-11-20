@@ -1621,18 +1621,17 @@ Each task is a PR on `phase-12/ecosystem`, the build green after each.
   release. The bench config has its own port (5177) and never reuses a server. Tests:
   `scripts/bench.test.mjs` (9: medians, machine id, options, `BENCH` lines to metrics, WebKit
   paint left out, comparison with threshold and floor, table, update keeping thresholds). Baseline
-  `win32-54922355` (the owner's i7-13700H laptop, on battery): Chromium at 100 pages layout 242 ms,
-  type handler p50 28 ms, Enter 31 ms, re-flow 280 ms; find panel 16 ms (Chromium) to 118 ms
-  (WebKit); `findAll` ≤ 1 ms; the corpus imports in 167 ms, exports in 188 ms, prints to PDF in
-  1.26 s. Found: a keystroke costs 2.5-4× and the first layout 2.9× what 0.2.0 did on the same
-  machine in the same state (each release's checkout run in one session: about half from Phase 8,
-  the rest from 9-11, none from Phase 12), so the Phase 5 targets are missed; not investigated
-  here. Rust/WASM: no benchmark shows a need (the cost is the view's DOM work and the browsers'
-  layout). Shortcuts: the baseline was recorded on battery, where the same code measured 1.5-1.9×
-  slower an hour later as the charge fell (past every threshold), so it must be recorded again on
-  mains before 12.11 (`pnpm bench --update`); the browser benchmarks run on the dev server as
-  before; the 1-50-section and list documents stay in `pnpm bench:layout` only; model build and
-  block type change stay in core's Vitest bench, untracked. No changeset: no published package
+  `win32-54922355` (the owner's i7-13700H laptop, on mains power, 2026-11-20): Chromium at 100
+  pages layout 110 ms, type handler p50 11.4 ms, Enter 12.9 ms, re-flow 131 ms (Firefox layout
+  151 ms, WebKit 204 ms); find panel 16 ms (Chromium, Firefox) to 46-62 ms (WebKit); `findAll`
+  ≤ 0.4 ms; the corpus imports in 53 ms, exports in 65 ms, prints to PDF in 537 ms. On battery the
+  same code measured 1.5-2× slower. Found: a keystroke's handler costs 3.3-3.5× and the first
+  layout and re-flow about 2.2× what 0.2.0 did (each release's checkout run in one session on
+  mains, 3 runs each: mostly from Phase 8, the layout's in 8-10, none from Phase 12), so the
+  Phase 5 targets are missed at 100 pages; not investigated here (12.11). Rust/WASM: no benchmark
+  shows a need (the cost is the view's DOM work and the browsers' layout). Shortcuts: the browser
+  benchmarks run on the dev server as before; the 1-50-section and list documents stay in
+  `pnpm bench:layout` only; model build and block type change stay in core's Vitest bench, untracked. No changeset: no published package
   changed.)
 - [ ] 12.8 Docs site: `apps/site` gets the docs (getting started, guides, API reference from the
   12.2 reports, limitations, changelog), built from `docs/` so they do not drift, with live
@@ -1649,7 +1648,8 @@ Each task is a PR on `phase-12/ecosystem`, the build green after each.
   limitations the owner picks as 1.0 blockers fixed, the rest listed; a security pass (paste,
   links, `.docx` and zip limits, pictures, `exportPdf` input); the ADR-0003 manual checks run or
   accepted again by the owner as 1.0 risks; `pnpm examples`, the corpus harnesses and the e2e
-  suite green in three engines.
+  suite green in three engines; investigate the keystroke and first-layout cost added in Phases
+  8–11 (12.7) and decide with the owner whether it blocks 1.0.
 - [ ] 12.12 Close: docs as of 1.0 (README, architecture, api, ADR-0008's outcome), size budgets,
   the acceptance checked, the 1.0.0 changeset and version PR; publish with the owner's approval.
   The owner's yes or no on ADR-0008's open point (1.x minors may add a schema version, saved at

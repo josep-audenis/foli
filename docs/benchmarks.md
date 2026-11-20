@@ -5,7 +5,7 @@ and how to reproduce it. Re-run and update a section when the code it measures c
 
 ## Performance tracking (12.7)
 
-**Run:** `pnpm bench` (`scripts/bench.mjs`; about 12 minutes on the owner's laptop) before each
+**Run:** `pnpm bench` (`scripts/bench.mjs`; about 12 minutes on the owner's laptop on battery, less on mains) before each
 release ([contributing](contributing.md#releasing)) and on any change meant to be faster; not in
 `pnpm check` or the pre-push hook, no hosted CI
 ([ADR-0008](decisions/ADR-0008-1.0-contract-and-extensions.md)). It builds the packages, runs
@@ -42,7 +42,7 @@ running (which could be another checkout's).
 **Thresholds:** a metric fails when its median is past the baseline by more than `threshold`
 (relative) **and** by more than `floor` (milliseconds: for whole-millisecond clocks and a frame of
 waiting); as far the other way it is reported `faster`. The defaults (`TOLERANCES` in the
-script) were set from two full runs of the same code an hour apart, whose browser medians stayed
+script) were set from two full runs of the same code an hour apart (on battery), whose browser medians stayed
 within ±30% of each other (WebKit's paint p95 aside, now not tracked) and whose sub-millisecond
 `findAll` medians moved by up to +150%:
 
@@ -56,66 +56,67 @@ within ±30% of each other (WebKit's paint p95 aside, now not tracked) and whose
 | `.docx` import and export |     ± 40% |  10 ms |
 | PDF                       |     ± 40% | 100 ms |
 
-**On battery the comparison is not reliable.** The baseline was recorded on battery (the owner's
-laptop, Windows' Balanced plan); as the charge fell from 55% to 35% the same code measured
-1.5-1.9× slower in Node and in Chromium, past every threshold. Compare in the state the baseline
-was recorded in, rerun once before believing a regression, and record the baseline again on mains
-power (`pnpm bench --update`) before 1.0 is released.
+**Compare on mains power.** On battery (Windows' Balanced plan) the same code measured 1.5-2×
+slower than on mains, and drifted further as the charge fell, past every threshold. Rerun once
+before believing a regression.
 
 ### 1.0 numbers
 
 **Environment:** Intel Core i7-13700H (14 cores, 20 threads), 16 GB RAM, Windows 11 (10.0.26200),
-**on battery**, other sessions using the machine at times; Node.js 25.3.0; Playwright 1.64.1 with
-Chromium 156.0.8078.4, Firefox 157.0 and WebKit 27.2 (headless, 1280×720); 2026-11-19, the code of
-12.6. Medians of 3 runs (`bench/baselines/win32-54922355.json`); milliseconds.
+**on mains power**; Node.js 25.3.0; Playwright 1.64.1 with Chromium 156.0.8078.4, Firefox 157.0
+and WebKit 27.2 (headless, 1280×720); 2026-11-20, the code of 12.6. Medians of 3 runs
+(`bench/baselines/win32-54922355.json`); milliseconds.
 
 | Engine   | Sections (pages) | layout | type handler p50 | type paint p95 | Enter handler p50 | Enter paint p95 | re-flow |
 | -------- | ---------------: | -----: | ---------------: | -------------: | ----------------: | --------------: | ------: |
-| Chromium |        100 (104) |    242 |               28 |             40 |                31 |              79 |     280 |
-| Chromium |        200 (208) |    443 |               57 |             83 |                61 |             150 |     581 |
-| Firefox  |        100 (104) |    299 |               29 |             61 |                31 |              98 |     322 |
-| Firefox  |        200 (208) |    551 |               51 |            100 |                54 |             173 |     651 |
-| WebKit   |        100 (104) |    563 |               58 |              - |                68 |               - |     657 |
-| WebKit   |        200 (208) |  1,299 |              101 |              - |               110 |               - |   1,398 |
+| Chromium |        100 (104) |    110 |             11.4 |           17.1 |              12.9 |            31.6 |     131 |
+| Chromium |        200 (208) |    206 |             22.9 |           31.9 |              25.6 |            62.4 |     264 |
+| Firefox  |        100 (104) |    151 |               13 |             30 |                16 |              45 |     150 |
+| Firefox  |        200 (208) |    285 |               31 |             59 |                34 |             104 |     330 |
+| WebKit   |        100 (104) |    204 |               17 |              - |                20 |               - |     219 |
+| WebKit   |        200 (208) |    388 |               33 |              - |                35 |               - |     451 |
 
 | Find (107 pages) | `findAll` (Node) | Chromium panel | Firefox panel | WebKit panel |
 | ---------------- | ---------------: | -------------: | ------------: | -----------: |
-| `th`             |          0.96 ms |          16 ms |         24 ms |        85 ms |
-| `the `           |          0.92 ms |          17 ms |         22 ms |       118 ms |
-| `the la`         |          0.25 ms |          17 ms |         13 ms |       116 ms |
-| `zebra`          |          0.13 ms |          16 ms |         14 ms |       113 ms |
+| `th`             |          0.41 ms |          16 ms |         17 ms |        46 ms |
+| `the `           |          0.39 ms |          17 ms |         16 ms |        47 ms |
+| `the la`         |          0.15 ms |          17 ms |         16 ms |        62 ms |
+| `zebra`          |          0.05 ms |          16 ms |         16 ms |        61 ms |
 
 The panel's figures are medians of later searches (the first after loading reads the trees, see
-"Find" below); Chromium's are about one frame. `.docx`, the 9 corpus files together (18-32 kB
-each): import 167 ms, export 188 ms (Node); `exportPdf` 1.26 s (Chromium, about 140 ms per
+"Find" below); Chromium's and Firefox's are about one frame. `.docx`, the 9 corpus files together
+(18-32 kB each): import 53 ms, export 65 ms (Node); `exportPdf` 537 ms (Chromium, about 60 ms per
 document).
 
-**Against earlier numbers.** Pagination was last measured for 0.2.0 (7.9, not on battery as far
-as recorded): Chromium laid 100 pages out in 41 ms and handled a key in 4-6 ms; 1.0 on battery
-takes 242 ms and 28-31 ms. To separate the code from the battery, the 100-section benchmark of each
-release's own checkout ran once in Chromium in one session on battery, one after the other
-(single runs, so ±30% per cell):
+**Against earlier numbers.** Pagination was last measured for 0.2.0 (7.9): Chromium laid 100
+pages out in 41 ms and handled a key in 4-6 ms; 1.0 takes 110 ms and 11-13 ms. To separate the
+code from the machine, the 100-section benchmark of each release's own checkout ran in Chromium
+in one session on mains, one after the other, 3 runs each (medians):
 
 | Code             | Pages | layout | type handler p50 | type paint p95 | Enter handler p50 | Enter paint p95 | re-flow |
 | ---------------- | ----: | -----: | ---------------: | -------------: | ----------------: | --------------: | ------: |
-| 0.2.0 (Phase 7)  |   100 |     88 |               10 |             22 |                14 |              47 |     240 |
-| 0.3.0 (Phase 8)  |   106 |    168 |               22 |             32 |                27 |              77 |     279 |
-| 0.5.0 (Phase 10) |   106 |    234 |               26 |             45 |                32 |              70 |     295 |
-| 0.6.0 (Phase 11) |   104 |    220 |               38 |             63 |                38 |              82 |     290 |
-| 12.6             |   104 |    253 |               42 |             72 |                34 |              82 |     323 |
+| 0.2.0 (Phase 7)  |   100 |     50 |              3.7 |            8.9 |               4.2 |              19 |      68 |
+| 0.3.0 (Phase 8)  |   106 |     78 |              9.7 |             18 |              10.8 |              31 |     133 |
+| 0.5.0 (Phase 10) |   106 |    110 |             11.3 |           20.5 |              13.4 |              34 |     137 |
+| 0.6.0 (Phase 11) |   104 |    107 |             12.0 |           19.9 |              13.1 |              30 |     129 |
+| 12.6             |   104 |    109 |             12.2 |           19.0 |              14.5 |              37 |     146 |
 
-**A regression since 0.2.0, not from Phase 12:** on the same machine in the same state a
-keystroke's handler costs 2.5-4× what it did in 0.2.0 and the first layout about 2.9×. About
-half of it came with the Word model (Phase 8: schema v3, Word's formatting resolved per block),
-the rest with Phases 9 to 11; 12.6 is within the noise of 0.6.0. The re-flow moved least (+35%). The
-pagination targets below (handler p50 ≤ 8 ms, layout ≤ 60 ms at 100 pages) are missed: on
-battery by 3.5-4×, and on mains too if the battery costs what it cost 0.2.0 here (about 2.2-2.5×).
-Not investigated in 12.7; the baseline catches further regressions from here.
+0.2.0's row agrees with what 7.9 measured, so the machine has not changed. (An earlier pass of
+single runs on battery gave the same picture at about twice the times.)
+
+**A regression since 0.2.0, not from Phase 12:** a keystroke's handler costs 3.3-3.5× what it
+did in 0.2.0, the first layout and the full re-flow about 2.2×, keystroke-to-paint p95 about 2×.
+Most of the keystroke cost came with the Word model (Phase 8: schema v3, Word's formatting
+resolved per block), the layout's in Phases 8 to 10; 12.6 is within the noise of 0.6.0. At 100
+pages the pagination targets below are missed in Chromium and Firefox: handler p50 11-16 ms
+(≤ 8), Enter's paint p95 32-45 ms (≤ 25; typing's 17 ms in Chromium passes), layout 110-151 ms
+(≤ 60), re-flow 131-150 ms (≤ 100). Not investigated in 12.7 (12.11 decides whether it blocks
+1.0); the baseline catches further regressions from here.
 
 **Rust and WebAssembly:** no benchmark shows a need. The slow paths are the view's work per
 keystroke and the browsers' own layout of the pages (DOM, measuring, painting), which WebAssembly
-does not speed up; the computing parts are small (`findAll` at most about 1 ms on 107 pages, a
-`.docx` import about 19 ms per document).
+does not speed up; the computing parts are small (`findAll` at most 0.4 ms on 107 pages, a `.docx`
+import about 6 ms per document).
 
 ## Document model: build and serialize (Phase 2)
 
