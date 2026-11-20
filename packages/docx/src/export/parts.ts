@@ -188,19 +188,22 @@ const STYLE_ORDER = [
   "tblStylePr",
 ];
 
+const TABLE_STYLE_KEYS = ["table", "row", "cell", "conditions"] as const;
+
 function styleXml(style: StyleJSON, ns: Namespaces): string {
   const o = original(style.ext, ns);
-  if (o) {
-    const reread = styleOf(o.element, reading(o.source));
-    if (reread && same(normalizeStyle(style), normalizeStyle(reread))) return style.ext as string;
+  let reread = o ? styleOf(o.element, reading(o.source)) : undefined;
+  // A schema 3 document (0.3.0, 0.4.0) kept a table style's parts in `ext` only: none of them
+  // in the model means they were never read, not removed, so they are written as read.
+  if (reread && TABLE_STYLE_KEYS.every((key) => style[key] === undefined)) {
+    reread = { ...reread };
+    for (const key of TABLE_STYLE_KEYS) delete reread[key];
   }
-  const reread = o ? styleOf(o.element, reading(o.source)) : undefined;
+  if (reread && same(normalizeStyle(style), normalizeStyle(reread))) return style.ext as string;
   // A table style read from the file has its parts written as read (`w:tblPr`… kept): a change
   // would be lost. A new one (Word's Table Grid, added by a command) is written from the model,
   // without conditional formats.
-  for (const key of o
-    ? (["table", "row", "cell", "conditions"] as const)
-    : (["conditions"] as const)) {
+  for (const key of o ? TABLE_STYLE_KEYS : (["conditions"] as const)) {
     if (!same(style[key], reread?.[key])) {
       throw new DocxError(
         `Style ${style.id}: a changed table style (${key}) cannot be exported yet`,

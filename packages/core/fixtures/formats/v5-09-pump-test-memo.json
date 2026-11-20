@@ -1,0 +1,2420 @@
+{
+  "schemaVersion": 5,
+  "section": {
+    "pageSize": {
+      "width": 11906,
+      "height": 16838
+    },
+    "margins": {
+      "top": 1440,
+      "right": 1440,
+      "bottom": 1440,
+      "left": 1440,
+      "header": 708,
+      "footer": 708,
+      "gutter": 0
+    },
+    "headers": {
+      "even": "rId6",
+      "default": "rId7",
+      "first": "rId10"
+    },
+    "footers": {
+      "even": "rId8",
+      "default": "rId9",
+      "first": "rId11"
+    },
+    "columns": {
+      "space": 708
+    },
+    "ext": "<w:sectPr w:rsidR=\"00074BD8\" w:rsidRPr=\"00074BD8\" w:rsidSect=\"00074BD8\"><w:headerReference w:type=\"even\" r:id=\"rId6\"/><w:headerReference w:type=\"default\" r:id=\"rId7\"/><w:footerReference w:type=\"even\" r:id=\"rId8\"/><w:footerReference w:type=\"default\" r:id=\"rId9\"/><w:headerReference w:type=\"first\" r:id=\"rId10\"/><w:footerReference w:type=\"first\" r:id=\"rId11\"/><w:pgSz w:w=\"11906\" w:h=\"16838\"/><w:pgMar w:top=\"1440\" w:right=\"1440\" w:bottom=\"1440\" w:left=\"1440\" w:header=\"708\" w:footer=\"708\" w:gutter=\"0\"/><w:cols w:space=\"708\"/><w:docGrid w:linePitch=\"360\"/></w:sectPr>"
+  },
+  "defaults": {
+    "paragraph": {
+      "spacing": {
+        "after": 160,
+        "line": 259,
+        "lineRule": "auto"
+      }
+    },
+    "run": [
+      {
+        "type": "font",
+        "attrs": {
+          "asciiTheme": "minorHAnsi",
+          "hAnsiTheme": "minorHAnsi",
+          "eastAsiaTheme": "minorHAnsi",
+          "csTheme": "minorBidi"
+        }
+      },
+      {
+        "type": "fontSize",
+        "attrs": {
+          "value": 22,
+          "complexScript": 22
+        }
+      }
+    ],
+    "ext": "<w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:asciiTheme=\"minorHAnsi\" w:eastAsiaTheme=\"minorHAnsi\" w:hAnsiTheme=\"minorHAnsi\" w:cstheme=\"minorBidi\"/><w:kern w:val=\"2\"/><w:sz w:val=\"22\"/><w:szCs w:val=\"22\"/><w:lang w:val=\"es-ES\" w:eastAsia=\"en-US\" w:bidi=\"he-IL\"/><w14:ligatures w14:val=\"standardContextual\"/></w:rPr></w:rPrDefault><w:pPrDefault><w:pPr><w:spacing w:after=\"160\" w:line=\"259\" w:lineRule=\"auto\"/></w:pPr></w:pPrDefault></w:docDefaults>"
+  },
+  "styles": [
+    {
+      "id": "Normal",
+      "type": "paragraph",
+      "name": "Normal",
+      "isDefault": true,
+      "ext": "<w:style w:type=\"paragraph\" w:default=\"1\" w:styleId=\"Normal\"><w:name w:val=\"Normal\"/><w:qFormat/><w:rPr><w:lang w:val=\"en-GB\"/></w:rPr></w:style>"
+    },
+    {
+      "id": "Heading1",
+      "type": "paragraph",
+      "name": "heading 1",
+      "basedOn": "Normal",
+      "next": "Normal",
+      "link": "Heading1Char",
+      "paragraph": {
+        "spacing": {
+          "before": 360,
+          "after": 80
+        },
+        "keepNext": true,
+        "keepLines": true,
+        "outlineLevel": 0
+      },
+      "run": [
+        {
+          "type": "font",
+          "attrs": {
+            "asciiTheme": "majorHAnsi",
+            "hAnsiTheme": "majorHAnsi",
+            "eastAsiaTheme": "majorEastAsia",
+            "csTheme": "majorBidi"
+          }
+        },
+        {
+          "type": "color",
+          "attrs": {
+            "value": "0F4761",
+            "themeColor": "accent1",
+            "themeShade": "BF"
+          }
+        },
+        {
+          "type": "fontSize",
+          "attrs": {
+            "value": 40,
+            "complexScript": 40
+          }
+        }
+      ],
+      "ext": "<w:style w:type=\"paragraph\" w:styleId=\"Heading1\"><w:name w:val=\"heading 1\"/><w:basedOn w:val=\"Normal\"/><w:next w:val=\"Normal\"/><w:link w:val=\"Heading1Char\"/><w:uiPriority w:val=\"9\"/><w:qFormat/><w:rsid w:val=\"00074BD8\"/><w:pPr><w:keepNext/><w:keepLines/><w:spacing w:before=\"360\" w:after=\"80\"/><w:outlineLvl w:val=\"0\"/></w:pPr><w:rPr><w:rFonts w:asciiTheme=\"majorHAnsi\" w:eastAsiaTheme=\"majorEastAsia\" w:hAnsiTheme=\"majorHAnsi\" w:cstheme=\"majorBidi\"/><w:color w:val=\"0F4761\" w:themeColor=\"accent1\" w:themeShade=\"BF\"/><w:sz w:val=\"40\"/><w:szCs w:val=\"40\"/></w:rPr></w:style>"
+    },
+    {
+      "id": "Heading2",
+      "type": "paragraph",
+      "name": "heading 2",
+      "basedOn": "Normal",
+      "next": "Normal",
+      "link": "Heading2Char",
+      "paragraph": {
+        "spacing": {
+          "before": 160,
+          "after": 80
+        },
+        "keepNext": true,
+        "keepLines": true,
+        "outlineLevel": 1
+      },
+      "run": [
+        {
+          "type": "font",
+          "attrs": {
+            "asciiTheme": "majorHAnsi",
+            "hAnsiTheme": "majorHAnsi",
+            "eastAsiaTheme": "majorEastAsia",
+            "csTheme": "majorBidi"
+          }
+        },
+        {
+          "type": "color",
+          "attrs": {
+            "value": "0F4761",
+            "themeColor": "accent1",
+            "themeShade": "BF"
+          }
+        },
+        {
+          "type": "fontSize",
+          "attrs": {
+            "value": 32,
+            "complexScript": 32
+          }
+        }
+      ],
+      "ext": "<w:style w:type=\"paragraph\" w:styleId=\"Heading2\"><w:name w:val=\"heading 2\"/><w:basedOn w:val=\"Normal\"/><w:next w:val=\"Normal\"/><w:link w:val=\"Heading2Char\"/><w:uiPriority w:val=\"9\"/><w:semiHidden/><w:unhideWhenUsed/><w:qFormat/><w:rsid w:val=\"00074BD8\"/><w:pPr><w:keepNext/><w:keepLines/><w:spacing w:before=\"160\" w:after=\"80\"/><w:outlineLvl w:val=\"1\"/></w:pPr><w:rPr><w:rFonts w:asciiTheme=\"majorHAnsi\" w:eastAsiaTheme=\"majorEastAsia\" w:hAnsiTheme=\"majorHAnsi\" w:cstheme=\"majorBidi\"/><w:color w:val=\"0F4761\" w:themeColor=\"accent1\" w:themeShade=\"BF\"/><w:sz w:val=\"32\"/><w:szCs w:val=\"32\"/></w:rPr></w:style>"
+    },
+    {
+      "id": "Heading3",
+      "type": "paragraph",
+      "name": "heading 3",
+      "basedOn": "Normal",
+      "next": "Normal",
+      "link": "Heading3Char",
+      "paragraph": {
+        "spacing": {
+          "before": 160,
+          "after": 80
+        },
+        "keepNext": true,
+        "keepLines": true,
+        "outlineLevel": 2
+      },
+      "run": [
+        {
+          "type": "font",
+          "attrs": {
+            "eastAsiaTheme": "majorEastAsia",
+            "csTheme": "majorBidi"
+          }
+        },
+        {
+          "type": "color",
+          "attrs": {
+            "value": "0F4761",
+            "themeColor": "accent1",
+            "themeShade": "BF"
+          }
+        },
+        {
+          "type": "fontSize",
+          "attrs": {
+            "value": 28,
+            "complexScript": 28
+          }
+        }
+      ],
+      "ext": "<w:style w:type=\"paragraph\" w:styleId=\"Heading3\"><w:name w:val=\"heading 3\"/><w:basedOn w:val=\"Normal\"/><w:next w:val=\"Normal\"/><w:link w:val=\"Heading3Char\"/><w:uiPriority w:val=\"9\"/><w:semiHidden/><w:unhideWhenUsed/><w:qFormat/><w:rsid w:val=\"00074BD8\"/><w:pPr><w:keepNext/><w:keepLines/><w:spacing w:before=\"160\" w:after=\"80\"/><w:outlineLvl w:val=\"2\"/></w:pPr><w:rPr><w:rFonts w:eastAsiaTheme=\"majorEastAsia\" w:cstheme=\"majorBidi\"/><w:color w:val=\"0F4761\" w:themeColor=\"accent1\" w:themeShade=\"BF\"/><w:sz w:val=\"28\"/><w:szCs w:val=\"28\"/></w:rPr></w:style>"
+    },
+    {
+      "id": "Heading4",
+      "type": "paragraph",
+      "name": "heading 4",
+      "basedOn": "Normal",
+      "next": "Normal",
+      "link": "Heading4Char",
+      "paragraph": {
+        "spacing": {
+          "before": 80,
+          "after": 40
+        },
+        "keepNext": true,
+        "keepLines": true,
+        "outlineLevel": 3
+      },
+      "run": [
+        {
+          "type": "italic",
+          "attrs": {
+            "complexScript": true
+          }
+        },
+        {
+          "type": "font",
+          "attrs": {
+            "eastAsiaTheme": "majorEastAsia",
+            "csTheme": "majorBidi"
+          }
+        },
+        {
+          "type": "color",
+          "attrs": {
+            "value": "0F4761",
+            "themeColor": "accent1",
+            "themeShade": "BF"
+          }
+        }
+      ],
+      "ext": "<w:style w:type=\"paragraph\" w:styleId=\"Heading4\"><w:name w:val=\"heading 4\"/><w:basedOn w:val=\"Normal\"/><w:next w:val=\"Normal\"/><w:link w:val=\"Heading4Char\"/><w:uiPriority w:val=\"9\"/><w:semiHidden/><w:unhideWhenUsed/><w:qFormat/><w:rsid w:val=\"00074BD8\"/><w:pPr><w:keepNext/><w:keepLines/><w:spacing w:before=\"80\" w:after=\"40\"/><w:outlineLvl w:val=\"3\"/></w:pPr><w:rPr><w:rFonts w:eastAsiaTheme=\"majorEastAsia\" w:cstheme=\"majorBidi\"/><w:i/><w:iCs/><w:color w:val=\"0F4761\" w:themeColor=\"accent1\" w:themeShade=\"BF\"/></w:rPr></w:style>"
+    },
+    {
+      "id": "Heading5",
+      "type": "paragraph",
+      "name": "heading 5",
+      "basedOn": "Normal",
+      "next": "Normal",
+      "link": "Heading5Char",
+      "paragraph": {
+        "spacing": {
+          "before": 80,
+          "after": 40
+        },
+        "keepNext": true,
+        "keepLines": true,
+        "outlineLevel": 4
+      },
+      "run": [
+        {
+          "type": "font",
+          "attrs": {
+            "eastAsiaTheme": "majorEastAsia",
+            "csTheme": "majorBidi"
+          }
+        },
+        {
+          "type": "color",
+          "attrs": {
+            "value": "0F4761",
+            "themeColor": "accent1",
+            "themeShade": "BF"
+          }
+        }
+      ],
+      "ext": "<w:style w:type=\"paragraph\" w:styleId=\"Heading5\"><w:name w:val=\"heading 5\"/><w:basedOn w:val=\"Normal\"/><w:next w:val=\"Normal\"/><w:link w:val=\"Heading5Char\"/><w:uiPriority w:val=\"9\"/><w:semiHidden/><w:unhideWhenUsed/><w:qFormat/><w:rsid w:val=\"00074BD8\"/><w:pPr><w:keepNext/><w:keepLines/><w:spacing w:before=\"80\" w:after=\"40\"/><w:outlineLvl w:val=\"4\"/></w:pPr><w:rPr><w:rFonts w:eastAsiaTheme=\"majorEastAsia\" w:cstheme=\"majorBidi\"/><w:color w:val=\"0F4761\" w:themeColor=\"accent1\" w:themeShade=\"BF\"/></w:rPr></w:style>"
+    },
+    {
+      "id": "Heading6",
+      "type": "paragraph",
+      "name": "heading 6",
+      "basedOn": "Normal",
+      "next": "Normal",
+      "link": "Heading6Char",
+      "paragraph": {
+        "spacing": {
+          "before": 40,
+          "after": 0
+        },
+        "keepNext": true,
+        "keepLines": true,
+        "outlineLevel": 5
+      },
+      "run": [
+        {
+          "type": "italic",
+          "attrs": {
+            "complexScript": true
+          }
+        },
+        {
+          "type": "font",
+          "attrs": {
+            "eastAsiaTheme": "majorEastAsia",
+            "csTheme": "majorBidi"
+          }
+        },
+        {
+          "type": "color",
+          "attrs": {
+            "value": "595959",
+            "themeColor": "text1",
+            "themeTint": "A6"
+          }
+        }
+      ],
+      "ext": "<w:style w:type=\"paragraph\" w:styleId=\"Heading6\"><w:name w:val=\"heading 6\"/><w:basedOn w:val=\"Normal\"/><w:next w:val=\"Normal\"/><w:link w:val=\"Heading6Char\"/><w:uiPriority w:val=\"9\"/><w:semiHidden/><w:unhideWhenUsed/><w:qFormat/><w:rsid w:val=\"00074BD8\"/><w:pPr><w:keepNext/><w:keepLines/><w:spacing w:before=\"40\" w:after=\"0\"/><w:outlineLvl w:val=\"5\"/></w:pPr><w:rPr><w:rFonts w:eastAsiaTheme=\"majorEastAsia\" w:cstheme=\"majorBidi\"/><w:i/><w:iCs/><w:color w:val=\"595959\" w:themeColor=\"text1\" w:themeTint=\"A6\"/></w:rPr></w:style>"
+    },
+    {
+      "id": "Heading7",
+      "type": "paragraph",
+      "name": "heading 7",
+      "basedOn": "Normal",
+      "next": "Normal",
+      "link": "Heading7Char",
+      "paragraph": {
+        "spacing": {
+          "before": 40,
+          "after": 0
+        },
+        "keepNext": true,
+        "keepLines": true,
+        "outlineLevel": 6
+      },
+      "run": [
+        {
+          "type": "font",
+          "attrs": {
+            "eastAsiaTheme": "majorEastAsia",
+            "csTheme": "majorBidi"
+          }
+        },
+        {
+          "type": "color",
+          "attrs": {
+            "value": "595959",
+            "themeColor": "text1",
+            "themeTint": "A6"
+          }
+        }
+      ],
+      "ext": "<w:style w:type=\"paragraph\" w:styleId=\"Heading7\"><w:name w:val=\"heading 7\"/><w:basedOn w:val=\"Normal\"/><w:next w:val=\"Normal\"/><w:link w:val=\"Heading7Char\"/><w:uiPriority w:val=\"9\"/><w:semiHidden/><w:unhideWhenUsed/><w:qFormat/><w:rsid w:val=\"00074BD8\"/><w:pPr><w:keepNext/><w:keepLines/><w:spacing w:before=\"40\" w:after=\"0\"/><w:outlineLvl w:val=\"6\"/></w:pPr><w:rPr><w:rFonts w:eastAsiaTheme=\"majorEastAsia\" w:cstheme=\"majorBidi\"/><w:color w:val=\"595959\" w:themeColor=\"text1\" w:themeTint=\"A6\"/></w:rPr></w:style>"
+    },
+    {
+      "id": "Heading8",
+      "type": "paragraph",
+      "name": "heading 8",
+      "basedOn": "Normal",
+      "next": "Normal",
+      "link": "Heading8Char",
+      "paragraph": {
+        "spacing": {
+          "after": 0
+        },
+        "keepNext": true,
+        "keepLines": true,
+        "outlineLevel": 7
+      },
+      "run": [
+        {
+          "type": "italic",
+          "attrs": {
+            "complexScript": true
+          }
+        },
+        {
+          "type": "font",
+          "attrs": {
+            "eastAsiaTheme": "majorEastAsia",
+            "csTheme": "majorBidi"
+          }
+        },
+        {
+          "type": "color",
+          "attrs": {
+            "value": "272727",
+            "themeColor": "text1",
+            "themeTint": "D8"
+          }
+        }
+      ],
+      "ext": "<w:style w:type=\"paragraph\" w:styleId=\"Heading8\"><w:name w:val=\"heading 8\"/><w:basedOn w:val=\"Normal\"/><w:next w:val=\"Normal\"/><w:link w:val=\"Heading8Char\"/><w:uiPriority w:val=\"9\"/><w:semiHidden/><w:unhideWhenUsed/><w:qFormat/><w:rsid w:val=\"00074BD8\"/><w:pPr><w:keepNext/><w:keepLines/><w:spacing w:after=\"0\"/><w:outlineLvl w:val=\"7\"/></w:pPr><w:rPr><w:rFonts w:eastAsiaTheme=\"majorEastAsia\" w:cstheme=\"majorBidi\"/><w:i/><w:iCs/><w:color w:val=\"272727\" w:themeColor=\"text1\" w:themeTint=\"D8\"/></w:rPr></w:style>"
+    },
+    {
+      "id": "Heading9",
+      "type": "paragraph",
+      "name": "heading 9",
+      "basedOn": "Normal",
+      "next": "Normal",
+      "link": "Heading9Char",
+      "paragraph": {
+        "spacing": {
+          "after": 0
+        },
+        "keepNext": true,
+        "keepLines": true,
+        "outlineLevel": 8
+      },
+      "run": [
+        {
+          "type": "font",
+          "attrs": {
+            "eastAsiaTheme": "majorEastAsia",
+            "csTheme": "majorBidi"
+          }
+        },
+        {
+          "type": "color",
+          "attrs": {
+            "value": "272727",
+            "themeColor": "text1",
+            "themeTint": "D8"
+          }
+        }
+      ],
+      "ext": "<w:style w:type=\"paragraph\" w:styleId=\"Heading9\"><w:name w:val=\"heading 9\"/><w:basedOn w:val=\"Normal\"/><w:next w:val=\"Normal\"/><w:link w:val=\"Heading9Char\"/><w:uiPriority w:val=\"9\"/><w:semiHidden/><w:unhideWhenUsed/><w:qFormat/><w:rsid w:val=\"00074BD8\"/><w:pPr><w:keepNext/><w:keepLines/><w:spacing w:after=\"0\"/><w:outlineLvl w:val=\"8\"/></w:pPr><w:rPr><w:rFonts w:eastAsiaTheme=\"majorEastAsia\" w:cstheme=\"majorBidi\"/><w:color w:val=\"272727\" w:themeColor=\"text1\" w:themeTint=\"D8\"/></w:rPr></w:style>"
+    },
+    {
+      "id": "DefaultParagraphFont",
+      "type": "character",
+      "name": "Default Paragraph Font",
+      "isDefault": true,
+      "ext": "<w:style w:type=\"character\" w:default=\"1\" w:styleId=\"DefaultParagraphFont\"><w:name w:val=\"Default Paragraph Font\"/><w:uiPriority w:val=\"1\"/><w:semiHidden/><w:unhideWhenUsed/></w:style>"
+    },
+    {
+      "id": "TableNormal",
+      "type": "table",
+      "name": "Normal Table",
+      "isDefault": true,
+      "table": {
+        "indent": {
+          "value": 0,
+          "type": "dxa"
+        },
+        "cellMargins": {
+          "top": {
+            "value": 0,
+            "type": "dxa"
+          },
+          "left": {
+            "value": 108,
+            "type": "dxa"
+          },
+          "bottom": {
+            "value": 0,
+            "type": "dxa"
+          },
+          "right": {
+            "value": 108,
+            "type": "dxa"
+          }
+        }
+      },
+      "ext": "<w:style w:type=\"table\" w:default=\"1\" w:styleId=\"TableNormal\"><w:name w:val=\"Normal Table\"/><w:uiPriority w:val=\"99\"/><w:semiHidden/><w:unhideWhenUsed/><w:tblPr><w:tblInd w:w=\"0\" w:type=\"dxa\"/><w:tblCellMar><w:top w:w=\"0\" w:type=\"dxa\"/><w:left w:w=\"108\" w:type=\"dxa\"/><w:bottom w:w=\"0\" w:type=\"dxa\"/><w:right w:w=\"108\" w:type=\"dxa\"/></w:tblCellMar></w:tblPr></w:style>"
+    },
+    {
+      "id": "NoList",
+      "type": "numbering",
+      "name": "No List",
+      "isDefault": true,
+      "ext": "<w:style w:type=\"numbering\" w:default=\"1\" w:styleId=\"NoList\"><w:name w:val=\"No List\"/><w:uiPriority w:val=\"99\"/><w:semiHidden/><w:unhideWhenUsed/></w:style>"
+    },
+    {
+      "id": "Heading1Char",
+      "type": "character",
+      "name": "Heading 1 Char",
+      "basedOn": "DefaultParagraphFont",
+      "link": "Heading1",
+      "run": [
+        {
+          "type": "font",
+          "attrs": {
+            "asciiTheme": "majorHAnsi",
+            "hAnsiTheme": "majorHAnsi",
+            "eastAsiaTheme": "majorEastAsia",
+            "csTheme": "majorBidi"
+          }
+        },
+        {
+          "type": "color",
+          "attrs": {
+            "value": "0F4761",
+            "themeColor": "accent1",
+            "themeShade": "BF"
+          }
+        },
+        {
+          "type": "fontSize",
+          "attrs": {
+            "value": 40,
+            "complexScript": 40
+          }
+        }
+      ],
+      "ext": "<w:style w:type=\"character\" w:customStyle=\"1\" w:styleId=\"Heading1Char\"><w:name w:val=\"Heading 1 Char\"/><w:basedOn w:val=\"DefaultParagraphFont\"/><w:link w:val=\"Heading1\"/><w:uiPriority w:val=\"9\"/><w:rsid w:val=\"00074BD8\"/><w:rPr><w:rFonts w:asciiTheme=\"majorHAnsi\" w:eastAsiaTheme=\"majorEastAsia\" w:hAnsiTheme=\"majorHAnsi\" w:cstheme=\"majorBidi\"/><w:color w:val=\"0F4761\" w:themeColor=\"accent1\" w:themeShade=\"BF\"/><w:sz w:val=\"40\"/><w:szCs w:val=\"40\"/><w:lang w:val=\"ca-ES\"/></w:rPr></w:style>"
+    },
+    {
+      "id": "Heading2Char",
+      "type": "character",
+      "name": "Heading 2 Char",
+      "basedOn": "DefaultParagraphFont",
+      "link": "Heading2",
+      "run": [
+        {
+          "type": "font",
+          "attrs": {
+            "asciiTheme": "majorHAnsi",
+            "hAnsiTheme": "majorHAnsi",
+            "eastAsiaTheme": "majorEastAsia",
+            "csTheme": "majorBidi"
+          }
+        },
+        {
+          "type": "color",
+          "attrs": {
+            "value": "0F4761",
+            "themeColor": "accent1",
+            "themeShade": "BF"
+          }
+        },
+        {
+          "type": "fontSize",
+          "attrs": {
+            "value": 32,
+            "complexScript": 32
+          }
+        }
+      ],
+      "ext": "<w:style w:type=\"character\" w:customStyle=\"1\" w:styleId=\"Heading2Char\"><w:name w:val=\"Heading 2 Char\"/><w:basedOn w:val=\"DefaultParagraphFont\"/><w:link w:val=\"Heading2\"/><w:uiPriority w:val=\"9\"/><w:semiHidden/><w:rsid w:val=\"00074BD8\"/><w:rPr><w:rFonts w:asciiTheme=\"majorHAnsi\" w:eastAsiaTheme=\"majorEastAsia\" w:hAnsiTheme=\"majorHAnsi\" w:cstheme=\"majorBidi\"/><w:color w:val=\"0F4761\" w:themeColor=\"accent1\" w:themeShade=\"BF\"/><w:sz w:val=\"32\"/><w:szCs w:val=\"32\"/><w:lang w:val=\"ca-ES\"/></w:rPr></w:style>"
+    },
+    {
+      "id": "Heading3Char",
+      "type": "character",
+      "name": "Heading 3 Char",
+      "basedOn": "DefaultParagraphFont",
+      "link": "Heading3",
+      "run": [
+        {
+          "type": "font",
+          "attrs": {
+            "eastAsiaTheme": "majorEastAsia",
+            "csTheme": "majorBidi"
+          }
+        },
+        {
+          "type": "color",
+          "attrs": {
+            "value": "0F4761",
+            "themeColor": "accent1",
+            "themeShade": "BF"
+          }
+        },
+        {
+          "type": "fontSize",
+          "attrs": {
+            "value": 28,
+            "complexScript": 28
+          }
+        }
+      ],
+      "ext": "<w:style w:type=\"character\" w:customStyle=\"1\" w:styleId=\"Heading3Char\"><w:name w:val=\"Heading 3 Char\"/><w:basedOn w:val=\"DefaultParagraphFont\"/><w:link w:val=\"Heading3\"/><w:uiPriority w:val=\"9\"/><w:semiHidden/><w:rsid w:val=\"00074BD8\"/><w:rPr><w:rFonts w:eastAsiaTheme=\"majorEastAsia\" w:cstheme=\"majorBidi\"/><w:color w:val=\"0F4761\" w:themeColor=\"accent1\" w:themeShade=\"BF\"/><w:sz w:val=\"28\"/><w:szCs w:val=\"28\"/><w:lang w:val=\"ca-ES\"/></w:rPr></w:style>"
+    },
+    {
+      "id": "Heading4Char",
+      "type": "character",
+      "name": "Heading 4 Char",
+      "basedOn": "DefaultParagraphFont",
+      "link": "Heading4",
+      "run": [
+        {
+          "type": "italic",
+          "attrs": {
+            "complexScript": true
+          }
+        },
+        {
+          "type": "font",
+          "attrs": {
+            "eastAsiaTheme": "majorEastAsia",
+            "csTheme": "majorBidi"
+          }
+        },
+        {
+          "type": "color",
+          "attrs": {
+            "value": "0F4761",
+            "themeColor": "accent1",
+            "themeShade": "BF"
+          }
+        }
+      ],
+      "ext": "<w:style w:type=\"character\" w:customStyle=\"1\" w:styleId=\"Heading4Char\"><w:name w:val=\"Heading 4 Char\"/><w:basedOn w:val=\"DefaultParagraphFont\"/><w:link w:val=\"Heading4\"/><w:uiPriority w:val=\"9\"/><w:semiHidden/><w:rsid w:val=\"00074BD8\"/><w:rPr><w:rFonts w:eastAsiaTheme=\"majorEastAsia\" w:cstheme=\"majorBidi\"/><w:i/><w:iCs/><w:color w:val=\"0F4761\" w:themeColor=\"accent1\" w:themeShade=\"BF\"/><w:lang w:val=\"ca-ES\"/></w:rPr></w:style>"
+    },
+    {
+      "id": "Heading5Char",
+      "type": "character",
+      "name": "Heading 5 Char",
+      "basedOn": "DefaultParagraphFont",
+      "link": "Heading5",
+      "run": [
+        {
+          "type": "font",
+          "attrs": {
+            "eastAsiaTheme": "majorEastAsia",
+            "csTheme": "majorBidi"
+          }
+        },
+        {
+          "type": "color",
+          "attrs": {
+            "value": "0F4761",
+            "themeColor": "accent1",
+            "themeShade": "BF"
+          }
+        }
+      ],
+      "ext": "<w:style w:type=\"character\" w:customStyle=\"1\" w:styleId=\"Heading5Char\"><w:name w:val=\"Heading 5 Char\"/><w:basedOn w:val=\"DefaultParagraphFont\"/><w:link w:val=\"Heading5\"/><w:uiPriority w:val=\"9\"/><w:semiHidden/><w:rsid w:val=\"00074BD8\"/><w:rPr><w:rFonts w:eastAsiaTheme=\"majorEastAsia\" w:cstheme=\"majorBidi\"/><w:color w:val=\"0F4761\" w:themeColor=\"accent1\" w:themeShade=\"BF\"/><w:lang w:val=\"ca-ES\"/></w:rPr></w:style>"
+    },
+    {
+      "id": "Heading6Char",
+      "type": "character",
+      "name": "Heading 6 Char",
+      "basedOn": "DefaultParagraphFont",
+      "link": "Heading6",
+      "run": [
+        {
+          "type": "italic",
+          "attrs": {
+            "complexScript": true
+          }
+        },
+        {
+          "type": "font",
+          "attrs": {
+            "eastAsiaTheme": "majorEastAsia",
+            "csTheme": "majorBidi"
+          }
+        },
+        {
+          "type": "color",
+          "attrs": {
+            "value": "595959",
+            "themeColor": "text1",
+            "themeTint": "A6"
+          }
+        }
+      ],
+      "ext": "<w:style w:type=\"character\" w:customStyle=\"1\" w:styleId=\"Heading6Char\"><w:name w:val=\"Heading 6 Char\"/><w:basedOn w:val=\"DefaultParagraphFont\"/><w:link w:val=\"Heading6\"/><w:uiPriority w:val=\"9\"/><w:semiHidden/><w:rsid w:val=\"00074BD8\"/><w:rPr><w:rFonts w:eastAsiaTheme=\"majorEastAsia\" w:cstheme=\"majorBidi\"/><w:i/><w:iCs/><w:color w:val=\"595959\" w:themeColor=\"text1\" w:themeTint=\"A6\"/><w:lang w:val=\"ca-ES\"/></w:rPr></w:style>"
+    },
+    {
+      "id": "Heading7Char",
+      "type": "character",
+      "name": "Heading 7 Char",
+      "basedOn": "DefaultParagraphFont",
+      "link": "Heading7",
+      "run": [
+        {
+          "type": "font",
+          "attrs": {
+            "eastAsiaTheme": "majorEastAsia",
+            "csTheme": "majorBidi"
+          }
+        },
+        {
+          "type": "color",
+          "attrs": {
+            "value": "595959",
+            "themeColor": "text1",
+            "themeTint": "A6"
+          }
+        }
+      ],
+      "ext": "<w:style w:type=\"character\" w:customStyle=\"1\" w:styleId=\"Heading7Char\"><w:name w:val=\"Heading 7 Char\"/><w:basedOn w:val=\"DefaultParagraphFont\"/><w:link w:val=\"Heading7\"/><w:uiPriority w:val=\"9\"/><w:semiHidden/><w:rsid w:val=\"00074BD8\"/><w:rPr><w:rFonts w:eastAsiaTheme=\"majorEastAsia\" w:cstheme=\"majorBidi\"/><w:color w:val=\"595959\" w:themeColor=\"text1\" w:themeTint=\"A6\"/><w:lang w:val=\"ca-ES\"/></w:rPr></w:style>"
+    },
+    {
+      "id": "Heading8Char",
+      "type": "character",
+      "name": "Heading 8 Char",
+      "basedOn": "DefaultParagraphFont",
+      "link": "Heading8",
+      "run": [
+        {
+          "type": "italic",
+          "attrs": {
+            "complexScript": true
+          }
+        },
+        {
+          "type": "font",
+          "attrs": {
+            "eastAsiaTheme": "majorEastAsia",
+            "csTheme": "majorBidi"
+          }
+        },
+        {
+          "type": "color",
+          "attrs": {
+            "value": "272727",
+            "themeColor": "text1",
+            "themeTint": "D8"
+          }
+        }
+      ],
+      "ext": "<w:style w:type=\"character\" w:customStyle=\"1\" w:styleId=\"Heading8Char\"><w:name w:val=\"Heading 8 Char\"/><w:basedOn w:val=\"DefaultParagraphFont\"/><w:link w:val=\"Heading8\"/><w:uiPriority w:val=\"9\"/><w:semiHidden/><w:rsid w:val=\"00074BD8\"/><w:rPr><w:rFonts w:eastAsiaTheme=\"majorEastAsia\" w:cstheme=\"majorBidi\"/><w:i/><w:iCs/><w:color w:val=\"272727\" w:themeColor=\"text1\" w:themeTint=\"D8\"/><w:lang w:val=\"ca-ES\"/></w:rPr></w:style>"
+    },
+    {
+      "id": "Heading9Char",
+      "type": "character",
+      "name": "Heading 9 Char",
+      "basedOn": "DefaultParagraphFont",
+      "link": "Heading9",
+      "run": [
+        {
+          "type": "font",
+          "attrs": {
+            "eastAsiaTheme": "majorEastAsia",
+            "csTheme": "majorBidi"
+          }
+        },
+        {
+          "type": "color",
+          "attrs": {
+            "value": "272727",
+            "themeColor": "text1",
+            "themeTint": "D8"
+          }
+        }
+      ],
+      "ext": "<w:style w:type=\"character\" w:customStyle=\"1\" w:styleId=\"Heading9Char\"><w:name w:val=\"Heading 9 Char\"/><w:basedOn w:val=\"DefaultParagraphFont\"/><w:link w:val=\"Heading9\"/><w:uiPriority w:val=\"9\"/><w:semiHidden/><w:rsid w:val=\"00074BD8\"/><w:rPr><w:rFonts w:eastAsiaTheme=\"majorEastAsia\" w:cstheme=\"majorBidi\"/><w:color w:val=\"272727\" w:themeColor=\"text1\" w:themeTint=\"D8\"/><w:lang w:val=\"ca-ES\"/></w:rPr></w:style>"
+    },
+    {
+      "id": "Title",
+      "type": "paragraph",
+      "name": "Title",
+      "basedOn": "Normal",
+      "next": "Normal",
+      "link": "TitleChar",
+      "paragraph": {
+        "spacing": {
+          "after": 80,
+          "line": 240,
+          "lineRule": "auto"
+        },
+        "contextualSpacing": true
+      },
+      "run": [
+        {
+          "type": "font",
+          "attrs": {
+            "asciiTheme": "majorHAnsi",
+            "hAnsiTheme": "majorHAnsi",
+            "eastAsiaTheme": "majorEastAsia",
+            "csTheme": "majorBidi"
+          }
+        },
+        {
+          "type": "characterSpacing",
+          "attrs": {
+            "value": -10
+          }
+        },
+        {
+          "type": "fontSize",
+          "attrs": {
+            "value": 56,
+            "complexScript": 56
+          }
+        }
+      ],
+      "ext": "<w:style w:type=\"paragraph\" w:styleId=\"Title\"><w:name w:val=\"Title\"/><w:basedOn w:val=\"Normal\"/><w:next w:val=\"Normal\"/><w:link w:val=\"TitleChar\"/><w:uiPriority w:val=\"10\"/><w:qFormat/><w:rsid w:val=\"00074BD8\"/><w:pPr><w:spacing w:after=\"80\" w:line=\"240\" w:lineRule=\"auto\"/><w:contextualSpacing/></w:pPr><w:rPr><w:rFonts w:asciiTheme=\"majorHAnsi\" w:eastAsiaTheme=\"majorEastAsia\" w:hAnsiTheme=\"majorHAnsi\" w:cstheme=\"majorBidi\"/><w:spacing w:val=\"-10\"/><w:kern w:val=\"28\"/><w:sz w:val=\"56\"/><w:szCs w:val=\"56\"/></w:rPr></w:style>"
+    },
+    {
+      "id": "TitleChar",
+      "type": "character",
+      "name": "Title Char",
+      "basedOn": "DefaultParagraphFont",
+      "link": "Title",
+      "run": [
+        {
+          "type": "font",
+          "attrs": {
+            "asciiTheme": "majorHAnsi",
+            "hAnsiTheme": "majorHAnsi",
+            "eastAsiaTheme": "majorEastAsia",
+            "csTheme": "majorBidi"
+          }
+        },
+        {
+          "type": "characterSpacing",
+          "attrs": {
+            "value": -10
+          }
+        },
+        {
+          "type": "fontSize",
+          "attrs": {
+            "value": 56,
+            "complexScript": 56
+          }
+        }
+      ],
+      "ext": "<w:style w:type=\"character\" w:customStyle=\"1\" w:styleId=\"TitleChar\"><w:name w:val=\"Title Char\"/><w:basedOn w:val=\"DefaultParagraphFont\"/><w:link w:val=\"Title\"/><w:uiPriority w:val=\"10\"/><w:rsid w:val=\"00074BD8\"/><w:rPr><w:rFonts w:asciiTheme=\"majorHAnsi\" w:eastAsiaTheme=\"majorEastAsia\" w:hAnsiTheme=\"majorHAnsi\" w:cstheme=\"majorBidi\"/><w:spacing w:val=\"-10\"/><w:kern w:val=\"28\"/><w:sz w:val=\"56\"/><w:szCs w:val=\"56\"/><w:lang w:val=\"ca-ES\"/></w:rPr></w:style>"
+    },
+    {
+      "id": "Subtitle",
+      "type": "paragraph",
+      "name": "Subtitle",
+      "basedOn": "Normal",
+      "next": "Normal",
+      "link": "SubtitleChar",
+      "paragraph": {
+        "numbering": {
+          "level": 1
+        }
+      },
+      "run": [
+        {
+          "type": "font",
+          "attrs": {
+            "eastAsiaTheme": "majorEastAsia",
+            "csTheme": "majorBidi"
+          }
+        },
+        {
+          "type": "color",
+          "attrs": {
+            "value": "595959",
+            "themeColor": "text1",
+            "themeTint": "A6"
+          }
+        },
+        {
+          "type": "characterSpacing",
+          "attrs": {
+            "value": 15
+          }
+        },
+        {
+          "type": "fontSize",
+          "attrs": {
+            "value": 28,
+            "complexScript": 28
+          }
+        }
+      ],
+      "ext": "<w:style w:type=\"paragraph\" w:styleId=\"Subtitle\"><w:name w:val=\"Subtitle\"/><w:basedOn w:val=\"Normal\"/><w:next w:val=\"Normal\"/><w:link w:val=\"SubtitleChar\"/><w:uiPriority w:val=\"11\"/><w:qFormat/><w:rsid w:val=\"00074BD8\"/><w:pPr><w:numPr><w:ilvl w:val=\"1\"/></w:numPr></w:pPr><w:rPr><w:rFonts w:eastAsiaTheme=\"majorEastAsia\" w:cstheme=\"majorBidi\"/><w:color w:val=\"595959\" w:themeColor=\"text1\" w:themeTint=\"A6\"/><w:spacing w:val=\"15\"/><w:sz w:val=\"28\"/><w:szCs w:val=\"28\"/></w:rPr></w:style>"
+    },
+    {
+      "id": "SubtitleChar",
+      "type": "character",
+      "name": "Subtitle Char",
+      "basedOn": "DefaultParagraphFont",
+      "link": "Subtitle",
+      "run": [
+        {
+          "type": "font",
+          "attrs": {
+            "eastAsiaTheme": "majorEastAsia",
+            "csTheme": "majorBidi"
+          }
+        },
+        {
+          "type": "color",
+          "attrs": {
+            "value": "595959",
+            "themeColor": "text1",
+            "themeTint": "A6"
+          }
+        },
+        {
+          "type": "characterSpacing",
+          "attrs": {
+            "value": 15
+          }
+        },
+        {
+          "type": "fontSize",
+          "attrs": {
+            "value": 28,
+            "complexScript": 28
+          }
+        }
+      ],
+      "ext": "<w:style w:type=\"character\" w:customStyle=\"1\" w:styleId=\"SubtitleChar\"><w:name w:val=\"Subtitle Char\"/><w:basedOn w:val=\"DefaultParagraphFont\"/><w:link w:val=\"Subtitle\"/><w:uiPriority w:val=\"11\"/><w:rsid w:val=\"00074BD8\"/><w:rPr><w:rFonts w:eastAsiaTheme=\"majorEastAsia\" w:cstheme=\"majorBidi\"/><w:color w:val=\"595959\" w:themeColor=\"text1\" w:themeTint=\"A6\"/><w:spacing w:val=\"15\"/><w:sz w:val=\"28\"/><w:szCs w:val=\"28\"/><w:lang w:val=\"ca-ES\"/></w:rPr></w:style>"
+    },
+    {
+      "id": "Quote",
+      "type": "paragraph",
+      "name": "Quote",
+      "basedOn": "Normal",
+      "next": "Normal",
+      "link": "QuoteChar",
+      "paragraph": {
+        "justification": "center",
+        "spacing": {
+          "before": 160
+        }
+      },
+      "run": [
+        {
+          "type": "italic",
+          "attrs": {
+            "complexScript": true
+          }
+        },
+        {
+          "type": "color",
+          "attrs": {
+            "value": "404040",
+            "themeColor": "text1",
+            "themeTint": "BF"
+          }
+        }
+      ],
+      "ext": "<w:style w:type=\"paragraph\" w:styleId=\"Quote\"><w:name w:val=\"Quote\"/><w:basedOn w:val=\"Normal\"/><w:next w:val=\"Normal\"/><w:link w:val=\"QuoteChar\"/><w:uiPriority w:val=\"29\"/><w:qFormat/><w:rsid w:val=\"00074BD8\"/><w:pPr><w:spacing w:before=\"160\"/><w:jc w:val=\"center\"/></w:pPr><w:rPr><w:i/><w:iCs/><w:color w:val=\"404040\" w:themeColor=\"text1\" w:themeTint=\"BF\"/></w:rPr></w:style>"
+    },
+    {
+      "id": "QuoteChar",
+      "type": "character",
+      "name": "Quote Char",
+      "basedOn": "DefaultParagraphFont",
+      "link": "Quote",
+      "run": [
+        {
+          "type": "italic",
+          "attrs": {
+            "complexScript": true
+          }
+        },
+        {
+          "type": "color",
+          "attrs": {
+            "value": "404040",
+            "themeColor": "text1",
+            "themeTint": "BF"
+          }
+        }
+      ],
+      "ext": "<w:style w:type=\"character\" w:customStyle=\"1\" w:styleId=\"QuoteChar\"><w:name w:val=\"Quote Char\"/><w:basedOn w:val=\"DefaultParagraphFont\"/><w:link w:val=\"Quote\"/><w:uiPriority w:val=\"29\"/><w:rsid w:val=\"00074BD8\"/><w:rPr><w:i/><w:iCs/><w:color w:val=\"404040\" w:themeColor=\"text1\" w:themeTint=\"BF\"/><w:lang w:val=\"ca-ES\"/></w:rPr></w:style>"
+    },
+    {
+      "id": "ListParagraph",
+      "type": "paragraph",
+      "name": "List Paragraph",
+      "basedOn": "Normal",
+      "paragraph": {
+        "indent": {
+          "left": 720
+        },
+        "contextualSpacing": true
+      },
+      "ext": "<w:style w:type=\"paragraph\" w:styleId=\"ListParagraph\"><w:name w:val=\"List Paragraph\"/><w:basedOn w:val=\"Normal\"/><w:uiPriority w:val=\"34\"/><w:qFormat/><w:rsid w:val=\"00074BD8\"/><w:pPr><w:ind w:left=\"720\"/><w:contextualSpacing/></w:pPr></w:style>"
+    },
+    {
+      "id": "IntenseEmphasis",
+      "type": "character",
+      "name": "Intense Emphasis",
+      "basedOn": "DefaultParagraphFont",
+      "run": [
+        {
+          "type": "italic",
+          "attrs": {
+            "complexScript": true
+          }
+        },
+        {
+          "type": "color",
+          "attrs": {
+            "value": "0F4761",
+            "themeColor": "accent1",
+            "themeShade": "BF"
+          }
+        }
+      ],
+      "ext": "<w:style w:type=\"character\" w:styleId=\"IntenseEmphasis\"><w:name w:val=\"Intense Emphasis\"/><w:basedOn w:val=\"DefaultParagraphFont\"/><w:uiPriority w:val=\"21\"/><w:qFormat/><w:rsid w:val=\"00074BD8\"/><w:rPr><w:i/><w:iCs/><w:color w:val=\"0F4761\" w:themeColor=\"accent1\" w:themeShade=\"BF\"/></w:rPr></w:style>"
+    },
+    {
+      "id": "IntenseQuote",
+      "type": "paragraph",
+      "name": "Intense Quote",
+      "basedOn": "Normal",
+      "next": "Normal",
+      "link": "IntenseQuoteChar",
+      "paragraph": {
+        "justification": "center",
+        "indent": {
+          "left": 864,
+          "right": 864
+        },
+        "spacing": {
+          "before": 360,
+          "after": 360
+        },
+        "borders": {
+          "top": {
+            "style": "single",
+            "size": 4,
+            "space": 10,
+            "color": "0F4761",
+            "themeColor": "accent1"
+          },
+          "bottom": {
+            "style": "single",
+            "size": 4,
+            "space": 10,
+            "color": "0F4761",
+            "themeColor": "accent1"
+          }
+        }
+      },
+      "run": [
+        {
+          "type": "italic",
+          "attrs": {
+            "complexScript": true
+          }
+        },
+        {
+          "type": "color",
+          "attrs": {
+            "value": "0F4761",
+            "themeColor": "accent1",
+            "themeShade": "BF"
+          }
+        }
+      ],
+      "ext": "<w:style w:type=\"paragraph\" w:styleId=\"IntenseQuote\"><w:name w:val=\"Intense Quote\"/><w:basedOn w:val=\"Normal\"/><w:next w:val=\"Normal\"/><w:link w:val=\"IntenseQuoteChar\"/><w:uiPriority w:val=\"30\"/><w:qFormat/><w:rsid w:val=\"00074BD8\"/><w:pPr><w:pBdr><w:top w:val=\"single\" w:sz=\"4\" w:space=\"10\" w:color=\"0F4761\" w:themeColor=\"accent1\" w:themeShade=\"BF\"/><w:bottom w:val=\"single\" w:sz=\"4\" w:space=\"10\" w:color=\"0F4761\" w:themeColor=\"accent1\" w:themeShade=\"BF\"/></w:pBdr><w:spacing w:before=\"360\" w:after=\"360\"/><w:ind w:left=\"864\" w:right=\"864\"/><w:jc w:val=\"center\"/></w:pPr><w:rPr><w:i/><w:iCs/><w:color w:val=\"0F4761\" w:themeColor=\"accent1\" w:themeShade=\"BF\"/></w:rPr></w:style>"
+    },
+    {
+      "id": "IntenseQuoteChar",
+      "type": "character",
+      "name": "Intense Quote Char",
+      "basedOn": "DefaultParagraphFont",
+      "link": "IntenseQuote",
+      "run": [
+        {
+          "type": "italic",
+          "attrs": {
+            "complexScript": true
+          }
+        },
+        {
+          "type": "color",
+          "attrs": {
+            "value": "0F4761",
+            "themeColor": "accent1",
+            "themeShade": "BF"
+          }
+        }
+      ],
+      "ext": "<w:style w:type=\"character\" w:customStyle=\"1\" w:styleId=\"IntenseQuoteChar\"><w:name w:val=\"Intense Quote Char\"/><w:basedOn w:val=\"DefaultParagraphFont\"/><w:link w:val=\"IntenseQuote\"/><w:uiPriority w:val=\"30\"/><w:rsid w:val=\"00074BD8\"/><w:rPr><w:i/><w:iCs/><w:color w:val=\"0F4761\" w:themeColor=\"accent1\" w:themeShade=\"BF\"/><w:lang w:val=\"ca-ES\"/></w:rPr></w:style>"
+    },
+    {
+      "id": "IntenseReference",
+      "type": "character",
+      "name": "Intense Reference",
+      "basedOn": "DefaultParagraphFont",
+      "run": [
+        {
+          "type": "bold",
+          "attrs": {
+            "complexScript": true
+          }
+        },
+        {
+          "type": "smallCaps"
+        },
+        {
+          "type": "color",
+          "attrs": {
+            "value": "0F4761",
+            "themeColor": "accent1",
+            "themeShade": "BF"
+          }
+        },
+        {
+          "type": "characterSpacing",
+          "attrs": {
+            "value": 5
+          }
+        }
+      ],
+      "ext": "<w:style w:type=\"character\" w:styleId=\"IntenseReference\"><w:name w:val=\"Intense Reference\"/><w:basedOn w:val=\"DefaultParagraphFont\"/><w:uiPriority w:val=\"32\"/><w:qFormat/><w:rsid w:val=\"00074BD8\"/><w:rPr><w:b/><w:bCs/><w:smallCaps/><w:color w:val=\"0F4761\" w:themeColor=\"accent1\" w:themeShade=\"BF\"/><w:spacing w:val=\"5\"/></w:rPr></w:style>"
+    },
+    {
+      "id": "Caption",
+      "type": "paragraph",
+      "name": "caption",
+      "basedOn": "Normal",
+      "next": "Normal",
+      "paragraph": {
+        "spacing": {
+          "after": 200,
+          "line": 240,
+          "lineRule": "auto"
+        }
+      },
+      "run": [
+        {
+          "type": "italic",
+          "attrs": {
+            "complexScript": true
+          }
+        },
+        {
+          "type": "color",
+          "attrs": {
+            "value": "0E2841",
+            "themeColor": "text2"
+          }
+        },
+        {
+          "type": "fontSize",
+          "attrs": {
+            "value": 18,
+            "complexScript": 18
+          }
+        }
+      ],
+      "ext": "<w:style w:type=\"paragraph\" w:styleId=\"Caption\"><w:name w:val=\"caption\"/><w:basedOn w:val=\"Normal\"/><w:next w:val=\"Normal\"/><w:uiPriority w:val=\"35\"/><w:unhideWhenUsed/><w:qFormat/><w:rsid w:val=\"00074BD8\"/><w:pPr><w:spacing w:after=\"200\" w:line=\"240\" w:lineRule=\"auto\"/></w:pPr><w:rPr><w:i/><w:iCs/><w:color w:val=\"0E2841\" w:themeColor=\"text2\"/><w:sz w:val=\"18\"/><w:szCs w:val=\"18\"/></w:rPr></w:style>"
+    },
+    {
+      "id": "FootnoteText",
+      "type": "paragraph",
+      "name": "footnote text",
+      "basedOn": "Normal",
+      "link": "FootnoteTextChar",
+      "paragraph": {
+        "spacing": {
+          "after": 0,
+          "line": 240,
+          "lineRule": "auto"
+        }
+      },
+      "run": [
+        {
+          "type": "fontSize",
+          "attrs": {
+            "value": 20,
+            "complexScript": 20
+          }
+        }
+      ],
+      "ext": "<w:style w:type=\"paragraph\" w:styleId=\"FootnoteText\"><w:name w:val=\"footnote text\"/><w:basedOn w:val=\"Normal\"/><w:link w:val=\"FootnoteTextChar\"/><w:uiPriority w:val=\"99\"/><w:semiHidden/><w:unhideWhenUsed/><w:rsid w:val=\"00074BD8\"/><w:pPr><w:spacing w:after=\"0\" w:line=\"240\" w:lineRule=\"auto\"/></w:pPr><w:rPr><w:sz w:val=\"20\"/><w:szCs w:val=\"20\"/></w:rPr></w:style>"
+    },
+    {
+      "id": "FootnoteTextChar",
+      "type": "character",
+      "name": "Footnote Text Char",
+      "basedOn": "DefaultParagraphFont",
+      "link": "FootnoteText",
+      "run": [
+        {
+          "type": "fontSize",
+          "attrs": {
+            "value": 20,
+            "complexScript": 20
+          }
+        }
+      ],
+      "ext": "<w:style w:type=\"character\" w:customStyle=\"1\" w:styleId=\"FootnoteTextChar\"><w:name w:val=\"Footnote Text Char\"/><w:basedOn w:val=\"DefaultParagraphFont\"/><w:link w:val=\"FootnoteText\"/><w:uiPriority w:val=\"99\"/><w:semiHidden/><w:rsid w:val=\"00074BD8\"/><w:rPr><w:sz w:val=\"20\"/><w:szCs w:val=\"20\"/><w:lang w:val=\"en-GB\"/></w:rPr></w:style>"
+    },
+    {
+      "id": "FootnoteReference",
+      "type": "character",
+      "name": "footnote reference",
+      "basedOn": "DefaultParagraphFont",
+      "run": [
+        {
+          "type": "verticalAlign",
+          "attrs": {
+            "value": "superscript"
+          }
+        }
+      ],
+      "ext": "<w:style w:type=\"character\" w:styleId=\"FootnoteReference\"><w:name w:val=\"footnote reference\"/><w:basedOn w:val=\"DefaultParagraphFont\"/><w:uiPriority w:val=\"99\"/><w:semiHidden/><w:unhideWhenUsed/><w:rsid w:val=\"00074BD8\"/><w:rPr><w:vertAlign w:val=\"superscript\"/></w:rPr></w:style>"
+    },
+    {
+      "id": "EndnoteText",
+      "type": "paragraph",
+      "name": "endnote text",
+      "basedOn": "Normal",
+      "link": "EndnoteTextChar",
+      "paragraph": {
+        "spacing": {
+          "after": 0,
+          "line": 240,
+          "lineRule": "auto"
+        }
+      },
+      "run": [
+        {
+          "type": "fontSize",
+          "attrs": {
+            "value": 20,
+            "complexScript": 20
+          }
+        }
+      ],
+      "ext": "<w:style w:type=\"paragraph\" w:styleId=\"EndnoteText\"><w:name w:val=\"endnote text\"/><w:basedOn w:val=\"Normal\"/><w:link w:val=\"EndnoteTextChar\"/><w:uiPriority w:val=\"99\"/><w:semiHidden/><w:unhideWhenUsed/><w:rsid w:val=\"00074BD8\"/><w:pPr><w:spacing w:after=\"0\" w:line=\"240\" w:lineRule=\"auto\"/></w:pPr><w:rPr><w:sz w:val=\"20\"/><w:szCs w:val=\"20\"/></w:rPr></w:style>"
+    },
+    {
+      "id": "EndnoteTextChar",
+      "type": "character",
+      "name": "Endnote Text Char",
+      "basedOn": "DefaultParagraphFont",
+      "link": "EndnoteText",
+      "run": [
+        {
+          "type": "fontSize",
+          "attrs": {
+            "value": 20,
+            "complexScript": 20
+          }
+        }
+      ],
+      "ext": "<w:style w:type=\"character\" w:customStyle=\"1\" w:styleId=\"EndnoteTextChar\"><w:name w:val=\"Endnote Text Char\"/><w:basedOn w:val=\"DefaultParagraphFont\"/><w:link w:val=\"EndnoteText\"/><w:uiPriority w:val=\"99\"/><w:semiHidden/><w:rsid w:val=\"00074BD8\"/><w:rPr><w:sz w:val=\"20\"/><w:szCs w:val=\"20\"/><w:lang w:val=\"en-GB\"/></w:rPr></w:style>"
+    },
+    {
+      "id": "EndnoteReference",
+      "type": "character",
+      "name": "endnote reference",
+      "basedOn": "DefaultParagraphFont",
+      "run": [
+        {
+          "type": "verticalAlign",
+          "attrs": {
+            "value": "superscript"
+          }
+        }
+      ],
+      "ext": "<w:style w:type=\"character\" w:styleId=\"EndnoteReference\"><w:name w:val=\"endnote reference\"/><w:basedOn w:val=\"DefaultParagraphFont\"/><w:uiPriority w:val=\"99\"/><w:semiHidden/><w:unhideWhenUsed/><w:rsid w:val=\"00074BD8\"/><w:rPr><w:vertAlign w:val=\"superscript\"/></w:rPr></w:style>"
+    },
+    {
+      "id": "Header",
+      "type": "paragraph",
+      "name": "header",
+      "basedOn": "Normal",
+      "link": "HeaderChar",
+      "paragraph": {
+        "spacing": {
+          "after": 0,
+          "line": 240,
+          "lineRule": "auto"
+        },
+        "tabs": [
+          {
+            "position": 4252,
+            "kind": "center"
+          },
+          {
+            "position": 8504,
+            "kind": "right"
+          }
+        ]
+      },
+      "ext": "<w:style w:type=\"paragraph\" w:styleId=\"Header\"><w:name w:val=\"header\"/><w:basedOn w:val=\"Normal\"/><w:link w:val=\"HeaderChar\"/><w:uiPriority w:val=\"99\"/><w:unhideWhenUsed/><w:rsid w:val=\"00074BD8\"/><w:pPr><w:tabs><w:tab w:val=\"center\" w:pos=\"4252\"/><w:tab w:val=\"right\" w:pos=\"8504\"/></w:tabs><w:spacing w:after=\"0\" w:line=\"240\" w:lineRule=\"auto\"/></w:pPr></w:style>"
+    },
+    {
+      "id": "HeaderChar",
+      "type": "character",
+      "name": "Header Char",
+      "basedOn": "DefaultParagraphFont",
+      "link": "Header",
+      "ext": "<w:style w:type=\"character\" w:customStyle=\"1\" w:styleId=\"HeaderChar\"><w:name w:val=\"Header Char\"/><w:basedOn w:val=\"DefaultParagraphFont\"/><w:link w:val=\"Header\"/><w:uiPriority w:val=\"99\"/><w:rsid w:val=\"00074BD8\"/><w:rPr><w:lang w:val=\"en-GB\"/></w:rPr></w:style>"
+    },
+    {
+      "id": "Footer",
+      "type": "paragraph",
+      "name": "footer",
+      "basedOn": "Normal",
+      "link": "FooterChar",
+      "paragraph": {
+        "spacing": {
+          "after": 0,
+          "line": 240,
+          "lineRule": "auto"
+        },
+        "tabs": [
+          {
+            "position": 4252,
+            "kind": "center"
+          },
+          {
+            "position": 8504,
+            "kind": "right"
+          }
+        ]
+      },
+      "ext": "<w:style w:type=\"paragraph\" w:styleId=\"Footer\"><w:name w:val=\"footer\"/><w:basedOn w:val=\"Normal\"/><w:link w:val=\"FooterChar\"/><w:uiPriority w:val=\"99\"/><w:unhideWhenUsed/><w:rsid w:val=\"00074BD8\"/><w:pPr><w:tabs><w:tab w:val=\"center\" w:pos=\"4252\"/><w:tab w:val=\"right\" w:pos=\"8504\"/></w:tabs><w:spacing w:after=\"0\" w:line=\"240\" w:lineRule=\"auto\"/></w:pPr></w:style>"
+    },
+    {
+      "id": "FooterChar",
+      "type": "character",
+      "name": "Footer Char",
+      "basedOn": "DefaultParagraphFont",
+      "link": "Footer",
+      "ext": "<w:style w:type=\"character\" w:customStyle=\"1\" w:styleId=\"FooterChar\"><w:name w:val=\"Footer Char\"/><w:basedOn w:val=\"DefaultParagraphFont\"/><w:link w:val=\"Footer\"/><w:uiPriority w:val=\"99\"/><w:rsid w:val=\"00074BD8\"/><w:rPr><w:lang w:val=\"en-GB\"/></w:rPr></w:style>"
+    }
+  ],
+  "numbering": {
+    "abstracts": [],
+    "instances": []
+  },
+  "theme": {
+    "fonts": {
+      "major": {
+        "latin": "Aptos Display",
+        "eastAsia": "",
+        "cs": ""
+      },
+      "minor": {
+        "latin": "Aptos",
+        "eastAsia": "",
+        "cs": ""
+      }
+    },
+    "colors": {
+      "dk1": "000000",
+      "lt1": "FFFFFF",
+      "dk2": "0E2841",
+      "lt2": "E8E8E8",
+      "accent1": "156082",
+      "accent2": "E97132",
+      "accent3": "196B24",
+      "accent4": "0F9ED5",
+      "accent5": "A02B93",
+      "accent6": "4EA72E",
+      "hlink": "467886",
+      "folHlink": "96607D"
+    }
+  },
+  "comments": [],
+  "stories": {
+    "rId8": {
+      "kind": "footer",
+      "content": {
+        "type": "doc",
+        "content": [
+          {
+            "type": "paragraph",
+            "attrs": {
+              "style": "Footer",
+              "ext": "<w:pPr><w:pStyle w:val=\"Footer\"/></w:pPr>",
+              "attributes": {
+                "w14:paraId": "33F94498",
+                "w14:textId": "77777777",
+                "w:rsidR": "00074BD8",
+                "w:rsidRDefault": "00074BD8"
+              }
+            }
+          }
+        ]
+      }
+    },
+    "rId7": {
+      "kind": "header",
+      "content": {
+        "type": "doc",
+        "content": [
+          {
+            "type": "paragraph",
+            "attrs": {
+              "style": "Header",
+              "ext": "<w:pPr><w:pStyle w:val=\"Header\"/></w:pPr>",
+              "attributes": {
+                "w14:paraId": "69CC70EB",
+                "w14:textId": "11488473",
+                "w:rsidR": "00074BD8",
+                "w:rsidRDefault": "00074BD8"
+              }
+            },
+            "content": [
+              {
+                "type": "text",
+                "text": "Pump test memo, page "
+              },
+              {
+                "type": "fieldStart"
+              },
+              {
+                "type": "fieldCode",
+                "attrs": {
+                  "text": " PAGE "
+                }
+              },
+              {
+                "type": "fieldSeparator"
+              },
+              {
+                "type": "text",
+                "text": "1",
+                "marks": [
+                  {
+                    "type": "runExt",
+                    "attrs": {
+                      "xml": "<w:rPr><w:noProof/></w:rPr>"
+                    }
+                  }
+                ]
+              },
+              {
+                "type": "fieldEnd"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "rId6": {
+      "kind": "header",
+      "content": {
+        "type": "doc",
+        "content": [
+          {
+            "type": "paragraph",
+            "attrs": {
+              "style": "Header",
+              "ext": "<w:pPr><w:pStyle w:val=\"Header\"/></w:pPr>",
+              "attributes": {
+                "w14:paraId": "56564A69",
+                "w14:textId": "77777777",
+                "w:rsidR": "00074BD8",
+                "w:rsidRDefault": "00074BD8"
+              }
+            }
+          }
+        ]
+      }
+    },
+    "rId11": {
+      "kind": "footer",
+      "content": {
+        "type": "doc",
+        "content": [
+          {
+            "type": "paragraph",
+            "attrs": {
+              "style": "Footer",
+              "ext": "<w:pPr><w:pStyle w:val=\"Footer\"/></w:pPr>",
+              "attributes": {
+                "w14:paraId": "165ED5C6",
+                "w14:textId": "77777777",
+                "w:rsidR": "00074BD8",
+                "w:rsidRDefault": "00074BD8"
+              }
+            }
+          }
+        ]
+      }
+    },
+    "endnote:-1": {
+      "kind": "endnote",
+      "noteType": "separator",
+      "content": {
+        "type": "doc",
+        "content": [
+          {
+            "type": "paragraph",
+            "attrs": {
+              "spacing": {
+                "after": 0,
+                "line": 240,
+                "lineRule": "auto"
+              },
+              "ext": "<w:pPr><w:spacing w:after=\"0\" w:line=\"240\" w:lineRule=\"auto\"/></w:pPr>",
+              "attributes": {
+                "w14:paraId": "2E3806EB",
+                "w14:textId": "77777777",
+                "w:rsidR": "00FD25CC",
+                "w:rsidRDefault": "00FD25CC",
+                "w:rsidP": "00074BD8"
+              }
+            },
+            "content": [
+              {
+                "type": "opaqueInline",
+                "attrs": {
+                  "xml": "<w:separator/>",
+                  "run": true
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "ext": "<w:endnote w:type=\"separator\" w:id=\"-1\">"
+    },
+    "endnote:0": {
+      "kind": "endnote",
+      "noteType": "continuationSeparator",
+      "content": {
+        "type": "doc",
+        "content": [
+          {
+            "type": "paragraph",
+            "attrs": {
+              "spacing": {
+                "after": 0,
+                "line": 240,
+                "lineRule": "auto"
+              },
+              "ext": "<w:pPr><w:spacing w:after=\"0\" w:line=\"240\" w:lineRule=\"auto\"/></w:pPr>",
+              "attributes": {
+                "w14:paraId": "3B820E90",
+                "w14:textId": "77777777",
+                "w:rsidR": "00FD25CC",
+                "w:rsidRDefault": "00FD25CC",
+                "w:rsidP": "00074BD8"
+              }
+            },
+            "content": [
+              {
+                "type": "opaqueInline",
+                "attrs": {
+                  "xml": "<w:continuationSeparator/>",
+                  "run": true
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "ext": "<w:endnote w:type=\"continuationSeparator\" w:id=\"0\">"
+    },
+    "endnote:1": {
+      "kind": "endnote",
+      "content": {
+        "type": "doc",
+        "content": [
+          {
+            "type": "paragraph",
+            "attrs": {
+              "style": "EndnoteText",
+              "ext": "<w:pPr><w:pStyle w:val=\"EndnoteText\"/><w:rPr><w:lang w:val=\"es-ES\"/></w:rPr></w:pPr>",
+              "attributes": {
+                "w14:paraId": "677AB685",
+                "w14:textId": "6959421C",
+                "w:rsidR": "00074BD8",
+                "w:rsidRPr": "00074BD8",
+                "w:rsidRDefault": "00074BD8"
+              }
+            },
+            "content": [
+              {
+                "type": "noteMark",
+                "marks": [
+                  {
+                    "type": "characterStyle",
+                    "attrs": {
+                      "id": "EndnoteReference"
+                    }
+                  },
+                  {
+                    "type": "runExt",
+                    "attrs": {
+                      "xml": "<w:rPr><w:rStyle w:val=\"EndnoteReference\"/></w:rPr>"
+                    }
+                  }
+                ]
+              },
+              {
+                "type": "text",
+                "text": " "
+              },
+              {
+                "type": "text",
+                "text": "Measured at the coupling.",
+                "marks": [
+                  {
+                    "type": "runExt",
+                    "attrs": {
+                      "xml": "<w:rPr><w:lang w:val=\"es-ES\"/></w:rPr>"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "ext": "<w:endnote w:id=\"1\">"
+    },
+    "endnote:2": {
+      "kind": "endnote",
+      "content": {
+        "type": "doc",
+        "content": [
+          {
+            "type": "paragraph",
+            "attrs": {
+              "style": "EndnoteText",
+              "ext": "<w:pPr><w:pStyle w:val=\"EndnoteText\"/><w:rPr><w:lang w:val=\"es-ES\"/></w:rPr></w:pPr>",
+              "attributes": {
+                "w14:paraId": "6D69631C",
+                "w14:textId": "2420D588",
+                "w:rsidR": "00074BD8",
+                "w:rsidRPr": "00074BD8",
+                "w:rsidRDefault": "00074BD8"
+              }
+            },
+            "content": [
+              {
+                "type": "noteMark",
+                "marks": [
+                  {
+                    "type": "characterStyle",
+                    "attrs": {
+                      "id": "EndnoteReference"
+                    }
+                  },
+                  {
+                    "type": "runExt",
+                    "attrs": {
+                      "xml": "<w:rPr><w:rStyle w:val=\"EndnoteReference\"/></w:rPr>"
+                    }
+                  }
+                ]
+              },
+              {
+                "type": "text",
+                "text": " "
+              },
+              {
+                "type": "text",
+                "text": "Design flow is 40 litres per second.",
+                "marks": [
+                  {
+                    "type": "runExt",
+                    "attrs": {
+                      "xml": "<w:rPr><w:lang w:val=\"es-ES\"/></w:rPr>"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "ext": "<w:endnote w:id=\"2\">"
+    },
+    "rId10": {
+      "kind": "header",
+      "content": {
+        "type": "doc",
+        "content": [
+          {
+            "type": "paragraph",
+            "attrs": {
+              "style": "Header",
+              "ext": "<w:pPr><w:pStyle w:val=\"Header\"/></w:pPr>",
+              "attributes": {
+                "w14:paraId": "09174079",
+                "w14:textId": "77777777",
+                "w:rsidR": "00074BD8",
+                "w:rsidRDefault": "00074BD8"
+              }
+            }
+          }
+        ]
+      }
+    },
+    "footnote:-1": {
+      "kind": "footnote",
+      "noteType": "separator",
+      "content": {
+        "type": "doc",
+        "content": [
+          {
+            "type": "paragraph",
+            "attrs": {
+              "spacing": {
+                "after": 0,
+                "line": 240,
+                "lineRule": "auto"
+              },
+              "ext": "<w:pPr><w:spacing w:after=\"0\" w:line=\"240\" w:lineRule=\"auto\"/></w:pPr>",
+              "attributes": {
+                "w14:paraId": "2E5F7608",
+                "w14:textId": "77777777",
+                "w:rsidR": "00FD25CC",
+                "w:rsidRDefault": "00FD25CC",
+                "w:rsidP": "00074BD8"
+              }
+            },
+            "content": [
+              {
+                "type": "opaqueInline",
+                "attrs": {
+                  "xml": "<w:separator/>",
+                  "run": true
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "ext": "<w:footnote w:type=\"separator\" w:id=\"-1\">"
+    },
+    "footnote:0": {
+      "kind": "footnote",
+      "noteType": "continuationSeparator",
+      "content": {
+        "type": "doc",
+        "content": [
+          {
+            "type": "paragraph",
+            "attrs": {
+              "spacing": {
+                "after": 0,
+                "line": 240,
+                "lineRule": "auto"
+              },
+              "ext": "<w:pPr><w:spacing w:after=\"0\" w:line=\"240\" w:lineRule=\"auto\"/></w:pPr>",
+              "attributes": {
+                "w14:paraId": "72DE0A64",
+                "w14:textId": "77777777",
+                "w:rsidR": "00FD25CC",
+                "w:rsidRDefault": "00FD25CC",
+                "w:rsidP": "00074BD8"
+              }
+            },
+            "content": [
+              {
+                "type": "opaqueInline",
+                "attrs": {
+                  "xml": "<w:continuationSeparator/>",
+                  "run": true
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "ext": "<w:footnote w:type=\"continuationSeparator\" w:id=\"0\">"
+    },
+    "footnote:1": {
+      "kind": "footnote",
+      "content": {
+        "type": "doc",
+        "content": [
+          {
+            "type": "paragraph",
+            "attrs": {
+              "style": "FootnoteText",
+              "ext": "<w:pPr><w:pStyle w:val=\"FootnoteText\"/><w:rPr><w:lang w:val=\"es-ES\"/></w:rPr></w:pPr>",
+              "attributes": {
+                "w14:paraId": "4DEB4BBC",
+                "w14:textId": "764DEEA7",
+                "w:rsidR": "00074BD8",
+                "w:rsidRPr": "00074BD8",
+                "w:rsidRDefault": "00074BD8"
+              }
+            },
+            "content": [
+              {
+                "type": "noteMark",
+                "marks": [
+                  {
+                    "type": "characterStyle",
+                    "attrs": {
+                      "id": "FootnoteReference"
+                    }
+                  },
+                  {
+                    "type": "runExt",
+                    "attrs": {
+                      "xml": "<w:rPr><w:rStyle w:val=\"FootnoteReference\"/></w:rPr>"
+                    }
+                  }
+                ]
+              },
+              {
+                "type": "text",
+                "text": " "
+              },
+              {
+                "type": "text",
+                "text": "Procedure P-14, issue 3.",
+                "marks": [
+                  {
+                    "type": "runExt",
+                    "attrs": {
+                      "xml": "<w:rPr><w:lang w:val=\"es-ES\"/></w:rPr>"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "ext": "<w:footnote w:id=\"1\">"
+    },
+    "footnote:2": {
+      "kind": "footnote",
+      "content": {
+        "type": "doc",
+        "content": [
+          {
+            "type": "paragraph",
+            "attrs": {
+              "style": "FootnoteText",
+              "ext": "<w:pPr><w:pStyle w:val=\"FootnoteText\"/><w:rPr><w:lang w:val=\"es-ES\"/></w:rPr></w:pPr>",
+              "attributes": {
+                "w14:paraId": "194CD9D5",
+                "w14:textId": "58EE6EE6",
+                "w:rsidR": "00074BD8",
+                "w:rsidRPr": "00074BD8",
+                "w:rsidRDefault": "00074BD8"
+              }
+            },
+            "content": [
+              {
+                "type": "noteMark",
+                "marks": [
+                  {
+                    "type": "characterStyle",
+                    "attrs": {
+                      "id": "FootnoteReference"
+                    }
+                  },
+                  {
+                    "type": "runExt",
+                    "attrs": {
+                      "xml": "<w:rPr><w:rStyle w:val=\"FootnoteReference\"/></w:rPr>"
+                    }
+                  }
+                ]
+              },
+              {
+                "type": "text",
+                "text": " "
+              },
+              {
+                "type": "text",
+                "text": "The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file. The rig was rebuilt in January: new pipework, a larger reservoir and a recalibrated flow meter, whose certificate is kept with the file.",
+                "marks": [
+                  {
+                    "type": "runExt",
+                    "attrs": {
+                      "xml": "<w:rPr><w:lang w:val=\"es-ES\"/></w:rPr>"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "ext": "<w:footnote w:id=\"2\">"
+    },
+    "rId9": {
+      "kind": "footer",
+      "content": {
+        "type": "doc",
+        "content": [
+          {
+            "type": "paragraph",
+            "attrs": {
+              "style": "Footer",
+              "ext": "<w:pPr><w:pStyle w:val=\"Footer\"/></w:pPr>",
+              "attributes": {
+                "w14:paraId": "4F7858A9",
+                "w14:textId": "77777777",
+                "w:rsidR": "00074BD8",
+                "w:rsidRDefault": "00074BD8"
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "content": {
+    "type": "doc",
+    "content": [
+      {
+        "type": "paragraph",
+        "attrs": {
+          "style": "Title",
+          "ext": "<w:pPr><w:pStyle w:val=\"Title\"/></w:pPr>",
+          "attributes": {
+            "w14:paraId": "71338366",
+            "w14:textId": "30357C6C",
+            "w:rsidR": "003519C1",
+            "w:rsidRDefault": "00074BD8",
+            "w:rsidP": "00074BD8"
+          }
+        },
+        "content": [
+          {
+            "type": "text",
+            "text": "Pump test memo"
+          }
+        ]
+      },
+      {
+        "type": "paragraph",
+        "attrs": {
+          "attributes": {
+            "w14:paraId": "1EBE689A",
+            "w14:textId": "741F2463",
+            "w:rsidR": "00074BD8",
+            "w:rsidRDefault": "00074BD8",
+            "w:rsidP": "00074BD8"
+          }
+        },
+        "content": [
+          {
+            "type": "text",
+            "text": "Issued on "
+          },
+          {
+            "type": "fieldStart",
+            "attrs": {
+              "locked": true
+            }
+          },
+          {
+            "type": "fieldCode",
+            "attrs": {
+              "text": " DATE \\@ \"d MMMM yyyy\" "
+            }
+          },
+          {
+            "type": "fieldSeparator"
+          },
+          {
+            "type": "text",
+            "text": "3 March 2026",
+            "marks": [
+              {
+                "type": "runExt",
+                "attrs": {
+                  "xml": "<w:rPr><w:noProof/></w:rPr>"
+                }
+              }
+            ]
+          },
+          {
+            "type": "fieldEnd"
+          }
+        ]
+      },
+      {
+        "type": "paragraph",
+        "attrs": {
+          "style": "Heading1",
+          "ext": "<w:pPr><w:pStyle w:val=\"Heading1\"/></w:pPr>",
+          "attributes": {
+            "w14:paraId": "2E9681B3",
+            "w14:textId": "5EFA6E71",
+            "w:rsidR": "00074BD8",
+            "w:rsidRDefault": "00074BD8",
+            "w:rsidP": "00074BD8"
+          }
+        },
+        "content": [
+          {
+            "type": "text",
+            "text": "Method"
+          }
+        ]
+      },
+      {
+        "type": "paragraph",
+        "attrs": {
+          "attributes": {
+            "w14:paraId": "6A4A4E32",
+            "w14:textId": "3BDDFACD",
+            "w:rsidR": "00074BD8",
+            "w:rsidRDefault": "00074BD8",
+            "w:rsidP": "00074BD8"
+          }
+        },
+        "content": [
+          {
+            "type": "text",
+            "text": "The test followed the agreed procedure"
+          },
+          {
+            "type": "noteReference",
+            "attrs": {
+              "story": "footnote:1"
+            },
+            "marks": [
+              {
+                "type": "characterStyle",
+                "attrs": {
+                  "id": "FootnoteReference"
+                }
+              },
+              {
+                "type": "runExt",
+                "attrs": {
+                  "xml": "<w:rPr><w:rStyle w:val=\"FootnoteReference\"/></w:rPr>"
+                }
+              }
+            ]
+          },
+          {
+            "type": "text",
+            "text": "."
+          }
+        ]
+      },
+      {
+        "type": "paragraph",
+        "attrs": {
+          "attributes": {
+            "w14:paraId": "593CF7C5",
+            "w14:textId": "34E49851",
+            "w:rsidR": "00074BD8",
+            "w:rsidRDefault": "00074BD8",
+            "w:rsidP": "00074BD8"
+          }
+        },
+        "content": [
+          {
+            "type": "text",
+            "text": "Each pump was run at its rated speed for an hour before the readings were taken, and the bearings were checked again once it had cooled. The figures below are the mean of three runs on different days, with the same operator and the same instruments, calibrated at the start of the week. Each pump was run at its rated speed for an hour before the readings were taken, and the bearings were checked again once it had cooled. The figures below are the mean of three runs on different days, with the same operator and the same instruments, calibrated at the start of the week. Each pump was run at its rated speed for an hour before the readings were taken, and the bearings were checked again once it had cooled. The figures below are the mean of three runs on different days, with the same operator and the same instruments, calibrated at the start of the week. Each pump was run at its rated speed for an hour before the readings were taken, and the bearings were checked again once it had cooled. The figures below are the mean of three runs on different days, with the same operator and the same instruments, calibrated at the start of the week. Each pump was run at its rated speed for an hour before the readings were taken, and the bearings were checked again once it had cooled. The figures below are the mean of three runs on different days, with the same operator and the same instruments, calibrated at the start of the week. "
+          }
+        ]
+      },
+      {
+        "type": "paragraph",
+        "attrs": {
+          "attributes": {
+            "w14:paraId": "5C6683A2",
+            "w14:textId": "4EE0DB73",
+            "w:rsidR": "00074BD8",
+            "w:rsidRDefault": "00074BD8",
+            "w:rsidP": "00074BD8"
+          }
+        },
+        "content": [
+          {
+            "type": "text",
+            "text": "Each pump was run at its rated speed for an hour before the readings were taken, and the bearings were checked again once it had cooled. The figures below are the mean of three runs on different days, with the same operator and the same instruments, calibrated at the start of the week. Each pump was run at its rated speed for an hour before the readings were taken, and the bearings were checked again once it had cooled. The figures below are the mean of three runs on different days, with the same operator and the same instruments, calibrated at the start of the week. Each pump was run at its rated speed for an hour before the readings were taken, and the bearings were checked again once it had cooled. The figures below are the mean of three runs on different days, with the same operator and the same instruments, calibrated at the start of the week. Each pump was run at its rated speed for an hour before the readings were taken, and the bearings were checked again once it had cooled. The figures below are the mean of three runs on different days, with the same operator and the same instruments, calibrated at the start of the week. "
+          }
+        ]
+      },
+      {
+        "type": "paragraph",
+        "attrs": {
+          "attributes": {
+            "w14:paraId": "3F883FCD",
+            "w14:textId": "4D4C1DF3",
+            "w:rsidR": "00074BD8",
+            "w:rsidRDefault": "00074BD8",
+            "w:rsidP": "00074BD8"
+          }
+        },
+        "content": [
+          {
+            "type": "text",
+            "text": "Each pump was run at its rated speed for an hour before the readings were taken, and the bearings were checked again once it had cooled. The figures below are the mean of three runs on different days, with the same operator and the same instruments, calibrated at the start of the week. Each pump was run at its rated speed for an hour before the readings were taken, and the bearings were checked again once it had cooled. The figures below are the mean of three runs on different days, with the same operator and the same instruments, calibrated at the start of the week. "
+          }
+        ]
+      },
+      {
+        "type": "paragraph",
+        "attrs": {
+          "attributes": {
+            "w14:paraId": "4F749E01",
+            "w14:textId": "26C972FB",
+            "w:rsidR": "00074BD8",
+            "w:rsidRDefault": "00074BD8",
+            "w:rsidP": "00074BD8"
+          }
+        },
+        "content": [
+          {
+            "type": "text",
+            "text": "The rig is described in the maintenance file"
+          },
+          {
+            "type": "noteReference",
+            "attrs": {
+              "story": "footnote:2"
+            },
+            "marks": [
+              {
+                "type": "characterStyle",
+                "attrs": {
+                  "id": "FootnoteReference"
+                }
+              },
+              {
+                "type": "runExt",
+                "attrs": {
+                  "xml": "<w:rPr><w:rStyle w:val=\"FootnoteReference\"/></w:rPr>"
+                }
+              }
+            ]
+          },
+          {
+            "type": "text",
+            "text": "."
+          }
+        ]
+      },
+      {
+        "type": "paragraph",
+        "attrs": {
+          "style": "Heading1",
+          "ext": "<w:pPr><w:pStyle w:val=\"Heading1\"/></w:pPr>",
+          "attributes": {
+            "w14:paraId": "1C32E9E4",
+            "w14:textId": "6843968F",
+            "w:rsidR": "00074BD8",
+            "w:rsidRDefault": "00074BD8",
+            "w:rsidP": "00074BD8"
+          }
+        },
+        "content": [
+          {
+            "type": "text",
+            "text": "Results"
+          }
+        ]
+      },
+      {
+        "type": "paragraph",
+        "attrs": {
+          "attributes": {
+            "w14:paraId": "3CA98904",
+            "w14:textId": "1AAC8518",
+            "w:rsidR": "00074BD8",
+            "w:rsidRDefault": "00074BD8",
+            "w:rsidP": "00074BD8"
+          }
+        },
+        "content": [
+          {
+            "type": "bookmarkStart",
+            "attrs": {
+              "id": 0,
+              "name": "PeakEfficiency"
+            }
+          },
+          {
+            "type": "text",
+            "text": "Peak efficiency was 81 percent"
+          },
+          {
+            "type": "bookmarkEnd",
+            "attrs": {
+              "id": 0
+            }
+          },
+          {
+            "type": "noteReference",
+            "attrs": {
+              "story": "endnote:1"
+            },
+            "marks": [
+              {
+                "type": "characterStyle",
+                "attrs": {
+                  "id": "EndnoteReference"
+                }
+              },
+              {
+                "type": "runExt",
+                "attrs": {
+                  "xml": "<w:rPr><w:rStyle w:val=\"EndnoteReference\"/></w:rPr>"
+                }
+              }
+            ]
+          },
+          {
+            "type": "text",
+            "text": " at the design flow"
+          },
+          {
+            "type": "noteReference",
+            "attrs": {
+              "story": "endnote:2"
+            },
+            "marks": [
+              {
+                "type": "characterStyle",
+                "attrs": {
+                  "id": "EndnoteReference"
+                }
+              },
+              {
+                "type": "runExt",
+                "attrs": {
+                  "xml": "<w:rPr><w:rStyle w:val=\"EndnoteReference\"/></w:rPr>"
+                }
+              }
+            ]
+          },
+          {
+            "type": "text",
+            "text": "."
+          }
+        ]
+      },
+      {
+        "type": "paragraph",
+        "attrs": {
+          "style": "Caption",
+          "ext": "<w:pPr><w:pStyle w:val=\"Caption\"/></w:pPr>",
+          "attributes": {
+            "w14:paraId": "33F6F72C",
+            "w14:textId": "468493A2",
+            "w:rsidR": "00074BD8",
+            "w:rsidRDefault": "00074BD8",
+            "w:rsidP": "00074BD8"
+          }
+        },
+        "content": [
+          {
+            "type": "text",
+            "text": "Figure "
+          },
+          {
+            "type": "fieldStart"
+          },
+          {
+            "type": "fieldCode",
+            "attrs": {
+              "text": " SEQ Figure \\* ARABIC "
+            }
+          },
+          {
+            "type": "fieldSeparator"
+          },
+          {
+            "type": "text",
+            "text": "1",
+            "marks": [
+              {
+                "type": "runExt",
+                "attrs": {
+                  "xml": "<w:rPr><w:noProof/></w:rPr>"
+                }
+              }
+            ]
+          },
+          {
+            "type": "fieldEnd"
+          },
+          {
+            "type": "text",
+            "text": ": efficiency against flow"
+          }
+        ]
+      },
+      {
+        "type": "paragraph",
+        "attrs": {
+          "style": "Caption",
+          "ext": "<w:pPr><w:pStyle w:val=\"Caption\"/></w:pPr>",
+          "attributes": {
+            "w14:paraId": "72F14469",
+            "w14:textId": "6FF9E2C1",
+            "w:rsidR": "00074BD8",
+            "w:rsidRDefault": "00074BD8",
+            "w:rsidP": "00074BD8"
+          }
+        },
+        "content": [
+          {
+            "type": "text",
+            "text": "Figure "
+          },
+          {
+            "type": "fieldStart"
+          },
+          {
+            "type": "fieldCode",
+            "attrs": {
+              "text": " SEQ Figure \\* ARABIC "
+            }
+          },
+          {
+            "type": "fieldSeparator"
+          },
+          {
+            "type": "text",
+            "text": "2",
+            "marks": [
+              {
+                "type": "runExt",
+                "attrs": {
+                  "xml": "<w:rPr><w:noProof/></w:rPr>"
+                }
+              }
+            ]
+          },
+          {
+            "type": "fieldEnd"
+          },
+          {
+            "type": "text",
+            "text": ": power against flow"
+          }
+        ]
+      },
+      {
+        "type": "paragraph",
+        "attrs": {
+          "style": "Heading1",
+          "ext": "<w:pPr><w:pStyle w:val=\"Heading1\"/></w:pPr>",
+          "attributes": {
+            "w14:paraId": "3ED7DD12",
+            "w14:textId": "7A48C3D7",
+            "w:rsidR": "00074BD8",
+            "w:rsidRDefault": "00074BD8",
+            "w:rsidP": "00074BD8"
+          }
+        },
+        "content": [
+          {
+            "type": "text",
+            "text": "Conclusions"
+          }
+        ]
+      },
+      {
+        "type": "paragraph",
+        "attrs": {
+          "attributes": {
+            "w14:paraId": "6A8EE89E",
+            "w14:textId": "43E91324",
+            "w:rsidR": "00074BD8",
+            "w:rsidRDefault": "00074BD8",
+            "w:rsidP": "00074BD8"
+          }
+        },
+        "content": [
+          {
+            "type": "text",
+            "text": "As stated on page "
+          },
+          {
+            "type": "fieldStart"
+          },
+          {
+            "type": "fieldCode",
+            "attrs": {
+              "text": " PAGEREF PeakEfficiency \\h "
+            }
+          },
+          {
+            "type": "fieldSeparator"
+          },
+          {
+            "type": "text",
+            "text": "3",
+            "marks": [
+              {
+                "type": "runExt",
+                "attrs": {
+                  "xml": "<w:rPr><w:noProof/></w:rPr>"
+                }
+              }
+            ]
+          },
+          {
+            "type": "fieldEnd"
+          },
+          {
+            "type": "text",
+            "text": ": "
+          },
+          {
+            "type": "fieldStart"
+          },
+          {
+            "type": "fieldCode",
+            "attrs": {
+              "text": " REF PeakEfficiency \\h "
+            }
+          },
+          {
+            "type": "fieldSeparator"
+          },
+          {
+            "type": "text",
+            "text": "Peak efficiency was 81 percent"
+          },
+          {
+            "type": "fieldEnd"
+          }
+        ]
+      },
+      {
+        "type": "paragraph",
+        "attrs": {
+          "attributes": {
+            "w14:paraId": "0AF193B4",
+            "w14:textId": "72B1C1E2",
+            "w:rsidR": "00074BD8",
+            "w:rsidRPr": "00074BD8",
+            "w:rsidRDefault": "00074BD8",
+            "w:rsidP": "00074BD8"
+          }
+        },
+        "content": [
+          {
+            "type": "text",
+            "text": "Each pump was run at its rated speed for an hour before the readings were taken, and the bearings were checked again once it had cooled. The figures below are the mean of three runs on different days, with the same operator and the same instruments, calibrated at the start of the week. Each pump was run at its rated speed for an hour before the readings were taken, and the bearings were checked again once it had cooled. The figures below are the mean of three runs on different days, with the same operator and the same instruments, calibrated at the start of the week. "
+          }
+        ]
+      }
+    ]
+  }
+}
