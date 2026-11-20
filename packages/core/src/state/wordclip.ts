@@ -37,6 +37,7 @@ import {
   type ParagraphPropertiesJSON,
   parseContent,
   parseDocument,
+  type ResourceJSON,
   SCHEMA_VERSION,
   type StoryJSON,
   type StyleJSON,
@@ -65,6 +66,8 @@ export interface WordDefinitions {
   comments: CommentJSON[];
   /** The notes the content refers to, by story id. */
   notes?: Record<string, StoryJSON>;
+  /** The resources (pictures' images) the content uses, by key. */
+  resources?: Record<string, ResourceJSON>;
 }
 
 /** What a paste brings: the content, the envelope it needs, and new notes. */
@@ -95,8 +98,9 @@ type Properties = Pick<ParagraphPropertiesJSON, "style" | "numbering" | "markFor
  * comments; with the document's id.
  */
 export function copiedDefinitions(context: WordContext, content: Node): WordDefinitions {
-  const { styles, numbering, comments, stories } = context.envelope;
+  const { styles, numbering, comments, stories, resources } = context.envelope;
   const noteStories = new Set<string>();
+  const resourceKeys = new Set<string>();
   const styleIds = new Set<string>();
   const numberingIds = new Set<number>();
   const commentIds = new Set<number>();
@@ -123,6 +127,7 @@ export function copiedDefinitions(context: WordContext, content: Node): WordDefi
     if (node.type === "tableRow") properties((attrs as { exceptions?: Properties }).exceptions);
     if (COMMENT_ANCHORS.has(node.type)) commentIds.add(attrs.id as number);
     if (node.type === "noteReference") noteStories.add(String(node.attrs?.story));
+    if (node.type === "picture") resourceKeys.add(String(node.attrs?.resource));
     marks(node.marks);
   };
   visit([content.toJSON()], references);
@@ -166,12 +171,18 @@ export function copiedDefinitions(context: WordContext, content: Node): WordDefi
       for (const o of instance.overrides ?? [])
         if (o.definition?.style) styleIds.add(o.definition.style);
   }
+  const used = Object.fromEntries(
+    [...resourceKeys].flatMap((key) =>
+      resources && Object.hasOwn(resources, key) ? [[key, resources[key] as ResourceJSON]] : [],
+    ),
+  );
   return {
     document: context.id,
     styles: styles.filter((s) => styleIds.has(s.id)),
     numbering: { abstracts: abstracts(), instances: instances() },
     comments: copied,
     ...(Object.keys(notes).length ? { notes } : {}),
+    ...(Object.keys(used).length ? { resources: used } : {}),
   };
 }
 
@@ -263,7 +274,8 @@ export function fitPaste(state: EditorState, content: unknown, definitions?: unk
       safeLinks(parseContent(content, { fragment: true, schema: state.schema }).toJSON()),
       true,
     );
-  const { document, styles, numbering, comments, notes } = definitions as Partial<WordDefinitions>;
+  const { document, styles, numbering, comments, notes, resources } =
+    definitions as Partial<WordDefinitions>;
   // Validated as a document's envelope: types, ranges, no style based on itself; the content
   // as content to paste (a table may end it).
   const checked = parseDocument({
@@ -274,6 +286,7 @@ export function fitPaste(state: EditorState, content: unknown, definitions?: unk
     numbering,
     comments,
     ...(notes ? { stories: notes } : {}),
+    ...(resources ? { resources } : {}),
     content: { type: "doc", content: [{ type: "paragraph" }] },
   });
   const json = parseContent(content, { fragment: true, schema: state.schema }).toJSON();
@@ -282,6 +295,7 @@ export function fitPaste(state: EditorState, content: unknown, definitions?: unk
     numbering: checked.numbering,
     comments: checked.comments,
     ...(checked.stories ? { notes: checked.stories } : {}),
+    ...(checked.resources ? { resources: checked.resources } : {}),
   };
   return fit(state, source, json, document === context.id);
 }
@@ -496,6 +510,32 @@ function fit(
     }
     return copy;
   };
+  // Pictures from another document bring their images: under a key of their own here (the same
+  // image already here is reused), without a package part, which would name one of this
+  // document's package (a part is all a resource has only when no view gave its bytes).
+  let resources = target.resources;
+  const resourceKeys = new Map<string, string>();
+  const mapResource = (key: string): string => {
+    const carriedResource =
+      !same && source.resources && Object.hasOwn(source.resources, key)
+        ? source.resources[key]
+        : undefined;
+    if (!carriedResource) return key;
+    const known = resourceKeys.get(key);
+    if (known !== undefined) return known;
+    const { part, size, ...rest } = carriedResource;
+    const resource: ResourceJSON =
+      rest.data !== undefined || rest.url !== undefined
+        ? { ...rest, ...(rest.data === undefined && size !== undefined ? { size } : {}) }
+        : carriedResource;
+    const existing = Object.entries(resources ?? {}).find(([, r]) => equal(r, resource))?.[0];
+    let next = existing ?? key;
+    for (let i = 2; !existing && resources && Object.hasOwn(resources, next); i++)
+      next = `${key}-${i}`;
+    if (!existing) resources = { ...resources, [next]: resource };
+    resourceKeys.set(key, next);
+    return next;
+  };
   // A note has one reference: one still in the document keeps it (cut and paste moves it).
   const referredTo = new Set<string>();
   state.doc.descendants((node, pos) => {
@@ -546,6 +586,8 @@ function fit(
         if (Object.keys(rest).length) next.attributes = rest;
         else delete next.attributes;
       }
+    } else if (node.type === "picture" && attrs) {
+      next = { ...attrs, resource: mapResource(String(attrs.resource)) };
     } else if (node.type === "table" && attrs?.style) {
       next = { ...attrs, style: mapStyle(String(attrs.style)) };
     } else if (node.type === "tableRow" && attrs) {
@@ -638,7 +680,8 @@ function fit(
     abstracts !== target.numbering.abstracts ||
     instances !== target.numbering.instances ||
     comments !== target.comments ||
-    controls !== target.controls;
+    controls !== target.controls ||
+    resources !== target.resources;
   return {
     doc,
     envelope: changed
@@ -648,6 +691,7 @@ function fit(
           numbering: { abstracts, instances },
           comments,
           ...(controls ? { controls } : {}),
+          ...(resources ? { resources } : {}),
         }
       : target,
     ...(notes.length ? { notes } : {}),

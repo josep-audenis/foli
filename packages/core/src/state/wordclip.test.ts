@@ -665,6 +665,57 @@ describe("fitPaste", () => {
     ]);
   });
 
+  it("brings pictures' images from another document under keys of their own", () => {
+    const PNG = "data:image/png;base64,iVBORw0KGgo=";
+    const GIF = "data:image/gif;base64,R0lGODlh";
+    const picture = (resource: string): NodeJSON => ({
+      type: "picture",
+      attrs: { resource, width: 914400, height: 914400 },
+    });
+    const source = editorOf([p({}, picture("rId5"), picture("rId6"), picture("rId7"))], {
+      resources: {
+        rId5: { contentType: "image/png", data: PNG, part: "word/media/image1.png", size: 9 },
+        rId6: { contentType: "image/gif", data: GIF },
+        rId7: { contentType: "image/png", part: "word/media/image2.png" },
+        unused: { contentType: "image/png", data: PNG },
+      },
+    });
+    const defs = copiedDefinitions(contextOf(source), source.state.doc);
+    expect(Object.keys(defs.resources ?? {})).toEqual(["rId5", "rId6", "rId7"]);
+    // The target has another image as rId5, and the GIF already (as "same").
+    const target = editorOf([p({}, text("x"))], {
+      resources: {
+        rId5: { contentType: "image/png", url: "https://example.com/other.png" },
+        same: { contentType: "image/gif", data: GIF },
+      },
+    });
+    const json = JSON.parse(JSON.stringify({ content: source.state.doc.toJSON(), word: defs }));
+    const fitted = fitPaste(target.state, json.content, json.word);
+    const keys: string[] = [];
+    fitted.doc.descendants((node) => {
+      if (node.type.name === "picture") keys.push(String(node.attrs.resource));
+    });
+    expect(keys).toEqual(["rId5-2", "same", "rId7"]);
+    expect(fitted.envelope.resources).toEqual({
+      rId5: { contentType: "image/png", url: "https://example.com/other.png" },
+      same: { contentType: "image/gif", data: GIF },
+      // Its bytes, not the source package's part (nor that part's size).
+      "rId5-2": { contentType: "image/png", data: PNG },
+      // Only a part known: kept as it is (the target's package may lack it).
+      rId7: { contentType: "image/png", part: "word/media/image2.png" },
+    });
+    // Within one document nothing is added: the picture keeps its own.
+    const own = fitPaste(source.state, json.content, json.word);
+    expect(own.envelope).toBe(envelopeOf(source));
+    // Definitions with a resource that is not one are refused.
+    expect(() =>
+      fitPaste(target.state, json.content, {
+        ...json.word,
+        resources: { rId5: { contentType: "image/png", url: "javascript:alert(1)" } },
+      }),
+    ).toThrow(/resources/);
+  });
+
   it("refuses definitions that are not a document's: a style based on itself, wrong types", () => {
     const editor = editorOf([p({}, text("x"))]);
     const content = docOf(p({}, text("a")));

@@ -737,6 +737,12 @@ export declare class EditorView {
     private readBack;
     /** Rebuilds every block that is not reused and puts the selection back. */
     private rerender;
+    /**
+     * A copied picture's image as another document can show and save it: its own `data:` or web
+     * URL, else the image this view shows, as a `data:` URL (read from the drawn image when it is
+     * an object URL: its bytes live in this page only). Nothing better known: as it is.
+     */
+    private portableResource;
     /** Copy writes the model's content (plain text, HTML, Foli JSON), never the browser's DOM. */
     private onCopy;
     private onCut;

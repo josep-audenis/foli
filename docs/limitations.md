@@ -224,7 +224,11 @@ Custom nodes and marks, plugins and toolbar items ([extensions](guides/extension
   in the other engines).
 - No cropping, rotation or touch resizing; resizing is refused while tracking (Foli does not
   record a size change yet). Alt text changes are not tracked.
-- Pictures copied to another document lose their images (their resources stay behind); Word's
+- A picture copied into another document brings its image (12.11): its own `data:` or web URL,
+  else the image the source view shows, as a `data:` URL; one shown from an object URL (a
+  `.docx` package's JPEG or PNG) is read from the drawn image and comes as PNG, the same pixels
+  in another encoding. One the source view does not show (no image resolver) still comes without
+  its image. Copying in WebKit is not automated (as every clipboard test). Word's
   picture-and-text paste brings the text only. The clipboard writes a floating picture inline.
 - `renderDocument` measures blocks on one long page: the lines after a floating picture may
   wrap a little differently than on the editing view's pages.
@@ -284,9 +288,11 @@ Details in the [package README](../packages/docx/README.md).
 
 - Strict Open XML documents are refused (`DocxError`) until a real file needs them. Encrypted
   zip entries, ZIP64 and compression methods other than stored and deflate are refused too.
-- A package may hold at most 10 000 entries, 512 MiB uncompressed and 1 000 000 XML elements in
-  the parts read (`maxEntries`, `maxSize`, `maxElements`; lower them on a server). At the element
-  limit an import can still take about 1.5 GB and 6 s ([security.md](security.md)).
+- A package may hold at most 10 000 entries, 512 MiB uncompressed and 4 000 000 XML nodes in the
+  parts read, a paragraph counting four (`maxEntries`, `maxSize`, `maxNodes`; lower them on a
+  server). A 659-page document of dense tables counts 1.9 million and takes about 0.8 GB to
+  import; at the limit a crafted file can still take about 2.3 GB and 12 s
+  ([security.md](security.md)).
 - Keep the imported `package` with the document: a document that refers to parts of its
   original package (headers, footers, pictures, content kept verbatim with relationship ids)
   cannot be exported without it (`DocxError`).
