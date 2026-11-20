@@ -3,6 +3,129 @@
 Numbers are only meaningful with their method. Each section says what was measured, on what,
 and how to reproduce it. Re-run and update a section when the code it measures changes.
 
+## Performance tracking (12.7)
+
+**Run:** `pnpm bench` (`scripts/bench.mjs`; about 12 minutes on the owner's laptop on battery, less on mains) before each
+release ([contributing](contributing.md#releasing)) and on any change meant to be faster; not in
+`pnpm check` or the pre-push hook, no hosted CI
+([ADR-0008](decisions/ADR-0008-1.0-contract-and-extensions.md)). It builds the packages, runs
+every benchmark below `--runs` times (default 3), takes the median of each metric over the runs,
+prints a table against this machine's baseline, writes `test-results/bench.json` and exits
+non-zero when a metric is past its threshold, or when a metric of the baseline was not measured
+by an engine that ran or came out as no number (`MISSING`: a renamed test, a query that found
+nothing to time). Each benchmark prints `BENCH {…}` lines (JSON). Options: `--update` writes the
+medians as the baseline (thresholds already in it are kept; refused while a median is no number),
+`--engines node,chromium,firefox,webkit` runs some of them (an `--update` then replaces only those
+engines' metrics and dates), `--machine NAME` (or `FOLI_BENCH_MACHINE`) names the machine,
+`--no-build` skips `pnpm build`.
+
+**Baselines:** `bench/baselines/<machine>.json`, committed: per engine the date and number of runs
+it was recorded with, per engine and metric the median, its `threshold` and `floor`, and the
+hardware, Node.js and browser versions. The machine is named by its platform and a hash of host
+name, CPU, cores and memory in GB (`win32-5f39f6c2` is the owner's laptop), so the host name stays
+out of the repository. With no baseline for the machine the table shows the numbers alone and the
+run fails, saying how to record one (`pnpm bench --update`).
+
+**Metrics** (milliseconds; engine `node` is Node.js):
+
+| Engine                    | Metric                                                      | Benchmark                                                                                                                                                 |
+| ------------------------- | ----------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Chromium, Firefox, WebKit | `layout`, `reflow` at 100 and 200 sections                  | [Pagination](#pagination-layout-keystrokes-and-re-flow-phase-5), the paragraph document (104 and 208 pages today)                                         |
+| Chromium, Firefox, WebKit | `typeHandlerP50`, `enterHandlerP50` at 100 and 200 sections | the same keystrokes                                                                                                                                       |
+| Chromium, Firefox         | `typePaintP95`, `enterPaintP95` at 100 and 200 sections     | the same keystrokes; not WebKit's (software painting on Windows, 2× apart between runs)                                                                   |
+| Chromium, Firefox, WebKit | `find "th"`, `"the "`, `"the la"`, `"zebra"`                | the [find](#find-on-a-long-document-1111) panel (`apps/playground/bench/find.bench.ts`) on the 1,640-paragraph document, each query typed 5 times, median |
+| Node                      | `findAll "th" x20`, `"the "`, `"the la"`, `"zebra"`         | `findAll` on the same document's editor (built packages), 20 calls per sample, median of 30 samples after 3 warm-up ones                                  |
+| Node                      | `docx import (corpus)`, `docx export (corpus)`              | `importDocx`, and `exportDocx(document, package)`, of the 9 `corpus/word` files: the sum of each file's median of 10 (after 2 warm-up calls)              |
+| Chromium                  | `pdf (corpus)`                                              | `exportPdf` of the 9 imported corpus files through Playwright's Chromium, tracked changes accepted, no added fonts: the sum of each file's median of 3    |
+
+The browser benchmarks run on the Vite dev server (unminified source, React's development build)
+as `pnpm bench:layout` always has, on a port of their own (5177) and never on a server already
+running (which could be another checkout's).
+
+**Thresholds:** a metric fails when its median is past the baseline by more than `threshold`
+(relative) **and** by more than `floor` (milliseconds: for whole-millisecond clocks and a frame of
+waiting); as far the other way it is reported `faster`. The defaults (`TOLERANCES` in the
+script) were set from two full runs of the same code an hour apart (on battery), whose browser
+medians stayed within ±30% of each other (WebKit's paint p95 aside, now not tracked), and from
+Node runs on mains: within one invocation `findAll` and `.docx` medians stay within ±10%, but
+between invocations on the shared laptop the `.docx` corpus import took 53 to 92 ms on a quiet
+machine (up to 140 ms with other work running). `findAll` is timed 20 calls at a time, since one
+call (0.05-0.5 ms) is too close to the clock's noise to catch anything:
+
+| Metric                    | Threshold |  Floor |
+| ------------------------- | --------: | -----: |
+| paint p95                 |     ± 50% |   8 ms |
+| keystroke handler p50     |     ± 50% | 1.5 ms |
+| layout, re-flow           |     ± 40% |   5 ms |
+| find (panel)              |     ± 50% |  10 ms |
+| `findAll` (20 calls)      |     ± 60% |   2 ms |
+| `.docx` import and export |     ± 60% |  20 ms |
+| PDF                       |     ± 40% | 100 ms |
+
+**Compare on mains power.** On battery (Windows' Balanced plan) the same code measured 1.5-2×
+slower than on mains, and drifted further as the charge fell, past every threshold. Rerun once
+before believing a regression.
+
+### 1.0 numbers
+
+**Environment:** Intel Core i7-13700H (14 cores, 20 threads), 16 GB RAM, Windows 11 (10.0.26200),
+**on mains power**; Node.js 25.3.0; Playwright 1.64.1 with Chromium 156.0.8078.4, Firefox 157.0
+and WebKit 27.2 (headless, 1280×720); 2026-11-20, the code of 12.6. Medians of 3 runs (Node's of
+5, recorded again with the review's changes) (`bench/baselines/win32-5f39f6c2.json`);
+milliseconds.
+
+| Engine   | Sections (pages) | layout | type handler p50 | type paint p95 | Enter handler p50 | Enter paint p95 | re-flow |
+| -------- | ---------------: | -----: | ---------------: | -------------: | ----------------: | --------------: | ------: |
+| Chromium |        100 (104) |    110 |             11.4 |           17.1 |              12.9 |            31.6 |     131 |
+| Chromium |        200 (208) |    206 |             22.9 |           31.9 |              25.6 |            62.4 |     264 |
+| Firefox  |        100 (104) |    151 |               13 |             30 |                16 |              45 |     150 |
+| Firefox  |        200 (208) |    285 |               31 |             59 |                34 |             104 |     330 |
+| WebKit   |        100 (104) |    204 |               17 |              - |                20 |               - |     219 |
+| WebKit   |        200 (208) |    388 |               33 |              - |                35 |               - |     451 |
+
+| Find (107 pages) | `findAll` (Node, per call) | Chromium panel | Firefox panel | WebKit panel |
+| ---------------- | -------------------------: | -------------: | ------------: | -----------: |
+| `th`             |                    0.48 ms |          16 ms |         17 ms |        46 ms |
+| `the `           |                    0.48 ms |          17 ms |         16 ms |        47 ms |
+| `the la`         |                    0.20 ms |          17 ms |         16 ms |        62 ms |
+| `zebra`          |                    0.06 ms |          16 ms |         16 ms |        61 ms |
+
+The panel's figures are medians of later searches (the first after loading reads the trees, see
+"Find" below); Chromium's and Firefox's are about one frame. `.docx`, the 9 corpus files together
+(18-32 kB each): import 72 ms, export 80 ms (Node; 53 and 65 ms in the full run of the same day);
+`exportPdf` 537 ms (Chromium, about 60 ms per document).
+
+**Against earlier numbers.** Pagination was last measured for 0.2.0 (7.9): Chromium laid 100
+pages out in 41 ms and handled a key in 4-6 ms; 1.0 takes 110 ms and 11-13 ms. To separate the
+code from the machine, the 100-section benchmark of each release's own checkout ran in Chromium
+in one session on mains, one after the other, 3 runs each (medians):
+
+| Code             | Pages | layout | type handler p50 | type paint p95 | Enter handler p50 | Enter paint p95 | re-flow |
+| ---------------- | ----: | -----: | ---------------: | -------------: | ----------------: | --------------: | ------: |
+| 0.2.0 (Phase 7)  |   100 |     50 |              3.7 |            8.9 |               4.2 |              19 |      68 |
+| 0.3.0 (Phase 8)  |   106 |     78 |              9.7 |             18 |              10.8 |              31 |     133 |
+| 0.5.0 (Phase 10) |   106 |    110 |             11.3 |           20.5 |              13.4 |              34 |     137 |
+| 0.6.0 (Phase 11) |   104 |    107 |             12.0 |           19.9 |              13.1 |              30 |     129 |
+| 12.6             |   104 |    109 |             12.2 |           19.0 |              14.5 |              37 |     146 |
+
+0.2.0's row is within run-to-run noise (±30%) of what 7.9 measured (layout 41 ms then, 50 now;
+handlers 4.1 and 5.7 then, 3.7 and 4.2 now). (An earlier pass of
+single runs on battery gave the same picture at about twice the times.)
+
+**A regression since 0.2.0, not from Phase 12:** a keystroke's handler costs 3.3-3.5× what it
+did in 0.2.0, the first layout and the full re-flow about 2.2×, keystroke-to-paint p95 about 2×.
+Most of the keystroke cost came with the Word model (Phase 8: schema v3, Word's formatting
+resolved per block), the layout's in Phases 8 to 10; 12.6 is within the noise of 0.6.0. At 100
+pages the pagination targets below are missed in Chromium and Firefox: handler p50 11-16 ms
+(≤ 8), Enter's paint p95 32-45 ms (≤ 25; typing's 17 ms in Chromium passes), layout 110-151 ms
+(≤ 60), re-flow 131-150 ms (≤ 100). Not investigated in 12.7 (12.11 decides whether it blocks
+1.0); the baseline catches further regressions from here.
+
+**Rust and WebAssembly:** no benchmark shows a need. The slow paths are the view's work per
+keystroke and the browsers' own layout of the pages (DOM, measuring, painting), which WebAssembly
+does not speed up; the computing parts are small (`findAll` at most 0.5 ms on 107 pages, a `.docx`
+import 6-8 ms per document).
+
 ## Document model: build and serialize (Phase 2)
 
 **Run:** `pnpm --filter @folijs/core bench` (Vitest 5 benchmark mode, tinybench under the hood;
@@ -75,6 +198,9 @@ same `Transform.setBlockType` (three runs, Vitest test runner). Now a single
 generous 250 ms bound.
 
 ## Pagination: layout, keystrokes and re-flow (Phase 5)
+
+The tables in this section are as of Phases 5 to 7 (up to 0.2.0); 1.0's numbers, and how much
+slower they are, are in [Performance tracking](#performance-tracking-127).
 
 **Run:** `pnpm bench:layout` (Playwright, `playwright.bench.config.ts`, one worker; about 3
 minutes for all three engines). Each test prints a `BENCH {…}` line. Not part of `pnpm check` or
@@ -180,7 +306,8 @@ Milliseconds (lower is better). Keystroke paint columns are p50 / p95 of the sam
 
 **Targets** (set from this baseline with headroom, on this machine, in Chromium and Firefox; for
 WebKit the handler columns only; for the paragraph document: the list document's misses are an
-accepted known limit, see "Lists"). A target counts as broken when two runs in a row exceed it; a
+accepted known limit, see "Lists"; **missed at 1.0**, see
+[Performance tracking](#performance-tracking-127)). A target counts as broken when two runs in a row exceed it; a
 change that breaks one needs a reason in its PR, and the table above re-run:
 
 | Measure                                 | 100 pages | 200 pages |
@@ -261,7 +388,8 @@ few hundred pages.
 
 ## Find on a long document (11.11)
 
-A document of 1,640 paragraphs (107 A5 pages, about 125,000 characters), `findAll` in Node and the
+As of 11.11 (1.0's numbers: [Performance tracking](#performance-tracking-127)). A document of
+1,640 paragraphs (107 A5 pages, about 125,000 characters), `findAll` in Node and the
 find panel in `apps/playground/e2e/word-navigation.spec.ts`: from the input event to the next frame
 after it, the panel updated and the matches marked. One worker, Windows, 2026-11-19.
 

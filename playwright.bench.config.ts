@@ -1,7 +1,11 @@
 import { defineConfig, devices } from "@playwright/test";
 
-/** Benchmarks (`pnpm bench:layout`): one at a time, so runs do not compete for the machine. */
-const PORT = 5175;
+/**
+ * Benchmarks (`pnpm bench:layout`, and `pnpm bench` for the release baselines): one at a time, so
+ * runs do not compete for the machine. A port of their own, never an e2e run's server (which may
+ * be another checkout's).
+ */
+const PORT = 5177;
 
 export default defineConfig({
   testDir: "apps/playground/bench",
@@ -22,6 +26,6 @@ export default defineConfig({
   webServer: {
     command: `pnpm --filter @folijs/playground dev --port ${PORT} --strictPort`,
     url: `http://localhost:${PORT}`,
-    reuseExistingServer: !process.env.CI,
+    reuseExistingServer: false,
   },
 });

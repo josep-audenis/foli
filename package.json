@@ -16,6 +16,7 @@
     "format": "biome check --write .",
     "check": "pnpm lint && pnpm typecheck && pnpm test && pnpm build && pnpm check:packages && pnpm api && pnpm size",
     "test:e2e": "playwright test",
+    "bench": "node scripts/bench.mjs",
     "bench:layout": "playwright test --config playwright.bench.config.ts",
     "corpus:pages": "playwright test --config playwright.word.config.ts",
     "prepare": "node scripts/install-hooks.mjs",

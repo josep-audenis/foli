@@ -26,6 +26,7 @@ is not installed when `core.hooksPath` is set or a foreign `pre-push` hook exist
 | `pnpm check`                    | lint + typecheck + test + build + package checks (`publint`) + API reports + bundle sizes; the pre-push hook         |
 | `pnpm api` / `pnpm api:update`  | Check each package's built types against its API report / rewrite the reports (after build)                          |
 | `pnpm size`                     | Bundle size per package against its budget (after `pnpm build`)                                                      |
+| `pnpm bench`                    | Benchmarks against this machine's baseline; fails on a regression (minutes; not in `pnpm check`; `--update` records) |
 | `pnpm changeset`                | Record a change to a published package (bump type and changelog line)                                                |
 | `pnpm examples`                 | Pack the packages, install them into `examples/` (Vite + React 18, Next.js + React 19), build, Playwright smoke test |
 
@@ -95,10 +96,18 @@ playground, spike and examples are never published.
 1. **With each change to a published package**, run `pnpm changeset`: pick the bump (before
    1.0: `minor` for breaking changes and features, `patch` for fixes) and write the changelog
    line for users. Commit the `.changeset/*.md` file with the change.
-2. **To release**, on a branch: `pnpm changeset version` applies every pending changeset (new
+2. **Before each release**, run `pnpm bench` on a quiet machine on mains power
+   ([benchmarks.md](benchmarks.md#performance-tracking-127)): it compares the layout,
+   keystroke, find, `.docx` and PDF benchmarks with the committed baseline of the machine
+   (`bench/baselines/<machine>.json`) and exits non-zero on a regression past a threshold or a
+   baseline metric not measured. Rerun once before believing a regression; explain a real one in
+   the release PR, or fix it. With no baseline for the machine it compares nothing and fails:
+   `pnpm bench --update` records one, commit it.
+   Run it too on a change meant to be faster, then `--update` to keep the new numbers.
+3. **To release**, on a branch: `pnpm changeset version` applies every pending changeset (new
    version in each `package.json`, `CHANGELOG.md` entries) and deletes the changeset files.
    Review, commit ("Version packages"), PR, merge to `main`.
-3. **Publish**: GitHub → Actions → **Release** → Run workflow (on `main`). It installs from the
+4. **Publish**: GitHub → Actions → **Release** → Run workflow (on `main`). It installs from the
    lockfile, refuses to run while unapplied changesets exist or a package is still at the
    `0.0.0` placeholder, runs `pnpm check`, publishes every version not yet on npm with
    [provenance](https://docs.npmjs.com/generating-provenance-statements), then tags every
