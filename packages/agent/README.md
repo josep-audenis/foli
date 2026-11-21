@@ -5,8 +5,8 @@ edits are tracked changes in the agent's name, for a person to accept or reject 
 Word. No DOM and no Node built-ins: runs in Node, browsers, workers and sandboxes. Its only
 dependency is `@folijs/core`, a peer at an exact version.
 
-> **Unstable (0.x), unreleased.** In development (roadmap, Phase 13): reading and text editing are built;
-> styles, comments and templates are not yet. Outside the 1.0 promise of the other packages.
+> **Unstable (0.x), unreleased.** In development (roadmap, Phase 13): reading, text editing, styles and
+> comments are built; templates are not yet. Outside the 1.0 promise of the other packages.
 
 ```ts
 import { openSession } from "@folijs/agent";
@@ -62,6 +62,8 @@ session.replaceText("b5", "Party", "Side", { all: true });
 session.insertAfter("b11", ["A new clause.", { text: "Schedule", style: "Heading 1" }]);
 session.insertBefore("b6", ["Recitals"]);
 session.deleteBlock("b17");
+session.setStyle("b21", "Heading 2");
+session.comment("b25", "Why three years?", { on: "three (3) years" });
 ```
 
 - **`replaceText(handle, find, replacement, { all })`**: `find` is text as `read` shows it,
@@ -76,6 +78,14 @@ session.deleteBlock("b17");
 - **`deleteBlock(handle)`**: a paragraph, or a table with all its cells. A paragraph that must
   stay is emptied instead, and the result says why: the last one of the document or of a cell,
   one before a table, one that ends a section.
+
+- **`styles()`** lists the paragraph styles by the names `read` shows. **`setStyle(handle,
+  style)`** puts a paragraph in one (by name or id, capitals do not count): a tracked
+  formatting change, the paragraph's direct formatting kept.
+- **`comment(handle, text, { on })`** comments a paragraph in the author's name: the whole
+  block, or `on`, text that is in it once. A line break in `text` starts a new paragraph of the
+  comment. Comments are not tracked changes: rejecting the session's changes leaves them.
+  A locked content control takes comments, as in Word, and nothing else.
 
 Refusals a model can act on: `no-match` (with the block's text), `several-matches` (with how
 many), `unknown-style` (with the styles there are), `gone`, `unknown-handle`, `not-a-paragraph`,

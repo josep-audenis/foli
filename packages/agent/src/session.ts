@@ -8,14 +8,18 @@ import {
 import { Handles } from "./handles.js";
 import {
   type Changed,
+  type CommentOptions,
   type Context,
   changed,
+  comment,
   deleteBlock,
   insert,
   type NewParagraph,
   type ReplaceOptions,
   replaceText,
   resolve,
+  setStyle,
+  styles,
 } from "./operations.js";
 import { type Block, formatBlocks, readBlocks } from "./read.js";
 import { type Result, refuse } from "./result.js";
@@ -88,6 +92,23 @@ export interface Session {
    * and `text` says why.
    */
   deleteBlock(handle: string): Result<{ text: string }>;
+  /** The paragraph styles there are, by the names `read` shows and `setStyle` takes. */
+  styles(): string[];
+  /**
+   * Puts a paragraph in a style, named by its name or id (capitals do not count). Its direct
+   * formatting stays. Recorded as a tracked formatting change.
+   */
+  setStyle(handle: string, style: string): Result<Changed>;
+  /**
+   * Comments a paragraph in the session's author's name: the whole block, or `on` text in it
+   * (there once). A line break in `text` starts a new paragraph of the comment. A comment is
+   * not a tracked change: rejecting the session's changes leaves it. Returns the comment's id.
+   */
+  comment(
+    handle: string,
+    text: string,
+    options?: CommentOptions,
+  ): Result<Changed & { comment: number }>;
 }
 
 /**
@@ -144,5 +165,8 @@ export function openSession(document: EditorDocument, options: SessionOptions): 
     insertAfter: (handle, paragraphs) => insert(context, handle, paragraphs, "after"),
     insertBefore: (handle, paragraphs) => insert(context, handle, paragraphs, "before"),
     deleteBlock: (handle) => deleteBlock(context, handle),
+    styles: () => styles(context),
+    setStyle: (handle, style) => setStyle(context, handle, style),
+    comment: (handle, text, options) => comment(context, handle, text, options),
   };
 }
