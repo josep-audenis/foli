@@ -99,10 +99,13 @@ writeFileSync(appEntry, `export { FoliEditor } from "${dist("react")}";\n`);
  * controls, captioned groups, dialogs by name, the color field, overflow into a More panel:
  * about 1.9 kB), with room for 17.5's replaceable strings (161.0 kB with them: the exported
  * list `toolbarMessages` holds each string a second time).
+ * View raised after the fourth bug sweep (112.1 kB, 113.0 allowed): it was at its limit, and the
+ * sweep's fixes in core (accepting a chain of deleted paragraphs) and the view (field codes beside
+ * a page number) add about 0.1 kB.
  */
 const BUNDLES = [
   { name: "@folijs/core", entry: dist("core"), budget: 88_000 },
-  { name: "@folijs/view", entry: dist("view"), budget: 114_700 },
+  { name: "@folijs/view", entry: dist("view"), budget: 115_712 },
   { name: "@folijs/react", entry: dist("react"), budget: 166_000 },
   { name: "FoliEditor only", entry: appEntry, budget: 166_000 },
   { name: "@folijs/docx", entry: dist("docx"), budget: 61_440 },
