@@ -494,8 +494,9 @@ export function AcmeEditor() {
   editor making them. Table, Section and Controls take a list; Header, Fields, Navigate and Notes
   a function ([api.md](../api.md#toolbar-items)).
 - App items keep the toolbar's keyboard use (one tab stop, arrow keys, Home, End),
-  `aria-pressed`, `aria-disabled`, and the document's focus and selection on click. They cannot be
-  boxes, color menus or dialogs: those are the built-in items' only.
+  `aria-pressed`, `aria-disabled`, and the document's focus and selection on click. They can
+  be boxes (`ToolbarSelect`) and color menus (`ToolbarColorMenu`) too
+  ([api.md](../api.md#toolbar-items)); they cannot open the toolbar's dialogs.
 - `useCommand(command)` or `useCommand(name, ...args)` gives a button of the app's own
   `{ enabled, run }`. Make its command outside the component, or memoize it: a new command on each
   render is dry-run on each render.
