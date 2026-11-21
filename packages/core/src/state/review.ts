@@ -340,10 +340,17 @@ function resolve(
         // Nothing to join with (a table follows, or a cell ends): a paragraph left empty goes
         // whole, inserted and rejected or deleted and accepted (Word's rules are restored after:
         // `keepTablesApart`). (Never a cell's only paragraph: a cell ends with one.)
+        // An accepted one goes only after a paragraph that stays and does not join it: where it
+        // is what keeps a table from another or from the start, or what the paragraphs before
+        // join into, it stays itself (not removed and made again, or left for another to take
+        // its place, which would be another paragraph to whoever holds on to it).
         else if (
           goes &&
           (!node.content.size || emptied) &&
-          tr.doc.resolve(start).parent.childCount > 1
+          tr.doc.resolve(start).parent.childCount > 1 &&
+          (!accept ||
+            (staysBefore(tr.doc.resolve(start).nodeBefore, start, removed) &&
+              !joins.some((join) => join.pos === start)))
         ) {
           removed.push([start, end]);
           wholes = true;
@@ -407,6 +414,17 @@ function resolve(
   ].sort((a, b) => b.at - a.at);
   for (const op of ops) op.run();
   keepTablesApart(tr);
+}
+
+/** Whether `before`, the block ending at `end`, is a paragraph that is not itself removed. */
+function staysBefore(
+  before: Node | null,
+  end: number,
+  removed: readonly [number, number][],
+): boolean {
+  if (!before?.isTextblock) return false;
+  const start = end - before.nodeSize;
+  return !removed.some(([s, e]) => s <= start && e >= end);
 }
 
 /** Whether every child of `node` (content at `start`) but markers lies in `removed`. */
