@@ -44,7 +44,7 @@ panel (`FoliNavigation`). For your own layout: `useFoliEditor`, `FoliEditorProvi
 `useEditorState(selector)` and `useCommand(command)`. To change the toolbar's items, pass groups
 of them (`toolbar` on `FoliEditor`, `items` on `FoliToolbar`): the built-in ones by name from
 `toolbarItems`, and your own (`ToolbarItem`: a button running a command, enabled by its dry
-run, a menu, a box or a color menu). `useCommand("undo")` takes a command's name too.
+run, a menu, a box, a color menu, a dialog or your own control). `useCommand("undo")` takes a command's name too.
 React 18.2+ and 19; server rendering gives the editor's shell, the document appears on
 hydration.
 

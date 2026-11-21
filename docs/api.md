@@ -26,7 +26,8 @@ exactly its own version (since 1.0.0). Stylesheet: `@folijs/react/styles.css`
 (`FoliEditorProps`, `FoliEditorHandle`, `FoliChange`, `FoliCanvasProps`, `FoliCanvasHandle`,
 `FoliCommentsProps`, `FoliNavigationProps`, `FoliToolbarProps`), the toolbar's items
 (`ToolbarItem`, `ToolbarButton`, `ToolbarMenu`, `ToolbarAction`, `ToolbarSelect`, `ToolbarOption`,
-`ToolbarColorMenu`, `ToolbarColor`, `ToolbarItemName`, `toolbarItems`,
+`ToolbarColorMenu`, `ToolbarColor`, `ToolbarDialog`, `ToolbarDialogProps`, `ToolbarCustom`,
+`ToolbarCustomProps`, `ToolbarItemName`, `toolbarItems`,
 `defaultToolbarItems`), the
 hooks and their options and results (`UseFoliEditorOptions`, `UseEditorStateOptions`,
 `UseCommandOptions`, `CommandState`).
@@ -213,7 +214,9 @@ typed `ToolbarMenu`, the boxes (`style`, `font`, `size`, `lineSpacing`, `reviewV
 other built-ins `ToolbarButton`.
 
 An app's item is a `ToolbarItem`: a `ToolbarButton` (with `command`), a `ToolbarMenu` (with
-`actions`), a `ToolbarSelect` (a box, with `select`) or a `ToolbarColorMenu` (with `colors`).
+`actions`), a `ToolbarSelect` (a box, with `select`), a `ToolbarColorMenu` (with `colors`), a
+`ToolbarDialog` (with `dialog`) or a `ToolbarCustom` (with `render`). An item has one of these
+fields, not two.
 
 - `key`: unique in the toolbar. `label`: the tooltip, and the accessible name when `icon` is
   given. `text`: the visible text and accessible name (default `label`). `icon`: a `ReactNode`
@@ -221,7 +224,8 @@ An app's item is a `ToolbarItem`: a `ToolbarButton` (with `command`), a `Toolbar
 - `command: Command`: what a press runs, on the editor of the story open on its page, else the
   body's. Enabled by its dry run (`editor.can(command)`) after every transaction, unless
   `enabled(state, editor)` says otherwise (keep either cheap). A box or a color menu is
-  enabled unless its `enabled` says no: its `pick` is not dry-run.
+  enabled unless its `enabled` says no: its `pick` is not dry-run. So are a dialog button
+  and an app's own control.
 - `pressed(state, editor)`: a toggle (`aria-pressed`).
 - `actions`: a menu button instead, its entries `ToolbarAction`s (`{ key, label, command,
   checked? }`, a `menuitemcheckbox` with `checked(state, editor)`), or a function of the body's
@@ -255,7 +259,30 @@ Since 1.1 `toolbarItems` types its six boxes and three color menus as `ToolbarSe
 `ToolbarColorMenu` (1.0 typed them `ToolbarButton`, with a `command` they never had). Types only:
 code that annotates one of them as `ToolbarButton` names the new type, or `ToolbarItem`.
 
-The dialogs of the built-in items are not available to app items.
+- `dialog({ editor, close })`: a button that opens the app's dialog under the toolbar, as
+  Picture… does. The toolbar renders a `role="dialog"` named by `label`
+  (`.foli-toolbar-dialog.foli-toolbar-<key>-dialog`, styled as the built-in dialogs) around
+  what `dialog` returns, moves the focus to its first field or button (to the dialog itself
+  when it has none), and closes it on Escape (unless the content prevented the key's default) (the focus back on its button), when
+  the toolbar is disabled, when another dialog of the toolbar opens, and when its item leaves
+  the toolbar. `close(applied)` closes it (and does nothing once it is closed): with `applied` the toolbar calls `onClickCommand` (`FoliEditor` focuses the
+  document), otherwise the focus goes back to the button. It stays open while the document
+  or the selection changes: close it yourself if it is about a place. `dialog` runs as a
+  component's body, so it may use hooks; `editor` is the story's or the body's, as for
+  commands. `pressed(state, editor)` makes the button a toggle.
+- `render({ editor, disabled, tabIndex, ref, onFocus })`: the app's own control in the toolbar
+  (a field, a slider, a button with its own popover). Put `ref`, `tabIndex` and `onFocus` on
+  its one focusable element (required: without it the toolbar's tab stop can land on nothing;
+  on a DOM element, or a component that passes them on, since React 18 gives a function
+  component no `ref`): the toolbar then keeps its single tab stop and its arrow keys
+  reach the control. `label` is not shown: the control names itself. `disabled` is the toolbar's, or the item's `enabled` saying no: show it
+  with `aria-disabled` and keep the element focusable. ArrowLeft, ArrowRight, Home and End are
+  the toolbar's: a control that needs them (a text field) stops their propagation. `render`
+  runs as a component's body (hooks such as `useEditorState` are fine), again when the
+  toolbar renders, not on every transaction. Nothing else is done for it: a click takes the
+  focus from the document unless the control prevents it on `mousedown`.
+
+The built-in dialogs themselves (link, picture, page setup…) open only from their own items.
 
 ### Hooks and provider
 

@@ -169,7 +169,7 @@ interface ToolbarItemBase {
   readonly icon?: ReactNode | undefined;
   /**
    * Whether it can be used now. Default: a button's dry run of its `command` (`editor.can`); for
-   * a menu, whether it has entries; a box or a color menu, always (its `pick` is not dry-run).
+   * a menu, whether it has entries; any other kind, always (a box's `pick` is not dry-run).
    * Runs after every transaction: keep it cheap.
    */
   readonly enabled?: ((state: EditorState, editor: Editor) => boolean) | undefined;
@@ -187,6 +187,8 @@ export interface ToolbarButton extends ToolbarItemBase {
   readonly actions?: undefined;
   readonly select?: undefined;
   readonly colors?: undefined;
+  readonly dialog?: undefined;
+  readonly render?: undefined;
 }
 
 /** A toolbar menu button: a WAI-ARIA menu of its `actions`. */
@@ -197,9 +199,11 @@ export interface ToolbarMenu extends ToolbarItemBase {
    */
   readonly actions: readonly ToolbarAction[] | ((editor: Editor) => readonly ToolbarAction[]);
   readonly command?: undefined;
-  readonly pressed?: undefined;
   readonly select?: undefined;
   readonly colors?: undefined;
+  readonly dialog?: undefined;
+  readonly render?: undefined;
+  readonly pressed?: undefined;
 }
 
 /** An entry of a toolbar box. */
@@ -229,6 +233,9 @@ export interface ToolbarSelect extends ToolbarItemBase {
   readonly command?: undefined;
   readonly actions?: undefined;
   readonly colors?: undefined;
+  readonly dialog?: undefined;
+  readonly render?: undefined;
+  readonly pressed?: undefined;
 }
 
 /** A color of a toolbar color menu. */
@@ -255,15 +262,92 @@ export interface ToolbarColorMenu extends ToolbarItemBase {
   readonly command?: undefined;
   readonly actions?: undefined;
   readonly select?: undefined;
+  readonly dialog?: undefined;
+  readonly render?: undefined;
+  readonly pressed?: undefined;
+}
+
+/** What an app's dialog gets. */
+export interface ToolbarDialogProps {
+  /** Where the toolbar's commands go: the header, footer or note open on its page, else the body. */
+  readonly editor: Editor;
+  /**
+   * Closes the dialog. `applied`: it changed the document, so the focus goes there
+   * (`onClickCommand`); otherwise back to the dialog's button.
+   */
+  readonly close: (applied?: boolean) => void;
+}
+
+/**
+ * A toolbar button that opens the app's dialog under the toolbar, as Picture… does: a
+ * `role="dialog"` named by `label` (classes `foli-toolbar-dialog` and
+ * `foli-toolbar-<key>-dialog`). The focus goes to its first field or button; Escape closes it
+ * back to its button; a disabled toolbar closes it.
+ */
+export interface ToolbarDialog extends ToolbarItemBase {
+  /** The dialog's content. Rendered as a component's body: hooks are fine. */
+  readonly dialog: (props: ToolbarDialogProps) => ReactNode;
+  /** A toggle: whether the button shows as pressed. Runs after every transaction. */
+  readonly pressed?: ((state: EditorState, editor: Editor) => boolean) | undefined;
+  readonly command?: undefined;
+  readonly actions?: undefined;
+  readonly select?: undefined;
+  readonly colors?: undefined;
+  readonly render?: undefined;
+}
+
+/**
+ * What an app's own control gets: `ref`, `tabIndex` and `onFocus` go on its focusable element
+ * (a DOM element, or a component that passes them on: React 18 does not pass `ref` to a
+ * function component).
+ */
+export interface ToolbarCustomProps {
+  /** Where the toolbar's commands go: the header, footer or note open on its page, else the body. */
+  readonly editor: Editor;
+  /** The toolbar is disabled, or the item's `enabled` says no: stay focusable (`aria-disabled`). */
+  readonly disabled: boolean;
+  /** The toolbar has one tab stop: 0 on the item the arrow keys are on, else -1. */
+  readonly tabIndex: 0 | -1;
+  /** The element the toolbar's arrow keys focus. */
+  readonly ref: (element: HTMLElement | null) => void;
+  /** Moves the toolbar's tab stop here. */
+  readonly onFocus: () => void;
+}
+
+/**
+ * A toolbar item the app renders itself (a search field, a zoom slider, a button with a
+ * popover). It must render one focusable element with the props' `ref`, `tabIndex` and
+ * `onFocus`: without it the toolbar's tab stop can land on nothing. The control names itself
+ * (`label` is not shown), shows `disabled` itself (`aria-disabled`) and decides what a click
+ * does to the focus. The toolbar's ArrowLeft, ArrowRight, Home and End move between items: a
+ * control that needs them stops their propagation. Enabled unless `enabled` says no.
+ */
+export interface ToolbarCustom extends ToolbarItemBase {
+  /** The control. Rendered as a component's body: hooks (`useEditorState`) are fine. */
+  readonly render: (props: ToolbarCustomProps) => ReactNode;
+  readonly command?: undefined;
+  readonly actions?: undefined;
+  readonly select?: undefined;
+  readonly colors?: undefined;
+  readonly dialog?: undefined;
+  readonly pressed?: undefined;
 }
 
 /**
  * A toolbar item, built-in (`toolbarItems`) or the app's own: a button running a command, a
- * menu button, a box or a color menu. The toolbar keeps one tab stop for all its items (arrow keys, Home and End move
+ * menu button, a box, a color menu, a button opening a dialog, or the app's own control
+ * (`ToolbarCustom`, which does for itself what follows). The
+ * toolbar keeps one tab stop for all its items (arrow keys, Home and End move
  * between them), gives toggles `aria-pressed` and an item that cannot apply now `aria-disabled`
  * (still focusable), and leaves the focus and selection in the document on click.
  */
-export type ToolbarItem = ToolbarButton | ToolbarMenu | ToolbarSelect | ToolbarColorMenu;
+export type ToolbarItem =
+  | ToolbarButton
+  | ToolbarMenu
+  | ToolbarSelect
+  | ToolbarColorMenu
+  | ToolbarDialog
+  | ToolbarCustom;
 
 /** An entry of a toolbar menu (a `menuitem`, or a `menuitemcheckbox` when it has `checked`). */
 export interface ToolbarAction {
@@ -287,8 +371,9 @@ interface Item extends ToolbarItemBase {
   colors?: ToolbarColorMenu["colors"] | undefined;
   /** An action menu button (the table menu): its commands, in order. */
   actions?: readonly Action[] | ((editor: Editor) => readonly Action[]) | undefined;
-  /** A button opening a dialog (the picture's). */
-  dialog?: "picture";
+  /** A button opening a dialog: the picture's, or an app's. */
+  dialog?: "picture" | ToolbarDialog["dialog"] | undefined;
+  render?: ToolbarCustom["render"] | undefined;
   select?: ToolbarSelect["select"] | undefined;
 }
 
@@ -1151,7 +1236,7 @@ const statesOf =
       value:
         item.colors?.value(state) ??
         item.select?.value(state) ??
-        (item.dialog ? (selectedPicture(state) ? "edit" : "insert") : undefined),
+        (item.dialog === "picture" ? (selectedPicture(state) ? "edit" : "insert") : undefined),
     }));
 
 /** A menu button's entries (made from the body's editor when a function). */
@@ -1209,7 +1294,7 @@ export function FoliToolbar({
   const [focused, setActive] = useState(0);
   // The tab stop stays on the toolbar when items are taken away.
   const active = focused < items.length ? focused : 0;
-  const buttons = useRef<(HTMLButtonElement | HTMLSelectElement | null)[]>([]);
+  const buttons = useRef<(HTMLElement | null)[]>([]);
   // Whether a select box was last used with the pointer (its pick then goes back to the document).
   const pointer = useRef(false);
   // The open menu (a menu button's key), if any.
@@ -1232,6 +1317,17 @@ export function FoliToolbar({
         selection: editor.state.selection,
         restore: buttons.current[index] ?? null,
       });
+      return;
+    }
+    if (typeof item.dialog === "function") {
+      setDialog(null);
+      setTableDialog(null);
+      setPictureDialog(null);
+      setSetupDialog(null);
+      setReferenceDialog(null);
+      setControlDialog(null);
+      setNoteDialog(null);
+      setAppDialog({ key: item.key, restore: buttons.current[index] ?? null });
       return;
     }
     if (item.actions && !actionsOf(item, body).length) return;
@@ -1396,6 +1492,27 @@ export function FoliToolbar({
     if (disabled) setPictureDialog(null);
   }, [disabled]);
 
+  // An app's dialog (a `ToolbarDialog` item's): it closes itself, and with a disabled toolbar.
+  const [appDialog, setAppDialog] = useState<{ key: string; restore: HTMLElement | null } | null>(
+    null,
+  );
+  // One dialog at a time: a built-in one that opens (Mod-K's, a menu's) takes its place.
+  const builtInDialog = Boolean(
+    dialog ||
+      tableDialog ||
+      pictureDialog ||
+      setupDialog ||
+      referenceDialog ||
+      controlDialog ||
+      noteDialog,
+  );
+  const appDialogItem = appDialog && items.find((item) => item.key === appDialog.key);
+  // Nor does it come back with its item, once that has left the toolbar.
+  const appDialogGone = !appDialogItem;
+  useEffect(() => {
+    if (disabled || builtInDialog || appDialogGone) setAppDialog(null);
+  }, [disabled, builtInDialog, appDialogGone]);
+
   const onKeyDown = (event: KeyboardEvent) => {
     // Alt+Left (back) and other shortcuts are the browser's.
     if (event.altKey || event.ctrlKey || event.metaKey) return;
@@ -1435,6 +1552,21 @@ export function FoliToolbar({
                 !state?.enabled ||
                 (item.dialog === "picture" && state?.value === "insert" && !upload) ||
                 (item.actions !== undefined && actionsOf(item, body).length === 0);
+              if (item.render) {
+                return (
+                  <CustomItem
+                    key={item.key}
+                    render={item.render}
+                    editor={editor}
+                    disabled={off}
+                    tabIndex={i === active ? 0 : -1}
+                    setRef={(element) => {
+                      buttons.current[i] = element;
+                    }}
+                    onFocus={() => setActive(i)}
+                  />
+                );
+              }
               if (item.select) {
                 const { select } = item;
                 const value = state?.value ?? "";
@@ -1624,6 +1756,22 @@ export function FoliToolbar({
           </Fragment>
         ))}
       </div>
+      {appDialog && typeof appDialogItem?.dialog === "function" && !disabled && !builtInDialog && (
+        <AppDialog
+          // Each item's dialog is its own component: its hooks are not another dialog's.
+          key={appDialogItem.key}
+          label={appDialogItem.label}
+          name={appDialogItem.key}
+          content={appDialogItem.dialog}
+          editor={editor}
+          close={(applied) => {
+            const { restore } = appDialog;
+            setAppDialog(null);
+            if (applied && onClickCommand) onClickCommand();
+            else restore?.focus();
+          }}
+        />
+      )}
       {pictureDialog && !disabled && (
         <PictureDialog
           editor={editor}
@@ -1703,6 +1851,71 @@ export function FoliToolbar({
         />
       )}
     </>
+  );
+}
+
+/** An app's own control: a component, so that its `render` may use hooks. */
+function CustomItem({
+  render,
+  setRef,
+  ...props
+}: Omit<ToolbarCustomProps, "ref"> & {
+  render: ToolbarCustom["render"];
+  setRef: ToolbarCustomProps["ref"];
+}) {
+  return <>{render({ ...props, ref: setRef })}</>;
+}
+
+/** An app's dialog: the focus goes into it on open; Escape closes it. */
+function AppDialog({
+  label,
+  name,
+  content,
+  editor,
+  close,
+}: {
+  label: string;
+  name: string;
+  content: ToolbarDialog["dialog"];
+  editor: Editor;
+  close: ToolbarDialogProps["close"];
+}) {
+  const box = useRef<HTMLDivElement>(null);
+  // A `close` kept by the app (called after an await) does nothing once this dialog is gone.
+  const open = useRef(true);
+  useEffect(() => {
+    open.current = true;
+    const element = box.current;
+    // Its first field or button, else the dialog itself (Escape works from there).
+    if (element && !element.contains(document.activeElement))
+      (
+        element.querySelector<HTMLElement>(
+          'input, select, textarea, button, [tabindex]:not([tabindex="-1"])',
+        ) ?? element
+      ).focus();
+    return () => {
+      open.current = false;
+    };
+  }, []);
+  const closeOnce: typeof close = (applied) => {
+    if (open.current) close(applied);
+  };
+  return (
+    <div
+      ref={box}
+      role="dialog"
+      aria-label={label}
+      tabIndex={-1}
+      className={`foli-link-dialog foli-toolbar-dialog foli-toolbar-${name}-dialog`}
+      onKeyDown={(event) => {
+        // An Escape the content took (its own pop-up) is not the dialog's.
+        if (event.key !== "Escape" || event.defaultPrevented) return;
+        event.preventDefault();
+        close(false);
+      }}
+    >
+      {content({ editor, close: closeOnce })}
+    </div>
   );
 }
 
