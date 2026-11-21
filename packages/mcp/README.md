@@ -95,7 +95,8 @@ every edit a tracked change you review. More in
 
 ## Code mode (`--code`)
 
-Not built into a release yet; not tried with a model.
+Since 0.2.0. Off unless asked for. A model has done whole tasks with it through the official
+SDK's client; not yet in a client of its own (Claude Code, Claude Desktop).
 
 Started with `--code`, the server has one more tool, `run`: the model writes a JavaScript
 script and the server runs it over an open document, so a task that is the same step on many
