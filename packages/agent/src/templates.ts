@@ -11,6 +11,7 @@ import {
   setControlValue,
   updateFields as updateFieldsOf,
 } from "@folijs/core";
+import { wordContext } from "@folijs/core/internal";
 import { type Changed, type Context, changed, MAX_WRITTEN } from "./operations.js";
 import { oneLine, readBlocks } from "./read.js";
 import { type Refusal, type Result, refuse } from "./result.js";
@@ -233,6 +234,33 @@ export function updateFields(
   for (const [key, value] of Object.entries(given ?? {}))
     if (value !== null && !(value instanceof Date) && typeof value === "object")
       return refuse("invalid", `data.${key} must be text, a number, true or false, or a date.`);
+  if (given) {
+    // A value is written into every merge field of its name, the headers' and notes' too: a
+    // template can hold the same field a thousand times. What that writes is held as a
+    // replace's is.
+    const lengths = new Map(
+      Object.entries(given).map(([key, value]) => [
+        key.toLowerCase(),
+        value === null ? 0 : value instanceof Date ? 40 : String(value).length,
+      ]),
+    );
+    const trees = [
+      context.editor.state.doc,
+      ...[...(wordContext(context.editor.state)?.stories.values() ?? [])].map((s) => s.doc),
+    ];
+    let written = 0;
+    for (const tree of trees)
+      for (const field of fieldsIn(tree)) {
+        const { name, args } = parseFieldInstruction(field.instruction);
+        if (name.toUpperCase() === "MERGEFIELD" && args[0])
+          written += lengths.get(args[0].toLowerCase()) ?? 0;
+      }
+    if (written > MAX_WRITTEN)
+      return refuse(
+        "invalid",
+        `That writes ${written} characters into the document's merge fields: one update writes ${MAX_WRITTEN} at most. Give shorter values.`,
+      );
+  }
   // A table of contents is not built again unless asked: without pages its entries would
   // come back with their page numbers empty, and a reader would take the document for broken.
   const rebuild = options?.contents === true;

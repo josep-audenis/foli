@@ -131,7 +131,8 @@ nothing (three runs of comments made a document that could not be saved). So:
 
 - One insert takes 500 paragraphs at most, one replace 500 places (`@folijs/agent`: the plain
   tools are held by it too), and one operation writes 300,000 characters at most, its places
-  together (a replacement times its places, a value times the controls that take it). A
+  together (a replacement times its places, a value times the controls that take it, a merge field's
+  value times the merge fields of its name, the headers' and notes' included). A
   call is bounded by that; the timer fires between calls.
 - A run may insert 2,000 paragraphs, wherever, add 300,000 characters to the body, and give
   its calls a million characters in all (comments, values, everything but the log); past any

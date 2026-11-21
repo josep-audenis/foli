@@ -183,3 +183,28 @@ describe("what one operation writes (the fourth review of #165)", () => {
     });
   });
 });
+
+describe("what merge data writes (the fourth review's re-check)", () => {
+  it("a value written into many fields of its name is held as a replace is", async () => {
+    const { document } = await corpus("03-offer-letter-template");
+    // A template that holds the same merge field a thousand times.
+    const content = document.content as { content: { content?: unknown[] }[] };
+    const holder = content.content.find((p) => JSON.stringify(p).includes("CandidateFirstName"));
+    const hostile = {
+      ...document,
+      content: { ...content, content: [...content.content, ...new Array(1000).fill(holder)] },
+    };
+    const session = openSession(hostile as never, { author: "Agent" });
+    const before = JSON.stringify(session.document());
+    const started = Date.now();
+    expect(
+      session.updateFields({ data: { CandidateFirstName: "v".repeat(190_000) } }),
+    ).toMatchObject({ ok: false, code: "invalid" });
+    expect(Date.now() - started).toBeLessThan(3000);
+    expect(JSON.stringify(session.document())).toBe(before);
+    // Short enough, all of them: done.
+    const done = session.updateFields({ data: { CandidateFirstName: "Ada" } });
+    expect(done).toMatchObject({ ok: true });
+    expect(done.ok && done.updated).toBeGreaterThan(1000);
+  });
+});

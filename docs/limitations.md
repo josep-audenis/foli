@@ -328,7 +328,9 @@ Unstable (0.x). Details in the [package README](../packages/agent/README.md).
 - `replaceText` with `all` makes one change and one undo step per place; a paragraph inserted
   in a built-in style the document lacks is two changes (the paragraph, then its style).
 - One insert takes 500 paragraphs at most and one `replaceText` with `all` 500 places; one
-  replace or fill writes 300,000 characters at most, its places together.
+  replace, fill or `updateFields` writes 300,000 characters at most, its places together.
+  Comments and notes have no total of their own per document: each call is bounded, many
+  calls are not.
 - What a document holds beside its body (comments, notes) is not counted in the server's
   limit on what the open documents hold: many sessions' worth of comments can make one too
   large to save.
