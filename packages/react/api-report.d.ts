@@ -59,7 +59,7 @@ export declare function FoliComments({ editor: editorProp, readOnly, label, clas
 import type { Editor, EditorDocument, Extension, FoliDocument, Plugin, ReviewView, Transaction } from "@folijs/core";
 import { type ReactNode } from "react";
 import { type FoliCanvasHandle, type FoliCanvasProps } from "./FoliCanvas.js";
-import { type ToolbarItem, type ToolbarTab } from "./FoliToolbar.js";
+import { type FoliToolbarProps, type ToolbarGroups, type ToolbarTab } from "./FoliToolbar.js";
 /**
  * A change to the document's content, as `FoliEditor` reports it. `document` is a getter:
  * spreading the object or `JSON.stringify(change)` serializes the document (and walks `editor`).
@@ -108,7 +108,13 @@ export interface FoliEditorProps extends Omit<FoliCanvasProps, "editor"> {
      * groups of items (`FoliToolbarProps.items`), or with these tabs (`FoliToolbarProps.tabs`,
      * e.g. `defaultToolbarTabs`).
      */
-    toolbar?: boolean | readonly (readonly ToolbarItem[])[] | readonly ToolbarTab[] | undefined;
+    toolbar?: boolean | ToolbarGroups | readonly ToolbarTab[] | undefined;
+    /**
+     * More of `FoliToolbar`'s props for the toolbar shown (`tab`, `onTabChange`, `label`,
+     * `className`…). `editor`, `disabled`, `comments`, `upload` and `onClickCommand` stay
+     * `FoliEditor`'s; `items` and `tabs` come from `toolbar`.
+     */
+    toolbarProps?: Omit<FoliToolbarProps, "editor" | "disabled" | "comments" | "upload" | "onClickCommand" | "items" | "tabs"> | undefined;
     /**
      * Show the comments pane (`FoliComments`) beside the pages: `"auto"` (the default) while the
      * document has comments, `true` always, `false` never.
@@ -178,7 +184,7 @@ export interface FoliToolbarProps {
      * built-in ones from `toolbarItems`, and the app's own. "New comment" shows only with
      * `comments`; an empty group is left out.
      */
-    items?: readonly (readonly ToolbarItem[])[] | undefined;
+    items?: ToolbarGroups | undefined;
     /**
      * Tabs over the toolbar (a WAI-ARIA tab list with its own tab stop: arrow keys, Home and End
      * move between tabs and show each), each with its own groups of items, in place of `items`;
@@ -186,8 +192,27 @@ export interface FoliToolbarProps {
      * `items`. With tabs, `className` goes on the element around both (`.foli-ribbon`).
      */
     tabs?: readonly ToolbarTab[] | undefined;
+    /**
+     * The tab shown, by its key: with it the app decides (change it in `onTabChange`). A key that
+     * is not among the tabs shown gives the first one.
+     */
+    tab?: string | undefined;
+    /** The tab shown at first, while the app does not pass `tab` (default: the first one). */
+    defaultTab?: string | undefined;
+    /** Someone picked another tab (a click, or the arrow keys). */
+    onTabChange?: ((key: string) => void) | undefined;
     className?: string | undefined;
 }
+/**
+ * A group of toolbar items with a caption: a `role="group"` named by `label`, shown under it.
+ * It has no `key` (a tab has: that tells them apart in `FoliEditor`'s `toolbar`).
+ */
+export interface ToolbarGroup {
+    readonly label: string;
+    readonly items: readonly ToolbarItem[];
+}
+/** A toolbar's groups, a separator between them: arrays of items, or groups with a caption. */
+export type ToolbarGroups = readonly (readonly ToolbarItem[] | ToolbarGroup)[];
 /** A tab of the toolbar: its items show while it is the selected one. */
 export interface ToolbarTab {
     /** Unique among the tabs. */
@@ -195,7 +220,15 @@ export interface ToolbarTab {
     /** The tab's text. */
     readonly label: string;
     /** Its items, in groups (as `FoliToolbarProps.items`); a key is unique within its tab. */
-    readonly items: readonly (readonly ToolbarItem[])[];
+    readonly items: ToolbarGroups;
+    /**
+     * A tab that comes and goes with the selection (Word's Table tab): shown while this says so
+     * (`editor` is the header, footer or note open on its page, else the body's, as for an item's
+     * `enabled`). Runs after every transaction: keep it cheap. It is not selected for the user
+     * when it comes (unless it is the `tab` or `defaultTab`); when the selected tab goes, the
+     * first one shows (no `onTabChange`).
+     */
+    readonly visible?: ((state: EditorState, editor: Editor) => boolean) | undefined;
 }
 /** What every toolbar item has. */
 interface ToolbarItemBase {
@@ -256,7 +289,7 @@ export interface ToolbarOption {
  */
 export interface ToolbarSelect extends ToolbarItemBase {
     readonly select: {
-        /** Its entries now. Runs on every render of the toolbar: keep it cheap. */
+        /** Its entries now. Runs after every transaction: keep it cheap. */
         readonly options: (state: EditorState) => readonly ToolbarOption[];
         /**
          * The entry shown: its `value`; null (or "") shows a blank entry (mixed, or nothing to
@@ -292,6 +325,11 @@ export interface ToolbarColorMenu extends ToolbarItemBase {
         readonly value: (state: EditorState) => string | null;
         /** What picking a color runs (null: the entry that removes it). */
         readonly pick: (color: string | null) => Command;
+        /**
+         * A last entry, "More colors…", that opens the browser's color field: `pick` then gets any
+         * `#rrggbb`. Default false: the palette only.
+         */
+        readonly custom?: boolean | undefined;
     };
     readonly command?: undefined;
     readonly actions?: undefined;
@@ -300,6 +338,12 @@ export interface ToolbarColorMenu extends ToolbarItemBase {
     readonly render?: undefined;
     readonly pressed?: undefined;
 }
+/**
+ * The toolbar's own dialogs, for `ToolbarDialog.dialog`: `"link"` (as Mod-K), `"picture"`
+ * (insert, or edit the selected one), `"insertTable"`, `"pageSetup"` (the caret's section),
+ * `"crossReference"`, `"controlProperties"` (the content control at the caret), `"noteOptions"`.
+ */
+export type ToolbarDialogName = "link" | "picture" | "insertTable" | "pageSetup" | "crossReference" | "controlProperties" | "noteOptions";
 /** What an app's dialog gets. */
 export interface ToolbarDialogProps {
     /** Where the toolbar's commands go: the header, footer or note open on its page, else the body. */
@@ -317,8 +361,12 @@ export interface ToolbarDialogProps {
  * back to its button; a disabled toolbar closes it.
  */
 export interface ToolbarDialog extends ToolbarItemBase {
-    /** The dialog's content. Rendered as a component's body: hooks are fine. */
-    readonly dialog: (props: ToolbarDialogProps) => ReactNode;
+    /**
+     * The dialog's content (rendered as a component's body: hooks are fine), or the name of one
+     * of the toolbar's own dialogs, which the button then opens as its built-in item or menu
+     * entry does. Such a button is enabled where that dialog applies, unless `enabled` says.
+     */
+    readonly dialog: ((props: ToolbarDialogProps) => ReactNode) | ToolbarDialogName;
     /** A toggle: whether the button shows as pressed. Runs after every transaction. */
     readonly pressed?: ((state: EditorState, editor: Editor) => boolean) | undefined;
     readonly command?: undefined;
@@ -399,7 +447,10 @@ export declare const defaultToolbarItems: readonly (readonly ToolbarItem[])[];
  * The built-in items in tabs, after Word's ribbon: Home, Insert, Layout, Review. For
  * `FoliToolbarProps.tabs` (or `FoliEditor`'s `toolbar`), whole or as a start for an app's own.
  */
-export declare const defaultToolbarTabs: readonly ToolbarTab[];
+export declare const defaultToolbarTabs: readonly (ToolbarTab & {
+    /** Arrays only, no captioned groups: `tab.items.map((group) => group.filter(…))` works. */
+    readonly items: readonly (readonly ToolbarItem[])[];
+})[];
 /**
  * Word's formatting controls for an editor (`defaultToolbarItems`, or `items`): paragraph
  * style, font and size boxes, marks, link (a dialog, also on Mod-K in the document), text color
@@ -410,7 +461,7 @@ export declare const defaultToolbarTabs: readonly ToolbarTab[];
  * `aria-pressed`; a button whose command cannot run now is `aria-disabled` (still focusable).
  * Clicks leave the focus and selection in the document.
  */
-export declare function FoliToolbar({ editor: given, disabled, onClickCommand, label, className, comments, upload, items: givenGroups, tabs, }: FoliToolbarProps): import("react").JSX.Element;
+export declare function FoliToolbar({ editor: given, disabled, onClickCommand, label, className, comments, upload, items: givenGroups, tabs: allTabs, tab: givenTab, defaultTab, onTabChange, }: FoliToolbarProps): import("react").JSX.Element;
 export {};
 
 // editor.d.ts
@@ -499,4 +550,4 @@ export { FoliCanvas, type FoliCanvasHandle, type FoliCanvasProps } from "./FoliC
 export { FoliComments, type FoliCommentsProps } from "./FoliComments.js";
 export { type FoliChange, FoliEditor, type FoliEditorHandle, type FoliEditorProps, } from "./FoliEditor.js";
 export { FoliNavigation, type FoliNavigationProps } from "./FoliNavigation.js";
-export { defaultToolbarItems, defaultToolbarTabs, FoliToolbar, type FoliToolbarProps, type ToolbarAction, type ToolbarButton, type ToolbarColor, type ToolbarColorMenu, type ToolbarCustom, type ToolbarCustomProps, type ToolbarDialog, type ToolbarDialogProps, type ToolbarItem, type ToolbarItemName, type ToolbarMenu, type ToolbarOption, type ToolbarSelect, type ToolbarTab, toolbarItems, } from "./FoliToolbar.js";
+export { defaultToolbarItems, defaultToolbarTabs, FoliToolbar, type FoliToolbarProps, type ToolbarAction, type ToolbarButton, type ToolbarColor, type ToolbarColorMenu, type ToolbarCustom, type ToolbarCustomProps, type ToolbarDialog, type ToolbarDialogName, type ToolbarDialogProps, type ToolbarGroup, type ToolbarGroups, type ToolbarItem, type ToolbarItemName, type ToolbarMenu, type ToolbarOption, type ToolbarSelect, type ToolbarTab, toolbarItems, } from "./FoliToolbar.js";

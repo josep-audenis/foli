@@ -223,6 +223,19 @@
   height: 16px;
 }
 
+/* The color field behind "More colors…": there for the browser's picker to open from, not seen. */
+.foli-toolbar-color-input {
+  position: absolute;
+  inset-block-end: 0;
+  inset-inline-start: 0;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  border: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
 .foli-menu-swatch {
   width: 16px;
   height: 16px;
@@ -489,6 +502,24 @@
   .foli-menu-swatch {
     forced-color-adjust: none;
   }
+}
+
+/* A group with a caption (`ToolbarGroup`): its items in a row, the caption under them. */
+.foli-toolbar-group {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+.foli-toolbar-group-items {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px;
+}
+.foli-toolbar-group-label {
+  font-size: 11px;
+  opacity: 0.75;
 }
 
 .foli-toolbar-separator {

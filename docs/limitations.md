@@ -88,7 +88,10 @@ checklist in [testing/ime.md](testing/ime.md)):
 - On Android, Backspace at a list paragraph's start may join it into the paragraph before
   instead of removing its number (untested on a device).
 - The toolbar's colors are a palette (seven text colors, Word's highlights; an app gives the
-  menus another one, [api.md](api.md#toolbar-items)), with no color picker; any
+  menus another one, and the browser's color field with `custom`,
+  [api.md](api.md#toolbar-items): checked by its tests only, not by hand in each browser; a
+  browser that reports every movement in the field makes an undo step of each); the built-in
+  menus offer no color picker by default; any
   `#rrggbb` works through `setTextColor` (a highlight outside Word's is written as shading).
 - Left and Right next to an opaque block treat Left as backward: in right-to-left text, Left at
   the start of a paragraph selects the block before it (left-to-right is the only direction the
@@ -145,8 +148,8 @@ Custom nodes and marks, plugins and toolbar items ([extensions](guides/extension
 - `plugins` and `extensions` (of `FoliEditor` and `useFoliEditor`) are read once: changing them
   after mount does not reconfigure the editor (a warning unless `process.env.NODE_ENV` is `"production"` at run time, which a bundle without `process` always shows; a new `key` makes a
   new editor, losing undo history and the selection).
-- Toolbar tabs (`tabs`) are fixed: none comes with the selection (Word's Table tab), the app
-  cannot say which is selected, and a toolbar wider than its place wraps (it does not collapse).
+- A toolbar wider than its place wraps (it does not collapse). A tab that comes with the
+  selection (`visible`) is not selected for the user, as Word's is not.
   People cannot change the toolbar themselves: an app does it over `items` or `tabs`.
 - Toolbar items of an app are buttons, menus of `ToolbarAction`s, boxes, color menus, buttons
   opening the app's dialog and the app's own controls. An app's dialog does not close when the
