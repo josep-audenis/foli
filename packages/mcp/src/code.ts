@@ -105,6 +105,7 @@ export async function runCode(
 ): Promise<ToolResult> {
   const { session } = document;
   const before = session.editor.state.doc;
+  const dirty = document.dirty;
   const point = session.checkpoint();
   const touched = new Set<string>();
   let deleted = 0;
@@ -196,6 +197,8 @@ export async function runCode(
     let back = "Nothing was changed: the document is as it was before the run.";
     try {
       point.rollback();
+      // Its edits are gone: there is no more to save than before it ran.
+      document.dirty = dirty;
     } catch {
       // Not seen to happen; a document half edited must not pass for one untouched.
       document.dirty = true;
