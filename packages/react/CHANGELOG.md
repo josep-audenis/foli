@@ -1,5 +1,48 @@
 # @folijs/react
 
+## 1.2.0
+
+### Minor Changes
+
+- a72d9ec: Toolbar: a color menu with `colors.custom` has a last entry, "More colors…", that opens the
+  browser's color field, so `pick` gets any `#rrggbb`
+  (`{ ...toolbarItems.textColor, colors: { ...toolbarItems.textColor.colors, custom: true } }`).
+- 8b3222f: Toolbar: an app's button can open one of the toolbar's own dialogs by name
+  (`ToolbarDialog` with `dialog: "link" | "picture" | "insertTable" | "pageSetup" |
+  "crossReference" | "controlProperties" | "noteOptions"`). Types only: `ToolbarDialog["dialog"]`
+  is now a function or one of those names, so code that calls an item's `dialog(props)` checks
+  `typeof item.dialog === "function"` first.
+- edc1930: Toolbar: `messages` translates every string the toolbar shows or announces (items, menus, colors,
+  tabs, More, dialogs and their messages), each by its English text; `toolbarMessages` lists them
+  and `ToolbarMessages` types a translation.
+- 6665c4c: Toolbar: `overflow="menu"` keeps the toolbar on one row and puts the groups that do not fit
+  under a More button, reachable with the same arrow keys. The default, `"wrap"`, is as before.
+- fce98e5: Toolbar: the app can say which tab shows (`tab`, `onTabChange`, `defaultTab`); a tab can come
+  and go with the selection (`ToolbarTab.visible`); a group can have a caption (`ToolbarGroup`:
+  `{ label, items }`). `FoliEditor` takes `toolbarProps` for its toolbar's other props.
+
+### Patch Changes
+
+- 4895bc9: A bug sweep of the toolbar's app items and of the MCP server, each fix with a regression test.
+
+  **core**
+  - Accepting a paragraph deleted whole before a table no longer removes it when the paragraphs before join into it, or when it is what keeps the table from another: it stays, as the same paragraph.
+
+  **react**
+  - A toolbar box's `options(state)` follow the document: they run after every transaction, not only when the toolbar renders again (the Style and Table style boxes kept an old list after `setDocument`).
+  - An app dialog's `close` called twice runs once; closing gives the focus back to the item's button as it is now, when the items changed while the dialog was open.
+  - A menu whose item left the toolbar does not come back open with it.
+  - A color menu without colors is disabled instead of opening empty.
+
+  **mcp**
+  - A file is open once whatever capitals or link names it: the second `open` is refused, where two sessions could save over each other.
+  - A name that only starts with two dots (`..draft.docx`) is inside its folder, not refused as outside.
+  - A change in a header or footer (a field updated, a control filled) counts as unsaved: `close` no longer drops it.
+- Updated dependencies [4895bc9]
+- Updated dependencies [fc6fdb8]
+  - @folijs/core@1.2.0
+  - @folijs/view@1.2.0
+
 ## 1.1.0
 
 ### Minor Changes
