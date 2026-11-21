@@ -538,6 +538,11 @@
 .foli-toolbar-more-panel[hidden] {
   display: none;
 }
+/* A menu of an item in the panel opens toward the panel's start, not past the toolbar's end. */
+.foli-toolbar-more-panel .foli-menu {
+  left: auto;
+  inset-inline-end: 0;
+}
 /* The first group in the panel needs no separator before it. */
 .foli-toolbar-more-panel > .foli-toolbar-separator:first-child {
   display: none;

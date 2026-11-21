@@ -150,7 +150,8 @@ Custom nodes and marks, plugins and toolbar items ([extensions](guides/extension
   new editor, losing undo history and the selection).
 - A toolbar wider than its place wraps, or with `overflow="menu"` puts whole groups under
   More: a group wider than the toolbar is then in the panel whole (its items are not split),
-  and a change of an item's own width (a box showing a longer value) is not measured again. A tab that comes with the
+  and a change of an item's own width (a box showing a longer value, a late font) is not
+  measured again. A tab that comes with the
   selection (`visible`) is not selected for the user, as Word's is not.
   People cannot change the toolbar themselves: an app does it over `items` or `tabs`.
 - Toolbar items of an app are buttons, menus of `ToolbarAction`s, boxes, color menus, buttons

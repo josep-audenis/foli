@@ -1487,44 +1487,68 @@ export function FoliToolbar({
   const rowGroups = overflowing && fit !== null ? Math.min(fit, groups.length) : groups.length;
   /** The first item in the More panel (the number of items when all are in the row). */
   const firstInMore = groups.slice(0, rowGroups).reduce((n, group) => n + group.items.length, 0);
+  /** Where each group ended with all of them in the row, and what More takes. */
+  const measured = useRef<{ ends: number[]; more: number } | null>(null);
+  /** The toolbar's inner width, and how many groups it takes. */
+  const fitNow = (element: HTMLElement) => {
+    const sizes = measured.current;
+    if (!sizes) return null;
+    const style = getComputedStyle(element);
+    const room =
+      element.getBoundingClientRect().width -
+      (Number.parseFloat(style.paddingInlineStart) || 0) -
+      (Number.parseFloat(style.paddingInlineEnd) || 0);
+    if ((sizes.ends.at(-1) ?? 0) <= room + 0.5) return sizes.ends.length;
+    const past = sizes.ends.findIndex((edge) => edge > room - sizes.more + 0.5);
+    return past < 0 ? sizes.ends.length : past;
+  };
   // biome-ignore lint/correctness/useExhaustiveDependencies: measured again when the groups change.
   useIsomorphicLayoutEffect(() => {
     if (!overflowing) return;
+    measured.current = null;
     setFit(null);
   }, [overflowing, groups]);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `fitNow` reads what this effect measures.
   useIsomorphicLayoutEffect(() => {
     const element = bar.current;
     if (!overflowing || fit !== null || !element) return;
-    // Every group is in the row now: where each ends, against where the row does.
+    // Every group is in the row now: where each ends, from where the row starts.
     const box = element.getBoundingClientRect();
     const style = getComputedStyle(element);
     const start = Number.parseFloat(style.paddingInlineStart) || 0;
-    const end = Number.parseFloat(style.paddingInlineEnd) || 0;
     const rtl = style.direction === "rtl";
-    const room = box.width - start - end;
     let at = 0;
+    let edge = 0;
     const ends = groups.map((group) => {
       at += group.items.length;
-      // The group's last item that has an element (an app's control may give none).
+      // The group's last item that has an element (an app's control may give none: the group
+      // then ends where the one before it does). A captioned group is as wide as its caption.
       for (let i = at - 1; i >= at - group.items.length; i--) {
-        const rect = buttons.current[i]?.getBoundingClientRect();
-        if (rect) return rtl ? box.right - end - rect.left : rect.right - box.left - start;
+        const item = buttons.current[i];
+        if (!item) continue;
+        const rect = (
+          item.closest<HTMLElement>(".foli-toolbar-group") ?? item
+        ).getBoundingClientRect();
+        edge = Math.max(edge, rtl ? box.right - start - rect.left : rect.right - box.left - start);
+        break;
       }
-      return 0;
+      return edge;
     });
-    const more = (moreButton.current?.getBoundingClientRect().width ?? 0) + 4;
-    const all = (ends.at(-1) ?? 0) <= room + 0.5;
-    setFit(all ? groups.length : ends.filter((edge) => edge <= room - more + 0.5).length);
+    measured.current = {
+      ends,
+      more: (moreButton.current?.getBoundingClientRect().width ?? 0) + 4,
+    };
+    setFit(fitNow(element));
   }, [overflowing, fit, groups]);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `fitNow` reads refs only.
   useEffect(() => {
     const element = bar.current;
     if (!overflowing || !element || typeof ResizeObserver === "undefined") return;
-    let width = element.getBoundingClientRect().width;
+    // Another width: the groups are counted again from what was measured (they stay where
+    // they are, with their state and the focus, unless they change sides).
     const observer = new ResizeObserver(() => {
-      const now = element.getBoundingClientRect().width;
-      if (Math.abs(now - width) < 0.5) return;
-      width = now;
-      setFit(null);
+      const next = fitNow(element);
+      if (next !== null) setFit((current) => (current === null ? current : next));
     });
     observer.observe(element);
     return () => observer.disconnect();
@@ -1541,14 +1565,14 @@ export function FoliToolbar({
     const onPointerDown = (event: PointerEvent) => {
       const target = event.target as Node | null;
       if (morePanel.current?.contains(target) || moreButton.current?.contains(target)) return;
+      // What is open or focused in it goes with it: its menu, and the focus (to More).
+      if (morePanel.current?.contains(document.activeElement)) moreButton.current?.focus();
+      setMenu(null);
       setMoreOpen(false);
     };
     document.addEventListener("pointerdown", onPointerDown);
     return () => document.removeEventListener("pointerdown", onPointerDown);
   }, [moreOpen, inMore]);
-  useEffect(() => {
-    if (disabled) setMoreOpen(false);
-  }, [disabled]);
   // An item in the panel that the arrow keys moved to before the panel was open.
   const focusNext = useRef<number | null>(null);
   useEffect(() => {
@@ -1559,6 +1583,11 @@ export function FoliToolbar({
   // The tab stop stays on the toolbar when items are taken away, and out of a closed panel.
   const active =
     focused < items.length && (focused < firstInMore || moreOpen || !inMore) ? focused : 0;
+  /** The focus back to a dialog's button: to More when the button is in the closed panel. */
+  const giveBack = (element: HTMLElement | null | undefined) => {
+    const closed = morePanel.current?.hidden && morePanel.current.contains(element ?? null);
+    (closed ? moreButton.current : element)?.focus();
+  };
   /** The items as last rendered: where a dialog closed later finds its button. */
   const shown = useRef(items);
   shown.current = items;
@@ -1702,7 +1731,7 @@ export function FoliToolbar({
     if (disabled) setDialog(null);
   }, [disabled]);
   const closeDialog = () => {
-    dialog?.restore?.focus();
+    giveBack(dialog?.restore);
     setDialog(null);
   };
   // The insert table dialog (from the table menu): the focus goes back to the menu's button.
@@ -1765,6 +1794,11 @@ export function FoliToolbar({
       controlDialog ||
       noteDialog,
   );
+  // A dialog opens under the toolbar, where the More panel is: the panel closes for it.
+  const anyDialog = builtInDialog || appDialog !== null;
+  useEffect(() => {
+    if (anyDialog) setMoreOpen(false);
+  }, [anyDialog]);
   const appDialogItem = appDialog && items.find((item) => item.key === appDialog.key);
   // Nor does it come back with its item, once that has left the toolbar.
   const appDialogGone = !appDialogItem;
@@ -1937,7 +1971,13 @@ export function FoliToolbar({
     const next = moves[event.key];
     if (next === undefined) {
       // Escape in the More panel closes it, the focus on its button.
-      if (event.key === "Escape" && moreOpen && morePanel.current?.contains(event.target as Node)) {
+      // (Not an Escape a control in it took for itself.)
+      if (
+        event.key === "Escape" &&
+        !event.defaultPrevented &&
+        moreOpen &&
+        morePanel.current?.contains(event.target as Node)
+      ) {
         event.preventDefault();
         setMoreOpen(false);
         setActive(0);
@@ -1964,7 +2004,6 @@ export function FoliToolbar({
         ref={moreButton}
         type="button"
         className="foli-toolbar-button foli-toolbar-more"
-        aria-haspopup="true"
         aria-expanded={moreOpen}
         aria-controls={`${id}-more`}
         // The items in the panel are reached with the arrow keys: this is the pointer's way.
@@ -1973,9 +2012,8 @@ export function FoliToolbar({
         style={inMore && fit !== null ? undefined : { visibility: "hidden" }}
         aria-hidden={inMore && fit !== null ? undefined : true}
         onMouseDown={(event) => event.preventDefault()}
-        onClick={() => {
-          if (!disabled) setMoreOpen((open) => !open);
-        }}
+        // Also on a disabled toolbar, whose items stay there to be found.
+        onClick={() => setMoreOpen((open) => !open)}
       >
         More
       </button>
@@ -2267,9 +2305,9 @@ export function FoliToolbar({
             if (applied && onClickCommand) onClickCommand();
             // Its button as it is now: the items may have changed while it was open.
             else
-              buttons.current[
-                shown.current.findIndex((item) => item.key === appDialogItem.key)
-              ]?.focus();
+              giveBack(
+                buttons.current[shown.current.findIndex((item) => item.key === appDialogItem.key)],
+              );
           }}
         />
       )}
@@ -2282,7 +2320,7 @@ export function FoliToolbar({
             const { restore } = pictureDialog;
             setPictureDialog(null);
             if (done && onClickCommand) onClickCommand();
-            else restore?.focus();
+            else giveBack(restore);
           }}
         />
       )}
@@ -2293,7 +2331,7 @@ export function FoliToolbar({
             const { restore } = setupDialog;
             setSetupDialog(null);
             if (applied && onClickCommand) onClickCommand();
-            else restore?.focus();
+            else giveBack(restore);
           }}
         />
       )}
@@ -2305,7 +2343,7 @@ export function FoliToolbar({
             const { restore } = referenceDialog;
             setReferenceDialog(null);
             if (inserted && onClickCommand) onClickCommand();
-            else restore?.focus();
+            else giveBack(restore);
           }}
         />
       )}
@@ -2316,7 +2354,7 @@ export function FoliToolbar({
             const { restore } = noteDialog;
             setNoteDialog(null);
             if (applied && onClickCommand) onClickCommand();
-            else restore?.focus();
+            else giveBack(restore);
           }}
         />
       )}
@@ -2327,7 +2365,7 @@ export function FoliToolbar({
             const { restore } = controlDialog;
             setControlDialog(null);
             if (applied && onClickCommand) onClickCommand();
-            else restore?.focus();
+            else giveBack(restore);
           }}
         />
       )}
@@ -2339,7 +2377,7 @@ export function FoliToolbar({
             const { restore } = tableDialog;
             setTableDialog(null);
             if (inserted && onClickCommand) onClickCommand();
-            else restore?.focus();
+            else giveBack(restore);
           }}
         />
       )}

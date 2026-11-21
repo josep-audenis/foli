@@ -351,16 +351,20 @@ An empty `tabs` shows `items`.
 `overflow="menu"` keeps the toolbar on one row (`.foli-toolbar-overflow`): the groups that do not
 fit its width go, whole and in order, into a panel (`.foli-toolbar-more-panel`, a `role="group"`
 named "More") under a More button at the row's end (`.foli-toolbar-more`, `aria-expanded`,
-`aria-controls`). The toolbar measures its groups with all of them in the row, before the browser
-paints, and again when its width or its groups change (not when only an item's own width does,
-as a box showing a longer value).
+`aria-controls`). The toolbar measures its groups once, with all of them in the row, before the
+browser first paints, and again when its groups change (they are rendered anew for it: an app's
+control in them loses its own state, and the panel closes). When its width changes it counts
+again from those measures, a frame later at most. It does not measure again when only an item's
+own width changes (a box showing a longer value, a font that loads late).
 
 - The arrow keys, Home and End go through every item as before: moving to one in the panel
   opens it, moving back out closes it. Escape in the panel closes it, the focus on More. More
   itself is not a stop of the arrow keys: it is the pointer's way in.
 - A click on More opens and closes the panel; a click on an item in it acts on the document,
-  which keeps the focus, and leaves the panel open; a press outside closes it. A disabled
-  toolbar closes it.
+  which keeps the focus, and leaves the panel open; a press outside closes it (its open menu
+  with it, and the focus goes to More if it was inside). It opens on a disabled toolbar too.
+- A dialog of the toolbar opens where the panel is, so the panel closes for it; when the dialog
+  closes, More takes the focus if the dialog's button is in the closed panel.
 - With tabs, the selected tab's groups overflow the same way.
 - On the server, and until the first measure, every group is in the row (cut off, not wrapped).
 
