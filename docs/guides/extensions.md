@@ -494,7 +494,8 @@ export function AcmeEditor() {
   editor making them. Table, Section and Controls take a list; Header, Fields, Navigate and Notes
   a function ([api.md](../api.md#toolbar-items)).
 - App items keep the toolbar's keyboard use (one tab stop, arrow keys, Home, End),
-  `aria-pressed`, `aria-disabled`, and the document's focus and selection on click. They can
+  `aria-pressed`, `aria-disabled`, and the document's focus and selection on click (a
+  `ToolbarCustom` does the last three for itself). They can
   be boxes (`ToolbarSelect`), color menus (`ToolbarColorMenu`), buttons opening the app's own
   dialog under the toolbar (`ToolbarDialog`) and controls the app renders (`ToolbarCustom`) too
   ([api.md](../api.md#toolbar-items)).

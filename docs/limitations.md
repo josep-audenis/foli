@@ -147,8 +147,8 @@ Custom nodes and marks, plugins and toolbar items ([extensions](guides/extension
   new editor, losing undo history and the selection).
 - Toolbar items of an app are buttons, menus of `ToolbarAction`s, boxes, color menus, buttons
   opening the app's dialog and the app's own controls. An app's dialog does not close when the
-  document or the selection changes (the built-in ones do), and an app's control sees the
-  toolbar's arrow keys unless it stops them. An app item's state without `enabled` is
+  document or the selection changes (the built-in ones do), and the toolbar takes
+  ArrowLeft, ArrowRight, Home and End from an app's control unless the control stops them. An app item's state without `enabled` is
   a dry run of its command after every transaction, which costs what the command costs (a box
   or a color menu is not dry-run: it is enabled unless its `enabled` says no).
   `useCommand(command)` with a command made anew on each render dry-runs it on each render.

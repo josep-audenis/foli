@@ -27,7 +27,7 @@ exactly its own version (since 1.0.0). Stylesheet: `@folijs/react/styles.css`
 `FoliCommentsProps`, `FoliNavigationProps`, `FoliToolbarProps`), the toolbar's items
 (`ToolbarItem`, `ToolbarButton`, `ToolbarMenu`, `ToolbarAction`, `ToolbarSelect`, `ToolbarOption`,
 `ToolbarColorMenu`, `ToolbarColor`, `ToolbarDialog`, `ToolbarDialogProps`, `ToolbarCustom`,
-`ToolbarRenderProps`, `ToolbarItemName`, `toolbarItems`,
+`ToolbarCustomProps`, `ToolbarItemName`, `toolbarItems`,
 `defaultToolbarItems`), the
 hooks and their options and results (`UseFoliEditorOptions`, `UseEditorStateOptions`,
 `UseCommandOptions`, `CommandState`).
@@ -261,18 +261,21 @@ code that annotates one of them as `ToolbarButton` names the new type, or `Toolb
 
 - `dialog({ editor, close })`: a button that opens the app's dialog under the toolbar, as
   Picture… does. The toolbar renders a `role="dialog"` named by `label`
-  (`.foli-link-dialog.foli-toolbar-<key>-dialog`) around what `dialog` returns, moves the focus
-  to its first field or button, and closes it on Escape (the focus back on its button), when
-  the toolbar is disabled, and when another dialog of the toolbar opens. `close(applied)`
-  closes it: with `applied` the toolbar calls `onClickCommand` (`FoliEditor` focuses the
+  (`.foli-toolbar-dialog.foli-toolbar-<key>-dialog`, styled as the built-in dialogs) around
+  what `dialog` returns, moves the focus to its first field or button (to the dialog itself
+  when it has none), and closes it on Escape (unless the content prevented the key's default) (the focus back on its button), when
+  the toolbar is disabled, when another dialog of the toolbar opens, and when its item leaves
+  the toolbar. `close(applied)` closes it (and does nothing once it is closed): with `applied` the toolbar calls `onClickCommand` (`FoliEditor` focuses the
   document), otherwise the focus goes back to the button. It stays open while the document
   or the selection changes: close it yourself if it is about a place. `dialog` runs as a
   component's body, so it may use hooks; `editor` is the story's or the body's, as for
   commands. `pressed(state, editor)` makes the button a toggle.
 - `render({ editor, disabled, tabIndex, ref, onFocus })`: the app's own control in the toolbar
   (a field, a slider, a button with its own popover). Put `ref`, `tabIndex` and `onFocus` on
-  its one focusable element: the toolbar then keeps its single tab stop and its arrow keys
-  reach the control. `disabled` is the toolbar's, or the item's `enabled` saying no: show it
+  its one focusable element (required: without it the toolbar's tab stop can land on nothing;
+  on a DOM element, or a component that passes them on, since React 18 gives a function
+  component no `ref`): the toolbar then keeps its single tab stop and its arrow keys
+  reach the control. `label` is not shown: the control names itself. `disabled` is the toolbar's, or the item's `enabled` saying no: show it
   with `aria-disabled` and keep the element focusable. ArrowLeft, ArrowRight, Home and End are
   the toolbar's: a control that needs them (a text field) stops their propagation. `render`
   runs as a component's body (hooks such as `useEditorState` are fine), again when the

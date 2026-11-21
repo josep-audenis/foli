@@ -295,8 +295,9 @@ export interface ToolbarDialogProps {
 }
 /**
  * A toolbar button that opens the app's dialog under the toolbar, as Picture… does: a
- * `role="dialog"` named by `label` (class `foli-toolbar-<key>-dialog`). The focus goes to its
- * first field or button; Escape closes it back to its button; a disabled toolbar closes it.
+ * `role="dialog"` named by `label` (classes `foli-toolbar-dialog` and
+ * `foli-toolbar-<key>-dialog`). The focus goes to its first field or button; Escape closes it
+ * back to its button; a disabled toolbar closes it.
  */
 export interface ToolbarDialog extends ToolbarItemBase {
     /** The dialog's content. Rendered as a component's body: hooks are fine. */
@@ -309,8 +310,12 @@ export interface ToolbarDialog extends ToolbarItemBase {
     readonly colors?: undefined;
     readonly render?: undefined;
 }
-/** What an app's own control gets: `ref`, `tabIndex` and `onFocus` go on its focusable element. */
-export interface ToolbarRenderProps {
+/**
+ * What an app's own control gets: `ref`, `tabIndex` and `onFocus` go on its focusable element
+ * (a DOM element, or a component that passes them on: React 18 does not pass `ref` to a
+ * function component).
+ */
+export interface ToolbarCustomProps {
     /** Where the toolbar's commands go: the header, footer or note open on its page, else the body. */
     readonly editor: Editor;
     /** The toolbar is disabled, or the item's `enabled` says no: stay focusable (`aria-disabled`). */
@@ -324,12 +329,15 @@ export interface ToolbarRenderProps {
 }
 /**
  * A toolbar item the app renders itself (a search field, a zoom slider, a button with a
- * popover). The toolbar's ArrowLeft, ArrowRight, Home and End move between items: a control
- * that needs them stops their propagation. Enabled unless `enabled` says no.
+ * popover). It must render one focusable element with the props' `ref`, `tabIndex` and
+ * `onFocus`: without it the toolbar's tab stop can land on nothing. The control names itself
+ * (`label` is not shown), shows `disabled` itself (`aria-disabled`) and decides what a click
+ * does to the focus. The toolbar's ArrowLeft, ArrowRight, Home and End move between items: a
+ * control that needs them stops their propagation. Enabled unless `enabled` says no.
  */
 export interface ToolbarCustom extends ToolbarItemBase {
     /** The control. Rendered as a component's body: hooks (`useEditorState`) are fine. */
-    readonly render: (props: ToolbarRenderProps) => ReactNode;
+    readonly render: (props: ToolbarCustomProps) => ReactNode;
     readonly command?: undefined;
     readonly actions?: undefined;
     readonly select?: undefined;
@@ -339,7 +347,8 @@ export interface ToolbarCustom extends ToolbarItemBase {
 }
 /**
  * A toolbar item, built-in (`toolbarItems`) or the app's own: a button running a command, a
- * menu button, a box, a color menu, a button opening a dialog, or the app's own control. The
+ * menu button, a box, a color menu, a button opening a dialog, or the app's own control
+ * (`ToolbarCustom`, which does for itself what follows). The
  * toolbar keeps one tab stop for all its items (arrow keys, Home and End move
  * between them), gives toggles `aria-pressed` and an item that cannot apply now `aria-disabled`
  * (still focusable), and leaves the focus and selection in the document on click.
@@ -468,4 +477,4 @@ export { FoliCanvas, type FoliCanvasHandle, type FoliCanvasProps } from "./FoliC
 export { FoliComments, type FoliCommentsProps } from "./FoliComments.js";
 export { type FoliChange, FoliEditor, type FoliEditorHandle, type FoliEditorProps, } from "./FoliEditor.js";
 export { FoliNavigation, type FoliNavigationProps } from "./FoliNavigation.js";
-export { defaultToolbarItems, FoliToolbar, type FoliToolbarProps, type ToolbarAction, type ToolbarButton, type ToolbarColor, type ToolbarColorMenu, type ToolbarCustom, type ToolbarDialog, type ToolbarDialogProps, type ToolbarItem, type ToolbarItemName, type ToolbarMenu, type ToolbarOption, type ToolbarRenderProps, type ToolbarSelect, toolbarItems, } from "./FoliToolbar.js";
+export { defaultToolbarItems, FoliToolbar, type FoliToolbarProps, type ToolbarAction, type ToolbarButton, type ToolbarColor, type ToolbarColorMenu, type ToolbarCustom, type ToolbarCustomProps, type ToolbarDialog, type ToolbarDialogProps, type ToolbarItem, type ToolbarItemName, type ToolbarMenu, type ToolbarOption, type ToolbarSelect, toolbarItems, } from "./FoliToolbar.js";

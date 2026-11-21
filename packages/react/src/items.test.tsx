@@ -336,12 +336,16 @@ describe("toolbar items", () => {
   it("opens an app's dialog under the toolbar: focus in, Escape and close back out", () => {
     const editor = createEditor({ document: doc() });
     const onClickCommand = vi.fn();
+    const late: { current: ((applied?: boolean) => void) | null } = { current: null };
+    // Fewer hooks than the other dialog's, and nothing that takes the focus.
+    const note: ToolbarDialog = { key: "note", label: "Note", dialog: () => <p>Read me.</p> };
     const stamp: ToolbarDialog = {
       key: "stamp",
       label: "Stamp",
       dialog: ({ editor, close }) => {
         // A component's body: hooks work.
         const [value, setValue] = useState("OK");
+        late.current = close;
         return (
           <form
             onSubmit={(event) => {
@@ -358,7 +362,7 @@ describe("toolbar items", () => {
     const view = (disabled = false) => (
       <FoliToolbar
         editor={editor}
-        items={[[stamp, toolbarItems.undo]]}
+        items={[[stamp, note, toolbarItems.undo]]}
         onClickCommand={onClickCommand}
         disabled={disabled}
       />
@@ -385,6 +389,20 @@ describe("toolbar items", () => {
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(onClickCommand).toHaveBeenCalledOnce();
 
+    // Another item's dialog takes its place, with its own state and the focus in it.
+    fireEvent.click(button, { detail: 1 });
+    fireEvent.click(screen.getByRole("button", { name: "Note" }), { detail: 1 });
+    const second = screen.getByRole("dialog");
+    expect(second.getAttribute("aria-label")).toBe("Note");
+    // Nothing to focus in it: the dialog itself, where Escape still closes it.
+    expect(document.activeElement).toBe(second);
+    // A `close` the first dialog kept does nothing now.
+    act(() => late.current?.(true));
+    screen.getByRole("dialog", { name: "Note" });
+    fireEvent.keyDown(second, { key: "Escape" });
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(onClickCommand).toHaveBeenCalledOnce();
+
     // A built-in dialog that opens takes its place.
     fireEvent.click(button, { detail: 1 });
     act(() => void editor.run(openLinkEditor));
@@ -401,6 +419,12 @@ describe("toolbar items", () => {
     expect(screen.queryByRole("dialog")).toBeNull();
     rerender(view());
     expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("takes an item of one kind only (types)", () => {
+    // @ts-expect-error a box is not also a button
+    const both: ToolbarItem = { ...toolbarItems.size, command: undo };
+    expect(both.key).toBe("size");
   });
 
   it("renders an app's own control in the toolbar's one tab stop", () => {
