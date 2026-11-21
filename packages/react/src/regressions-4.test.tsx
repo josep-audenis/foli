@@ -2,7 +2,7 @@
 // Regressions (fourth sweep: the toolbar's link dialog focus, tabs, RTL keys, menus).
 
 import { createDocument, createEditor, openLinkEditor, TextSelection } from "@folijs/core";
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   FoliToolbar,
@@ -124,6 +124,81 @@ describe("regressions 4: toolbar", () => {
     );
     act(() => void editor.run(openLinkEditor));
     expect(screen.getAllByRole("dialog")).toHaveLength(1);
+  });
+
+  it("a click on Link in the second toolbar opens the second toolbar's dialog, and only one", () => {
+    const editor = createEditor({ document: doc() });
+    selectAll(editor);
+    render(
+      <>
+        <div data-testid="one">
+          <FoliToolbar editor={editor} label="One" />
+        </div>
+        <div data-testid="two">
+          <FoliToolbar editor={editor} label="Two" />
+        </div>
+      </>,
+    );
+    const link = within(screen.getByTestId("two")).getByRole("button", { name: "Link" });
+    fireEvent.mouseDown(link);
+    fireEvent.click(link, { detail: 1 });
+    within(screen.getByTestId("two")).getByRole("dialog");
+    act(() => void editor.run(openLinkEditor));
+    expect(screen.getAllByRole("dialog")).toHaveLength(1);
+    within(screen.getByTestId("two")).getByRole("dialog");
+  });
+
+  it("the first mounted toolbar stays the link dialog's owner after its `disabled` flips", () => {
+    const editor = createEditor({ document: doc() });
+    selectAll(editor);
+    const both = (off: boolean) => (
+      <>
+        <div data-testid="one">
+          <FoliToolbar editor={editor} label="One" disabled={off} />
+        </div>
+        <div data-testid="two">
+          <FoliToolbar editor={editor} label="Two" />
+        </div>
+      </>
+    );
+    const { rerender } = render(both(false));
+    rerender(both(true));
+    rerender(both(false));
+    act(() => void editor.run(openLinkEditor));
+    expect(screen.getAllByRole("dialog")).toHaveLength(1);
+    within(screen.getByTestId("one")).getByRole("dialog");
+  });
+
+  it("a `defaultTab` not in `tabs` yet is selected when it arrives", () => {
+    const editor = createEditor({ document: doc() });
+    const tabs: ToolbarTab[] = [
+      { key: "home", label: "Home", items: [[toolbarItems.undo]] },
+      { key: "insert", label: "Insert", items: [[toolbarItems.bold]] },
+    ];
+    const { rerender } = render(
+      <FoliToolbar editor={editor} tabs={tabs.slice(0, 1)} defaultTab="insert" />,
+    );
+    expect(selected()).toBe("Home");
+    rerender(<FoliToolbar editor={editor} tabs={tabs} defaultTab="insert" />);
+    expect(selected()).toBe("Insert");
+  });
+
+  it("a toolbar styled `direction: ltr` inside a right-to-left block keeps the arrow keys", () => {
+    const editor = createEditor({ document: doc() });
+    render(
+      <div dir="rtl">
+        <div style={{ direction: "ltr" }}>
+          <FoliToolbar
+            editor={editor}
+            items={[[toolbarItems.undo, toolbarItems.redo, toolbarItems.bold]]}
+          />
+        </div>
+      </div>,
+    );
+    const undoButton = screen.getByRole("button", { name: "Undo" });
+    act(() => undoButton.focus());
+    fireEvent.keyDown(undoButton, { key: "ArrowRight" });
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Redo" }));
   });
 
   it("an open menu closes when its item's `enabled` turns false", () => {

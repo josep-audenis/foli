@@ -1414,13 +1414,21 @@ const actionsOf = (item: Item, body: Editor): readonly Action[] =>
   typeof item.actions === "function" ? item.actions(body) : (item.actions ?? []);
 
 /** The mounted, enabled toolbars of each editor, in order: one of them opens its link dialog. */
-const linkOwners = new WeakMap<Editor, { holds: (node: Node | null) => boolean }[]>();
+const linkOwners = new WeakMap<Editor, LinkOwner[]>();
+type LinkOwner = {
+  holds: (node: Node | null) => boolean;
+  disabled: boolean;
+  /** Its link dialog is open. */
+  open: boolean;
+  /** Its own button is asking for the link dialog now. */
+  here: boolean;
+};
 
 /** ArrowRight's step (WAI-ARIA): mirrored right to left, where it goes to the previous one. */
 const rightStep = (element: Element) =>
-  // The `dir` attribute too: environments without layout (jsdom) do not compute `direction`.
-  getComputedStyle(element).direction === "rtl" ||
-  element.closest("[dir]")?.getAttribute("dir")?.toLowerCase() === "rtl"
+  // The `dir` attribute only where `direction` is not computed (no layout: jsdom).
+  (getComputedStyle(element).direction ||
+    element.closest("[dir]")?.getAttribute("dir")?.toLowerCase()) === "rtl"
     ? -1
     : 1;
 
@@ -1483,7 +1491,11 @@ export function FoliToolbar({
   const tab = tabs?.find((t) => t.key === wanted) ?? tabs?.[0];
   // A pick taken out of `tabs` is forgotten: it is not selected again when the app adds it back
   // (one hidden by its `visible` stays wanted).
-  const pickGone = tabKey !== null && !allTabs?.some((t) => t.key === tabKey);
+  // Only a key seen before: a `defaultTab` that arrives later is still wanted.
+  const seenTabs = useRef(new Set<string>());
+  for (const t of allTabs ?? []) seenTabs.current.add(t.key);
+  const pickGone =
+    tabKey !== null && seenTabs.current.has(tabKey) && !allTabs?.some((t) => t.key === tabKey);
   useEffect(() => {
     if (pickGone) setTabKey(null);
   }, [pickGone]);
@@ -1670,7 +1682,7 @@ export function FoliToolbar({
       return;
     }
     if (!item.command) return;
-    editor.run(item.command);
+    runHere(item.command);
     // `detail` counts pointer clicks; Enter and Space on a button give 0.
     if (event.detail > 0) onClickCommand?.();
   };
@@ -1680,13 +1692,26 @@ export function FoliToolbar({
   // for the selection it opened on: a change to the document or the selection (a click in the
   // document) closes it. A second request while it is open focuses it again.
   const [dialog, setDialog] = useState<LinkDialogState | null>(null);
-  // Several toolbars on one editor open one link dialog: the toolbar's that has the focus (its
-  // link button), else the first enabled one mounted's.
-  const linkOwner = useRef({
+  // Several toolbars on one editor open one link dialog: the one already open, else the toolbar's
+  // whose button asked, else the one that has the focus, else the first enabled one mounted's.
+  const linkOwner = useRef<LinkOwner>({
     holds: (node: Node | null) => !!(ribbon.current ?? bar.current)?.contains(node),
+    disabled,
+    open: false,
+    here: false,
   });
+  linkOwner.current.disabled = disabled;
+  linkOwner.current.open = dialog !== null;
+  const runHere = (command: Command) => {
+    linkOwner.current.here = true;
+    try {
+      editor.run(command);
+    } finally {
+      linkOwner.current.here = false;
+    }
+  };
+  // Registered once per editor: the mount order survives `disabled` flips.
   useEffect(() => {
-    if (disabled) return;
     const owner = linkOwner.current;
     linkOwners.set(editor, [...(linkOwners.get(editor) ?? []), owner]);
     return () => {
@@ -1695,7 +1720,7 @@ export function FoliToolbar({
         (linkOwners.get(editor) ?? []).filter((o) => o !== owner),
       );
     };
-  }, [editor, disabled]);
+  }, [editor]);
   useEffect(
     () =>
       editor.subscribe((state, transactions) => {
@@ -1763,9 +1788,13 @@ export function FoliToolbar({
           return;
         }
         const active = typeof document === "undefined" ? null : document.activeElement;
-        const owners = linkOwners.get(editor) ?? [];
-        if ((owners.find((owner) => owner.holds(active)) ?? owners[0]) !== linkOwner.current)
-          return;
+        const owners = (linkOwners.get(editor) ?? []).filter((owner) => !owner.disabled);
+        const owner =
+          owners.find((o) => o.open) ??
+          owners.find((o) => o.here) ??
+          owners.find((o) => o.holds(active)) ??
+          owners[0];
+        if (owner !== linkOwner.current) return;
         setTableDialog(null);
         setPictureDialog(null);
         setSetupDialog(null);
@@ -1879,7 +1908,7 @@ export function FoliToolbar({
     const { selection } = editor.state;
     if (name === "link") {
       // As Mod-K: the toolbar hears the request (and keeps the focus to give back).
-      editor.run(openLinkEditor);
+      runHere(openLinkEditor);
     } else if (name === "picture") {
       const selected = selectedPicture(editor.state);
       // Inserting needs the app's upload; editing a selected picture does not.
