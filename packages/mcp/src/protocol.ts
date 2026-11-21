@@ -3,7 +3,7 @@
  * (ADR-0009): JSON-RPC 2.0, one message per line, `initialize`, `ping`, `tools/list` and
  * `tools/call`. Written here and not taken from the SDK, whose client checks it in the tests.
  */
-import { invalid, type JsonSchema } from "./schema.js";
+import { invalid, type JsonSchema, published } from "./schema.js";
 
 /** The protocol versions answered, newest first. A client asking for another gets the newest. */
 export const PROTOCOL_VERSIONS = ["2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05"] as const;
@@ -26,6 +26,12 @@ export interface Tool {
   run(args: Record<string, unknown>): ToolResult | Promise<ToolResult>;
 }
 
+/** Where answers go: a stream (`write`, and `once("drain")` when it is full), or anything with `write`. */
+export interface Output {
+  write(text: string): unknown;
+  once?(event: "drain", listener: () => void): unknown;
+}
+
 export interface ServerOptions {
   name: string;
   version: string;
@@ -41,8 +47,7 @@ export interface ServerOptions {
 type Id = string | number;
 const isRecord = (v: unknown): v is Record<string, unknown> =>
   typeof v === "object" && v !== null && !Array.isArray(v);
-const isId = (v: unknown): v is Id =>
-  typeof v === "string" || (typeof v === "number" && Number.isFinite(v));
+const isId = (v: unknown): v is Id => typeof v === "string" || Number.isSafeInteger(v);
 
 const PARSE_ERROR = -32700;
 const INVALID_REQUEST = -32600;
@@ -61,20 +66,26 @@ class RpcError extends Error {
 /**
  * Serves `options.tools` to the client on `input` and `output` (a process's stdin and stdout,
  * or any stream of bytes and anything to write lines to) until `input` ends. Messages are
- * answered one at a time, in order. Nothing a client sends makes it throw: what is not a message
- * is answered with a JSON-RPC error, or ignored where the protocol says to.
+ * answered one at a time, in order: the next is read once the answer is written, and taken by
+ * `output` when it says it is full. Nothing read from `input` makes it throw: what is not a
+ * message is answered with a JSON-RPC error, or ignored where the protocol says to. It rejects
+ * only when `input` or `output` themselves fail.
  */
 export async function serve(
   input: AsyncIterable<Uint8Array | string>,
-  output: { write(text: string): unknown },
+  output: Output,
   options: ServerOptions,
 ): Promise<void> {
   const tools = new Map(options.tools.map((tool) => [tool.name, tool]));
-  const send = (message: object) => {
-    output.write(`${JSON.stringify({ jsonrpc: "2.0", ...message })}\n`);
+  const send = async (message: object) => {
+    const taken = output.write(`${JSON.stringify({ jsonrpc: "2.0", ...message })}\n`);
+    // A client that reads slowly holds the server back, rather than filling its memory.
+    if (taken === false && output.once)
+      await new Promise<void>((resolve) => output.once?.("drain", resolve));
   };
+  // An error for no request there is an id for has none: `null` is not an id to MCP clients.
   const fail = (id: Id | null, code: number, message: string) =>
-    send({ id, error: { code, message } });
+    send({ ...(id === null ? {} : { id }), error: { code, message } });
 
   const call = async (params: unknown): Promise<object> => {
     if (!isRecord(params) || typeof params.name !== "string")
@@ -100,12 +111,17 @@ export async function serve(
     };
   };
 
+  let named = false;
   const answer = async (method: string, params: unknown): Promise<object> => {
     switch (method) {
       case "initialize": {
         const asked = isRecord(params) ? params.protocolVersion : undefined;
         const client = isRecord(params) && isRecord(params.clientInfo) && params.clientInfo.name;
-        if (typeof client === "string") options.onClient?.(client);
+        // The first one's: a client does not rename itself.
+        if (typeof client === "string" && !named) {
+          named = true;
+          options.onClient?.(client);
+        }
         return {
           protocolVersion: (PROTOCOL_VERSIONS as readonly unknown[]).includes(asked)
             ? asked
@@ -122,7 +138,7 @@ export async function serve(
           tools: options.tools.map(({ name, description, inputSchema }) => ({
             name,
             description,
-            inputSchema,
+            inputSchema: published(inputSchema),
           })),
         };
       case "tools/call":
@@ -152,14 +168,18 @@ export async function serve(
     if (id === undefined) return;
     if (!isId(id)) return fail(null, INVALID_REQUEST, "Invalid request: id");
     try {
-      send({ id, result: await answer(method, message.params) });
+      const result = await answer(method, message.params);
+      return send({ id, result });
     } catch (error) {
       if (error instanceof RpcError) return fail(id, error.code, error.message);
       options.log?.(`${method} threw: ${error instanceof Error ? error.stack : error}`);
-      fail(id, -32603, "Internal error");
+      return fail(id, -32603, "Internal error");
     }
   };
 
+  const tooLong = () =>
+    fail(null, INVALID_REQUEST, `Invalid request: a message over ${MAX_MESSAGE_BYTES} bytes`);
+  /** The line being read: its pieces so far, their size, and whether it is over the limit. */
   let buffered: Buffer[] = [];
   let size = 0;
   let dropping = false;
@@ -168,21 +188,27 @@ export async function serve(
     for (;;) {
       const end = rest.indexOf(10);
       if (end < 0) break;
-      const line = Buffer.concat([...buffered, rest.subarray(0, end)]).toString("utf8");
+      // Over the limit however it arrived: in pieces, or whole with its newline.
+      const whole = !dropping && size + end <= MAX_MESSAGE_BYTES;
+      const line = whole
+        ? Buffer.concat([...buffered, rest.subarray(0, end)]).toString("utf8")
+        : "";
+      const said = dropping;
       rest = rest.subarray(end + 1);
       buffered = [];
       size = 0;
-      if (dropping) dropping = false;
-      else if (line.trim()) await handle(line.replace(/\r$/, ""));
+      dropping = false;
+      if (!whole) {
+        if (!said) await tooLong();
+      } else if (line.trim()) await handle(line.replace(/\r$/, ""));
     }
     if (dropping) continue;
     size += rest.length;
     if (size > MAX_MESSAGE_BYTES) {
       // The rest of the line, when it comes, is not a message either.
       buffered = [];
-      size = 0;
       dropping = true;
-      fail(null, INVALID_REQUEST, `Invalid request: a message over ${MAX_MESSAGE_BYTES} bytes`);
+      await tooLong();
     } else if (rest.length) buffered.push(rest);
   }
 }

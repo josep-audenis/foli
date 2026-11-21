@@ -34,6 +34,11 @@ export interface Tool {
     };
     run(args: Record<string, unknown>): ToolResult | Promise<ToolResult>;
 }
+/** Where answers go: a stream (`write`, and `once("drain")` when it is full), or anything with `write`. */
+export interface Output {
+    write(text: string): unknown;
+    once?(event: "drain", listener: () => void): unknown;
+}
 export interface ServerOptions {
     name: string;
     version: string;
@@ -48,12 +53,12 @@ export interface ServerOptions {
 /**
  * Serves `options.tools` to the client on `input` and `output` (a process's stdin and stdout,
  * or any stream of bytes and anything to write lines to) until `input` ends. Messages are
- * answered one at a time, in order. Nothing a client sends makes it throw: what is not a message
- * is answered with a JSON-RPC error, or ignored where the protocol says to.
+ * answered one at a time, in order: the next is read once the answer is written, and taken by
+ * `output` when it says it is full. Nothing read from `input` makes it throw: what is not a
+ * message is answered with a JSON-RPC error, or ignored where the protocol says to. It rejects
+ * only when `input` or `output` themselves fail.
  */
-export declare function serve(input: AsyncIterable<Uint8Array | string>, output: {
-    write(text: string): unknown;
-}, options: ServerOptions): Promise<void>;
+export declare function serve(input: AsyncIterable<Uint8Array | string>, output: Output, options: ServerOptions): Promise<void>;
 
 // schema.d.ts
 /**
@@ -71,6 +76,7 @@ export interface JsonSchema {
     items?: JsonSchemaOrAny;
     enum?: readonly (string | number | boolean | null)[];
     minimum?: number;
+    maximum?: number;
 }
 /** A schema, or one of several (`anyOf`): a value that fits any of them fits. */
 export type JsonSchemaOrAny = JsonSchema | {

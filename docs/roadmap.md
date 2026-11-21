@@ -2195,7 +2195,15 @@ review.
   JSON, a batch, a line over 8 MB, messages cut inside a character). Claude Code 2.1.92 reports
   the built `bin` connected; a model calling a tool through it was not tried, the CLI on the
   machine not being logged in: 14.6's. In `pnpm check`: the API report and publint; no size
-  budget, as nothing ships it to a browser.)
+  budget, as nothing ships it to a browser. From the review of #148 (a security review): an
+  error with `"id": null` is not a message the SDK's transports take, and the tests' transport
+  did not check messages as they do; the 8 MB limit did not hold for a line that came whole
+  with its newline; fractional ids were echoed; answers were written without waiting for a
+  slow client; a schema was checked more strictly than it was published. All fixed here. For
+  the ADR's file rules: a save through a planted link would have written outside the root, so
+  a save goes to a new file created exclusively and renamed; a file system's root is not a
+  root; `:` in a path is refused; line-ending characters in a document's text must not forge
+  read lines.)
 - [ ] 14.2 Package and protocol: `packages/mcp` as `@folijs/mcp` 0.0.0, `private`, with
   `@folijs/agent`, `@folijs/docx` and `@folijs/core` as exact dependencies, a `bin`, Node only
   (its build has Node's types and no DOM). The stdio loop: messages parsed and validated,

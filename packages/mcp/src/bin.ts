@@ -30,6 +30,8 @@ const read: Tool = {
   },
 };
 
+// The client went away: nothing to say, and nobody to say it to.
+process.stdout.on("error", () => process.exit(0));
 await serve(process.stdin, process.stdout, {
   name: "foli",
   version,

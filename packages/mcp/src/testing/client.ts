@@ -1,8 +1,11 @@
 import { PassThrough } from "node:stream";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
-import type { JSONRPCMessage } from "@modelcontextprotocol/sdk/types.js";
+import { JSONRPCMessageSchema } from "@modelcontextprotocol/sdk/types.js";
 import { type ServerOptions, serve } from "../protocol.js";
+
+/** A line the server wrote, as the SDK's own transports take it: a valid MCP message, or a throw. */
+export const message = (line: string) => JSONRPCMessageSchema.parse(JSON.parse(line));
 
 /**
  * The server on two in-process streams, as it is on stdin and stdout: every byte it reads and
@@ -38,10 +41,10 @@ export function wire(options: ServerOptions) {
     done,
     nextLine,
     /** Writes `text` and a newline, and reads one answer. */
-    async raw(text: string | Buffer): Promise<Record<string, unknown>> {
+    async raw(text: string | Buffer) {
       input.write(text);
       input.write("\n");
-      return JSON.parse(await nextLine());
+      return message(await nextLine()) as unknown as Record<string, unknown>;
     },
     /** Ends the client's side; resolves when the server has stopped. */
     async end(): Promise<void> {
@@ -58,7 +61,7 @@ export async function connect(options: ServerOptions, version?: string) {
   const transport: Transport = {
     async start() {
       void (async () => {
-        while (!closed) transport.onmessage?.(JSON.parse(await nextLine()) as JSONRPCMessage);
+        while (!closed) transport.onmessage?.(message(await nextLine()));
       })();
     },
     async send(message) {

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { MAX_MESSAGE_BYTES, PROTOCOL_VERSIONS, type Tool } from "./protocol.js";
-import { connect, wire } from "./testing/client.js";
+import { MAX_MESSAGE_BYTES, PROTOCOL_VERSIONS, serve, type Tool } from "./protocol.js";
+import { invalid, published } from "./schema.js";
+import { connect, message, wire } from "./testing/client.js";
 
 const echo: Tool = {
   name: "echo",
@@ -189,7 +190,14 @@ describe("what is not a message", () => {
     const { input, nextLine, raw, end } = wire(options());
     const chunk = Buffer.alloc(1024 * 1024, 97);
     for (let written = 0; written <= MAX_MESSAGE_BYTES; written += chunk.length) input.write(chunk);
-    expect(JSON.parse(await nextLine())).toMatchObject({ id: null, error: { code: -32600 } });
+    // Said once, as a message the SDK's transports take: an error with no id.
+    expect(message(await nextLine())).toEqual({
+      jsonrpc: "2.0",
+      error: {
+        code: -32600,
+        message: `Invalid request: a message over ${MAX_MESSAGE_BYTES} bytes`,
+      },
+    });
     input.write("still the same line\n");
     expect(await raw('{"jsonrpc":"2.0","id":1,"method":"ping"}')).toMatchObject({ id: 1 });
     await end();
@@ -214,5 +222,137 @@ describe("what is not a message", () => {
     expect(JSON.parse(await nextLine())).toMatchObject({ id: 2 });
     expect(order).toEqual(["start a", "end a", "start b", "end b"]);
     await end();
+  });
+
+  it("holds a line to the limit however it arrives", async () => {
+    const { input, nextLine, raw, end } = wire(options());
+    const over = {
+      code: -32600,
+      message: `Invalid request: a message over ${MAX_MESSAGE_BYTES} bytes`,
+    };
+    const ping = '{"jsonrpc":"2.0","id":1,"method":"ping"}';
+    // Whole in one write, its newline with it, and a good message behind it.
+    input.write(
+      Buffer.concat([Buffer.alloc(MAX_MESSAGE_BYTES + 1, 97), Buffer.from(`\n${ping}\n`)]),
+    );
+    expect(message(await nextLine())).toEqual({ jsonrpc: "2.0", error: over });
+    expect(message(await nextLine())).toMatchObject({ id: 1, result: {} });
+    // Under the limit in pieces, over it with the piece that ends it.
+    input.write(Buffer.alloc(MAX_MESSAGE_BYTES - 1, 97));
+    await new Promise((resolve) => setImmediate(resolve));
+    input.write(Buffer.concat([Buffer.alloc(1024, 97), Buffer.from("\n")]));
+    expect(message(await nextLine())).toEqual({ jsonrpc: "2.0", error: over });
+    // Exactly the limit is a message: here one that is not JSON.
+    input.write(Buffer.concat([Buffer.alloc(MAX_MESSAGE_BYTES, 97), Buffer.from("\n")]));
+    expect(message(await nextLine())).toMatchObject({ error: { code: -32700 } });
+    expect(await raw(ping)).toMatchObject({ id: 1 });
+    await end();
+  });
+
+  it("takes ids that are strings or whole numbers, and no other", async () => {
+    const { raw, end } = wire(options());
+    const ping = (id: string) => raw(`{"jsonrpc":"2.0","id":${id},"method":"ping"}`);
+    expect(await ping("0")).toEqual({ jsonrpc: "2.0", id: 0, result: {} });
+    expect(await ping('""')).toMatchObject({ id: "", result: {} });
+    for (const id of ["1.5", "12345678901234567890", "null", "true", "[1]"])
+      expect(await ping(id)).toEqual({
+        jsonrpc: "2.0",
+        error: { code: -32600, message: "Invalid request: id" },
+      });
+    await end();
+  });
+
+  it("drops a last line that never ended, and takes the client's name once", async () => {
+    const names: string[] = [];
+    const { raw, input, done } = wire({ ...options(), onClient: (name) => names.push(name) });
+    const hello = (name: string) =>
+      raw(
+        JSON.stringify({
+          jsonrpc: "2.0",
+          id: 1,
+          method: "initialize",
+          params: { protocolVersion: "2025-06-18", clientInfo: { name } },
+        }),
+      );
+    await hello("first");
+    await hello("second");
+    expect(names).toEqual(["first"]);
+    input.write('{"jsonrpc":"2.0","id":2,"method":"ping"}');
+    input.end();
+    await done;
+  });
+
+  it("waits for a client that reads slowly", async () => {
+    const big: Tool = {
+      name: "big",
+      description: "",
+      inputSchema: { type: "object" },
+      run: () => ({ text: "x".repeat(1024 * 1024) }),
+    };
+    let release: (() => void) | undefined;
+    let written = 0;
+    const output = {
+      write: () => {
+        written++;
+        return false;
+      },
+      once: (_event: "drain", listener: () => void) => {
+        release = listener;
+      },
+    };
+    const lines = Array.from({ length: 5 }, (_, id) => `${call(id, "big")}\n`).join("");
+    const input = (async function* () {
+      yield Buffer.from(lines);
+    })();
+    const done = serve(input, output, { ...options(), tools: [big] });
+    for (let answered = 1; answered <= 5; answered++) {
+      await new Promise((resolve) => setImmediate(resolve));
+      // One answer written, the next call not run until the client has taken it.
+      expect(written).toBe(answered);
+      release?.();
+    }
+    await done;
+  });
+});
+
+describe("a tool's arguments", () => {
+  const schema = {
+    type: "object",
+    properties: {
+      n: { type: "integer", minimum: 1, maximum: 10 },
+      x: { type: "number" },
+      inner: { type: "object", properties: { a: { type: "string" } }, required: ["a"] },
+      any: { type: "object", additionalProperties: true },
+    },
+  } as const;
+  it("are held to the schema", () => {
+    const wrong = (value: unknown) => invalid(value, schema);
+    expect(wrong({ n: 10, x: 1.5, inner: { a: "" }, any: { whatever: [1] } })).toBeNull();
+    expect(wrong({ n: 11 })).toBe("arguments.n must be at most 10");
+    expect(wrong({ n: 1e300 })).toBe("arguments.n must be at most 10");
+    expect(wrong({ n: Number.NaN })).toContain("must be integer");
+    expect(wrong({ x: Number.POSITIVE_INFINITY })).toContain("must be number");
+    expect(wrong({ inner: {} })).toBe("arguments.inner.a is missing");
+    expect(wrong({ inner: { a: "", b: 1 } })).toContain("arguments.inner.b is not an argument");
+    expect(wrong(JSON.parse('{"__proto__":1}'))).toContain(
+      "arguments.__proto__ is not an argument",
+    );
+    expect(wrong({ constructor: 1 })).toContain("arguments.constructor is not an argument");
+    expect(wrong([])).toBe("arguments must be object, not array");
+    expect(wrong(null)).toBe("arguments must be object, not null");
+  });
+
+  it("are published as they are held: no property that is not named", async () => {
+    expect(published(schema)).toMatchObject({
+      additionalProperties: false,
+      properties: {
+        inner: { additionalProperties: false },
+        any: { additionalProperties: true },
+      },
+    });
+    const client = await connect(options());
+    const { tools } = await client.listTools();
+    expect(tools[0]?.inputSchema.additionalProperties).toBe(false);
+    await client.close();
   });
 });

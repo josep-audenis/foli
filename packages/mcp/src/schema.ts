@@ -13,6 +13,7 @@ export interface JsonSchema {
   items?: JsonSchemaOrAny;
   enum?: readonly (string | number | boolean | null)[];
   minimum?: number;
+  maximum?: number;
 }
 
 /** A schema, or one of several (`anyOf`): a value that fits any of them fits. */
@@ -46,6 +47,8 @@ export function invalid(
     return `${path} must be one of ${schema.enum.map((v) => JSON.stringify(v)).join(", ")}`;
   if (schema.minimum !== undefined && (value as number) < schema.minimum)
     return `${path} must be at least ${schema.minimum}`;
+  if (schema.maximum !== undefined && (value as number) > schema.maximum)
+    return `${path} must be at most ${schema.maximum}`;
   if (schema.type === "array" && schema.items)
     for (const [index, item] of (value as unknown[]).entries()) {
       const wrong = invalid(item, schema.items, `${path}[${index}]`);
@@ -68,4 +71,20 @@ export function invalid(
     }
   }
   return null;
+}
+
+/**
+ * @internal A schema as a client is told it: saying of every object what `invalid` holds it to,
+ * that it takes no property it does not name (unless it says it takes any).
+ */
+export function published<T extends JsonSchemaOrAny>(schema: T): T {
+  if ("anyOf" in schema) return { ...schema, anyOf: schema.anyOf.map(published) };
+  const out: JsonSchema = { ...schema };
+  if (out.properties)
+    out.properties = Object.fromEntries(
+      Object.entries(out.properties).map(([key, value]) => [key, published(value)]),
+    );
+  if (out.items) out.items = published(out.items);
+  if (out.type === "object" && out.additionalProperties !== true) out.additionalProperties = false;
+  return out as T;
 }

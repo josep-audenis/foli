@@ -17,7 +17,7 @@ give a model?
 
 ## Spike (`packages/mcp`, kept: it is the start of 14.2)
 
-A stdio server written by hand (`src/protocol.ts`, about 150 lines; `src/schema.ts`, the check
+A stdio server written by hand (`src/protocol.ts`, about 200 lines; `src/schema.ts`, the check
 of a tool's arguments): JSON-RPC 2.0, one message per line, `initialize`, `ping`, `tools/list`,
 `tools/call`, and one tool, `read`, that reads a `.docx` under the working directory with
 `@folijs/docx` and `@folijs/agent`.
@@ -26,7 +26,8 @@ of a tool's arguments): JSON-RPC 2.0, one message per line, `initialize`, `ping`
   to it over two in-process streams, byte for byte what stdin and stdout carry: it initializes,
   reads the server's name, capabilities and instructions, pings, lists the tools and calls
   them, on the oldest and the newest protocol version the server answers
-  (`protocol.test.ts`, 7 tests).
+  (`protocol.test.ts`). Every line the server writes goes through the SDK's own message schema
+  first, as its transports do, so a reply that is not a valid message fails the test.
 - **Claude Code 2.1.92**, with the built `bin` registered in a project (`claude mcp add`),
   reports it `✓ Connected` (`claude mcp get foli`). A model calling the tool through Claude
   Code was not tried: the CLI on the machine is not logged in. It is task 14.6's check.
@@ -51,12 +52,22 @@ protocol that is not small (a network transport, authentication).
 - **Versions** answered: `2025-11-25`, `2025-06-18`, `2025-03-26`, `2024-11-05`. A client asking
   for one of them gets it; any other gets the newest, as the protocol says, and decides.
   A new version of the protocol is added here when the SDK's client in the tests asks for it.
-- **No batches.** The protocol dropped JSON-RPC batches in `2025-06-18`; an array is answered
-  with `-32600`.
+- **No batches**, a known deviation: `2025-03-26` says a server must take a JSON-RPC batch
+  (an array of messages), and `2025-06-18` removed them. The server answers an array with
+  `-32600` on every version. No client found sends one; the SDK's client does not.
+- **An error for nothing that had an id has no `id`** (bad JSON, a line over the limit): MCP's
+  messages do not allow `"id": null`, which JSON-RPC 2.0 itself would use there.
+- **Ids** are strings or whole numbers; another id is answered as an invalid request.
 - **stdout carries protocol messages only**; what the server has to say besides goes to stderr.
-- **One message at a time, in order**: a tool call is finished before the next message is read.
-  Edits to a document cannot interleave.
-- **Limits:** a line over 8 MB is dropped and answered with an error; the server goes on.
+- **One message at a time, in order**: a tool call is finished, and its answer taken by the
+  client, before the next message is read. Edits to a document cannot interleave, and a client
+  that does not read cannot make the server hold its answers in memory. The cost: while a tool
+  runs nothing else is answered, a `ping` included. So a tool must be bounded: the files' size
+  limits (below) are what bounds them.
+- **Limits:** a line over 8 MB is dropped, however it arrives, and answered with an error; the
+  server goes on.
+- **A tool's arguments** are checked against its schema before it runs, and the schema is
+  published as it is checked: an object takes no property it does not name.
 - **Not spoken:** resources, prompts, sampling, logging, progress, cancellation (a call is
   short), tasks, any transport but stdio.
 
@@ -80,14 +91,28 @@ configured, driven by a model whose input may come from a document (a prompt inj
 - **A root.** `--root <dir>`, default the working directory the client starts it in. Every path
   a tool takes is resolved against it; the file's real path (symlinks followed) must be inside
   the root's real path, or the tool refuses. For a file to be written, its directory's real
-  path.
-- **Only `.docx`**, by extension, read and written. A file over 64 MB is refused before it is
-  read; what is inside is `@folijs/docx`'s to refuse (its zip limits), as a refusal, never a
-  crash.
+  path. A file system's own root (`/`, `C:\`) is refused as the root: a client that starts the
+  server there has not chosen a folder. The paths a tool is given and gives back are relative
+  to the root; no answer holds a path outside it.
+- **Only `.docx`**, by extension (capitals not counting), read and written. No `:` in a
+  relative path (on Windows `a.docx:b.docx` is a stream of the file `a.docx`). A file over 64 MB
+  is refused before it is read; what is inside is `@folijs/docx`'s to refuse (its zip limits,
+  set here to 256 MB unpacked), as a refusal, never a crash.
 - **A save never destroys by default.** `save` without a path writes `<name>.agent.docx`
-  beside the input. Writing over the input, or over a file the server did not write itself in
-  this run, is refused unless the server was started with `--overwrite`.
+  beside the input, or `<name>.agent-2.docx`… when that is taken. Writing over the input, or
+  over a file the server did not write itself in this run, is refused unless the server was
+  started with `--overwrite`.
+- **A save never writes through a link or leaves half a file.** The bytes go to a new file in
+  the same folder, created exclusively, then renamed over the target. A target that is not a
+  plain file (a link, even one that points nowhere; a folder) is refused, with `--overwrite`
+  too. So a link planted in the root cannot send a save outside it, and a server stopped while
+  saving leaves the old file whole.
 - **No other access:** no listing of directories, no deleting, no network.
+- **What a document says is data.** A read is text from a file, and may say anything. It cannot
+  forge the read's own lines: every character that ends a line is shown as ↵ (a change to
+  `@folijs/agent`). What the model then does is the client's and the user's to bound, which is
+  why a save cannot overwrite and no tool reaches outside the root.
+- **Logs** (stderr) get the server's own errors and never a document's text.
 
 ### Author
 
@@ -97,7 +122,8 @@ name from `initialize` (`clientInfo.name`); without that, "Agent".
 ### Documents and sessions
 
 `open` reads a file and makes an `@folijs/agent` session, kept in memory under an id (`d1`,
-`d2`…) until `close` or the server's end; at most 16 at once. Every other tool takes the
+`d2`…) until `close` or the server's end; at most 16 at once (with the size limits, what bounds
+the server's memory). Every other tool takes the
 document's id, which may be left out while one document is open. Handles (`b7`) are a
 document's own. `close` refuses a document with changes not saved unless told to discard them.
 Nothing is saved on its own.
