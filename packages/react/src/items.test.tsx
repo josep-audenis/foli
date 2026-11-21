@@ -622,12 +622,37 @@ describe("toolbar items", () => {
     expect(onTabChange).toHaveBeenCalledExactlyOnceWith("edit");
     expect(selected()).toBe("Format");
     screen.getByRole("button", { name: "Bold" });
+    // The arrow keys go on from the tab that has the focus, though the app kept its `tab`.
+    const [edit, format] = screen.getAllByRole("tab") as [HTMLElement, HTMLElement];
+    act(() => format.focus());
+    fireEvent.keyDown(format, { key: "ArrowRight" });
+    expect(document.activeElement).toBe(edit);
+    fireEvent.keyDown(edit, { key: "ArrowRight" });
+    expect(document.activeElement).toBe(format);
+    expect(onTabChange.mock.calls).toEqual([["edit"], ["edit"]]);
+    // A pick the app does not follow leaves the tab's open menu alone.
+    rerender(
+      <FoliToolbar
+        editor={editor}
+        tabs={[
+          tabs[0] as ToolbarTab,
+          { key: "format", label: "Format", items: [[toolbarItems.textColor]] },
+        ]}
+        tab="format"
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Text color" }), { detail: 0 });
+    fireEvent.click(screen.getByRole("tab", { name: "Edit" }), { detail: 1 });
+    screen.getByRole("menu");
+    // A key that is not a tab: the first one, and the last tab's menu goes with it.
+    rerender(view("nope"));
+    expect(selected()).toBe("Edit");
+    expect(screen.queryByRole("menu")).toBeNull();
+    rerender(view("format"));
+    expect(selected()).toBe("Format");
     rerender(view("edit"));
     expect(selected()).toBe("Edit");
     screen.getByRole("button", { name: "Undo" });
-    // A key that is not a tab: the first one.
-    rerender(view("nope"));
-    expect(selected()).toBe("Edit");
   });
 
   it("shows a tab only while its `visible` says so; the first one when the selected one goes", () => {
@@ -660,6 +685,16 @@ describe("toolbar items", () => {
     // Back: the tab picked is still the one wanted.
     selectAll(editor);
     screen.getByRole("button", { name: "Clear" });
+    // Its tab had the focus when it went: the tab now selected takes it, not the page.
+    act(() => screen.getByRole("tab", { name: "Selection" }).focus());
+    act(() => editor.select(1, 1));
+    expect(document.activeElement).toBe(screen.getByRole("tab", { name: "Edit" }));
+    // Picking the tab that shows meanwhile is a pick: the other does not come back selected.
+    fireEvent.click(screen.getByRole("tab", { name: "Edit" }), { detail: 1 });
+    expect(onTabChange).toHaveBeenLastCalledWith("edit");
+    selectAll(editor);
+    expect(names()).toEqual(["Edit", "Selection"]);
+    screen.getByRole("button", { name: "Undo" });
   });
 
   it("names a group with a caption; the arrow keys cross it", () => {
@@ -667,7 +702,13 @@ describe("toolbar items", () => {
     const { container } = render(
       <FoliToolbar
         editor={editor}
-        items={[[toolbarItems.undo], { label: "Text", items: [toolbarItems.bold, clear] }, []]}
+        items={[
+          [toolbarItems.undo],
+          { label: "Text", items: [toolbarItems.bold, clear] },
+          [],
+          // Nothing left in it without `comments`: no group, no separator.
+          { label: "Comments", items: [toolbarItems.newComment] },
+        ]}
       />,
     );
     const group = screen.getByRole("group", { name: "Text" });
@@ -680,6 +721,9 @@ describe("toolbar items", () => {
     expect(caption.textContent).toBe("Text");
     expect(caption.getAttribute("aria-hidden")).toBe("true");
     expect(container.querySelectorAll("hr")).toHaveLength(1);
+    expect(screen.getAllByRole("group")).toHaveLength(1);
+    // `defaultToolbarTabs` keeps its groups as arrays (types).
+    expect(defaultToolbarTabs[0]?.items[0]?.map((item) => item.key)).toEqual(["undo", "redo"]);
     const buttons = screen.getAllByRole("button");
     expect(buttons.map((b) => b.tabIndex)).toEqual([0, -1, -1]);
     fireEvent.keyDown(buttons[0] as HTMLElement, { key: "ArrowRight" });

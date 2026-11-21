@@ -203,7 +203,10 @@ export interface FoliToolbarProps {
     onTabChange?: ((key: string) => void) | undefined;
     className?: string | undefined;
 }
-/** A group of toolbar items with a caption: a `role="group"` named by `label`, shown under it. */
+/**
+ * A group of toolbar items with a caption: a `role="group"` named by `label`, shown under it.
+ * It has no `key` (a tab has: that tells them apart in `FoliEditor`'s `toolbar`).
+ */
 export interface ToolbarGroup {
     readonly label: string;
     readonly items: readonly ToolbarItem[];
@@ -219,9 +222,11 @@ export interface ToolbarTab {
     /** Its items, in groups (as `FoliToolbarProps.items`); a key is unique within its tab. */
     readonly items: ToolbarGroups;
     /**
-     * A tab that comes and goes with the selection (Word's Table tab): shown while this says so.
-     * Runs after every transaction: keep it cheap. It is not selected for the user when it comes;
-     * when the selected tab goes, the first one shows (no `onTabChange`).
+     * A tab that comes and goes with the selection (Word's Table tab): shown while this says so
+     * (`editor` is the header, footer or note open on its page, else the body's, as for an item's
+     * `enabled`). Runs after every transaction: keep it cheap. It is not selected for the user
+     * when it comes (unless it is the `tab` or `defaultTab`); when the selected tab goes, the
+     * first one shows (no `onTabChange`).
      */
     readonly visible?: ((state: EditorState, editor: Editor) => boolean) | undefined;
 }
@@ -427,7 +432,10 @@ export declare const defaultToolbarItems: readonly (readonly ToolbarItem[])[];
  * The built-in items in tabs, after Word's ribbon: Home, Insert, Layout, Review. For
  * `FoliToolbarProps.tabs` (or `FoliEditor`'s `toolbar`), whole or as a start for an app's own.
  */
-export declare const defaultToolbarTabs: readonly ToolbarTab[];
+export declare const defaultToolbarTabs: readonly (ToolbarTab & {
+    /** Arrays only, no captioned groups: `tab.items.map((group) => group.filter(…))` works. */
+    readonly items: readonly (readonly ToolbarItem[])[];
+})[];
 /**
  * Word's formatting controls for an editor (`defaultToolbarItems`, or `items`): paragraph
  * style, font and size boxes, marks, link (a dialog, also on Mod-K in the document), text color
