@@ -49,6 +49,13 @@ function rejected(document: FoliDocument): FoliDocument {
   return editor.getDocument();
 }
 
+/** Everything of a document but its content: styles, numbering, comments, controls, stories. */
+const envelope = (document: FoliDocument) => ({ ...document, content: null });
+
+/** A document as `.docx` gives it back: what export writes of it, read again. */
+const written = async (document: FoliDocument, pkg: Parameters<typeof exportDocx>[1]) =>
+  (await importDocx(await exportDocx(document, pkg))).document;
+
 /** What a reader of the document sees: the body's blocks, with no handles. */
 const seen = (document: FoliDocument) => text(openSession(document, { author: "Reader" }));
 
@@ -100,20 +107,28 @@ describe("fill a template", () => {
     // Known difference (limitations.md): a placeholder that comes back loses the run properties
     // Foli keeps verbatim (here `w:lang`), and a date control keeps the date it was given in
     // its properties. Nothing else differs.
-    const plain = (content: unknown) =>
+    let dropped = 0;
+    const plain = (content: unknown, count = false) =>
       JSON.parse(
-        JSON.stringify(content, (_key, value) =>
-          Array.isArray(value) ? value.filter((v) => v?.type !== "runExt") : value,
-        ),
+        JSON.stringify(content, (_key, value) => {
+          if (!Array.isArray(value)) return value;
+          const kept = value.filter((v) => v?.type !== "runExt");
+          if (count) dropped += value.length - kept.length;
+          return kept;
+        }),
       );
     const after = rejected(session.document());
     expect(after.content).not.toEqual(document.content);
-    expect(plain(after.content)).toEqual(plain(document.content));
+    expect(plain(after.content)).toEqual(plain(document.content, true));
+    // The three placeholders that were filled, and no other run.
+    expect(dropped - JSON.stringify(after.content).split('"runExt"').length + 1).toBe(3);
     const date = Object.keys(document.controls ?? {})[0] as string;
-    expect({ ...after.controls?.[date], date: undefined }).toEqual({
-      ...document.controls?.[date],
-      date: undefined,
+    const undated = (d: FoliDocument) => ({
+      ...envelope(d),
+      controls: { ...d.controls, [date]: { ...d.controls?.[date], date: undefined } },
     });
+    expect(after.controls?.[date]?.date).toBe("2026-12-01T00:00:00Z");
+    expect(undated(after)).toEqual(undated(document));
   });
 });
 
@@ -166,7 +181,13 @@ describe("redline a contract", () => {
     expect(trackedChanges(editor.state.doc).every((c) => c.author === AUTHOR)).toBe(true);
     expect(back.document.comments).toMatchObject([{ author: AUTHOR }]);
     expect(seen(rejected(back.document))).toBe(seen(document));
-    expect(rejected(session.document()).content).toEqual(document.content);
+    const after = rejected(session.document());
+    expect(after.content).toEqual(document.content);
+    expect(envelope(after)).toEqual(envelope(document));
+    // Through the file too: what is written after the reject reads as the input written.
+    expect((await written(rejected(back.document), back.package)).content).toEqual(
+      (await written(document, pkg)).content,
+    );
   });
 
   it("works on a document already redlined in Word, leaving Word's changes", async () => {
@@ -186,11 +207,17 @@ describe("redline a contract", () => {
 
     const back = await throughDocx(session, pkg);
     expect(seen(back.document)).toBe(seen(session.document()));
-    const after = trackedChanges(createEditor({ document: back.document }).state.doc);
-    expect(after.filter((c) => c.author !== AUTHOR)).toHaveLength(before.length);
+    const left = trackedChanges(createEditor({ document: back.document }).state.doc);
+    expect(left.filter((c) => c.author !== AUTHOR)).toHaveLength(before.length);
     // Rejecting the agent's changes leaves the document as Word's reviewers left it.
     expect(seen(rejected(back.document))).toBe(seen(document));
-    expect(rejected(session.document()).content).toEqual(document.content);
+    const after = rejected(session.document());
+    expect(after.content).toEqual(document.content);
+    expect(envelope(after)).toEqual(envelope(document));
+    // Through the file too: what is written after the reject reads as the input written.
+    expect((await written(rejected(back.document), back.package)).content).toEqual(
+      (await written(document, pkg)).content,
+    );
   });
 });
 
@@ -243,13 +270,16 @@ describe("restyle headings", () => {
     // (`w14:paraId`, tab stops in `ext`). The restyling alone comes back exactly.
     const entries = (content: unknown) =>
       JSON.parse(
-        JSON.stringify(content, (key, value) =>
-          key === "ext" || key === "attributes" ? undefined : value,
+        JSON.stringify(content, (_key, value) =>
+          value?.type === "paragraph" && /^TOC/.test(value.attrs?.style ?? "")
+            ? { ...value, attrs: { ...value.attrs, ext: undefined, attributes: undefined } }
+            : value,
         ),
       );
     const after = rejected(session.document());
     expect(after.content).not.toEqual(document.content);
     expect(entries(after.content)).toEqual(entries(document.content));
+    expect(envelope(after)).toEqual(envelope(document));
     const alone = openSession(document, { author: AUTHOR });
     // A first read of the same document gives the same handles.
     ok(alone.read());
@@ -257,6 +287,6 @@ describe("restyle headings", () => {
       const level = Number(block.style?.slice(-1));
       ok(alone.setStyle(block.handle, `Heading ${level + 1}`));
     }
-    expect(rejected(alone.document()).content).toEqual(document.content);
+    expect(rejected(alone.document())).toEqual(document);
   });
 });

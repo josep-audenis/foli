@@ -2054,12 +2054,18 @@ Each task is a PR on `phase-13/agent`, the build green after each.
   kept verbatim for it (`w:lang`) and the date control keeps its date in its properties; in 04
   the entries of the rebuilt table of contents come back without their `w14:paraId` and the
   tab stops kept in `ext`. Both are core's (control values and field updates under tracking),
-  not the agent's operations. Word: `scripts/corpus/agent-roundtrip.mjs` makes the three
-  documents through the package and checks what Word reads with `word-review.ps1`
-  (corpus/README.md). 2026-11-21, Word 16.0.20625: 3 of 3 open without a repair prompt, every
-  revision is the agent's (9, 6 and 5: Word shows adjacent restyled headings as one), the
-  comment is there, and Word's text with every change accepted and with every change rejected
-  is Foli's paragraph by paragraph.)
+  not the agent's operations. The envelope (styles, numbering, comments, controls, stories) is
+  the input's too, but for that date; and for 01 and 02 the file written after the reject reads
+  as the input written. Word: `scripts/corpus/agent-roundtrip.mjs` makes three documents
+  through the package (04 with its table of contents built again) and checks what Word reads
+  with `word-review.ps1` (corpus/README.md). 2026-11-21, Word 16.0.20625: 3 of 3 open without
+  a repair prompt; every revision is the agent's and of the task's kinds (9, 6 and 19: Word
+  shows adjacent restyled headings as one); Word's insertions, deletions and restyled
+  paragraphs hold the texts the tasks wrote and removed; the comment is there; Word's text
+  with every change accepted and with every change rejected is Foli's paragraph by paragraph.
+  From the review of #143: the harness compared no text of the edits themselves (their
+  paragraphs hold fields and were set aside) and passed on a paragraph count that differed;
+  the tests' "nothing else differs" stripped more than the known differences.)
 - [ ] 13.7 Docs and release: README (also the site's guide), `api.md`, `architecture.md`,
   `limitations.md`, the exploration note marked with what was built, acceptance checked above,
   the changeset, `private` removed from the manifest; 0.1.0 published with the owner's

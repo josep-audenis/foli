@@ -291,7 +291,9 @@ Custom nodes and marks, plugins and toolbar items ([extensions](guides/extension
 
 Unstable (0.x). Details in the [package README](../packages/agent/README.md).
 
-- Only the body is read and edited: not headers, footers, footnotes or endnotes.
+- Only the body is read and edited: not headers, footers, footnotes or endnotes. One
+  exception: `updateFields` also updates the fields there (core's does), as tracked changes the
+  session does not read back, and does not report what it skipped there.
 - No operation inserts a table or a picture, changes a run's formatting (bold, color), or
   accepts or rejects changes. `session.editor` is the headless editor for those, by positions.
 - A paragraph whose mark is deleted as a tracked change but that keeps text is read as its own
@@ -313,6 +315,8 @@ Unstable (0.x). Details in the [package README](../packages/agent/README.md).
   layout the session does not have.
 - Core's rules let a paragraph be inserted into a locked block content control; the session
   refuses it itself, the editor under it (`session.editor`) does not.
+- A style the session adds to the document stays when its changes are rejected: a built-in
+  heading it used, and the styles a rebuilt table of contents or a control's placeholder needs.
 - A handle lost (its block removed, or joined into the next) does not come back with undo.
 - Every operation reads the whole body again; not measured on long documents.
 

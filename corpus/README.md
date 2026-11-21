@@ -125,11 +125,13 @@ was written).
 (`@folijs/agent`, 13.6). `make` runs three tasks through the package as "Foli Agent": the offer
 letter's content controls and merge fields filled (03), the NDA redlined (01: replacements, a
 clause inserted, a clause deleted, a comment), the board report's headings moved a level down
-(04). `check` reads what Word made of each: it opened, every tracked change is the agent's and
-of the kinds the task makes, the comment is there, and Word's accepted and rejected text equals
-Foli's paragraph by paragraph outside tables (paragraphs with fields, notes or page breaks
-aside). 2026-11-21, Word 16.0.20625: 3 of 3 pass (9, 6 and 5 revisions; Word shows adjacent
-restyled headings as one).
+and its table of contents built again (04). `check` reads what Word made of each: it opened;
+every tracked change is the agent's and of the kinds the task makes, no other; Word's
+insertions, deletions and restyled paragraphs hold the texts the task wrote and removed; the
+comment is there; Word's accepted and rejected text equals Foli's paragraph by paragraph
+outside tables (paragraphs with fields, notes or page breaks aside). A paragraph count that
+differs fails. 2026-11-21, Word 16.0.20625: 3 of 3 pass (9, 6 and 19 revisions; Word shows
+adjacent restyled headings as one).
 
 ```bash
 pnpm build

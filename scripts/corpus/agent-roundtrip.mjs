@@ -10,9 +10,11 @@
 // deletes clauses, comments), and moves the board report's headings a level down. It exports
 // <name>-agent.docx to <dir>/foli with what Foli expects of it.
 // `check` compares what Word read (word-review.ps1): it opened; every tracked change is the
-// agent's (the documents had none), of the kinds the task makes; the comment is there; Word's
-// text with every change accepted, and rejected, is Foli's, paragraph by paragraph outside
-// tables. <dir> outside the repository (word-review.ps1 asks for it).
+// agent's (the documents had none) and of the kinds the task makes, no other; Word's
+// insertions, deletions and restyled paragraphs hold the texts the task wrote and removed; the
+// comment is there; Word's text with every change accepted, and rejected, is Foli's, paragraph
+// by paragraph outside tables (paragraphs with fields, notes or page breaks aside: the texts
+// above cover what is in them). <dir> outside the repository (word-review.ps1 asks for it).
 // Prints one line per document; exits 1 on any difference.
 
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -48,6 +50,8 @@ function handleOf(session, text) {
 const TASKS = {
   "03-offer-letter-template": {
     types: [1, 2],
+    inserted: ["1 December 2026", "Senior Data Engineer", "72,000", "Ada", "5 January 2027"],
+    deleted: ["CandidateFirstName", "StartDate"],
     run(session) {
       done(session.fillControl("offer_date", "2026-12-01"));
       done(session.fillControl("position", "Senior Data Engineer"));
@@ -61,6 +65,8 @@ const TASKS = {
   "01-mutual-nda": {
     types: [1, 2],
     comment: COMMENT,
+    inserted: ["five (5) years", "Signatory", "A reference to a statute includes"],
+    deleted: ["three (3) years", "Party", "the existence and terms of the discussions"],
     run(session) {
       const term = handleOf(session, "continues for a period of three (3) years");
       done(session.replaceText(term, "three (3) years", "five (5) years"));
@@ -75,13 +81,25 @@ const TASKS = {
     },
   },
   "04-board-report": {
-    types: [10],
+    // The headings restyled; the table of contents built again from them (insertions and
+    // deletions inside its field's result).
+    types: [1, 2, 10],
+    restyled: [
+      "Executive summary",
+      "Trading performance",
+      "Sales by region",
+      "Costs",
+      "Staff costs",
+      "Decisions requested",
+      "Appendix: capital expenditure",
+    ],
     run(session) {
       const headings = done(session.read()).blocks.filter((b) =>
         /^heading [123]$/.test(b.style ?? ""),
       );
       for (const block of headings)
         done(session.setStyle(block.handle, `Heading ${Number(block.style.slice(-1)) + 1}`));
+      if (done(session.updateFields()).rebuilt !== 1) throw new Error("no table of contents");
     },
   },
 };
@@ -140,10 +158,17 @@ if (mode === "make") {
     failures++;
     console.log(`${name}: FAILED: ${what}`);
   };
-  for (const [task, { types, comment }] of Object.entries(TASKS)) {
+  for (const [task, spec] of Object.entries(TASKS)) {
+    const { types, comment } = spec;
     const name = `${task}-agent`;
     const expected = JSON.parse(readFileSync(join(dir, "foli", `${name}.expected.json`), "utf8"));
-    const word = JSON.parse(readFileSync(join(dir, "word", `${name}.json`), "utf8"));
+    let word;
+    try {
+      word = JSON.parse(readFileSync(join(dir, "word", `${name}.json`), "utf8"));
+    } catch {
+      fail(name, "Word's reading is missing: run word-review.ps1 first");
+      continue;
+    }
     if (!word.opened) {
       fail(name, `Word did not open it: ${word.error}`);
       continue;
@@ -152,19 +177,33 @@ if (mode === "make") {
     if (others.length) fail(name, `${others.length} revisions not by ${AUTHOR}`);
     const seen = new Set(word.revisions.map((r) => r.type));
     for (const type of types) if (!seen.has(type)) fail(name, `no revision of type ${type}`);
+    for (const type of seen) if (!types.includes(type)) fail(name, `a revision of type ${type}`);
+    // What the task wrote and removed, in Word's own reading of the changes.
+    const textOfType = (type) =>
+      word.revisions
+        .filter((r) => r.type === type)
+        .map((r) => r.text)
+        .join("\n");
+    for (const [what, type] of [
+      ["inserted", 1],
+      ["deleted", 2],
+      ["restyled", 10],
+    ])
+      for (const text of spec[what] ?? [])
+        if (!textOfType(type).includes(text))
+          fail(name, `${what} text not in Word's revisions: ${JSON.stringify(text)}`);
     if (comment) {
       const made = word.comments.find((c) => c.text === comment);
       if (!made || made.author !== AUTHOR) fail(name, `comment: ${JSON.stringify(made)}`);
     } else if (word.comments.length) fail(name, `${word.comments.length} comments, none made`);
-    // Paragraph by paragraph, case aside (Word's Range.Text applies the styles' all caps). Not
-    // when Word has another number of paragraphs (a content control around paragraphs is one
-    // block in Foli).
+    // Paragraph by paragraph, case aside (Word's Range.Text applies the styles' all caps).
     let compared = "accept/reject text compared";
     for (const kind of ["accepted", "rejected"]) {
       const theirs = plain(word[kind]);
       const own = expected[kind];
       if (theirs.length !== own.length) {
-        compared = `text not compared (${own.length} paragraphs in Foli, ${theirs.length} in Word)`;
+        compared = "text not compared";
+        fail(name, `${kind}: ${own.length} paragraphs in Foli, ${theirs.length} in Word`);
         continue;
       }
       const differs = own.findIndex(
