@@ -217,7 +217,9 @@ function attrsLike(context: Context, node: Node, side: "before" | "after"): Attr
     const id =
       (attrs.style as string | null) ?? paragraph.filter((s) => s.isDefault).at(-1)?.id ?? null;
     const next = paragraph.find((s) => s.id === id)?.next;
-    if (next !== undefined && next !== id) return { controls: attrs.controls ?? null, style: next };
+    // One the document does not have as a paragraph style is no next style: Word stays in this one.
+    if (next !== undefined && next !== id && paragraph.some((s) => s.id === next))
+      return { controls: attrs.controls ?? null, style: next };
   }
   return { ...attrs, ...MARK_ONLY };
 }

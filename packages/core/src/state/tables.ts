@@ -9,7 +9,8 @@ import type { Mappable } from "../transform/stepmap.js";
 import { attempt as attemptTr } from "./attempt.js";
 import { MARK_ATTRS } from "./mark.js";
 import { Selection, type SelectionJSON, TextSelection } from "./selection.js";
-import { type Command, type EditorState, Plugin, type Transaction } from "./state.js";
+import { type Command, type EditorState, Plugin, stateBefore, type Transaction } from "./state.js";
+import { trackState, untracked } from "./track.js";
 
 const isTable = (node: Node) => node.type.name === "table";
 
@@ -63,7 +64,15 @@ export function deleteAcrossTables(tr: Transaction, from: number, to: number): b
     else {
       let end = start + 1;
       for (let r = 0; r <= row; r++) end += table.child(r).nodeSize;
-      tr.delete(start + 1, end);
+      // A merge starting in these rows goes on from the first row kept. Recorded as a tracked
+      // change the rows stay: the merge is restarted when their deletion is accepted (review.ts).
+      const before = stateBefore(tr);
+      const recorded = !!before && trackState(before)?.on === true && !tr.getMeta(untracked);
+      const next = recorded ? null : rowRestartingMerges(table, 0, row);
+      if (next) {
+        const slice = new Slice(Fragment.from(next), 0, 0);
+        tr.replace(start + 1, end + table.child(row + 1).nodeSize, slice);
+      } else tr.delete(start + 1, end);
     }
     middleEnd = start;
   }
@@ -85,6 +94,42 @@ export function deleteAcrossTables(tr: Transaction, from: number, to: number): b
   if (middleStart < middleEnd) deleteBetween(tr, middleStart, middleEnd);
   if (fromRows) tr.delete(fromRows[0], fromRows[1]);
   return true;
+}
+
+/**
+ * The row after rows `top..bottom` of `table` as it is once they are deleted, or null when it
+ * stays as it is: a vertical merge starting in them goes on from it, its covered cell becoming
+ * the merge's cell as it was (its properties, its text, then any text the covered cell held,
+ * which Word does not show). Not for a delete recorded as a tracked change (the rows stay, and
+ * a copy of the row would repeat its bookmarks and ids): there it is done on accepting.
+ * @internal
+ */
+export function rowRestartingMerges(table: Node, top: number, bottom: number): Node | null {
+  const next = table.maybeChild(bottom + 1);
+  if (!next) return null;
+  // Positions inside the table (`Node.nodeAt`'s).
+  const grid = gridOf(table, -1);
+  let changed = false;
+  let column = (next.attrs.gridBefore as number | null) ?? 0;
+  const cells: Node[] = [];
+  next.forEach((cell) => {
+    const at = column;
+    column += (cell.attrs.gridSpan as number | null) ?? 1;
+    const start =
+      cell.attrs.vMerge === "continue" &&
+      grid.find(
+        (c) => c.column === at && c.row >= top && c.row <= bottom && c.row + c.rowSpan > bottom + 1,
+      );
+    const first = start && table.nodeAt(start.pos);
+    if (!first) {
+      cells.push(cell);
+      return;
+    }
+    changed = true;
+    const content = cell.textContent ? first.content.append(cell.content) : first.content;
+    cells.push(cell.type.create({ ...first.attrs, vMerge: "restart" }, content));
+  });
+  return changed ? next.type.create(next.attrs, cells) : null;
 }
 
 /**

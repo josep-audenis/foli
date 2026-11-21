@@ -122,7 +122,8 @@ export function history({ newGroupDelay = 500, depth = 100 }: HistoryOptions = {
             ]
           : [...hist.done, { steps: inverted, selection: oldState.selection.toJSON() }];
         return {
-          done: done.slice(-depth),
+          // `slice(-0)` is everything.
+          done: depth > 0 ? done.slice(-depth) : [],
           undone: [],
           // A closed change is a step of its own on both sides: what follows does not join it.
           prevTime: root ? hist.prevTime : tr.getMeta(closeHistory) ? 0 : tr.time,

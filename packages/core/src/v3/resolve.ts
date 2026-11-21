@@ -179,6 +179,7 @@ function mergeParagraph(target: Merging, props: ParagraphPropertiesJSON | undefi
   if (indent) {
     // A first-line indent and a hanging one are one value: setting one replaces the other.
     if (indent.firstLine !== undefined) target.indent.hanging = 0;
+    else if (indent.hanging !== undefined) target.indent.firstLine = 0;
     Object.assign(target.indent, indent);
     // With both, Word applies the hanging indent.
     if (target.indent.hanging) target.indent.firstLine = 0;

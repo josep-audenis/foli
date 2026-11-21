@@ -346,7 +346,7 @@ describe("writing stories", () => {
     ).rejects.toThrow(/must be a w:footnote/);
   });
 
-  it("refuses a header part that cannot hold what is written", async () => {
+  it("writes into a header part that names WordprocessingML with another prefix", async () => {
     const { document, package: pkg } = await load("08-newsletter.docx");
     const id = headerId(document);
     const name = pkg.relationships(pkg.mainDocument).find((r) => r.id === id)?.partName as string;
@@ -359,7 +359,8 @@ describe("writing stories", () => {
     );
     const stories = structuredClone(document.stories ?? {});
     (stories[id] as { content: NodeJSON }).content = doc(paragraph("New"));
-    await expect(exportDocx({ ...document, stories }, changed)).rejects.toThrow(/namespaces/);
+    const out = await importDocx(await exportDocx({ ...document, stories }, changed));
+    expect(out.document.stories?.[id]?.content).toEqual(doc(paragraph("New")));
   });
 
   it("keeps references in comments verbatim, so the import succeeds", async () => {

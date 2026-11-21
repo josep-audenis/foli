@@ -10,6 +10,7 @@
  * together. These edits are not tracked themselves, and undo takes them back.
  */
 import type { Attrs, Mark, Node } from "../model/index.js";
+import { Fragment, Slice } from "../model/index.js";
 import { TransformError } from "../transform/transform.js";
 import type { SectionJSON } from "../v3/document.js";
 import { RUN_PROPERTY_MARKS } from "../v3/schema.js";
@@ -19,7 +20,7 @@ import { MARK_ATTRS } from "./mark.js";
 import { absorbSection, lastSection, resolveSectionChange } from "./sections.js";
 import { TextSelection } from "./selection.js";
 import { type Command, EditorState, type Transaction } from "./state.js";
-import { keepTablesApart } from "./tables.js";
+import { keepTablesApart, rowRestartingMerges } from "./tables.js";
 import { RECORDED, trackState, untracked } from "./track.js";
 import {
   StoryStep,
@@ -364,8 +365,39 @@ function resolve(
     removed.length = 0;
     removed.push(...outer);
   }
+  // A vertical merge starting in rows that go is restarted in the row after them, before they
+  // go (from the document as it is then: what was accepted inside that row is kept).
+  const restarts: { at: number; run: () => void }[] = [];
+  for (const [table, rows] of rowsGoing) {
+    const node = tr.doc.nodeAt(table);
+    if (!node || rows.length === node.childCount) continue;
+    const going = new Set(rows.map(([from]) => from));
+    let pos = table + 1;
+    let top = -1;
+    node.forEach((row, _offset, index) => {
+      const goes = going.has(pos);
+      if (goes && top < 0) top = index;
+      if (!goes && top >= 0) {
+        const first = top;
+        const at = pos;
+        restarts.push({
+          at,
+          run: () => {
+            const now = tr.doc.nodeAt(table);
+            const next = now && rowRestartingMerges(now, first, index - 1);
+            const old = tr.doc.nodeAt(at);
+            if (next && old)
+              tr.replace(at, at + old.nodeSize, new Slice(Fragment.from(next), 0, 0));
+          },
+        });
+        top = -1;
+      }
+      pos += row.nodeSize;
+    });
+  }
   // Content removed and paragraphs joined, from the end so earlier positions stay.
   const ops = [
+    ...restarts,
     ...removed.map(([s, e]) => ({ at: s, run: () => tr.delete(s, e) })),
     ...joins
       .filter(

@@ -173,15 +173,20 @@ function keepRows(element: HTMLElement, bottoms: number[], pageHeight: number): 
   return bottoms.filter((y) => !kept.some(([from, to]) => y > from + 0.5 && y < to - 0.5));
 }
 
-/** The height of a table's leading header rows (repeated on each page it continues on), or 0. */
-function headerHeight(element: HTMLElement): number {
+/**
+ * The height of a table's leading header rows (repeated on each page it continues on), or 0.
+ * @internal
+ */
+export function headerHeight(element: HTMLElement): number {
   let bottom = 0;
   // The table's own rows: not those of a table nested in a cell.
   for (const row of element.querySelectorAll(":scope > table > tbody > tr")) {
-    if (!(row as HTMLElement).dataset || !("foliHeader" in (row as HTMLElement).dataset)) break;
+    if (!(row as HTMLElement).dataset || !("foliHeader" in (row as HTMLElement).dataset))
+      return bottom ? bottom - element.getBoundingClientRect().top : 0;
     bottom = row.getBoundingClientRect().bottom;
   }
-  return bottom ? bottom - element.getBoundingClientRect().top : 0;
+  // Word repeats header rows only while some body row follows them (as `tableFrame`).
+  return 0;
 }
 
 /** The lines that end with one of the explicit breaks `attr` marks, by the break's position. */

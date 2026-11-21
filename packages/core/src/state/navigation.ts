@@ -181,7 +181,11 @@ export function renameBookmark(editor: Editor, name: string, next: string): Book
   // shortcut: a reference whose name is split over two `w:instrText` runs is not followed.
   // A bare name stands for `REF` only when it is no field's name: `{ TITLE }` is the title.
   const bare = FIELD_NAMES.has(current.name.toUpperCase()) ? "" : "?";
-  const reference = new RegExp(`^(\\s*(?:(?:REF|PAGEREF|NOTEREF)\\s+)${bare})${old}(?=\\s|$)`, "i");
+  // The name may be quoted; a `HYPERLINK`'s `\l` names its bookmark.
+  const reference = new RegExp(
+    `^(\\s*(?:(?:(?:REF|PAGEREF|NOTEREF)\\s+)${bare}|HYPERLINK\\b.*?\\\\l\\s+)"?)${old}(?="?(?:\\s|$))`,
+    "i",
+  );
   const edits = new Map<string | null, (tr: Transaction) => void>();
   for (const { id, tree } of treesOf(editor.state))
     edits.set(id, (tr) => {

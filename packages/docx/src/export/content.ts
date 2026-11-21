@@ -223,14 +223,16 @@ function inlinesXml(nodes: readonly NodeJSON[], context: WriteContext, deleted =
       const { marks: _marks, ...rest } = n;
       return marks.length ? { ...rest, marks } : rest;
     };
-    const gone = deleted || shared.some((m) => m.type === "deletion");
+    const gone = deleted || shared.some(isDeleted);
+    // Inside the elements around it: what their start tags declare is in scope.
+    const inside = shared.reduce((c, m) => within(c, m.attrs?.attributes), context);
     const xml = control
       ? controlXml(
           String(id),
-          inlinesXml(nodes.slice(i + 1, end).map(without), context, gone),
-          context,
+          inlinesXml(nodes.slice(i + 1, end).map(without), inside, gone),
+          inside,
         )
-      : simpleFieldXml(nodes.slice(i, end).map(without), context, gone);
+      : simpleFieldXml(nodes.slice(i, end).map(without), inside, gone);
     if (xml === undefined) {
       out.push(node);
       continue;
@@ -241,21 +243,31 @@ function inlinesXml(nodes: readonly NodeJSON[], context: WriteContext, deleted =
   return plainInlinesXml(out, context, deleted);
 }
 
-/** Hyperlinks outermost, then insertions (or move destinations), then deletions (or move sources). */
+/** Whether a mark's text is deleted text (`w:delText`): a deletion, not a move's source (`w:t`). */
+const isDeleted = (m: MarkJSON | undefined) => m?.type === "deletion" && !m.attrs?.move;
+
+/**
+ * Hyperlinks outermost, then insertions (or move destinations), then deletions (or move sources).
+ * What each start tag declares (`xmlns:foo` in its `attributes` bag) is in scope inside it.
+ */
 function plainInlinesXml(
   nodes: readonly NodeJSON[],
   context: WriteContext,
   outerDeleted: boolean,
 ): string {
+  const inside = (c: WriteContext, m: unknown) =>
+    within(c, (m as MarkJSON | undefined)?.attrs?.attributes);
   return grouped(
     nodes,
     (n) => markOf(n, "link"),
     (group, link) => {
+      const inLink = inside(context, link);
       const inner = grouped(
         group,
         (n) => markOf(n, "insertion"),
-        (g, ins) =>
-          wrapChange(
+        (g, ins) => {
+          const inIns = inside(inLink, ins);
+          return wrapChange(
             ins as MarkJSON | undefined,
             "ins",
             "moveTo",
@@ -267,12 +279,17 @@ function plainInlinesXml(
                   del as MarkJSON | undefined,
                   "del",
                   "moveFrom",
-                  runsXml(g2, !!del || outerDeleted, context),
-                  context,
+                  runsXml(
+                    g2,
+                    isDeleted(del as MarkJSON | undefined) || outerDeleted,
+                    inside(inIns, del),
+                  ),
+                  inIns,
                 ),
             ),
-            context,
-          ),
+            inLink,
+          );
+        },
       );
       return link ? hyperlinkXml(link as MarkJSON, inner, context) : inner;
     },
@@ -291,12 +308,14 @@ function wrapChange(
   if (!mark) return inner;
   const a = (mark.attrs ?? {}) as Json;
   const name = a.move ? `w:${moveLocal}` : `w:${local}`;
+  // A date the model could not hold was kept in the bag as read: written while the mark has none.
+  const { "w:date": kept, ...bag } = (a.attributes ?? {}) as Record<string, string>;
   const open = el(name, {
     "w:id": String(a.id),
     "w:author": String(a.author ?? ""),
-    "w:date": a.date as string | undefined,
+    "w:date": (a.date as string | null | undefined) ?? kept,
   }).slice(0, -2);
-  return `${open}${bagXml(a.attributes, context.namespaces, CHANGE_ATTRIBUTES)}>${inner}</${name}>`;
+  return `${open}${bagXml(bag, context.namespaces, CHANGE_ATTRIBUTES)}>${inner}</${name}>`;
 }
 
 function hyperlinkXml(link: MarkJSON, inner: string, context: WriteContext): string {

@@ -701,7 +701,18 @@ function BookmarksDialog({
   useEffect(() => {
     input.current?.focus();
   }, [request]);
-  useEffect(() => setList(listBookmarks(body, { hidden })), [body, hidden]);
+  // The list follows the document: the dialog is not modal, bookmarks change under it.
+  useEffect(() => {
+    setList(listBookmarks(body, { hidden }));
+    let { doc } = body.state;
+    let context = wordContext(body.state);
+    return body.subscribe((state) => {
+      if (state.doc === doc && wordContext(state) === context) return;
+      doc = state.doc;
+      context = wordContext(state);
+      setList(listBookmarks(body, { hidden }));
+    });
+  }, [body, hidden]);
   const refresh = () => setList(listBookmarks(body, { hidden }));
   const outcome = (result: { ok: boolean; reason?: string }) => {
     setError(result.ok ? "" : (BOOKMARK_ERRORS[result.reason ?? ""] ?? ""));
@@ -796,10 +807,12 @@ function BookmarksDialog({
               type="button"
               disabled={!chosen}
               onClick={() => {
-                if (chosen) deleteBookmark(body, chosen.name);
-                setPicked("");
-                setName("");
-                refresh();
+                if (!chosen) return;
+                // Refused (locked content): the bookmark stays picked, and the dialog says so.
+                if (outcome({ ok: deleteBookmark(body, chosen.name), reason: "refused" })) {
+                  setPicked("");
+                  setName("");
+                }
               }}
             >
               Delete

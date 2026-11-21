@@ -285,9 +285,7 @@ describe("exporting what changed, and only that", () => {
       ),
     );
     const xml = await source(await exportDocx(document, pkg));
-    expect(xml).toContain(
-      '<w:moveFrom w:id="2" w:author="A"><w:r><w:delText>x</w:delText></w:r></w:moveFrom>',
-    );
+    expect(xml).toContain('<w:moveFrom w:id="2" w:author="A"><w:r><w:t>x</w:t></w:r></w:moveFrom>');
     expect(xml).toContain('<w:moveTo w:id="4" w:author="A"><w:r><w:t>x</w:t></w:r></w:moveTo>');
   });
 

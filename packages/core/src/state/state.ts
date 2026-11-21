@@ -63,6 +63,11 @@ export class Plugin<T = unknown> {
   }
 }
 
+/** The state each transaction started from (not a member: the class is public API). */
+const origins = new WeakMap<Transaction, EditorState>();
+/** @internal The state `tr` was made from. */
+export const stateBefore = (tr: Transaction): EditorState | undefined => origins.get(tr);
+
 /**
  * A transform created from a state: tracks the selection (mapped through every step), stored
  * marks and metadata. Metadata `addToHistory: false` keeps a change out of undo history.
@@ -78,6 +83,7 @@ export class Transaction extends Transform {
 
   constructor(state: EditorState) {
     super(state.doc);
+    origins.set(this, state);
     this.currentSelection = state.selection;
     this.storedMarks = state.storedMarks;
   }

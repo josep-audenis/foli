@@ -792,6 +792,11 @@ export class EditorView {
     this.listen("beforeinput", this.onBeforeInput);
     this.listen("focus", this.onFocus);
     this.listen("keydown", this.onKeyDown);
+    // Ctrl/Cmd+Shift+V's paste event comes before any key is let go: none came (the browser or
+    // a keymap took the key), so a later paste is an ordinary one.
+    this.listen("keyup", () => {
+      this.plainPaste = false;
+    });
     this.listen("input", this.onInput);
     this.listen("compositionstart", this.onCompositionStart);
     this.listen("compositionend", this.onCompositionEnd);
@@ -899,6 +904,8 @@ export class EditorView {
     const { host } = this;
     for (const [type, listener] of this.listeners) host.removeEventListener(type, listener);
     this.endDrag();
+    // The pointer on a column border, no drag: the cursor is the view's.
+    if (this.resizeCursor) host.style.removeProperty("cursor");
     this.endResize();
     host.ownerDocument.removeEventListener("selectionchange", this.onSelectionChange);
     const owned = [
