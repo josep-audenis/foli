@@ -319,6 +319,70 @@ describe("toolbar items", () => {
     expect(JSON.stringify(editor.state.doc.toJSON())).toContain("123456");
   });
 
+  it("offers any color through the browser's color field, with `custom`", () => {
+    const editor = createEditor({ document: doc() });
+    const onClickCommand = vi.fn();
+    const textColor: ToolbarColorMenu = {
+      ...toolbarItems.textColor,
+      colors: { ...toolbarItems.textColor.colors, custom: true },
+    };
+    const { container } = render(
+      <FoliToolbar
+        editor={editor}
+        items={[[textColor, toolbarItems.highlight]]}
+        onClickCommand={onClickCommand}
+      />,
+    );
+    selectAll(editor);
+    // Only the menu that asks for it has the entry and the field.
+    const fields = container.querySelectorAll<HTMLInputElement>('input[type="color"]');
+    expect(fields).toHaveLength(1);
+    const field = fields[0] as HTMLInputElement;
+    expect(field.getAttribute("aria-hidden")).toBe("true");
+    expect(field.tabIndex).toBe(-1);
+    const opened = vi.spyOn(field, "click");
+    const button = screen.getByRole("button", { name: "Text color" });
+    act(() => button.focus());
+    fireEvent.click(button, { detail: 0 });
+    // The last entry, after the palette: End reaches it, ArrowDown wraps from it.
+    const more = screen.getByRole("menuitem", { name: "More colors…" });
+    const radios = screen.getAllByRole("menuitemradio");
+    fireEvent.keyDown(radios[0] as HTMLElement, { key: "End" });
+    expect(document.activeElement).toBe(more);
+    fireEvent.keyDown(more, { key: "ArrowDown" });
+    expect(document.activeElement).toBe(radios[0]);
+    // It closes the menu and opens the field; by keyboard the focus is back on the button.
+    fireEvent.click(more, { detail: 0 });
+    expect(screen.queryByRole("menu")).toBeNull();
+    expect(opened).toHaveBeenCalledOnce();
+    expect(document.activeElement).toBe(button);
+    // Nothing is applied while the user is choosing (`input`), only the color chosen (`change`).
+    field.value = "#12ab56";
+    fireEvent.input(field);
+    expect(JSON.stringify(editor.state.doc.toJSON())).not.toContain("12AB56");
+    act(() => void field.dispatchEvent(new Event("change", { bubbles: true })));
+    expect(JSON.stringify(editor.state.doc.toJSON())).toContain("12AB56");
+    expect(onClickCommand).not.toHaveBeenCalled();
+    // Opened with the pointer: the focus goes to the document after the pick.
+    field.value = "#ffffff";
+    fireEvent.click(button, { detail: 1 });
+    fireEvent.click(screen.getByRole("menuitem", { name: "More colors…" }), { detail: 1 });
+    // It opens on the color at the selection; its button has the focus meanwhile.
+    expect(field.value).toBe("#12ab56");
+    expect(document.activeElement).toBe(button);
+    // A click in the document that closes the field moves the selection first: the color
+    // still goes to the selection the field opened on.
+    act(() => editor.select(1, 1));
+    field.value = "#000001";
+    act(() => void field.dispatchEvent(new Event("change", { bubbles: true })));
+    expect(onClickCommand).toHaveBeenCalledOnce();
+    expect(JSON.stringify(editor.state.doc.toJSON())).not.toContain("12AB56");
+    expect(editor.state.selection.empty).toBe(false);
+
+    fireEvent.click(screen.getByRole("button", { name: "Highlight" }), { detail: 0 });
+    expect(screen.queryByRole("menuitem", { name: "More colors…" })).toBeNull();
+  });
+
   it("keeps a box that is not enabled focusable, and does not run its pick", () => {
     const editor = createEditor({ document: doc() });
     const pick = vi.fn(() => () => true);

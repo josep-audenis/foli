@@ -2529,7 +2529,7 @@ agent's review.
 - [x] 17.2 (#169) Built-in dialogs by name: a `ToolbarDialog` whose `dialog` is `"link"`,
   `"picture"`, `"insertTable"`, `"pageSetup"`, `"crossReference"`, `"controlProperties"` or
   `"noteOptions"`.
-- [ ] 17.3 Any color: `colors.custom` adds an entry with the browser's color field to a color
+- [x] 17.3 (#170) Any color: `colors.custom` adds an entry with the browser's color field to a color
   menu.
 - [ ] 17.4 Overflow: `overflow="menu"` (default `"wrap"`, as today).
 - [ ] 17.5 Strings: `messages`, `toolbarMessages` (the list), the test that every string shown

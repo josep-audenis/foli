@@ -304,6 +304,11 @@ export interface ToolbarColorMenu extends ToolbarItemBase {
     readonly value: (state: EditorState) => string | null;
     /** What picking a color runs (null: the entry that removes it). */
     readonly pick: (color: string | null) => Command;
+    /**
+     * A last entry, "More colors…", that opens the browser's color field: `pick` then gets any
+     * `#rrggbb`. Default false: the palette only.
+     */
+    readonly custom?: boolean | undefined;
   };
   readonly command?: undefined;
   readonly actions?: undefined;
@@ -1471,6 +1476,9 @@ export function FoliToolbar({
   const pointer = useRef(false);
   // The open menu (a menu button's key), if any.
   const [menu, setMenu] = useState<string | null>(null);
+  // The color fields behind "More colors…" (by item key), and what the last one opened on.
+  const colorFields = useRef<Record<string, HTMLInputElement | null>>({});
+  const customColor = useRef<{ pointer: boolean; editor: Editor; state: EditorState } | null>(null);
   // Nor does it come back with its item, once that has left the toolbar.
   const menuGone = menu !== null && !items.some((item) => item.key === menu);
   useEffect(() => {
@@ -2019,6 +2027,47 @@ export function FoliToolbar({
                         setMenu(null);
                         if (refocus) buttons.current[i]?.focus();
                       }}
+                      onCustom={
+                        item.colors.custom
+                          ? (pointer) => {
+                              setMenu(null);
+                              // The entry goes with the menu: its button keeps the focus, also
+                              // when the user leaves the field without choosing.
+                              buttons.current[i]?.focus();
+                              const field = colorFields.current[item.key];
+                              if (!field) return;
+                              customColor.current = { pointer, editor, state: editor.state };
+                              // It opens on the color at the selection.
+                              field.value = state?.value ?? "#000000";
+                              try {
+                                field.showPicker();
+                              } catch {
+                                // No `showPicker` (older browsers), or it refused: a click opens it.
+                                field.click();
+                              }
+                            }
+                          : undefined
+                      }
+                    />
+                  )}
+                  {item.colors.custom && !disabled && (
+                    <ColorField
+                      setRef={(element) => {
+                        colorFields.current[item.key] = element;
+                      }}
+                      onPick={(color) => {
+                        const opened = customColor.current;
+                        // The color is for the selection the field opened on: a click in the
+                        // document that closed the field may have moved it since.
+                        if (
+                          opened?.editor === editor &&
+                          opened.state.doc === editor.state.doc &&
+                          !opened.state.selection.eq(editor.state.selection)
+                        )
+                          editor.dispatch(editor.state.tr.setSelection(opened.state.selection));
+                        editor.run(pick(color));
+                        if (opened?.pointer) onClickCommand?.();
+                      }}
                     />
                   )}
                 </span>
@@ -2222,12 +2271,15 @@ function ColorMenu({
   current,
   onPick,
   onClose,
+  onCustom,
 }: {
   label: string;
   options: readonly ToolbarColor[];
   current: string | null;
   onPick: (color: string | null, pointer: boolean) => void;
   onClose: (refocus: boolean) => void;
+  /** With it, a last entry that asks for any color. */
+  onCustom?: ((pointer: boolean) => void) | undefined;
 }) {
   const items = useRef<(HTMLButtonElement | null)[]>([]);
   const checked = Math.max(
@@ -2240,7 +2292,7 @@ function ColorMenu({
   }, []);
 
   const onKeyDown = (event: KeyboardEvent) => {
-    const count = options.length;
+    const count = options.length + (onCustom ? 1 : 0);
     const at = items.current.indexOf(event.target as HTMLButtonElement);
     const moves: Record<string, number> = {
       ArrowDown: (at + 1) % count,
@@ -2295,7 +2347,60 @@ function ColorMenu({
           {option.name}
         </button>
       ))}
+      {onCustom && (
+        <button
+          ref={(element) => {
+            items.current[options.length] = element;
+          }}
+          type="button"
+          role="menuitem"
+          aria-haspopup="dialog"
+          tabIndex={-1}
+          className="foli-menu-item foli-menu-custom"
+          onMouseDown={(event) => event.preventDefault()}
+          onClick={(event) => onCustom(event.detail > 0)}
+        >
+          More colors…
+        </button>
+      )}
     </div>
+  );
+}
+
+/**
+ * The browser's color field behind a color menu's "More colors…": not shown (the entry opens
+ * it), and heard on `change` (the color chosen), not while the user is still choosing.
+ */
+function ColorField({
+  setRef,
+  onPick,
+}: {
+  setRef: (element: HTMLInputElement | null) => void;
+  onPick: (color: string) => void;
+}) {
+  const field = useRef<HTMLInputElement | null>(null);
+  const pick = useRef(onPick);
+  pick.current = onPick;
+  useEffect(() => {
+    const element = field.current;
+    if (!element) return;
+    const onChange = () => pick.current(element.value.toLowerCase());
+    element.addEventListener("change", onChange);
+    return () => element.removeEventListener("change", onChange);
+  }, []);
+  return (
+    <input
+      ref={(element) => {
+        field.current = element;
+        setRef(element);
+      }}
+      type="color"
+      className="foli-toolbar-color-input"
+      // Only its picker is for people: the entry in the menu is what they find and use.
+      aria-hidden="true"
+      tabIndex={-1}
+      defaultValue="#000000"
+    />
   );
 }
 
