@@ -2522,8 +2522,8 @@ the API report; changesets (minor); released as 1.2.0 with the owner's approval.
 Each task is a PR on `phase-17/toolbar-developers`, the build green after each, merged after an
 agent's review.
 
-- [ ] Claim phase, branch `phase-17/toolbar-developers` (with 17.1)
-- [ ] 17.1 Tabs and groups: `tab` and `onTabChange` (controlled), `defaultTab`;
+- [x] Claim phase, branch `phase-17/toolbar-developers` (with 17.1)
+- [x] 17.1 Tabs and groups (also `toolbarProps` on `FoliEditor`, for these and the later props): `tab` and `onTabChange` (controlled), `defaultTab`;
   `ToolbarTab.visible(state, editor)`; a group as `{ label, items }` (`ToolbarGroup`), shown as
   a named `role="group"` with its caption.
 - [ ] 17.2 Built-in dialogs by name: a `ToolbarDialog` whose `dialog` is `"link"`,

@@ -591,6 +591,133 @@ describe("toolbar items", () => {
     screen.getByRole("button", { name: "Track changes" });
   });
 
+  it("lets the app say which tab shows, and tells it of a pick", () => {
+    const editor = createEditor({ document: doc() });
+    const tabs: ToolbarTab[] = [
+      { key: "edit", label: "Edit", items: [[toolbarItems.undo]] },
+      { key: "format", label: "Format", items: [[toolbarItems.bold]] },
+    ];
+    const onTabChange = vi.fn();
+    const selected = () =>
+      screen.getAllByRole("tab").find((t) => t.getAttribute("aria-selected") === "true")
+        ?.textContent;
+    // Not controlled: `defaultTab` at first, then what is picked.
+    const first = render(
+      <FoliToolbar editor={editor} tabs={tabs} defaultTab="format" onTabChange={onTabChange} />,
+    );
+    expect(selected()).toBe("Format");
+    fireEvent.click(screen.getByRole("tab", { name: "Edit" }), { detail: 1 });
+    expect(selected()).toBe("Edit");
+    expect(onTabChange).toHaveBeenLastCalledWith("edit");
+    first.unmount();
+
+    // Controlled: a pick only tells the app; the tab changes when `tab` does.
+    onTabChange.mockClear();
+    const view = (tab: string) => (
+      <FoliToolbar editor={editor} tabs={tabs} tab={tab} onTabChange={onTabChange} />
+    );
+    const { rerender } = render(view("format"));
+    expect(selected()).toBe("Format");
+    fireEvent.click(screen.getByRole("tab", { name: "Edit" }), { detail: 1 });
+    expect(onTabChange).toHaveBeenCalledExactlyOnceWith("edit");
+    expect(selected()).toBe("Format");
+    screen.getByRole("button", { name: "Bold" });
+    rerender(view("edit"));
+    expect(selected()).toBe("Edit");
+    screen.getByRole("button", { name: "Undo" });
+    // A key that is not a tab: the first one.
+    rerender(view("nope"));
+    expect(selected()).toBe("Edit");
+  });
+
+  it("shows a tab only while its `visible` says so; the first one when the selected one goes", () => {
+    const editor = createEditor({ document: doc() });
+    const onTabChange = vi.fn();
+    const tabs: ToolbarTab[] = [
+      { key: "edit", label: "Edit", items: [[toolbarItems.undo]] },
+      {
+        key: "selection",
+        label: "Selection",
+        items: [[clear]],
+        visible: (state) => !state.selection.empty,
+      },
+    ];
+    render(<FoliToolbar editor={editor} tabs={tabs} onTabChange={onTabChange} />);
+    const names = () => screen.getAllByRole("tab").map((t) => t.textContent);
+    expect(names()).toEqual(["Edit"]);
+    selectAll(editor);
+    // It comes, and is not selected for the user.
+    expect(names()).toEqual(["Edit", "Selection"]);
+    expect(screen.getByRole("tab", { name: "Edit" }).getAttribute("aria-selected")).toBe("true");
+    fireEvent.click(screen.getByRole("tab", { name: "Selection" }), { detail: 1 });
+    screen.getByRole("button", { name: "Clear" });
+    expect(onTabChange).toHaveBeenCalledExactlyOnceWith("selection");
+    // It goes with the selection: the first tab shows, and the app is not told of a pick.
+    act(() => editor.select(1, 1));
+    expect(names()).toEqual(["Edit"]);
+    screen.getByRole("button", { name: "Undo" });
+    expect(onTabChange).toHaveBeenCalledOnce();
+    // Back: the tab picked is still the one wanted.
+    selectAll(editor);
+    screen.getByRole("button", { name: "Clear" });
+  });
+
+  it("names a group with a caption; the arrow keys cross it", () => {
+    const editor = createEditor({ document: doc() });
+    const { container } = render(
+      <FoliToolbar
+        editor={editor}
+        items={[[toolbarItems.undo], { label: "Text", items: [toolbarItems.bold, clear] }, []]}
+      />,
+    );
+    const group = screen.getByRole("group", { name: "Text" });
+    expect(
+      within(group)
+        .getAllByRole("button")
+        .map((b) => b.textContent),
+    ).toEqual(["B", "Clear"]);
+    const caption = group.querySelector(".foli-toolbar-group-label") as HTMLElement;
+    expect(caption.textContent).toBe("Text");
+    expect(caption.getAttribute("aria-hidden")).toBe("true");
+    expect(container.querySelectorAll("hr")).toHaveLength(1);
+    const buttons = screen.getAllByRole("button");
+    expect(buttons.map((b) => b.tabIndex)).toEqual([0, -1, -1]);
+    fireEvent.keyDown(buttons[0] as HTMLElement, { key: "ArrowRight" });
+    expect(document.activeElement).toBe(buttons[1]);
+    fireEvent.keyDown(buttons[1] as HTMLElement, { key: "End" });
+    expect(document.activeElement).toBe(buttons[2]);
+  });
+
+  it("takes captioned groups and more of the toolbar's props through FoliEditor", () => {
+    const onTabChange = vi.fn();
+    const groups = render(
+      <FoliEditor
+        initialContent={doc()}
+        toolbar={[{ label: "History", items: [toolbarItems.undo] }]}
+        toolbarProps={{ label: "Tools", className: "mine" }}
+        label="Document"
+      />,
+    );
+    const bar = screen.getByRole("toolbar", { name: "Tools" });
+    expect(bar.className).toBe("foli-toolbar mine");
+    within(bar).getByRole("group", { name: "History" });
+    expect(screen.queryByRole("tablist")).toBeNull();
+    groups.unmount();
+
+    render(
+      <FoliEditor
+        initialContent={doc()}
+        toolbar={defaultToolbarTabs}
+        toolbarProps={{ tab: "review", onTabChange }}
+        label="Document"
+      />,
+    );
+    screen.getByRole("button", { name: "Track changes" });
+    fireEvent.click(screen.getByRole("tab", { name: "Home" }), { detail: 1 });
+    expect(onTabChange).toHaveBeenCalledExactlyOnceWith("home");
+    screen.getByRole("button", { name: "Track changes" });
+  });
+
   it("warns once about two items with one key, outside production", () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     const editor = createEditor({ document: doc() });
