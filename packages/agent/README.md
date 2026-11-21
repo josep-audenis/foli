@@ -6,7 +6,7 @@ Word. No DOM and no Node built-ins: runs in Node, browsers, workers and sandboxe
 dependency is `@folijs/core`, a peer at an exact version.
 
 > **Unstable (0.x).** Outside the 1.0 promise of the other packages: its API may change in any
-> 0.x release. Not released yet.
+> 0.x release. Changes in `CHANGELOG.md`. `npm install @folijs/agent @folijs/core`.
 
 ```ts
 import { openSession } from "@folijs/agent";

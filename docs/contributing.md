@@ -220,8 +220,9 @@ calling it flaky.
 version (a
 Changesets `fixed` group, [`.changeset/config.json`](../.changeset/config.json)); the
 playground, site, spike and examples are never published. `@folijs/agent` (Phase 13) is
-outside the group and versions on its own as 0.x, with `@folijs/core` as an exact peer; it is
-`private` until its first release, so Changesets neither versions nor publishes it.
+outside the group and versions on its own as 0.x, with `@folijs/core` as an exact peer: a
+release that bumps core bumps it too (a patch, by Changesets, as core's dependant), so that it
+asks for the new core.
 
 1. **With each change to a published package**, run `pnpm changeset`: pick the bump (before
    1.0: `minor` for breaking changes and features, `patch` for fixes; from 1.0 the rules of

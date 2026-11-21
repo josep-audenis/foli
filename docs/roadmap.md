@@ -2104,7 +2104,12 @@ Each task is a PR on `phase-13/agent`, the build green after each.
 - [ ] 13.8 Release: the changeset, `private` removed from the manifest, the package versioned
   0.1.0 with its changelog, its API page and changelog on the site; 0.1.0 published with the
   owner's approval. Its own PR, for the owner to merge; then the Release workflow. Phase 14
-  (`@folijs/mcp`) is not planned here: it starts with the owner.
+  (`@folijs/mcp`) is not planned here: it starts with the owner. (Prepared, not
+  merged: this PR removes `private`, applies the changeset (`pnpm changeset version`: 0.1.0
+  and `CHANGELOG.md`, the other packages untouched), and gives the site the package's API page
+  and changelog. The tarball holds `dist`, `src` without tests, README, changelog and licence,
+  with `@folijs/core` `1.0.0` as its exact peer; core's source is unchanged since that tag.
+  Merging it is the owner's approval of the version; the Release workflow then publishes.)
 
 ## After 1.0
 

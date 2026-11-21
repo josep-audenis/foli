@@ -7,7 +7,7 @@
 export type Entry =
   /** `title` in place of the file's first heading (a package README's is its package name). */
   | { md: string; title?: string }
-  | { api: "core" | "view" | "react" | "docx" | "pdf" }
+  | { api: "core" | "view" | "react" | "docx" | "pdf" | "agent" }
   | { changelog: true }
   | { example: string };
 
@@ -47,6 +47,7 @@ export const NAV: Group[] = [
       { api: "view" },
       { api: "docx" },
       { api: "pdf" },
+      { api: "agent" },
       { changelog: true },
     ],
   },
