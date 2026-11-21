@@ -9,25 +9,26 @@ leaves `main` green with a working playground.
 **Update this table in the same PR that starts, advances or finishes a phase.** It is the only
 place that says what is in progress; check it before starting work.
 
-| Phase                    | Status                   | Branch | Notes                                                                                                                |
-| ------------------------ | ------------------------ | ------ | -------------------------------------------------------------------------------------------------------------------- |
-| 0 Foundation             | ✅ Done                  | —      |                                                                                                                      |
-| 1 Architecture spike     | ✅ Done (G1 provisional) | —      | Merged in #1; ADR-0003 accepted provisionally; IME, dead-key and screen-reader checks open                           |
-| 2 Document model         | ✅ Done                  | —      | Merged in #2                                                                                                         |
-| 3 Transactions & history | ✅ Done                  | —      | Merged in #4; gate G2 passed                                                                                         |
-| 4 Editor view            | ✅ Done (G3 provisional) | —      | Merged in #8–#13; manual checks (4.6) deferred, open risks in ADR-0003                                               |
-| 5 Native pagination      | ✅ Done (G4 provisional) | —      | Merged in #15–#22; page-break manual checks open, risks in ADR-0003                                                  |
-| 6 React API & 0.1.0      | ✅ Done                  | —      | Merged in #23–#31; 0.1.0 on npm; manual checks shipped as known risks (ADR-0003)                                     |
-| 7 Rich content           | ✅ Done                  | —      | Merged in #33–#41; 0.2.0 on npm; list-document benchmark misses accepted (known limit)                               |
-| 8 Word model & DOCX      | ✅ Done                  | —      | Merged in #44–#61; 0.3.0 on npm (`@folijs/docx` first released); gate G5 passed                                      |
-| 9 Review                 | ✅ Done                  | —      | Merged in #63–#72; 0.4.0 on npm                                                                                      |
-| 10 Tables & images       | ✅ Done                  | —      | Merged in #73–#97 (#90, the landing page, went to main); 0.5.0 on npm; two misses accepted                           |
-| 11 Sections & templates  | ✅ Done                  | —      | Merged in #100–#118 (#106, #107, #110, #112 and #113, the site, went to main); 0.6.0 on npm; misses accepted         |
-| 12 Ecosystem & 1.0       | ✅ Done                  | —      | Merged in #120–#133; 1.0.0 on npm (2026-11-20); Phase 5 speed misses and manual checks accepted as 1.0 risks         |
-| 13 Agent library         | ✅ Done                  | —      | Merged in #138–#146; `@folijs/agent` 0.1.0 on npm (2026-11-21)                                                       |
-| 14 MCP server            | ✅ Done                  | —      | Merged in #148–#162; `@folijs/mcp` 0.1.0 on npm (2026-11-21); a model in a client of its own is not tried (see 14.8) |
-| 15 Toolbar               | ✅ Done                  | —      | Merged in #149–#160; 1.1.0 on npm (2026-11-21); the release's bench ran on a busy machine (see #160)                 |
-| 16 Code mode             | Ready                    | —      | Planned 2026-11-21: a `run` tool in `@folijs/mcp`, a script in a sandbox; nothing built                              |
+| Phase                     | Status                   | Branch                        | Notes                                                                                                                |
+| ------------------------- | ------------------------ | ----------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| 0 Foundation              | ✅ Done                  | —                             |                                                                                                                      |
+| 1 Architecture spike      | ✅ Done (G1 provisional) | —                             | Merged in #1; ADR-0003 accepted provisionally; IME, dead-key and screen-reader checks open                           |
+| 2 Document model          | ✅ Done                  | —                             | Merged in #2                                                                                                         |
+| 3 Transactions & history  | ✅ Done                  | —                             | Merged in #4; gate G2 passed                                                                                         |
+| 4 Editor view             | ✅ Done (G3 provisional) | —                             | Merged in #8–#13; manual checks (4.6) deferred, open risks in ADR-0003                                               |
+| 5 Native pagination       | ✅ Done (G4 provisional) | —                             | Merged in #15–#22; page-break manual checks open, risks in ADR-0003                                                  |
+| 6 React API & 0.1.0       | ✅ Done                  | —                             | Merged in #23–#31; 0.1.0 on npm; manual checks shipped as known risks (ADR-0003)                                     |
+| 7 Rich content            | ✅ Done                  | —                             | Merged in #33–#41; 0.2.0 on npm; list-document benchmark misses accepted (known limit)                               |
+| 8 Word model & DOCX       | ✅ Done                  | —                             | Merged in #44–#61; 0.3.0 on npm (`@folijs/docx` first released); gate G5 passed                                      |
+| 9 Review                  | ✅ Done                  | —                             | Merged in #63–#72; 0.4.0 on npm                                                                                      |
+| 10 Tables & images        | ✅ Done                  | —                             | Merged in #73–#97 (#90, the landing page, went to main); 0.5.0 on npm; two misses accepted                           |
+| 11 Sections & templates   | ✅ Done                  | —                             | Merged in #100–#118 (#106, #107, #110, #112 and #113, the site, went to main); 0.6.0 on npm; misses accepted         |
+| 12 Ecosystem & 1.0        | ✅ Done                  | —                             | Merged in #120–#133; 1.0.0 on npm (2026-11-20); Phase 5 speed misses and manual checks accepted as 1.0 risks         |
+| 13 Agent library          | ✅ Done                  | —                             | Merged in #138–#146; `@folijs/agent` 0.1.0 on npm (2026-11-21)                                                       |
+| 14 MCP server             | ✅ Done                  | —                             | Merged in #148–#162; `@folijs/mcp` 0.1.0 on npm (2026-11-21); a model in a client of its own is not tried (see 14.8) |
+| 15 Toolbar                | ✅ Done                  | —                             | Merged in #149–#160; 1.1.0 on npm (2026-11-21); the release's bench ran on a busy machine (see #160)                 |
+| 16 Code mode              | Ready                    | —                             | Planned 2026-11-21: a `run` tool in `@folijs/mcp`, a script in a sandbox; nothing built                              |
+| 17 Toolbar for developers | In progress              | `phase-17/toolbar-developers` | Planned 2026-11-21: what Phase 15 left a developer unable to do; independent of Phase 16                             |
 
 Status values: `Ready` (dependencies met, nobody on it) · `In progress` · `In review` (PR open) ·
 `✅ Done` (merged, acceptance criteria met) · `Blocked by …`.
@@ -88,25 +89,26 @@ Foli's engine is not credible until all five pass in Chromium, Firefox and WebKi
 
 ## Overview
 
-| Phase | Name                      | Outcome                                                       | Release      | Size |
-| ----- | ------------------------- | ------------------------------------------------------------- | ------------ | ---- |
-| 0     | Foundation                | Monorepo, docs, own schema v1, read-only view                 | —            | ✅   |
-| 1     | Architecture spike        | Two-page editable surface validated → ADR-0003                | —            | M    |
-| 2     | Document model            | Schema, immutable nodes, positions, slices, JSON              | —            | L    |
-| 3     | Transactions & history    | Steps, mapping, state, undo/redo, commands, headless editor   | —            | L    |
-| 4     | Editor view               | Editable DOM view: input, selection, IME, clipboard           | 0.0.x canary | XL   |
-| 5     | Native pagination         | Real pages, fragments, incremental reflow, print              | —            | XL   |
-| 6     | React API & first release | `FoliEditor`, hooks, toolbar, packaging                       | **0.1.0**    | M    |
-| 7     | Rich content              | Lists, links, alignment, color, highlight, rules              | 0.2.0        | L    |
-| 8     | Word model & DOCX         | Schema v3 (Word-shaped), styles, numbering, lossless DOCX     | 0.3.0        | XL   |
-| 9     | Review                    | Tracked changes and comments, Word-compatible                 | 0.4.0        | XL   |
-| 10    | Tables & images           | Word tables across pages, inline and floating images          | 0.5.0        | XL   |
-| 11    | Sections & templates      | Headers/footers, fields, content controls, notes, PDF         | 0.6.0        | L    |
-| 12    | Ecosystem & 1.0           | Extension API freeze, docs site, performance tracking         | **1.0.0**    | L    |
-| 13    | Agent library             | `@folijs/agent`: an LLM edits a document without positions    | agent 0.1.0  | M    |
-| 14    | MCP server                | `@folijs/mcp`: the agent library as tools for any MCP client  | mcp 0.1.0    | M    |
-| 16    | Code mode                 | `run` in `@folijs/mcp`: a script over the document, sandboxed | mcp 0.2.0    | M    |
-| —     | Optional                  | Real-time collaboration                                       | —            | —    |
+| Phase | Name                      | Outcome                                                                     | Release      | Size |
+| ----- | ------------------------- | --------------------------------------------------------------------------- | ------------ | ---- |
+| 0     | Foundation                | Monorepo, docs, own schema v1, read-only view                               | —            | ✅   |
+| 1     | Architecture spike        | Two-page editable surface validated → ADR-0003                              | —            | M    |
+| 2     | Document model            | Schema, immutable nodes, positions, slices, JSON                            | —            | L    |
+| 3     | Transactions & history    | Steps, mapping, state, undo/redo, commands, headless editor                 | —            | L    |
+| 4     | Editor view               | Editable DOM view: input, selection, IME, clipboard                         | 0.0.x canary | XL   |
+| 5     | Native pagination         | Real pages, fragments, incremental reflow, print                            | —            | XL   |
+| 6     | React API & first release | `FoliEditor`, hooks, toolbar, packaging                                     | **0.1.0**    | M    |
+| 7     | Rich content              | Lists, links, alignment, color, highlight, rules                            | 0.2.0        | L    |
+| 8     | Word model & DOCX         | Schema v3 (Word-shaped), styles, numbering, lossless DOCX                   | 0.3.0        | XL   |
+| 9     | Review                    | Tracked changes and comments, Word-compatible                               | 0.4.0        | XL   |
+| 10    | Tables & images           | Word tables across pages, inline and floating images                        | 0.5.0        | XL   |
+| 11    | Sections & templates      | Headers/footers, fields, content controls, notes, PDF                       | 0.6.0        | L    |
+| 12    | Ecosystem & 1.0           | Extension API freeze, docs site, performance tracking                       | **1.0.0**    | L    |
+| 13    | Agent library             | `@folijs/agent`: an LLM edits a document without positions                  | agent 0.1.0  | M    |
+| 14    | MCP server                | `@folijs/mcp`: the agent library as tools for any MCP client                | mcp 0.1.0    | M    |
+| 16    | Code mode                 | `run` in `@folijs/mcp`: a script over the document, sandboxed               | mcp 0.2.0    | M    |
+| 17    | Toolbar for developers    | Tabs an app controls, the built-in dialogs and strings open to it, overflow | 1.2.0        | M    |
+| —     | Optional                  | Real-time collaboration                                                     | —            | —    |
 
 ```
 P0 ─┬─► P1 spike ────────────────┐
@@ -2488,6 +2490,52 @@ review.
   opens the results. What it shows wrong in the description, fixed.
 - [ ] 16.7 Docs, the e2e in `pnpm check`, one run on Linux; then the changeset and 0.2.0,
   published with the owner's approval (the Release workflow).
+
+## Phase 17 — Toolbar for developers · M → 1.2.0
+
+What a developer still could not do with `FoliToolbar` after Phase 15 (1.1.0), asked for by the
+owner on 2026-11-21 ("maximum customization for developers"). All of it added to
+`@folijs/react`: a minor release, nothing of 1.1 removed or changed in what it does. Independent
+of Phase 16.
+
+Not in this phase: people changing the toolbar while they use the editor (an app does it over
+`items` and `tabs`; the owner left it out), translating `FoliNavigation` and `FoliComments`
+(the same way, later), changing what a built-in dialog contains (an app that wants another
+dialog writes its own, a `ToolbarDialog`).
+
+**Starts from (1.1.0):** tabs are uncontrolled and fixed; a group is an array without a name; a
+built-in dialog opens only from its own item or menu entry; the color menus offer a palette
+only; a toolbar wider than its place wraps; every built-in string is English in the source.
+
+**Acceptance:** an app says which tab shows and hears of a change (`tab`, `onTabChange`), and
+a tab can come and go with the selection (`visible`); a group can have a caption; an app's
+button opens a built-in dialog by name; a color menu can offer any color (the browser's color
+field) beside its palette; with `overflow="menu"` the groups that do not fit one row go into a
+More menu, reachable by the same arrow keys; every string the toolbar shows or announces
+(items, menu entries, dialogs, messages) can be replaced through `messages`, the list of them
+is exported and a test finds none outside it; tests for each (jsdom), e2e for overflow and one
+translated toolbar with axe; `api.md`, the extensions guide, `styling.md`, `limitations.md`,
+the API report; changesets (minor); released as 1.2.0 with the owner's approval.
+
+### Tasks
+
+Each task is a PR on `phase-17/toolbar-developers`, the build green after each, merged after an
+agent's review.
+
+- [ ] Claim phase, branch `phase-17/toolbar-developers` (with 17.1)
+- [ ] 17.1 Tabs and groups: `tab` and `onTabChange` (controlled), `defaultTab`;
+  `ToolbarTab.visible(state, editor)`; a group as `{ label, items }` (`ToolbarGroup`), shown as
+  a named `role="group"` with its caption.
+- [ ] 17.2 Built-in dialogs by name: a `ToolbarDialog` whose `dialog` is `"link"`,
+  `"picture"`, `"insertTable"`, `"pageSetup"`, `"crossReference"`, `"controlProperties"` or
+  `"noteOptions"`.
+- [ ] 17.3 Any color: `colors.custom` adds an entry with the browser's color field to a color
+  menu.
+- [ ] 17.4 Overflow: `overflow="menu"` (default `"wrap"`, as today).
+- [ ] 17.5 Strings: `messages`, `toolbarMessages` (the list), the test that every string shown
+  is in it.
+- [ ] 17.6 Docs checked against the acceptance above; 1.2.0 published with the owner's approval
+  (the Release workflow).
 
 ## After 1.0
 
