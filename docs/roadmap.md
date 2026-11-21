@@ -2244,7 +2244,7 @@ an agent's review.
 - [x] Claim phase, branch `phase-15/toolbar-customization` (with 15.1, #149)
 - [x] 15.1 (#149) Boxes and color menus: `ToolbarSelect` and `ToolbarColorMenu` public, the built-in
   ones typed so in `toolbarItems`, their options replaceable through a copy.
-- [ ] 15.2 Dialogs and controls: `ToolbarDialog` (the app's content in a dialog under the
+- [x] 15.2 Dialogs and controls: `ToolbarDialog` (the app's content in a dialog under the
   toolbar) and `ToolbarCustom` (`render`, with the props that keep the one tab stop).
 - [ ] 15.3 Tabs: `tabs` on `FoliToolbar`, `toolbar` of `FoliEditor` taking them; the playground
   shows them; e2e.

@@ -21,11 +21,14 @@ import {
   FoliEditorProvider,
   FoliToolbar,
   type ToolbarColorMenu,
+  type ToolbarCustom,
+  type ToolbarDialog,
   type ToolbarItem,
   type ToolbarItemName,
   type ToolbarSelect,
   toolbarItems,
   useCommand,
+  useEditorState,
 } from "./index.js";
 
 declare module "@folijs/core" {
@@ -327,6 +330,101 @@ describe("toolbar items", () => {
     expect(box.value).toBe("");
     fireEvent.change(box, { target: { value: "a" } });
     expect(pick).not.toHaveBeenCalled();
+  });
+
+  it("opens an app's dialog under the toolbar: focus in, Escape and close back out", () => {
+    const editor = createEditor({ document: doc() });
+    const onClickCommand = vi.fn();
+    const stamp: ToolbarDialog = {
+      key: "stamp",
+      label: "Stamp",
+      dialog: ({ editor, close }) => {
+        // A component's body: hooks work.
+        const [value, setValue] = useState("OK");
+        return (
+          <form
+            onSubmit={(event) => {
+              event.preventDefault();
+              close(editor.run(insertText(value)));
+            }}
+          >
+            <input aria-label="Text" value={value} onChange={(e) => setValue(e.target.value)} />
+            <button type="submit">Insert</button>
+          </form>
+        );
+      },
+    };
+    const view = (disabled = false) => (
+      <FoliToolbar
+        editor={editor}
+        items={[[stamp, toolbarItems.undo]]}
+        onClickCommand={onClickCommand}
+        disabled={disabled}
+      />
+    );
+    const { rerender } = render(view());
+    const button = screen.getByRole("button", { name: "Stamp" });
+    expect(button.getAttribute("aria-haspopup")).toBe("dialog");
+    expect(button.getAttribute("aria-disabled")).toBeNull();
+    act(() => button.focus());
+    fireEvent.click(button, { detail: 0 });
+    const dialog = screen.getByRole("dialog", { name: "Stamp" });
+    expect(dialog.className).toContain("foli-toolbar-stamp-dialog");
+    const field = screen.getByRole("textbox", { name: "Text" });
+    expect(document.activeElement).toBe(field);
+    fireEvent.keyDown(field, { key: "Escape" });
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(document.activeElement).toBe(button);
+
+    // Applied: the focus goes to the document (the app's `onClickCommand`).
+    fireEvent.click(button, { detail: 1 });
+    fireEvent.change(screen.getByRole("textbox", { name: "Text" }), { target: { value: "Hi " } });
+    fireEvent.click(screen.getByRole("button", { name: "Insert" }));
+    expect(text(editor)).toBe("Hi Hello");
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(onClickCommand).toHaveBeenCalledOnce();
+
+    // A disabled toolbar closes it, and it does not come back.
+    fireEvent.click(button, { detail: 1 });
+    screen.getByRole("dialog");
+    rerender(view(true));
+    expect(screen.queryByRole("dialog")).toBeNull();
+    rerender(view());
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("renders an app's own control in the toolbar's one tab stop", () => {
+    const editor = createEditor({ document: doc() });
+    const count: ToolbarCustom = {
+      key: "count",
+      label: "Characters",
+      enabled: (state) => !state.selection.empty,
+      render: ({ editor, disabled, ...props }) => {
+        const size = useEditorState((state) => state.doc.textContent.length, { editor });
+        return (
+          <input
+            {...props}
+            aria-label="Characters"
+            aria-disabled={disabled}
+            readOnly
+            value={size}
+          />
+        );
+      },
+    };
+    render(<FoliToolbar editor={editor} items={[[toolbarItems.undo, count]]} />);
+    const undoButton = screen.getByRole("button", { name: "Undo" });
+    const field = screen.getByRole("textbox", { name: "Characters" }) as HTMLInputElement;
+    expect(field.value).toBe("5");
+    expect(field.getAttribute("aria-disabled")).toBe("true");
+    expect([undoButton.tabIndex, field.tabIndex]).toEqual([0, -1]);
+    fireEvent.keyDown(undoButton, { key: "ArrowRight" });
+    expect(document.activeElement).toBe(field);
+    expect([undoButton.tabIndex, field.tabIndex]).toEqual([-1, 0]);
+    selectAll(editor);
+    expect(field.getAttribute("aria-disabled")).toBe("false");
+    act(() => editor.run(insertText("Hey")));
+    expect(field.value).toBe("3");
   });
 
   it("warns once about two items with one key, outside production", () => {
