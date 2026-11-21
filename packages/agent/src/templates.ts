@@ -6,22 +6,29 @@ import {
   controlValues,
   type FieldsReport,
   fieldsIn,
+  parseFieldInstruction,
   setControlValue,
   updateFields as updateFieldsOf,
 } from "@folijs/core";
 import { type Changed, type Context, changed } from "./operations.js";
+import { readBlocks } from "./read.js";
 import { type Refusal, type Result, refuse } from "./result.js";
 
 /** A content control of the body: a place a template leaves to be filled. */
 export interface Control {
-  /** What `fillControl` takes: its tag, or its title when it has no tag, or its id. */
+  /** Its own name in the document: what `fillControl` takes to fill this control and no other. */
+  id: string;
+  /**
+   * Its tag, or its title when it has no tag, or its id. `fillControl` takes it too; controls
+   * that share a tag are all filled by it.
+   */
   name: string;
   tag?: string;
   title?: string;
   kind: ControlValue["kind"];
   /**
-   * Text: the text. A list: the chosen item. A date: `yyyy-mm-dd`. A check box: whether it is
-   * checked. Null while it is empty, and for kinds that hold no value.
+   * Text: the text. A list: the chosen item. A date: `yyyy-mm-dd`, or the text typed. A check
+   * box: whether it is checked. Null while it is empty, and for kinds that hold no value.
    */
   value: string | boolean | null;
   /** It shows its placeholder: nothing was filled in yet. */
@@ -34,19 +41,29 @@ export interface Control {
   block: string;
 }
 
-const FILLABLE = new Set(["text", "richText", "dropDown", "comboBox", "date", "checkbox"]);
-
-interface Found {
-  control: Control;
+/** A control that was not filled, with why, when others of the same name were. */
+export interface Unfilled {
   id: string;
+  name: string;
+  code: Refusal["code"];
+  message: string;
 }
 
-/** The body's controls with what a model needs of each, in document order. */
-function found(context: Context): Found[] {
+const FILLABLE = new Set(["text", "richText", "dropDown", "comboBox", "date", "checkbox"]);
+
+/**
+ * The body's controls with what a model needs of each, in document order. Not those in a block
+ * that is not read (deleted as a tracked change): they are gone to the agent, as their block is.
+ */
+function found(context: Context): Control[] {
   const { editor, handles } = context;
   const doc = editor.state.doc;
-  const ranges = new Map(controlsIn(doc).map((range) => [range.id, range]));
-  const out: Found[] = [];
+  // A read first: handles are issued in the document's order, whatever is asked first.
+  const read = new Set(readBlocks(editor.state, handles).map((block) => block.handle));
+  const ranges = new Map<string, ReturnType<typeof controlsIn>[number]>();
+  // The first range of an id, as `controlValues` reports the first.
+  for (const range of controlsIn(doc)) if (!ranges.has(range.id)) ranges.set(range.id, range);
+  const out: Control[] = [];
   for (const value of controlValues(editor.state)) {
     const range = ranges.get(value.id);
     const properties = controlProperties(editor.state, value.id);
@@ -58,50 +75,83 @@ function found(context: Context): Found[] {
     const pos = depth > 0 ? $from.before(depth) : range.from;
     const node = doc.nodeAt(pos);
     if (!node) continue;
+    const block = handles.at(pos, node);
+    if (!read.has(block)) continue;
     const control: Control = {
-      name: value.tag ?? value.title ?? value.id,
+      id: value.id,
+      name: value.tag || value.title || value.id,
       kind: value.kind,
       value: value.value,
       empty: value.showingPlaceholder,
       readOnly: controlIsReadOnly(properties),
-      block: handles.at(pos, node),
+      block,
     };
-    if (value.tag !== undefined) control.tag = value.tag;
-    if (value.title !== undefined) control.title = value.title;
+    if (value.tag) control.tag = value.tag;
+    if (value.title) control.title = value.title;
     if (properties.items) control.items = properties.items.map((i) => i.display ?? i.value);
-    out.push({ control, id: value.id });
+    out.push(control);
   }
   return out;
 }
 
 /** @internal */
 export function controls(context: Context): Control[] {
-  return found(context).map((f) => f.control);
+  return found(context);
 }
 
 const same = (a: string | undefined, b: string) => a?.trim().toLowerCase() === b;
+const isDay = (text: string) => {
+  const day = new Date(`${text}T00:00:00Z`);
+  return !Number.isNaN(day.getTime()) && day.toISOString().slice(0, 10) === text;
+};
+
+/** Why `control` does not take `value`, known before trying; null when it may. */
+function unfit(control: Control, value: string | boolean | null): Refusal | null {
+  const label = JSON.stringify(control.name);
+  if (control.readOnly)
+    return refuse("read-only", `The control ${label} is locked: it cannot be filled.`);
+  if (!FILLABLE.has(control.kind))
+    return refuse(
+      "read-only",
+      `The control ${label} is a ${control.kind} control: it holds no value to fill.`,
+    );
+  if (control.kind === "checkbox")
+    return typeof value === "boolean"
+      ? null
+      : refuse("invalid", `The control ${label} is a check box: its value is true or false.`);
+  if (typeof value === "boolean")
+    return refuse("invalid", `The control ${label} takes text, not true or false.`);
+  if (control.kind === "dropDown" && value && !control.items?.includes(value))
+    return refuse(
+      "invalid",
+      `The control ${label} is a drop-down list: its value is one of ${(control.items ?? []).map((i) => JSON.stringify(i)).join(", ")}.`,
+    );
+  if (control.kind === "date" && value && /^\d{4}-\d{2}-\d{2}$/.test(value) && !isDay(value))
+    return refuse("invalid", `${JSON.stringify(value)} is not a day of the calendar.`);
+  return null;
+}
 
 /** @internal */
 export function fillControl(
   context: Context,
   name: string,
   value: string | boolean | null,
-): Result<Changed & { controls: Control[] }> {
+): Result<Changed & { controls: Control[]; unfilled: Unfilled[] }> {
   const { editor } = context;
   if (typeof name !== "string")
-    return refuse("invalid", "A content control is named by its tag or title, a string.");
+    return refuse("invalid", "A content control is named by its id, tag or title, a string.");
   if (value !== null && typeof value !== "string" && typeof value !== "boolean")
     return refuse("invalid", "A control's value is text, true or false, or null to empty it.");
   const all = found(context);
   const wanted = name.trim().toLowerCase();
-  // By tag first (several controls may share one: all are filled), then title, then id.
+  // Its id names one control; a tag every control that has it; then a title.
   const targets = [
-    all.filter((f) => same(f.control.tag, wanted)),
-    all.filter((f) => same(f.control.title, wanted)),
-    all.filter((f) => f.id.toLowerCase() === wanted),
+    all.filter((c) => c.id === name),
+    all.filter((c) => same(c.tag, wanted)),
+    all.filter((c) => same(c.title, wanted)),
   ].find((group) => group.length);
   if (!targets) {
-    const names = all.map((f) => f.control.name);
+    const names = all.map((c) => c.name);
     return refuse(
       "unknown-control",
       names.length
@@ -109,65 +159,48 @@ export function fillControl(
         : "The document has no content controls.",
     );
   }
-  let input: string | boolean | null = value;
   const filled: string[] = [];
-  let why: Refusal | undefined;
-  for (const { control, id } of targets) {
-    const label = JSON.stringify(control.name);
-    if (control.readOnly) {
-      why ??= refuse("read-only", `The control ${label} is locked: it cannot be filled.`);
-      continue;
-    }
-    if (!FILLABLE.has(control.kind)) {
-      why ??= refuse(
-        "read-only",
-        `The control ${label} is a ${control.kind} control: it holds no value to fill.`,
-      );
-      continue;
-    }
-    if (control.kind === "checkbox") {
-      if (input === "true" || input === "false") input = input === "true";
-      if (typeof input !== "boolean") {
-        why ??= refuse(
-          "invalid",
-          `The control ${label} is a check box: its value is true or false.`,
-        );
-        continue;
-      }
-    } else if (typeof input === "boolean") {
-      why ??= refuse("invalid", `The control ${label} takes text, not true or false.`);
-      continue;
-    }
-    if (editor.run(setControlValue(id, input))) {
-      filled.push(control.block);
-      continue;
-    }
-    why ??=
-      control.kind === "dropDown"
-        ? refuse(
-            "invalid",
-            `The control ${label} is a drop-down list: its value is one of ${(control.items ?? []).map((i) => JSON.stringify(i)).join(", ")}.`,
-          )
-        : control.kind === "date"
-          ? refuse("invalid", `The control ${label} is a date: its value is a date as yyyy-mm-dd.`)
-          : refuse("refused", `The control ${label} could not be filled.`);
+  const unfilled: Unfilled[] = [];
+  for (const control of targets) {
+    // "true" and "false" are a check box's values too; each control reads the value its way.
+    const input =
+      control.kind === "checkbox" && (value === "true" || value === "false")
+        ? value === "true"
+        : value;
+    const why =
+      unfit(control, input) ??
+      // The value it has: nothing to record.
+      (control.value === input || (control.empty && (input === null || input === ""))
+        ? null
+        : editor.run(setControlValue(control.id, input))
+          ? null
+          : refuse("refused", `The control ${JSON.stringify(control.name)} could not be filled.`));
+    if (why)
+      unfilled.push({ id: control.id, name: control.name, code: why.code, message: why.message });
+    else filled.push(control.block);
   }
-  if (!filled.length)
-    return why ?? refuse("refused", `The control ${JSON.stringify(name)} could not be filled.`);
+  const first = unfilled[0];
+  if (!filled.length && first) return refuse(first.code, first.message);
   const ids = new Set(targets.map((t) => t.id));
+  const result = changed(context, filled);
+  if (unfilled.length) result.text += `\nNot filled: ${unfilled.map((u) => u.message).join(" ")}`;
   return {
     ok: true,
-    ...changed(context, filled),
-    controls: found(context)
-      .filter((f) => ids.has(f.id))
-      .map((f) => f.control),
+    ...result,
+    controls: found(context).filter((c) => ids.has(c.id)),
+    unfilled,
   };
 }
 
 export interface UpdateFieldsOptions {
-  /** Values for the document's merge fields (`«Name»` in a read), by field name. */
-  data?: Readonly<Record<string, unknown>>;
+  /**
+   * Values for the document's merge fields (`«Name»` in a read), by field name, capitals not
+   * counting: text, numbers, true or false, dates.
+   */
+  data?: Readonly<Record<string, string | number | boolean | Date | null>>;
 }
+
+const count = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 
 /** @internal */
 export function updateFields(
@@ -177,24 +210,34 @@ export function updateFields(
   const given = options?.data;
   if (given !== undefined && (given === null || typeof given !== "object" || Array.isArray(given)))
     return refuse("invalid", "data must be an object: merge field names with their values.");
+  for (const [key, value] of Object.entries(given ?? {}))
+    if (value !== null && !(value instanceof Date) && typeof value === "object")
+      return refuse("invalid", `data.${key} must be text, a number, true or false, or a date.`);
   const report = updateFieldsOf(context.editor, given ? { data: given } : {});
-  const skipped = report.skipped.map(
-    (s) => `${s.instruction.trim()} (${s.reason}${s.detail ? `: ${s.detail}` : ""})`,
-  );
-  // Merge fields are left alone without data for them, and not reported: name them.
-  const data = given ?? {};
-  const unfilled = new Set<string>();
-  for (const field of fieldsIn(context.editor.state.doc)) {
-    const name = /^\s*MERGEFIELD\s+("[^"]*"|\S+)/i
-      .exec(field.instruction)?.[1]
-      ?.replaceAll('"', "");
-    if (name && !Object.hasOwn(data, name)) unfilled.add(name);
-  }
-  const changed = report.updated + report.rebuilt;
+
+  // What was left, said for a model: by reason, the body's only (the session reads no other).
+  const body = report.skipped.filter((s) => s.story === null);
+  const pages = body.filter((s) => s.reason === "no-layout").length;
+  const noData = new Set(body.filter((s) => s.reason === "no-data").map((s) => s.detail ?? ""));
+  // Without data core leaves merge fields alone and does not report them: name them.
+  if (!given)
+    for (const field of fieldsIn(context.editor.state.doc)) {
+      const { name, args } = parseFieldInstruction(field.instruction);
+      if (name.toUpperCase() === "MERGEFIELD" && args[0]) noData.add(args[0]);
+    }
+  noData.delete("");
+  const others = body
+    .filter((s) => s.reason !== "no-layout" && s.reason !== "no-data")
+    .map((s) => `${s.instruction.trim()} (${s.reason}${s.detail ? `: ${s.detail}` : ""})`);
+  const done = report.updated + report.rebuilt;
   const text = [
-    `${changed} field${changed === 1 ? "" : "s"} updated, ${report.unchanged} unchanged.`,
-    ...(skipped.length ? [`Left as they were: ${skipped.join("; ")}.`] : []),
-    ...(unfilled.size ? [`Merge fields without data: ${[...unfilled].join(", ")}.`] : []),
+    `${count(done, "field")} updated, ${report.unchanged} unchanged.`,
+    ...(noData.size ? [`Merge fields without data: ${[...noData].join(", ")}.`] : []),
+    ...(pages
+      ? [`${count(pages, "page number")} left: they need a page layout the session does not have.`]
+      : []),
+    ...(others.length ? [`Left as they were: ${others.join("; ")}.`] : []),
+    ...(done ? ["Read again to see the text."] : []),
   ].join(" ");
   return { ok: true, ...report, text };
 }

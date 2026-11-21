@@ -2031,7 +2031,13 @@ Each task is a PR on `phase-13/agent`, the build green after each.
   (`«Name»` in a read); the result counts what changed and names the merge fields left without
   data and the fields skipped with why (page numbers need a layout the session does not have).
   All tracked. Size 72.0 kB gzip with core (field updates are most of the growth), budget
-  75.7 kB.)
+  75.7 kB. From the review of #142: a control has its `id`, which `fillControl` matches before
+  tags, so a control without a tag, or one of several sharing a tag, can be filled alone;
+  controls sharing a name that do not all take the value give `unfilled` with why, and each
+  reads "true" its own way; a control in a block deleted as a tracked change is not listed;
+  a value the control has records nothing; a day that does not exist is refused, other text in
+  a date control is kept as typed; merge fields without data are named once, by core's own
+  matching (capitals not counting); page numbers left are said in words.)
 - [ ] 13.6 The three tasks and the tracking check: tests that import a corpus `.docx`, run the
   calls a model would make, export, and import again; `rejectAllChanges(author)` compared with
   the input for each; the results opened in Word by the harness. Fix what they find in the

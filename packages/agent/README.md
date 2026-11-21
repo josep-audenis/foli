@@ -99,8 +99,8 @@ control as `[empty: Offer date]` and a merge field as `«CandidateFirstName»`.
 
 ```ts
 session.controls();
-// [{ name: "offer_date", title: "Offer date", kind: "date", value: null, empty: true,
-//    readOnly: false, block: "b2" },
+// [{ id: "/word/document.xml#0", name: "offer_date", title: "Offer date", kind: "date",
+//    value: null, empty: true, readOnly: false, block: "b2" },
 //  { name: "position", kind: "dropDown", items: ["Data Engineer", "Senior Data Engineer"], … }]
 session.fillControl("offer_date", "2026-12-01");
 session.fillControl("position", "Senior Data Engineer");
@@ -109,15 +109,17 @@ session.updateFields({ data: { CandidateFirstName: "Ada" } });
 ```
 
 - **`controls()`**: the body's content controls with their values, and the handle of the block
-  each is in.
-- **`fillControl(name, value)`**: by the control's tag (every control that has it), else its
-  title, else its id. Text for a text control, one of its items for a list, `yyyy-mm-dd` for a
-  date, true or false for a check box; `null` empties it. A wrong value is refused with what
-  would work (a list's items); a locked control as `read-only`.
+  each is in. Not those in a block deleted as a tracked change.
+- **`fillControl(name, value)`**: the control with that `id`, else every control with that tag,
+  else with that title. Text for a text control, one of its items for a drop-down list, a day
+  as `yyyy-mm-dd` for a date (any other text is kept as typed, as Word does), true or false for
+  a check box; `null` empties it. Refused with what would work: the controls there are, a
+  list's items, `read-only` for a locked control. When controls share the name and only some
+  take the value, the result is ok and `unfilled` says which did not and why.
 - **`updateFields({ data })`**: updates the document's fields (dates, cross-references, a table
-  of contents) and fills its merge fields from `data`. The result says what was left as it
-  was: merge fields without data, and page numbers, which need a page layout the session does
-  not have.
+  of contents) and fills its merge fields from `data`, by name, capitals not counting. `text`
+  says what was left as it was: merge fields without data, and page numbers, which need a page
+  layout the session does not have. It returns no blocks: read again.
 
 ## Limits
 

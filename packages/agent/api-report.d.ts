@@ -8,7 +8,7 @@ export type { Changed, CommentOptions, NewParagraph, ReplaceOptions } from "./op
 export { type Block, formatBlocks } from "./read.js";
 export type { Ok, Refusal, Result } from "./result.js";
 export { openSession, type ReadOptions, type ReadResult, type Session, type SessionOptions, } from "./session.js";
-export type { Control, UpdateFieldsOptions } from "./templates.js";
+export type { Control, Unfilled, UpdateFieldsOptions } from "./templates.js";
 
 // operations.d.ts
 import { type Block } from "./read.js";
@@ -99,7 +99,7 @@ import { type Editor, type EditorDocument, type Extension, type FieldsReport, ty
 import { type Changed, type CommentOptions, type NewParagraph, type ReplaceOptions } from "./operations.js";
 import { type Block } from "./read.js";
 import { type Result } from "./result.js";
-import { type Control, type UpdateFieldsOptions } from "./templates.js";
+import { type Control, type Unfilled, type UpdateFieldsOptions } from "./templates.js";
 export interface SessionOptions {
     /** Whose tracked changes and comments the session's edits are. */
     author: string;
@@ -186,13 +186,15 @@ export interface Session {
     /** The body's content controls: what a template leaves to be filled, with their values. */
     controls(): Control[];
     /**
-     * Fills the content control named by its tag (every control with that tag), else its title,
-     * else its id. Text for a text control, an item for a list, `yyyy-mm-dd` for a date, true or
-     * false for a check box; null or "" empties it. A tracked change. Returns the blocks changed
-     * and the controls as they are now.
+     * Fills a content control: the one with this id, else every control with this tag, else with
+     * this title. Text for a text control (line breaks only where the control takes them), an
+     * item for a list, `yyyy-mm-dd` or any text for a date, true or false for a check box; null
+     * or "" empties it. A tracked change. Returns the blocks changed, the controls as they are
+     * now, and `unfilled`: those of the name that did not take the value, each with why.
      */
     fillControl(name: string, value: string | boolean | null): Result<Changed & {
         controls: Control[];
+        unfilled: Unfilled[];
     }>;
     /**
      * Updates the document's fields (dates, cross-references, tables of contents; page numbers
@@ -211,16 +213,22 @@ export declare function openSession(document: EditorDocument, options: SessionOp
 
 // templates.d.ts
 import { type ControlValue } from "@folijs/core";
+import { type Refusal } from "./result.js";
 /** A content control of the body: a place a template leaves to be filled. */
 export interface Control {
-    /** What `fillControl` takes: its tag, or its title when it has no tag, or its id. */
+    /** Its own name in the document: what `fillControl` takes to fill this control and no other. */
+    id: string;
+    /**
+     * Its tag, or its title when it has no tag, or its id. `fillControl` takes it too; controls
+     * that share a tag are all filled by it.
+     */
     name: string;
     tag?: string;
     title?: string;
     kind: ControlValue["kind"];
     /**
-     * Text: the text. A list: the chosen item. A date: `yyyy-mm-dd`. A check box: whether it is
-     * checked. Null while it is empty, and for kinds that hold no value.
+     * Text: the text. A list: the chosen item. A date: `yyyy-mm-dd`, or the text typed. A check
+     * box: whether it is checked. Null while it is empty, and for kinds that hold no value.
      */
     value: string | boolean | null;
     /** It shows its placeholder: nothing was filled in yet. */
@@ -232,7 +240,17 @@ export interface Control {
     /** The handle of the block it is in (the first, when it holds several). */
     block: string;
 }
+/** A control that was not filled, with why, when others of the same name were. */
+export interface Unfilled {
+    id: string;
+    name: string;
+    code: Refusal["code"];
+    message: string;
+}
 export interface UpdateFieldsOptions {
-    /** Values for the document's merge fields (`«Name»` in a read), by field name. */
-    data?: Readonly<Record<string, unknown>>;
+    /**
+     * Values for the document's merge fields (`«Name»` in a read), by field name, capitals not
+     * counting: text, numbers, true or false, dates.
+     */
+    data?: Readonly<Record<string, string | number | boolean | Date | null>>;
 }

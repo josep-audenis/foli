@@ -8,4 +8,4 @@ export {
   type Session,
   type SessionOptions,
 } from "./session.js";
-export type { Control, UpdateFieldsOptions } from "./templates.js";
+export type { Control, Unfilled, UpdateFieldsOptions } from "./templates.js";

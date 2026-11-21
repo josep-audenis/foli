@@ -28,6 +28,7 @@ import {
   type Control,
   controls,
   fillControl,
+  type Unfilled,
   type UpdateFieldsOptions,
   updateFields,
 } from "./templates.js";
@@ -120,15 +121,16 @@ export interface Session {
   /** The body's content controls: what a template leaves to be filled, with their values. */
   controls(): Control[];
   /**
-   * Fills the content control named by its tag (every control with that tag), else its title,
-   * else its id. Text for a text control, an item for a list, `yyyy-mm-dd` for a date, true or
-   * false for a check box; null or "" empties it. A tracked change. Returns the blocks changed
-   * and the controls as they are now.
+   * Fills a content control: the one with this id, else every control with this tag, else with
+   * this title. Text for a text control (line breaks only where the control takes them), an
+   * item for a list, `yyyy-mm-dd` or any text for a date, true or false for a check box; null
+   * or "" empties it. A tracked change. Returns the blocks changed, the controls as they are
+   * now, and `unfilled`: those of the name that did not take the value, each with why.
    */
   fillControl(
     name: string,
     value: string | boolean | null,
-  ): Result<Changed & { controls: Control[] }>;
+  ): Result<Changed & { controls: Control[]; unfilled: Unfilled[] }>;
   /**
    * Updates the document's fields (dates, cross-references, tables of contents; page numbers
    * need a layout and are left), and fills its merge fields from `data`. A tracked change.

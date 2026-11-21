@@ -14,7 +14,9 @@ const lines = (session: Session) => {
 describe("controls", () => {
   it("lists the body's content controls with their values and where they are", async () => {
     const session = await open();
-    expect(session.controls()).toEqual([
+    // Asked before any read: the handles are still the document's, in its order.
+    const controls = session.controls();
+    expect(controls.map(({ id: _id, ...rest }) => rest)).toEqual([
       {
         name: "offer_date",
         tag: "offer_date",
@@ -23,7 +25,7 @@ describe("controls", () => {
         value: null,
         empty: true,
         readOnly: false,
-        block: "b1",
+        block: "b2",
       },
       {
         name: "position",
@@ -34,7 +36,7 @@ describe("controls", () => {
         empty: true,
         items: ["Data Engineer", "Senior Data Engineer", "Engineering Manager"],
         readOnly: false,
-        block: "b2",
+        block: "b5",
       },
       {
         name: "salary",
@@ -44,7 +46,7 @@ describe("controls", () => {
         value: null,
         empty: true,
         readOnly: false,
-        block: "b3",
+        block: "b6",
       },
       {
         name: "remote",
@@ -54,7 +56,7 @@ describe("controls", () => {
         value: false,
         empty: false,
         readOnly: false,
-        block: "b4",
+        block: "b8",
       },
       {
         name: "benefits",
@@ -64,12 +66,13 @@ describe("controls", () => {
         value: "Private health insurance; 25 days' annual leave; pension contribution of 5%.",
         empty: false,
         readOnly: false,
-        block: "b5",
+        block: "b10",
       },
     ]);
+    expect(new Set(controls.map((c) => c.id)).size).toBe(5);
     // The same handles a read gives those blocks.
     const read = session.read();
-    expect(read.ok && read.blocks.find((b) => b.handle === "b1")?.text).toBe(
+    expect(read.ok && read.blocks.find((b) => b.handle === "b2")?.text).toBe(
       "Date: [empty: Offer date]",
     );
     expect((await open("01-mutual-nda")).controls()).toEqual([]);
@@ -140,17 +143,21 @@ describe("fillControl", () => {
     const item = session.fillControl("position", "Chief Engineer");
     expect(item).toMatchObject({ ok: false, code: "invalid" });
     expect(!item.ok && item.message).toContain('"Senior Data Engineer"');
+    // A date control takes a day, or any text typed, as in Word; not a day that does not exist.
+    expect(session.fillControl("offer_date", "2026-02-30")).toMatchObject({
+      ok: false,
+      code: "invalid",
+    });
     expect(session.fillControl("offer_date", "next Tuesday")).toMatchObject({
       ok: true,
-      controls: [{ empty: false }],
+      controls: [{ value: "next Tuesday", empty: false }],
     });
     expect(session.fillControl("remote", "yes")).toMatchObject({ ok: false, code: "invalid" });
     expect(session.fillControl("remote", "true")).toMatchObject({ ok: true });
     expect(session.fillControl("salary", true)).toMatchObject({ ok: false, code: "invalid" });
     expect(session.fillControl(5 as never, "x")).toMatchObject({ ok: false, code: "invalid" });
     expect(session.fillControl("salary", 5 as never)).toMatchObject({ code: "invalid" });
-    expect(session.updateFields({ data: [] as never })).toMatchObject({ code: "invalid" });
-    expect(session.updateFields(null as never)).toMatchObject({ ok: true });
+
     expect((await open("01-mutual-nda")).fillControl("x", "y")).toMatchObject({
       code: "unknown-control",
       message: "The document has no content controls.",
@@ -172,6 +179,111 @@ describe("fillControl", () => {
     const session = openSession(locked as typeof document, { author: "Agent" });
     expect(session.controls().find((c) => c.name === "salary")?.readOnly).toBe(true);
     expect(session.fillControl("salary", "1")).toMatchObject({ ok: false, code: "read-only" });
+  });
+});
+
+describe("what the review of #142 found", () => {
+  /** The template with its controls' properties changed. */
+  const patched = async (
+    change: (control: Record<string, unknown>, tag: string) => Record<string, unknown>,
+  ) => {
+    const { document } = await corpus("03-offer-letter-template");
+    const controls = Object.fromEntries(
+      Object.entries(document.controls ?? {}).map(([id, control]) => [
+        id,
+        change({ ...control }, control.tag ?? ""),
+      ]),
+    );
+    return openSession({ ...document, controls } as unknown as typeof document, {
+      author: "Agent",
+    });
+  };
+
+  it("fills one control by its id when a name would fill another, or several", async () => {
+    // "Salary" is one control's title and another's tag.
+    const session = await patched((control, tag) => {
+      if (tag === "salary") {
+        const { tag: _tag, ...untagged } = control;
+        return untagged;
+      }
+      if (tag === "benefits") return { ...control, tag: "salary" };
+      return control;
+    });
+    const [untagged, tagged] = session.controls().filter((c) => /salary/i.test(c.name));
+    expect(untagged).toMatchObject({ name: "Salary", kind: "text" });
+    expect(tagged).toMatchObject({ name: "salary", kind: "richText" });
+    // By name the tag wins; by id each is filled alone.
+    expect(session.fillControl("Salary", "by name")).toMatchObject({
+      controls: [{ id: tagged?.id }],
+    });
+    expect(session.fillControl(untagged?.id as string, "by id")).toMatchObject({
+      ok: true,
+      controls: [{ id: untagged?.id, value: "by id" }],
+    });
+    expect(session.controls().map((c) => c.value)).toEqual(
+      expect.arrayContaining(["by name", "by id"]),
+    );
+  });
+
+  it("says which controls of a shared tag were not filled, each reading the value its own way", async () => {
+    const shared = await patched((control, tag) =>
+      ["position", "salary", "remote"].includes(tag) ? { ...control, tag: "x" } : control,
+    );
+    const text = shared.fillControl("x", "Hello");
+    expect(text).toMatchObject({ ok: true, controls: [{}, { value: "Hello" }, {}] });
+    expect(text.ok && text.unfilled.map((u) => u.code)).toEqual(["invalid", "invalid"]);
+    expect(text.ok && text.text).toContain("Not filled:");
+    expect(text.ok && text.text).toContain("drop-down list");
+    // "true" checks the box and is text to the text control, whichever comes first.
+    const mixed = shared.fillControl("x", "true");
+    expect(mixed.ok && mixed.controls.map((c) => c.value)).toEqual([null, "true", true]);
+    expect(mixed.ok && mixed.unfilled).toHaveLength(1);
+  });
+
+  it("does not list, or fill, a control in a block deleted as a tracked change", async () => {
+    const session = openSession((await corpus("03-offer-letter-template")).document, {
+      author: "Agent",
+    });
+    const salary = session.controls().find((c) => c.name === "salary");
+    expect(session.deleteBlock(salary?.block as string)).toMatchObject({ ok: true });
+    expect(session.controls().map((c) => c.name)).not.toContain("salary");
+    expect(session.fillControl("salary", "5")).toMatchObject({ code: "unknown-control" });
+    expect(session.block(salary?.block as string)).toMatchObject({ code: "gone" });
+  });
+
+  it("records nothing when a control has the value already", async () => {
+    const session = openSession((await corpus("03-offer-letter-template")).document, {
+      author: "Agent",
+    });
+    expect(session.fillControl("remote", false)).toMatchObject({ ok: true, unfilled: [] });
+    expect(session.fillControl("salary", null)).toMatchObject({ ok: true });
+    expect(trackedChanges(session.editor.state.doc)).toHaveLength(0);
+  });
+
+  it("names the merge fields without data once, whatever the capitals of the data", async () => {
+    const session = openSession((await corpus("03-offer-letter-template")).document, {
+      author: "Agent",
+    });
+    const result = session.updateFields({ data: { candidatefirstname: "Ada" } });
+    expect(result).toMatchObject({ ok: true, updated: 1 });
+    const said = result.ok ? result.text : "";
+    expect(said).toContain("Merge fields without data: StartDate.");
+    expect(said).not.toContain("CandidateFirstName");
+    expect(said.match(/StartDate/g)).toHaveLength(1);
+    expect(session.updateFields({ data: [] as never })).toMatchObject({ code: "invalid" });
+    expect(session.updateFields({ data: { StartDate: { a: 1 } as never } })).toMatchObject({
+      code: "invalid",
+    });
+    expect(session.updateFields(null as never)).toMatchObject({ ok: true });
+  });
+
+  it("says in words that page numbers need a layout", async () => {
+    const session = openSession((await corpus("04-board-report")).document, { author: "Agent" });
+    const result = session.updateFields();
+    expect(result.ok && result.text).toMatch(
+      /\d+ page numbers left: they need a page layout the session does not have\./,
+    );
+    expect(result.ok && result.text).not.toContain("no-layout");
   });
 });
 
