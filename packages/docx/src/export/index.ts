@@ -17,7 +17,7 @@ import {
 } from "@folijs/core";
 import { customToWord } from "../custom.js";
 import { controlsUsed, packageStories } from "../import/index.js";
-import { child, isW, REL, W } from "../import/ooxml.js";
+import { child, isW, R, REL, W } from "../import/ooxml.js";
 import { noteIds } from "../import/stories.js";
 import { DocxError, type DocxPackage, type NewPart } from "../package.js";
 import { newSettingsXml, withSettings, withTrackRevisions } from "../settings.js";
@@ -42,6 +42,7 @@ import {
   type Namespaces,
   NEW_ROOT_ATTRIBUTES,
   namespacesOf,
+  scoped,
 } from "./xmlout.js";
 
 const CT = {
@@ -132,20 +133,26 @@ class Relationships {
     return id;
   }
 
-  /** The relationships part with the added ones (`original` its text, if it exists). */
-  xml(original: string | undefined): string {
+  /** The relationships part with the added ones (`original` the part, if it exists). */
+  xml(original: OriginalPart | undefined): string {
+    // Its elements are named as its root is (`<rel:Relationships>`).
+    const prefix = original?.root.prefix ? `${original.root.prefix}:` : "";
     const entries = this.added
       .map(
         (r) =>
-          `<Relationship Id="${r.id}" Type="${escapeAttribute(r.type)}" Target="${escapeAttribute(r.target)}"${r.external ? ' TargetMode="External"' : ""}/>`,
+          `<${prefix}Relationship Id="${r.id}" Type="${escapeAttribute(r.type)}" Target="${escapeAttribute(r.target)}"${r.external ? ' TargetMode="External"' : ""}/>`,
       )
       .join("");
     if (original === undefined) {
       return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\r\n<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${entries}</Relationships>`;
     }
-    const close = original.lastIndexOf("</Relationships>");
-    if (close === -1) return original.replace(/\/>\s*$/, `>${entries}</Relationships>`);
-    return original.slice(0, close) + entries + original.slice(close);
+    const { root, source } = original;
+    return wrapPart(
+      original,
+      root.name,
+      DEFAULT_NAMESPACES,
+      source.slice(root.openEnd, root.closeStart) + entries,
+    );
   }
 }
 
@@ -399,22 +406,42 @@ async function intoPackage(
   const main = pkg.xml(mainName);
   const body = child(main.root, "body");
   if (!body) throw new DocxError(`${mainName}: no w:body`);
-  const namespaces = namespacesOf(main.root, main.source);
+  // Content is written with `w:` and `r:`: where the part does not declare one (WordprocessingML
+  // under another prefix, or as the default namespace), the body's start tag does.
+  const declares = (el: XmlElement) =>
+    Object.fromEntries(
+      el.attributes
+        .filter((a) => a.name === "xmlns" || a.prefix === "xmlns")
+        .map((a) => [a.name, a.value]),
+    );
+  const declared: Record<string, string> = { ...declares(main.root), ...declares(body) };
+  if ((declared["xmlns:w"] ?? W) !== W)
+    throw new DocxError(`${mainName}: its w: prefix is not WordprocessingML`);
+  const missing = Object.entries({ "xmlns:w": W, "xmlns:r": R }).filter(
+    ([name]) => !Object.hasOwn(declared, name),
+  );
+  const namespaces = scoped(
+    scoped(namespacesOf(main.root, main.source), declares(body)),
+    Object.fromEntries(missing),
+  );
   const rels = new Relationships(pkg.relationships(mainName));
   const context = contextFor(namespaces, rels, media, mainName);
 
   const content = blocksXml(doc.content.content ?? [], context) + bodySection(doc, namespaces);
-  const documentXml =
-    body.openEnd === body.end
-      ? `${main.source.slice(0, body.start)}<${body.name}>${content}</${body.name}>${main.source.slice(body.end)}`
-      : main.source.slice(0, body.openEnd) + content + main.source.slice(body.closeStart);
+  const added = missing
+    .filter(([name]) => name === "xmlns:w" || /\sr:[\w.-]+\s*=/.test(content))
+    .map(([name, uri]) => ` ${name}="${uri}"`)
+    .join("");
+  const empty = body.openEnd === body.end;
+  const open = main.source.slice(0, empty ? body.end - 2 : body.openEnd - 1);
+  const documentXml = `${open}${added}>${content}${empty ? `</${body.name}>${main.source.slice(body.end)}` : main.source.slice(body.closeStart)}`;
 
   const replace = new Map<string, Uint8Array>();
   const add: NewPart[] = [];
   const set = (name: string, text: string) => {
     if (pkg.text(name) !== text) replace.set(name, encoder.encode(utf8Declaration(text)));
   };
-  set(mainName, documentXml);
+  set(mainName, documentXml === main.source ? documentXml : checkedPart(mainName, documentXml));
 
   /** The main document's related part of `type`, or a new one at `defaultName`. */
   const part = (
@@ -583,7 +610,7 @@ async function intoPackage(
 
   function writeRelationships(source: string, relationships: Relationships): void {
     const relsName = relationshipsPartName(source);
-    if (pkg.part(relsName)) set(relsName, relationships.xml(pkg.text(relsName)));
+    if (pkg.part(relsName)) set(relsName, relationships.xml(pkg.xml(relsName)));
     else
       add.push({
         name: relsName,

@@ -387,7 +387,8 @@ export function formatNumber(n: number, format: string | undefined): string {
 /** Word's `chicago` marks: `*`, `†`, `‡`, `§`, then the same doubled, tripled... */
 function chicago(n: number): string {
   const marks = ["*", "†", "‡", "§"];
-  if (n < 1) return String(n);
+  // shortcut: past 120 (30 marks) the number is written in digits, as `letters` bounds its string.
+  if (n < 1 || n > 120) return String(n);
   return (marks[(n - 1) % 4] as string).repeat(Math.ceil(n / 4));
 }
 

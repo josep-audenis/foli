@@ -336,12 +336,11 @@ function resolve(
             tr.setNodeMarkup(start, node.type, { ...node.attrs, revision: next, section: null });
         }
         if (joining) joins.push({ pos: end, keepFirst: accept && !emptied });
-        // Nothing to join with (a table follows, or a cell ends): an inserted paragraph left
-        // empty goes whole when rejected (Word's rules are restored after: `keepTablesApart`).
-        // (Never a cell's only paragraph: a cell ends with one.)
+        // Nothing to join with (a table follows, or a cell ends): a paragraph left empty goes
+        // whole, inserted and rejected or deleted and accepted (Word's rules are restored after:
+        // `keepTablesApart`). (Never a cell's only paragraph: a cell ends with one.)
         else if (
           goes &&
-          !accept &&
           (!node.content.size || emptied) &&
           tr.doc.resolve(start).parent.childCount > 1
         ) {

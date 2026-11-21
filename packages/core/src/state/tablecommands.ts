@@ -128,6 +128,15 @@ function rowPos(table: Node, pos: number, index: number): number {
 const caretIn = (tr: Transaction, cellPos: number) =>
   tr.setSelection(Selection.near(tr.doc.resolve(cellPos + 1), 1));
 
+/** The caret in the first cell of the row at `rowPos` that no merge covers (a covered cell is not drawn). */
+function caretInRow(tr: Transaction, rowPos: number): void {
+  const row = tr.doc.nodeAt(rowPos) as Node;
+  let cellPos = rowPos + 1;
+  for (let i = 0; i < row.childCount - 1 && row.child(i).attrs.vMerge === "continue"; i++)
+    cellPos += row.child(i).nodeSize;
+  caretIn(tr, cellPos);
+}
+
 /** The text width of the document's (last) section, in twips. */
 function textWidth(state: EditorState): number {
   const section = wordContext(state)?.envelope.section;
@@ -219,11 +228,16 @@ export function insertRow(dir: -1 | 1): Command {
         merged ? cell.type.create({ ...cell.attrs, vMerge: "continue" }, cell.content) : cell,
       );
     });
-    const row = plain.type.create(plain.attrs, cells);
+    // Header rows are a run from the table's top: a row put above or among them is one too.
+    const header = reference.attrs.header && (dir < 0 || beyond?.attrs.header);
+    const row = plain.type.create(
+      header ? { ...plain.attrs, header: reference.attrs.header } : plain.attrs,
+      cells,
+    );
     const at = dir < 0 ? rowPos(table, pos, index) : rowPos(table, pos, index + 1);
     return apply(state, dispatch, (tr) => {
       tr.insert(at, row);
-      caretIn(tr, at + 1);
+      caretInRow(tr, at);
     });
   };
 }
@@ -272,7 +286,7 @@ export const deleteRows: Command = (state, dispatch) => {
     tr.delete(from, to);
     // The row after the deleted ones, or the one before when they were the last.
     const last = bottom === table.childCount - 1;
-    caretIn(tr, last ? rowPos(table, pos, top - 1) + 1 : tr.mapping.map(from) + 1);
+    caretInRow(tr, last ? rowPos(table, pos, top - 1) : tr.mapping.map(from));
   });
 };
 

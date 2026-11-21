@@ -22,12 +22,17 @@ function canCut(node: Node, start: number, end: number): boolean {
  */
 export function liftTarget(range: NodeRange): number | null {
   const content = range.parent.content.cutByIndex(range.startIndex, range.endIndex);
+  // The halves split off an ancestor before and after the range stay in the node above it.
+  let before = 0;
+  let after = 0;
   for (let depth = range.depth; ; depth--) {
     const node = range.$from.node(depth);
-    const index = range.$from.index(depth);
-    const endIndex = range.$to.indexAfter(depth);
+    const index = range.$from.index(depth) + before;
+    const endIndex = range.$to.indexAfter(depth) - after;
     if (depth < range.depth && node.canReplace(index, endIndex, content)) return depth;
     if (depth === 0 || !canCut(node, index, endIndex)) return null;
+    if (index) before = 1;
+    if (endIndex < node.childCount) after = 1;
   }
 }
 
@@ -129,6 +134,8 @@ export function canJoin(doc: Node, pos: number): boolean {
   if (!before || !after || before.isLeaf || after.isLeaf) return false;
   const index = $pos.index();
   return (
+    // Empty content fits anywhere: the nodes' types must still take the same content.
+    before.type.compatibleContent(after.type) &&
     before.canReplace(before.childCount, before.childCount, after.content) &&
     $pos.parent.canReplace(index, index + 1)
   );

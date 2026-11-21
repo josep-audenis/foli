@@ -14,7 +14,15 @@ import {
   rowPropertiesXml,
   tablePropertiesXml,
 } from "./tables.js";
-import { bagXml, el, escapeAttribute, escapeText, fragment, type Namespaces } from "./xmlout.js";
+import {
+  bagXml,
+  el,
+  escapeAttribute,
+  escapeText,
+  fragment,
+  type Namespaces,
+  scoped,
+} from "./xmlout.js";
 
 /** @internal */
 export interface WriteContext {
@@ -74,6 +82,12 @@ export function blocksXml(blocks: readonly NodeJSON[], context: WriteContext): s
   });
 }
 
+/** `context` inside an element with this `attributes` bag: the namespaces it declares in scope. */
+function within(context: WriteContext, bag: unknown): WriteContext {
+  const namespaces = scoped(context.namespaces, bag);
+  return namespaces === context.namespaces ? context : { ...context, namespaces };
+}
+
 /** A table: its properties, its grid, then each row's exceptions, properties and cells. */
 function tableXml(table: NodeJSON, context: WriteContext): string {
   const ns = context.namespaces;
@@ -81,11 +95,13 @@ function tableXml(table: NodeJSON, context: WriteContext): string {
   let out = `<w:tbl>${tablePropertiesXml(attrs, ns)}${gridXml(attrs, ns)}`;
   out += inControls(table.content ?? [], 0, context, (row) => {
     const r = (row.attrs ?? {}) as Json;
-    const cells = inControls(row.content ?? [], 0, context, (cell) => {
+    const inRow = within(context, r.attributes);
+    const rowNs = inRow.namespaces;
+    const cells = inControls(row.content ?? [], 0, inRow, (cell) => {
       const c = (cell.attrs ?? {}) as Json;
-      return `<w:tc>${cellPropertiesXml(c, ns)}${blocksXml(cell.content ?? [], context)}</w:tc>`;
+      return `<w:tc>${cellPropertiesXml(c, rowNs)}${blocksXml(cell.content ?? [], inRow)}</w:tc>`;
     });
-    return `<w:tr${bagXml(r.attributes, ns)}>${exceptionsXml(r.exceptions, ns)}${rowPropertiesXml(r, ns)}${cells}</w:tr>`;
+    return `<w:tr${bagXml(r.attributes, ns)}>${exceptionsXml(r.exceptions, rowNs)}${rowPropertiesXml(r, rowNs)}${cells}</w:tr>`;
   });
   return `${out}</w:tbl>`;
 }
@@ -99,7 +115,8 @@ function notYet(node: NodeJSON): never {
 export function paragraphXml(p: NodeJSON, context: WriteContext): string {
   const attrs = (p.attrs ?? {}) as Json;
   const own = bagXml(attrs.attributes, context.namespaces);
-  const inner = `${paragraphPropertiesXml(attrs, context.namespaces)}${inlinesXml(p.content ?? [], context)}`;
+  const inside = within(context, attrs.attributes);
+  const inner = `${paragraphPropertiesXml(attrs, inside.namespaces)}${inlinesXml(p.content ?? [], inside)}`;
   // An empty paragraph as Word writes it.
   return inner ? `<w:p${own}>${inner}</w:p>` : `<w:p${own}/>`;
 }

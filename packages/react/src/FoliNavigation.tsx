@@ -282,7 +282,7 @@ const RESEARCH_DELAY = 300;
 /** The find, replace and go to panel: not modal, the document stays usable beside it. */
 function FindPanel({
   body,
-  mode,
+  mode: asked,
   request,
   readOnly,
   query,
@@ -295,6 +295,8 @@ function FindPanel({
   onBookmarks,
   onClose,
 }: FindPanelProps) {
+  // Replace is not offered once the editor turns read-only under an open panel.
+  const mode = readOnly && asked === "replace" ? "find" : asked;
   const id = useId();
   const input = useRef<HTMLInputElement>(null);
   const [replacement, setReplacement] = useState("");

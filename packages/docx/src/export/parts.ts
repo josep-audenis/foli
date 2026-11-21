@@ -18,6 +18,7 @@ import type {
 import { attr, child, integer, isW, W, W15 } from "../import/ooxml.js";
 import {
   abstractOf,
+  DATE,
   defaultsOf,
   instanceOf,
   level as levelOf,
@@ -504,7 +505,7 @@ function commentStart(comment: CommentJSON, ns: Namespaces): string {
       const author = attr(o.element, "author") ?? "";
       const initials = attr(o.element, "initials");
       const date = attr(o.element, "date");
-      const readDate = date && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(date) ? date : undefined;
+      const readDate = date && DATE.test(date) ? date : undefined;
       if (
         Number(attr(o.element, "id")) === comment.id &&
         author.slice(0, 255) === comment.author &&

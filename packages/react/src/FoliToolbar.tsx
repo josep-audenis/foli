@@ -1378,8 +1378,7 @@ export function FoliToolbar({
       const selected = selectedPicture(editor.state);
       // Inserting needs the app's upload; editing a selected picture does not.
       if (!selected && !upload) return;
-      setDialog(null);
-      setTableDialog(null);
+      closeDialogs();
       setPictureDialog({
         pos: selected?.pos ?? null,
         selection: editor.state.selection,
@@ -1388,13 +1387,7 @@ export function FoliToolbar({
       return;
     }
     if (typeof item.dialog === "function") {
-      setDialog(null);
-      setTableDialog(null);
-      setPictureDialog(null);
-      setSetupDialog(null);
-      setReferenceDialog(null);
-      setControlDialog(null);
-      setNoteDialog(null);
+      closeDialogs();
       setAppDialog({ key: item.key, restore: buttons.current[index] ?? null });
       return;
     }
@@ -1479,7 +1472,9 @@ export function FoliToolbar({
           );
           setDialog((current) =>
             current &&
-            (transactions.some((tr) => tr.docChanged) || !state.selection.eq(current.selection))
+            (!transactions.length ||
+              transactions.some((tr) => tr.docChanged) ||
+              !state.selection.eq(current.selection))
               ? null
               : current,
           );
@@ -1491,6 +1486,7 @@ export function FoliToolbar({
         setSetupDialog(null);
         setReferenceDialog(null);
         setControlDialog(null);
+        setNoteDialog(null);
         setDialog((current) =>
           current
             ? { ...current, request: current.request + 1 }
@@ -1580,6 +1576,17 @@ export function FoliToolbar({
   useEffect(() => {
     if (disabled || builtInDialog || appDialogGone) setAppDialog(null);
   }, [disabled, builtInDialog, appDialogGone]);
+
+  // One dialog at a time: opening one closes the rest (`keep` reopens itself, counting requests).
+  function closeDialogs(keep?: "table") {
+    setDialog(null);
+    if (keep !== "table") setTableDialog(null);
+    setPictureDialog(null);
+    setSetupDialog(null);
+    setReferenceDialog(null);
+    setControlDialog(null);
+    setNoteDialog(null);
+  }
 
   // Another tab: its items from the first, and nothing of the last tab's left open.
   const showTab = (next: ToolbarTab) => {
@@ -1815,19 +1822,12 @@ export function FoliToolbar({
                           onPick={(action, pointer) => {
                             setMenu(null);
                             if (action.dialog === "noteOptions") {
-                              setDialog(null);
-                              setTableDialog(null);
-                              setSetupDialog(null);
-                              setReferenceDialog(null);
-                              setControlDialog(null);
+                              closeDialogs();
                               setNoteDialog({ restore: buttons.current[i] ?? null });
                               return;
                             }
                             if (action.dialog === "controlProperties") {
-                              setDialog(null);
-                              setTableDialog(null);
-                              setSetupDialog(null);
-                              setReferenceDialog(null);
+                              closeDialogs();
                               setControlDialog({
                                 restore: buttons.current[i] ?? null,
                                 selection: editor.state.selection,
@@ -1835,9 +1835,7 @@ export function FoliToolbar({
                               return;
                             }
                             if (action.dialog === "crossReference") {
-                              setDialog(null);
-                              setTableDialog(null);
-                              setSetupDialog(null);
+                              closeDialogs();
                               setReferenceDialog({
                                 restore: buttons.current[i] ?? null,
                                 selection: editor.state.selection,
@@ -1845,8 +1843,7 @@ export function FoliToolbar({
                               return;
                             }
                             if (action.dialog === "pageSetup") {
-                              setDialog(null);
-                              setTableDialog(null);
+                              closeDialogs();
                               setSetupDialog({
                                 restore: buttons.current[i] ?? null,
                                 selection: editor.state.selection,
@@ -1854,8 +1851,7 @@ export function FoliToolbar({
                               return;
                             }
                             if (action.dialog) {
-                              setDialog(null);
-                              setSetupDialog(null);
+                              closeDialogs("table");
                               setTableDialog((current) => ({
                                 restore: buttons.current[i] ?? null,
                                 selection: editor.state.selection,
@@ -2772,7 +2768,8 @@ function ControlDialog({
           title,
           tag,
           lock,
-          ...(hasList ? { items: parseItems(items) } : {}),
+          // Unedited items are left alone: the text form cannot carry a value with a `|` in it.
+          ...(hasList && items !== itemsText(control?.items) ? { items: parseItems(items) } : {}),
           ...(kind === "date" ? { dateFormat } : {}),
           ...(kind === "text" ? { multiLine } : {}),
         }),
