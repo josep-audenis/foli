@@ -163,6 +163,29 @@ Every edit you make is a tracked change a person will accept or reject: change o
 task asks, and use comment to explain a change that is not obvious.
 ```
 
+## Showing what changed
+
+In an app, the person sees the session's editor: give `session.editor` to `FoliCanvas` (or to
+an `EditorView`). Then core's `hint` shows each block the agent changed for a few seconds,
+without moving the caret, from the handles the operations return:
+
+```tsx
+import { hint } from "@folijs/core";
+import { FoliCanvas } from "@folijs/react";
+
+const result = session.replaceText("b12", "30 days", "45 days");
+if (result.ok)
+  for (const block of result.blocks) {
+    const where = session.target(block.handle);
+    if (where.ok) hint(session.editor, where.target, { ms: 2500 });
+  }
+
+<FoliCanvas editor={session.editor} />;
+```
+
+A new hint replaces the one showing: to walk through several changes, show them one after the
+other.
+
 ## Limits
 
 Unstable: the API may change in any 0.x release. What is not there yet, and what rejecting the

@@ -1,0 +1,161 @@
+/**
+ * The hint (Phase 18), on the editing page (`/edit.html`): a place marked for a few seconds on
+ * real pages, without moving the caret. A far page, a header, an edit while it shows, a range
+ * over two pages, reduced motion.
+ */
+import AxeBuilder from "@axe-core/playwright";
+import { expect, type Page, test } from "@playwright/test";
+
+type Json = Record<string, unknown>;
+const editor = (page: Page) => page.getByRole("textbox", { name: "Document" });
+const text = (value: string): Json => ({ type: "text", text: value });
+const paragraph = (value: string): Json => ({ type: "paragraph", content: [text(value)] });
+
+/** A header, and enough text for three or four pages. */
+const sample = (): Json => ({
+  schemaVersion: 5,
+  section: {
+    pageSize: { width: 8391, height: 11906 },
+    margins: { top: 1440, right: 1000, bottom: 1440, left: 1000, header: 500, footer: 400 },
+    headers: { default: "h1" },
+  },
+  defaults: { paragraph: { spacing: { after: 120 } } },
+  styles: [{ id: "Normal", type: "paragraph", name: "Normal", isDefault: true }],
+  numbering: { abstracts: [], instances: [] },
+  comments: [],
+  content: {
+    type: "doc",
+    content: [
+      paragraph("First chapter"),
+      ...Array.from({ length: 60 }, (_, i) => paragraph(`Filler line number ${i} of the text.`)),
+      paragraph("Another cat at the end."),
+    ],
+  },
+  stories: {
+    h1: { kind: "header", content: { type: "doc", content: [paragraph("The cat header")] } },
+  },
+});
+
+async function load(page: Page) {
+  await page.goto("/edit.html");
+  await page.waitForFunction(() => !!window.foliEdit);
+  await page.evaluate((doc) => window.foliEdit.load(doc as never), sample());
+  await editor(page).click({ position: { x: 200, y: 200 } });
+}
+
+const marks = (page: Page, name = "foli-hint") =>
+  page.evaluate((n) => {
+    const registry = (CSS as unknown as { highlights?: Map<string, Set<Range>> }).highlights;
+    return [...(registry?.get(n) ?? [])].map((r) => r.toString());
+  }, name);
+
+/** Where a paragraph's text is in the body: its first and last positions. */
+const where = (page: Page, needle: string) =>
+  page.evaluate((n) => {
+    let found: [number, number] | null = null;
+    window.foliEdit.editor.state.doc.descendants((node, pos) => {
+      if (!found && node.isTextblock && node.textContent.includes(n)) {
+        const at = pos + 1 + node.textContent.indexOf(n);
+        found = [at, at + n.length];
+      }
+      return !found;
+    });
+    return found as unknown as [number, number];
+  }, needle);
+
+const hint = (page: Page, target: Json, ms = 2000) =>
+  page.evaluate(
+    ([t, m]) => window.foliEdit.view.hint(t as never, { ms: m as number }),
+    [target, ms],
+  );
+
+const selection = (page: Page) =>
+  page.evaluate(() => JSON.stringify(window.foliEdit.editor.state.selection.toJSON()));
+
+test("a far page is scrolled to and marked, then the mark fades and goes; the caret stays", async ({
+  page,
+}) => {
+  await load(page);
+  const before = await selection(page);
+  const top = await page.evaluate(() => scrollY);
+  const [from, to] = await where(page, "Another cat");
+  expect(await hint(page, { story: null, from, to }, 800)).toBe(true);
+  expect(await marks(page)).toEqual(["Another cat"]);
+  expect(await page.evaluate(() => scrollY)).toBeGreaterThan(top + 500);
+  expect(await selection(page)).toBe(before);
+  // The marked text is on the screen.
+  const shown = await page.evaluate(() => {
+    const range = [
+      ...((CSS as unknown as { highlights: Map<string, Set<Range>> }).highlights.get("foli-hint") ??
+        []),
+    ][0];
+    const rect = range?.getBoundingClientRect();
+    return !!rect && rect.top >= 0 && rect.bottom <= innerHeight;
+  });
+  expect(shown).toBe(true);
+  // The pages while marked: the hint adds nothing to them, so nothing new to find there.
+  const axe = await new AxeBuilder({ page }).include(".foli-page").analyze();
+  expect(axe.violations.map((v) => v.id)).toEqual([]);
+  await expect.poll(() => marks(page, "foli-hint-fading")).toEqual(["Another cat"]);
+  await expect.poll(() => marks(page, "foli-hint-fading")).toEqual([]);
+  expect(await marks(page)).toEqual([]);
+  expect(await selection(page)).toBe(before);
+});
+
+test("a range over two pages is marked on both", async ({ page }) => {
+  await load(page);
+  const [from] = await where(page, "Filler line number 20");
+  const [, to] = await where(page, "Filler line number 45 of the text.");
+  expect(await hint(page, { story: null, from, to })).toBe(true);
+  const pages = await page.evaluate(() => {
+    const ranges = [
+      ...((CSS as unknown as { highlights: Map<string, Set<Range>> }).highlights.get("foli-hint") ??
+        []),
+    ];
+    const of = (r: Range) => (r.startContainer.parentElement as Element).closest(".foli-page");
+    return new Set(ranges.map(of)).size;
+  });
+  expect(pages).toBeGreaterThan(1);
+});
+
+test("an edit while it shows: the mark follows its text, and goes with it", async ({ page }) => {
+  await load(page);
+  const [from, to] = await where(page, "First chapter");
+  await hint(page, { story: null, from: from + 6, to }, 5000);
+  expect(await marks(page)).toEqual(["chapter"]);
+  await page.evaluate(() => {
+    window.foliEdit.editor.select(1);
+    window.foliEdit.editor.commands.insertText("New ");
+  });
+  expect(await marks(page)).toEqual(["chapter"]);
+  await page.evaluate(
+    ([a, b]) => {
+      window.foliEdit.editor.select(a as number, b as number);
+      window.foliEdit.editor.commands.deleteSelection();
+    },
+    [from + 10, to + 4],
+  );
+  expect(await marks(page)).toEqual([]);
+});
+
+test("a header's range is marked where the pages draw it, without opening it", async ({ page }) => {
+  await load(page);
+  // "cat" in "The cat header": the story's positions.
+  expect(await hint(page, { story: "h1", from: 5, to: 8 }, 3000)).toBe(true);
+  const shown = await marks(page);
+  expect(shown.length).toBeGreaterThan(0);
+  expect(new Set(shown)).toEqual(new Set(["cat"]));
+  expect(await page.locator(".foli-story-mount").count()).toBe(0);
+  expect(await hint(page, { story: "nope", from: 1, to: 2 })).toBe(false);
+});
+
+test("under reduced motion it goes without fading", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await load(page);
+  const [from, to] = await where(page, "First chapter");
+  await hint(page, { story: null, from, to }, 600);
+  expect(await marks(page)).toEqual(["First chapter"]);
+  await expect.poll(() => marks(page)).toEqual([]);
+  // At no point after its time was there a fading step: polled at once, and still none.
+  expect(await marks(page, "foli-hint-fading")).toEqual([]);
+});

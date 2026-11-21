@@ -111,3 +111,18 @@ describe("server rendering and hydration", () => {
     container.remove();
   });
 });
+
+describe("the ref's hint (18.3)", () => {
+  afterEach(cleanup);
+
+  it("shows a place through the view, and leaves the selection", () => {
+    const ref = createRef<FoliEditorHandle>();
+    render(<FoliEditor ref={ref} initialContent={text("Hello world")} />);
+    const handle = ref.current;
+    if (!handle) throw new Error("no ref");
+    const selection = handle.editor.state.selection.toJSON();
+    expect(handle.hint({ story: null, from: 7, to: 12 })).toBe(true);
+    expect(handle.hint({ bookmark: "none" })).toBe(false);
+    expect(handle.editor.state.selection.toJSON()).toEqual(selection);
+  });
+});

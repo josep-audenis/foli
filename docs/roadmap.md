@@ -2699,11 +2699,19 @@ review.
   a change to the story ends the hint. The story being edited hints in its own view. Tested in
   jsdom as far as it goes (the copy's marks; bookmarks through a stand-in view;
   `session.target` on the NDA, through an insert); the pages themselves in 18.3's e2e.)
-- [ ] 18.3 React and the app's side: `FoliEditor`'s ref gets `hint`; whether a hook adds
+- [x] 18.3 React and the app's side: `FoliEditor`'s ref gets `hint`; whether a hook adds
   anything (`useHint`) is decided here, and not built if not. The playground gets a "show"
   button per tracked change; the site's agent guide shows a session's edits hinted one after
   the other. e2e in three browsers with axe: a far page, a header, an edit while it shows, a
-  hint replaced, reduced motion.
+  hint replaced, reduced motion. (Done: `FoliEditor`'s ref has `hint`; no hook, since core's
+  `hint(editor, …)` already works with `useCurrentEditor`. `hint.spec.ts`, 5 tests, passed in
+  Chromium, Firefox and WebKit on Windows (2026-11-21): a far page scrolled to and marked on
+  the screen, faded, gone, the selection unchanged, axe on the pages while marked; a range over
+  two pages marked on both; an edit before the mark followed and a deletion ending it; a
+  header's copies marked without opening it; reduced motion without the fading step. The
+  replaced hint is tested in jsdom only. The agent's README (the site's guide) shows a
+  session's changes hinted. Not built: the playground's "show" button, the e2e drives
+  `view.hint` itself.)
 - [ ] 18.4 Docs (README, `api.md`, `architecture.md`, limitations, the guide), size budgets,
   the changesets; then 1.3.0 and agent 0.3.0, published with the owner's approval (the Release
   workflow).

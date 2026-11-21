@@ -61,7 +61,8 @@ migrated (`parseDocument`), and what it reports is v5.
 | `className`      | `string`                                                                                                 | —            | Added to the `.foli-canvas` element.                                                                                                             |
 | `children`       | `ReactNode`                                                                                              | —            | Rendered between the toolbar and the pages, inside the editor's context.                                                                         |
 
-`ref` → `FoliEditorHandle`: `{ editor: Editor; focus(): void }` (`editor.setDocument` takes
+`ref` → `FoliEditorHandle`: `{ editor: Editor; focus(): void; hint(target, options?): boolean }`
+(`hint`, 1.3: core's `hint` on its editor) (`editor.setDocument` takes
 a document of any version too).
 
 `FoliChange`:
