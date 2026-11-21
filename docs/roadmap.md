@@ -2513,9 +2513,20 @@ review.
   tracked changes. It fails with the rollback taken out, and with the handles not put back.
   It found that a footnote taken out and put back has its keys in another order: the same
   document, compared so. The e2e runs the bin with `--code`. The review: under 16.2.)
-- [ ] 16.6 A model's trial, as 14.8's: a fresh model with the server's own words only, tasks
+- [x] 16.6 A model's trial, as 14.8's: a fresh model with the server's own words only, tasks
   that need a loop, through the SDK's client; calls counted against the plain tools; Word
-  opens the results. What it shows wrong in the description, fixed.
+  opens the results. What it shows wrong in the description, fixed. (Done 2026-11-21: a fresh
+  Claude agent, told only what the server says of itself, through the SDK's client against
+  the built `bin` with `--code`: a company renamed through an NDA with a comment, a report's
+  headings moved a level down, an offer letter filled. 11 tool calls (3 `open`, 3 `run`, 3
+  `save`, `list_controls`, `list_documents`), none refused; every script ran at the first try.
+  The same kind of tasks took 35 calls with the plain tools (14.8). Word 16.0.20625 opens the
+  three files, every revision the client's (6 and a comment, 5, 9). It had to guess, and the
+  description now says: what `replaced`, `refused`, `comment` and `unfilled` are; that
+  `blocks()` is a copy; that a table's text is empty; that built-in headings read "heading 1"
+  without a capital; that headers, footers and notes are not there (now in the server's
+  instructions too). It left the table of contents as it was, as the tool says. Not a client
+  of its own, as in 14.8.)
 - [ ] 16.7 Docs, the e2e in `pnpm check`, one run on Linux; then the changeset and 0.2.0,
   published with the owner's approval (the Release workflow).
 

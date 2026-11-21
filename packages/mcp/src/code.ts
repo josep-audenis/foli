@@ -49,21 +49,22 @@ const PRELUDE = `(() => {
 })();`;
 
 /** @internal What a script is told of `doc`: part of the tool's description. */
-export const DOC_TYPES = `doc.blocks(): Block[]                      // every block of the body, in order
+export const DOC_TYPES = `doc.blocks(): Block[]            // every block of the body, in order, as it reads now (a copy: call again after edits)
 doc.block(handle): Block
-doc.replaceText(handle, find, replacement, { all? }): { blocks, replaced, refused }
-doc.insertAfter(handle, paragraphs): { blocks }   // paragraphs: "text" | { text, style? } | a list of them
+doc.replaceText(handle, find, replacement, { all? }): { blocks, replaced, refused }   // replaced: places changed; refused: places that could not be (locked)
+doc.insertAfter(handle, paragraphs): { blocks }    // paragraphs: "text" | { text, style? } | a list of them; blocks: the new ones
 doc.insertBefore(handle, paragraphs): { blocks }
-doc.deleteBlock(handle): { text }
+doc.deleteBlock(handle): { text }                  // text: a sentence saying what was done
 doc.styles(): string[]
 doc.setStyle(handle, style): { blocks }
-doc.comment(handle, text, { on? }): { blocks, comment }
-doc.controls(): Control[]                   // { id, name, kind, value, empty, items?, readOnly, block }
-doc.fillControl(name, value): { blocks, controls, unfilled }
-doc.updateFields({ data?, contents? }): { updated, unchanged, rebuilt, text }
-console.log(...values)                      // shown in the answer
+doc.comment(handle, text, { on? }): { blocks, comment }   // comment: the new comment's id
+doc.controls(): Control[]                          // { id, name, kind, value, empty, items?, readOnly, block }
+doc.fillControl(name, value): { blocks, controls, unfilled }   // unfilled: controls of that name that did not take the value, each with why
+doc.updateFields({ data?, contents? }): { updated, unchanged, rebuilt, text }   // counts, and a sentence
+console.log(...values)                             // shown in the answer
 type Block = { handle, kind: "paragraph" | "table" | "other", style?, number?, text, rows?, columns?,
-  cell?: { table, row, column }, depth, changed, comments }`;
+  cell?: { table, row, column }, depth, changed, comments }
+blocks in a result are Blocks as they read after the edit. A table's own text is ""; its cells' paragraphs follow it, each with cell. style is the name as read shows it ("heading 1", "Title"): compare without capitals. Only the body is there: headers, footers and the text of notes are not.`;
 
 const LOG_CHARS = 20_000;
 const VALUE_CHARS = 50_000;
