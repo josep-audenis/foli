@@ -1371,6 +1371,9 @@ export function FoliToolbar({
   // The tab stop stays on the toolbar when items are taken away.
   const active = focused < items.length ? focused : 0;
   const buttons = useRef<(HTMLElement | null)[]>([]);
+  /** The items as last rendered: where a dialog closed later finds its button. */
+  const shown = useRef(items);
+  shown.current = items;
   // Whether a select box was last used with the pointer (its pick then goes back to the document).
   const pointer = useRef(false);
   // The open menu (a menu button's key), if any.
@@ -1736,7 +1739,9 @@ export function FoliToolbar({
                 if (item.select) {
                   const { select } = item;
                   const value = state?.value ?? "";
-                  const options = state?.options ?? [];
+                  // Read now: the list may come from outside the editor (the state's copy of it
+                  // only makes the toolbar render again when it changes with the document).
+                  const options = select.options(editor.state);
                   return (
                     <select
                       key={item.key}
@@ -1925,7 +1930,10 @@ export function FoliToolbar({
             setAppDialog(null);
             if (applied && onClickCommand) onClickCommand();
             // Its button as it is now: the items may have changed while it was open.
-            else buttons.current[items.indexOf(appDialogItem)]?.focus();
+            else
+              buttons.current[
+                shown.current.findIndex((item) => item.key === appDialogItem.key)
+              ]?.focus();
           }}
         />
       )}
@@ -2070,7 +2078,7 @@ function AppDialog({
         // An Escape the content took (its own pop-up) is not the dialog's.
         if (event.key !== "Escape" || event.defaultPrevented) return;
         event.preventDefault();
-        close(false);
+        closeOnce(false);
       }}
     >
       {content({ editor, close: closeOnce })}

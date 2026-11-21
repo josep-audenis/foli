@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
-// Bug-hunt repros (third sweep, the toolbar's app items, dialogs and tabs): each test asserts
-// the correct behaviour.
+// Regressions (third sweep: the toolbar's app items, dialogs and tabs).
+
 import { createDocument, createEditor, insertText } from "@folijs/core";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -45,6 +45,40 @@ describe("regressions 3: toolbar items", () => {
     expect(offered()).toEqual(["Hello"]);
     act(() => void editor.run(insertText("Hey ")));
     expect(offered().sort()).toEqual(["Hello", "Hey"]);
+  });
+
+  it("a box offers a list kept outside the editor as it is on each render", () => {
+    const editor = createEditor({ document: doc() });
+    let mine = [{ value: "a", label: "A" }];
+    const items: ToolbarSelect[][] = [
+      [
+        {
+          key: "mine",
+          label: "Mine",
+          select: { options: () => mine, value: () => null, pick: () => () => true },
+        },
+      ],
+    ];
+    const { rerender } = render(<FoliToolbar editor={editor} items={items} />);
+    const box = screen.getByRole("combobox", { name: "Mine" }) as HTMLSelectElement;
+    mine = [...mine, { value: "b", label: "B" }];
+    rerender(<FoliToolbar editor={editor} items={items} />);
+    expect([...box.options].map((o) => o.value).filter(Boolean)).toEqual(["a", "b"]);
+  });
+
+  it("an app dialog cancelled with Escape does not run a close(true) its content makes on blur", () => {
+    const editor = createEditor({ document: doc() });
+    const onClickCommand = vi.fn();
+    const blurry: ToolbarDialog = {
+      key: "blurry",
+      label: "Blurry",
+      dialog: ({ close }) => <input aria-label="Name" onBlur={() => close(true)} />,
+    };
+    render(<FoliToolbar editor={editor} items={[[blurry]]} onClickCommand={onClickCommand} />);
+    fireEvent.click(screen.getByRole("button", { name: "Blurry" }), { detail: 0 });
+    fireEvent.keyDown(screen.getByRole("dialog", { name: "Blurry" }), { key: "Escape" });
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(onClickCommand).not.toHaveBeenCalled();
   });
 
   it("an app dialog's close called twice closes (and calls onClickCommand) once", () => {
