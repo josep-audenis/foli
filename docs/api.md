@@ -314,13 +314,17 @@ without the Link item. An item's `key` is unique within its tab; the same item m
 An empty `tabs` shows `items`.
 
 - `tab` and `onTabChange(key)`: the app says which tab shows. With `tab`, a pick (a click, the
-  arrow keys) only calls `onTabChange`; the tab changes when `tab` does. A key that is not among
+  arrow keys) only calls `onTabChange`; the tab changes when `tab` does (an app that keeps it
+  leaves the focus on the tab picked, which the arrow keys go on from). Whenever another tab
+  shows, the last one's open menu and dialogs close. A key that is not among
   the tabs shown gives the first one. Without `tab`, `defaultTab` is the one shown at first.
 - `visible(state, editor)` on a tab: it shows only while this says so (Word's Table tab:
-  `visible: (state) => inTable(state)` with a check of the app's). It runs after every
-  transaction: keep it cheap. A tab that comes is not selected for the user; when the selected
-  one goes, the first tab shows, without `onTabChange`, and comes back selected with it unless
-  another was picked meanwhile.
+  `visible: (state) => inTable(state)` with a check of the app's; `editor` is the story's or
+  the body's, as for an item's `enabled`). It runs after every transaction: keep it cheap. A
+  tab that comes is not selected for the user (unless it is the `tab` or `defaultTab`); when
+  the selected one goes, the first tab shows, without `onTabChange`, and the one that went
+  comes back selected unless another was picked meanwhile (the first one included). If the
+  focus was on what went, the selected tab takes it.
 - A group is an array of items, or a `ToolbarGroup` `{ label, items }`: a `role="group"` named by
   `label` (`.foli-toolbar-group`), its items in `.foli-toolbar-group-items` and the caption under
   them (`.foli-toolbar-group-label`). In `items` and in a tab's `items` alike

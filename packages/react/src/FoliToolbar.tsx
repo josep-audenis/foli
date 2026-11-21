@@ -173,7 +173,10 @@ export interface FoliToolbarProps {
   className?: string | undefined;
 }
 
-/** A group of toolbar items with a caption: a `role="group"` named by `label`, shown under it. */
+/**
+ * A group of toolbar items with a caption: a `role="group"` named by `label`, shown under it.
+ * It has no `key` (a tab has: that tells them apart in `FoliEditor`'s `toolbar`).
+ */
 export interface ToolbarGroup {
   readonly label: string;
   readonly items: readonly ToolbarItem[];
@@ -191,9 +194,11 @@ export interface ToolbarTab {
   /** Its items, in groups (as `FoliToolbarProps.items`); a key is unique within its tab. */
   readonly items: ToolbarGroups;
   /**
-   * A tab that comes and goes with the selection (Word's Table tab): shown while this says so.
-   * Runs after every transaction: keep it cheap. It is not selected for the user when it comes;
-   * when the selected tab goes, the first one shows (no `onTabChange`).
+   * A tab that comes and goes with the selection (Word's Table tab): shown while this says so
+   * (`editor` is the header, footer or note open on its page, else the body's, as for an item's
+   * `enabled`). Runs after every transaction: keep it cheap. It is not selected for the user
+   * when it comes (unless it is the `tab` or `defaultTab`); when the selected tab goes, the
+   * first one shows (no `onTabChange`).
    */
   readonly visible?: ((state: EditorState, editor: Editor) => boolean) | undefined;
 }
@@ -1245,7 +1250,10 @@ const labelOf = (group: ToolbarGroups[number]): string | undefined =>
  * The built-in items in tabs, after Word's ribbon: Home, Insert, Layout, Review. For
  * `FoliToolbarProps.tabs` (or `FoliEditor`'s `toolbar`), whole or as a start for an app's own.
  */
-export const defaultToolbarTabs: readonly ToolbarTab[] = (() => {
+export const defaultToolbarTabs: readonly (ToolbarTab & {
+  /** Arrays only, no captioned groups: `tab.items.map((group) => group.filter(…))` works. */
+  readonly items: readonly (readonly ToolbarItem[])[];
+})[] = (() => {
   const t = toolbarItems;
   return [
     {
@@ -1384,13 +1392,10 @@ export function FoliToolbar({
   // The tabs shown now (a tab with `visible` comes and goes with the selection), as their keys.
   const shownKeys = useEditorState(
     (state, active) =>
-      (allTabs ?? [])
-        .filter((t) => !t.visible || t.visible(state, active))
-        .map((t) => t.key)
-        .join("\n"),
-    { editor },
+      (allTabs ?? []).filter((t) => !t.visible || t.visible(state, active)).map((t) => t.key),
+    { editor, isEqual: sameItems },
   );
-  const shownTabs = new Set(shownKeys.split("\n"));
+  const shownTabs = new Set(shownKeys);
   const tabs = allTabs?.filter((t) => shownTabs.has(t.key));
   // The tab shown: the app's, else the one picked while it is still there, else the first.
   const [tabKey, setTabKey] = useState(defaultTab ?? null);
@@ -1655,27 +1660,42 @@ export function FoliToolbar({
   }
 
   // Another tab: its items from the first, and nothing of the last tab's left open.
+  // A pick: the app's to follow when it passes `tab`. Picking the tab that shows only because
+  // the wanted one went (a tab with `visible`) is a pick too.
   const showTab = (next: ToolbarTab) => {
-    if (next.key === tab?.key) return;
-    setTabKey(next.key);
+    if (next.key === tab?.key && (wanted === null || wanted === next.key)) return;
+    if (givenTab === undefined) setTabKey(next.key);
     onTabChange?.(next.key);
+  };
+  // Another tab shows (picked, the app's `tab`, or the selected one went): its items from the
+  // first, and nothing of the last tab's left open (a dialog's button goes with its tab).
+  const tabNow = tab?.key;
+  const lastTab = useRef(tabNow);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: only a change of tab; `closeDialogs` sets state.
+  useEffect(() => {
+    if (lastTab.current === tabNow) return;
+    lastTab.current = tabNow;
     setActive(0);
-    // The button a dialog would give the focus back to goes with its tab.
     setMenu(null);
     setAppDialog(null);
-    setDialog(null);
-    setTableDialog(null);
-    setPictureDialog(null);
-    setSetupDialog(null);
-    setReferenceDialog(null);
-    setControlDialog(null);
-    setNoteDialog(null);
-  };
+    closeDialogs();
+  }, [tabNow]);
+  // The focus was in the ribbon and what had it is gone (a tab or an item that went with the
+  // selection): the selected tab takes it, not the page.
+  const ribbon = useRef<HTMLDivElement>(null);
+  const ribbonFocused = useRef(false);
+  useEffect(() => {
+    const element = ribbon.current;
+    if (!ribbonFocused.current || !element || element.contains(document.activeElement)) return;
+    tabButtons.current[tabs?.findIndex((t) => t.key === tabNow) ?? -1]?.focus();
+  });
   // The tab list's keys (WAI-ARIA tabs, automatic activation: the tab focused is the one shown).
   const onTabKeyDown = (event: KeyboardEvent) => {
     if (!tabs || !tab || event.altKey || event.ctrlKey || event.metaKey) return;
     const count = tabs.length;
-    const at = tabs.findIndex((t) => t.key === tab.key);
+    // From the tab that has the focus: the selected one, unless the app kept its `tab`.
+    const focusedTab = tabButtons.current.indexOf(event.target as HTMLButtonElement);
+    const at = focusedTab >= 0 ? focusedTab : tabs.findIndex((t) => t.key === tab.key);
     const moves: Record<string, number> = {
       ArrowRight: (at + 1) % count,
       ArrowLeft: (at - 1 + count) % count,
@@ -1687,12 +1707,23 @@ export function FoliToolbar({
     event.preventDefault();
     showTab(next);
     tabButtons.current[tabs.indexOf(next)]?.focus();
-    // A tab the app does not show (it keeps `tab`) still has the focus: nothing else to do.
   };
   // With tabs, a ribbon: the tab list and the selected tab's panel, which holds the toolbar.
   const panel = (bar: ReactNode) =>
     tabs && tab ? (
-      <div className={className ? `foli-ribbon ${className}` : "foli-ribbon"}>
+      // biome-ignore lint/a11y/noStaticElementInteractions: it only notes whether the focus is inside.
+      <div
+        ref={ribbon}
+        className={className ? `foli-ribbon ${className}` : "foli-ribbon"}
+        onFocus={() => {
+          ribbonFocused.current = true;
+        }}
+        onBlur={(event) => {
+          // Not fired when the focused element is removed: the flag then stays.
+          if (!event.currentTarget.contains(event.relatedTarget as Node | null))
+            ribbonFocused.current = false;
+        }}
+      >
         <div
           role="tablist"
           aria-label={label}
