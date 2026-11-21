@@ -6,8 +6,19 @@ import {
   type FoliDocument,
 } from "@folijs/core";
 import { Handles } from "./handles.js";
+import {
+  type Changed,
+  type Context,
+  changed,
+  deleteBlock,
+  insert,
+  type NewParagraph,
+  type ReplaceOptions,
+  replaceText,
+  resolve,
+} from "./operations.js";
 import { type Block, formatBlocks, readBlocks } from "./read.js";
-import { type Refusal, type Result, refuse } from "./result.js";
+import { type Result, refuse } from "./result.js";
 
 export interface SessionOptions {
   /** Whose tracked changes and comments the session's edits are. */
@@ -49,6 +60,34 @@ export interface Session {
   read(options?: ReadOptions): Result<ReadResult>;
   /** One block by its handle. */
   block(handle: string): Result<{ block: Block; text: string }>;
+  /**
+   * Replaces `find` in a paragraph by `replacement` ("" deletes it). `find` is text as `read`
+   * shows it, capitals and spaces included, and must be in the block once, unless `all`. The
+   * replacement takes the formatting of the text it replaces. Returns the block as it reads
+   * now, how many places were replaced and how many could not be (a locked control, a field).
+   */
+  replaceText(
+    handle: string,
+    find: string,
+    replacement: string,
+    options?: ReplaceOptions,
+  ): Result<Changed & { replaced: number; refused: number }>;
+  /**
+   * Inserts paragraphs after a block (a paragraph, a table, anything read): one, or a list.
+   * Next to a paragraph they are formatted as Enter there gives in Word: as the paragraph,
+   * numbering included, or in the style its style names as the next (after a heading: body
+   * text); a paragraph that names a `style` has that style and nothing of the neighbour's.
+   * Returns the new blocks with their handles.
+   */
+  insertAfter(handle: string, paragraphs: NewParagraph | readonly NewParagraph[]): Result<Changed>;
+  /** As `insertAfter`, before the block: the block keeps its handle. */
+  insertBefore(handle: string, paragraphs: NewParagraph | readonly NewParagraph[]): Result<Changed>;
+  /**
+   * Deletes a paragraph, or a table with all its cells. A paragraph that must stay (the last of
+   * the document or of a cell, one before a table, one that ends a section) is emptied instead,
+   * and `text` says why.
+   */
+  deleteBlock(handle: string): Result<{ text: string }>;
 }
 
 /**
@@ -69,19 +108,7 @@ export function openSession(document: EditorDocument, options: SessionOptions): 
   });
   const handles = new Handles(editor);
 
-  /** Why `handle` names no block now, or null when it does. */
-  const missing = (handle: string): Refusal | null => {
-    if (handles.resolve(handle)) return null;
-    return handles.issued(handle)
-      ? refuse(
-          "gone",
-          `Block ${handle} is no longer in the document. Read again for the blocks there are.`,
-        )
-      : refuse(
-          "unknown-handle",
-          `There is no block ${handle}. Handles come from read: [b1], [b2]…`,
-        );
-  };
+  const context: Context = { editor, handles, author };
 
   const read = (options: ReadOptions = {}): Result<ReadResult> => {
     const { from, limit } = options;
@@ -90,11 +117,9 @@ export function openSession(document: EditorDocument, options: SessionOptions): 
     const all = readBlocks(editor.state, handles);
     let start = 0;
     if (from !== undefined) {
-      const refusal = missing(from);
-      if (refusal) return refusal;
+      const target = resolve(context, from);
+      if ("ok" in target) return target;
       start = all.findIndex((block) => block.handle === from);
-      if (start < 0)
-        return refuse("gone", `Block ${from} was deleted as a tracked change: it is not read.`);
     }
     const blocks = all.slice(start, limit === undefined ? undefined : start + limit);
     const next = all[start + blocks.length]?.handle ?? null;
@@ -102,12 +127,22 @@ export function openSession(document: EditorDocument, options: SessionOptions): 
   };
 
   const block = (handle: string): Result<{ block: Block; text: string }> => {
-    const refusal = missing(handle);
-    if (refusal) return refusal;
-    const found = readBlocks(editor.state, handles).find((b) => b.handle === handle);
-    if (!found) return refuse("gone", `Block ${handle} was deleted as a tracked change.`);
-    return { ok: true, block: found, text: formatBlocks([found]) };
+    const target = resolve(context, handle);
+    if ("ok" in target) return target;
+    const { blocks, text } = changed(context, [handle]);
+    return { ok: true, block: blocks[0] as Block, text };
   };
 
-  return { editor, author, document: () => editor.getDocument(), read, block };
+  return {
+    editor,
+    author,
+    document: () => editor.getDocument(),
+    read,
+    block,
+    replaceText: (handle, find, replacement, options) =>
+      replaceText(context, handle, find, replacement, options),
+    insertAfter: (handle, paragraphs) => insert(context, handle, paragraphs, "after"),
+    insertBefore: (handle, paragraphs) => insert(context, handle, paragraphs, "before"),
+    deleteBlock: (handle) => deleteBlock(context, handle),
+  };
 }
