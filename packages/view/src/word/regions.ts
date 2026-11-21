@@ -45,12 +45,17 @@ export interface FieldValues {
 }
 
 const PAGE_FIELDS = new Set(["PAGE", "NUMPAGES", "SECTIONPAGES"]);
-/** `\\*` switches: `arabic` in any case, the others as Word spells their case. */
+/**
+ * `\\*` switches: `arabic` in any case, the others as Word spells their case (an initial capital
+ * is the uppercase format).
+ */
 const FORMATS = new Map([
   ["roman", "lowerRoman"],
   ["ROMAN", "upperRoman"],
+  ["Roman", "upperRoman"],
   ["alphabetic", "lowerLetter"],
   ["ALPHABETIC", "upperLetter"],
+  ["Alphabetic", "upperLetter"],
 ]);
 
 /** A page field in a story: which, and the format its own switch asks for. */
@@ -61,15 +66,21 @@ interface FieldSlot {
 
 /** Stands in the drawn story for a slot's text: the private use area is not document text. */
 const SLOT_MARK = "\uE000";
-const SLOT_TEXT = /\uE000([\uE100-\uF8FF])/g;
+/** After the text's own `SLOT_MARK` in a story with slots: that character, not a slot. */
+const SLOT_ESCAPE = "\uE0FF";
+const SLOT_TEXT = /\uE000([\uE0FF-\uF8FF])/g;
+const ONLY_SLOTS = /^(?:\uE000[\uE100-\uF8FF])+$/;
 
 /** The page field `code` (its instruction) is, or null. */
 function pageField(code: string): FieldSlot | null {
   const name = code.trim().split(/\s+/)[0]?.toUpperCase() ?? "";
   if (!PAGE_FIELDS.has(name)) return null;
-  const asked = /\\\*\s*(\S+)/.exec(code)?.[1];
-  const format = asked?.toLowerCase() === "arabic" ? "decimal" : FORMATS.get(asked ?? "");
-  return { name, format };
+  // The first switch that names a number format (`\* MERGEFORMAT` is none).
+  for (const [, asked = ""] of code.matchAll(/\\\*\s*(\S+)/g)) {
+    const format = asked.toLowerCase() === "arabic" ? "decimal" : FORMATS.get(asked);
+    if (format) return { name, format };
+  }
+  return { name, format: undefined };
 }
 
 /** What `slot` shows; the section's number format is the page number's, a switch goes first. */
@@ -92,7 +103,11 @@ function markInline(nodes: readonly NodeJSON[], slots: FieldSlot[]): NodeJSON[] 
   const out: NodeJSON[] = [];
   for (let i = 0; i < nodes.length; i++) {
     const node = nodes[i] as NodeJSON;
-    out.push(node);
+    out.push(
+      node.type === "text" && node.text?.includes(SLOT_MARK)
+        ? { ...node, text: node.text.replace(//g, SLOT_MARK + SLOT_ESCAPE) }
+        : node,
+    );
     if (node.type !== "fieldStart") continue;
     let depth = 1;
     let separator = -1;
@@ -142,12 +157,10 @@ function filledCopy(template: HTMLElement, texts: readonly string[]): HTMLElemen
   for (let node = walker.nextNode(); node; node = walker.nextNode()) {
     const text = node as Text;
     // A page's own number: not document text (find leaves it alone).
-    if (text.data.replace(SLOT_TEXT, "") === "" && text.data)
-      text.parentElement?.setAttribute(PAGE_FIELD_ATTR, "");
+    if (ONLY_SLOTS.test(text.data)) text.parentElement?.setAttribute(PAGE_FIELD_ATTR, "");
     if (text.data.includes(SLOT_MARK))
-      text.data = text.data.replace(
-        SLOT_TEXT,
-        (_, slot: string) => texts[slot.charCodeAt(0) - 0xe100] ?? "",
+      text.data = text.data.replace(SLOT_TEXT, (_, slot: string) =>
+        slot === SLOT_ESCAPE ? SLOT_MARK : (texts[slot.charCodeAt(0) - 0xe100] ?? ""),
       );
   }
   return copy;
@@ -303,7 +316,9 @@ export class PageRegions {
     let entry = this.cache.get(story);
     if (!entry) {
       const slots: FieldSlot[] = [];
-      const content = marked(story.content, slots);
+      const withSlots = marked(story.content, slots);
+      // No page field: nothing is filled in, the story is drawn as it is.
+      const content = slots.length ? withSlots : story.content;
       const template = this.doc.createElement("div");
       template.className = REGION_CONTENT_CLASS;
       template.style.paddingTop = "0.01px";

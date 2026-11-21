@@ -225,13 +225,22 @@ export function FoliComments({
   measureRef.current = measure;
   // biome-ignore lint/correctness/useExhaustiveDependencies: measured after every change of what it shows.
   useIsomorphicLayoutEffect(measure, [doc, comments, writing, threads.length]);
+  const observer = useRef<ResizeObserver | null>(null);
+  // After each render until the pages are there: a pane mounted before the canvas has none yet.
   useEffect(() => {
+    if (observer.current || typeof ResizeObserver === "undefined") return;
     const container = pane.current && pagesAround(pane.current);
-    if (!container || typeof ResizeObserver === "undefined") return;
-    const observer = new ResizeObserver(() => measureRef.current());
-    observer.observe(container);
-    return () => observer.disconnect();
-  }, []);
+    if (!container) return;
+    observer.current = new ResizeObserver(() => measureRef.current());
+    observer.current.observe(container);
+  });
+  useEffect(
+    () => () => {
+      observer.current?.disconnect();
+      observer.current = null;
+    },
+    [],
+  );
   // Focus where the last action left it (after React drew the change).
   useEffect(() => {
     const focus = refocus.current;

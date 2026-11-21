@@ -120,7 +120,8 @@ included). Within the parts it writes:
   Word's own changes and replies (checked with Word on the corpus: `corpus/README.md`). A run's
   recorded formatting (`w:rPrChange`) is imported in canonical form, as the editor records it.
 - Runs are regrouped from the model: hyperlinks outermost, then insertions (or move
-  destinations), deletions (or move sources) with `w:delText`, then runs of equal properties.
+  destinations), deletions with `w:delText` (move sources keep `w:t`, as Word writes them), then
+  runs of equal properties.
   Line ends and vertical tabs in text become breaks, a tab character `w:tab` (read back as a
   `tab` node); a character XML cannot hold (other control characters, lone surrogates) is
   refused with a `DocxError`, never written.

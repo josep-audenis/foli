@@ -114,7 +114,8 @@ export function revisionOf(element: XmlElement): {
 
 /**
  * A tracked change's mark (`insertion`, `deletion`, with `move` for `w:moveFrom`/`w:moveTo`).
- * An invalid date is left out rather than losing the change.
+ * A date the model does not hold (one without a time) is not the mark's, rather than losing the
+ * change: it stays in the `attributes` bag as read, and export writes it back.
  * @internal
  */
 export function revisionMark(
@@ -130,9 +131,13 @@ export function revisionMark(
   }
   const attributes = attributeBag(element, ["w:id", "w:author", "w:date"], context) ?? null;
   const attrs = { id, author, date, move, attributes };
-  return (
-    mark({ type, attrs }, element.name, context) ??
-    mark({ type, attrs: { ...attrs, date: null } }, element.name, context)
+  const dated = mark({ type, attrs }, element.name, context);
+  if (dated) return dated;
+  const withDate = attributeBag(element, ["w:id", "w:author"], context) ?? null;
+  return mark(
+    { type, attrs: { ...attrs, date: null, attributes: withDate } },
+    element.name,
+    context,
   );
 }
 

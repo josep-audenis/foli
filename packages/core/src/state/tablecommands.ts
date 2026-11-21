@@ -21,6 +21,7 @@ import {
   type GridCell,
   gridOf,
   keepTablesApart,
+  rowRestartingMerges,
 } from "./tables.js";
 import { trackState } from "./track.js";
 import { splitAttrs, withEnvelope, wordContext } from "./word.js";
@@ -250,43 +251,25 @@ export function insertRow(dir: -1 | 1): Command {
 export const deleteRows: Command = (state, dispatch) => {
   const found = around(state);
   if (!found) return false;
-  const { table, pos, grid, top, bottom } = found;
+  const { table, pos, top, bottom } = found;
   if (top === 0 && bottom === table.childCount - 1) return deleteTable(state, dispatch);
   const from = rowPos(table, pos, top);
   const to = rowPos(table, pos, bottom + 1);
   return apply(state, dispatch, (tr) => {
-    const next = table.maybeChild(bottom + 1);
-    if (next && !tracking(state)) {
-      // Merges cut at their start: the first kept row's covered cell starts them again.
-      let cellPos = to + 1;
-      const starts: { pos: number; from: GridCell }[] = [];
-      for (const { cell, column } of placed(next)) {
-        if (cell.attrs.vMerge === "continue") {
-          const start = grid.find(
-            (c) =>
-              c.column === column &&
-              c.row >= top &&
-              c.row <= bottom &&
-              c.row + c.rowSpan > bottom + 1,
-          );
-          if (start) starts.push({ pos: cellPos, from: start });
-        }
-        cellPos += cell.nodeSize;
-      }
-      for (const { pos: at, from: start } of starts.reverse()) {
-        const cell = tr.doc.nodeAt(at) as Node;
-        const first = state.doc.nodeAt(start.pos) as Node;
-        // The merge's cell as it was (its properties, its text, then any text the covered
-        // cell held, which Word does not show).
-        const content = cell.textContent ? first.content.append(cell.content) : first.content;
-        tr.setNodeMarkup(at, cell.type, { ...first.attrs, vMerge: "restart" });
-        tr.replace(at + 1, at + cell.nodeSize - 1, new Slice(content, 0, 0));
-      }
-    }
-    tr.delete(from, to);
-    // The row after the deleted ones, or the one before when they were the last.
-    const last = bottom === table.childCount - 1;
-    caretInRow(tr, last ? rowPos(table, pos, top - 1) : tr.mapping.map(from));
+    // Merges cut at their start: the first kept row's covered cell starts them again.
+    const next = rowRestartingMerges(table, top, bottom);
+    if (next) {
+      const slice = new Slice(Fragment.from(next), 0, 0);
+      tr.replace(from, to + table.child(bottom + 1).nodeSize, slice);
+    } else tr.delete(from, to);
+    // The first row not marked deleted after the deleted ones (while tracking they all stay),
+    // or before them when there is none; any row left when every one is marked deleted.
+    const rows = [...Array(table.childCount).keys()];
+    const others = [...rows.slice(bottom + 1), ...rows.slice(0, top).reverse()];
+    const kept = others.find(
+      (r) => !(table.child(r).attrs.revision as { deletion?: unknown } | null)?.deletion,
+    );
+    caretInRow(tr, tr.mapping.map(rowPos(table, pos, kept ?? (others[0] as number)), -1));
   });
 };
 

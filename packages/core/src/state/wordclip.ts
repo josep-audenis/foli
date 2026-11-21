@@ -642,11 +642,11 @@ function fit(
     } as NodeJSON;
   };
 
-  // Pasted into a block control, the new paragraphs are in it as the one at the caret is.
+  // Pasted into a block control, the new paragraphs are in it as the one at the caret is (not
+  // as the row or cell around selected cells or a selected block is: that control is not theirs).
+  const { $from, $to } = state.selection;
   const around = (
-    from === to || state.selection.$from.parent === state.selection.$to.parent
-      ? state.selection.$from.parent.attrs.controls
-      : null
+    $from.parent.isTextblock && $from.parent === $to.parent ? $from.parent.attrs.controls : null
   ) as string[] | null | undefined;
   const mapped = mapNode(json) as NodeJSON;
   const inPlace = around?.length

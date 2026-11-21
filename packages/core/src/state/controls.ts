@@ -1026,7 +1026,10 @@ function dayOf(value: unknown): string | null {
 
 function formatDate(control: ControlJSON, date: string): string {
   const [y, m, d] = date.slice(0, 10).split("-").map(Number) as [number, number, number];
-  return formatDatePicture(new Date(y, m - 1, d), control.dateFormat ?? "d MMMM yyyy");
+  const day = new Date(2000, m - 1, d);
+  // The constructor reads a year under 100 as 19xx.
+  day.setFullYear(y, m - 1, d);
+  return formatDatePicture(day, control.dateFormat ?? "d MMMM yyyy");
 }
 
 /** A check box state's character; a code that is none shows as Word's box would. */

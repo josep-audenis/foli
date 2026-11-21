@@ -17,7 +17,7 @@ import {
 } from "@folijs/core";
 import { customToWord } from "../custom.js";
 import { controlsUsed, packageStories } from "../import/index.js";
-import { child, isW, R, REL, W } from "../import/ooxml.js";
+import { child, isW, REL, W } from "../import/ooxml.js";
 import { noteIds } from "../import/stories.js";
 import { DocxError, type DocxPackage, type NewPart } from "../package.js";
 import { newSettingsXml, withSettings, withTrackRevisions } from "../settings.js";
@@ -38,11 +38,13 @@ import { drawingXml, Media, pictureBytes } from "./pictures.js";
 import { same, sectionXml } from "./properties.js";
 import {
   DEFAULT_NAMESPACES,
+  declarationsOf,
   escapeAttribute,
   type Namespaces,
   NEW_ROOT_ATTRIBUTES,
   namespacesOf,
   scoped,
+  wordScope,
 } from "./xmlout.js";
 
 const CT = {
@@ -406,32 +408,22 @@ async function intoPackage(
   const main = pkg.xml(mainName);
   const body = child(main.root, "body");
   if (!body) throw new DocxError(`${mainName}: no w:body`);
-  // Content is written with `w:` and `r:`: where the part does not declare one (WordprocessingML
-  // under another prefix, or as the default namespace), the body's start tag does.
-  const declares = (el: XmlElement) =>
-    Object.fromEntries(
-      el.attributes
-        .filter((a) => a.name === "xmlns" || a.prefix === "xmlns")
-        .map((a) => [a.name, a.value]),
-    );
-  const declared: Record<string, string> = { ...declares(main.root), ...declares(body) };
+  const declared = { ...declarationsOf(main.root), ...declarationsOf(body) };
   if ((declared["xmlns:w"] ?? W) !== W)
     throw new DocxError(`${mainName}: its w: prefix is not WordprocessingML`);
-  const missing = Object.entries({ "xmlns:w": W, "xmlns:r": R }).filter(
-    ([name]) => !Object.hasOwn(declared, name),
+  // Content is written with `w:` and `r:`: where the part does not declare one, the body's start
+  // tag does.
+  const word = wordScope(
+    scoped(namespacesOf(main.root, main.source), declarationsOf(body)),
+    main.root,
+    body,
   );
-  const namespaces = scoped(
-    scoped(namespacesOf(main.root, main.source), declares(body)),
-    Object.fromEntries(missing),
-  );
+  const { namespaces } = word;
   const rels = new Relationships(pkg.relationships(mainName));
   const context = contextFor(namespaces, rels, media, mainName);
 
   const content = blocksXml(doc.content.content ?? [], context) + bodySection(doc, namespaces);
-  const added = missing
-    .filter(([name]) => name === "xmlns:w" || /\sr:[\w.-]+\s*=/.test(content))
-    .map(([name, uri]) => ` ${name}="${uri}"`)
-    .join("");
+  const added = word.declare(content);
   const empty = body.openEnd === body.end;
   const open = main.source.slice(0, empty ? body.end - 2 : body.openEnd - 1);
   const documentXml = `${open}${added}>${content}${empty ? `</${body.name}>${main.source.slice(body.end)}` : main.source.slice(body.closeStart)}`;
@@ -439,9 +431,17 @@ async function intoPackage(
   const replace = new Map<string, Uint8Array>();
   const add: NewPart[] = [];
   const set = (name: string, text: string) => {
-    if (pkg.text(name) !== text) replace.set(name, encoder.encode(utf8Declaration(text)));
+    // Whatever is rewritten is checked: never an ill-formed part.
+    if (pkg.text(name) !== text)
+      replace.set(name, encoder.encode(utf8Declaration(checkedPart(name, text))));
   };
-  set(mainName, documentXml === main.source ? documentXml : checkedPart(mainName, documentXml));
+  set(mainName, documentXml);
+  /** An existing part to write into: `w:` and `r:` in scope, declared by its root where needed. */
+  const originalOf = (name: string): { o: OriginalPart; ns: Namespaces } => {
+    const { root, source } = pkg.xml(name);
+    const scope = wordScope(namespacesOf(root, source), root);
+    return { o: { root, source, declare: scope.declare }, ns: scope.namespaces };
+  };
 
   /** The main document's related part of `type`, or a new one at `defaultName`. */
   const part = (
@@ -454,21 +454,15 @@ async function intoPackage(
     const relationship = pkg.relationships(mainName).find((r) => r.type === type && !r.external);
     const existing = relationship?.partName ? pkg.part(relationship.partName) : undefined;
     if (existing) {
-      const xml = pkg.xml(existing.name);
-      set(
-        existing.name,
-        write({ root: xml.root, source: xml.source }, namespacesOf(xml.root, xml.source)),
-      );
+      const { o, ns } = originalOf(existing.name);
+      set(existing.name, write(o, ns));
       return existing.name;
     }
     if (!needed) return undefined;
     if (pkg.part(defaultName)) {
       // There, but not related to the document: written in place, then related.
-      const xml = pkg.xml(defaultName);
-      set(
-        defaultName,
-        write({ root: xml.root, source: xml.source }, namespacesOf(xml.root, xml.source)),
-      );
+      const { o, ns } = originalOf(defaultName);
+      set(defaultName, write(o, ns));
       rels.add(type, relative(mainName, defaultName), false);
       return defaultName;
     }
@@ -540,14 +534,10 @@ async function intoPackage(
     const existing = related?.partName ? pkg.part(related.partName) : undefined;
     if (existing && unchanged(id)) continue;
     const name = existing?.name ?? freePart(story.kind, (n) => !!pkg.part(n) || newNames.has(n));
-    const xml = existing ? pkg.xml(existing.name) : undefined;
-    const ns = xml ? namespacesOf(xml.root, xml.source) : namespaces;
+    const { o, ns } = existing ? originalOf(existing.name) : { o: undefined, ns: namespaces };
     const partRels = ownRelationships(name, !!existing);
     const inner = blocksXml(story.content.content ?? [], contextFor(ns, partRels, media, name));
-    const text = checkedPart(
-      name,
-      wrapPart(xml && { root: xml.root, source: xml.source }, root, ns, inner),
-    );
+    const text = checkedPart(name, wrapPart(o, root, ns, inner));
     // Two relationships can share a part: both stories must then say the same.
     const earlier = writtenStories.get(name);
     if (earlier !== undefined && earlier !== text)
@@ -574,13 +564,10 @@ async function intoPackage(
     }
     const partRels = ownRelationships(target, !!name);
     const write = (o: OriginalPart | undefined, ns: Namespaces) =>
-      checkedPart(
-        target,
-        notesXml(kind, stories, originals, unchanged, isReferenced, o, {
-          ...contextFor(ns, partRels, media, target),
-          note: kind,
-        }),
-      );
+      notesXml(kind, stories, originals, unchanged, isReferenced, o, {
+        ...contextFor(ns, partRels, media, target),
+        note: kind,
+      });
     part(rel, defaultName, contentType, write, held);
     if (partRels.added.length) writeRelationships(target, partRels);
   }
@@ -765,7 +752,10 @@ async function newPackage(
   });
   const overrides = [...parts, ...media.added]
     .filter((p) => p.contentType !== CT.rels)
-    .map((p) => `<Override PartName="${p.name}" ContentType="${p.contentType}"/>`)
+    .map(
+      (p) =>
+        `<Override PartName="${escapeAttribute(p.name)}" ContentType="${escapeAttribute(p.contentType)}"/>`,
+    )
     .join("");
   const files: [string, string][] = [
     [

@@ -599,6 +599,9 @@ function readHTML(html: string): { content: DocJSON; open: boolean } | null {
     if (last?.type === "hardBreak") inline.pop(); // a trailing <br> adds no line in HTML
     const tail = inline[inline.length - 1];
     if (tail?.type === "text" && !blockPre) tail.text = trimSpaces(tail.text);
+    // `<p>&nbsp;</p>` is how Outlook and TinyMCE write an empty line: no text.
+    if (keepEmpty && inline.length === 1 && tail?.type === "text" && /^ $/.test(tail.text))
+      inline = [];
     // Non-breaking spaces survive the trimming above, then become ordinary spaces.
     for (const node of inline) {
       if (node.type === "text") node.text = node.text.replace(/ /g, " ");

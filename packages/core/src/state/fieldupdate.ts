@@ -260,7 +260,9 @@ function formatted(
   for (const name of instruction.switches.get("*") ?? []) {
     const lower = name.toLowerCase();
     if (KEEPS_FORMAT.has(lower)) continue;
-    const asNumber = NUMBER_SWITCH[name] ?? NUMBER_SWITCH_ANY_CASE[lower];
+    // The name's first letter gives the case: `Roman` is `ROMAN`.
+    const cased = /^[A-Z]/.test(name) ? name.toUpperCase() : lower;
+    const asNumber = NUMBER_SWITCH[cased] ?? NUMBER_SWITCH_ANY_CASE[lower];
     if (asNumber) format = asNumber;
     else if (lower === "hex") hex = true;
     else if (CASE_SWITCH[lower]) cases.push(CASE_SWITCH[lower]);
@@ -271,7 +273,7 @@ function formatted(
     const pictured = formatNumericPicture(number, picture);
     if (pictured === null) return null;
     text = pictured;
-  } else if (number !== null && hex) text = number.toString(16).toUpperCase();
+  } else if (number !== null && hex) text = Math.round(number).toString(16).toUpperCase();
   else if (number !== null && (format || typeof value === "number"))
     text = formatNumber(number, format);
   for (const apply of cases) text = apply(text);

@@ -109,4 +109,42 @@ describe("regressions: agent", () => {
     const value = session.controls()[0]?.value as string;
     expect(session.fillControl("choice", value).ok).toBe(true);
   });
+
+  it("a block control showing its placeholder over several paragraphs reads it once", () => {
+    const controls = { controls: ["c1"] };
+    const session = openSession(
+      {
+        ...createDocument({
+          type: "doc",
+          content: [p("Click here", controls), p("to write.", controls), p("After")],
+        } as never),
+        controls: { c1: { kind: "richText", alias: "Notes", placeholder: { showing: true } } },
+      },
+      { author: "Agent" },
+    );
+    expect(blocks(session).map((b) => b.text)).toEqual(["[empty: Notes]", "", "After"]);
+  });
+
+  for (const [what, next] of [
+    ["is not in the document", "Gone"],
+    ["is not a paragraph style", "Strong"],
+  ] as const) {
+    it(`a paragraph after one whose style's next style ${what} keeps the style`, () => {
+      const session = openSession(
+        {
+          ...createDocument({ type: "doc", content: [p("Title", { style: "H" })] } as never),
+          styles: [
+            { id: "N", type: "paragraph", name: "Normal", isDefault: true },
+            { id: "H", type: "paragraph", name: "Heading", next },
+            { id: "Strong", type: "character", name: "Strong" },
+          ],
+        },
+        { author: "Agent" },
+      );
+      const result = session.insertAfter(blocks(session)[0]?.handle as string, "Body");
+      expect(result.ok).toBe(true);
+      const inserted = session.document().content.content?.[1];
+      expect(inserted?.attrs?.style).toBe("H");
+    });
+  }
 });

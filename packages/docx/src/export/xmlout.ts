@@ -1,6 +1,6 @@
 /** Writing XML: escaping, elements, and reading back the verbatim fragments the model keeps. */
 
-import { W } from "../import/ooxml.js";
+import { R, W } from "../import/ooxml.js";
 import { DocxError } from "../package.js";
 import { parseXml, type XmlElement } from "../xml.js";
 
@@ -160,6 +160,45 @@ export function scoped(namespaces: Namespaces, bag: unknown): Namespaces {
     prefixes.add(name.slice(6));
   }
   return { declarations, prefixes };
+}
+
+/**
+ * The `xmlns` declarations an element's start tag makes, as an `attributes` bag (for `scoped`).
+ * @internal
+ */
+export function declarationsOf(element: XmlElement): Record<string, string> {
+  return Object.fromEntries(
+    element.attributes
+      .filter((a) => a.name === "xmlns" || a.prefix === "xmlns")
+      .map((a) => [a.name, a.value]),
+  );
+}
+
+/**
+ * Content is written with `w:` and `r:`. For a part where `elements` (the start tags around
+ * that content: its root, the body) do not declare one (WordprocessingML under another prefix,
+ * or as the default namespace): `namespaces` is `base` with both in scope, and `declare` gives
+ * the declarations the innermost start tag must add for `content` (those it uses only: a part
+ * written as it was stays as it was).
+ * @internal
+ */
+export function wordScope(
+  base: Namespaces,
+  ...elements: XmlElement[]
+): { namespaces: Namespaces; declare: (content: string) => string } {
+  const declared = Object.assign({}, ...elements.map(declarationsOf)) as Record<string, string>;
+  const missing = Object.entries({ "xmlns:w": W, "xmlns:r": R }).filter(
+    ([name]) => !Object.hasOwn(declared, name),
+  );
+  const used: Record<string, RegExp> = { "xmlns:w": /<w:/, "xmlns:r": /\sr:[\w.-]+\s*=/ };
+  return {
+    namespaces: scoped(base, Object.fromEntries(missing)),
+    declare: (content) =>
+      missing
+        .filter(([name]) => used[name]?.test(content))
+        .map(([name, uri]) => ` ${name}="${uri}"`)
+        .join(""),
+  };
 }
 
 /**

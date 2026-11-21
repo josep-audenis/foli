@@ -70,6 +70,8 @@ interface Hidden {
   from: number;
   to: number;
   label?: string;
+  /** Its label is in a block's text already: a control over several paragraphs shows it once. */
+  shown?: boolean;
 }
 
 /** What of the body does not show: field codes and controls' placeholders, in order. */
@@ -93,7 +95,6 @@ function hiddenRanges(state: EditorState): Hidden[] {
 /** A paragraph's text as `Block.text` has it, and what else a read says of it. */
 function paragraphText(node: Node, pos: number, hiddenAt: (at: number) => Hidden | null) {
   let text = "";
-  let shown: Hidden | null = null;
   let changed = !!revisionOf(node) || !!node.attrs.formatChange;
   let comments = 0;
   node.forEach((child, offset) => {
@@ -103,9 +104,9 @@ function paragraphText(node: Node, pos: number, hiddenAt: (at: number) => Hidden
     const hidden = hiddenAt(pos + 1 + offset);
     if (hidden) {
       // What stands for a placeholder, once; not for one deleted with its control.
-      if (hidden.label && shown !== hidden && !marked(child, "deletion")) {
+      if (hidden.label && !hidden.shown && !marked(child, "deletion")) {
         text += hidden.label;
-        shown = hidden;
+        hidden.shown = true;
       }
       return;
     }

@@ -34,12 +34,15 @@ import { paragraphPropertiesXml, runPropertiesXml, same } from "./properties.js"
 import { stylePartsXml } from "./tables.js";
 import {
   attributesOf,
+  bagXml,
+  declarationsOf,
   el,
   escapeAttribute,
   fragment,
   merged,
   type Namespaces,
   onOff,
+  scoped,
   val,
 } from "./xmlout.js";
 
@@ -48,7 +51,12 @@ type Json = Record<string, unknown>;
 export interface OriginalPart {
   readonly root: XmlElement;
   readonly source: string;
+  /** The declarations its root's start tag must add for the children written (`wordScope`). */
+  readonly declare?: (children: string) => string;
 }
+
+/** The end tag of the element a kept start tag opens (`<x:comment …>`: `</x:comment>`). */
+const closing = (start: string) => `</${/^<([^\s/>]+)/.exec(start)?.[1]}>`;
 
 const reading = (source: string) => ({ source, report: new Recorder() });
 const text = (part: OriginalPart, node: XmlNode) => part.source.slice(node.start, node.end);
@@ -60,10 +68,14 @@ function otherAttributes(
   skip: readonly string[],
 ): string {
   if (!element) return "";
-  return element.attributes
-    .filter((a) => !skip.includes(a.name) && a.name !== "xmlns" && a.prefix !== "xmlns")
-    .map((a) => ` ${source.slice(a.start, a.end)}`)
-    .join("");
+  return (
+    element.attributes
+      // By namespace: `x:styleId` is `w:styleId` where the part names WordprocessingML `x`.
+      .filter((a) => !skip.includes(a.ns === W ? `w:${a.local}` : a.name))
+      .filter((a) => a.name !== "xmlns" && a.prefix !== "xmlns")
+      .map((a) => ` ${source.slice(a.start, a.end)}`)
+      .join("")
+  );
 }
 
 function original(ext: string | undefined, ns: Namespaces, expected?: string) {
@@ -92,11 +104,12 @@ export function wrapPart(
     return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\r\n<${rootName} ${ns.declarations}>${children}</${rootName}>`;
   }
   const { root, source } = part;
+  const added = part.declare?.(children) ?? "";
   if (root.openEnd === root.end) {
     // `<w:styles …/>`: opened to hold the children.
-    return `${source.slice(0, root.end - 2)}>${children}</${root.name}>${source.slice(root.end)}`;
+    return `${source.slice(0, root.end - 2)}${added}>${children}</${root.name}>${source.slice(root.end)}`;
   }
-  return source.slice(0, root.openEnd) + children + source.slice(root.closeStart);
+  return `${source.slice(0, root.openEnd - 1)}${added}>${children}${source.slice(root.closeStart)}`;
 }
 
 /**
@@ -497,10 +510,15 @@ export function numberingXml(
 
 // ---- comments ---------------------------------------------------------------------------------
 
-/** A comment's start tag: as written while author, initials and date are what was read from it. */
-function commentStart(comment: CommentJSON, ns: Namespaces): string {
+/**
+ * A comment's start tag: as written while author, initials and date are what was read from it.
+ * `ns`: what is in scope inside it (a written one keeps the namespaces the read one declared).
+ */
+function commentStart(comment: CommentJSON, ns: Namespaces): { start: string; ns: Namespaces } {
+  let declared = {};
   if (comment.ext) {
-    const o = fragment(`${comment.ext}</w:comment>`, ns, "comment");
+    const o = fragment(comment.ext.replace(/\/?>$/, "/>"), ns, "comment");
+    declared = declarationsOf(o.element);
     {
       const author = attr(o.element, "author") ?? "";
       const initials = attr(o.element, "initials");
@@ -513,16 +531,17 @@ function commentStart(comment: CommentJSON, ns: Namespaces): string {
           comment.initials &&
         readDate === comment.date
       ) {
-        return comment.ext;
+        return { start: comment.ext.replace(/\/>$/, ">"), ns: scoped(ns, declared) };
       }
     }
   }
-  return el("w:comment", {
+  const open = el("w:comment", {
     "w:id": comment.id,
     "w:author": comment.author,
     "w:date": comment.date,
     "w:initials": comment.initials,
-  }).replace(/\/>$/, ">");
+  }).slice(0, -2);
+  return { start: `${open}${bagXml(declared, ns)}>`, ns: scoped(ns, declared) };
 }
 
 /** @internal */
@@ -533,8 +552,10 @@ export function commentsXml(
 ): string {
   // A comment is matched to the element it was read from by its start tag and id.
   const comments = matcher(doc.comments, (c) => (c.ext ? `${c.ext}#${c.id}` : undefined));
-  const write = (c: CommentJSON) =>
-    `${commentStart(c, context.namespaces)}${blocksXml(c.content, context)}</w:comment>`;
+  const write = (c: CommentJSON) => {
+    const { start, ns } = commentStart(c, context.namespaces);
+    return `${start}${blocksXml(c.content, { ...context, namespaces: ns })}${closing(start)}`;
+  };
   const body = rebuild<CommentJSON>(
     part,
     (c) => {
@@ -585,6 +606,7 @@ export function notesXml(
     if (!new RegExp(`^${kind}:-?\\d+$`).test(key))
       throw new DocxError(`Not the id of a ${kind}: ${key.slice(0, 64)}`);
     const type = story.noteType ? ` w:type="${story.noteType}"` : "";
+    let inside = context;
     if (story.ext) {
       // The element it was read from must be this note: a copy would repeat another's id.
       const { element } = fragment(story.ext.replace(/\/?>$/, "/>"), context.namespaces, kind);
@@ -593,10 +615,12 @@ export function notesXml(
         attr(element, "type") !== story.noteType
       )
         throw new DocxError(`The start tag kept for ${key.slice(0, 64)} is another note's`);
+      // What its start tag declares is in scope for its content.
+      inside = { ...context, namespaces: scoped(context.namespaces, declarationsOf(element)) };
     }
     const start =
       story.ext?.replace(/\/>$/, ">") ?? `<w:${kind}${type} w:id="${key.slice(kind.length + 1)}">`;
-    return `${start}${blocksXml(story.content.content ?? [], context)}</w:${kind}>`;
+    return `${start}${blocksXml(story.content.content ?? [], inside)}${closing(start)}`;
   };
   const seen = new Set<string>();
   const held = part ? notesOf(part.root, kind) : new Map<string, XmlElement>();

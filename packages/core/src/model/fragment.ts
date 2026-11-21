@@ -135,6 +135,7 @@ export class Fragment {
   cut(from: number, to = this.size): Fragment {
     if (from <= 0 && to >= this.size) return this;
     if (from >= to) return Fragment.empty;
+    if (to > this.size) throw new RangeError(`Position ${to} outside fragment`);
     const result: Node[] = [];
     let size = 0;
     for (let i = 0, pos = 0; pos < to; i++) {
