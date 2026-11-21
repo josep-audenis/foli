@@ -192,7 +192,8 @@ interface ToolbarItemBase {
     readonly icon?: ReactNode | undefined;
     /**
      * Whether it can be used now. Default: a button's dry run of its `command` (`editor.can`); for
-     * a menu, whether it has entries. Runs after every transaction: keep it cheap.
+     * a menu, whether it has entries; a box or a color menu, always (its `pick` is not dry-run).
+     * Runs after every transaction: keep it cheap.
      */
     readonly enabled?: ((state: EditorState, editor: Editor) => boolean) | undefined;
 }
@@ -206,6 +207,8 @@ export interface ToolbarButton extends ToolbarItemBase {
     /** A toggle: whether it shows as pressed (`aria-pressed`). Runs after every transaction. */
     readonly pressed?: ((state: EditorState, editor: Editor) => boolean) | undefined;
     readonly actions?: undefined;
+    readonly select?: undefined;
+    readonly colors?: undefined;
 }
 /** A toolbar menu button: a WAI-ARIA menu of its `actions`. */
 export interface ToolbarMenu extends ToolbarItemBase {
@@ -216,14 +219,67 @@ export interface ToolbarMenu extends ToolbarItemBase {
     readonly actions: readonly ToolbarAction[] | ((editor: Editor) => readonly ToolbarAction[]);
     readonly command?: undefined;
     readonly pressed?: undefined;
+    readonly select?: undefined;
+    readonly colors?: undefined;
+}
+/** An entry of a toolbar box. */
+export interface ToolbarOption {
+    /** What `pick` gets; unique in the box, and not "". */
+    readonly value: string;
+    readonly label: string;
 }
 /**
- * A toolbar item, built-in (`toolbarItems`) or the app's own: a button running a command, or a
- * menu button. The toolbar keeps one tab stop for all its items (arrow keys, Home and End move
+ * A toolbar box (a `select`), as the font box: Up and Down on a closed box apply each value
+ * they pass. A built-in box with other entries is a copy:
+ * `{ ...toolbarItems.size, select: { ...toolbarItems.size.select, options: () => mine } }`.
+ */
+export interface ToolbarSelect extends ToolbarItemBase {
+    readonly select: {
+        /** Its entries now. Runs on every render of the toolbar: keep it cheap. */
+        readonly options: (state: EditorState) => readonly ToolbarOption[];
+        /**
+         * The entry shown: its `value`; null (or "") shows a blank entry (mixed, or nothing to
+         * show), a value that is not among the options shows itself. Runs after every transaction.
+         */
+        readonly value: (state: EditorState) => string | null;
+        /** What picking an entry runs. */
+        readonly pick: (value: string) => Command;
+    };
+    readonly command?: undefined;
+    readonly actions?: undefined;
+    readonly colors?: undefined;
+}
+/** A color of a toolbar color menu. */
+export interface ToolbarColor {
+    /** Its name in the menu (the accessible name); unique in the menu. */
+    readonly name: string;
+    /** Lowercase `#rrggbb`; null is the entry that removes the color. */
+    readonly color: string | null;
+}
+/**
+ * A toolbar color menu button (a WAI-ARIA menu of `menuitemradio`s, the current color checked
+ * and shown on the button), as the text color's. A built-in one with another palette is a copy:
+ * `{ ...toolbarItems.textColor, colors: { ...toolbarItems.textColor.colors, options: mine } }`.
+ */
+export interface ToolbarColorMenu extends ToolbarItemBase {
+    readonly colors: {
+        readonly options: readonly ToolbarColor[];
+        /** The color at the selection (null: none, or mixed). Runs after every transaction. */
+        readonly value: (state: EditorState) => string | null;
+        /** What picking a color runs (null: the entry that removes it). */
+        readonly pick: (color: string | null) => Command;
+    };
+    readonly command?: undefined;
+    readonly actions?: undefined;
+    readonly select?: undefined;
+}
+/**
+ * A toolbar item, built-in (`toolbarItems`) or the app's own: a button running a command, a
+ * menu button, a box or a color menu. The toolbar keeps one tab stop for all its items (arrow keys, Home and End move
  * between them), gives toggles `aria-pressed` and an item that cannot apply now `aria-disabled`
  * (still focusable), and leaves the focus and selection in the document on click.
  */
-export type ToolbarItem = ToolbarButton | ToolbarMenu;
+export type ToolbarItem = ToolbarButton | ToolbarMenu | ToolbarSelect | ToolbarColorMenu;
 /** An entry of a toolbar menu (a `menuitem`, or a `menuitemcheckbox` when it has `checked`). */
 export interface ToolbarAction {
     /** Unique in its menu. */
@@ -236,14 +292,16 @@ export interface ToolbarAction {
 }
 /** The names of the built-in items in `toolbarItems`. */
 export type ToolbarItemName = "style" | "font" | "size" | "bold" | "italic" | "underline" | "strike" | "link" | "textColor" | "highlight" | "alignStart" | "alignCenter" | "alignEnd" | "alignJustify" | "lineSpacing" | "bulletList" | "orderedList" | "outdent" | "indent" | "newComment" | "trackChanges" | "reviewView" | "previousChange" | "nextChange" | "acceptChange" | "rejectChange" | "acceptAll" | "rejectAll" | "undo" | "redo" | "table" | "tableStyle" | "cellShading" | "picture" | "pageBreak" | "section" | "headerFooter" | "fields" | "navigate" | "notes" | "controls";
-/** The built-in menu buttons of `actions` (the color menus and boxes are buttons to an app). */
+/** The built-in menu buttons of `actions`. */
 type ToolbarMenuName = "table" | "section" | "headerFooter" | "fields" | "navigate" | "notes" | "controls";
+type ToolbarSelectName = "style" | "font" | "size" | "lineSpacing" | "reviewView" | "tableStyle";
+type ToolbarColorName = "textColor" | "highlight" | "cellShading";
 /**
  * The built-in items by name, to place in `FoliToolbarProps.items` (an item's `key` is its name,
  * except the alignments: `align-start`, `align-center`, `align-end`, `align-justify`). A copy
  * with another `label` or `icon` keeps what the built-in does.
  */
-export declare const toolbarItems: { readonly [Name in ToolbarItemName]: Name extends ToolbarMenuName ? ToolbarMenu : ToolbarButton; };
+export declare const toolbarItems: { readonly [Name in ToolbarItemName]: Name extends ToolbarMenuName ? ToolbarMenu : Name extends ToolbarSelectName ? ToolbarSelect : Name extends ToolbarColorName ? ToolbarColorMenu : ToolbarButton; };
 /** The default toolbar: groups of `toolbarItems`, a separator between groups. */
 export declare const defaultToolbarItems: readonly (readonly ToolbarItem[])[];
 /**
@@ -345,4 +403,4 @@ export { FoliCanvas, type FoliCanvasHandle, type FoliCanvasProps } from "./FoliC
 export { FoliComments, type FoliCommentsProps } from "./FoliComments.js";
 export { type FoliChange, FoliEditor, type FoliEditorHandle, type FoliEditorProps, } from "./FoliEditor.js";
 export { FoliNavigation, type FoliNavigationProps } from "./FoliNavigation.js";
-export { defaultToolbarItems, FoliToolbar, type FoliToolbarProps, type ToolbarAction, type ToolbarButton, type ToolbarItem, type ToolbarItemName, type ToolbarMenu, toolbarItems, } from "./FoliToolbar.js";
+export { defaultToolbarItems, FoliToolbar, type FoliToolbarProps, type ToolbarAction, type ToolbarButton, type ToolbarColor, type ToolbarColorMenu, type ToolbarItem, type ToolbarItemName, type ToolbarMenu, type ToolbarOption, type ToolbarSelect, toolbarItems, } from "./FoliToolbar.js";
