@@ -24,7 +24,7 @@ place that says what is in progress; check it before starting work.
 | 10 Tables & images       | ✅ Done                  | —                | Merged in #73–#97 (#90, the landing page, went to main); 0.5.0 on npm; two misses accepted                   |
 | 11 Sections & templates  | ✅ Done                  | —                | Merged in #100–#118 (#106, #107, #110, #112 and #113, the site, went to main); 0.6.0 on npm; misses accepted |
 | 12 Ecosystem & 1.0       | ✅ Done                  | —                | Merged in #120–#133; 1.0.0 on npm (2026-11-20); Phase 5 speed misses and manual checks accepted as 1.0 risks |
-| 13 Agent library         | In progress              | `phase-13/agent` | 13.1–13.5 done; `@folijs/mcp` (Phase 14, not planned yet) waits for it                                       |
+| 13 Agent library         | In progress              | `phase-13/agent` | 13.1–13.6 done; `@folijs/mcp` (Phase 14, not planned yet) waits for it                                       |
 
 Status values: `Ready` (dependencies met, nobody on it) · `In progress` · `In review` (PR open) ·
 `✅ Done` (merged, acceptance criteria met) · `Blocked by …`.
@@ -2038,10 +2038,28 @@ Each task is a PR on `phase-13/agent`, the build green after each.
   a value the control has records nothing; a day that does not exist is refused, other text in
   a date control is kept as typed; merge fields without data are named once, by core's own
   matching (capitals not counting); page numbers left are said in words.)
-- [ ] 13.6 The three tasks and the tracking check: tests that import a corpus `.docx`, run the
+- [x] 13.6 The three tasks and the tracking check: tests that import a corpus `.docx`, run the
   calls a model would make, export, and import again; `rejectAllChanges(author)` compared with
   the input for each; the results opened in Word by the harness. Fix what they find in the
-  operations; write the rest in limitations.
+  operations; write the rest in limitations. (Done: `scenarios.test.ts` runs each task as a model would,
+  picking handles off the read's lines: the offer letter's controls and merge fields filled
+  (03), the NDA redlined (01: two replacements, one first refused for several matches, a clause
+  inserted, a clause deleted, a comment on replaced text), the agreement Word's reviewers
+  already redlined edited again with their changes left (02), the board report's seven
+  headings moved a level down and its table of contents built again (04). Each is exported,
+  imported again and read: the same as the session's read, every new change the agent's. Then
+  the agent's changes are rejected and its comments deleted: the read is the input's in all
+  four, and the content is the input's exactly in 01, in 02 and for the restyling of 04. What
+  differs (limitations.md): in 03 a placeholder that comes back has lost the run properties
+  kept verbatim for it (`w:lang`) and the date control keeps its date in its properties; in 04
+  the entries of the rebuilt table of contents come back without their `w14:paraId` and the
+  tab stops kept in `ext`. Both are core's (control values and field updates under tracking),
+  not the agent's operations. Word: `scripts/corpus/agent-roundtrip.mjs` makes the three
+  documents through the package and checks what Word reads with `word-review.ps1`
+  (corpus/README.md). 2026-11-21, Word 16.0.20625: 3 of 3 open without a repair prompt, every
+  revision is the agent's (9, 6 and 5: Word shows adjacent restyled headings as one), the
+  comment is there, and Word's text with every change accepted and with every change rejected
+  is Foli's paragraph by paragraph.)
 - [ ] 13.7 Docs and release: README (also the site's guide), `api.md`, `architecture.md`,
   `limitations.md`, the exploration note marked with what was built, acceptance checked above,
   the changeset, `private` removed from the manifest; 0.1.0 published with the owner's
