@@ -166,25 +166,24 @@ task asks, and use comment to explain a change that is not obvious.
 ## Showing what changed
 
 In an app, the person sees the session's editor: give `session.editor` to `FoliCanvas` (or to
-an `EditorView`). Then core's `hint` shows each block the agent changed for a few seconds,
-without moving the caret, from the handles the operations return:
+an `EditorView`). Once it is shown, core's `hint` marks a block the agent changed for a few
+seconds, without moving the caret, from the handles the operations return. A new hint
+replaces the one showing, so several changes are shown one after the other:
 
 ```tsx
 import { hint } from "@folijs/core";
 import { FoliCanvas } from "@folijs/react";
 
+<FoliCanvas editor={session.editor} />;
+
+// Later, once the canvas is on the page (before that, `hint` is false):
 const result = session.replaceText("b12", "30 days", "45 days");
 if (result.ok)
-  for (const block of result.blocks) {
+  result.blocks.forEach((block, i) => {
     const where = session.target(block.handle);
-    if (where.ok) hint(session.editor, where.target, { ms: 2500 });
-  }
-
-<FoliCanvas editor={session.editor} />;
+    if (where.ok) setTimeout(() => hint(session.editor, where.target, { ms: 2500 }), i * 3000);
+  });
 ```
-
-A new hint replaces the one showing: to walk through several changes, show them one after the
-other.
 
 ## Limits
 
