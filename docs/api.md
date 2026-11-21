@@ -130,7 +130,7 @@ undo, redo · Table (a menu), Table style (a box of the document's table styles 
 Grid), Shading (a menu of light cell fills; both in a table, not while tracking) · Picture… (a dialog) · page break · Section, Header (menus) · Controls (a menu: rich text, plain text, drop-down list, combo box, date picker, check box, picture around a selected one, repeating section, Add repeating item, Control properties… (a dialog: title, tag, the two locks, list items, date format, line breaks)) · Fields (a menu: page number, date, Cross-reference… (a dialog of the document's headings and bookmarks), table of contents, update the selected fields or all of them, show field codes). A pointer pick in a box calls `onClickCommand`, like a button click.
 Up and Down on a closed box apply each value they pass (Chrome and Firefox on Windows), one
 undo step each. Text color and highlight are menu buttons (WAI-ARIA menu, `menuitemradio`
-items) with a fixed palette (Word's highlight colors), the current color checked; arrow keys,
+items) with a palette (Word's highlight colors; an app gives another, [Toolbar items](#toolbar-items)), the current color checked; arrow keys,
 Home and End move, Enter picks, Escape closes back to the button. The alignment buttons show
 the selection's alignment pressed (none when mixed).
 A WAI-ARIA toolbar: one Tab stop, arrow keys, Home and End move between buttons; toggle buttons
