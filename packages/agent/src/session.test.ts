@@ -21,4 +21,9 @@ describe("openSession", () => {
     expect(changes.some((c) => c.kind === "insertion" && c.author === "Agent")).toBe(true);
     expect(JSON.stringify(session.document().content)).toContain("Draft. ");
   });
+
+  it("refuses an empty author", async () => {
+    const { document } = await importDocx(readFileSync(new URL("01-mutual-nda.docx", CORPUS)));
+    expect(() => openSession(document, { author: " " })).toThrow(/author/);
+  });
 });

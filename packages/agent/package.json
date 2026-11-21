@@ -1,6 +1,7 @@
 {
   "name": "@folijs/agent",
   "version": "0.0.0",
+  "private": true,
   "description": "Agent editing for the Foli document engine: an LLM reads a document as text with a handle per block and edits it with a few coarse operations, every edit a tracked change. No DOM, no Node built-ins.",
   "license": "MIT",
   "repository": {
@@ -36,8 +37,7 @@
   "devDependencies": {
     "@folijs/core": "workspace:*",
     "@folijs/docx": "workspace:*",
-    "@types/node": "^20.19.43",
-    "fast-check": "^4.10.2"
+    "@types/node": "^20.19.43"
   },
   "publishConfig": {
     "exports": {

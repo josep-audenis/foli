@@ -88,7 +88,7 @@ writeFileSync(appEntry, `export { FoliEditor } from "${dist("react")}";\n`);
  * and marks, which every package carries (the extended schema, foreign nodes and their JSON
  * mapping in core; their drawing and the clipboard HTML carrying their JSON in the view; their
  * tagged content controls in docx).
- * Agent added in 13.1 (56.2 kB, about 10% headroom): the session is `createEditor`, so nearly
+ * Agent added in 13.1 (56.2 kB, about 8% headroom): the session is `createEditor`, so nearly
  * all of it is core, which an app that edits already loads.
  */
 const BUNDLES = [

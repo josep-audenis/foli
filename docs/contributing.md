@@ -38,6 +38,7 @@ corpus scripts read.
 | `packages/react/`              | Components, hooks, the toolbar and its items (`src/`); the default theme (`styles.css`)                                 |
 | `packages/docx/src/`           | Zip, XML, the package, `import/`, `export/`, custom types (`custom.ts`)                                                 |
 | `packages/pdf/src/`            | `exportPdf` and the page script it runs (`renderer.ts`)                                                                 |
+| `packages/agent/src/`          | `openSession`: a document open for an LLM agent, its edits tracked (Phase 13, in development)                           |
 | `apps/playground/`             | Pages the e2e tests drive (`e2e/`), benchmarks (`bench/`), the Word corpus pages (`word/`). No engine logic             |
 | `apps/site/`                   | The landing page, `/test/`, the docs site (`src/docs/`), its live examples and the guides' samples (`src/guides/`)      |
 | `corpus/`, `scripts/corpus/`   | Word-written documents, Word's reference data, the harnesses that compare Foli with Word                                |
@@ -218,7 +219,9 @@ calling it flaky.
 `@folijs/core`, `@folijs/view`, `@folijs/react`, `@folijs/docx` and `@folijs/pdf` always share one
 version (a
 Changesets `fixed` group, [`.changeset/config.json`](../.changeset/config.json)); the
-playground, site, spike and examples are never published.
+playground, site, spike and examples are never published. `@folijs/agent` (Phase 13, in
+development) is outside the group and versions on its own as 0.x; it is `private` until its
+first release, so Changesets neither versions nor publishes it.
 
 1. **With each change to a published package**, run `pnpm changeset`: pick the bump (before
    1.0: `minor` for breaking changes and features, `patch` for fixes; from 1.0 the rules of

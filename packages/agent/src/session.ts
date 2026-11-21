@@ -17,7 +17,8 @@ export interface SessionOptions {
 export interface Session {
   /**
    * The headless editor under the session, for what the session has no operation for. Its
-   * commands take positions; edits made through it are tracked like the session's own.
+   * commands take positions; edits made through it are tracked like the session's own, unless
+   * tracking is turned off on it.
    */
   readonly editor: Editor;
   readonly author: string;
@@ -28,9 +29,11 @@ export interface Session {
 /**
  * Opens a document for an agent. The document is validated as `createEditor` does (an older
  * format is migrated); tracking is on from the start, whatever the document's own setting.
+ * Throws on a document that does not validate, and on an empty `author`.
  */
 export function openSession(document: EditorDocument, options: SessionOptions): Session {
   const { author, extensions } = options;
+  if (!author.trim()) throw new TypeError("openSession: `author` must name who edits");
   const editor = createEditor({
     document,
     author,

@@ -1931,7 +1931,7 @@ Each task is a PR on `phase-13/agent`, the build green after each.
 
 - [x] Claim phase, branch `phase-13/agent`
 - [x] 13.1 Package: `packages/agent` as `@folijs/agent` 0.0.0, core as its exact peer, the
-  `@foli/source` condition, in `scripts/` (`PACKAGES` of the API report, size, package checks)
+  `@folijs/source` condition, in `scripts/` (`PACKAGES` of the API report, size, package checks)
   and the changeset config; typechecked without the DOM lib and without Node's types, so a
   stray import fails the build. `openSession(document, { author })` over a tracking
   `createEditor`, `session.document()` for export. Record here why 0.x. (Done: the
@@ -1941,7 +1941,8 @@ Each task is a PR on `phase-13/agent`, the build green after each.
   for. `author` is required. Not in changesets' `fixed` group: it versions on its own. Why 0.x:
   the operations are shaped by the first real tool calls, which come with Phase 14, and ADR-0008
   forbids changing a 1.x API; the peer on core is exact all the same. Size 56.2 kB gzip with
-  core, budget 60.5 kB.)
+  core, budget 60.5 kB. `private` until 13.7: otherwise the next release of the
+  1.x packages would bump and publish it, as their dependant.)
 - [ ] 13.2 Reading and handles: `session.read()` (the whole body, or from a handle for a number
   of blocks, so a long document can be read in parts) and `session.block(handle)`. Decide and
   write down the text format (a line per block: handle, style, list number, text; cells nested
@@ -1965,7 +1966,8 @@ Each task is a PR on `phase-13/agent`, the build green after each.
   operations; write the rest in limitations.
 - [ ] 13.7 Docs and release: README (also the site's guide), `api.md`, `architecture.md`,
   `limitations.md`, the exploration note marked with what was built, acceptance checked above,
-  the changeset; 0.1.0 published with the owner's approval. Phase 14 planned.
+  the changeset, `private` removed from the manifest; 0.1.0 published with the owner's
+  approval. Phase 14 planned.
 
 ## After 1.0
 
