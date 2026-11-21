@@ -164,6 +164,25 @@ describe("tracked deleteRows", () => {
     rejected.commands.rejectAllChanges();
     expect(shape(tableOf(rejected))).toEqual(["a1^ b1", "| b2", "| b3"]);
   });
+
+  it("leaves the row after as it is until accepted (no copy of it, its bookmarks and ids)", () => {
+    const editor = editorOf([merged3(), p("end")], {}, true);
+    const before = tableOf(editor).child(1);
+    select(editor, inside(editor, "b1"));
+    expect(editor.run(deleteRows)).toBe(true);
+    expect(tableOf(editor).childCount).toBe(3);
+    expect(tableOf(editor).child(1).eq(before)).toBe(true);
+  });
+
+  it("restarts the merge past rows deleted one after another", () => {
+    const editor = editorOf([merged3(), p("end")], {}, true);
+    select(editor, inside(editor, "b2"));
+    expect(editor.run(deleteRows)).toBe(true);
+    select(editor, inside(editor, "b1"));
+    expect(editor.run(deleteRows)).toBe(true);
+    editor.commands.acceptAllChanges();
+    expect(shape(tableOf(editor))).toEqual(["a1^ b3"]);
+  });
 });
 
 describe("paste over cells of one row", () => {

@@ -9,7 +9,8 @@ import type { Mappable } from "../transform/stepmap.js";
 import { attempt as attemptTr } from "./attempt.js";
 import { MARK_ATTRS } from "./mark.js";
 import { Selection, type SelectionJSON, TextSelection } from "./selection.js";
-import { type Command, type EditorState, Plugin, type Transaction } from "./state.js";
+import { type Command, type EditorState, Plugin, stateBefore, type Transaction } from "./state.js";
+import { trackState, untracked } from "./track.js";
 
 const isTable = (node: Node) => node.type.name === "table";
 
@@ -63,8 +64,11 @@ export function deleteAcrossTables(tr: Transaction, from: number, to: number): b
     else {
       let end = start + 1;
       for (let r = 0; r <= row; r++) end += table.child(r).nodeSize;
-      // A merge starting in these rows goes on from the first row kept.
-      const next = rowRestartingMerges(table, 0, row);
+      // A merge starting in these rows goes on from the first row kept. Recorded as a tracked
+      // change the rows stay: the merge is restarted when their deletion is accepted (review.ts).
+      const before = stateBefore(tr);
+      const recorded = !!before && trackState(before)?.on === true && !tr.getMeta(untracked);
+      const next = recorded ? null : rowRestartingMerges(table, 0, row);
       if (next) {
         const slice = new Slice(Fragment.from(next), 0, 0);
         tr.replace(start + 1, end + table.child(row + 1).nodeSize, slice);
@@ -96,8 +100,8 @@ export function deleteAcrossTables(tr: Transaction, from: number, to: number): b
  * The row after rows `top..bottom` of `table` as it is once they are deleted, or null when it
  * stays as it is: a vertical merge starting in them goes on from it, its covered cell becoming
  * the merge's cell as it was (its properties, its text, then any text the covered cell held,
- * which Word does not show). It replaces the rows in one step with them, so that a tracked
- * delete can be rejected as a whole.
+ * which Word does not show). Not for a delete recorded as a tracked change (the rows stay, and
+ * a copy of the row would repeat its bookmarks and ids): there it is done on accepting.
  * @internal
  */
 export function rowRestartingMerges(table: Node, top: number, bottom: number): Node | null {

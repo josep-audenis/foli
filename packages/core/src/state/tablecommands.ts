@@ -257,7 +257,8 @@ export const deleteRows: Command = (state, dispatch) => {
   const to = rowPos(table, pos, bottom + 1);
   return apply(state, dispatch, (tr) => {
     // Merges cut at their start: the first kept row's covered cell starts them again.
-    const next = rowRestartingMerges(table, top, bottom);
+    // While tracking the rows stay: the merge is restarted when their deletion is accepted.
+    const next = tracking(state) ? null : rowRestartingMerges(table, top, bottom);
     if (next) {
       const slice = new Slice(Fragment.from(next), 0, 0);
       tr.replace(from, to + table.child(bottom + 1).nodeSize, slice);
