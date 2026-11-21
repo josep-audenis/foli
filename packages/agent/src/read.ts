@@ -102,9 +102,11 @@ function paragraphText(node: Node, pos: number, hiddenAt: (at: number) => Hidden
     if (TRACKED.some((mark) => marked(child, mark))) changed = true;
     const hidden = hiddenAt(pos + 1 + offset);
     if (hidden) {
-      // What stands for a placeholder, once.
-      if (hidden.label && shown !== hidden) text += hidden.label;
-      shown = hidden;
+      // What stands for a placeholder, once; not for one deleted with its control.
+      if (hidden.label && shown !== hidden && !marked(child, "deletion")) {
+        text += hidden.label;
+        shown = hidden;
+      }
       return;
     }
     if (marked(child, "hidden") || marked(child, "deletion")) return;

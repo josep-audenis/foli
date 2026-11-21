@@ -66,17 +66,18 @@ session.deleteBlock("b17");
 
 - **`replaceText(handle, find, replacement, { all })`**: `find` is text as `read` shows it,
   capitals and spaces included. It must be in the block exactly once, or `all` replaces every
-  place. The replacement takes the formatting of what it replaces; `""` deletes. `↵` or `
-` is
-  a line break.
-- **`insertAfter` / `insertBefore(handle, paragraphs)`**: next to a paragraph, a table or
-  anything else read. A new paragraph next to a paragraph is formatted as it is (style,
-  numbering, indentation), as Enter gives in Word, unless it names a `style` (by the name `read`
-  shows). The block keeps its handle; the new ones come back with theirs.
-- **`deleteBlock(handle)`**: a paragraph, or a table with all its cells. Where Word needs a
-  paragraph (the last of the document or of a cell, between two tables) it is emptied instead,
-  and the result says so.
+  place. The replacement takes the formatting of what it replaces; `""` deletes. `↵` or `\n`
+  is a line break. What `read` shows in brackets is not text and cannot be in `find`.
+- **`insertAfter` / `insertBefore(handle, paragraphs)`**: one paragraph or a list, next to a
+  paragraph, a table or anything else read. A new paragraph is formatted as Enter there gives
+  in Word: as the paragraph next to it (style, numbering, indentation), or after a heading as
+  body text. One that names a `style` (by the name `read` shows) has that style only. The block
+  keeps its handle; the new ones come back with theirs.
+- **`deleteBlock(handle)`**: a paragraph, or a table with all its cells. A paragraph that must
+  stay is emptied instead, and the result says why: the last one of the document or of a cell,
+  one before a table, one that ends a section.
 
 Refusals a model can act on: `no-match` (with the block's text), `several-matches` (with how
 many), `unknown-style` (with the styles there are), `gone`, `unknown-handle`, `not-a-paragraph`,
-`read-only`.
+`read-only` (a locked content control, content Foli does not edit), `invalid` (an argument of
+the wrong kind), `refused` (the document would not take the change). No operation throws.

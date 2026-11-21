@@ -1,4 +1,10 @@
-import { createEditor, rejectAllChanges, trackedChanges, undo } from "@folijs/core";
+import {
+  acceptAllChanges,
+  createEditor,
+  rejectAllChanges,
+  trackedChanges,
+  undo,
+} from "@folijs/core";
 import { describe, expect, it } from "vitest";
 import { type Block, openSession, type Session } from "./index.js";
 import { corpus } from "./testing/corpus.js";
@@ -271,5 +277,178 @@ describe("deleteBlock", () => {
     if (!made.ok) throw new Error(made.message);
     expect(session.deleteBlock((made.blocks[0] as Block).handle)).toMatchObject({ ok: true });
     expect(blocks(session).map((b) => b.text)).toEqual(original.map((b) => b.text));
+  });
+});
+
+describe("what the review of #140 found", () => {
+  it("deletes the table asked for when its first cell starts with another table", async () => {
+    const { document } = await corpus("06-price-schedule");
+    const moved = structuredClone(document);
+    type Json = { type: string; content?: Json[] };
+    const outer = (moved.content.content as Json[]).find((b) => b.type === "table") as Json;
+    const cells = (outer.content as Json[]).flatMap((row) => row.content as Json[]);
+    const holder = cells.find((c) => c.content?.some((b) => b.type === "table")) as Json;
+    const nested = holder.content?.find((b) => b.type === "table") as Json;
+    holder.content = holder.content?.filter((b) => b !== nested) as Json[];
+    (cells[0] as Json).content?.unshift(nested);
+    const session = openSession(moved, { author: "Agent" });
+    const original = blocks(session);
+    const tables = original.filter((b) => b.kind === "table");
+    expect(tables[1]?.cell).toMatchObject({ table: tables[0]?.handle, row: 1, column: 1 });
+
+    expect(session.deleteBlock(tables[0]?.handle as string)).toMatchObject({
+      ok: true,
+      text: `Deleted table ${tables[0]?.handle} with its cells.`,
+    });
+    // Both tables and every cell are gone from the read; the paragraphs around stay.
+    expect(blocks(session)).toEqual(original.filter((b) => b.depth === 0 && b.kind !== "table"));
+    expectTracked(session, original);
+  });
+
+  it("refuses to insert into, and to delete, what a locked content control holds", async () => {
+    const { document } = await corpus("03-offer-letter-template");
+    const controls = Object.fromEntries(
+      Object.entries(document.controls ?? {}).map(([id, control]) => [
+        id,
+        { ...control, lock: "sdtContentLocked" as const },
+      ]),
+    );
+    const session = openSession({ ...document, controls }, { author: "Agent" });
+    const all = blocks(session);
+    const benefits = starting(all, "Private health insurance");
+    const before = text(session);
+    expect(session.insertAfter(benefits.handle, ["x"])).toMatchObject({ code: "read-only" });
+    expect(session.insertBefore(benefits.handle, ["x"])).toMatchObject({ code: "read-only" });
+    expect(session.deleteBlock(benefits.handle)).toMatchObject({ code: "read-only" });
+    // A paragraph with a locked control in its line: full of text, and not "already empty".
+    const remote = all.find((b) => b.text.includes("Remote working")) as Block;
+    const refused = session.deleteBlock(remote.handle);
+    expect(refused).toMatchObject({ ok: false, code: "read-only" });
+    expect(!refused.ok && refused.message).toContain("Remote");
+    expect(text(session)).toBe(before);
+    // Next to it, outside the control, a paragraph goes in.
+    expect(session.insertAfter(remote.handle, ["After."])).toMatchObject({ ok: true });
+  });
+
+  it("empties a paragraph before a table and says why: accepting would leave it too", async () => {
+    const session = await open("06-price-schedule");
+    const original = blocks(session);
+    const lead = original[1] as Block;
+    expect(original[2]?.kind).toBe("table");
+    const result = session.deleteBlock(lead.handle);
+    expect(result.ok && result.text).toContain(
+      "was emptied but stays: the block after it is not a paragraph it can join",
+    );
+    session.editor.run(acceptAllChanges());
+    expect(session.block(lead.handle)).toMatchObject({ block: { text: "" } });
+  });
+
+  it("deletes a paragraph that holds an empty control, placeholder and all", async () => {
+    const session = await open("03-offer-letter-template");
+    const original = blocks(session);
+    const date = starting(original, "Date: [empty: Offer date]");
+    expect(session.deleteBlock(date.handle)).toMatchObject({
+      ok: true,
+      text: `Deleted block ${date.handle}.`,
+    });
+    expect(blocks(session).some((b) => b.handle === date.handle)).toBe(false);
+    expectTracked(session, original);
+  });
+
+  it("keeps a section break: the paragraph that ends a section is not deleted", async () => {
+    const { document } = await corpus("08-newsletter");
+    const session = openSession(document, { author: "Agent" });
+    const sections = () => {
+      let count = 1;
+      session.editor.state.doc.forEach((node) => {
+        if (node.attrs.section) count++;
+      });
+      return count;
+    };
+    const before = sections();
+    expect(before).toBeGreaterThan(1);
+    // The body's blocks and what is read at depth 0 are the same list, in the same order.
+    let index = -1;
+    session.editor.state.doc.forEach((node, _offset, i) => {
+      if (index < 0 && node.attrs.section) index = i;
+    });
+    const breaker = blocks(session).filter((b) => b.depth === 0)[index] as Block;
+    const result = session.deleteBlock(breaker.handle);
+    expect(result.ok ? result.text : result.message).toContain("it ends a section");
+    session.editor.run(acceptAllChanges());
+    expect(sections()).toBe(before);
+  });
+
+  it("removes its own paragraph at the document's end for real", async () => {
+    const session = await open();
+    const original = blocks(session);
+    const last = original.at(-1) as Block;
+    const made = session.insertAfter(last.handle, ["Appendix."]);
+    if (!made.ok) throw new Error(made.message);
+    expect(session.deleteBlock(made.blocks[0]?.handle as string)).toMatchObject({
+      ok: true,
+      text: `Deleted block ${made.blocks[0]?.handle}.`,
+    });
+    expect(blocks(session)).toEqual(original);
+    expect(trackedChanges(session.editor.state.doc)).toHaveLength(0);
+  });
+
+  it("after a heading inserts body text, as Enter does, not another heading", async () => {
+    const session = await open();
+    const original = blocks(session);
+    const heading = starting(original, "Definitions and interpretation");
+    const result = session.insertAfter(heading.handle, ["In this clause:"]);
+    expect(result.ok && result.blocks[0]?.style).not.toBe("heading 1");
+    expect(result.ok && result.blocks[0]?.number).toBeUndefined();
+    // The headings after it keep their numbers.
+    expect(starting(blocks(session), "Obligations of confidentiality").number).toBe("2.");
+    // Before a heading: as the heading, which is what Enter at its start gives.
+    const before = session.insertBefore(heading.handle, ["Recitals"]);
+    expect(before.ok && before.blocks[0]?.style).toBe("heading 1");
+    expectTracked(session, original);
+  });
+
+  it("takes one paragraph given bare, and refuses what is not text instead of throwing", async () => {
+    const session = await open();
+    const first = blocks(session)[0] as Block;
+    const never = null as never;
+    expect(session.insertAfter(first.handle, "One paragraph.")).toMatchObject({
+      ok: true,
+      blocks: [{ text: "One paragraph." }],
+    });
+    expect(session.insertAfter(first.handle, [never])).toMatchObject({ code: "invalid" });
+    expect(session.insertAfter(first.handle, [{ text: 5 as never }])).toMatchObject({
+      code: "invalid",
+    });
+    expect(session.insertAfter(first.handle, [{ text: "x", style: 5 as never }])).toMatchObject({
+      code: "invalid",
+    });
+    expect(session.replaceText(first.handle, undefined as never, "x")).toMatchObject({
+      code: "invalid",
+    });
+    expect(session.replaceText(first.handle, "MUTUAL", undefined as never)).toMatchObject({
+      code: "invalid",
+    });
+    expect(session.replaceText(7 as never, "a", "b")).toMatchObject({ code: "invalid" });
+    expect(session.deleteBlock(undefined as never)).toMatchObject({ code: "invalid" });
+  });
+
+  it("records nothing when the replacement is the text there", async () => {
+    const session = await open();
+    const first = blocks(session)[0] as Block;
+    expect(session.replaceText(first.handle, "MUTUAL", "MUTUAL")).toMatchObject({
+      ok: true,
+      replaced: 0,
+      blocks: [{ changed: false }],
+    });
+    expect(trackedChanges(session.editor.state.doc)).toHaveLength(0);
+  });
+
+  it("says that what read shows in brackets is not text to find", async () => {
+    const session = await open("03-offer-letter-template");
+    const date = starting(blocks(session), "Date: [empty: Offer date]");
+    const result = session.replaceText(date.handle, "[empty: Offer date]", "1 May");
+    expect(result).toMatchObject({ ok: false, code: "no-match" });
+    expect(!result.ok && result.message).toContain("in brackets");
   });
 });

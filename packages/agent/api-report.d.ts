@@ -137,22 +137,27 @@ export interface Session {
     /**
      * Replaces `find` in a paragraph by `replacement` ("" deletes it). `find` is text as `read`
      * shows it, capitals and spaces included, and must be in the block once, unless `all`. The
-     * replacement takes the formatting of the text it replaces. Returns the block as it reads now.
+     * replacement takes the formatting of the text it replaces. Returns the block as it reads
+     * now, how many places were replaced and how many could not be (a locked control, a field).
      */
     replaceText(handle: string, find: string, replacement: string, options?: ReplaceOptions): Result<Changed & {
         replaced: number;
+        refused: number;
     }>;
     /**
-     * Inserts paragraphs after a block (a paragraph, a table, anything read). Next to a paragraph
-     * they are formatted as it is, numbering included, unless they name a `style`. Returns the
-     * new blocks with their handles.
+     * Inserts paragraphs after a block (a paragraph, a table, anything read): one, or a list.
+     * Next to a paragraph they are formatted as Enter there gives in Word: as the paragraph,
+     * numbering included, or in the style its style names as the next (after a heading: body
+     * text); a paragraph that names a `style` has that style and nothing of the neighbour's.
+     * Returns the new blocks with their handles.
      */
-    insertAfter(handle: string, paragraphs: readonly NewParagraph[]): Result<Changed>;
+    insertAfter(handle: string, paragraphs: NewParagraph | readonly NewParagraph[]): Result<Changed>;
     /** As `insertAfter`, before the block: the block keeps its handle. */
-    insertBefore(handle: string, paragraphs: readonly NewParagraph[]): Result<Changed>;
+    insertBefore(handle: string, paragraphs: NewParagraph | readonly NewParagraph[]): Result<Changed>;
     /**
-     * Deletes a paragraph, or a table with all its cells. The last paragraph of the document or
-     * of a cell cannot go: it is emptied, and `text` says so.
+     * Deletes a paragraph, or a table with all its cells. A paragraph that must stay (the last of
+     * the document or of a cell, one before a table, one that ends a section) is emptied instead,
+     * and `text` says why.
      */
     deleteBlock(handle: string): Result<{
         text: string;

@@ -1,4 +1,7 @@
 import {
+  controlIsReadOnly,
+  controlProperties,
+  controlsIn,
   deleteTable,
   type Editor,
   findAll,
@@ -7,6 +10,7 @@ import {
   type ReplaceRefusal,
   replace,
   setParagraphStyle,
+  untracked,
 } from "@folijs/core";
 import { wordContext } from "@folijs/core/internal";
 import type { Handles } from "./handles.js";
@@ -31,7 +35,10 @@ export interface ReplaceOptions {
 export interface Context {
   editor: Editor;
   handles: Handles;
+  author: string;
 }
+
+type Attrs = Record<string, unknown>;
 
 /** A paragraph's attributes that are its mark's own: a new paragraph does not take them. */
 const MARK_ONLY = { section: null, revision: null, formatChange: null, attributes: null };
@@ -49,7 +56,7 @@ const WHY: Record<ReplaceRefusal, string> = {
 /** Text as a model writes it, as the document takes it: ↵ is a line break, no control characters. */
 const typed = (text: string) =>
   text
-    .replaceAll("\r\n", "\n")
+    .replace(/\r\n?/g, "\n")
     .replaceAll("↵", "\n")
     // biome-ignore lint/suspicious/noControlCharactersInRegex: control characters are what goes
     .replace(/[\u0000-\u0008\u000B-\u001F]/g, "");
@@ -58,6 +65,8 @@ const quote = (text: string) => JSON.stringify(text.length > 80 ? `${text.slice(
 
 /** @internal Why `handle` names no block now, or the block. */
 export function resolve(context: Context, handle: string): Refusal | { pos: number; node: Node } {
+  if (typeof handle !== "string")
+    return refuse("invalid", "A block is named by its handle, a string as read gives it: b7.");
   const found = context.handles.resolve(handle);
   if (found) {
     if (readBlocks(context.editor.state, context.handles).some((b) => b.handle === handle))
@@ -84,6 +93,7 @@ export function changed(context: Context, handles: readonly string[]): Changed {
 /** @internal The id of the paragraph style a model named (by its name or id), or the refusal. */
 export function styleId(context: Context, name: string): string | Refusal {
   const styles = paragraphStyles(context.editor.state);
+  if (typeof name !== "string") return refuse("invalid", "A style is named by its name, a string.");
   const wanted = name.trim().toLowerCase();
   const style =
     styles.find((s) => s.name.toLowerCase() === wanted) ??
@@ -95,6 +105,21 @@ export function styleId(context: Context, name: string): string | Refusal {
   );
 }
 
+/** The content controls `node` at `pos` is in or holds that may not be edited, by name. */
+function lockedControls(context: Context, pos: number, node: Node): string[] {
+  const { state } = context.editor;
+  const ids = new Set<string>((node.attrs.controls as string[] | null) ?? []);
+  const end = pos + node.nodeSize;
+  for (const range of controlsIn(state.doc))
+    if (range.from < end && pos < range.to) ids.add(range.id);
+  const names: string[] = [];
+  for (const id of ids) {
+    const control = controlProperties(state, id);
+    if (control && controlIsReadOnly(control)) names.push(control.alias ?? control.tag ?? id);
+  }
+  return names;
+}
+
 /** @internal */
 export function replaceText(
   context: Context,
@@ -102,7 +127,7 @@ export function replaceText(
   find: string,
   replacement: string,
   options: ReplaceOptions = {},
-): Result<Changed & { replaced: number }> {
+): Result<Changed & { replaced: number; refused: number }> {
   const { editor } = context;
   const target = resolve(context, handle);
   if ("ok" in target) return target;
@@ -111,7 +136,10 @@ export function replaceText(
       "not-a-paragraph",
       `Block ${handle} is not a paragraph: text is replaced in paragraphs (a table's are its cells' blocks).`,
     );
+  if (typeof find !== "string" || typeof replacement !== "string")
+    return refuse("invalid", 'find and replacement must be strings (replacement "" deletes).');
   const query = typed(find);
+  const text = typed(replacement);
   if (!query) return refuse("invalid", "find must be the text to replace, as read shows it.");
   const from = target.pos;
   const to = target.pos + target.node.nodeSize;
@@ -120,9 +148,12 @@ export function replaceText(
   );
   if (!matches.length) {
     const now = changed(context, [handle]).blocks[0]?.text ?? "";
+    const brackets = /\[[^\]]+\]/.test(query)
+      ? " What read shows in brackets ([picture], [empty: …]) is not text: leave it out of find."
+      : "";
     return refuse(
       "no-match",
-      `${quote(query)} is not in block ${handle}. Capitals and spaces count. Its text is: ${JSON.stringify(now)}`,
+      `${quote(query)} is not in block ${handle}. Capitals and spaces count.${brackets} Its text is: ${JSON.stringify(now)}`,
     );
   }
   if (matches.length > 1 && !options.all)
@@ -130,20 +161,27 @@ export function replaceText(
       "several-matches",
       `${quote(query)} is in block ${handle} ${matches.length} times. Give a longer find that is there once, or all: true to replace every one.`,
     );
+  // Nothing to record: the text is what it would become.
+  if (query === text) return { ok: true, replaced: 0, refused: 0, ...changed(context, [handle]) };
   let replaced = 0;
+  let refused = 0;
   let why: ReplaceRefusal | undefined;
   // Last first: a replacement moves what comes after it.
   for (const match of matches.reverse()) {
-    const report = replace(editor, match, typed(replacement), { matchCase: true });
+    const report = replace(editor, match, text, { matchCase: true });
     replaced += report.replaced;
+    refused += report.refused.length;
     why ??= report.refused[0]?.reason;
   }
+  const reason = why ? WHY[why] : "the document refused the change";
   if (!replaced)
     return refuse(
       why === "locked" || why === "control" ? "read-only" : "refused",
-      `${quote(query)} in block ${handle} was not replaced: ${why ? WHY[why] : "the document refused the change"}.`,
+      `${quote(query)} in block ${handle} was not replaced: ${reason}.`,
     );
-  return { ok: true, replaced, ...changed(context, [handle]) };
+  const result = changed(context, [handle]);
+  if (refused) result.text += `\n${refused} of ${matches.length} not replaced: ${reason}.`;
+  return { ok: true, replaced, refused, ...result };
 }
 
 /** A new paragraph's content: its text, line breaks and tabs. */
@@ -158,34 +196,69 @@ function inline(editor: Editor, text: string): Node[] {
   return nodes;
 }
 
+/**
+ * The attributes of a paragraph put next to `node`, as Enter gives in Word (core's
+ * `splitAttrs`): the paragraph's own properties and controls, without its mark's own. After a
+ * paragraph whose style names another as the next (a heading: Normal), that style, without the
+ * direct formatting.
+ */
+function attrsLike(context: Context, node: Node, side: "before" | "after"): Attrs | null {
+  if (node.type.name !== "paragraph") return null;
+  const attrs = node.attrs as Attrs;
+  if (side === "after") {
+    const styles = wordContext(context.editor.state)?.envelope.styles ?? [];
+    const paragraph = styles.filter((s) => s.type === "paragraph");
+    const id =
+      (attrs.style as string | null) ?? paragraph.filter((s) => s.isDefault).at(-1)?.id ?? null;
+    const next = paragraph.find((s) => s.id === id)?.next;
+    if (next !== undefined && next !== id) return { controls: attrs.controls ?? null, style: next };
+  }
+  return { ...attrs, ...MARK_ONLY };
+}
+
 /** @internal Inserts paragraphs before or after the block `handle`. */
 export function insert(
   context: Context,
   handle: string,
-  paragraphs: readonly NewParagraph[],
+  paragraphs: NewParagraph | readonly NewParagraph[],
   side: "before" | "after",
 ): Result<Changed> {
   const { editor, handles } = context;
   const target = resolve(context, handle);
   if ("ok" in target) return target;
-  if (!paragraphs.length) return refuse("invalid", "Give at least one paragraph to insert.");
-  // Like Enter in Word: a new paragraph next to one is formatted as it is, in the same controls.
-  const like: Record<string, unknown> | null =
-    target.node.type.name === "paragraph" ? { ...target.node.attrs, ...MARK_ONLY } : null;
+  // One paragraph given bare is one paragraph.
+  const list: readonly unknown[] = Array.isArray(paragraphs) ? paragraphs : [paragraphs];
+  if (!list.length) return refuse("invalid", "Give at least one paragraph to insert.");
+  const like = attrsLike(context, target.node, side);
+  // A new paragraph next to one in a control is in that control: not when it is locked.
+  for (const id of (like?.controls as string[] | null | undefined) ?? []) {
+    const control = controlProperties(editor.state, id);
+    if (control && controlIsReadOnly(control))
+      return refuse(
+        "read-only",
+        `Block ${handle} is in the locked content control ${quote(control.alias ?? control.tag ?? id)}: nothing is inserted there.`,
+      );
+  }
   const known = new Set(wordContext(editor.state)?.envelope.styles.map((s) => s.id));
   const { schema } = editor.state;
   const nodes: Node[] = [];
   /** Styles Word has built in that the document has not yet: put on once the paragraph is there. */
   const later: { index: number; id: string }[] = [];
-  for (const [index, paragraph] of paragraphs.entries()) {
-    const { text, style } = typeof paragraph === "string" ? { text: paragraph } : paragraph;
-    if (typeof text !== "string") return refuse("invalid", "A paragraph to insert needs its text.");
-    let attrs: Record<string, unknown> | null = like;
+  for (const [index, paragraph] of list.entries()) {
+    const given = typeof paragraph === "string" ? { text: paragraph } : paragraph;
+    const { text, style } = (given ?? {}) as { text?: unknown; style?: unknown };
+    if (typeof text !== "string")
+      return refuse(
+        "invalid",
+        'A paragraph to insert is its text, or { "text": …, "style": … } with the text a string.',
+      );
+    let attrs = like;
     if (style !== undefined) {
-      const id = styleId(context, style);
+      const id = styleId(context, style as string);
       if (typeof id !== "string") return id;
-      if (known.has(id)) attrs = { controls: like?.controls ?? null, style: id };
-      else later.push({ index, id });
+      // In a style of its own: none of the neighbour's numbering or indents.
+      attrs = { controls: like?.controls ?? null, ...(known.has(id) ? { style: id } : {}) };
+      if (!known.has(id)) later.push({ index, id });
     }
     nodes.push(schema.node("paragraph", attrs, inline(editor, text)));
   }
@@ -197,65 +270,106 @@ export function insert(
   const made: string[] = [];
   let pos = at;
   for (const [index] of nodes.entries()) {
-    const node = editor.state.doc.nodeAt(pos);
-    if (!node) break;
-    made.push(handles.at(pos, node));
     const style = later.find((l) => l.index === index);
     if (style) {
+      // shortcut: a second change and undo step; only for a built-in style the document lacks.
       editor.select(pos + 1);
       editor.run(setParagraphStyle(style.id));
     }
-    pos += (editor.state.doc.nodeAt(pos) ?? node).nodeSize;
+    const node = editor.state.doc.nodeAt(pos);
+    if (!node) break;
+    made.push(handles.at(pos, node));
+    pos += node.nodeSize;
   }
   return { ok: true, ...changed(context, made) };
 }
 
+/** Why a paragraph must stay where it is, or null when it may go whole. */
+function mustStay(node: Node, previous: Node | null, next: Node | null): string | null {
+  if (node.attrs.section) return "it ends a section, and its section break stays with it";
+  if (!next) return "a paragraph must end the document, and a table's cell";
+  if (next.type.name !== "paragraph")
+    return previous?.type.name === "table" && next.type.name === "table"
+      ? "a paragraph must stand between two tables"
+      : "the block after it is not a paragraph it can join";
+  return null;
+}
+
+/** Whether a paragraph has anything left to delete: content not deleted already. */
+const hasContent = (node: Node) => {
+  let live = false;
+  node.forEach((child) => {
+    live ||= !child.marks.some((m) => m.type.name === "deletion");
+  });
+  return live;
+};
+
 /** @internal */
 export function deleteBlock(context: Context, handle: string): Result<{ text: string }> {
-  const { editor } = context;
+  const { editor, author } = context;
   const target = resolve(context, handle);
   if ("ok" in target) return target;
   const { node, pos } = target;
   const name = node.type.name;
-  const before = editor.state.doc;
-  if (name === "table") {
-    let inside = -1;
-    node.descendants((child, offset) => {
-      if (inside < 0 && child.isTextblock) inside = pos + 1 + offset + 1;
-      return inside < 0;
-    });
-    editor.select(inside);
-    editor.run(deleteTable);
-  } else if (name === "paragraph") {
-    // Word's rules: a cell and the body end with a paragraph, and two tables never touch. Where
-    // the paragraph holds one of them up, only its content goes.
-    const $pos = editor.state.doc.resolve(pos);
-    const index = $pos.index();
-    const parent = $pos.parent;
-    const next = index + 1 < parent.childCount ? parent.child(index + 1) : null;
-    const previous = index > 0 ? parent.child(index - 1) : null;
-    const stays = !next || (previous?.type.name === "table" && next.type.name === "table");
-    const tr = editor.state.tr;
-    editor.dispatch(
-      stays ? tr.delete(pos + 1, pos + node.nodeSize - 1) : tr.delete(pos, pos + node.nodeSize),
-    );
-  } else
+  if (name !== "table" && name !== "paragraph")
     return refuse(
       "read-only",
       `Block ${handle} is content Foli does not edit: it cannot be deleted.`,
     );
-  if (editor.state.doc === before)
+  const locked = lockedControls(context, pos, node);
+  if (locked.length)
+    return refuse(
+      "read-only",
+      `Block ${handle} is in or holds the locked content control ${quote(locked[0] as string)}: it cannot be deleted.`,
+    );
+  const before = editor.state.doc;
+  if (name === "table") {
+    // The caret in a paragraph of the table's own first cell (a cell ends with one), not in a
+    // table nested there: `deleteTable` takes the innermost table around the caret.
+    const cell = node.child(0).child(0);
+    const last = cell.child(cell.childCount - 1);
+    editor.select(pos + 2 + cell.content.size - last.nodeSize + 2);
+    editor.run(deleteTable);
+    if (editor.state.doc === before || changed(context, [handle]).blocks.length)
+      return refuse("refused", `Table ${handle} was not deleted: the document refused the change.`);
+    return { ok: true, text: `Deleted table ${handle} with its cells.` };
+  }
+  // Word's rules: a cell and the body end with a paragraph, two tables never touch, and a
+  // paragraph mark that cannot join a paragraph after it stays when its deletion is accepted.
+  // Where the paragraph must stay, only its content goes.
+  const $pos = editor.state.doc.resolve(pos);
+  const index = $pos.index();
+  const parent = $pos.parent;
+  const next = index + 1 < parent.childCount ? parent.child(index + 1) : null;
+  const previous = index > 0 ? parent.child(index - 1) : null;
+  const stays = mustStay(node, previous, next);
+  const own = (node.attrs.revision as { insertion?: { author?: string } } | null)?.insertion;
+  if (
+    stays &&
+    !node.attrs.section &&
+    own?.author === author &&
+    previous?.type.name === "paragraph"
+  ) {
+    // The session's own paragraph, never accepted: it goes for real, as its text would.
+    editor.dispatch(editor.state.tr.delete(pos, pos + node.nodeSize).setMeta(untracked, true));
+    if (editor.state.doc !== before) return { ok: true, text: `Deleted block ${handle}.` };
+  }
+  if (stays && !hasContent(node))
     return refuse(
       "refused",
-      name === "paragraph"
-        ? `Block ${handle} was not deleted: it is already empty, and a paragraph must stay there (the last of the document or of a cell, or between two tables).`
-        : `Block ${handle} was not deleted: the document refused the change.`,
+      `Block ${handle} was not deleted: it is already empty, and it stays because ${stays}.`,
     );
+  const tr = editor.state.tr;
+  editor.dispatch(
+    stays ? tr.delete(pos + 1, pos + node.nodeSize - 1) : tr.delete(pos, pos + node.nodeSize),
+  );
+  if (editor.state.doc === before)
+    return refuse("refused", `Block ${handle} was not deleted: the document refused the change.`);
   const left = changed(context, [handle]);
   if (left.blocks.length)
     return {
       ok: true,
-      text: `Block ${handle} was emptied but stays: a paragraph must be there (the last of the document or of a cell, or between two tables).\n${left.text}`,
+      text: `Block ${handle} was emptied but stays: ${stays ?? "its paragraph mark could not be deleted"}.\n${left.text}`,
     };
   return { ok: true, text: `Deleted block ${handle}.` };
 }

@@ -1885,8 +1885,8 @@ Each task is a PR on `phase-12/ecosystem`, the build green after each.
 A library an LLM agent uses to read and edit a document without computing positions: the
 document as text with a handle per block, a few coarse operations, every edit a tracked change
 in the agent's name that a person accepts or rejects in Foli or in Word. Background, and what
-was tried: [explorations/agent-editing.md](explorations/agent-editing.md). Planned 2026-11-21,
-nothing built.
+was tried: [explorations/agent-editing.md](explorations/agent-editing.md). Planned 2026-11-21;
+what is built is ticked under Tasks.
 
 Decided with the owner on 2026-11-21: the MCP server is a separate package (`@folijs/mcp`, Phase
 14, planned when this phase closes), because it follows the MCP SDK's releases and needs Node,
@@ -1981,19 +1981,29 @@ Each task is a PR on `phase-13/agent`, the build green after each.
   (text and an optional style each), `deleteBlock(handle)`. Each returns what changed in the
   read format, so the model need not read again. Refusals as values, not exceptions. (Done:
   `replaceText` goes through core's `findAll` and `replace` with capitals counting, kept to the
-  block's range, so it finds what `read` shows and nothing deleted; ↵ and "
-  " are a line
-  break in `find`, the replacement and new paragraphs. `insertAfter` and `insertBefore` take
-  strings or `{ text, style }`, next to any block; a new paragraph next to a paragraph has its
-  properties (style, numbering, indents, its content controls), as Enter gives in Word, without
-  its mark's own (section break, revisions, `w14:paraId`); a style is named by name or id,
-  capitals not counting, and a built-in heading the document lacks is added. `deleteBlock`
-  takes a paragraph or a table (`deleteTable`); where Word needs a paragraph (the last of the
-  body or of a cell, between two tables) it is emptied and the result says so. Each returns the
-  blocks as they read now, in `blocks` and `text` (`deleteBlock` a sentence). A block deleted as
-  a tracked change is `gone` to every operation. Tests reject the agent's changes after each
-  operation and compare the read with the first. The blocks around an inserted or deleted block keep their handles when
-  the change is accepted or rejected (13.2's handles).)
+  block's range, so it finds what `read` shows and nothing deleted; ↵ and `\n` are a line break
+  in `find`, the replacement and new paragraphs; it returns how many places were replaced and
+  how many could not be, and records nothing when the replacement is the text there.
+  `insertAfter` and `insertBefore` take one paragraph or a list, each a string or
+  `{ text, style }`, next to any block. A new paragraph is formatted as Enter there gives in
+  Word (core's `splitAttrs`): the neighbour's properties and controls without its mark's own
+  (section break, revisions, `w14:paraId`), or after a paragraph whose style names another as
+  the next (a heading) that style; one that names a style has only that style. A style is named
+  by name or id, capitals not counting; a built-in heading the document lacks is added, as a
+  second change. Nothing is inserted into a locked content control. `deleteBlock` takes a
+  paragraph (a whole-node delete, which tracking records) or a table (`deleteTable`, the caret
+  in the table's own first cell). A paragraph that must stay is emptied and the result says
+  why: the last of the body or of a cell, one before a table or other block (its mark could not
+  join, so accepting would leave it), one that ends a section. The session's own inserted
+  paragraph there is removed for real. A block in or holding a locked control is refused as
+  `read-only`. Each returns the blocks as they read now, in `blocks` and `text` (`deleteBlock`
+  a sentence). A block deleted as a tracked change is `gone` to every operation. Arguments of
+  the wrong type are refused as `invalid`, not thrown. Tests reject the agent's changes after
+  each operation and compare the read, handles included, with the first. Found by the review of
+  #140 and fixed: a table whose first cell starts with a table had the nested one deleted;
+  inserting next to a locked control's paragraph went in; a heading's new paragraph was a
+  heading; a section break went with its empty paragraph. Not fixed here: core's control filter
+  lets a paragraph into a locked block control (`allowed()`, `state/controls.ts`).)
 - [ ] 13.4 Style and comments: `styles()`, `setStyle(handle, name)`,
   `comment(handle, text, { on })` (`on`: text in the block to anchor to; the whole block
   without it).
@@ -2075,7 +2085,7 @@ reduced motion respected (no fade, no smooth scroll). A requirement if pages are
 page before scrolling. Today every page is in the DOM, so a far page is reached. (An editor
 compared before 1.0 failed exactly there: pages not yet rendered could not be gone to.)
 
-**Agent editing:** the library is Phase 13 (planned, nothing built). After it, in order: an MCP
+**Agent editing:** the library is Phase 13 (in progress). After it, in order: an MCP
 server over it as its own package (`@folijs/mcp`, Phase 14 when planned), then maybe a
 sandboxed `run(code)` tool inside that server (code mode), once someone asks for it. The hint
 above is independent and is what lets an agent show what it changed. Explored:
