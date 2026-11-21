@@ -154,6 +154,7 @@ export declare function FoliNavigation({ editor: given, readOnly }: FoliNavigati
 import { type Command, type Editor, type EditorState } from "@folijs/core";
 import { type EditorViewOptions } from "@folijs/view";
 import { type ReactNode } from "react";
+import { type ToolbarMessages } from "./messages.js";
 export interface FoliToolbarProps {
     /** Default: the editor of the nearest `FoliEditorProvider`. */
     editor?: Editor | undefined;
@@ -208,6 +209,12 @@ export interface FoliToolbarProps {
      * back; Escape closes it.
      */
     overflow?: "wrap" | "menu" | undefined;
+    /**
+     * The toolbar's strings in another language, each by its English text (`toolbarMessages`):
+     * its items' names and tooltips, menus, colors, tabs, dialogs and their messages. A string not
+     * given stays English. An app's own labels are its own to translate.
+     */
+    messages?: ToolbarMessages | undefined;
     className?: string | undefined;
 }
 /**
@@ -468,7 +475,7 @@ export declare const defaultToolbarTabs: readonly (ToolbarTab & {
  * `aria-pressed`; a button whose command cannot run now is `aria-disabled` (still focusable).
  * Clicks leave the focus and selection in the document.
  */
-export declare function FoliToolbar({ editor: given, disabled, onClickCommand, label, className, comments, upload, items: givenGroups, tabs: allTabs, tab: givenTab, defaultTab, onTabChange, overflow, }: FoliToolbarProps): import("react").JSX.Element;
+export declare function FoliToolbar({ editor: given, disabled, onClickCommand, label: givenLabel, className, comments, upload, items: givenGroups, tabs: allTabs, tab: givenTab, defaultTab, onTabChange, overflow, messages, }: FoliToolbarProps): import("react").JSX.Element;
 export {};
 
 // editor.d.ts
@@ -558,3 +565,18 @@ export { FoliComments, type FoliCommentsProps } from "./FoliComments.js";
 export { type FoliChange, FoliEditor, type FoliEditorHandle, type FoliEditorProps, } from "./FoliEditor.js";
 export { FoliNavigation, type FoliNavigationProps } from "./FoliNavigation.js";
 export { defaultToolbarItems, defaultToolbarTabs, FoliToolbar, type FoliToolbarProps, type ToolbarAction, type ToolbarButton, type ToolbarColor, type ToolbarColorMenu, type ToolbarCustom, type ToolbarCustomProps, type ToolbarDialog, type ToolbarDialogName, type ToolbarDialogProps, type ToolbarGroup, type ToolbarGroups, type ToolbarItem, type ToolbarItemName, type ToolbarMenu, type ToolbarOption, type ToolbarSelect, type ToolbarTab, toolbarItems, } from "./FoliToolbar.js";
+export { type ToolbarMessage, type ToolbarMessages, toolbarMessages } from "./messages.js";
+
+// messages.d.ts
+/**
+ * Every string the toolbar shows or announces, in English: its items and their tooltips, menu
+ * entries, colors, tabs, dialogs and their messages. Each is also its own key in `messages`
+ * (`FoliToolbarProps.messages`), as gettext does: `{ Bold: "Negrita" }`. `{name}` in a message is
+ * a value filled in (keep it in the translation). A string added or reworded is listed in the
+ * changelog.
+ */
+export declare const toolbarMessages: readonly ["*, †, ‡", "1, 2, 3", "A", "A cross-reference cannot be inserted here.", "A table cannot be inserted here: put the caret in a paragraph.", "a, b, c", "A, B, C", "Accept", "Accept all", "Accept all changes", "Accept the change here, or the changes selected", "Add link", "Add repeating item", "Align left", "Align right", "All markup", "Allow line breaks", "Alt text", "Apply", "Automatic", "B", "Below text", "Blue", "Bold", "Bookmark: {name}", "Bookmarks…", "Bottom margin (cm)", "Bottom of page", "Bright green", "Bulleted list", "Cancel", "Cell shading", "Center", "Check box", "Check this value: {field}.", "Choose an image file.", "Close header and footer", "Column break", "Columns", "Combo box", "Content control properties", "Content controls", "Continuous", "Control properties…", "Controls", "Convert endnotes to footnotes", "Convert footnotes to endnotes", "Cross-reference…", "Date", "Date format", "Date picker", "Decorative (no alt text)", "Decrease indent", "Delete columns", "Delete rows", "Delete table", "Describe the picture, or mark it as decorative.", "Different first page", "Different odd and even pages", "Drop-down list", "Edit footer", "Edit header", "Edit link", "Edit picture", "End of document", "End of section", "Endnotes", "Enter a number of columns from 1 to {max}.", "Enter a number of rows from 1 to {max}.", "Enter a web or email address, or a link starting with http, https, mailto or tel.", "Enter a width and height in pixels, from 1 to {max}.", "Even page", "Fields", "Find and go to", "Find…", "Font", "Font size", "Footnotes", "Footnotes and endnotes", "Formatting", "Go to note or reference", "Go to…", "Gray", "Green", "H", "Header", "Header and footer", "Height (px)", "Highlight", "Home", "I", "i, ii, iii", "I, II, III", "Image", "Increase indent", "Insert", "Insert a picture, or edit the selected one", "Insert column left", "Insert column right", "Insert cross-reference", "Insert endnote", "Insert footnote", "Insert picture", "Insert row above", "Insert row below", "Insert table", "Insert table…", "Inserting the picture…", "Italic", "Its page number", "Its paragraph number", "Its text", "Justify", "Keep proportions", "Landscape", "Layout", "Left margin (cm)", "Light blue", "Light gray", "Light green", "Light orange", "Light yellow", "Line between columns", "Line spacing", "Link", "Link to it", "Link to previous", "List items, one per line (shown | value)", "Merge cells", "More", "More colors…", "Navigate", "New comment", "New comment on the selection", "Next change", "Next column", "Next page", "No markup", "None", "Note options", "Note options…", "Notes", "Number format", "Numbered list", "Numbering", "Odd page", "OK", "Orange", "Orientation", "Outline", "Page break", "Page height (cm)", "Page number", "Page setup", "Page setup…", "Page width (cm)", "Paragraph style", "Picture (selected)", "Picture…", "Pink", "Plain text", "Portrait", "Position", "Previous change", "Purple", "Red", "Redo", "Refer to", "Reject", "Reject all", "Reject all changes", "Reject the change here, or the changes selected", "Remove link", "Remove section break", "Repeat as header row", "Repeating section", "Replace…", "Restart each page", "Restart each section", "Review", "Rich text", "Right margin (cm)", "Rows", "S", "Section", "Section break: continuous", "Section break: even page", "Section break: next page", "Section break: odd page", "Section starts", "Set column widths (cm, separated by ;)", "Shading", "Show", "Show changes as", "Show field codes", "Simple markup", "Size", "Space between columns (cm)", "Split cell", "Start at", "Strikethrough", "Style", "Table", "Table of contents", "Table style", "Tag", "Text color", "The contents cannot be edited", "The control cannot be deleted", "The number of columns differs from the set widths: list one width per column, or clear them for equal columns.", "The picture could not be inserted: the file could not be read or uploaded here.", "The size does not change while changes are tracked.", "The start must be a whole number from 1.", "This setup leaves no room for text, or its columns do not fit the page.", "Title", "Top margin (cm)", "Track changes", "Turquoise", "U", "Underline", "Undo", "Update all fields", "Update selected fields", "URL", "Width (px)", "Yellow"];
+/** One of `toolbarMessages`. */
+export type ToolbarMessage = (typeof toolbarMessages)[number];
+/** Translations of the toolbar's strings, each by its English text (`toolbarMessages`). */
+export type ToolbarMessages = Partial<Readonly<Record<ToolbarMessage, string>>>;

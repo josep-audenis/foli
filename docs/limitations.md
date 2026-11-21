@@ -154,6 +154,9 @@ Custom nodes and marks, plugins and toolbar items ([extensions](guides/extension
   measured again. A tab that comes with the
   selection (`visible`) is not selected for the user, as Word's is not.
   People cannot change the toolbar themselves: an app does it over `items` or `tabs`.
+- The toolbar's strings are English unless an app gives `messages`; `FoliNavigation`,
+  `FoliComments` and the canvas's own strings cannot be translated yet. One English text is one
+  message wherever it is shown.
 - Toolbar items of an app are buttons, menus of `ToolbarAction`s, boxes, color menus, buttons
   opening the app's dialog and the app's own controls. An app's dialog does not close when the
   document or the selection changes (the built-in ones do), and the toolbar takes

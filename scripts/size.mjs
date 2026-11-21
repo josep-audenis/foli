@@ -97,7 +97,8 @@ writeFileSync(appEntry, `export { FoliEditor } from "${dist("react")}";\n`);
  * the sweeps' fixes add about 0.5 kB over core, view and React, on a bundle already at its limit.
  * React raised in 17.4 (159.3 kB, 162.1 allowed): Phase 17's toolbar for developers (tabs an app
  * controls, captioned groups, dialogs by name, the color field, overflow into a More panel:
- * about 1.9 kB), with room for 17.5's replaceable strings.
+ * about 1.9 kB), with room for 17.5's replaceable strings (161.0 kB with them: the exported
+ * list `toolbarMessages` holds each string a second time).
  */
 const BUNDLES = [
   { name: "@folijs/core", entry: dist("core"), budget: 88_000 },

@@ -12,7 +12,7 @@
     "typecheck": "pnpm -r typecheck",
     "test": "vitest run",
     "test:watch": "vitest",
-    "lint": "biome check .",
+    "lint": "biome check . && node scripts/toolbar-messages.mjs --check",
     "format": "biome check --write .",
     "check": "pnpm lint && pnpm typecheck && pnpm test && pnpm build && pnpm check:packages && pnpm api && pnpm size && pnpm mcp:e2e",
     "test:e2e": "playwright test",
