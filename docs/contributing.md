@@ -189,6 +189,26 @@ of one of these alone is noise; anything else is a real failure.
   `NS_ERROR_CONNECTION_REFUSED` on `page.goto`, the dev server not answering for a moment) and
   `word-navigation.spec.ts` "typing in the document with a search open…" (WebKit: its timing
   check, 8.4 s against 6.6 s allowed); both passed 3 times in a row when rerun.
+- Under a full three-engine run beside other sessions' work (2026-11-21, after the bug sweeps of
+  #151, #157 and #166; 998 passed, 19 failed), every failure a timeout or a lost connection,
+  none an assertion: in WebKit, `caret.spec.ts` "the caret scrolls into view…" and "T1: typing
+  and formatting…", `lists.spec.ts` "list editing with the keyboard…", `pages.spec.ts` "typing
+  that grows page 1…", "a heading never ends a page…", "a split paragraph leaves at least two
+  lines…" and "typing on page 1 of a long document…", `visual.spec.ts` "short" and
+  "multi-page", `word-navigation.spec.ts` "the panel goes to a page and a heading…" and the
+  site's `docs.spec.ts` "every nav entry opens its page…"; in Firefox, `word-fields.spec.ts`
+  "what is typed after a trailing field…" (`NS_ERROR_CONNECTION_REFUSED`, then the context
+  hanging on closing), the site's `docs.spec.ts` "search finds headings and API names",
+  "/docs/api/react/ is axe-clean", "/docs/api/core/ is axe-clean" and "the plugin example's
+  key…", and `build.spec.ts` for `/docs/`, `/docs/api/core/` and `/docs/examples/custom-node/`.
+  Run again with 2 workers, 17 passed; the other two (`caret.spec.ts` "the caret scrolls into
+  view…", WebKit; `word-fields.spec.ts`, Firefox) passed 3 times in a row alone. The caret test
+  runs close to its 30 s under load (29.0 s once) and takes 11 to 15 s alone, as it did before
+  the sweeps (timed on both).
+
+Fixed in #166 (it failed in pre-push runs about one time in four, from #151 on): the handles
+property test (`packages/agent/src/read.test.ts`, "after any tracked edits…"), a real defect in
+accepting a paragraph deleted before a table, not noise.
 
 Fixed in 12.11 (they failed in pre-push runs now and then): the tracked-changes property test
 (`track.test.ts`, a random seed about one run in five hit a known difference it did not leave
