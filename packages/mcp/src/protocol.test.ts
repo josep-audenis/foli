@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { MAX_MESSAGE_BYTES, PROTOCOL_VERSIONS, serve, type Tool } from "./protocol.js";
+import {
+  MAX_MESSAGE_BYTES,
+  MAX_RESULT_CHARS,
+  PROTOCOL_VERSIONS,
+  serve,
+  type Tool,
+} from "./protocol.js";
 import { invalid, published } from "./schema.js";
 import { connect, message, wire } from "./testing/client.js";
 
@@ -128,7 +134,9 @@ describe("with the SDK's client", () => {
       content: [{ type: "text", text: "throws failed inside the server." }],
       isError: true,
     });
-    expect(log.join("\n")).toContain("secret detail");
+    // Where, not what: an error's message may quote a document.
+    expect(log.join("\n")).toMatch(/^throws threw: Error\n\s+at /);
+    expect(log.join("\n")).not.toContain("secret detail");
     await expect(client.callTool({ name: "nope" })).rejects.toThrow(/Unknown tool: nope/);
     await client.close();
   });
@@ -280,6 +288,25 @@ describe("what is not a message", () => {
     input.write('{"jsonrpc":"2.0","id":2,"method":"ping"}');
     input.end();
     await done;
+  });
+
+  it("cuts a result that is too long, and says so", async () => {
+    const big: Tool = {
+      name: "big",
+      description: "",
+      inputSchema: { type: "object" },
+      run: () => ({ text: "x".repeat(MAX_RESULT_CHARS + 5) }),
+    };
+    const client = await connect({ ...options(), tools: [big, echo] });
+    const result = await client.callTool({ name: "big" });
+    const text = (result.content as { text: string }[])[0]?.text ?? "";
+    expect(text.length).toBeLessThan(MAX_RESULT_CHARS + 200);
+    expect(text).toMatch(
+      /\n\(cut: 200005 characters in all, the first 200000 shown\. Ask for less at a time\.\)$/,
+    );
+    const whole = await client.callTool({ name: "echo", arguments: { text: "y".repeat(1000) } });
+    expect((whole.content as { text: string }[])[0]?.text).toHaveLength(1000);
+    await client.close();
   });
 
   it("waits for a client that reads slowly", async () => {

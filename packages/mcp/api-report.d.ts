@@ -4,9 +4,16 @@
 #!/usr/bin/env node
 export {};
 
+// documents.d.ts
+export {};
+
+// files.d.ts
+export {};
+
 // index.d.ts
-export { MAX_MESSAGE_BYTES, type Output, PROTOCOL_VERSIONS, type ServerOptions, serve, type Tool, type ToolResult, } from "./protocol.js";
+export { MAX_MESSAGE_BYTES, MAX_RESULT_CHARS, type Output, PROTOCOL_VERSIONS, type ServerOptions, serve, type Tool, type ToolResult, } from "./protocol.js";
 export type { JsonSchema, JsonSchemaOrAny } from "./schema.js";
+export { type FoliServerOptions, foliServer } from "./server.js";
 
 // protocol.d.ts
 /**
@@ -19,6 +26,11 @@ import { type JsonSchema } from "./schema.js";
 export declare const PROTOCOL_VERSIONS: readonly ["2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05"];
 /** A line longer than this is not a message: it is dropped, and the client told. */
 export declare const MAX_MESSAGE_BYTES: number;
+/**
+ * The most characters of a tool's result that are sent: more is cut, and said. A client, and
+ * the model's context behind it, is not the place for a document whole.
+ */
+export declare const MAX_RESULT_CHARS = 200000;
 /** What a tool gives back: text for the model; `isError` when it should act on it and try again. */
 export interface ToolResult {
     text: string;
@@ -83,3 +95,21 @@ export type JsonSchemaOrAny = JsonSchema | {
     anyOf: readonly JsonSchema[];
     description?: string;
 };
+
+// server.d.ts
+import type { ServerOptions } from "./protocol.js";
+export interface FoliServerOptions {
+    /** The folder files are read from and written to; nothing outside it is touched. */
+    root: string;
+    /** Whether a save may write over a file the server did not write itself. Default false. */
+    overwrite?: boolean;
+    /** Whose tracked changes and comments the edits are. Default: the client's name, or "Agent". */
+    author?: string;
+    version: string;
+    log?: (message: string) => void;
+}
+/** The server's options for `serve`: Foli's tools over the documents under `root`. */
+export declare function foliServer(options: FoliServerOptions): ServerOptions;
+
+// tools.d.ts
+export {};

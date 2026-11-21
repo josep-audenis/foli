@@ -11,6 +11,12 @@ export const PROTOCOL_VERSIONS = ["2025-11-25", "2025-06-18", "2025-03-26", "202
 /** A line longer than this is not a message: it is dropped, and the client told. */
 export const MAX_MESSAGE_BYTES = 8 * 1024 * 1024;
 
+/**
+ * The most characters of a tool's result that are sent: more is cut, and said. A client, and
+ * the model's context behind it, is not the place for a document whole.
+ */
+export const MAX_RESULT_CHARS = 200_000;
+
 /** What a tool gives back: text for the model; `isError` when it should act on it and try again. */
 export interface ToolResult {
   text: string;
@@ -53,6 +59,15 @@ const PARSE_ERROR = -32700;
 const INVALID_REQUEST = -32600;
 const METHOD_NOT_FOUND = -32601;
 const INVALID_PARAMS = -32602;
+
+/**
+ * An error for the log: its kind and where it was thrown, not its message, which may quote the
+ * document it was thrown over. Clients keep a server's stderr.
+ */
+const where = (error: unknown) =>
+  error instanceof Error
+    ? [error.name, ...(error.stack ?? "").split("\n").filter((l) => /^\s+at /.test(l))].join("\n")
+    : typeof error;
 
 class RpcError extends Error {
   constructor(
@@ -102,11 +117,15 @@ export async function serve(
       try {
         result = await tool.run(args as Record<string, unknown>);
       } catch (error) {
-        options.log?.(`${tool.name} threw: ${error instanceof Error ? error.stack : error}`);
+        options.log?.(`${tool.name} threw: ${where(error)}`);
         result = { text: `${tool.name} failed inside the server.`, isError: true };
       }
+    const text =
+      result.text.length > MAX_RESULT_CHARS
+        ? `${result.text.slice(0, MAX_RESULT_CHARS)}\n(cut: ${result.text.length} characters in all, the first ${MAX_RESULT_CHARS} shown. Ask for less at a time.)`
+        : result.text;
     return {
-      content: [{ type: "text", text: result.text }],
+      content: [{ type: "text", text }],
       ...(result.isError ? { isError: true } : {}),
     };
   };
@@ -172,7 +191,7 @@ export async function serve(
       return send({ id, result });
     } catch (error) {
       if (error instanceof RpcError) return fail(id, error.code, error.message);
-      options.log?.(`${method} threw: ${error instanceof Error ? error.stack : error}`);
+      options.log?.(`${method} threw: ${where(error)}`);
       return fail(id, -32603, "Internal error");
     }
   };

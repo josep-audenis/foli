@@ -78,7 +78,7 @@ export interface Block {
  *
  * After the handle: where it is in a table, its style, its list number, `changed` when it holds
  * tracked changes, its comments; after the colon, its text. A line break inside a paragraph
- * shows as ↵, so a block is always one line.
+ * shows as ↵, as does any other character that ends a line, so a block is always one line.
  */
 export declare function formatBlocks(blocks: readonly Block[]): string;
 
