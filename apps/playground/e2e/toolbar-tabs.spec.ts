@@ -20,8 +20,8 @@ test("shows one tab's items at a time, without axe violations", async ({ page })
   const scan = async () =>
     (
       await new AxeBuilder({ page })
-        .include(".foli-toolbar-tabs")
-        .include(".foli-toolbar-panel")
+        .include(".foli-ribbon-tabs")
+        .include(".foli-ribbon-panel")
         .analyze()
     ).violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target).join(", ")}`);
   expect(await scan()).toEqual([]);

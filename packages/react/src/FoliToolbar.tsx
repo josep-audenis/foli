@@ -155,9 +155,10 @@ export interface FoliToolbarProps {
    */
   items?: readonly (readonly ToolbarItem[])[] | undefined;
   /**
-   * Tabs over the toolbar (a WAI-ARIA tab list: arrow keys, Home and End move between tabs and
-   * show each), each with its own groups of items, in place of `items`; the first one shows at
-   * first. `defaultToolbarTabs` are Word's. Without tabs (or with none), `items`.
+   * Tabs over the toolbar (a WAI-ARIA tab list with its own tab stop: arrow keys, Home and End
+   * move between tabs and show each), each with its own groups of items, in place of `items`;
+   * the first one shows at first. `defaultToolbarTabs` are Word's. Without tabs (or with none),
+   * `items`. With tabs, `className` goes on the element around both (`.foli-ribbon`).
    */
   tabs?: readonly ToolbarTab[] | undefined;
   className?: string | undefined;
@@ -175,7 +176,7 @@ export interface ToolbarTab {
 
 /** What every toolbar item has. */
 interface ToolbarItemBase {
-  /** Unique in the toolbar; also its class, `foli-toolbar-<key>`. */
+  /** Unique in the toolbar (with tabs: in its tab); also its class, `foli-toolbar-<key>`. */
   readonly key: string;
   /** What it does: the tooltip, and the accessible name when an `icon` stands for the text. */
   readonly label: string;
@@ -1585,8 +1586,16 @@ export function FoliToolbar({
     if (next.key === tab?.key) return;
     setTabKey(next.key);
     setActive(0);
+    // The button a dialog would give the focus back to goes with its tab.
     setMenu(null);
     setAppDialog(null);
+    setDialog(null);
+    setTableDialog(null);
+    setPictureDialog(null);
+    setSetupDialog(null);
+    setReferenceDialog(null);
+    setControlDialog(null);
+    setNoteDialog(null);
   };
   // The tab list's keys (WAI-ARIA tabs, automatic activation: the tab focused is the one shown).
   const onTabKeyDown = (event: KeyboardEvent) => {
@@ -1605,15 +1614,47 @@ export function FoliToolbar({
     showTab(next);
     tabButtons.current[tabs.indexOf(next)]?.focus();
   };
+  // With tabs, a ribbon: the tab list and the selected tab's panel, which holds the toolbar.
   const panel = (bar: ReactNode) =>
     tabs && tab ? (
-      <div
-        role="tabpanel"
-        id={`${id}-panel`}
-        aria-labelledby={`${id}-tab-${tabs.indexOf(tab)}`}
-        className="foli-toolbar-panel"
-      >
-        {bar}
+      <div className={className ? `foli-ribbon ${className}` : "foli-ribbon"}>
+        <div
+          role="tablist"
+          aria-label={label}
+          className="foli-ribbon-tabs"
+          onKeyDown={onTabKeyDown}
+        >
+          {tabs.map((t, n) => (
+            <button
+              key={t.key}
+              ref={(element) => {
+                tabButtons.current[n] = element;
+              }}
+              type="button"
+              role="tab"
+              id={`${id}-tab-${n}`}
+              className={`foli-ribbon-tab foli-ribbon-tab-${t.key}`}
+              aria-selected={t === tab}
+              aria-controls={`${id}-panel`}
+              tabIndex={t === tab ? 0 : -1}
+              // Keep the focus (and the selection) in the document on click.
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={() => showTab(t)}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+        <div
+          role="tabpanel"
+          id={`${id}-panel`}
+          aria-labelledby={`${id}-tab-${tabs.indexOf(tab)}`}
+          className="foli-ribbon-panel"
+          // A tab without items has nothing to focus: the panel takes the tab stop.
+          tabIndex={items.length ? undefined : 0}
+        >
+          {bar}
+        </div>
       </div>
     ) : (
       bar
@@ -1639,40 +1680,12 @@ export function FoliToolbar({
   let index = 0;
   return (
     <>
-      {tabs && tab && (
-        <div
-          role="tablist"
-          aria-label={`${label} tabs`}
-          className="foli-toolbar-tabs"
-          onKeyDown={onTabKeyDown}
-        >
-          {tabs.map((t, n) => (
-            <button
-              key={t.key}
-              ref={(element) => {
-                tabButtons.current[n] = element;
-              }}
-              type="button"
-              role="tab"
-              id={`${id}-tab-${n}`}
-              className={`foli-toolbar-tab foli-toolbar-tab-${t.key}`}
-              aria-selected={t === tab}
-              aria-controls={`${id}-panel`}
-              tabIndex={t === tab ? 0 : -1}
-              // Keep the focus (and the selection) in the document on click.
-              onMouseDown={(event) => event.preventDefault()}
-              onClick={() => showTab(t)}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
-      )}
       {panel(
         <div
           role="toolbar"
           aria-label={label}
-          className={className ? `foli-toolbar ${className}` : "foli-toolbar"}
+          // With tabs, `className` is the ribbon's.
+          className={className && !tab ? `foli-toolbar ${className}` : "foli-toolbar"}
           onKeyDown={onKeyDown}
         >
           {groups.map((group, g) => (

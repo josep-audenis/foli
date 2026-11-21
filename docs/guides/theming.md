@@ -39,7 +39,8 @@ export const ThemedEditor = () => (
 
 The toolbar's menus and dialogs, the find panel and the comments pane are rendered inside it (no
 portals), so they take the theme too. To theme one part only, set the variables on
-`.foli-toolbar` or `.foli-canvas` (both take a `className`).
+`.foli-toolbar` or `.foli-canvas` (both take a `className`; with toolbar tabs the toolbar's
+`className` is on `.foli-ribbon`, around the tabs and the toolbar).
 
 Do not set them on `:root`: the stylesheet's own `:root` rule has the same specificity, so
 whichever loads last wins.

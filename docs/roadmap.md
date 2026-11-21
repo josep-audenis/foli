@@ -2246,7 +2246,7 @@ an agent's review.
   ones typed so in `toolbarItems`, their options replaceable through a copy.
 - [x] 15.2 (#150) Dialogs and controls: `ToolbarDialog` (the app's content in a dialog under the
   toolbar) and `ToolbarCustom` (`render`, with the props that keep the one tab stop).
-- [x] 15.3 Tabs: `tabs` on `FoliToolbar`, `toolbar` of `FoliEditor` taking them; the playground
+- [x] 15.3 (#152) Tabs: `tabs` on `FoliToolbar`, `toolbar` of `FoliEditor` taking them; the playground
   shows them; e2e.
 - [ ] 15.4 Docs checked against the acceptance above, the changeset; 1.1.0 published with the
   owner's approval (the Release workflow).

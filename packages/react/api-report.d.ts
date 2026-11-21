@@ -180,9 +180,10 @@ export interface FoliToolbarProps {
      */
     items?: readonly (readonly ToolbarItem[])[] | undefined;
     /**
-     * Tabs over the toolbar (a WAI-ARIA tab list: arrow keys, Home and End move between tabs and
-     * show each), each with its own groups of items, in place of `items`; the first one shows at
-     * first. `defaultToolbarTabs` are Word's. Without tabs (or with none), `items`.
+     * Tabs over the toolbar (a WAI-ARIA tab list with its own tab stop: arrow keys, Home and End
+     * move between tabs and show each), each with its own groups of items, in place of `items`;
+     * the first one shows at first. `defaultToolbarTabs` are Word's. Without tabs (or with none),
+     * `items`. With tabs, `className` goes on the element around both (`.foli-ribbon`).
      */
     tabs?: readonly ToolbarTab[] | undefined;
     className?: string | undefined;
@@ -198,7 +199,7 @@ export interface ToolbarTab {
 }
 /** What every toolbar item has. */
 interface ToolbarItemBase {
-    /** Unique in the toolbar; also its class, `foli-toolbar-<key>`. */
+    /** Unique in the toolbar (with tabs: in its tab); also its class, `foli-toolbar-<key>`. */
     readonly key: string;
     /** What it does: the tooltip, and the accessible name when an `icon` stands for the text. */
     readonly label: string;

@@ -148,6 +148,7 @@ export const FoliEditor = forwardRef<FoliEditorHandle, FoliEditorProps>(function
     [editor],
   );
 
+  const tabbed = typeof toolbar === "object" && toolbar.length > 0 && !Array.isArray(toolbar[0]);
   return (
     <FoliEditorProvider editor={editor}>
       {toolbar && (
@@ -156,17 +157,13 @@ export const FoliEditor = forwardRef<FoliEditorHandle, FoliEditorProps>(function
           disabled={canvas.readOnly}
           comments={comments !== false}
           upload={canvas.upload}
-          // Groups are arrays of items; tabs are objects.
+          // Groups are arrays of items, tabs are objects; an empty array is no items (as in 1.0).
           items={
-            toolbar === true || !Array.isArray(toolbar[0])
+            toolbar === true || tabbed
               ? undefined
               : (toolbar as readonly (readonly ToolbarItem[])[])
           }
-          tabs={
-            toolbar === true || Array.isArray(toolbar[0])
-              ? undefined
-              : (toolbar as readonly ToolbarTab[])
-          }
+          tabs={tabbed ? (toolbar as readonly ToolbarTab[]) : undefined}
           onClickCommand={() => canvasRef.current?.focus()}
         />
       )}

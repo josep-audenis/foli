@@ -298,12 +298,14 @@ import { defaultToolbarTabs, FoliEditor } from "@folijs/react";
 <FoliEditor toolbar={[...defaultToolbarTabs, { key: "acme", label: "Acme", items: [[mine]] }]} />;
 ```
 
-A WAI-ARIA tab list (`.foli-toolbar-tabs`, `role="tablist"`, named "`label` tabs") of `role="tab"`
-buttons (`.foli-toolbar-tab.foli-toolbar-tab-<key>`), over a `role="tabpanel"`
-(`.foli-toolbar-panel`) named by its tab, which holds the toolbar. One tab stop for the tabs:
+With tabs the toolbar is inside a `.foli-ribbon` element, which then takes `className` (the
+toolbar itself does not): a WAI-ARIA tab list (`.foli-ribbon-tabs`, `role="tablist"`, named by
+`label` as the toolbar is) of `role="tab"` buttons (`.foli-ribbon-tab.foli-ribbon-tab-<key>`),
+over a `role="tabpanel"` (`.foli-ribbon-panel`) named by its tab, which holds the toolbar (a tab
+whose items all are left out has an empty one, and its panel is then the tab stop). One tab stop for the tabs:
 ArrowLeft, ArrowRight, Home and End move between them and show each (the arrows wrap); Tab goes on
 into the toolbar. A click on a tab keeps the document's focus and selection. Changing tab closes
-the last tab's open menu and an app's dialog. Mod-K's link dialog opens on any tab, also one
+the last tab's open menu and any dialog of the toolbar. Mod-K's link dialog opens on any tab, also one
 without the Link item. An item's `key` is unique within its tab; the same item may be in two tabs.
 An empty `tabs` shows `items`.
 
