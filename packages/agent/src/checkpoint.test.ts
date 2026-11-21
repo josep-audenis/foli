@@ -202,6 +202,17 @@ describe("what merge data writes (the fourth review's re-check)", () => {
     ).toMatchObject({ ok: false, code: "invalid" });
     expect(Date.now() - started).toBeLessThan(3000);
     expect(JSON.stringify(session.document())).toBe(before);
+    // The same name twice, by capitals: the longest is what counts.
+    for (const data of [
+      { CandidateFirstName: "v".repeat(190_000), candidatefirstname: "" },
+      { candidatefirstname: "", CandidateFirstName: "v".repeat(190_000) },
+      { CANDIDATEFIRSTNAME: "", CandidateFirstName: "", candidateFirstName: "v".repeat(190_000) },
+    ])
+      expect(session.updateFields({ data }), JSON.stringify(Object.keys(data))).toMatchObject({
+        ok: false,
+        code: "invalid",
+      });
+    expect(JSON.stringify(session.document())).toBe(before);
     // Short enough, all of them: done.
     const done = session.updateFields({ data: { CandidateFirstName: "Ada" } });
     expect(done).toMatchObject({ ok: true });

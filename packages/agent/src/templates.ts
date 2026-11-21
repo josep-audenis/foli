@@ -238,12 +238,14 @@ export function updateFields(
     // A value is written into every merge field of its name, the headers' and notes' too: a
     // template can hold the same field a thousand times. What that writes is held as a
     // replace's is.
-    const lengths = new Map(
-      Object.entries(given).map(([key, value]) => [
-        key.toLowerCase(),
-        value === null ? 0 : value instanceof Date ? 40 : String(value).length,
-      ]),
-    );
+    // Keys equal without capitals are one name to a field, and core may take any of them:
+    // the longest counts.
+    const lengths = new Map<string, number>();
+    for (const [key, value] of Object.entries(given)) {
+      const length = value === null ? 0 : value instanceof Date ? 40 : String(value).length;
+      const name = key.toLowerCase();
+      lengths.set(name, Math.max(lengths.get(name) ?? 0, length));
+    }
     const trees = [
       context.editor.state.doc,
       ...[...(wordContext(context.editor.state)?.stories.values() ?? [])].map((s) => s.doc),
