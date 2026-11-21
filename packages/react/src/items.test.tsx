@@ -20,8 +20,10 @@ import {
   FoliEditor,
   FoliEditorProvider,
   FoliToolbar,
+  type ToolbarColorMenu,
   type ToolbarItem,
   type ToolbarItemName,
+  type ToolbarSelect,
   toolbarItems,
   useCommand,
 } from "./index.js";
@@ -227,6 +229,82 @@ describe("toolbar items", () => {
     fireEvent.click(button);
     fireEvent.keyDown(button, { key: "ArrowDown" });
     expect(screen.queryByRole("menu")).toBeNull();
+  });
+
+  it("shows an app's box: its options, the value at the selection, a pick runs its command", () => {
+    const editor = createEditor({ document: doc() });
+    const word: ToolbarSelect = {
+      key: "word",
+      label: "Word",
+      select: {
+        options: () => ["Hello", "Bye"].map((value) => ({ value, label: `Say ${value}` })),
+        value: (state) => state.doc.textContent || null,
+        pick: (value) => (state, dispatch) => {
+          dispatch?.(state.tr.insertText(value, 1, state.doc.content.size - 1));
+          return true;
+        },
+      },
+    };
+    render(<FoliToolbar editor={editor} items={[[word, toolbarItems.undo]]} />);
+    const box = screen.getByRole("combobox", { name: "Word" }) as HTMLSelectElement;
+    expect(box.className).toContain("foli-toolbar-word");
+    expect(box.value).toBe("Hello");
+    expect([...box.options].map((o) => o.textContent)).toEqual(["Say Hello", "Say Bye"]);
+    // One tab stop with the buttons.
+    expect(box.tabIndex).toBe(0);
+    expect(screen.getByRole("button", { name: "Undo" }).tabIndex).toBe(-1);
+    fireEvent.change(box, { target: { value: "Bye" } });
+    expect(text(editor)).toBe("Bye");
+    expect(box.value).toBe("Bye");
+    // A value that is not offered shows itself.
+    act(() => editor.run(insertText("!")));
+    expect(box.value).toBe("!Bye");
+  });
+
+  it("shows an app's color menu, and a built-in one with another palette", () => {
+    const editor = createEditor({ document: doc() });
+    const picked: (string | null)[] = [];
+    const palette = [
+      { name: "None", color: null },
+      { name: "Brand", color: "#123456" },
+    ];
+    const mood: ToolbarColorMenu = {
+      key: "mood",
+      label: "Mood",
+      colors: {
+        options: palette,
+        value: () => picked.at(-1) ?? null,
+        pick: (color) => (state, dispatch) => {
+          if (dispatch) {
+            picked.push(color);
+            dispatch(state.tr);
+          }
+          return true;
+        },
+      },
+    };
+    const textColor: ToolbarColorMenu = {
+      ...toolbarItems.textColor,
+      colors: { ...toolbarItems.textColor.colors, options: palette },
+    };
+    render(<FoliToolbar editor={editor} items={[[mood, textColor]]} />);
+    const button = screen.getByRole("button", { name: "Mood" });
+    expect(button.getAttribute("aria-haspopup")).toBe("menu");
+    fireEvent.click(button, { detail: 0 });
+    const items = screen.getAllByRole("menuitemradio");
+    expect(items.map((item) => item.textContent)).toEqual(["None", "Brand"]);
+    fireEvent.click(items[1] as HTMLElement, { detail: 0 });
+    expect(picked).toEqual(["#123456"]);
+    expect(screen.queryByRole("menu")).toBeNull();
+    expect(document.activeElement).toBe(button);
+    const swatch = button.querySelector(".foli-toolbar-swatch") as HTMLElement;
+    expect(swatch.style.background).toBe("rgb(18, 52, 86)");
+
+    fireEvent.click(screen.getByRole("button", { name: "Text color" }), { detail: 0 });
+    expect(screen.getAllByRole("menuitemradio").map((item) => item.textContent)).toEqual([
+      "None",
+      "Brand",
+    ]);
   });
 
   it("warns once about two items with one key, outside production", () => {

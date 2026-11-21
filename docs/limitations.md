@@ -87,7 +87,8 @@ checklist in [testing/ime.md](testing/ime.md)):
 - No horizontal rule button (Word's rule is a paragraph's bottom border, kept and shown).
 - On Android, Backspace at a list paragraph's start may join it into the paragraph before
   instead of removing its number (untested on a device).
-- Colors come from a fixed palette in the toolbar (seven text colors, Word's highlights); any
+- The toolbar's colors are a palette (seven text colors, Word's highlights; an app gives the
+  menus another one, [api.md](api.md#toolbar-items)), with no color picker; any
   `#rrggbb` works through `setTextColor` (a highlight outside Word's is written as shading).
 - Left and Right next to an opaque block treat Left as backward: in right-to-left text, Left at
   the start of a paragraph selects the block before it (left-to-right is the only direction the
@@ -144,8 +145,8 @@ Custom nodes and marks, plugins and toolbar items ([extensions](guides/extension
 - `plugins` and `extensions` (of `FoliEditor` and `useFoliEditor`) are read once: changing them
   after mount does not reconfigure the editor (a warning unless `process.env.NODE_ENV` is `"production"` at run time, which a bundle without `process` always shows; a new `key` makes a
   new editor, losing undo history and the selection).
-- Toolbar items of an app are buttons and menus of `ToolbarAction`s: the boxes (style, font),
-  color menus and dialogs are only the built-in items'. An app item's state without `enabled` is
+- Toolbar items of an app are buttons, menus of `ToolbarAction`s, boxes and color menus: the
+  dialogs are only the built-in items'. An app item's state without `enabled` is
   a dry run of its command after every transaction, which costs what the command costs.
   `useCommand(command)` with a command made anew on each render dry-runs it on each render.
 - Keys ([keyboard.md](keyboard.md)): `editor.handleKey` runs the plugins' keymaps only, not the

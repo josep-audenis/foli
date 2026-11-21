@@ -197,13 +197,66 @@ export interface ToolbarMenu extends ToolbarItemBase {
   readonly pressed?: undefined;
 }
 
+/** An entry of a toolbar box. */
+export interface ToolbarOption {
+  /** What `pick` gets; unique in the box, and not "". */
+  readonly value: string;
+  readonly label: string;
+}
+
 /**
- * A toolbar item, built-in (`toolbarItems`) or the app's own: a button running a command, or a
- * menu button. The toolbar keeps one tab stop for all its items (arrow keys, Home and End move
+ * A toolbar box (a `select`), as the font box: Up and Down on a closed box apply each value
+ * they pass. A built-in box with other entries is a copy:
+ * `{ ...toolbarItems.size, select: { ...toolbarItems.size.select, options: () => mine } }`.
+ */
+export interface ToolbarSelect extends ToolbarItemBase {
+  readonly select: {
+    /** Its entries now. Runs on every render of the toolbar: keep it cheap. */
+    readonly options: (state: EditorState) => readonly ToolbarOption[];
+    /**
+     * The entry shown: its `value`; null (or "") shows a blank entry (mixed, or nothing to
+     * show), a value that is not among the options shows itself. Runs after every transaction.
+     */
+    readonly value: (state: EditorState) => string | null;
+    /** What picking an entry runs. */
+    readonly pick: (value: string) => Command;
+  };
+  readonly command?: undefined;
+  readonly actions?: undefined;
+}
+
+/** A color of a toolbar color menu. */
+export interface ToolbarColor {
+  /** Its name in the menu (the accessible name); unique in the menu. */
+  readonly name: string;
+  /** Lowercase `#rrggbb`; null is the entry that removes the color. */
+  readonly color: string | null;
+}
+
+/**
+ * A toolbar color menu button (a WAI-ARIA menu of `menuitemradio`s, the current color checked
+ * and shown on the button), as the text color's. A built-in one with another palette is a copy:
+ * `{ ...toolbarItems.textColor, colors: { ...toolbarItems.textColor.colors, options: mine } }`.
+ */
+export interface ToolbarColorMenu extends ToolbarItemBase {
+  readonly colors: {
+    readonly options: readonly ToolbarColor[];
+    /** The color at the selection (null: none, or mixed). Runs after every transaction. */
+    readonly value: (state: EditorState) => string | null;
+    /** What picking a color runs (null: the entry that removes it). */
+    readonly pick: (color: string | null) => Command;
+  };
+  readonly command?: undefined;
+  readonly actions?: undefined;
+}
+
+/**
+ * A toolbar item, built-in (`toolbarItems`) or the app's own: a button running a command, a
+ * menu button, a box or a color menu. The toolbar keeps one tab stop for all its items (arrow keys, Home and End move
  * between them), gives toggles `aria-pressed` and an item that cannot apply now `aria-disabled`
  * (still focusable), and leaves the focus and selection in the document on click.
  */
-export type ToolbarItem = ToolbarButton | ToolbarMenu;
+export type ToolbarItem = ToolbarButton | ToolbarMenu | ToolbarSelect | ToolbarColorMenu;
 
 /** An entry of a toolbar menu (a `menuitem`, or a `menuitemcheckbox` when it has `checked`). */
 export interface ToolbarAction {
@@ -217,29 +270,19 @@ export interface ToolbarAction {
 }
 
 /**
- * A built-in item: boxes, color menus and dialogs are only the toolbar's own. Each has its own
+ * Any item, as the toolbar reads it; the dialogs are only the built-in items'. Each of those has its own
  * cheap `enabled`, not a dry run: that runs after every transaction, and a dry run builds the
  * whole transaction (for a block type over a large selection, quadratic in the number of blocks).
  */
 interface Item extends ToolbarItemBase {
   command?: Command | undefined;
   pressed?: ((state: EditorState, editor: Editor) => boolean) | undefined;
-  /** A menu button: its options, the current value, and what picking one runs. */
-  menu?: {
-    options: readonly ColorOption[];
-    value: (state: EditorState) => string | null;
-    pick: (color: string | null) => Command;
-  };
+  colors?: ToolbarColorMenu["colors"] | undefined;
   /** An action menu button (the table menu): its commands, in order. */
   actions?: readonly Action[] | ((editor: Editor) => readonly Action[]) | undefined;
   /** A button opening a dialog (the picture's). */
   dialog?: "picture";
-  /** A drop-down list (a `select`): its options, the current value, and what picking runs. */
-  select?: {
-    options: (state: EditorState) => readonly { value: string; label: string }[];
-    value: (state: EditorState) => string | null;
-    pick: (value: string) => Command;
-  };
+  select?: ToolbarSelect["select"] | undefined;
 }
 
 /** A built-in menu's entry: it may open a dialog or move the focus. */
@@ -250,17 +293,11 @@ interface Action extends ToolbarAction {
   movesFocus?: boolean;
 }
 
-interface ColorOption {
-  name: string;
-  /** Lowercase `#rrggbb`; null removes the color. */
-  color: string | null;
-}
-
 /**
  * The palettes (fixed: a document should not need a color picker). Text colors keep at least
  * 4.5:1 contrast on white; highlights keep dark text readable.
  */
-const TEXT_COLORS: readonly ColorOption[] = [
+const TEXT_COLORS: readonly ToolbarColor[] = [
   { name: "Automatic", color: null },
   { name: "Gray", color: "#5f6368" },
   { name: "Red", color: "#c00000" },
@@ -270,7 +307,7 @@ const TEXT_COLORS: readonly ColorOption[] = [
   { name: "Purple", color: "#7030a0" },
 ];
 /** Word's highlight colors (a document opened in Word shows these exactly). */
-const HIGHLIGHTS: readonly ColorOption[] = [
+const HIGHLIGHTS: readonly ToolbarColor[] = [
   { name: "None", color: null },
   { name: "Yellow", color: "#ffff00" },
   { name: "Bright green", color: "#00ff00" },
@@ -280,7 +317,7 @@ const HIGHLIGHTS: readonly ColorOption[] = [
 ];
 
 /** Cell shadings: light fills that keep text readable. */
-const SHADINGS: readonly ColorOption[] = [
+const SHADINGS: readonly ToolbarColor[] = [
   { name: "None", color: null },
   { name: "Light gray", color: "#d9d9d9" },
   { name: "Light blue", color: "#deeaf6" },
@@ -713,7 +750,7 @@ const GROUPS: Item[][] = [
       label: "Text color",
       icon: "A",
       enabled: hasTextblock,
-      menu: {
+      colors: {
         options: TEXT_COLORS,
         value: (state) => colorAt(state, "textColor"),
         pick: setTextColor,
@@ -724,7 +761,7 @@ const GROUPS: Item[][] = [
       label: "Highlight",
       icon: "H",
       enabled: hasTextblock,
-      menu: {
+      colors: {
         options: HIGHLIGHTS,
         value: (state) => colorAt(state, "highlight"),
         pick: setHighlight,
@@ -917,7 +954,7 @@ const GROUPS: Item[][] = [
       label: "Cell shading",
       text: "Shading",
       enabled: canFormatTable,
-      menu: {
+      colors: {
         options: SHADINGS,
         value: (state) => {
           const fill = (cellAt(state)?.attrs.shading as { fill?: string } | null)?.fill;
@@ -1033,7 +1070,7 @@ export type ToolbarItemName =
   | "notes"
   | "controls";
 
-/** The built-in menu buttons of `actions` (the color menus and boxes are buttons to an app). */
+/** The built-in menu buttons of `actions`. */
 type ToolbarMenuName =
   | "table"
   | "section"
@@ -1042,6 +1079,8 @@ type ToolbarMenuName =
   | "navigate"
   | "notes"
   | "controls";
+type ToolbarSelectName = "style" | "font" | "size" | "lineSpacing" | "reviewView" | "tableStyle";
+type ToolbarColorName = "textColor" | "highlight" | "cellShading";
 
 /**
  * The built-in items by name, to place in `FoliToolbarProps.items` (an item's `key` is its name,
@@ -1051,7 +1090,13 @@ type ToolbarMenuName =
 export const toolbarItems = Object.fromEntries(
   GROUPS.flat().map((item) => [item.key.replace(/-(\w)/, (_, c: string) => c.toUpperCase()), item]),
 ) as unknown as {
-  readonly [Name in ToolbarItemName]: Name extends ToolbarMenuName ? ToolbarMenu : ToolbarButton;
+  readonly [Name in ToolbarItemName]: Name extends ToolbarMenuName
+    ? ToolbarMenu
+    : Name extends ToolbarSelectName
+      ? ToolbarSelect
+      : Name extends ToolbarColorName
+        ? ToolbarColorMenu
+        : ToolbarButton;
 };
 
 /** The default toolbar: groups of `toolbarItems`, a separator between groups. */
@@ -1097,7 +1142,7 @@ const statesOf =
           ? actionsOf(item, body).length > 0
           : !item.command || editor.can(item.command),
       value:
-        item.menu?.value(state) ??
+        item.colors?.value(state) ??
         item.select?.value(state) ??
         (item.dialog ? (selectedPicture(state) ? "edit" : "insert") : undefined),
     }));
@@ -1183,7 +1228,7 @@ export function FoliToolbar({
       return;
     }
     if (item.actions && !actionsOf(item, body).length) return;
-    if (item.menu || item.actions) {
+    if (item.colors || item.actions) {
       if (menu !== item.key) {
         setMenu(item.key);
         return;
@@ -1441,9 +1486,9 @@ export function FoliToolbar({
                   title={item.label}
                   aria-pressed={item.pressed ? Boolean(state?.pressed) : undefined}
                   aria-haspopup={
-                    item.menu || item.actions ? "menu" : item.dialog ? "dialog" : undefined
+                    item.colors || item.actions ? "menu" : item.dialog ? "dialog" : undefined
                   }
-                  aria-expanded={item.menu || item.actions ? menu === item.key : undefined}
+                  aria-expanded={item.colors || item.actions ? menu === item.key : undefined}
                   aria-disabled={off || undefined}
                   tabIndex={i === active ? 0 : -1}
                   // Keep the focus (and the selection) in the document on click.
@@ -1452,13 +1497,13 @@ export function FoliToolbar({
                   onClick={(event) => run(i, event)}
                   onKeyDown={(event) => {
                     // ArrowDown opens a menu (the WAI-ARIA menu button pattern).
-                    if (!(item.menu || item.actions) || off || event.key !== "ArrowDown") return;
+                    if (!(item.colors || item.actions) || off || event.key !== "ArrowDown") return;
                     event.preventDefault();
                     setMenu(item.key);
                   }}
                 >
                   {item.icon ?? item.text ?? item.label}
-                  {item.menu && (
+                  {item.colors && (
                     <span
                       className="foli-toolbar-swatch"
                       aria-hidden="true"
@@ -1543,9 +1588,9 @@ export function FoliToolbar({
                   </span>
                 );
               }
-              const options = item.menu?.options;
-              if (!options || !item.menu) return button;
-              const { pick } = item.menu;
+              const options = item.colors?.options;
+              if (!options || !item.colors) return button;
+              const { pick } = item.colors;
               return (
                 <span key={item.key} className="foli-toolbar-menu">
                   {button}
@@ -1667,7 +1712,7 @@ function ColorMenu({
   onClose,
 }: {
   label: string;
-  options: readonly ColorOption[];
+  options: readonly ToolbarColor[];
   current: string | null;
   onPick: (color: string | null, pointer: boolean) => void;
   onClose: (refocus: boolean) => void;

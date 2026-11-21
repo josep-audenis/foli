@@ -25,7 +25,8 @@ exactly its own version (since 1.0.0). Stylesheet: `@folijs/react/styles.css`
 ([styling.md](styling.md)). Stable with the components: their props and handles
 (`FoliEditorProps`, `FoliEditorHandle`, `FoliChange`, `FoliCanvasProps`, `FoliCanvasHandle`,
 `FoliCommentsProps`, `FoliNavigationProps`, `FoliToolbarProps`), the toolbar's items
-(`ToolbarItem`, `ToolbarButton`, `ToolbarMenu`, `ToolbarAction`, `ToolbarItemName`, `toolbarItems`,
+(`ToolbarItem`, `ToolbarButton`, `ToolbarMenu`, `ToolbarAction`, `ToolbarSelect`, `ToolbarOption`,
+`ToolbarColorMenu`, `ToolbarColor`, `ToolbarItemName`, `toolbarItems`,
 `defaultToolbarItems`), the
 hooks and their options and results (`UseFoliEditorOptions`, `UseEditorStateOptions`,
 `UseCommandOptions`, `CommandState`).
@@ -207,10 +208,12 @@ class, `foli-toolbar-<key>` (the alignments' keys are `align-start`, `align-cent
 `align-justify`). Groups are compared item by item, so an inline `items` array of the same items
 costs nothing; two items with one `key` log a warning unless `process.env.NODE_ENV` is `"production"` at run time. The
 built-in menus (`table`, `section`, `headerFooter`, `fields`, `navigate`, `notes`, `controls`) are
-typed `ToolbarMenu`, the other built-ins `ToolbarButton`.
+typed `ToolbarMenu`, the boxes (`style`, `font`, `size`, `lineSpacing`, `reviewView`, `tableStyle`)
+`ToolbarSelect`, the color menus (`textColor`, `highlight`, `cellShading`) `ToolbarColorMenu`, the
+other built-ins `ToolbarButton`.
 
-An app's item is a `ToolbarItem`: a `ToolbarButton` (with `command`) or a `ToolbarMenu` (with
-`actions`).
+An app's item is a `ToolbarItem`: a `ToolbarButton` (with `command`), a `ToolbarMenu` (with
+`actions`), a `ToolbarSelect` (a box, with `select`) or a `ToolbarColorMenu` (with `colors`).
 
 - `key`: unique in the toolbar. `label`: the tooltip, and the accessible name when `icon` is
   given. `text`: the visible text and accessible name (default `label`). `icon`: a `ReactNode`
@@ -231,8 +234,23 @@ An app's item is a `ToolbarItem`: a `ToolbarButton` (with `command`) or a `Toolb
 App items behave as the built-in buttons: one tab stop for the whole toolbar, the focus visible,
 a click keeps the document's focus and selection and calls `onClickCommand`, Enter or Space keeps
 the focus on the item, ArrowDown opens a menu. A copy of a built-in item with another `label`,
-`text` or `icon` does what the built-in does. The boxes, color menus and dialogs of the built-in
-items are not available to app items.
+`text` or `icon` does what the built-in does.
+
+- `select: { options(state), value(state), pick(value) }`: a box (a `select`, as Font).
+  `options` gives its `ToolbarOption`s (`{ value, label }`) on every render of the toolbar,
+  `value` the one shown (null or "": a blank entry; one that is not offered shows itself),
+  `pick` the command a choice runs. `label` is its accessible name.
+- `colors: { options, value(state), pick(color) }`: a color menu button (as Text color).
+  `options` are `ToolbarColor`s (`{ name, color }`, `color` a lowercase `#rrggbb`, or null for
+  the entry that removes it), `value` the color at the selection (checked in the menu, shown on
+  the button), `pick` the command a choice runs.
+- A built-in box or color menu with other entries is a copy:
+  `{ ...toolbarItems.textColor, colors: { ...toolbarItems.textColor.colors, options: mine } }`,
+  `{ ...toolbarItems.font, select: { ...toolbarItems.font.select, options: () => myFonts } }`.
+  The text color goes into the document as it is; a highlight outside Word's is written as
+  shading. Keep text colors readable on white (4.5:1).
+
+The dialogs of the built-in items are not available to app items.
 
 ### Hooks and provider
 
