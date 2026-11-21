@@ -304,6 +304,11 @@ export interface ToolbarColorMenu extends ToolbarItemBase {
     readonly value: (state: EditorState) => string | null;
     /** What picking a color runs (null: the entry that removes it). */
     readonly pick: (color: string | null) => Command;
+    /**
+     * A last entry, "More colors…", that opens the browser's color field: `pick` then gets any
+     * `#rrggbb`. Default false: the palette only.
+     */
+    readonly custom?: boolean | undefined;
   };
   readonly command?: undefined;
   readonly actions?: undefined;
@@ -1471,6 +1476,9 @@ export function FoliToolbar({
   const pointer = useRef(false);
   // The open menu (a menu button's key), if any.
   const [menu, setMenu] = useState<string | null>(null);
+  // The color fields behind "More colors…" (by item key), and whether the last was opened by pointer.
+  const colorFields = useRef<Record<string, HTMLInputElement | null>>({});
+  const customPointer = useRef(false);
   // Nor does it come back with its item, once that has left the toolbar.
   const menuGone = menu !== null && !items.some((item) => item.key === menu);
   useEffect(() => {
@@ -2019,6 +2027,32 @@ export function FoliToolbar({
                         setMenu(null);
                         if (refocus) buttons.current[i]?.focus();
                       }}
+                      onCustom={
+                        item.colors.custom
+                          ? (pointer) => {
+                              setMenu(null);
+                              if (!pointer) buttons.current[i]?.focus();
+                              customPointer.current = pointer;
+                              const field = colorFields.current[item.key];
+                              if (!field) return;
+                              // It opens on the color at the selection.
+                              field.value = state?.value ?? "#000000";
+                              field.click();
+                            }
+                          : undefined
+                      }
+                    />
+                  )}
+                  {item.colors.custom && !disabled && (
+                    <ColorField
+                      label={`${item.label}: more colors`}
+                      setRef={(element) => {
+                        colorFields.current[item.key] = element;
+                      }}
+                      onPick={(color) => {
+                        editor.run(pick(color));
+                        if (customPointer.current) onClickCommand?.();
+                      }}
                     />
                   )}
                 </span>
@@ -2222,12 +2256,15 @@ function ColorMenu({
   current,
   onPick,
   onClose,
+  onCustom,
 }: {
   label: string;
   options: readonly ToolbarColor[];
   current: string | null;
   onPick: (color: string | null, pointer: boolean) => void;
   onClose: (refocus: boolean) => void;
+  /** With it, a last entry that asks for any color. */
+  onCustom?: ((pointer: boolean) => void) | undefined;
 }) {
   const items = useRef<(HTMLButtonElement | null)[]>([]);
   const checked = Math.max(
@@ -2240,7 +2277,7 @@ function ColorMenu({
   }, []);
 
   const onKeyDown = (event: KeyboardEvent) => {
-    const count = options.length;
+    const count = options.length + (onCustom ? 1 : 0);
     const at = items.current.indexOf(event.target as HTMLButtonElement);
     const moves: Record<string, number> = {
       ArrowDown: (at + 1) % count,
@@ -2295,7 +2332,61 @@ function ColorMenu({
           {option.name}
         </button>
       ))}
+      {onCustom && (
+        <button
+          ref={(element) => {
+            items.current[options.length] = element;
+          }}
+          type="button"
+          role="menuitem"
+          aria-haspopup="dialog"
+          tabIndex={-1}
+          className="foli-menu-item foli-menu-custom"
+          onMouseDown={(event) => event.preventDefault()}
+          onClick={(event) => onCustom(event.detail > 0)}
+        >
+          More colors…
+        </button>
+      )}
     </div>
+  );
+}
+
+/**
+ * The browser's color field behind a color menu's "More colors…": not shown (the entry opens
+ * it), and heard on `change` (the color chosen), not while the user is still choosing.
+ */
+function ColorField({
+  label,
+  setRef,
+  onPick,
+}: {
+  label: string;
+  setRef: (element: HTMLInputElement | null) => void;
+  onPick: (color: string) => void;
+}) {
+  const field = useRef<HTMLInputElement | null>(null);
+  const pick = useRef(onPick);
+  pick.current = onPick;
+  useEffect(() => {
+    const element = field.current;
+    if (!element) return;
+    const onChange = () => pick.current(element.value.toLowerCase());
+    element.addEventListener("change", onChange);
+    return () => element.removeEventListener("change", onChange);
+  }, []);
+  return (
+    <input
+      ref={(element) => {
+        field.current = element;
+        setRef(element);
+      }}
+      type="color"
+      className="foli-toolbar-color-input"
+      aria-label={label}
+      tabIndex={-1}
+      defaultValue="#000000"
+    />
   );
 }
 

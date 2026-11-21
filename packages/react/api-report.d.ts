@@ -325,6 +325,11 @@ export interface ToolbarColorMenu extends ToolbarItemBase {
         readonly value: (state: EditorState) => string | null;
         /** What picking a color runs (null: the entry that removes it). */
         readonly pick: (color: string | null) => Command;
+        /**
+         * A last entry, "More colors…", that opens the browser's color field: `pick` then gets any
+         * `#rrggbb`. Default false: the palette only.
+         */
+        readonly custom?: boolean | undefined;
     };
     readonly command?: undefined;
     readonly actions?: undefined;

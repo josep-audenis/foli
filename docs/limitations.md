@@ -88,7 +88,8 @@ checklist in [testing/ime.md](testing/ime.md)):
 - On Android, Backspace at a list paragraph's start may join it into the paragraph before
   instead of removing its number (untested on a device).
 - The toolbar's colors are a palette (seven text colors, Word's highlights; an app gives the
-  menus another one, [api.md](api.md#toolbar-items)), with no color picker; any
+  menus another one, and the browser's color field with `custom`,
+  [api.md](api.md#toolbar-items)); the built-in menus offer no color picker by default; any
   `#rrggbb` works through `setTextColor` (a highlight outside Word's is written as shading).
 - Left and Right next to an opaque block treat Left as backward: in right-to-left text, Left at
   the start of a paragraph selects the block before it (left-to-right is the only direction the
