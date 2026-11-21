@@ -241,6 +241,26 @@ export function deleteBookmark(editor: Editor, name: string): boolean {
 }
 
 /**
+ * Shows `target` for a few seconds without selecting it (`StoryView.hint`): the view scrolls to it
+ * and marks it, then the mark fades. False without a view that shows it: a hint is for the eyes.
+ */
+export function hint(
+  editor: Editor,
+  target: DocumentTarget | { bookmark: string },
+  options: { ms?: number } = {},
+): boolean {
+  const view = editor.storyView;
+  if (!view?.hint) return false;
+  if (typeof target !== "object" || target === null) return false;
+  if (!("bookmark" in target)) return view.hint(target, options);
+  if (typeof target.bookmark !== "string") return false;
+  // By name, capitals not counting, as Word finds a bookmark; Word's own hidden ones too.
+  const name = target.bookmark.toLowerCase();
+  const found = listBookmarks(editor, { hidden: true }).find((b) => b.name.toLowerCase() === name);
+  return found ? view.hint({ story: found.story, from: found.from, to: found.to }, options) : false;
+}
+
+/**
  * Selects `target` and shows it: through the view when there is one (which opens a story for it),
  * else in the editor of its tree. Whether it could.
  */

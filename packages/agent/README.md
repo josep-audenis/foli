@@ -128,6 +128,8 @@ session.updateFields({ data: { CandidateFirstName: "Ada" } });
   a page layout the session does not have. A table of contents is left as it is unless
   `contents` is true: built here, its entries follow the headings and their page numbers are
   empty until Word updates the field. It returns no blocks: read again.
+- **`target(handle)`**: where a block's content is in `session.editor`, as a `DocumentTarget`:
+  what core's `hint` and `goTo` take, to show an agent's change in a view of that editor.
 - **`checkpoint()`**: marks the document as it is. `rollback()` on what it returns takes back
   every edit made since, as if none had been: no tracked change is left of them and every
   handle names the block it named; a style they added to the document is gone, and undo is
@@ -159,6 +161,28 @@ updateFields do: it returns none). A refusal says what to do instead: follow it.
 Give find the exact text from the line, with its capitals, long enough to be there once.
 Every edit you make is a tracked change a person will accept or reject: change only what the
 task asks, and use comment to explain a change that is not obvious.
+```
+
+## Showing what changed
+
+In an app, the person sees the session's editor: give `session.editor` to `FoliCanvas` (or to
+an `EditorView`). Once it is shown, core's `hint` marks a block the agent changed for a few
+seconds, without moving the caret, from the handles the operations return. A new hint
+replaces the one showing, so several changes are shown one after the other:
+
+```tsx
+import { hint } from "@folijs/core";
+import { FoliCanvas } from "@folijs/react";
+
+<FoliCanvas editor={session.editor} />;
+
+// Later, once the canvas is on the page (before that, `hint` is false):
+const result = session.replaceText("b12", "30 days", "45 days");
+if (result.ok)
+  result.blocks.forEach((block, i) => {
+    const where = session.target(block.handle);
+    if (where.ok) setTimeout(() => hint(session.editor, where.target, { ms: 2500 }), i * 3000);
+  });
 ```
 
 ## Limits

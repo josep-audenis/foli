@@ -176,6 +176,12 @@ export interface StoryView {
    * `focus`: the document takes the focus. False when no page shows it.
    */
   reveal(target: DocumentTarget, options?: { focus?: boolean }): boolean;
+  /**
+   * Scrolls to `target` and marks it for `ms` milliseconds, then lets the mark fade; the
+   * document, the selection and the focus stay. False when no page shows it. Optional: a view
+   * made before 1.3 has none.
+   */
+  hint?(target: DocumentTarget, options?: { ms?: number }): boolean;
   /** The caret to the start of page `page` (1-based), scrolled to. False when there is none. */
   goToPage(page: number, options?: { focus?: boolean }): boolean;
   /** Focuses the document, or the story open in it. */

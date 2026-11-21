@@ -269,7 +269,11 @@ content: they are part of the block's key, so only blocks whose decorations chan
 measured again, and the flow restarts from the first of them as after an edit. Inline ones cut
 text runs at their ends. Plugin views are made after the first render, told after each update and
 destroyed first in `destroy`. Find's matches and the selected field's shading do not use
-decorations: the Custom Highlight API and one attribute draw them without redrawing a block.
+decorations: the Custom Highlight API and one attribute draw them without redrawing a block. The
+hint (`view.hint`, Phase 18) is drawn the same way, in its own highlight (`foli-hint`, then
+`foli-hint-fading`): its range kept as positions, mapped through each transaction the view hears
+of, made into DOM ranges again after each render; for a header, footer or note that is not open,
+by paragraph index and character in the copies the pages draw, as their text has no positions.
 
 ## Editor view (`@folijs/view`)
 

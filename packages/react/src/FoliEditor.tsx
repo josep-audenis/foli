@@ -1,11 +1,13 @@
-import type {
-  Editor,
-  EditorDocument,
-  Extension,
-  FoliDocument,
-  Plugin,
-  ReviewView,
-  Transaction,
+import {
+  type DocumentTarget,
+  type Editor,
+  type EditorDocument,
+  type Extension,
+  type FoliDocument,
+  hint,
+  type Plugin,
+  type ReviewView,
+  type Transaction,
 } from "@folijs/core";
 import { documentJSON, wordContext } from "@folijs/core/internal";
 import { forwardRef, type ReactNode, useImperativeHandle, useRef } from "react";
@@ -98,6 +100,11 @@ export interface FoliEditorProps extends Omit<FoliCanvasProps, "editor"> {
 /** What a `ref` on `FoliEditor` gives: its editor (commands, `setDocument`…) and focus. */
 export interface FoliEditorHandle extends FoliCanvasHandle {
   readonly editor: Editor;
+  /**
+   * Shows a place for a few seconds without moving the caret (core's `hint`): a range, or a
+   * bookmark by name. False when no page shows it.
+   */
+  hint(target: DocumentTarget | { bookmark: string }, options?: { ms?: number }): boolean;
 }
 
 /**
@@ -137,7 +144,15 @@ export const FoliEditor = forwardRef<FoliEditorHandle, FoliEditorProps>(function
   const onChangeRef = useRef(onChange);
   const canvasRef = useRef<FoliCanvasHandle>(null);
 
-  useImperativeHandle(ref, () => ({ editor, focus: () => canvasRef.current?.focus() }), [editor]);
+  useImperativeHandle(
+    ref,
+    () => ({
+      editor,
+      focus: () => canvasRef.current?.focus(),
+      hint: (target, options) => hint(editor, target, options),
+    }),
+    [editor],
+  );
 
   useIsomorphicLayoutEffect(() => {
     onChangeRef.current = onChange;
