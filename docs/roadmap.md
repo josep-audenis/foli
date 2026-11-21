@@ -9,26 +9,26 @@ leaves `main` green with a working playground.
 **Update this table in the same PR that starts, advances or finishes a phase.** It is the only
 place that says what is in progress; check it before starting work.
 
-| Phase                     | Status                   | Branch                        | Notes                                                                                                                                          |
-| ------------------------- | ------------------------ | ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| 0 Foundation              | ✅ Done                  | —                             |                                                                                                                                                |
-| 1 Architecture spike      | ✅ Done (G1 provisional) | —                             | Merged in #1; ADR-0003 accepted provisionally; IME, dead-key and screen-reader checks open                                                     |
-| 2 Document model          | ✅ Done                  | —                             | Merged in #2                                                                                                                                   |
-| 3 Transactions & history  | ✅ Done                  | —                             | Merged in #4; gate G2 passed                                                                                                                   |
-| 4 Editor view             | ✅ Done (G3 provisional) | —                             | Merged in #8–#13; manual checks (4.6) deferred, open risks in ADR-0003                                                                         |
-| 5 Native pagination       | ✅ Done (G4 provisional) | —                             | Merged in #15–#22; page-break manual checks open, risks in ADR-0003                                                                            |
-| 6 React API & 0.1.0       | ✅ Done                  | —                             | Merged in #23–#31; 0.1.0 on npm; manual checks shipped as known risks (ADR-0003)                                                               |
-| 7 Rich content            | ✅ Done                  | —                             | Merged in #33–#41; 0.2.0 on npm; list-document benchmark misses accepted (known limit)                                                         |
-| 8 Word model & DOCX       | ✅ Done                  | —                             | Merged in #44–#61; 0.3.0 on npm (`@folijs/docx` first released); gate G5 passed                                                                |
-| 9 Review                  | ✅ Done                  | —                             | Merged in #63–#72; 0.4.0 on npm                                                                                                                |
-| 10 Tables & images        | ✅ Done                  | —                             | Merged in #73–#97 (#90, the landing page, went to main); 0.5.0 on npm; two misses accepted                                                     |
-| 11 Sections & templates   | ✅ Done                  | —                             | Merged in #100–#118 (#106, #107, #110, #112 and #113, the site, went to main); 0.6.0 on npm; misses accepted                                   |
-| 12 Ecosystem & 1.0        | ✅ Done                  | —                             | Merged in #120–#133; 1.0.0 on npm (2026-11-20); Phase 5 speed misses and manual checks accepted as 1.0 risks                                   |
-| 13 Agent library          | ✅ Done                  | —                             | Merged in #138–#146; `@folijs/agent` 0.1.0 on npm (2026-11-21)                                                                                 |
-| 14 MCP server             | ✅ Done                  | —                             | Merged in #148–#162; `@folijs/mcp` 0.1.0 on npm (2026-11-21); a model in a client of its own is not tried (see 14.8)                           |
-| 15 Toolbar                | ✅ Done                  | —                             | Merged in #149–#160; 1.1.0 on npm (2026-11-21); the release's bench ran on a busy machine (see #160)                                           |
-| 16 Code mode              | In review                | `phase-16/run-code`           | Built in #165 behind `--code`, after three security reviews; a model did three tasks in 11 calls; the release of mcp 0.2.0 waits for the owner |
-| 17 Toolbar for developers | In progress              | `phase-17/toolbar-developers` | Planned 2026-11-21: what Phase 15 left a developer unable to do; independent of Phase 16                                                       |
+| Phase                     | Status                     | Branch                        | Notes                                                                                                                                          |
+| ------------------------- | -------------------------- | ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0 Foundation              | ✅ Done                    | —                             |                                                                                                                                                |
+| 1 Architecture spike      | ✅ Done (G1 provisional)   | —                             | Merged in #1; ADR-0003 accepted provisionally; IME, dead-key and screen-reader checks open                                                     |
+| 2 Document model          | ✅ Done                    | —                             | Merged in #2                                                                                                                                   |
+| 3 Transactions & history  | ✅ Done                    | —                             | Merged in #4; gate G2 passed                                                                                                                   |
+| 4 Editor view             | ✅ Done (G3 provisional)   | —                             | Merged in #8–#13; manual checks (4.6) deferred, open risks in ADR-0003                                                                         |
+| 5 Native pagination       | ✅ Done (G4 provisional)   | —                             | Merged in #15–#22; page-break manual checks open, risks in ADR-0003                                                                            |
+| 6 React API & 0.1.0       | ✅ Done                    | —                             | Merged in #23–#31; 0.1.0 on npm; manual checks shipped as known risks (ADR-0003)                                                               |
+| 7 Rich content            | ✅ Done                    | —                             | Merged in #33–#41; 0.2.0 on npm; list-document benchmark misses accepted (known limit)                                                         |
+| 8 Word model & DOCX       | ✅ Done                    | —                             | Merged in #44–#61; 0.3.0 on npm (`@folijs/docx` first released); gate G5 passed                                                                |
+| 9 Review                  | ✅ Done                    | —                             | Merged in #63–#72; 0.4.0 on npm                                                                                                                |
+| 10 Tables & images        | ✅ Done                    | —                             | Merged in #73–#97 (#90, the landing page, went to main); 0.5.0 on npm; two misses accepted                                                     |
+| 11 Sections & templates   | ✅ Done                    | —                             | Merged in #100–#118 (#106, #107, #110, #112 and #113, the site, went to main); 0.6.0 on npm; misses accepted                                   |
+| 12 Ecosystem & 1.0        | ✅ Done                    | —                             | Merged in #120–#133; 1.0.0 on npm (2026-11-20); Phase 5 speed misses and manual checks accepted as 1.0 risks                                   |
+| 13 Agent library          | ✅ Done                    | —                             | Merged in #138–#146; `@folijs/agent` 0.1.0 on npm (2026-11-21)                                                                                 |
+| 14 MCP server             | ✅ Done                    | —                             | Merged in #148–#162; `@folijs/mcp` 0.1.0 on npm (2026-11-21); a model in a client of its own is not tried (see 14.8)                           |
+| 15 Toolbar                | ✅ Done                    | —                             | Merged in #149–#160; 1.1.0 on npm (2026-11-21); the release's bench ran on a busy machine (see #160)                                           |
+| 16 Code mode              | In review                  | `phase-16/run-code`           | Built in #165 behind `--code`, after three security reviews; a model did three tasks in 11 calls; the release of mcp 0.2.0 waits for the owner |
+| 17 Toolbar for developers | In progress (release left) | `phase-17/toolbar-developers` | Built and merged in #167–#173 (2026-11-21); 1.2.0 waits for the owner's approval to publish                                                    |
 
 Status values: `Ready` (dependencies met, nobody on it) · `In progress` · `In review` (PR open) ·
 `✅ Done` (merged, acceptance criteria met) · `Blocked by …`.
@@ -2594,8 +2594,10 @@ agent's review.
 - [x] 17.4 (#172) Overflow: `overflow="menu"` (default `"wrap"`, as today).
 - [x] 17.5 (#173) Strings: `messages`, `toolbarMessages` (the list, kept by
   `scripts/toolbar-messages.mjs` in `pnpm lint`), the test that every string shown is in it.
-- [ ] 17.6 Docs checked against the acceptance above; 1.2.0 published with the owner's approval
-  (the Release workflow).
+- [ ] 17.6 Docs checked against the acceptance above (done 2026-11-21: every point but the
+  release holds; jsdom tests for each, e2e in three browsers with axe for tabs, overflow and a
+  translated toolbar; six changesets, minor); still to do: 1.2.0 published with the owner's
+  approval (the Release workflow).
 
 ## After 1.0
 

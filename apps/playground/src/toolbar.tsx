@@ -17,6 +17,7 @@ import {
   defaultToolbarTabs,
   FoliEditor,
   type ToolbarItem,
+  type ToolbarMessages,
   toolbarItems,
   useCommand,
 } from "@folijs/react";
@@ -79,6 +80,27 @@ const initial = createDocument({
 });
 
 const query = new URLSearchParams(location.search);
+/** `/toolbar.html?tabs&es`: the toolbar in Spanish, in part (17.5). */
+const es: ToolbarMessages = {
+  Formatting: "Formato",
+  Home: "Inicio",
+  Insert: "Insertar",
+  Layout: "Disposición",
+  Review: "Revisar",
+  Bold: "Negrita",
+  B: "N",
+  Italic: "Cursiva",
+  I: "K",
+  Undo: "Deshacer",
+  Redo: "Rehacer",
+  Table: "Tabla",
+  "Insert table…": "Insertar tabla…",
+  "Insert table": "Insertar tabla",
+  Rows: "Filas",
+  Columns: "Columnas",
+  Cancel: "Cancelar",
+  "Enter a number of rows from 1 to {max}.": "Escribe un número de filas de 1 a {max}.",
+};
 const root = document.getElementById("root");
 if (!root) throw new Error("#root element missing");
 createRoot(root).render(
@@ -87,7 +109,10 @@ createRoot(root).render(
       initialContent={initial}
       plugins={[stamps]}
       // `/toolbar.html?overflow`: every built-in item in one row, the rest under More (17.4).
-      toolbarProps={{ overflow: query.has("overflow") ? "menu" : "wrap" }}
+      toolbarProps={{
+        overflow: query.has("overflow") ? "menu" : "wrap",
+        messages: query.has("es") ? es : undefined,
+      }}
       toolbar={
         // `/toolbar.html?tabs`: Word's tabs, and one of the app's (15.3).
         query.has("overflow")
