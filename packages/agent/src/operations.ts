@@ -404,9 +404,19 @@ export function setStyle(context: Context, handle: string, style: string): Resul
   const resolver = wordContext(editor.state)?.resolver;
   const now = resolver?.paragraph(target.node.attrs as Record<string, unknown>).paragraph.style;
   if (now !== id) {
+    const before = editor.state.doc;
     editor.select(target.pos + 1);
-    if (!editor.run(setParagraphStyle(id)))
-      return refuse("refused", `The style of block ${handle} could not be changed.`);
+    editor.run(setParagraphStyle(id));
+    // The command says yes before the document's rules have their say (a locked control).
+    if (editor.state.doc === before) {
+      const locked = lockedControls(context, target.pos, target.node)[0];
+      return locked
+        ? refuse(
+            "read-only",
+            `Block ${handle} is in the locked content control ${quote(locked)}: its style cannot be changed.`,
+          )
+        : refuse("refused", `The style of block ${handle} could not be changed.`);
+    }
   }
   return { ok: true, ...changed(context, [handle]) };
 }
@@ -455,7 +465,13 @@ export function comment(
   const ids = () => new Set(wordContext(editor.state)?.envelope.comments.map((c) => c.id));
   const before = ids();
   editor.select(from, to);
-  if (!editor.run(addComment(content)))
+  // Word shows a comment's initials beside it: the author's, as Word makes them.
+  const initials = context.author
+    .split(/\s+/)
+    .map((word) => word[0] ?? "")
+    .join("")
+    .slice(0, 9);
+  if (!editor.run(addComment(content, { initials })))
     return refuse("refused", `Block ${handle} could not be commented.`);
   const made = [...ids()].find((id) => !before.has(id));
   if (made === undefined) return refuse("refused", `Block ${handle} could not be commented.`);

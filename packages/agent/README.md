@@ -85,6 +85,7 @@ session.comment("b25", "Why three years?", { on: "three (3) years" });
 - **`comment(handle, text, { on })`** comments a paragraph in the author's name: the whole
   block, or `on`, text that is in it once. A line break in `text` starts a new paragraph of the
   comment. Comments are not tracked changes: rejecting the session's changes leaves them.
+  A locked content control takes comments, as in Word, and nothing else.
 
 Refusals a model can act on: `no-match` (with the block's text), `several-matches` (with how
 many), `unknown-style` (with the styles there are), `gone`, `unknown-handle`, `not-a-paragraph`,

@@ -74,6 +74,47 @@ describe("styles and setStyle", () => {
   });
 });
 
+describe("setStyle and the document's rules", () => {
+  it("refuses a paragraph in a locked content control, and restyles one that only holds one", async () => {
+    const { document } = await corpus("03-offer-letter-template");
+    const controls = Object.fromEntries(
+      Object.entries(document.controls ?? {}).map(([id, control]) => [
+        id,
+        { ...control, lock: "sdtContentLocked" as const },
+      ]),
+    );
+    const session = openSession({ ...document, controls }, { author: "Agent" });
+    const all = blocks(session);
+    const benefits = starting(all, "Private health insurance");
+    const refused = session.setStyle(benefits.handle, "Heading 1");
+    expect(refused).toMatchObject({ ok: false, code: "read-only" });
+    expect(!refused.ok && refused.message).toContain("Benefits");
+    expect(session.block(benefits.handle)).toMatchObject({
+      block: { style: "Normal", changed: false },
+    });
+    const remote = all.find((b) => b.text.includes("Remote working")) as Block;
+    expect(session.setStyle(remote.handle, "Heading 1")).toMatchObject({
+      ok: true,
+      blocks: [{ style: "heading 1", changed: true }],
+    });
+  });
+
+  it("adds a built-in heading the document does not have", async () => {
+    const { document } = await corpus("01-mutual-nda");
+    const styles = document.styles.filter((s) => !/^Heading[2-9]$/.test(s.id));
+    const session = openSession({ ...document, styles }, { author: "Agent" });
+    const original = blocks(session);
+    expect(session.styles().map((s) => s.toLowerCase())).toContain("heading 3");
+    const parties = starting(original, "each a");
+    const result = session.setStyle(parties.handle, "Heading 3");
+    expect(result.ok && result.blocks[0]?.changed).toBe(true);
+    expect(result.ok && result.blocks[0]?.style?.toLowerCase()).toBe("heading 3");
+    expect(session.editor.getDocument().styles.some((s) => s.id === "Heading3")).toBe(true);
+    session.editor.run(rejectAllChanges("Agent"));
+    expect(blocks(session)).toEqual(original);
+  });
+});
+
 describe("comment", () => {
   it("comments a whole block in the author's name", async () => {
     const session = await open();
@@ -84,7 +125,7 @@ describe("comment", () => {
     if (!result.ok) return;
     expect(result.text).toContain("Clause, 3.1, 1 comment: This Agreement continues");
     const made = session.editor.getDocument().comments.find((c) => c.id === result.comment);
-    expect(made).toMatchObject({ author: "Agent" });
+    expect(made).toMatchObject({ author: "Agent", initials: "A" });
     expect(JSON.stringify(made?.content)).toContain("Three years is short.");
     expect(made?.content).toHaveLength(2);
     // Not a tracked change: the text is as it was, and rejecting leaves the comment.

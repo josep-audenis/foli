@@ -2013,7 +2013,11 @@ Each task is a PR on `phase-13/agent`, the build green after each.
   `addComment` over the block's content, or over `on`, which must be in the block once; a line
   break in the text starts a new paragraph of the comment; it returns the comment's id. A
   comment is not a tracked change, as in Word: rejecting the session's changes leaves it. Both
-  refuse a table or other block as `not-a-paragraph`.)
+  refuse a table or other block as `not-a-paragraph`. From the review of #141: `setStyle` said
+  yes in a locked block control while the document's rules dropped the change; it now looks at
+  the document after and refuses as `read-only` (a paragraph that only holds a locked inline
+  control is restyled). Comments carry the author's initials. A comment in a locked control is
+  made, as in Word.)
 - [ ] 13.5 Templates: `controls()` (tag, title, kind, value, the block it is in),
   `fillControl(tagOrTitle, value)`, `updateFields()`. A read-only control is refused by name.
 - [ ] 13.6 The three tasks and the tracking check: tests that import a corpus `.docx`, run the
