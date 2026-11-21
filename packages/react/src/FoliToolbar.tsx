@@ -153,7 +153,7 @@ export interface FoliToolbarProps {
    * built-in ones from `toolbarItems`, and the app's own. "New comment" shows only with
    * `comments`; an empty group is left out.
    */
-  items?: readonly (readonly ToolbarItem[])[] | undefined;
+  items?: ToolbarGroups | undefined;
   /**
    * Tabs over the toolbar (a WAI-ARIA tab list with its own tab stop: arrow keys, Home and End
    * move between tabs and show each), each with its own groups of items, in place of `items`;
@@ -161,8 +161,26 @@ export interface FoliToolbarProps {
    * `items`. With tabs, `className` goes on the element around both (`.foli-ribbon`).
    */
   tabs?: readonly ToolbarTab[] | undefined;
+  /**
+   * The tab shown, by its key: with it the app decides (change it in `onTabChange`). A key that
+   * is not among the tabs shown gives the first one.
+   */
+  tab?: string | undefined;
+  /** The tab shown at first, while the app does not pass `tab` (default: the first one). */
+  defaultTab?: string | undefined;
+  /** Someone picked another tab (a click, or the arrow keys). */
+  onTabChange?: ((key: string) => void) | undefined;
   className?: string | undefined;
 }
+
+/** A group of toolbar items with a caption: a `role="group"` named by `label`, shown under it. */
+export interface ToolbarGroup {
+  readonly label: string;
+  readonly items: readonly ToolbarItem[];
+}
+
+/** A toolbar's groups, a separator between them: arrays of items, or groups with a caption. */
+export type ToolbarGroups = readonly (readonly ToolbarItem[] | ToolbarGroup)[];
 
 /** A tab of the toolbar: its items show while it is the selected one. */
 export interface ToolbarTab {
@@ -171,7 +189,13 @@ export interface ToolbarTab {
   /** The tab's text. */
   readonly label: string;
   /** Its items, in groups (as `FoliToolbarProps.items`); a key is unique within its tab. */
-  readonly items: readonly (readonly ToolbarItem[])[];
+  readonly items: ToolbarGroups;
+  /**
+   * A tab that comes and goes with the selection (Word's Table tab): shown while this says so.
+   * Runs after every transaction: keep it cheap. It is not selected for the user when it comes;
+   * when the selected tab goes, the first one shows (no `onTabChange`).
+   */
+  readonly visible?: ((state: EditorState, editor: Editor) => boolean) | undefined;
 }
 
 /** What every toolbar item has. */
@@ -1211,6 +1235,12 @@ export const toolbarItems = Object.fromEntries(
 /** The default toolbar: groups of `toolbarItems`, a separator between groups. */
 export const defaultToolbarItems = GROUPS as unknown as readonly (readonly ToolbarItem[])[];
 
+/** A group's items, with or without a caption. */
+const itemsOf = (group: ToolbarGroups[number]): readonly ToolbarItem[] =>
+  Array.isArray(group) ? group : (group as ToolbarGroup).items;
+const labelOf = (group: ToolbarGroups[number]): string | undefined =>
+  Array.isArray(group) ? undefined : (group as ToolbarGroup).label;
+
 /**
  * The built-in items in tabs, after Word's ribbon: Home, Insert, Layout, Review. For
  * `FoliToolbarProps.tabs` (or `FoliEditor`'s `toolbar`), whole or as a start for an app's own.
@@ -1313,11 +1343,15 @@ const actionsOf = (item: Item, body: Editor): readonly Action[] =>
   typeof item.actions === "function" ? item.actions(body) : (item.actions ?? []);
 
 /** The same groups of the same items (an inline `items` array is not a change). */
-const sameGroups = (
-  a: readonly (readonly ToolbarItem[])[] | undefined,
-  b: readonly (readonly ToolbarItem[])[] | undefined,
-) =>
-  a === b || (!!a && !!b && a.length === b.length && a.every((group, i) => sameItems(group, b[i])));
+const sameGroups = (a: ToolbarGroups | undefined, b: ToolbarGroups | undefined) =>
+  a === b ||
+  (!!a &&
+    !!b &&
+    a.length === b.length &&
+    a.every((group, i) => {
+      const other = b[i] as ToolbarGroups[number];
+      return labelOf(group) === labelOf(other) && sameItems(itemsOf(group), itemsOf(other));
+    }));
 
 /**
  * Word's formatting controls for an editor (`defaultToolbarItems`, or `items`): paragraph
@@ -1338,26 +1372,46 @@ export function FoliToolbar({
   comments = false,
   upload,
   items: givenGroups,
-  tabs,
+  tabs: allTabs,
+  tab: givenTab,
+  defaultTab,
+  onTabChange,
 }: FoliToolbarProps) {
   const id = useId();
-  // The tab shown: the one picked while it is still there, else the first.
-  const [tabKey, setTabKey] = useState<string | null>(null);
-  const tab = tabs?.find((t) => t.key === tabKey) ?? tabs?.[0];
-  const itemGroups = tab ? tab.items : givenGroups;
-  const tabButtons = useRef<(HTMLButtonElement | null)[]>([]);
   const body = useEditorOrContext(given, "FoliToolbar");
   // A story open on its page takes the formatting commands; the body otherwise.
   const editor = useActiveEditor(body);
+  // The tabs shown now (a tab with `visible` comes and goes with the selection), as their keys.
+  const shownKeys = useEditorState(
+    (state, active) =>
+      (allTabs ?? [])
+        .filter((t) => !t.visible || t.visible(state, active))
+        .map((t) => t.key)
+        .join("\n"),
+    { editor },
+  );
+  const shownTabs = new Set(shownKeys.split("\n"));
+  const tabs = allTabs?.filter((t) => shownTabs.has(t.key));
+  // The tab shown: the app's, else the one picked while it is still there, else the first.
+  const [tabKey, setTabKey] = useState(defaultTab ?? null);
+  const wanted = givenTab ?? tabKey;
+  const tab = tabs?.find((t) => t.key === wanted) ?? tabs?.[0];
+  const itemGroups = tab ? tab.items : givenGroups;
+  const tabButtons = useRef<(HTMLButtonElement | null)[]>([]);
   // Without "New comment" where no comments pane lets a comment be written.
   const lastGroups = useRef(itemGroups);
   if (!sameGroups(lastGroups.current, itemGroups)) lastGroups.current = itemGroups;
   const stableGroups = lastGroups.current;
   const { groups, items, selectStates } = useMemo(() => {
-    const groups = ((stableGroups ?? GROUPS) as readonly (readonly Item[])[])
-      .map((group) => group.filter((item) => comments || item.key !== "newComment"))
-      .filter((group) => group.length > 0);
-    const items = groups.flat();
+    const groups = ((stableGroups ?? GROUPS) as ToolbarGroups)
+      .map((group) => ({
+        label: labelOf(group),
+        items: (itemsOf(group) as readonly Item[]).filter(
+          (item) => comments || item.key !== "newComment",
+        ),
+      }))
+      .filter((group) => group.items.length > 0);
+    const items = groups.flatMap((group) => group.items);
     if (development()) {
       const keys = items.map((item) => item.key);
       const twice = keys.find((key, i) => keys.indexOf(key) !== i);
@@ -1604,6 +1658,7 @@ export function FoliToolbar({
   const showTab = (next: ToolbarTab) => {
     if (next.key === tab?.key) return;
     setTabKey(next.key);
+    onTabChange?.(next.key);
     setActive(0);
     // The button a dialog would give the focus back to goes with its tab.
     setMenu(null);
@@ -1620,7 +1675,7 @@ export function FoliToolbar({
   const onTabKeyDown = (event: KeyboardEvent) => {
     if (!tabs || !tab || event.altKey || event.ctrlKey || event.metaKey) return;
     const count = tabs.length;
-    const at = tabs.indexOf(tab);
+    const at = tabs.findIndex((t) => t.key === tab.key);
     const moves: Record<string, number> = {
       ArrowRight: (at + 1) % count,
       ArrowLeft: (at - 1 + count) % count,
@@ -1632,6 +1687,7 @@ export function FoliToolbar({
     event.preventDefault();
     showTab(next);
     tabButtons.current[tabs.indexOf(next)]?.focus();
+    // A tab the app does not show (it keeps `tab`) still has the focus: nothing else to do.
   };
   // With tabs, a ribbon: the tab list and the selected tab's panel, which holds the toolbar.
   const panel = (bar: ReactNode) =>
@@ -1653,9 +1709,9 @@ export function FoliToolbar({
               role="tab"
               id={`${id}-tab-${n}`}
               className={`foli-ribbon-tab foli-ribbon-tab-${t.key}`}
-              aria-selected={t === tab}
+              aria-selected={t.key === tab.key}
               aria-controls={`${id}-panel`}
-              tabIndex={t === tab ? 0 : -1}
+              tabIndex={t.key === tab.key ? 0 : -1}
               // Keep the focus (and the selection) in the document on click.
               onMouseDown={(event) => event.preventDefault()}
               onClick={() => showTab(t)}
@@ -1667,7 +1723,7 @@ export function FoliToolbar({
         <div
           role="tabpanel"
           id={`${id}-panel`}
-          aria-labelledby={`${id}-tab-${tabs.indexOf(tab)}`}
+          aria-labelledby={`${id}-tab-${tabs.findIndex((t) => t.key === tab.key)}`}
           className="foli-ribbon-panel"
           // A tab without items has nothing to focus: the panel takes the tab stop.
           tabIndex={items.length ? undefined : 0}
@@ -1707,201 +1763,172 @@ export function FoliToolbar({
           className={className && !tab ? `foli-toolbar ${className}` : "foli-toolbar"}
           onKeyDown={onKeyDown}
         >
-          {groups.map((group, g) => (
-            <Fragment key={group[0]?.key}>
-              {g > 0 && <hr className="foli-toolbar-separator" aria-orientation="vertical" />}
-              {group.map((item) => {
-                const i = index++;
-                const state = states[i];
-                // Inserting a picture needs the app's upload; editing a selected one does not.
-                // A menu without entries (or colors) cannot open, whatever its `enabled` says.
-                const off =
-                  disabled ||
-                  !state?.enabled ||
-                  (item.dialog === "picture" && state?.value === "insert" && !upload) ||
-                  (item.actions !== undefined && actionsOf(item, body).length === 0) ||
-                  item.colors?.options.length === 0;
-                if (item.render) {
-                  return (
-                    <CustomItem
-                      key={item.key}
-                      render={item.render}
-                      editor={editor}
-                      disabled={off}
-                      tabIndex={i === active ? 0 : -1}
-                      setRef={(element) => {
-                        buttons.current[i] = element;
-                      }}
-                      onFocus={() => setActive(i)}
-                    />
-                  );
-                }
-                if (item.select) {
-                  const { select } = item;
-                  const value = state?.value ?? "";
-                  // Read now: the list may come from outside the editor (the state's copy of it
-                  // only makes the toolbar render again when it changes with the document).
-                  const options = select.options(editor.state);
-                  return (
-                    <select
-                      key={item.key}
-                      ref={(element) => {
-                        buttons.current[i] = element;
-                      }}
-                      className={`foli-toolbar-select foli-toolbar-${item.key}`}
-                      aria-label={item.label}
-                      title={item.label}
-                      // Still focusable when it cannot apply, like the buttons.
-                      aria-disabled={off || undefined}
-                      tabIndex={i === active ? 0 : -1}
-                      value={value}
-                      onFocus={() => setActive(i)}
-                      onMouseDown={() => {
-                        pointer.current = true;
-                      }}
-                      onKeyDown={() => {
-                        pointer.current = false;
-                      }}
-                      // shortcut: Up and Down on a closed box apply each value they pass (Chrome
-                      // and Firefox on Windows), one undo step each; apply on Enter if it matters.
-                      onChange={(event) => {
-                        if (off) return;
-                        editor.run(select.pick(event.target.value));
-                        if (pointer.current) onClickCommand?.();
-                      }}
-                    >
-                      {/* Mixed (or nothing to show): a blank entry; a value not offered: itself. */}
-                      {value === "" && <option value="" />}
-                      {value !== "" && !options.some((o) => o.value === value) && (
-                        <option value={value}>{value}</option>
-                      )}
-                      {options.map((o) => (
-                        <option key={o.value} value={o.value}>
-                          {o.label}
-                        </option>
-                      ))}
-                    </select>
-                  );
-                }
-                const button = (
-                  <button
+          {groups.map((group, g) => {
+            const controls = group.items.map((item) => {
+              const i = index++;
+              const state = states[i];
+              // Inserting a picture needs the app's upload; editing a selected one does not.
+              // A menu without entries (or colors) cannot open, whatever its `enabled` says.
+              const off =
+                disabled ||
+                !state?.enabled ||
+                (item.dialog === "picture" && state?.value === "insert" && !upload) ||
+                (item.actions !== undefined && actionsOf(item, body).length === 0) ||
+                item.colors?.options.length === 0;
+              if (item.render) {
+                return (
+                  <CustomItem
+                    key={item.key}
+                    render={item.render}
+                    editor={editor}
+                    disabled={off}
+                    tabIndex={i === active ? 0 : -1}
+                    setRef={(element) => {
+                      buttons.current[i] = element;
+                    }}
+                    onFocus={() => setActive(i)}
+                  />
+                );
+              }
+              if (item.select) {
+                const { select } = item;
+                const value = state?.value ?? "";
+                // Read now: the list may come from outside the editor (the state's copy of it
+                // only makes the toolbar render again when it changes with the document).
+                const options = select.options(editor.state);
+                return (
+                  <select
                     key={item.key}
                     ref={(element) => {
                       buttons.current[i] = element;
                     }}
-                    type="button"
-                    className={`foli-toolbar-button foli-toolbar-${item.key}`}
-                    // Speech input users say what they see: "H1", "Undo"; symbols get a name.
-                    aria-label={item.icon !== undefined ? item.label : undefined}
+                    className={`foli-toolbar-select foli-toolbar-${item.key}`}
+                    aria-label={item.label}
                     title={item.label}
-                    aria-pressed={item.pressed ? Boolean(state?.pressed) : undefined}
-                    aria-haspopup={
-                      item.colors || item.actions ? "menu" : item.dialog ? "dialog" : undefined
-                    }
-                    aria-expanded={item.colors || item.actions ? menu === item.key : undefined}
+                    // Still focusable when it cannot apply, like the buttons.
                     aria-disabled={off || undefined}
                     tabIndex={i === active ? 0 : -1}
-                    // Keep the focus (and the selection) in the document on click.
-                    onMouseDown={(event) => event.preventDefault()}
+                    value={value}
                     onFocus={() => setActive(i)}
-                    onClick={(event) => run(i, event)}
-                    onKeyDown={(event) => {
-                      // ArrowDown opens a menu (the WAI-ARIA menu button pattern).
-                      if (!(item.colors || item.actions) || off || event.key !== "ArrowDown")
-                        return;
-                      event.preventDefault();
-                      setMenu(item.key);
+                    onMouseDown={() => {
+                      pointer.current = true;
+                    }}
+                    onKeyDown={() => {
+                      pointer.current = false;
+                    }}
+                    // shortcut: Up and Down on a closed box apply each value they pass (Chrome
+                    // and Firefox on Windows), one undo step each; apply on Enter if it matters.
+                    onChange={(event) => {
+                      if (off) return;
+                      editor.run(select.pick(event.target.value));
+                      if (pointer.current) onClickCommand?.();
                     }}
                   >
-                    {item.icon ?? item.text ?? item.label}
-                    {item.colors && (
-                      <span
-                        className="foli-toolbar-swatch"
-                        aria-hidden="true"
-                        style={{ background: state?.value ?? "transparent" }}
-                      />
+                    {/* Mixed (or nothing to show): a blank entry; a value not offered: itself. */}
+                    {value === "" && <option value="" />}
+                    {value !== "" && !options.some((o) => o.value === value) && (
+                      <option value={value}>{value}</option>
                     )}
-                  </button>
+                    {options.map((o) => (
+                      <option key={o.value} value={o.value}>
+                        {o.label}
+                      </option>
+                    ))}
+                  </select>
                 );
-                if (item.actions) {
-                  const actions = actionsOf(item, body);
-                  return (
-                    <span key={item.key} className="foli-toolbar-menu">
-                      {button}
-                      {menu === item.key && !disabled && actions.length > 0 && (
-                        <ActionMenu
-                          label={item.label}
-                          actions={actions}
-                          editor={editor}
-                          state={editor.state}
-                          onPick={(action, pointer) => {
-                            setMenu(null);
-                            if (action.dialog === "noteOptions") {
-                              closeDialogs();
-                              setNoteDialog({ restore: buttons.current[i] ?? null });
-                              return;
-                            }
-                            if (action.dialog === "controlProperties") {
-                              closeDialogs();
-                              setControlDialog({
-                                restore: buttons.current[i] ?? null,
-                                selection: editor.state.selection,
-                              });
-                              return;
-                            }
-                            if (action.dialog === "crossReference") {
-                              closeDialogs();
-                              setReferenceDialog({
-                                restore: buttons.current[i] ?? null,
-                                selection: editor.state.selection,
-                              });
-                              return;
-                            }
-                            if (action.dialog === "pageSetup") {
-                              closeDialogs();
-                              setSetupDialog({
-                                restore: buttons.current[i] ?? null,
-                                selection: editor.state.selection,
-                              });
-                              return;
-                            }
-                            if (action.dialog) {
-                              closeDialogs("table");
-                              setTableDialog((current) => ({
-                                restore: buttons.current[i] ?? null,
-                                selection: editor.state.selection,
-                                request: (current?.request ?? -1) + 1,
-                              }));
-                              return;
-                            }
-                            editor.run(action.command);
-                            if (action.movesFocus) return;
-                            if (pointer) onClickCommand?.();
-                            else buttons.current[i]?.focus();
-                          }}
-                          onClose={(refocus) => {
-                            setMenu(null);
-                            if (refocus) buttons.current[i]?.focus();
-                          }}
-                        />
-                      )}
-                    </span>
-                  );
-                }
-                const options = item.colors?.options;
-                if (!options || !item.colors) return button;
-                const { pick } = item.colors;
+              }
+              const button = (
+                <button
+                  key={item.key}
+                  ref={(element) => {
+                    buttons.current[i] = element;
+                  }}
+                  type="button"
+                  className={`foli-toolbar-button foli-toolbar-${item.key}`}
+                  // Speech input users say what they see: "H1", "Undo"; symbols get a name.
+                  aria-label={item.icon !== undefined ? item.label : undefined}
+                  title={item.label}
+                  aria-pressed={item.pressed ? Boolean(state?.pressed) : undefined}
+                  aria-haspopup={
+                    item.colors || item.actions ? "menu" : item.dialog ? "dialog" : undefined
+                  }
+                  aria-expanded={item.colors || item.actions ? menu === item.key : undefined}
+                  aria-disabled={off || undefined}
+                  tabIndex={i === active ? 0 : -1}
+                  // Keep the focus (and the selection) in the document on click.
+                  onMouseDown={(event) => event.preventDefault()}
+                  onFocus={() => setActive(i)}
+                  onClick={(event) => run(i, event)}
+                  onKeyDown={(event) => {
+                    // ArrowDown opens a menu (the WAI-ARIA menu button pattern).
+                    if (!(item.colors || item.actions) || off || event.key !== "ArrowDown") return;
+                    event.preventDefault();
+                    setMenu(item.key);
+                  }}
+                >
+                  {item.icon ?? item.text ?? item.label}
+                  {item.colors && (
+                    <span
+                      className="foli-toolbar-swatch"
+                      aria-hidden="true"
+                      style={{ background: state?.value ?? "transparent" }}
+                    />
+                  )}
+                </button>
+              );
+              if (item.actions) {
+                const actions = actionsOf(item, body);
                 return (
                   <span key={item.key} className="foli-toolbar-menu">
                     {button}
-                    {menu === item.key && !disabled && (
-                      <ColorMenu
+                    {menu === item.key && !disabled && actions.length > 0 && (
+                      <ActionMenu
                         label={item.label}
-                        options={options}
-                        current={state?.value ?? null}
-                        onPick={(color, pointer) => {
-                          editor.run(pick(color));
+                        actions={actions}
+                        editor={editor}
+                        state={editor.state}
+                        onPick={(action, pointer) => {
                           setMenu(null);
+                          if (action.dialog === "noteOptions") {
+                            closeDialogs();
+                            setNoteDialog({ restore: buttons.current[i] ?? null });
+                            return;
+                          }
+                          if (action.dialog === "controlProperties") {
+                            closeDialogs();
+                            setControlDialog({
+                              restore: buttons.current[i] ?? null,
+                              selection: editor.state.selection,
+                            });
+                            return;
+                          }
+                          if (action.dialog === "crossReference") {
+                            closeDialogs();
+                            setReferenceDialog({
+                              restore: buttons.current[i] ?? null,
+                              selection: editor.state.selection,
+                            });
+                            return;
+                          }
+                          if (action.dialog === "pageSetup") {
+                            closeDialogs();
+                            setSetupDialog({
+                              restore: buttons.current[i] ?? null,
+                              selection: editor.state.selection,
+                            });
+                            return;
+                          }
+                          if (action.dialog) {
+                            closeDialogs("table");
+                            setTableDialog((current) => ({
+                              restore: buttons.current[i] ?? null,
+                              selection: editor.state.selection,
+                              request: (current?.request ?? -1) + 1,
+                            }));
+                            return;
+                          }
+                          editor.run(action.command);
+                          if (action.movesFocus) return;
                           if (pointer) onClickCommand?.();
                           else buttons.current[i]?.focus();
                         }}
@@ -1913,9 +1940,50 @@ export function FoliToolbar({
                     )}
                   </span>
                 );
-              })}
-            </Fragment>
-          ))}
+              }
+              const options = item.colors?.options;
+              if (!options || !item.colors) return button;
+              const { pick } = item.colors;
+              return (
+                <span key={item.key} className="foli-toolbar-menu">
+                  {button}
+                  {menu === item.key && !disabled && (
+                    <ColorMenu
+                      label={item.label}
+                      options={options}
+                      current={state?.value ?? null}
+                      onPick={(color, pointer) => {
+                        editor.run(pick(color));
+                        setMenu(null);
+                        if (pointer) onClickCommand?.();
+                        else buttons.current[i]?.focus();
+                      }}
+                      onClose={(refocus) => {
+                        setMenu(null);
+                        if (refocus) buttons.current[i]?.focus();
+                      }}
+                    />
+                  )}
+                </span>
+              );
+            });
+            return (
+              <Fragment key={group.items[0]?.key}>
+                {g > 0 && <hr className="foli-toolbar-separator" aria-orientation="vertical" />}
+                {group.label === undefined ? (
+                  controls
+                ) : (
+                  // biome-ignore lint/a11y/useSemanticElements: a fieldset cannot be a flex row in every browser.
+                  <div role="group" aria-label={group.label} className="foli-toolbar-group">
+                    <div className="foli-toolbar-group-items">{controls}</div>
+                    <div className="foli-toolbar-group-label" aria-hidden="true">
+                      {group.label}
+                    </div>
+                  </div>
+                )}
+              </Fragment>
+            );
+          })}
         </div>,
       )}
       {appDialog && typeof appDialogItem?.dialog === "function" && !disabled && !builtInDialog && (

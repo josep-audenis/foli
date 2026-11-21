@@ -18,7 +18,12 @@ import {
 import { FoliCanvas, type FoliCanvasHandle, type FoliCanvasProps } from "./FoliCanvas.js";
 import { FoliComments } from "./FoliComments.js";
 import { FoliNavigation } from "./FoliNavigation.js";
-import { FoliToolbar, type ToolbarItem, type ToolbarTab } from "./FoliToolbar.js";
+import {
+  FoliToolbar,
+  type FoliToolbarProps,
+  type ToolbarGroups,
+  type ToolbarTab,
+} from "./FoliToolbar.js";
 
 /**
  * A change to the document's content, as `FoliEditor` reports it. `document` is a getter:
@@ -69,7 +74,18 @@ export interface FoliEditorProps extends Omit<FoliCanvasProps, "editor"> {
    * groups of items (`FoliToolbarProps.items`), or with these tabs (`FoliToolbarProps.tabs`,
    * e.g. `defaultToolbarTabs`).
    */
-  toolbar?: boolean | readonly (readonly ToolbarItem[])[] | readonly ToolbarTab[] | undefined;
+  toolbar?: boolean | ToolbarGroups | readonly ToolbarTab[] | undefined;
+  /**
+   * More of `FoliToolbar`'s props for the toolbar shown (`tab`, `onTabChange`, `label`,
+   * `className`…). `editor`, `disabled`, `comments`, `upload` and `onClickCommand` stay
+   * `FoliEditor`'s; `items` and `tabs` come from `toolbar`.
+   */
+  toolbarProps?:
+    | Omit<
+        FoliToolbarProps,
+        "editor" | "disabled" | "comments" | "upload" | "onClickCommand" | "items" | "tabs"
+      >
+    | undefined;
   /**
    * Show the comments pane (`FoliComments`) beside the pages: `"auto"` (the default) while the
    * document has comments, `true` always, `false` never.
@@ -99,6 +115,7 @@ export const FoliEditor = forwardRef<FoliEditorHandle, FoliEditorProps>(function
     reviewView,
     onChange,
     toolbar = true,
+    toolbarProps,
     comments = "auto",
     children,
     ...canvas
@@ -148,21 +165,20 @@ export const FoliEditor = forwardRef<FoliEditorHandle, FoliEditorProps>(function
     [editor],
   );
 
-  const tabbed = typeof toolbar === "object" && toolbar.length > 0 && !Array.isArray(toolbar[0]);
+  // Groups are arrays of items or `{ label, items }`; a tab has a `key`.
+  const first = typeof toolbar === "object" ? toolbar[0] : undefined;
+  const tabbed = first !== undefined && !Array.isArray(first) && "key" in first;
   return (
     <FoliEditorProvider editor={editor}>
       {toolbar && (
         <FoliToolbar
+          {...toolbarProps}
           editor={editor}
           disabled={canvas.readOnly}
           comments={comments !== false}
           upload={canvas.upload}
           // Groups are arrays of items, tabs are objects; an empty array is no items (as in 1.0).
-          items={
-            toolbar === true || tabbed
-              ? undefined
-              : (toolbar as readonly (readonly ToolbarItem[])[])
-          }
+          items={toolbar === true || tabbed ? undefined : (toolbar as ToolbarGroups)}
           tabs={tabbed ? (toolbar as readonly ToolbarTab[]) : undefined}
           onClickCommand={() => canvasRef.current?.focus()}
         />

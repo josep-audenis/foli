@@ -491,6 +491,24 @@
   }
 }
 
+/* A group with a caption (`ToolbarGroup`): its items in a row, the caption under them. */
+.foli-toolbar-group {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+.foli-toolbar-group-items {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px;
+}
+.foli-toolbar-group-label {
+  font-size: 11px;
+  opacity: 0.75;
+}
+
 .foli-toolbar-separator {
   align-self: stretch;
   width: 1px;

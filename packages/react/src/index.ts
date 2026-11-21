@@ -31,6 +31,8 @@ export {
   type ToolbarCustomProps,
   type ToolbarDialog,
   type ToolbarDialogProps,
+  type ToolbarGroup,
+  type ToolbarGroups,
   type ToolbarItem,
   type ToolbarItemName,
   type ToolbarMenu,
