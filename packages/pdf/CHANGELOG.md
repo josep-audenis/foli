@@ -1,5 +1,13 @@
 # @folijs/pdf
 
+## 1.1.0
+
+### Patch Changes
+
+- Updated dependencies [617ed0b]
+- Updated dependencies [a4945da]
+  - @folijs/core@1.1.0
+
 ## 1.0.0
 
 ### Major Changes
