@@ -729,9 +729,10 @@ while tracking), `setPictureAlt(pos, alt, decorative?)`, `selectedPicture(state)
 selection of a picture, and its position).
 
 Fields (11.8, ADR-0007; markers in the model, see
-[document-model.md](document-model.md)). `updateFields(editor, { layout, data, now, only })` works
+[document-model.md](document-model.md)). `updateFields(editor, { layout, data, now, only, maxWritten })` works
 results out and writes them in one transaction, one undo step, recorded as tracked changes when
-tracking is on (a story's change is a `StoryStep` of it), and returns `{ updated, unchanged, rebuilt,
+tracking is on (a story's change is a `StoryStep` of it; with `maxWritten`, it throws a
+`RangeError` and changes nothing when the new results would hold more characters than that), and returns `{ updated, unchanged, rebuilt,
 skipped }`. Locked fields stay; a field left as it was is in `skipped`, with its `instruction`, its
 `story` and why (`locked`, `unknown`, `no-layout`, `no-data`, `missing-bookmark`,
 `unsupported-switch`, `self-reference`, `failed`, `untrackable`). `layout` is a `FieldLayout` (`pages`, `pageAt(pos)`: `number`,

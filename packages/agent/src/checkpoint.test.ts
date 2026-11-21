@@ -185,7 +185,7 @@ describe("what one operation writes (the fourth review of #165)", () => {
 });
 
 describe("what merge data writes (the fourth review's re-check)", () => {
-  it("a value written into many fields of its name is held as a replace is", async () => {
+  it("a value written into many fields of its name is held by what it writes", async () => {
     const { document } = await corpus("03-offer-letter-template");
     // A template that holds the same merge field a thousand times.
     const content = document.content as { content: { content?: unknown[] }[] };
@@ -202,11 +202,11 @@ describe("what merge data writes (the fourth review's re-check)", () => {
     ).toMatchObject({ ok: false, code: "invalid" });
     expect(Date.now() - started).toBeLessThan(3000);
     expect(JSON.stringify(session.document())).toBe(before);
-    // The same name twice, by capitals: the longest is what counts.
+    // The same name twice, by capitals, the long value where core looks: what is written is
+    // what is counted, whichever key core takes.
     for (const data of [
       { CandidateFirstName: "v".repeat(190_000), candidatefirstname: "" },
       { candidatefirstname: "", CandidateFirstName: "v".repeat(190_000) },
-      { CANDIDATEFIRSTNAME: "", CandidateFirstName: "", candidateFirstName: "v".repeat(190_000) },
     ])
       expect(session.updateFields({ data }), JSON.stringify(Object.keys(data))).toMatchObject({
         ok: false,
@@ -217,5 +217,35 @@ describe("what merge data writes (the fourth review's re-check)", () => {
     const done = session.updateFields({ data: { CandidateFirstName: "Ada" } });
     expect(done).toMatchObject({ ok: true });
     expect(done.ok && done.updated).toBeGreaterThan(1000);
+  });
+});
+
+describe("what a document's own fields write (the re-check of #175)", () => {
+  it("pictures that write far more than the document holds are refused, nothing changed", async () => {
+    const { document } = await corpus("03-offer-letter-template");
+    const content = document.content as { content: unknown[] };
+    const picture = `"${"dddd ".repeat(2000)}"`;
+    const fieldParagraph = {
+      type: "paragraph",
+      content: [
+        { type: "fieldStart" },
+        { type: "fieldCode", attrs: { text: `DATE \\@ ${picture}` } },
+        { type: "fieldSeparator" },
+        { type: "text", text: "old" },
+        { type: "fieldEnd" },
+      ],
+    };
+    const hostile = {
+      ...document,
+      content: { ...content, content: [...content.content, ...new Array(50).fill(fieldParagraph)] },
+    };
+    const session = openSession(hostile as never, { author: "Agent" });
+    const before = JSON.stringify(session.document());
+    const started = Date.now();
+    const refused = session.updateFields();
+    expect(refused).toMatchObject({ ok: false, code: "invalid" });
+    expect(!refused.ok && refused.message).toContain("Nothing was changed");
+    expect(Date.now() - started).toBeLessThan(5000);
+    expect(JSON.stringify(session.document())).toBe(before);
   });
 });

@@ -2510,8 +2510,10 @@ review.
   counted nowhere. One operation now writes 300,000 characters at most, and a run's calls
   give a million at most; measured, each worst script answers in 10.0 s or less. Its re-check found merge data
   multiplied the same way (a value written into a template's thousand fields of one name:
-  190 million characters, then a save that failed): `updateFields` is held to the same
-  300,000.)
+  190 million characters, then a save that failed), and then the document's own fields (a
+  thousand date pictures of 50,000 characters: 90 million characters from an update with no
+  arguments). So core's `updateFields` takes `maxWritten`, counts what the results hold as it
+  works them out, and changes nothing past it; the agent gives it 300,000.)
 - [x] 16.3 `doc` over a session: reading as blocks (handle, style, text, table place,
   changed) in parts, every operation of the tools with the same argument checks, results and
   refusals as values a script can test (`if (!r.ok)`); `console.log` kept as the log. A

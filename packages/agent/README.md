@@ -135,7 +135,8 @@ session.updateFields({ data: { CandidateFirstName: "Ada" } });
   operations that must all be done or none.
 - One `insertAfter` or `insertBefore` takes 500 paragraphs at most, and one `replaceText` with
   `all` 500 places; one replace, fill or `updateFields` writes 300,000 characters at
-  most, its places together (a merge value counts once per merge field of its name): more is refused, to be done in parts.
+  most, its places together (for `updateFields`, what the fields' results hold, counted as they
+  are worked out): more is refused, to be done in parts.
 
 ## For the model
 
