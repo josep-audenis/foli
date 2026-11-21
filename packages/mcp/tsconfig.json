@@ -1,0 +1,7 @@
+{
+  "extends": "../../tsconfig.base.json",
+  // A Node program. The DOM's types stay (the base's): @folijs/docx's source, which typecheck
+  // reads, names some (Blob); nothing here uses them.
+  "compilerOptions": { "types": ["node"] },
+  "include": ["src"]
+}

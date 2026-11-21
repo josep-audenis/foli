@@ -39,6 +39,7 @@ corpus scripts read.
 | `packages/docx/src/`           | Zip, XML, the package, `import/`, `export/`, custom types (`custom.ts`)                                                 |
 | `packages/pdf/src/`            | `exportPdf` and the page script it runs (`renderer.ts`)                                                                 |
 | `packages/agent/src/`          | `openSession`: reading by block handles (`read.ts`, `handles.ts`), operations (`operations.ts`, `templates.ts`)         |
+| `packages/mcp/src/`            | The MCP server (Phase 14, in development): the stdio protocol (`protocol.ts`), the `bin`                                |
 | `apps/playground/`             | Pages the e2e tests drive (`e2e/`), benchmarks (`bench/`), the Word corpus pages (`word/`). No engine logic             |
 | `apps/site/`                   | The landing page, `/test/`, the docs site (`src/docs/`), its live examples and the guides' samples (`src/guides/`)      |
 | `corpus/`, `scripts/corpus/`   | Word-written documents, Word's reference data, the harnesses that compare Foli with Word                                |
