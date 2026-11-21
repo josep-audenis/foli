@@ -251,9 +251,11 @@ export function hint(
 ): boolean {
   const view = editor.storyView;
   if (!view?.hint) return false;
+  if (typeof target !== "object" || target === null) return false;
   if (!("bookmark" in target)) return view.hint(target, options);
+  if (typeof target.bookmark !== "string") return false;
   // By name, capitals not counting, as Word finds a bookmark; Word's own hidden ones too.
-  const name = String(target.bookmark).toLowerCase();
+  const name = target.bookmark.toLowerCase();
   const found = listBookmarks(editor, { hidden: true }).find((b) => b.name.toLowerCase() === name);
   return found ? view.hint({ story: found.story, from: found.from, to: found.to }, options) : false;
 }

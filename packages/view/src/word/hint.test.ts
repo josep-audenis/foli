@@ -160,7 +160,8 @@ describe("a story's drawn copy", () => {
   it("is marked by paragraph and character, across the text nodes of a paragraph", async () => {
     const { rangesInCopy } = await import("./matches.js");
     const root = document.createElement("div");
-    root.innerHTML = "<p><span>Page </span><span>3</span> of 9</p><p>Second line</p>";
+    root.innerHTML =
+      "<p><span>Page </span><span>3</span> of 9</p><p><span data-foli-marker>1.	</span>Second line</p>";
     document.body.append(root);
     const marked = (spans: { block: number; from: number; to: number }[]) =>
       rangesInCopy(root, spans).map((r) => r.toString());

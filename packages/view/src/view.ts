@@ -1913,6 +1913,8 @@ export class EditorView {
    */
   hint({ story, from, to }: DocumentTarget, { ms = 2000 } = {}): boolean {
     this.endHint();
+    // One in the open story, shown by its own view, is replaced too.
+    this.mount?.view.endHint();
     if (!Number.isInteger(from) || !Number.isInteger(to)) return false;
     // The story being edited shows its own hint, in its own view.
     if (story !== null && story === this.mount?.id)
@@ -2019,7 +2021,10 @@ export class EditorView {
         const end = start + node.content.size;
         if (end >= from && start <= to) {
           const text = (a: number) =>
-            tree.textBetween(start, Math.max(start, Math.min(a, end))).length;
+            // A tab is drawn as one; numbers and other leaves are skipped on both sides.
+            tree.textBetween(start, Math.max(start, Math.min(a, end)), "", (leaf) =>
+              leaf.type.name === "tab" ? "	" : "",
+            ).length;
           spans.push({ block, from: text(from), to: text(to) });
         }
         block++;

@@ -56,7 +56,7 @@ export interface FoliCommentsProps {
 export declare function FoliComments({ editor: editorProp, readOnly, label, className, hidden, }: FoliCommentsProps): import("react").JSX.Element;
 
 // FoliEditor.d.ts
-import type { Editor, EditorDocument, Extension, FoliDocument, Plugin, ReviewView, Transaction } from "@folijs/core";
+import { type DocumentTarget, type Editor, type EditorDocument, type Extension, type FoliDocument, type Plugin, type ReviewView, type Transaction } from "@folijs/core";
 import { type ReactNode } from "react";
 import { type FoliCanvasHandle, type FoliCanvasProps } from "./FoliCanvas.js";
 import { type FoliToolbarProps, type ToolbarGroups, type ToolbarTab } from "./FoliToolbar.js";
@@ -126,6 +126,15 @@ export interface FoliEditorProps extends Omit<FoliCanvasProps, "editor"> {
 /** What a `ref` on `FoliEditor` gives: its editor (commands, `setDocument`…) and focus. */
 export interface FoliEditorHandle extends FoliCanvasHandle {
     readonly editor: Editor;
+    /**
+     * Shows a place for a few seconds without moving the caret (core's `hint`): a range, or a
+     * bookmark by name. False when no page shows it.
+     */
+    hint(target: DocumentTarget | {
+        bookmark: string;
+    }, options?: {
+        ms?: number;
+    }): boolean;
 }
 /**
  * An editable document on real pages with a toolbar: creates its editor, provides it to

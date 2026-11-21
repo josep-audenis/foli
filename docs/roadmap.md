@@ -2698,13 +2698,18 @@ review.
   window are marked by their text (`rangesInCopy`), the page scrolled to when none is near, and
   a change to the story ends the hint. The story being edited hints in its own view. Tested in
   jsdom as far as it goes (the copy's marks; bookmarks through a stand-in view;
-  `session.target` on the NDA, through an insert); the pages themselves in 18.3's e2e.)
+  `session.target` on the NDA, through an insert); the pages themselves in 18.3's e2e. From
+  the review of #182's second commit: a tab, a note's number and a list's number are drawn as
+  text and were not counted, so the mark slid by them (now counted as the copy draws them,
+  tested on a real header and note in three browsers); a new hint now ends one shown in the
+  open story; a target that is not an object, or a bookmark name that is not a string, is
+  false. Left, in limitations: merged cells, the final review view, field codes shown.)
 - [x] 18.3 React and the app's side: `FoliEditor`'s ref gets `hint`; whether a hook adds
   anything (`useHint`) is decided here, and not built if not. The playground gets a "show"
   button per tracked change; the site's agent guide shows a session's edits hinted one after
   the other. e2e in three browsers with axe: a far page, a header, an edit while it shows, a
   hint replaced, reduced motion. (Done: `FoliEditor`'s ref has `hint`; no hook, since core's
-  `hint(editor, …)` already works with `useCurrentEditor`. `hint.spec.ts`, 5 tests, passed in
+  `hint(editor, …)` already works with `useCurrentEditor`. `hint.spec.ts`, 6 tests, passed in
   Chromium, Firefox and WebKit on Windows (2026-11-21): a far page scrolled to and marked on
   the screen, faded, gone, the selection unchanged, axe on the pages while marked; a range over
   two pages marked on both; an edit before the mark followed and a deletion ending it; a

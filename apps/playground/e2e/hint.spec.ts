@@ -76,6 +76,9 @@ test("a far page is scrolled to and marked, then the mark fades and goes; the ca
   page,
 }) => {
   await load(page);
+  // A caret of the test's own, once the click's has reached the model: what must not move.
+  await page.waitForFunction(() => window.foliEdit.editor.state.selection.from > 1);
+  await page.evaluate(() => window.foliEdit.editor.select(3));
   const before = await selection(page);
   const top = await page.evaluate(() => scrollY);
   const [from, to] = await where(page, "Another cat");
@@ -93,13 +96,14 @@ test("a far page is scrolled to and marked, then the mark fades and goes; the ca
     return !!rect && rect.top >= 0 && rect.bottom <= innerHeight;
   });
   expect(shown).toBe(true);
-  // The pages while marked: the hint adds nothing to them, so nothing new to find there.
-  const axe = await new AxeBuilder({ page }).include(".foli-page").analyze();
-  expect(axe.violations.map((v) => v.id)).toEqual([]);
   await expect.poll(() => marks(page, "foli-hint-fading")).toEqual(["Another cat"]);
   await expect.poll(() => marks(page, "foli-hint-fading")).toEqual([]);
   expect(await marks(page)).toEqual([]);
   expect(await selection(page)).toBe(before);
+  // The pages while marked (a hint long enough for axe): it adds nothing to them to find.
+  await hint(page, { story: null, from, to }, 60_000);
+  const axe = await new AxeBuilder({ page }).include(".foli-page").analyze();
+  expect(axe.violations.map((v) => v.id)).toEqual([]);
 });
 
 test("a range over two pages is marked on both", async ({ page }) => {
@@ -158,4 +162,55 @@ test("under reduced motion it goes without fading", async ({ page }) => {
   await expect.poll(() => marks(page)).toEqual([]);
   // At no point after its time was there a fading step: polled at once, and still none.
   expect(await marks(page, "foli-hint-fading")).toEqual([]);
+});
+
+test("in a header with a tab and in a note with its number, the mark is on the story's text", async ({
+  page,
+}) => {
+  const doc = sample() as { stories: Json; content: { content: Json[] }; styles: Json[] };
+  doc.styles.push(
+    { id: "FootnoteText", type: "paragraph", name: "footnote text", basedOn: "Normal" },
+    { id: "FootnoteReference", type: "character", name: "footnote reference" },
+  );
+  const reference = { type: "characterStyle", attrs: { id: "FootnoteReference" } };
+  doc.stories = {
+    h1: {
+      kind: "header",
+      content: {
+        type: "doc",
+        content: [
+          { type: "paragraph", content: [text("Left"), { type: "tab" }, text("cat right")] },
+        ],
+      },
+    },
+    "footnote:1": {
+      kind: "footnote",
+      content: {
+        type: "doc",
+        content: [
+          {
+            type: "paragraph",
+            attrs: { style: "FootnoteText" },
+            content: [{ type: "noteMark", marks: [reference] }, text(" A cat in the note")],
+          },
+        ],
+      },
+    },
+  };
+  doc.content.content.splice(1, 0, {
+    type: "paragraph",
+    content: [
+      text("A note here"),
+      { type: "noteReference", attrs: { story: "footnote:1" }, marks: [reference] },
+    ],
+  });
+  await page.goto("/edit.html");
+  await page.waitForFunction(() => !!window.foliEdit);
+  await page.evaluate((d) => window.foliEdit.load(d as never), doc);
+  // "Left" 1..5, the tab 5..6, "cat" 6..9.
+  expect(await hint(page, { story: "h1", from: 6, to: 9 }, 3000)).toBe(true);
+  expect(new Set(await marks(page))).toEqual(new Set(["cat"]));
+  // The note's number 1..2, " A " 2..5, "cat" 5..8.
+  expect(await hint(page, { story: "footnote:1", from: 5, to: 8 }, 3000)).toBe(true);
+  expect(await marks(page)).toEqual(["cat"]);
 });

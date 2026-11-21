@@ -272,6 +272,8 @@ describe("hint (18.2)", () => {
     expect(options).toEqual({ ms: 500 });
     expect(editor.state.doc.textBetween(target.from, target.to)).toBe("the start");
     expect(hint(editor, { bookmark: "Nope" })).toBe(false);
+    expect(hint(editor, "Intro" as never)).toBe(false);
+    expect(hint(editor, { bookmark: null } as never)).toBe(false);
     // A view of another make, without hint: false.
     editor.storyView = {} as never;
     expect(hint(editor, { bookmark: "Intro" })).toBe(false);

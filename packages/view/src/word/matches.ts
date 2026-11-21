@@ -157,6 +157,8 @@ export function rangesInCopy(
       node;
       node = walker.nextNode() as Text | null
     ) {
+      // A list's number and a note's are drawn, and are no text of the story.
+      if (node.parentElement?.closest("[data-foli-marker],[data-foli-note-number]")) continue;
       const start = Math.max(from - at, 0);
       const end = Math.min(to - at, node.length);
       if (start < end) {
