@@ -483,7 +483,8 @@ export function comment(
   // Word shows a comment's initials beside it: the author's, as Word makes them.
   const initials = context.author
     .split(/\s+/)
-    .map((word) => [...word][0] ?? "") // by code point: no half of a surrogate pair
+    // Each word's first letter or digit, as a person's initials are: "Claude (trial)" is "Ct".
+    .map((word) => /[\p{L}\p{N}]/u.exec(word)?.[0] ?? "")
     .slice(0, 9)
     .join("");
   if (!editor.run(addComment(content, { initials })))

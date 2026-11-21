@@ -303,6 +303,13 @@ describe("templates", () => {
     expect((await call("update_fields", { data: "Ada" })).text).toContain(
       "arguments.data must be object",
     );
+    // No table of contents here: asked for or not, nothing is said of one.
+    const built = await call("update_fields", { contents: true });
+    expect(built.refused).toBe(false);
+    expect(built.text).not.toContain("table of contents");
+    expect((await call("update_fields", { contents: "yes" })).text).toContain(
+      "arguments.contents must be boolean",
+    );
 
     const text = (await call("read")).text;
     for (const line of [

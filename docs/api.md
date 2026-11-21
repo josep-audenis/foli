@@ -1081,7 +1081,8 @@ version. Details, the read format and examples: the
 - Templates: `controls()` → `Control[]` (`id`, `name`, `tag`, `title`, `kind`, `value`,
   `empty`, `items`, `readOnly`, `block`); `fillControl(name, value)`, by id, else tag, else
   title (also `controls`, as they are now, and `unfilled`: `Unfilled[]`, those of the name
-  that did not take the value); `updateFields({ data? })` → core's `FieldsReport` and `text`.
+  that did not take the value); `updateFields({ data?, contents? })` → core's `FieldsReport` and `text`
+  (a table of contents is built again only with `contents: true`).
 - `session.document()`: the document to save or export. `session.editor`: the headless editor
   under the session, for what it has no operation for; `session.author`.
 

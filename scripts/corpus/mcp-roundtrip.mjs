@@ -230,7 +230,7 @@ async function main() {
         const wanted = EXPECT["04-board-report"].restyled.length;
         check(restyled === wanted, `04: ${restyled} headings restyled, not ${wanted}`);
         // The table of contents built again: at least a field changed.
-        const fields = await call("update_fields", { document });
+        const fields = await call("update_fields", { document, contents: true });
         check(/^[1-9]\d* fields? updated/.test(fields), `04 fields: ${fields}`);
       },
     };

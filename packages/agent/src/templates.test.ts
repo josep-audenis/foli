@@ -277,13 +277,44 @@ describe("what the review of #142 found", () => {
     expect(session.updateFields(null as never)).toMatchObject({ ok: true });
   });
 
-  it("says in words that page numbers need a layout", async () => {
-    const session = openSession((await corpus("04-board-report")).document, { author: "Agent" });
-    const result = session.updateFields();
-    expect(result.ok && result.text).toMatch(
-      /\d+ page numbers left: they need a page layout the session does not have\./,
+  it("leaves a table of contents as it is unless asked, and says what building it costs", async () => {
+    const { document } = await corpus("04-board-report");
+    const session = openSession(document, { author: "Agent" });
+    const contents = () => {
+      const read = session.read({ limit: 12 });
+      return read.ok ? read.text.split("\n").filter((line) => /\] toc /.test(line)) : [];
+    };
+    const before = contents();
+    expect(before[0]).toMatch(/toc 1: Executive summary\t3$/);
+
+    const left = session.updateFields();
+    expect(left).toMatchObject({ ok: true, rebuilt: 0 });
+    expect(left.ok && left.text).toContain(
+      "1 table of contents left as it is: update it in Word, or pass contents: true",
     );
-    expect(result.ok && result.text).not.toContain("no-layout");
+    expect(left.ok && left.text).not.toContain("no-layout");
+    expect(contents()).toEqual(before);
+    expect(trackedChanges(session.editor.state.doc)).toHaveLength(0);
+
+    // A heading changed: the table no longer says what the document does.
+    const all = session.read({ limit: 2000 });
+    const heading = (all.ok ? all.blocks : []).find(
+      (b) => b.style === "heading 1" && b.text === "Executive summary",
+    );
+    expect(session.replaceText(heading?.handle ?? "", "Executive", "Board")).toMatchObject({
+      ok: true,
+    });
+    expect(session.updateFields()).toMatchObject({ ok: true, rebuilt: 0 });
+    expect(contents()).toEqual(before);
+
+    const built = session.updateFields({ contents: true });
+    expect(built).toMatchObject({ ok: true, rebuilt: 1 });
+    expect(built.ok && built.text).toContain("page numbers are empty until Word updates the field");
+    expect(built.ok && built.text).toMatch(
+      /\d+ page numbers not worked out, and left as they were/,
+    );
+    // The entries again, their numbers gone: what the sentence says.
+    expect(contents()[0]).toMatch(/toc 1, changed: Board summary\t$/);
   });
 });
 

@@ -319,7 +319,9 @@ Unstable (0.x). Details in the [package README](../packages/agent/README.md).
 - `replaceText` with `all` makes one change and one undo step per place; a paragraph inserted
   in a built-in style the document lacks is two changes (the paragraph, then its style).
 - `updateFields` returns no blocks, and leaves page numbers as they are: they need a page
-  layout the session does not have.
+  layout the session does not have. It leaves a table of contents as it is unless
+  `contents: true`; one built that way has its entries' page numbers empty until Word updates
+  the field (F9).
 - Core's rules let a paragraph be inserted into a locked block content control; the session
   refuses it itself, the editor under it (`session.editor`) does not.
 - A style the session adds to the document stays when its changes are rejected: a built-in

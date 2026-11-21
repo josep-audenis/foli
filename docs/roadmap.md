@@ -9,24 +9,24 @@ leaves `main` green with a working playground.
 **Update this table in the same PR that starts, advances or finishes a phase.** It is the only
 place that says what is in progress; check it before starting work.
 
-| Phase                    | Status                     | Branch                           | Notes                                                                                                        |
-| ------------------------ | -------------------------- | -------------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| 0 Foundation             | ✅ Done                    | —                                |                                                                                                              |
-| 1 Architecture spike     | ✅ Done (G1 provisional)   | —                                | Merged in #1; ADR-0003 accepted provisionally; IME, dead-key and screen-reader checks open                   |
-| 2 Document model         | ✅ Done                    | —                                | Merged in #2                                                                                                 |
-| 3 Transactions & history | ✅ Done                    | —                                | Merged in #4; gate G2 passed                                                                                 |
-| 4 Editor view            | ✅ Done (G3 provisional)   | —                                | Merged in #8–#13; manual checks (4.6) deferred, open risks in ADR-0003                                       |
-| 5 Native pagination      | ✅ Done (G4 provisional)   | —                                | Merged in #15–#22; page-break manual checks open, risks in ADR-0003                                          |
-| 6 React API & 0.1.0      | ✅ Done                    | —                                | Merged in #23–#31; 0.1.0 on npm; manual checks shipped as known risks (ADR-0003)                             |
-| 7 Rich content           | ✅ Done                    | —                                | Merged in #33–#41; 0.2.0 on npm; list-document benchmark misses accepted (known limit)                       |
-| 8 Word model & DOCX      | ✅ Done                    | —                                | Merged in #44–#61; 0.3.0 on npm (`@folijs/docx` first released); gate G5 passed                              |
-| 9 Review                 | ✅ Done                    | —                                | Merged in #63–#72; 0.4.0 on npm                                                                              |
-| 10 Tables & images       | ✅ Done                    | —                                | Merged in #73–#97 (#90, the landing page, went to main); 0.5.0 on npm; two misses accepted                   |
-| 11 Sections & templates  | ✅ Done                    | —                                | Merged in #100–#118 (#106, #107, #110, #112 and #113, the site, went to main); 0.6.0 on npm; misses accepted |
-| 12 Ecosystem & 1.0       | ✅ Done                    | —                                | Merged in #120–#133; 1.0.0 on npm (2026-11-20); Phase 5 speed misses and manual checks accepted as 1.0 risks |
-| 13 Agent library         | ✅ Done                    | —                                | Merged in #138–#146; `@folijs/agent` 0.1.0 on npm (2026-11-21)                                               |
-| 14 MCP server            | In review                  | `phase-14/mcp`                   | Built in #148, #153, #155, #156; a model in a real client and the release of 0.1.0 wait for the owner        |
-| 15 Toolbar               | In progress (release left) | `phase-15/toolbar-customization` | Built and merged in #149–#152 (2026-11-21); 1.1.0 waits for the owner's approval to publish                  |
+| Phase                    | Status                     | Branch                           | Notes                                                                                                                                       |
+| ------------------------ | -------------------------- | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0 Foundation             | ✅ Done                    | —                                |                                                                                                                                             |
+| 1 Architecture spike     | ✅ Done (G1 provisional)   | —                                | Merged in #1; ADR-0003 accepted provisionally; IME, dead-key and screen-reader checks open                                                  |
+| 2 Document model         | ✅ Done                    | —                                | Merged in #2                                                                                                                                |
+| 3 Transactions & history | ✅ Done                    | —                                | Merged in #4; gate G2 passed                                                                                                                |
+| 4 Editor view            | ✅ Done (G3 provisional)   | —                                | Merged in #8–#13; manual checks (4.6) deferred, open risks in ADR-0003                                                                      |
+| 5 Native pagination      | ✅ Done (G4 provisional)   | —                                | Merged in #15–#22; page-break manual checks open, risks in ADR-0003                                                                         |
+| 6 React API & 0.1.0      | ✅ Done                    | —                                | Merged in #23–#31; 0.1.0 on npm; manual checks shipped as known risks (ADR-0003)                                                            |
+| 7 Rich content           | ✅ Done                    | —                                | Merged in #33–#41; 0.2.0 on npm; list-document benchmark misses accepted (known limit)                                                      |
+| 8 Word model & DOCX      | ✅ Done                    | —                                | Merged in #44–#61; 0.3.0 on npm (`@folijs/docx` first released); gate G5 passed                                                             |
+| 9 Review                 | ✅ Done                    | —                                | Merged in #63–#72; 0.4.0 on npm                                                                                                             |
+| 10 Tables & images       | ✅ Done                    | —                                | Merged in #73–#97 (#90, the landing page, went to main); 0.5.0 on npm; two misses accepted                                                  |
+| 11 Sections & templates  | ✅ Done                    | —                                | Merged in #100–#118 (#106, #107, #110, #112 and #113, the site, went to main); 0.6.0 on npm; misses accepted                                |
+| 12 Ecosystem & 1.0       | ✅ Done                    | —                                | Merged in #120–#133; 1.0.0 on npm (2026-11-20); Phase 5 speed misses and manual checks accepted as 1.0 risks                                |
+| 13 Agent library         | ✅ Done                    | —                                | Merged in #138–#146; `@folijs/agent` 0.1.0 on npm (2026-11-21)                                                                              |
+| 14 MCP server            | In review                  | `phase-14/mcp`                   | Built in #148, #153, #155, #156; a model used the tools through the SDK's client; a real client and the release of 0.1.0 wait for the owner |
+| 15 Toolbar               | In progress (release left) | `phase-15/toolbar-customization` | Built and merged in #149–#152 (2026-11-21); 1.1.0 waits for the owner's approval to publish                                                 |
 
 Status values: `Ready` (dependencies met, nobody on it) · `In progress` · `In review` (PR open) ·
 `✅ Done` (merged, acceptance criteria met) · `Blocked by …`.
@@ -2180,11 +2180,12 @@ revision the agent's and its accepted and rejected text Foli's (3 of 3); README,
 what was asked, from two security reviews (#148, #153): a result is cut at 200,000 characters,
 the open documents are held to a size together, a save is written to a new file and renamed,
 and nothing a document names can start a line of an answer (a block's text, a style, a list
-number, a control's name, items and value, a field's instruction, a merge field's name). **Not
-met:** no model has called the tools in a real client, so "a real client does one task end to
-end" and "the tools' descriptions are enough for the model" are not shown (the CLI on the build
-machine is not logged in); `npx @folijs/mcp` is not tried, the package not being published:
-what was started is the built `bin`; 0.1.0 is not published. All are 14.8, with the owner.
+number, a control's name, items and value, a field's instruction, a merge field's name). A
+model has used the tools, though not in a client of its own: see 14.8. **Not met:** no model
+has called the tools in a real client (the CLI on the build machine is not logged in), so "a
+real client does one task end to end" is not shown; `npx @folijs/mcp` is not tried, the package
+not being published: what was started is the built `bin`; 0.1.0 is not published. All are
+14.8, with the owner.
 Each task after an agent's review: #148, #153, #155, and this one, #156.)
 
 ### Tasks
@@ -2331,6 +2332,19 @@ review.
   least; recorded with its version, and what its use of the tools showed wrong in their
   descriptions fixed); then the changeset, `private` removed, 0.1.0; published with the owner's
   approval (the Release workflow). `@folijs/agent`'s pending patch goes out with it.
+  (Partly, 2026-11-21: a model did the tasks, not in a real client. A fresh Claude agent, told
+  nothing but what the server says of itself (its instructions and `tools/list`), called the
+  built `bin` through the official SDK's client over stdio, one tool call a command: an NDA
+  amended with comments, an offer letter filled from a template, a board report's headings
+  changed and its fields updated. 35 tool calls, none refused, none a protocol error; the
+  originals unchanged; the three saved files open in Word 16.0.20625 with every revision the
+  client's name as author (19 revisions and 1 comment, 8 and 2, 9 and 0). What it showed
+  wrong, fixed here: a table of contents built again without pages came back with its page
+  numbers empty and the answer did not say so (now left as it is unless `contents` is true,
+  and the answer says what building it costs); a comment's initials for "Claude (trial)" were
+  `C(` (now `Ct`); the descriptions did not say that a style's name takes any capitals, nor
+  how to comment a deletion. Still open: Claude Code's own client with a model, the `npx`
+  form, the release.)
 
 ## Phase 15 — Toolbar customization · S → 1.1.0
 

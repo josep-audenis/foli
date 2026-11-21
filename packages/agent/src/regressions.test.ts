@@ -24,6 +24,14 @@ describe("regressions: agent", () => {
     expect(initials).not.toMatch(/\p{Cs}/u); // no lone surrogate
   });
 
+  it("comment initials are letters, not the punctuation a word starts with", () => {
+    const session = openSession(createDocument({ type: "doc", content: [p("Hello")] } as never), {
+      author: "Claude (trial)",
+    });
+    expect(session.comment(blocks(session)[0]?.handle as string, "note").ok).toBe(true);
+    expect(session.document().comments[0]?.initials).toBe("Ct");
+  });
+
   it("deleting the author's own inserted paragraph keeps another author's text in it", () => {
     const doc = createDocument({
       type: "doc",
