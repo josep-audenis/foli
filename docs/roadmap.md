@@ -27,6 +27,7 @@ place that says what is in progress; check it before starting work.
 | 13 Agent library         | ✅ Done                  | —      | Merged in #138–#146; `@folijs/agent` 0.1.0 on npm (2026-11-21)                                                       |
 | 14 MCP server            | ✅ Done                  | —      | Merged in #148–#162; `@folijs/mcp` 0.1.0 on npm (2026-11-21); a model in a client of its own is not tried (see 14.8) |
 | 15 Toolbar               | ✅ Done                  | —      | Merged in #149–#160; 1.1.0 on npm (2026-11-21); the release's bench ran on a busy machine (see #160)                 |
+| 16 Code mode             | Ready                    | —      | Planned 2026-11-21: a `run` tool in `@folijs/mcp`, a script in a sandbox; nothing built                              |
 
 Status values: `Ready` (dependencies met, nobody on it) · `In progress` · `In review` (PR open) ·
 `✅ Done` (merged, acceptance criteria met) · `Blocked by …`.
@@ -87,24 +88,25 @@ Foli's engine is not credible until all five pass in Chromium, Firefox and WebKi
 
 ## Overview
 
-| Phase | Name                      | Outcome                                                      | Release      | Size |
-| ----- | ------------------------- | ------------------------------------------------------------ | ------------ | ---- |
-| 0     | Foundation                | Monorepo, docs, own schema v1, read-only view                | —            | ✅   |
-| 1     | Architecture spike        | Two-page editable surface validated → ADR-0003               | —            | M    |
-| 2     | Document model            | Schema, immutable nodes, positions, slices, JSON             | —            | L    |
-| 3     | Transactions & history    | Steps, mapping, state, undo/redo, commands, headless editor  | —            | L    |
-| 4     | Editor view               | Editable DOM view: input, selection, IME, clipboard          | 0.0.x canary | XL   |
-| 5     | Native pagination         | Real pages, fragments, incremental reflow, print             | —            | XL   |
-| 6     | React API & first release | `FoliEditor`, hooks, toolbar, packaging                      | **0.1.0**    | M    |
-| 7     | Rich content              | Lists, links, alignment, color, highlight, rules             | 0.2.0        | L    |
-| 8     | Word model & DOCX         | Schema v3 (Word-shaped), styles, numbering, lossless DOCX    | 0.3.0        | XL   |
-| 9     | Review                    | Tracked changes and comments, Word-compatible                | 0.4.0        | XL   |
-| 10    | Tables & images           | Word tables across pages, inline and floating images         | 0.5.0        | XL   |
-| 11    | Sections & templates      | Headers/footers, fields, content controls, notes, PDF        | 0.6.0        | L    |
-| 12    | Ecosystem & 1.0           | Extension API freeze, docs site, performance tracking        | **1.0.0**    | L    |
-| 13    | Agent library             | `@folijs/agent`: an LLM edits a document without positions   | agent 0.1.0  | M    |
-| 14    | MCP server                | `@folijs/mcp`: the agent library as tools for any MCP client | mcp 0.1.0    | M    |
-| —     | Optional                  | Real-time collaboration                                      | —            | —    |
+| Phase | Name                      | Outcome                                                       | Release      | Size |
+| ----- | ------------------------- | ------------------------------------------------------------- | ------------ | ---- |
+| 0     | Foundation                | Monorepo, docs, own schema v1, read-only view                 | —            | ✅   |
+| 1     | Architecture spike        | Two-page editable surface validated → ADR-0003                | —            | M    |
+| 2     | Document model            | Schema, immutable nodes, positions, slices, JSON              | —            | L    |
+| 3     | Transactions & history    | Steps, mapping, state, undo/redo, commands, headless editor   | —            | L    |
+| 4     | Editor view               | Editable DOM view: input, selection, IME, clipboard           | 0.0.x canary | XL   |
+| 5     | Native pagination         | Real pages, fragments, incremental reflow, print              | —            | XL   |
+| 6     | React API & first release | `FoliEditor`, hooks, toolbar, packaging                       | **0.1.0**    | M    |
+| 7     | Rich content              | Lists, links, alignment, color, highlight, rules              | 0.2.0        | L    |
+| 8     | Word model & DOCX         | Schema v3 (Word-shaped), styles, numbering, lossless DOCX     | 0.3.0        | XL   |
+| 9     | Review                    | Tracked changes and comments, Word-compatible                 | 0.4.0        | XL   |
+| 10    | Tables & images           | Word tables across pages, inline and floating images          | 0.5.0        | XL   |
+| 11    | Sections & templates      | Headers/footers, fields, content controls, notes, PDF         | 0.6.0        | L    |
+| 12    | Ecosystem & 1.0           | Extension API freeze, docs site, performance tracking         | **1.0.0**    | L    |
+| 13    | Agent library             | `@folijs/agent`: an LLM edits a document without positions    | agent 0.1.0  | M    |
+| 14    | MCP server                | `@folijs/mcp`: the agent library as tools for any MCP client  | mcp 0.1.0    | M    |
+| 16    | Code mode                 | `run` in `@folijs/mcp`: a script over the document, sandboxed | mcp 0.2.0    | M    |
+| —     | Optional                  | Real-time collaboration                                       | —            | —    |
 
 ```
 P0 ─┬─► P1 spike ────────────────┐
@@ -2393,6 +2395,100 @@ an agent's review.
   install from npm. `pnpm bench` before it exited non-zero on a machine that was not quiet,
   and so did the 1.0.0 tag under the same load (#160): to rerun on a quiet machine.
 
+## Phase 16 — Code mode: `run` in the MCP server · M → mcp 0.2.0
+
+A tool of `@folijs/mcp` that takes a script instead of one operation: the model writes a loop
+over the document ("replace X in every table cell", "put every clause title in Heading 2") and
+the server runs it in a sandbox, in one call where the plain tools take dozens. For agents
+that talk MCP only; one that can run code itself uses `@folijs/agent` in its own sandbox and
+needs none of this. Background:
+[explorations/agent-editing.md](explorations/agent-editing.md#where-code-modes-sandbox-runs).
+Planned 2026-11-21 at the owner's request; nothing built.
+
+Not in this phase: Foli's own API in the script (core's commands and positions: the script
+gets the session's operations, as the tools do), files from a script (`open` and `save` stay
+tools), anything asynchronous in a script (no timers, no network, no imports), state kept
+between two runs, a sandbox in the browser or in `@folijs/agent`, accepting or rejecting
+changes.
+
+**Starts from (mcp 0.1.0, agent 0.1.2):** 14 tools over a session per open document; every
+argument checked against a schema; an answer is the library's `text` or its refusal, cut at
+200,000 characters; the server's only dependencies are Foli's own packages, and the protocol
+is written by hand to keep it so (ADR-0009). The trial of 14.8 took 35 tool calls for three
+small tasks. The exploration's spike (2026-11-21, not kept) ran all of `@folijs/core` inside
+QuickJS: it works, but core needs `Intl.Segmenter`, `Intl.DateTimeFormat` and
+`structuredClone`, which QuickJS has not; loading the bundle costs about 180 ms a runtime; and
+tracking cannot be enforced on code that holds the editor. `isolated-vm` did not install on
+Node 25. `quickjs-emscripten-core` and `@jitl/quickjs-wasmfile-release-sync` are 0.32.0, MIT,
+795 kB and 650 kB unpacked (npm, 2026-11-21).
+
+**Proposed shape, for the ADR to confirm or change:** the script is the only thing in the
+sandbox. The session stays in the server; the script gets one object, `doc`, whose methods are
+the server's functions over the open session: the operations the tools have, with the same
+checks and the same refusals as values. Only JSON crosses, both ways. So the script cannot
+turn tracking off, reach a file, or do to a document what a tool call could not; core needs no
+`Intl` in the guest; and there is no bundle to load.
+
+**Acceptance:** ADR-0010 records the decisions (below) and is accepted by review, as the
+owner delegates; a `run` tool takes a script and a document and answers with what the script
+returned, what it logged and the blocks it changed; every edit a script makes is a tracked
+change by the server's author, as a tool's is; a script that throws, runs out of time or of
+memory, or is stopped, leaves the document as it was before the run, and the answer says
+where it failed (the line) in words a model can act on; nothing a script does makes the
+server exit, hang past its time limit, grow past its memory limit, read or write a file,
+or reach the network (tests, and a fuzz of hostile scripts: endless loops, memory and stack
+exhaustion, huge results, getters and proxies as arguments, prototype pollution, use after
+the run ended); what a document says still cannot start a line of the answer; the tool's
+description alone (the `doc` object's types, a short example) is enough for a model: a fresh
+model, told nothing else, does in one `run` call each a task of 13.6 that needs a loop, the
+result opens in Word with every revision the agent's, and the count of calls is recorded
+beside the plain tools'; the plain tools work as before whether or not `run` is there;
+README, `security.md` (the sandbox: what it holds, what crosses, its limits), `api.md`,
+`architecture.md`, limitations, `THIRD_PARTY_NOTICES.md` if the dependency asks for it; the
+package's checks in `pnpm check` (e2e through the built `bin` included), on Windows and one
+run on Linux; 0.2.0 published with the owner's approval.
+
+### Tasks
+
+Each task is a PR on `phase-16/run-code`, the build green after each, merged after an agent's
+review.
+
+- [ ] Claim phase, branch `phase-16/run-code`
+- [ ] 16.1 ADR-0010 and a spike. To decide, with the spike's evidence: (a) what is in the
+  sandbox. Proposed: the script alone, with host functions over the session (above); against
+  it, core inside the guest (the exploration's spike), kept only if the spike shows a task the
+  operations cannot do. (b) The engine. Proposed: QuickJS as WASM (`quickjs-emscripten-core`
+  with one synchronous release variant), MIT, no native build, any Node the server runs on;
+  `isolated-vm` ruled out (native, Node 24 and 26 only, in maintenance); Node's `vm` is not a
+  boundary. The spike measures start-up, a host call's cost and a 500-block loop, and tries
+  the limits (time by the interrupt handler, memory, stack) on Windows. (c) The dependency:
+  the server's first outside Foli. Proposed: a dependency of `@folijs/mcp`, loaded when `run`
+  is first called, licenses checked and noticed; or an optional one, the tool absent without
+  it. (d) Whether the tool is there by default or behind a flag (`--code`). Proposed: behind
+  the flag in 0.2.0: it is new surface for hostile input. (e) All or nothing: how a failed
+  run is taken back (the editor's undo, or a checkpoint of the session with its handles; a
+  change to `@folijs/agent` if it needs one). (f) Limits and their defaults (time, memory,
+  stack, host calls, the size of what is returned and logged). (g) One run at a time, a new
+  sandbox each run.
+- [ ] 16.2 The sandbox, apart from documents (`sandbox.ts`): runs a script with a set of host
+  functions and limits, and answers with its value, its log, or its failure with the line.
+  JSON only across; a new context each run, disposed whatever happens. Tests for each limit
+  and for what must not be there (`fetch`, `require`, `process`, timers, `import()`).
+- [ ] 16.3 `doc` over a session: reading as blocks (handle, style, text, table place,
+  changed) in parts, every operation of the tools with the same argument checks, results and
+  refusals as values a script can test (`if (!r.ok)`); `console.log` kept as the log. A
+  failed run takes back every edit it made.
+- [ ] 16.4 The `run` tool: schema, a description that carries the `doc` types and one
+  example, the answer's format (returned value, log, blocks changed, each held to a size and
+  to one line per block), a refusal's wording. In `tools/list` as decided in (d).
+- [ ] 16.5 Hostile scripts: the fuzz and the escape tests of the acceptance, each proved to
+  fail when its guard is taken out; a security review by an agent, on the built server.
+- [ ] 16.6 A model's trial, as 14.8's: a fresh model with the server's own words only, tasks
+  that need a loop, through the SDK's client; calls counted against the plain tools; Word
+  opens the results. What it shows wrong in the description, fixed.
+- [ ] 16.7 Docs, the e2e in `pnpm check`, one run on Linux; then the changeset and 0.2.0,
+  published with the owner's approval (the Release workflow).
+
 ## After 1.0
 
 Not a phase yet: the backlog written down on 2026-11-21, from [limitations.md](limitations.md),
@@ -2461,8 +2557,8 @@ page before scrolling. Today every page is in the DOM, so a far page is reached.
 compared before 1.0 failed exactly there: pages not yet rendered could not be gone to.)
 
 **Agent editing:** the library is built and released (Phase 13, `@folijs/agent` 0.1.0). After
-it: an MCP server over it as its own package (`@folijs/mcp`, Phase 14, built, not released), then maybe a
-sandboxed `run(code)` tool inside that server (code mode), once someone asks for it. The hint
+it: an MCP server over it as its own package (`@folijs/mcp`, Phase 14, 0.1.0), then a
+sandboxed `run` tool inside that server (code mode): planned as Phase 16. The hint
 above is independent and is what lets an agent show what it changed. Explored:
 [explorations/agent-editing.md](explorations/agent-editing.md).
 
