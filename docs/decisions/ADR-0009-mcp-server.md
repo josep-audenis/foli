@@ -88,44 +88,73 @@ passes instructions on.
 The server is the first Foli program on the user's files, started by a client the user
 configured, driven by a model whose input may come from a document (a prompt injection). So:
 
-- **A root.** `--root <dir>`, default the working directory the client starts it in. Every path
-  a tool takes is resolved against it; the file's real path (symlinks followed) must be inside
-  the root's real path, or the tool refuses. For a file to be written, its directory's real
-  path. A file system's own root (`/`, `C:\`) is refused as the root: a client that starts the
-  server there has not chosen a folder. The paths a tool is given and gives back are relative
-  to the root; no answer holds a path outside it.
-- **Only `.docx`**, by extension (capitals not counting), read and written. No `:` in a
-  relative path (on Windows `a.docx:b.docx` is a stream of the file `a.docx`). A file over 64 MB
-  is refused before it is read; what is inside is `@folijs/docx`'s to refuse (its zip limits,
-  set here to 256 MB unpacked), as a refusal, never a crash.
+- **A root.** `--root <dir>`, default the working directory the client starts it in. A file
+  system's own root (`/`, `C:\`) is refused as the root: a client that starts the server there
+  has not chosen a folder.
+- **A path is a relative name going down**: no absolute path, no `..` (it would say what the
+  folders above the root are called), no `:` (on Windows `a.docx:b.docx` is a stream of the
+  file `a.docx`), no control character. It is resolved against the root; the file's real path
+  (links followed) must be inside the root's real path, and for a file to be written its
+  folder's real path, checked at the time of the write. What lies outside is answered as what
+  is not there. The paths a tool gives back are relative to the root.
+- **Only `.docx`**, by extension (capitals not counting), read and written.
 - **A save never destroys by default.** `save` without a path writes `<name>.agent.docx`
   beside the input, or `<name>.agent-2.docx`… when that is taken. Writing over the input, or
-  over a file the server did not write itself in this run, is refused unless the server was
-  started with `--overwrite`.
+  over any file the server did not write itself in this run, is refused unless the server was
+  started with `--overwrite`. "Its own" is the path and the file as it left it (its size and
+  time): a file someone put there since is theirs.
 - **A save never writes through a link or leaves half a file.** The bytes go to a new file in
   the same folder, created exclusively, then renamed over the target. A target that is not a
   plain file (a link, even one that points nowhere; a folder) is refused, with `--overwrite`
   too. So a link planted in the root cannot send a save outside it, and a server stopped while
-  saving leaves the old file whole.
+  saving leaves the old file whole. shortcut: between the last look at the target and the
+  rename a file that appears there is replaced; upgrade to a hard link and unlink, which
+  cannot replace, if that window ever matters.
+- **A file is open once**: a second `open` of it is refused, since two sessions would each save
+  over the other's edits.
 - **No other access:** no listing of directories, no deleting, no network.
-- **What a document says is data.** A read is text from a file, and may say anything. It cannot
-  forge the read's own lines: every character that ends a line is shown as ↵ (a change to
-  `@folijs/agent`). What the model then does is the client's and the user's to bound, which is
-  why a save cannot overwrite and no tool reaches outside the root.
-- **Logs** (stderr) get the server's own errors and never a document's text.
+
+### Size
+
+A hostile file is small on disk and large in memory, and a tool call is answered whole, so each
+of these is bounded:
+
+- A file over 64 MB is not read. `@folijs/docx` is held to 64 MB unpacked and 400,000 XML nodes
+  a file (its own limits are 512 MB and 4 million).
+- The documents open hold at most 3 million positions of body together (a character or a
+  block's edge each; a long report is some hundred thousand); an `open` that would pass it is
+  refused. At most 16 documents.
+- A tool's result is cut at 200,000 characters, and says so; a refusal quotes at most 2,000
+  characters of a block.
+- A line read from the client is at most 8 MB (above).
+
+Measured by the review of #153 before these limits: a 23 KB file of empty paragraphs held 300 MB
+of heap, the fourteenth open of it ended the process; a 266 KB file returned 251 MB as a result.
+
+### What a document says is data
+
+A read is text from a file, and may say anything, to a model that may believe it. What bounds
+the damage is above: no tool reaches outside the root, none overwrites by default, and every
+edit is a tracked change a person reviews. Besides, a document cannot forge the tools' own
+lines: everything a document names that is put in an answer (a block's text, a style, a list
+number, a control's tag, title and items, the reader's error) is shown on one line, every
+character that ends a line as ↵ (in `@folijs/agent`). **Logs** (stderr) get the server's own
+errors by kind and place, never a message, which may quote a document.
 
 ### Author
 
 Tracked changes and comments are made in the name given by `--author`; without it, the client's
-name from `initialize` (`clientInfo.name`); without that, "Agent".
+name from `initialize` (`clientInfo.name`); without that, "Agent". A name is made fit to be
+written first: one line, no control characters, whole characters only, 60 at most. An
+`--author` with nothing left is refused at start.
 
 ### Documents and sessions
 
 `open` reads a file and makes an `@folijs/agent` session, kept in memory under an id (`d1`,
-`d2`…) until `close` or the server's end; at most 16 at once (with the size limits, what bounds
-the server's memory). Every other tool takes the
+`d2`…) until `close` or the server's end, within the limits above. Every other tool takes the
 document's id, which may be left out while one document is open. Handles (`b7`) are a
-document's own. `close` refuses a document with changes not saved unless told to discard them.
+document's own. `close` refuses a document with changes not saved unless told to discard them; "changes" is
+whether the document differs, whatever the tools answered.
 Nothing is saved on its own.
 
 ### Tools

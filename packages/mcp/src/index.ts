@@ -1,5 +1,6 @@
 export {
   MAX_MESSAGE_BYTES,
+  MAX_RESULT_CHARS,
   type Output,
   PROTOCOL_VERSIONS,
   type ServerOptions,

@@ -60,13 +60,12 @@ const control = (c: Control) =>
 
 /** @internal */
 export function tools(documents: Documents): Tool[] {
-  /** A tool over an open document's session. `edits`: a call that went through changed it. */
+  /** A tool over an open document's session. */
   const on = (
     name: string,
     description: string,
     inputSchema: JsonSchema & { type: "object" },
     run: (session: Session, a: Record<string, unknown>, document: OpenDocument) => ToolResult,
-    edits = true,
   ): Tool => ({
     name,
     description,
@@ -74,8 +73,10 @@ export function tools(documents: Documents): Tool[] {
     run(a) {
       const document = documents.get(a.document);
       if (!("session" in document)) return document;
+      const before = document.session.editor.state.doc;
       const result = run(document.session, a, document);
-      if (edits && !result.isError) document.dirty = true;
+      // Whatever the tool answered: an edit made is an edit to save.
+      if (document.session.editor.state.doc !== before) document.dirty = true;
       return result;
     },
   });
@@ -127,7 +128,6 @@ export function tools(documents: Documents): Tool[] {
         });
         return told(result, result.ok && result.next ? `\n(more: read from "${result.next}")` : "");
       },
-      false,
     ),
     on(
       "replace_text",
@@ -220,7 +220,6 @@ export function tools(documents: Documents): Tool[] {
       "Lists the paragraph styles of an open document, by the names set_style and insert_paragraphs take.",
       args({}),
       (session) => ({ text: session.styles().join("\n") }),
-      false,
     ),
     on(
       "comment",
@@ -259,7 +258,6 @@ export function tools(documents: Documents): Tool[] {
           text: all.length ? all.map(control).join("\n") : "The document has no content controls.",
         };
       },
-      false,
     ),
     on(
       "fill_control",
@@ -315,7 +313,6 @@ export function tools(documents: Documents): Tool[] {
       "Closes an open document. Refused while it has changes that were not saved, unless discard is true.",
       args({ discard: { type: "boolean", description: "Lose the changes that were not saved." } }),
       (_session, { discard }, document) => documents.close(document, discard === true),
-      false,
     ),
     {
       name: "list_documents",

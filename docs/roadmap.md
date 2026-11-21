@@ -2211,7 +2211,7 @@ review.
   `initialize` with `instructions`, `ping`, `tools/list`, `tools/call`, errors as JSON-RPC
   errors, nothing but protocol messages on stdout (logs on stderr), a clean end when stdin
   closes. A tool is a name, a description, a JSON Schema for its arguments and a function;
-  arguments checked against the schema before the function runs. Tests with the SDK's client. (Done with 14.3 to 14.5 in one PR, #151: the tools are thin and
+  arguments checked against the schema before the function runs. Tests with the SDK's client. (Done with 14.3 to 14.5 in one PR, #153: the tools are thin and
   read best with the server. `bin.ts` reads `--root`, `--author`, `--overwrite`, `--help` and
   `--version`, logs on stderr as `foli-mcp: …`, ends quietly when the client goes; `server.ts`
   (`foliServer`) puts the file rules, the documents and the tools together, with the
@@ -2246,7 +2246,17 @@ review.
 - [x] 14.5 Template tools: `list_controls`, `fill_control`, `update_fields` (with `data`). (Done: `list_controls` gives a line per control: its
   name, kind, whether it is locked, its block, its value or `empty`, a list's items, and its
   id when that is not its name; `fill_control` returns the blocks changed and those lines;
-  `update_fields` the library's sentence.)
+  `update_fields` the library's sentence. From the security review of #153, each proved on a file
+  made for it and fixed: a style's name, a list's number, a control's tag or an error of the
+  reader could start a line of an answer that read as another block (now on one line, in
+  `@folijs/agent`); a 266 KB file gave a 251 MB answer and a 23 KB one 300 MB of heap, the
+  fourteenth open ending the process (a result is cut at 200,000 characters, a file held to
+  64 MB unpacked and 400,000 nodes, the open documents to 3 million positions together); a
+  save beside the original did not check its folder again; a file opened twice was saved over
+  by its other session (a file is open once); a client's name cut through a character or
+  holding a control character made every save fail; `..` told the names of the folders above
+  the root; a test of links could not fail. Not fixed, written in the ADR: a file that
+  appears between the last look and the rename is replaced.)
 - [ ] 14.6 End to end: the three tasks of 13.6 through the built server and the SDK's client;
   their results through 13.6's Word harness; a fuzz of malformed and hostile messages (the
   server answers or ignores, never exits, never writes outside the root); Claude Code set up

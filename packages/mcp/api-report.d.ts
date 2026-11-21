@@ -11,7 +11,7 @@ export {};
 export {};
 
 // index.d.ts
-export { MAX_MESSAGE_BYTES, type Output, PROTOCOL_VERSIONS, type ServerOptions, serve, type Tool, type ToolResult, } from "./protocol.js";
+export { MAX_MESSAGE_BYTES, MAX_RESULT_CHARS, type Output, PROTOCOL_VERSIONS, type ServerOptions, serve, type Tool, type ToolResult, } from "./protocol.js";
 export type { JsonSchema, JsonSchemaOrAny } from "./schema.js";
 export { type FoliServerOptions, foliServer } from "./server.js";
 
@@ -26,6 +26,11 @@ import { type JsonSchema } from "./schema.js";
 export declare const PROTOCOL_VERSIONS: readonly ["2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05"];
 /** A line longer than this is not a message: it is dropped, and the client told. */
 export declare const MAX_MESSAGE_BYTES: number;
+/**
+ * The most characters of a tool's result that are sent: more is cut, and said. A client, and
+ * the model's context behind it, is not the place for a document whole.
+ */
+export declare const MAX_RESULT_CHARS = 200000;
 /** What a tool gives back: text for the model; `isError` when it should act on it and try again. */
 export interface ToolResult {
     text: string;

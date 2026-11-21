@@ -14,19 +14,38 @@ export interface FoliServerOptions {
   log?: (message: string) => void;
 }
 
+/**
+ * @internal
+ * A name fit to stand beside every change in Word and to be written to a `.docx`: one line,
+ * no control characters, no half of a character, at most 60 characters. "" when nothing is left.
+ */
+export const authorName = (name: string) =>
+  [
+    ...name
+      // biome-ignore lint/suspicious/noControlCharactersInRegex: control characters are what goes
+      .replace(/[\u0000-\u001F\u007F-\u009F\u2028\u2029]+/g, " ")
+      .replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, "")
+      .replace(/\s+/g, " ")
+      .trim(),
+  ]
+    .slice(0, 60)
+    .join("");
+
 /** The server's options for `serve`: Foli's tools over the documents under `root`. */
 export function foliServer(options: FoliServerOptions): ServerOptions {
   const rules: FileRules = fileRules(options.root, options.overwrite ?? false);
   let client: string | undefined;
-  const documents = new Documents(rules, () => options.author || client || "Agent");
+  const given = options.author === undefined ? "" : authorName(options.author);
+  if (options.author !== undefined && !given)
+    throw new Error("--author needs a name that can be written beside a change");
+  const documents = new Documents(rules, () => given || client || "Agent");
   return {
     name: "foli",
     version: options.version,
     instructions: INSTRUCTIONS,
     tools: tools(documents),
     onClient: (name) => {
-      // A name a person will read beside every change: one line, not long.
-      client = name.replace(/\s+/g, " ").trim().slice(0, 60) || undefined;
+      client = authorName(name) || undefined;
     },
     ...(options.log ? { log: options.log } : {}),
   };

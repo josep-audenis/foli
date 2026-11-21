@@ -15,10 +15,10 @@ import { join, parse } from "node:path";
 import { createEditor, trackedChanges } from "@folijs/core";
 import { importDocx } from "@folijs/docx";
 import { afterEach, describe, expect, it } from "vitest";
-import { MAX_DOCUMENTS } from "./documents.js";
-import { MAX_FILE_BYTES } from "./files.js";
-import { foliServer, parseArgs } from "./server.js";
-import { connect } from "./testing/client.js";
+import { Documents, MAX_DOCUMENTS } from "./documents.js";
+import { fileRules, MAX_FILE_BYTES, write } from "./files.js";
+import { authorName, foliServer, parseArgs } from "./server.js";
+import { connect, wire } from "./testing/client.js";
 
 const CORPUS = new URL("../../../corpus/word/", import.meta.url);
 const made: string[] = [];
@@ -100,6 +100,38 @@ describe("documents", () => {
     await client.close();
   });
 
+  it("makes any name fit to be an author, so that a save cannot fail on it", async () => {
+    expect(authorName("  Maria\n\tLopez\u0001 ")).toBe("Maria Lopez");
+    // Cut by characters, never through one: an emoji across the sixtieth place stays whole or goes.
+    const long = authorName(`${"a".repeat(59)}😀😀`);
+    expect([...long]).toHaveLength(60);
+    expect(long.endsWith("😀")).toBe(true);
+    expect(authorName(`a\uD83Db`)).toBe("ab");
+    expect(authorName("\u0000\n")).toBe("");
+    expect(() => foliServer({ root: ".", version: "0", author: "\u0001" })).toThrow(/--author/);
+
+    const { root } = folder(NDA);
+    const log: string[] = [];
+    const options = foliServer({ root, version: "0", log: (m) => log.push(m) });
+    options.onClient?.(`${"n".repeat(59)}😀\u0001client`);
+    const { raw, end } = wire(options);
+    const call = (id: number, name: string, args: object) =>
+      raw(
+        JSON.stringify({
+          jsonrpc: "2.0",
+          id,
+          method: "tools/call",
+          params: { name, arguments: args },
+        }),
+      );
+    await call(1, "open", { path: `${NDA}.docx` });
+    await call(2, "replace_text", { handle: "b1", find: "MUTUAL", replacement: "X" });
+    expect(await call(3, "save", {})).toMatchObject({
+      result: { content: [{ text: "Saved d1 as 01-mutual-nda.agent.docx." }] },
+    });
+    await end();
+  });
+
   it("takes the document's id, which may be left out only while one is open", async () => {
     const { root } = folder(NDA, "05-business-letter");
     const { call, client } = await server(root);
@@ -134,19 +166,50 @@ describe("documents", () => {
     await client.close();
   });
 
-  it("opens no more than its limit", async () => {
+  it("opens no more than its limit, and a file once", async () => {
     const { root } = folder(NDA);
+    for (let i = 0; i <= MAX_DOCUMENTS; i++)
+      copyFileSync(join(root, `${NDA}.docx`), join(root, `copy-${i}.docx`));
     const { call, client } = await server(root);
     for (let i = 0; i < MAX_DOCUMENTS; i++)
-      expect((await call("open", { path: `${NDA}.docx` })).refused).toBe(false);
-    expect((await call("open", { path: `${NDA}.docx` })).text).toBe(
+      expect((await call("open", { path: `copy-${i}.docx` })).refused).toBe(false);
+    expect((await call("open", { path: `copy-${MAX_DOCUMENTS}.docx` })).text).toBe(
       `${MAX_DOCUMENTS} documents are open already: close one first.`,
     );
     await call("close", { document: "d1" });
-    expect((await call("open", { path: `${NDA}.docx` })).text).toContain(
+    // Two sessions over one file would each save over the other's edits.
+    expect(await call("open", { path: "sub/../copy-1.docx" })).toMatchObject({ refused: true });
+    expect((await call("open", { path: "copy-1.docx" })).text).toBe(
+      "copy-1.docx is open already, as d2.",
+    );
+    expect((await call("open", { path: "copy-0.docx" })).text).toContain(
       `as d${MAX_DOCUMENTS + 1}.`,
     );
     await client.close();
+  });
+
+  it("holds the open documents to a size together, and frees a closed one's share", async () => {
+    const { root } = folder(NDA, "05-business-letter");
+    const rules = fileRules(root, false);
+    const one = new Documents(rules, () => "A");
+    const nda = await one.open(`${NDA}.docx`);
+    if (!("session" in nda)) throw new Error(nda.text);
+    const size = nda.size;
+    expect(size).toBeGreaterThan(1000);
+
+    const tight = new Documents(rules, () => "A", size + 10);
+    const first = await tight.open(`${NDA}.docx`);
+    if (!("session" in first)) throw new Error(first.text);
+    expect(await tight.open("05-business-letter.docx")).toEqual({
+      text: "05-business-letter.docx is too large to open beside the documents open now: close one first.",
+      isError: true,
+    });
+    tight.close(first, false);
+    expect("session" in (await tight.open("05-business-letter.docx"))).toBe(true);
+    expect(await new Documents(rules, () => "A", size - 1).open(`${NDA}.docx`)).toEqual({
+      text: "01-mutual-nda.docx is too large to open.",
+      isError: true,
+    });
   });
 });
 
@@ -157,23 +220,31 @@ describe("files", () => {
     const missing = 'There is no file "nope.docx" in the server\'s folder.';
     expect(await call("open", { path: "nope.docx" })).toEqual({ text: missing, refused: true });
     // An absolute path, and a stream of a file (Windows): not relative names.
-    for (const path of [join(base, "outside.docx"), "/outside.docx", `${NDA}.docx:x.docx`])
+    for (const path of [
+      join(base, "outside.docx"),
+      "/outside.docx",
+      `${NDA}.docx:x.docx`,
+      "../outside.docx",
+      "sub/../../outside.docx",
+      // A folder above by its own name: would say what the folders above are called.
+      `../root/${NDA}.docx`,
+    ])
       expect((await call("open", { path })).text).toMatch(
         /^A path is relative to the server's folder/,
       );
-    for (const path of ["../outside.docx", "sub/../../outside.docx"]) {
-      const result = await call("open", { path });
-      expect(result.refused).toBe(true);
-      expect(result.text).toMatch(/^There is no file /);
-    }
     // A link in the root to a file outside it, where the system lets a test make one; a folder
     // linked from inside (a junction on Windows) always.
     symlinkSync(base, join(root, "up"), "junction");
     expect((await call("open", { path: "up/outside.docx" })).text).toMatch(/^There is no file /);
+    let linked = true;
     try {
       symlinkSync(join(base, "outside.docx"), join(root, "link.docx"), "file");
+    } catch {
+      // No right to make links here (Windows without developer mode).
+      linked = false;
+    }
+    if (linked)
       expect((await call("open", { path: "link.docx" })).text).toMatch(/^There is no file /);
-    } catch {}
 
     writeFileSync(join(root, "notes.txt"), "text");
     expect((await call("open", { path: "notes.txt" })).text).toBe(
@@ -228,7 +299,10 @@ describe("files", () => {
     expect((await call("save", { path: join(base, "out.docx") })).text).toMatch(
       /^A path is relative to the server's folder/,
     );
-    for (const path of ["../out.docx", "up/out.docx", "missing/out.docx"]) {
+    expect((await call("save", { path: "../out.docx" })).text).toMatch(
+      /^A path is relative to the server's folder/,
+    );
+    for (const path of ["up/out.docx", "missing/out.docx"]) {
       if (path.startsWith("up")) symlinkSync(base, join(root, "up"), "junction");
       const result = await call("save", { path });
       expect(result.refused).toBe(true);
@@ -306,6 +380,57 @@ describe("files", () => {
     expect(readFileSync(join(base, "outside.docx")).equals(outside)).toBe(true);
     expect(linked === 0 || linked === 2).toBe(true);
     await client.close();
+  });
+
+  it("checks the folder again for a save beside the original", async () => {
+    const { root, base } = folder();
+    mkdirSync(join(root, "work"));
+    copyFileSync(new URL(`${NDA}.docx`, CORPUS), join(root, "work", "a.docx"));
+    const { call, client } = await server(root);
+    await call("open", { path: "work/a.docx" });
+    // The folder is swapped for a link out of the root while the document is open.
+    rmSync(join(root, "work"), { recursive: true });
+    mkdirSync(join(base, "away"));
+    symlinkSync(join(base, "away"), join(root, "work"), "junction");
+    const result = await call("save");
+    expect(result).toEqual({
+      text: 'The folder of "work/a.agent.docx" is not there in the server\'s folder.',
+      refused: true,
+    });
+    expect(readdirSync(join(base, "away"))).toEqual([]);
+    await client.close();
+  });
+
+  it("writes over its own save only while the file is still its own", async () => {
+    const { root } = folder(NDA);
+    const { call, client } = await server(root);
+    await call("open", { path: `${NDA}.docx` });
+    expect((await call("save", { path: "out.docx" })).refused).toBe(false);
+    expect((await call("save", { path: "out.docx" })).refused).toBe(false);
+    // Someone puts their own file there.
+    writeFileSync(join(root, "out.docx"), "theirs, and longer than nothing");
+    expect((await call("save", { path: "out.docx" })).text).toContain("exists");
+    expect(readFileSync(join(root, "out.docx"), "utf8")).toBe("theirs, and longer than nothing");
+    await client.close();
+  });
+
+  it("removes no file it did not make when a save fails", () => {
+    const { root } = folder();
+    const file = join(root, "out.docx");
+    const now = Date.now;
+    Date.now = () => 42;
+    try {
+      const planted = join(root, `.out.docx.${process.pid}.42.tmp`);
+      writeFileSync(planted, "someone's");
+      expect(write(file, new Uint8Array([1]), false)).toEqual({
+        ok: false,
+        message: '"out.docx" could not be written.',
+      });
+      expect(readFileSync(planted, "utf8")).toBe("someone's");
+      expect(existsSync(file)).toBe(false);
+    } finally {
+      Date.now = now;
+    }
   });
 
   it("refuses a whole drive as its root", () => {

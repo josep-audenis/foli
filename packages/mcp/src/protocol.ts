@@ -11,6 +11,12 @@ export const PROTOCOL_VERSIONS = ["2025-11-25", "2025-06-18", "2025-03-26", "202
 /** A line longer than this is not a message: it is dropped, and the client told. */
 export const MAX_MESSAGE_BYTES = 8 * 1024 * 1024;
 
+/**
+ * The most characters of a tool's result that are sent: more is cut, and said. A client, and
+ * the model's context behind it, is not the place for a document whole.
+ */
+export const MAX_RESULT_CHARS = 200_000;
+
 /** What a tool gives back: text for the model; `isError` when it should act on it and try again. */
 export interface ToolResult {
   text: string;
@@ -114,8 +120,12 @@ export async function serve(
         options.log?.(`${tool.name} threw: ${where(error)}`);
         result = { text: `${tool.name} failed inside the server.`, isError: true };
       }
+    const text =
+      result.text.length > MAX_RESULT_CHARS
+        ? `${result.text.slice(0, MAX_RESULT_CHARS)}\n(cut: ${result.text.length} characters in all, the first ${MAX_RESULT_CHARS} shown. Ask for less at a time.)`
+        : result.text;
     return {
-      content: [{ type: "text", text: result.text }],
+      content: [{ type: "text", text }],
       ...(result.isError ? { isError: true } : {}),
     };
   };

@@ -11,7 +11,7 @@ import {
   updateFields as updateFieldsOf,
 } from "@folijs/core";
 import { type Changed, type Context, changed } from "./operations.js";
-import { readBlocks } from "./read.js";
+import { oneLine, readBlocks } from "./read.js";
 import { type Refusal, type Result, refuse } from "./result.js";
 
 /** A content control of the body: a place a template leaves to be filled. */
@@ -79,16 +79,17 @@ function found(context: Context): Control[] {
     if (!read.has(block)) continue;
     const control: Control = {
       id: value.id,
-      name: value.tag || value.title || value.id,
+      name: oneLine(value.tag || value.title || value.id),
       kind: value.kind,
       value: value.value,
       empty: value.showingPlaceholder,
       readOnly: controlIsReadOnly(properties),
       block,
     };
-    if (value.tag) control.tag = value.tag;
-    if (value.title) control.title = value.title;
-    if (properties.items) control.items = properties.items.map((i) => i.display ?? i.value);
+    if (value.tag) control.tag = oneLine(value.tag);
+    if (value.title) control.title = oneLine(value.title);
+    if (properties.items)
+      control.items = properties.items.map((i) => oneLine(i.display ?? i.value));
     out.push(control);
   }
   return out;
@@ -143,7 +144,7 @@ export function fillControl(
   if (value !== null && typeof value !== "string" && typeof value !== "boolean")
     return refuse("invalid", "A control's value is text, true or false, or null to empty it.");
   const all = found(context);
-  const wanted = name.trim().toLowerCase();
+  const wanted = oneLine(name).trim().toLowerCase();
   // Its id names one control; a tag every control that has it; then a title.
   const targets = [
     all.filter((c) => c.id === name),

@@ -55,10 +55,12 @@ export function fileRules(root: string, overwrite: boolean): FileRules {
 
 /** A path as a tool is given it: a `.docx`'s name relative to the root, or why it is not. */
 function named(path: unknown): string | Checked {
-  if (typeof path !== "string" || !path.trim() || path.includes("\0"))
+  // biome-ignore lint/suspicious/noControlCharactersInRegex: control characters are what is refused
+  if (typeof path !== "string" || !path.trim() || /[\u0000-\u001F\u007F]/.test(path))
     return no("A path is the file's name, relative to the server's folder: contract.docx.");
-  // Relative only. A colon is a drive, or on Windows a stream of another file (a.docx:b.docx).
-  if (isAbsolute(path) || path.includes(":"))
+  // Relative, and downwards only. A colon is a drive, or on Windows a stream of another file
+  // (a.docx:b.docx); `..` would say whether a folder above the root has a given name.
+  if (isAbsolute(path) || path.includes(":") || path.split(/[\\/]/).includes(".."))
     return no("A path is relative to the server's folder: contract.docx, or drafts/contract.docx.");
   if (extname(path).toLowerCase() !== ".docx") return no("Only .docx files are read and written.");
   return path;
@@ -147,8 +149,10 @@ export function write(file: string, bytes: Uint8Array, replace: boolean): Checke
       `${name} exists, and the server was not started to write over files. Save under another name.`,
     );
   const temporary = join(dirname(file), `.${basename(file)}.${process.pid}.${Date.now()}.tmp`);
+  let made = false;
   try {
     const handle = openSync(temporary, "wx");
+    made = true;
     try {
       writeSync(handle, bytes);
     } finally {
@@ -158,8 +162,19 @@ export function write(file: string, bytes: Uint8Array, replace: boolean): Checke
     if (there === "nothing" && standing(file) !== "nothing") throw new Error("taken");
     renameSync(temporary, file);
   } catch {
-    rmSync(temporary, { force: true });
+    // Only what was made here: a file that stood at that name is someone's.
+    if (made) rmSync(temporary, { force: true });
     return no(`${name} could not be written.`);
   }
   return { ok: true, file };
+}
+
+/** @internal What tells a file from another put in its place: its size and when it was written. */
+export function stamp(file: string): string | null {
+  try {
+    const stat = lstatSync(file);
+    return stat.isFile() ? `${stat.size}:${stat.mtimeMs}` : null;
+  } catch {
+    return null;
+  }
 }

@@ -234,6 +234,14 @@ export function readBlocks(state: EditorState, handles: Handles): Block[] {
   return blocks;
 }
 
+/**
+ * @internal
+ * Text from a document on one line: every character that ends a line shows as ↵. For all a
+ * document names that is put in a line for a model (a style, a list number, a control), as for
+ * its text: none of it may start a line of its own, which would read as another block.
+ */
+export const oneLine = (text: string) => text.replace(/\r\n|[\n\r\u0085\u2028\u2029]/g, "↵");
+
 const count = (n: number | undefined, what: string) => `${n} ${what}${n === 1 ? "" : "s"}`;
 
 /**
@@ -262,11 +270,13 @@ export function formatBlocks(blocks: readonly Block[]): string {
       const size = [count(block.rows, "row"), count(block.columns, "column")];
       return start + [...where, "table", ...size, ...flags].join(", ");
     }
-    // Every character that ends a line, not only the line break: a document's text must not
-    // be able to start a line of its own, which would read as another block.
-    const text = block.text.replace(/\r\n|[\n\r\u0085\u2028\u2029]/g, "↵");
+    const text = oneLine(block.text);
     if (block.kind === "other") return `${start}${[...where, "not editable"].join(", ")}: ${text}`;
-    const head = [...where, block.style ?? "paragraph", ...(block.number ? [block.number] : [])];
+    const head = [
+      ...where,
+      oneLine(block.style ?? "paragraph"),
+      ...(block.number ? [oneLine(block.number)] : []),
+    ];
     return `${start}${[...head, ...flags].join(", ")}: ${text}`;
   };
   return blocks.map(line).join("\n");

@@ -15,7 +15,7 @@ import {
 } from "@folijs/core";
 import { wordContext } from "@folijs/core/internal";
 import type { Handles } from "./handles.js";
-import { type Block, formatBlocks, readBlocks } from "./read.js";
+import { type Block, formatBlocks, oneLine, readBlocks } from "./read.js";
 import { type Refusal, type Result, refuse } from "./result.js";
 
 /** A paragraph to insert: its text ("\n" or ↵ a line break, a tab a tab), in `style` if given. */
@@ -62,7 +62,8 @@ const typed = (text: string) =>
     // biome-ignore lint/suspicious/noControlCharactersInRegex: control characters are what goes
     .replace(/[\u0000-\u0008\u000B-\u001F]/g, "");
 
-const quote = (text: string) => JSON.stringify(text.length > 80 ? `${text.slice(0, 77)}…` : text);
+const quote = (text: string, most = 80) =>
+  JSON.stringify(text.length > most ? `${text.slice(0, most - 3)}…` : text);
 
 /** @internal Why `handle` names no block now, or the block. */
 export function resolve(context: Context, handle: string): Refusal | { pos: number; node: Node } {
@@ -93,9 +94,13 @@ export function changed(context: Context, handles: readonly string[]): Changed {
 
 /** @internal The id of the paragraph style a model named (by its name or id), or the refusal. */
 export function styleId(context: Context, name: string): string | Refusal {
-  const styles = paragraphStyles(context.editor.state);
+  // By the names a read shows them under: on one line.
+  const styles = paragraphStyles(context.editor.state).map((s) => ({
+    id: s.id,
+    name: oneLine(s.name),
+  }));
   if (typeof name !== "string") return refuse("invalid", "A style is named by its name, a string.");
-  const wanted = name.trim().toLowerCase();
+  const wanted = oneLine(name).trim().toLowerCase();
   const style =
     styles.find((s) => s.name.toLowerCase() === wanted) ??
     styles.find((s) => s.id.toLowerCase() === wanted);
@@ -154,7 +159,7 @@ export function replaceText(
       : "";
     return refuse(
       "no-match",
-      `${quote(query)} is not in block ${handle}. Capitals and spaces count.${brackets} Its text is: ${JSON.stringify(now)}`,
+      `${quote(query)} is not in block ${handle}. Capitals and spaces count.${brackets} Its text is: ${quote(now, 2000)}`,
     );
   }
   if (matches.length > 1 && !options?.all)
@@ -391,7 +396,7 @@ function paragraphAt(
 
 /** @internal The paragraph styles there are to name, as `read` names them. */
 export function styles(context: Context): string[] {
-  return paragraphStyles(context.editor.state).map((style) => style.name);
+  return paragraphStyles(context.editor.state).map((style) => oneLine(style.name));
 }
 
 /** @internal */
@@ -457,7 +462,7 @@ export function comment(
           )
         : refuse(
             "no-match",
-            `${quote(query)} is not in block ${handle}. Capitals and spaces count. Its text is: ${JSON.stringify(now)}`,
+            `${quote(query)} is not in block ${handle}. Capitals and spaces count. Its text is: ${quote(now, 2000)}`,
           );
     }
     ({ from, to } = match);

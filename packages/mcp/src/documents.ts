@@ -5,18 +5,26 @@
 import { basename, dirname, extname, join } from "node:path";
 import { openSession, type Session } from "@folijs/agent";
 import { type DocxPackage, exportDocx, importDocx } from "@folijs/docx";
-import { type FileRules, read, shown, standing, target, write } from "./files.js";
+import { type FileRules, read, shown, stamp, standing, target, write } from "./files.js";
 import type { ToolResult } from "./protocol.js";
 
 /**
  * @internal
- * What a `.docx` may unpack to and hold, below `@folijs/docx`'s own limits: with the number of
- * documents open, what bounds the server's memory and the time one `open` takes.
+ * What one `.docx` may unpack to and hold, well below `@folijs/docx`'s own limits: a document
+ * of a few hundred pages passes, a file made to be large does not.
  */
-export const READ_LIMITS = { maxSize: 256 * 1024 * 1024, maxNodes: 1_000_000 };
+export const READ_LIMITS = { maxSize: 64 * 1024 * 1024, maxNodes: 400_000 };
 
 /** @internal At most this many documents open at once. */
 export const MAX_DOCUMENTS = 16;
+
+/**
+ * @internal
+ * The most the open documents may hold together, in positions of their bodies (a character or
+ * a block's edge each). With `READ_LIMITS`, what bounds the server's memory: a body of empty
+ * paragraphs costs about 600 bytes a position.
+ */
+export const MAX_OPEN_SIZE = 3_000_000;
 
 /** @internal */
 export interface OpenDocument {
@@ -27,7 +35,12 @@ export interface OpenDocument {
   package: DocxPackage;
   /** It has edits no save has written. */
   dirty: boolean;
+  /** Its body's size when opened, in positions: its share of `MAX_OPEN_SIZE`. */
+  size: number;
 }
+
+/** A reader's error on one line: its message may hold a name from the file. */
+const oneLine = (text: string) => text.replace(/[\r\n\u0085\u2028\u2029]+/g, " ").slice(0, 300);
 
 const refusal = (text: string): ToolResult => ({ text, isError: true });
 
@@ -36,13 +49,18 @@ export class Documents {
   readonly #rules: FileRules;
   readonly #author: () => string;
   readonly #open = new Map<string, OpenDocument>();
-  /** The files this server wrote: a save may write over them again. */
-  readonly #written = new Set<string>();
+  /**
+   * The files this server wrote, each as it left it (`stamp`): a save may write over one again
+   * while it is still that file.
+   */
+  readonly #written = new Map<string, string | null>();
+  readonly #budget: number;
   #issued = 0;
 
-  constructor(rules: FileRules, author: () => string) {
+  constructor(rules: FileRules, author: () => string, budget = MAX_OPEN_SIZE) {
     this.#rules = rules;
     this.#author = author;
+    this.#budget = budget;
   }
 
   /**
@@ -74,6 +92,9 @@ export class Documents {
     const checked = read(this.#rules, path);
     if (!checked.ok) return refusal(checked.message);
     const name = shown(this.#rules, checked.file);
+    // One session a file: two would each save over the other's edits.
+    const already = [...this.#open.values()].find((d) => d.file === checked.file);
+    if (already) return refusal(`${name} is open already, as ${already.id}.`);
     let session: Session;
     let pkg: DocxPackage;
     try {
@@ -82,15 +103,24 @@ export class Documents {
       session = openSession(imported.document, { author: this.#author() });
     } catch (error) {
       // Not a .docx Word wrote, damaged, or over the reader's limits: said, not thrown.
-      const why = error instanceof Error ? error.message : "it could not be read";
+      const why = error instanceof Error ? oneLine(error.message) : "it could not be read";
       return refusal(`${name} could not be opened as a .docx: ${why}`);
     }
+    const size = session.editor.state.doc.content.size;
+    const held = [...this.#open.values()].reduce((sum, d) => sum + d.size, 0);
+    if (held + size > this.#budget)
+      return refusal(
+        held
+          ? `${name} is too large to open beside the documents open now: close one first.`
+          : `${name} is too large to open.`,
+      );
     const document: OpenDocument = {
       id: `d${++this.#issued}`,
       file: checked.file,
       session,
       package: pkg,
       dirty: false,
+      size,
     };
     this.#open.set(document.id, document);
     return document;
@@ -101,20 +131,20 @@ export class Documents {
    * (`<name>.agent-2.docx`… when that is someone else's).
    */
   async save(document: OpenDocument, path: unknown): Promise<ToolResult> {
-    let file: string;
-    if (path === undefined || path === null) {
+    let wanted = path;
+    if (wanted === undefined || wanted === null) {
       const base = basename(document.file, extname(document.file)).replace(/\.agent(-\d+)?$/i, "");
       const beside = (n: number) =>
         join(dirname(document.file), `${base}.agent${n > 1 ? `-${n}` : ""}.docx`);
       let n = 1;
       // The first name that is free, or the server's own from an earlier save.
       while (n < 100 && standing(beside(n)) !== "nothing" && !this.#mine(beside(n))) n++;
-      file = beside(n);
-    } else {
-      const checked = target(this.#rules, path);
-      if (!checked.ok) return refusal(checked.message);
-      file = checked.file;
+      // Checked as a path given: the folder may not be what it was when the file was opened.
+      wanted = shown(this.#rules, beside(n));
     }
+    const checked = target(this.#rules, wanted);
+    if (!checked.ok) return refusal(checked.message);
+    const file = checked.file;
     let bytes: Uint8Array;
     try {
       bytes = await exportDocx(document.session.document(), document.package);
@@ -124,14 +154,15 @@ export class Documents {
     }
     const written = write(file, bytes, this.#rules.overwrite || this.#mine(file));
     if (!written.ok) return refusal(written.message);
-    this.#written.add(file);
+    this.#written.set(file, stamp(file));
     document.dirty = false;
     return { text: `Saved ${document.id} as ${shown(this.#rules, file)}.` };
   }
 
-  /** Whether the server wrote `file` in this run: it may write over it again. */
+  /** Whether `file` is as the server wrote it in this run: it may write over it again. */
   #mine(file: string): boolean {
-    return this.#written.has(file);
+    const left = this.#written.get(file);
+    return left !== undefined && left !== null && left === stamp(file);
   }
 
   close(document: OpenDocument, discard: boolean): ToolResult {
