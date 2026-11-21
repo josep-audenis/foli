@@ -22,6 +22,7 @@ import {
   FoliEditor,
   FoliEditorProvider,
   FoliToolbar,
+  type FoliToolbarProps,
   type ToolbarColorMenu,
   type ToolbarCustom,
   type ToolbarDialog,
@@ -343,9 +344,10 @@ describe("toolbar items", () => {
       label,
       dialog,
     });
-    render(
+    const view = (upload?: FoliToolbarProps["upload"]) => (
       <FoliToolbar
         editor={editor}
+        upload={upload}
         items={[
           [
             named("insertTable", "My table"),
@@ -358,8 +360,9 @@ describe("toolbar items", () => {
             { ...named("pageSetup", "Never"), key: "never", enabled: () => false },
           ],
         ]}
-      />,
+      />
     );
+    const { rerender } = render(view());
     const button = (name: string) => screen.getByRole("button", { name });
     const open = () => screen.getAllByRole("dialog").map((d) => d.getAttribute("aria-label"));
     expect(button("My table").getAttribute("aria-haspopup")).toBe("dialog");
@@ -385,11 +388,20 @@ describe("toolbar items", () => {
     expect(open()).toEqual(["Page setup"]);
     fireEvent.click(button("My notes"), { detail: 0 });
     expect(open()).toEqual(["Note options"]);
+    // Nothing to refer to in this document (no heading, no bookmark): no empty dialog.
     fireEvent.click(button("My reference"), { detail: 0 });
-    expect(open()).toEqual(["Insert cross-reference"]);
-    selectAll(editor);
+    expect(open()).toEqual(["Note options"]);
+    // The link dialog takes the open one's place, and gives the focus back to the app's button.
+    act(() => button("My link").focus());
     fireEvent.click(button("My link"), { detail: 0 });
     expect(open()).toEqual(["Add link"]);
+    fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
+    expect(document.activeElement).toBe(button("My link"));
+    // With the app's `upload`, the picture dialog inserts.
+    rerender(view(async () => ({ src: "x.png" })));
+    expect(button("My picture").getAttribute("aria-disabled")).toBeNull();
+    fireEvent.click(button("My picture"), { detail: 0 });
+    expect(open()).toEqual(["Insert picture"]);
   });
 
   it("opens an app's dialog under the toolbar: focus in, Escape and close back out", () => {

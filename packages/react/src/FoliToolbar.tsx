@@ -1348,10 +1348,11 @@ const DIALOG_APPLIES: Record<ToolbarDialogName, (state: EditorState) => boolean>
   link: (state) => openLinkEditor(state),
   picture: (state) =>
     wordContext(state) !== null && (selectedPicture(state) !== null || hasTextblock(state)),
-  // The dialog says so when the caret is where no table can go.
-  insertTable: (state) => wordContext(state) !== null && hasTextblock(state),
-  pageSetup: (state) => sectionAt(state) !== null,
-  crossReference: (state) => wordContext(state) !== null,
+  insertTable: (state) => wordContext(state) !== null && state.selection.$from.parent.isTextblock,
+  // A Word document has a section everywhere.
+  pageSetup: (state) => wordContext(state) !== null,
+  // Whether there is something to refer to is asked when it opens (that reads the document).
+  crossReference: (state) => wordContext(state) !== null && insertPageBreak(state),
   controlProperties: (state) => selectedControl(state) !== null,
   noteOptions: (state) => wordContext(state) !== null,
 };
@@ -1695,6 +1696,11 @@ export function FoliToolbar({
         request: (current?.request ?? -1) + 1,
       }));
     } else {
+      // Nothing to refer to: no dialog (its menu entry is disabled then).
+      if (name === "crossReference") {
+        const { bookmarks, headings } = crossReferenceTargets(editor.state);
+        if (bookmarks.length + headings.length === 0) return;
+      }
       closeDialogs();
       if (name === "noteOptions") setNoteDialog({ restore });
       else if (name === "controlProperties") setControlDialog({ restore, selection });

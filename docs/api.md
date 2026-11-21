@@ -289,13 +289,14 @@ code that annotates one of them as `ToolbarButton` names the new type, or `Toolb
 
 - `dialog: "link" | "picture" | "insertTable" | "pageSetup" | "crossReference" |
   "controlProperties" | "noteOptions"` (`ToolbarDialogName`): the button opens that dialog of
-  the toolbar's own, as its built-in item or menu entry does (`"link"` as Mod-K does), and gets
-  the focus back when it closes. Without `enabled` it is enabled where the dialog applies:
-  link, where a link can be; picture, on a selected picture, or in a paragraph with `upload`;
-  insert table, in a paragraph (the dialog says so where no table can go); page setup, in a
-  section; control properties, on a content control; note options and cross-reference, in a
-  Word document (the cross-reference dialog may have nothing to offer). What the dialogs
-  contain is theirs.
+  the toolbar's own, as its built-in item or menu entry does (`"link"` as Mod-K does); a
+  dialog closed without applying gives the focus back to the button (the link dialog, to where
+  it was), one that applied calls `onClickCommand`. Without `enabled` it is enabled where the
+  dialog applies: link, where a link can be; picture, on a selected picture, or in a paragraph
+  with `upload`; insert table, with the caret in a paragraph; control properties, on a content
+  control; page setup and note options, in a Word document; cross-reference, where a field can
+  be inserted (with no heading or bookmark to refer to, the button opens nothing). What the
+  dialogs contain is theirs.
 
 #### Toolbar tabs
 
