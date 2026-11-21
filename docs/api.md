@@ -27,7 +27,7 @@ exactly its own version (since 1.0.0). Stylesheet: `@folijs/react/styles.css`
 (`FoliEditorProps`, `FoliEditorHandle`, `FoliChange`, `FoliCanvasProps`, `FoliCanvasHandle`,
 `FoliCommentsProps`, `FoliNavigationProps`, `FoliToolbarProps`), the toolbar's items
 (`ToolbarItem`, `ToolbarButton`, `ToolbarMenu`, `ToolbarAction`, `ToolbarSelect`, `ToolbarOption`,
-`ToolbarColorMenu`, `ToolbarColor`, `ToolbarDialog`, `ToolbarDialogProps`, `ToolbarCustom`,
+`ToolbarColorMenu`, `ToolbarColor`, `ToolbarDialog`, `ToolbarDialogName`, `ToolbarDialogProps`, `ToolbarCustom`,
 `ToolbarCustomProps`, `ToolbarItemName`, `toolbarItems`,
 `defaultToolbarItems`, `ToolbarGroup`, `ToolbarGroups`, `ToolbarTab`, `defaultToolbarTabs`), the
 hooks and their options and results (`UseFoliEditorOptions`, `UseEditorStateOptions`,
@@ -287,7 +287,16 @@ code that annotates one of them as `ToolbarButton` names the new type, or `Toolb
   toolbar renders, not on every transaction. Nothing else is done for it: a click takes the
   focus from the document unless the control prevents it on `mousedown`.
 
-The built-in dialogs themselves (link, picture, page setup…) open only from their own items.
+- `dialog: "link" | "picture" | "insertTable" | "pageSetup" | "crossReference" |
+  "controlProperties" | "noteOptions"` (`ToolbarDialogName`): the button opens that dialog of
+  the toolbar's own, as its built-in item or menu entry does (`"link"` as Mod-K does); a
+  dialog closed without applying gives the focus back to the button (the link dialog, to where
+  it was), one that applied calls `onClickCommand`. Without `enabled` it is enabled where the
+  dialog applies: link, where a link can be; picture, on a selected picture, or in a paragraph
+  with `upload`; insert table, with the caret in a paragraph; control properties, on a content
+  control; page setup and note options, in a Word document; cross-reference, where a field can
+  be inserted (with no heading or bookmark to refer to, the button opens nothing). What the
+  dialogs contain is theirs.
 
 #### Toolbar tabs
 

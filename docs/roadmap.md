@@ -2523,10 +2523,10 @@ Each task is a PR on `phase-17/toolbar-developers`, the build green after each, 
 agent's review.
 
 - [x] Claim phase, branch `phase-17/toolbar-developers` (with 17.1)
-- [x] 17.1 Tabs and groups (also `toolbarProps` on `FoliEditor`, for these and the later props): `tab` and `onTabChange` (controlled), `defaultTab`;
+- [x] 17.1 (#167, #168) Tabs and groups (also `toolbarProps` on `FoliEditor`, for these and the later props): `tab` and `onTabChange` (controlled), `defaultTab`;
   `ToolbarTab.visible(state, editor)`; a group as `{ label, items }` (`ToolbarGroup`), shown as
   a named `role="group"` with its caption.
-- [ ] 17.2 Built-in dialogs by name: a `ToolbarDialog` whose `dialog` is `"link"`,
+- [x] 17.2 (#169) Built-in dialogs by name: a `ToolbarDialog` whose `dialog` is `"link"`,
   `"picture"`, `"insertTable"`, `"pageSetup"`, `"crossReference"`, `"controlProperties"` or
   `"noteOptions"`.
 - [ ] 17.3 Any color: `colors.custom` adds an entry with the browser's color field to a color

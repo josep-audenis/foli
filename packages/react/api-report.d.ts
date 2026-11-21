@@ -333,6 +333,12 @@ export interface ToolbarColorMenu extends ToolbarItemBase {
     readonly render?: undefined;
     readonly pressed?: undefined;
 }
+/**
+ * The toolbar's own dialogs, for `ToolbarDialog.dialog`: `"link"` (as Mod-K), `"picture"`
+ * (insert, or edit the selected one), `"insertTable"`, `"pageSetup"` (the caret's section),
+ * `"crossReference"`, `"controlProperties"` (the content control at the caret), `"noteOptions"`.
+ */
+export type ToolbarDialogName = "link" | "picture" | "insertTable" | "pageSetup" | "crossReference" | "controlProperties" | "noteOptions";
 /** What an app's dialog gets. */
 export interface ToolbarDialogProps {
     /** Where the toolbar's commands go: the header, footer or note open on its page, else the body. */
@@ -350,8 +356,12 @@ export interface ToolbarDialogProps {
  * back to its button; a disabled toolbar closes it.
  */
 export interface ToolbarDialog extends ToolbarItemBase {
-    /** The dialog's content. Rendered as a component's body: hooks are fine. */
-    readonly dialog: (props: ToolbarDialogProps) => ReactNode;
+    /**
+     * The dialog's content (rendered as a component's body: hooks are fine), or the name of one
+     * of the toolbar's own dialogs, which the button then opens as its built-in item or menu
+     * entry does. Such a button is enabled where that dialog applies, unless `enabled` says.
+     */
+    readonly dialog: ((props: ToolbarDialogProps) => ReactNode) | ToolbarDialogName;
     /** A toggle: whether the button shows as pressed. Runs after every transaction. */
     readonly pressed?: ((state: EditorState, editor: Editor) => boolean) | undefined;
     readonly command?: undefined;
@@ -535,4 +545,4 @@ export { FoliCanvas, type FoliCanvasHandle, type FoliCanvasProps } from "./FoliC
 export { FoliComments, type FoliCommentsProps } from "./FoliComments.js";
 export { type FoliChange, FoliEditor, type FoliEditorHandle, type FoliEditorProps, } from "./FoliEditor.js";
 export { FoliNavigation, type FoliNavigationProps } from "./FoliNavigation.js";
-export { defaultToolbarItems, defaultToolbarTabs, FoliToolbar, type FoliToolbarProps, type ToolbarAction, type ToolbarButton, type ToolbarColor, type ToolbarColorMenu, type ToolbarCustom, type ToolbarCustomProps, type ToolbarDialog, type ToolbarDialogProps, type ToolbarGroup, type ToolbarGroups, type ToolbarItem, type ToolbarItemName, type ToolbarMenu, type ToolbarOption, type ToolbarSelect, type ToolbarTab, toolbarItems, } from "./FoliToolbar.js";
+export { defaultToolbarItems, defaultToolbarTabs, FoliToolbar, type FoliToolbarProps, type ToolbarAction, type ToolbarButton, type ToolbarColor, type ToolbarColorMenu, type ToolbarCustom, type ToolbarCustomProps, type ToolbarDialog, type ToolbarDialogName, type ToolbarDialogProps, type ToolbarGroup, type ToolbarGroups, type ToolbarItem, type ToolbarItemName, type ToolbarMenu, type ToolbarOption, type ToolbarSelect, type ToolbarTab, toolbarItems, } from "./FoliToolbar.js";

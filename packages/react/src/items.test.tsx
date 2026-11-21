@@ -22,9 +22,11 @@ import {
   FoliEditor,
   FoliEditorProvider,
   FoliToolbar,
+  type FoliToolbarProps,
   type ToolbarColorMenu,
   type ToolbarCustom,
   type ToolbarDialog,
+  type ToolbarDialogName,
   type ToolbarItem,
   type ToolbarItemName,
   type ToolbarSelect,
@@ -333,6 +335,73 @@ describe("toolbar items", () => {
     expect(box.value).toBe("");
     fireEvent.change(box, { target: { value: "a" } });
     expect(pick).not.toHaveBeenCalled();
+  });
+
+  it("opens the toolbar's own dialogs from an app's buttons, by name", () => {
+    const editor = createEditor({ document: doc() });
+    const named = (dialog: ToolbarDialogName, label: string): ToolbarDialog => ({
+      key: `my-${dialog}`,
+      label,
+      dialog,
+    });
+    const view = (upload?: FoliToolbarProps["upload"]) => (
+      <FoliToolbar
+        editor={editor}
+        upload={upload}
+        items={[
+          [
+            named("insertTable", "My table"),
+            named("link", "My link"),
+            named("pageSetup", "My page"),
+            named("noteOptions", "My notes"),
+            named("crossReference", "My reference"),
+            named("controlProperties", "My control"),
+            named("picture", "My picture"),
+            { ...named("pageSetup", "Never"), key: "never", enabled: () => false },
+          ],
+        ]}
+      />
+    );
+    const { rerender } = render(view());
+    const button = (name: string) => screen.getByRole("button", { name });
+    const open = () => screen.getAllByRole("dialog").map((d) => d.getAttribute("aria-label"));
+    expect(button("My table").getAttribute("aria-haspopup")).toBe("dialog");
+    // Where a dialog does not apply its button says so: no control at the caret, no `upload`
+    // to insert a picture with, and the app's own `enabled`.
+    expect(button("My control").getAttribute("aria-disabled")).toBe("true");
+    expect(button("My picture").getAttribute("aria-disabled")).toBe("true");
+    expect(button("Never").getAttribute("aria-disabled")).toBe("true");
+    fireEvent.click(button("My control"), { detail: 0 });
+    fireEvent.click(button("Never"), { detail: 0 });
+    expect(screen.queryByRole("dialog")).toBeNull();
+
+    act(() => button("My table").focus());
+    fireEvent.click(button("My table"), { detail: 0 });
+    expect(open()).toEqual(["Insert table"]);
+    // Escape gives the focus back to the app's button.
+    fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(document.activeElement).toBe(button("My table"));
+
+    // One at a time: each takes the last one's place.
+    fireEvent.click(button("My page"), { detail: 0 });
+    expect(open()).toEqual(["Page setup"]);
+    fireEvent.click(button("My notes"), { detail: 0 });
+    expect(open()).toEqual(["Note options"]);
+    // Nothing to refer to in this document (no heading, no bookmark): no empty dialog.
+    fireEvent.click(button("My reference"), { detail: 0 });
+    expect(open()).toEqual(["Note options"]);
+    // The link dialog takes the open one's place, and gives the focus back to the app's button.
+    act(() => button("My link").focus());
+    fireEvent.click(button("My link"), { detail: 0 });
+    expect(open()).toEqual(["Add link"]);
+    fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
+    expect(document.activeElement).toBe(button("My link"));
+    // With the app's `upload`, the picture dialog inserts.
+    rerender(view(async () => ({ src: "x.png" })));
+    expect(button("My picture").getAttribute("aria-disabled")).toBeNull();
+    fireEvent.click(button("My picture"), { detail: 0 });
+    expect(open()).toEqual(["Insert picture"]);
   });
 
   it("opens an app's dialog under the toolbar: focus in, Escape and close back out", () => {
