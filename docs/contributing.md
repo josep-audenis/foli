@@ -154,17 +154,15 @@ pnpm --filter @folijs/site preview  # serve the build locally
 ```
 
 It is published at [foli.josepaudenis.com/docs](https://foli.josepaudenis.com/docs/) and
-**deploys itself: every push builds it.** Known (2026-11-20, 12.12): a Cloudflare Pages project
-named `foli`, connected to the repository through Cloudflare's GitHub app
-(`cloudflare-workers-and-pages`), builds every pushed commit and reports a "Cloudflare Pages"
-check on it: on `main`'s commits "Deployed successfully" (a production deployment on
-`foli-8c6.pages.dev`), on other branches a preview at `<branch>.foli-8c6.pages.dev` (for
-example `phase-12-ecosystem.foli-8c6.pages.dev`). foli.josepaudenis.com serves the same files as
-`main`'s deployment. Inferred, not visible from the repository: the production branch is `main`
-and the custom domain points at it; the build command and output directory (presumably the
-site's build into `apps/site/dist/`) are set in Cloudflare's dashboard, as nothing in the
-repository configures them (no `wrangler.toml`, no workflow). So merging to `main` publishes the
-docs; nothing else is needed. Pages are folders with an `index.html` (`/docs/styling/` →
+**deploys from GitHub Actions on every push to `main`**: `.github/workflows/deploy-site.yml`
+builds it and uploads `apps/site/dist/` to the Cloudflare Pages project `foli` with Wrangler
+(production, `foli-8c6.pages.dev`; foli.josepaudenis.com serves the same files). Pull requests
+and other branches deploy nothing. Run the workflow by hand from the Actions tab to redeploy.
+It needs, on the `cloudflare` environment, the `CLOUDFLARE_API_TOKEN` secret (a token with
+"Cloudflare Pages: Edit") and the `CLOUDFLARE_ACCOUNT_ID` variable. Until 2026-11-21 the project
+was connected to the repository through Cloudflare's GitHub app and built every pushed commit,
+previews included; that connection's automatic deployments are turned off in Cloudflare's
+dashboard (owner step), so the workflow is the only deploy. Pages are folders with an `index.html` (`/docs/styling/` →
 `docs/styling/index.html`); an unknown path gets the landing page with status 200 (there is no
 `404.html`), so check a page by its title, not its status.
 

@@ -6,7 +6,7 @@
     <title>Foli — real pages for the web</title>
     <meta
       name="description"
-      content="A Word-style editor for React apps. Open a .docx, edit it on real pages with tracked changes and comments, and save it back. MIT licensed."
+      content="A Word-style editor for React apps. Open a .docx, edit it on real pages with tracked changes and comments, and save it back. AI agents edit the same files as tracked changes. MIT licensed."
     />
     <meta name="theme-color" content="#f3f3f1" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
@@ -34,6 +34,7 @@
           <a href="#docx">.docx</a>
           <a href="#review">Review</a>
           <a href="#tables">Tables</a>
+          <a href="#agents">Agents</a>
           <a href="#engine">Engine</a>
           <a href="/docs/">Docs</a>
           <a href="https://github.com/josep-audenis/foli">GitHub</a>
@@ -300,6 +301,42 @@
         <div class="tb-view" data-table-view aria-hidden="true"><div class="tb-canvas" data-canvas></div></div>
       </section>
 
+      <section class="scene wrap-wide" id="agents" aria-labelledby="agents-title">
+        <header class="scene-head">
+          <h2 id="agents-title">Let an agent <del>rewrite</del> <ins>redline</ins> the contract.</h2>
+          <p>
+            An agent reads the document by handle and edits it the way a colleague would: each edit is a
+            tracked change in its name, each note a comment. You accept or reject them in Foli or in
+            Word.
+          </p>
+        </header>
+        <div class="agents-code">
+          <div class="listing">
+            <div class="listing-head"><span>Claude Code, or any MCP client</span><button type="button" class="copy" data-copy="code-mcp">Copy</button></div>
+<pre id="code-mcp">claude mcp add foli -- npx -y @folijs/mcp --root .</pre>
+            <p class="caption">
+              <a href="https://github.com/josep-audenis/foli/tree/main/packages/mcp#readme"><code>@folijs/mcp</code></a>:
+              tools to open, read, edit, comment and save <code>.docx</code> files under one folder.
+            </p>
+          </div>
+          <div class="listing">
+            <div class="listing-head"><span>agent.ts</span><button type="button" class="copy" data-copy="code-agent">Copy</button></div>
+<pre id="code-agent">import { openSession } from "@folijs/agent";
+import { importDocx } from "@folijs/docx";
+
+const { document } = await importDocx(bytes);
+const session = openSession(document, { author: "Agent" });
+const { text } = session.read();
+// [b7] Clause, 1.1: Invoices are payable within 30 days.</pre>
+            <p class="caption">
+              <a href="https://github.com/josep-audenis/foli/tree/main/packages/agent#readme"><code>@folijs/agent</code></a>:
+              the same session in your own agent. No DOM, runs in Node, browsers and workers.
+            </p>
+          </div>
+        </div>
+        <p class="caption">Both packages are 0.x: their API may change in any release.</p>
+      </section>
+
       <section class="band" id="engine" aria-labelledby="engine-title">
         <div class="wrap-wide">
           <header class="scene-head">
@@ -365,7 +402,8 @@ export function Editor() {
             <li class="toc-done"><span class="toc-name">Changes and comments</span><span class="toc-leader"></span><span class="toc-state">0.4</span></li>
             <li class="toc-done"><span class="toc-name">Tables and pictures</span><span class="toc-leader"></span><span class="toc-state">0.5</span></li>
             <li class="toc-done"><span class="toc-name">Headers, fields, templates, PDF</span><span class="toc-leader"></span><span class="toc-state">0.6</span></li>
-            <li class="toc-now"><span class="toc-name">Ecosystem and 1.0</span><span class="toc-leader"></span><span class="toc-state">1.0</span></li>
+            <li class="toc-done"><span class="toc-name">Ecosystem and 1.0</span><span class="toc-leader"></span><span class="toc-state">1.0</span></li>
+            <li class="toc-done"><span class="toc-name">Agents and MCP server</span><span class="toc-leader"></span><span class="toc-state">1.1</span></li>
           </ol>
         </section>
       </div>
@@ -375,7 +413,7 @@ export function Editor() {
       <div class="wrap-wide">
         <p class="cover-title"><a href="/test/">Try the real editor.</a></p>
         <div class="cover-row">
-          <p><a href="https://github.com/josep-audenis/foli">GitHub</a> · v0.5.0 · MIT · © 2026 Josep Audenis</p>
+          <p><a href="https://github.com/josep-audenis/foli">GitHub</a> · v1.1.0 · MIT · © 2026 Josep Audenis</p>
         </div>
       </div>
       <a class="corner" href="/test/" aria-label="Open the editor at /test"><span>/test/</span></a>
