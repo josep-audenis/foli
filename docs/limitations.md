@@ -273,6 +273,8 @@ Custom nodes and marks, plugins and toolbar items ([extensions](guides/extension
 - Marks need the CSS Custom Highlight API (Chromium 105, Safari 17.2, Firefox 140); without it find
   still counts, goes to and selects matches. Only pages within a screen of the window are marked.
   In the drawn copies of a story that is not open, marks come from looking for the text there.
+  A hint (`view.hint`) needs the same API to show: without it, it still scrolls. Its fading is
+  one lighter colour for 0.4 s, not a smooth fade. It takes body ranges only (18.1).
 - A match in a header no page shows (an unused first-page or even-page variant) is found and
   replaced but cannot be gone to. A read-only view does not open stories.
 - Go to takes a page's place in the document, not the number printed on it. Renaming a bookmark

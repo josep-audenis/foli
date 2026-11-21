@@ -241,6 +241,18 @@ export function deleteBookmark(editor: Editor, name: string): boolean {
 }
 
 /**
+ * Shows `target` for a few seconds without selecting it (`StoryView.hint`): the view scrolls to it
+ * and marks it, then the mark fades. False without a view that shows it: a hint is for the eyes.
+ */
+export function hint(
+  editor: Editor,
+  target: DocumentTarget,
+  options: { ms?: number } = {},
+): boolean {
+  return editor.storyView?.hint?.(target, options) ?? false;
+}
+
+/**
  * Selects `target` and shows it: through the view when there is one (which opens a story for it),
  * else in the editor of its tree. Whether it could.
  */

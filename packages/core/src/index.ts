@@ -154,6 +154,7 @@ export {
   goToCellVertically,
   HIGHLIGHT_HEX,
   type HistoryOptions,
+  hint,
   history,
   type InsertFieldOptions,
   type InsertNoteOptions,

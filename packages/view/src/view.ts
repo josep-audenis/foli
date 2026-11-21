@@ -150,7 +150,7 @@ import {
   type WordInfo,
   WordRenderer,
 } from "./word/edit.js";
-import { MATCH_STYLES, MatchMarks, rangesInText } from "./word/matches.js";
+import { HintMarks, MATCH_STYLES, MatchMarks, rangesInText } from "./word/matches.js";
 import { NOTE_ATTR, type NoteGroup, PageNotes } from "./word/notes.js";
 import { measureLineRatio } from "./word/pages.js";
 import { PageRegions, REGION_CONTENT_CLASS } from "./word/regions.js";
@@ -257,6 +257,9 @@ const FIELD_SELECTED_ATTR = "data-foli-field-selected";
 const MIN_PICTURE = 8;
 // Generated content is not document text: no caret stops inside it, a zero-height float keeps
 // the caret at the line start, and the empty alt text keeps screen readers on aria-placeholder.
+/** How long a hint takes to fade, after its time (18.1). */
+const HINT_FADE = 400;
+
 const STYLES = `[${FIELD_SELECTED_ATTR}]{background-color:rgba(0,0,0,.14)}@media print{[${FIELD_SELECTED_ATTR}]{background-color:transparent}}.foli-in-story>.foli-page>:not(.foli-region){opacity:.45}.foli-story-mount{pointer-events:auto;outline:1px dashed GrayText;outline-offset:2px}.foli-story-mount>[contenteditable=true]:focus{outline:none}@media print{.foli-in-story>.foli-page>:not(.foli-region){opacity:1}.foli-story-mount{outline:none}}.${CELL_CLASS}{box-shadow:inset 0 0 0 9999px rgba(0,120,215,.22)}[${CELLS_ATTR}] ::selection{background:transparent}[data-foli-no-alt]{outline:2px dashed #b45309;outline-offset:-2px}@media print{[data-foli-no-alt]{outline:none}}[${PICTURE_SELECTED_ATTR}]{position:relative;outline:2px solid Highlight}[${PICTURE_SELECTED_ATTR}] [data-foli-resize]{position:absolute;right:-5px;bottom:-5px;width:10px;height:10px;box-sizing:border-box;border:1px solid Canvas;background:Highlight;cursor:nwse-resize;forced-color-adjust:none}@media print{[${PICTURE_SELECTED_ATTR}]{outline:none}[${PICTURE_SELECTED_ATTR}] [data-foli-resize]{display:none}}[${PLACEHOLDER_ATTR}]::before{content:attr(${PLACEHOLDER_ATTR});content:attr(${PLACEHOLDER_ATTR}) / "";float:inline-start;height:0;pointer-events:none;color:GrayText}${CONTROL_STYLES}${MATCH_STYLES}`;
 
 /**
@@ -708,6 +711,9 @@ export class EditorView {
   private found: FoundMatches | null = null;
   private matchStory: string | null = null;
   private readonly matchMarks: MatchMarks;
+  private readonly hintMarks: HintMarks;
+  /** The hint shown, as positions of the body (18.1). */
+  private shownHint: { from: number; to: number; fading: boolean; timers: number[] } | null = null;
   /** The pages marked, as a key; the frame waiting to look again. */
   private matchPages = "";
   private matchFrame = 0;
@@ -733,6 +739,7 @@ export class EditorView {
   ) {
     this.state = editor.state;
     this.matchMarks = new MatchMarks(host.ownerDocument);
+    this.hintMarks = new HintMarks(host.ownerDocument);
     this.paged = options.paged !== false;
     this.noteMark = options.noteMark;
     const view = this;
@@ -814,7 +821,10 @@ export class EditorView {
     this.claimStories();
     host.ownerDocument.addEventListener("selectionchange", this.onSelectionChange);
     host.ownerDocument.fonts?.addEventListener("loadingdone", this.onFontsLoaded);
-    this.unsubscribe = editor.subscribe((state) => this.update(state));
+    this.unsubscribe = editor.subscribe((state, transactions) => {
+      this.mapHint(state, transactions);
+      this.update(state);
+    });
     for (const extension of extensions) {
       try {
         if (extension.view) this.pluginViews.push(extension.view(this));
@@ -893,6 +903,7 @@ export class EditorView {
     this.pluginViews = [];
     this.closeStory(false);
     this.showFound(null);
+    this.endHint();
     this.controlChrome.destroy();
     if (this.editor.storyView === this.stories) this.editor.storyView = null;
     this.destroyed = true;
@@ -1036,6 +1047,8 @@ export class EditorView {
     // Decorations that changed redraw their blocks (the others are reused).
     const decorated = this.decorate(state);
     if (docChanged || decorated || (storiesChanged && !this.redrawRegions())) this.render();
+    // Blocks drawn again hold new text nodes: the hint's ranges are made again on them.
+    if (this.shownHint && (docChanged || decorated)) this.drawHint();
     if (lost) this.closeStory(true);
     // The open story has its own editor, which hears nothing of this.
     if (codesChanged) this.mount?.view.update(this.mount.view.editor.state);
@@ -1843,6 +1856,7 @@ export class EditorView {
   private afterPlace(): void {
     this.drawControls();
     this.drawMatches();
+    this.drawHint();
     if (!this.mount?.moved) return;
     this.mount.moved = false;
     this.mount.view.focus();
@@ -1868,6 +1882,7 @@ export class EditorView {
     updateFields: (options, editor) => view.updateFields(options, editor),
     showMatches: (found) => view.showMatches(found),
     reveal: (target, options) => view.reveal(target, options),
+    hint: (target, options) => view.hint(target, options),
     goToPage: (page, options) => view.goToPage(page, options),
     focus: () => view.focus(),
   }))(this);
@@ -1878,6 +1893,83 @@ export class EditorView {
     const first = !this.editor.storyView;
     this.editor.storyView = this.stories;
     if (!first) this.editor.storyChanged();
+  }
+
+  // ---------- a hint: a place shown for a few seconds (18.1) ----------
+
+  /**
+   * Scrolls `target` into view and marks it for `ms` milliseconds (default 2000), then lets the
+   * mark fade. The document, the selection, undo and the focus stay as they are. The range
+   * follows edits made while it shows, and goes when its text is deleted; a new hint replaces
+   * it. False when no page shows the target.
+   */
+  hint({ story, from, to }: DocumentTarget, { ms = 2000 } = {}): boolean {
+    this.endHint();
+    const { doc } = this.state;
+    if (story !== null || !(from >= 0 && from <= to && to <= doc.content.size)) return false;
+    this.shownHint = { from, to, fading: false, timers: [] };
+    injectStyles(this.host);
+    this.scrollToRange(from, to);
+    this.drawHint();
+    const win = this.host.ownerDocument.defaultView;
+    const still = win?.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
+    const later = (wait: number, run: () => void) =>
+      this.shownHint?.timers.push(win?.setTimeout(run, wait) ?? 0);
+    // Fading is one lighter colour before it goes; with reduced motion it just goes.
+    if (still) later(ms, () => this.endHint());
+    else {
+      later(ms, () => {
+        if (this.shownHint) this.shownHint.fading = true;
+        this.drawHint();
+      });
+      later(ms + HINT_FADE, () => this.endHint());
+    }
+    return true;
+  }
+
+  /** The hint taken off, its timers stopped. */
+  private endHint(): void {
+    const shown = this.shownHint;
+    if (!shown) return;
+    const win = this.host.ownerDocument.defaultView;
+    for (const timer of shown.timers) win?.clearTimeout(timer);
+    this.shownHint = null;
+    this.hintMarks.set([]);
+  }
+
+  /** The hint's range through `transactions`; gone when what it marked is. */
+  private mapHint(state: EditorState, transactions: readonly Transaction[]): void {
+    const shown = this.shownHint;
+    if (!shown) return;
+    // A document replaced tells without a transaction: nothing of the old one holds.
+    if (!transactions.length && state.doc !== this.state.doc) {
+      this.endHint();
+      return;
+    }
+    for (const tr of transactions) {
+      shown.from = tr.mapping.map(shown.from, 1);
+      shown.to = tr.mapping.map(shown.to, -1);
+    }
+    if (shown.from >= shown.to && transactions.some((tr) => tr.docChanged)) this.endHint();
+  }
+
+  /** The hint's ranges on the pages, after each render: a paragraph's text at a time. */
+  private drawHint(): void {
+    const shown = this.shownHint;
+    if (!shown) return;
+    const { from, to, fading } = shown;
+    const ranges: Range[] = [];
+    if (from === to) ranges.push(...this.rangesOf(from, from));
+    else
+      this.state.doc.nodesBetween(from, to, (node, pos) => {
+        if (!node.isTextblock) return true;
+        const start = pos + 1;
+        ranges.push(
+          ...this.rangesOf(Math.max(from, start), Math.min(to, start + node.content.size)),
+        );
+        return false;
+      });
+    this.hintMarks.set(ranges, fading);
   }
 
   // ---------- find, and going places (11.11) ----------

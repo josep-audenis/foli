@@ -821,6 +821,7 @@ Bookmarks and the outline:
 | `listBookmarks(editorOrState, options?)`      | `name`, `story`, `from`, `to`, `text`, `hidden`; `{ hidden: true }` adds Word's own (`_Toc…`, `_Ref…`)                                                     |
 | `isBookmarkName(name)`                        | A letter, then letters, digits and `_`, 40 at most                                                                                                         |
 | `goTo(editor, { story, from, to }, options?)` | Selects it and shows it, through the view when there is one (`focus`: the document takes the focus)                                                        |
+| `hint(editor, { story, from, to }, { ms? })`  | Shows it for `ms` (2000) without selecting it, through the view's `hint`; false without a view that shows it                                               |
 | `documentOutline(state, layout?)`             | `pos`, `level`, `text`, `number`, `page` (with `editor.storyView.fieldLayout`): the body's headings, by the rule of a table of contents with `\o` and `\u` |
 
 The first three return `{ ok: true, bookmark }` or `{ ok: false, reason }` (`invalid-name`,
@@ -989,7 +990,12 @@ const view = new EditorView(host, editor, { editable: true, placeholder: "" });
   `foli-find-current`): nothing is added to the DOM or the document, and it does not print. Only
   pages near the window carry marks. `view.reveal({ story, from, to }, { focus })` selects and
   scrolls there, opening a header, footer or note where it is and leaving it for the body;
-  `view.goToPage(n, { focus })`. All three are on `editor.storyView` too. Ctrl+F, Ctrl+H, Ctrl+G,
+  `view.goToPage(n, { focus })`. `view.hint({ story, from, to }, { ms })` (1.3) scrolls there and
+  marks the range for `ms` (default 2000) with `::highlight(foli-hint)`, then one lighter step,
+  `foli-hint-fading`, for 0.4 s, without touching the document, the selection, undo or the
+  focus; the range follows edits and goes with its text; a new hint replaces it; under
+  `prefers-reduced-motion` it goes without the fading step. Body ranges only so far (18.1).
+  All four are on `editor.storyView` too (`hint` is optional there). Ctrl+F, Ctrl+H, Ctrl+G,
   F3, Shift+F3 and Ctrl+Shift+F5 go to `editor.navigation` when something has set it, and are
   otherwise left to the browser.
 - `view.focus()`: focuses the host, shows the editor's selection, scrolls it into view.

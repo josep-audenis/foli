@@ -328,6 +328,9 @@ export declare class EditorView {
     private found;
     private matchStory;
     private readonly matchMarks;
+    private readonly hintMarks;
+    /** The hint shown, as positions of the body (18.1). */
+    private shownHint;
     /** The pages marked, as a key; the frame waiting to look again. */
     private matchPages;
     private matchFrame;
@@ -412,6 +415,21 @@ export declare class EditorView {
     private readonly stories;
     /** Makes this view the one `Editor.storyView` speaks for, telling listeners if it was not. */
     private claimStories;
+    /**
+     * Scrolls `target` into view and marks it for `ms` milliseconds (default 2000), then lets the
+     * mark fade. The document, the selection, undo and the focus stay as they are. The range
+     * follows edits made while it shows, and goes when its text is deleted; a new hint replaces
+     * it. False when no page shows the target.
+     */
+    hint({ story, from, to }: DocumentTarget, { ms }?: {
+        ms?: number | undefined;
+    }): boolean;
+    /** The hint taken off, its timers stopped. */
+    private endHint;
+    /** The hint's range through `transactions`; gone when what it marked is. */
+    private mapHint;
+    /** The hint's ranges on the pages, after each render: a paragraph's text at a time. */
+    private drawHint;
     /**
      * Marks what find found: on the pages, in the story open, and in the drawn copies of the others.
      * Nothing of it is in the document or the pages' DOM, and it does not print. The current match is

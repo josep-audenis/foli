@@ -155,6 +155,7 @@ export {
   deleteBookmark,
   documentOutline,
   goTo,
+  hint,
   insertBookmark,
   isBookmarkName,
   listBookmarks,

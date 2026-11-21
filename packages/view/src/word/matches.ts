@@ -9,6 +9,8 @@ import { PAGE_FIELD_ATTR } from "./regions.js";
 
 const ALL = "foli-find";
 const CURRENT = "foli-find-current";
+const HINT = "foli-hint";
+const FADING = "foli-hint-fading";
 
 /** @internal */
 export const MATCH_STYLES =
@@ -16,11 +18,29 @@ export const MATCH_STYLES =
   `::highlight(${CURRENT}){background-color:#f5a04a}` +
   `@media print{::highlight(${ALL}),::highlight(${CURRENT}){background-color:transparent}}` +
   `@media (forced-colors:active){::highlight(${ALL}){background-color:Mark;color:MarkText}` +
-  `::highlight(${CURRENT}){background-color:Highlight;color:HighlightText}}`;
+  `::highlight(${CURRENT}){background-color:Highlight;color:HighlightText}}` +
+  // A hint: above find's marks; the second colour is its fading, a step before it goes.
+  `::highlight(${HINT}){background-color:#9ccbff}::highlight(${FADING}){background-color:#d9ebff}` +
+  `@media print{::highlight(${HINT}),::highlight(${FADING}){background-color:transparent}}` +
+  `@media (forced-colors:active){::highlight(${HINT}),::highlight(${FADING}){background-color:Mark;color:MarkText}}`;
 
 interface HighlightWindow {
   CSS?: { highlights?: Map<string, Set<Range> & { priority: number }> };
   Highlight?: new () => Set<Range> & { priority: number };
+}
+
+/** The document's highlight `name`, made once; null without the API. */
+function highlight(doc: Document, name: string, priority: number) {
+  const win = doc.defaultView as unknown as HighlightWindow | null;
+  const registry = win?.CSS?.highlights;
+  if (!registry || !win?.Highlight) return null;
+  let found = registry.get(name);
+  if (!found) {
+    found = new win.Highlight();
+    found.priority = priority;
+    registry.set(name, found);
+  }
+  return found;
 }
 
 /**
@@ -33,22 +53,9 @@ export class MatchMarks {
 
   constructor(private readonly doc: Document) {}
 
-  private highlight(name: string, priority: number) {
-    const win = this.doc.defaultView as unknown as HighlightWindow | null;
-    const registry = win?.CSS?.highlights;
-    if (!registry || !win?.Highlight) return null;
-    let found = registry.get(name);
-    if (!found) {
-      found = new win.Highlight();
-      found.priority = priority;
-      registry.set(name, found);
-    }
-    return found;
-  }
-
   set(all: Range[], current: Range[]): void {
-    const allMarks = this.highlight(ALL, 0);
-    const currentMarks = this.highlight(CURRENT, 1);
+    const allMarks = highlight(this.doc, ALL, 0);
+    const currentMarks = highlight(this.doc, CURRENT, 1);
     if (!allMarks || !currentMarks) return;
     for (const range of this.all) allMarks.delete(range);
     for (const range of this.current) currentMarks.delete(range);
@@ -101,4 +108,26 @@ export function rangesInText(root: Element, query: string, options: FindOptions)
     }
   }
   return out;
+}
+
+/**
+ * One view's hint (18.1): its ranges in the document's `foli-hint` highlight, or in
+ * `foli-hint-fading` as it goes.
+ * @internal
+ */
+export class HintMarks {
+  private ranges: Range[] = [];
+  private fading = false;
+
+  constructor(private readonly doc: Document) {}
+
+  set(ranges: Range[], fading = false): void {
+    const shown = highlight(this.doc, HINT, 2);
+    const fade = highlight(this.doc, FADING, 2);
+    if (!shown || !fade) return;
+    for (const range of this.ranges) (this.fading ? fade : shown).delete(range);
+    for (const range of ranges) (fading ? fade : shown).add(range);
+    this.ranges = ranges;
+    this.fading = fading;
+  }
 }

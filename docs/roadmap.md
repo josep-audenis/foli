@@ -9,27 +9,27 @@ leaves `main` green with a working playground.
 **Update this table in the same PR that starts, advances or finishes a phase.** It is the only
 place that says what is in progress; check it before starting work.
 
-| Phase                     | Status                   | Branch | Notes                                                                                                                                                                  |
-| ------------------------- | ------------------------ | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 0 Foundation              | ✅ Done                  | —      |                                                                                                                                                                        |
-| 1 Architecture spike      | ✅ Done (G1 provisional) | —      | Merged in #1; ADR-0003 accepted provisionally; IME, dead-key and screen-reader checks open                                                                             |
-| 2 Document model          | ✅ Done                  | —      | Merged in #2                                                                                                                                                           |
-| 3 Transactions & history  | ✅ Done                  | —      | Merged in #4; gate G2 passed                                                                                                                                           |
-| 4 Editor view             | ✅ Done (G3 provisional) | —      | Merged in #8–#13; manual checks (4.6) deferred, open risks in ADR-0003                                                                                                 |
-| 5 Native pagination       | ✅ Done (G4 provisional) | —      | Merged in #15–#22; page-break manual checks open, risks in ADR-0003                                                                                                    |
-| 6 React API & 0.1.0       | ✅ Done                  | —      | Merged in #23–#31; 0.1.0 on npm; manual checks shipped as known risks (ADR-0003)                                                                                       |
-| 7 Rich content            | ✅ Done                  | —      | Merged in #33–#41; 0.2.0 on npm; list-document benchmark misses accepted (known limit)                                                                                 |
-| 8 Word model & DOCX       | ✅ Done                  | —      | Merged in #44–#61; 0.3.0 on npm (`@folijs/docx` first released); gate G5 passed                                                                                        |
-| 9 Review                  | ✅ Done                  | —      | Merged in #63–#72; 0.4.0 on npm                                                                                                                                        |
-| 10 Tables & images        | ✅ Done                  | —      | Merged in #73–#97 (#90, the landing page, went to main); 0.5.0 on npm; two misses accepted                                                                             |
-| 11 Sections & templates   | ✅ Done                  | —      | Merged in #100–#118 (#106, #107, #110, #112 and #113, the site, went to main); 0.6.0 on npm; misses accepted                                                           |
-| 12 Ecosystem & 1.0        | ✅ Done                  | —      | Merged in #120–#133; 1.0.0 on npm (2026-11-20); Phase 5 speed misses and manual checks accepted as 1.0 risks                                                           |
-| 13 Agent library          | ✅ Done                  | —      | Merged in #138–#146; `@folijs/agent` 0.1.0 on npm (2026-11-21)                                                                                                         |
-| 14 MCP server             | ✅ Done                  | —      | Merged in #148–#162; `@folijs/mcp` 0.1.0 on npm (2026-11-21); a model in a client of its own is not tried (see 14.8)                                                   |
-| 15 Toolbar                | ✅ Done                  | —      | Merged in #149–#160; 1.1.0 on npm (2026-11-21); the release's bench ran on a busy machine (see #160)                                                                   |
-| 16 Code mode              | ✅ Done                  | —      | Merged in #164–#176; `@folijs/mcp` 0.2.0 and `@folijs/agent` 0.2.0 on npm (2026-11-21), `run` behind `--code`; four security reviews; not tried in a client of its own |
-| 17 Toolbar for developers | ✅ Done                  | —      | Merged in #167–#173; 1.2.0 on npm (2026-11-21), released with Phase 16 (#176)                                                                                          |
-| 18 Hint                   | Ready                    | —      | Planned 2026-11-21: `view.hint`, a place marked for a few seconds without moving the caret; nothing built                                                              |
+| Phase                     | Status                   | Branch          | Notes                                                                                                                                                                  |
+| ------------------------- | ------------------------ | --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0 Foundation              | ✅ Done                  | —               |                                                                                                                                                                        |
+| 1 Architecture spike      | ✅ Done (G1 provisional) | —               | Merged in #1; ADR-0003 accepted provisionally; IME, dead-key and screen-reader checks open                                                                             |
+| 2 Document model          | ✅ Done                  | —               | Merged in #2                                                                                                                                                           |
+| 3 Transactions & history  | ✅ Done                  | —               | Merged in #4; gate G2 passed                                                                                                                                           |
+| 4 Editor view             | ✅ Done (G3 provisional) | —               | Merged in #8–#13; manual checks (4.6) deferred, open risks in ADR-0003                                                                                                 |
+| 5 Native pagination       | ✅ Done (G4 provisional) | —               | Merged in #15–#22; page-break manual checks open, risks in ADR-0003                                                                                                    |
+| 6 React API & 0.1.0       | ✅ Done                  | —               | Merged in #23–#31; 0.1.0 on npm; manual checks shipped as known risks (ADR-0003)                                                                                       |
+| 7 Rich content            | ✅ Done                  | —               | Merged in #33–#41; 0.2.0 on npm; list-document benchmark misses accepted (known limit)                                                                                 |
+| 8 Word model & DOCX       | ✅ Done                  | —               | Merged in #44–#61; 0.3.0 on npm (`@folijs/docx` first released); gate G5 passed                                                                                        |
+| 9 Review                  | ✅ Done                  | —               | Merged in #63–#72; 0.4.0 on npm                                                                                                                                        |
+| 10 Tables & images        | ✅ Done                  | —               | Merged in #73–#97 (#90, the landing page, went to main); 0.5.0 on npm; two misses accepted                                                                             |
+| 11 Sections & templates   | ✅ Done                  | —               | Merged in #100–#118 (#106, #107, #110, #112 and #113, the site, went to main); 0.6.0 on npm; misses accepted                                                           |
+| 12 Ecosystem & 1.0        | ✅ Done                  | —               | Merged in #120–#133; 1.0.0 on npm (2026-11-20); Phase 5 speed misses and manual checks accepted as 1.0 risks                                                           |
+| 13 Agent library          | ✅ Done                  | —               | Merged in #138–#146; `@folijs/agent` 0.1.0 on npm (2026-11-21)                                                                                                         |
+| 14 MCP server             | ✅ Done                  | —               | Merged in #148–#162; `@folijs/mcp` 0.1.0 on npm (2026-11-21); a model in a client of its own is not tried (see 14.8)                                                   |
+| 15 Toolbar                | ✅ Done                  | —               | Merged in #149–#160; 1.1.0 on npm (2026-11-21); the release's bench ran on a busy machine (see #160)                                                                   |
+| 16 Code mode              | ✅ Done                  | —               | Merged in #164–#176; `@folijs/mcp` 0.2.0 and `@folijs/agent` 0.2.0 on npm (2026-11-21), `run` behind `--code`; four security reviews; not tried in a client of its own |
+| 17 Toolbar for developers | ✅ Done                  | —               | Merged in #167–#173; 1.2.0 on npm (2026-11-21), released with Phase 16 (#176)                                                                                          |
+| 18 Hint                   | In progress              | `phase-18/hint` | 18.1 built: `view.hint` and core's `hint` in the body                                                                                                                  |
 
 Status values: `Ready` (dependencies met, nobody on it) · `In progress` · `In review` (PR open) ·
 `✅ Done` (merged, acceptance criteria met) · `Blocked by …`.
@@ -2668,8 +2668,8 @@ speed): `reveal` and `hint` must lay out the target's page before they scroll.
 Each task is a PR on `phase-18/hint`, the build green after each, merged after an agent's
 review.
 
-- [ ] Claim phase, branch `phase-18/hint`
-- [ ] 18.1 `view.hint` in the body: its own highlight (`foli-hint`, beside find's, with the
+- [x] Claim phase, branch `phase-18/hint`
+- [x] 18.1 `view.hint` in the body: its own highlight (`foli-hint`, beside find's, with the
   forced-colors and print rules), scrolling without selecting (`scrollToRange` exists, private),
   the range mapped through each transaction and redrawn after each render as find's matches
   are, removed when deleted, when its time is up or when a new hint comes; the fade a CSS
@@ -2677,7 +2677,15 @@ review.
   decide in the PR, with the measurements: whether the fade is CSS (a class on the pages with a
   transition on `::highlight`, if the browsers allow it) or a few timed steps of the colour.
   jsdom tests for what does not need a browser; core's `hint(editor, target, options)` over
-  `storyView`.
+  `storyView`. (Done: `view.hint`, core's `hint`, `StoryView.hint` optional so a view of
+  another make still fits the type. The fade is one lighter highlight, `foli-hint-fading`, for
+  0.4 s: whether CSS transitions apply to `::highlight` in the three engines was not checked; one
+  step needs nothing of them, reads as fading, and costs nothing per frame. To look at in 18.3
+  with the e2e. No smooth
+  scroll at all (the view's scrolling was already instant), so reduced motion drops only the
+  fading step. Six jsdom tests: marked, faded, gone; nothing else changed (document, selection,
+  undo); edits followed, deletion ends it; replaced; a new document ends it; reduced motion;
+  refusals; no Highlight API. The view's budget raised 1 kB for it (112.6 of 113.0 kB).)
 - [ ] 18.2 Targets: a story's range (opened for the hint as `reveal` opens it, closed after);
   a bookmark by name (`{ bookmark: "Intro" }`, refused when there is none); an agent's block
   (`session.target(handle)` in `@folijs/agent`: the block's `DocumentTarget`, or a refusal
