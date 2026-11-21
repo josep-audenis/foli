@@ -3,6 +3,7 @@ import {
   type Editor,
   type EditorDocument,
   type Extension,
+  type FieldsReport,
   type FoliDocument,
 } from "@folijs/core";
 import { Handles } from "./handles.js";
@@ -23,6 +24,14 @@ import {
 } from "./operations.js";
 import { type Block, formatBlocks, readBlocks } from "./read.js";
 import { type Result, refuse } from "./result.js";
+import {
+  type Control,
+  controls,
+  fillControl,
+  type Unfilled,
+  type UpdateFieldsOptions,
+  updateFields,
+} from "./templates.js";
 
 export interface SessionOptions {
   /** Whose tracked changes and comments the session's edits are. */
@@ -109,6 +118,24 @@ export interface Session {
     text: string,
     options?: CommentOptions,
   ): Result<Changed & { comment: number }>;
+  /** The body's content controls: what a template leaves to be filled, with their values. */
+  controls(): Control[];
+  /**
+   * Fills a content control: the one with this id, else every control with this tag, else with
+   * this title. Text for a text control (line breaks only where the control takes them), an
+   * item for a list, `yyyy-mm-dd` or any text for a date, true or false for a check box; null
+   * or "" empties it. A tracked change. Returns the blocks changed, the controls as they are
+   * now, and `unfilled`: those of the name that did not take the value, each with why.
+   */
+  fillControl(
+    name: string,
+    value: string | boolean | null,
+  ): Result<Changed & { controls: Control[]; unfilled: Unfilled[] }>;
+  /**
+   * Updates the document's fields (dates, cross-references, tables of contents; page numbers
+   * need a layout and are left), and fills its merge fields from `data`. A tracked change.
+   */
+  updateFields(options?: UpdateFieldsOptions): Result<FieldsReport & { text: string }>;
 }
 
 /**
@@ -168,5 +195,8 @@ export function openSession(document: EditorDocument, options: SessionOptions): 
     styles: () => styles(context),
     setStyle: (handle, style) => setStyle(context, handle, style),
     comment: (handle, text, options) => comment(context, handle, text, options),
+    controls: () => controls(context),
+    fillControl: (name, value) => fillControl(context, name, value),
+    updateFields: (options) => updateFields(context, options),
   };
 }
