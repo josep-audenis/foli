@@ -287,6 +287,39 @@ Custom nodes and marks, plugins and toolbar items ([extensions](guides/extension
   stays: its anchors there cannot be removed.
 - Revisions carry no initials (Word has none); comments do.
 
+## Agent editing (`@folijs/agent`)
+
+Unstable (0.x). Details in the [package README](../packages/agent/README.md).
+
+- Only the body is read and edited: not headers, footers, footnotes or endnotes. One
+  exception: `updateFields` also updates the fields there (core's does), as tracked changes the
+  session does not read back, and does not report what it skipped there.
+- No operation inserts a table or a picture, changes a run's formatting (bold, color), or
+  accepts or rejects changes. `session.editor` is the headless editor for those, by positions.
+- A paragraph whose mark is deleted as a tracked change but that keeps text is read as its own
+  block; Word's final view shows it joined with the next paragraph.
+- Text is matched with its capitals and spaces as read; what stands in brackets in a read
+  (`[picture]`, `[note]`, `[page break]`, `[empty: …]`) cannot be part of a match, and text is
+  not matched across it.
+- A new paragraph has no formatting of its own beyond what the paragraph next to it has or the
+  style named gives: no bold or links from its text.
+- Comments are not tracked changes: rejecting the agent's changes leaves its comments.
+- Rejecting the agent's changes gives the document back, with these differences (13.6): a
+  content control emptied again shows its placeholder without the run properties Foli kept
+  verbatim for it (`w:lang`…), and a date control keeps the date it was given in its
+  properties; the entries of a table of contents built again come back with their text and
+  style but without what Foli kept of them verbatim (`w14:paraId`, their tab stops).
+- `replaceText` with `all` makes one change and one undo step per place; a paragraph inserted
+  in a built-in style the document lacks is two changes (the paragraph, then its style).
+- `updateFields` returns no blocks, and leaves page numbers as they are: they need a page
+  layout the session does not have.
+- Core's rules let a paragraph be inserted into a locked block content control; the session
+  refuses it itself, the editor under it (`session.editor`) does not.
+- A style the session adds to the document stays when its changes are rejected: a built-in
+  heading it used, and the styles a rebuilt table of contents or a control's placeholder needs.
+- A handle lost (its block removed, or joined into the next) does not come back with undo.
+- Every operation reads the whole body again; not measured on long documents.
+
 ## .docx (`@folijs/docx`)
 
 Details in the [package README](../packages/docx/README.md).

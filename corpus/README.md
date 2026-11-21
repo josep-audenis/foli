@@ -121,6 +121,25 @@ in all 5. 2026-11-19, Word 16.0.20625, on all nine corpus documents: all 9 pass,
 reads an inline picture as Word's `/` (07 failed without: its pictures were opaque when the script
 was written).
 
+`scripts/corpus/agent-roundtrip.mjs` does the same for what an agent's session makes
+(`@folijs/agent`, 13.6). `make` runs three tasks through the package as "Foli Agent": the offer
+letter's content controls and merge fields filled (03), the NDA redlined (01: replacements, a
+clause inserted, a clause deleted, a comment), the board report's headings moved a level down
+and its table of contents built again (04). `check` reads what Word made of each: it opened;
+every tracked change is the agent's and of the kinds the task makes, no other; Word's
+insertions, deletions and restyled paragraphs hold the texts the task wrote and removed; the
+comment is there; Word's accepted and rejected text equals Foli's paragraph by paragraph
+outside tables (paragraphs with fields, notes or page breaks aside). A paragraph count that
+differs fails. 2026-11-21, Word 16.0.20625: 3 of 3 pass (9, 6 and 19 revisions; Word shows
+adjacent restyled headings as one).
+
+```bash
+pnpm build
+node scripts/corpus/agent-roundtrip.mjs make <folder outside the repository>
+powershell -ExecutionPolicy Bypass -File scripts/corpus/word-review.ps1 -In <folder>/foli -Out <folder>/word
+node scripts/corpus/agent-roundtrip.mjs check <folder>
+```
+
 ```bash
 pnpm build
 powershell -ExecutionPolicy Bypass -File scripts/corpus/word-review.ps1 -In corpus/word -Out corpus/reference/review
