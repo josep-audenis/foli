@@ -664,7 +664,9 @@ function run(
           break;
         }
         const known = ["w:fldCharType", "w:dirty", "w:fldLock"];
-        const plain = !elements(el).length && el.attributes.every((a) => known.includes(a.name));
+        const plain =
+          !elements(el).length &&
+          el.attributes.every((a) => known.includes(a.ns === W ? `w:${a.local}` : a.name));
         const flags: Record<string, unknown> = {};
         if (name === "fieldStart" && plain) {
           const dirty = attr(el, "dirty");

@@ -344,15 +344,25 @@ function resolve(
         // is what keeps a table from another or from the start, or what the paragraphs before
         // join into, it stays itself (not removed and made again, or left for another to take
         // its place, which would be another paragraph to whoever holds on to it).
-        else if (
+        // Paragraphs joining it that are all emptied go with it (each order of accepting then
+        // gives the same): `first` is where they start, -1 when one of them keeps its text.
+        let first = start;
+        for (let into = joins.find((j) => j.pos === first); into; ) {
+          if (into.keepFirst) {
+            first = -1;
+            break;
+          }
+          first -= (tr.doc.resolve(first).nodeBefore as Node).nodeSize;
+          into = joins.find((j) => j.pos === first);
+        }
+        if (
           goes &&
+          !joining &&
           (!node.content.size || emptied) &&
           tr.doc.resolve(start).parent.childCount > 1 &&
-          (!accept ||
-            (staysBefore(tr.doc.resolve(start).nodeBefore, start, removed) &&
-              !joins.some((join) => join.pos === start)))
+          (!accept || (first >= 0 && staysBefore(tr.doc.resolve(first).nodeBefore, first, removed)))
         ) {
-          removed.push([start, end]);
+          removed.push([accept ? first : start, end]);
           wholes = true;
         }
         break;

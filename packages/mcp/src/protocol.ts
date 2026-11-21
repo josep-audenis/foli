@@ -32,10 +32,14 @@ export interface Tool {
   run(args: Record<string, unknown>): ToolResult | Promise<ToolResult>;
 }
 
-/** Where answers go: a stream (`write`, and `once("drain")` when it is full), or anything with `write`. */
+/**
+ * Where answers go: a stream (`write`, and `once("drain")` when it is full, or `close` or
+ * `error` when it went away), or anything with `write`.
+ */
 export interface Output {
   write(text: string): unknown;
-  once?(event: "drain", listener: () => void): unknown;
+  once?(event: "drain" | "close" | "error", listener: () => void): unknown;
+  off?(event: "drain" | "close" | "error", listener: () => void): unknown;
 }
 
 export interface ServerOptions {
@@ -96,7 +100,20 @@ export async function serve(
     const taken = output.write(`${JSON.stringify({ jsonrpc: "2.0", ...message })}\n`);
     // A client that reads slowly holds the server back, rather than filling its memory.
     if (taken === false && output.once)
-      await new Promise<void>((resolve) => output.once?.("drain", resolve));
+      await new Promise<void>((resolve, reject) => {
+        const settle = (closed: boolean) => () => {
+          for (const event of ["drain", "close", "error"] as const)
+            output.off?.(event, event === "drain" ? drained : gone);
+          if (closed) reject(new Error("The output closed before an answer was taken"));
+          else resolve();
+        };
+        const drained = settle(false);
+        const gone = settle(true);
+        // A stream that closes without draining would hold the server forever.
+        output.once?.("close", gone);
+        output.once?.("error", gone);
+        output.once?.("drain", drained);
+      });
   };
   // An error for no request there is an id for has none: `null` is not an id to MCP clients.
   const fail = (id: Id | null, code: number, message: string) =>
@@ -202,6 +219,7 @@ export async function serve(
   let buffered: Buffer[] = [];
   let size = 0;
   let dropping = false;
+  let first = true;
   for await (const chunk of input) {
     let rest: Buffer = Buffer.from(chunk);
     for (;;) {
@@ -209,9 +227,13 @@ export async function serve(
       if (end < 0) break;
       // Over the limit however it arrived: in pieces, or whole with its newline.
       const whole = !dropping && size + end <= MAX_MESSAGE_BYTES;
-      const line = whole
-        ? Buffer.concat([...buffered, rest.subarray(0, end)]).toString("utf8")
-        : "";
+      let line = whole ? Buffer.concat([...buffered, rest.subarray(0, end)]).toString("utf8") : "";
+      // A byte order mark some clients write before the first message is not part of it
+      // (read from the decoded line: it may come split over chunks).
+      if (first) {
+        first = false;
+        if (line.startsWith("﻿")) line = line.slice(1);
+      }
       const said = dropping;
       rest = rest.subarray(end + 1);
       buffered = [];
