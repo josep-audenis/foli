@@ -1,5 +1,16 @@
 # @folijs/agent
 
+## 0.2.0
+
+### Minor Changes
+
+- 4a9f01d: `session.checkpoint()`: marks the document as it is; `rollback()` takes back every edit made since (no tracked change left of them, every handle naming the block it named), `release()` keeps them. For a batch of operations that must all be done or none. One insert now takes 500 paragraphs at most, and one `replaceText` with `all` 500 places: more is refused.
+
+### Patch Changes
+
+- Updated dependencies [4895bc9]
+  - @folijs/core@1.2.0
+
 ## 0.1.2
 
 ### Patch Changes

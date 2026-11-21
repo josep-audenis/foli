@@ -1,5 +1,12 @@
 # @folijs/docx
 
+## 1.2.0
+
+### Patch Changes
+
+- Updated dependencies [4895bc9]
+  - @folijs/core@1.2.0
+
 ## 1.1.0
 
 ### Patch Changes
