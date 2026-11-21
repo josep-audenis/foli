@@ -485,9 +485,10 @@ export function comment(
   // Word shows a comment's initials beside it: the author's, as Word makes them.
   const initials = context.author
     .split(/\s+/)
-    .map((word) => [...word][0] ?? "") // by code point: no half of a surrogate pair
-    .slice(0, 9)
-    .join("");
+    // Each word's first letter or digit, as a person's initials are: "Claude (trial)" is "Ct".
+    .map((word) => /[\p{L}\p{N}]/u.exec(word)?.[0] ?? "")
+    // Nine UTF-16 units at most, as core keeps, and never half a character.
+    .reduce((all, initial) => (all.length + initial.length <= 9 ? all + initial : all), "");
   if (!editor.run(addComment(content, { initials })))
     return refuse("refused", `Block ${handle} could not be commented.`);
   const made = [...ids()].find((id) => !before.has(id));

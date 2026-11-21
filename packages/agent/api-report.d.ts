@@ -253,4 +253,11 @@ export interface UpdateFieldsOptions {
      * counting: text, numbers, true or false, dates.
      */
     data?: Readonly<Record<string, string | number | boolean | Date | null>>;
+    /**
+     * Build the tables of contents again from the headings as they are now. Default false: a
+     * table of contents is left as it is. Its page numbers need a page layout, which a session
+     * has not, so one built here has its entries right and their page numbers empty until Word
+     * updates the field.
+     */
+    contents?: boolean;
 }

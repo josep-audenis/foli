@@ -208,7 +208,8 @@ export function tools(documents: Documents): Tool[] {
           handle: HANDLE,
           style: {
             type: "string",
-            description: "The style's name, as read or list_styles shows it.",
+            description:
+              "The style's name, as read or list_styles shows it; capitals do not count.",
           },
         },
         ["handle", "style"],
@@ -223,7 +224,7 @@ export function tools(documents: Documents): Tool[] {
     ),
     on(
       "comment",
-      "Adds a comment to a paragraph, in the margin as in Word: on the whole paragraph, or on text in it. Use it to explain a change or to ask the reader something. It does not change the text.",
+      "Adds a comment to a paragraph, in the margin as in Word: on the whole paragraph, or on text in it. Use it to explain a change or to ask the reader something. It does not change the text. A deleted block takes none: to explain a deletion, comment the block before or after it.",
       args(
         {
           handle: HANDLE,
@@ -279,17 +280,25 @@ export function tools(documents: Documents): Tool[] {
     ),
     on(
       "update_fields",
-      "Fills the document's merge fields («Name» in a read) from data, and updates its other fields (dates, cross-references, a table of contents), as tracked changes. Returns what was updated and what was left; read again to see the text.",
+      "Fills the document's merge fields («Name» in a read) from data, and updates its other fields (dates, cross-references), as tracked changes. A table of contents is left as it is unless contents is true. Returns what was updated and what was left, in words; read again to see the text.",
       args({
         data: {
           type: "object",
           description: 'Merge field names with their values: { "FirstName": "Ada" }.',
           additionalProperties: true,
         },
+        contents: {
+          type: "boolean",
+          description:
+            "Build the tables of contents again from the headings as they are now. Their entries become new blocks with new handles, and their page numbers stay empty until Word updates the field: say so to the reader. Default: false.",
+        },
       }),
-      (session, { data }) =>
+      (session, { data, contents }) =>
         told(
-          session.updateFields(data === undefined ? {} : { data: data as Record<string, string> }),
+          session.updateFields({
+            ...(data === undefined ? {} : { data: data as Record<string, string> }),
+            ...(contents === true ? { contents: true } : {}),
+          }),
         ),
     ),
     {

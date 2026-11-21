@@ -249,7 +249,7 @@ describe("restyle headings", () => {
       code: "unknown-style",
     });
 
-    const fields = ok(session.updateFields());
+    const fields = ok(session.updateFields({ contents: true }));
     expect(fields.rebuilt).toBe(1);
     const restyled = text(session);
     expect(restyled).toContain("heading 2, changed: Executive summary");

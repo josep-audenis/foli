@@ -122,10 +122,12 @@ session.updateFields({ data: { CandidateFirstName: "Ada" } });
   a check box; `null` empties it (not a check box). Refused with what would work: the controls there are, a
   list's items, `read-only` for a locked control. When controls share the name and only some
   take the value, the result is ok and `unfilled` says which did not and why.
-- **`updateFields({ data })`**: updates the document's fields (dates, cross-references, a table
-  of contents) and fills its merge fields from `data`, by name, capitals not counting. `text`
-  says what was left as it was: merge fields without data, and page numbers, which need a page
-  layout the session does not have. It returns no blocks: read again.
+- **`updateFields({ data, contents })`**: updates the document's fields (dates,
+  cross-references) and fills its merge fields from `data`, by name, capitals not counting.
+  `text` says what was left as it was: merge fields without data, and page numbers, which need
+  a page layout the session does not have. A table of contents is left as it is unless
+  `contents` is true: built here, its entries follow the headings and their page numbers are
+  empty until Word updates the field. It returns no blocks: read again.
 
 ## For the model
 

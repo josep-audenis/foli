@@ -265,6 +265,19 @@ describe("what a document names", () => {
 });
 
 describe("templates", () => {
+  it("builds a table of contents again only when asked", async () => {
+    const { client, call, first } = await opened("04-board-report");
+    const heading = /^\[(b\d+)\] heading 1: Executive summary$/m.exec(first.text)?.[1];
+    await call("replace_text", { handle: heading, find: "Executive", replacement: "Board" });
+    expect((await call("update_fields")).text).toContain("1 table of contents left as it is");
+    expect((await call("read")).text).toContain("Executive summary\t3");
+    const built = (await call("update_fields", { contents: true })).text;
+    expect(built).toContain("A table of contents was built again");
+    expect(built).not.toContain("left as");
+    expect((await call("read")).text).toMatch(/toc 1, changed: Board summary\t$/m);
+    await client.close();
+  });
+
   it("lists and fills controls and merge fields", async () => {
     const { client, call, first, saved } = await opened("03-offer-letter-template");
     expect(first.text).toContain("Date: [empty: Offer date]");
@@ -302,6 +315,13 @@ describe("templates", () => {
     expect((await call("update_fields")).refused).toBe(false);
     expect((await call("update_fields", { data: "Ada" })).text).toContain(
       "arguments.data must be object",
+    );
+    // No table of contents here: asked for or not, nothing is said of one.
+    const built = await call("update_fields", { contents: true });
+    expect(built.refused).toBe(false);
+    expect(built.text).not.toContain("table of contents");
+    expect((await call("update_fields", { contents: "yes" })).text).toContain(
+      "arguments.contents must be boolean",
     );
 
     const text = (await call("read")).text;

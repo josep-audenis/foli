@@ -73,7 +73,8 @@ const RUN = {
     );
     for (const block of headings)
       done(session.setStyle(block.handle, `Heading ${Number(block.style.slice(-1)) + 1}`));
-    if (done(session.updateFields()).rebuilt !== 1) throw new Error("no table of contents");
+    if (done(session.updateFields({ contents: true })).rebuilt !== 1)
+      throw new Error("no table of contents");
   },
 };
 

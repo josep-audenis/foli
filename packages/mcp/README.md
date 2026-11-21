@@ -67,7 +67,7 @@ with a handle (`[b7]`), and edits by handle:
 | `set_style`, `list_styles`        | Puts a paragraph in a style                                       |
 | `comment`                         | A comment on a paragraph, or on text in it                        |
 | `list_controls`, `fill_control`   | A template's content controls: text, lists, dates, check boxes    |
-| `update_fields`                   | Fills merge fields from data; updates dates, references, contents |
+| `update_fields`                   | Fills merge fields from data; updates dates and references        |
 | `save`                            | Writes a `.docx`                                                  |
 
 What the tools return, the read format and what each operation refuses are `@folijs/agent`'s:
@@ -98,6 +98,8 @@ every edit a tracked change you review. More in
   of body among them. A tool's answer is cut at 200,000 characters.
 - The body only: headers, footers and notes are not read (`update_fields` updates their
   fields).
+- No pages: `update_fields` leaves page numbers as they are, and a table of contents too
+  unless asked (`contents`), when its page numbers come back empty until Word updates it.
 - One client, over stdin and stdout. No network transport.
 - What the library does not do, the server does not: no tables or pictures inserted, no
   formatting of text, no accepting or rejecting changes.

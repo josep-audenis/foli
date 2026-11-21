@@ -4,6 +4,7 @@ import {
   controlProperties,
   controlsIn,
   controlValues,
+  type Field,
   type FieldsReport,
   fieldsIn,
   parseFieldInstruction,
@@ -205,6 +206,13 @@ export interface UpdateFieldsOptions {
    * counting: text, numbers, true or false, dates.
    */
   data?: Readonly<Record<string, string | number | boolean | Date | null>>;
+  /**
+   * Build the tables of contents again from the headings as they are now. Default false: a
+   * table of contents is left as it is. Its page numbers need a page layout, which a session
+   * has not, so one built here has its entries right and their page numbers empty until Word
+   * updates the field.
+   */
+  contents?: boolean;
 }
 
 const count = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
@@ -220,10 +228,39 @@ export function updateFields(
   for (const [key, value] of Object.entries(given ?? {}))
     if (value !== null && !(value instanceof Date) && typeof value === "object")
       return refuse("invalid", `data.${key} must be text, a number, true or false, or a date.`);
-  const report = updateFieldsOf(context.editor, given ? { data: given } : {});
+  // A table of contents is not built again unless asked: without pages its entries would
+  // come back with their page numbers empty, and a reader would take the document for broken.
+  const rebuild = options?.contents === true;
+  const inContents = (field: Field | null): boolean =>
+    field !== null && (field.name === "TOC" || inContents(field.parent));
+  // The tables `contents` would build: not one deleted, nor one inside another.
+  const tables = fieldsIn(context.editor.state.doc).filter(
+    (f) => f.name === "TOC" && !f.deleted && !inContents(f.parent),
+  ).length;
+  const before = context.editor.state.doc;
+  const rest = updateFieldsOf(context.editor, {
+    ...(given ? { data: given } : {}),
+    only: (field: Field) => !inContents(field),
+  });
+  // The tables apart, after the rest: the page numbers of entries about to be replaced are
+  // not among those "left as they were".
+  const built = rebuild
+    ? updateFieldsOf(context.editor, {
+        only: (field: Field) => field.name === "TOC",
+        continues: context.editor.state.doc !== before,
+      })
+    : null;
+  const report: FieldsReport = built
+    ? {
+        updated: rest.updated + built.updated,
+        unchanged: rest.unchanged + built.unchanged,
+        rebuilt: built.rebuilt,
+        skipped: [...rest.skipped, ...built.skipped],
+      }
+    : rest;
 
   // What was left, said for a model: by reason, the body's only (the session reads no other).
-  const body = report.skipped.filter((s) => s.story === null);
+  const body = rest.skipped.filter((s) => s.story === null);
   const pages = body.filter((s) => s.reason === "no-layout").length;
   const noData = new Set(body.filter((s) => s.reason === "no-data").map((s) => s.detail ?? ""));
   // Without data core leaves merge fields alone and does not report them: name them.
@@ -236,12 +273,25 @@ export function updateFields(
   const others = body
     .filter((s) => s.reason !== "no-layout" && s.reason !== "no-data")
     .map((s) => `${s.instruction.trim()} (${s.reason}${s.detail ? `: ${s.detail}` : ""})`);
-  const done = report.updated + report.rebuilt;
+  // Core counts a table built again among the updated.
+  const done = report.updated;
   const text = [
     `${count(done, "field")} updated, ${report.unchanged} unchanged.`,
     ...(noData.size ? [`Merge fields without data: ${[...noData].join(", ")}.`] : []),
     ...(pages
-      ? [`${count(pages, "page number")} left: they need a page layout the session does not have.`]
+      ? [
+          `${count(pages, "page number")} not worked out, and left as ${pages === 1 ? "it was" : "they were"}: they need a page layout the session does not have.`,
+        ]
+      : []),
+    ...(tables && !rebuild
+      ? [
+          `${count(tables, "table of contents", "tables of contents")} left as ${tables === 1 ? "it is" : "they are"}: update ${tables === 1 ? "it" : "them"} in Word, or pass contents: true to build ${tables === 1 ? "its" : "their"} entries again here, with page numbers empty until Word updates them.`,
+        ]
+      : []),
+    ...(report.rebuilt
+      ? [
+          "A table of contents was built again from the headings its levels cover: its entries are new blocks with new handles, and their page numbers are empty until Word updates the field.",
+        ]
       : []),
     ...(others.length ? [`Left as they were: ${others.join("; ")}.`] : []),
     ...(done ? ["Read again to see the text."] : []),
