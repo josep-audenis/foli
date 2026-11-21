@@ -1,0 +1,13 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "dist",
+    "customConditions": [],
+    // The package runs wherever JavaScript does (a worker, a sandbox without a DOM): the build
+    // has neither the DOM's types nor Node's, so a stray `document` or `node:fs` fails it.
+    "lib": ["ES2022"],
+    "types": []
+  },
+  "exclude": ["src/**/*.test.ts", "src/**/*.bench.ts", "src/testing"]
+}

@@ -9,22 +9,22 @@ leaves `main` green with a working playground.
 **Update this table in the same PR that starts, advances or finishes a phase.** It is the only
 place that says what is in progress; check it before starting work.
 
-| Phase                    | Status                   | Branch | Notes                                                                                                        |
-| ------------------------ | ------------------------ | ------ | ------------------------------------------------------------------------------------------------------------ |
-| 0 Foundation             | ✅ Done                  | —      |                                                                                                              |
-| 1 Architecture spike     | ✅ Done (G1 provisional) | —      | Merged in #1; ADR-0003 accepted provisionally; IME, dead-key and screen-reader checks open                   |
-| 2 Document model         | ✅ Done                  | —      | Merged in #2                                                                                                 |
-| 3 Transactions & history | ✅ Done                  | —      | Merged in #4; gate G2 passed                                                                                 |
-| 4 Editor view            | ✅ Done (G3 provisional) | —      | Merged in #8–#13; manual checks (4.6) deferred, open risks in ADR-0003                                       |
-| 5 Native pagination      | ✅ Done (G4 provisional) | —      | Merged in #15–#22; page-break manual checks open, risks in ADR-0003                                          |
-| 6 React API & 0.1.0      | ✅ Done                  | —      | Merged in #23–#31; 0.1.0 on npm; manual checks shipped as known risks (ADR-0003)                             |
-| 7 Rich content           | ✅ Done                  | —      | Merged in #33–#41; 0.2.0 on npm; list-document benchmark misses accepted (known limit)                       |
-| 8 Word model & DOCX      | ✅ Done                  | —      | Merged in #44–#61; 0.3.0 on npm (`@folijs/docx` first released); gate G5 passed                              |
-| 9 Review                 | ✅ Done                  | —      | Merged in #63–#72; 0.4.0 on npm                                                                              |
-| 10 Tables & images       | ✅ Done                  | —      | Merged in #73–#97 (#90, the landing page, went to main); 0.5.0 on npm; two misses accepted                   |
-| 11 Sections & templates  | ✅ Done                  | —      | Merged in #100–#118 (#106, #107, #110, #112 and #113, the site, went to main); 0.6.0 on npm; misses accepted |
-| 12 Ecosystem & 1.0       | ✅ Done                  | —      | Merged in #120–#133; 1.0.0 on npm (2026-11-20); Phase 5 speed misses and manual checks accepted as 1.0 risks |
-| 13 Agent library         | Ready                    | —      | Planned 2026-11-21, nothing built; `@folijs/mcp` (Phase 14, not planned yet) waits for it                    |
+| Phase                    | Status                   | Branch           | Notes                                                                                                        |
+| ------------------------ | ------------------------ | ---------------- | ------------------------------------------------------------------------------------------------------------ |
+| 0 Foundation             | ✅ Done                  | —                |                                                                                                              |
+| 1 Architecture spike     | ✅ Done (G1 provisional) | —                | Merged in #1; ADR-0003 accepted provisionally; IME, dead-key and screen-reader checks open                   |
+| 2 Document model         | ✅ Done                  | —                | Merged in #2                                                                                                 |
+| 3 Transactions & history | ✅ Done                  | —                | Merged in #4; gate G2 passed                                                                                 |
+| 4 Editor view            | ✅ Done (G3 provisional) | —                | Merged in #8–#13; manual checks (4.6) deferred, open risks in ADR-0003                                       |
+| 5 Native pagination      | ✅ Done (G4 provisional) | —                | Merged in #15–#22; page-break manual checks open, risks in ADR-0003                                          |
+| 6 React API & 0.1.0      | ✅ Done                  | —                | Merged in #23–#31; 0.1.0 on npm; manual checks shipped as known risks (ADR-0003)                             |
+| 7 Rich content           | ✅ Done                  | —                | Merged in #33–#41; 0.2.0 on npm; list-document benchmark misses accepted (known limit)                       |
+| 8 Word model & DOCX      | ✅ Done                  | —                | Merged in #44–#61; 0.3.0 on npm (`@folijs/docx` first released); gate G5 passed                              |
+| 9 Review                 | ✅ Done                  | —                | Merged in #63–#72; 0.4.0 on npm                                                                              |
+| 10 Tables & images       | ✅ Done                  | —                | Merged in #73–#97 (#90, the landing page, went to main); 0.5.0 on npm; two misses accepted                   |
+| 11 Sections & templates  | ✅ Done                  | —                | Merged in #100–#118 (#106, #107, #110, #112 and #113, the site, went to main); 0.6.0 on npm; misses accepted |
+| 12 Ecosystem & 1.0       | ✅ Done                  | —                | Merged in #120–#133; 1.0.0 on npm (2026-11-20); Phase 5 speed misses and manual checks accepted as 1.0 risks |
+| 13 Agent library         | In progress              | `phase-13/agent` | 13.1 done; `@folijs/mcp` (Phase 14, not planned yet) waits for it                                            |
 
 Status values: `Ready` (dependencies met, nobody on it) · `In progress` · `In review` (PR open) ·
 `✅ Done` (merged, acceptance criteria met) · `Blocked by …`.
@@ -1929,12 +1929,19 @@ ADR-0008's 1.0 promise until Phase 14 has used it.
 
 Each task is a PR on `phase-13/agent`, the build green after each.
 
-- [ ] Claim phase, branch `phase-13/agent`
-- [ ] 13.1 Package: `packages/agent` as `@folijs/agent` 0.0.0, core as its exact peer, the
+- [x] Claim phase, branch `phase-13/agent`
+- [x] 13.1 Package: `packages/agent` as `@folijs/agent` 0.0.0, core as its exact peer, the
   `@foli/source` condition, in `scripts/` (`PACKAGES` of the API report, size, package checks)
   and the changeset config; typechecked without the DOM lib and without Node's types, so a
   stray import fails the build. `openSession(document, { author })` over a tracking
-  `createEditor`, `session.document()` for export. Record here why 0.x.
+  `createEditor`, `session.document()` for export. Record here why 0.x. (Done: the
+  package builds with `lib: ["ES2022"]` and no `types`, so the DOM and Node fail its build;
+  tests are typechecked with Node's types, as they read the corpus. `openSession` returns
+  `{ editor, author, document() }`: the editor is exposed for what the session has no operation
+  for. `author` is required. Not in changesets' `fixed` group: it versions on its own. Why 0.x:
+  the operations are shaped by the first real tool calls, which come with Phase 14, and ADR-0008
+  forbids changing a 1.x API; the peer on core is exact all the same. Size 56.2 kB gzip with
+  core, budget 60.5 kB.)
 - [ ] 13.2 Reading and handles: `session.read()` (the whole body, or from a handle for a number
   of blocks, so a long document can be read in parts) and `session.block(handle)`. Decide and
   write down the text format (a line per block: handle, style, list number, text; cells nested
