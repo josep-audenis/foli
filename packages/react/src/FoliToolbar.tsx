@@ -123,6 +123,13 @@ import {
   useEditorState,
   useIsomorphicLayoutEffect,
 } from "./editor.js";
+import {
+  MessagesContext,
+  type ToolbarMessage,
+  type ToolbarMessages,
+  translator,
+  useT,
+} from "./messages.js";
 
 export interface FoliToolbarProps {
   /** Default: the editor of the nearest `FoliEditorProvider`. */
@@ -178,6 +185,12 @@ export interface FoliToolbarProps {
    * back; Escape closes it.
    */
   overflow?: "wrap" | "menu" | undefined;
+  /**
+   * The toolbar's strings in another language, each by its English text (`toolbarMessages`):
+   * its items' names and tooltips, menus, colors, tabs, dialogs and their messages. A string not
+   * given stays English. An app's own labels are its own to translate.
+   */
+  messages?: ToolbarMessages | undefined;
   className?: string | undefined;
 }
 
@@ -1271,6 +1284,9 @@ export const toolbarItems = Object.fromEntries(
 /** The default toolbar: groups of `toolbarItems`, a separator between groups. */
 export const defaultToolbarItems = GROUPS as unknown as readonly (readonly ToolbarItem[])[];
 
+/** The boxes whose entries are the document's names (styles, fonts, table styles) or numbers. */
+const DATA_BOXES = new Set(["style", "font", "size", "lineSpacing", "tableStyle"]);
+
 /** A group's items, with or without a caption. */
 const itemsOf = (group: ToolbarGroups[number]): readonly ToolbarItem[] =>
   Array.isArray(group) ? group : (group as ToolbarGroup).items;
@@ -1422,7 +1438,7 @@ export function FoliToolbar({
   editor: given,
   disabled = false,
   onClickCommand,
-  label = "Formatting",
+  label: givenLabel,
   className,
   comments = false,
   upload,
@@ -1432,7 +1448,12 @@ export function FoliToolbar({
   defaultTab,
   onTabChange,
   overflow = "wrap",
+  messages,
 }: FoliToolbarProps) {
+  const tr = translator(messages);
+  /** A label that may be one of the toolbar's messages (a built-in item's, a tab's…). */
+  const trLabel = (text: string) => tr(text as ToolbarMessage);
+  const label = givenLabel ?? tr("Formatting");
   const id = useId();
   const body = useEditorOrContext(given, "FoliToolbar");
   // A story open on its page takes the formatting commands; the body otherwise.
@@ -1939,7 +1960,7 @@ export function FoliToolbar({
               onMouseDown={(event) => event.preventDefault()}
               onClick={() => showTab(t)}
             >
-              {t.label}
+              {trLabel(t.label)}
             </button>
           ))}
         </div>
@@ -2015,7 +2036,7 @@ export function FoliToolbar({
         // Also on a disabled toolbar, whose items stay there to be found.
         onClick={() => setMoreOpen((open) => !open)}
       >
-        More
+        {tr("More")}
       </button>
     );
     return (
@@ -2028,7 +2049,7 @@ export function FoliToolbar({
             ref={morePanel}
             id={`${id}-more`}
             role="group"
-            aria-label="More"
+            aria-label={tr("More")}
             className="foli-toolbar-more-panel"
             hidden={!moreOpen}
           >
@@ -2041,7 +2062,7 @@ export function FoliToolbar({
 
   let index = 0;
   return (
-    <>
+    <MessagesContext.Provider value={messages}>
       {panel(
         <div
           role="toolbar"
@@ -2100,8 +2121,8 @@ export function FoliToolbar({
                         buttons.current[i] = element;
                       }}
                       className={`foli-toolbar-select foli-toolbar-${item.key}`}
-                      aria-label={item.label}
-                      title={item.label}
+                      aria-label={trLabel(item.label)}
+                      title={trLabel(item.label)}
                       // Still focusable when it cannot apply, like the buttons.
                       aria-disabled={off || undefined}
                       tabIndex={i === active ? 0 : -1}
@@ -2128,7 +2149,7 @@ export function FoliToolbar({
                       )}
                       {options.map((o) => (
                         <option key={o.value} value={o.value}>
-                          {o.label}
+                          {DATA_BOXES.has(item.key) ? o.label : trLabel(o.label)}
                         </option>
                       ))}
                     </select>
@@ -2143,8 +2164,8 @@ export function FoliToolbar({
                     type="button"
                     className={`foli-toolbar-button foli-toolbar-${item.key}`}
                     // Speech input users say what they see: "H1", "Undo"; symbols get a name.
-                    aria-label={item.icon !== undefined ? item.label : undefined}
-                    title={item.label}
+                    aria-label={item.icon !== undefined ? trLabel(item.label) : undefined}
+                    title={trLabel(item.label)}
                     aria-pressed={item.pressed ? Boolean(state?.pressed) : undefined}
                     aria-haspopup={
                       item.colors || item.actions ? "menu" : item.dialog ? "dialog" : undefined
@@ -2164,7 +2185,10 @@ export function FoliToolbar({
                       setMenu(item.key);
                     }}
                   >
-                    {item.icon ?? item.text ?? item.label}
+                    {/* A letter for an icon (B for bold) is a message too. */}
+                    {typeof item.icon === "string"
+                      ? trLabel(item.icon)
+                      : (item.icon ?? trLabel(item.text ?? item.label))}
                     {item.colors && (
                       <span
                         className="foli-toolbar-swatch"
@@ -2181,7 +2205,7 @@ export function FoliToolbar({
                       {button}
                       {menu === item.key && !disabled && actions.length > 0 && (
                         <ActionMenu
-                          label={item.label}
+                          label={trLabel(item.label)}
                           actions={actions}
                           editor={editor}
                           state={editor.state}
@@ -2213,7 +2237,7 @@ export function FoliToolbar({
                     {button}
                     {menu === item.key && !disabled && (
                       <ColorMenu
-                        label={item.label}
+                        label={trLabel(item.label)}
                         options={options}
                         current={state?.value ?? null}
                         onPick={(color, pointer) => {
@@ -2279,10 +2303,14 @@ export function FoliToolbar({
                     controls
                   ) : (
                     // biome-ignore lint/a11y/useSemanticElements: a fieldset cannot be a flex row in every browser.
-                    <div role="group" aria-label={group.label} className="foli-toolbar-group">
+                    <div
+                      role="group"
+                      aria-label={trLabel(group.label)}
+                      className="foli-toolbar-group"
+                    >
                       <div className="foli-toolbar-group-items">{controls}</div>
                       <div className="foli-toolbar-group-label" aria-hidden="true">
-                        {group.label}
+                        {trLabel(group.label)}
                       </div>
                     </div>
                   )}
@@ -2296,7 +2324,7 @@ export function FoliToolbar({
         <AppDialog
           // Each item's dialog is its own component: its hooks are not another dialog's.
           key={appDialogItem.key}
-          label={appDialogItem.label}
+          label={trLabel(appDialogItem.label)}
           name={appDialogItem.key}
           content={appDialogItem.dialog}
           editor={editor}
@@ -2389,7 +2417,7 @@ export function FoliToolbar({
           onClose={closeDialog}
         />
       )}
-    </>
+    </MessagesContext.Provider>
   );
 }
 
@@ -2481,6 +2509,7 @@ function ColorMenu({
   /** With it, a last entry that asks for any color. */
   onCustom?: ((pointer: boolean) => void) | undefined;
 }) {
+  const t = useT();
   const items = useRef<(HTMLButtonElement | null)[]>([]);
   const checked = Math.max(
     0,
@@ -2544,7 +2573,7 @@ function ColorMenu({
             aria-hidden="true"
             style={{ background: option.color ?? "transparent" }}
           />
-          {option.name}
+          {t(option.name as ToolbarMessage)}
         </button>
       ))}
       {onCustom && (
@@ -2560,7 +2589,7 @@ function ColorMenu({
           onMouseDown={(event) => event.preventDefault()}
           onClick={(event) => onCustom(event.detail > 0)}
         >
-          More colors…
+          {t("More colors…")}
         </button>
       )}
     </div>
@@ -2621,6 +2650,7 @@ function LinkDialog({
   request: number;
   onClose: () => void;
 }) {
+  const t = useT();
   const [value, setValue] = useState(href);
   const [invalid, setInvalid] = useState(false);
   const input = useRef<HTMLInputElement>(null);
@@ -2651,7 +2681,7 @@ function LinkDialog({
   return (
     <div
       role="dialog"
-      aria-label={href ? "Edit link" : "Add link"}
+      aria-label={href ? t("Edit link") : t("Add link")}
       className="foli-link-dialog"
       onKeyDown={(event) => {
         if (event.key !== "Escape") return;
@@ -2660,7 +2690,7 @@ function LinkDialog({
       }}
     >
       <form onSubmit={apply} noValidate>
-        <label htmlFor={`${id}-url`}>URL</label>
+        <label htmlFor={`${id}-url`}>{t("URL")}</label>
         <input
           ref={input}
           id={`${id}-url`}
@@ -2676,18 +2706,18 @@ function LinkDialog({
             setInvalid(false);
           }}
         />
-        <button type="submit">Apply</button>
+        <button type="submit">{t("Apply")}</button>
         {href && (
           <button type="button" onClick={remove}>
-            Remove link
+            {t("Remove link")}
           </button>
         )}
         <button type="button" onClick={onClose}>
-          Cancel
+          {t("Cancel")}
         </button>
         {invalid && (
           <p id={`${id}-error`} className="foli-link-error" role="alert">
-            Enter a web or email address, or a link starting with http, https, mailto or tel.
+            {t("Enter a web or email address, or a link starting with http, https, mailto or tel.")}
           </p>
         )}
       </form>
@@ -2717,6 +2747,7 @@ function ActionMenu({
   onPick: (action: Action, pointer: boolean) => void;
   onClose: (refocus: boolean) => void;
 }) {
+  const t = useT();
   const items = useRef<(HTMLButtonElement | null)[]>([]);
   // Dry runs, once per opening (not after every transaction).
   // biome-ignore lint/correctness/useExhaustiveDependencies: the actions are a constant list.
@@ -2777,11 +2808,11 @@ function ActionMenu({
             role="menuitemcheckbox"
             aria-checked={action.checked(state, editor)}
           >
-            {action.label}
+            {t(action.label as ToolbarMessage)}
           </button>
         ) : (
           <button key={action.key} {...props} role="menuitem">
-            {action.label}
+            {t(action.label as ToolbarMessage)}
           </button>
         );
       })}
@@ -2808,6 +2839,7 @@ function InsertTableDialog({
   /** `inserted`: a table was inserted (the focus may go to the document). */
   onClose: (inserted: boolean) => void;
 }) {
+  const t = useT();
   const [rows, setRows] = useState("2");
   const [columns, setColumns] = useState("3");
   // What is wrong: a field out of range, or the place (the caret is not in a paragraph).
@@ -2838,9 +2870,9 @@ function InsertTableDialog({
     (wrong === "columns" ? columnsField : rowsField).current?.focus();
   };
   const messages = {
-    rows: `Enter a number of rows from 1 to ${MAX_TABLE_ROWS}.`,
-    columns: `Enter a number of columns from 1 to ${MAX_TABLE_COLUMNS}.`,
-    place: "A table cannot be inserted here: put the caret in a paragraph.",
+    rows: t("Enter a number of rows from 1 to {max}.", { max: MAX_TABLE_ROWS }),
+    columns: t("Enter a number of columns from 1 to {max}.", { max: MAX_TABLE_COLUMNS }),
+    place: t("A table cannot be inserted here: put the caret in a paragraph."),
   };
   const field = (
     name: "rows" | "columns",
@@ -2873,7 +2905,7 @@ function InsertTableDialog({
   return (
     <div
       role="dialog"
-      aria-label="Insert table"
+      aria-label={t("Insert table")}
       className="foli-link-dialog foli-table-dialog"
       onKeyDown={(event) => {
         if (event.key !== "Escape") return;
@@ -2882,11 +2914,11 @@ function InsertTableDialog({
       }}
     >
       <form onSubmit={insert} noValidate>
-        {field("rows", "Rows", rows, setRows, MAX_TABLE_ROWS, rowsField)}
-        {field("columns", "Columns", columns, setColumns, MAX_TABLE_COLUMNS, columnsField)}
-        <button type="submit">Insert</button>
+        {field("rows", t("Rows"), rows, setRows, MAX_TABLE_ROWS, rowsField)}
+        {field("columns", t("Columns"), columns, setColumns, MAX_TABLE_COLUMNS, columnsField)}
+        <button type="submit">{t("Insert")}</button>
         <button type="button" onClick={() => onClose(false)}>
-          Cancel
+          {t("Cancel")}
         </button>
         {error && (
           <p id={`${id}-error`} className="foli-link-error" role="alert">
@@ -2911,13 +2943,17 @@ function CrossReferenceDialog({
   layout: () => FieldLayout | null;
   onClose: (inserted: boolean) => void;
 }) {
+  const t = useT();
   const [{ bookmarks, headings }] = useState(() => crossReferenceTargets(editor.state));
   const options = [
     ...headings.map((h) => ({
       value: `h${h.pos}`,
       label: `${"\u00a0".repeat((h.level - 1) * 2)}${h.number ? `${h.number} ` : ""}${h.text}`,
     })),
-    ...bookmarks.map((b) => ({ value: `b${b.name}`, label: `Bookmark: ${b.name}` })),
+    ...bookmarks.map((b) => ({
+      value: `b${b.name}`,
+      label: t("Bookmark: {name}", { name: b.name }),
+    })),
   ];
   const [target, setTarget] = useState(options[0]?.value ?? "");
   const [show, setShow] = useState<"text" | "page" | "number">("text");
@@ -2938,7 +2974,7 @@ function CrossReferenceDialog({
     <div
       role="dialog"
       aria-modal="true"
-      aria-label="Insert cross-reference"
+      aria-label={t("Insert cross-reference")}
       className="foli-link-dialog foli-table-dialog"
       onKeyDown={(event) => {
         if (event.key === "Escape") {
@@ -2957,7 +2993,7 @@ function CrossReferenceDialog({
       }}
     >
       <form onSubmit={insert} noValidate>
-        <label htmlFor={`${id}-target`}>Refer to</label>
+        <label htmlFor={`${id}-target`}>{t("Refer to")}</label>
         <select
           ref={first}
           id={`${id}-target`}
@@ -2973,15 +3009,15 @@ function CrossReferenceDialog({
             </option>
           ))}
         </select>
-        <label htmlFor={`${id}-show`}>Show</label>
+        <label htmlFor={`${id}-show`}>{t("Show")}</label>
         <select
           id={`${id}-show`}
           value={show}
           onChange={(event) => setShow(event.target.value as typeof show)}
         >
-          <option value="text">Its text</option>
-          <option value="page">Its page number</option>
-          <option value="number">Its paragraph number</option>
+          <option value="text">{t("Its text")}</option>
+          <option value="page">{t("Its page number")}</option>
+          <option value="number">{t("Its paragraph number")}</option>
         </select>
         <label>
           <input
@@ -2989,15 +3025,15 @@ function CrossReferenceDialog({
             checked={link}
             onChange={(event) => setLink(event.target.checked)}
           />
-          Link to it
+          {t("Link to it")}
         </label>
-        <button type="submit">Insert</button>
+        <button type="submit">{t("Insert")}</button>
         <button type="button" onClick={() => onClose(false)}>
-          Cancel
+          {t("Cancel")}
         </button>
         {failed && (
           <p className="foli-link-error" role="alert">
-            A cross-reference cannot be inserted here.
+            {t("A cross-reference cannot be inserted here.")}
           </p>
         )}
       </form>
@@ -3026,6 +3062,7 @@ function NoteOptionsDialog({
   editor: Editor;
   onClose: (applied: boolean) => void;
 }) {
+  const t = useT();
   const [kind, setKind] = useState<NoteKind>("footnote");
   const valuesOf = (of: NoteKind) => {
     const envelope = wordContext(editor.state)?.envelope;
@@ -3057,7 +3094,7 @@ function NoteOptionsDialog({
   return (
     <div
       role="dialog"
-      aria-label="Note options"
+      aria-label={t("Note options")}
       className="foli-link-dialog foli-table-dialog"
       onKeyDown={(event) => {
         if (event.key !== "Escape") return;
@@ -3066,7 +3103,7 @@ function NoteOptionsDialog({
       }}
     >
       <form onSubmit={apply} noValidate>
-        <label htmlFor={`${id}-kind`}>Notes</label>
+        <label htmlFor={`${id}-kind`}>{t("Notes")}</label>
         <select
           ref={first}
           id={`${id}-kind`}
@@ -3079,10 +3116,10 @@ function NoteOptionsDialog({
             setStart(String(shown.start));
           }}
         >
-          <option value="footnote">Footnotes</option>
-          <option value="endnote">Endnotes</option>
+          <option value="footnote">{t("Footnotes")}</option>
+          <option value="endnote">{t("Endnotes")}</option>
         </select>
-        <label htmlFor={`${id}-position`}>Position</label>
+        <label htmlFor={`${id}-position`}>{t("Position")}</label>
         <select
           id={`${id}-position`}
           value={values.position}
@@ -3092,17 +3129,17 @@ function NoteOptionsDialog({
         >
           {kind === "footnote" ? (
             <>
-              <option value="pageBottom">Bottom of page</option>
-              <option value="beneathText">Below text</option>
+              <option value="pageBottom">{t("Bottom of page")}</option>
+              <option value="beneathText">{t("Below text")}</option>
             </>
           ) : (
             <>
-              <option value="docEnd">End of document</option>
-              <option value="sectEnd">End of section</option>
+              <option value="docEnd">{t("End of document")}</option>
+              <option value="sectEnd">{t("End of section")}</option>
             </>
           )}
         </select>
-        <label htmlFor={`${id}-format`}>Number format</label>
+        <label htmlFor={`${id}-format`}>{t("Number format")}</label>
         <select
           id={`${id}-format`}
           value={values.format}
@@ -3110,11 +3147,11 @@ function NoteOptionsDialog({
         >
           {NOTE_FORMATS.map(([value, label]) => (
             <option key={value} value={value}>
-              {label}
+              {t(label)}
             </option>
           ))}
         </select>
-        <label htmlFor={`${id}-start`}>Start at</label>
+        <label htmlFor={`${id}-start`}>{t("Start at")}</label>
         <input
           id={`${id}-start`}
           type="number"
@@ -3124,7 +3161,7 @@ function NoteOptionsDialog({
           aria-invalid={invalid || undefined}
           onChange={(event) => setStart(event.target.value)}
         />
-        <label htmlFor={`${id}-restart`}>Numbering</label>
+        <label htmlFor={`${id}-restart`}>{t("Numbering")}</label>
         <select
           id={`${id}-restart`}
           value={values.restart}
@@ -3132,17 +3169,17 @@ function NoteOptionsDialog({
             set({ restart: event.target.value as NonNullable<NotePropertiesJSON["restart"]> })
           }
         >
-          <option value="continuous">Continuous</option>
-          <option value="eachSect">Restart each section</option>
-          {kind === "footnote" && <option value="eachPage">Restart each page</option>}
+          <option value="continuous">{t("Continuous")}</option>
+          <option value="eachSect">{t("Restart each section")}</option>
+          {kind === "footnote" && <option value="eachPage">{t("Restart each page")}</option>}
         </select>
-        <button type="submit">Apply</button>
+        <button type="submit">{t("Apply")}</button>
         <button type="button" onClick={() => onClose(false)}>
-          Cancel
+          {t("Cancel")}
         </button>
         {invalid && (
           <p className="foli-link-error" role="alert">
-            The start must be a whole number from 1.
+            {t("The start must be a whole number from 1.")}
           </p>
         )}
       </form>
@@ -3182,6 +3219,7 @@ function ControlDialog({
   editor: Editor;
   onClose: (applied: boolean) => void;
 }) {
+  const t = useT();
   const [selected] = useState(() => selectedControl(editor.state));
   const control = selected?.control;
   const [title, setTitle] = useState(control?.alias ?? "");
@@ -3229,7 +3267,7 @@ function ControlDialog({
   return (
     <div
       role="dialog"
-      aria-label="Content control properties"
+      aria-label={t("Content control properties")}
       className="foli-link-dialog foli-table-dialog"
       onKeyDown={(event) => {
         if (event.key !== "Escape") return;
@@ -3238,14 +3276,14 @@ function ControlDialog({
       }}
     >
       <form onSubmit={apply} noValidate>
-        <label htmlFor={`${id}-title`}>Title</label>
+        <label htmlFor={`${id}-title`}>{t("Title")}</label>
         <input
           ref={first}
           id={`${id}-title`}
           value={title}
           onChange={(event) => setTitle(event.target.value)}
         />
-        <label htmlFor={`${id}-tag`}>Tag</label>
+        <label htmlFor={`${id}-tag`}>{t("Tag")}</label>
         <input id={`${id}-tag`} value={tag} onChange={(event) => setTag(event.target.value)} />
         <label>
           <input
@@ -3253,7 +3291,7 @@ function ControlDialog({
             checked={noDelete}
             onChange={(event) => setNoDelete(event.target.checked)}
           />
-          The control cannot be deleted
+          {t("The control cannot be deleted")}
         </label>
         <label>
           <input
@@ -3261,11 +3299,11 @@ function ControlDialog({
             checked={noEdit}
             onChange={(event) => setNoEdit(event.target.checked)}
           />
-          The contents cannot be edited
+          {t("The contents cannot be edited")}
         </label>
         {hasList && (
           <>
-            <label htmlFor={`${id}-items`}>List items, one per line (shown | value)</label>
+            <label htmlFor={`${id}-items`}>{t("List items, one per line (shown | value)")}</label>
             <textarea
               id={`${id}-items`}
               rows={4}
@@ -3276,7 +3314,7 @@ function ControlDialog({
         )}
         {kind === "date" && (
           <>
-            <label htmlFor={`${id}-format`}>Date format</label>
+            <label htmlFor={`${id}-format`}>{t("Date format")}</label>
             <input
               id={`${id}-format`}
               value={dateFormat}
@@ -3291,12 +3329,12 @@ function ControlDialog({
               checked={multiLine}
               onChange={(event) => setMultiLine(event.target.checked)}
             />
-            Allow line breaks
+            {t("Allow line breaks")}
           </label>
         )}
-        <button type="submit">OK</button>
+        <button type="submit">{t("OK")}</button>
         <button type="button" onClick={() => onClose(false)}>
-          Cancel
+          {t("Cancel")}
         </button>
       </form>
     </div>
@@ -3332,7 +3370,7 @@ type SetupField =
   | "count"
   | "space"
   | "widths";
-const SETUP_LABELS: Record<SetupField, string> = {
+const SETUP_LABELS: Record<SetupField, ToolbarMessage> = {
   width: "Page width (cm)",
   height: "Page height (cm)",
   top: "Top margin (cm)",
@@ -3357,6 +3395,7 @@ function PageSetupDialog({
   /** `applied`: the setup changed (the focus may go to the document). */
   onClose: (applied: boolean) => void;
 }) {
+  const t = useT();
   const id = useId();
   const [initial] = useState(() => {
     const setup = sectionAt(editor.state)?.setup ?? {};
@@ -3485,7 +3524,7 @@ function PageSetupDialog({
   const marked = (name: SetupField) => error === name || (name === "count" && error === "mismatch");
   const field = (name: SetupField) => (
     <div key={name} className="foli-setup-field">
-      <label htmlFor={`${id}-${name}`}>{SETUP_LABELS[name]}</label>
+      <label htmlFor={`${id}-${name}`}>{t(SETUP_LABELS[name])}</label>
       <input
         id={`${id}-${name}`}
         type="text"
@@ -3504,7 +3543,7 @@ function PageSetupDialog({
   return (
     <div
       role="dialog"
-      aria-label="Page setup"
+      aria-label={t("Page setup")}
       className="foli-link-dialog foli-setup-dialog"
       onKeyDown={(event) => {
         if (event.key !== "Escape") return;
@@ -3514,7 +3553,7 @@ function PageSetupDialog({
     >
       <form onSubmit={apply} noValidate>
         <div className="foli-setup-field">
-          <label htmlFor={`${id}-start`}>Section starts</label>
+          <label htmlFor={`${id}-start`}>{t("Section starts")}</label>
           <select
             ref={first}
             id={`${id}-start`}
@@ -3523,20 +3562,20 @@ function PageSetupDialog({
           >
             {SECTION_STARTS.map(([value, label]) => (
               <option key={value} value={value}>
-                {label}
+                {t(label)}
               </option>
             ))}
           </select>
         </div>
         <div className="foli-setup-field">
-          <label htmlFor={`${id}-orientation`}>Orientation</label>
+          <label htmlFor={`${id}-orientation`}>{t("Orientation")}</label>
           <select
             id={`${id}-orientation`}
             value={orientation}
             onChange={(event) => setOrientationSwapping(event.target.value)}
           >
-            <option value="portrait">Portrait</option>
-            <option value="landscape">Landscape</option>
+            <option value="portrait">{t("Portrait")}</option>
+            <option value="landscape">{t("Landscape")}</option>
           </select>
         </div>
         {(["width", "height", "top", "bottom", "left", "right", "count", "space"] as const).map(
@@ -3549,20 +3588,22 @@ function PageSetupDialog({
             checked={separator}
             onChange={(event) => setSeparator(event.target.checked)}
           />
-          <label htmlFor={`${id}-separator`}>Line between columns</label>
+          <label htmlFor={`${id}-separator`}>{t("Line between columns")}</label>
         </div>
         {field("widths")}
-        <button type="submit">Apply</button>
+        <button type="submit">{t("Apply")}</button>
         <button type="button" onClick={() => onClose(false)}>
-          Cancel
+          {t("Cancel")}
         </button>
         {error && (
           <p id={`${id}-error`} className="foli-link-error" role="alert">
             {error === "setup"
-              ? "This setup leaves no room for text, or its columns do not fit the page."
+              ? t("This setup leaves no room for text, or its columns do not fit the page.")
               : error === "mismatch"
-                ? "The number of columns differs from the set widths: list one width per column, or clear them for equal columns."
-                : `Check this value: ${SETUP_LABELS[error]}.`}
+                ? t(
+                    "The number of columns differs from the set widths: list one width per column, or clear them for equal columns.",
+                  )
+                : t("Check this value: {field}.", { field: t(SETUP_LABELS[error]) })}
           </p>
         )}
       </form>
@@ -3593,6 +3634,7 @@ function PictureDialog({
   /** `done`: a picture was inserted or changed (the focus may go to the document). */
   onClose: (done: boolean) => void;
 }) {
+  const t = useT();
   const picture = pos === null ? null : editor.state.doc.nodeAt(pos);
   const attrs = picture?.attrs ?? {};
   const px = (emu: unknown) => String(Math.round(Number(emu) / EMU_PER_PX));
@@ -3632,10 +3674,10 @@ function PictureDialog({
   }, []);
 
   const messages = {
-    file: "Choose an image file.",
-    alt: "Describe the picture, or mark it as decorative.",
-    size: `Enter a width and height in pixels, from 1 to ${MAX_PICTURE_PX}.`,
-    failed: "The picture could not be inserted: the file could not be read or uploaded here.",
+    file: t("Choose an image file."),
+    alt: t("Describe the picture, or mark it as decorative."),
+    size: t("Enter a width and height in pixels, from 1 to {max}.", { max: MAX_PICTURE_PX }),
+    failed: t("The picture could not be inserted: the file could not be read or uploaded here."),
   };
   const invalid = (field: string) => (error === field ? true : undefined);
   const described = (field: string) => (error === field ? `${id}-error` : undefined);
@@ -3726,7 +3768,7 @@ function PictureDialog({
   return (
     <div
       role="dialog"
-      aria-label={pos === null ? "Insert picture" : "Edit picture"}
+      aria-label={pos === null ? t("Insert picture") : t("Edit picture")}
       className="foli-link-dialog foli-picture-dialog"
       aria-busy={busy || undefined}
       onKeyDown={(event) => {
@@ -3738,7 +3780,7 @@ function PictureDialog({
       <form onSubmit={submit} noValidate>
         {pos === null && (
           <>
-            <label htmlFor={`${id}-file`}>Image</label>
+            <label htmlFor={`${id}-file`}>{t("Image")}</label>
             <input
               ref={fileField}
               id={`${id}-file`}
@@ -3754,7 +3796,7 @@ function PictureDialog({
             />
           </>
         )}
-        <label htmlFor={`${id}-alt`}>Alt text</label>
+        <label htmlFor={`${id}-alt`}>{t("Alt text")}</label>
         <input
           ref={altField}
           id={`${id}-alt`}
@@ -3780,11 +3822,11 @@ function PictureDialog({
               setError(null);
             }}
           />
-          Decorative (no alt text)
+          {t("Decorative (no alt text)")}
         </label>
         {pos !== null && (
           <>
-            <label htmlFor={`${id}-width`}>Width (px)</label>
+            <label htmlFor={`${id}-width`}>{t("Width (px)")}</label>
             <input
               ref={widthField}
               id={`${id}-width`}
@@ -3798,7 +3840,7 @@ function PictureDialog({
               aria-describedby={sizeDescribed}
               onChange={(event) => changeWidth(event.target.value)}
             />
-            <label htmlFor={`${id}-height`}>Height (px)</label>
+            <label htmlFor={`${id}-height`}>{t("Height (px)")}</label>
             <input
               id={`${id}-height`}
               type="number"
@@ -3819,20 +3861,22 @@ function PictureDialog({
                 aria-describedby={sizeNote}
                 onChange={(event) => setKeep(event.target.checked)}
               />
-              Keep proportions
+              {t("Keep proportions")}
             </label>
-            {tracking && <p id={sizeNote}>The size does not change while changes are tracked.</p>}
+            {tracking && (
+              <p id={sizeNote}>{t("The size does not change while changes are tracked.")}</p>
+            )}
           </>
         )}
         {/* Not `disabled` while uploading: the focus stays on it (Escape still cancels). */}
         <button type="submit" aria-disabled={busy || undefined}>
-          {pos === null ? "Insert" : "Apply"}
+          {pos === null ? t("Insert") : t("Apply")}
         </button>
         <button type="button" onClick={() => onClose(false)}>
-          Cancel
+          {t("Cancel")}
         </button>
         <p role="status" className="foli-picture-status">
-          {busy ? "Inserting the picture…" : ""}
+          {busy ? t("Inserting the picture…") : ""}
         </p>
         {error && (
           <p id={`${id}-error`} className="foli-link-error" role="alert">

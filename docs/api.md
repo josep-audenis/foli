@@ -29,7 +29,8 @@ exactly its own version (since 1.0.0). Stylesheet: `@folijs/react/styles.css`
 (`ToolbarItem`, `ToolbarButton`, `ToolbarMenu`, `ToolbarAction`, `ToolbarSelect`, `ToolbarOption`,
 `ToolbarColorMenu`, `ToolbarColor`, `ToolbarDialog`, `ToolbarDialogName`, `ToolbarDialogProps`, `ToolbarCustom`,
 `ToolbarCustomProps`, `ToolbarItemName`, `toolbarItems`,
-`defaultToolbarItems`, `ToolbarGroup`, `ToolbarGroups`, `ToolbarTab`, `defaultToolbarTabs`), the
+`defaultToolbarItems`, `ToolbarGroup`, `ToolbarGroups`, `ToolbarTab`, `defaultToolbarTabs`,
+`toolbarMessages`, `ToolbarMessage`, `ToolbarMessages`), the
 hooks and their options and results (`UseFoliEditorOptions`, `UseEditorStateOptions`,
 `UseCommandOptions`, `CommandState`).
 
@@ -50,7 +51,7 @@ migrated (`parseDocument`), and what it reports is v5.
 | `reviewView`     | `ReviewView`                                                                                             | `"markup"`   | Read once: how tracked changes show (the toolbar changes it).                                                                                    |
 | `onChange`       | `(change: FoliChange) => void`                                                                           | —            | After every content change made through transactions. Not for selection changes or `setDocument`.                                                |
 | `toolbar`        | `boolean \| ToolbarGroups \| readonly ToolbarTab[]`                                                      | `true`       | Show `FoliToolbar` above the pages; groups of items in place of the default ones (its `items`), or tabs (its `tabs`, e.g. `defaultToolbarTabs`). |
-| `toolbarProps`   | `FoliToolbarProps` without `editor`, `disabled`, `comments`, `upload`, `onClickCommand`, `items`, `tabs` | —            | More props for that toolbar: `tab`, `onTabChange`, `defaultTab`, `overflow`, `label`, `className`.                                               |
+| `toolbarProps`   | `FoliToolbarProps` without `editor`, `disabled`, `comments`, `upload`, `onClickCommand`, `items`, `tabs` | —            | More props for that toolbar: `tab`, `onTabChange`, `defaultTab`, `overflow`, `messages`, `label`, `className`.                                   |
 | `comments`       | `boolean \| "auto"`                                                                                      | `"auto"`     | The comments pane beside the pages: while the document has comments (`"auto"`), always, never.                                                   |
 | `readOnly`       | `boolean`                                                                                                | `false`      | Read, select, copy; no editing. Disables the toolbar.                                                                                            |
 | `placeholder`    | `string`                                                                                                 | `""`         | Shown while the document is empty.                                                                                                               |
@@ -198,6 +199,7 @@ it, and only one of the link and insert table dialogs is open at a time.
 | `tab`, `defaultTab` | `string`                | the first tab         | The tab shown, by key: `tab` when the app decides, `defaultTab` only at first.                                 |
 | `onTabChange`       | `(key: string) => void` | —                     | Someone picked another tab.                                                                                    |
 | `overflow`          | `"wrap" \| "menu"`      | `"wrap"`              | What happens to items that do not fit: more rows, or one row and a More panel ([Overflow](#toolbar-overflow)). |
+| `messages`          | `ToolbarMessages`       | English               | The toolbar's strings in another language, each by its English text ([Toolbar messages](#toolbar-messages)).   |
 | `className`         | `string`                | —                     | Added to `.foli-toolbar`.                                                                                      |
 
 #### Toolbar items
@@ -345,6 +347,44 @@ An empty `tabs` shows `items`.
   `label` (`.foli-toolbar-group`), its items in `.foli-toolbar-group-items` and the caption under
   them (`.foli-toolbar-group-label`). In `items` and in a tab's `items` alike
   (`ToolbarGroups`).
+
+#### Toolbar messages
+
+`messages` gives the toolbar's strings in another language. A message's key is its English text,
+as gettext does, and `toolbarMessages` lists them all (about 230: items' names, tooltips and
+letters, menu entries, colors, tabs, More, the dialogs' labels, buttons and messages, the
+default `label` "Formatting"). `ToolbarMessages` types the object, so a key that is not a message
+is a type error:
+
+```tsx
+import { FoliToolbar, type ToolbarMessages } from "@folijs/react";
+
+const es: ToolbarMessages = {
+  Bold: "Negrita",
+  B: "N",
+  Cancel: "Cancelar",
+  "Enter a number of rows from 1 to {max}.": "Escribe un número de filas de 1 a {max}.",
+};
+
+<FoliToolbar messages={es} />;
+```
+
+- A message not given stays English. `{name}` in a message is a value the toolbar fills in: keep
+  it in the translation.
+- A label of an app's item, tab, group, menu entry or color, or an entry of an app's box, that
+  is a message (a copy of a built-in item, `defaultToolbarTabs`) is translated too; any other is
+  the app's own, shown as it is. The entries of the style, font, size, line spacing and table
+  style boxes are not translated (they are the document's names, or numbers).
+- One English text is one message wherever it is shown ("Insert" is the table dialog's button
+  and the picture dialog's): a language that needs two words for it cannot have them.
+- `toolbarItems` keeps its English labels: `messages` changes what the toolbar shows, not the
+  items.
+- A message added or reworded is named in the changelog; in 1.x none is removed (one the
+  toolbar no longer shows stays in the list, so a typed translation keeps compiling).
+  `pnpm check` fails when the list and the toolbar differ, or when the toolbar shows a literal
+  string without `t(…)`. Not translated by it: the document's
+  own names (styles, fonts, table styles, headings, bookmarks), numbers, `FoliNavigation`,
+  `FoliComments` and the canvas.
 
 #### Toolbar overflow
 

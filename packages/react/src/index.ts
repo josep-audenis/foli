@@ -42,3 +42,4 @@ export {
   type ToolbarTab,
   toolbarItems,
 } from "./FoliToolbar.js";
+export { type ToolbarMessage, type ToolbarMessages, toolbarMessages } from "./messages.js";

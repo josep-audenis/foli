@@ -2592,8 +2592,8 @@ agent's review.
 - [x] 17.3 (#170) Any color: `colors.custom` adds an entry with the browser's color field to a color
   menu.
 - [x] 17.4 (#172) Overflow: `overflow="menu"` (default `"wrap"`, as today).
-- [ ] 17.5 Strings: `messages`, `toolbarMessages` (the list), the test that every string shown
-  is in it.
+- [x] 17.5 (#173) Strings: `messages`, `toolbarMessages` (the list, kept by
+  `scripts/toolbar-messages.mjs` in `pnpm lint`), the test that every string shown is in it.
 - [ ] 17.6 Docs checked against the acceptance above; 1.2.0 published with the owner's approval
   (the Release workflow).
 
