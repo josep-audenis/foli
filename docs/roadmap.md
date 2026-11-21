@@ -29,7 +29,7 @@ place that says what is in progress; check it before starting work.
 | 15 Toolbar                | ✅ Done                  | —               | Merged in #149–#160; 1.1.0 on npm (2026-11-21); the release's bench ran on a busy machine (see #160)                                                                   |
 | 16 Code mode              | ✅ Done                  | —               | Merged in #164–#176; `@folijs/mcp` 0.2.0 and `@folijs/agent` 0.2.0 on npm (2026-11-21), `run` behind `--code`; four security reviews; not tried in a client of its own |
 | 17 Toolbar for developers | ✅ Done                  | —               | Merged in #167–#173; 1.2.0 on npm (2026-11-21), released with Phase 16 (#176)                                                                                          |
-| 18 Hint                   | In progress              | `phase-18/hint` | 18.1, 18.2 built: `view.hint`, core's `hint` (ranges, stories, bookmarks), `session.target`                                                                            |
+| 18 Hint                   | In review                | `phase-18/hint` | 18.1–18.3 built in #182 (e2e in three browsers); the release of 1.3.0 and agent 0.3.0 waits for the owner                                                              |
 
 Status values: `Ready` (dependencies met, nobody on it) · `In progress` · `In review` (PR open) ·
 `✅ Done` (merged, acceptance criteria met) · `Blocked by …`.
@@ -2719,7 +2719,9 @@ review.
   `view.hint` itself.)
 - [ ] 18.4 Docs (README, `api.md`, `architecture.md`, limitations, the guide), size budgets,
   the changesets; then 1.3.0 and agent 0.3.0, published with the owner's approval (the Release
-  workflow).
+  workflow). (Partly: `api.md`, `architecture.md`, limitations, the agent's README (the guide) say
+  what is built; budgets met, view and React raised with their reasons; four changesets (core,
+  view, React minor; agent minor). Not done: the release, which waits for the owner.)
 
 ## After 1.0
 
