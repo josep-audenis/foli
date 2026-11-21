@@ -1134,7 +1134,10 @@ Planned, created only when needed:
 - **Allowed:** general-purpose libraries under permissive licenses (MIT, Apache-2.0, BSD, ISC),
   after checking size and whether existing code already covers the need.
 - **Copied code:** only with provenance in `THIRD_PARTY_NOTICES.md` and preserved notices.
-- Runtime dependencies today: none besides React (peer) and our own packages. `@folijs/pdf`
+- Runtime dependencies today: none besides React (peer) and our own packages, but in
+  `@folijs/mcp`: QuickJS as WebAssembly (`quickjs-emscripten-core`,
+  `@jitl/quickjs-wasmfile-release-sync`, MIT), the sandbox of its code mode
+  ([ADR-0010](decisions/ADR-0010-code-mode.md)). `@folijs/pdf`
   needs the app's headless Chromium (Playwright or Puppeteer), which it does not depend on.
 - Dev-only exception: `@axe-core/playwright` / `axe-core` (MPL-2.0) for the accessibility check
   in Playwright. Test tooling, never bundled or published.

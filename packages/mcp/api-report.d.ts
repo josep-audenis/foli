@@ -72,6 +72,9 @@ export interface ServerOptions {
  */
 export declare function serve(input: AsyncIterable<Uint8Array | string>, output: Output, options: ServerOptions): Promise<void>;
 
+// sandbox.d.ts
+export {};
+
 // schema.d.ts
 /**
  * The part of JSON Schema the tools' arguments use, and its check. Small on purpose: the

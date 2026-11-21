@@ -3,8 +3,9 @@
 An MCP server for [Foli](https://github.com/josep-audenis/foli): the model of an MCP client
 (Claude Code, Claude Desktop, an editor's assistant) reads and edits Word documents through
 tools. Every edit is a tracked change, and every note a comment, for a person to accept or
-reject in Word. Built on [`@folijs/agent`](../agent/README.md); its only dependencies are
-Foli's own packages.
+reject in Word. Built on [`@folijs/agent`](../agent/README.md); its dependencies are
+Foli's own packages and, for a sandbox that is being built and is not yet used, QuickJS as
+WebAssembly (MIT).
 
 > **Unstable (0.x).** Outside the 1.0 promise of the other packages: tools and options may
 > change in any 0.x release; changes in `CHANGELOG.md`. Every tool is driven by the official
