@@ -1574,3 +1574,15 @@ button.app-tool:not([aria-disabled="true"]):active {
     transition: none;
   }
 }
+
+/* Agents: two listings side by side, stacked on narrow screens. */
+.agents-code {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 360px), 1fr));
+  gap: clamp(24px, 4vw, 56px);
+  margin-bottom: 16px;
+}
+
+.agents-code .caption {
+  margin-top: 12px;
+}
