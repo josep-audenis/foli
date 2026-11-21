@@ -29,6 +29,7 @@ place that says what is in progress; check it before starting work.
 | 15 Toolbar                | ✅ Done                  | —      | Merged in #149–#160; 1.1.0 on npm (2026-11-21); the release's bench ran on a busy machine (see #160)                                                                   |
 | 16 Code mode              | ✅ Done                  | —      | Merged in #164–#176; `@folijs/mcp` 0.2.0 and `@folijs/agent` 0.2.0 on npm (2026-11-21), `run` behind `--code`; four security reviews; not tried in a client of its own |
 | 17 Toolbar for developers | ✅ Done                  | —      | Merged in #167–#173; 1.2.0 on npm (2026-11-21), released with Phase 16 (#176)                                                                                          |
+| 18 Hint                   | Ready                    | —      | Planned 2026-11-21: `view.hint`, a place marked for a few seconds without moving the caret; nothing built                                                              |
 
 Status values: `Ready` (dependencies met, nobody on it) · `In progress` · `In review` (PR open) ·
 `✅ Done` (merged, acceptance criteria met) · `Blocked by …`.
@@ -108,6 +109,7 @@ Foli's engine is not credible until all five pass in Chromium, Firefox and WebKi
 | 14    | MCP server                | `@folijs/mcp`: the agent library as tools for any MCP client                | mcp 0.1.0    | M    |
 | 16    | Code mode                 | `run` in `@folijs/mcp`: a script over the document, sandboxed               | mcp 0.2.0    | M    |
 | 17    | Toolbar for developers    | Tabs an app controls, the built-in dialogs and strings open to it, overflow | 1.2.0        | M    |
+| 18    | Hint                      | Show a place for a few seconds: an app's, or an agent's change              | 1.3.0        | S    |
 | —     | Optional                  | Real-time collaboration                                                     | —            | —    |
 
 ```
@@ -2618,6 +2620,77 @@ agent's review.
   translated toolbar; six changesets, minor); 1.2.0 published 2026-11-21 with the owner's
   approval, with Phase 16 (#176, the Release workflow).
 
+## Phase 18 — Hint: show a place for a few seconds · S → 1.3.0, agent 0.3.0
+
+An app, or an agent saying what it changed, points at a place in the document; the editor
+scrolls there and marks it for a few seconds, then the mark fades, without changing the
+document or the selection. Wanted by the owner since the agent exploration (the fourth of
+the pieces around `@folijs/agent`, after the library, the MCP server and code mode). Planned
+2026-11-21; nothing built.
+
+Not in this phase: a hint in the MCP server (it has no view: it can only say a block's handle,
+which it does), a hint that stays until dismissed (that is a selection or a comment), several
+hints styled apart (one name, `foli-hint`, for all), a hint in `renderDocument` or a PDF,
+virtualized pages (none today; a requirement noted below if they come).
+
+**Starts from (1.2.0):** `view.reveal({ story, from, to })` and core's `goTo(editor, target)`
+scroll to any range of the body or a story, but select it: the caret moves. Find marks its
+matches with the CSS Custom Highlight API (`::highlight(foli-find)`, `view/src/word/matches.ts`:
+ranges beside the DOM, nothing added to the pages, a forced-colors and a print rule), and maps
+them to the pages again after each render. `listBookmarks` names a document's bookmarks.
+`@folijs/agent` sessions make their own editor (`openSession(document)`), so a block's handle
+is a position in the session's document; an app shows that editor by giving it to `FoliCanvas`
+(`editor` prop). Every page is in the DOM, so a far page is reached. The view's bundle is at its
+size budget (112.0 of 112.0 kB gzip): what this adds must be small, or the budget raised with
+the reason.
+
+**Acceptance:** `view.hint(target, { ms })` and core's `hint(editor, target, options)` (as
+`goTo` is to `reveal`) scroll the target into view, mark it for `ms` (default 2 s) and let the
+mark fade; neither the document, the selection, undo nor the focus changes (tests compare
+each); the target is a range of the body or of a story (a header shown on its page: opened
+there as `reveal` does, closed again after, unless the person was editing it), a bookmark by
+name, or an agent's block by handle (`session.target(handle)` gives the `DocumentTarget`); a
+range is mapped through edits made while it shows and the mark goes when its text is deleted;
+a new hint replaces the one showing; `prefers-reduced-motion` gives no fade and no smooth
+scroll; forced colors use the system's mark colors, print shows none; without the Highlight
+API it still scrolls, as find does; an app themes it with `::highlight(foli-hint)`; the
+React components expose it (`FoliEditor`'s ref, a hook if one is needed); e2e in Chromium,
+Firefox and WebKit (a far page, a header, an edit while it shows, reduced motion) with axe;
+README, `api.md`, `architecture.md`, limitations, the site's guide on agents shows an agent's
+change hinted; size budgets met or raised with a reason; the changesets (core, view, react
+minor; agent minor) and 1.3.0 / agent 0.3.0 published with the owner's approval.
+
+A requirement for later, if pages are ever virtualized (an option for the first layout's
+speed): `reveal` and `hint` must lay out the target's page before they scroll.
+
+### Tasks
+
+Each task is a PR on `phase-18/hint`, the build green after each, merged after an agent's
+review.
+
+- [ ] Claim phase, branch `phase-18/hint`
+- [ ] 18.1 `view.hint` in the body: its own highlight (`foli-hint`, beside find's, with the
+  forced-colors and print rules), scrolling without selecting (`scrollToRange` exists, private),
+  the range mapped through each transaction and redrawn after each render as find's matches
+  are, removed when deleted, when its time is up or when a new hint comes; the fade a CSS
+  transition of the highlight's color, none under reduced motion (and no smooth scroll). To
+  decide in the PR, with the measurements: whether the fade is CSS (a class on the pages with a
+  transition on `::highlight`, if the browsers allow it) or a few timed steps of the colour.
+  jsdom tests for what does not need a browser; core's `hint(editor, target, options)` over
+  `storyView`.
+- [ ] 18.2 Targets: a story's range (opened for the hint as `reveal` opens it, closed after);
+  a bookmark by name (`{ bookmark: "Intro" }`, refused when there is none); an agent's block
+  (`session.target(handle)` in `@folijs/agent`: the block's `DocumentTarget`, or a refusal
+  as for any handle). The answer is a value: `true`, or false when no page shows the target.
+- [ ] 18.3 React and the app's side: `FoliEditor`'s ref gets `hint`; whether a hook adds
+  anything (`useHint`) is decided here, and not built if not. The playground gets a "show"
+  button per tracked change; the site's agent guide shows a session's edits hinted one after
+  the other. e2e in three browsers with axe: a far page, a header, an edit while it shows, a
+  hint replaced, reduced motion.
+- [ ] 18.4 Docs (README, `api.md`, `architecture.md`, limitations, the guide), size budgets,
+  the changesets; then 1.3.0 and agent 0.3.0, published with the owner's approval (the Release
+  workflow).
+
 ## After 1.0
 
 Not a phase yet: the backlog written down on 2026-11-21, from [limitations.md](limitations.md),
@@ -2672,7 +2745,7 @@ supplies, so a server without a browser cannot make PDFs).
 - Find does not look in comments or text boxes.
 - No horizontal rule button; colors only from the toolbar's fixed palette.
 
-**Hint: show a place for a few seconds** (wanted by the owner, nothing built). An app, or an agent
+**Hint: show a place for a few seconds** (wanted by the owner; planned as Phase 18). An app, or an agent
 citing what it changed, points at a range, a block or a bookmark; the editor scrolls there and
 marks it briefly, then the mark fades, without changing the document or the selection. Pieces
 that exist: `view.reveal({ story, from, to })` and `goTo(editor, range)` scroll to any range,
@@ -2687,8 +2760,8 @@ compared before 1.0 failed exactly there: pages not yet rendered could not be go
 
 **Agent editing:** the library is built and released (Phase 13, `@folijs/agent` 0.1.0). After
 it: an MCP server over it as its own package (`@folijs/mcp`, Phase 14, 0.1.0), then a
-sandboxed `run` tool inside that server (code mode): planned as Phase 16. The hint
-above is independent and is what lets an agent show what it changed. Explored:
+sandboxed `run` tool inside that server (code mode, Phase 16, mcp 0.2.0). The hint
+above (Phase 18) is independent and is what lets an agent show what it changed. Explored:
 [explorations/agent-editing.md](explorations/agent-editing.md).
 
 **Optional, later:** real-time collaboration (steps and mapping enable a central-authority
