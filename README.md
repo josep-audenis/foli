@@ -4,7 +4,7 @@ An open-source document-editing engine for the web, built from the ground up: it
 model, transactions, view and layout, designed around native pagination, with first-class React
 integration.
 
-> **Status: 1.0.0 on [npm](https://www.npmjs.com/package/@folijs/react)
+> **Status: 1.1.0 on [npm](https://www.npmjs.com/package/@folijs/react)
 > ([docs](https://foli.josepaudenis.com/docs/)).** Foli edits documents
 > with its own model, engine and view (no ProseMirror/Tiptap/Lexical) on real pages: paragraphs
 > split across pages at a line, explicit page breaks, widow/orphan, keep-with-next and
