@@ -16,7 +16,7 @@ const docs = buildDocs(root, out);
 const docsWatch: Plugin = {
   name: "foli-docs",
   configureServer(server) {
-    const packages = ["core", "view", "react", "docx", "pdf"];
+    const packages = ["core", "view", "react", "docx", "pdf", "agent"];
     server.watcher.add([
       page("../../docs"),
       ...packages.flatMap((p) => [
