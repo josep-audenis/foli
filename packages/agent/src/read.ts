@@ -248,7 +248,7 @@ const count = (n: number | undefined, what: string) => `${n} ${what}${n === 1 ? 
  *
  * After the handle: where it is in a table, its style, its list number, `changed` when it holds
  * tracked changes, its comments; after the colon, its text. A line break inside a paragraph
- * shows as ↵, so a block is always one line.
+ * shows as ↵, as does any other character that ends a line, so a block is always one line.
  */
 export function formatBlocks(blocks: readonly Block[]): string {
   const line = (block: Block): string => {
@@ -262,7 +262,9 @@ export function formatBlocks(blocks: readonly Block[]): string {
       const size = [count(block.rows, "row"), count(block.columns, "column")];
       return start + [...where, "table", ...size, ...flags].join(", ");
     }
-    const text = block.text.replace(/\r?\n/g, "↵");
+    // Every character that ends a line, not only the line break: a document's text must not
+    // be able to start a line of its own, which would read as another block.
+    const text = block.text.replace(/\r\n|[\n\r\u0085\u2028\u2029]/g, "↵");
     if (block.kind === "other") return `${start}${[...where, "not editable"].join(", ")}: ${text}`;
     const head = [...where, block.style ?? "paragraph", ...(block.number ? [block.number] : [])];
     return `${start}${[...head, ...flags].join(", ")}: ${text}`;

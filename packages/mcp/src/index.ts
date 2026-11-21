@@ -8,3 +8,4 @@ export {
   type ToolResult,
 } from "./protocol.js";
 export type { JsonSchema, JsonSchemaOrAny } from "./schema.js";
+export { type FoliServerOptions, foliServer } from "./server.js";

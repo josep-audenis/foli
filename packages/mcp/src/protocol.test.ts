@@ -128,7 +128,9 @@ describe("with the SDK's client", () => {
       content: [{ type: "text", text: "throws failed inside the server." }],
       isError: true,
     });
-    expect(log.join("\n")).toContain("secret detail");
+    // Where, not what: an error's message may quote a document.
+    expect(log.join("\n")).toMatch(/^throws threw: Error\n\s+at /);
+    expect(log.join("\n")).not.toContain("secret detail");
     await expect(client.callTool({ name: "nope" })).rejects.toThrow(/Unknown tool: nope/);
     await client.close();
   });

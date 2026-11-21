@@ -25,7 +25,7 @@ place that says what is in progress; check it before starting work.
 | 11 Sections & templates  | ✅ Done                  | —                                | Merged in #100–#118 (#106, #107, #110, #112 and #113, the site, went to main); 0.6.0 on npm; misses accepted |
 | 12 Ecosystem & 1.0       | ✅ Done                  | —                                | Merged in #120–#133; 1.0.0 on npm (2026-11-20); Phase 5 speed misses and manual checks accepted as 1.0 risks |
 | 13 Agent library         | ✅ Done                  | —                                | Merged in #138–#146; `@folijs/agent` 0.1.0 on npm (2026-11-21)                                               |
-| 14 MCP server            | In progress              | `phase-14/mcp`                   | 14.1 done                                                                                                    |
+| 14 MCP server            | In progress              | `phase-14/mcp`                   | 14.1–14.5 done                                                                                               |
 | 15 Toolbar               | In progress              | `phase-15/toolbar-customization` | Planned 2026-11-21; independent of Phase 14                                                                  |
 
 Status values: `Ready` (dependencies met, nobody on it) · `In progress` · `In review` (PR open) ·
@@ -2205,22 +2205,48 @@ review.
   a save goes to a new file created exclusively and renamed; a file system's root is not a
   root; `:` in a path is refused; line-ending characters in a document's text must not forge
   read lines.)
-- [ ] 14.2 Package and protocol: `packages/mcp` as `@folijs/mcp` 0.0.0, `private`, with
+- [x] 14.2 Package and protocol: `packages/mcp` as `@folijs/mcp` 0.0.0, `private`, with
   `@folijs/agent`, `@folijs/docx` and `@folijs/core` as exact dependencies, a `bin`, Node only
   (its build has Node's types and no DOM). The stdio loop: messages parsed and validated,
   `initialize` with `instructions`, `ping`, `tools/list`, `tools/call`, errors as JSON-RPC
   errors, nothing but protocol messages on stdout (logs on stderr), a clean end when stdin
   closes. A tool is a name, a description, a JSON Schema for its arguments and a function;
-  arguments checked against the schema before the function runs. Tests with the SDK's client.
-- [ ] 14.3 Documents: `open(path)` (the file read under the root, imported, a session made;
+  arguments checked against the schema before the function runs. Tests with the SDK's client. (Done with 14.3 to 14.5 in one PR, #151: the tools are thin and
+  read best with the server. `bin.ts` reads `--root`, `--author`, `--overwrite`, `--help` and
+  `--version`, logs on stderr as `foli-mcp: …`, ends quietly when the client goes; `server.ts`
+  (`foliServer`) puts the file rules, the documents and the tools together, with the
+  instructions; the client's name is cut to a line of 60 characters before it is an author. A
+  tool that throws is logged by its error's kind and stack, not its message, which may quote
+  a document.)
+- [x] 14.3 Documents: `open(path)` (the file read under the root, imported, a session made;
   returns the document's id and the start of a read), `save(id, path?)`, `close(id)`,
   `list_documents`. The file rules of ADR-0009, each with its test: outside the root, through
-  a symlink, not a `.docx`, over the size limit, a damaged zip, the input written over.
-- [ ] 14.4 Reading and editing tools over a session: `read` (from, limit), `replace_text`,
+  a symlink, not a `.docx`, over the size limit, a damaged zip, the input written over. (Done: `files.ts` and
+  `documents.ts`, by ADR-0009 as the review of #148 left it. A path is relative, with no `:`;
+  a file to read is found by its real path under the root's, and what is outside is answered
+  as what is not there; 64 MB, then `@folijs/docx` held to 256 MB unpacked and a million
+  nodes. A save goes to a new file made exclusively beside the target and renamed over it;
+  over a file only when the server wrote it in this run or was started with `--overwrite`;
+  never over what is not a plain file. Without a path: `<name>.agent.docx`, or
+  `.agent-2.docx`… when that is another's. A whole drive is refused as the root. Tests on real
+  folders: paths up, absolute, through a folder link (a junction) and, where the system lets a
+  test make them, file links, one to nothing; not a zip, an empty and a cut file; a file a
+  byte over the limit; the input and another file not written over; nothing left beside what
+  was saved. File links cannot be made on the machine the phase was built on (Windows without
+  developer mode): those cases run in the Release workflow's check, on Linux.)
+- [x] 14.4 Reading and editing tools over a session: `read` (from, limit), `replace_text`,
   `insert_paragraphs` (before or after), `delete_block`, `set_style`, `list_styles`, `comment`.
   Descriptions written for the model, with the read format; results the library's `text`.
-  What the tools show the library lacks goes into `@folijs/agent`, with a changeset.
-- [ ] 14.5 Template tools: `list_controls`, `fill_control`, `update_fields` (with `data`).
+  What the tools show the library lacks goes into `@folijs/agent`, with a changeset. (Done: `tools.ts`. Each tool is the library's method and returns its
+  `text`; `read` gives 200 blocks unless told (2,000 at most) and says where to go on from;
+  `open` returns the id and the first read. Every schema names each argument and what it is,
+  and takes none it does not name. From the review of #148, in `@folijs/agent` (a patch, with
+  a changeset): a read shows every character that ends a line as ↵, not only the line break,
+  so a document's text cannot start a line that reads as another block.)
+- [x] 14.5 Template tools: `list_controls`, `fill_control`, `update_fields` (with `data`). (Done: `list_controls` gives a line per control: its
+  name, kind, whether it is locked, its block, its value or `empty`, a list's items, and its
+  id when that is not its name; `fill_control` returns the blocks changed and those lines;
+  `update_fields` the library's sentence.)
 - [ ] 14.6 End to end: the three tasks of 13.6 through the built server and the SDK's client;
   their results through 13.6's Word harness; a fuzz of malformed and hostile messages (the
   server answers or ignores, never exits, never writes outside the root); Claude Code set up

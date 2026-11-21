@@ -4,9 +4,16 @@
 #!/usr/bin/env node
 export {};
 
+// documents.d.ts
+export {};
+
+// files.d.ts
+export {};
+
 // index.d.ts
 export { MAX_MESSAGE_BYTES, type Output, PROTOCOL_VERSIONS, type ServerOptions, serve, type Tool, type ToolResult, } from "./protocol.js";
 export type { JsonSchema, JsonSchemaOrAny } from "./schema.js";
+export { type FoliServerOptions, foliServer } from "./server.js";
 
 // protocol.d.ts
 /**
@@ -83,3 +90,21 @@ export type JsonSchemaOrAny = JsonSchema | {
     anyOf: readonly JsonSchema[];
     description?: string;
 };
+
+// server.d.ts
+import type { ServerOptions } from "./protocol.js";
+export interface FoliServerOptions {
+    /** The folder files are read from and written to; nothing outside it is touched. */
+    root: string;
+    /** Whether a save may write over a file the server did not write itself. Default false. */
+    overwrite?: boolean;
+    /** Whose tracked changes and comments the edits are. Default: the client's name, or "Agent". */
+    author?: string;
+    version: string;
+    log?: (message: string) => void;
+}
+/** The server's options for `serve`: Foli's tools over the documents under `root`. */
+export declare function foliServer(options: FoliServerOptions): ServerOptions;
+
+// tools.d.ts
+export {};

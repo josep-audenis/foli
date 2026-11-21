@@ -54,6 +54,15 @@ const INVALID_REQUEST = -32600;
 const METHOD_NOT_FOUND = -32601;
 const INVALID_PARAMS = -32602;
 
+/**
+ * An error for the log: its kind and where it was thrown, not its message, which may quote the
+ * document it was thrown over. Clients keep a server's stderr.
+ */
+const where = (error: unknown) =>
+  error instanceof Error
+    ? [error.name, ...(error.stack ?? "").split("\n").filter((l) => /^\s+at /.test(l))].join("\n")
+    : typeof error;
+
 class RpcError extends Error {
   constructor(
     readonly code: number,
@@ -102,7 +111,7 @@ export async function serve(
       try {
         result = await tool.run(args as Record<string, unknown>);
       } catch (error) {
-        options.log?.(`${tool.name} threw: ${error instanceof Error ? error.stack : error}`);
+        options.log?.(`${tool.name} threw: ${where(error)}`);
         result = { text: `${tool.name} failed inside the server.`, isError: true };
       }
     return {
@@ -172,7 +181,7 @@ export async function serve(
       return send({ id, result });
     } catch (error) {
       if (error instanceof RpcError) return fail(id, error.code, error.message);
-      options.log?.(`${method} threw: ${error instanceof Error ? error.stack : error}`);
+      options.log?.(`${method} threw: ${where(error)}`);
       return fail(id, -32603, "Internal error");
     }
   };
