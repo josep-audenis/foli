@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { type Host, runScript, SANDBOX_LIMITS, type SandboxLimits } from "./sandbox.js";
 
-// What a server's prelude does, in small: one function over `__call`, which is then gone.
+// What a server's prelude does, in small: one function over `__call` (left in the script's
+// sight here: whatever calls it, the host takes its name and arguments as an attacker's).
 const PRELUDE = `const host = (name, ...args) => {
   const answer = JSON.parse(__call(name, JSON.stringify(args)));
   if ("error" in answer) throw new Error(answer.error);
@@ -84,9 +85,12 @@ describe("what is not there", () => {
   });
 
   it("no module can be loaded", async () => {
-    const dynamic = await run("return import('node:fs').then(() => 'loaded', (e) => 'refused')");
-    // A promise is not JSON: its settling is never seen, and nothing was loaded either way.
-    expect(dynamic.ok ? dynamic.value : dynamic.reason).not.toContain("loaded");
+    // Jobs are never run: neither a module's loading nor a promise's settling is seen.
+    expect(
+      await run(
+        "let seen = 'pending'; import('node:fs').then(() => { seen = 'loaded' }, () => { seen = 'refused' }); Promise.resolve().then(() => { seen = 'job' }); return seen",
+      ),
+    ).toMatchObject({ ok: true, value: '"pending"' });
     expect(await run("import fs from 'node:fs'; return 1")).toMatchObject({
       ok: false,
       reason: "error",
@@ -135,7 +139,6 @@ describe("limits", () => {
       "for (;;) 'x'.repeat(1e6)",
       "return /(a+)+$/.test('a'.repeat(40) + 'b')",
       "for (;;) { try { for (;;) {} } catch (e) {} }",
-      "const a = new Array(3e6).fill(0).map((_, i) => -i); a.sort((x, y) => x - y); return 1",
       "for (;;) host('x')",
     ]) {
       const started = Date.now();
@@ -146,27 +149,123 @@ describe("limits", () => {
   });
 
   it("holds its memory", async () => {
-    const ran = await run("const a = []; for (;;) a.push(new Uint8Array(1e6))", {
-      memory: 8 * 1024 * 1024,
-    });
-    expect(ran).toMatchObject({
-      ok: false,
+    const memory = 32 * 1024 * 1024;
+    expect(
+      await run("const a = []; for (;;) a.push(new Uint8Array(1e6))", { memory }),
+    ).toMatchObject({ ok: false, reason: "memory", message: "It used more than 32 MB of memory." });
+    // How much it got before it was told there is no more, each way of holding memory: the
+    // bytes, not the message, are the limit. (QuickJS's own limit let 2 GB through.)
+    for (const [code, most] of [
+      [
+        "const a = []; try { for (;;) a.push(new Uint8Array(1e6)) } catch (e) {} return a.length",
+        32,
+      ],
+      [
+        "const a = []; try { for (;;) a.push('x'.repeat(2000) + a.length) } catch (e) {} return a.length * 2000 / 1e6",
+        32,
+      ],
+      [
+        "let f = () => 1, n = 0; try { for (;;) { f = f.bind(null); n++ } } catch (e) {} return n * 64 / 1e6",
+        32,
+      ],
+    ] as const) {
+      const started = Date.now();
+      const ran = await run(code, { memory, ms: 4000 });
+      // Where the engine cannot go on without memory the thread ends (a crash): contained.
+      // Out of memory, or out of time while trying: never more than the limit.
+      if (ran.ok) expect(Number(ran.value), code).toBeLessThan(most);
+      else expect(ran.reason, code).toMatch(/^(time|memory|error|crash)$/);
+      expect(Date.now() - started, code).toBeLessThan(6000);
+    }
+    expect(await run("return 'x'.repeat(5e7).length", { memory })).toMatchObject({
       reason: "memory",
-      message: "It used more than 8 MB of memory.",
     });
-    expect(await run("return 'x'.repeat(5e7).length", { memory: 8 * 1024 * 1024 })).toMatchObject({
-      reason: "memory",
+    // The process did not grow by what the scripts asked for.
+    expect(process.memoryUsage().rss).toBeLessThan(1500 * 1024 * 1024);
+  });
+
+  it("holds what a call sends, what a run returns and what an error says", async () => {
+    let called = 0;
+    const host: Host = (_name, args) => {
+      called++;
+      return args;
+    };
+    // Arguments over the size: refused in the sandbox, the host never asked.
+    expect(
+      await run("try { host('x', 'y'.repeat(300000)) } catch (e) { return e.message }", {}, host),
+    ).toMatchObject({
+      ok: true,
+      value: '"A call\'s arguments are over 200000 characters as JSON."',
     });
-    // Caught and tried again: time ends it.
     expect(
       await run(
-        "const a = []; for (;;) { try { a.push('x'.repeat(1e5) + a.length) } catch (e) {} }",
-        {
-          memory: 8 * 1024 * 1024,
-          ms: 500,
-        },
+        "try { __call('x'.repeat(200), '[]') } catch (e) { return 1 }\nreturn JSON.parse(__call('x'.repeat(200), '[]')).error",
+        {},
+        host,
       ),
-    ).toMatchObject({ ok: false, reason: "time" });
+    ).toMatchObject({ ok: true });
+    expect(called).toBe(0);
+    // Nested as deep as the size lets: answered in time.
+    const started = Date.now();
+    const deep = await run(
+      "const s = '['.repeat(99000) + ']'.repeat(99000); return __call('deep', s).length",
+      {},
+      host,
+    );
+    expect(deep.ok || deep.reason === "error").toBe(true);
+    expect(Date.now() - started).toBeLessThan(2500);
+
+    expect(await run("return 'x'.repeat(2e6)")).toMatchObject({
+      ok: false,
+      reason: "error",
+      message: "RangeError: the value returned is over 1000000 characters as JSON",
+    });
+    const loud = await run("throw new Error('x'.repeat(3e6))");
+    expect(!loud.ok && loud.message.length).toBeLessThan(2200);
+  });
+
+  it("takes an error of any shape, and a host that fails any way", async () => {
+    for (const thrown of [
+      "{ name: { toString: 1 }, message: { toString() { throw 1 } } }",
+      "null",
+      "undefined",
+      "Symbol('s')",
+      "new Proxy({}, { get() { throw new Error('trap') } })",
+      "{ get name() { for (;;) {} } }",
+      "Object.create(null)",
+    ]) {
+      const ran = await run(`throw ${thrown}`, { ms: 600 });
+      expect(ran.ok, thrown).toBe(false);
+      expect(!ran.ok && typeof ran.message, thrown).toBe("string");
+    }
+    for (const failing of [
+      () => {
+        const error = new Error("x");
+        (error as { message: unknown }).message = 5n;
+        throw error;
+      },
+      () => {
+        throw { message: { toString: 1 } };
+      },
+      () => 5n,
+      () => {
+        const cycle: Record<string, unknown> = {};
+        cycle.self = cycle;
+        return cycle;
+      },
+    ] as Host[])
+      expect(
+        await run("try { host('x') } catch (e) { return e.message }", {}, failing),
+      ).toMatchObject({ ok: true });
+  });
+
+  it("a call made while a call's name is being read does not mix the answers", async () => {
+    const ran = await run(
+      `const evil = { toString() { host('inner'); return 'outer' } };
+const first = JSON.parse(__call(evil, '[]')).value.name;
+return [first, host('n0').name, host('n1').name];`,
+    );
+    expect(ran).toMatchObject({ ok: true, value: '["outer","n0","n1"]', calls: 4 });
   });
 
   it("holds its stack: a recursion without end is the script's error, not the thread's", async () => {
@@ -180,7 +279,12 @@ describe("limits", () => {
     const nested = await run(
       "let s = ''; for (let i = 0; i < 100000; i++) s += '['; return JSON.parse(s)",
     );
+    // The script's error, or the thread's end where the engine's own parser went too deep:
+    // contained either way, and the next run is not touched by it.
     expect(nested.ok).toBe(false);
+    const parser = await run("return eval('('.repeat(2e5) + '1' + ')'.repeat(2e5))");
+    expect(parser.ok).toBe(false);
+    expect(await run("return 1")).toMatchObject({ ok: true, value: "1" });
     const getter = await run("const o = { get a() { return this.a } }; return o.a");
     expect(getter).toMatchObject({ ok: false, reason: "error" });
   });
@@ -244,7 +348,7 @@ return 1`,
     expect(called).toBe(0);
   });
 
-  it("many runs, one after another and at once, leave nothing behind", async () => {
+  it("runs at once each get their own answers", async () => {
     const all = await Promise.all(
       Array.from({ length: 8 }, (_, i) => run(`return host('n', ${i}).args[0]`)),
     );

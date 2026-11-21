@@ -35,8 +35,21 @@ Windows 11, Node 25.3.0, `quickjs-emscripten-core` and `@jitl/quickjs-wasmfile-r
   known state.
 - **In a worker thread both hold.** The same scripts, with the thread ended by the host after
   the deadline: every one stopped within 20 ms of it, the native calls included. With a 4 MB
-  thread stack the deep recursions are QuickJS's own `stack overflow`, an error of the script
-  with its line. A run costs about 55 ms to start (the thread, the module's 10 ms).
+  thread stack a recursion of the script's is QuickJS's own `stack overflow`, an error of the
+  script with its line; one inside the engine's parser (`eval` of 200,000 nested brackets)
+  still ends the thread, with no line: a failed run, and the server untouched. A run costs
+  about 55 ms to start (the thread, the module's 10 ms).
+- **QuickJS's memory limit does not hold in this build** (found by the review of #165, not by
+  the spike). `setMemoryLimit` refused one allocation over the limit and about limit/8
+  allocations, whatever their size: under a limit of 8 MB a loop of 1 MB arrays reached the
+  module's 2 GB, and runs after it failed. The module asks the thread's
+  `WebAssembly.Memory.prototype.grow` for more memory: that function, replaced in the worker
+  to refuse past the limit, held the same loops to the limit in bytes (61 arrays of 1 MB under
+  64 MB, then QuickJS's own "out of memory").
+- **What the host parses must be small** (the same review). A call's arguments are JSON text
+  the server's thread parses, where the timer lives: 10 MB of nested brackets, parsed and
+  given back, held a 2 s run for 62 s (V8's `JSON.stringify` is quadratic in depth), and
+  60 MB of objects in a loop ended a host started with a 512 MB heap.
 - **What is there:** `fetch`, `require`, `process`, `setTimeout`, `console`, `WebAssembly`,
   `Atomics` are all undefined in the script. Its errors carry a line (`script:3:7`).
 - **Taking a run back.** The editor's undo does not fit: it keeps 100 steps, joins steps made
@@ -77,25 +90,33 @@ the editor can turn tracking off, so every result would need proving afterwards.
 - **Calls to the host are ordinary functions to the script.** The thread posts the call,
   waits (`Atomics.wait`) and reads the answer (`receiveMessageOnPort`); the server's thread
   answers between its own events. No promise, no `await` in a script.
-- **Only JSON crosses**, as text, both ways. The script's arguments are parsed by the host
-  with `JSON.parse` and then checked as a tool's are; its result is made text inside the
-  sandbox, under its limits.
+- **Only JSON crosses**, as text, both ways, and little of it: a call's arguments are refused
+  in the sandbox over 200,000 characters, before they are sent; the host parses them with
+  `JSON.parse` and checks them as a tool's are. The script's result is made text inside the
+  sandbox, under its limits, and refused over a million characters; an error's message is cut
+  at 2,000. What a script returns is shown on one line whatever it is: a script can replace
+  `JSON.stringify` and return any text.
 - **One run at a time**, as every tool call (ADR-0009).
 
 ### Limits
 
 Each ends the run and takes it back. Defaults, constants of the server:
 
-| Limit                 | Default                                                                       | How                                                           |
-| --------------------- | ----------------------------------------------------------------------------- | ------------------------------------------------------------- |
-| Time, the whole run   | 10 s                                                                          | The server ends the thread                                    |
-| The script's memory   | 64 MB                                                                         | QuickJS's own limit: "out of memory" is an error of the run   |
-| The script's stack    | 192 kB                                                                        | QuickJS's own limit, under what the thread's 4 MB stack holds |
-| Calls to the document | 5,000                                                                         | Counted by the server                                         |
-| The thread's own heap | 64+16 MB                                                                      | The worker's `resourceLimits`: over it the thread ends        |
+| Limit                 | Default                                                                       | How                                                                                                                                      |
+| --------------------- | ----------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| Time, the whole run   | 10 s                                                                          | The server ends the thread                                                                                                               |
+| The script's memory   | 64 MB, the engine's own few included                                          | The module's memory is refused growth past it (the worker's `WebAssembly.Memory.prototype.grow`): "out of memory" is an error of the run |
+| A call's arguments    | 200,000 characters as JSON                                                    | Refused in the sandbox, and again by the host                                                                                            |
+| The script's stack    | 192 kB                                                                        | QuickJS's own limit, under what the thread's 4 MB stack holds                                                                            |
+| Calls to the document | 5,000                                                                         | Counted by the server                                                                                                                    |
+| The thread's own heap | 64+16 MB                                                                      | The worker's `resourceLimits`: over it the thread ends                                                                                   |
 | What the tool answers | 200,000 characters, as every tool (ADR-0009); the log and the value each less |
 
-While a script runs the server answers nothing else, a `ping` included: ten seconds at most.
+A script can name its own failure as it likes (throw an error that reads "out of memory", or
+one whose stack names another line): the run failed and is taken back either way.
+
+While a script runs the server answers nothing else, a `ping` included: ten seconds, and
+what one call to the document takes, at most (the timer fires between calls).
 A hosted or shared server would want the run in another process; this one serves one client
 on its own machine.
 

@@ -12,7 +12,10 @@ import { MessageChannel, Worker } from "node:worker_threads";
 export interface SandboxLimits {
   /** Wall-clock time for the whole run, the host's answers included. */
   ms: number;
-  /** The script's memory, in bytes. */
+  /**
+   * The script's memory, in bytes: all the WebAssembly module may hold, the engine's own few
+   * megabytes included.
+   */
   memory: number;
   /** How many calls to the host a run may make. */
   calls: number;
@@ -20,6 +23,15 @@ export interface SandboxLimits {
 
 /** @internal */
 export const SANDBOX_LIMITS: SandboxLimits = { ms: 10_000, memory: 64 * 1024 * 1024, calls: 5_000 };
+
+/**
+ * @internal
+ * The most a call's arguments may be, as JSON text, and the most a script may return. The
+ * host parses the arguments in the thread that keeps the time, and its answers may hold them.
+ */
+export const MAX_ARGS = 200_000;
+/** @internal */
+export const MAX_VALUE = 1_000_000;
 
 /**
  * The script's stack, in bytes. Above about 256 kB a deep recursion overflows the thread's own
@@ -86,7 +98,16 @@ export function runScript(
     const signal = new Int32Array(flag);
     const { port1, port2 } = new MessageChannel();
     const worker = new Worker(WORKER, {
-      workerData: { code, prelude, memory: limits.memory, stack: STACK, flag, port: port2 },
+      workerData: {
+        code,
+        prelude,
+        memory: limits.memory,
+        stack: STACK,
+        maxArgs: MAX_ARGS,
+        maxValue: MAX_VALUE,
+        flag,
+        port: port2,
+      },
       transferList: [port2],
       // Nothing the thread prints reaches the process's stdout, which carries the protocol.
       stdout: true,
@@ -119,9 +140,18 @@ export function runScript(
         return failed("calls", `It made more than ${limits.calls} calls to the document.`);
       let answer: string;
       try {
+        // Held to a size by the thread already; checked here, where it is parsed.
+        if (typeof message?.name !== "string" || typeof message.args !== "string")
+          throw new Error("not a call");
+        if (message.args.length > MAX_ARGS) throw new Error("the arguments are too large");
         answer = JSON.stringify({ value: host(message.name, JSON.parse(message.args)) ?? null });
       } catch (error) {
-        answer = JSON.stringify({ error: error instanceof Error ? error.message : "failed" });
+        // Whatever was thrown, and whatever its message is: an answer.
+        let said = "failed";
+        try {
+          if (error instanceof Error && typeof error.message === "string") said = error.message;
+        } catch {}
+        answer = JSON.stringify({ error: said });
       }
       port1.postMessage(answer);
       Atomics.store(signal, 0, 1);

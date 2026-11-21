@@ -178,11 +178,13 @@ export async function runCode(
   }
 
   point.release();
+  // JSON has no line end of its own; a script that replaced JSON.stringify may return any text.
+  const returned = oneLine(ran.value);
   if (session.editor.state.doc !== before) document.dirty = true;
   const value =
-    ran.value === ""
+    returned === ""
       ? "The script returned nothing."
-      : `Returned: ${ran.value.length > VALUE_CHARS ? `${ran.value.slice(0, VALUE_CHARS)}… (cut: ${ran.value.length} characters)` : ran.value}`;
+      : `Returned: ${returned.length > VALUE_CHARS ? `${returned.slice(0, VALUE_CHARS)}… (cut: ${returned.length} characters)` : returned}`;
   // The blocks its operations returned, as they read now; those it deleted since are not read.
   const read = touched.size ? session.read() : null;
   const blocks = read?.ok ? read.blocks.filter((block) => touched.has(block.handle)) : [];

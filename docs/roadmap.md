@@ -2482,7 +2482,13 @@ review.
   `sandbox.ts` and `sandbox-worker.mjs`, 16 tests: the value as JSON, the host's answer and
   its error, the line of a failure; time ended within the limit for loops and for calls slow
   inside the engine; memory, stack and the number of calls; nothing of Node in the script;
-  each run clean. Not used by any tool yet.)
+  each run clean. From the security review of #165, which ran the built sandbox: QuickJS's
+  memory limit did not hold (2 GB under a limit of 8 MB: the module's memory is now refused
+  growth past the limit, and the test counts what a script got); a call's arguments were of
+  any size and parsed where the timer lives (a 2 s run held for 62 s: held to 200,000
+  characters now); the value and an error's message were of any size; a call made while a
+  call's name was read mixed the answers; a host error with a message that is not text
+  ended the process. Each has a test; the memory test fails without the guard.)
 - [x] 16.3 `doc` over a session: reading as blocks (handle, style, text, table place,
   changed) in parts, every operation of the tools with the same argument checks, results and
   refusals as values a script can test (`if (!r.ok)`); `console.log` kept as the log. A
@@ -2506,7 +2512,7 @@ review.
   A failed run leaves the document and every handle as before; a kept one only the author's
   tracked changes. It fails with the rollback taken out, and with the handles not put back.
   It found that a footnote taken out and put back has its keys in another order: the same
-  document, compared so. The e2e runs the bin with `--code`. The review: see #165.)
+  document, compared so. The e2e runs the bin with `--code`. The review: under 16.2.)
 - [ ] 16.6 A model's trial, as 14.8's: a fresh model with the server's own words only, tasks
   that need a loop, through the SDK's client; calls counted against the plain tools; Word
   opens the results. What it shows wrong in the description, fixed.
