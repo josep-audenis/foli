@@ -82,5 +82,6 @@ export function parseArgs(
       else author = value;
     } else return { print: `Unknown argument: ${arg}\n\n${USAGE}`, code: 2 };
   }
-  return { root, overwrite, ...(author ? { author } : {}) };
+  // An author given is an author to check, an empty one too.
+  return { root, overwrite, ...(author === undefined ? {} : { author }) };
 }

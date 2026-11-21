@@ -25,7 +25,7 @@ place that says what is in progress; check it before starting work.
 | 11 Sections & templates  | ✅ Done                    | —                                | Merged in #100–#118 (#106, #107, #110, #112 and #113, the site, went to main); 0.6.0 on npm; misses accepted |
 | 12 Ecosystem & 1.0       | ✅ Done                    | —                                | Merged in #120–#133; 1.0.0 on npm (2026-11-20); Phase 5 speed misses and manual checks accepted as 1.0 risks |
 | 13 Agent library         | ✅ Done                    | —                                | Merged in #138–#146; `@folijs/agent` 0.1.0 on npm (2026-11-21)                                               |
-| 14 MCP server            | In progress                | `phase-14/mcp`                   | 14.1–14.5 done                                                                                               |
+| 14 MCP server            | In progress                | `phase-14/mcp`                   | 14.1–14.6 done                                                                                               |
 | 15 Toolbar               | In progress (release left) | `phase-15/toolbar-customization` | Built and merged in #149–#152 (2026-11-21); 1.1.0 waits for the owner's approval to publish                  |
 
 Status values: `Ready` (dependencies met, nobody on it) · `In progress` · `In review` (PR open) ·
@@ -2257,10 +2257,42 @@ review.
   holding a control character made every save fail; `..` told the names of the folders above
   the root; a test of links could not fail. Not fixed, written in the ADR: a file that
   appears between the last look and the rename is replaced.)
-- [ ] 14.6 End to end: the three tasks of 13.6 through the built server and the SDK's client;
+- [x] 14.6 End to end: the three tasks of 13.6 through the built server and the SDK's client;
   their results through 13.6's Word harness; a fuzz of malformed and hostile messages (the
   server answers or ignores, never exits, never writes outside the root); Claude Code set up
-  by hand, one task done, recorded. Fix what they find.
+  by hand, one task done, recorded. Fix what they find. (Done but for a model in a real client.
+  `scripts/corpus/mcp-roundtrip.mjs` starts the built `bin` and speaks to it over its stdin and
+  stdout with the SDK's client: the tools by name; an absolute path, a path up to a file that
+  is there, and a save over the original refused, each by its message; the three tasks done
+  (`agent-tasks.mjs` holds what both harnesses expect of them) and saved beside the originals;
+  the originals byte for byte as they were; every saved file read again by Foli, with changes,
+  all the author's; nothing on stderr. It also runs the command line (`--version`, an unknown
+  argument, a whole drive, an empty author: their exit codes and where they print), sends the
+  process what is not a message and has its ping answered, and requires it to end by itself
+  with code 0 when its input ends. That runs in `pnpm check` (`pnpm mcp:e2e`). What it saved
+  went through 13.6's Word harness: 2026-11-21, Word 16.0.20625, 3 of 3 open, every revision
+  the agent's (9, 6 and 19), the texts written and removed in Word's revisions, accepted and
+  rejected text Foli's. `fuzz.test.ts`: 60 runs, the same every time, of up to 30 lines each
+  against the server on a folder: calls made to fit their tool from its own schema, with values
+  mostly right, paths as often an attempt to leave the folder as a file in it, and the rest
+  wrong on purpose. Those runs reach 35 edits, 10 saves, 14 opens and saves by a path that
+  leaves the folder, 33 refusals by the file rules, 63 by the library and 78 by the schema,
+  and the test fails if any of these is none. After each run: every call answered once with a
+  valid message; no answer over the cap or quoting the file outside; no tool threw; the
+  originals and the file outside whole; nothing beside the folder; in it only `.docx` files
+  Foli reads again, their changes the author's. With the `..` rule and the check of the real
+  path taken out of `files.ts`, the test fails; so it does when a save may overwrite. 400 other
+  runs (`FC_SEED=random`) pass. Linux: `pnpm check` passed once on `ubuntu-latest`, Node 24
+  (a workflow on a branch since deleted, run 44908327247), the first run there of the server's
+  tests, of the end-to-end script and of the cases with file links, which Windows did not let
+  the build machine make. Claude Code 2.1.92 reports the built server connected. From the
+  review of #155: the first fuzz sent every argument name to every tool, so 97% of its calls
+  were refused by the schema and none edited, saved or met the file rules, and it passed with
+  those rules taken out; the script's check of the server's end could not fail (the SDK kills
+  a server that stays), nor its path up (to a file that was not there), nor its count of
+  fields; `--author ""` started a server, against the ADR. Not done: a model calling the
+  tools through Claude Code. The CLI on the machine is not logged in; it is the owner's to try
+  before the release, 14.8.)
 - [ ] 14.7 Docs: README (the site's guide) with the clients' configuration, `security.md`,
   `api.md`, `architecture.md`, `limitations.md`, acceptance checked above.
 - [ ] 14.8 Release: the changeset, `private` removed, 0.1.0; published with the owner's

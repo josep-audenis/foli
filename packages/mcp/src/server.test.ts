@@ -461,6 +461,7 @@ describe("the command line", () => {
       author: "Ada",
       overwrite: true,
     });
+    expect(parseArgs(["--author", ""])).toEqual({ root: ".", overwrite: false, author: "" });
     expect(parseArgs(["--help"])).toMatchObject({ code: 0 });
     expect(parseArgs(["--version"])).toEqual({ print: "", code: 0 });
     expect(parseArgs(["--root"])).toMatchObject({ code: 2 });

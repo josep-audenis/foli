@@ -140,6 +140,25 @@ powershell -ExecutionPolicy Bypass -File scripts/corpus/word-review.ps1 -In <fol
 node scripts/corpus/agent-roundtrip.mjs check <folder>
 ```
 
+`scripts/corpus/mcp-roundtrip.mjs` does the same three tasks through the MCP server
+(`@folijs/mcp`, 14.6): it starts the built `bin` as a client does, speaks to it on its stdin and
+stdout with the official SDK's client, and writes what the server saved where
+`agent-roundtrip.mjs check` reads it, so Word's reading is held to the same rules
+(`agent-tasks.mjs` holds what both scripts expect of each task). Without Word it checks the
+command line, the tools by name, that a path outside the folder, a path up and a save over the
+original are refused by their messages, that the originals are as they were, that every saved
+file is a document with changes all the author's, and that the server answers after what is
+not a message and ends by itself when its input does: that part runs in `pnpm check`
+(`pnpm mcp:e2e`). 2026-11-21, Word 16.0.20625: 3 of 3 pass (9, 6 and 19 revisions, as through
+the library). The folder's `work` is emptied at each run.
+
+```bash
+pnpm build
+node scripts/corpus/mcp-roundtrip.mjs <folder outside the repository>
+powershell -ExecutionPolicy Bypass -File scripts/corpus/word-review.ps1 -In <folder>/foli -Out <folder>/word
+node scripts/corpus/agent-roundtrip.mjs check <folder>
+```
+
 ```bash
 pnpm build
 powershell -ExecutionPolicy Bypass -File scripts/corpus/word-review.ps1 -In corpus/word -Out corpus/reference/review
