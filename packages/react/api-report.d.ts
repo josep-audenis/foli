@@ -201,6 +201,13 @@ export interface FoliToolbarProps {
     defaultTab?: string | undefined;
     /** Someone picked another tab (a click, or the arrow keys). */
     onTabChange?: ((key: string) => void) | undefined;
+    /**
+     * What happens to items that do not fit the toolbar's width: `"wrap"` (the default) puts
+     * them on more rows; `"menu"` keeps one row and puts the groups that do not fit, whole, in a
+     * panel under a "More" button at its end. The arrow keys go on into the panel (it opens) and
+     * back; Escape closes it.
+     */
+    overflow?: "wrap" | "menu" | undefined;
     className?: string | undefined;
 }
 /**
@@ -461,7 +468,7 @@ export declare const defaultToolbarTabs: readonly (ToolbarTab & {
  * `aria-pressed`; a button whose command cannot run now is `aria-disabled` (still focusable).
  * Clicks leave the focus and selection in the document.
  */
-export declare function FoliToolbar({ editor: given, disabled, onClickCommand, label, className, comments, upload, items: givenGroups, tabs: allTabs, tab: givenTab, defaultTab, onTabChange, }: FoliToolbarProps): import("react").JSX.Element;
+export declare function FoliToolbar({ editor: given, disabled, onClickCommand, label, className, comments, upload, items: givenGroups, tabs: allTabs, tab: givenTab, defaultTab, onTabChange, overflow, }: FoliToolbarProps): import("react").JSX.Element;
 export {};
 
 // editor.d.ts

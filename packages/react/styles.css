@@ -504,6 +504,50 @@
   }
 }
 
+/* `overflow="menu"`: one row; the groups that do not fit are in the panel under More. */
+.foli-toolbar-overflow {
+  position: relative;
+  flex-wrap: nowrap;
+}
+.foli-toolbar-overflow > * {
+  flex-shrink: 0;
+}
+.foli-toolbar-measuring {
+  overflow: hidden;
+}
+.foli-toolbar-more {
+  margin-inline-start: auto;
+}
+.foli-toolbar-more-panel {
+  position: absolute;
+  top: 100%;
+  inset-inline-end: 8px;
+  z-index: 10;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px;
+  max-width: calc(100% - 16px);
+  margin-top: 2px;
+  padding: 4px 8px;
+  border: 1px solid var(--foli-border-color);
+  border-radius: 4px;
+  background: var(--foli-toolbar-background);
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.15);
+}
+.foli-toolbar-more-panel[hidden] {
+  display: none;
+}
+/* A menu of an item in the panel opens toward the panel's start, not past the toolbar's end. */
+.foli-toolbar-more-panel .foli-menu {
+  left: auto;
+  inset-inline-end: 0;
+}
+/* The first group in the panel needs no separator before it. */
+.foli-toolbar-more-panel > .foli-toolbar-separator:first-child {
+  display: none;
+}
+
 /* A group with a caption (`ToolbarGroup`): its items in a row, the caption under them. */
 .foli-toolbar-group {
   display: inline-flex;
