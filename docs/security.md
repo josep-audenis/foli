@@ -82,8 +82,31 @@ links, odd names.
 | The author's name      | `mcp/src/server.ts`                                                          | One line, no control characters, whole characters, 60 at most                                                                                                                             |
 | The log (stderr)       | `mcp/src/protocol.ts`                                                        | A tool's or a method's error by kind and place, never its message (a failure to start says its own, which holds no document's text)                                                       |
 
+**Code mode (`--code`, off by default; [ADR-0010](decisions/ADR-0010-code-mode.md)).** The
+`run` tool takes a script the model wrote. The script is as little trusted as a tool's
+arguments, and can do more work with them, so it is held by more:
+
+| What                         | Where                                                    | Rule                                                                                                                                                            |
+| ---------------------------- | -------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Where a script runs          | `mcp/src/sandbox.ts`, `sandbox-worker.mjs`               | QuickJS compiled to WebAssembly, in a worker thread made for the run and ended after it: the language, and no object of Node, no file, network, module or timer |
+| What a script reaches        | `mcp/src/code.ts`                                        | `doc`: the operations of the tools over the one open document, checked as the tools' are. No `open`, no `save`, no path                                         |
+| What crosses                 | `mcp/src/sandbox.ts`                                     | JSON text, both ways; the script's arguments parsed with `JSON.parse`, its result made text inside the sandbox                                                  |
+| Time                         | `mcp/src/sandbox.ts`                                     | 10 s for the run: the server ends the thread, whatever it is doing                                                                                              |
+| Memory, stack, calls         | `mcp/src/sandbox.ts`                                     | 64 MB (QuickJS's limit), a 192 kB stack under the thread's 4 MB, 5,000 calls to the document; the thread's own heap 80 MB                                       |
+| A run that does not end well | `agent/src/session.ts` (`checkpoint`), `mcp/src/code.ts` | Every edit it made is taken back: the document and its handles as before the run                                                                                |
+| What a script says           | `mcp/src/code.ts`                                        | Its value as JSON on one line, its log a line per call, an error's message on one line; each held to a size                                                     |
+| What the thread prints       | `mcp/src/sandbox.ts`                                     | Taken: it never reaches stdout, which carries the protocol                                                                                                      |
+
+A script cannot turn tracking off, change the author, or reach a document that is not open: it
+has no editor, only `doc`. What it can do is what a patient series of tool calls can: edit
+every block of the open documents, as tracked changes. Known and accepted: while a script
+runs the server answers nothing else, for up to 10 seconds; QuickJS and the WebAssembly
+engine are trusted to hold the script (a flaw in either is a flaw here); fuzzed with scripts
+made of the operations and of the ways a run can end, not with scripts written to break
+QuickJS itself.
+
 **What stays the user's.** Choosing the root: everything under it can be read by the model and
-so reach the model's provider. `--overwrite`. Reviewing the tracked changes: the server cannot
+so reach the model's provider. `--overwrite`. `--code`. Reviewing the tracked changes: the server cannot
 tell a good edit from one a document talked the model into. What the client lets the model do
 with what it read (other tools, the network) is the client's.
 

@@ -25,26 +25,26 @@ corpus scripts read.
 
 [architecture.md](architecture.md) describes the design and every subsystem; this is the map.
 
-| Path                           | What                                                                                                                    |
-| ------------------------------ | ----------------------------------------------------------------------------------------------------------------------- |
-| `packages/core/src/model/`     | Schema, immutable nodes, fragments, marks, positions, slices, JSON. No DOM, no Word                                     |
-| `packages/core/src/transform/` | Steps, mapping, `Transform`                                                                                             |
-| `packages/core/src/state/`     | `EditorState`, `Transaction`, plugins, `createEditor` (`editor.ts`), history, commands, Word's editing features         |
-| `packages/core/src/v3/`        | The saved document: Word's schema, `parseDocument`, migrations, the formatting resolver, custom types (`extensions.ts`) |
-| `packages/view/src/view.ts`    | `EditorView`: input, keys, selection, stories, the drawing and layout passes                                            |
-| `packages/view/src/word/`      | Word's blocks, tables, headers, notes and fields drawn on pages; `renderDocument` (`pages.ts`)                          |
-| `packages/view/src/layout/`    | The page flow (`flow.ts`): blocks and lines onto pages                                                                  |
-| `packages/view/src/`           | Also the clipboard (`clipboard.ts`), print rules (`print.ts`), view extensions (`extension.ts`)                         |
-| `packages/react/`              | Components, hooks, the toolbar and its items (`src/`); the default theme (`styles.css`)                                 |
-| `packages/docx/src/`           | Zip, XML, the package, `import/`, `export/`, custom types (`custom.ts`)                                                 |
-| `packages/pdf/src/`            | `exportPdf` and the page script it runs (`renderer.ts`)                                                                 |
-| `packages/agent/src/`          | `openSession`: reading by block handles (`read.ts`, `handles.ts`), operations (`operations.ts`, `templates.ts`)         |
-| `packages/mcp/src/`            | The MCP server: the stdio protocol (`protocol.ts`), file rules (`files.ts`), documents, `tools.ts`, the `bin`           |
-| `apps/playground/`             | Pages the e2e tests drive (`e2e/`), benchmarks (`bench/`), the Word corpus pages (`word/`). No engine logic             |
-| `apps/site/`                   | The landing page, `/test/`, the docs site (`src/docs/`), its live examples and the guides' samples (`src/guides/`)      |
-| `corpus/`, `scripts/corpus/`   | Word-written documents, Word's reference data, the harnesses that compare Foli with Word                                |
-| `examples/`                    | Vite, Next.js, extension and framework-free apps that install the packed packages (`pnpm examples`)                     |
-| `spikes/two-page/`             | Phase 1's spike; never published                                                                                        |
+| Path                           | What                                                                                                                                                                                                        |
+| ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `packages/core/src/model/`     | Schema, immutable nodes, fragments, marks, positions, slices, JSON. No DOM, no Word                                                                                                                         |
+| `packages/core/src/transform/` | Steps, mapping, `Transform`                                                                                                                                                                                 |
+| `packages/core/src/state/`     | `EditorState`, `Transaction`, plugins, `createEditor` (`editor.ts`), history, commands, Word's editing features                                                                                             |
+| `packages/core/src/v3/`        | The saved document: Word's schema, `parseDocument`, migrations, the formatting resolver, custom types (`extensions.ts`)                                                                                     |
+| `packages/view/src/view.ts`    | `EditorView`: input, keys, selection, stories, the drawing and layout passes                                                                                                                                |
+| `packages/view/src/word/`      | Word's blocks, tables, headers, notes and fields drawn on pages; `renderDocument` (`pages.ts`)                                                                                                              |
+| `packages/view/src/layout/`    | The page flow (`flow.ts`): blocks and lines onto pages                                                                                                                                                      |
+| `packages/view/src/`           | Also the clipboard (`clipboard.ts`), print rules (`print.ts`), view extensions (`extension.ts`)                                                                                                             |
+| `packages/react/`              | Components, hooks, the toolbar and its items (`src/`); the default theme (`styles.css`)                                                                                                                     |
+| `packages/docx/src/`           | Zip, XML, the package, `import/`, `export/`, custom types (`custom.ts`)                                                                                                                                     |
+| `packages/pdf/src/`            | `exportPdf` and the page script it runs (`renderer.ts`)                                                                                                                                                     |
+| `packages/agent/src/`          | `openSession`: reading by block handles (`read.ts`, `handles.ts`), operations (`operations.ts`, `templates.ts`)                                                                                             |
+| `packages/mcp/src/`            | The MCP server: the stdio protocol (`protocol.ts`), file rules (`files.ts`), documents, `tools.ts`, the `bin`; code mode (`code.ts`, `sandbox.ts`, `sandbox-worker.mjs`, plain JavaScript copied to `dist`) |
+| `apps/playground/`             | Pages the e2e tests drive (`e2e/`), benchmarks (`bench/`), the Word corpus pages (`word/`). No engine logic                                                                                                 |
+| `apps/site/`                   | The landing page, `/test/`, the docs site (`src/docs/`), its live examples and the guides' samples (`src/guides/`)                                                                                          |
+| `corpus/`, `scripts/corpus/`   | Word-written documents, Word's reference data, the harnesses that compare Foli with Word                                                                                                                    |
+| `examples/`                    | Vite, Next.js, extension and framework-free apps that install the packed packages (`pnpm examples`)                                                                                                         |
+| `spikes/two-page/`             | Phase 1's spike; never published                                                                                                                                                                            |
 
 ### How a keystroke flows
 

@@ -150,7 +150,10 @@ original are refused by their messages, that the originals are as they were, tha
 file is a document with changes all the author's, and that the server answers after what is
 not a message and ends by itself when its input does: that part runs in `pnpm check`
 (`pnpm mcp:e2e`). 2026-11-21, Word 16.0.20625: 3 of 3 pass (9, 6 and 19 revisions, as through
-the library). The folder's `work` is emptied at each run.
+the library). The folder's `work` is emptied at each run. Since 16.5 it also starts the `bin`
+with `--code` and does the board report's task in one `run` call: a script that fails and one
+that does not end change nothing, and the script's document reads as the tools' does (the
+same expectations). That file is not given to Word.
 
 ```bash
 pnpm build

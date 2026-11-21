@@ -2498,8 +2498,15 @@ review.
   with `--code`, 15 tools then, 14 without. The answer: `Returned:` and the value as JSON on a
   line, the blocks changed as they read now (40 at most), what was deleted, the log; a
   failure with its line and "Nothing was changed". 10 tests through the SDK's client.)
-- [ ] 16.5 Hostile scripts: the fuzz and the escape tests of the acceptance, each proved to
-  fail when its guard is taken out; a security review by an agent, on the built server.
+- [x] 16.5 Hostile scripts: the fuzz and the escape tests of the acceptance, each proved to
+  fail when its guard is taken out; a security review by an agent, on the built server. (Done:
+  `code-fuzz.test.ts`, 70 scripts on each of three documents, seed 20261121: operations with
+  arguments of any shape, caught or not, then one of twenty ends (a return, a throw, loops
+  without end, recursion, memory, a huge or cyclic value, prototypes changed, `import()`).
+  A failed run leaves the document and every handle as before; a kept one only the author's
+  tracked changes. It fails with the rollback taken out, and with the handles not put back.
+  It found that a footnote taken out and put back has its keys in another order: the same
+  document, compared so. The e2e runs the bin with `--code`. The review: see #165.)
 - [ ] 16.6 A model's trial, as 14.8's: a fresh model with the server's own words only, tasks
   that need a loop, through the SDK's client; calls counted against the plain tools; Word
   opens the results. What it shows wrong in the description, fixed.

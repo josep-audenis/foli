@@ -1071,6 +1071,10 @@ transaction and runs core's commands. Background and what was tried:
   `deleteTable`), `setStyle`, `comment`,
   `fillControl`, `updateFields`. Each returns a value: the blocks as they read now (`deleteBlock`
   and `updateFields` a sentence), or a refusal with a code and a message written for the model.
+- **Checkpoint** (`session.ts`): `checkpoint()` listens to the editor's transactions;
+  `rollback()` applies the inverse of every step made since, last first, as one change that
+  is not tracked, not in undo, and marked as an undo (core's rules for content controls let an
+  undo put back what no edit may write), then restores each handle's position.
 - **What it is not:** no sandbox, no file system, no MCP: that is `@folijs/mcp`, below.
 
 ## The MCP server
@@ -1094,7 +1098,15 @@ folder. Node only; no dependency but Foli's packages.
 - **Tools** (`tools.ts`): one per operation of the library, returning its text; the server's
   `instructions` are the read format. `server.ts` puts it together (`foliServer`); `bin.ts` is
   the command line.
-- **What it is not:** no network transport, no sandbox, no `run(code)`.
+- **Code mode** (`code.ts`, `sandbox.ts`, `sandbox-worker.mjs`; ADR-0010), with `--code`: the
+  `run` tool runs a script in QuickJS (WebAssembly) in a worker thread made for the run. The
+  script calls `doc.replaceText(…)` as a function; under it the thread posts the call, waits
+  on `Atomics.wait`, and the server's thread answers from the session: the same operations
+  the tools call. Only JSON crosses. The server ends the thread at the time limit. Before the
+  script the session marks a checkpoint (`session.checkpoint()` of `@folijs/agent`: it
+  records the transactions made, and a rollback inverts their steps, last first, in one
+  untracked change, and puts the handles back); a run that fails goes back to it.
+- **What it is not:** no network transport; no code run unless started with `--code`.
 
 ## Packages
 

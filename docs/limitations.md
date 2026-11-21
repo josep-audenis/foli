@@ -342,6 +342,13 @@ Unstable (0.x). Details in the [package README](../packages/mcp/README.md) and
   refused, though the `2025-03-26` version of the protocol has them.
 - One message at a time: while a tool runs (an `open` of a large file takes seconds) nothing
   else is answered, a `ping` included.
+- Code mode (`run`, with `--code`): not tried with a model in a client of its own. A script is
+  plain JavaScript as QuickJS runs it: no `await` that waits for anything, no timers, no
+  imports, no `Intl`. 10 seconds, 64 MB and 5,000 calls to the document a run, not
+  configurable. It works on one open document, and cannot open or save. A run costs about
+  55 ms before the script starts. Its answer shows 40 changed blocks at most. `doc` has the
+  tools' operations and no more: no reading in parts (`blocks()` is the whole body), nothing
+  of the editor under it.
 - Documents live in memory: unsaved edits are lost when the server stops, and nothing is saved
   on its own. A file is open once.
 - Only `.docx`, up to 64 MB and 64 MB unpacked; the open documents hold about 3 million
