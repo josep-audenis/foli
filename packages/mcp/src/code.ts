@@ -75,8 +75,7 @@ blocks in a result are Blocks as they read after the edit. A table's own text is
 export const RUN_GROWTH = 300_000;
 /**
  * @internal
- * And how many blocks it may add: an edit costs the more the more blocks there are, and 2,000
- * added and taken back again is about two seconds of the host's time.
+ * And how many paragraphs it may insert: an edit costs the more the more blocks there are.
  */
 export const RUN_BLOCKS = 2_000;
 
@@ -126,16 +125,12 @@ export async function runCode(
   };
   // A script's arguments are JSON of any shape: the library refuses what does not fit, as it
   // does for a tool, so they are passed as they come.
-  const started = Date.now();
   const size = before.content.size;
-  const count = before.childCount;
+  /** Paragraphs the run has inserted, wherever (a table's cells are not the body's blocks). */
+  let inserted = 0;
   const host: Host = (name, args) => {
-    // The host's own limits, which a script cannot catch its way past: the time, when calls
-    // follow each other too closely for the timer, and what the run has added so far.
-    if (Date.now() - started > limits.ms)
-      throw new StopRun(`It did not finish in ${limits.ms / 1000} seconds.`);
-    const now = session.editor.state.doc;
-    if (now.content.size - size > RUN_GROWTH || now.childCount - count > RUN_BLOCKS)
+    // The host's own limit, which a script cannot catch its way past: what the run has added.
+    if (session.editor.state.doc.content.size - size > RUN_GROWTH || inserted > RUN_BLOCKS)
       throw new StopRun(
         `It added more than ${RUN_BLOCKS} paragraphs or ${RUN_GROWTH} characters to the document: a run is held to that. Do the work in several runs.`,
       );
@@ -156,9 +151,13 @@ export async function runCode(
         return { blocks, replaced, refused };
       }
       case "insertAfter":
-        return { blocks: edited(session.insertAfter(a, b)).blocks };
-      case "insertBefore":
-        return { blocks: edited(session.insertBefore(a, b)).blocks };
+      case "insertBefore": {
+        const { blocks } = edited(
+          name === "insertAfter" ? session.insertAfter(a, b) : session.insertBefore(a, b),
+        );
+        inserted += blocks.length;
+        return { blocks };
+      }
       case "deleteBlock": {
         const { text } = given(session.deleteBlock(a));
         deleted++;

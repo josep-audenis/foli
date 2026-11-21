@@ -118,24 +118,30 @@ one whose stack names another line): the run failed and is taken back either way
 ### The server's own work is bounded apart
 
 The time is kept in the server's thread, which also does the work of every call to `doc` and
-of taking a run back: no timer fires while it works. The second review of #165 showed what
-that leaves open: one `insertAfter` of 20,000 empty paragraphs (60 kB of arguments) ran for
-85 s and ended the server out of memory; a loop of smaller inserts was stopped at 10 s and
-then took 27 s to take back. So the work is held by counts, not by the clock:
+of taking a run back: no timer fires while it works. Two reviews of #165 showed what that
+leaves open. One `insertAfter` of 20,000 empty paragraphs (60 kB of arguments) ran for 85 s
+and ended the server out of memory; a loop of smaller inserts was stopped at 10 s and then
+took 27 s to take back. Then, with those held: a script that swapped a long paragraph's text
+back and forth, adding nothing, ended the server in 14 s, because the checkpoint kept every
+step's transaction, each with its documents (465 MB for 20,000 steps); and paragraphs
+inserted in a table's cell were not counted. So:
 
 - One insert takes 500 paragraphs at most, one replace 500 places (`@folijs/agent`: the plain
-  tools are held by it too).
-- A run may add 2,000 paragraphs or 300,000 characters to the document; past that the server
-  ends it, whatever the script catches (`StopRun`). 2,000 paragraphs added and taken back
-  again is about two seconds on the corpus's documents.
-- Each call checks the run's time as it starts.
-- A rollback does not rebase undo's stored steps (what made it slow): it gives undo back the
-  state it had at the checkpoint.
+  tools are held by it too). A call is bounded by that; the timer fires between calls.
+- A run may insert 2,000 paragraphs, wherever, or add 300,000 characters; past that the
+  server ends it, whatever the script catches (`StopRun`).
+- A rollback costs the same whatever the run did: the body is put back whole in one step,
+  and only what changed beside it (a comment's text, a note, a header) is undone step by
+  step. The checkpoint keeps no transaction. Undo is given back the state it had, not
+  rebased.
 
-While a script runs the server answers nothing else, a `ping` included: ten seconds, then
-what the call that is running takes and the taking back, each held as above. Measured on the
-NDA: a run stopped for what it added answered in under 8 s, one stopped at a 2 s limit in
-under 6 s.
+While a script runs the server answers nothing else, a `ping` included. Measured on the NDA
+with the limits as they are (Windows 11, Node 25, one run each): the back-and-forth script,
+the same followed by inserts in a cell, single inserts without end, and 1,000-character
+comments without end each answered in 10.0 to 10.2 s with the document as it was, the process
+at about 500 MB at most; inserts of 500 in a cell without end were stopped for what they added
+in 0.9 s. Measured, not proved: a script that finds an operation slow in itself would add
+that operation's time once.
 A hosted or shared server would want the run in another process; this one serves one client
 on its own machine.
 
@@ -143,8 +149,9 @@ on its own machine.
 
 A run that throws, or meets a limit, leaves the document as it was before the run: the
 session marks a checkpoint before the script starts and goes back to it
-(`session.checkpoint()` in `@folijs/agent`: every step made since inverted, last first, in one
-change that is not tracked, with the handles as they were). A run that ends well keeps its
+(`session.checkpoint()` in `@folijs/agent`: the body put back whole and what changed beside
+it undone, in one change that is not tracked, with the handles, the styles and undo as they
+were). A run that ends well keeps its
 edits, tracked like a tool's. So a model that reads "it failed at line 12" can fix the script
 and run it again on the same document, not on a half-edited one.
 

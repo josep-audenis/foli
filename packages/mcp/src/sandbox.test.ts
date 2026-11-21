@@ -165,13 +165,6 @@ describe("limits", { timeout: 30_000 }, () => {
     expect(
       await run("const a = []; for (;;) a.push(new Uint8Array(1e6))", { memory }),
     ).toMatchObject({ ok: false, reason: "memory", message: "It used more than 32 MB of memory." });
-    // Many small things: told there is no more under the limit, or still trying when time is up.
-    const strings = await run(
-      "const a = []; try { for (;;) a.push('x'.repeat(2000) + a.length) } catch (e) {} return a.length",
-      { memory, ms: 5000 },
-    );
-    if (strings.ok) expect(Number(strings.value) * 2000).toBeLessThan(memory);
-    else expect(strings.reason).toBe("time");
   });
 
   it("holds what a call sends, what a run returns and what an error says", async () => {

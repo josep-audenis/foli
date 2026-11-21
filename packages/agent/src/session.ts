@@ -5,7 +5,9 @@ import {
   type Extension,
   type FieldsReport,
   type FoliDocument,
-  type Transaction,
+  type Node,
+  Slice,
+  type Step,
   untracked,
 } from "@folijs/core";
 import { withEnvelope, wordContext } from "@folijs/core/internal";
@@ -208,7 +210,10 @@ export function openSession(document: EditorDocument, options: SessionOptions): 
     const envelope = wordContext(editor.state)?.envelope;
     const history = editor.state.plugins.find((plugin) => plugin.key.name === "history");
     const undo = history?.key.getState(editor.state);
-    const made: Transaction[] = [];
+    // What the edits change outside the body (a comment's text, a note, a header): each such
+    // step, inverted. The body's own steps are not kept: it is put back whole, so a run of
+    // any number of edits costs a rollback the same, and holds no document but the first.
+    const aside: Step[] = [];
     let changed = false;
     let lost = false;
     let over = false;
@@ -218,7 +223,11 @@ export function openSession(document: EditorDocument, options: SessionOptions): 
       if (!transactions.length && state.doc !== last) lost = true;
       last = state.doc;
       if (transactions.length) changed = true;
-      made.push(...transactions.filter((tr) => tr.steps.length));
+      for (const tr of transactions)
+        for (const [i, step] of tr.steps.entries()) {
+          const from = tr.docs[i] as Node;
+          if ((tr.docs[i + 1] ?? tr.doc) === from) aside.push(step.invert(from));
+        }
     });
     const end = () => {
       if (over) throw new Error("checkpoint: already rolled back or released");
@@ -232,11 +241,11 @@ export function openSession(document: EditorDocument, options: SessionOptions): 
         if (lost)
           throw new Error("checkpoint: the document was replaced, it cannot be rolled back");
         if (changed) {
-          // Every step undone, last first, in one change that is not tracked.
+          // The body as it was, in one step, and what changed beside it undone, last first: one
+          // change that is not tracked.
           const tr = editor.state.tr;
-          for (const done of [...made].reverse())
-            for (let i = done.steps.length - 1; i >= 0; i--)
-              tr.step((done.steps[i] as (typeof done.steps)[number]).invert(done.docs[i] as never));
+          tr.replace(0, tr.doc.content.size, new Slice(start.content, 0, 0));
+          for (const step of aside.reverse()) tr.step(step);
           // Marked as an undo, which it is: core's rules for content controls let an undo
           // put back what no edit may write (a list's placeholder, a check box's glyph).
           tr.setMeta(untracked, true).setMeta("historyOp", "undo");

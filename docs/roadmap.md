@@ -2496,7 +2496,13 @@ review.
   where it rebased every stored step; a rollback left the run in undo and a style the run
   added in the document: both put back; the memory test passed without its guard in all but
   one line: rewritten to count what a script got. Left, and in limitations: a paragraph
-  inserted then deleted leaves a wrong tracked change (older than this phase).)
+  inserted then deleted leaves a wrong tracked change (older than this phase). From the third,
+  on the fixes: a script that swapped a paragraph's text back and forth, adding nothing, still
+  ended the server in 14 s (the checkpoint kept every step's transaction and its documents),
+  and paragraphs inserted in a cell were not counted. The checkpoint now keeps no body step:
+  a rollback puts the body back whole, in one step whatever was done; inserts are counted
+  where they are made. The worst scripts of the three reviews answer in 10.0 to 10.2 s with
+  the document as it was. Four assertions that could not fail were rewritten or removed.)
 - [x] 16.3 `doc` over a session: reading as blocks (handle, style, text, table place,
   changed) in parts, every operation of the tools with the same argument checks, results and
   refusals as values a script can test (`if (!r.ok)`); `console.log` kept as the log. A

@@ -104,7 +104,7 @@ undefinedFunction();`);
     ]);
     expect(await read()).toBe(before);
     // Nothing to save, so nothing to lose: it closes without being asked to discard.
-    expect((await call("list_documents")).text).not.toMatch(/unsaved/i);
+    expect((await call("list_documents")).text).not.toContain("changes not saved");
     expect((await call("close")).refused).toBe(false);
     await client.close();
   });
@@ -275,7 +275,7 @@ for (;;) { try { doc.insertAfter(h, new Array(500).fill("x".repeat(40))) } catch
     ]);
     // Stopped by what it added, not by its time: the message says which.
     expect(await read()).toBe(before);
-    expect((await call("list_documents")).text).not.toMatch(/unsaved/i);
+    expect((await call("list_documents")).text).not.toContain("changes not saved");
     await client.close();
   });
 
@@ -294,10 +294,8 @@ for (;;) { try { doc.insertAfter(h, new Array(500).fill("x".repeat(40))) } catch
     await client.close();
   });
 
-  it("a failed run leaves no style behind, and control characters out of its answer", async () => {
-    const { client, run, saved } = await opened("01-mutual-nda");
-    const styles = (await importDocx(readFileSync(new URL("01-mutual-nda.docx", CORPUS)))).document
-      .styles.length;
+  it("a failed run keeps control characters out of its answer", async () => {
+    const { client, run } = await opened("01-mutual-nda");
     const failed = await run(`const h = doc.blocks()[2].handle;
 for (const name of doc.styles()) { try { doc.setStyle(h, name) } catch (e) {} }
 console.log("a\\u001b[31mb\\u0000c\\u000cd\\te");
@@ -308,10 +306,43 @@ throw new Error("over\\u001b[2J");`);
       "Logged:",
       "  a[31mbcd\te",
     ]);
-    // What is saved after it is the document as it was opened: its styles too.
-    const kept = await run('return doc.comment(doc.blocks()[2].handle, "kept").comment;');
-    expect(kept.refused).toBe(false);
-    expect((await saved()).styles).toHaveLength(styles);
+    await client.close();
+  });
+
+  it("paragraphs inserted in a table's cell count as any others", async () => {
+    const { client, run, read } = await opened("01-mutual-nda");
+    const before = await read();
+    const cell = /^\[(b\d+)\]\s+r1 c1,/m.exec(before)?.[1];
+    const grown = await run(
+      `for (;;) { try { doc.insertAfter("${cell}", new Array(500).fill("")) } catch (e) {} }`,
+    );
+    expect(grown.refused).toBe(true);
+    expect(grown.text).toMatch(/^The script was stopped\. It added more than 2000 paragraphs/);
+    expect(await read()).toBe(before);
+    await client.close();
+  });
+
+  it("edits without end that add nothing are held by time, and cost a rollback no more", async () => {
+    // The third review's script: one long paragraph, its text swapped back and forth, 500
+    // places a call. Nothing grows, so no count of what was added sees it; a checkpoint that
+    // kept every step's document held 4 GB of them and ended the server.
+    const { client, run, read } = await opened("01-mutual-nda", { ms: 4000, calls: 1e9 });
+    const before = await read();
+    const heap = process.memoryUsage().heapUsed;
+    const started = Date.now();
+    const churn =
+      await run(`const K = 40; const ch = (i) => String.fromCharCode(0x4e00 + i); let s = "";
+for (let j = 0; j < 500; j++) for (let i = 0; i < K; i++) s += ch(i) + " ";
+const h = doc.insertAfter("b2", s).blocks[0].handle;
+for (let i = 0; i < K; i++) doc.replaceText(h, ch(i), ch(1000 + i), { all: true });
+let n = 0; for (;;) { doc.replaceText(h, ch(n % 2 ? 2000 : 1000), ch(n % 2 ? 1000 : 2000), { all: true }); n++ }`);
+    expect(churn.refused).toBe(true);
+    expect(churn.text).toMatch(/^The script was stopped\. It did not finish in 4 seconds\./);
+    expect(await read()).toBe(before);
+    // Its time, the call under way, and a rollback that is one step whatever was done.
+    expect(Date.now() - started).toBeLessThan(4000 + 15_000);
+    global.gc?.();
+    expect(process.memoryUsage().heapUsed - heap).toBeLessThan(600 * 1024 * 1024);
     await client.close();
   });
 });
