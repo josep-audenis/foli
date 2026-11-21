@@ -154,12 +154,29 @@ export interface FoliToolbarProps {
    * `comments`; an empty group is left out.
    */
   items?: readonly (readonly ToolbarItem[])[] | undefined;
+  /**
+   * Tabs over the toolbar (a WAI-ARIA tab list with its own tab stop: arrow keys, Home and End
+   * move between tabs and show each), each with its own groups of items, in place of `items`;
+   * the first one shows at first. `defaultToolbarTabs` are Word's. Without tabs (or with none),
+   * `items`. With tabs, `className` goes on the element around both (`.foli-ribbon`).
+   */
+  tabs?: readonly ToolbarTab[] | undefined;
   className?: string | undefined;
+}
+
+/** A tab of the toolbar: its items show while it is the selected one. */
+export interface ToolbarTab {
+  /** Unique among the tabs. */
+  readonly key: string;
+  /** The tab's text. */
+  readonly label: string;
+  /** Its items, in groups (as `FoliToolbarProps.items`); a key is unique within its tab. */
+  readonly items: readonly (readonly ToolbarItem[])[];
 }
 
 /** What every toolbar item has. */
 interface ToolbarItemBase {
-  /** Unique in the toolbar; also its class, `foli-toolbar-<key>`. */
+  /** Unique in the toolbar (with tabs: in its tab); also its class, `foli-toolbar-<key>`. */
   readonly key: string;
   /** What it does: the tooltip, and the accessible name when an `icon` stands for the text. */
   readonly label: string;
@@ -1194,6 +1211,50 @@ export const toolbarItems = Object.fromEntries(
 /** The default toolbar: groups of `toolbarItems`, a separator between groups. */
 export const defaultToolbarItems = GROUPS as unknown as readonly (readonly ToolbarItem[])[];
 
+/**
+ * The built-in items in tabs, after Word's ribbon: Home, Insert, Layout, Review. For
+ * `FoliToolbarProps.tabs` (or `FoliEditor`'s `toolbar`), whole or as a start for an app's own.
+ */
+export const defaultToolbarTabs: readonly ToolbarTab[] = (() => {
+  const t = toolbarItems;
+  return [
+    {
+      key: "home",
+      label: "Home",
+      items: [
+        [t.undo, t.redo],
+        [t.style, t.font, t.size],
+        [t.bold, t.italic, t.underline, t.strike, t.textColor, t.highlight],
+        [t.alignStart, t.alignCenter, t.alignEnd, t.alignJustify, t.lineSpacing],
+        [t.bulletList, t.orderedList, t.outdent, t.indent],
+        [t.navigate],
+      ],
+    },
+    {
+      key: "insert",
+      label: "Insert",
+      items: [[t.table, t.picture, t.link], [t.pageBreak], [t.fields, t.notes, t.controls]],
+    },
+    {
+      key: "layout",
+      label: "Layout",
+      items: [
+        [t.section, t.headerFooter],
+        [t.tableStyle, t.cellShading],
+      ],
+    },
+    {
+      key: "review",
+      label: "Review",
+      items: [
+        [t.newComment],
+        [t.trackChanges, t.reviewView],
+        [t.previousChange, t.nextChange, t.acceptChange, t.rejectChange, t.acceptAll, t.rejectAll],
+      ],
+    },
+  ];
+})();
+
 interface LinkDialogState {
   /** The link at the selection when the dialog opened ("" for none). */
   href: string;
@@ -1268,8 +1329,15 @@ export function FoliToolbar({
   className,
   comments = false,
   upload,
-  items: itemGroups,
+  items: givenGroups,
+  tabs,
 }: FoliToolbarProps) {
+  const id = useId();
+  // The tab shown: the one picked while it is still there, else the first.
+  const [tabKey, setTabKey] = useState<string | null>(null);
+  const tab = tabs?.find((t) => t.key === tabKey) ?? tabs?.[0];
+  const itemGroups = tab ? tab.items : givenGroups;
+  const tabButtons = useRef<(HTMLButtonElement | null)[]>([]);
   const body = useEditorOrContext(given, "FoliToolbar");
   // A story open on its page takes the formatting commands; the body otherwise.
   const editor = useActiveEditor(body);
@@ -1310,8 +1378,7 @@ export function FoliToolbar({
       const selected = selectedPicture(editor.state);
       // Inserting needs the app's upload; editing a selected picture does not.
       if (!selected && !upload) return;
-      setDialog(null);
-      setTableDialog(null);
+      closeDialogs();
       setPictureDialog({
         pos: selected?.pos ?? null,
         selection: editor.state.selection,
@@ -1320,13 +1387,7 @@ export function FoliToolbar({
       return;
     }
     if (typeof item.dialog === "function") {
-      setDialog(null);
-      setTableDialog(null);
-      setPictureDialog(null);
-      setSetupDialog(null);
-      setReferenceDialog(null);
-      setControlDialog(null);
-      setNoteDialog(null);
+      closeDialogs();
       setAppDialog({ key: item.key, restore: buttons.current[index] ?? null });
       return;
     }
@@ -1411,7 +1472,9 @@ export function FoliToolbar({
           );
           setDialog((current) =>
             current &&
-            (transactions.some((tr) => tr.docChanged) || !state.selection.eq(current.selection))
+            (!transactions.length ||
+              transactions.some((tr) => tr.docChanged) ||
+              !state.selection.eq(current.selection))
               ? null
               : current,
           );
@@ -1423,6 +1486,7 @@ export function FoliToolbar({
         setSetupDialog(null);
         setReferenceDialog(null);
         setControlDialog(null);
+        setNoteDialog(null);
         setDialog((current) =>
           current
             ? { ...current, request: current.request + 1 }
@@ -1513,6 +1577,96 @@ export function FoliToolbar({
     if (disabled || builtInDialog || appDialogGone) setAppDialog(null);
   }, [disabled, builtInDialog, appDialogGone]);
 
+  // One dialog at a time: opening one closes the rest (`keep` reopens itself, counting requests).
+  function closeDialogs(keep?: "table") {
+    setDialog(null);
+    if (keep !== "table") setTableDialog(null);
+    setPictureDialog(null);
+    setSetupDialog(null);
+    setReferenceDialog(null);
+    setControlDialog(null);
+    setNoteDialog(null);
+  }
+
+  // Another tab: its items from the first, and nothing of the last tab's left open.
+  const showTab = (next: ToolbarTab) => {
+    if (next.key === tab?.key) return;
+    setTabKey(next.key);
+    setActive(0);
+    // The button a dialog would give the focus back to goes with its tab.
+    setMenu(null);
+    setAppDialog(null);
+    setDialog(null);
+    setTableDialog(null);
+    setPictureDialog(null);
+    setSetupDialog(null);
+    setReferenceDialog(null);
+    setControlDialog(null);
+    setNoteDialog(null);
+  };
+  // The tab list's keys (WAI-ARIA tabs, automatic activation: the tab focused is the one shown).
+  const onTabKeyDown = (event: KeyboardEvent) => {
+    if (!tabs || !tab || event.altKey || event.ctrlKey || event.metaKey) return;
+    const count = tabs.length;
+    const at = tabs.indexOf(tab);
+    const moves: Record<string, number> = {
+      ArrowRight: (at + 1) % count,
+      ArrowLeft: (at - 1 + count) % count,
+      Home: 0,
+      End: count - 1,
+    };
+    const next = tabs[moves[event.key] ?? -1];
+    if (!next) return;
+    event.preventDefault();
+    showTab(next);
+    tabButtons.current[tabs.indexOf(next)]?.focus();
+  };
+  // With tabs, a ribbon: the tab list and the selected tab's panel, which holds the toolbar.
+  const panel = (bar: ReactNode) =>
+    tabs && tab ? (
+      <div className={className ? `foli-ribbon ${className}` : "foli-ribbon"}>
+        <div
+          role="tablist"
+          aria-label={label}
+          className="foli-ribbon-tabs"
+          onKeyDown={onTabKeyDown}
+        >
+          {tabs.map((t, n) => (
+            <button
+              key={t.key}
+              ref={(element) => {
+                tabButtons.current[n] = element;
+              }}
+              type="button"
+              role="tab"
+              id={`${id}-tab-${n}`}
+              className={`foli-ribbon-tab foli-ribbon-tab-${t.key}`}
+              aria-selected={t === tab}
+              aria-controls={`${id}-panel`}
+              tabIndex={t === tab ? 0 : -1}
+              // Keep the focus (and the selection) in the document on click.
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={() => showTab(t)}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+        <div
+          role="tabpanel"
+          id={`${id}-panel`}
+          aria-labelledby={`${id}-tab-${tabs.indexOf(tab)}`}
+          className="foli-ribbon-panel"
+          // A tab without items has nothing to focus: the panel takes the tab stop.
+          tabIndex={items.length ? undefined : 0}
+        >
+          {bar}
+        </div>
+      </div>
+    ) : (
+      bar
+    );
+
   const onKeyDown = (event: KeyboardEvent) => {
     // Alt+Left (back) and other shortcuts are the browser's.
     if (event.altKey || event.ctrlKey || event.metaKey) return;
@@ -1533,188 +1687,206 @@ export function FoliToolbar({
   let index = 0;
   return (
     <>
-      <div
-        role="toolbar"
-        aria-label={label}
-        className={className ? `foli-toolbar ${className}` : "foli-toolbar"}
-        onKeyDown={onKeyDown}
-      >
-        {groups.map((group, g) => (
-          <Fragment key={group[0]?.key}>
-            {g > 0 && <hr className="foli-toolbar-separator" aria-orientation="vertical" />}
-            {group.map((item) => {
-              const i = index++;
-              const state = states[i];
-              // Inserting a picture needs the app's upload; editing a selected one does not.
-              // A menu without entries cannot open, whatever its `enabled` says.
-              const off =
-                disabled ||
-                !state?.enabled ||
-                (item.dialog === "picture" && state?.value === "insert" && !upload) ||
-                (item.actions !== undefined && actionsOf(item, body).length === 0);
-              if (item.render) {
-                return (
-                  <CustomItem
-                    key={item.key}
-                    render={item.render}
-                    editor={editor}
-                    disabled={off}
-                    tabIndex={i === active ? 0 : -1}
-                    setRef={(element) => {
-                      buttons.current[i] = element;
-                    }}
-                    onFocus={() => setActive(i)}
-                  />
-                );
-              }
-              if (item.select) {
-                const { select } = item;
-                const value = state?.value ?? "";
-                const options = select.options(editor.state);
-                return (
-                  <select
+      {panel(
+        <div
+          role="toolbar"
+          aria-label={label}
+          // With tabs, `className` is the ribbon's.
+          className={className && !tab ? `foli-toolbar ${className}` : "foli-toolbar"}
+          onKeyDown={onKeyDown}
+        >
+          {groups.map((group, g) => (
+            <Fragment key={group[0]?.key}>
+              {g > 0 && <hr className="foli-toolbar-separator" aria-orientation="vertical" />}
+              {group.map((item) => {
+                const i = index++;
+                const state = states[i];
+                // Inserting a picture needs the app's upload; editing a selected one does not.
+                // A menu without entries cannot open, whatever its `enabled` says.
+                const off =
+                  disabled ||
+                  !state?.enabled ||
+                  (item.dialog === "picture" && state?.value === "insert" && !upload) ||
+                  (item.actions !== undefined && actionsOf(item, body).length === 0);
+                if (item.render) {
+                  return (
+                    <CustomItem
+                      key={item.key}
+                      render={item.render}
+                      editor={editor}
+                      disabled={off}
+                      tabIndex={i === active ? 0 : -1}
+                      setRef={(element) => {
+                        buttons.current[i] = element;
+                      }}
+                      onFocus={() => setActive(i)}
+                    />
+                  );
+                }
+                if (item.select) {
+                  const { select } = item;
+                  const value = state?.value ?? "";
+                  const options = select.options(editor.state);
+                  return (
+                    <select
+                      key={item.key}
+                      ref={(element) => {
+                        buttons.current[i] = element;
+                      }}
+                      className={`foli-toolbar-select foli-toolbar-${item.key}`}
+                      aria-label={item.label}
+                      title={item.label}
+                      // Still focusable when it cannot apply, like the buttons.
+                      aria-disabled={off || undefined}
+                      tabIndex={i === active ? 0 : -1}
+                      value={value}
+                      onFocus={() => setActive(i)}
+                      onMouseDown={() => {
+                        pointer.current = true;
+                      }}
+                      onKeyDown={() => {
+                        pointer.current = false;
+                      }}
+                      // shortcut: Up and Down on a closed box apply each value they pass (Chrome
+                      // and Firefox on Windows), one undo step each; apply on Enter if it matters.
+                      onChange={(event) => {
+                        if (off) return;
+                        editor.run(select.pick(event.target.value));
+                        if (pointer.current) onClickCommand?.();
+                      }}
+                    >
+                      {/* Mixed (or nothing to show): a blank entry; a value not offered: itself. */}
+                      {value === "" && <option value="" />}
+                      {value !== "" && !options.some((o) => o.value === value) && (
+                        <option value={value}>{value}</option>
+                      )}
+                      {options.map((o) => (
+                        <option key={o.value} value={o.value}>
+                          {o.label}
+                        </option>
+                      ))}
+                    </select>
+                  );
+                }
+                const button = (
+                  <button
                     key={item.key}
                     ref={(element) => {
                       buttons.current[i] = element;
                     }}
-                    className={`foli-toolbar-select foli-toolbar-${item.key}`}
-                    aria-label={item.label}
+                    type="button"
+                    className={`foli-toolbar-button foli-toolbar-${item.key}`}
+                    // Speech input users say what they see: "H1", "Undo"; symbols get a name.
+                    aria-label={item.icon !== undefined ? item.label : undefined}
                     title={item.label}
-                    // Still focusable when it cannot apply, like the buttons.
+                    aria-pressed={item.pressed ? Boolean(state?.pressed) : undefined}
+                    aria-haspopup={
+                      item.colors || item.actions ? "menu" : item.dialog ? "dialog" : undefined
+                    }
+                    aria-expanded={item.colors || item.actions ? menu === item.key : undefined}
                     aria-disabled={off || undefined}
                     tabIndex={i === active ? 0 : -1}
-                    value={value}
+                    // Keep the focus (and the selection) in the document on click.
+                    onMouseDown={(event) => event.preventDefault()}
                     onFocus={() => setActive(i)}
-                    onMouseDown={() => {
-                      pointer.current = true;
-                    }}
-                    onKeyDown={() => {
-                      pointer.current = false;
-                    }}
-                    // shortcut: Up and Down on a closed box apply each value they pass (Chrome
-                    // and Firefox on Windows), one undo step each; apply on Enter if it matters.
-                    onChange={(event) => {
-                      if (off) return;
-                      editor.run(select.pick(event.target.value));
-                      if (pointer.current) onClickCommand?.();
+                    onClick={(event) => run(i, event)}
+                    onKeyDown={(event) => {
+                      // ArrowDown opens a menu (the WAI-ARIA menu button pattern).
+                      if (!(item.colors || item.actions) || off || event.key !== "ArrowDown")
+                        return;
+                      event.preventDefault();
+                      setMenu(item.key);
                     }}
                   >
-                    {/* Mixed (or nothing to show): a blank entry; a value not offered: itself. */}
-                    {value === "" && <option value="" />}
-                    {value !== "" && !options.some((o) => o.value === value) && (
-                      <option value={value}>{value}</option>
+                    {item.icon ?? item.text ?? item.label}
+                    {item.colors && (
+                      <span
+                        className="foli-toolbar-swatch"
+                        aria-hidden="true"
+                        style={{ background: state?.value ?? "transparent" }}
+                      />
                     )}
-                    {options.map((o) => (
-                      <option key={o.value} value={o.value}>
-                        {o.label}
-                      </option>
-                    ))}
-                  </select>
+                  </button>
                 );
-              }
-              const button = (
-                <button
-                  key={item.key}
-                  ref={(element) => {
-                    buttons.current[i] = element;
-                  }}
-                  type="button"
-                  className={`foli-toolbar-button foli-toolbar-${item.key}`}
-                  // Speech input users say what they see: "H1", "Undo"; symbols get a name.
-                  aria-label={item.icon !== undefined ? item.label : undefined}
-                  title={item.label}
-                  aria-pressed={item.pressed ? Boolean(state?.pressed) : undefined}
-                  aria-haspopup={
-                    item.colors || item.actions ? "menu" : item.dialog ? "dialog" : undefined
-                  }
-                  aria-expanded={item.colors || item.actions ? menu === item.key : undefined}
-                  aria-disabled={off || undefined}
-                  tabIndex={i === active ? 0 : -1}
-                  // Keep the focus (and the selection) in the document on click.
-                  onMouseDown={(event) => event.preventDefault()}
-                  onFocus={() => setActive(i)}
-                  onClick={(event) => run(i, event)}
-                  onKeyDown={(event) => {
-                    // ArrowDown opens a menu (the WAI-ARIA menu button pattern).
-                    if (!(item.colors || item.actions) || off || event.key !== "ArrowDown") return;
-                    event.preventDefault();
-                    setMenu(item.key);
-                  }}
-                >
-                  {item.icon ?? item.text ?? item.label}
-                  {item.colors && (
-                    <span
-                      className="foli-toolbar-swatch"
-                      aria-hidden="true"
-                      style={{ background: state?.value ?? "transparent" }}
-                    />
-                  )}
-                </button>
-              );
-              if (item.actions) {
-                const actions = actionsOf(item, body);
+                if (item.actions) {
+                  const actions = actionsOf(item, body);
+                  return (
+                    <span key={item.key} className="foli-toolbar-menu">
+                      {button}
+                      {menu === item.key && !disabled && actions.length > 0 && (
+                        <ActionMenu
+                          label={item.label}
+                          actions={actions}
+                          editor={editor}
+                          state={editor.state}
+                          onPick={(action, pointer) => {
+                            setMenu(null);
+                            if (action.dialog === "noteOptions") {
+                              closeDialogs();
+                              setNoteDialog({ restore: buttons.current[i] ?? null });
+                              return;
+                            }
+                            if (action.dialog === "controlProperties") {
+                              closeDialogs();
+                              setControlDialog({
+                                restore: buttons.current[i] ?? null,
+                                selection: editor.state.selection,
+                              });
+                              return;
+                            }
+                            if (action.dialog === "crossReference") {
+                              closeDialogs();
+                              setReferenceDialog({
+                                restore: buttons.current[i] ?? null,
+                                selection: editor.state.selection,
+                              });
+                              return;
+                            }
+                            if (action.dialog === "pageSetup") {
+                              closeDialogs();
+                              setSetupDialog({
+                                restore: buttons.current[i] ?? null,
+                                selection: editor.state.selection,
+                              });
+                              return;
+                            }
+                            if (action.dialog) {
+                              closeDialogs("table");
+                              setTableDialog((current) => ({
+                                restore: buttons.current[i] ?? null,
+                                selection: editor.state.selection,
+                                request: (current?.request ?? -1) + 1,
+                              }));
+                              return;
+                            }
+                            editor.run(action.command);
+                            if (action.movesFocus) return;
+                            if (pointer) onClickCommand?.();
+                            else buttons.current[i]?.focus();
+                          }}
+                          onClose={(refocus) => {
+                            setMenu(null);
+                            if (refocus) buttons.current[i]?.focus();
+                          }}
+                        />
+                      )}
+                    </span>
+                  );
+                }
+                const options = item.colors?.options;
+                if (!options || !item.colors) return button;
+                const { pick } = item.colors;
                 return (
                   <span key={item.key} className="foli-toolbar-menu">
                     {button}
-                    {menu === item.key && !disabled && actions.length > 0 && (
-                      <ActionMenu
+                    {menu === item.key && !disabled && (
+                      <ColorMenu
                         label={item.label}
-                        actions={actions}
-                        editor={editor}
-                        state={editor.state}
-                        onPick={(action, pointer) => {
+                        options={options}
+                        current={state?.value ?? null}
+                        onPick={(color, pointer) => {
+                          editor.run(pick(color));
                           setMenu(null);
-                          if (action.dialog === "noteOptions") {
-                            setDialog(null);
-                            setTableDialog(null);
-                            setSetupDialog(null);
-                            setReferenceDialog(null);
-                            setControlDialog(null);
-                            setNoteDialog({ restore: buttons.current[i] ?? null });
-                            return;
-                          }
-                          if (action.dialog === "controlProperties") {
-                            setDialog(null);
-                            setTableDialog(null);
-                            setSetupDialog(null);
-                            setReferenceDialog(null);
-                            setControlDialog({
-                              restore: buttons.current[i] ?? null,
-                              selection: editor.state.selection,
-                            });
-                            return;
-                          }
-                          if (action.dialog === "crossReference") {
-                            setDialog(null);
-                            setTableDialog(null);
-                            setSetupDialog(null);
-                            setReferenceDialog({
-                              restore: buttons.current[i] ?? null,
-                              selection: editor.state.selection,
-                            });
-                            return;
-                          }
-                          if (action.dialog === "pageSetup") {
-                            setDialog(null);
-                            setTableDialog(null);
-                            setSetupDialog({
-                              restore: buttons.current[i] ?? null,
-                              selection: editor.state.selection,
-                            });
-                            return;
-                          }
-                          if (action.dialog) {
-                            setDialog(null);
-                            setSetupDialog(null);
-                            setTableDialog((current) => ({
-                              restore: buttons.current[i] ?? null,
-                              selection: editor.state.selection,
-                              request: (current?.request ?? -1) + 1,
-                            }));
-                            return;
-                          }
-                          editor.run(action.command);
-                          if (action.movesFocus) return;
                           if (pointer) onClickCommand?.();
                           else buttons.current[i]?.focus();
                         }}
@@ -1726,36 +1898,11 @@ export function FoliToolbar({
                     )}
                   </span>
                 );
-              }
-              const options = item.colors?.options;
-              if (!options || !item.colors) return button;
-              const { pick } = item.colors;
-              return (
-                <span key={item.key} className="foli-toolbar-menu">
-                  {button}
-                  {menu === item.key && !disabled && (
-                    <ColorMenu
-                      label={item.label}
-                      options={options}
-                      current={state?.value ?? null}
-                      onPick={(color, pointer) => {
-                        editor.run(pick(color));
-                        setMenu(null);
-                        if (pointer) onClickCommand?.();
-                        else buttons.current[i]?.focus();
-                      }}
-                      onClose={(refocus) => {
-                        setMenu(null);
-                        if (refocus) buttons.current[i]?.focus();
-                      }}
-                    />
-                  )}
-                </span>
-              );
-            })}
-          </Fragment>
-        ))}
-      </div>
+              })}
+            </Fragment>
+          ))}
+        </div>,
+      )}
       {appDialog && typeof appDialogItem?.dialog === "function" && !disabled && !builtInDialog && (
         <AppDialog
           // Each item's dialog is its own component: its hooks are not another dialog's.
@@ -2621,7 +2768,8 @@ function ControlDialog({
           title,
           tag,
           lock,
-          ...(hasList ? { items: parseItems(items) } : {}),
+          // Unedited items are left alone: the text form cannot carry a value with a `|` in it.
+          ...(hasList && items !== itemsText(control?.items) ? { items: parseItems(items) } : {}),
           ...(kind === "date" ? { dateFormat } : {}),
           ...(kind === "text" ? { multiLine } : {}),
         }),

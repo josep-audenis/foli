@@ -374,7 +374,15 @@ export class WordRenderer {
           if (name === "pageBreak") br.setAttribute(WORD_PAGE_BREAK_ATTR, "");
           if (name === "columnBreak") br.setAttribute(WORD_COLUMN_BREAK_ATTR, "");
           leaves.push({ dom: br, offset, size: 1 });
-          holder(offset).append(br);
+          // A deleted break breaks nothing in the views that show the text as accepted.
+          const gone =
+            this.#review !== "markup" && child.marks.some((m) => m.type.name === "deletion");
+          if (gone && !hidden) {
+            const span = doc.createElement("span");
+            span.style.display = "none";
+            span.append(br);
+            holder(offset).append(span);
+          } else holder(offset).append(br);
           return;
         }
         case "tab": {

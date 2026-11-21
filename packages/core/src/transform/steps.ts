@@ -217,6 +217,8 @@ export class ReplaceAroundStep extends Step {
  * the first or last along the path. Used by structure steps.
  */
 function contentBetween(doc: Node, from: number, to: number): boolean {
+  // Out of range: nothing to protect, and the replace itself fails (it does not throw).
+  if (from < 0 || to > doc.content.size || from > to) return false;
   const $from = doc.resolve(from);
   let dist = to - from;
   let depth = $from.depth;

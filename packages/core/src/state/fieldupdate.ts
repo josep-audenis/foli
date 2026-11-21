@@ -135,11 +135,12 @@ export function formatDatePicture(date: Date, picture: string): string {
     ss: pad(date.getSeconds()),
   };
   const noon = date.getHours() < 12;
-  const pattern = /'([^']*)'|AM\/PM|am\/pm|A\/P|a\/p|d+|M+|y+|h+|H+|m+|s+/g;
+  const pattern = /'([^']*)'|AM\/PM|am\/pm|A\/P|a\/p|[dD]+|M+|[yY]+|h+|H+|m+|s+/g;
   return picture.replace(pattern, (match, quoted) => {
     if (quoted !== undefined) return quoted as string;
     if (match.includes("/")) return (noon ? match.split("/")[0] : match.split("/")[1]) as string;
-    return parts[match] ?? match;
+    // Word takes d and y in either case; M and m, H and h differ.
+    return parts[/^[dy]/i.test(match) ? match.toLowerCase() : match] ?? match;
   });
 }
 
@@ -686,6 +687,7 @@ function sequenceValues(run: Run, fields: readonly Field[]): Map<Field, number> 
   const counters = new Map<string, number>();
   const seen = new Map<string, { pos: number; value: number }[]>();
   const headings = headingsOf(tree, run.word);
+  const references: { field: Field; list: { pos: number; value: number }[]; to: number }[] = [];
   for (const field of fields) {
     if (field.name !== "SEQ" || field.deleted) continue;
     const { args, switches } = parseFieldInstruction(field.instruction);
@@ -702,16 +704,23 @@ function sequenceValues(run: Run, fields: readonly Field[]): Map<Field, number> 
     )
       value = 0;
     const target = args[1] ? bookmarkNamed(tree, args[1]) : undefined;
+    // A reference counts nothing: it is worked out below, once every number is known.
+    if (target) {
+      references.push({ field, list, to: target.to });
+      continue;
+    }
     // Of `\c`, `\n` and `\r`, the first written counts.
     const action = [...switches.keys()].find((letter) => "cnr".includes(letter));
     const restart = Number(switches.get("r")?.[0]);
-    if (target) value = [...list].reverse().find((s) => s.pos < target.from)?.value ?? 0;
-    else if (action === "r" && Number.isFinite(restart)) value = restart;
+    if (action === "r" && Number.isFinite(restart)) value = restart;
     else if (action !== "c") value++;
-    if (!target) counters.set(id, value);
+    counters.set(id, value);
     list.push({ pos: field.from, value });
     values.set(field, value);
   }
+  // The sequence's last number before the bookmark's end, wherever the reference stands.
+  for (const { field, list, to } of references)
+    values.set(field, [...list].reverse().find((s) => s.pos < to)?.value ?? 0);
   return values;
 }
 
@@ -834,7 +843,11 @@ function work(run: Run, field: Field, sequence: Map<Field, number>): Worked | nu
       if (value instanceof Date)
         shown = picture ? formatDatePicture(value, picture) : value.toISOString();
       else if (picture && typeof value === "string" && !Number.isNaN(Date.parse(value)))
-        shown = formatDatePicture(new Date(value), picture);
+        // A bare day is that day here, not UTC's midnight (the day before, west of it).
+        shown = formatDatePicture(
+          new Date(/^\d{4}-\d{2}-\d{2}$/.test(value) ? `${value}T00:00` : value),
+          picture,
+        );
       const text = formatted(typeof shown === "number" ? shown : String(shown), instruction);
       if (text === null) {
         skip(run, field, "unsupported-switch", "\\*");

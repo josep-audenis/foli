@@ -4,7 +4,7 @@
  * a foreign node or mark holding its type and attributes, and written back as it was.
  */
 import type { Attrs, MarkJSON, MarkSpec, NodeJSON, NodeSpec } from "../model/index.js";
-import { Schema } from "../model/index.js";
+import { FoliDocumentError, Schema } from "../model/index.js";
 import type { Plugin } from "../state/state.js";
 import { isRecord } from "./check.js";
 import { CUSTOM_TYPE, schema as wordSchema } from "./schema.js";
@@ -139,6 +139,9 @@ export function resolveCustom(value: unknown, schema: Schema, inline = false, de
   const type = value.type;
   const marks = resolveMarks(value.marks, schema);
   if (typeof type === "string" && CUSTOM_TYPE.test(type) && !schema.nodes[type]) {
+    // A custom type is a leaf (1.x): content on one would be lost, so it is refused.
+    if (value.content !== undefined || value.text !== undefined)
+      throw new FoliDocumentError(`${type}: a custom node holds no content or text`);
     const text = foreignTextOf(value as unknown as NodeJSON);
     return {
       type: inline ? "foreignInline" : "foreignBlock",

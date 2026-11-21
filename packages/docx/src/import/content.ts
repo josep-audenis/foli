@@ -594,7 +594,8 @@ function run(
     switch (el.local) {
       case "t":
       case "delText":
-        text(spaced(el));
+        // A line end in a `w:t` is white space to Word, not a break (`w:br`, `w:cr`).
+        text(spaced(el).replace(/\n/g, " "));
         break;
       case "tab":
         out.push(node("tab", marks));
@@ -748,13 +749,13 @@ function run(
 }
 
 /**
- * A `w:t`'s text as Word reads it: without `xml:space="preserve"`, whitespace at its ends is not
- * part of the text (Word writes `preserve` whenever it is).
+ * A `w:t`'s text as Word reads it: without `xml:space="preserve"`, XML white space at its ends
+ * is not part of the text (Word writes `preserve` whenever it is). A no-break space is text.
  */
 function spaced(el: XmlElement): string {
   const value = textOf(el);
   const preserve = el.attributes.some(
     (a) => a.local === "space" && a.prefix === "xml" && a.value === "preserve",
   );
-  return preserve ? value : value.trim();
+  return preserve ? value : value.replace(/^[ \t\r\n]+|[ \t\r\n]+$/g, "");
 }

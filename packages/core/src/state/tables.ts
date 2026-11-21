@@ -239,8 +239,15 @@ export function goToCell(dir: 1 | -1): Command {
     const table = $pos.node(tableDepth);
     const tableStart = $pos.before(tableDepth);
     const cells = cellsOf(table, tableStart);
-    const at = cells.indexOf($pos.before(depth));
-    const next = cells[at + dir];
+    const here = $pos.before(depth);
+    const at = cells.indexOf(here);
+    // From a cell a merge covers (not among `cells`): the nearest cell after or before it.
+    const next =
+      at >= 0
+        ? cells[at + dir]
+        : dir > 0
+          ? cells.find((cell) => cell > here)
+          : cells.filter((cell) => cell < here).pop();
     if (next !== undefined) {
       if (dispatch) {
         const tr = state.tr;

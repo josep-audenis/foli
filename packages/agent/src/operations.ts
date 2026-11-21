@@ -302,6 +302,15 @@ function mustStay(node: Node, previous: Node | null, next: Node | null): string 
 }
 
 /** Whether a paragraph has anything left to delete: content not deleted already. */
+/** Whether all of the paragraph's content is `author`'s own tracked insertion. */
+function ownText(node: Node, author: string): boolean {
+  let own = true;
+  node.forEach((child) => {
+    own &&= child.marks.some((m) => m.type.name === "insertion" && m.attrs.author === author);
+  });
+  return own;
+}
+
 const hasContent = (node: Node) => {
   let live = false;
   node.forEach((child) => {
@@ -354,6 +363,7 @@ export function deleteBlock(context: Context, handle: string): Result<{ text: st
     stays &&
     !node.attrs.section &&
     own?.author === author &&
+    ownText(node, author) &&
     previous?.type.name === "paragraph"
   ) {
     // The session's own paragraph, never accepted: it goes for real, as its text would.
@@ -473,9 +483,9 @@ export function comment(
   // Word shows a comment's initials beside it: the author's, as Word makes them.
   const initials = context.author
     .split(/\s+/)
-    .map((word) => word[0] ?? "")
-    .join("")
-    .slice(0, 9);
+    .map((word) => [...word][0] ?? "") // by code point: no half of a surrogate pair
+    .slice(0, 9)
+    .join("");
   if (!editor.run(addComment(content, { initials })))
     return refuse("refused", `Block ${handle} could not be commented.`);
   const made = [...ids()].find((id) => !before.has(id));

@@ -20,6 +20,7 @@ export {
 export { FoliNavigation, type FoliNavigationProps } from "./FoliNavigation.js";
 export {
   defaultToolbarItems,
+  defaultToolbarTabs,
   FoliToolbar,
   type FoliToolbarProps,
   type ToolbarAction,
@@ -35,5 +36,6 @@ export {
   type ToolbarMenu,
   type ToolbarOption,
   type ToolbarSelect,
+  type ToolbarTab,
   toolbarItems,
 } from "./FoliToolbar.js";
