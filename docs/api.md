@@ -256,8 +256,10 @@ the focus on the item, ArrowDown opens a menu. A copy of a built-in item with an
   the button), `pick` the command a choice runs. `custom: true` adds a last entry, "More
   colors…", that opens the browser's color field (an `input type="color"` kept out of sight,
   `.foli-toolbar-color-input`, opened on the color at the selection): `pick` then gets the
-  color chosen, any `#rrggbb`, once the user has chosen it. What that field looks like is
-  the browser's.
+  color chosen, any `#rrggbb`, when the field says it changed (`change`), for the selection
+  the field opened on. What that field looks like, and when it says so, is the browser's: on
+  closing it, or while the user still drags in it, each time an undo step; never for the color
+  it opened on.
 - A built-in box or color menu with other entries is a copy:
   `{ ...toolbarItems.textColor, colors: { ...toolbarItems.textColor.colors, options: mine } }`,
   `{ ...toolbarItems.font, select: { ...toolbarItems.font.select, options: () => myFonts } }`.

@@ -89,7 +89,9 @@ checklist in [testing/ime.md](testing/ime.md)):
   instead of removing its number (untested on a device).
 - The toolbar's colors are a palette (seven text colors, Word's highlights; an app gives the
   menus another one, and the browser's color field with `custom`,
-  [api.md](api.md#toolbar-items)); the built-in menus offer no color picker by default; any
+  [api.md](api.md#toolbar-items): checked by its tests only, not by hand in each browser; a
+  browser that reports every movement in the field makes an undo step of each); the built-in
+  menus offer no color picker by default; any
   `#rrggbb` works through `setTextColor` (a highlight outside Word's is written as shading).
 - Left and Right next to an opaque block treat Left as backward: in right-to-left text, Left at
   the start of a paragraph selects the block before it (left-to-right is the only direction the

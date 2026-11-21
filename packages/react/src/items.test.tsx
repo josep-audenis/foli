@@ -338,7 +338,7 @@ describe("toolbar items", () => {
     const fields = container.querySelectorAll<HTMLInputElement>('input[type="color"]');
     expect(fields).toHaveLength(1);
     const field = fields[0] as HTMLInputElement;
-    expect(field.getAttribute("aria-label")).toBe("Text color: more colors");
+    expect(field.getAttribute("aria-hidden")).toBe("true");
     expect(field.tabIndex).toBe(-1);
     const opened = vi.spyOn(field, "click");
     const button = screen.getByRole("button", { name: "Text color" });
@@ -364,13 +364,20 @@ describe("toolbar items", () => {
     expect(JSON.stringify(editor.state.doc.toJSON())).toContain("12AB56");
     expect(onClickCommand).not.toHaveBeenCalled();
     // Opened with the pointer: the focus goes to the document after the pick.
+    field.value = "#ffffff";
     fireEvent.click(button, { detail: 1 });
     fireEvent.click(screen.getByRole("menuitem", { name: "More colors…" }), { detail: 1 });
-    // It opens on the color at the selection.
+    // It opens on the color at the selection; its button has the focus meanwhile.
     expect(field.value).toBe("#12ab56");
+    expect(document.activeElement).toBe(button);
+    // A click in the document that closes the field moves the selection first: the color
+    // still goes to the selection the field opened on.
+    act(() => editor.select(1, 1));
     field.value = "#000001";
     act(() => void field.dispatchEvent(new Event("change", { bubbles: true })));
     expect(onClickCommand).toHaveBeenCalledOnce();
+    expect(JSON.stringify(editor.state.doc.toJSON())).not.toContain("12AB56");
+    expect(editor.state.selection.empty).toBe(false);
 
     fireEvent.click(screen.getByRole("button", { name: "Highlight" }), { detail: 0 });
     expect(screen.queryByRole("menuitem", { name: "More colors…" })).toBeNull();
