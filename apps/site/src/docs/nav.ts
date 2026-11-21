@@ -30,6 +30,7 @@ export const NAV: Group[] = [
       { md: "packages/docx/README.md", title: "DOCX" },
       { md: "packages/pdf/README.md", title: "PDF" },
       { md: "packages/agent/README.md", title: "Agents" },
+      { md: "packages/mcp/README.md", title: "MCP server" },
       { md: "docs/guides/migrating-from-0x.md" },
     ],
   },

@@ -327,6 +327,29 @@ Unstable (0.x). Details in the [package README](../packages/agent/README.md).
 - A handle lost (its block removed, or joined into the next) does not come back with undo.
 - Every operation reads the whole body again; not measured on long documents.
 
+## The MCP server (`@folijs/mcp`)
+
+Unstable (0.x). Details in the [package README](../packages/mcp/README.md) and
+[ADR-0009](decisions/ADR-0009-mcp-server.md).
+
+- Everything under "Agent editing" above: the tools are that library's operations.
+- Not tried with a model calling the tools in a real client; Claude Code connects to it, and
+  the official SDK's client drives every tool in the tests.
+- Stdio only: no network transport, no authentication, one client a process. Of the protocol
+  it speaks tools; no resources, prompts, progress or cancellation. A JSON-RPC batch is
+  refused, though the `2025-03-26` version of the protocol has them.
+- One message at a time: while a tool runs (an `open` of a large file takes seconds) nothing
+  else is answered, a `ping` included.
+- Documents live in memory: unsaved edits are lost when the server stops, and nothing is saved
+  on its own. A file is open once.
+- Only `.docx`, up to 64 MB and 64 MB unpacked; the open documents hold about 3 million
+  characters of body together, so a very long document may be refused, or leave no room for
+  another. An answer over 200,000 characters is cut: read less at a time.
+- A save beside the original takes the first free name up to `.agent-99.docx`, then refuses.
+- File links (symlinks) could not be made on the Windows machine it was built on: the tests
+  of those rules ran once on Linux (`pnpm check` on `ubuntu-latest`, 2026-11-21) and run in
+  every Release workflow. Not tested on macOS.
+
 ## .docx (`@folijs/docx`)
 
 Details in the [package README](../packages/docx/README.md).
