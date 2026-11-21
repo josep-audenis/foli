@@ -103,11 +103,7 @@ function markInline(nodes: readonly NodeJSON[], slots: FieldSlot[]): NodeJSON[] 
   const out: NodeJSON[] = [];
   for (let i = 0; i < nodes.length; i++) {
     const node = nodes[i] as NodeJSON;
-    out.push(
-      node.type === "text" && node.text?.includes(SLOT_MARK)
-        ? { ...node, text: node.text.replace(//g, SLOT_MARK + SLOT_ESCAPE) }
-        : node,
-    );
+    out.push(escaped(node));
     if (node.type !== "fieldStart") continue;
     let depth = 1;
     let separator = -1;
@@ -126,7 +122,7 @@ function markInline(nodes: readonly NodeJSON[], slots: FieldSlot[]): NodeJSON[] 
     const codeEnd = separator < 0 ? end : separator + 1;
     const result = nodes.slice(codeEnd, end);
     const model = result.find((n) => n.type === "text") ?? nodes[codeEnd - 1];
-    out.push(...nodes.slice(i + 1, codeEnd));
+    out.push(...nodes.slice(i + 1, codeEnd).map(escaped));
     out.push({
       type: "text",
       text: SLOT_MARK + String.fromCharCode(0xe100 + slots.length),
@@ -137,6 +133,17 @@ function markInline(nodes: readonly NodeJSON[], slots: FieldSlot[]): NodeJSON[] 
     i = end;
   }
   return out;
+}
+
+/** `node` with its own `SLOT_MARK`s escaped: its text, or its code where field codes are shown. */
+function escaped(node: NodeJSON): NodeJSON {
+  const kept = (value: string) => value.replace(//g, SLOT_MARK + SLOT_ESCAPE);
+  if (node.type === "text" && node.text?.includes(SLOT_MARK))
+    return { ...node, text: kept(node.text) };
+  const code = node.type === "fieldCode" ? node.attrs?.text : undefined;
+  if (typeof code === "string" && code.includes(SLOT_MARK))
+    return { ...node, attrs: { ...node.attrs, text: kept(code) } };
+  return node;
 }
 
 /** `node` with the page fields in it marked. */

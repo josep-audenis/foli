@@ -47,7 +47,8 @@ export function attributeBag(
   const bag: Record<string, string> = {};
   let count = 0;
   for (const a of element.attributes) {
-    if (modeled.includes(a.name)) continue;
+    // `modeled` names WordprocessingML's attributes as `w:`, whatever prefix the part binds.
+    if (modeled.includes(a.ns === W ? `w:${a.local}` : a.name)) continue;
     if (!ATTRIBUTE_NAME.test(a.name) || a.value.length > 65_535 || count === 64) {
       context.report.unmodeled(`${element.name}@${a.name}`, "not kept as an attribute");
       continue;

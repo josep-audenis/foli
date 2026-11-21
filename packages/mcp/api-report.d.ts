@@ -49,10 +49,14 @@ export interface Tool {
     };
     run(args: Record<string, unknown>): ToolResult | Promise<ToolResult>;
 }
-/** Where answers go: a stream (`write`, and `once("drain")` when it is full), or anything with `write`. */
+/**
+ * Where answers go: a stream (`write`, and `once("drain")` when it is full, or `close` or
+ * `error` when it went away), or anything with `write`.
+ */
 export interface Output {
     write(text: string): unknown;
-    once?(event: "drain", listener: () => void): unknown;
+    once?(event: "drain" | "close" | "error", listener: () => void): unknown;
+    off?(event: "drain" | "close" | "error", listener: () => void): unknown;
 }
 export interface ServerOptions {
     name: string;

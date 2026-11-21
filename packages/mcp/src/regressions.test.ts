@@ -1,3 +1,4 @@
+import { EventEmitter } from "node:events";
 import {
   copyFileSync,
   existsSync,
@@ -12,6 +13,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { exportDocx, importDocx } from "@folijs/docx";
 import { afterEach, describe, expect, it } from "vitest";
+import { Documents } from "./documents.js";
+import { fileRules } from "./files.js";
+import { serve } from "./protocol.js";
 import { foliServer } from "./server.js";
 import { connect } from "./testing/client.js";
 
@@ -91,6 +95,68 @@ describe("regressions", () => {
     const closed = await call("close");
     expect(closed.refused).toBe(true);
     expect(closed.text).toContain("changes that are not saved");
+    await client.close();
+  });
+
+  it("says a save's failure on one line, as an open's", async () => {
+    const root = folder();
+    const documents = new Documents(fileRules(root, false), () => "Agent");
+    const document = await documents.open(NDA);
+    if (!("session" in document)) throw new Error(document.text);
+    document.session.document = () => {
+      throw new Error(`first line\nsecond line\u2028${"x".repeat(1000)}`);
+    };
+    const saved = await documents.save(document, "out.docx");
+    expect(saved.isError).toBe(true);
+    expect(saved.text).not.toMatch(/[\r\n\u2028]/);
+    expect(saved.text).toContain("first line second line");
+    expect(saved.text.length).toBeLessThan(400);
+  });
+
+  it("ignores a byte order mark before the first message", async () => {
+    const lines: string[] = [];
+    const input = (async function* () {
+      yield Buffer.from(`﻿${JSON.stringify({ jsonrpc: "2.0", id: 1, method: "ping" })}\n`);
+    })();
+    await serve(input, { write: (t) => lines.push(t) }, { name: "t", version: "0", tools: [] });
+    expect(JSON.parse(lines[0] ?? "")).toEqual({ jsonrpc: "2.0", id: 1, result: {} });
+  });
+
+  it("ignores a byte order mark that comes split over chunks", async () => {
+    const lines: string[] = [];
+    const message = Buffer.from(`﻿${JSON.stringify({ jsonrpc: "2.0", id: 1, method: "ping" })}\n`);
+    const input = (async function* () {
+      yield message.subarray(0, 1);
+      yield message.subarray(1, 2);
+      yield message.subarray(2);
+    })();
+    await serve(input, { write: (t) => lines.push(t) }, { name: "t", version: "0", tools: [] });
+    expect(JSON.parse(lines[0] ?? "")).toEqual({ jsonrpc: "2.0", id: 1, result: {} });
+  });
+
+  it("stops when the output closes while an answer waits to be taken", async () => {
+    const output = Object.assign(new EventEmitter(), { write: () => false });
+    const input = (async function* () {
+      yield `${JSON.stringify({ jsonrpc: "2.0", id: 1, method: "ping" })}\n`;
+      yield `${JSON.stringify({ jsonrpc: "2.0", id: 2, method: "ping" })}\n`;
+    })();
+    const done = serve(input, output, { name: "t", version: "0", tools: [] });
+    await new Promise((resolve) => setImmediate(resolve));
+    output.emit("close");
+    await expect(done).rejects.toThrow(/closed/);
+    expect(output.listenerCount("drain") + output.listenerCount("error")).toBe(0);
+  });
+
+  it("saves again over its own file named in other capitals", async () => {
+    const root = folder();
+    const { client, call } = await server(root);
+    await call("open", { path: NDA });
+    expect((await call("save", { path: "out.docx" })).refused).toBe(false);
+    // Only where capitals do not count (Windows, macOS): elsewhere OUT.DOCX is another file.
+    if (existsSync(join(root, "OUT.DOCX")))
+      expect((await call("save", { path: "OUT.DOCX" })).text).toBe("Saved d1 as OUT.DOCX.");
+    // Someone else's file is still not written over.
+    expect((await call("save", { path: NDA })).refused).toBe(true);
     await client.close();
   });
 });

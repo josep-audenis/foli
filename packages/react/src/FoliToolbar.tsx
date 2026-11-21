@@ -1413,6 +1413,17 @@ const statesOf =
 const actionsOf = (item: Item, body: Editor): readonly Action[] =>
   typeof item.actions === "function" ? item.actions(body) : (item.actions ?? []);
 
+/** The mounted, enabled toolbars of each editor, in order: one of them opens its link dialog. */
+const linkOwners = new WeakMap<Editor, { holds: (node: Node | null) => boolean }[]>();
+
+/** ArrowRight's step (WAI-ARIA): mirrored right to left, where it goes to the previous one. */
+const rightStep = (element: Element) =>
+  // The `dir` attribute too: environments without layout (jsdom) do not compute `direction`.
+  getComputedStyle(element).direction === "rtl" ||
+  element.closest("[dir]")?.getAttribute("dir")?.toLowerCase() === "rtl"
+    ? -1
+    : 1;
+
 /** The same groups of the same items (an inline `items` array is not a change). */
 const sameGroups = (a: ToolbarGroups | undefined, b: ToolbarGroups | undefined) =>
   a === b ||
@@ -1470,6 +1481,12 @@ export function FoliToolbar({
   const [tabKey, setTabKey] = useState(defaultTab ?? null);
   const wanted = givenTab ?? tabKey;
   const tab = tabs?.find((t) => t.key === wanted) ?? tabs?.[0];
+  // A pick taken out of `tabs` is forgotten: it is not selected again when the app adds it back
+  // (one hidden by its `visible` stays wanted).
+  const pickGone = tabKey !== null && !allTabs?.some((t) => t.key === tabKey);
+  useEffect(() => {
+    if (pickGone) setTabKey(null);
+  }, [pickGone]);
   const itemGroups = tab ? tab.items : givenGroups;
   const tabButtons = useRef<(HTMLButtonElement | null)[]>([]);
   // Without "New comment" where no comments pane lets a comment be written.
@@ -1620,7 +1637,9 @@ export function FoliToolbar({
   const colorFields = useRef<Record<string, HTMLInputElement | null>>({});
   const customColor = useRef<{ pointer: boolean; editor: Editor; state: EditorState } | null>(null);
   // Nor does it come back with its item, once that has left the toolbar.
-  const menuGone = menu !== null && !items.some((item) => item.key === menu);
+  // Nor stays open once its item's `enabled` says no (read-only, another selection).
+  const menuGone =
+    menu !== null && !items.some((item, i) => item.key === menu && states[i]?.enabled !== false);
   useEffect(() => {
     if (disabled || menuGone) setMenu(null);
   }, [disabled, menuGone]);
@@ -1661,6 +1680,22 @@ export function FoliToolbar({
   // for the selection it opened on: a change to the document or the selection (a click in the
   // document) closes it. A second request while it is open focuses it again.
   const [dialog, setDialog] = useState<LinkDialogState | null>(null);
+  // Several toolbars on one editor open one link dialog: the toolbar's that has the focus (its
+  // link button), else the first enabled one mounted's.
+  const linkOwner = useRef({
+    holds: (node: Node | null) => !!(ribbon.current ?? bar.current)?.contains(node),
+  });
+  useEffect(() => {
+    if (disabled) return;
+    const owner = linkOwner.current;
+    linkOwners.set(editor, [...(linkOwners.get(editor) ?? []), owner]);
+    return () => {
+      linkOwners.set(
+        editor,
+        (linkOwners.get(editor) ?? []).filter((o) => o !== owner),
+      );
+    };
+  }, [editor, disabled]);
   useEffect(
     () =>
       editor.subscribe((state, transactions) => {
@@ -1728,6 +1763,9 @@ export function FoliToolbar({
           return;
         }
         const active = typeof document === "undefined" ? null : document.activeElement;
+        const owners = linkOwners.get(editor) ?? [];
+        if ((owners.find((owner) => owner.holds(active)) ?? owners[0]) !== linkOwner.current)
+          return;
         setTableDialog(null);
         setPictureDialog(null);
         setSetupDialog(null);
@@ -1752,7 +1790,14 @@ export function FoliToolbar({
     if (disabled) setDialog(null);
   }, [disabled]);
   const closeDialog = () => {
-    giveBack(dialog?.restore);
+    const restore = dialog?.restore;
+    // What had the focus went (an app's or the picture dialog, closed for this one): the Link
+    // button, else the document.
+    if (restore && !restore.isConnected) {
+      const link = buttons.current[shown.current.findIndex((item) => item.key === "link")];
+      if (link) giveBack(link);
+      else onClickCommand?.();
+    } else giveBack(restore);
     setDialog(null);
   };
   // The insert table dialog (from the table menu): the focus goes back to the menu's button.
@@ -1909,9 +1954,10 @@ export function FoliToolbar({
     // From the tab that has the focus: the selected one, unless the app kept its `tab`.
     const focusedTab = tabButtons.current.indexOf(event.target as HTMLButtonElement);
     const at = focusedTab >= 0 ? focusedTab : tabs.findIndex((t) => t.key === tab.key);
+    const right = rightStep(event.currentTarget);
     const moves: Record<string, number> = {
-      ArrowRight: (at + 1) % count,
-      ArrowLeft: (at - 1 + count) % count,
+      ArrowRight: (at + right + count) % count,
+      ArrowLeft: (at - right + count) % count,
       Home: 0,
       End: count - 1,
     };
@@ -1983,9 +2029,10 @@ export function FoliToolbar({
     // Alt+Left (back) and other shortcuts are the browser's.
     if (event.altKey || event.ctrlKey || event.metaKey) return;
     const count = items.length;
+    const right = rightStep(event.currentTarget);
     const moves: Record<string, number> = {
-      ArrowRight: (active + 1) % count,
-      ArrowLeft: (active - 1 + count) % count,
+      ArrowRight: (active + right + count) % count,
+      ArrowLeft: (active - right + count) % count,
       Home: 0,
       End: count - 1,
     };

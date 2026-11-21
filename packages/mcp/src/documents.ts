@@ -162,7 +162,7 @@ export class Documents {
     try {
       bytes = await exportDocx(document.session.document(), document.package);
     } catch (error) {
-      const why = error instanceof Error ? error.message : "it could not be written";
+      const why = error instanceof Error ? oneLine(error.message) : "it could not be written";
       return refusal(`${document.id} could not be saved: ${why}`);
     }
     const written = write(file, bytes, this.#rules.overwrite || this.#mine(file));
@@ -174,8 +174,10 @@ export class Documents {
 
   /** Whether `file` is as the server wrote it in this run: it may write over it again. */
   #mine(file: string): boolean {
-    const left = this.#written.get(file);
-    return left !== undefined && left !== null && left === stamp(file);
+    // By `same`: in other capitals (Windows, macOS) it is still the file the server wrote.
+    for (const [written, left] of this.#written)
+      if (left !== null && same(written, file) && left === stamp(file)) return true;
+    return false;
   }
 
   close(document: OpenDocument, discard: boolean): ToolResult {
