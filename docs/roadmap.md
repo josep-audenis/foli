@@ -24,7 +24,7 @@ place that says what is in progress; check it before starting work.
 | 10 Tables & images       | ✅ Done                  | —                | Merged in #73–#97 (#90, the landing page, went to main); 0.5.0 on npm; two misses accepted                   |
 | 11 Sections & templates  | ✅ Done                  | —                | Merged in #100–#118 (#106, #107, #110, #112 and #113, the site, went to main); 0.6.0 on npm; misses accepted |
 | 12 Ecosystem & 1.0       | ✅ Done                  | —                | Merged in #120–#133; 1.0.0 on npm (2026-11-20); Phase 5 speed misses and manual checks accepted as 1.0 risks |
-| 13 Agent library         | In progress              | `phase-13/agent` | 13.1–13.2 done; `@folijs/mcp` (Phase 14, not planned yet) waits for it                                       |
+| 13 Agent library         | In progress              | `phase-13/agent` | 13.1–13.3 done; `@folijs/mcp` (Phase 14, not planned yet) waits for it                                       |
 
 Status values: `Ready` (dependencies met, nobody on it) · `In progress` · `In review` (PR open) ·
 `✅ Done` (merged, acceptance criteria met) · `Blocked by …`.
@@ -1976,10 +1976,24 @@ Each task is a PR on `phase-13/agent`, the build green after each.
   handle out of order at any step; then either `rejectAllChanges(author)` gives back every
   block under its first handle with its first text, or `acceptAllChanges` leaves the read text
   whole with every block under a handle it had.)
-- [ ] 13.3 Editing text: `replaceText(handle, find, replacement, { all })` (refuses on none, or
+- [x] 13.3 Editing text: `replaceText(handle, find, replacement, { all })` (refuses on none, or
   on several without `all`, saying how many), `insertAfter` and `insertBefore(handle, paragraphs)`
   (text and an optional style each), `deleteBlock(handle)`. Each returns what changed in the
-  read format, so the model need not read again. Refusals as values, not exceptions.
+  read format, so the model need not read again. Refusals as values, not exceptions. (Done:
+  `replaceText` goes through core's `findAll` and `replace` with capitals counting, kept to the
+  block's range, so it finds what `read` shows and nothing deleted; ↵ and "
+  " are a line
+  break in `find`, the replacement and new paragraphs. `insertAfter` and `insertBefore` take
+  strings or `{ text, style }`, next to any block; a new paragraph next to a paragraph has its
+  properties (style, numbering, indents, its content controls), as Enter gives in Word, without
+  its mark's own (section break, revisions, `w14:paraId`); a style is named by name or id,
+  capitals not counting, and a built-in heading the document lacks is added. `deleteBlock`
+  takes a paragraph or a table (`deleteTable`); where Word needs a paragraph (the last of the
+  body or of a cell, between two tables) it is emptied and the result says so. Each returns the
+  blocks as they read now, in `blocks` and `text` (`deleteBlock` a sentence). A block deleted as
+  a tracked change is `gone` to every operation. Tests reject the agent's changes after each
+  operation and compare the read with the first. The blocks around an inserted or deleted block keep their handles when
+  the change is accepted or rejected (13.2's handles).)
 - [ ] 13.4 Style and comments: `styles()`, `setStyle(handle, name)`,
   `comment(handle, text, { on })` (`on`: text in the block to anchor to; the whole block
   without it).

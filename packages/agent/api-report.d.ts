@@ -4,9 +4,27 @@
 export {};
 
 // index.d.ts
+export type { Changed, NewParagraph, ReplaceOptions } from "./operations.js";
 export { type Block, formatBlocks } from "./read.js";
 export type { Ok, Refusal, Result } from "./result.js";
 export { openSession, type ReadOptions, type ReadResult, type Session, type SessionOptions, } from "./session.js";
+
+// operations.d.ts
+import { type Block } from "./read.js";
+/** A paragraph to insert: its text ("\n" or ↵ a line break, a tab a tab), in `style` if given. */
+export type NewParagraph = string | {
+    text: string;
+    style?: string;
+};
+/** What an operation changed: the blocks as they are now, and as `read` would show them. */
+export interface Changed {
+    blocks: Block[];
+    text: string;
+}
+export interface ReplaceOptions {
+    /** Replace every place `find` is in the block. Default: refuse when there are several. */
+    all?: boolean;
+}
 
 // read.d.ts
 /** A block as an agent reads it: the document as it would be with every change accepted. */
@@ -73,6 +91,7 @@ export type Result<T = object> = Ok<T> | Refusal;
 
 // session.d.ts
 import { type Editor, type EditorDocument, type Extension, type FoliDocument } from "@folijs/core";
+import { type Changed, type NewParagraph, type ReplaceOptions } from "./operations.js";
 import { type Block } from "./read.js";
 import { type Result } from "./result.js";
 export interface SessionOptions {
@@ -113,6 +132,29 @@ export interface Session {
     /** One block by its handle. */
     block(handle: string): Result<{
         block: Block;
+        text: string;
+    }>;
+    /**
+     * Replaces `find` in a paragraph by `replacement` ("" deletes it). `find` is text as `read`
+     * shows it, capitals and spaces included, and must be in the block once, unless `all`. The
+     * replacement takes the formatting of the text it replaces. Returns the block as it reads now.
+     */
+    replaceText(handle: string, find: string, replacement: string, options?: ReplaceOptions): Result<Changed & {
+        replaced: number;
+    }>;
+    /**
+     * Inserts paragraphs after a block (a paragraph, a table, anything read). Next to a paragraph
+     * they are formatted as it is, numbering included, unless they name a `style`. Returns the
+     * new blocks with their handles.
+     */
+    insertAfter(handle: string, paragraphs: readonly NewParagraph[]): Result<Changed>;
+    /** As `insertAfter`, before the block: the block keeps its handle. */
+    insertBefore(handle: string, paragraphs: readonly NewParagraph[]): Result<Changed>;
+    /**
+     * Deletes a paragraph, or a table with all its cells. The last paragraph of the document or
+     * of a cell cannot go: it is emptied, and `text` says so.
+     */
+    deleteBlock(handle: string): Result<{
         text: string;
     }>;
 }
