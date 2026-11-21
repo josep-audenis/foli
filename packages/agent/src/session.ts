@@ -3,6 +3,7 @@ import {
   type Editor,
   type EditorDocument,
   type Extension,
+  type FieldsReport,
   type FoliDocument,
 } from "@folijs/core";
 import { Handles } from "./handles.js";
@@ -23,6 +24,13 @@ import {
 } from "./operations.js";
 import { type Block, formatBlocks, readBlocks } from "./read.js";
 import { type Result, refuse } from "./result.js";
+import {
+  type Control,
+  controls,
+  fillControl,
+  type UpdateFieldsOptions,
+  updateFields,
+} from "./templates.js";
 
 export interface SessionOptions {
   /** Whose tracked changes and comments the session's edits are. */
@@ -109,6 +117,23 @@ export interface Session {
     text: string,
     options?: CommentOptions,
   ): Result<Changed & { comment: number }>;
+  /** The body's content controls: what a template leaves to be filled, with their values. */
+  controls(): Control[];
+  /**
+   * Fills the content control named by its tag (every control with that tag), else its title,
+   * else its id. Text for a text control, an item for a list, `yyyy-mm-dd` for a date, true or
+   * false for a check box; null or "" empties it. A tracked change. Returns the blocks changed
+   * and the controls as they are now.
+   */
+  fillControl(
+    name: string,
+    value: string | boolean | null,
+  ): Result<Changed & { controls: Control[] }>;
+  /**
+   * Updates the document's fields (dates, cross-references, tables of contents; page numbers
+   * need a layout and are left), and fills its merge fields from `data`. A tracked change.
+   */
+  updateFields(options?: UpdateFieldsOptions): Result<FieldsReport & { text: string }>;
 }
 
 /**
@@ -168,5 +193,8 @@ export function openSession(document: EditorDocument, options: SessionOptions): 
     styles: () => styles(context),
     setStyle: (handle, style) => setStyle(context, handle, style),
     comment: (handle, text, options) => comment(context, handle, text, options),
+    controls: () => controls(context),
+    fillControl: (name, value) => fillControl(context, name, value),
+    updateFields: (options) => updateFields(context, options),
   };
 }

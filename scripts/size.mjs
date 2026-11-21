@@ -92,6 +92,7 @@ writeFileSync(appEntry, `export { FoliEditor } from "${dist("react")}";\n`);
  * all of it is core, which an app that edits already loads.
  * Raised in 13.3 (62.1 kB): the editing operations bring in core's find and replace, table
  * deletion and paragraph styles.
+ * Raised in 13.5 (72.0 kB): comments (13.4), content controls' values and field updates.
  */
 const BUNDLES = [
   { name: "@folijs/core", entry: dist("core"), budget: 88_000 },
@@ -100,7 +101,7 @@ const BUNDLES = [
   { name: "FoliEditor only", entry: appEntry, budget: 160_800 },
   { name: "@folijs/docx", entry: dist("docx"), budget: 61_440 },
   { name: "@folijs/pdf", entry: dist("pdf"), budget: 18_800 },
-  { name: "@folijs/agent", entry: dist("agent"), budget: 66_000 },
+  { name: "@folijs/agent", entry: dist("agent"), budget: 77_500 },
 ];
 /** Bundles built as they ship (minified scripts): their gzipped bytes, with their budget. */
 const BUILT = [

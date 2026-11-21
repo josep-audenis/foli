@@ -8,6 +8,7 @@ export type { Changed, CommentOptions, NewParagraph, ReplaceOptions } from "./op
 export { type Block, formatBlocks } from "./read.js";
 export type { Ok, Refusal, Result } from "./result.js";
 export { openSession, type ReadOptions, type ReadResult, type Session, type SessionOptions, } from "./session.js";
+export type { Control, UpdateFieldsOptions } from "./templates.js";
 
 // operations.d.ts
 import { type Block } from "./read.js";
@@ -94,10 +95,11 @@ export type Ok<T = object> = {
 export type Result<T = object> = Ok<T> | Refusal;
 
 // session.d.ts
-import { type Editor, type EditorDocument, type Extension, type FoliDocument } from "@folijs/core";
+import { type Editor, type EditorDocument, type Extension, type FieldsReport, type FoliDocument } from "@folijs/core";
 import { type Changed, type CommentOptions, type NewParagraph, type ReplaceOptions } from "./operations.js";
 import { type Block } from "./read.js";
 import { type Result } from "./result.js";
+import { type Control, type UpdateFieldsOptions } from "./templates.js";
 export interface SessionOptions {
     /** Whose tracked changes and comments the session's edits are. */
     author: string;
@@ -181,6 +183,24 @@ export interface Session {
     comment(handle: string, text: string, options?: CommentOptions): Result<Changed & {
         comment: number;
     }>;
+    /** The body's content controls: what a template leaves to be filled, with their values. */
+    controls(): Control[];
+    /**
+     * Fills the content control named by its tag (every control with that tag), else its title,
+     * else its id. Text for a text control, an item for a list, `yyyy-mm-dd` for a date, true or
+     * false for a check box; null or "" empties it. A tracked change. Returns the blocks changed
+     * and the controls as they are now.
+     */
+    fillControl(name: string, value: string | boolean | null): Result<Changed & {
+        controls: Control[];
+    }>;
+    /**
+     * Updates the document's fields (dates, cross-references, tables of contents; page numbers
+     * need a layout and are left), and fills its merge fields from `data`. A tracked change.
+     */
+    updateFields(options?: UpdateFieldsOptions): Result<FieldsReport & {
+        text: string;
+    }>;
 }
 /**
  * Opens a document for an agent. The document is validated as `createEditor` does (an older
@@ -188,3 +208,31 @@ export interface Session {
  * Throws on a document that does not validate, and on an empty `author`.
  */
 export declare function openSession(document: EditorDocument, options: SessionOptions): Session;
+
+// templates.d.ts
+import { type ControlValue } from "@folijs/core";
+/** A content control of the body: a place a template leaves to be filled. */
+export interface Control {
+    /** What `fillControl` takes: its tag, or its title when it has no tag, or its id. */
+    name: string;
+    tag?: string;
+    title?: string;
+    kind: ControlValue["kind"];
+    /**
+     * Text: the text. A list: the chosen item. A date: `yyyy-mm-dd`. A check box: whether it is
+     * checked. Null while it is empty, and for kinds that hold no value.
+     */
+    value: string | boolean | null;
+    /** It shows its placeholder: nothing was filled in yet. */
+    empty: boolean;
+    /** A drop-down list's or combo box's items, as shown. */
+    items?: string[];
+    /** Locked, or filled from bound data: it cannot be filled. */
+    readOnly: boolean;
+    /** The handle of the block it is in (the first, when it holds several). */
+    block: string;
+}
+export interface UpdateFieldsOptions {
+    /** Values for the document's merge fields (`«Name»` in a read), by field name. */
+    data?: Readonly<Record<string, unknown>>;
+}

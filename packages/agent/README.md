@@ -5,8 +5,8 @@ edits are tracked changes in the agent's name, for a person to accept or reject 
 Word. No DOM and no Node built-ins: runs in Node, browsers, workers and sandboxes. Its only
 dependency is `@folijs/core`, a peer at an exact version.
 
-> **Unstable (0.x), unreleased.** In development (roadmap, Phase 13): reading, text editing, styles and
-> comments are built; templates are not yet. Outside the 1.0 promise of the other packages.
+> **Unstable (0.x), unreleased.** In development (roadmap, Phase 13): every operation is built; not yet
+> released. Outside the 1.0 promise of the other packages.
 
 ```ts
 import { openSession } from "@folijs/agent";
@@ -91,3 +91,36 @@ Refusals a model can act on: `no-match` (with the block's text), `several-matche
 many), `unknown-style` (with the styles there are), `gone`, `unknown-handle`, `not-a-paragraph`,
 `read-only` (a locked content control, content Foli does not edit), `invalid` (an argument of
 the wrong kind), `refused` (the document would not take the change). No operation throws.
+
+## Templates
+
+A template's blanks are Word's content controls and merge fields. A read shows an unfilled
+control as `[empty: Offer date]` and a merge field as `«CandidateFirstName»`.
+
+```ts
+session.controls();
+// [{ name: "offer_date", title: "Offer date", kind: "date", value: null, empty: true,
+//    readOnly: false, block: "b2" },
+//  { name: "position", kind: "dropDown", items: ["Data Engineer", "Senior Data Engineer"], … }]
+session.fillControl("offer_date", "2026-12-01");
+session.fillControl("position", "Senior Data Engineer");
+session.fillControl("remote", true);
+session.updateFields({ data: { CandidateFirstName: "Ada" } });
+```
+
+- **`controls()`**: the body's content controls with their values, and the handle of the block
+  each is in.
+- **`fillControl(name, value)`**: by the control's tag (every control that has it), else its
+  title, else its id. Text for a text control, one of its items for a list, `yyyy-mm-dd` for a
+  date, true or false for a check box; `null` empties it. A wrong value is refused with what
+  would work (a list's items); a locked control as `read-only`.
+- **`updateFields({ data })`**: updates the document's fields (dates, cross-references, a table
+  of contents) and fills its merge fields from `data`. The result says what was left as it
+  was: merge fields without data, and page numbers, which need a page layout the session does
+  not have.
+
+## Limits
+
+Unstable: the API may change in any 0.x release. What is not there yet, and what rejecting the
+agent's changes does not bring back exactly:
+[limitations](https://github.com/josep-audenis/foli/blob/main/docs/limitations.md#agent-editing-folijsagent).

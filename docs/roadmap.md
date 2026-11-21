@@ -24,7 +24,7 @@ place that says what is in progress; check it before starting work.
 | 10 Tables & images       | ✅ Done                  | —                | Merged in #73–#97 (#90, the landing page, went to main); 0.5.0 on npm; two misses accepted                   |
 | 11 Sections & templates  | ✅ Done                  | —                | Merged in #100–#118 (#106, #107, #110, #112 and #113, the site, went to main); 0.6.0 on npm; misses accepted |
 | 12 Ecosystem & 1.0       | ✅ Done                  | —                | Merged in #120–#133; 1.0.0 on npm (2026-11-20); Phase 5 speed misses and manual checks accepted as 1.0 risks |
-| 13 Agent library         | In progress              | `phase-13/agent` | 13.1–13.4 done; `@folijs/mcp` (Phase 14, not planned yet) waits for it                                       |
+| 13 Agent library         | In progress              | `phase-13/agent` | 13.1–13.5 done; `@folijs/mcp` (Phase 14, not planned yet) waits for it                                       |
 
 Status values: `Ready` (dependencies met, nobody on it) · `In progress` · `In review` (PR open) ·
 `✅ Done` (merged, acceptance criteria met) · `Blocked by …`.
@@ -2018,8 +2018,20 @@ Each task is a PR on `phase-13/agent`, the build green after each.
   the document after and refuses as `read-only` (a paragraph that only holds a locked inline
   control is restyled). Comments carry the author's initials. A comment in a locked control is
   made, as in Word.)
-- [ ] 13.5 Templates: `controls()` (tag, title, kind, value, the block it is in),
-  `fillControl(tagOrTitle, value)`, `updateFields()`. A read-only control is refused by name.
+- [x] 13.5 Templates: `controls()` (tag, title, kind, value, the block it is in),
+  `fillControl(tagOrTitle, value)`, `updateFields()`. A read-only control is refused by name. (Done: `controls()` gives the body's
+  content controls in order: `name` (the tag, else the title, else the id: what `fillControl`
+  takes), kind, value, whether it still shows its placeholder, a list's items, whether it is
+  locked, and the handle of the block it is in. A read shows an unfilled one as
+  `[empty: Offer date]` (13.2). `fillControl(name, value)` matches the tag (every control with
+  it), else the title, else the id, capitals not counting, and runs core's `setControlValue`:
+  text, a list's item, `yyyy-mm-dd`, true or false; null empties. Refused with what would work:
+  the controls there are, a drop-down's items, true or false for a check box, `read-only` for a
+  locked one. `updateFields({ data })` runs core's `updateFields`: `data` fills merge fields
+  (`«Name»` in a read); the result counts what changed and names the merge fields left without
+  data and the fields skipped with why (page numbers need a layout the session does not have).
+  All tracked. Size 72.0 kB gzip with core (field updates are most of the growth), budget
+  75.7 kB.)
 - [ ] 13.6 The three tasks and the tracking check: tests that import a corpus `.docx`, run the
   calls a model would make, export, and import again; `rejectAllChanges(author)` compared with
   the input for each; the results opened in Word by the harness. Fix what they find in the
