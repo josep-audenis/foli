@@ -97,7 +97,14 @@ export function tools(documents: Documents, code: SandboxLimits | false = false)
       const before = session.editor.state.doc;
       const dirty = document.dirty;
       const point = session.checkpoint();
-      const result = run(session, a, document);
+      let result: ToolResult;
+      try {
+        result = run(session, a, document);
+      } catch (error) {
+        // A tool that throws keeps no checkpoint open; what it did stays, as it did before.
+        point.release();
+        throw error;
+      }
       // A document is held to a weight, whatever made it heavier: what would pass it is
       // taken back.
       if (weight(session) > document.heaviest) {
