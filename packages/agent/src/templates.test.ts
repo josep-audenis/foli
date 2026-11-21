@@ -310,9 +310,9 @@ describe("what the review of #142 found", () => {
     const built = session.updateFields({ contents: true });
     expect(built).toMatchObject({ ok: true, rebuilt: 1 });
     expect(built.ok && built.text).toContain("page numbers are empty until Word updates the field");
-    expect(built.ok && built.text).toMatch(
-      /\d+ page numbers not worked out, and left as they were/,
-    );
+    // One table, counted once; its old entries' page numbers are not "left as they were".
+    expect(built.ok && built.text).toMatch(/^1 field updated/);
+    expect(built.ok && built.text).not.toContain("left as");
     // The entries again, their numbers gone: what the sentence says.
     expect(contents()[0]).toMatch(/toc 1, changed: Board summary\t$/);
   });

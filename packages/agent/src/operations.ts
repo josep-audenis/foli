@@ -485,8 +485,8 @@ export function comment(
     .split(/\s+/)
     // Each word's first letter or digit, as a person's initials are: "Claude (trial)" is "Ct".
     .map((word) => /[\p{L}\p{N}]/u.exec(word)?.[0] ?? "")
-    .slice(0, 9)
-    .join("");
+    // Nine UTF-16 units at most, as core keeps, and never half a character.
+    .reduce((all, initial) => (all.length + initial.length <= 9 ? all + initial : all), "");
   if (!editor.run(addComment(content, { initials })))
     return refuse("refused", `Block ${handle} could not be commented.`);
   const made = [...ids()].find((id) => !before.has(id));

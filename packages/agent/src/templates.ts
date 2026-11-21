@@ -233,14 +233,34 @@ export function updateFields(
   const rebuild = options?.contents === true;
   const inContents = (field: Field | null): boolean =>
     field !== null && (field.name === "TOC" || inContents(field.parent));
-  const tables = fieldsIn(context.editor.state.doc).filter((f) => f.name === "TOC").length;
-  const report = updateFieldsOf(context.editor, {
+  // The tables `contents` would build: not one deleted, nor one inside another.
+  const tables = fieldsIn(context.editor.state.doc).filter(
+    (f) => f.name === "TOC" && !f.deleted && !inContents(f.parent),
+  ).length;
+  const before = context.editor.state.doc;
+  const rest = updateFieldsOf(context.editor, {
     ...(given ? { data: given } : {}),
-    ...(rebuild ? {} : { only: (field: Field) => !inContents(field) }),
+    only: (field: Field) => !inContents(field),
   });
+  // The tables apart, after the rest: the page numbers of entries about to be replaced are
+  // not among those "left as they were".
+  const built = rebuild
+    ? updateFieldsOf(context.editor, {
+        only: (field: Field) => field.name === "TOC",
+        continues: context.editor.state.doc !== before,
+      })
+    : null;
+  const report: FieldsReport = built
+    ? {
+        updated: rest.updated + built.updated,
+        unchanged: rest.unchanged + built.unchanged,
+        rebuilt: built.rebuilt,
+        skipped: [...rest.skipped, ...built.skipped],
+      }
+    : rest;
 
   // What was left, said for a model: by reason, the body's only (the session reads no other).
-  const body = report.skipped.filter((s) => s.story === null);
+  const body = rest.skipped.filter((s) => s.story === null);
   const pages = body.filter((s) => s.reason === "no-layout").length;
   const noData = new Set(body.filter((s) => s.reason === "no-data").map((s) => s.detail ?? ""));
   // Without data core leaves merge fields alone and does not report them: name them.
@@ -253,7 +273,8 @@ export function updateFields(
   const others = body
     .filter((s) => s.reason !== "no-layout" && s.reason !== "no-data")
     .map((s) => `${s.instruction.trim()} (${s.reason}${s.detail ? `: ${s.detail}` : ""})`);
-  const done = report.updated + report.rebuilt;
+  // Core counts a table built again among the updated.
+  const done = report.updated;
   const text = [
     `${count(done, "field")} updated, ${report.unchanged} unchanged.`,
     ...(noData.size ? [`Merge fields without data: ${[...noData].join(", ")}.`] : []),
