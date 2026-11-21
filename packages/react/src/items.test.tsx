@@ -13,11 +13,12 @@ import {
   TextSelection,
   undo,
 } from "@folijs/core";
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   defaultToolbarItems,
+  defaultToolbarTabs,
   FoliEditor,
   FoliEditorProvider,
   FoliToolbar,
@@ -27,6 +28,7 @@ import {
   type ToolbarItem,
   type ToolbarItemName,
   type ToolbarSelect,
+  type ToolbarTab,
   toolbarItems,
   useCommand,
   useEditorState,
@@ -459,6 +461,105 @@ describe("toolbar items", () => {
     expect(field.getAttribute("aria-disabled")).toBe("false");
     act(() => editor.run(insertText("Hey")));
     expect(field.value).toBe("3");
+  });
+
+  it("shows tabs over the toolbar: one tab's items at a time, arrow keys between tabs", () => {
+    const editor = createEditor({ document: doc() });
+    const tabs: ToolbarTab[] = [
+      { key: "edit", label: "Edit", items: [[toolbarItems.undo, toolbarItems.redo]] },
+      { key: "format", label: "Format", items: [[toolbarItems.bold], [clear]] },
+    ];
+    const { rerender } = render(<FoliToolbar editor={editor} tabs={tabs} items={[[clear]]} />);
+    const names = () =>
+      within(screen.getByRole("toolbar"))
+        .getAllByRole("button")
+        .map((b) => b.getAttribute("aria-label") ?? b.textContent);
+    screen.getByRole("tablist", { name: "Formatting tabs" });
+    const [edit, format] = screen.getAllByRole("tab") as [HTMLElement, HTMLElement];
+    expect([edit.textContent, format.textContent]).toEqual(["Edit", "Format"]);
+    expect([edit.getAttribute("aria-selected"), format.getAttribute("aria-selected")]).toEqual([
+      "true",
+      "false",
+    ]);
+    expect([edit.tabIndex, format.tabIndex]).toEqual([0, -1]);
+    // The tab names its panel, which holds the toolbar; `items` gives way to the tabs.
+    const tabPanel = screen.getByRole("tabpanel", { name: "Edit" });
+    expect(edit.getAttribute("aria-controls")).toBe(tabPanel.id);
+    expect(tabPanel.firstElementChild).toBe(screen.getByRole("toolbar", { name: "Formatting" }));
+    expect(names()).toEqual(["Undo", "Redo"]);
+
+    // Arrow keys move between tabs and show each; they wrap.
+    act(() => edit.focus());
+    fireEvent.keyDown(edit, { key: "ArrowRight" });
+    expect(document.activeElement).toBe(format);
+    expect(format.getAttribute("aria-selected")).toBe("true");
+    expect(names()).toEqual(["Bold", "Clear"]);
+    screen.getByRole("tabpanel", { name: "Format" });
+    fireEvent.keyDown(format, { key: "ArrowRight" });
+    expect(document.activeElement).toBe(edit);
+    expect(names()).toEqual(["Undo", "Redo"]);
+    fireEvent.keyDown(edit, { key: "End" });
+    expect(names()).toEqual(["Bold", "Clear"]);
+
+    // A click shows a tab without taking the focus from the document.
+    expect(fireEvent.mouseDown(edit)).toBe(false);
+    fireEvent.click(edit, { detail: 1 });
+    expect(names()).toEqual(["Undo", "Redo"]);
+
+    // The tab shown stays while it is among the tabs; without it, the first one shows.
+    fireEvent.click(format, { detail: 1 });
+    rerender(<FoliToolbar editor={editor} tabs={[...tabs].reverse()} />);
+    expect(names()).toEqual(["Bold", "Clear"]);
+    rerender(<FoliToolbar editor={editor} tabs={tabs.slice(0, 1)} />);
+    expect(names()).toEqual(["Undo", "Redo"]);
+    // No tabs: the items, and no tab list.
+    rerender(<FoliToolbar editor={editor} tabs={[]} items={[[clear]]} />);
+    expect(screen.queryByRole("tablist")).toBeNull();
+    expect(screen.queryByRole("tabpanel")).toBeNull();
+    expect(names()).toEqual(["Clear"]);
+  });
+
+  it("closes a tab's open menu with the tab, and opens Mod-K's link dialog on any tab", () => {
+    const editor = createEditor({ document: doc() });
+    const tabs: ToolbarTab[] = [
+      { key: "a", label: "A", items: [[toolbarItems.textColor]] },
+      { key: "b", label: "B", items: [[toolbarItems.undo]] },
+    ];
+    render(<FoliToolbar editor={editor} tabs={tabs} />);
+    fireEvent.click(screen.getByRole("button", { name: "Text color" }), { detail: 0 });
+    screen.getByRole("menu");
+    fireEvent.click(screen.getByRole("tab", { name: "B" }), { detail: 1 });
+    expect(screen.queryByRole("menu")).toBeNull();
+    fireEvent.click(screen.getByRole("tab", { name: "A" }), { detail: 1 });
+    expect(screen.queryByRole("menu")).toBeNull();
+    // No link item on either tab: the dialog is the toolbar's.
+    selectAll(editor);
+    act(() => void editor.run(openLinkEditor));
+    screen.getByRole("dialog", { name: "Add link" });
+  });
+
+  it("has Word's tabs of the built-in items, each item once, through FoliEditor's toolbar", () => {
+    expect(defaultToolbarTabs.map((tab) => tab.label)).toEqual([
+      "Home",
+      "Insert",
+      "Layout",
+      "Review",
+    ]);
+    const all = defaultToolbarTabs.flatMap((tab) => tab.items.flat());
+    expect(new Set(all)).toEqual(new Set(Object.values(toolbarItems)));
+    expect(all).toHaveLength(Object.keys(toolbarItems).length);
+
+    render(<FoliEditor initialContent={doc()} toolbar={defaultToolbarTabs} label="Document" />);
+    expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual([
+      "Home",
+      "Insert",
+      "Layout",
+      "Review",
+    ]);
+    screen.getByRole("button", { name: "Bold" });
+    fireEvent.click(screen.getByRole("tab", { name: "Review" }), { detail: 1 });
+    expect(screen.queryByRole("button", { name: "Bold" })).toBeNull();
+    screen.getByRole("button", { name: "Track changes" });
   });
 
   it("warns once about two items with one key, outside production", () => {

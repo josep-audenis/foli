@@ -499,6 +499,10 @@ export function AcmeEditor() {
   be boxes (`ToolbarSelect`), color menus (`ToolbarColorMenu`), buttons opening the app's own
   dialog under the toolbar (`ToolbarDialog`) and controls the app renders (`ToolbarCustom`) too
   ([api.md](../api.md#toolbar-items)).
+- `tabs` (or `FoliEditor`'s `toolbar`) takes tabs of groups in place of groups:
+  `[...defaultToolbarTabs, { key: "acme", label: "Acme", items: [[mentionButton, topicMenu]] }]`
+  is Word's Home, Insert, Layout and Review with a tab of the app's
+  ([api.md](../api.md#toolbar-tabs)).
 - `useCommand(command)` or `useCommand(name, ...args)` gives a button of the app's own
   `{ enabled, run }`. Make its command outside the component, or memoize it: a new command on each
   render is dry-run on each render.

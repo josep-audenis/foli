@@ -439,8 +439,45 @@
   color: var(--foli-error-color);
 }
 
+/* Tabs over the toolbar (FoliToolbar's `tabs`). */
+.foli-toolbar-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  padding: 4px 8px 0;
+  background: var(--foli-toolbar-background);
+  color: var(--foli-toolbar-color);
+  font:
+    14px / 1 system-ui,
+    sans-serif;
+}
+.foli-toolbar-tab {
+  padding: 6px 10px;
+  border: none;
+  border-bottom: 2px solid transparent;
+  border-radius: 4px 4px 0 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.foli-toolbar-tab:hover {
+  background: var(--foli-toolbar-hover);
+}
+.foli-toolbar-tab[aria-selected="true"] {
+  border-bottom-color: var(--foli-focus-ring);
+  font-weight: 600;
+}
+.foli-toolbar-tab:focus-visible {
+  outline: 2px solid var(--foli-focus-ring);
+  outline-offset: -2px;
+}
+
 /* Forced colors (Windows High Contrast) drop backgrounds: mark pressed buttons another way. */
 @media (forced-colors: active) {
+  .foli-toolbar-tab[aria-selected="true"] {
+    border-bottom-color: Highlight;
+  }
   .foli-toolbar-button[aria-pressed="true"] {
     outline: 2px solid Highlight;
     outline-offset: -2px;
@@ -571,6 +608,7 @@
     box-shadow: none;
   }
   .foli-toolbar,
+  .foli-toolbar-tabs,
   .foli-link-dialog,
   .foli-outline,
   .foli-comments {

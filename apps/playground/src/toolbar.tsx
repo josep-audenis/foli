@@ -13,7 +13,13 @@ import {
   PluginKey,
   toggleMark,
 } from "@folijs/core";
-import { FoliEditor, type ToolbarItem, toolbarItems, useCommand } from "@folijs/react";
+import {
+  defaultToolbarTabs,
+  FoliEditor,
+  type ToolbarItem,
+  toolbarItems,
+  useCommand,
+} from "@folijs/react";
 import "@folijs/react/styles.css";
 import "./playground.css";
 import { StrictMode } from "react";
@@ -79,11 +85,19 @@ createRoot(root).render(
     <FoliEditor
       initialContent={initial}
       plugins={[stamps]}
-      toolbar={[
-        [toolbarItems.undo, toolbarItems.redo],
-        [toolbarItems.bold, toolbarItems.italic, strike],
-        [stamp, insertMenu],
-      ]}
+      toolbar={
+        // `/toolbar.html?tabs`: Word's tabs, and one of the app's (15.3).
+        new URLSearchParams(location.search).has("tabs")
+          ? [
+              ...defaultToolbarTabs,
+              { key: "stamps", label: "Stamps", items: [[stamp, insertMenu]] },
+            ]
+          : [
+              [toolbarItems.undo, toolbarItems.redo],
+              [toolbarItems.bold, toolbarItems.italic, strike],
+              [stamp, insertMenu],
+            ]
+      }
     >
       <SignButton />
     </FoliEditor>

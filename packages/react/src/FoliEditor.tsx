@@ -18,7 +18,7 @@ import {
 import { FoliCanvas, type FoliCanvasHandle, type FoliCanvasProps } from "./FoliCanvas.js";
 import { FoliComments } from "./FoliComments.js";
 import { FoliNavigation } from "./FoliNavigation.js";
-import { FoliToolbar, type ToolbarItem } from "./FoliToolbar.js";
+import { FoliToolbar, type ToolbarItem, type ToolbarTab } from "./FoliToolbar.js";
 
 /**
  * A change to the document's content, as `FoliEditor` reports it. `document` is a getter:
@@ -65,10 +65,11 @@ export interface FoliEditorProps extends Omit<FoliCanvasProps, "editor"> {
    */
   onChange?: ((change: FoliChange) => void) | undefined;
   /**
-   * Show `FoliToolbar` above the pages (default true): with `defaultToolbarItems`, or with these
-   * groups of items (`FoliToolbarProps.items`).
+   * Show `FoliToolbar` above the pages (default true): with `defaultToolbarItems`, with these
+   * groups of items (`FoliToolbarProps.items`), or with these tabs (`FoliToolbarProps.tabs`,
+   * e.g. `defaultToolbarTabs`).
    */
-  toolbar?: boolean | readonly (readonly ToolbarItem[])[] | undefined;
+  toolbar?: boolean | readonly (readonly ToolbarItem[])[] | readonly ToolbarTab[] | undefined;
   /**
    * Show the comments pane (`FoliComments`) beside the pages: `"auto"` (the default) while the
    * document has comments, `true` always, `false` never.
@@ -155,7 +156,17 @@ export const FoliEditor = forwardRef<FoliEditorHandle, FoliEditorProps>(function
           disabled={canvas.readOnly}
           comments={comments !== false}
           upload={canvas.upload}
-          items={toolbar === true ? undefined : toolbar}
+          // Groups are arrays of items; tabs are objects.
+          items={
+            toolbar === true || !Array.isArray(toolbar[0])
+              ? undefined
+              : (toolbar as readonly (readonly ToolbarItem[])[])
+          }
+          tabs={
+            toolbar === true || Array.isArray(toolbar[0])
+              ? undefined
+              : (toolbar as readonly ToolbarTab[])
+          }
           onClickCommand={() => canvasRef.current?.focus()}
         />
       )}
