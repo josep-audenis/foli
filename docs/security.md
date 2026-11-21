@@ -6,7 +6,8 @@ What Foli checks, where, and what stays the embedding app's job. Reviewed for 1.
 ## Threat model
 
 Foli runs in the user's browser tab (the editor, the view, `exportPdf`) and in Node or a
-browser (`@folijs/core`, `@folijs/docx`). Untrusted input reaches it as:
+browser (`@folijs/core`, `@folijs/docx`). The MCP server is a program of its own, with its own
+section below. Untrusted input reaches the editor and the libraries as:
 
 - **Pasted data**: HTML from any page, Foli's own clipboard JSON (which a hostile page can
   forge), plain text.
@@ -57,6 +58,40 @@ with document or pasted data (the clipboard reads back markup it built itself).
   network path can make Word fetch it when fields update, as any `.docx` can.
 - **Extensions** are trusted code: what a node view's `render` returns is not checked, and `h`
   allows `id`, `name` and `position: fixed`, which can clash with the host page.
+
+## The MCP server (`@folijs/mcp`)
+
+Not part of 1.0: a 0.x package (Phase 14), reviewed as it was built
+([ADR-0009](decisions/ADR-0009-mcp-server.md)). It is the one Foli program that reads and writes
+the user's files, started by an MCP client the user configured and driven by a model.
+
+**Who is not trusted.** The client's messages (checked as any input). The model's tool calls: a
+model may be following text planted in a document it read, so every argument is treated as an
+attacker's. The files under the root, which may come from someone else: hostile `.docx` files,
+links, odd names.
+
+| What                   | Where                                                                        | Rule                                                                                                                                                                                      |
+| ---------------------- | ---------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A line from the client | `mcp/src/protocol.ts`                                                        | JSON-RPC 2.0, at most 8 MB; what is not a message is answered with an error or ignored; one message at a time                                                                             |
+| A tool's arguments     | `mcp/src/schema.ts`                                                          | Checked against the tool's schema before it runs; no property that is not named (`update_fields`' `data` takes any name: its values are the library's to check)                           |
+| A path                 | `mcp/src/files.ts`                                                           | A relative `.docx` name, no `..`, `:` or control character; its real path under the root's; outside is "not there"                                                                        |
+| A file read            | `mcp/src/files.ts`, `documents.ts`                                           | 64 MB; 64 MB unpacked and 400,000 XML nodes; the open documents 3 million positions together, 16 at most; open once                                                                       |
+| A file written         | `mcp/src/files.ts`                                                           | A new file made exclusively, renamed into place; never over what is not a plain file; over a file only its own or with `--overwrite`                                                      |
+| What a document names  | `agent/src/read.ts`, `operations.ts`, `templates.ts`; `mcp/src/documents.ts` | Shown on one line: a text, a style, a list number, a control's name, items and value, a field's instruction, a merge field's name and the reader's error cannot start a line of an answer |
+| An answer              | `mcp/src/protocol.ts`                                                        | Cut at 200,000 characters                                                                                                                                                                 |
+| The author's name      | `mcp/src/server.ts`                                                          | One line, no control characters, whole characters, 60 at most                                                                                                                             |
+| The log (stderr)       | `mcp/src/protocol.ts`                                                        | A tool's or a method's error by kind and place, never its message (a failure to start says its own, which holds no document's text)                                                       |
+
+**What stays the user's.** Choosing the root: everything under it can be read by the model and
+so reach the model's provider. `--overwrite`. Reviewing the tracked changes: the server cannot
+tell a good edit from one a document talked the model into. What the client lets the model do
+with what it read (other tools, the network) is the client's.
+
+**Known and accepted:** a file that appears at a save's target between the last check and the
+rename is replaced; a hard link inside the root to a file outside it is read as the file it is;
+a server stopped while saving leaves a `.name.pid.time.tmp` file beside the target; the
+protocol is not authenticated (stdio: whoever started the process speaks to it). Not checked on
+macOS or with a model in a real client.
 
 ## Residual risks (known, accepted for 1.0)
 

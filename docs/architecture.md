@@ -1071,8 +1071,30 @@ transaction and runs core's commands. Background and what was tried:
   `deleteTable`), `setStyle`, `comment`,
   `fillControl`, `updateFields`. Each returns a value: the blocks as they read now (`deleteBlock`
   and `updateFields` a sentence), or a refusal with a code and a message written for the model.
-- **What it is not:** no sandbox, no file system, no MCP. An MCP server over it is a separate
-  package, decided and not planned yet (roadmap, Phase 13).
+- **What it is not:** no sandbox, no file system, no MCP: that is `@folijs/mcp`, below.
+
+## The MCP server
+
+`@folijs/mcp` (`packages/mcp`, Phase 14, [ADR-0009](decisions/ADR-0009-mcp-server.md)) is a
+program an MCP client starts: `@folijs/agent`'s operations as tools over `.docx` files in a
+folder. Node only; no dependency but Foli's packages.
+
+- **Protocol** (`protocol.ts`, `schema.ts`): `serve` reads lines from stdin and writes lines to
+  stdout: JSON-RPC 2.0, `initialize`, `ping`, `tools/list`, `tools/call`. Written here, not
+  taken from the MCP SDK, whose client is the conformance check in the tests. One message at a
+  time; a tool's arguments checked against its schema first; a refusal or wrong arguments are
+  a result the model reads (`isError`), not a protocol error.
+- **Files** (`files.ts`): the trust boundary to the disk. A path is a relative `.docx` name
+  whose real path is under the root's; a save goes to a new file made exclusively and renamed
+  into place, never over what is not a plain file, and over a file only if the server wrote it
+  or was started with `--overwrite`.
+- **Documents** (`documents.ts`): `open` imports a file (`@folijs/docx`) into an
+  `@folijs/agent` session kept under an id until `close`; limits on a file, on how many are
+  open and on what they hold together bound the memory.
+- **Tools** (`tools.ts`): one per operation of the library, returning its text; the server's
+  `instructions` are the read format. `server.ts` puts it together (`foliServer`); `bin.ts` is
+  the command line.
+- **What it is not:** no network transport, no sandbox, no `run(code)`.
 
 ## Packages
 
@@ -1086,7 +1108,8 @@ foli/
 │   ├── react/ @folijs/react  React components + default stylesheet.
 │   ├── docx/  @folijs/docx   DOCX import to Word's model (schema v5) and lossless export; package (zip, parts, relationships), XML keeping source text. No DOM.
 │   ├── pdf/   @folijs/pdf    exportPdf: a document printed by the app's headless Chromium page; ships the read-only renderer as a page script.
-│   └── agent/ @folijs/agent  openSession: a document read and edited by an LLM agent through block handles, every edit tracked. 0.x. No DOM, no Node.
+│   ├── agent/ @folijs/agent  openSession: a document read and edited by an LLM agent through block handles, every edit tracked. 0.x. No DOM, no Node.
+│   └── mcp/   @folijs/mcp    foli-mcp: an MCP server over @folijs/agent and @folijs/docx for .docx files in a folder. 0.x. Node only.
 ├── spikes/two-page/     Phase 1 spike; throwaway, never published.
 ├── examples/            Example apps installing the packed packages (6.4, 12.10); never published.
 └── docs/

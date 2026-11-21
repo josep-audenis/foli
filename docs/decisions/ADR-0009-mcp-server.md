@@ -137,8 +137,9 @@ A read is text from a file, and may say anything, to a model that may believe it
 the damage is above: no tool reaches outside the root, none overwrites by default, and every
 edit is a tracked change a person reviews. Besides, a document cannot forge the tools' own
 lines: everything a document names that is put in an answer (a block's text, a style, a list
-number, a control's tag, title and items, the reader's error) is shown on one line, every
-character that ends a line as ↵ (in `@folijs/agent`). **Logs** (stderr) get the server's own
+number, a control's tag, title, items and value, a field's instruction, a merge field's name,
+the reader's error) is shown on one line, every character that ends a line as ↵ (in
+`@folijs/agent`). **Logs** (stderr) get the server's own
 errors by kind and place, never a message, which may quote a document.
 
 ### Author

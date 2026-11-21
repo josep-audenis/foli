@@ -1,6 +1,7 @@
 # API reference
 
-The public API of the five 1.x packages, as of 1.0.0, and of `@folijs/agent` (0.x), with
+The public API of the five 1.x packages, as of 1.0.0, and of `@folijs/agent` and `@folijs/mcp`
+(0.x), with
 the export lists of 12.2 ([ADR-0008](decisions/ADR-0008-1.0-contract-and-extensions.md)).
 
 **Stable or internal.** Every name on this page is **stable** unless marked **internal**: the
@@ -1083,6 +1084,28 @@ version. Details, the read format and examples: the
   that did not take the value); `updateFields({ data? })` → core's `FieldsReport` and `text`.
 - `session.document()`: the document to save or export. `session.editor`: the headless editor
   under the session, for what it has no operation for; `session.author`.
+
+## `@folijs/mcp`
+
+An MCP server over `@folijs/agent` (Phase 14, ADR-0009). **Unstable: 0.x.** A program first
+(`foli-mcp [--root <folder>] [--author <name>] [--overwrite]`, the tools and what it does to
+files: the [package README](../packages/mcp/README.md)); Node 20.19+. Its dependencies are
+Foli's packages, at exact versions.
+
+- `serve(input, output, options): Promise<void>`: the protocol over any stream of bytes and
+  anything with `write` (`Output`): JSON-RPC 2.0, a message a line, `initialize`, `ping`,
+  `tools/list`, `tools/call`. Resolves when `input` ends. `ServerOptions`: `name`, `version`,
+  `instructions`, `tools`, `onClient(name)`, `log(message)`.
+- `Tool`: `name`, `description`, `inputSchema` (`JsonSchema`, the subset the server checks:
+  types, `description`, `properties`, `required`, `additionalProperties`, `items`, `enum`,
+  `minimum`, `maximum`; `JsonSchemaOrAny` adds `anyOf`), and
+  `run(args)` returning a `ToolResult` `{ text, isError? }` or a promise of one. Arguments are
+  checked against the schema before `run`.
+- `foliServer(options: FoliServerOptions): ServerOptions` (`root`, `overwrite?`, `author?`,
+  `version`, `log?`): this server's
+  tools over the `.docx` files under `root`. Throws when `root` is not a folder or is a whole
+  drive, and on an `author` with nothing writable in it.
+- `PROTOCOL_VERSIONS`, `MAX_MESSAGE_BYTES` (8 MB), `MAX_RESULT_CHARS` (200,000).
 
 ## `@folijs/pdf`
 
