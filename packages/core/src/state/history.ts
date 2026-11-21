@@ -23,6 +23,8 @@ interface HistoryState {
   readonly prevRanges: readonly number[] | null;
   /** The story `prevRanges` are positions of (ADR-0007); none: the body. */
   readonly prevStory?: string | null;
+  /** The selection-only transaction whose appended change opened the last event. */
+  readonly prevRoot?: Transaction;
 }
 
 export interface HistoryOptions {
@@ -105,8 +107,9 @@ export function history({ newGroupDelay = 500, depth = 100 }: HistoryOptions = {
         const story = tr.getMeta(storyEdit) as StoryEdit | undefined;
         const merge =
           last !== undefined &&
-          // An appended change joins its root's event; a root that changed nothing has none.
-          (root?.docChanged === true ||
+          // An appended change joins its root's event; a root that changed nothing has none,
+          // so its first appended change opens one and the later ones join that.
+          ((root !== undefined && (root.docChanged || hist.prevRoot === root)) ||
             tr.getMeta(joinHistory) === true ||
             (!tr.getMeta(closeHistory) &&
               tr.time - hist.prevTime < newGroupDelay &&
@@ -127,6 +130,7 @@ export function history({ newGroupDelay = 500, depth = 100 }: HistoryOptions = {
             ? mapRanges(hist.prevRanges, tr.mapping)
             : changedRanges(story?.tr ?? tr),
           prevStory: root ? (hist.prevStory ?? null) : (story?.id ?? null),
+          ...(root && !root.docChanged ? { prevRoot: root } : {}),
         };
       },
     },

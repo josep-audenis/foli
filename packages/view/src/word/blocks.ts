@@ -744,23 +744,32 @@ export function renderBlocks(
   };
   // A joined paragraph is numbered once, with the first paragraph's marker.
   // Cell paragraphs are numbered with the rest, in document order, as Word does.
+  // By place, not by object: an app may use one paragraph object several times.
   const listed: Record<string, unknown>[] = [];
-  const listedAt = new Map<NodeJSON, number>();
-  const list = (node: NodeJSON, joined: boolean) => {
-    if (node.type === "paragraph") {
-      listedAt.set(node, listed.length);
-      listed.push(joined ? { numbering: { id: 0 } } : attrsOf(node));
-    } else if (node.type === "table")
-      for (const row of node.content ?? [])
-        for (const cell of row.content ?? [])
-          for (const block of cell.content ?? []) list(block, false);
+  /** Where in `listed` each top-level block is, and the cell paragraphs in the order drawn. */
+  const topSlots: number[] = [];
+  const cellSlots: number[] = [];
+  const listCells = (table: NodeJSON) => {
+    for (const row of table.content ?? [])
+      for (const cell of row.content ?? []) {
+        // A cell a merge covers is not drawn (`modelTable`).
+        if ((cell.attrs as Record<string, unknown> | undefined)?.vMerge === "continue") continue;
+        for (const block of cell.content ?? []) {
+          if (block.type === "table") listCells(block);
+          else if (block.type === "paragraph") cellSlots.push(listed.push(attrsOf(block)) - 1);
+        }
+      }
   };
   content.forEach((node, index) => {
-    list(node, joins(index - 1));
+    if (node.type === "paragraph")
+      topSlots[index] =
+        listed.push(joins(index - 1) ? { numbering: { id: 0 } } : attrsOf(node)) - 1;
+    else if (node.type === "table") listCells(node);
   });
   const numbered = resolver.markers(listed);
-  const markerOf = (node: NodeJSON | undefined) =>
-    (node && numbered[listedAt.get(node) ?? -1]) || null;
+  const markerAt = (index: number) => numbered[topSlots[index] ?? -1] ?? null;
+  let cellsDrawn = 0;
+  const cellMarker = () => numbered[cellSlots[cellsDrawn++] ?? -1] ?? null;
   const blocks: WordBlock[] = [];
   const displays = fieldDisplay(content.map(inlineTypes), codes);
   let carried: { nodes: number[]; inline: NodeJSON[]; display: FieldDisplay } | null = null;
@@ -781,7 +790,7 @@ export function renderBlocks(
           codes,
           options.notes,
           review,
-          markerOf,
+          cellMarker,
         ),
       );
       return;
@@ -806,9 +815,9 @@ export function renderBlocks(
     // The line's own height is the paragraph mark's (Word has none but its runs' and the mark's).
     const mark = resolver.run(run, (attrs.markFormat ?? []) as MarkJSON[]);
     styleRun(element, mark, lineHeight(paragraph, mark, ratio(fontStack(latin(mark)))));
-    const marker = markerOf(node);
+    const marker = markerAt(index);
     const firstMerged = merged.nodes[0];
-    const shownMarker = firstMerged !== undefined ? markerOf(content[firstMerged]) : marker;
+    const shownMarker = firstMerged !== undefined ? markerAt(firstMerged) : marker;
     if (shownMarker) element.append(markerElement(shownMarker, paragraph, doc, ratio));
     const inline = [...merged.inline, ...(node.content ?? [])];
     renderInline(element, inline, run, paragraph, {
@@ -1161,8 +1170,8 @@ export function opaqueBlock(
   codes = false,
   notes?: BlockOptions["notes"],
   review: ReviewView = "markup",
-  /** A cell paragraph's list marker (lists are numbered through tables). */
-  markerOf: (paragraph: NodeJSON) => ListMarker | null = () => null,
+  /** The list marker of the next cell paragraph drawn (lists are numbered through tables). */
+  markerOf: () => ListMarker | null = () => null,
 ): WordBlock {
   const attrs = (node.attrs ?? {}) as Record<string, unknown>;
   const element = doc.createElement("div");
@@ -1428,7 +1437,7 @@ function modelTable(
   codes: boolean,
   notes: BlockOptions["notes"],
   review: ReviewView,
-  markerOf: (paragraph: NodeJSON) => ListMarker | null,
+  markerOf: () => ListMarker | null,
 ): HTMLElement {
   const attrs = (node.attrs ?? {}) as Record<string, unknown>;
   const table = doc.createElement("table");
@@ -1533,7 +1542,7 @@ function modelTable(
         styleParagraph(element, paragraph);
         styleRun(element, run, lineHeight(paragraph, run, ratio(fontStack(latin(run)))));
         const display = displays[b] as FieldDisplay;
-        const marker = markerOf(block);
+        const marker = markerOf();
         if (marker) element.append(markerElement(marker, paragraph, doc, ratio));
         renderInline(element, block.content ?? [], run, paragraph, {
           ...context,

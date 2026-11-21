@@ -57,6 +57,36 @@ describe("history", () => {
     // Only the plugin's "!" goes: the typing a minute before is another step.
     expect(state.doc.textContent).toBe("ab");
   });
+
+  it("two plugins' changes appended to one selection-only transaction are one undo step", () => {
+    const first = new Plugin({
+      appendTransaction(transactions, _old, state) {
+        const root = transactions[0];
+        if (!root || root.docChanged || root.getMeta("stamp") !== true) return null;
+        return state.tr.insertText("!", 1);
+      },
+    });
+    // Reacts to the first plugin's change.
+    const second = new Plugin({
+      appendTransaction(transactions, _old, state) {
+        if (state.doc.textContent.endsWith("?") || !transactions.some((tr) => tr.docChanged))
+          return null;
+        return state.doc.textContent.startsWith("!")
+          ? state.tr.insertText("?", state.doc.content.size - 1)
+          : null;
+      },
+    });
+    let state = EditorState.create({ doc: tdoc(para("a")), plugins: [history(), first, second] });
+    const dispatch = (tr: Parameters<typeof state.apply>[0]) => {
+      state = state.applyTransaction(tr).state;
+    };
+    dispatch(state.tr.insertText("b", 2));
+    vi.advanceTimersByTime(60_000);
+    dispatch(state.tr.setSelection(TextSelection.create(state.doc, 1)).setMeta("stamp", true));
+    expect(state.doc.textContent).toBe("!ab?");
+    expect(undo(state, dispatch)).toBe(true);
+    expect(state.doc.textContent).toBe("ab");
+  });
 });
 
 describe("stored marks", () => {

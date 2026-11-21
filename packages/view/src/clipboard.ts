@@ -616,7 +616,8 @@ function readHTML(html: string): { content: DocJSON; open: boolean } | null {
     });
   };
   const addText = (given: string, marks: Marks, pre: boolean) => {
-    const raw = writable(given);
+    // A form feed or vertical tab is white space in HTML, not a character to drop.
+    const raw = writable(given.replace(/[\v\f]/g, " "));
     // Source formatting between blocks ("</p>\n<br>\n<p>") is not content.
     if (!inline && !pre && !/[^ \t\n\r\f]/.test(raw)) return;
     if (!inline) {

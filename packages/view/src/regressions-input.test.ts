@@ -108,6 +108,11 @@ describe("htmlToDoc", () => {
     expect(lines("<center>one</center><center>two</center>")).toEqual(["one", "two"]);
     expect(lines("<fieldset><legend>Legend</legend>text</fieldset>")).toEqual(["Legend", "text"]);
   });
+
+  it("reads a form feed between words as white space", () => {
+    const [block] = htmlToDoc("<p>a\fb</p>")?.content ?? [];
+    expect(textOf(block as Block)).toBe("a b");
+  });
 });
 
 describe("destroy", () => {

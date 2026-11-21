@@ -124,4 +124,12 @@ describe("renderBlocks: lists in table cells", () => {
     expect(cell?.element.querySelector("[data-foli-marker]")?.textContent).toContain("2.");
     expect(after?.element.querySelector("[data-foli-marker]")?.textContent).toContain("3.");
   });
+
+  it("numbers one paragraph object used several times by its place", () => {
+    const item = p({ numbering: { id: 1, level: 0 } }, text("same"));
+    const blocks = renderBlocks(documentOf(item, item, item), document);
+    expect(
+      blocks.map((b) => b.element.querySelector("[data-foli-marker]")?.textContent?.trim()),
+    ).toEqual(["1.", "2.", "3."]);
+  });
 });
