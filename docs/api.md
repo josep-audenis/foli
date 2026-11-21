@@ -50,7 +50,7 @@ migrated (`parseDocument`), and what it reports is v5.
 | `reviewView`     | `ReviewView`                                                                                             | `"markup"`   | Read once: how tracked changes show (the toolbar changes it).                                                                                    |
 | `onChange`       | `(change: FoliChange) => void`                                                                           | —            | After every content change made through transactions. Not for selection changes or `setDocument`.                                                |
 | `toolbar`        | `boolean \| ToolbarGroups \| readonly ToolbarTab[]`                                                      | `true`       | Show `FoliToolbar` above the pages; groups of items in place of the default ones (its `items`), or tabs (its `tabs`, e.g. `defaultToolbarTabs`). |
-| `toolbarProps`   | `FoliToolbarProps` without `editor`, `disabled`, `comments`, `upload`, `onClickCommand`, `items`, `tabs` | —            | More props for that toolbar: `tab`, `onTabChange`, `defaultTab`, `label`, `className`.                                                           |
+| `toolbarProps`   | `FoliToolbarProps` without `editor`, `disabled`, `comments`, `upload`, `onClickCommand`, `items`, `tabs` | —            | More props for that toolbar: `tab`, `onTabChange`, `defaultTab`, `overflow`, `label`, `className`.                                               |
 | `comments`       | `boolean \| "auto"`                                                                                      | `"auto"`     | The comments pane beside the pages: while the document has comments (`"auto"`), always, never.                                                   |
 | `readOnly`       | `boolean`                                                                                                | `false`      | Read, select, copy; no editing. Disables the toolbar.                                                                                            |
 | `placeholder`    | `string`                                                                                                 | `""`         | Shown while the document is empty.                                                                                                               |
@@ -185,19 +185,20 @@ closes it and calls `onClickCommand` (the focus goes to the document, where the 
 Cancel returns the focus to the Table button. A change to the document or the selection closes
 it, and only one of the link and insert table dialogs is open at a time.
 
-| Prop                | Type                    | Default               | Notes                                                                                                      |
-| ------------------- | ----------------------- | --------------------- | ---------------------------------------------------------------------------------------------------------- |
-| `editor`            | `Editor`                | context               |                                                                                                            |
-| `disabled`          | `boolean`               | `false`               | Pass it whenever the canvas is `readOnly`.                                                                 |
-| `onClickCommand`    | `() => void`            | —                     | After a click ran a command (`FoliEditor` focuses its canvas here).                                        |
-| `label`             | `string`                | `"Formatting"`        | Accessible name.                                                                                           |
-| `comments`          | `boolean`               | `false`               | Show New comment (only with a comments pane; `FoliEditor` passes it).                                      |
-| `upload`            | `(file) => Promise<…>`  | —                     | Where Picture… puts an inserted image file (`FoliEditor` passes its own).                                  |
-| `items`             | `ToolbarGroups`         | `defaultToolbarItems` | The items, in groups (a separator between groups).                                                         |
-| `tabs`              | `readonly ToolbarTab[]` | —                     | Tabs over the toolbar, each with its groups of items, in place of `items` ([Toolbar tabs](#toolbar-tabs)). |
-| `tab`, `defaultTab` | `string`                | the first tab         | The tab shown, by key: `tab` when the app decides, `defaultTab` only at first.                             |
-| `onTabChange`       | `(key: string) => void` | —                     | Someone picked another tab.                                                                                |
-| `className`         | `string`                | —                     | Added to `.foli-toolbar`.                                                                                  |
+| Prop                | Type                    | Default               | Notes                                                                                                          |
+| ------------------- | ----------------------- | --------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `editor`            | `Editor`                | context               |                                                                                                                |
+| `disabled`          | `boolean`               | `false`               | Pass it whenever the canvas is `readOnly`.                                                                     |
+| `onClickCommand`    | `() => void`            | —                     | After a click ran a command (`FoliEditor` focuses its canvas here).                                            |
+| `label`             | `string`                | `"Formatting"`        | Accessible name.                                                                                               |
+| `comments`          | `boolean`               | `false`               | Show New comment (only with a comments pane; `FoliEditor` passes it).                                          |
+| `upload`            | `(file) => Promise<…>`  | —                     | Where Picture… puts an inserted image file (`FoliEditor` passes its own).                                      |
+| `items`             | `ToolbarGroups`         | `defaultToolbarItems` | The items, in groups (a separator between groups).                                                             |
+| `tabs`              | `readonly ToolbarTab[]` | —                     | Tabs over the toolbar, each with its groups of items, in place of `items` ([Toolbar tabs](#toolbar-tabs)).     |
+| `tab`, `defaultTab` | `string`                | the first tab         | The tab shown, by key: `tab` when the app decides, `defaultTab` only at first.                                 |
+| `onTabChange`       | `(key: string) => void` | —                     | Someone picked another tab.                                                                                    |
+| `overflow`          | `"wrap" \| "menu"`      | `"wrap"`              | What happens to items that do not fit: more rows, or one row and a More panel ([Overflow](#toolbar-overflow)). |
+| `className`         | `string`                | —                     | Added to `.foli-toolbar`.                                                                                      |
 
 #### Toolbar items
 
@@ -344,6 +345,24 @@ An empty `tabs` shows `items`.
   `label` (`.foli-toolbar-group`), its items in `.foli-toolbar-group-items` and the caption under
   them (`.foli-toolbar-group-label`). In `items` and in a tab's `items` alike
   (`ToolbarGroups`).
+
+#### Toolbar overflow
+
+`overflow="menu"` keeps the toolbar on one row (`.foli-toolbar-overflow`): the groups that do not
+fit its width go, whole and in order, into a panel (`.foli-toolbar-more-panel`, a `role="group"`
+named "More") under a More button at the row's end (`.foli-toolbar-more`, `aria-expanded`,
+`aria-controls`). The toolbar measures its groups with all of them in the row, before the browser
+paints, and again when its width or its groups change (not when only an item's own width does,
+as a box showing a longer value).
+
+- The arrow keys, Home and End go through every item as before: moving to one in the panel
+  opens it, moving back out closes it. Escape in the panel closes it, the focus on More. More
+  itself is not a stop of the arrow keys: it is the pointer's way in.
+- A click on More opens and closes the panel; a click on an item in it acts on the document,
+  which keeps the focus, and leaves the panel open; a press outside closes it. A disabled
+  toolbar closes it.
+- With tabs, the selected tab's groups overflow the same way.
+- On the server, and until the first measure, every group is in the row (cut off, not wrapped).
 
 ### Hooks and provider
 

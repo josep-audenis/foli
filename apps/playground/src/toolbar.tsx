@@ -78,6 +78,7 @@ const initial = createDocument({
   ],
 });
 
+const query = new URLSearchParams(location.search);
 const root = document.getElementById("root");
 if (!root) throw new Error("#root element missing");
 createRoot(root).render(
@@ -85,18 +86,22 @@ createRoot(root).render(
     <FoliEditor
       initialContent={initial}
       plugins={[stamps]}
+      // `/toolbar.html?overflow`: every built-in item in one row, the rest under More (17.4).
+      toolbarProps={{ overflow: query.has("overflow") ? "menu" : "wrap" }}
       toolbar={
         // `/toolbar.html?tabs`: Word's tabs, and one of the app's (15.3).
-        new URLSearchParams(location.search).has("tabs")
-          ? [
-              ...defaultToolbarTabs,
-              { key: "stamps", label: "Stamps", items: [[stamp, insertMenu]] },
-            ]
-          : [
-              [toolbarItems.undo, toolbarItems.redo],
-              [toolbarItems.bold, toolbarItems.italic, strike],
-              [stamp, insertMenu],
-            ]
+        query.has("overflow")
+          ? true
+          : query.has("tabs")
+            ? [
+                ...defaultToolbarTabs,
+                { key: "stamps", label: "Stamps", items: [[stamp, insertMenu]] },
+              ]
+            : [
+                [toolbarItems.undo, toolbarItems.redo],
+                [toolbarItems.bold, toolbarItems.italic, strike],
+                [stamp, insertMenu],
+              ]
       }
     >
       <SignButton />

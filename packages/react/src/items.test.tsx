@@ -895,6 +895,74 @@ describe("toolbar items", () => {
     screen.getByRole("button", { name: "Track changes" });
   });
 
+  it('puts the groups that do not fit under More, with `overflow="menu"`', () => {
+    const editor = createEditor({ document: doc() });
+    // No layout in jsdom: give the toolbar 100px, each item 40px in a row, More 30px.
+    const rect = (left: number, width: number) =>
+      ({ left, right: left + width, width, top: 0, bottom: 20, height: 20 }) as DOMRect;
+    const measure = vi
+      .spyOn(HTMLElement.prototype, "getBoundingClientRect")
+      .mockImplementation(function (this: HTMLElement) {
+        if (this.getAttribute("role") === "toolbar") return rect(0, 100);
+        if (this.classList.contains("foli-toolbar-more")) return rect(0, 30);
+        const at = screen.getAllByRole("button", { hidden: true }).indexOf(this);
+        return rect(at * 40, 40);
+      });
+    const items = [[toolbarItems.undo], [toolbarItems.redo], [toolbarItems.bold, clear]];
+    const { container, rerender } = render(
+      <FoliToolbar editor={editor} items={items} overflow="menu" />,
+    );
+    const more = container.querySelector(".foli-toolbar-more") as HTMLElement;
+    const panel = container.querySelector(".foli-toolbar-more-panel") as HTMLElement;
+    expect([panel.getAttribute("role"), panel.getAttribute("aria-label")]).toEqual([
+      "group",
+      "More",
+    ]);
+    // 100px take one group of 40px and More (30px, 4px apart); the others are in the panel.
+    expect(more.getAttribute("aria-expanded")).toBe("false");
+    expect(more.getAttribute("aria-controls")).toBe(panel.id);
+    expect(panel.hidden).toBe(true);
+    expect(
+      within(panel)
+        .getAllByRole("button", { hidden: true })
+        .map((b) => b.title),
+    ).toEqual(["Redo", "Bold", "Delete the selection"]);
+    const undoButton = screen.getByRole("button", { name: "Undo" });
+    expect(panel.contains(undoButton)).toBe(false);
+    // The arrow keys go on into the panel, which opens, and back out, which closes it.
+    act(() => undoButton.focus());
+    fireEvent.keyDown(undoButton, { key: "ArrowRight" });
+    expect(panel.hidden).toBe(false);
+    expect(more.getAttribute("aria-expanded")).toBe("true");
+    const redoButton = screen.getByRole("button", { name: "Redo" });
+    expect(document.activeElement).toBe(redoButton);
+    fireEvent.keyDown(redoButton, { key: "Home" });
+    expect(panel.hidden).toBe(true);
+    expect(document.activeElement).toBe(undoButton);
+    // The tab stop is never in a closed panel.
+    expect(screen.getAllByRole("button", { hidden: true }).filter((b) => b.tabIndex === 0)).toEqual(
+      [undoButton],
+    );
+    // More opens and closes it for the pointer; Escape in it closes it, the focus on More.
+    expect(fireEvent.mouseDown(more)).toBe(false);
+    fireEvent.click(more, { detail: 1 });
+    expect(panel.hidden).toBe(false);
+    fireEvent.keyDown(screen.getByRole("button", { name: "Bold" }), { key: "Escape" });
+    expect(panel.hidden).toBe(true);
+    expect(document.activeElement).toBe(more);
+    // A press outside closes it too.
+    fireEvent.click(more, { detail: 1 });
+    fireEvent.pointerDown(document.body);
+    expect(panel.hidden).toBe(true);
+
+    // The default, `"wrap"`: no More, no panel, the toolbar as before.
+    rerender(<FoliToolbar editor={editor} items={items} />);
+    expect(container.querySelector(".foli-toolbar-more")).toBeNull();
+    expect(screen.queryByRole("group", { hidden: true })).toBeNull();
+    expect(screen.getByRole("toolbar").className).toBe("foli-toolbar");
+    measure.mockRestore();
+  });
+
   it("warns once about two items with one key, outside production", () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     const editor = createEditor({ document: doc() });
