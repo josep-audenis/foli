@@ -129,8 +129,8 @@ session.updateFields({ data: { CandidateFirstName: "Ada" } });
 
 ## For the model
 
-The session is a library: an app gives its methods to a model as tools (an MCP server over it
-is to be its own package; not planned yet). What a model needs to be told fits in a system prompt:
+The session is a library: an app gives its methods to a model as tools. `@folijs/mcp` does that
+for MCP clients, over `.docx` files in a folder. What a model needs to be told fits in a system prompt:
 
 ```text
 You edit a document through tools. read gives it a line per block:

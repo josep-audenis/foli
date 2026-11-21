@@ -110,6 +110,7 @@ for (const path of [
   "/docs/guides/extensions/",
   "/docs/guides/docx/",
   "/docs/guides/agent/",
+  "/docs/guides/mcp/",
   "/docs/benchmarks/",
   "/docs/changelog/",
   "/docs/api/react/",

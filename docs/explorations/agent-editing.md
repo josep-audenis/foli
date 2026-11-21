@@ -2,8 +2,8 @@
 
 Status: **the library is built** (`@folijs/agent`,
 [Phase 13](../roadmap.md#phase-13--agent-library-folijsagent--m--agent-010); how it works:
-[architecture](../architecture.md#agent-editing)). The MCP server, a separate package after it,
-and `run(code)` are not. What follows is the exploration as written before the library; where
+[architecture](../architecture.md#agent-editing)). The MCP server is built too
+(`@folijs/mcp`, Phase 14, not released); `run(code)` is not. What follows is the exploration as written before the library; where
 the library decided otherwise it says so. Written 2026-11-21 after 1.0.0. Collaboration is left out
 on purpose (a later exploration); this note is about an AI agent editing a document without
 touching OOXML.

@@ -82,16 +82,17 @@ toolbar, Next.js and using the view without React. Before using Foli, read the
 
 ## Packages
 
-| Package                              | Purpose                                                                                          |
-| ------------------------------------ | ------------------------------------------------------------------------------------------------ |
-| [`@folijs/core`](packages/core)      | Document model and headless editing engine: schema, nodes, steps, history, commands. No DOM.     |
-| [`@folijs/view`](packages/view)      | Framework-agnostic editable DOM view (`EditorView`): rendering, input, selection.                |
-| [`@folijs/react`](packages/react)    | React components and default stylesheet.                                                         |
-| [`@folijs/docx`](packages/docx)      | `.docx` import to Foli's Word model and lossless export. No DOM.                                 |
-| [`@folijs/pdf`](packages/pdf)        | PDF from Foli's pages (`exportPdf`), printed by a headless Chromium page the app supplies.       |
-| [`@folijs/agent`](packages/agent)    | An LLM agent reads and edits a document by block handles; every edit a tracked change. 0.x.      |
-| [`apps/playground`](apps/playground) | Demo app; consumes the packages like a third party would.                                        |
-| [`apps/site`](apps/site)             | Landing page, the real editor at `/test`, the docs at `/docs`; `pnpm --filter @folijs/site dev`. |
+| Package                              | Purpose                                                                                           |
+| ------------------------------------ | ------------------------------------------------------------------------------------------------- |
+| [`@folijs/core`](packages/core)      | Document model and headless editing engine: schema, nodes, steps, history, commands. No DOM.      |
+| [`@folijs/view`](packages/view)      | Framework-agnostic editable DOM view (`EditorView`): rendering, input, selection.                 |
+| [`@folijs/react`](packages/react)    | React components and default stylesheet.                                                          |
+| [`@folijs/docx`](packages/docx)      | `.docx` import to Foli's Word model and lossless export. No DOM.                                  |
+| [`@folijs/pdf`](packages/pdf)        | PDF from Foli's pages (`exportPdf`), printed by a headless Chromium page the app supplies.        |
+| [`@folijs/agent`](packages/agent)    | An LLM agent reads and edits a document by block handles; every edit a tracked change. 0.x.       |
+| [`@folijs/mcp`](packages/mcp)        | MCP server: an MCP client's model edits `.docx` files in a folder through tools. 0.x, unreleased. |
+| [`apps/playground`](apps/playground) | Demo app; consumes the packages like a third party would.                                         |
+| [`apps/site`](apps/site)             | Landing page, the real editor at `/test`, the docs at `/docs`; `pnpm --filter @folijs/site dev`.  |
 
 ## Documentation
 
