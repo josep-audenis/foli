@@ -11,7 +11,7 @@ import {
   setControlValue,
   updateFields as updateFieldsOf,
 } from "@folijs/core";
-import { type Changed, type Context, changed } from "./operations.js";
+import { type Changed, type Context, changed, MAX_WRITTEN } from "./operations.js";
 import { oneLine, readBlocks } from "./read.js";
 import { type Refusal, type Result, refuse } from "./result.js";
 
@@ -167,6 +167,11 @@ export function fillControl(
         : "The document has no content controls.",
     );
   }
+  if (typeof value === "string" && targets.length * value.length > MAX_WRITTEN)
+    return refuse(
+      "invalid",
+      `That writes ${targets.length * value.length} characters into ${targets.length} controls: one fill writes ${MAX_WRITTEN} at most.`,
+    );
   const filled: string[] = [];
   const unfilled: Unfilled[] = [];
   for (const control of targets) {

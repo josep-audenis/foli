@@ -154,3 +154,32 @@ describe("checkpoint: what the review of #165 found", () => {
     });
   });
 });
+
+describe("what one operation writes (the fourth review of #165)", () => {
+  it("a replace or a fill that would write too much, its places together, is refused", async () => {
+    const { document } = await corpus("03-offer-letter-template");
+    const session = openSession(document, { author: "Agent" });
+    const r = session.read({ limit: 2 });
+    const first = (r.ok ? r.blocks[0]?.handle : "") as string;
+    const made = session.insertAfter(first, "a".repeat(500));
+    const handle = (made.ok ? made.blocks[0]?.handle : "") as string;
+    const before = JSON.stringify(session.document());
+    const started = Date.now();
+    expect(session.replaceText(handle, "a", "x".repeat(199_000), { all: true })).toMatchObject({
+      ok: false,
+      code: "invalid",
+    });
+    expect(Date.now() - started).toBeLessThan(2000);
+    expect(JSON.stringify(session.document())).toBe(before);
+    // At the cap: done.
+    expect(session.replaceText(handle, "a", "x".repeat(600), { all: true })).toMatchObject({
+      ok: true,
+      replaced: 500,
+    });
+    const control = session.controls().find((c) => c.kind === "text" || c.kind === "richText");
+    expect(session.fillControl(control?.id as string, "y".repeat(300_001))).toMatchObject({
+      ok: false,
+      code: "invalid",
+    });
+  });
+});

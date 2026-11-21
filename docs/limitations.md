@@ -327,7 +327,11 @@ Unstable (0.x). Details in the [package README](../packages/agent/README.md).
   style but without what Foli kept of them verbatim (`w14:paraId`, their tab stops).
 - `replaceText` with `all` makes one change and one undo step per place; a paragraph inserted
   in a built-in style the document lacks is two changes (the paragraph, then its style).
-- One insert takes 500 paragraphs at most and one `replaceText` with `all` 500 places.
+- One insert takes 500 paragraphs at most and one `replaceText` with `all` 500 places; one
+  replace or fill writes 300,000 characters at most, its places together.
+- What a document holds beside its body (comments, notes) is not counted in the server's
+  limit on what the open documents hold: many sessions' worth of comments can make one too
+  large to save.
 - A paragraph the session inserted and then deleted leaves a tracked paragraph insertion on
   the paragraph before it: rejecting every change then joins that paragraph with the next
   (found by the review of #165; not fixed).
@@ -357,7 +361,7 @@ Unstable (0.x). Details in the [package README](../packages/mcp/README.md) and
   else is answered, a `ping` included.
 - Code mode (`run`, with `--code`): not tried with a model in a client of its own. A script is
   plain JavaScript as QuickJS runs it: no `await` that waits for anything, no timers, no
-  imports, no `Intl`. 10 seconds, 64 MB, 5,000 calls to the document and 2,000 paragraphs added a run, not
+  imports, no `Intl`. 10 seconds, 64 MB, 5,000 calls to the document, 2,000 paragraphs inserted and a million characters given a run, not
   configurable. It works on one open document, and cannot open or save. A run costs about
   55 ms before the script starts. Its answer shows 40 changed blocks at most. `doc` has the
   tools' operations and no more: no reading in parts (`blocks()` is the whole body), nothing

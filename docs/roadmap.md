@@ -2504,7 +2504,11 @@ review.
   and paragraphs inserted in a cell were not counted. The checkpoint now keeps no body step:
   a rollback puts the body back whole, in one step whatever was done; inserts are counted
   where they are made. The worst scripts of the three reviews answer in 10.0 to 10.2 s with
-  the document as it was. Four assertions that could not fail were rewritten or removed.)
+  the document as it was. Four assertions that could not fail were rewritten or removed. A fourth review, of main after the merge,
+  found the rollback right on nine documents and sixteen kinds of edit, and two holes: one
+  replace could write 100 million characters (500 places of 199,000), and comment text was
+  counted nowhere. One operation now writes 300,000 characters at most, and a run's calls
+  give a million at most; measured, each worst script answers in 10.0 s or less.)
 - [x] 16.3 `doc` over a session: reading as blocks (handle, style, text, table place,
   changed) in parts, every operation of the tools with the same argument checks, results and
   refusals as values a script can test (`if (!r.ok)`); `console.log` kept as the log. A

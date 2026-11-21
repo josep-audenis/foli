@@ -35,6 +35,12 @@ export interface ReplaceOptions {
 /** The most paragraphs one insert takes, and the most places one replace changes. */
 const MAX_PARAGRAPHS = 500;
 const MAX_PLACES = 500;
+/**
+ * @internal
+ * The most text one operation writes, its places together: a replacement times its places, a
+ * value times the controls that take it.
+ */
+export const MAX_WRITTEN = 300_000;
 
 /** @internal What the operations work on. */
 export interface Context {
@@ -176,6 +182,11 @@ export function replaceText(
     return refuse(
       "several-matches",
       `${quote(query)} is in block ${handle} ${matches.length} times: at most ${MAX_PLACES} places are replaced at once. Give a longer find.`,
+    );
+  if (matches.length * text.length > MAX_WRITTEN)
+    return refuse(
+      "invalid",
+      `That writes ${matches.length * text.length} characters: one replace writes ${MAX_WRITTEN} at most, its places together. Replace in parts.`,
     );
   // Nothing to record: the text is what it would become.
   if (query === text) return { ok: true, replaced: 0, refused: 0, ...changed(context, [handle]) };

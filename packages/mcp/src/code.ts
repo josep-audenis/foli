@@ -78,6 +78,12 @@ export const RUN_GROWTH = 300_000;
  * And how many paragraphs it may insert: an edit costs the more the more blocks there are.
  */
 export const RUN_BLOCKS = 2_000;
+/**
+ * @internal
+ * And how much text its calls may give the document, wherever it goes (a comment's text is
+ * not the body's, and grows nothing a count of the body sees).
+ */
+export const RUN_TEXT = 1_000_000;
 
 const LOG_CHARS = 20_000;
 const VALUE_CHARS = 50_000;
@@ -129,8 +135,16 @@ export async function runCode(
   const size = before.content.size;
   /** Paragraphs the run has inserted, wherever (a table's cells are not the body's blocks). */
   let inserted = 0;
+  /** The characters the run's calls have given, as JSON: a bound on what they wrote. */
+  let sent = 0;
   const host: Host = (name, args) => {
-    // The host's own limit, which a script cannot catch its way past: what the run has added.
+    // The host's own limits, which a script cannot catch its way past: what the run has added,
+    // and what its calls have given.
+    if (name !== "log") sent += JSON.stringify(args ?? null).length;
+    if (sent > RUN_TEXT)
+      throw new StopRun(
+        `Its calls gave the document more than ${RUN_TEXT} characters: a run is held to that. Do the work in several runs.`,
+      );
     if (session.editor.state.doc.content.size - size > RUN_GROWTH || inserted > RUN_BLOCKS)
       throw new StopRun(
         `It added more than ${RUN_BLOCKS} paragraphs or ${RUN_GROWTH} characters to the document: a run is held to that. Do the work in several runs.`,
