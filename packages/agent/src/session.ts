@@ -5,6 +5,8 @@ import {
   type Extension,
   type FieldsReport,
   type FoliDocument,
+  type Transaction,
+  untracked,
 } from "@folijs/core";
 import { Handles } from "./handles.js";
 import {
@@ -136,6 +138,19 @@ export interface Session {
    * need a layout and are left), and fills its merge fields from `data`. A tracked change.
    */
   updateFields(options?: UpdateFieldsOptions): Result<FieldsReport & { text: string }>;
+  /**
+   * Marks the document as it is now, to come back to: `rollback` takes back every edit made
+   * since, the session's own and those made through `editor`, as if none had been (no tracked
+   * change is left of them, and every handle names the block it named). `release` ends the
+   * checkpoint and keeps the edits. One or the other, once. `setDocument` on the editor
+   * cannot be taken back: `rollback` then throws.
+   */
+  checkpoint(): Checkpoint;
+}
+
+export interface Checkpoint {
+  rollback(): void;
+  release(): void;
 }
 
 /**
@@ -182,7 +197,45 @@ export function openSession(document: EditorDocument, options: SessionOptions): 
     return { ok: true, block: blocks[0] as Block, text };
   };
 
+  const checkpoint = (): Checkpoint => {
+    const start = editor.state.doc;
+    const ends = handles.snapshot();
+    const made: Transaction[] = [];
+    let lost = false;
+    let last = start;
+    const stop = editor.subscribe((state, transactions) => {
+      // A document replaced tells without a transaction: there are no steps to take back.
+      if (!transactions.length && state.doc !== last) lost = true;
+      last = state.doc;
+      made.push(...transactions.filter((tr) => tr.steps.length));
+    });
+    return {
+      release: stop,
+      rollback() {
+        stop();
+        if (lost)
+          throw new Error("checkpoint: the document was replaced, it cannot be rolled back");
+        if (made.length) {
+          // Every step undone, last first, in one change that is neither tracked nor in undo.
+          const tr = editor.state.tr;
+          for (const done of [...made].reverse())
+            for (let i = done.steps.length - 1; i >= 0; i--)
+              tr.step((done.steps[i] as (typeof done.steps)[number]).invert(done.docs[i] as never));
+          // Marked as an undo, which it is: core's rules for content controls let an undo
+          // put back what no edit may write (a list's placeholder, a check box's glyph).
+          editor.dispatch(
+            tr.setMeta(untracked, true).setMeta("addToHistory", false).setMeta("historyOp", "undo"),
+          );
+        }
+        if (!editor.state.doc.eq(start))
+          throw new Error("checkpoint: the rollback did not give the document back");
+        handles.restore(ends);
+      },
+    };
+  };
+
   return {
+    checkpoint,
     editor,
     author,
     document: () => editor.getDocument(),

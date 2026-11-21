@@ -56,6 +56,20 @@ export class Handles {
     return handle;
   }
 
+  /**
+   * Where every handle is now, to put back with `restore` once the document is again as it
+   * is now. Handles issued in between stay issued, and name nothing: none is given twice.
+   */
+  snapshot(): ReadonlyMap<string, number> {
+    return new Map(this.#ends);
+  }
+
+  restore(ends: ReadonlyMap<string, number>): void {
+    this.#ends.clear();
+    for (const [handle, end] of ends) this.#ends.set(handle, end);
+    this.#byEnd = null;
+  }
+
   /** Whether `handle` was ever issued. */
   issued(handle: string): boolean {
     const n = /^b([1-9]\d*)$/.exec(handle);

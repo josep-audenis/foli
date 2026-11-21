@@ -27,7 +27,7 @@ place that says what is in progress; check it before starting work.
 | 13 Agent library         | ✅ Done                  | —                   | Merged in #138–#146; `@folijs/agent` 0.1.0 on npm (2026-11-21)                                                       |
 | 14 MCP server            | ✅ Done                  | —                   | Merged in #148–#162; `@folijs/mcp` 0.1.0 on npm (2026-11-21); a model in a client of its own is not tried (see 14.8) |
 | 15 Toolbar               | ✅ Done                  | —                   | Merged in #149–#160; 1.1.0 on npm (2026-11-21); the release's bench ran on a busy machine (see #160)                 |
-| 16 Code mode             | In progress              | `phase-16/run-code` | ADR-0010 and the sandbox (16.1, 16.2); the tool is not built                                                         |
+| 16 Code mode             | In progress              | `phase-16/run-code` | ADR-0010, the sandbox and the `run` tool behind `--code` (16.1–16.4); not tried with a model, not released           |
 
 Status values: `Ready` (dependencies met, nobody on it) · `In progress` · `In review` (PR open) ·
 `✅ Done` (merged, acceptance criteria met) · `Blocked by …`.
@@ -2483,13 +2483,21 @@ review.
   its error, the line of a failure; time ended within the limit for loops and for calls slow
   inside the engine; memory, stack and the number of calls; nothing of Node in the script;
   each run clean. Not used by any tool yet.)
-- [ ] 16.3 `doc` over a session: reading as blocks (handle, style, text, table place,
+- [x] 16.3 `doc` over a session: reading as blocks (handle, style, text, table place,
   changed) in parts, every operation of the tools with the same argument checks, results and
   refusals as values a script can test (`if (!r.ok)`); `console.log` kept as the log. A
-  failed run takes back every edit it made.
-- [ ] 16.4 The `run` tool: schema, a description that carries the `doc` types and one
+  failed run takes back every edit it made. (Done: `code.ts`. `doc` has `blocks`, `block` and
+  the eleven operations; a refusal is thrown in the script, so a script that does not look
+  stops there. `session.checkpoint()` in `@folijs/agent` takes a run back: the document equal
+  as JSON and every handle as it was, on the three corpus documents after every kind of
+  edit. Two arguments the tools' schemas refuse the library takes as no options
+  (`comment`'s and `updateFields`' options given as a string or a number).)
+- [x] 16.4 The `run` tool: schema, a description that carries the `doc` types and one
   example, the answer's format (returned value, log, blocks changed, each held to a size and
-  to one line per block), a refusal's wording. In `tools/list` as decided in (d).
+  to one line per block), a refusal's wording. In `tools/list` as decided in (d). (Done: `run`
+  with `--code`, 15 tools then, 14 without. The answer: `Returned:` and the value as JSON on a
+  line, the blocks changed as they read now (40 at most), what was deleted, the log; a
+  failure with its line and "Nothing was changed". 10 tests through the SDK's client.)
 - [ ] 16.5 Hostile scripts: the fuzz and the escape tests of the acceptance, each proved to
   fail when its guard is taken out; a security review by an agent, on the built server.
 - [ ] 16.6 A model's trial, as 14.8's: a fresh model with the server's own words only, tasks

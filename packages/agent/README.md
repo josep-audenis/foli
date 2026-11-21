@@ -128,6 +128,10 @@ session.updateFields({ data: { CandidateFirstName: "Ada" } });
   a page layout the session does not have. A table of contents is left as it is unless
   `contents` is true: built here, its entries follow the headings and their page numbers are
   empty until Word updates the field. It returns no blocks: read again.
+- **`checkpoint()`**: marks the document as it is. `rollback()` on what it returns takes back
+  every edit made since, as if none had been: no tracked change is left of them and every
+  handle names the block it named. `release()` keeps them. For a batch of operations that
+  must all be done or none.
 
 ## For the model
 

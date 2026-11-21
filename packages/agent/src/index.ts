@@ -2,6 +2,7 @@ export type { Changed, CommentOptions, NewParagraph, ReplaceOptions } from "./op
 export { type Block, formatBlocks } from "./read.js";
 export type { Ok, Refusal, Result } from "./result.js";
 export {
+  type Checkpoint,
   openSession,
   type ReadOptions,
   type ReadResult,
