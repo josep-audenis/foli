@@ -32,11 +32,11 @@ export interface ReplaceOptions {
   all?: boolean;
 }
 
-/** @internal What the operations work on. */
 /** The most paragraphs one insert takes, and the most places one replace changes. */
 const MAX_PARAGRAPHS = 500;
 const MAX_PLACES = 500;
 
+/** @internal What the operations work on. */
 export interface Context {
   editor: Editor;
   handles: Handles;
