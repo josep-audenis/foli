@@ -24,7 +24,7 @@ place that says what is in progress; check it before starting work.
 | 10 Tables & images       | ✅ Done                  | —                | Merged in #73–#97 (#90, the landing page, went to main); 0.5.0 on npm; two misses accepted                   |
 | 11 Sections & templates  | ✅ Done                  | —                | Merged in #100–#118 (#106, #107, #110, #112 and #113, the site, went to main); 0.6.0 on npm; misses accepted |
 | 12 Ecosystem & 1.0       | ✅ Done                  | —                | Merged in #120–#133; 1.0.0 on npm (2026-11-20); Phase 5 speed misses and manual checks accepted as 1.0 risks |
-| 13 Agent library         | In progress              | `phase-13/agent` | 13.1–13.6 done; `@folijs/mcp` (Phase 14, not planned yet) waits for it                                       |
+| 13 Agent library         | In review                | `phase-13/agent` | Merged in #138–#144; the release PR of 0.1.0 waits for the owner; Phase 14 not planned                       |
 
 Status values: `Ready` (dependencies met, nobody on it) · `In progress` · `In review` (PR open) ·
 `✅ Done` (merged, acceptance criteria met) · `Blocked by …`.
@@ -1923,7 +1923,31 @@ differs is listed in limitations; Word opens each result and shows the changes u
 agent's name (the Word harness); the API report, size and package checks of `pnpm check` cover
 the package; README, `api.md`, `architecture.md` and the site document it, with a system-prompt
 snippet for the handle format; 0.1.0 published with the owner's approval, as 0.x: outside
-ADR-0008's 1.0 promise until Phase 14 has used it.
+ADR-0008's 1.0 promise until Phase 14 has used it. (Checked 2026-11-21, Word 16.0.20625 on
+Windows, `pnpm check` green with 75 tests in the package: its only dependency is `@folijs/core`,
+an exact peer; no DOM and no Node built-ins, checked by its build (`lib: ["ES2022"]`, no
+`types`) rather than by a test; `read` gives the body a line per block with handle, table
+place, style, list number, changes, comments and text, tables before their cells' blocks,
+what Foli does not model as `not editable`; a handle names its block through the session's
+edits, undo, and accepting or rejecting them (a property test of 200 runs; the handle is the
+block's end, Word's paragraph mark), and a handle whose block is gone is refused as `gone`;
+`replaceText`, `insertAfter`, `insertBefore`, `deleteBlock`, `setStyle`, `comment`, `controls`,
+`fillControl` and `updateFields` return values, a refusal with a code and a message, and do
+not throw on wrong arguments; every edit is a tracked change by the author (comments are
+comments, as in Word); the three tasks pass through `importDocx` and `exportDocx`
+(`scenarios.test.ts`), with a fourth on a document Word's reviewers had redlined; rejecting
+the agent's changes gives the content back exactly for the redlines and the restyling, and
+with two differences listed in limitations for a filled control and a rebuilt table of
+contents, both core's; Word opens the three results and shows every change under the agent's
+name, its accepted and rejected text Foli's (`agent-roundtrip.mjs`, 3 of 3); the API report,
+size (72.4 kB gzip with core, budget 75.7) and publint are in `pnpm check`; README, `api.md`,
+`architecture.md` and the site document it, the README with a system prompt for the handle
+format. Each task merged after an agent's review (#138–#144), which found and had fixed: the
+package about to be published by the next 1.x release; handles moving to another block when a
+deleted paragraph was accepted; a nested table deleted in place of its table; inserts into a
+locked content control; a section break deleted with its empty paragraph; a restyle reported
+done in a locked control; a control filled by another's name. Not done: 0.1.0 is not
+published; its release PR waits for the owner.)
 
 ### Tasks
 
@@ -2066,10 +2090,16 @@ Each task is a PR on `phase-13/agent`, the build green after each.
   From the review of #143: the harness compared no text of the edits themselves (their
   paragraphs hold fields and were set aside) and passed on a paragraph count that differed;
   the tests' "nothing else differs" stripped more than the known differences.)
-- [ ] 13.7 Docs and release: README (also the site's guide), `api.md`, `architecture.md`,
+- [x] 13.7 Docs and release: README (also the site's guide), `api.md`, `architecture.md`,
   `limitations.md`, the exploration note marked with what was built, acceptance checked above,
   the changeset, `private` removed from the manifest; 0.1.0 published with the owner's
-  approval. Phase 14 planned.
+  approval. (Done but for the release: the README has the read format, every operation, the
+  templates and a system prompt for the model; it is the site's guide `/docs/guides/agent/`;
+  `api.md`, `architecture.md` ("Agent editing"), `limitations.md` (13.6), `benchmarks.md` (the
+  bundle), `contributing.md` and the exploration note say what was built. The release is its
+  own PR, left open for the owner: it removes `private`, adds the changeset and versions the
+  package 0.1.0; merging it and running the Release workflow publish it. Phase 14
+  (`@folijs/mcp`) is not planned here: it starts with the owner.)
 
 ## After 1.0
 

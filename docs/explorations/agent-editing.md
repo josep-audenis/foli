@@ -1,8 +1,10 @@
 # Exploration: agents editing documents
 
-Status: **exploration, nothing built.** The library is planned as
-[Phase 13](../roadmap.md#phase-13--agent-library-folijsagent--m--agent-010); the MCP server is a
-separate package after it. Written 2026-11-21 after 1.0.0. Collaboration is left out
+Status: **the library is built** (`@folijs/agent`,
+[Phase 13](../roadmap.md#phase-13--agent-library-folijsagent--m--agent-010); how it works:
+[architecture](../architecture.md#agent-editing)). The MCP server, a separate package after it,
+and `run(code)` are not. What follows is the exploration as written before the library; where
+the library decided otherwise it says so. Written 2026-11-21 after 1.0.0. Collaboration is left out
 on purpose (a later exploration); this note is about an AI agent editing a document without
 touching OOXML.
 
@@ -118,6 +120,10 @@ give back the input; anything left is an untracked edit, and the result is refus
 - ~~Block handles: is `w14:paraId` kept on every paragraph, and given to new ones?~~ Answered
   2026-11-21: kept on imported paragraphs, not given to new ones, dropped by paste. Handles are
   session ids moved through each transaction's mapping (roadmap, Phase 13).
+- ~~The facade's operation list~~: built from three tasks (fill a template, redline a contract,
+  restyle headings): `replaceText`, `insertAfter`, `insertBefore`, `deleteBlock`, `setStyle`,
+  `comment`, `controls`, `fillControl`, `updateFields`. Not built: `insertTable`, accepting and
+  rejecting changes (a person's part).
 - The facade's operation list: start from real agent tasks (fill a template, redline a contract,
   restyle headings) rather than mirroring every command.
 - Should the facade return serialized steps instead of whole documents? It would need

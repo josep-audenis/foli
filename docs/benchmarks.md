@@ -502,8 +502,10 @@ fails when a bundle passes its budget.
 | `@folijs/docx`    | docx, core                      | 177.4 kB |  58.0 kB |  60.0 kB |
 | `@folijs/pdf`     | pdf (Node's side), core         |  51.8 kB |  17.2 kB |  18.4 kB |
 | pdf's renderer    | core, view's read-only renderer | 251.1 kB |  84.7 kB |  95.2 kB |
+| `@folijs/agent`   | agent, core                     | 218.7 kB |  72.4 kB |  75.7 kB |
 
-(kB = 1,024 bytes; measured 2026-11-20 for 1.0.0. Every raise of a budget, with its reason, is
+(kB = 1,024 bytes; measured 2026-11-20 for 1.0.0, `@folijs/agent` 2026-11-21 in Phase 13: mostly
+what it uses of core, which an app that edits already loads. Every raise of a budget, with its reason, is
 in `scripts/size.mjs`. Gzipped sizes at 0.1.0: 14.1, 19.9, 25.3 and 25.2 kB; at 0.5.0's budgets:
 core 52.7, view 63.5, React 87.9, docx 44.9 kB; at 0.6.0: core 84.6, view 106.6, React 149.9,
 docx 55.3, pdf 16.2 kB. Phase 12 added custom nodes and marks, view extensions, named commands,

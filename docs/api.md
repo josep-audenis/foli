@@ -972,6 +972,39 @@ Details (what import keeps, what export writes, limits): the
 - Errors: `DocxError` (not a WordprocessingML document, Strict Open XML, content export cannot
   write), `ZipError` (the container), `XmlError` (with the `offset`).
 
+## `@folijs/agent`
+
+An LLM agent reads and edits a document by block handles; every edit is a tracked change
+(Phase 13). **Unstable: 0.x, outside the 1.0 promise of the packages above; its API may change
+in any 0.x release.** No DOM and no Node built-ins. Peer dependency: `@folijs/core` at an exact
+version. Details, the read format and examples: the
+[package README](../packages/agent/README.md).
+
+- `openSession(document, { author, extensions? }): Session`: opens a document (validated and
+  migrated as `createEditor` does) with tracking on in `author`'s name. Throws on a document
+  that does not validate and on an empty author; nothing else in the package throws.
+- Every `Session` method but `document`, `styles` and `controls` returns a `Result`:
+  `{ ok: true, … }` or a `Refusal` `{ ok: false, code, message }`, the message written for the
+  model. Codes: `unknown-handle`, `gone`, `not-a-paragraph`, `no-match`, `several-matches`,
+  `unknown-style`, `unknown-control`, `read-only`, `invalid`, `refused`.
+- Reading: `read({ from?, limit? })` → `ReadResult` `{ text, blocks, next }`: the body as it
+  would be with every change accepted, a line per block starting with its handle (`[b7]`);
+  `block(handle)` → `{ block, text }`. `Block`: `handle`, `kind` (`paragraph`, `table`,
+  `other`), `style`, `number`, `text`, `rows`, `columns`, `cell` (`{ table, row, column }`),
+  `depth`, `changed`, `comments`. `formatBlocks(blocks)` makes the text from blocks.
+- Editing, each returning `Changed` `{ blocks, text }` for what it changed:
+  `replaceText(handle, find, replacement, { all? })` (also `replaced`, `refused`),
+  `insertAfter` and `insertBefore(handle, paragraphs)` (`NewParagraph`: a string or
+  `{ text, style? }`, one or a list), `deleteBlock(handle)` (`{ text }`),
+  `setStyle(handle, style)`, `comment(handle, text, { on? })` (also `comment`, its id);
+  `styles()` lists the paragraph styles' names.
+- Templates: `controls()` → `Control[]` (`id`, `name`, `tag`, `title`, `kind`, `value`,
+  `empty`, `items`, `readOnly`, `block`); `fillControl(name, value)`, by id, else tag, else
+  title (also `controls`, as they are now, and `unfilled`: `Unfilled[]`, those of the name
+  that did not take the value); `updateFields({ data? })` → core's `FieldsReport` and `text`.
+- `session.document()`: the document to save or export. `session.editor`: the headless editor
+  under the session, for what it has no operation for; `session.author`.
+
 ## `@folijs/pdf`
 
 PDF from Foli's own page layout, printed by a headless Chromium page the app supplies (11.12,

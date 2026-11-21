@@ -29,6 +29,11 @@ This document describes **what exists** and **what is decided**. Planned parts a
 └──────────────────────────────────────────────────────────────┘
 ```
 
+Beside the stack, `@folijs/agent` (Phase 13, unstable 0.x) drives the headless editor of
+`@folijs/core` for an LLM agent: the body read as lines with a handle per block, a few
+operations that take handles, every edit a tracked change. No DOM. See
+[Agent editing](#agent-editing).
+
 | Subsystem           | Responsibility                                                                 | Status                                                                                                                                                                                                                             |
 | ------------------- | ------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Document model      | Schema, immutable tree, marks, positions, JSON, validation                     | ✅ (Phase 2); Word's model (schema v3, 8.3–8.7) current as schema v5 (tables and pictures 10.3, stories, fields and controls 11.3); v1–v4 read and migrated                                                                        |
@@ -1038,6 +1043,36 @@ must have loaded, and the container must not be scaled (`transform`, `zoom`).
   border) does not read back as a rule. Between Foli editors the Foli JSON is read first.
   Fixtures: `packages/view/fixtures/clipboard/`.
 
+## Agent editing
+
+`@folijs/agent` (`packages/agent`, Phase 13) is a facade over the headless editor for an LLM
+agent. Nothing in it is new editing logic: each operation places a selection or builds a
+transaction and runs core's commands. Background and what was tried:
+[explorations/agent-editing.md](explorations/agent-editing.md).
+
+- **Session** (`session.ts`): `openSession(document, { author })` makes a `createEditor` with
+  tracking on and the `final` review view, so core's find sees the text the session reads.
+- **Reading** (`read.ts`): `readBlocks` walks the body: paragraphs, tables before their cells'
+  blocks, anything else as a block that is not editable. A paragraph's text follows find's
+  rules (`state/find.ts`): field codes, hidden text and tracked deletions out; what is not text
+  stands in brackets, where find stops. Styles and list numbers come from core's `Resolver`
+  (`@folijs/core/internal`), numbered as the view numbers the final text. `formatBlocks` makes
+  the one line per block a model reads.
+- **Handles** (`handles.ts`): a handle (`b7`) is the position after its block, kept by mapping
+  the two sides of the block's closing through every transaction (`editor.subscribe`). A
+  paragraph's closing is Word's paragraph mark, so the handle behaves as the paragraph does in
+  Word: Enter leaves it on the text after the caret, a join leaves the second paragraph's, and
+  accepting or rejecting a paragraph's insertion or deletion leaves the paragraphs around under
+  theirs. Not `w14:paraId`: paragraphs Foli creates have none.
+- **Operations** (`operations.ts`, `templates.ts`): `replaceText` (core's `findAll` and
+  `replace`, kept to the block), `insertAfter`/`insertBefore` (a paragraph node with the
+  neighbour's properties, minus its mark's own), `deleteBlock` (a whole-node delete, which
+  tracking records; content only where Word needs a paragraph), `setStyle`, `comment`,
+  `fillControl`, `updateFields`. Each returns a value: the blocks as they read now, or a refusal
+  with a code and a message written for the model.
+- **What it is not:** no sandbox, no file system, no MCP. An MCP server over it is a separate
+  package (roadmap, Phase 14).
+
 ## Packages
 
 ```
@@ -1049,7 +1084,8 @@ foli/
 │   ├── view/  @folijs/view   Editable DOM view (EditorView). Framework-agnostic.
 │   ├── react/ @folijs/react  React components + default stylesheet.
 │   ├── docx/  @folijs/docx   DOCX import to Word's model (schema v5) and lossless export; package (zip, parts, relationships), XML keeping source text. No DOM.
-│   └── pdf/   @folijs/pdf    exportPdf: a document printed by the app's headless Chromium page; ships the read-only renderer as a page script.
+│   ├── pdf/   @folijs/pdf    exportPdf: a document printed by the app's headless Chromium page; ships the read-only renderer as a page script.
+│   └── agent/ @folijs/agent  openSession: a document read and edited by an LLM agent through block handles, every edit tracked. 0.x. No DOM, no Node.
 ├── spikes/two-page/     Phase 1 spike; throwaway, never published.
 ├── examples/            Example apps installing the packed packages (6.4, 12.10); never published.
 └── docs/

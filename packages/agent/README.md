@@ -5,8 +5,8 @@ edits are tracked changes in the agent's name, for a person to accept or reject 
 Word. No DOM and no Node built-ins: runs in Node, browsers, workers and sandboxes. Its only
 dependency is `@folijs/core`, a peer at an exact version.
 
-> **Unstable (0.x), unreleased.** In development (roadmap, Phase 13): every operation is built; not yet
-> released. Outside the 1.0 promise of the other packages.
+> **Unstable (0.x).** Outside the 1.0 promise of the other packages: its API may change in any
+> 0.x release. Not released yet.
 
 ```ts
 import { openSession } from "@folijs/agent";
@@ -120,6 +120,25 @@ session.updateFields({ data: { CandidateFirstName: "Ada" } });
   of contents) and fills its merge fields from `data`, by name, capitals not counting. `text`
   says what was left as it was: merge fields without data, and page numbers, which need a page
   layout the session does not have. It returns no blocks: read again.
+
+## For the model
+
+The session is a library: an app gives its methods to a model as tools (an MCP server over it
+is planned as its own package). What a model needs to be told fits in a system prompt:
+
+```text
+You edit a document through tools. read gives it a line per block:
+  [b7] Clause, 1.1, changed: text
+[b7] is the block's handle: pass it to the other tools. After it come where the block is in a
+table (r1 c1), its style, its list number, "changed" if it has tracked changes, its comments;
+after the colon, its text. ↵ is a line break. Words in brackets ([picture], [note],
+[empty: Offer date]) are not text: never put them in find.
+Handles stay valid while you edit. A tool that changes the document returns the blocks as they
+are now: do not read again to check. A refusal says what to do instead: follow it.
+Give find the exact text from the line, with its capitals, long enough to be there once.
+Every edit you make is a tracked change a person will accept or reject: change only what the
+task asks, and use comment to explain a change that is not obvious.
+```
 
 ## Limits
 
