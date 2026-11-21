@@ -7,6 +7,7 @@ import {
   type FoliDocument,
   insertText,
   type OpenStory,
+  openLinkEditor,
   Plugin,
   PluginKey,
   TextSelection,
@@ -383,6 +384,15 @@ describe("toolbar items", () => {
     expect(text(editor)).toBe("Hi Hello");
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(onClickCommand).toHaveBeenCalledOnce();
+
+    // A built-in dialog that opens takes its place.
+    fireEvent.click(button, { detail: 1 });
+    act(() => void editor.run(openLinkEditor));
+    expect(screen.getAllByRole("dialog").map((d) => d.getAttribute("aria-label"))).toEqual([
+      "Add link",
+    ]);
+    fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
+    expect(screen.queryByRole("dialog")).toBeNull();
 
     // A disabled toolbar closes it, and it does not come back.
     fireEvent.click(button, { detail: 1 });

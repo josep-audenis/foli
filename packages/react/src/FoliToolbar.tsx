@@ -1487,9 +1487,19 @@ export function FoliToolbar({
   const [appDialog, setAppDialog] = useState<{ key: string; restore: HTMLElement | null } | null>(
     null,
   );
+  // One dialog at a time: a built-in one that opens (Mod-K's, a menu's) takes its place.
+  const builtInDialog = Boolean(
+    dialog ||
+      tableDialog ||
+      pictureDialog ||
+      setupDialog ||
+      referenceDialog ||
+      controlDialog ||
+      noteDialog,
+  );
   useEffect(() => {
-    if (disabled) setAppDialog(null);
-  }, [disabled]);
+    if (disabled || builtInDialog) setAppDialog(null);
+  }, [disabled, builtInDialog]);
   const appDialogItem = appDialog && items.find((item) => item.key === appDialog.key);
 
   const onKeyDown = (event: KeyboardEvent) => {
@@ -1735,7 +1745,7 @@ export function FoliToolbar({
           </Fragment>
         ))}
       </div>
-      {appDialog && typeof appDialogItem?.dialog === "function" && !disabled && (
+      {appDialog && typeof appDialogItem?.dialog === "function" && !disabled && !builtInDialog && (
         <AppDialog
           label={appDialogItem.label}
           name={appDialogItem.key}
