@@ -7,7 +7,7 @@ What Foli checks, where, and what stays the embedding app's job. Reviewed for 1.
 
 Foli runs in the user's browser tab (the editor, the view, `exportPdf`) and in Node or a
 browser (`@folijs/core`, `@folijs/docx`). The MCP server is a program of its own, with its own
-section below. Untrusted input reaches it as:
+section below. Untrusted input reaches the editor and the libraries as:
 
 - **Pasted data**: HTML from any page, Foli's own clipboard JSON (which a hostile page can
   forge), plain text.
@@ -70,17 +70,17 @@ model may be following text planted in a document it read, so every argument is 
 attacker's. The files under the root, which may come from someone else: hostile `.docx` files,
 links, odd names.
 
-| What                   | Where                              | Rule                                                                                                                                 |
-| ---------------------- | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| A line from the client | `mcp/src/protocol.ts`              | JSON-RPC 2.0, at most 8 MB; what is not a message is answered with an error or ignored; one message at a time                        |
-| A tool's arguments     | `mcp/src/schema.ts`                | Checked against the tool's schema before it runs; no property that is not named                                                      |
-| A path                 | `mcp/src/files.ts`                 | A relative `.docx` name, no `..`, `:` or control character; its real path under the root's; outside is "not there"                   |
-| A file read            | `mcp/src/files.ts`, `documents.ts` | 64 MB; 64 MB unpacked and 400,000 XML nodes; the open documents 3 million positions together, 16 at most; open once                  |
-| A file written         | `mcp/src/files.ts`                 | A new file made exclusively, renamed into place; never over what is not a plain file; over a file only its own or with `--overwrite` |
-| What a document names  | `agent/src/read.ts`                | Shown on one line: a text, a style, a list number or a control's name cannot start a line of an answer                               |
-| An answer              | `mcp/src/protocol.ts`              | Cut at 200,000 characters                                                                                                            |
-| The author's name      | `mcp/src/server.ts`                | One line, no control characters, whole characters, 60 at most                                                                        |
-| The log (stderr)       | `mcp/src/protocol.ts`              | An error's kind and place, never its message                                                                                         |
+| What                   | Where                                                                        | Rule                                                                                                                                                                                      |
+| ---------------------- | ---------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A line from the client | `mcp/src/protocol.ts`                                                        | JSON-RPC 2.0, at most 8 MB; what is not a message is answered with an error or ignored; one message at a time                                                                             |
+| A tool's arguments     | `mcp/src/schema.ts`                                                          | Checked against the tool's schema before it runs; no property that is not named (`update_fields`' `data` takes any name: its values are the library's to check)                           |
+| A path                 | `mcp/src/files.ts`                                                           | A relative `.docx` name, no `..`, `:` or control character; its real path under the root's; outside is "not there"                                                                        |
+| A file read            | `mcp/src/files.ts`, `documents.ts`                                           | 64 MB; 64 MB unpacked and 400,000 XML nodes; the open documents 3 million positions together, 16 at most; open once                                                                       |
+| A file written         | `mcp/src/files.ts`                                                           | A new file made exclusively, renamed into place; never over what is not a plain file; over a file only its own or with `--overwrite`                                                      |
+| What a document names  | `agent/src/read.ts`, `operations.ts`, `templates.ts`; `mcp/src/documents.ts` | Shown on one line: a text, a style, a list number, a control's name, items and value, a field's instruction, a merge field's name and the reader's error cannot start a line of an answer |
+| An answer              | `mcp/src/protocol.ts`                                                        | Cut at 200,000 characters                                                                                                                                                                 |
+| The author's name      | `mcp/src/server.ts`                                                          | One line, no control characters, whole characters, 60 at most                                                                                                                             |
+| The log (stderr)       | `mcp/src/protocol.ts`                                                        | A tool's or a method's error by kind and place, never its message (a failure to start says its own, which holds no document's text)                                                       |
 
 **What stays the user's.** Choosing the root: everything under it can be read by the model and
 so reach the model's provider. `--overwrite`. Reviewing the tracked changes: the server cannot

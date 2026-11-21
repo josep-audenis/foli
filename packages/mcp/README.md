@@ -15,6 +15,11 @@ Foli's own packages.
 
 The server is a program the client starts. It needs Node 20.19 or later.
 
+**Until 0.1.0 is on npm, `npx @folijs/mcp` finds nothing.** Build the repository
+(`pnpm install && pnpm build`) and give the client `node <checkout>/packages/mcp/dist/bin.js`
+in place of `npx -y @folijs/mcp` below. That is the form Claude Code 2.1.92 was connected
+with; the `npx` form is not tried.
+
 ```
 foli-mcp [--root <folder>] [--author <name>] [--overwrite]
 ```
@@ -26,7 +31,7 @@ claude mcp add foli -- npx -y @folijs/mcp --root .
 ```
 
 Clients that are configured with a file take the same command, in the shape most of them share
-(not tried in clients other than Claude Code):
+(not tried in any client):
 
 ```json
 {
@@ -45,7 +50,7 @@ Clients that are configured with a file take the same command, in the shape most
 - **`--author <name>`**: whose tracked changes and comments the edits are, as Word will show
   them. Default: the name the client gives itself, or "Agent".
 - **`--overwrite`**: lets `save` write over existing files, the original included. Without it
-  a save never does.
+  a save writes over nothing but its own earlier saves.
 
 ## What the model can do
 

@@ -83,7 +83,7 @@ function found(context: Context): Control[] {
       id: value.id,
       name: oneLine(value.tag || value.title || value.id),
       kind: value.kind,
-      value: item?.display ?? value.value,
+      value: shownValue(item?.display ?? value.value),
       empty: value.showingPlaceholder,
       readOnly: controlIsReadOnly(properties),
       block,
@@ -101,6 +101,10 @@ function found(context: Context): Control[] {
 export function controls(context: Context): Control[] {
   return found(context);
 }
+
+/** A control's value as it is given: its text on one line, as all a document names. */
+const shownValue = (value: string | boolean | null) =>
+  typeof value === "string" ? oneLine(value) : value;
 
 const same = (a: string | undefined, b: string) => a?.trim().toLowerCase() === b;
 const isDay = (text: string) => {
@@ -242,5 +246,7 @@ export function updateFields(
     ...(others.length ? [`Left as they were: ${others.join("; ")}.`] : []),
     ...(done ? ["Read again to see the text."] : []),
   ].join(" ");
-  return { ok: true, ...report, text };
+  // One sentence run, on one line: a field's instruction and a merge field's name are the
+  // document's, and must not start a line any more than its text may.
+  return { ok: true, ...report, text: oneLine(text) };
 }

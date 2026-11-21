@@ -25,7 +25,7 @@ place that says what is in progress; check it before starting work.
 | 11 Sections & templates  | ✅ Done                    | —                                | Merged in #100–#118 (#106, #107, #110, #112 and #113, the site, went to main); 0.6.0 on npm; misses accepted |
 | 12 Ecosystem & 1.0       | ✅ Done                    | —                                | Merged in #120–#133; 1.0.0 on npm (2026-11-20); Phase 5 speed misses and manual checks accepted as 1.0 risks |
 | 13 Agent library         | ✅ Done                    | —                                | Merged in #138–#146; `@folijs/agent` 0.1.0 on npm (2026-11-21)                                               |
-| 14 MCP server            | In review                  | `phase-14/mcp`                   | Built, #148–#156; a model in a real client, and the release of 0.1.0, wait for the owner                     |
+| 14 MCP server            | In review                  | `phase-14/mcp`                   | Built in #148, #153, #155, #156; a model in a real client and the release of 0.1.0 wait for the owner        |
 | 15 Toolbar               | In progress (release left) | `phase-15/toolbar-customization` | Built and merged in #149–#152 (2026-11-21); 1.1.0 waits for the owner's approval to publish                  |
 
 Status values: `Ready` (dependencies met, nobody on it) · `In progress` · `In review` (PR open) ·
@@ -2125,8 +2125,8 @@ The agent library as tools for any MCP client (Claude Code, Claude Desktop, Curs
 the client starts, which opens `.docx` files, gives the model `@folijs/agent`'s reading and
 operations as tools, and saves the result with every edit a tracked change. For agents that
 cannot run code; one that can uses `@folijs/agent` directly. Background:
-[explorations/agent-editing.md](explorations/agent-editing.md). Planned 2026-11-21, nothing
-built.
+[explorations/agent-editing.md](explorations/agent-editing.md). Planned 2026-11-21; built, not
+released: see the tasks.
 
 Not in this phase: `run(code)` (code mode, After 1.0), a network transport (HTTP), resources
 and prompts of the protocol, accepting or rejecting changes, the hint highlight, anything that
@@ -2164,7 +2164,7 @@ README (the site's guide) with the configuration for the clients tried, `securit
 the server may read and write, `api.md`, `architecture.md`, limitations; the package is in
 `pnpm check` (tests, publint, its API report if it exports any); 0.1.0 published with the
 owner's approval, as 0.x. (Checked 2026-11-21, Word 16.0.20625, Windows 11 and one run on
-`ubuntu-latest` with Node 24, `pnpm check` green with 37 tests in the package:
+`ubuntu-latest` with Node 24, `pnpm check` green with 38 tests in the package:
 [ADR-0009](decisions/ADR-0009-mcp-server.md) accepted by review (#148); the built `bin` is a
 stdio server the SDK's client lists and calls (`pnpm mcp:e2e`) and Claude Code 2.1.92 reports
 connected; 14 tools: `open` by a path under the root, `read` in parts, every operation of
@@ -2179,11 +2179,13 @@ revision the agent's and its accepted and rejected text Foli's (3 of 3); README,
 `api.md`, `architecture.md` and limitations; the API report and publint in `pnpm check`. Beyond
 what was asked, from two security reviews (#148, #153): a result is cut at 200,000 characters,
 the open documents are held to a size together, a save is written to a new file and renamed,
-and nothing a document names can start a line of an answer. **Not met:** no model has called
-the tools in a real client, so "a real client does one task end to end" and "the tools'
-descriptions are enough for the model" are not shown; the CLI on the build machine is not
-logged in. 0.1.0 is not published. Both are 14.8, with the owner. Each task merged after an
-agent's review: #148, #153, #155, #156.)
+and nothing a document names can start a line of an answer (a block's text, a style, a list
+number, a control's name, items and value, a field's instruction, a merge field's name). **Not
+met:** no model has called the tools in a real client, so "a real client does one task end to
+end" and "the tools' descriptions are enough for the model" are not shown (the CLI on the build
+machine is not logged in); `npx @folijs/mcp` is not tried, the package not being published:
+what was started is the built `bin`; 0.1.0 is not published. All are 14.8, with the owner.
+Each task after an agent's review: #148, #153, #155, and this one, #156.)
 
 ### Tasks
 
@@ -2244,8 +2246,8 @@ review.
   a symlink, not a `.docx`, over the size limit, a damaged zip, the input written over. (Done: `files.ts` and
   `documents.ts`, by ADR-0009 as the review of #148 left it. A path is relative, with no `:`;
   a file to read is found by its real path under the root's, and what is outside is answered
-  as what is not there; 64 MB, then `@folijs/docx` held to 256 MB unpacked and a million
-  nodes. A save goes to a new file made exclusively beside the target and renamed over it;
+  as what is not there; 64 MB, then `@folijs/docx` held to limits of its own (set in the
+  review, below). A save goes to a new file made exclusively beside the target and renamed over it;
   over a file only when the server wrote it in this run or was started with `--overwrite`;
   never over what is not a plain file. Without a path: `<name>.agent.docx`, or
   `.agent-2.docx`… when that is another's. A whole drive is refused as the root. Tests on real
@@ -2319,7 +2321,12 @@ review.
   it is the site's guide `/docs/guides/mcp/`. `security.md` has the server's section: who is
   not trusted, each check and where it is, what stays the user's, what is known and accepted.
   `api.md` (`serve`, `Tool`, `foliServer`), `architecture.md` ("The MCP server"),
-  `limitations.md`, the root README and `contributing.md` say what was built.)
+  `limitations.md`, the root README and `contributing.md` say what was built. From the
+  review of #156, a fact check that also ran the server: a field's instruction, a merge
+  field's name and a control's value still reached an answer with their line ends (fixed in
+  `@folijs/agent`, tested through the server); the hundredth name beside the original was
+  written over when the server was started to overwrite (refused now); the README gave `npx`
+  commands for a package that is not on npm.)
 - [ ] 14.8 Release: first a model in a real client doing one task end to end (Claude Code at
   least; recorded with its version, and what its use of the tools showed wrong in their
   descriptions fixed); then the changeset, `private` removed, 0.1.0; published with the owner's
@@ -2437,7 +2444,7 @@ page before scrolling. Today every page is in the DOM, so a far page is reached.
 compared before 1.0 failed exactly there: pages not yet rendered could not be gone to.)
 
 **Agent editing:** the library is built and released (Phase 13, `@folijs/agent` 0.1.0). After
-it: an MCP server over it as its own package (`@folijs/mcp`, Phase 14, planned), then maybe a
+it: an MCP server over it as its own package (`@folijs/mcp`, Phase 14, built, not released), then maybe a
 sandboxed `run(code)` tool inside that server (code mode), once someone asks for it. The hint
 above is independent and is what lets an agent show what it changed. Explored:
 [explorations/agent-editing.md](explorations/agent-editing.md).

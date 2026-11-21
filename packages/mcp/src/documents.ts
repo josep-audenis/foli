@@ -139,6 +139,11 @@ export class Documents {
       let n = 1;
       // The first name that is free, or the server's own from an earlier save.
       while (n < 100 && standing(beside(n)) !== "nothing" && !this.#mine(beside(n))) n++;
+      // All taken: the last is not the server's to write over for having run out of names.
+      if (standing(beside(n)) !== "nothing" && !this.#mine(beside(n)))
+        return refusal(
+          `The names beside ${shown(this.#rules, document.file)} are taken, up to .agent-${n}.docx: save with a path.`,
+        );
       // Checked as a path given: the folder may not be what it was when the file was opened.
       wanted = shown(this.#rules, beside(n));
     }

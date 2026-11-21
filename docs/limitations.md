@@ -345,7 +345,8 @@ Unstable (0.x). Details in the [package README](../packages/mcp/README.md) and
 - Only `.docx`, up to 64 MB and 64 MB unpacked; the open documents hold about 3 million
   characters of body together, so a very long document may be refused, or leave no room for
   another. An answer over 200,000 characters is cut: read less at a time.
-- A save beside the original takes the first free name up to `.agent-99.docx`, then refuses.
+- A save beside the original takes the first free name up to `.agent-100.docx`; when all are
+  taken it refuses, and a path must be given.
 - File links (symlinks) could not be made on the Windows machine it was built on: the tests
   of those rules ran once on Linux (`pnpm check` on `ubuntu-latest`, 2026-11-21) and run in
   every Release workflow. Not tested on macOS.

@@ -349,6 +349,22 @@ describe("files", () => {
     await client.close();
   });
 
+  it("refuses a save beside the original when every name is taken, started to overwrite or not", async () => {
+    for (const overwrite of [false, true]) {
+      const { root } = folder(NDA);
+      for (let n = 1; n <= 100; n++)
+        writeFileSync(join(root, `${NDA}.agent${n > 1 ? `-${n}` : ""}.docx`), "theirs");
+      const { call, client } = await server(root, { overwrite });
+      await call("open", { path: `${NDA}.docx` });
+      expect(await call("save")).toEqual({
+        text: "The names beside 01-mutual-nda.docx are taken, up to .agent-100.docx: save with a path.",
+        refused: true,
+      });
+      expect(readFileSync(join(root, `${NDA}.agent-100.docx`), "utf8")).toBe("theirs");
+      await client.close();
+    }
+  });
+
   it("never writes through a link, though started to overwrite", async () => {
     const { root, base } = folder(NDA);
     const { call, client } = await server(root, { overwrite: true });

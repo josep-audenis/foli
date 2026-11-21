@@ -1097,10 +1097,12 @@ Foli's packages, at exact versions.
   `tools/list`, `tools/call`. Resolves when `input` ends. `ServerOptions`: `name`, `version`,
   `instructions`, `tools`, `onClient(name)`, `log(message)`.
 - `Tool`: `name`, `description`, `inputSchema` (`JsonSchema`, the subset the server checks:
-  types, `properties`, `required`, `items`, `enum`, `minimum`, `maximum`, `anyOf`), and
+  types, `description`, `properties`, `required`, `additionalProperties`, `items`, `enum`,
+  `minimum`, `maximum`; `JsonSchemaOrAny` adds `anyOf`), and
   `run(args)` returning a `ToolResult` `{ text, isError? }` or a promise of one. Arguments are
   checked against the schema before `run`.
-- `foliServer({ root, overwrite?, author?, version, log? }): ServerOptions`: this server's
+- `foliServer(options: FoliServerOptions): ServerOptions` (`root`, `overwrite?`, `author?`,
+  `version`, `log?`): this server's
   tools over the `.docx` files under `root`. Throws when `root` is not a folder or is a whole
   drive, and on an `author` with nothing writable in it.
 - `PROTOCOL_VERSIONS`, `MAX_MESSAGE_BYTES` (8 MB), `MAX_RESULT_CHARS` (200,000).
