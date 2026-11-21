@@ -107,6 +107,18 @@ importers:
         specifier: 18.2.1
         version: 18.2.1
 
+  packages/agent:
+    devDependencies:
+      '@folijs/core':
+        specifier: workspace:*
+        version: link:../core
+      '@folijs/docx':
+        specifier: workspace:*
+        version: link:../docx
+      '@types/node':
+        specifier: ^20.19.43
+        version: 20.19.43
+
   packages/core:
     devDependencies:
       '@vitest/coverage-v8':

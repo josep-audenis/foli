@@ -46,7 +46,8 @@ jobs:
             echo "$pending"
             exit 1
           fi
-          if grep -l '"version": "0.0.0"' packages/*/package.json; then
+          # A private package (one in development, not published yet) may stay at 0.0.0.
+          if grep -L '"private": true' packages/*/package.json | xargs grep -l '"version": "0.0.0"'; then
             echo "::error::Version 0.0.0 is the unreleased placeholder: version the packages first."
             exit 1
           fi
