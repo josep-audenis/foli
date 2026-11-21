@@ -244,7 +244,7 @@ the focus on the item, ArrowDown opens a menu. A copy of a built-in item with an
 `text` or `icon` does what the built-in does.
 
 - `select: { options(state), value(state), pick(value) }`: a box (a `select`, as Font).
-  `options` gives its `ToolbarOption`s (`{ value, label }`) on every render of the toolbar,
+  `options` gives its `ToolbarOption`s (`{ value, label }`) for the state now (it runs after every transaction: keep it cheap),
   `value` the one shown (null or "": a blank entry; one that is not offered shows itself),
   `pick` the command a choice runs. `label` is its accessible name.
 - `colors: { options, value(state), pick(color) }`: a color menu button (as Text color).

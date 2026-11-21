@@ -237,7 +237,7 @@ export interface ToolbarOption {
  */
 export interface ToolbarSelect extends ToolbarItemBase {
   readonly select: {
-    /** Its entries now. Runs on every render of the toolbar: keep it cheap. */
+    /** Its entries now. Runs after every transaction: keep it cheap. */
     readonly options: (state: EditorState) => readonly ToolbarOption[];
     /**
      * The entry shown: its `value`; null (or "") shows a blank entry (mixed, or nothing to
@@ -1269,7 +1269,13 @@ interface ItemState {
   enabled: boolean;
   /** A menu button's current value (a color, or null). */
   value: string | null | undefined;
+  /** A box's entries: the toolbar renders again when they change, not only with its value. */
+  options: readonly ToolbarOption[] | undefined;
 }
+
+const sameOptions = (a: readonly ToolbarOption[] = [], b: readonly ToolbarOption[] = []) =>
+  a.length === b.length &&
+  a.every((option, i) => option.value === b[i]?.value && option.label === b[i]?.label);
 
 const sameStates = (a: ItemState[], b: ItemState[]) =>
   a.length === b.length &&
@@ -1277,7 +1283,8 @@ const sameStates = (a: ItemState[], b: ItemState[]) =>
     (item, i) =>
       item.pressed === b[i]?.pressed &&
       item.enabled === b[i]?.enabled &&
-      item.value === b[i]?.value,
+      item.value === b[i]?.value &&
+      sameOptions(item.options, b[i]?.options),
   );
 
 /**
@@ -1298,6 +1305,7 @@ const statesOf =
         item.colors?.value(state) ??
         item.select?.value(state) ??
         (item.dialog === "picture" ? (selectedPicture(state) ? "edit" : "insert") : undefined),
+      options: item.select?.options(state),
     }));
 
 /** A menu button's entries (made from the body's editor when a function). */
@@ -1367,9 +1375,11 @@ export function FoliToolbar({
   const pointer = useRef(false);
   // The open menu (a menu button's key), if any.
   const [menu, setMenu] = useState<string | null>(null);
+  // Nor does it come back with its item, once that has left the toolbar.
+  const menuGone = menu !== null && !items.some((item) => item.key === menu);
   useEffect(() => {
-    if (disabled) setMenu(null);
-  }, [disabled]);
+    if (disabled || menuGone) setMenu(null);
+  }, [disabled, menuGone]);
 
   const run = (index: number, event: MouseEvent) => {
     const item = items[index];
@@ -1388,10 +1398,11 @@ export function FoliToolbar({
     }
     if (typeof item.dialog === "function") {
       closeDialogs();
-      setAppDialog({ key: item.key, restore: buttons.current[index] ?? null });
+      setAppDialog({ key: item.key });
       return;
     }
     if (item.actions && !actionsOf(item, body).length) return;
+    if (item.colors && !item.colors.options.length) return;
     if (item.colors || item.actions) {
       if (menu !== item.key) {
         setMenu(item.key);
@@ -1557,9 +1568,7 @@ export function FoliToolbar({
   }, [disabled]);
 
   // An app's dialog (a `ToolbarDialog` item's): it closes itself, and with a disabled toolbar.
-  const [appDialog, setAppDialog] = useState<{ key: string; restore: HTMLElement | null } | null>(
-    null,
-  );
+  const [appDialog, setAppDialog] = useState<{ key: string } | null>(null);
   // One dialog at a time: a built-in one that opens (Mod-K's, a menu's) takes its place.
   const builtInDialog = Boolean(
     dialog ||
@@ -1702,12 +1711,13 @@ export function FoliToolbar({
                 const i = index++;
                 const state = states[i];
                 // Inserting a picture needs the app's upload; editing a selected one does not.
-                // A menu without entries cannot open, whatever its `enabled` says.
+                // A menu without entries (or colors) cannot open, whatever its `enabled` says.
                 const off =
                   disabled ||
                   !state?.enabled ||
                   (item.dialog === "picture" && state?.value === "insert" && !upload) ||
-                  (item.actions !== undefined && actionsOf(item, body).length === 0);
+                  (item.actions !== undefined && actionsOf(item, body).length === 0) ||
+                  item.colors?.options.length === 0;
                 if (item.render) {
                   return (
                     <CustomItem
@@ -1726,7 +1736,7 @@ export function FoliToolbar({
                 if (item.select) {
                   const { select } = item;
                   const value = state?.value ?? "";
-                  const options = select.options(editor.state);
+                  const options = state?.options ?? [];
                   return (
                     <select
                       key={item.key}
@@ -1912,10 +1922,10 @@ export function FoliToolbar({
           content={appDialogItem.dialog}
           editor={editor}
           close={(applied) => {
-            const { restore } = appDialog;
             setAppDialog(null);
             if (applied && onClickCommand) onClickCommand();
-            else restore?.focus();
+            // Its button as it is now: the items may have changed while it was open.
+            else buttons.current[items.indexOf(appDialogItem)]?.focus();
           }}
         />
       )}
@@ -2045,7 +2055,9 @@ function AppDialog({
     };
   }, []);
   const closeOnce: typeof close = (applied) => {
-    if (open.current) close(applied);
+    if (!open.current) return;
+    open.current = false;
+    close(applied);
   };
   return (
     <div

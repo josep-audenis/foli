@@ -256,7 +256,7 @@ export interface ToolbarOption {
  */
 export interface ToolbarSelect extends ToolbarItemBase {
     readonly select: {
-        /** Its entries now. Runs on every render of the toolbar: keep it cheap. */
+        /** Its entries now. Runs after every transaction: keep it cheap. */
         readonly options: (state: EditorState) => readonly ToolbarOption[];
         /**
          * The entry shown: its `value`; null (or "") shows a blank entry (mixed, or nothing to

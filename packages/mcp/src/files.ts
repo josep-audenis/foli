@@ -13,7 +13,17 @@ import {
   statSync,
   writeSync,
 } from "node:fs";
-import { basename, dirname, extname, isAbsolute, join, parse, relative, resolve } from "node:path";
+import {
+  basename,
+  dirname,
+  extname,
+  isAbsolute,
+  join,
+  parse,
+  relative,
+  resolve,
+  sep,
+} from "node:path";
 
 /** @internal A file larger than this is not read. */
 export const MAX_FILE_BYTES = 64 * 1024 * 1024;
@@ -37,8 +47,25 @@ export const shown = (rules: FileRules, file: string) =>
 
 const inside = (root: string, file: string) => {
   const rel = relative(root, file);
-  return rel !== "" && !rel.startsWith("..") && !isAbsolute(rel);
+  // `..` or under it: a name that only starts with two dots (`..draft.docx`) is inside.
+  return rel !== "" && rel !== ".." && !rel.startsWith(`..${sep}`) && !isAbsolute(rel);
 };
+
+/**
+ * @internal
+ * Whether two paths are one file on disk, whatever they are called: on Windows and macOS a
+ * name in other capitals is the same file, and so is a hard link's anywhere.
+ */
+export function same(a: string, b: string): boolean {
+  if (a === b) return true;
+  try {
+    const [x, y] = [statSync(a, { bigint: true }), statSync(b, { bigint: true })];
+    // No number (some network shares) tells nothing.
+    return x.ino !== 0n && x.ino === y.ino && x.dev === y.dev;
+  } catch {
+    return false;
+  }
+}
 
 /**
  * @internal

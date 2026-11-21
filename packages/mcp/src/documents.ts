@@ -5,7 +5,7 @@
 import { basename, dirname, extname, join } from "node:path";
 import { openSession, type Session } from "@folijs/agent";
 import { type DocxPackage, exportDocx, importDocx } from "@folijs/docx";
-import { type FileRules, read, shown, stamp, standing, target, write } from "./files.js";
+import { type FileRules, read, same, shown, stamp, standing, target, write } from "./files.js";
 import type { ToolResult } from "./protocol.js";
 
 /**
@@ -93,7 +93,7 @@ export class Documents {
     if (!checked.ok) return refusal(checked.message);
     const name = shown(this.#rules, checked.file);
     // One session a file: two would each save over the other's edits.
-    const already = [...this.#open.values()].find((d) => d.file === checked.file);
+    const already = [...this.#open.values()].find((d) => same(d.file, checked.file));
     if (already) return refusal(`${name} is open already, as ${already.id}.`);
     let session: Session;
     let pkg: DocxPackage;
@@ -122,6 +122,10 @@ export class Documents {
       dirty: false,
       size,
     };
+    // What `state.doc` does not show: a header's or footer's field updated, its control filled.
+    session.editor.subscribe((_state, transactions) => {
+      if (transactions.some((tr) => tr.docChanged)) document.dirty = true;
+    });
     this.#open.set(document.id, document);
     return document;
   }
