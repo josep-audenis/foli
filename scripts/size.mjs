@@ -95,12 +95,15 @@ writeFileSync(appEntry, `export { FoliEditor } from "${dist("react")}";\n`);
  * Raised in 13.5 (72.0 kB): comments (13.4), content controls' values and field updates.
  * React raised after Phase 15's toolbar work and the two bug sweeps (157.4 kB, 159.0 allowed):
  * the sweeps' fixes add about 0.5 kB over core, view and React, on a bundle already at its limit.
+ * React raised in 17.4 (159.3 kB, 162.1 allowed): Phase 17's toolbar for developers (tabs an app
+ * controls, captioned groups, dialogs by name, the color field, overflow into a More panel:
+ * about 1.9 kB), with room for 17.5's replaceable strings.
  */
 const BUNDLES = [
   { name: "@folijs/core", entry: dist("core"), budget: 88_000 },
   { name: "@folijs/view", entry: dist("view"), budget: 114_700 },
-  { name: "@folijs/react", entry: dist("react"), budget: 162_800 },
-  { name: "FoliEditor only", entry: appEntry, budget: 162_800 },
+  { name: "@folijs/react", entry: dist("react"), budget: 166_000 },
+  { name: "FoliEditor only", entry: appEntry, budget: 166_000 },
   { name: "@folijs/docx", entry: dist("docx"), budget: 61_440 },
   { name: "@folijs/pdf", entry: dist("pdf"), budget: 18_800 },
   { name: "@folijs/agent", entry: dist("agent"), budget: 77_500 },
