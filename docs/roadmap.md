@@ -24,7 +24,7 @@ place that says what is in progress; check it before starting work.
 | 10 Tables & images       | ✅ Done                  | —                | Merged in #73–#97 (#90, the landing page, went to main); 0.5.0 on npm; two misses accepted                   |
 | 11 Sections & templates  | ✅ Done                  | —                | Merged in #100–#118 (#106, #107, #110, #112 and #113, the site, went to main); 0.6.0 on npm; misses accepted |
 | 12 Ecosystem & 1.0       | ✅ Done                  | —                | Merged in #120–#133; 1.0.0 on npm (2026-11-20); Phase 5 speed misses and manual checks accepted as 1.0 risks |
-| 13 Agent library         | In progress              | `phase-13/agent` | 13.1–13.3 done; `@folijs/mcp` (Phase 14, not planned yet) waits for it                                       |
+| 13 Agent library         | In progress              | `phase-13/agent` | 13.1–13.4 done; `@folijs/mcp` (Phase 14, not planned yet) waits for it                                       |
 
 Status values: `Ready` (dependencies met, nobody on it) · `In progress` · `In review` (PR open) ·
 `✅ Done` (merged, acceptance criteria met) · `Blocked by …`.
@@ -2004,9 +2004,16 @@ Each task is a PR on `phase-13/agent`, the build green after each.
   inserting next to a locked control's paragraph went in; a heading's new paragraph was a
   heading; a section break went with its empty paragraph. Not fixed here: core's control filter
   lets a paragraph into a locked block control (`allowed()`, `state/controls.ts`).)
-- [ ] 13.4 Style and comments: `styles()`, `setStyle(handle, name)`,
+- [x] 13.4 Style and comments: `styles()`, `setStyle(handle, name)`,
   `comment(handle, text, { on })` (`on`: text in the block to anchor to; the whole block
-  without it).
+  without it). (Done: `styles()` gives the names `read` shows, the document's and
+  Word's Heading 1 to 3 where it lacks them (core's `paragraphStyles`). `setStyle` runs
+  `setParagraphStyle` with the caret in the block: a tracked paragraph formatting change, the
+  direct formatting kept; no change when the paragraph is in the style already. `comment` runs
+  `addComment` over the block's content, or over `on`, which must be in the block once; a line
+  break in the text starts a new paragraph of the comment; it returns the comment's id. A
+  comment is not a tracked change, as in Word: rejecting the session's changes leaves it. Both
+  refuse a table or other block as `not-a-paragraph`.)
 - [ ] 13.5 Templates: `controls()` (tag, title, kind, value, the block it is in),
   `fillControl(tagOrTitle, value)`, `updateFields()`. A read-only control is refused by name.
 - [ ] 13.6 The three tasks and the tracking check: tests that import a corpus `.docx`, run the

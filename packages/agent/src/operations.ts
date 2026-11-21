@@ -1,4 +1,5 @@
 import {
+  addComment,
   controlIsReadOnly,
   controlProperties,
   controlsIn,
@@ -372,4 +373,91 @@ export function deleteBlock(context: Context, handle: string): Result<{ text: st
       text: `Block ${handle} was emptied but stays: ${stays ?? "its paragraph mark could not be deleted"}.\n${left.text}`,
     };
   return { ok: true, text: `Deleted block ${handle}.` };
+}
+
+/** @internal The paragraph `handle` names, or why an operation on a paragraph cannot go on. */
+function paragraphAt(
+  context: Context,
+  handle: string,
+  what: string,
+): Refusal | { pos: number; node: Node } {
+  const target = resolve(context, handle);
+  if ("ok" in target || target.node.type.name === "paragraph") return target;
+  return refuse(
+    "not-a-paragraph",
+    `Block ${handle} is not a paragraph: ${what} (a table's are its cells' blocks).`,
+  );
+}
+
+/** @internal The paragraph styles there are to name, as `read` names them. */
+export function styles(context: Context): string[] {
+  return paragraphStyles(context.editor.state).map((style) => style.name);
+}
+
+/** @internal */
+export function setStyle(context: Context, handle: string, style: string): Result<Changed> {
+  const { editor } = context;
+  const target = paragraphAt(context, handle, "a style is set on paragraphs");
+  if ("ok" in target) return target;
+  const id = styleId(context, style);
+  if (typeof id !== "string") return id;
+  const resolver = wordContext(editor.state)?.resolver;
+  const now = resolver?.paragraph(target.node.attrs as Record<string, unknown>).paragraph.style;
+  if (now !== id) {
+    editor.select(target.pos + 1);
+    if (!editor.run(setParagraphStyle(id)))
+      return refuse("refused", `The style of block ${handle} could not be changed.`);
+  }
+  return { ok: true, ...changed(context, [handle]) };
+}
+
+export interface CommentOptions {
+  /** Text in the block to anchor the comment to, as `read` shows it. Default: the whole block. */
+  on?: string;
+}
+
+/** @internal */
+export function comment(
+  context: Context,
+  handle: string,
+  text: string,
+  options: CommentOptions = {},
+): Result<Changed & { comment: number }> {
+  const { editor } = context;
+  const target = paragraphAt(context, handle, "a comment is anchored in a paragraph");
+  if ("ok" in target) return target;
+  const content = typeof text === "string" ? typed(text).trim() : "";
+  if (!content) return refuse("invalid", "A comment needs its text, a string.");
+  let from = target.pos + 1;
+  let to = target.pos + target.node.nodeSize - 1;
+  const on = options?.on;
+  if (on !== undefined) {
+    const query = typeof on === "string" ? typed(on) : "";
+    if (!query) return refuse("invalid", "on must be text of the block, as read shows it.");
+    const matches = findAll(editor, query, { matchCase: true }).filter(
+      (m) => m.story === null && m.from >= from && m.to <= to,
+    );
+    const match = matches[0];
+    if (!match || matches.length > 1) {
+      const now = changed(context, [handle]).blocks[0]?.text ?? "";
+      return match
+        ? refuse(
+            "several-matches",
+            `${quote(query)} is in block ${handle} ${matches.length} times. Give a longer text that is there once.`,
+          )
+        : refuse(
+            "no-match",
+            `${quote(query)} is not in block ${handle}. Capitals and spaces count. Its text is: ${JSON.stringify(now)}`,
+          );
+    }
+    ({ from, to } = match);
+  }
+  const ids = () => new Set(wordContext(editor.state)?.envelope.comments.map((c) => c.id));
+  const before = ids();
+  editor.select(from, to);
+  if (!editor.run(addComment(content)))
+    return refuse("refused", `Block ${handle} could not be commented.`);
+  const made = [...ids()].find((id) => !before.has(id));
+  if (made === undefined) return refuse("refused", `Block ${handle} could not be commented.`);
+  return { ok: true, comment: made, ...changed(context, [handle]) };
 }

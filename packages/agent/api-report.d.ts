@@ -4,7 +4,7 @@
 export {};
 
 // index.d.ts
-export type { Changed, NewParagraph, ReplaceOptions } from "./operations.js";
+export type { Changed, CommentOptions, NewParagraph, ReplaceOptions } from "./operations.js";
 export { type Block, formatBlocks } from "./read.js";
 export type { Ok, Refusal, Result } from "./result.js";
 export { openSession, type ReadOptions, type ReadResult, type Session, type SessionOptions, } from "./session.js";
@@ -24,6 +24,10 @@ export interface Changed {
 export interface ReplaceOptions {
     /** Replace every place `find` is in the block. Default: refuse when there are several. */
     all?: boolean;
+}
+export interface CommentOptions {
+    /** Text in the block to anchor the comment to, as `read` shows it. Default: the whole block. */
+    on?: string;
 }
 
 // read.d.ts
@@ -91,7 +95,7 @@ export type Result<T = object> = Ok<T> | Refusal;
 
 // session.d.ts
 import { type Editor, type EditorDocument, type Extension, type FoliDocument } from "@folijs/core";
-import { type Changed, type NewParagraph, type ReplaceOptions } from "./operations.js";
+import { type Changed, type CommentOptions, type NewParagraph, type ReplaceOptions } from "./operations.js";
 import { type Block } from "./read.js";
 import { type Result } from "./result.js";
 export interface SessionOptions {
@@ -161,6 +165,21 @@ export interface Session {
      */
     deleteBlock(handle: string): Result<{
         text: string;
+    }>;
+    /** The paragraph styles there are, by the names `read` shows and `setStyle` takes. */
+    styles(): string[];
+    /**
+     * Puts a paragraph in a style, named by its name or id (capitals do not count). Its direct
+     * formatting stays. Recorded as a tracked formatting change.
+     */
+    setStyle(handle: string, style: string): Result<Changed>;
+    /**
+     * Comments a paragraph in the session's author's name: the whole block, or `on` text in it
+     * (there once). A line break in `text` starts a new paragraph of the comment. A comment is
+     * not a tracked change: rejecting the session's changes leaves it. Returns the comment's id.
+     */
+    comment(handle: string, text: string, options?: CommentOptions): Result<Changed & {
+        comment: number;
     }>;
 }
 /**
