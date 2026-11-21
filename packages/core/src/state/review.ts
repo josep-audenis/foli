@@ -9,7 +9,8 @@
  * deletion's record is dropped, recorded formatting comes back. Both ends of a tracked move go
  * together. These edits are not tracked themselves, and undo takes them back.
  */
-import { type Attrs, Fragment, type Mark, type Node, Slice } from "../model/index.js";
+import type { Attrs, Mark, Node } from "../model/index.js";
+import { Fragment, Slice } from "../model/index.js";
 import { TransformError } from "../transform/transform.js";
 import type { SectionJSON } from "../v3/document.js";
 import { RUN_PROPERTY_MARKS } from "../v3/schema.js";
