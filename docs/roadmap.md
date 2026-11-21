@@ -24,7 +24,8 @@ place that says what is in progress; check it before starting work.
 | 10 Tables & images       | ✅ Done                  | —      | Merged in #73–#97 (#90, the landing page, went to main); 0.5.0 on npm; two misses accepted                   |
 | 11 Sections & templates  | ✅ Done                  | —      | Merged in #100–#118 (#106, #107, #110, #112 and #113, the site, went to main); 0.6.0 on npm; misses accepted |
 | 12 Ecosystem & 1.0       | ✅ Done                  | —      | Merged in #120–#133; 1.0.0 on npm (2026-11-20); Phase 5 speed misses and manual checks accepted as 1.0 risks |
-| 13 Agent library         | ✅ Done                  | —      | Merged in #138–#146; `@folijs/agent` 0.1.0 on npm (2026-11-21); Phase 14 (`@folijs/mcp`) not planned         |
+| 13 Agent library         | ✅ Done                  | —      | Merged in #138–#146; `@folijs/agent` 0.1.0 on npm (2026-11-21)                                               |
+| 14 MCP server            | Ready                    | —      | Planned 2026-11-21, nothing built                                                                            |
 
 Status values: `Ready` (dependencies met, nobody on it) · `In progress` · `In review` (PR open) ·
 `✅ Done` (merged, acceptance criteria met) · `Blocked by …`.
@@ -85,23 +86,24 @@ Foli's engine is not credible until all five pass in Chromium, Firefox and WebKi
 
 ## Overview
 
-| Phase | Name                      | Outcome                                                     | Release      | Size |
-| ----- | ------------------------- | ----------------------------------------------------------- | ------------ | ---- |
-| 0     | Foundation                | Monorepo, docs, own schema v1, read-only view               | —            | ✅   |
-| 1     | Architecture spike        | Two-page editable surface validated → ADR-0003              | —            | M    |
-| 2     | Document model            | Schema, immutable nodes, positions, slices, JSON            | —            | L    |
-| 3     | Transactions & history    | Steps, mapping, state, undo/redo, commands, headless editor | —            | L    |
-| 4     | Editor view               | Editable DOM view: input, selection, IME, clipboard         | 0.0.x canary | XL   |
-| 5     | Native pagination         | Real pages, fragments, incremental reflow, print            | —            | XL   |
-| 6     | React API & first release | `FoliEditor`, hooks, toolbar, packaging                     | **0.1.0**    | M    |
-| 7     | Rich content              | Lists, links, alignment, color, highlight, rules            | 0.2.0        | L    |
-| 8     | Word model & DOCX         | Schema v3 (Word-shaped), styles, numbering, lossless DOCX   | 0.3.0        | XL   |
-| 9     | Review                    | Tracked changes and comments, Word-compatible               | 0.4.0        | XL   |
-| 10    | Tables & images           | Word tables across pages, inline and floating images        | 0.5.0        | XL   |
-| 11    | Sections & templates      | Headers/footers, fields, content controls, notes, PDF       | 0.6.0        | L    |
-| 12    | Ecosystem & 1.0           | Extension API freeze, docs site, performance tracking       | **1.0.0**    | L    |
-| 13    | Agent library             | `@folijs/agent`: an LLM edits a document without positions  | agent 0.1.0  | M    |
-| —     | Optional                  | Real-time collaboration                                     | —            | —    |
+| Phase | Name                      | Outcome                                                      | Release      | Size |
+| ----- | ------------------------- | ------------------------------------------------------------ | ------------ | ---- |
+| 0     | Foundation                | Monorepo, docs, own schema v1, read-only view                | —            | ✅   |
+| 1     | Architecture spike        | Two-page editable surface validated → ADR-0003               | —            | M    |
+| 2     | Document model            | Schema, immutable nodes, positions, slices, JSON             | —            | L    |
+| 3     | Transactions & history    | Steps, mapping, state, undo/redo, commands, headless editor  | —            | L    |
+| 4     | Editor view               | Editable DOM view: input, selection, IME, clipboard          | 0.0.x canary | XL   |
+| 5     | Native pagination         | Real pages, fragments, incremental reflow, print             | —            | XL   |
+| 6     | React API & first release | `FoliEditor`, hooks, toolbar, packaging                      | **0.1.0**    | M    |
+| 7     | Rich content              | Lists, links, alignment, color, highlight, rules             | 0.2.0        | L    |
+| 8     | Word model & DOCX         | Schema v3 (Word-shaped), styles, numbering, lossless DOCX    | 0.3.0        | XL   |
+| 9     | Review                    | Tracked changes and comments, Word-compatible                | 0.4.0        | XL   |
+| 10    | Tables & images           | Word tables across pages, inline and floating images         | 0.5.0        | XL   |
+| 11    | Sections & templates      | Headers/footers, fields, content controls, notes, PDF        | 0.6.0        | L    |
+| 12    | Ecosystem & 1.0           | Extension API freeze, docs site, performance tracking        | **1.0.0**    | L    |
+| 13    | Agent library             | `@folijs/agent`: an LLM edits a document without positions   | agent 0.1.0  | M    |
+| 14    | MCP server                | `@folijs/mcp`: the agent library as tools for any MCP client | mcp 0.1.0    | M    |
+| —     | Optional                  | Real-time collaboration                                      | —            | —    |
 
 ```
 P0 ─┬─► P1 spike ────────────────┐
@@ -2116,6 +2118,96 @@ Each task is a PR on `phase-13/agent`, the build green after each.
   new package. Installed from npm beside `@folijs/docx` in an empty project, a session read
   and edited the NDA and exported it.)
 
+## Phase 14 — MCP server (`@folijs/mcp`) · M → mcp 0.1.0
+
+The agent library as tools for any MCP client (Claude Code, Claude Desktop, Cursor…): a program
+the client starts, which opens `.docx` files, gives the model `@folijs/agent`'s reading and
+operations as tools, and saves the result with every edit a tracked change. For agents that
+cannot run code; one that can uses `@folijs/agent` directly. Background:
+[explorations/agent-editing.md](explorations/agent-editing.md). Planned 2026-11-21, nothing
+built.
+
+Not in this phase: `run(code)` (code mode, After 1.0), a network transport (HTTP), resources
+and prompts of the protocol, accepting or rejecting changes, the hint highlight, anything that
+shows the document. Changes to `@folijs/agent` only where a tool needs one (its 0.x allows it;
+each with a changeset).
+
+**Starts from (agent 0.1.0):** `@folijs/agent` runs anywhere and has no file access: a session
+is opened from a document already imported. Its results are made for a model: `text` in the
+read format, or a refusal with a message. `@folijs/docx` reads and writes `.docx` in Node. The
+repository has no runtime dependency besides React and its own packages
+([architecture](architecture.md#dependency-policy)), and no program that reads or writes the
+user's files: this is the first. The MCP TypeScript SDK (`@modelcontextprotocol/sdk` 1.32.2,
+MIT; checked on npm 2026-11-21) needs `zod` as a peer and brings 17 dependencies (express,
+hono, jose, ajv…, 4.5 MB unpacked), most of them for the HTTP transports and authentication a
+stdio server does not use. A stdio server that only has tools speaks a small part of the
+protocol: JSON-RPC 2.0, one message per line, `initialize`, `ping`, `tools/list`,
+`tools/call`.
+
+**Acceptance:** ADR-0009 records the server's decisions (below) and is accepted by review, as
+the owner delegates; `npx @folijs/mcp` starts a stdio server that an MCP client lists and
+calls; its tools open a `.docx` from a path, read it in parts, run every operation of
+`@folijs/agent` and save a `.docx`, with what a tool returns being the library's `text` or its
+refusal (marked as an error the model can read and act on); several documents can be open at
+once; files are read and written only under the root the server was started with, a path that
+leaves it is refused, and the input file is never written over unless the server was started
+allowing it; a file that is not a `.docx`, too large or damaged is a refusal, not a crash, and
+no input of a client's makes the server exit or write outside the root (tests, and a fuzz of
+malformed messages); the official SDK's client drives the server in the tests (a
+devDependency: the conformance check), over stdio against the built `bin`; the three tasks of
+13.6 pass through the tools and their results open in Word (the harness of 13.6, fed by the
+server); a real client is set up by hand and does one task end to end (Claude Code at least;
+recorded with its version); the tools' descriptions are enough for the model without a system
+prompt (the one of `@folijs/agent`'s README, said once in the server's `instructions`);
+README (the site's guide) with the configuration for the clients tried, `security.md` on what
+the server may read and write, `api.md`, `architecture.md`, limitations; the package is in
+`pnpm check` (tests, publint, its API report if it exports any); 0.1.0 published with the
+owner's approval, as 0.x.
+
+### Tasks
+
+Each task is a PR on `phase-14/mcp`, the build green after each, merged after an agent's
+review.
+
+- [ ] Claim phase, branch `phase-14/mcp`
+- [ ] 14.1 ADR-0009 and a spike. To decide, with the spike's evidence: (a) the protocol by hand
+  or by the SDK. Proposed: by hand (stdio, tools only, no runtime dependency beyond Foli's own
+  packages), with the SDK's client as the test of conformance; the SDK instead if the spike
+  shows a client (Claude Code, the MCP Inspector) the hand-written server does not satisfy.
+  (b) The protocol versions answered. (c) Files: a root (`--root`, default the working
+  directory), paths resolved and checked after symlinks, the size limit, and where a save
+  goes: by default a new file beside the input (`<name>.agent.docx`), the input itself only
+  with `--overwrite`. (d) The author of the changes: `--author`, else the client's name from
+  `initialize`, else "Agent". (e) Sessions: in memory, by an id the `open` tool returns, gone
+  when the server stops; what `close` does to unsaved changes. (f) The tools, one per
+  operation or fewer and wider; how a refusal is returned (`isError` with the message).
+  Spike: `initialize`, `tools/list` and one `read` tool, called by the SDK's client and by
+  Claude Code.
+- [ ] 14.2 Package and protocol: `packages/mcp` as `@folijs/mcp` 0.0.0, `private`, with
+  `@folijs/agent`, `@folijs/docx` and `@folijs/core` as exact dependencies, a `bin`, Node only
+  (its build has Node's types and no DOM). The stdio loop: messages parsed and validated,
+  `initialize` with `instructions`, `ping`, `tools/list`, `tools/call`, errors as JSON-RPC
+  errors, nothing but protocol messages on stdout (logs on stderr), a clean end when stdin
+  closes. A tool is a name, a description, a JSON Schema for its arguments and a function;
+  arguments checked against the schema before the function runs. Tests with the SDK's client.
+- [ ] 14.3 Documents: `open(path)` (the file read under the root, imported, a session made;
+  returns the document's id and the start of a read), `save(id, path?)`, `close(id)`,
+  `list_documents`. The file rules of ADR-0009, each with its test: outside the root, through
+  a symlink, not a `.docx`, over the size limit, a damaged zip, the input written over.
+- [ ] 14.4 Reading and editing tools over a session: `read` (from, limit), `replace_text`,
+  `insert_paragraphs` (before or after), `delete_block`, `set_style`, `list_styles`, `comment`.
+  Descriptions written for the model, with the read format; results the library's `text`.
+  What the tools show the library lacks goes into `@folijs/agent`, with a changeset.
+- [ ] 14.5 Template tools: `list_controls`, `fill_control`, `update_fields` (with `data`).
+- [ ] 14.6 End to end: the three tasks of 13.6 through the built server and the SDK's client;
+  their results through 13.6's Word harness; a fuzz of malformed and hostile messages (the
+  server answers or ignores, never exits, never writes outside the root); Claude Code set up
+  by hand, one task done, recorded. Fix what they find.
+- [ ] 14.7 Docs: README (the site's guide) with the clients' configuration, `security.md`,
+  `api.md`, `architecture.md`, `limitations.md`, acceptance checked above.
+- [ ] 14.8 Release: the changeset, `private` removed, 0.1.0; published with the owner's
+  approval (the Release workflow).
+
 ## After 1.0
 
 Not a phase yet: the backlog written down on 2026-11-21, from [limitations.md](limitations.md),
@@ -2183,8 +2275,8 @@ reduced motion respected (no fade, no smooth scroll). A requirement if pages are
 page before scrolling. Today every page is in the DOM, so a far page is reached. (An editor
 compared before 1.0 failed exactly there: pages not yet rendered could not be gone to.)
 
-**Agent editing:** the library is built and released (Phase 13, `@folijs/agent` 0.1.0). After it, in order: an MCP
-server over it as its own package (`@folijs/mcp`, Phase 14 when planned), then maybe a
+**Agent editing:** the library is built and released (Phase 13, `@folijs/agent` 0.1.0). After
+it: an MCP server over it as its own package (`@folijs/mcp`, Phase 14, planned), then maybe a
 sandboxed `run(code)` tool inside that server (code mode), once someone asks for it. The hint
 above is independent and is what lets an agent show what it changed. Explored:
 [explorations/agent-editing.md](explorations/agent-editing.md).
