@@ -1071,6 +1071,12 @@ transaction and runs core's commands. Background and what was tried:
   `deleteTable`), `setStyle`, `comment`,
   `fillControl`, `updateFields`. Each returns a value: the blocks as they read now (`deleteBlock`
   and `updateFields` a sentence), or a refusal with a code and a message written for the model.
+- **Checkpoint** (`session.ts`): `checkpoint()` keeps the body as it is (a document is a value), the
+  envelope, undo's state and each handle's position, and from then on the inverse of every
+  step that changes something beside the body (a comment, a note, a header). `rollback()` is
+  one change: the body replaced by the one kept, those steps undone, the envelope and undo's
+  state given back; not tracked, and marked as an undo (core's rules for content controls let
+  an undo put back what no edit may write). Its cost does not grow with what was done.
 - **What it is not:** no sandbox, no file system, no MCP: that is `@folijs/mcp`, below.
 
 ## The MCP server
@@ -1094,7 +1100,14 @@ folder. Node only; no dependency but Foli's packages.
 - **Tools** (`tools.ts`): one per operation of the library, returning its text; the server's
   `instructions` are the read format. `server.ts` puts it together (`foliServer`); `bin.ts` is
   the command line.
-- **What it is not:** no network transport, no sandbox, no `run(code)`.
+- **Code mode** (`code.ts`, `sandbox.ts`, `sandbox-worker.mjs`; ADR-0010), with `--code`: the
+  `run` tool runs a script in QuickJS (WebAssembly) in a worker thread made for the run. The
+  script calls `doc.replaceText(…)` as a function; under it the thread posts the call, waits
+  on `Atomics.wait`, and the server's thread answers from the session: the same operations
+  the tools call. Only JSON crosses. The server ends the thread at the time limit. Before the
+  script the session marks a checkpoint (`session.checkpoint()` of `@folijs/agent`: it
+  keeps the body, and a rollback puts it back whole in one untracked change, with the handles); a run that fails goes back to it.
+- **What it is not:** no network transport; no code run unless started with `--code`.
 
 ## Packages
 
@@ -1134,7 +1147,10 @@ Planned, created only when needed:
 - **Allowed:** general-purpose libraries under permissive licenses (MIT, Apache-2.0, BSD, ISC),
   after checking size and whether existing code already covers the need.
 - **Copied code:** only with provenance in `THIRD_PARTY_NOTICES.md` and preserved notices.
-- Runtime dependencies today: none besides React (peer) and our own packages. `@folijs/pdf`
+- Runtime dependencies today: none besides React (peer) and our own packages, but in
+  `@folijs/mcp`: QuickJS as WebAssembly (`quickjs-emscripten-core`,
+  `@jitl/quickjs-wasmfile-release-sync`, MIT), the sandbox of its code mode
+  ([ADR-0010](decisions/ADR-0010-code-mode.md)). `@folijs/pdf`
   needs the app's headless Chromium (Playwright or Puppeteer), which it does not depend on.
 - Dev-only exception: `@axe-core/playwright` / `axe-core` (MPL-2.0) for the accessibility check
   in Playwright. Test tooling, never bundled or published.

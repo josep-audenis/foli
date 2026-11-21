@@ -4,6 +4,9 @@
 #!/usr/bin/env node
 export {};
 
+// code.d.ts
+export {};
+
 // documents.d.ts
 export {};
 
@@ -72,6 +75,9 @@ export interface ServerOptions {
  */
 export declare function serve(input: AsyncIterable<Uint8Array | string>, output: Output, options: ServerOptions): Promise<void>;
 
+// sandbox.d.ts
+export {};
+
 // schema.d.ts
 /**
  * The part of JSON Schema the tools' arguments use, and its check. Small on purpose: the
@@ -105,6 +111,11 @@ export interface FoliServerOptions {
     overwrite?: boolean;
     /** Whose tracked changes and comments the edits are. Default: the client's name, or "Agent". */
     author?: string;
+    /**
+     * Code mode (ADR-0010): a `run` tool that takes a script over a document, run in a sandbox.
+     * Default false.
+     */
+    code?: boolean;
     version: string;
     log?: (message: string) => void;
 }

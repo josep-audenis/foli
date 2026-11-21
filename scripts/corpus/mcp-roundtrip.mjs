@@ -95,6 +95,91 @@ function started(args, lines) {
   });
 }
 
+/**
+ * Code mode (16.4): the bin started with `--code`, its `run` tool doing the board report's
+ * task in one call, a script that fails changing nothing, and one that does not end stopped.
+ */
+async function codeMode() {
+  const transport = new StdioClientTransport({
+    command: process.execPath,
+    args: [bin, "--root", work, "--author", AUTHOR, "--code"],
+    stderr: "pipe",
+  });
+  let stderr = "";
+  transport.stderr?.on("data", (chunk) => {
+    stderr += chunk;
+  });
+  const client = new Client({ name: "mcp-roundtrip", version: "0.0.0" });
+  await client.connect(transport);
+  try {
+    const call = async (name, args = {}) => {
+      const result = await client.callTool({ name, arguments: args });
+      return { text: result.content[0]?.text ?? "", refused: result.isError === true };
+    };
+    const { tools } = await client.listTools();
+    check(
+      tools.map((t) => t.name).join() === [...TOOLS, "run"].join(),
+      `tools with --code: ${tools.map((t) => t.name)}`,
+    );
+    const name = "04-board-report";
+    await call("open", { path: `${name}.docx` });
+    const before = (await call("read", { limit: 1000 })).text;
+
+    const failed = await call("run", {
+      code: 'for (const b of doc.blocks()) if (b.kind === "paragraph" && b.text) doc.insertAfter(b.handle, "x");\nnope();',
+    });
+    check(
+      failed.refused && failed.text.startsWith("The script failed at line 2: ReferenceError"),
+      `a failing script: ${failed.text}`,
+    );
+    const started = Date.now();
+    const endless = await call("run", {
+      code: 'doc.insertAfter(doc.blocks()[0].handle, "x");\nfor (;;) {}',
+    });
+    check(
+      endless.refused &&
+        endless.text.startsWith("The script was stopped.") &&
+        Date.now() - started < 15000,
+      `a script without end: ${endless.text}`,
+    );
+    check(
+      (await call("read", { limit: 1000 })).text === before,
+      "a failed run changed the document",
+    );
+
+    const wanted = EXPECT[name].restyled.length;
+    const ran = await call("run", {
+      code: `let n = 0;
+for (const b of doc.blocks()) {
+  const level = /^heading ([123])$/.exec(b.style ?? "");
+  if (level) { doc.setStyle(b.handle, "Heading " + (Number(level[1]) + 1)); n++; }
+}
+return [n, doc.updateFields({ contents: true }).rebuilt];`,
+    });
+    check(
+      !ran.refused && ran.text.startsWith(`Returned: [${wanted},1]\nChanged ${wanted} blocks`),
+      `the board report in one run: ${ran.text.slice(0, 200)}`,
+    );
+    const saved = await call("save", { path: `${name}.code.docx` });
+    check(saved.text === `Saved d1 as ${name}.code.docx.`, `save said: ${saved.text}`);
+    const { document: made } = await importDocx(
+      new Uint8Array(readFileSync(join(work, `${name}.code.docx`))),
+    );
+    // What the script did is what the tools did: the same document, read both ways.
+    const byTools = JSON.parse(readFileSync(join(out, `${name}-agent.expected.json`), "utf8"));
+    check(
+      JSON.stringify(expected(made)) === JSON.stringify(byTools),
+      "the run's document differs from the tools'",
+    );
+    console.log(`${name}: done in one run call, saved`);
+  } catch (error) {
+    fail(error instanceof Error ? error.message : String(error));
+  } finally {
+    await client.close();
+  }
+  check(!stderr.trim(), `the server wrote to stderr with --code:\n${stderr}`);
+}
+
 async function main() {
   rmSync(work, { recursive: true, force: true });
   mkdirSync(work, { recursive: true });
@@ -303,6 +388,7 @@ async function main() {
     await client.close();
   }
   check(!stderr.trim(), `the server wrote to stderr:\n${stderr}`);
+  await codeMode();
 }
 
 try {

@@ -9,26 +9,26 @@ leaves `main` green with a working playground.
 **Update this table in the same PR that starts, advances or finishes a phase.** It is the only
 place that says what is in progress; check it before starting work.
 
-| Phase                     | Status                   | Branch                        | Notes                                                                                                                |
-| ------------------------- | ------------------------ | ----------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| 0 Foundation              | ✅ Done                  | —                             |                                                                                                                      |
-| 1 Architecture spike      | ✅ Done (G1 provisional) | —                             | Merged in #1; ADR-0003 accepted provisionally; IME, dead-key and screen-reader checks open                           |
-| 2 Document model          | ✅ Done                  | —                             | Merged in #2                                                                                                         |
-| 3 Transactions & history  | ✅ Done                  | —                             | Merged in #4; gate G2 passed                                                                                         |
-| 4 Editor view             | ✅ Done (G3 provisional) | —                             | Merged in #8–#13; manual checks (4.6) deferred, open risks in ADR-0003                                               |
-| 5 Native pagination       | ✅ Done (G4 provisional) | —                             | Merged in #15–#22; page-break manual checks open, risks in ADR-0003                                                  |
-| 6 React API & 0.1.0       | ✅ Done                  | —                             | Merged in #23–#31; 0.1.0 on npm; manual checks shipped as known risks (ADR-0003)                                     |
-| 7 Rich content            | ✅ Done                  | —                             | Merged in #33–#41; 0.2.0 on npm; list-document benchmark misses accepted (known limit)                               |
-| 8 Word model & DOCX       | ✅ Done                  | —                             | Merged in #44–#61; 0.3.0 on npm (`@folijs/docx` first released); gate G5 passed                                      |
-| 9 Review                  | ✅ Done                  | —                             | Merged in #63–#72; 0.4.0 on npm                                                                                      |
-| 10 Tables & images        | ✅ Done                  | —                             | Merged in #73–#97 (#90, the landing page, went to main); 0.5.0 on npm; two misses accepted                           |
-| 11 Sections & templates   | ✅ Done                  | —                             | Merged in #100–#118 (#106, #107, #110, #112 and #113, the site, went to main); 0.6.0 on npm; misses accepted         |
-| 12 Ecosystem & 1.0        | ✅ Done                  | —                             | Merged in #120–#133; 1.0.0 on npm (2026-11-20); Phase 5 speed misses and manual checks accepted as 1.0 risks         |
-| 13 Agent library          | ✅ Done                  | —                             | Merged in #138–#146; `@folijs/agent` 0.1.0 on npm (2026-11-21)                                                       |
-| 14 MCP server             | ✅ Done                  | —                             | Merged in #148–#162; `@folijs/mcp` 0.1.0 on npm (2026-11-21); a model in a client of its own is not tried (see 14.8) |
-| 15 Toolbar                | ✅ Done                  | —                             | Merged in #149–#160; 1.1.0 on npm (2026-11-21); the release's bench ran on a busy machine (see #160)                 |
-| 16 Code mode              | Ready                    | —                             | Planned 2026-11-21: a `run` tool in `@folijs/mcp`, a script in a sandbox; nothing built                              |
-| 17 Toolbar for developers | In progress              | `phase-17/toolbar-developers` | Planned 2026-11-21: what Phase 15 left a developer unable to do; independent of Phase 16                             |
+| Phase                     | Status                   | Branch                        | Notes                                                                                                                                          |
+| ------------------------- | ------------------------ | ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0 Foundation              | ✅ Done                  | —                             |                                                                                                                                                |
+| 1 Architecture spike      | ✅ Done (G1 provisional) | —                             | Merged in #1; ADR-0003 accepted provisionally; IME, dead-key and screen-reader checks open                                                     |
+| 2 Document model          | ✅ Done                  | —                             | Merged in #2                                                                                                                                   |
+| 3 Transactions & history  | ✅ Done                  | —                             | Merged in #4; gate G2 passed                                                                                                                   |
+| 4 Editor view             | ✅ Done (G3 provisional) | —                             | Merged in #8–#13; manual checks (4.6) deferred, open risks in ADR-0003                                                                         |
+| 5 Native pagination       | ✅ Done (G4 provisional) | —                             | Merged in #15–#22; page-break manual checks open, risks in ADR-0003                                                                            |
+| 6 React API & 0.1.0       | ✅ Done                  | —                             | Merged in #23–#31; 0.1.0 on npm; manual checks shipped as known risks (ADR-0003)                                                               |
+| 7 Rich content            | ✅ Done                  | —                             | Merged in #33–#41; 0.2.0 on npm; list-document benchmark misses accepted (known limit)                                                         |
+| 8 Word model & DOCX       | ✅ Done                  | —                             | Merged in #44–#61; 0.3.0 on npm (`@folijs/docx` first released); gate G5 passed                                                                |
+| 9 Review                  | ✅ Done                  | —                             | Merged in #63–#72; 0.4.0 on npm                                                                                                                |
+| 10 Tables & images        | ✅ Done                  | —                             | Merged in #73–#97 (#90, the landing page, went to main); 0.5.0 on npm; two misses accepted                                                     |
+| 11 Sections & templates   | ✅ Done                  | —                             | Merged in #100–#118 (#106, #107, #110, #112 and #113, the site, went to main); 0.6.0 on npm; misses accepted                                   |
+| 12 Ecosystem & 1.0        | ✅ Done                  | —                             | Merged in #120–#133; 1.0.0 on npm (2026-11-20); Phase 5 speed misses and manual checks accepted as 1.0 risks                                   |
+| 13 Agent library          | ✅ Done                  | —                             | Merged in #138–#146; `@folijs/agent` 0.1.0 on npm (2026-11-21)                                                                                 |
+| 14 MCP server             | ✅ Done                  | —                             | Merged in #148–#162; `@folijs/mcp` 0.1.0 on npm (2026-11-21); a model in a client of its own is not tried (see 14.8)                           |
+| 15 Toolbar                | ✅ Done                  | —                             | Merged in #149–#160; 1.1.0 on npm (2026-11-21); the release's bench ran on a busy machine (see #160)                                           |
+| 16 Code mode              | In review                | `phase-16/run-code`           | Built in #165 behind `--code`, after three security reviews; a model did three tasks in 11 calls; the release of mcp 0.2.0 waits for the owner |
+| 17 Toolbar for developers | In progress              | `phase-17/toolbar-developers` | Planned 2026-11-21: what Phase 15 left a developer unable to do; independent of Phase 16                                                       |
 
 Status values: `Ready` (dependencies met, nobody on it) · `In progress` · `In review` (PR open) ·
 `✅ Done` (merged, acceptance criteria met) · `Blocked by …`.
@@ -2455,8 +2455,8 @@ run on Linux; 0.2.0 published with the owner's approval.
 Each task is a PR on `phase-16/run-code`, the build green after each, merged after an agent's
 review.
 
-- [ ] Claim phase, branch `phase-16/run-code`
-- [ ] 16.1 ADR-0010 and a spike. To decide, with the spike's evidence: (a) what is in the
+- [x] Claim phase, branch `phase-16/run-code`
+- [x] 16.1 ADR-0010 and a spike. To decide, with the spike's evidence: (a) what is in the
   sandbox. Proposed: the script alone, with host functions over the session (above); against
   it, core inside the guest (the exploration's spike), kept only if the spike shows a task the
   operations cannot do. (b) The engine. Proposed: QuickJS as WASM (`quickjs-emscripten-core`
@@ -2471,25 +2471,85 @@ review.
   run is taken back (the editor's undo, or a checkpoint of the session with its handles; a
   change to `@folijs/agent` if it needs one). (f) Limits and their defaults (time, memory,
   stack, host calls, the size of what is returned and logged). (g) One run at a time, a new
-  sandbox each run.
-- [ ] 16.2 The sandbox, apart from documents (`sandbox.ts`): runs a script with a set of host
+  sandbox each run. (Done: [ADR-0010](decisions/ADR-0010-code-mode.md). As proposed: the
+  script alone in QuickJS as WebAssembly, behind `--code`, a plain dependency. Changed by the
+  spike: the sandbox is in a worker thread, because in the server's own thread QuickJS's
+  interrupt is not asked inside its native functions (a 2 s deadline overrun past 5 s) and a
+  deep recursion overflowed the host's stack; and a failed run is taken back by a checkpoint
+  of the session (`@folijs/agent`, built in 16.3), not by undo, which joins and drops steps.)
+- [x] 16.2 The sandbox, apart from documents (`sandbox.ts`): runs a script with a set of host
   functions and limits, and answers with its value, its log, or its failure with the line.
   JSON only across; a new context each run, disposed whatever happens. Tests for each limit
-  and for what must not be there (`fetch`, `require`, `process`, timers, `import()`).
-- [ ] 16.3 `doc` over a session: reading as blocks (handle, style, text, table place,
+  and for what must not be there (`fetch`, `require`, `process`, timers, `import()`). (Done:
+  `sandbox.ts` and `sandbox-worker.mjs`, 16 tests: the value as JSON, the host's answer and
+  its error, the line of a failure; time ended within the limit for loops and for calls slow
+  inside the engine; memory, stack and the number of calls; nothing of Node in the script;
+  each run clean. From the security review of #165, which ran the built sandbox: QuickJS's
+  memory limit did not hold (2 GB under a limit of 8 MB: the module's memory is now refused
+  growth past the limit, and the test counts what a script got); a call's arguments were of
+  any size and parsed where the timer lives (a 2 s run held for 62 s: held to 200,000
+  characters now); the value and an error's message were of any size; a call made while a
+  call's name was read mixed the answers; a host error with a message that is not text
+  ended the process. Each has a test; the memory test fails without the guard. From the second review, which
+  drove the built server: the host's own work was not bounded, since no timer fires while the
+  server's thread works (one insert of 20,000 paragraphs ended the server; a stopped loop took
+  27 s to take back): an insert and a replace are held to 500 (`@folijs/agent`, so the plain
+  tools too), a run to 2,000 paragraphs added, and a rollback gives undo its state back
+  where it rebased every stored step; a rollback left the run in undo and a style the run
+  added in the document: both put back; the memory test passed without its guard in all but
+  one line: rewritten to count what a script got. Left, and in limitations: a paragraph
+  inserted then deleted leaves a wrong tracked change (older than this phase). From the third,
+  on the fixes: a script that swapped a paragraph's text back and forth, adding nothing, still
+  ended the server in 14 s (the checkpoint kept every step's transaction and its documents),
+  and paragraphs inserted in a cell were not counted. The checkpoint now keeps no body step:
+  a rollback puts the body back whole, in one step whatever was done; inserts are counted
+  where they are made. The worst scripts of the three reviews answer in 10.0 to 10.2 s with
+  the document as it was. Four assertions that could not fail were rewritten or removed.)
+- [x] 16.3 `doc` over a session: reading as blocks (handle, style, text, table place,
   changed) in parts, every operation of the tools with the same argument checks, results and
   refusals as values a script can test (`if (!r.ok)`); `console.log` kept as the log. A
-  failed run takes back every edit it made.
-- [ ] 16.4 The `run` tool: schema, a description that carries the `doc` types and one
+  failed run takes back every edit it made. (Done: `code.ts`. `doc` has `blocks`, `block` and
+  the eleven operations; a refusal is thrown in the script, so a script that does not look
+  stops there. `session.checkpoint()` in `@folijs/agent` takes a run back: the document equal
+  as JSON and every handle as it was, on the three corpus documents after every kind of
+  edit. Two arguments the tools' schemas refuse the library takes as no options
+  (`comment`'s and `updateFields`' options given as a string or a number).)
+- [x] 16.4 The `run` tool: schema, a description that carries the `doc` types and one
   example, the answer's format (returned value, log, blocks changed, each held to a size and
-  to one line per block), a refusal's wording. In `tools/list` as decided in (d).
-- [ ] 16.5 Hostile scripts: the fuzz and the escape tests of the acceptance, each proved to
-  fail when its guard is taken out; a security review by an agent, on the built server.
-- [ ] 16.6 A model's trial, as 14.8's: a fresh model with the server's own words only, tasks
+  to one line per block), a refusal's wording. In `tools/list` as decided in (d). (Done: `run`
+  with `--code`, 15 tools then, 14 without. The answer: `Returned:` and the value as JSON on a
+  line, the blocks changed as they read now (40 at most), what was deleted, the log; a
+  failure with its line and "Nothing was changed". 10 tests through the SDK's client.)
+- [x] 16.5 Hostile scripts: the fuzz and the escape tests of the acceptance, each proved to
+  fail when its guard is taken out; a security review by an agent, on the built server. (Done:
+  `code-fuzz.test.ts`, 30 scripts on each of three documents, seed 20261121: operations with
+  arguments of any shape, caught or not, then one of twenty ends (a return, a throw, loops
+  without end, recursion, memory, a huge or cyclic value, prototypes changed, `import()`).
+  A failed run leaves the document and every handle as before; a kept one only the author's
+  tracked changes. It fails with the rollback taken out, and with the handles not put back.
+  It found that a footnote taken out and put back has its keys in another order: the same
+  document, compared so. The e2e runs the bin with `--code`. The review: under 16.2.)
+- [x] 16.6 A model's trial, as 14.8's: a fresh model with the server's own words only, tasks
   that need a loop, through the SDK's client; calls counted against the plain tools; Word
-  opens the results. What it shows wrong in the description, fixed.
+  opens the results. What it shows wrong in the description, fixed. (Done 2026-11-21: a fresh
+  Claude agent, told only what the server says of itself, through the SDK's client against
+  the built `bin` with `--code`: a company renamed through an NDA with a comment, a report's
+  headings moved a level down, an offer letter filled. 11 tool calls (3 `open`, 3 `run`, 3
+  `save`, `list_controls`, `list_documents`), none refused; every script ran at the first try.
+  The same kind of tasks took 35 calls with the plain tools (14.8). Word 16.0.20625 opens the
+  three files, every revision the client's (6 and a comment, 5, 9). It had to guess, and the
+  description now says: what `replaced`, `refused`, `comment` and `unfilled` are; that
+  `blocks()` is a copy; that a table's text is empty; that built-in headings read "heading 1"
+  without a capital; that headers, footers and notes are not there (now in the server's
+  instructions too). It left the table of contents as it was, as the tool says. Not a client
+  of its own, as in 14.8.)
 - [ ] 16.7 Docs, the e2e in `pnpm check`, one run on Linux; then the changeset and 0.2.0,
-  published with the owner's approval (the Release workflow).
+  published with the owner's approval (the Release workflow). (Partly, 2026-11-21: README, `security.md`,
+  `architecture.md`, `api.md`, limitations and `contributing.md` say what is built; the e2e
+  with `--code` is in `pnpm check`; one run of `pnpm check` on `ubuntu-latest` with Node 24
+  passed at 25fd822, before the last review's fix (the rollback in one step), which was
+  checked on Windows only; the changesets are written (agent minor, mcp minor). Not done:
+  0.2.0, which waits for the owner.)
 
 ## Phase 17 — Toolbar for developers · M → 1.2.0
 

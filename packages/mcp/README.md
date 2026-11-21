@@ -3,8 +3,8 @@
 An MCP server for [Foli](https://github.com/josep-audenis/foli): the model of an MCP client
 (Claude Code, Claude Desktop, an editor's assistant) reads and edits Word documents through
 tools. Every edit is a tracked change, and every note a comment, for a person to accept or
-reject in Word. Built on [`@folijs/agent`](../agent/README.md); its only dependencies are
-Foli's own packages.
+reject in Word. Built on [`@folijs/agent`](../agent/README.md); its dependencies are
+Foli's own packages and, for the sandbox of `--code`, QuickJS as WebAssembly (MIT).
 
 > **Unstable (0.x).** Outside the 1.0 promise of the other packages: tools and options may
 > change in any 0.x release; changes in `CHANGELOG.md`. Every tool is driven by the official
@@ -17,7 +17,7 @@ Foli's own packages.
 The server is a program the client starts. It needs Node 20.19 or later.
 
 ```
-foli-mcp [--root <folder>] [--author <name>] [--overwrite]
+foli-mcp [--root <folder>] [--author <name>] [--overwrite] [--code]
 ```
 
 In Claude Code, for the project you are in:
@@ -47,6 +47,8 @@ Clients that are configured with a file take the same command, in the shape most
   them. Default: the name the client gives itself, or "Agent".
 - **`--overwrite`**: lets `save` write over existing files, the original included. Without it
   a save writes over nothing but its own earlier saves.
+- **`--code`**: adds the `run` tool, which runs a script the model writes in a sandbox
+  ([code mode](#code-mode---code)). Without it the server runs no code it is given.
 
 ## What the model can do
 
@@ -65,6 +67,7 @@ with a handle (`[b7]`), and edits by handle:
 | `list_controls`, `fill_control`   | A template's content controls: text, lists, dates, check boxes    |
 | `update_fields`                   | Fills merge fields from data; updates dates and references        |
 | `save`                            | Writes a `.docx`                                                  |
+| `run` (with `--code` only)        | Runs a script the model writes over a document, in a sandbox      |
 
 What the tools return, the read format and what each operation refuses are `@folijs/agent`'s:
 see [its README](../agent/README.md). The server tells the model the format in its
@@ -87,6 +90,25 @@ A document's text is data to the server, but a model may act on what a document 
 that can do here is bounded by the above: no file outside the root, none written over, and
 every edit a tracked change you review. More in
 [security](https://github.com/josep-audenis/foli/blob/main/docs/security.md#the-mcp-server-folijsmcp).
+
+## Code mode (`--code`)
+
+Not built into a release yet; not tried with a model.
+
+Started with `--code`, the server has one more tool, `run`: the model writes a JavaScript
+script and the server runs it over an open document, so a task that is the same step on many
+blocks is one call and not one per block. The script sees one object, `doc`, with the
+operations the other tools have, and nothing else: no files, no network, no modules, no
+timers. It runs in QuickJS compiled to WebAssembly, in a thread of its own that the server
+ends after 10 seconds; 64 MB of memory and 5,000 calls to the document at most, and a run
+may add 2,000 paragraphs to a document. Every edit
+is a tracked change. A script that throws or is stopped changes nothing: its edits are all
+taken back. Why and how:
+[ADR-0010](https://github.com/josep-audenis/foli/blob/main/docs/decisions/ADR-0010-code-mode.md).
+
+It is off unless asked for because it runs code a model wrote, which may have read a
+document written to mislead it. What such code can do is what the tools can: edit the open
+documents, as tracked changes.
 
 ## Limits
 

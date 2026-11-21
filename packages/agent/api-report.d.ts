@@ -7,7 +7,7 @@ export {};
 export type { Changed, CommentOptions, NewParagraph, ReplaceOptions } from "./operations.js";
 export { type Block, formatBlocks } from "./read.js";
 export type { Ok, Refusal, Result } from "./result.js";
-export { openSession, type ReadOptions, type ReadResult, type Session, type SessionOptions, } from "./session.js";
+export { type Checkpoint, openSession, type ReadOptions, type ReadResult, type Session, type SessionOptions, } from "./session.js";
 export type { Control, Unfilled, UpdateFieldsOptions } from "./templates.js";
 
 // operations.d.ts
@@ -203,6 +203,19 @@ export interface Session {
     updateFields(options?: UpdateFieldsOptions): Result<FieldsReport & {
         text: string;
     }>;
+    /**
+     * Marks the document as it is now, to come back to: `rollback` takes back every edit made
+     * since, the session's own and those made through `editor`, as if none had been (no tracked
+     * change is left of them, and every handle names the block it named). `release` ends the
+     * checkpoint and keeps the edits. One or the other, once: a second call throws. Undo is as it
+     * was at the checkpoint: what was taken back cannot be undone or redone. `setDocument` on the editor
+     * cannot be taken back: `rollback` then throws.
+     */
+    checkpoint(): Checkpoint;
+}
+export interface Checkpoint {
+    rollback(): void;
+    release(): void;
 }
 /**
  * Opens a document for an agent. The document is validated as `createEditor` does (an older

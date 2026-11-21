@@ -1114,7 +1114,9 @@ version. Details, the read format and examples: the
   `empty`, `items`, `readOnly`, `block`); `fillControl(name, value)`, by id, else tag, else
   title (also `controls`, as they are now, and `unfilled`: `Unfilled[]`, those of the name
   that did not take the value); `updateFields({ data?, contents? })` → core's `FieldsReport` and `text`
-  (a table of contents is built again only with `contents: true`).
+  (a table of contents is built again only with `contents: true`); `checkpoint()` →
+  `Checkpoint` (`rollback()` takes back every edit since, handles included; `release()` keeps
+  them).
 - `session.document()`: the document to save or export. `session.editor`: the headless editor
   under the session, for what it has no operation for; `session.author`.
 
@@ -1135,7 +1137,7 @@ Foli's packages, at exact versions.
   `run(args)` returning a `ToolResult` `{ text, isError? }` or a promise of one. Arguments are
   checked against the schema before `run`.
 - `foliServer(options: FoliServerOptions): ServerOptions` (`root`, `overwrite?`, `author?`,
-  `version`, `log?`): this server's
+  `code?`, `version`, `log?`): this server's
   tools over the `.docx` files under `root`. Throws when `root` is not a folder or is a whole
   drive, and on an `author` with nothing writable in it.
 - `PROTOCOL_VERSIONS`, `MAX_MESSAGE_BYTES` (8 MB), `MAX_RESULT_CHARS` (200,000).

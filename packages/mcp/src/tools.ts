@@ -3,8 +3,10 @@
  * returns is the library's own text; its refusals come back for the model to act on.
  */
 import type { Control, Session } from "@folijs/agent";
+import { DOC_TYPES, runCode } from "./code.js";
 import type { Documents, OpenDocument } from "./documents.js";
 import type { Tool, ToolResult } from "./protocol.js";
+import type { SandboxLimits } from "./sandbox.js";
 import type { JsonSchema, JsonSchemaOrAny } from "./schema.js";
 
 /** @internal Blocks a `read` gives when it is not told how many. */
@@ -22,6 +24,7 @@ Start with open, then work on what read shows. read gives the document a line pe
 [b7] is the block's handle: pass it to the other tools. After it come where the block is in a table (r1 c1), its style, its list number, "changed" if it has tracked changes, its comments; after the colon, its text. ↵ is a line break. A line "table, 3 rows, 2 columns" is a table: its cells' blocks follow, indented. A line "not editable: …" is content you cannot change.
 Words in brackets ([picture], [note], [empty: Offer date]) are not text: never put them in find. [empty: …] is a content control to fill with fill_control; «Name» is a merge field to fill with update_fields.
 A handle stays its block's while you edit; a deleted block's is refused. A tool that changes the document returns the blocks it changed as they are now: do not read again to check (after update_fields do: it returns none). When a tool refuses, its message says what to do instead: follow it.
+Only the body is read and edited: headers, footers and the text of notes ([note]) are not shown.
 Nothing is written to disk until save. save writes a new file beside the original and says its name.`;
 
 const DOCUMENT: JsonSchema = {
@@ -58,8 +61,24 @@ const control = (c: Control) =>
     c.name !== c.id ? `; id ${JSON.stringify(c.id)}` : "",
   ].join("");
 
+/** The tool of code mode (ADR-0010): there only when the server was started with it. */
+const runTool = (documents: Documents, limits: SandboxLimits): Tool => ({
+  name: "run",
+  description: `Runs a JavaScript script over an open document: use it when a task is the same step on many blocks (every heading, every table cell), where the other tools would take a call each. The script is a function's body: it uses doc, and what it returns is the answer. Every edit is a tracked change, as with the other tools. All or nothing: if the script throws or is stopped, none of its edits is kept, and the answer says the line.
+${DOC_TYPES}
+A method that cannot do what it is asked throws an Error whose message says why (replaceText when find is not in the block, or is there twice without all): test first (block.text.includes(find)) or use try and catch. Handles are the ones read shows. Plain JavaScript, no await, no imports, no timers; ${limits.ms / 1000} seconds and ${limits.calls} calls to doc at most. Nothing is saved: save is a tool.
+Example: let n = 0; for (const b of doc.blocks()) if (b.kind === "paragraph" && b.text.includes("Acme Ltd")) n += doc.replaceText(b.handle, "Acme Ltd", "Acme Limited", { all: true }).replaced; return n;`,
+  inputSchema: args({ code: { type: "string", description: "The script: a function's body." } }, [
+    "code",
+  ]),
+  async run({ document: id, code }) {
+    const document = documents.get(id);
+    return "session" in document ? runCode(document, code as string, limits) : document;
+  },
+});
+
 /** @internal */
-export function tools(documents: Documents): Tool[] {
+export function tools(documents: Documents, code: SandboxLimits | false = false): Tool[] {
   /** A tool over an open document's session. */
   const on = (
     name: string,
@@ -330,5 +349,6 @@ export function tools(documents: Documents): Tool[] {
       inputSchema: { type: "object", properties: {}, additionalProperties: false },
       run: () => documents.list(),
     },
+    ...(code ? [runTool(documents, code)] : []),
   ];
 }

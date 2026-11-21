@@ -33,13 +33,15 @@
     "node": ">=20.19"
   },
   "scripts": {
-    "build": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\" && tsc -p tsconfig.build.json",
+    "build": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\" && tsc -p tsconfig.build.json && node -e \"require('node:fs').copyFileSync('src/sandbox-worker.mjs','dist/sandbox-worker.mjs')\"",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
     "@folijs/agent": "workspace:*",
     "@folijs/core": "workspace:*",
-    "@folijs/docx": "workspace:*"
+    "@folijs/docx": "workspace:*",
+    "@jitl/quickjs-wasmfile-release-sync": "0.32.0",
+    "quickjs-emscripten-core": "0.32.0"
   },
   "devDependencies": {
     "@modelcontextprotocol/sdk": "1.32.2",
