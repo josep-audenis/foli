@@ -371,14 +371,18 @@ const es: ToolbarMessages = {
 
 - A message not given stays English. `{name}` in a message is a value the toolbar fills in: keep
   it in the translation.
-- A label of an app's item, tab or group that is a message (a copy of a built-in item, or
-  `defaultToolbarTabs`) is translated too; any other is the app's own, shown as it is.
+- A label of an app's item, tab, group, menu entry or color, or an entry of an app's box, that
+  is a message (a copy of a built-in item, `defaultToolbarTabs`) is translated too; any other is
+  the app's own, shown as it is. The entries of the style, font, size, line spacing and table
+  style boxes are not translated (they are the document's names, or numbers).
 - One English text is one message wherever it is shown ("Insert" is the table dialog's button
   and the picture dialog's): a language that needs two words for it cannot have them.
 - `toolbarItems` keeps its English labels: `messages` changes what the toolbar shows, not the
   items.
-- A message added, removed or reworded is a change of the list, named in the changelog;
-  `pnpm check` fails when the list and the toolbar differ. Not translated by it: the document's
+- A message added or reworded is named in the changelog; in 1.x none is removed (one the
+  toolbar no longer shows stays in the list, so a typed translation keeps compiling).
+  `pnpm check` fails when the list and the toolbar differ, or when the toolbar shows a literal
+  string without `t(…)`. Not translated by it: the document's
   own names (styles, fonts, table styles, headings, bookmarks), numbers, `FoliNavigation`,
   `FoliComments` and the canvas.
 

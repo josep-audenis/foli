@@ -1284,6 +1284,9 @@ export const toolbarItems = Object.fromEntries(
 /** The default toolbar: groups of `toolbarItems`, a separator between groups. */
 export const defaultToolbarItems = GROUPS as unknown as readonly (readonly ToolbarItem[])[];
 
+/** The boxes whose entries are the document's names (styles, fonts, table styles) or numbers. */
+const DATA_BOXES = new Set(["style", "font", "size", "lineSpacing", "tableStyle"]);
+
 /** A group's items, with or without a caption. */
 const itemsOf = (group: ToolbarGroups[number]): readonly ToolbarItem[] =>
   Array.isArray(group) ? group : (group as ToolbarGroup).items;
@@ -2146,7 +2149,7 @@ export function FoliToolbar({
                       )}
                       {options.map((o) => (
                         <option key={o.value} value={o.value}>
-                          {trLabel(o.label)}
+                          {DATA_BOXES.has(item.key) ? o.label : trLabel(o.label)}
                         </option>
                       ))}
                     </select>
