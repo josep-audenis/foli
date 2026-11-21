@@ -220,7 +220,8 @@ An app's item is a `ToolbarItem`: a `ToolbarButton` (with `command`), a `Toolbar
   shown instead of the text.
 - `command: Command`: what a press runs, on the editor of the story open on its page, else the
   body's. Enabled by its dry run (`editor.can(command)`) after every transaction, unless
-  `enabled(state, editor)` says otherwise (keep either cheap).
+  `enabled(state, editor)` says otherwise (keep either cheap). A box or a color menu is
+  enabled unless its `enabled` says no: its `pick` is not dry-run.
 - `pressed(state, editor)`: a toggle (`aria-pressed`).
 - `actions`: a menu button instead, its entries `ToolbarAction`s (`{ key, label, command,
   checked? }`, a `menuitemcheckbox` with `checked(state, editor)`), or a function of the body's
@@ -249,6 +250,10 @@ the focus on the item, ArrowDown opens a menu. A copy of a built-in item with an
   `{ ...toolbarItems.font, select: { ...toolbarItems.font.select, options: () => myFonts } }`.
   The text color goes into the document as it is; a highlight outside Word's is written as
   shading. Keep text colors readable on white (4.5:1).
+
+Since 1.1 `toolbarItems` types its six boxes and three color menus as `ToolbarSelect` and
+`ToolbarColorMenu` (1.0 typed them `ToolbarButton`, with a `command` they never had). Types only:
+code that annotates one of them as `ToolbarButton` names the new type, or `ToolbarItem`.
 
 The dialogs of the built-in items are not available to app items.
 

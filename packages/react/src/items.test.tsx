@@ -300,11 +300,33 @@ describe("toolbar items", () => {
     const swatch = button.querySelector(".foli-toolbar-swatch") as HTMLElement;
     expect(swatch.style.background).toBe("rgb(18, 52, 86)");
 
+    selectAll(editor);
     fireEvent.click(screen.getByRole("button", { name: "Text color" }), { detail: 0 });
     expect(screen.getAllByRole("menuitemradio").map((item) => item.textContent)).toEqual([
       "None",
       "Brand",
     ]);
+    // The copy still does what the built-in does.
+    fireEvent.click(screen.getByRole("menuitemradio", { name: "Brand" }), { detail: 0 });
+    expect(JSON.stringify(editor.state.doc.toJSON())).toContain("123456");
+  });
+
+  it("keeps a box that is not enabled focusable, and does not run its pick", () => {
+    const editor = createEditor({ document: doc() });
+    const pick = vi.fn(() => () => true);
+    const off: ToolbarSelect = {
+      key: "off",
+      label: "Off",
+      enabled: () => false,
+      select: { options: () => [{ value: "a", label: "A" }], value: () => null, pick },
+    };
+    render(<FoliToolbar editor={editor} items={[[off]]} />);
+    const box = screen.getByRole("combobox", { name: "Off" }) as HTMLSelectElement;
+    expect(box.getAttribute("aria-disabled")).toBe("true");
+    // Nothing to show: a blank entry.
+    expect(box.value).toBe("");
+    fireEvent.change(box, { target: { value: "a" } });
+    expect(pick).not.toHaveBeenCalled();
   });
 
   it("warns once about two items with one key, outside production", () => {

@@ -6,4 +6,7 @@ Toolbar: an app's item can be a box (`ToolbarSelect`) or a color menu (`ToolbarC
 the built-in ones take other fonts, sizes and colors through a copy
 (`{ ...toolbarItems.textColor, colors: { ...toolbarItems.textColor.colors, options } }`).
 `toolbarItems` now types its boxes and color menus as what they are, not `ToolbarButton` (they
-never had a `command`).
+never had a `command`). Types only, nothing changes at run time: code that annotates one of
+those nine items (`style`, `font`, `size`, `lineSpacing`, `reviewView`, `tableStyle`, `textColor`,
+`highlight`, `cellShading`) as `ToolbarButton` names `ToolbarSelect`, `ToolbarColorMenu` or
+`ToolbarItem` instead.

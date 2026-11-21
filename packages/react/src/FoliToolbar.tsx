@@ -169,7 +169,8 @@ interface ToolbarItemBase {
   readonly icon?: ReactNode | undefined;
   /**
    * Whether it can be used now. Default: a button's dry run of its `command` (`editor.can`); for
-   * a menu, whether it has entries. Runs after every transaction: keep it cheap.
+   * a menu, whether it has entries; a box or a color menu, always (its `pick` is not dry-run).
+   * Runs after every transaction: keep it cheap.
    */
   readonly enabled?: ((state: EditorState, editor: Editor) => boolean) | undefined;
 }
@@ -184,6 +185,8 @@ export interface ToolbarButton extends ToolbarItemBase {
   /** A toggle: whether it shows as pressed (`aria-pressed`). Runs after every transaction. */
   readonly pressed?: ((state: EditorState, editor: Editor) => boolean) | undefined;
   readonly actions?: undefined;
+  readonly select?: undefined;
+  readonly colors?: undefined;
 }
 
 /** A toolbar menu button: a WAI-ARIA menu of its `actions`. */
@@ -195,6 +198,8 @@ export interface ToolbarMenu extends ToolbarItemBase {
   readonly actions: readonly ToolbarAction[] | ((editor: Editor) => readonly ToolbarAction[]);
   readonly command?: undefined;
   readonly pressed?: undefined;
+  readonly select?: undefined;
+  readonly colors?: undefined;
 }
 
 /** An entry of a toolbar box. */
@@ -223,6 +228,7 @@ export interface ToolbarSelect extends ToolbarItemBase {
   };
   readonly command?: undefined;
   readonly actions?: undefined;
+  readonly colors?: undefined;
 }
 
 /** A color of a toolbar color menu. */
@@ -248,6 +254,7 @@ export interface ToolbarColorMenu extends ToolbarItemBase {
   };
   readonly command?: undefined;
   readonly actions?: undefined;
+  readonly select?: undefined;
 }
 
 /**

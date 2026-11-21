@@ -147,7 +147,8 @@ Custom nodes and marks, plugins and toolbar items ([extensions](guides/extension
   new editor, losing undo history and the selection).
 - Toolbar items of an app are buttons, menus of `ToolbarAction`s, boxes and color menus: the
   dialogs are only the built-in items'. An app item's state without `enabled` is
-  a dry run of its command after every transaction, which costs what the command costs.
+  a dry run of its command after every transaction, which costs what the command costs (a box
+  or a color menu is not dry-run: it is enabled unless its `enabled` says no).
   `useCommand(command)` with a command made anew on each render dry-runs it on each render.
 - Keys ([keyboard.md](keyboard.md)): `editor.handleKey` runs the plugins' keymaps only, not the
   view's own keys (they need the pages). A keymap cannot take a reserved key, nor the browser's

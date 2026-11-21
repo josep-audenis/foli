@@ -2241,8 +2241,8 @@ say what is there; a changeset (minor); released as 1.1.0 with the owner's appro
 Each task is a PR on `phase-15/toolbar-customization`, the build green after each, merged after
 an agent's review.
 
-- [ ] Claim phase, branch `phase-15/toolbar-customization` (with 15.1)
-- [ ] 15.1 Boxes and color menus: `ToolbarSelect` and `ToolbarColorMenu` public, the built-in
+- [x] Claim phase, branch `phase-15/toolbar-customization` (with 15.1, #149)
+- [x] 15.1 (#149) Boxes and color menus: `ToolbarSelect` and `ToolbarColorMenu` public, the built-in
   ones typed so in `toolbarItems`, their options replaceable through a copy.
 - [ ] 15.2 Dialogs and controls: `ToolbarDialog` (the app's content in a dialog under the
   toolbar) and `ToolbarCustom` (`render`, with the props that keep the one tab stop).
