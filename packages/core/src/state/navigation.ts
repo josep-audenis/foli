@@ -210,7 +210,7 @@ export function renameBookmark(editor: Editor, name: string, next: string): Book
           inField = false;
         }
         const link = node.marks.find(
-          (m: Mark) => m.type.name === "link" && m.attrs.anchor === current.name,
+          (m: Mark) => m.type.name === "link" && same(String(m.attrs.anchor ?? ""), name),
         );
         if (link) {
           const end = pos + node.nodeSize;

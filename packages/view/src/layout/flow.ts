@@ -639,6 +639,9 @@ export function flowFrom(
     };
     if (box.sectionMark && state.onPage) {
       gaps[index] = 0;
+      // A break on the mark still counts (page break before the next section's first paragraph).
+      if (box.breaksAfter?.(state.column).length) state.breakPending = true;
+      else if (box.columnBreaksAfter?.(state.column).length) state.columnPending = true;
       return [{ ...at(0, Infinity), mark: true }];
     }
     const above = state.previousMargin;

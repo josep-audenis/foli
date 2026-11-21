@@ -231,9 +231,23 @@ export function docFromClipboard(
   return null;
 }
 
-/** Plain text: one paragraph per line. */
+/**
+ * `text` without what XML 1.0, so a `.docx`, cannot hold: control characters but tab and line
+ * ends, lone surrogates, U+FFFE and U+FFFF. Pasted, they would make the document unexportable.
+ */
+const writable = (text: string) =>
+  text.replace(/[^\P{Cc}\t\n\r\u007F-\u009F]|[\uFFFE\uFFFF]|\p{Cs}/gu, "");
+
+/** `text` without the spaces at its end (a loop: a `+$` pattern is quadratic on a long run). */
+function trimSpaces(text: string): string {
+  let end = text.length;
+  while (end && text[end - 1] === " ") end--;
+  return text.slice(0, end);
+}
+
+/** Plain text: one paragraph per line (a vertical tab, Word's line break in plain text, ends one). */
 export function textToDoc(text: string, marks: readonly MarkJSON[] = []): DocJSON {
-  const lines = text.replace(/\r\n?/g, "\n").split("\n");
+  const lines = writable(text.replace(/\r\n?|\v|\f/g, "\n")).split("\n");
   return {
     type: "doc",
     content: lines.map((line) => ({
@@ -252,6 +266,13 @@ const BLOCK_TAGS = new Set([
   "article",
   "aside",
   "blockquote",
+  "caption",
+  "center",
+  "details",
+  "fieldset",
+  "form",
+  "legend",
+  "summary",
   "dd",
   "div",
   "dl",
@@ -577,7 +598,7 @@ function readHTML(html: string): { content: DocJSON; open: boolean } | null {
     const last = inline[inline.length - 1];
     if (last?.type === "hardBreak") inline.pop(); // a trailing <br> adds no line in HTML
     const tail = inline[inline.length - 1];
-    if (tail?.type === "text" && !blockPre) tail.text = tail.text.replace(/ +$/, "");
+    if (tail?.type === "text" && !blockPre) tail.text = trimSpaces(tail.text);
     // Non-breaking spaces survive the trimming above, then become ordinary spaces.
     for (const node of inline) {
       if (node.type === "text") node.text = node.text.replace(/ /g, " ");
@@ -594,7 +615,8 @@ function readHTML(html: string): { content: DocJSON; open: boolean } | null {
       ...(content.length ? { content } : {}),
     });
   };
-  const addText = (raw: string, marks: Marks, pre: boolean) => {
+  const addText = (given: string, marks: Marks, pre: boolean) => {
+    const raw = writable(given);
     // Source formatting between blocks ("</p>\n<br>\n<p>") is not content.
     if (!inline && !pre && !/[^ \t\n\r\f]/.test(raw)) return;
     if (!inline) {
@@ -640,7 +662,7 @@ function readHTML(html: string): { content: DocJSON; open: boolean } | null {
     }
     const list = inline as InlineJSON[];
     const tail = list[list.length - 1];
-    if (tail?.type === "text") tail.text = tail.text.replace(/ +$/, "");
+    if (tail?.type === "text") tail.text = trimSpaces(tail.text);
     list.push({ type: "hardBreak" });
     afterSpace = true;
   };

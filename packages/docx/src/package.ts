@@ -108,6 +108,8 @@ export class DocxPackage {
   readonly #defaults: ReadonlyMap<string, string>;
   readonly #overridden: ReadonlySet<string>;
   readonly #contentTypesText: string;
+  /** The prefix `[Content_Types].xml` writes its elements with (`ct:`, or none). */
+  readonly #contentTypesPrefix: string;
 
   /** @internal Use {@link readPackage}. */
   constructor(entries: readonly ZipEntry[], data: readonly Uint8Array[], options: ParseXmlOptions) {
@@ -121,6 +123,7 @@ export class DocxPackage {
     const types = contentTypes(typesXml.root);
     this.#defaults = types.defaults;
     this.#overridden = new Set(types.overrides.keys());
+    this.#contentTypesPrefix = typesXml.root.prefix && `${typesXml.root.prefix}:`;
     // Rewritten as UTF-8 when parts are added: the declaration says so.
     this.#contentTypesText = typesXml.source.replace(
       /^(<\?xml[^?]*?encoding=)(["'])[^"']*\2/,
@@ -232,7 +235,7 @@ export class DocxPackage {
         this.#defaults.get(extension(part.name)) !== part.contentType
       ) {
         overrides.push(
-          `<Override PartName="${escapeXml(part.name)}" ContentType="${escapeXml(part.contentType)}"/>`,
+          `<${this.#contentTypesPrefix}Override PartName="${escapeXml(part.name)}" ContentType="${escapeXml(part.contentType)}"/>`,
         );
       }
     }

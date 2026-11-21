@@ -8,7 +8,7 @@ import { type DocJSON, type MarkJSON } from "@folijs/core";
  * from a schema v3 document the definitions they reference (`copiedDefinitions`).
  */
 export declare const FOLI_MIME = "application/x-foli+json";
-/** Plain text: one paragraph per line. */
+/** Plain text: one paragraph per line (a vertical tab, Word's line break in plain text, ends one). */
 export declare function textToDoc(text: string, marks?: readonly MarkJSON[]): DocJSON;
 /**
  * Own HTML reader: maps known tags and inline styles to the schema (paragraphs, headings,

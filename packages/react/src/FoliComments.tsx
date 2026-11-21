@@ -149,7 +149,9 @@ export function FoliComments({
   const pane = useRef<HTMLElement>(null);
   const [tops, setTops] = useState<number[]>([]);
   const [height, setHeight] = useState(0);
-  const [writing, setWriting] = useState<{ id: number; reply: boolean } | null>(null);
+  const [written, setWriting] = useState<{ id: number; reply: boolean } | null>(null);
+  // A form open when the editor turns read-only goes: it could still save.
+  const writing = readOnly ? null : written;
   const [focused, setFocused] = useState<number | null>(null);
   /** The comments the pane has seen, per document: only ones made later open for writing. */
   const known = useRef<{

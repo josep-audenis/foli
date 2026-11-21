@@ -96,6 +96,8 @@ export class Transaction extends Transform {
   setSelection(selection: Selection): this {
     if (selection.$anchor.doc !== this.doc)
       throw new RangeError("Selection is not in this document");
+    // Marks toggled at a caret are for what is typed there: they do not follow the selection.
+    if (!this.storedMarksSet && !selection.eq(this.selection)) this.storedMarks = null;
     this.currentSelection = selection;
     this.selectionStep = this.steps.length;
     return this;

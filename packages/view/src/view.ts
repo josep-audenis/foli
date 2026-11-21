@@ -902,6 +902,7 @@ export class EditorView {
     this.endResize();
     host.ownerDocument.removeEventListener("selectionchange", this.onSelectionChange);
     const owned = [
+      CELLS_ATTR,
       "contenteditable",
       "role",
       "aria-multiline",
@@ -4420,7 +4421,10 @@ export class EditorView {
     );
     // One empty paragraph: nothing to paste (a lone opaque block is something).
     const only = pasted?.doc.childCount === 1 ? pasted.doc.firstChild : null;
-    if (!pasted || (only?.isTextblock && !only.content.size)) return false;
+    // A rule is an empty paragraph with a border: content, and a block of its own.
+    const rule = (node: ModelNode | null | undefined) =>
+      !!node?.isTextblock && !node.content.size && !!node.attrs.borders;
+    if (!pasted || (only?.isTextblock && !only.content.size && !rule(only))) return false;
     const { doc, open, envelope, notes } = pasted;
     // As a slice (text joins the text around the caret); where that cannot be (an opaque block
     // at an end), as whole blocks at the caret.
@@ -4432,7 +4436,12 @@ export class EditorView {
         tr.setSelection(Selection.near(tr.doc.resolve(from + doc.content.size), -1));
       } else {
         // A slice opens into its first and last blocks: an opaque block there has no inside.
-        if (doc.firstChild?.isLeaf || doc.lastChild?.isLeaf) {
+        if (
+          doc.firstChild?.isLeaf ||
+          doc.lastChild?.isLeaf ||
+          rule(doc.firstChild) ||
+          rule(doc.lastChild)
+        ) {
           throw new TransformError("An opaque block at an end is pasted as a block");
         }
         tr.replaceSelection(doc.slice(1, doc.content.size - 1));

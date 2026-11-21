@@ -77,11 +77,13 @@ function found(context: Context): Control[] {
     if (!node) continue;
     const block = handles.at(pos, node);
     if (!read.has(block)) continue;
+    // A list's value reads as its item is shown: what `items` lists and `fillControl` takes.
+    const item = properties.items?.find((i) => i.value === value.value);
     const control: Control = {
       id: value.id,
       name: value.tag || value.title || value.id,
       kind: value.kind,
-      value: value.value,
+      value: item?.display ?? value.value,
       empty: value.showingPlaceholder,
       readOnly: controlIsReadOnly(properties),
       block,

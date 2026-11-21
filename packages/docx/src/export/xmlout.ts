@@ -142,6 +142,27 @@ export function namespacesOf(root: XmlElement, source: string): Namespaces {
 }
 
 /**
+ * `namespaces` with the declarations an element's `attributes` bag makes (`xmlns:foo` on a
+ * `w:p`): what is in scope for the content written inside that element.
+ * @internal
+ */
+export function scoped(namespaces: Namespaces, bag: unknown): Namespaces {
+  const own = Object.entries((bag ?? {}) as Record<string, string>).filter(
+    ([name]) => name === "xmlns" || name.startsWith("xmlns:"),
+  );
+  if (!own.length) return namespaces;
+  let { declarations } = namespaces;
+  const prefixes = new Set(namespaces.prefixes);
+  for (const [name, value] of own) {
+    // One it declares again replaces the part's.
+    const outer = new RegExp(`(^| )${name.replace(/\./g, "\\.")}\\s*=\\s*("[^"]*"|'[^']*')`);
+    declarations = `${declarations.replace(outer, "")} ${name}="${escapeAttribute(value)}"`;
+    prefixes.add(name.slice(6));
+  }
+  return { declarations, prefixes };
+}
+
+/**
  * A verbatim fragment (`ext`, `runExt`, an opaque node's XML) parsed in the part's namespaces:
  * exactly one element (named `expected` when given), with its offsets into the returned
  * source. Anything else could not be written into the part as well-formed XML: DocxError.

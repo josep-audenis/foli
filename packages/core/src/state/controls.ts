@@ -569,7 +569,7 @@ function dateFromText(control: ControlJSON, text: string): string | null {
   const names = monthNames(locale || "en-US") ?? [];
   const fields: string[] = [];
   const pattern = (control.dateFormat ?? "d MMMM yyyy").replace(
-    /'[^']*'|d+|M+|y+|[Hhms]+|[AaPp]{2}|[.*+?^${}()|[\]\\/]/g,
+    /'[^']*'|am\/pm|AM\/PM|a\/p|A\/P|d+|M+|y+|[Hhms]+|[AaPp]{2}|[.*+?^${}()|[\]\\/]/g,
     (token) => {
       if (token[0] === "'") return token.slice(1, -1).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
       if (/^[.*+?^${}()|[\]\\/]$/.test(token)) return `\\${token}`;
@@ -1041,7 +1041,7 @@ function glyph(state: { value: string }): string {
 function textNodes(state: EditorState, text: string, marks: readonly Mark[]): Node[] {
   const { schema } = state;
   return text
-    .split("\n")
+    .split(/\r\n?|\n/)
     .flatMap((line, i) => [
       ...(i ? [schema.nodes.hardBreak?.create(null, null, marks) as Node] : []),
       ...(line ? [schema.text(line, marks)] : []),
@@ -1120,7 +1120,9 @@ function valueFor(
     case "dropDown":
     case "comboBox": {
       if (typeof value !== "string") return null;
-      const item = control.items?.find((i) => i.value === value || i.display === value);
+      const item =
+        control.items?.find((i) => i.value === value) ??
+        control.items?.find((i) => i.display === value);
       if (!item && control.kind === "dropDown") return null;
       return text(item ? (item.display ?? item.value) : value);
     }

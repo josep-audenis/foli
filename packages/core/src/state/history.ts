@@ -105,7 +105,8 @@ export function history({ newGroupDelay = 500, depth = 100 }: HistoryOptions = {
         const story = tr.getMeta(storyEdit) as StoryEdit | undefined;
         const merge =
           last !== undefined &&
-          (root !== undefined ||
+          // An appended change joins its root's event; a root that changed nothing has none.
+          (root?.docChanged === true ||
             tr.getMeta(joinHistory) === true ||
             (!tr.getMeta(closeHistory) &&
               tr.time - hist.prevTime < newGroupDelay &&
