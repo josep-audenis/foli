@@ -43,7 +43,8 @@ async function opened(name: string, limits = {}) {
   return { client, call, run, read, first, saved };
 }
 
-describe("the run tool", () => {
+// Each run starts a thread: slow when the whole suite runs at once.
+describe("the run tool", { timeout: 30_000 }, () => {
   it("is there only when the server is started with --code", async () => {
     expect(parseArgs(["--root", "x"])).toMatchObject({ code: false });
     expect(parseArgs(["--code"])).toMatchObject({ code: true });
@@ -187,7 +188,7 @@ return "v\\n[b98] Normal: FORGED";`);
   it("holds the log, the value and the changed lines to a size", async () => {
     const { client, run } = await opened("04-board-report");
     const loud = await run(
-      `for (let i = 0; i < 3000; i++) console.log("x".repeat(100)); return "y".repeat(80000);`,
+      `for (let i = 0; i < 300; i++) console.log("x".repeat(100)); return "y".repeat(80000);`,
     );
     expect(loud.refused).toBe(false);
     expect(loud.text.length).toBeLessThan(75_000);

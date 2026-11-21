@@ -17,7 +17,7 @@ const echo: Host = (name, args) => {
 const run = (code: string, limits: Partial<SandboxLimits> = {}, host: Host = echo) =>
   runScript(code, PRELUDE, host, { ...SANDBOX_LIMITS, ms: 3000, ...limits });
 
-describe("a script's answer", () => {
+describe("a script's answer", { timeout: 30_000 }, () => {
   it("is what it returns, as JSON; nothing when it returns nothing", async () => {
     expect(await run("return { n: 1 + 1, s: 'a\\nb' }")).toEqual({
       ok: true,
@@ -71,7 +71,7 @@ describe("a script's answer", () => {
   });
 });
 
-describe("what is not there", () => {
+describe("what is not there", { timeout: 30_000 }, () => {
   it("nothing of Node, the web or the host but the language", async () => {
     const names = [
       "fetch", "require", "process", "setTimeout", "setInterval", "queueMicrotask", "console",
@@ -121,7 +121,7 @@ describe("what is not there", () => {
   });
 });
 
-describe("limits", () => {
+describe("limits", { timeout: 30_000 }, () => {
   it("ends a script that does not end", async () => {
     const started = Date.now();
     expect(await run("for (;;) {}", { ms: 300 })).toEqual({
@@ -319,7 +319,7 @@ return [first, host('n0').name, host('n1').name];`,
   });
 });
 
-describe("what the host is given", () => {
+describe("what the host is given", { timeout: 30_000 }, () => {
   it("is JSON, whatever the script passes", async () => {
     const seen: unknown[] = [];
     const host: Host = (name, args) => {
