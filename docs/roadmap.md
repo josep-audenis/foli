@@ -24,6 +24,7 @@ place that says what is in progress; check it before starting work.
 | 10 Tables & images       | ✅ Done                  | —      | Merged in #73–#97 (#90, the landing page, went to main); 0.5.0 on npm; two misses accepted                   |
 | 11 Sections & templates  | ✅ Done                  | —      | Merged in #100–#118 (#106, #107, #110, #112 and #113, the site, went to main); 0.6.0 on npm; misses accepted |
 | 12 Ecosystem & 1.0       | ✅ Done                  | —      | Merged in #120–#133; 1.0.0 on npm (2026-11-20); Phase 5 speed misses and manual checks accepted as 1.0 risks |
+| 13 Agent library         | Ready                    | —      | Planned 2026-11-21, nothing built; `@folijs/mcp` (Phase 14, not planned yet) waits for it                    |
 
 Status values: `Ready` (dependencies met, nobody on it) · `In progress` · `In review` (PR open) ·
 `✅ Done` (merged, acceptance criteria met) · `Blocked by …`.
@@ -99,7 +100,8 @@ Foli's engine is not credible until all five pass in Chromium, Firefox and WebKi
 | 10    | Tables & images           | Word tables across pages, inline and floating images        | 0.5.0        | XL   |
 | 11    | Sections & templates      | Headers/footers, fields, content controls, notes, PDF       | 0.6.0        | L    |
 | 12    | Ecosystem & 1.0           | Extension API freeze, docs site, performance tracking       | **1.0.0**    | L    |
-| —     | Optional                  | Real-time collaboration, AI-assisted editing                | —            | —    |
+| 13    | Agent library             | `@folijs/agent`: an LLM edits a document without positions  | agent 0.1.0  | M    |
+| —     | Optional                  | Real-time collaboration                                     | —            | —    |
 
 ```
 P0 ─┬─► P1 spike ────────────────┐
@@ -1878,6 +1880,86 @@ Each task is a PR on `phase-12/ecosystem`, the build green after each.
   guide); `changeset status` plans 1.0.0 for all five. The version PR (#133); 1.0.0 published
   2026-11-20 by the Release workflow with the owner's approval, README's status switched after.)
 
+## Phase 13 — Agent library (`@folijs/agent`) · M → agent 0.1.0
+
+A library an LLM agent uses to read and edit a document without computing positions: the
+document as text with a handle per block, a few coarse operations, every edit a tracked change
+in the agent's name that a person accepts or rejects in Foli or in Word. Background, and what
+was tried: [explorations/agent-editing.md](explorations/agent-editing.md). Planned 2026-11-21,
+nothing built.
+
+Decided with the owner on 2026-11-21: the MCP server is a separate package (`@folijs/mcp`, Phase
+14, planned when this phase closes), because it follows the MCP SDK's releases and needs Node,
+files and stdio, while this package stays pure. Not in this phase: the MCP server, `run(code)`
+(code mode), the hint highlight (After 1.0), accepting or rejecting changes (the agent proposes,
+a person decides), inserting tables and pictures, headers, footers and notes, steps as JSON.
+
+**Starts from (1.0.0):** the headless editor does every edit an agent needs, but by integer
+positions and the selection. `createEditor({ document, author, trackChanges })`; commands on the
+selection (`setParagraphStyle`, `addComment`, `insertText`, `setControlValue`…); `findAll` and
+`replaceAll` over the model; `documentOutline` (headings only, with positions);
+`paragraphStyles`, `controlValues`, `updateFields`; `rejectAllChanges(author)`.
+`editor.subscribe` gives each change's transactions and a `Transaction` has its `mapping`, so a
+position held outside the editor can follow edits. Paragraphs imported from Word keep
+`w14:paraId` as an unknown attribute, but paragraphs Foli creates get none and a paste drops
+them (export writes only the ones comment threads need), so it cannot identify a block.
+`@folijs/docx` imports and exports in Node with no DOM.
+
+**Acceptance:** `@folijs/agent` depends on `@folijs/core` only (an exact peer, as ADR-0008 has
+the other packages) and loads with no DOM and no Node built-ins (checked by a test); a session
+over a document gives its body as text, one block per line group with a handle, the paragraph's
+style, its list number and its text, tables with their cells' paragraphs as blocks, and what
+Foli does not model shown as a placeholder that cannot be edited; a handle issued by one read
+still names the same block after any of the session's edits, and a handle whose block is gone is
+refused by name; the operations (replace text in a block, insert paragraphs before or after a
+block, delete a block, set a block's style, comment on a block or on text in it, list and fill
+content controls, update fields) each refuse with a message a model can act on (no match, three
+matches, unknown style with the styles that exist) and never by throwing a position error;
+every edit is a tracked change by the session's author; three tasks written as a model would
+call them pass on corpus documents through `importDocx` and `exportDocx`: fill a template's
+controls, redline a contract (replace, insert and delete clauses, comment), restyle headings;
+for each, `rejectAllChanges(author)` on the result gives back the input document, or what
+differs is listed in limitations; Word opens each result and shows the changes under the
+agent's name (the Word harness); the API report, size and package checks of `pnpm check` cover
+the package; README, `api.md`, `architecture.md` and the site document it, with a system-prompt
+snippet for the handle format; 0.1.0 published with the owner's approval, as 0.x: outside
+ADR-0008's 1.0 promise until Phase 14 has used it.
+
+### Tasks
+
+Each task is a PR on `phase-13/agent`, the build green after each.
+
+- [ ] Claim phase, branch `phase-13/agent`
+- [ ] 13.1 Package: `packages/agent` as `@folijs/agent` 0.0.0, core as its exact peer, the
+  `@foli/source` condition, in `scripts/` (`PACKAGES` of the API report, size, package checks)
+  and the changeset config; typechecked without the DOM lib and without Node's types, so a
+  stray import fails the build. `openSession(document, { author })` over a tracking
+  `createEditor`, `session.document()` for export. Record here why 0.x.
+- [ ] 13.2 Reading and handles: `session.read()` (the whole body, or from a handle for a number
+  of blocks, so a long document can be read in parts) and `session.block(handle)`. Decide and
+  write down the text format (a line per block: handle, style, list number, text; cells nested
+  under their table), how existing tracked changes and comments by others show (as Word's
+  final text, with a mark that the block has changes), and what a placeholder says. Handles are
+  session ids (`b1`, `b2`…) on block start positions, moved through each transaction's
+  `mapping` from `editor.subscribe`; a block made by an operation gets a handle the operation
+  returns. Property test: random operations, every live handle still resolves to its block.
+- [ ] 13.3 Editing text: `replaceText(handle, find, replacement, { all })` (refuses on none, or
+  on several without `all`, saying how many), `insertAfter` and `insertBefore(handle, paragraphs)`
+  (text and an optional style each), `deleteBlock(handle)`. Each returns what changed in the
+  read format, so the model need not read again. Refusals as values, not exceptions.
+- [ ] 13.4 Style and comments: `styles()`, `setStyle(handle, name)`,
+  `comment(handle, text, { on })` (`on`: text in the block to anchor to; the whole block
+  without it).
+- [ ] 13.5 Templates: `controls()` (tag, title, kind, value, the block it is in),
+  `fillControl(tagOrTitle, value)`, `updateFields()`. A read-only control is refused by name.
+- [ ] 13.6 The three tasks and the tracking check: tests that import a corpus `.docx`, run the
+  calls a model would make, export, and import again; `rejectAllChanges(author)` compared with
+  the input for each; the results opened in Word by the harness. Fix what they find in the
+  operations; write the rest in limitations.
+- [ ] 13.7 Docs and release: README (also the site's guide), `api.md`, `architecture.md`,
+  `limitations.md`, the exploration note marked with what was built, acceptance checked above,
+  the changeset; 0.1.0 published with the owner's approval. Phase 14 planned.
+
 ## After 1.0
 
 Not a phase yet: the backlog written down on 2026-11-21, from [limitations.md](limitations.md),
@@ -1945,8 +2027,10 @@ reduced motion respected (no fade, no smooth scroll). A requirement if pages are
 page before scrolling. Today every page is in the DOM, so a far page is reached. (An editor
 compared before 1.0 failed exactly there: pages not yet rendered could not be gone to.)
 
-**Agent editing:** a facade an LLM can use without positions, an MCP server over it, and maybe a
-sandboxed `run(code)` tool (code mode). Explored, nothing built:
+**Agent editing:** the library is Phase 13 (planned, nothing built). After it, in order: an MCP
+server over it as its own package (`@folijs/mcp`, Phase 14 when planned), then maybe a
+sandboxed `run(code)` tool inside that server (code mode), once someone asks for it. The hint
+above is independent and is what lets an agent show what it changed. Explored:
 [explorations/agent-editing.md](explorations/agent-editing.md).
 
 **Optional, later:** real-time collaboration (steps and mapping enable a central-authority
