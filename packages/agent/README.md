@@ -130,8 +130,11 @@ session.updateFields({ data: { CandidateFirstName: "Ada" } });
   empty until Word updates the field. It returns no blocks: read again.
 - **`checkpoint()`**: marks the document as it is. `rollback()` on what it returns takes back
   every edit made since, as if none had been: no tracked change is left of them and every
-  handle names the block it named. `release()` keeps them. For a batch of operations that
-  must all be done or none.
+  handle names the block it named; a style they added to the document is gone, and undo is
+  as it was at the checkpoint. `release()` keeps them. One or the other, once. For a batch of
+  operations that must all be done or none.
+- One `insertAfter` or `insertBefore` takes 500 paragraphs at most, and one `replaceText` with
+  `all` 500 places: more is refused, to be done in parts.
 
 ## For the model
 

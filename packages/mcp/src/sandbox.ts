@@ -47,6 +47,13 @@ const STACK = 192 * 1024;
  */
 export type Host = (name: string, args: unknown) => unknown;
 
+/**
+ * @internal
+ * Thrown by a host function to end the run there: a limit of the host's own was met. Any
+ * other error is thrown in the script, which may catch it.
+ */
+export class StopRun extends Error {}
+
 /** @internal */
 export type Ran =
   | {
@@ -59,9 +66,10 @@ export type Ran =
       ok: false;
       /**
        * `error`: the script threw (a syntax error included). `time`, `memory`, `calls`: a
-       * limit. `crash`: the thread ended some other way.
+       * limit. `host`: the host ended it (`StopRun`). `crash`: the thread ended some other
+       * way.
        */
-      reason: "error" | "time" | "memory" | "calls" | "crash";
+      reason: "error" | "time" | "memory" | "calls" | "host" | "crash";
       /** The error's name and message, for `error`. */
       message: string;
       /** The line of the script it was thrown at, when known (1 is its first). */
@@ -82,8 +90,9 @@ const lineOf = (stack: string): number | null => {
 /**
  * @internal
  * Runs `code` as a function's body, after `prelude` (the server's own code, which builds what
- * the script sees over `__call`). Never throws, never takes longer than `limits.ms` and a
- * thread's start.
+ * the script sees over `__call`). Never throws. The script itself never has longer than
+ * `limits.ms`; the time is kept in the host's thread, so the answer comes when the host
+ * function that is running at that moment has returned: a host function must be bounded.
  */
 export function runScript(
   code: string,
@@ -127,7 +136,7 @@ export function runScript(
       void worker.terminate();
       resolve(ran);
     };
-    const failed = (reason: "time" | "calls" | "crash", message: string) =>
+    const failed = (reason: "time" | "calls" | "host" | "crash", message: string) =>
       end({ ok: false, reason, message, line: null, calls });
     const timer = setTimeout(
       () => failed("time", `It did not finish in ${limits.ms / 1000} seconds.`),
@@ -146,6 +155,7 @@ export function runScript(
         if (message.args.length > MAX_ARGS) throw new Error("the arguments are too large");
         answer = JSON.stringify({ value: host(message.name, JSON.parse(message.args)) ?? null });
       } catch (error) {
+        if (error instanceof StopRun) return failed("host", error.message);
         // Whatever was thrown, and whatever its message is: an answer.
         let said = "failed";
         try {

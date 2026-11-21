@@ -6,7 +6,7 @@
 import { formatBlocks, type Result } from "@folijs/agent";
 import type { OpenDocument } from "./documents.js";
 import type { ToolResult } from "./protocol.js";
-import { type Host, runScript, SANDBOX_LIMITS, type SandboxLimits } from "./sandbox.js";
+import { type Host, runScript, SANDBOX_LIMITS, type SandboxLimits, StopRun } from "./sandbox.js";
 
 /** The methods of `doc`, by name: what a script may call. */
 const METHODS = [
@@ -66,12 +66,33 @@ type Block = { handle, kind: "paragraph" | "table" | "other", style?, number?, t
   cell?: { table, row, column }, depth, changed, comments }
 blocks in a result are Blocks as they read after the edit. A table's own text is ""; its cells' paragraphs follow it, each with cell. style is the name as read shows it ("heading 1", "Title"): compare without capitals. Only the body is there: headers, footers and the text of notes are not.`;
 
+/**
+ * @internal
+ * How much a run may add to a document, in positions (a character or a block's edge each):
+ * about a hundred pages. What a run adds, a failed run takes back, and both take the host's
+ * time, which no timer interrupts.
+ */
+export const RUN_GROWTH = 300_000;
+/**
+ * @internal
+ * And how many blocks it may add: an edit costs the more the more blocks there are, and 2,000
+ * added and taken back again is about two seconds of the host's time.
+ */
+export const RUN_BLOCKS = 2_000;
+
 const LOG_CHARS = 20_000;
 const VALUE_CHARS = 50_000;
 const CHANGED_LINES = 40;
 
-/** Text of the document or of the script on one line of an answer. */
-const oneLine = (text: string) => text.replace(/\r\n|[\n\r\u0085\u2028\u2029]/g, "↵");
+/**
+ * Text of the document or of the script on one line of an answer: line ends shown, and the
+ * other control characters (an escape, a form feed) out.
+ */
+const oneLine = (text: string) =>
+  text
+    .replace(/\r\n|[\n\r\u0085\u2028\u2029]/g, "↵")
+    // biome-ignore lint/suspicious/noControlCharactersInRegex: control characters are what goes
+    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "");
 
 /**
  * @internal
@@ -105,7 +126,19 @@ export async function runCode(
   };
   // A script's arguments are JSON of any shape: the library refuses what does not fit, as it
   // does for a tool, so they are passed as they come.
+  const started = Date.now();
+  const size = before.content.size;
+  const count = before.childCount;
   const host: Host = (name, args) => {
+    // The host's own limits, which a script cannot catch its way past: the time, when calls
+    // follow each other too closely for the timer, and what the run has added so far.
+    if (Date.now() - started > limits.ms)
+      throw new StopRun(`It did not finish in ${limits.ms / 1000} seconds.`);
+    const now = session.editor.state.doc;
+    if (now.content.size - size > RUN_GROWTH || now.childCount - count > RUN_BLOCKS)
+      throw new StopRun(
+        `It added more than ${RUN_BLOCKS} paragraphs or ${RUN_GROWTH} characters to the document: a run is held to that. Do the work in several runs.`,
+      );
     const [a, b, c, d] = (Array.isArray(args) ? args : []) as [never, never, never, never];
     switch (name) {
       case "log": {

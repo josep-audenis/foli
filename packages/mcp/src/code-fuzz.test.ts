@@ -16,7 +16,7 @@ import type { OpenDocument } from "./documents.js";
 import { SANDBOX_LIMITS } from "./sandbox.js";
 
 const CORPUS = new URL("../../../corpus/word/", import.meta.url);
-const LIMITS = { ...SANDBOX_LIMITS, ms: 1500, memory: 16 * 1024 * 1024, calls: 400 };
+const LIMITS = { ...SANDBOX_LIMITS, ms: 1500, memory: 32 * 1024 * 1024, calls: 400 };
 
 /**
  * A document as text whatever the order of its keys: a footnote taken out and put back by a
@@ -116,6 +116,7 @@ describe("hostile scripts", () => {
       await fc.assert(
         fc.asyncProperty(script, async (code) => {
           const before = state();
+          const dirty = document.dirty;
           const started = Date.now();
           const result = await runCode(document, code, LIMITS);
           expect(Date.now() - started).toBeLessThan(LIMITS.ms + 2500);
@@ -126,6 +127,8 @@ describe("hostile scripts", () => {
           if (result.isError) {
             // As it was: the document, and every handle on the block it named.
             expect(after).toBe(before);
+            // Nothing to save that was not there to save before.
+            expect(document.dirty).toBe(dirty);
             expect(lines[1]).toBe("Nothing was changed: the document is as it was before the run.");
             expect(blockLines).toHaveLength(0);
             if (lines[0]?.startsWith("The script was stopped")) seen.stopped++;

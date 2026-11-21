@@ -148,40 +148,30 @@ describe("limits", { timeout: 30_000 }, () => {
     }
   });
 
-  it("holds its memory", async () => {
+  it("holds its memory, in bytes", async () => {
     const memory = 32 * 1024 * 1024;
+    // What a script holds when it is told there is no more, counted by the script, in
+    // megabytes. (QuickJS's own limit let 2 GB through, and said "out of memory" at the
+    // module's end: the message alone proves nothing.)
+    for (const code of [
+      "const a = []; try { for (;;) a.push(new Uint8Array(1e6)) } catch (e) {} return a.length",
+      "const a = []; try { for (;;) a.push(new ArrayBuffer(1e6)) } catch (e) {} return a.length",
+    ]) {
+      const ran = await run(code, { memory, ms: 5000 });
+      expect(ran, code).toMatchObject({ ok: true });
+      expect(Number(ran.ok && ran.value), code).toBeGreaterThan(8);
+      expect(Number(ran.ok && ran.value), code).toBeLessThan(32);
+    }
     expect(
       await run("const a = []; for (;;) a.push(new Uint8Array(1e6))", { memory }),
     ).toMatchObject({ ok: false, reason: "memory", message: "It used more than 32 MB of memory." });
-    // How much it got before it was told there is no more, each way of holding memory: the
-    // bytes, not the message, are the limit. (QuickJS's own limit let 2 GB through.)
-    for (const [code, most] of [
-      [
-        "const a = []; try { for (;;) a.push(new Uint8Array(1e6)) } catch (e) {} return a.length",
-        32,
-      ],
-      [
-        "const a = []; try { for (;;) a.push('x'.repeat(2000) + a.length) } catch (e) {} return a.length * 2000 / 1e6",
-        32,
-      ],
-      [
-        "let f = () => 1, n = 0; try { for (;;) { f = f.bind(null); n++ } } catch (e) {} return n * 64 / 1e6",
-        32,
-      ],
-    ] as const) {
-      const started = Date.now();
-      const ran = await run(code, { memory, ms: 4000 });
-      // Where the engine cannot go on without memory the thread ends (a crash): contained.
-      // Out of memory, or out of time while trying: never more than the limit.
-      if (ran.ok) expect(Number(ran.value), code).toBeLessThan(most);
-      else expect(ran.reason, code).toMatch(/^(time|memory|error|crash)$/);
-      expect(Date.now() - started, code).toBeLessThan(6000);
-    }
-    expect(await run("return 'x'.repeat(5e7).length", { memory })).toMatchObject({
-      reason: "memory",
-    });
-    // The process did not grow by what the scripts asked for.
-    expect(process.memoryUsage().rss).toBeLessThan(1500 * 1024 * 1024);
+    // Many small things: told there is no more under the limit, or still trying when time is up.
+    const strings = await run(
+      "const a = []; try { for (;;) a.push('x'.repeat(2000) + a.length) } catch (e) {} return a.length",
+      { memory, ms: 5000 },
+    );
+    if (strings.ok) expect(Number(strings.value) * 2000).toBeLessThan(memory);
+    else expect(strings.reason).toBe("time");
   });
 
   it("holds what a call sends, what a run returns and what an error says", async () => {
@@ -344,7 +334,10 @@ return 1`,
   it("arguments that are not JSON are the script's error, and the host is not called", async () => {
     let called = 0;
     const host: Host = () => ++called;
-    expect(await run(`return __call("x", "{not json")`, {}, host)).toMatchObject({ ok: true });
+    // The host's parser refuses it; the script reads that as the call's error.
+    expect(
+      await run(`return typeof JSON.parse(__call("x", "{not json")).error`, {}, host),
+    ).toMatchObject({ ok: true, value: '"string"' });
     expect(called).toBe(0);
   });
 

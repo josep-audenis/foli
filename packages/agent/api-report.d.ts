@@ -11,6 +11,8 @@ export { type Checkpoint, openSession, type ReadOptions, type ReadResult, type S
 export type { Control, Unfilled, UpdateFieldsOptions } from "./templates.js";
 
 // operations.d.ts
+import { type Editor } from "@folijs/core";
+import type { Handles } from "./handles.js";
 import { type Block } from "./read.js";
 /** A paragraph to insert: its text ("\n" or ↵ a line break, a tab a tab), in `style` if given. */
 export type NewParagraph = string | {
@@ -25,6 +27,11 @@ export interface Changed {
 export interface ReplaceOptions {
     /** Replace every place `find` is in the block. Default: refuse when there are several. */
     all?: boolean;
+}
+export interface Context {
+    editor: Editor;
+    handles: Handles;
+    author: string;
 }
 export interface CommentOptions {
     /** Text in the block to anchor the comment to, as `read` shows it. Default: the whole block. */
@@ -207,7 +214,8 @@ export interface Session {
      * Marks the document as it is now, to come back to: `rollback` takes back every edit made
      * since, the session's own and those made through `editor`, as if none had been (no tracked
      * change is left of them, and every handle names the block it named). `release` ends the
-     * checkpoint and keeps the edits. One or the other, once. `setDocument` on the editor
+     * checkpoint and keeps the edits. One or the other, once: a second call throws. Undo is as it
+     * was at the checkpoint: what was taken back cannot be undone or redone. `setDocument` on the editor
      * cannot be taken back: `rollback` then throws.
      */
     checkpoint(): Checkpoint;

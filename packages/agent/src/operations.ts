@@ -33,6 +33,10 @@ export interface ReplaceOptions {
 }
 
 /** @internal What the operations work on. */
+/** The most paragraphs one insert takes, and the most places one replace changes. */
+const MAX_PARAGRAPHS = 500;
+const MAX_PLACES = 500;
+
 export interface Context {
   editor: Editor;
   handles: Handles;
@@ -167,6 +171,12 @@ export function replaceText(
       "several-matches",
       `${quote(query)} is in block ${handle} ${matches.length} times. Give a longer find that is there once, or all: true to replace every one.`,
     );
+  // Each place is a change of its own.
+  if (matches.length > MAX_PLACES)
+    return refuse(
+      "several-matches",
+      `${quote(query)} is in block ${handle} ${matches.length} times: at most ${MAX_PLACES} places are replaced at once. Give a longer find.`,
+    );
   // Nothing to record: the text is what it would become.
   if (query === text) return { ok: true, replaced: 0, refused: 0, ...changed(context, [handle]) };
   let replaced = 0;
@@ -237,6 +247,12 @@ export function insert(
   // One paragraph given bare is one paragraph.
   const list: readonly unknown[] = Array.isArray(paragraphs) ? paragraphs : [paragraphs];
   if (!list.length) return refuse("invalid", "Give at least one paragraph to insert.");
+  // Each is a step of the editor, and a document of many thousands is slow to edit at all.
+  if (list.length > MAX_PARAGRAPHS)
+    return refuse(
+      "invalid",
+      `At most ${MAX_PARAGRAPHS} paragraphs are inserted at once: ${list.length} were given. Insert them in parts.`,
+    );
   const like = attrsLike(context, target.node, side);
   // A new paragraph next to one in a control is in that control: not when it is locked.
   for (const id of (like?.controls as string[] | null | undefined) ?? []) {

@@ -8,6 +8,7 @@ import {
   type Transaction,
   untracked,
 } from "@folijs/core";
+import { withEnvelope, wordContext } from "@folijs/core/internal";
 import { Handles } from "./handles.js";
 import {
   type Changed,
@@ -142,7 +143,8 @@ export interface Session {
    * Marks the document as it is now, to come back to: `rollback` takes back every edit made
    * since, the session's own and those made through `editor`, as if none had been (no tracked
    * change is left of them, and every handle names the block it named). `release` ends the
-   * checkpoint and keeps the edits. One or the other, once. `setDocument` on the editor
+   * checkpoint and keeps the edits. One or the other, once: a second call throws. Undo is as it
+   * was at the checkpoint: what was taken back cannot be undone or redone. `setDocument` on the editor
    * cannot be taken back: `rollback` then throws.
    */
   checkpoint(): Checkpoint;
@@ -200,32 +202,51 @@ export function openSession(document: EditorDocument, options: SessionOptions): 
   const checkpoint = (): Checkpoint => {
     const start = editor.state.doc;
     const ends = handles.snapshot();
+    // What the document holds besides its body (styles, numbering…), and undo's own state: a
+    // rollback puts both back as they are now. The history plugin is found by its key's name
+    // (core does not export the key): its state, given back to it, is taken as it is.
+    const envelope = wordContext(editor.state)?.envelope;
+    const history = editor.state.plugins.find((plugin) => plugin.key.name === "history");
+    const undo = history?.key.getState(editor.state);
     const made: Transaction[] = [];
+    let changed = false;
     let lost = false;
+    let over = false;
     let last = start;
     const stop = editor.subscribe((state, transactions) => {
       // A document replaced tells without a transaction: there are no steps to take back.
       if (!transactions.length && state.doc !== last) lost = true;
       last = state.doc;
+      if (transactions.length) changed = true;
       made.push(...transactions.filter((tr) => tr.steps.length));
     });
+    const end = () => {
+      if (over) throw new Error("checkpoint: already rolled back or released");
+      over = true;
+      stop();
+    };
     return {
-      release: stop,
+      release: end,
       rollback() {
-        stop();
+        end();
         if (lost)
           throw new Error("checkpoint: the document was replaced, it cannot be rolled back");
-        if (made.length) {
-          // Every step undone, last first, in one change that is neither tracked nor in undo.
+        if (changed) {
+          // Every step undone, last first, in one change that is not tracked.
           const tr = editor.state.tr;
           for (const done of [...made].reverse())
             for (let i = done.steps.length - 1; i >= 0; i--)
               tr.step((done.steps[i] as (typeof done.steps)[number]).invert(done.docs[i] as never));
           // Marked as an undo, which it is: core's rules for content controls let an undo
           // put back what no edit may write (a list's placeholder, a check box's glyph).
-          editor.dispatch(
-            tr.setMeta(untracked, true).setMeta("addToHistory", false).setMeta("historyOp", "undo"),
-          );
+          tr.setMeta(untracked, true).setMeta("historyOp", "undo");
+          // Undo as it was: neither this change nor those it takes back are steps of it.
+          if (history) tr.setMeta(history.key, undo);
+          else tr.setMeta("addToHistory", false);
+          // A style the edits added to the document is no step: the envelope is put back whole.
+          if (envelope && wordContext(editor.state)?.envelope !== envelope)
+            withEnvelope(tr, envelope);
+          editor.dispatch(tr);
         }
         if (!editor.state.doc.eq(start))
           throw new Error("checkpoint: the rollback did not give the document back");

@@ -115,8 +115,27 @@ Each ends the run and takes it back. Defaults, constants of the server:
 A script can name its own failure as it likes (throw an error that reads "out of memory", or
 one whose stack names another line): the run failed and is taken back either way.
 
-While a script runs the server answers nothing else, a `ping` included: ten seconds, and
-what one call to the document takes, at most (the timer fires between calls).
+### The server's own work is bounded apart
+
+The time is kept in the server's thread, which also does the work of every call to `doc` and
+of taking a run back: no timer fires while it works. The second review of #165 showed what
+that leaves open: one `insertAfter` of 20,000 empty paragraphs (60 kB of arguments) ran for
+85 s and ended the server out of memory; a loop of smaller inserts was stopped at 10 s and
+then took 27 s to take back. So the work is held by counts, not by the clock:
+
+- One insert takes 500 paragraphs at most, one replace 500 places (`@folijs/agent`: the plain
+  tools are held by it too).
+- A run may add 2,000 paragraphs or 300,000 characters to the document; past that the server
+  ends it, whatever the script catches (`StopRun`). 2,000 paragraphs added and taken back
+  again is about two seconds on the corpus's documents.
+- Each call checks the run's time as it starts.
+- A rollback does not rebase undo's stored steps (what made it slow): it gives undo back the
+  state it had at the checkpoint.
+
+While a script runs the server answers nothing else, a `ping` included: ten seconds, then
+what the call that is running takes and the taking back, each held as above. Measured on the
+NDA: a run stopped for what it added answered in under 8 s, one stopped at a 2 s limit in
+under 6 s.
 A hosted or shared server would want the run in another process; this one serves one client
 on its own machine.
 

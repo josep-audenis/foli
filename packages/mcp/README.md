@@ -100,7 +100,8 @@ script and the server runs it over an open document, so a task that is the same 
 blocks is one call and not one per block. The script sees one object, `doc`, with the
 operations the other tools have, and nothing else: no files, no network, no modules, no
 timers. It runs in QuickJS compiled to WebAssembly, in a thread of its own that the server
-ends after 10 seconds; 64 MB of memory and 5,000 calls to the document at most. Every edit
+ends after 10 seconds; 64 MB of memory and 5,000 calls to the document at most, and a run
+may add 2,000 paragraphs to a document. Every edit
 is a tracked change. A script that throws or is stopped changes nothing: its edits are all
 taken back. Why and how:
 [ADR-0010](https://github.com/josep-audenis/foli/blob/main/docs/decisions/ADR-0010-code-mode.md).

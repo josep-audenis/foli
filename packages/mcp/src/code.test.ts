@@ -237,3 +237,83 @@ return doc.updateFields({ data: { CandidateFirstName: "Ada", StartDate: "5 Janua
     await client.close();
   });
 });
+
+// From the second review of #165: the time is kept in the server's thread, so what a call to
+// `doc` does there, and what taking a run back costs, must be bounded by something else.
+describe("the server's own work for a run is bounded", { timeout: 60_000 }, () => {
+  it("one call cannot be made of very many paragraphs or places", async () => {
+    const { client, call, run, read } = await opened("01-mutual-nda");
+    const before = await read();
+    const started = Date.now();
+    const many = await run('doc.insertAfter(doc.blocks()[2].handle, new Array(20000).fill(""));');
+    expect(many.refused).toBe(true);
+    expect(many.text).toMatch(
+      /^The script failed at line 1: Error: At most 500 paragraphs are inserted at once: 20000 were given/,
+    );
+    expect(Date.now() - started).toBeLessThan(3000);
+    expect(await read()).toBe(before);
+    // The plain tool is the same call.
+    const tool = await call("insert_paragraphs", {
+      handle: "b3",
+      paragraphs: new Array(20000).fill(""),
+    });
+    expect(tool.refused).toBe(true);
+    expect(tool.text).toContain("At most 500 paragraphs");
+    await client.close();
+  });
+
+  it("a run that keeps adding is stopped, whatever it catches, and taken back in time", async () => {
+    const { client, call, run, read } = await opened("01-mutual-nda", { ms: 8000 });
+    const before = await read();
+    const started = Date.now();
+    const grown = await run(`const h = doc.blocks()[2].handle;
+for (;;) { try { doc.insertAfter(h, new Array(500).fill("x".repeat(40))) } catch (e) {} }`);
+    const took = Date.now() - started;
+    expect(grown.refused).toBe(true);
+    expect(grown.text.split("\n")).toEqual([
+      "The script was stopped. It added more than 2000 paragraphs or 300000 characters to the document: a run is held to that. Do the work in several runs.",
+      "Nothing was changed: the document is as it was before the run.",
+    ]);
+    // Stopped by what it added, well before its time, and the rollback with it.
+    expect(took).toBeLessThan(8000);
+    expect(await read()).toBe(before);
+    expect((await call("list_documents")).text).not.toMatch(/unsaved/i);
+    await client.close();
+  });
+
+  it("a run of small edits without end is stopped at its time, and answered soon after", async () => {
+    const { client, run, read } = await opened("01-mutual-nda", { ms: 2000, calls: 1e9 });
+    const before = await read();
+    const started = Date.now();
+    const endless = await run(
+      'const h = doc.blocks()[2].handle; for (;;) doc.insertAfter(h, "x");',
+    );
+    expect(endless.refused).toBe(true);
+    expect(endless.text).toMatch(/^The script was stopped\. It did not finish in 2 seconds\./);
+    // Its time, and the taking back of what it did in that time.
+    expect(Date.now() - started).toBeLessThan(2000 + 4000);
+    expect(await read()).toBe(before);
+    await client.close();
+  });
+
+  it("a failed run leaves no style behind, and control characters out of its answer", async () => {
+    const { client, run, saved } = await opened("01-mutual-nda");
+    const styles = (await importDocx(readFileSync(new URL("01-mutual-nda.docx", CORPUS)))).document
+      .styles.length;
+    const failed = await run(`const h = doc.blocks()[2].handle;
+for (const name of doc.styles()) { try { doc.setStyle(h, name) } catch (e) {} }
+console.log("a\\u001b[31mb\\u0000c\\u000cd\\te");
+throw new Error("over\\u001b[2J");`);
+    expect(failed.text.split("\n")).toEqual([
+      "The script failed at line 4: Error: over[2J",
+      "Nothing was changed: the document is as it was before the run.",
+      "Logged:",
+      "  a[31mbcd\te",
+    ]);
+    // What is saved after it is the document as it was opened: its styles too.
+    const kept = await run('return doc.comment(doc.blocks()[2].handle, "kept").comment;');
+    expect(kept.refused).toBe(false);
+    expect((await saved()).styles).toHaveLength(styles);
+    await client.close();
+  });
+});

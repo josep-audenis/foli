@@ -2488,7 +2488,15 @@ review.
   any size and parsed where the timer lives (a 2 s run held for 62 s: held to 200,000
   characters now); the value and an error's message were of any size; a call made while a
   call's name was read mixed the answers; a host error with a message that is not text
-  ended the process. Each has a test; the memory test fails without the guard.)
+  ended the process. Each has a test; the memory test fails without the guard. From the second review, which
+  drove the built server: the host's own work was not bounded, since no timer fires while the
+  server's thread works (one insert of 20,000 paragraphs ended the server; a stopped loop took
+  27 s to take back): an insert and a replace are held to 500 (`@folijs/agent`, so the plain
+  tools too), a run to 2,000 paragraphs added, and a rollback gives undo its state back
+  where it rebased every stored step; a rollback left the run in undo and a style the run
+  added in the document: both put back; the memory test passed without its guard in all but
+  one line: rewritten to count what a script got. Left, and in limitations: a paragraph
+  inserted then deleted leaves a wrong tracked change (older than this phase).)
 - [x] 16.3 `doc` over a session: reading as blocks (handle, style, text, table place,
   changed) in parts, every operation of the tools with the same argument checks, results and
   refusals as values a script can test (`if (!r.ok)`); `console.log` kept as the log. A
