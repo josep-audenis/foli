@@ -24,7 +24,7 @@ place that says what is in progress; check it before starting work.
 | 10 Tables & images       | ✅ Done                  | —                | Merged in #73–#97 (#90, the landing page, went to main); 0.5.0 on npm; two misses accepted                   |
 | 11 Sections & templates  | ✅ Done                  | —                | Merged in #100–#118 (#106, #107, #110, #112 and #113, the site, went to main); 0.6.0 on npm; misses accepted |
 | 12 Ecosystem & 1.0       | ✅ Done                  | —                | Merged in #120–#133; 1.0.0 on npm (2026-11-20); Phase 5 speed misses and manual checks accepted as 1.0 risks |
-| 13 Agent library         | In progress              | `phase-13/agent` | 13.1 done; `@folijs/mcp` (Phase 14, not planned yet) waits for it                                            |
+| 13 Agent library         | In progress              | `phase-13/agent` | 13.1–13.2 done; `@folijs/mcp` (Phase 14, not planned yet) waits for it                                       |
 
 Status values: `Ready` (dependencies met, nobody on it) · `In progress` · `In review` (PR open) ·
 `✅ Done` (merged, acceptance criteria met) · `Blocked by …`.
@@ -1943,14 +1943,39 @@ Each task is a PR on `phase-13/agent`, the build green after each.
   forbids changing a 1.x API; the peer on core is exact all the same. Size 56.2 kB gzip with
   core, budget 60.5 kB. `private` until 13.7: otherwise the next release of the
   1.x packages would bump and publish it, as their dependant.)
-- [ ] 13.2 Reading and handles: `session.read()` (the whole body, or from a handle for a number
+- [x] 13.2 Reading and handles: `session.read()` (the whole body, or from a handle for a number
   of blocks, so a long document can be read in parts) and `session.block(handle)`. Decide and
   write down the text format (a line per block: handle, style, list number, text; cells nested
   under their table), how existing tracked changes and comments by others show (as Word's
   final text, with a mark that the block has changes), and what a placeholder says. Handles are
   session ids (`b1`, `b2`…) on block start positions, moved through each transaction's
   `mapping` from `editor.subscribe`; a block made by an operation gets a handle the operation
-  returns. Property test: random operations, every live handle still resolves to its block.
+  returns. Property test: random operations, every live handle still resolves to its block. (Done:
+  `session.read({ from, limit })` gives `{ text, blocks, next }` and `session.block(handle)`
+  one block; both return a value with `ok`, a refusal carrying a `code` and a message. The
+  format, a line per block: `[b7] Clause, 1.1, changed, 2 comments: text`; in a table
+  `[b5]   r1 c1, Normal: Item` under `[b4] table, 3 rows, 2 columns`; what Foli does not model
+  `[b9] not editable: <what>`; a line break in a paragraph as ↵; a bullet as • whatever its
+  font's character. The text is the document with every change accepted (the session's editor
+  is in the `final` review view, so find agrees): deleted text and hidden text are left out, as
+  are field codes; a paragraph, row or table deleted as a tracked change is not read.
+  Shortcut: a paragraph whose mark is deleted but that keeps text is its own block,
+  where Word joins it with the next. Styles and list numbers come from core's resolver
+  (`@folijs/core/internal`). What is not text stands in brackets, where find stops too:
+  `[picture]`, `[note]`, `[page break]`, `[empty: Offer date]` for a control showing its
+  placeholder. A paragraph whose deleted mark joins it to the next is not numbered apart, as in
+  the view; one that cannot join (before a table, the last one) is still read. A handle is the
+  position after its block, its two sides moved through each transaction's mapping: a
+  paragraph's closing is Word's paragraph mark, which is what a paragraph is there. So Enter
+  leaves the handle on the text after the caret (the text before gets a new mark), a paragraph
+  joined with the next loses its handle, and accepting a deleted paragraph or rejecting an
+  inserted one leaves the blocks around under theirs. (First built on the position before the
+  block; the review of #139 showed accepting a deletion moved the dead handle onto the next
+  block.) `setDocument` forgets every handle; a block removed and brought back by undo comes
+  back without its own. Property test, 200 runs of up to 25 random tracked edits and undos: no
+  handle out of order at any step; then either `rejectAllChanges(author)` gives back every
+  block under its first handle with its first text, or `acceptAllChanges` leaves the read text
+  whole with every block under a handle it had.)
 - [ ] 13.3 Editing text: `replaceText(handle, find, replacement, { all })` (refuses on none, or
   on several without `all`, saying how many), `insertAfter` and `insertBefore(handle, paragraphs)`
   (text and an optional style each), `deleteBlock(handle)`. Each returns what changed in the
