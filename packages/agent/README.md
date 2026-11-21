@@ -33,13 +33,15 @@ every tracked change accepted:
 ```
 
 - `[b7]` is the block's **handle**: what every operation takes. It names the same block for the
-  whole session, whatever is edited around it. A block that is removed loses its handle; a new
-  block gets a new one.
+  whole session, whatever is edited around it. A new block gets a new handle; a block that is
+  removed, or joined into the one after it, loses its own. (A paragraph is its paragraph mark,
+  as in Word: Enter in the middle of one leaves the handle on the text after the caret.) Undo
+  does not bring a lost handle back: read again.
 - Then: where the block is in a table (`r1 c1`), its paragraph style, its list number, `changed`
   when it holds tracked changes, how many comments are anchored in it.
-- After the colon, the text. A line break inside a paragraph shows as `↵`, a picture as
-  `[picture]`, a note's reference as `[note]`. Deleted text, hidden text, field codes and
-  controls' placeholders are left out.
+- After the colon, the text. A line break inside a paragraph shows as `↵`. What is not text
+  stands in brackets: `[picture]`, `[note]`, `[page break]`, `[empty: Offer date]` (a content
+  control not filled in yet). Deleted text, hidden text and field codes are left out.
 - `read({ from: "b40", limit: 50 })` reads a long document in parts; `next` is the handle to go
   on from. `session.block("b7")` gives one block. `blocks` has the same as data.
 

@@ -23,7 +23,7 @@ export interface ReadOptions {
   limit?: number;
 }
 
-export interface Read {
+export interface ReadResult {
   /** The blocks as lines, each starting with its handle in brackets (`formatBlocks`). */
   text: string;
   blocks: Block[];
@@ -46,7 +46,7 @@ export interface Session {
    * The body as it would be with every tracked change accepted, a block per line. Headers,
    * footers and notes are not read. Refused when `from` names no block.
    */
-  read(options?: ReadOptions): Result<Read>;
+  read(options?: ReadOptions): Result<ReadResult>;
   /** One block by its handle. */
   block(handle: string): Result<{ block: Block; text: string }>;
 }
@@ -83,7 +83,7 @@ export function openSession(document: EditorDocument, options: SessionOptions): 
         );
   };
 
-  const read = (options: ReadOptions = {}): Result<Read> => {
+  const read = (options: ReadOptions = {}): Result<ReadResult> => {
     const { from, limit } = options;
     if (limit !== undefined && !(Number.isInteger(limit) && limit > 0))
       return refuse("invalid", "limit must be a whole number above 0.");

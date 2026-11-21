@@ -1958,15 +1958,24 @@ Each task is a PR on `phase-13/agent`, the build green after each.
   `[b9] not editable: <what>`; a line break in a paragraph as ↵; a bullet as • whatever its
   font's character. The text is the document with every change accepted (the session's editor
   is in the `final` review view, so find agrees): deleted text and hidden text are left out, as
-  are field codes and controls' placeholders; a paragraph or row deleted as a tracked change is
-  not read. Shortcut: a paragraph whose mark is deleted but that keeps text is its own block,
+  are field codes; a paragraph, row or table deleted as a tracked change is not read.
+  Shortcut: a paragraph whose mark is deleted but that keeps text is its own block,
   where Word joins it with the next. Styles and list numbers come from core's resolver
-  (`@folijs/core/internal`). A handle holds the position before its block and is moved with the
-  position after the block's opening: when a transaction deletes either or parts them, the
-  block was removed or joined away and the handle goes. Enter at a paragraph's start leaves the
-  handle on the empty paragraph before the text. Property test: after up to 25 random tracked
-  edits and undos, no handle is out of order, and `rejectAllChanges(author)` gives back every
-  block under its first handle with its first text.)
+  (`@folijs/core/internal`). What is not text stands in brackets, where find stops too:
+  `[picture]`, `[note]`, `[page break]`, `[empty: Offer date]` for a control showing its
+  placeholder. A paragraph whose deleted mark joins it to the next is not numbered apart, as in
+  the view; one that cannot join (before a table, the last one) is still read. A handle is the
+  position after its block, its two sides moved through each transaction's mapping: a
+  paragraph's closing is Word's paragraph mark, which is what a paragraph is there. So Enter
+  leaves the handle on the text after the caret (the text before gets a new mark), a paragraph
+  joined with the next loses its handle, and accepting a deleted paragraph or rejecting an
+  inserted one leaves the blocks around under theirs. (First built on the position before the
+  block; the review of #139 showed accepting a deletion moved the dead handle onto the next
+  block.) `setDocument` forgets every handle; a block removed and brought back by undo comes
+  back without its own. Property test, 200 runs of up to 25 random tracked edits and undos: no
+  handle out of order at any step; then either `rejectAllChanges(author)` gives back every
+  block under its first handle with its first text, or `acceptAllChanges` leaves the read text
+  whole with every block under a handle it had.)
 - [ ] 13.3 Editing text: `replaceText(handle, find, replacement, { all })` (refuses on none, or
   on several without `all`, saying how many), `insertAfter` and `insertBefore(handle, paragraphs)`
   (text and an optional style each), `deleteBlock(handle)`. Each returns what changed in the

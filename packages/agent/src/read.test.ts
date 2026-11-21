@@ -1,5 +1,7 @@
 import {
+  acceptAllChanges,
   deleteSelection,
+  findAll,
   insertText,
   joinBackward,
   rejectAllChanges,
@@ -52,6 +54,7 @@ describe("read", () => {
       style: "heading 1",
       number: "1.",
       text: "Definitions and interpretation",
+      depth: 0,
       changed: false,
       comments: 0,
     });
@@ -97,6 +100,66 @@ describe("read", () => {
     expect(rest.next).toBeNull();
   });
 
+  it("reads a part that starts inside a nested table as the whole read has it", async () => {
+    const session = await open("06-price-schedule");
+    const all = read(session);
+    const first = read(session, { limit: 17 });
+    const rest = read(session, { from: first.next as string });
+    expect(rest.text.split("\n")[0]).toBe("[b18]     r1 c2, Normal: 37.50");
+    expect(`${first.text}\n${rest.text}`).toBe(all.text);
+    expect(session.block("b18")).toMatchObject({
+      text: "[b18]     r1 c2, Normal: 37.50",
+      block: { depth: 2 },
+    });
+  });
+
+  it("shows what is not text in brackets, where find stops too", async () => {
+    const session = await open("01-mutual-nda");
+    const { editor } = session;
+    const title = read(session).blocks[0] as Block;
+    expect(findAll(editor, "MUTUAL NON-DISCLOSURE", { matchCase: true })).toHaveLength(1);
+    const { schema } = editor.state;
+    editor.dispatch(editor.state.tr.insert(8, schema.node("pageBreak")).setMeta(untracked, true));
+    expect(session.block(title.handle)).toMatchObject({
+      block: { text: "MUTUAL [page break]NON-DISCLOSURE AGREEMENT" },
+    });
+    // The text either side is found; text across the break is not, and does not read as one.
+    expect(findAll(editor, "MUTUAL NON-DISCLOSURE", { matchCase: true })).toHaveLength(0);
+    expect(findAll(editor, "NON-DISCLOSURE AGREEMENT", { matchCase: true })).toHaveLength(1);
+
+    const template = await open("03-offer-letter-template");
+    const lines = read(template).text.split("\n");
+    expect(lines[1]).toBe("[b2] Normal: Date: [empty: Offer date]");
+    expect(lines[4]).toBe("[b5] Normal: Position: [empty: Position]");
+  });
+
+  it("reads content Foli does not model as a block that is not editable", async () => {
+    const session = await open("01-mutual-nda");
+    const before = read(session).blocks;
+    const { editor } = session;
+    const { schema } = editor.state;
+    const at = start(session, before[2] as Block);
+    const other = schema.node("opaqueBlock", { xml: "<w:customXml/>", label: "w:customXml" });
+    editor.dispatch(editor.state.tr.insert(at, other).setMeta(untracked, true));
+    const after = read(session);
+    expect(after.blocks[2]).toMatchObject({ kind: "other", text: "w:customXml", depth: 0 });
+    const handle = (after.blocks[2] as Block).handle;
+    expect(after.text.split("\n")[2]).toBe(`[${handle}] not editable: w:customXml`);
+    // Its neighbours keep their handles; it keeps its own when they go, and goes alone.
+    expect(after.blocks[1]?.handle).toBe(before[1]?.handle);
+    expect(after.blocks[3]?.handle).toBe(before[2]?.handle);
+    const next = start(session, before[2] as Block);
+    const size = editor.state.doc.nodeAt(next)?.nodeSize ?? 0;
+    editor.dispatch(editor.state.tr.delete(next, next + size).setMeta(untracked, true));
+    expect(session.block(handle)).toMatchObject({ ok: true, block: { kind: "other" } });
+    expect(session.block((before[2] as Block).handle)).toMatchObject({ code: "gone" });
+    editor.dispatch(editor.state.tr.delete(next - 1, next).setMeta(untracked, true));
+    expect(session.block(handle)).toMatchObject({ ok: false, code: "gone" });
+    expect(read(session).blocks.map((b) => b.handle)).toEqual(
+      before.filter((_, i) => i !== 2).map((b) => b.handle),
+    );
+  });
+
   it("gives one block, and the same handles on a second read", async () => {
     const session = await open("01-mutual-nda");
     const first = read(session);
@@ -138,10 +201,15 @@ describe("handles", () => {
     const again = after.find((b) => b.handle === purpose.handle) as Block;
     expect(again.text).toContain("means the evaluation of a possible supply");
     expect(again.changed).toBe(true);
-    // The split made one more block, with a handle no block had.
+    // The split made one more block, with a handle no block had: the text before the caret.
+    // The paragraph's own mark, and so its handle, stay with what comes after.
     expect(after).toHaveLength(before.length + 1);
     const made = after.filter((b) => !before.some((o) => o.handle === b.handle));
     expect(made).toHaveLength(1);
+    expect(made[0]?.text).toBe("each ");
+    expect(after.find((b) => b.handle === byText(before, "each a").handle)?.text).toBe(
+      'a "Party" and together the "Parties".',
+    );
     // Every other block is still under its handle, in the same order.
     expect(after.filter((b) => b !== made[0]).map((b) => b.handle)).toEqual(
       before.map((b) => b.handle),
@@ -174,7 +242,22 @@ describe("handles", () => {
     expect(after.slice(8).map((b) => b.handle)).toEqual(before.slice(7).map((b) => b.handle));
   });
 
-  it("go with a block that is removed or joined into the one before", async () => {
+  it("stay with the text when Enter is pressed at a paragraph's start", async () => {
+    const session = await open("01-mutual-nda");
+    const before = read(session).blocks;
+    const { editor } = session;
+    const target = before[6] as Block;
+    editor.select(start(session, target) + 1);
+    editor.run(splitBlock);
+    const after = read(session).blocks;
+    expect(after[6]).toMatchObject({ text: "" });
+    expect(after[6]?.handle).not.toBe(target.handle);
+    expect(after[7]).toMatchObject({ handle: target.handle, text: target.text });
+    editor.run(rejectAllChanges("Agent"));
+    expect(read(session).blocks).toEqual(before);
+  });
+
+  it("go with a block that is removed, or joined with the one after", async () => {
     const session = await open("01-mutual-nda");
     const blocks = read(session).blocks;
     const { editor } = session;
@@ -191,12 +274,72 @@ describe("handles", () => {
       block: { text: (blocks[5] as Block).text },
     });
 
+    // Two paragraphs joined: the first one's mark goes, the joined paragraph ends with the
+    // second one's.
+    const first = blocks[8] as Block;
     const joinAt = start(session, joined);
     editor.dispatch(editor.state.tr.delete(joinAt - 1, joinAt + 1).setMeta(untracked, true));
-    expect(session.block(joined.handle)).toMatchObject({ ok: false, code: "gone" });
-    expect(session.read({ from: joined.handle })).toMatchObject({ ok: false, code: "gone" });
-    const merged = session.block((blocks[8] as Block).handle);
-    expect(merged.ok && merged.block.text).toBe((blocks[8] as Block).text + joined.text);
+    expect(session.block(first.handle)).toMatchObject({ ok: false, code: "gone" });
+    expect(session.read({ from: first.handle })).toMatchObject({ ok: false, code: "gone" });
+    const merged = session.block(joined.handle);
+    expect(merged.ok && merged.block.text).toBe(first.text + joined.text);
+  });
+
+  it("stay on the blocks around a deleted paragraph when the deletion is accepted", async () => {
+    for (const how of ["node", "selection"]) {
+      const session = await open("01-mutual-nda");
+      const blocks = read(session).blocks;
+      const { editor } = session;
+      const clause = byText(blocks, "Clause headings do not affect");
+      const heading = byText(blocks, "Obligations of confidentiality");
+      const at = start(session, clause);
+      if (how === "node") {
+        const size = editor.state.doc.nodeAt(at)?.nodeSize ?? 0;
+        editor.dispatch(editor.state.tr.delete(at, at + size));
+      } else {
+        editor.select(at + 1, start(session, heading) + 1);
+        editor.run(deleteSelection);
+      }
+      const tracked = read(session).blocks;
+      expect(tracked.map((b) => b.handle)).toEqual(
+        blocks.filter((b) => b !== clause).map((b) => b.handle),
+      );
+      expect(editor.run(acceptAllChanges())).toBe(true);
+      // Accepting changes nothing of what was read: same blocks, same handles, same numbers.
+      expect(read(session).blocks).toEqual(tracked);
+      expect(session.block(clause.handle)).toMatchObject({ ok: false, code: "gone" });
+      expect(session.block(heading.handle)).toMatchObject({
+        block: { text: "Obligations of confidentiality", style: "heading 1", number: "2." },
+      });
+    }
+  });
+
+  it("number what follows a deleted paragraph mark as the joined text will be", async () => {
+    const session = await open("01-mutual-nda");
+    const blocks = read(session).blocks;
+    const { editor } = session;
+    const heading = byText(blocks, "Obligations of confidentiality");
+    const next = byText(blocks, "Each Party shall keep");
+    expect(next.number).toBe("2.1");
+    // The end of clause 1.2 and its mark deleted: the heading will run on in clause 1.2.
+    const at = start(session, heading);
+    editor.select(at - 8, at + 1);
+    editor.run(deleteSelection);
+    const tracked = read(session).blocks;
+    expect(tracked.find((b) => b.handle === heading.handle)?.number).toBeUndefined();
+    expect(tracked.find((b) => b.handle === next.handle)?.number).toBe("1.3");
+    editor.run(acceptAllChanges());
+    expect(session.block(next.handle)).toMatchObject({ block: { number: "1.3" } });
+  });
+
+  it("are forgotten when the editor is given another document", async () => {
+    const session = await open("01-mutual-nda");
+    const blocks = read(session).blocks;
+    session.editor.setDocument((await corpus("05-business-letter")).document);
+    expect(session.block("b1")).toMatchObject({ ok: false, code: "gone" });
+    const letter = read(session).blocks;
+    expect(letter.some((b) => blocks.some((o) => o.handle === b.handle))).toBe(false);
+    expect(letter[0]?.handle).toBe(`b${blocks.length + 1}`);
   });
 
   it("a block deleted as a tracked change is not read; rejecting brings it back under its handle", async () => {
@@ -215,7 +358,7 @@ describe("handles", () => {
     expect(read(session).blocks).toEqual(blocks);
   });
 
-  it("after any tracked edits, rejecting them gives every block back under its handle", async () => {
+  it("after any tracked edits, rejecting gives every block back under its handle, and accepting leaves each handle on its text", async () => {
     const { document } = await corpus("01-mutual-nda");
     const fraction = fc.double({ min: 0, max: 0.999, noNaN: true });
     const edit = fc.record({
@@ -224,8 +367,9 @@ describe("handles", () => {
       at: fraction,
       to: fraction,
     });
+    const edits = fc.array(edit, { minLength: 1, maxLength: 25 });
     fc.assert(
-      fc.property(fc.array(edit, { minLength: 1, maxLength: 25 }), (edits) => {
+      fc.property(edits, fc.boolean(), (edits, accept) => {
         const session = openSession(document, { author: "Agent" });
         const { editor } = session;
         const original = read(session).blocks;
@@ -262,10 +406,24 @@ describe("handles", () => {
           const kept = now.filter((h) => first.has(h));
           expect(kept).toEqual(original.map((b) => b.handle).filter((h) => kept.includes(h)));
         }
-        editor.run(rejectAllChanges("Agent"));
-        expect(read(session).blocks).toEqual(original);
+        if (!accept) {
+          editor.run(rejectAllChanges("Agent"));
+          expect(read(session).blocks).toEqual(original);
+          return;
+        }
+        // Accepting joins paragraphs whose marks were deleted and changes nothing else that is
+        // read: the same text in all, each block that is left under a handle it had, holding
+        // what that handle's block held (after what joined it).
+        const tracked = read(session).blocks;
+        editor.run(acceptAllChanges());
+        const accepted = read(session).blocks;
+        expect(accepted.map((b) => b.text).join("")).toBe(tracked.map((b) => b.text).join(""));
+        for (const block of accepted) {
+          const was = tracked.find((b) => b.handle === block.handle);
+          expect(was && block.text.endsWith(was.text)).toBe(true);
+        }
       }),
-      { numRuns: 40 },
+      { numRuns: 200 },
     );
   }, 60_000);
 });

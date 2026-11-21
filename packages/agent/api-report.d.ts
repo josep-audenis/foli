@@ -6,7 +6,7 @@ export {};
 // index.d.ts
 export { type Block, formatBlocks } from "./read.js";
 export type { Ok, Refusal, Result } from "./result.js";
-export { openSession, type Read, type ReadOptions, type Session, type SessionOptions, } from "./session.js";
+export { openSession, type ReadOptions, type ReadResult, type Session, type SessionOptions, } from "./session.js";
 
 // read.d.ts
 /** A block as an agent reads it: the document as it would be with every change accepted. */
@@ -20,10 +20,11 @@ export interface Block {
     /** A numbered or bulleted paragraph's marker, as Word shows it ("1.", "(a)", "•"). */
     number?: string;
     /**
-     * A paragraph's text: tabs as tabs, line breaks as "\n", a picture as "[picture]", a note's
-     * reference as "[note]", other objects as "[object]". Text deleted as a tracked change and
-     * hidden text are left out, as are field codes and controls' placeholders. A table: "".
-     * Other: what it is.
+     * A paragraph's text: tabs as tabs, line breaks as "\n". What is not text stands in brackets:
+     * "[picture]", "[note]" (a note's reference), "[page break]", "[column break]", "[empty: Offer
+     * date]" (a content control showing its placeholder, by its title), "[object]". Text deleted
+     * as a tracked change, hidden text and field codes are left out. A table: "". Other: what it
+     * is.
      */
     text: string;
     /** A table's size: its rows, and the cells of its longest row. */
@@ -35,6 +36,8 @@ export interface Block {
         row: number;
         column: number;
     };
+    /** How many tables it is inside: 0 in the body. */
+    depth: number;
     /** It holds tracked changes not yet accepted or rejected (anyone's). */
     changed: boolean;
     /** How many comments are anchored in it. */
@@ -84,7 +87,7 @@ export interface ReadOptions {
     /** At most this many blocks. Default: all of them. */
     limit?: number;
 }
-export interface Read {
+export interface ReadResult {
     /** The blocks as lines, each starting with its handle in brackets (`formatBlocks`). */
     text: string;
     blocks: Block[];
@@ -106,7 +109,7 @@ export interface Session {
      * The body as it would be with every tracked change accepted, a block per line. Headers,
      * footers and notes are not read. Refused when `from` names no block.
      */
-    read(options?: ReadOptions): Result<Read>;
+    read(options?: ReadOptions): Result<ReadResult>;
     /** One block by its handle. */
     block(handle: string): Result<{
         block: Block;
