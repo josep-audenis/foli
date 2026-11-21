@@ -7,6 +7,10 @@ import { formatBlocks, type Result } from "@folijs/agent";
 import type { OpenDocument } from "./documents.js";
 import type { ToolResult } from "./protocol.js";
 import { type Host, runScript, SANDBOX_LIMITS, type SandboxLimits, StopRun } from "./sandbox.js";
+import { MAX_GROWTH, weight } from "./weight.js";
+
+/** @internal What a tool says when its edit would make the document heavier than it may be. */
+export const HEAVY = `That would make the document more than ${MAX_GROWTH / 1_000_000} million characters larger than it was when opened, as it would be saved: a session is held to that. Nothing was changed. Save it, close it and open the saved file to go on.`;
 
 /** The methods of `doc`, by name: what a script may call. */
 const METHODS = [
@@ -145,6 +149,7 @@ export async function runCode(
       throw new StopRun(
         `Its calls gave the document more than ${RUN_TEXT} characters: a run is held to that. Do the work in several runs.`,
       );
+    if (weight(session) > document.heaviest) throw new StopRun(HEAVY);
     if (session.editor.state.doc.content.size - size > RUN_GROWTH || inserted > RUN_BLOCKS)
       throw new StopRun(
         `It added more than ${RUN_BLOCKS} paragraphs or ${RUN_GROWTH} characters to the document: a run is held to that. Do the work in several runs.`,
@@ -227,6 +232,12 @@ export async function runCode(
     return { text: `${what}\n${back}${said}`, isError: true };
   }
 
+  // What its last call did is weighed too: the check before each call has not seen it.
+  if (weight(session) > document.heaviest) {
+    point.rollback();
+    document.dirty = dirty;
+    return { text: `The script was stopped. ${HEAVY}${said}`, isError: true };
+  }
   point.release();
   // JSON has no line end of its own; a script that replaced JSON.stringify may return any text.
   const returned = oneLine(ran.value);

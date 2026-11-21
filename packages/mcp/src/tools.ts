@@ -3,11 +3,12 @@
  * returns is the library's own text; its refusals come back for the model to act on.
  */
 import type { Control, Session } from "@folijs/agent";
-import { DOC_TYPES, runCode } from "./code.js";
+import { DOC_TYPES, HEAVY, runCode } from "./code.js";
 import type { Documents, OpenDocument } from "./documents.js";
 import type { Tool, ToolResult } from "./protocol.js";
 import type { SandboxLimits } from "./sandbox.js";
 import type { JsonSchema, JsonSchemaOrAny } from "./schema.js";
+import { weight } from "./weight.js";
 
 /** @internal Blocks a `read` gives when it is not told how many. */
 export const READ_LIMIT = 200;
@@ -92,10 +93,21 @@ export function tools(documents: Documents, code: SandboxLimits | false = false)
     run(a) {
       const document = documents.get(a.document);
       if (!("session" in document)) return document;
-      const before = document.session.editor.state.doc;
-      const result = run(document.session, a, document);
+      const { session } = document;
+      const before = session.editor.state.doc;
+      const dirty = document.dirty;
+      const point = session.checkpoint();
+      const result = run(session, a, document);
+      // A document is held to a weight, whatever made it heavier: what would pass it is
+      // taken back.
+      if (weight(session) > document.heaviest) {
+        point.rollback();
+        document.dirty = dirty;
+        return { text: HEAVY, isError: true };
+      }
+      point.release();
       // Whatever the tool answered: an edit made is an edit to save.
-      if (document.session.editor.state.doc !== before) document.dirty = true;
+      if (session.editor.state.doc !== before) document.dirty = true;
       return result;
     },
   });

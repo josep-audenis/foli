@@ -2513,7 +2513,11 @@ review.
   190 million characters, then a save that failed), and then the document's own fields (a
   thousand date pictures of 50,000 characters: 90 million characters from an update with no
   arguments). So core's `updateFields` takes `maxWritten`, counts what the results hold as it
-  works them out, and changes nothing past it; the agent gives it 300,000.)
+  works them out, and changes nothing past it; the agent gives it 300,000. Its re-check found
+  a reference copying its bookmark's formatting (60 KB a run, 2,000 references: a save that
+  ended the server): core now counts results as JSON, and the server holds every open
+  document to a weight, 16 million characters past what it was when opened, every tool call
+  and run taken back past it.)
 - [x] 16.3 `doc` over a session: reading as blocks (handle, style, text, table place,
   changed) in parts, every operation of the tools with the same argument checks, results and
   refusals as values a script can test (`if (!r.ok)`); `console.log` kept as the log. A

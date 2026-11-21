@@ -213,6 +213,27 @@ describe("updateFields' maxWritten (a review of code mode, #175)", () => {
         "references to a bookmark",
         [p(...bm(1, "Big", "x".repeat(20_000))), ...many(50, "REF Big")],
       ],
+      [
+        // Short text, heavy formatting: what a position count did not see.
+        "references to formatting",
+        [
+          p(
+            ...bm(
+              1,
+              "Heavy",
+              ...Array.from({ length: 20 }, (_, i) =>
+                t(String(i % 10), [
+                  {
+                    type: "runExt",
+                    attrs: { xml: `<w:rPr><w:lang w:val="${"x".repeat(20_000)}"/></w:rPr>` },
+                  },
+                ]),
+              ),
+            ),
+          ),
+          ...many(50, "REF Heavy"),
+        ],
+      ],
     ] as const) {
       const editor = open([...content]);
       const before = editor.getDocument();

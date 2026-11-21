@@ -155,6 +155,19 @@ that operation's time once.
 A hosted or shared server would want the run in another process; this one serves one client
 on its own machine.
 
+### The document's weight
+
+Each of the four reviews found another way for a call within every limit of its own to make
+a document far heavier: a replacement times its places, a merge value times its fields, a
+date picture, a reference copying its bookmark's formatting (which takes no positions, so a
+count of positions did not see it either). The server now holds every open document to a
+weight: about the characters of its JSON, body, stories and comments, attributes and marks
+included, cached per node so weighing again costs what an edit changed (`weight.ts`). It may
+grow 16 million characters past what it weighed when opened. Every tool call is made inside a
+checkpoint and taken back when it would pass that; a run checks it before each call to `doc`
+and at its end. The limits of each operation stay (they keep one call quick); this one keeps
+the document something a save can write.
+
 ### All or nothing
 
 A run that throws, or meets a limit, leaves the document as it was before the run: the

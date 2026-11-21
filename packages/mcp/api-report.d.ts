@@ -124,3 +124,6 @@ export declare function foliServer(options: FoliServerOptions): ServerOptions;
 
 // tools.d.ts
 export {};
+
+// weight.d.ts
+export {};

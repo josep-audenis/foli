@@ -7,6 +7,7 @@ import { openSession, type Session } from "@folijs/agent";
 import { type DocxPackage, exportDocx, importDocx } from "@folijs/docx";
 import { type FileRules, read, same, shown, stamp, standing, target, write } from "./files.js";
 import type { ToolResult } from "./protocol.js";
+import { MAX_GROWTH, weight } from "./weight.js";
 
 /**
  * @internal
@@ -37,6 +38,8 @@ export interface OpenDocument {
   dirty: boolean;
   /** Its body's size when opened, in positions: its share of `MAX_OPEN_SIZE`. */
   size: number;
+  /** The weight (`weight.ts`) it may not go past: what it weighed when opened, and `MAX_GROWTH`. */
+  heaviest: number;
 }
 
 /** A reader's error on one line: its message may hold a name from the file. */
@@ -121,6 +124,7 @@ export class Documents {
       package: pkg,
       dirty: false,
       size,
+      heaviest: weight(session) + MAX_GROWTH,
     };
     // What `state.doc` does not show: a header's or footer's field updated, its control filled.
     session.editor.subscribe((_state, transactions) => {

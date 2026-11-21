@@ -644,7 +644,13 @@ function spend(run: Run, size: number): void {
     );
 }
 
-const sizeOf = (nodes: readonly Node[]) => nodes.reduce((sum, node) => sum + node.nodeSize, 0);
+/**
+ * What results hold as the document is saved: their JSON, formatting included. A position
+ * count would miss what a mark or an attribute carries (a run's kept XML, a picture), which a
+ * reference copies with its bookmark's text.
+ */
+const sizeOf = (nodes: readonly Node[]) =>
+  nodes.reduce((sum, node) => sum + JSON.stringify(node.toJSON()).length, 0);
 
 const PAGE_FIELDS = new Set(["PAGE", "NUMPAGES", "SECTIONPAGES"]);
 const VALUE_FIELDS = new Set([...PAGE_FIELDS, "DATE", "TIME", "SEQ", "MERGEFIELD"]);
@@ -1077,9 +1083,12 @@ function updateTree(run: Run): void {
           report.unchanged++;
           continue;
         }
-        spend(run, worked.nodes ? sizeOf(worked.nodes) : worked.text.length);
         const marks = resultMarks(field, parseFieldInstruction(field.instruction));
-        jobs.set(field, worked.nodes ?? inlineText(schema, worked.text, marks));
+        const nodes = worked.nodes ?? inlineText(schema, worked.text, marks);
+        // The text's own length first: a result too long to make into nodes is not made.
+        if (!worked.nodes) spend(run, worked.text.length);
+        spend(run, sizeOf(nodes) - (worked.nodes ? 0 : worked.text.length));
+        jobs.set(field, nodes);
         report.updated++;
       } catch (error) {
         if (error instanceof OverBudget) throw error;

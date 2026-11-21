@@ -331,9 +331,11 @@ Unstable (0.x). Details in the [package README](../packages/agent/README.md).
   replace, fill or `updateFields` writes 300,000 characters at most, its places together.
   Comments and notes have no total of their own per document: each call is bounded, many
   calls are not.
-- What a document holds beside its body (comments, notes) is not counted in the server's
-  limit on what the open documents hold: many sessions' worth of comments can make one too
-  large to save.
+- A document may grow 16 million characters, as it would be saved, past what it was when
+  opened (`MAX_GROWTH`): a call or a run past that is taken back, and the message says to save,
+  close and open the saved file to go on. What it weighs when opened is held only by the
+  reader's limits (64 MB unpacked): a document whose fields hold long instructions can need
+  several hundred MB to open and to save.
 - A paragraph the session inserted and then deleted leaves a tracked paragraph insertion on
   the paragraph before it: rejecting every change then joins that paragraph with the next
   (found by the review of #165; not fixed).
