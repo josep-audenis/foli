@@ -197,3 +197,60 @@ describe("regressions: bookmarks", () => {
     expect(link?.attrs?.anchor).toBe("Start");
   });
 });
+
+describe("updateFields' maxWritten (a review of code mode, #175)", () => {
+  // What a document from someone else can make its fields write: far more than it holds.
+  const picture = `"${"dddd ".repeat(2000)}"`;
+  const many = (n: number, code: string) =>
+    Array.from({ length: n }, () => p(...field(code, "old")));
+  const now = new Date(Date.UTC(2026, 10, 18));
+
+  it("past it, nothing is changed and it throws", () => {
+    for (const [name, content] of [
+      ["date pictures", many(50, `DATE \\@ ${picture}`)],
+      ["a merge value", many(50, "MERGEFIELD Name")],
+      [
+        "references to a bookmark",
+        [p(...bm(1, "Big", "x".repeat(20_000))), ...many(50, "REF Big")],
+      ],
+      [
+        // Short text, heavy formatting: what a position count did not see.
+        "references to formatting",
+        [
+          p(
+            ...bm(
+              1,
+              "Heavy",
+              ...Array.from({ length: 20 }, (_, i) =>
+                t(String(i % 10), [
+                  {
+                    type: "runExt",
+                    attrs: { xml: `<w:rPr><w:lang w:val="${"x".repeat(20_000)}"/></w:rPr>` },
+                  },
+                ]),
+              ),
+            ),
+          ),
+          ...many(50, "REF Heavy"),
+        ],
+      ],
+    ] as const) {
+      const editor = open([...content]);
+      const before = editor.getDocument();
+      expect(
+        () =>
+          updateFields(editor, { now, data: { Name: "v".repeat(20_000) }, maxWritten: 300_000 }),
+        name,
+      ).toThrow(RangeError);
+      expect(editor.getDocument(), name).toEqual(before);
+    }
+  });
+
+  it("under it, or without it, the update is as it was", () => {
+    const editor = open(many(3, "MERGEFIELD Name"));
+    expect(updateFields(editor, { data: { Name: "Ada" }, maxWritten: 300_000 }).updated).toBe(3);
+    expect(paragraphs(editor)).toEqual(["Ada", "Ada", "Ada"]);
+    const unlimited = open(many(50, "MERGEFIELD Name"));
+    expect(updateFields(unlimited, { data: { Name: "v".repeat(20_000) } }).updated).toBe(50);
+  });
+});

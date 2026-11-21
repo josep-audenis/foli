@@ -346,3 +346,29 @@ let n = 0; for (;;) { doc.replaceText(h, ch(n % 2 ? 2000 : 1000), ch(n % 2 ? 100
     await client.close();
   });
 });
+
+describe("what a run's calls give (the fourth review of #165)", { timeout: 60_000 }, () => {
+  it("one call that multiplies its text is refused, and comments count against the run", async () => {
+    const { client, run, read } = await opened("01-mutual-nda");
+    const before = await read();
+    const started = Date.now();
+    const multiplied = await run(`const h = doc.blocks()[0].handle;
+const ins = doc.insertAfter(h, "a".repeat(500)).blocks[0].handle;
+return doc.replaceText(ins, "a", "x".repeat(199000), { all: true }).replaced;`);
+    expect(multiplied.refused).toBe(true);
+    expect(multiplied.text).toMatch(
+      /^The script failed at line 3: Error: That writes 99500000 characters/,
+    );
+    expect(Date.now() - started).toBeLessThan(15_000);
+    expect(await read()).toBe(before);
+
+    const comments = await run(`const h = doc.blocks()[2].handle; let n = 0;
+for (;;) { try { doc.comment(h, "c".repeat(190000) + n++) } catch (e) {} }`);
+    expect(comments.refused).toBe(true);
+    expect(comments.text).toMatch(
+      /^The script was stopped\. Its calls gave the document more than 1000000 characters/,
+    );
+    expect(await read()).toBe(before);
+    await client.close();
+  });
+});

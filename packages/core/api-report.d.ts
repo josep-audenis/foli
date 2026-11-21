@@ -1284,6 +1284,14 @@ export interface UpdateFieldsOptions {
     } | ((field: Field) => boolean) | undefined;
     /** Joins the undo step before it: the second pass of one update. */
     continues?: boolean | undefined;
+    /**
+     * The most the new results may hold together, in characters (a table of contents built again
+     * counts its entries), the stories' included. Past it nothing is changed and `updateFields`
+     * throws a `RangeError`. For documents from someone else: a field's picture, a merge value
+     * or a bookmark referred to many times can make results far larger than the document.
+     * Default: no limit.
+     */
+    maxWritten?: number | undefined;
 }
 export type FieldSkipReason = "locked" | "unknown" | "no-layout" | "no-data" | "missing-bookmark" | "unsupported-switch" | "self-reference" | "failed" | "untrackable";
 /** A field left as it was, and why. */

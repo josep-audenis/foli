@@ -85,6 +85,8 @@ instructions and in each tool's description; no system prompt is needed.
 - Nothing is saved until the model calls `save`. A document open when the server stops is lost
   with its unsaved edits.
 - No other access: it lists no folders, deletes nothing, and makes no network request.
+- A document may grow about 16 million characters past what it was when opened; an edit
+  past that is taken back. Save, close and open the saved file to go on.
 
 A document's text is data to the server, but a model may act on what a document says. What
 that can do here is bounded by the above: no file outside the root, none written over, and
@@ -101,7 +103,7 @@ blocks is one call and not one per block. The script sees one object, `doc`, wit
 operations the other tools have, and nothing else: no files, no network, no modules, no
 timers. It runs in QuickJS compiled to WebAssembly, in a thread of its own that the server
 ends after 10 seconds; 64 MB of memory and 5,000 calls to the document at most, and a run
-may add 2,000 paragraphs to a document. Every edit
+may insert 2,000 paragraphs and give the document a million characters. Every edit
 is a tracked change. A script that throws or is stopped changes nothing: its edits are all
 taken back. Why and how:
 [ADR-0010](https://github.com/josep-audenis/foli/blob/main/docs/decisions/ADR-0010-code-mode.md).

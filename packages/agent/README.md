@@ -134,7 +134,9 @@ session.updateFields({ data: { CandidateFirstName: "Ada" } });
   as it was at the checkpoint. `release()` keeps them. One or the other, once. For a batch of
   operations that must all be done or none.
 - One `insertAfter` or `insertBefore` takes 500 paragraphs at most, and one `replaceText` with
-  `all` 500 places: more is refused, to be done in parts.
+  `all` 500 places; one replace, fill or `updateFields` writes 300,000 characters at
+  most, its places together (for `updateFields`, what the fields' results hold, counted as they
+  are worked out): more is refused, to be done in parts.
 
 ## For the model
 

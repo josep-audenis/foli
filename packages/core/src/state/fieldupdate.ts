@@ -312,6 +312,14 @@ export interface UpdateFieldsOptions {
   only?: { from: number; to: number } | ((field: Field) => boolean) | undefined;
   /** Joins the undo step before it: the second pass of one update. */
   continues?: boolean | undefined;
+  /**
+   * The most the new results may hold together, in characters (a table of contents built again
+   * counts its entries), the stories' included. Past it nothing is changed and `updateFields`
+   * throws a `RangeError`. For documents from someone else: a field's picture, a merge value
+   * or a bookmark referred to many times can make results far larger than the document.
+   * Default: no limit.
+   */
+  maxWritten?: number | undefined;
 }
 
 export type FieldSkipReason =
@@ -620,7 +628,29 @@ interface Run {
   contents: boolean;
   /** Picks fields of this tree. */
   picked(field: Field): boolean;
+  /** What may still be written, shared by the body's run and the stories'. */
+  budget: { left: number };
 }
+
+/** Past `maxWritten`: no field's own failure, so it is not caught as one. */
+class OverBudget extends RangeError {}
+
+/** Counts `size` characters of results against the update's limit. */
+function spend(run: Run, size: number): void {
+  run.budget.left -= size;
+  if (run.budget.left < 0)
+    throw new OverBudget(
+      `The fields' results would hold more than ${run.options.maxWritten} characters`,
+    );
+}
+
+/**
+ * What results hold as the document is saved: their JSON, formatting included. A position
+ * count would miss what a mark or an attribute carries (a run's kept XML, a picture), which a
+ * reference copies with its bookmark's text.
+ */
+const sizeOf = (nodes: readonly Node[]) =>
+  nodes.reduce((sum, node) => sum + JSON.stringify(node.toJSON()).length, 0);
 
 const PAGE_FIELDS = new Set(["PAGE", "NUMPAGES", "SECTIONPAGES"]);
 const VALUE_FIELDS = new Set([...PAGE_FIELDS, "DATE", "TIME", "SEQ", "MERGEFIELD"]);
@@ -1054,9 +1084,14 @@ function updateTree(run: Run): void {
           continue;
         }
         const marks = resultMarks(field, parseFieldInstruction(field.instruction));
-        jobs.set(field, worked.nodes ?? inlineText(schema, worked.text, marks));
+        const nodes = worked.nodes ?? inlineText(schema, worked.text, marks);
+        // The text's own length first: a result too long to make into nodes is not made.
+        if (!worked.nodes) spend(run, worked.text.length);
+        spend(run, sizeOf(nodes) - (worked.nodes ? 0 : worked.text.length));
+        jobs.set(field, nodes);
         report.updated++;
       } catch (error) {
+        if (error instanceof OverBudget) throw error;
         skip(run, field, "failed", (error as Error).message);
       }
     }
@@ -1085,6 +1120,7 @@ function updateTree(run: Run): void {
     try {
       rebuildContents(run, i);
     } catch (error) {
+      if (error instanceof OverBudget) throw error;
       skip(run, field, "failed", (error as Error).message);
     }
   }
@@ -1382,6 +1418,7 @@ function rebuildContents(run: Run, index: number): void {
       content,
     );
   });
+  spend(run, sizeOf(paragraphs));
   if (!layout)
     report.skipped.push({ instruction: field.instruction, story: null, reason: "no-layout" });
   if (!paragraphs.length) {
@@ -1540,6 +1577,7 @@ export function updateFields(editor: Editor, options: UpdateFieldsOptions = {}):
       envelope: word.envelope,
       numbers: new Map(),
       contents,
+      budget: { left: options.maxWritten ?? Number.POSITIVE_INFINITY },
       picked: (field) => {
         if (typeof only === "function") return only(field);
         if (!picks) return true;
@@ -1624,6 +1662,7 @@ function placeField(
     numbers: new Map(),
     contents: true,
     picked: (field) => field.from === pos,
+    budget: { left: Number.POSITIVE_INFINITY },
   };
   updateTree(run);
   if (run.envelope !== word.envelope) withEnvelope(tr, run.envelope);

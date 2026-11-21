@@ -14,6 +14,7 @@ import { describe, expect, it } from "vitest";
 import { runCode } from "./code.js";
 import type { OpenDocument } from "./documents.js";
 import { SANDBOX_LIMITS } from "./sandbox.js";
+import { MAX_GROWTH, weight } from "./weight.js";
 
 const CORPUS = new URL("../../../corpus/word/", import.meta.url);
 const LIMITS = { ...SANDBOX_LIMITS, ms: 20_000, memory: 32 * 1024 * 1024, calls: 400 };
@@ -34,7 +35,15 @@ async function open(name: string): Promise<OpenDocument> {
     new Uint8Array(readFileSync(new URL(`${name}.docx`, CORPUS))),
   );
   const session = openSession(document, { author: "Agent" });
-  return { id: "d1", file: name, session, package: pkg, dirty: false, size: 0 };
+  return {
+    id: "d1",
+    file: name,
+    session,
+    package: pkg,
+    dirty: false,
+    size: 0,
+    heaviest: weight(session) + MAX_GROWTH,
+  };
 }
 
 // A value a script may pass: a real handle (H is every handle, set at the script's start), a

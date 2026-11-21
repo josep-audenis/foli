@@ -11,7 +11,7 @@ import {
   setControlValue,
   updateFields as updateFieldsOf,
 } from "@folijs/core";
-import { type Changed, type Context, changed } from "./operations.js";
+import { type Changed, type Context, changed, MAX_WRITTEN } from "./operations.js";
 import { oneLine, readBlocks } from "./read.js";
 import { type Refusal, type Result, refuse } from "./result.js";
 
@@ -167,6 +167,11 @@ export function fillControl(
         : "The document has no content controls.",
     );
   }
+  if (typeof value === "string" && targets.length * value.length > MAX_WRITTEN)
+    return refuse(
+      "invalid",
+      `That writes ${targets.length * value.length} characters into ${targets.length} controls: one fill writes ${MAX_WRITTEN} at most.`,
+    );
   const filled: string[] = [];
   const unfilled: Unfilled[] = [];
   for (const control of targets) {
@@ -238,18 +243,38 @@ export function updateFields(
     (f) => f.name === "TOC" && !f.deleted && !inContents(f.parent),
   ).length;
   const before = context.editor.state.doc;
-  const rest = updateFieldsOf(context.editor, {
-    ...(given ? { data: given } : {}),
-    only: (field: Field) => !inContents(field),
-  });
+  // What fields write is held by core as it works them out, not guessed from here: a merge
+  // value, a picture or a bookmark referred to a thousand times writes far more than it is.
+  let rest: FieldsReport;
+  try {
+    rest = updateFieldsOf(context.editor, {
+      ...(given ? { data: given } : {}),
+      only: (field: Field) => !inContents(field),
+      maxWritten: MAX_WRITTEN,
+    });
+  } catch (error) {
+    if (!(error instanceof RangeError)) throw error;
+    return refuse(
+      "invalid",
+      `The fields' results would write more than ${MAX_WRITTEN} characters: one update writes that at most. Nothing was changed. Give shorter values, or fill the fields with replace_text.`,
+    );
+  }
   // The tables apart, after the rest: the page numbers of entries about to be replaced are
   // not among those "left as they were".
-  const built = rebuild
-    ? updateFieldsOf(context.editor, {
+  let tooLarge = false;
+  let built: FieldsReport | null = null;
+  if (rebuild)
+    try {
+      built = updateFieldsOf(context.editor, {
         only: (field: Field) => field.name === "TOC",
         continues: context.editor.state.doc !== before,
-      })
-    : null;
+        maxWritten: MAX_WRITTEN,
+      });
+    } catch (error) {
+      if (!(error instanceof RangeError)) throw error;
+      // The other fields are updated; the tables are left as they are, and the answer says so.
+      tooLarge = true;
+    }
   const report: FieldsReport = built
     ? {
         updated: rest.updated + built.updated,
@@ -286,6 +311,11 @@ export function updateFields(
     ...(tables && !rebuild
       ? [
           `${count(tables, "table of contents", "tables of contents")} left as ${tables === 1 ? "it is" : "they are"}: update ${tables === 1 ? "it" : "them"} in Word, or pass contents: true to build ${tables === 1 ? "its" : "their"} entries again here, with page numbers empty until Word updates them.`,
+        ]
+      : []),
+    ...(tooLarge
+      ? [
+          `The tables of contents were left as they are: built again they would write more than ${MAX_WRITTEN} characters.`,
         ]
       : []),
     ...(report.rebuilt

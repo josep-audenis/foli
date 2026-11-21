@@ -124,26 +124,49 @@ and ended the server out of memory; a loop of smaller inserts was stopped at 10 
 took 27 s to take back. Then, with those held: a script that swapped a long paragraph's text
 back and forth, adding nothing, ended the server in 14 s, because the checkpoint kept every
 step's transaction, each with its documents (465 MB for 20,000 steps); and paragraphs
-inserted in a table's cell were not counted. So:
+inserted in a table's cell were not counted. A fourth review found that one call could still
+multiply what it was given (a replace of 500 places, each with 199,000 characters: 100
+million characters in one call, 27 s and 1.35 GB), and that comment text counted against
+nothing (three runs of comments made a document that could not be saved). So:
 
 - One insert takes 500 paragraphs at most, one replace 500 places (`@folijs/agent`: the plain
-  tools are held by it too). A call is bounded by that; the timer fires between calls.
-- A run may insert 2,000 paragraphs, wherever, or add 300,000 characters; past that the
-  server ends it, whatever the script catches (`StopRun`).
+  tools are held by it too), and one operation writes 300,000 characters at most, its places
+  together (a replacement times its places, a value times the controls that take it, and what a field
+  update's results hold together, counted by core as it works them out: a merge value, a
+  date or number picture, a bookmark referred to by many fields, a table of contents, in the
+  body and the stories alike). A
+  call is bounded by that; the timer fires between calls.
+- A run may insert 2,000 paragraphs, wherever, add 300,000 characters to the body, and give
+  its calls a million characters in all (comments, values, everything but the log); past any
+  of these the server ends it, whatever the script catches (`StopRun`).
 - A rollback costs the same whatever the run did: the body is put back whole in one step,
   and only what changed beside it (a comment's text, a note, a header) is undone step by
   step. The checkpoint keeps no transaction. Undo is given back the state it had, not
   rebased.
 
-While a script runs the server answers nothing else, a `ping` included. Measured on the NDA
-with the limits as they are (Windows 11, Node 25, one run each): the back-and-forth script,
-the same followed by inserts in a cell, single inserts without end, and 1,000-character
-comments without end each answered in 10.0 to 10.2 s with the document as it was, the process
-at about 500 MB at most; inserts of 500 in a cell without end were stopped for what they added
-in 0.9 s. Measured, not proved: a script that finds an operation slow in itself would add
+While a script runs the server answers nothing else, a `ping` included. Measured with the
+limits as they are (Windows 11, Node 25, one run each, five in one process): the
+back-and-forth script, single inserts without end, and replaces at the multiplying cap
+without end each answered in 10.0 s with the document as it was; comments of 190,000
+characters without end, and every control filled without end, were stopped for what their
+calls gave in 0.1 and 0.4 s. The process stayed under 700 MB across the five. Before, inserts
+of 500 in a cell without end were stopped for what they added in 0.9 s. Measured, not proved: a script that finds an operation slow in itself would add
 that operation's time once.
 A hosted or shared server would want the run in another process; this one serves one client
 on its own machine.
+
+### The document's weight
+
+Each of the four reviews found another way for a call within every limit of its own to make
+a document far heavier: a replacement times its places, a merge value times its fields, a
+date picture, a reference copying its bookmark's formatting (which takes no positions, so a
+count of positions did not see it either). The server now holds every open document to a
+weight: about the characters of its JSON, body, stories and comments, attributes and marks
+included, cached per node so weighing again costs what an edit changed (`weight.ts`). It may
+grow 16 million characters past what it weighed when opened. Every tool call is made inside a
+checkpoint and taken back when it would pass that; a run checks it before each call to `doc`
+and at its end. The limits of each operation stay (they keep one call quick); this one keeps
+the document something a save can write.
 
 ### All or nothing
 
