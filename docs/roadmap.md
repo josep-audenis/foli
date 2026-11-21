@@ -24,7 +24,7 @@ place that says what is in progress; check it before starting work.
 | 10 Tables & images       | ✅ Done                  | —                | Merged in #73–#97 (#90, the landing page, went to main); 0.5.0 on npm; two misses accepted                   |
 | 11 Sections & templates  | ✅ Done                  | —                | Merged in #100–#118 (#106, #107, #110, #112 and #113, the site, went to main); 0.6.0 on npm; misses accepted |
 | 12 Ecosystem & 1.0       | ✅ Done                  | —                | Merged in #120–#133; 1.0.0 on npm (2026-11-20); Phase 5 speed misses and manual checks accepted as 1.0 risks |
-| 13 Agent library         | In progress              | `phase-13/agent` | 13.1–13.6 done; `@folijs/mcp` (Phase 14, not planned yet) waits for it                                       |
+| 13 Agent library         | In review                | `phase-13/agent` | 13.1–13.7 in #138–#144; 13.8, the release of 0.1.0, waits for the owner; Phase 14 not planned                |
 
 Status values: `Ready` (dependencies met, nobody on it) · `In progress` · `In review` (PR open) ·
 `✅ Done` (merged, acceptance criteria met) · `Blocked by …`.
@@ -1923,7 +1923,33 @@ differs is listed in limitations; Word opens each result and shows the changes u
 agent's name (the Word harness); the API report, size and package checks of `pnpm check` cover
 the package; README, `api.md`, `architecture.md` and the site document it, with a system-prompt
 snippet for the handle format; 0.1.0 published with the owner's approval, as 0.x: outside
-ADR-0008's 1.0 promise until Phase 14 has used it.
+ADR-0008's 1.0 promise until Phase 14 has used it. (Checked 2026-11-21, Word 16.0.20625 on
+Windows, `pnpm check` green with 75 tests in the package: its only dependency is `@folijs/core`,
+an exact peer; no DOM and no Node built-ins, checked by its build (`lib: ["ES2022"]`, no
+`types`) rather than by a test; `read` gives the body a line per block with handle, table
+place, style, list number, changes, comments and text, tables before their cells' blocks,
+what Foli does not model as `not editable`; a handle names its block through the session's
+edits, undo, and accepting or rejecting them (a property test of 200 runs of tracked edits
+made on the session's editor, and the operations' own tests; the handle is the
+block's end, Word's paragraph mark), and a handle whose block is gone is refused as `gone`;
+`replaceText`, `insertAfter`, `insertBefore`, `deleteBlock`, `setStyle`, `comment`, `controls`,
+`fillControl` and `updateFields` return values, a refusal with a code and a message, and do
+not throw on wrong arguments or a null options object; every edit is a tracked change by the author (comments are
+comments, as in Word); the three tasks pass through `importDocx` and `exportDocx`
+(`scenarios.test.ts`), with a fourth on a document Word's reviewers had redlined; rejecting
+the agent's changes gives the content back exactly for the redlines and the restyling, and
+with differences in two places, listed in limitations: a filled control and a rebuilt table
+of contents, both core's; Word opens the three results and shows every change under the agent's
+name, its accepted and rejected text Foli's (`agent-roundtrip.mjs`, 3 of 3); the API report,
+size (72.4 kB gzip with core, budget 75.7) and publint are in `pnpm check`; README, `api.md`,
+`architecture.md` and the site document it, the README with a system prompt for the handle
+format. Each task merged after an agent's review (#138–#143, this one #144), which found and
+had fixed: the
+package about to be published by the next 1.x release; handles moving to another block when a
+deleted paragraph was accepted; a nested table deleted in place of its table; inserts into a
+locked content control; a section break deleted with its empty paragraph; a restyle reported
+done in a locked control; a control filled by another's name; a Word harness that compared
+none of the edits' text. Not done: 0.1.0 is not published (task 13.8).)
 
 ### Tasks
 
@@ -2023,8 +2049,8 @@ Each task is a PR on `phase-13/agent`, the build green after each.
   content controls in order: `name` (the tag, else the title, else the id: what `fillControl`
   takes), kind, value, whether it still shows its placeholder, a list's items, whether it is
   locked, and the handle of the block it is in. A read shows an unfilled one as
-  `[empty: Offer date]` (13.2). `fillControl(name, value)` matches the tag (every control with
-  it), else the title, else the id, capitals not counting, and runs core's `setControlValue`:
+  `[empty: Offer date]` (13.2). `fillControl(name, value)` matches the id, else the tag (every
+  control with it), else the title, capitals not counting, and runs core's `setControlValue`:
   text, a list's item, `yyyy-mm-dd`, true or false; null empties. Refused with what would work:
   the controls there are, a drop-down's items, true or false for a check box, `read-only` for a
   locked one. `updateFields({ data })` runs core's `updateFields`: `data` fills merge fields
@@ -2066,10 +2092,19 @@ Each task is a PR on `phase-13/agent`, the build green after each.
   From the review of #143: the harness compared no text of the edits themselves (their
   paragraphs hold fields and were set aside) and passed on a paragraph count that differed;
   the tests' "nothing else differs" stripped more than the known differences.)
-- [ ] 13.7 Docs and release: README (also the site's guide), `api.md`, `architecture.md`,
-  `limitations.md`, the exploration note marked with what was built, acceptance checked above,
-  the changeset, `private` removed from the manifest; 0.1.0 published with the owner's
-  approval. Phase 14 planned.
+- [x] 13.7 Docs: README (also the site's guide), `api.md`, `architecture.md`,
+  `limitations.md`, the exploration note marked with what was built, acceptance checked above.
+  (Done: the README has the read format, every operation, the templates and a system prompt
+  for the model; it is the site's guide `/docs/guides/agent/`; `api.md`, `architecture.md`
+  ("Agent editing"), `limitations.md` (13.6), `benchmarks.md` (the bundle), `contributing.md`
+  and the exploration note say what was built. From the review of #144: `read` and
+  `replaceText` threw on a null options object; the README said every call returns a result
+  and that no operation throws, and its system prompt told the model never to read again,
+  which `updateFields` needs. Split from the release, 13.8.)
+- [ ] 13.8 Release: the changeset, `private` removed from the manifest, the package versioned
+  0.1.0 with its changelog, its API page and changelog on the site; 0.1.0 published with the
+  owner's approval. Its own PR, for the owner to merge; then the Release workflow. Phase 14
+  (`@folijs/mcp`) is not planned here: it starts with the owner.
 
 ## After 1.0
 
@@ -2138,7 +2173,7 @@ reduced motion respected (no fade, no smooth scroll). A requirement if pages are
 page before scrolling. Today every page is in the DOM, so a far page is reached. (An editor
 compared before 1.0 failed exactly there: pages not yet rendered could not be gone to.)
 
-**Agent editing:** the library is Phase 13 (in progress). After it, in order: an MCP
+**Agent editing:** the library is built (Phase 13; 0.1.0 not released yet). After it, in order: an MCP
 server over it as its own package (`@folijs/mcp`, Phase 14 when planned), then maybe a
 sandboxed `run(code)` tool inside that server (code mode), once someone asks for it. The hint
 above is independent and is what lets an agent show what it changed. Explored:

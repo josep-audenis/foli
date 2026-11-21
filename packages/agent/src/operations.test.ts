@@ -431,6 +431,11 @@ describe("what the review of #140 found", () => {
     });
     expect(session.replaceText(7 as never, "a", "b")).toMatchObject({ code: "invalid" });
     expect(session.deleteBlock(undefined as never)).toMatchObject({ code: "invalid" });
+    // null where an options object may be left out, as a tool call may send it.
+    expect(session.read(null as never)).toMatchObject({ ok: true });
+    expect(session.replaceText(first.handle, "A", "a", null as never)).toMatchObject({
+      code: "several-matches",
+    });
   });
 
   it("records nothing when the replacement is the text there", async () => {

@@ -29,6 +29,7 @@ export const NAV: Group[] = [
       { md: "docs/pagination.md" },
       { md: "packages/docx/README.md", title: "DOCX" },
       { md: "packages/pdf/README.md", title: "PDF" },
+      { md: "packages/agent/README.md", title: "Agents" },
       { md: "docs/guides/migrating-from-0x.md" },
     ],
   },
