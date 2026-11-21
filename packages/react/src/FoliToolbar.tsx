@@ -313,6 +313,20 @@ export interface ToolbarColorMenu extends ToolbarItemBase {
   readonly pressed?: undefined;
 }
 
+/**
+ * The toolbar's own dialogs, for `ToolbarDialog.dialog`: `"link"` (as Mod-K), `"picture"`
+ * (insert, or edit the selected one), `"insertTable"`, `"pageSetup"` (the caret's section),
+ * `"crossReference"`, `"controlProperties"` (the content control at the caret), `"noteOptions"`.
+ */
+export type ToolbarDialogName =
+  | "link"
+  | "picture"
+  | "insertTable"
+  | "pageSetup"
+  | "crossReference"
+  | "controlProperties"
+  | "noteOptions";
+
 /** What an app's dialog gets. */
 export interface ToolbarDialogProps {
   /** Where the toolbar's commands go: the header, footer or note open on its page, else the body. */
@@ -331,8 +345,12 @@ export interface ToolbarDialogProps {
  * back to its button; a disabled toolbar closes it.
  */
 export interface ToolbarDialog extends ToolbarItemBase {
-  /** The dialog's content. Rendered as a component's body: hooks are fine. */
-  readonly dialog: (props: ToolbarDialogProps) => ReactNode;
+  /**
+   * The dialog's content (rendered as a component's body: hooks are fine), or the name of one
+   * of the toolbar's own dialogs, which the button then opens as its built-in item or menu
+   * entry does. Such a button is enabled where that dialog applies, unless `enabled` says.
+   */
+  readonly dialog: ((props: ToolbarDialogProps) => ReactNode) | ToolbarDialogName;
   /** A toggle: whether the button shows as pressed. Runs after every transaction. */
   readonly pressed?: ((state: EditorState, editor: Editor) => boolean) | undefined;
   readonly command?: undefined;
@@ -418,7 +436,7 @@ interface Item extends ToolbarItemBase {
   /** An action menu button (the table menu): its commands, in order. */
   actions?: readonly Action[] | ((editor: Editor) => readonly Action[]) | undefined;
   /** A button opening a dialog: the picture's, or an app's. */
-  dialog?: "picture" | ToolbarDialog["dialog"] | undefined;
+  dialog?: ToolbarDialog["dialog"] | undefined;
   render?: ToolbarCustom["render"] | undefined;
   select?: ToolbarSelect["select"] | undefined;
 }
@@ -426,7 +444,7 @@ interface Item extends ToolbarItemBase {
 /** A built-in menu's entry: it may open a dialog or move the focus. */
 interface Action extends ToolbarAction {
   /** With `dialog`, `command` says whether it applies: the dialog does the rest. */
-  dialog?: "insertTable" | "pageSetup" | "crossReference" | "controlProperties" | "noteOptions";
+  dialog?: Exclude<ToolbarDialogName, "link" | "picture">;
   /** It takes the focus where it belongs (into a story, or back to the body). */
   movesFocus?: boolean;
 }
@@ -1325,6 +1343,19 @@ const sameStates = (a: ItemState[], b: ItemState[]) =>
       sameOptions(item.options, b[i]?.options),
   );
 
+/** Where each built-in dialog applies (cheap: these run after every transaction). */
+const DIALOG_APPLIES: Record<ToolbarDialogName, (state: EditorState) => boolean> = {
+  link: (state) => openLinkEditor(state),
+  picture: (state) =>
+    wordContext(state) !== null && (selectedPicture(state) !== null || hasTextblock(state)),
+  // The dialog says so when the caret is where no table can go.
+  insertTable: (state) => wordContext(state) !== null && hasTextblock(state),
+  pageSetup: (state) => sectionAt(state) !== null,
+  crossReference: (state) => wordContext(state) !== null,
+  controlProperties: (state) => selectedControl(state) !== null,
+  noteOptions: (state) => wordContext(state) !== null,
+};
+
 /**
  * Runs after every transaction: the built-ins' checks are O(selection), no transactions built;
  * an app's item without `enabled` gets a dry run of its command.
@@ -1336,9 +1367,11 @@ const statesOf =
       pressed: item.pressed?.(state, editor),
       enabled: item.enabled
         ? item.enabled(state, editor)
-        : item.actions
-          ? actionsOf(item, body).length > 0
-          : !item.command || editor.can(item.command),
+        : typeof item.dialog === "string"
+          ? DIALOG_APPLIES[item.dialog](state)
+          : item.actions
+            ? actionsOf(item, body).length > 0
+            : !item.command || editor.can(item.command),
       value:
         item.colors?.value(state) ??
         item.select?.value(state) ??
@@ -1446,16 +1479,8 @@ export function FoliToolbar({
   const run = (index: number, event: MouseEvent) => {
     const item = items[index];
     if (!item || disabled || !states[index]?.enabled) return;
-    if (item.dialog === "picture") {
-      const selected = selectedPicture(editor.state);
-      // Inserting needs the app's upload; editing a selected picture does not.
-      if (!selected && !upload) return;
-      closeDialogs();
-      setPictureDialog({
-        pos: selected?.pos ?? null,
-        selection: editor.state.selection,
-        restore: buttons.current[index] ?? null,
-      });
+    if (typeof item.dialog === "string") {
+      openBuiltIn(item.dialog, buttons.current[index] ?? null);
       return;
     }
     if (typeof item.dialog === "function") {
@@ -1649,6 +1674,35 @@ export function FoliToolbar({
   }, [disabled, builtInDialog, appDialogGone]);
 
   // One dialog at a time: opening one closes the rest (`keep` reopens itself, counting requests).
+  // A built-in dialog, from its menu entry or from an item that names it; the focus goes back
+  // to `restore` when it closes.
+  function openBuiltIn(name: ToolbarDialogName, restore: HTMLElement | null) {
+    const { selection } = editor.state;
+    if (name === "link") {
+      // As Mod-K: the toolbar hears the request (and keeps the focus to give back).
+      editor.run(openLinkEditor);
+    } else if (name === "picture") {
+      const selected = selectedPicture(editor.state);
+      // Inserting needs the app's upload; editing a selected picture does not.
+      if (!selected && !upload) return;
+      closeDialogs();
+      setPictureDialog({ pos: selected?.pos ?? null, selection, restore });
+    } else if (name === "insertTable") {
+      closeDialogs("table");
+      setTableDialog((current) => ({
+        restore,
+        selection,
+        request: (current?.request ?? -1) + 1,
+      }));
+    } else {
+      closeDialogs();
+      if (name === "noteOptions") setNoteDialog({ restore });
+      else if (name === "controlProperties") setControlDialog({ restore, selection });
+      else if (name === "crossReference") setReferenceDialog({ restore, selection });
+      else setSetupDialog({ restore, selection });
+    }
+  }
+
   function closeDialogs(keep?: "table") {
     setDialog(null);
     if (keep !== "table") setTableDialog(null);
@@ -1920,42 +1974,8 @@ export function FoliToolbar({
                         state={editor.state}
                         onPick={(action, pointer) => {
                           setMenu(null);
-                          if (action.dialog === "noteOptions") {
-                            closeDialogs();
-                            setNoteDialog({ restore: buttons.current[i] ?? null });
-                            return;
-                          }
-                          if (action.dialog === "controlProperties") {
-                            closeDialogs();
-                            setControlDialog({
-                              restore: buttons.current[i] ?? null,
-                              selection: editor.state.selection,
-                            });
-                            return;
-                          }
-                          if (action.dialog === "crossReference") {
-                            closeDialogs();
-                            setReferenceDialog({
-                              restore: buttons.current[i] ?? null,
-                              selection: editor.state.selection,
-                            });
-                            return;
-                          }
-                          if (action.dialog === "pageSetup") {
-                            closeDialogs();
-                            setSetupDialog({
-                              restore: buttons.current[i] ?? null,
-                              selection: editor.state.selection,
-                            });
-                            return;
-                          }
                           if (action.dialog) {
-                            closeDialogs("table");
-                            setTableDialog((current) => ({
-                              restore: buttons.current[i] ?? null,
-                              selection: editor.state.selection,
-                              request: (current?.request ?? -1) + 1,
-                            }));
+                            openBuiltIn(action.dialog, buttons.current[i] ?? null);
                             return;
                           }
                           editor.run(action.command);
@@ -2140,7 +2160,7 @@ function AppDialog({
 }: {
   label: string;
   name: string;
-  content: ToolbarDialog["dialog"];
+  content: (props: ToolbarDialogProps) => ReactNode;
   editor: Editor;
   close: ToolbarDialogProps["close"];
 }) {

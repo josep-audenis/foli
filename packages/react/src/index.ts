@@ -30,6 +30,7 @@ export {
   type ToolbarCustom,
   type ToolbarCustomProps,
   type ToolbarDialog,
+  type ToolbarDialogName,
   type ToolbarDialogProps,
   type ToolbarGroup,
   type ToolbarGroups,
