@@ -11,8 +11,6 @@ export { type Checkpoint, openSession, type ReadOptions, type ReadResult, type S
 export type { Control, Unfilled, UpdateFieldsOptions } from "./templates.js";
 
 // operations.d.ts
-import { type Editor } from "@folijs/core";
-import type { Handles } from "./handles.js";
 import { type Block } from "./read.js";
 /** A paragraph to insert: its text ("\n" or ↵ a line break, a tab a tab), in `style` if given. */
 export type NewParagraph = string | {
@@ -27,11 +25,6 @@ export interface Changed {
 export interface ReplaceOptions {
     /** Replace every place `find` is in the block. Default: refuse when there are several. */
     all?: boolean;
-}
-export interface Context {
-    editor: Editor;
-    handles: Handles;
-    author: string;
 }
 export interface CommentOptions {
     /** Text in the block to anchor the comment to, as `read` shows it. Default: the whole block. */
