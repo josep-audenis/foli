@@ -1,9 +1,14 @@
 ---
+"@folijs/core": patch
 "@folijs/react": patch
 "@folijs/mcp": patch
 ---
 
 A bug sweep of the toolbar's app items and of the MCP server, each fix with a regression test.
+
+**core**
+
+- Accepting a paragraph deleted whole before a table no longer removes it when the paragraphs before join into it, or when it is what keeps the table from another: it stays, as the same paragraph.
 
 **react**
 
