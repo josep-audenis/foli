@@ -20,8 +20,8 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { openSession } from "../../packages/agent/dist/index.js";
-import { createEditor } from "../../packages/core/dist/index.js";
 import { exportDocx, importDocx } from "../../packages/docx/dist/index.js";
+import { AUTHOR, COMMENT, EXPECT, expected } from "./agent-tasks.mjs";
 
 const [mode, dir] = process.argv.slice(2);
 if ((mode !== "make" && mode !== "check") || !dir) {
@@ -29,8 +29,6 @@ if ((mode !== "make" && mode !== "check") || !dir) {
   process.exit(2);
 }
 
-const AUTHOR = "Foli Agent";
-const COMMENT = "Extended to five years to match the supply agreement.";
 const corpus = join(import.meta.dirname, "..", "..", "corpus", "word");
 
 const done = (result) => {
@@ -46,109 +44,57 @@ function handleOf(session, text) {
   return /^\[(b\d+)\]/.exec(lines[0])[1];
 }
 
-// WdRevisionType: 1 insert, 2 delete, 10 paragraph property.
-const TASKS = {
-  "03-offer-letter-template": {
-    types: [1, 2],
-    inserted: ["1 December 2026", "Senior Data Engineer", "72,000", "Ada", "5 January 2027"],
-    deleted: ["CandidateFirstName", "StartDate"],
-    run(session) {
-      done(session.fillControl("offer_date", "2026-12-01"));
-      done(session.fillControl("position", "Senior Data Engineer"));
-      done(session.fillControl("salary", "72,000"));
-      done(session.fillControl("remote", true));
-      done(
-        session.updateFields({ data: { CandidateFirstName: "Ada", StartDate: "5 January 2027" } }),
-      );
-    },
+/** Each task's steps through the library; what Word must find of it is `EXPECT`'s. */
+const RUN = {
+  "03-offer-letter-template"(session) {
+    done(session.fillControl("offer_date", "2026-12-01"));
+    done(session.fillControl("position", "Senior Data Engineer"));
+    done(session.fillControl("salary", "72,000"));
+    done(session.fillControl("remote", true));
+    done(
+      session.updateFields({ data: { CandidateFirstName: "Ada", StartDate: "5 January 2027" } }),
+    );
   },
-  "01-mutual-nda": {
-    types: [1, 2],
-    comment: COMMENT,
-    inserted: ["five (5) years", "Signatory", "A reference to a statute includes"],
-    deleted: ["three (3) years", "Party", "the existence and terms of the discussions"],
-    run(session) {
-      const term = handleOf(session, "continues for a period of three (3) years");
-      done(session.replaceText(term, "three (3) years", "five (5) years"));
-      done(session.comment(term, COMMENT, { on: "five (5) years" }));
-      done(session.replaceText(handleOf(session, 'each a "Party"'), '"Party"', '"Signatory"'));
-      done(
-        session.insertAfter(handleOf(session, "Clause headings do not affect"), [
-          "A reference to a statute includes that statute as amended from time to time.",
-        ]),
-      );
-      done(session.deleteBlock(handleOf(session, "the existence and terms of the discussions")));
-    },
+  "01-mutual-nda"(session) {
+    const term = handleOf(session, "continues for a period of three (3) years");
+    done(session.replaceText(term, "three (3) years", "five (5) years"));
+    done(session.comment(term, COMMENT, { on: "five (5) years" }));
+    done(session.replaceText(handleOf(session, 'each a "Party"'), '"Party"', '"Signatory"'));
+    done(
+      session.insertAfter(handleOf(session, "Clause headings do not affect"), [
+        "A reference to a statute includes that statute as amended from time to time.",
+      ]),
+    );
+    done(session.deleteBlock(handleOf(session, "the existence and terms of the discussions")));
   },
-  "04-board-report": {
-    // The headings restyled; the table of contents built again from them (insertions and
-    // deletions inside its field's result).
-    types: [1, 2, 10],
-    restyled: [
-      "Executive summary",
-      "Trading performance",
-      "Sales by region",
-      "Costs",
-      "Staff costs",
-      "Decisions requested",
-      "Appendix: capital expenditure",
-    ],
-    run(session) {
-      const headings = done(session.read()).blocks.filter((b) =>
-        /^heading [123]$/.test(b.style ?? ""),
-      );
-      for (const block of headings)
-        done(session.setStyle(block.handle, `Heading ${Number(block.style.slice(-1)) + 1}`));
-      if (done(session.updateFields()).rebuilt !== 1) throw new Error("no table of contents");
-    },
+  "04-board-report"(session) {
+    const headings = done(session.read()).blocks.filter((b) =>
+      /^heading [123]$/.test(b.style ?? ""),
+    );
+    for (const block of headings)
+      done(session.setStyle(block.handle, `Heading ${Number(block.style.slice(-1)) + 1}`));
+    if (done(session.updateFields()).rebuilt !== 1) throw new Error("no table of contents");
   },
 };
 
-/** A paragraph's text as Word's Range.Text gives it (an inline picture is "/"). */
-const textOf = (p) =>
-  (p.content ?? [])
-    .map((n) => {
-      if (n.type === "text") return n.text;
-      if (n.type === "tab") return "\t";
-      if (n.type === "hardBreak") return "\n";
-      return n.type === "picture" && !n.attrs?.float ? "/" : "";
-    })
-    .join("");
-/** A paragraph's text, or null for one Word shows otherwise (verbatim content, fields, notes). */
-const shownText = (p) =>
-  (p.content ?? []).some((n) =>
-    ["opaqueInline", "fieldStart", "noteReference", "pageBreak"].includes(n.type),
-  )
-    ? null
-    : textOf(p);
-const paragraphs = (document) =>
-  (document.content.content ?? []).filter((b) => b.type === "paragraph").map(shownText);
 /** Word's paragraphs outside tables. */
 const plain = (list) => list.filter((p) => !p.inTable).map((p) => p.text);
 
 if (mode === "make") {
   const out = join(dir, "foli");
   mkdirSync(out, { recursive: true });
-  for (const [name, task] of Object.entries(TASKS)) {
+  for (const [name, run] of Object.entries(RUN)) {
     const imported = await importDocx(new Uint8Array(readFileSync(join(corpus, `${name}.docx`))));
     const session = openSession(imported.document, { author: AUTHOR });
-    task.run(session);
+    run(session);
     const document = session.document();
     writeFileSync(
       join(out, `${name}-agent.docx`),
       await exportDocx(document, imported.package, { trackRevisions: true }),
     );
-    const accept = createEditor({ document });
-    accept.commands.acceptAllChanges();
-    const reject = createEditor({ document });
-    reject.commands.rejectAllChanges();
-    const expected = {
-      accepted: paragraphs(accept.getDocument()),
-      rejected: paragraphs(reject.getDocument()),
-    };
     writeFileSync(
       join(out, `${name}-agent.expected.json`),
-      `${JSON.stringify(expected, null, 2)}\n`,
+      `${JSON.stringify(expected(document), null, 2)}\n`,
     );
     console.log(`${name}-agent.docx: made`);
   }
@@ -158,10 +104,10 @@ if (mode === "make") {
     failures++;
     console.log(`${name}: FAILED: ${what}`);
   };
-  for (const [task, spec] of Object.entries(TASKS)) {
+  for (const [task, spec] of Object.entries(EXPECT)) {
     const { types, comment } = spec;
     const name = `${task}-agent`;
-    const expected = JSON.parse(readFileSync(join(dir, "foli", `${name}.expected.json`), "utf8"));
+    const foli = JSON.parse(readFileSync(join(dir, "foli", `${name}.expected.json`), "utf8"));
     let word;
     try {
       word = JSON.parse(readFileSync(join(dir, "word", `${name}.json`), "utf8"));
@@ -200,7 +146,7 @@ if (mode === "make") {
     let compared = "accept/reject text compared";
     for (const kind of ["accepted", "rejected"]) {
       const theirs = plain(word[kind]);
-      const own = expected[kind];
+      const own = foli[kind];
       if (theirs.length !== own.length) {
         compared = "text not compared";
         fail(name, `${kind}: ${own.length} paragraphs in Foli, ${theirs.length} in Word`);
