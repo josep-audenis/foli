@@ -157,7 +157,7 @@ export function replaceText(
       `${quote(query)} is not in block ${handle}. Capitals and spaces count.${brackets} Its text is: ${JSON.stringify(now)}`,
     );
   }
-  if (matches.length > 1 && !options.all)
+  if (matches.length > 1 && !options?.all)
     return refuse(
       "several-matches",
       `${quote(query)} is in block ${handle} ${matches.length} times. Give a longer find that is there once, or all: true to replace every one.`,

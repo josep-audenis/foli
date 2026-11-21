@@ -124,8 +124,6 @@ give back the input; anything left is an untracked edit, and the result is refus
   restyle headings): `replaceText`, `insertAfter`, `insertBefore`, `deleteBlock`, `setStyle`,
   `comment`, `controls`, `fillControl`, `updateFields`. Not built: `insertTable`, accepting and
   rejecting changes (a person's part).
-- The facade's operation list: start from real agent tasks (fill a template, redline a contract,
-  restyle headings) rather than mirroring every command.
 - Should the facade return serialized steps instead of whole documents? It would need
   `toJSON`/`fromJSON` on every `Step` (none today), which collaboration needs too.
 

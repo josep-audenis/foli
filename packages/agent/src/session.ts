@@ -159,7 +159,8 @@ export function openSession(document: EditorDocument, options: SessionOptions): 
   const context: Context = { editor, handles, author };
 
   const read = (options: ReadOptions = {}): Result<ReadResult> => {
-    const { from, limit } = options;
+    // A model's tool call may send null for an object left out.
+    const { from, limit } = options ?? {};
     if (limit !== undefined && !(Number.isInteger(limit) && limit > 0))
       return refuse("invalid", "limit must be a whole number above 0.");
     const all = readBlocks(editor.state, handles);

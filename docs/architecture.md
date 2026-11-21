@@ -1066,12 +1066,13 @@ transaction and runs core's commands. Background and what was tried:
   theirs. Not `w14:paraId`: paragraphs Foli creates have none.
 - **Operations** (`operations.ts`, `templates.ts`): `replaceText` (core's `findAll` and
   `replace`, kept to the block), `insertAfter`/`insertBefore` (a paragraph node with the
-  neighbour's properties, minus its mark's own), `deleteBlock` (a whole-node delete, which
-  tracking records; content only where Word needs a paragraph), `setStyle`, `comment`,
-  `fillControl`, `updateFields`. Each returns a value: the blocks as they read now, or a refusal
-  with a code and a message written for the model.
+  neighbour's properties, minus its mark's own), `deleteBlock` (a paragraph: a whole-node
+  delete, which tracking records, content only where the paragraph must stay; a table: core's
+  `deleteTable`), `setStyle`, `comment`,
+  `fillControl`, `updateFields`. Each returns a value: the blocks as they read now (`deleteBlock`
+  and `updateFields` a sentence), or a refusal with a code and a message written for the model.
 - **What it is not:** no sandbox, no file system, no MCP. An MCP server over it is a separate
-  package (roadmap, Phase 14).
+  package, decided and not planned yet (roadmap, Phase 13).
 
 ## Packages
 

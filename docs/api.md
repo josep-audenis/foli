@@ -1,6 +1,6 @@
 # API reference
 
-The public API of the five packages, as of 1.0.0, with
+The public API of the five 1.x packages, as of 1.0.0, and of `@folijs/agent` (0.x), with
 the export lists of 12.2 ([ADR-0008](decisions/ADR-0008-1.0-contract-and-extensions.md)).
 
 **Stable or internal.** Every name on this page is **stable** unless marked **internal**: the
@@ -982,7 +982,7 @@ version. Details, the read format and examples: the
 
 - `openSession(document, { author, extensions? }): Session`: opens a document (validated and
   migrated as `createEditor` does) with tracking on in `author`'s name. Throws on a document
-  that does not validate and on an empty author; nothing else in the package throws.
+  that does not validate and on an empty author; no method of a `Session` throws.
 - Every `Session` method but `document`, `styles` and `controls` returns a `Result`:
   `{ ok: true, … }` or a `Refusal` `{ ok: false, code, message }`, the message written for the
   model. Codes: `unknown-handle`, `gone`, `not-a-paragraph`, `no-match`, `several-matches`,
@@ -992,10 +992,11 @@ version. Details, the read format and examples: the
   `block(handle)` → `{ block, text }`. `Block`: `handle`, `kind` (`paragraph`, `table`,
   `other`), `style`, `number`, `text`, `rows`, `columns`, `cell` (`{ table, row, column }`),
   `depth`, `changed`, `comments`. `formatBlocks(blocks)` makes the text from blocks.
-- Editing, each returning `Changed` `{ blocks, text }` for what it changed:
+- Editing, each returning `Changed` `{ blocks, text }` for what it changed (`deleteBlock`
+  only `{ text }`, a sentence):
   `replaceText(handle, find, replacement, { all? })` (also `replaced`, `refused`),
   `insertAfter` and `insertBefore(handle, paragraphs)` (`NewParagraph`: a string or
-  `{ text, style? }`, one or a list), `deleteBlock(handle)` (`{ text }`),
+  `{ text, style? }`, one or a list), `deleteBlock(handle)`,
   `setStyle(handle, style)`, `comment(handle, text, { on? })` (also `comment`, its id);
   `styles()` lists the paragraph styles' names.
 - Templates: `controls()` → `Control[]` (`id`, `name`, `tag`, `title`, `kind`, `value`,
