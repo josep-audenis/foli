@@ -2522,7 +2522,7 @@ review.
   failure with its line and "Nothing was changed". 10 tests through the SDK's client.)
 - [x] 16.5 Hostile scripts: the fuzz and the escape tests of the acceptance, each proved to
   fail when its guard is taken out; a security review by an agent, on the built server. (Done:
-  `code-fuzz.test.ts`, 40 scripts on each of three documents, seed 20261121: operations with
+  `code-fuzz.test.ts`, 30 scripts on each of three documents, seed 20261121: operations with
   arguments of any shape, caught or not, then one of twenty ends (a return, a throw, loops
   without end, recursion, memory, a huge or cyclic value, prototypes changed, `import()`).
   A failed run leaves the document and every handle as before; a kept one only the author's

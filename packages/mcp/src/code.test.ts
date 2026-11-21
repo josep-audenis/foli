@@ -280,16 +280,16 @@ for (;;) { try { doc.insertAfter(h, new Array(500).fill("x".repeat(40))) } catch
   });
 
   it("a run of small edits without end is stopped at its time, and answered soon after", async () => {
-    const { client, run, read } = await opened("01-mutual-nda", { ms: 2000, calls: 1e9 });
+    const { client, run, read } = await opened("01-mutual-nda", { ms: 1000, calls: 1e9 });
     const before = await read();
     const started = Date.now();
     const endless = await run(
       'const h = doc.blocks()[2].handle; for (;;) doc.insertAfter(h, "x");',
     );
     expect(endless.refused).toBe(true);
-    expect(endless.text).toMatch(/^The script was stopped\. It did not finish in 2 seconds\./);
+    expect(endless.text).toMatch(/^The script was stopped\. It did not finish in 1 seconds\./);
     // Its time, and the taking back of what it did in that time.
-    expect(Date.now() - started).toBeLessThan(2000 + 20_000);
+    expect(Date.now() - started).toBeLessThan(1000 + 20_000);
     expect(await read()).toBe(before);
     await client.close();
   });
@@ -326,7 +326,7 @@ throw new Error("over\\u001b[2J");`);
     // The third review's script: one long paragraph, its text swapped back and forth, 500
     // places a call. Nothing grows, so no count of what was added sees it; a checkpoint that
     // kept every step's document held 4 GB of them and ended the server.
-    const { client, run, read } = await opened("01-mutual-nda", { ms: 4000, calls: 1e9 });
+    const { client, run, read } = await opened("01-mutual-nda", { ms: 1500, calls: 1e9 });
     const before = await read();
     const heap = process.memoryUsage().heapUsed;
     const started = Date.now();
@@ -337,10 +337,10 @@ const h = doc.insertAfter("b2", s).blocks[0].handle;
 for (let i = 0; i < K; i++) doc.replaceText(h, ch(i), ch(1000 + i), { all: true });
 let n = 0; for (;;) { doc.replaceText(h, ch(n % 2 ? 2000 : 1000), ch(n % 2 ? 1000 : 2000), { all: true }); n++ }`);
     expect(churn.refused).toBe(true);
-    expect(churn.text).toMatch(/^The script was stopped\. It did not finish in 4 seconds\./);
+    expect(churn.text).toMatch(/^The script was stopped\. It did not finish in 1.5 seconds\./);
     expect(await read()).toBe(before);
     // Its time, the call under way, and a rollback that is one step whatever was done.
-    expect(Date.now() - started).toBeLessThan(4000 + 15_000);
+    expect(Date.now() - started).toBeLessThan(1500 + 15_000);
     global.gc?.();
     expect(process.memoryUsage().heapUsed - heap).toBeLessThan(600 * 1024 * 1024);
     await client.close();
