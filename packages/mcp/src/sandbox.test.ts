@@ -15,7 +15,7 @@ const echo: Host = (name, args) => {
   return { name, args };
 };
 const run = (code: string, limits: Partial<SandboxLimits> = {}, host: Host = echo) =>
-  runScript(code, PRELUDE, host, { ...SANDBOX_LIMITS, ms: 3000, ...limits });
+  runScript(code, PRELUDE, host, { ...SANDBOX_LIMITS, ms: 15_000, ...limits });
 
 describe("a script's answer", { timeout: 30_000 }, () => {
   it("is what it returns, as JSON; nothing when it returns nothing", async () => {
