@@ -99,6 +99,9 @@ writeFileSync(appEntry, `export { FoliEditor } from "${dist("react")}";\n`);
  * controls, captioned groups, dialogs by name, the color field, overflow into a More panel:
  * about 1.9 kB), with room for 17.5's replaceable strings (161.0 kB with them: the exported
  * list `toolbarMessages` holds each string a second time).
+ * View raised after the fourth bug sweep (112.1 kB, 113.0 allowed): it was at its limit, and the
+ * sweep's fixes in core (accepting a chain of deleted paragraphs) and the view (field codes beside
+ * a page number) add about 0.1 kB.
  * View raised in 18.1 (112.6 kB, 113.0 allowed): the hint (its highlight, timers, its range
  * mapped through edits and drawn again after a render: about 0.6 kB), on a bundle with no
  * headroom left since 12.3. Raised in 18.2 (113.1 kB, 113.5 allowed): a hint in a header, footer

@@ -4,7 +4,9 @@
  */
 
 import type { MarkJSON, NodeJSON } from "@folijs/core";
+import { W } from "../import/ooxml.js";
 import { DocxError } from "../package.js";
+import type { XmlAttribute } from "../xml.js";
 import type { ControlWriter } from "./controls.js";
 import { paragraphPropertiesXml, runPropertiesXml, same } from "./properties.js";
 import {
@@ -171,16 +173,21 @@ function simpleFieldXml(
   const instruction = String(code.attrs?.text ?? "");
   const ext = start.attrs?.ext as string | undefined;
   let open = `<w:fldSimple w:instr="${escapeAttribute(instruction)}">`;
+  let close = "</w:fldSimple>";
   if (ext) {
-    const { element, source } = fragment(`${ext}</w:fldSimple>`, context.namespaces, "fldSimple");
+    // Read as an empty element: its own prefix may not be `w`.
+    const { element, source } = fragment(ext.replace(/>$/, "/>"), context.namespaces, "fldSimple");
+    const isInstr = (a: XmlAttribute) => a.ns === W && a.local === "instr";
     const others = element.attributes
-      .filter((a) => a.name !== "w:instr")
+      .filter((a) => !isInstr(a))
       .map((a) => ` ${source.slice(a.start, a.end)}`)
       .join("");
-    const same = element.attributes.find((a) => a.name === "w:instr")?.value === instruction;
-    open = same ? ext : `<w:fldSimple w:instr="${escapeAttribute(instruction)}"${others}>`;
+    if (element.attributes.find(isInstr)?.value === instruction) {
+      open = ext;
+      close = `</${element.name}>`;
+    } else open = `<w:fldSimple w:instr="${escapeAttribute(instruction)}"${others}>`;
   }
-  return `${open}${inlinesXml(inner.slice(3), context, deleted)}</w:fldSimple>`;
+  return `${open}${inlinesXml(inner.slice(3), context, deleted)}${close}`;
 }
 
 /** The hyperlink and tracked changes `a` and `b` both have: they go around the whole element. */

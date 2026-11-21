@@ -584,17 +584,20 @@ function removedWhole(doc: Node): boolean {
  * properties when accepting joins it to the next one, while the same edits untracked joined an
  * empty paragraph and kept the next one's (found by a random seed in 12.11, about 1 run in 5).
  * Compared with the mirror without paragraph properties then: the text must still agree.
+ * Deleted text in it (a paragraph removed whole into it) leaves it as empty, as accepting shows.
  */
 function typedIntoJoined(doc: Node): boolean {
   let found = false;
   doc.forEach((block) => {
-    if (!(block.attrs.revision as { deletion?: unknown } | null)?.deletion || !block.childCount)
-      return;
-    let inserted = true;
+    if (!(block.attrs.revision as { deletion?: unknown } | null)?.deletion) return;
+    let inserted = false;
+    let kept = false;
     block.forEach((inline) => {
-      if (!inline.marks.some((m) => m.type.name === "insertion")) inserted = false;
+      const names = inline.marks.map((m) => m.type.name);
+      if (names.includes("insertion")) inserted = true;
+      else if (!names.includes("deletion")) kept = true;
     });
-    if (inserted) found = true;
+    if (inserted && !kept) found = true;
   });
   return found;
 }
@@ -603,48 +606,67 @@ function typedIntoJoined(doc: Node): boolean {
 const textOnly = (lines: string[]) =>
   lines.map((line) => line.replace(/^(\(\w+\))?(\[\w+\])?/, ""));
 
+/** Tracked edits on paragraphs `texts` against the same edits untracked, after each op and at the end. */
+function check(texts: string[], ops: Op[]): void {
+  // A paragraph with "a" first is a heading (its next style differs).
+  const content = texts.map((t) => ({
+    ...(t ? p(text(t)) : p()),
+    ...(t.startsWith("a") ? { attrs: { style: "Heading1" } } : {}),
+  }));
+  const editor = tracked(...content);
+  const original = editor.getDocument();
+  const start = editor.state.doc;
+  for (const o of ops) {
+    if (knownDifference(editor.state.doc, o)) continue;
+    const mirror = createEditor({
+      document: documentOf(...project(editor.state.doc, true).map(parse)),
+    });
+    apply(editor, o);
+    apply(mirror, o);
+    if (typedIntoJoined(editor.state.doc))
+      expect(textOnly(project(editor.state.doc, true))).toEqual(
+        textOnly(project(mirror.state.doc, true)),
+      );
+    else if (!removedWhole(editor.state.doc))
+      expect(project(editor.state.doc, true)).toEqual(project(mirror.state.doc, true));
+    expect(project(editor.state.doc, false)).toEqual(project(start, true));
+  }
+  // Accepting and rejecting everything for real gives what the projections say.
+  const REVIEW = /"type":"(insertion|deletion|formatChange)"|"revision":\{|"formatChange":\{/;
+  for (const accept of [true, false]) {
+    const copy = createEditor({ document: editor.getDocument() });
+    if (accept) copy.commands.acceptAllChanges();
+    else copy.commands.rejectAllChanges();
+    expect(JSON.stringify(copy.getDocument().content)).not.toMatch(REVIEW);
+    expect(project(copy.state.doc, true)).toEqual(project(editor.state.doc, accept));
+  }
+  while (editor.commands.undo()) {}
+  expect(editor.getDocument()).toEqual(original);
+}
+
 describe("tracked changes (property)", () => {
   it("accept all = the same edits untracked; reject all = the original; undo all = exact", () => {
     const paragraphs = fc.array(fc.stringMatching(/^[a-d]{0,5}$/), { minLength: 1, maxLength: 4 });
     fc.assert(
-      fc.property(paragraphs, fc.array(op, { minLength: 1, maxLength: 8 }), (texts, ops) => {
-        // A paragraph with "a" first is a heading (its next style differs).
-        const content = texts.map((t) => ({
-          ...(t ? p(text(t)) : p()),
-          ...(t.startsWith("a") ? { attrs: { style: "Heading1" } } : {}),
-        }));
-        const editor = tracked(...content);
-        const original = editor.getDocument();
-        const start = editor.state.doc;
-        for (const o of ops) {
-          if (knownDifference(editor.state.doc, o)) continue;
-          const mirror = createEditor({
-            document: documentOf(...project(editor.state.doc, true).map(parse)),
-          });
-          apply(editor, o);
-          apply(mirror, o);
-          if (typedIntoJoined(editor.state.doc))
-            expect(textOnly(project(editor.state.doc, true))).toEqual(
-              textOnly(project(mirror.state.doc, true)),
-            );
-          else if (!removedWhole(editor.state.doc))
-            expect(project(editor.state.doc, true)).toEqual(project(mirror.state.doc, true));
-          expect(project(editor.state.doc, false)).toEqual(project(start, true));
-        }
-        // Accepting and rejecting everything for real gives what the projections say.
-        const REVIEW = /"type":"(insertion|deletion|formatChange)"|"revision":\{|"formatChange":\{/;
-        for (const accept of [true, false]) {
-          const copy = createEditor({ document: editor.getDocument() });
-          if (accept) copy.commands.acceptAllChanges();
-          else copy.commands.rejectAllChanges();
-          expect(JSON.stringify(copy.getDocument().content)).not.toMatch(REVIEW);
-          expect(project(copy.state.doc, true)).toEqual(project(editor.state.doc, accept));
-        }
-        while (editor.commands.undo()) {}
-        expect(editor.getDocument()).toEqual(original);
-      }),
+      fc.property(paragraphs, fc.array(op, { minLength: 1, maxLength: 8 }), (texts, ops) =>
+        check(texts, ops),
+      ),
       { numRuns: 500 },
     );
     // Seconds alone; more with the whole suite running beside it.
   }, 120_000);
+
+  it("a paragraph removed whole into an emptied one with a deleted mark, then typed into", () => {
+    // Seed -2138808030 (about 1 run in 15): the deleted "a" joined in left it empty as accepting
+    // shows, so it keeps its own (Normal) style like any typed-into joined paragraph.
+    check(
+      ["a", "", "", "a"],
+      [
+        { kind: "enter", a: 0.1, b: 0.1, text: "x" },
+        { kind: "delete", a: 0.25, b: 0.25, text: "x" },
+        { kind: "replace", a: 0.3, b: 0, text: "x" },
+        { kind: "type", a: 0, b: 0, text: "x" },
+      ],
+    );
+  });
 });
