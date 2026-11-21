@@ -128,6 +128,8 @@ session.updateFields({ data: { CandidateFirstName: "Ada" } });
   a page layout the session does not have. A table of contents is left as it is unless
   `contents` is true: built here, its entries follow the headings and their page numbers are
   empty until Word updates the field. It returns no blocks: read again.
+- **`target(handle)`**: where a block's content is in `session.editor`, as a `DocumentTarget`:
+  what core's `hint` and `goTo` take, to show an agent's change in a view of that editor.
 - **`checkpoint()`**: marks the document as it is. `rollback()` on what it returns takes back
   every edit made since, as if none had been: no tracked change is left of them and every
   handle names the block it named; a style they added to the document is gone, and undo is

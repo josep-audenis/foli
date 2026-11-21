@@ -101,13 +101,15 @@ writeFileSync(appEntry, `export { FoliEditor } from "${dist("react")}";\n`);
  * list `toolbarMessages` holds each string a second time).
  * View raised in 18.1 (112.6 kB, 113.0 allowed): the hint (its highlight, timers, its range
  * mapped through edits and drawn again after a render: about 0.6 kB), on a bundle with no
- * headroom left since 12.3.
+ * headroom left since 12.3. Raised in 18.2 (113.1 kB, 113.5 allowed): a hint in a header, footer
+ * or note, marked in the copies the pages draw (about 0.5 kB). React and FoliEditor with it
+ * (162.3 kB, 163.1 allowed): they carry the view, with room for 18.3's `hint` on the ref.
  */
 const BUNDLES = [
   { name: "@folijs/core", entry: dist("core"), budget: 88_000 },
-  { name: "@folijs/view", entry: dist("view"), budget: 115_700 },
-  { name: "@folijs/react", entry: dist("react"), budget: 166_000 },
-  { name: "FoliEditor only", entry: appEntry, budget: 166_000 },
+  { name: "@folijs/view", entry: dist("view"), budget: 116_250 },
+  { name: "@folijs/react", entry: dist("react"), budget: 167_000 },
+  { name: "FoliEditor only", entry: appEntry, budget: 167_000 },
   { name: "@folijs/docx", entry: dist("docx"), budget: 61_440 },
   { name: "@folijs/pdf", entry: dist("pdf"), budget: 18_800 },
   { name: "@folijs/agent", entry: dist("agent"), budget: 77_500 },

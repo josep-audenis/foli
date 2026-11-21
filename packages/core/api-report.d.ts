@@ -1640,7 +1640,9 @@ export declare function deleteBookmark(editor: Editor, name: string): boolean;
  * Shows `target` for a few seconds without selecting it (`StoryView.hint`): the view scrolls to it
  * and marks it, then the mark fades. False without a view that shows it: a hint is for the eyes.
  */
-export declare function hint(editor: Editor, target: DocumentTarget, options?: {
+export declare function hint(editor: Editor, target: DocumentTarget | {
+    bookmark: string;
+}, options?: {
     ms?: number;
 }): boolean;
 /**

@@ -249,3 +249,26 @@ describe("what a document's own fields write (the re-check of #175)", () => {
     expect(JSON.stringify(session.document())).toBe(before);
   });
 });
+
+describe("target (18.2)", () => {
+  it("is where a block's content is in the session's editor, or the handle's refusal", async () => {
+    const { document } = await corpus("01-mutual-nda");
+    const session = openSession(document, { author: "Agent" });
+    const read = session.read();
+    if (!read.ok) throw new Error(read.message);
+    const paragraph = read.blocks.find((b) => b.kind === "paragraph" && b.text.length > 10);
+    const table = read.blocks.find((b) => b.kind === "table");
+    const at = session.target(paragraph?.handle as string);
+    expect(at).toMatchObject({ ok: true, target: { story: null } });
+    const { from, to } = (at as { target: { from: number; to: number } }).target;
+    expect(session.editor.state.doc.textBetween(from, to)).toBe(paragraph?.text);
+    // It follows the block through edits.
+    session.insertBefore(paragraph?.handle as string, "Inserted.");
+    const moved = session.target(paragraph?.handle as string);
+    const again = (moved as { target: { from: number; to: number } }).target;
+    expect(again.from).toBeGreaterThan(from);
+    expect(session.editor.state.doc.textBetween(again.from, again.to)).toBe(paragraph?.text);
+    expect(session.target(table?.handle as string)).toMatchObject({ ok: true });
+    expect(session.target("b9999")).toMatchObject({ ok: false, code: "unknown-handle" });
+  });
+});

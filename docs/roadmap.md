@@ -29,7 +29,7 @@ place that says what is in progress; check it before starting work.
 | 15 Toolbar                | ✅ Done                  | —               | Merged in #149–#160; 1.1.0 on npm (2026-11-21); the release's bench ran on a busy machine (see #160)                                                                   |
 | 16 Code mode              | ✅ Done                  | —               | Merged in #164–#176; `@folijs/mcp` 0.2.0 and `@folijs/agent` 0.2.0 on npm (2026-11-21), `run` behind `--code`; four security reviews; not tried in a client of its own |
 | 17 Toolbar for developers | ✅ Done                  | —               | Merged in #167–#173; 1.2.0 on npm (2026-11-21), released with Phase 16 (#176)                                                                                          |
-| 18 Hint                   | In progress              | `phase-18/hint` | 18.1 built: `view.hint` and core's `hint` in the body                                                                                                                  |
+| 18 Hint                   | In progress              | `phase-18/hint` | 18.1, 18.2 built: `view.hint`, core's `hint` (ranges, stories, bookmarks), `session.target`                                                                            |
 
 Status values: `Ready` (dependencies met, nobody on it) · `In progress` · `In review` (PR open) ·
 `✅ Done` (merged, acceptance criteria met) · `Blocked by …`.
@@ -2626,7 +2626,7 @@ An app, or an agent saying what it changed, points at a place in the document; t
 scrolls there and marks it for a few seconds, then the mark fades, without changing the
 document or the selection. Wanted by the owner since the agent exploration (the fourth of
 the pieces around `@folijs/agent`, after the library, the MCP server and code mode). Planned
-2026-11-21; nothing built.
+2026-11-21; being built: see the tasks.
 
 Not in this phase: a hint in the MCP server (it has no view: it can only say a block's handle,
 which it does), a hint that stays until dismissed (that is a selection or a comment), several
@@ -2646,7 +2646,7 @@ the reason.
 
 **Acceptance:** `view.hint(target, { ms })` and core's `hint(editor, target, options)` (as
 `goTo` is to `reveal`) scroll the target into view, mark it for `ms` (default 2 s) and let the
-mark fade; neither the document, the selection, undo nor the focus changes (tests compare
+mark fade (`::highlight(foli-hint)`, then `foli-hint-fading`); neither the document, the selection, undo nor the focus changes (tests compare
 each); the target is a range of the body or of a story (a header shown on its page: opened
 there as `reveal` does, closed again after, unless the person was editing it), a bookmark by
 name, or an agent's block by handle (`session.target(handle)` gives the `DocumentTarget`); a
@@ -2685,11 +2685,20 @@ review.
   scroll at all (the view's scrolling was already instant), so reduced motion drops only the
   fading step. Six jsdom tests: marked, faded, gone; nothing else changed (document, selection,
   undo); edits followed, deletion ends it; replaced; a new document ends it; reduced motion;
-  refusals; no Highlight API. The view's budget raised 1 kB for it (112.6 of 113.0 kB).)
-- [ ] 18.2 Targets: a story's range (opened for the hint as `reveal` opens it, closed after);
+  refusals; no Highlight API. The view's budget raised 1 kB for it (112.6 of 113.0 kB). From
+  the review of #182: a point (`from === to`) marked nothing and ended at the first edit (now
+  it shows its paragraph); positions not whole numbers are refused; three tests that could not
+  fail made to (a replaced hint's timers, a new document with text, the focus compared).)
+- [x] 18.2 Targets: a story's range (opened for the hint as `reveal` opens it, closed after);
   a bookmark by name (`{ bookmark: "Intro" }`, refused when there is none); an agent's block
   (`session.target(handle)` in `@folijs/agent`: the block's `DocumentTarget`, or a refusal
   as for any handle). The answer is a value: `true`, or false when no page shows the target.
+  (Done, otherwise than planned for stories: a header's, footer's or note's range is not
+  opened, which would turn the view to editing it; its copies drawn on the pages near the
+  window are marked by their text (`rangesInCopy`), the page scrolled to when none is near, and
+  a change to the story ends the hint. The story being edited hints in its own view. Tested in
+  jsdom as far as it goes (the copy's marks; bookmarks through a stand-in view;
+  `session.target` on the NDA, through an insert); the pages themselves in 18.3's e2e.)
 - [ ] 18.3 React and the app's side: `FoliEditor`'s ref gets `hint`; whether a hook adds
   anything (`useHint`) is decided here, and not built if not. The playground gets a "show"
   button per tracked change; the site's agent guide shows a session's edits hinted one after

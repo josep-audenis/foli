@@ -150,7 +150,7 @@ import {
   type WordInfo,
   WordRenderer,
 } from "./word/edit.js";
-import { HintMarks, MATCH_STYLES, MatchMarks, rangesInText } from "./word/matches.js";
+import { HintMarks, MATCH_STYLES, MatchMarks, rangesInCopy, rangesInText } from "./word/matches.js";
 import { NOTE_ATTR, type NoteGroup, PageNotes } from "./word/notes.js";
 import { measureLineRatio } from "./word/pages.js";
 import { PageRegions, REGION_CONTENT_CLASS } from "./word/regions.js";
@@ -713,7 +713,14 @@ export class EditorView {
   private readonly matchMarks: MatchMarks;
   private readonly hintMarks: HintMarks;
   /** The hint shown, as positions of the body (18.1). */
-  private shownHint: { from: number; to: number; fading: boolean; timers: number[] } | null = null;
+  private shownHint: {
+    /** null: the body; a story's id: its copies drawn on the pages are marked. */
+    story: string | null;
+    from: number;
+    to: number;
+    fading: boolean;
+    timers: number[];
+  } | null = null;
   /** The pages marked, as a key; the frame waiting to look again. */
   private matchPages = "";
   private matchFrame = 0;
@@ -1047,7 +1054,8 @@ export class EditorView {
     // Decorations that changed redraw their blocks (the others are reused).
     const decorated = this.decorate(state);
     if (docChanged || decorated || (storiesChanged && !this.redrawRegions())) this.render();
-    // Blocks drawn again hold new text nodes: the hint's ranges are made again on them.
+    // Blocks drawn again hold new text nodes: the hint's ranges are made again on them (and
+    // during a composition, when the pages are not placed again).
     if (this.shownHint && (docChanged || decorated)) this.drawHint();
     if (lost) this.closeStory(true);
     // The open story has its own editor, which hears nothing of this.
@@ -1905,11 +1913,28 @@ export class EditorView {
    */
   hint({ story, from, to }: DocumentTarget, { ms = 2000 } = {}): boolean {
     this.endHint();
-    const { doc } = this.state;
-    if (story !== null || !(from >= 0 && from <= to && to <= doc.content.size)) return false;
-    this.shownHint = { from, to, fading: false, timers: [] };
+    if (!Number.isInteger(from) || !Number.isInteger(to)) return false;
+    // The story being edited shows its own hint, in its own view.
+    if (story !== null && story === this.mount?.id)
+      return this.mount.view.hint({ story: null, from, to }, { ms });
+    const tree = story === null ? this.state.doc : wordContext(this.state)?.stories.get(story)?.doc;
+    if (!tree || !(from >= 0 && from <= to && to <= tree.content.size)) return false;
+    // A point (a bookmark that holds nothing) shows its paragraph: there is no text to mark.
+    if (from === to) {
+      const $at = tree.resolve(from);
+      if ($at.parent.isTextblock) [from, to] = [$at.start(), $at.end()];
+    }
+    // A story is shown where a page draws it; one no page draws is not shown.
+    const copies = story === null ? [] : this.storyCopies(story, false);
+    if (story !== null && !copies.length) return false;
+    this.shownHint = { story, from, to, fading: false, timers: [] };
     injectStyles(this.host);
-    this.scrollToRange(from, to);
+    if (story === null) this.scrollToRange(from, to);
+    else if (!this.storyCopies(story, true).length) {
+      const rect = copies[0]?.getBoundingClientRect();
+      if (rect)
+        scrollRectIntoView(this.host, { top: rect.top - REVEAL_ABOVE, bottom: rect.bottom + 48 });
+    }
     this.drawHint();
     const win = this.host.ownerDocument.defaultView;
     const still = win?.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
@@ -1925,6 +1950,23 @@ export class EditorView {
       later(ms + HINT_FADE, () => this.endHint());
     }
     return true;
+  }
+
+  /** The drawn copies of story `id` on the pages (near the window only, when `near`). */
+  private storyCopies(id: string, near: boolean): Element[] {
+    const pages = near ? this.pagesNearView() : null;
+    const out: Element[] = [];
+    this.pages.forEach((page, p) => {
+      if (pages && !pages.has(p)) return;
+      for (const region of [this.pageRegions[p]?.header, this.pageRegions[p]?.footer])
+        if (region?.id === id) {
+          const content = region.element.querySelector(`:scope > .${REGION_CONTENT_CLASS}`);
+          if (content) out.push(content);
+        }
+      for (const note of page.querySelectorAll(`[${NOTE_ATTR}]`))
+        if (note.getAttribute(NOTE_ATTR) === id) out.push(note);
+    });
+    return out;
   }
 
   /** The hint taken off, its timers stopped. */
@@ -1946,6 +1988,13 @@ export class EditorView {
       this.endHint();
       return;
     }
+    // A story's positions are not mapped through the body's steps: a change to it ends the hint.
+    if (shown.story !== null) {
+      const story = (from: EditorState) =>
+        wordContext(from)?.stories.get(shown.story as string)?.doc;
+      if (story(state) !== story(this.state)) this.endHint();
+      return;
+    }
     for (const tr of transactions) {
       shown.from = tr.mapping.map(shown.from, 1);
       shown.to = tr.mapping.map(shown.to, -1);
@@ -1957,9 +2006,29 @@ export class EditorView {
   private drawHint(): void {
     const shown = this.shownHint;
     if (!shown) return;
-    const { from, to, fading } = shown;
+    const { story, from, to, fading } = shown;
     const ranges: Range[] = [];
-    if (from === to) ranges.push(...this.rangesOf(from, from));
+    if (story !== null) {
+      // Each paragraph of the story it covers, by its index and its text's characters.
+      const tree = wordContext(this.state)?.stories.get(story)?.doc;
+      const spans: { block: number; from: number; to: number }[] = [];
+      let block = 0;
+      tree?.descendants((node, pos) => {
+        if (!node.isTextblock) return true;
+        const start = pos + 1;
+        const end = start + node.content.size;
+        if (end >= from && start <= to) {
+          const text = (a: number) =>
+            tree.textBetween(start, Math.max(start, Math.min(a, end))).length;
+          spans.push({ block, from: text(from), to: text(to) });
+        }
+        block++;
+        return false;
+      });
+      for (const copy of this.storyCopies(story, true)) ranges.push(...rangesInCopy(copy, spans));
+    }
+    // shortcut: a range of the whole document marks every page at each render while it shows
+    // (2.4 s); mark only pages near the window, as find does, if a hint of that size matters.
     else
       this.state.doc.nodesBetween(from, to, (node, pos) => {
         if (!node.isTextblock) return true;

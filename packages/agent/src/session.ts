@@ -1,5 +1,6 @@
 import {
   createEditor,
+  type DocumentTarget,
   type Editor,
   type EditorDocument,
   type Extension,
@@ -106,6 +107,11 @@ export interface Session {
    * and `text` says why.
    */
   deleteBlock(handle: string): Result<{ text: string }>;
+  /**
+   * Where a block is, as positions of this session's editor (`session.editor`): what core's
+   * `hint` and `goTo` take, to show an agent's change in a view of that editor.
+   */
+  target(handle: string): Result<{ target: DocumentTarget }>;
   /** The paragraph styles there are, by the names `read` shows and `setStyle` takes. */
   styles(): string[];
   /**
@@ -276,6 +282,13 @@ export function openSession(document: EditorDocument, options: SessionOptions): 
     insertAfter: (handle, paragraphs) => insert(context, handle, paragraphs, "after"),
     insertBefore: (handle, paragraphs) => insert(context, handle, paragraphs, "before"),
     deleteBlock: (handle) => deleteBlock(context, handle),
+    target: (handle) => {
+      const found = resolve(context, handle);
+      if ("ok" in found) return found;
+      // Its content: a paragraph's text, a table's cells.
+      const { pos, node } = found;
+      return { ok: true, target: { story: null, from: pos + 1, to: pos + node.nodeSize - 1 } };
+    },
     styles: () => styles(context),
     setStyle: (handle, style) => setStyle(context, handle, style),
     comment: (handle, text, options) => comment(context, handle, text, options),

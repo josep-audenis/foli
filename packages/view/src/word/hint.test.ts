@@ -47,7 +47,9 @@ describe("a hint", () => {
   it("marks its range, then fades, then goes; nothing else changes", () => {
     vi.useFakeTimers();
     const marks = fakeHighlights();
-    const { editor } = setup("one cat", "two dogs");
+    const { editor, host } = setup("one cat", "two dogs");
+    host.focus();
+    const focused = document.activeElement;
     editor.select(2);
     const selection = editor.state.selection.toJSON();
     const doc = editor.state.doc;
@@ -59,6 +61,7 @@ describe("a hint", () => {
     expect(editor.state.selection.toJSON()).toEqual(selection);
     expect(editor.state.doc).toBe(doc);
     expect(undoDepth(editor.state)).toBe(depth);
+    expect(document.activeElement).toBe(focused);
 
     vi.advanceTimersByTime(999);
     expect(marks.shown()).toEqual(["cat", "tw"]);
@@ -91,13 +94,23 @@ describe("a hint", () => {
     const marks = fakeHighlights();
     const { editor } = setup("one cat", "two dogs");
     hint(editor, { story: null, from: 1, to: 4 });
+    vi.advanceTimersByTime(1000);
     hint(editor, { story: null, from: 14, to: 18 });
     expect(marks.shown()).toEqual(["dogs"]);
-    // The first one's timers are stopped: the second fades on its own time.
-    vi.advanceTimersByTime(2000);
+    // Where the first one's time ran out: the second is still shown whole.
+    vi.advanceTimersByTime(1200);
+    expect(marks.shown()).toEqual(["dogs"]);
+    expect(marks.fading()).toEqual([]);
+    vi.advanceTimersByTime(800);
     expect(marks.fading()).toEqual(["dogs"]);
     hint(editor, { story: null, from: 1, to: 4 });
-    editor.setDocument(createDocument({ type: "doc", content: [{ type: "paragraph" }] }));
+    // A new document with text where the hint was: nothing of it is marked.
+    editor.setDocument(
+      createDocument({
+        type: "doc",
+        content: [{ type: "paragraph", content: [{ type: "text", text: "another document" }] }],
+      }),
+    );
     expect(marks.shown()).toEqual([]);
   });
 
@@ -114,11 +127,23 @@ describe("a hint", () => {
     expect(marks.fading()).toEqual([]);
   });
 
+  it("shows a point's paragraph, and keeps it through edits elsewhere", () => {
+    vi.useFakeTimers();
+    const marks = fakeHighlights();
+    const { editor } = setup("one cat", "two dogs");
+    expect(hint(editor, { story: null, from: 3, to: 3 })).toBe(true);
+    expect(marks.shown()).toEqual(["one cat"]);
+    editor.select(14);
+    editor.commands.insertText("!");
+    expect(marks.shown()).toEqual(["one cat"]);
+  });
+
   it("says when it cannot: a range outside the document, a story not built yet, no view", () => {
     fakeHighlights();
     const { editor, view } = setup("one cat");
     expect(view.hint({ story: null, from: 3, to: 99 })).toBe(false);
     expect(view.hint({ story: null, from: 5, to: 3 })).toBe(false);
+    expect(view.hint({ story: null, from: 1.5, to: 3 })).toBe(false);
     expect(view.hint({ story: "header1", from: 1, to: 2 })).toBe(false);
     view.destroy();
     views = [];
@@ -128,5 +153,25 @@ describe("a hint", () => {
   it("without the Highlight API, still answers and marks nothing", () => {
     const { editor } = setup("one cat");
     expect(hint(editor, { story: null, from: 5, to: 8 })).toBe(true);
+  });
+});
+
+describe("a story's drawn copy", () => {
+  it("is marked by paragraph and character, across the text nodes of a paragraph", async () => {
+    const { rangesInCopy } = await import("./matches.js");
+    const root = document.createElement("div");
+    root.innerHTML = "<p><span>Page </span><span>3</span> of 9</p><p>Second line</p>";
+    document.body.append(root);
+    const marked = (spans: { block: number; from: number; to: number }[]) =>
+      rangesInCopy(root, spans).map((r) => r.toString());
+    expect(marked([{ block: 0, from: 3, to: 8 }])).toEqual(["e ", "3", " o"]);
+    expect(marked([{ block: 1, from: 0, to: 6 }])).toEqual(["Second"]);
+    // A paragraph the copy does not have, and an empty span: nothing.
+    expect(
+      marked([
+        { block: 5, from: 0, to: 3 },
+        { block: 0, from: 2, to: 2 },
+      ]),
+    ).toEqual([]);
   });
 });

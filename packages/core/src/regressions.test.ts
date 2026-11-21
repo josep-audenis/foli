@@ -254,3 +254,26 @@ describe("updateFields' maxWritten (a review of code mode, #175)", () => {
     expect(updateFields(unlimited, { data: { Name: "v".repeat(20_000) } }).updated).toBe(50);
   });
 });
+
+describe("hint (18.2)", () => {
+  it("goes to the view, a bookmark by name with any capitals; false without a view or a bookmark", async () => {
+    const { hint } = await import("./state/navigation.js");
+    const editor = open([p("Before "), p(...bm(1, "Intro", "the start"))]);
+    expect(hint(editor, { story: null, from: 1, to: 3 })).toBe(false);
+    const seen: unknown[] = [];
+    editor.storyView = {
+      hint: (target: unknown, options: unknown) => {
+        seen.push([target, options]);
+        return true;
+      },
+    } as never;
+    expect(hint(editor, { bookmark: "intro" }, { ms: 500 })).toBe(true);
+    const [[target, options]] = seen as [[{ story: null; from: number; to: number }, unknown]];
+    expect(options).toEqual({ ms: 500 });
+    expect(editor.state.doc.textBetween(target.from, target.to)).toBe("the start");
+    expect(hint(editor, { bookmark: "Nope" })).toBe(false);
+    // A view of another make, without hint: false.
+    editor.storyView = {} as never;
+    expect(hint(editor, { bookmark: "Intro" })).toBe(false);
+  });
+});

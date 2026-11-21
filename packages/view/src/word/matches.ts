@@ -131,3 +131,43 @@ export class HintMarks {
     this.fading = fading;
   }
 }
+
+/**
+ * Ranges in a drawn copy of a story (a header on a page, a note's lines): each span names a
+ * paragraph of the story by its index and characters of its text. The copy has no positions;
+ * its paragraphs are the story's, in order, and their text is the story's text.
+ * shortcut: a page number drawn there may differ in length from the story's own result;
+ * marks after it in the same paragraph shift by the difference. Fine for a hint.
+ * @internal
+ */
+export function rangesInCopy(
+  root: Element,
+  spans: readonly { block: number; from: number; to: number }[],
+): Range[] {
+  const doc = root.ownerDocument;
+  const blocks = root.querySelectorAll("p,h1,h2,h3,h4,h5,h6");
+  const out: Range[] = [];
+  for (const { block, from, to } of spans) {
+    const element = blocks[block];
+    if (!element) continue;
+    const walker = doc.createTreeWalker(element, NodeFilter.SHOW_TEXT);
+    let at = 0;
+    for (
+      let node = walker.nextNode() as Text | null;
+      node;
+      node = walker.nextNode() as Text | null
+    ) {
+      const start = Math.max(from - at, 0);
+      const end = Math.min(to - at, node.length);
+      if (start < end) {
+        const range = doc.createRange();
+        range.setStart(node, start);
+        range.setEnd(node, end);
+        out.push(range);
+      }
+      at += node.length;
+      if (at >= to) break;
+    }
+  }
+  return out;
+}

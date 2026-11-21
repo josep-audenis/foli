@@ -424,6 +424,8 @@ export declare class EditorView {
     hint({ story, from, to }: DocumentTarget, { ms }?: {
         ms?: number | undefined;
     }): boolean;
+    /** The drawn copies of story `id` on the pages (near the window only, when `near`). */
+    private storyCopies;
     /** The hint taken off, its timers stopped. */
     private endHint;
     /** The hint's range through `transactions`; gone when what it marked is. */

@@ -95,7 +95,7 @@ export type Ok<T = object> = {
 export type Result<T = object> = Ok<T> | Refusal;
 
 // session.d.ts
-import { type Editor, type EditorDocument, type Extension, type FieldsReport, type FoliDocument } from "@folijs/core";
+import { type DocumentTarget, type Editor, type EditorDocument, type Extension, type FieldsReport, type FoliDocument } from "@folijs/core";
 import { type Changed, type CommentOptions, type NewParagraph, type ReplaceOptions } from "./operations.js";
 import { type Block } from "./read.js";
 import { type Result } from "./result.js";
@@ -167,6 +167,13 @@ export interface Session {
      */
     deleteBlock(handle: string): Result<{
         text: string;
+    }>;
+    /**
+     * Where a block is, as positions of this session's editor (`session.editor`): what core's
+     * `hint` and `goTo` take, to show an agent's change in a view of that editor.
+     */
+    target(handle: string): Result<{
+        target: DocumentTarget;
     }>;
     /** The paragraph styles there are, by the names `read` shows and `setStyle` takes. */
     styles(): string[];

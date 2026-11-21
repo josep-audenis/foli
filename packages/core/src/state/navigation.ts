@@ -246,10 +246,16 @@ export function deleteBookmark(editor: Editor, name: string): boolean {
  */
 export function hint(
   editor: Editor,
-  target: DocumentTarget,
+  target: DocumentTarget | { bookmark: string },
   options: { ms?: number } = {},
 ): boolean {
-  return editor.storyView?.hint?.(target, options) ?? false;
+  const view = editor.storyView;
+  if (!view?.hint) return false;
+  if (!("bookmark" in target)) return view.hint(target, options);
+  // By name, capitals not counting, as Word finds a bookmark; Word's own hidden ones too.
+  const name = String(target.bookmark).toLowerCase();
+  const found = listBookmarks(editor, { hidden: true }).find((b) => b.name.toLowerCase() === name);
+  return found ? view.hint({ story: found.story, from: found.from, to: found.to }, options) : false;
 }
 
 /**

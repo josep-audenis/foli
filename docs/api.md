@@ -813,16 +813,16 @@ Regular expressions are not offered: a pattern can hang the page.
 
 Bookmarks and the outline:
 
-| Function                                      | Does                                                                                                                                                       |
-| --------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `insertBookmark(editor, name, range?)`        | Over the selection or `range` of that editor's tree (a caret: a point). A name in use, in any case or story, moves it                                      |
-| `renameBookmark(editor, name, next)`          | With the `REF`, `PAGEREF`, `NOTEREF` and links that point at it                                                                                            |
-| `deleteBookmark(editor, name)`                | Whichever tree it is in; true when it went                                                                                                                 |
-| `listBookmarks(editorOrState, options?)`      | `name`, `story`, `from`, `to`, `text`, `hidden`; `{ hidden: true }` adds Word's own (`_Toc…`, `_Ref…`)                                                     |
-| `isBookmarkName(name)`                        | A letter, then letters, digits and `_`, 40 at most                                                                                                         |
-| `goTo(editor, { story, from, to }, options?)` | Selects it and shows it, through the view when there is one (`focus`: the document takes the focus)                                                        |
-| `hint(editor, { story, from, to }, { ms? })`  | Shows it for `ms` (2000) without selecting it, through the view's `hint`; false without a view that shows it                                               |
-| `documentOutline(state, layout?)`             | `pos`, `level`, `text`, `number`, `page` (with `editor.storyView.fieldLayout`): the body's headings, by the rule of a table of contents with `\o` and `\u` |
+| Function                                      | Does                                                                                                                                                                               |
+| --------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `insertBookmark(editor, name, range?)`        | Over the selection or `range` of that editor's tree (a caret: a point). A name in use, in any case or story, moves it                                                              |
+| `renameBookmark(editor, name, next)`          | With the `REF`, `PAGEREF`, `NOTEREF` and links that point at it                                                                                                                    |
+| `deleteBookmark(editor, name)`                | Whichever tree it is in; true when it went                                                                                                                                         |
+| `listBookmarks(editorOrState, options?)`      | `name`, `story`, `from`, `to`, `text`, `hidden`; `{ hidden: true }` adds Word's own (`_Toc…`, `_Ref…`)                                                                             |
+| `isBookmarkName(name)`                        | A letter, then letters, digits and `_`, 40 at most                                                                                                                                 |
+| `goTo(editor, { story, from, to }, options?)` | Selects it and shows it, through the view when there is one (`focus`: the document takes the focus)                                                                                |
+| `hint(editor, target, { ms? })`               | Shows `{ story, from, to }` or `{ bookmark }` (by name, capitals not counting) for `ms` (2000) without selecting it, through the view's `hint`; false without a view that shows it |
+| `documentOutline(state, layout?)`             | `pos`, `level`, `text`, `number`, `page` (with `editor.storyView.fieldLayout`): the body's headings, by the rule of a table of contents with `\o` and `\u`                         |
 
 The first three return `{ ok: true, bookmark }` or `{ ok: false, reason }` (`invalid-name`,
 `no-place`, `missing`, `exists`, `refused`), except `deleteBookmark`. Bookmarks are not tracked, as
@@ -994,7 +994,11 @@ const view = new EditorView(host, editor, { editable: true, placeholder: "" });
   marks the range for `ms` (default 2000) with `::highlight(foli-hint)`, then one lighter step,
   `foli-hint-fading`, for 0.4 s, without touching the document, the selection, undo or the
   focus; the range follows edits and goes with its text; a new hint replaces it; under
-  `prefers-reduced-motion` it goes without the fading step. Body ranges only so far (18.1).
+  `prefers-reduced-motion` it goes without the fading step. A point (`from === to`) shows its
+  paragraph. A header's, footer's or note's range (`story`) marks the copies the pages near the
+  window draw, without opening the story (the story being edited hints in its own view), and
+  ends when the story changes. An app themes it with `::highlight(foli-hint)` and
+  `::highlight(foli-hint-fading)`.
   All four are on `editor.storyView` too (`hint` is optional there). Ctrl+F, Ctrl+H, Ctrl+G,
   F3, Shift+F3 and Ctrl+Shift+F5 go to `editor.navigation` when something has set it, and are
   otherwise left to the browser.
@@ -1186,7 +1190,8 @@ version. Details, the read format and examples: the
   that did not take the value); `updateFields({ data?, contents? })` → core's `FieldsReport` and `text`
   (a table of contents is built again only with `contents: true`); `checkpoint()` →
   `Checkpoint` (`rollback()` takes back every edit since, handles included; `release()` keeps
-  them).
+  them); `target(handle)` → `{ target }`, the block's content as a `DocumentTarget` of
+  `session.editor`, for core's `hint` or `goTo` in a view of that editor (0.3).
 - `session.document()`: the document to save or export. `session.editor`: the headless editor
   under the session, for what it has no operation for; `session.author`.
 
