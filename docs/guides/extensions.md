@@ -494,9 +494,15 @@ export function AcmeEditor() {
   editor making them. Table, Section and Controls take a list; Header, Fields, Navigate and Notes
   a function ([api.md](../api.md#toolbar-items)).
 - App items keep the toolbar's keyboard use (one tab stop, arrow keys, Home, End),
-  `aria-pressed`, `aria-disabled`, and the document's focus and selection on click. They can
-  be boxes (`ToolbarSelect`) and color menus (`ToolbarColorMenu`) too
-  ([api.md](../api.md#toolbar-items)); they cannot open the toolbar's dialogs.
+  `aria-pressed`, `aria-disabled`, and the document's focus and selection on click (a
+  `ToolbarCustom` does the last three for itself). They can
+  be boxes (`ToolbarSelect`), color menus (`ToolbarColorMenu`), buttons opening the app's own
+  dialog under the toolbar (`ToolbarDialog`) and controls the app renders (`ToolbarCustom`) too
+  ([api.md](../api.md#toolbar-items)).
+- `tabs` (or `FoliEditor`'s `toolbar`) takes tabs of groups in place of groups:
+  `[...defaultToolbarTabs, { key: "acme", label: "Acme", items: [[mentionButton, topicMenu]] }]`
+  is Word's Home, Insert, Layout and Review with a tab of the app's
+  ([api.md](../api.md#toolbar-tabs)).
 - `useCommand(command)` or `useCommand(name, ...args)` gives a button of the app's own
   `{ enabled, run }`. Make its command outside the component, or memoize it: a new command on each
   render is dry-run on each render.

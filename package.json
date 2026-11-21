@@ -20,7 +20,7 @@
     "bench:layout": "playwright test --config playwright.bench.config.ts",
     "corpus:pages": "playwright test --config playwright.word.config.ts",
     "prepare": "node scripts/install-hooks.mjs",
-    "check:packages": "publint --strict packages/core && publint --strict packages/view && publint --strict packages/react && publint --strict packages/docx && publint --strict packages/pdf && publint --strict packages/agent",
+    "check:packages": "publint --strict packages/core && publint --strict packages/view && publint --strict packages/react && publint --strict packages/docx && publint --strict packages/pdf && publint --strict packages/agent && publint --strict packages/mcp",
     "api": "node scripts/api.mjs",
     "api:update": "node scripts/api.mjs --update",
     "size": "node scripts/size.mjs",

@@ -26,8 +26,9 @@ exactly its own version (since 1.0.0). Stylesheet: `@folijs/react/styles.css`
 (`FoliEditorProps`, `FoliEditorHandle`, `FoliChange`, `FoliCanvasProps`, `FoliCanvasHandle`,
 `FoliCommentsProps`, `FoliNavigationProps`, `FoliToolbarProps`), the toolbar's items
 (`ToolbarItem`, `ToolbarButton`, `ToolbarMenu`, `ToolbarAction`, `ToolbarSelect`, `ToolbarOption`,
-`ToolbarColorMenu`, `ToolbarColor`, `ToolbarItemName`, `toolbarItems`,
-`defaultToolbarItems`), the
+`ToolbarColorMenu`, `ToolbarColor`, `ToolbarDialog`, `ToolbarDialogProps`, `ToolbarCustom`,
+`ToolbarCustomProps`, `ToolbarItemName`, `toolbarItems`,
+`defaultToolbarItems`, `ToolbarTab`, `defaultToolbarTabs`), the
 hooks and their options and results (`UseFoliEditorOptions`, `UseEditorStateOptions`,
 `UseCommandOptions`, `CommandState`).
 
@@ -38,24 +39,24 @@ An editable document on pages, with a toolbar. Creates its own editor and provid
 Word's toolbar; schema v5 since 0.6.0): a document saved by 0.1.0 to 0.5.0 given to it is
 migrated (`parseDocument`), and what it reports is v5.
 
-| Prop             | Type                                             | Default      | Notes                                                                                                     |
-| ---------------- | ------------------------------------------------ | ------------ | --------------------------------------------------------------------------------------------------------- |
-| `initialContent` | `EditorDocument`                                 | empty A4     | Read once, on mount; any version (migrated). Later: `editor.setDocument()` or a new `key`.                |
-| `plugins`        | `readonly Plugin[]`                              | `[]`         | Read once, on mount. Other plugins later: ignored, with a dev warning (`useFoliEditor`); use a new `key`. |
-| `extensions`     | `readonly Extension[]`                           | `[]`         | Read once, on mount, as `plugins`: custom nodes and marks, with their view hooks (`ViewExtension`).       |
-| `author`         | `string`                                         | `"Author"`   | Read once: who edits (tracked changes are made in this name).                                             |
-| `trackChanges`   | `boolean`                                        | `false`      | Read once: record edits as tracked changes (the toolbar turns it on and off).                             |
-| `reviewView`     | `ReviewView`                                     | `"markup"`   | Read once: how tracked changes show (the toolbar changes it).                                             |
-| `onChange`       | `(change: FoliChange) => void`                   | —            | After every content change made through transactions. Not for selection changes or `setDocument`.         |
-| `toolbar`        | `boolean \| readonly (readonly ToolbarItem[])[]` | `true`       | Show `FoliToolbar` above the pages; groups of items in place of the default ones (its `items`).           |
-| `comments`       | `boolean \| "auto"`                              | `"auto"`     | The comments pane beside the pages: while the document has comments (`"auto"`), always, never.            |
-| `readOnly`       | `boolean`                                        | `false`      | Read, select, copy; no editing. Disables the toolbar.                                                     |
-| `placeholder`    | `string`                                         | `""`         | Shown while the document is empty.                                                                        |
-| `label`          | `string`                                         | `"Document"` | Accessible name of the editable area.                                                                     |
-| `upload`         | `(file) => Promise<…>`                           | —            | Where pasted, dropped and inserted image files go (the view's `upload`); the toolbar's Picture too.       |
-| `resource`       | `(key, resource) => string \| null \| undefined` | —            | The URL to show a picture's image from (`packageImages` for a .docx package); `null` shows its box.       |
-| `className`      | `string`                                         | —            | Added to the `.foli-canvas` element.                                                                      |
-| `children`       | `ReactNode`                                      | —            | Rendered between the toolbar and the pages, inside the editor's context.                                  |
+| Prop             | Type                                                                      | Default      | Notes                                                                                                                                            |
+| ---------------- | ------------------------------------------------------------------------- | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `initialContent` | `EditorDocument`                                                          | empty A4     | Read once, on mount; any version (migrated). Later: `editor.setDocument()` or a new `key`.                                                       |
+| `plugins`        | `readonly Plugin[]`                                                       | `[]`         | Read once, on mount. Other plugins later: ignored, with a dev warning (`useFoliEditor`); use a new `key`.                                        |
+| `extensions`     | `readonly Extension[]`                                                    | `[]`         | Read once, on mount, as `plugins`: custom nodes and marks, with their view hooks (`ViewExtension`).                                              |
+| `author`         | `string`                                                                  | `"Author"`   | Read once: who edits (tracked changes are made in this name).                                                                                    |
+| `trackChanges`   | `boolean`                                                                 | `false`      | Read once: record edits as tracked changes (the toolbar turns it on and off).                                                                    |
+| `reviewView`     | `ReviewView`                                                              | `"markup"`   | Read once: how tracked changes show (the toolbar changes it).                                                                                    |
+| `onChange`       | `(change: FoliChange) => void`                                            | —            | After every content change made through transactions. Not for selection changes or `setDocument`.                                                |
+| `toolbar`        | `boolean \| readonly (readonly ToolbarItem[])[] \| readonly ToolbarTab[]` | `true`       | Show `FoliToolbar` above the pages; groups of items in place of the default ones (its `items`), or tabs (its `tabs`, e.g. `defaultToolbarTabs`). |
+| `comments`       | `boolean \| "auto"`                                                       | `"auto"`     | The comments pane beside the pages: while the document has comments (`"auto"`), always, never.                                                   |
+| `readOnly`       | `boolean`                                                                 | `false`      | Read, select, copy; no editing. Disables the toolbar.                                                                                            |
+| `placeholder`    | `string`                                                                  | `""`         | Shown while the document is empty.                                                                                                               |
+| `label`          | `string`                                                                  | `"Document"` | Accessible name of the editable area.                                                                                                            |
+| `upload`         | `(file) => Promise<…>`                                                    | —            | Where pasted, dropped and inserted image files go (the view's `upload`); the toolbar's Picture too.                                              |
+| `resource`       | `(key, resource) => string \| null \| undefined`                          | —            | The URL to show a picture's image from (`packageImages` for a .docx package); `null` shows its box.                                              |
+| `className`      | `string`                                                                  | —            | Added to the `.foli-canvas` element.                                                                                                             |
+| `children`       | `ReactNode`                                                               | —            | Rendered between the toolbar and the pages, inside the editor's context.                                                                         |
 
 `ref` → `FoliEditorHandle`: `{ editor: Editor; focus(): void }` (`editor.setDocument` takes
 a document of any version too).
@@ -182,16 +183,17 @@ closes it and calls `onClickCommand` (the focus goes to the document, where the 
 Cancel returns the focus to the Table button. A change to the document or the selection closes
 it, and only one of the link and insert table dialogs is open at a time.
 
-| Prop             | Type                                  | Default               | Notes                                                                     |
-| ---------------- | ------------------------------------- | --------------------- | ------------------------------------------------------------------------- |
-| `editor`         | `Editor`                              | context               |                                                                           |
-| `disabled`       | `boolean`                             | `false`               | Pass it whenever the canvas is `readOnly`.                                |
-| `onClickCommand` | `() => void`                          | —                     | After a click ran a command (`FoliEditor` focuses its canvas here).       |
-| `label`          | `string`                              | `"Formatting"`        | Accessible name.                                                          |
-| `comments`       | `boolean`                             | `false`               | Show New comment (only with a comments pane; `FoliEditor` passes it).     |
-| `upload`         | `(file) => Promise<…>`                | —                     | Where Picture… puts an inserted image file (`FoliEditor` passes its own). |
-| `items`          | `readonly (readonly ToolbarItem[])[]` | `defaultToolbarItems` | The items, in groups (a separator between groups).                        |
-| `className`      | `string`                              | —                     | Added to `.foli-toolbar`.                                                 |
+| Prop             | Type                                  | Default               | Notes                                                                                                      |
+| ---------------- | ------------------------------------- | --------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `editor`         | `Editor`                              | context               |                                                                                                            |
+| `disabled`       | `boolean`                             | `false`               | Pass it whenever the canvas is `readOnly`.                                                                 |
+| `onClickCommand` | `() => void`                          | —                     | After a click ran a command (`FoliEditor` focuses its canvas here).                                        |
+| `label`          | `string`                              | `"Formatting"`        | Accessible name.                                                                                           |
+| `comments`       | `boolean`                             | `false`               | Show New comment (only with a comments pane; `FoliEditor` passes it).                                      |
+| `upload`         | `(file) => Promise<…>`                | —                     | Where Picture… puts an inserted image file (`FoliEditor` passes its own).                                  |
+| `items`          | `readonly (readonly ToolbarItem[])[]` | `defaultToolbarItems` | The items, in groups (a separator between groups).                                                         |
+| `tabs`           | `readonly ToolbarTab[]`               | —                     | Tabs over the toolbar, each with its groups of items, in place of `items` ([Toolbar tabs](#toolbar-tabs)). |
+| `className`      | `string`                              | —                     | Added to `.foli-toolbar`.                                                                                  |
 
 #### Toolbar items
 
@@ -213,7 +215,9 @@ typed `ToolbarMenu`, the boxes (`style`, `font`, `size`, `lineSpacing`, `reviewV
 other built-ins `ToolbarButton`.
 
 An app's item is a `ToolbarItem`: a `ToolbarButton` (with `command`), a `ToolbarMenu` (with
-`actions`), a `ToolbarSelect` (a box, with `select`) or a `ToolbarColorMenu` (with `colors`).
+`actions`), a `ToolbarSelect` (a box, with `select`), a `ToolbarColorMenu` (with `colors`), a
+`ToolbarDialog` (with `dialog`) or a `ToolbarCustom` (with `render`). An item has one of these
+fields, not two.
 
 - `key`: unique in the toolbar. `label`: the tooltip, and the accessible name when `icon` is
   given. `text`: the visible text and accessible name (default `label`). `icon`: a `ReactNode`
@@ -221,7 +225,8 @@ An app's item is a `ToolbarItem`: a `ToolbarButton` (with `command`), a `Toolbar
 - `command: Command`: what a press runs, on the editor of the story open on its page, else the
   body's. Enabled by its dry run (`editor.can(command)`) after every transaction, unless
   `enabled(state, editor)` says otherwise (keep either cheap). A box or a color menu is
-  enabled unless its `enabled` says no: its `pick` is not dry-run.
+  enabled unless its `enabled` says no: its `pick` is not dry-run. So are a dialog button
+  and an app's own control.
 - `pressed(state, editor)`: a toggle (`aria-pressed`).
 - `actions`: a menu button instead, its entries `ToolbarAction`s (`{ key, label, command,
   checked? }`, a `menuitemcheckbox` with `checked(state, editor)`), or a function of the body's
@@ -255,7 +260,57 @@ Since 1.1 `toolbarItems` types its six boxes and three color menus as `ToolbarSe
 `ToolbarColorMenu` (1.0 typed them `ToolbarButton`, with a `command` they never had). Types only:
 code that annotates one of them as `ToolbarButton` names the new type, or `ToolbarItem`.
 
-The dialogs of the built-in items are not available to app items.
+- `dialog({ editor, close })`: a button that opens the app's dialog under the toolbar, as
+  Picture… does. The toolbar renders a `role="dialog"` named by `label`
+  (`.foli-toolbar-dialog.foli-toolbar-<key>-dialog`, styled as the built-in dialogs) around
+  what `dialog` returns, moves the focus to its first field or button (to the dialog itself
+  when it has none), and closes it on Escape (unless the content prevented the key's default) (the focus back on its button), when
+  the toolbar is disabled, when another dialog of the toolbar opens, and when its item leaves
+  the toolbar. `close(applied)` closes it (and does nothing once it is closed): with `applied` the toolbar calls `onClickCommand` (`FoliEditor` focuses the
+  document), otherwise the focus goes back to the button. It stays open while the document
+  or the selection changes: close it yourself if it is about a place. `dialog` runs as a
+  component's body, so it may use hooks; `editor` is the story's or the body's, as for
+  commands. `pressed(state, editor)` makes the button a toggle.
+- `render({ editor, disabled, tabIndex, ref, onFocus })`: the app's own control in the toolbar
+  (a field, a slider, a button with its own popover). Put `ref`, `tabIndex` and `onFocus` on
+  its one focusable element (required: without it the toolbar's tab stop can land on nothing;
+  on a DOM element, or a component that passes them on, since React 18 gives a function
+  component no `ref`): the toolbar then keeps its single tab stop and its arrow keys
+  reach the control. `label` is not shown: the control names itself. `disabled` is the toolbar's, or the item's `enabled` saying no: show it
+  with `aria-disabled` and keep the element focusable. ArrowLeft, ArrowRight, Home and End are
+  the toolbar's: a control that needs them (a text field) stops their propagation. `render`
+  runs as a component's body (hooks such as `useEditorState` are fine), again when the
+  toolbar renders, not on every transaction. Nothing else is done for it: a click takes the
+  focus from the document unless the control prevents it on `mousedown`.
+
+The built-in dialogs themselves (link, picture, page setup…) open only from their own items.
+
+#### Toolbar tabs
+
+`tabs` (or `FoliEditor`'s `toolbar`) puts tabs over the toolbar, as Word's ribbon: each
+`ToolbarTab` is `{ key, label, items }`, `items` being groups as above, and the toolbar shows the
+selected tab's items (the first tab at first; the tab picked stays while it is among the tabs).
+`defaultToolbarTabs` has every built-in item once in Home, Insert, Layout and Review:
+
+```tsx
+import { defaultToolbarTabs, FoliEditor } from "@folijs/react";
+
+<FoliEditor toolbar={[...defaultToolbarTabs, { key: "acme", label: "Acme", items: [[mine]] }]} />;
+```
+
+With tabs the toolbar is inside a `.foli-ribbon` element, which then takes `className` (the
+toolbar itself does not): a WAI-ARIA tab list (`.foli-ribbon-tabs`, `role="tablist"`, named by
+`label` as the toolbar is) of `role="tab"` buttons (`.foli-ribbon-tab.foli-ribbon-tab-<key>`),
+over a `role="tabpanel"` (`.foli-ribbon-panel`) named by its tab, which holds the toolbar (a tab
+whose items all are left out has an empty one, and its panel is then the tab stop). One tab stop for the tabs:
+ArrowLeft, ArrowRight, Home and End move between them and show each (the arrows wrap); Tab goes on
+into the toolbar. A click on a tab keeps the document's focus and selection. Changing tab closes
+the last tab's open menu and any dialog of the toolbar. Mod-K's link dialog opens on any tab, also one
+without the Link item. An item's `key` is unique within its tab; the same item may be in two tabs.
+An empty `tabs` shows `items`.
+
+Not there: tabs that come with the selection (Word's Table tab), a tab chosen by the app
+(`tabs` has no selected-tab prop), groups with a caption.
 
 ### Hooks and provider
 

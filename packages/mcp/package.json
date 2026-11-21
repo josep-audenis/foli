@@ -1,0 +1,58 @@
+{
+  "name": "@folijs/mcp",
+  "version": "0.0.0",
+  "private": true,
+  "description": "MCP server for the Foli document engine: an MCP client's model reads and edits .docx files through tools, every edit a tracked change. Node only.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/josep-audenis/foli.git",
+    "directory": "packages/mcp"
+  },
+  "homepage": "https://github.com/josep-audenis/foli#readme",
+  "bugs": "https://github.com/josep-audenis/foli/issues",
+  "type": "module",
+  "sideEffects": false,
+  "bin": {
+    "foli-mcp": "./dist/bin.js"
+  },
+  "exports": {
+    ".": {
+      "@folijs/source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "CHANGELOG.md",
+    "src",
+    "!src/**/*.test.*",
+    "!src/testing"
+  ],
+  "engines": {
+    "node": ">=20.19"
+  },
+  "scripts": {
+    "build": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\" && tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@folijs/agent": "workspace:*",
+    "@folijs/core": "workspace:*",
+    "@folijs/docx": "workspace:*"
+  },
+  "devDependencies": {
+    "@modelcontextprotocol/sdk": "1.32.2",
+    "@types/node": "^20.19.43",
+    "zod": "^4.0.0"
+  },
+  "publishConfig": {
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      }
+    }
+  }
+}

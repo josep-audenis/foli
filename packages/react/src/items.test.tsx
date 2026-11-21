@@ -7,25 +7,31 @@ import {
   type FoliDocument,
   insertText,
   type OpenStory,
+  openLinkEditor,
   Plugin,
   PluginKey,
   TextSelection,
   undo,
 } from "@folijs/core";
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   defaultToolbarItems,
+  defaultToolbarTabs,
   FoliEditor,
   FoliEditorProvider,
   FoliToolbar,
   type ToolbarColorMenu,
+  type ToolbarCustom,
+  type ToolbarDialog,
   type ToolbarItem,
   type ToolbarItemName,
   type ToolbarSelect,
+  type ToolbarTab,
   toolbarItems,
   useCommand,
+  useEditorState,
 } from "./index.js";
 
 declare module "@folijs/core" {
@@ -327,6 +333,262 @@ describe("toolbar items", () => {
     expect(box.value).toBe("");
     fireEvent.change(box, { target: { value: "a" } });
     expect(pick).not.toHaveBeenCalled();
+  });
+
+  it("opens an app's dialog under the toolbar: focus in, Escape and close back out", () => {
+    const editor = createEditor({ document: doc() });
+    const onClickCommand = vi.fn();
+    const late: { current: ((applied?: boolean) => void) | null } = { current: null };
+    // Fewer hooks than the other dialog's, and nothing that takes the focus.
+    const note: ToolbarDialog = { key: "note", label: "Note", dialog: () => <p>Read me.</p> };
+    const stamp: ToolbarDialog = {
+      key: "stamp",
+      label: "Stamp",
+      dialog: ({ editor, close }) => {
+        // A component's body: hooks work.
+        const [value, setValue] = useState("OK");
+        late.current = close;
+        return (
+          <form
+            onSubmit={(event) => {
+              event.preventDefault();
+              close(editor.run(insertText(value)));
+            }}
+          >
+            <input aria-label="Text" value={value} onChange={(e) => setValue(e.target.value)} />
+            <button type="submit">Insert</button>
+          </form>
+        );
+      },
+    };
+    const view = (disabled = false) => (
+      <FoliToolbar
+        editor={editor}
+        items={[[stamp, note, toolbarItems.undo]]}
+        onClickCommand={onClickCommand}
+        disabled={disabled}
+      />
+    );
+    const { rerender } = render(view());
+    const button = screen.getByRole("button", { name: "Stamp" });
+    expect(button.getAttribute("aria-haspopup")).toBe("dialog");
+    expect(button.getAttribute("aria-disabled")).toBeNull();
+    act(() => button.focus());
+    fireEvent.click(button, { detail: 0 });
+    const dialog = screen.getByRole("dialog", { name: "Stamp" });
+    expect(dialog.className).toContain("foli-toolbar-stamp-dialog");
+    const field = screen.getByRole("textbox", { name: "Text" });
+    expect(document.activeElement).toBe(field);
+    fireEvent.keyDown(field, { key: "Escape" });
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(document.activeElement).toBe(button);
+
+    // Applied: the focus goes to the document (the app's `onClickCommand`).
+    fireEvent.click(button, { detail: 1 });
+    fireEvent.change(screen.getByRole("textbox", { name: "Text" }), { target: { value: "Hi " } });
+    fireEvent.click(screen.getByRole("button", { name: "Insert" }));
+    expect(text(editor)).toBe("Hi Hello");
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(onClickCommand).toHaveBeenCalledOnce();
+
+    // Another item's dialog takes its place, with its own state and the focus in it.
+    fireEvent.click(button, { detail: 1 });
+    fireEvent.click(screen.getByRole("button", { name: "Note" }), { detail: 1 });
+    const second = screen.getByRole("dialog");
+    expect(second.getAttribute("aria-label")).toBe("Note");
+    // Nothing to focus in it: the dialog itself, where Escape still closes it.
+    expect(document.activeElement).toBe(second);
+    // A `close` the first dialog kept does nothing now.
+    act(() => late.current?.(true));
+    screen.getByRole("dialog", { name: "Note" });
+    fireEvent.keyDown(second, { key: "Escape" });
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(onClickCommand).toHaveBeenCalledOnce();
+
+    // A built-in dialog that opens takes its place.
+    fireEvent.click(button, { detail: 1 });
+    act(() => void editor.run(openLinkEditor));
+    expect(screen.getAllByRole("dialog").map((d) => d.getAttribute("aria-label"))).toEqual([
+      "Add link",
+    ]);
+    fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
+    expect(screen.queryByRole("dialog")).toBeNull();
+
+    // A disabled toolbar closes it, and it does not come back.
+    fireEvent.click(button, { detail: 1 });
+    screen.getByRole("dialog");
+    rerender(view(true));
+    expect(screen.queryByRole("dialog")).toBeNull();
+    rerender(view());
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("takes an item of one kind only (types)", () => {
+    // @ts-expect-error a box is not also a button
+    const both: ToolbarItem = { ...toolbarItems.size, command: undo };
+    expect(both.key).toBe("size");
+  });
+
+  it("renders an app's own control in the toolbar's one tab stop", () => {
+    const editor = createEditor({ document: doc() });
+    const count: ToolbarCustom = {
+      key: "count",
+      label: "Characters",
+      enabled: (state) => !state.selection.empty,
+      render: ({ editor, disabled, ...props }) => {
+        const size = useEditorState((state) => state.doc.textContent.length, { editor });
+        return (
+          <input
+            {...props}
+            aria-label="Characters"
+            aria-disabled={disabled}
+            readOnly
+            value={size}
+          />
+        );
+      },
+    };
+    render(<FoliToolbar editor={editor} items={[[toolbarItems.undo, count]]} />);
+    const undoButton = screen.getByRole("button", { name: "Undo" });
+    const field = screen.getByRole("textbox", { name: "Characters" }) as HTMLInputElement;
+    expect(field.value).toBe("5");
+    expect(field.getAttribute("aria-disabled")).toBe("true");
+    expect([undoButton.tabIndex, field.tabIndex]).toEqual([0, -1]);
+    fireEvent.keyDown(undoButton, { key: "ArrowRight" });
+    expect(document.activeElement).toBe(field);
+    expect([undoButton.tabIndex, field.tabIndex]).toEqual([-1, 0]);
+    selectAll(editor);
+    expect(field.getAttribute("aria-disabled")).toBe("false");
+    act(() => editor.run(insertText("Hey")));
+    expect(field.value).toBe("3");
+  });
+
+  it("shows tabs over the toolbar: one tab's items at a time, arrow keys between tabs", () => {
+    const editor = createEditor({ document: doc() });
+    const tabs: ToolbarTab[] = [
+      { key: "edit", label: "Edit", items: [[toolbarItems.undo, toolbarItems.redo]] },
+      { key: "format", label: "Format", items: [[toolbarItems.bold], [clear]] },
+    ];
+    const { rerender } = render(<FoliToolbar editor={editor} tabs={tabs} items={[[clear]]} />);
+    const names = () =>
+      within(screen.getByRole("toolbar"))
+        .getAllByRole("button")
+        .map((b) => b.getAttribute("aria-label") ?? b.textContent);
+    screen.getByRole("tablist", { name: "Formatting" });
+    const [edit, format] = screen.getAllByRole("tab") as [HTMLElement, HTMLElement];
+    expect([edit.textContent, format.textContent]).toEqual(["Edit", "Format"]);
+    expect([edit.getAttribute("aria-selected"), format.getAttribute("aria-selected")]).toEqual([
+      "true",
+      "false",
+    ]);
+    expect([edit.tabIndex, format.tabIndex]).toEqual([0, -1]);
+    // The tab names its panel, which holds the toolbar; `items` gives way to the tabs.
+    const tabPanel = screen.getByRole("tabpanel", { name: "Edit" });
+    expect(edit.getAttribute("aria-controls")).toBe(tabPanel.id);
+    expect(tabPanel.firstElementChild).toBe(screen.getByRole("toolbar", { name: "Formatting" }));
+    expect(tabPanel.tabIndex).toBe(-1);
+    expect(names()).toEqual(["Undo", "Redo"]);
+
+    // Arrow keys move between tabs and show each; they wrap.
+    act(() => edit.focus());
+    fireEvent.keyDown(edit, { key: "ArrowRight" });
+    expect(document.activeElement).toBe(format);
+    expect(format.getAttribute("aria-selected")).toBe("true");
+    expect(names()).toEqual(["Bold", "Clear"]);
+    screen.getByRole("tabpanel", { name: "Format" });
+    fireEvent.keyDown(format, { key: "ArrowRight" });
+    expect(document.activeElement).toBe(edit);
+    expect(names()).toEqual(["Undo", "Redo"]);
+    fireEvent.keyDown(edit, { key: "End" });
+    expect(names()).toEqual(["Bold", "Clear"]);
+
+    // A click shows a tab without taking the focus from the document.
+    expect(fireEvent.mouseDown(edit)).toBe(false);
+    fireEvent.click(edit, { detail: 1 });
+    expect(names()).toEqual(["Undo", "Redo"]);
+
+    // The tab shown stays while it is among the tabs; without it, the first one shows.
+    fireEvent.click(format, { detail: 1 });
+    rerender(<FoliToolbar editor={editor} tabs={[...tabs].reverse()} />);
+    expect(names()).toEqual(["Bold", "Clear"]);
+    rerender(<FoliToolbar editor={editor} tabs={tabs.slice(0, 1)} />);
+    expect(names()).toEqual(["Undo", "Redo"]);
+    // No tabs: the items, and no tab list.
+    rerender(<FoliToolbar editor={editor} tabs={[]} items={[[clear]]} />);
+    expect(screen.queryByRole("tablist")).toBeNull();
+    expect(screen.queryByRole("tabpanel")).toBeNull();
+    expect(names()).toEqual(["Clear"]);
+  });
+
+  it("closes a tab's open menu and dialogs with the tab, and opens Mod-K's link dialog on any tab", () => {
+    const editor = createEditor({ document: doc() });
+    // On both tabs, so that only the change of tab can close its dialog.
+    const note: ToolbarDialog = { key: "note", label: "Note", dialog: () => <p>Read me.</p> };
+    const tabs: ToolbarTab[] = [
+      { key: "a", label: "A", items: [[toolbarItems.textColor, toolbarItems.table, note]] },
+      { key: "b", label: "B", items: [[toolbarItems.undo, note]] },
+      { key: "c", label: "C", items: [[toolbarItems.newComment]] },
+    ];
+    const { container } = render(<FoliToolbar editor={editor} tabs={tabs} className="mine" />);
+    // `className` is on the element around the tabs and the toolbar.
+    const ribbon = container.querySelector(".foli-ribbon.mine") as HTMLElement;
+    expect(ribbon.contains(screen.getByRole("tablist"))).toBe(true);
+    expect(screen.getByRole("toolbar").className).toBe("foli-toolbar");
+    fireEvent.click(screen.getByRole("button", { name: "Note" }), { detail: 1 });
+    screen.getByRole("dialog", { name: "Note" });
+    fireEvent.click(screen.getByRole("tab", { name: "B" }), { detail: 1 });
+    expect(screen.queryByRole("dialog")).toBeNull();
+    fireEvent.click(screen.getByRole("tab", { name: "A" }), { detail: 1 });
+    // A built-in dialog too: its button went with the tab.
+    fireEvent.click(screen.getByRole("button", { name: "Table" }), { detail: 0 });
+    fireEvent.click(screen.getByRole("menuitem", { name: "Insert table\u2026" }), { detail: 0 });
+    screen.getByRole("dialog", { name: "Insert table" });
+    fireEvent.click(screen.getByRole("tab", { name: "B" }), { detail: 1 });
+    expect(screen.queryByRole("dialog")).toBeNull();
+    // A tab with nothing to show (New comment without `comments`): its panel is the tab stop.
+    fireEvent.click(screen.getByRole("tab", { name: "C" }), { detail: 1 });
+    expect(screen.getByRole("tabpanel").tabIndex).toBe(0);
+    fireEvent.click(screen.getByRole("tab", { name: "A" }), { detail: 1 });
+    fireEvent.click(screen.getByRole("button", { name: "Text color" }), { detail: 0 });
+    screen.getByRole("menu");
+    fireEvent.click(screen.getByRole("tab", { name: "B" }), { detail: 1 });
+    expect(screen.queryByRole("menu")).toBeNull();
+    fireEvent.click(screen.getByRole("tab", { name: "A" }), { detail: 1 });
+    expect(screen.queryByRole("menu")).toBeNull();
+    // No link item on either tab: the dialog is the toolbar's.
+    selectAll(editor);
+    act(() => void editor.run(openLinkEditor));
+    screen.getByRole("dialog", { name: "Add link" });
+  });
+
+  it("has Word's tabs of the built-in items, each item once, through FoliEditor's toolbar", () => {
+    expect(defaultToolbarTabs.map((tab) => tab.label)).toEqual([
+      "Home",
+      "Insert",
+      "Layout",
+      "Review",
+    ]);
+    const all = defaultToolbarTabs.flatMap((tab) => tab.items.flat());
+    expect(new Set(all)).toEqual(new Set(Object.values(toolbarItems)));
+    expect(all).toHaveLength(Object.keys(toolbarItems).length);
+
+    // No groups is no items, as before there were tabs.
+    const empty = render(<FoliEditor initialContent={doc()} toolbar={[]} label="Document" />);
+    expect(screen.queryByRole("tablist")).toBeNull();
+    expect(within(screen.getByRole("toolbar")).queryAllByRole("button")).toEqual([]);
+    empty.unmount();
+
+    render(<FoliEditor initialContent={doc()} toolbar={defaultToolbarTabs} label="Document" />);
+    expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual([
+      "Home",
+      "Insert",
+      "Layout",
+      "Review",
+    ]);
+    screen.getByRole("button", { name: "Bold" });
+    fireEvent.click(screen.getByRole("tab", { name: "Review" }), { detail: 1 });
+    expect(screen.queryByRole("button", { name: "Bold" })).toBeNull();
+    screen.getByRole("button", { name: "Track changes" });
   });
 
   it("warns once about two items with one key, outside production", () => {

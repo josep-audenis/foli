@@ -25,7 +25,7 @@ place that says what is in progress; check it before starting work.
 | 11 Sections & templates  | ✅ Done                  | —                                | Merged in #100–#118 (#106, #107, #110, #112 and #113, the site, went to main); 0.6.0 on npm; misses accepted |
 | 12 Ecosystem & 1.0       | ✅ Done                  | —                                | Merged in #120–#133; 1.0.0 on npm (2026-11-20); Phase 5 speed misses and manual checks accepted as 1.0 risks |
 | 13 Agent library         | ✅ Done                  | —                                | Merged in #138–#146; `@folijs/agent` 0.1.0 on npm (2026-11-21)                                               |
-| 14 MCP server            | Ready                    | —                                | Planned 2026-11-21, nothing built                                                                            |
+| 14 MCP server            | In progress              | `phase-14/mcp`                   | 14.1 done                                                                                                    |
 | 15 Toolbar               | In progress              | `phase-15/toolbar-customization` | Planned 2026-11-21; independent of Phase 14                                                                  |
 
 Status values: `Ready` (dependencies met, nobody on it) · `In progress` · `In review` (PR open) ·
@@ -2170,8 +2170,8 @@ owner's approval, as 0.x.
 Each task is a PR on `phase-14/mcp`, the build green after each, merged after an agent's
 review.
 
-- [ ] Claim phase, branch `phase-14/mcp`
-- [ ] 14.1 ADR-0009 and a spike. To decide, with the spike's evidence: (a) the protocol by hand
+- [x] Claim phase, branch `phase-14/mcp`
+- [x] 14.1 ADR-0009 and a spike. To decide, with the spike's evidence: (a) the protocol by hand
   or by the SDK. Proposed: by hand (stdio, tools only, no runtime dependency beyond Foli's own
   packages), with the SDK's client as the test of conformance; the SDK instead if the spike
   shows a client (Claude Code, the MCP Inspector) the hand-written server does not satisfy.
@@ -2183,7 +2183,28 @@ review.
   when the server stops; what `close` does to unsaved changes. (f) The tools, one per
   operation or fewer and wider; how a refusal is returned (`isError` with the message).
   Spike: `initialize`, `tools/list` and one `read` tool, called by the SDK's client and by
-  Claude Code.
+  Claude Code. (Done:
+  [ADR-0009](decisions/ADR-0009-mcp-server.md), accepted by review. Decided as proposed: the
+  protocol by hand, the SDK's client its conformance check and a devDependency only; the
+  versions `2025-11-25` to `2024-11-05`; a root, `.docx` only, 64 MB, a save beside the input
+  unless `--overwrite`; the author from `--author`, the client's name, or "Agent"; documents
+  by id, at most 16, the id left out while one is open; one tool per operation; a refusal and
+  wrong arguments as a result with `isError`. The spike is the package itself, `private`:
+  `protocol.ts` (the stdio loop, about 150 lines) and `schema.ts` (the check of arguments),
+  with one tool, `read`, to be replaced in 14.3. The SDK's client initializes, lists and calls
+  on the oldest and the newest version (7 tests, which also send what is not a message: bad
+  JSON, a batch, a line over 8 MB, messages cut inside a character). Claude Code 2.1.92 reports
+  the built `bin` connected; a model calling a tool through it was not tried, the CLI on the
+  machine not being logged in: 14.6's. In `pnpm check`: the API report and publint; no size
+  budget, as nothing ships it to a browser. From the review of #148 (a security review): an
+  error with `"id": null` is not a message the SDK's transports take, and the tests' transport
+  did not check messages as they do; the 8 MB limit did not hold for a line that came whole
+  with its newline; fractional ids were echoed; answers were written without waiting for a
+  slow client; a schema was checked more strictly than it was published. All fixed here. For
+  the ADR's file rules: a save through a planted link would have written outside the root, so
+  a save goes to a new file created exclusively and renamed; a file system's root is not a
+  root; `:` in a path is refused; line-ending characters in a document's text must not forge
+  read lines.)
 - [ ] 14.2 Package and protocol: `packages/mcp` as `@folijs/mcp` 0.0.0, `private`, with
   `@folijs/agent`, `@folijs/docx` and `@folijs/core` as exact dependencies, a `bin`, Node only
   (its build has Node's types and no DOM). The stdio loop: messages parsed and validated,
@@ -2244,9 +2265,9 @@ an agent's review.
 - [x] Claim phase, branch `phase-15/toolbar-customization` (with 15.1, #149)
 - [x] 15.1 (#149) Boxes and color menus: `ToolbarSelect` and `ToolbarColorMenu` public, the built-in
   ones typed so in `toolbarItems`, their options replaceable through a copy.
-- [ ] 15.2 Dialogs and controls: `ToolbarDialog` (the app's content in a dialog under the
+- [x] 15.2 (#150) Dialogs and controls: `ToolbarDialog` (the app's content in a dialog under the
   toolbar) and `ToolbarCustom` (`render`, with the props that keep the one tab stop).
-- [ ] 15.3 Tabs: `tabs` on `FoliToolbar`, `toolbar` of `FoliEditor` taking them; the playground
+- [x] 15.3 (#152) Tabs: `tabs` on `FoliToolbar`, `toolbar` of `FoliEditor` taking them; the playground
   shows them; e2e.
 - [ ] 15.4 Docs checked against the acceptance above, the changeset; 1.1.0 published with the
   owner's approval (the Release workflow).
