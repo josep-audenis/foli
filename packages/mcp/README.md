@@ -6,19 +6,15 @@ tools. Every edit is a tracked change, and every note a comment, for a person to
 reject in Word. Built on [`@folijs/agent`](../agent/README.md); its only dependencies are
 Foli's own packages.
 
-> **Unstable (0.x), not released yet.** Outside the 1.0 promise of the other packages: tools
-> and options may change in any 0.x release. Every tool is driven by the official MCP SDK's
-> client in the tests, on Windows and Linux, and Claude Code 2.1.92 connects to it; **it has
-> not yet been tried with a model calling the tools in a real client.**
+> **Unstable (0.x).** Outside the 1.0 promise of the other packages: tools and options may
+> change in any 0.x release; changes in `CHANGELOG.md`. Every tool is driven by the official
+> MCP SDK's client in the tests, on Windows and Linux, and Claude Code 2.1.92 connects to it. A
+> model has done whole tasks with the tools through that SDK client; **it has not yet been
+> tried with a model in a client of its own (Claude Code, Claude Desktop).**
 
 ## Set up
 
 The server is a program the client starts. It needs Node 20.19 or later.
-
-**Until 0.1.0 is on npm, `npx @folijs/mcp` finds nothing.** Build the repository
-(`pnpm install && pnpm build`) and give the client `node <checkout>/packages/mcp/dist/bin.js`
-in place of `npx -y @folijs/mcp` below. That is the form Claude Code 2.1.92 was connected
-with; the `npx` form is not tried.
 
 ```
 foli-mcp [--root <folder>] [--author <name>] [--overwrite]
