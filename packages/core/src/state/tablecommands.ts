@@ -1,9 +1,9 @@
 /**
  * Table commands (10.7, ADR-0006): inserting a table, inserting and deleting rows and columns,
- * deleting a table; and a horizontal rule (19.1). They act on the table around the selection:
- * the rectangle of a cell selection, or the cell holding the caret. Rows are inserted and deleted as tracked changes
- * while tracking (the rebuild records them, 10.6a); column changes are not tracked by Foli yet,
- * so they do not apply while tracking.
+ * deleting a table; also inserting a horizontal rule (19.1). They act on the table around the
+ * selection: the rectangle of a cell selection, or the cell holding the caret. Rows are inserted
+ * and deleted as tracked changes while tracking (the rebuild records them, 10.6a); column changes
+ * are not tracked by Foli yet, so they do not apply while tracking.
  */
 import { FoliDocumentError, Fragment, type Node, type NodeType, Slice } from "../model/index.js";
 import { attempt } from "./attempt.js";
@@ -212,21 +212,24 @@ export const insertHorizontalRule: Command = (state, dispatch) => {
   const context = wordContext(state);
   if (!paragraph || !context || !state.selection.$from.parent.isTextblock) return false;
   const borders = { bottom: { ...HORIZONTAL_RULE } };
+  const controls = state.selection.$from.parent.attrs.controls ?? null;
   return apply(state, dispatch, (tr) => {
     if (!tr.selection.empty) deleteSelectionKeepingTables(tr);
     const $pos = tr.selection.$from;
     if (!$pos.parent.isTextblock) throw new RangeError("No paragraph at the caret");
     if ($pos.parentOffset === 0) {
-      tr.insert($pos.before(), paragraph.create({ borders }));
+      tr.insert($pos.before(), paragraph.create({ borders, controls }));
     } else {
       // Two splits, as Enter makes them: the text before and the rule get new paragraph marks,
       // the text after keeps the original one.
-      const { before, after } = splitAttrs(context, $pos.parent, false);
+      // At the end, the text after is a new paragraph in the style that follows (as Enter).
+      const atEnd = $pos.parentOffset === $pos.parent.content.size;
+      const { before, after } = splitAttrs(context, $pos.parent, atEnd);
       tr.split($pos.pos, 1, [{ type: $pos.parent.type, attrs: after }]);
       tr.split($pos.pos + 2, 1, [{ type: $pos.parent.type, attrs: after }]);
       if (before) tr.setNodeMarkup($pos.before(), $pos.parent.type, before);
-      // The rule's own paragraph: no text, so none of the split text's properties.
-      tr.setNodeMarkup($pos.pos + 1, paragraph, { borders }, []);
+      // The rule's own paragraph: none of the split text's properties, but its controls.
+      tr.setNodeMarkup($pos.pos + 1, paragraph, { borders, controls }, []);
     }
     tr.setSelection(Selection.near(tr.doc.resolve(tr.mapping.map($pos.pos, 1)), 1));
   });

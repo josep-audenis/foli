@@ -225,6 +225,46 @@ describe("insertHorizontalRule", () => {
     valid(editor);
   });
 
+  it("stays in the paragraph's content controls", () => {
+    const inControl = { ...p("abcd"), attrs: { controls: ["c1"] } } as NodeJSON;
+    for (const at of [1, 3]) {
+      const editor = editorOf([inControl]);
+      select(editor, at);
+      editor.run(insertHorizontalRule);
+      const all: unknown[] = [];
+      editor.state.doc.forEach((b) => {
+        all.push(b.attrs.controls);
+      });
+      // At the start: the rule, then the paragraph; else the two halves around it.
+      expect(all).toEqual(Array(at === 1 ? 2 : 3).fill(["c1"]));
+    }
+  });
+
+  it("at a heading's end, goes on in the style that follows it, as Enter does", () => {
+    const heading = { ...p("Title"), attrs: { style: "Heading1" } } as NodeJSON;
+    const editor = createEditor({
+      document: {
+        ...documentOf(heading),
+        styles: [
+          { id: "Normal", type: "paragraph", name: "Normal", isDefault: true },
+          {
+            id: "Heading1",
+            type: "paragraph",
+            name: "heading 1",
+            basedOn: "Normal",
+            next: "Normal",
+          },
+        ],
+      } as FoliDocument,
+    });
+    select(editor, 6);
+    editor.run(insertHorizontalRule);
+    expect(editor.state.doc.child(0).attrs.style).toBe("Heading1");
+    expect(editor.state.doc.child(1).attrs.style).toBe(null);
+    expect(editor.state.doc.child(2).attrs.style).not.toBe("Heading1");
+    expect(editor.state.selection.$head.index(0)).toBe(2);
+  });
+
   it("is one undo step", () => {
     const editor = editorOf([p("abcd")]);
     select(editor, 3);
