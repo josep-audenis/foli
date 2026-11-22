@@ -316,7 +316,8 @@ export function runProperties(rPr: XmlElement | undefined, context: Context): Ma
     }
     context.report.unmodeled(name("rPr"), `a property written twice (${m.type}), read as one`);
     const attrs = { ...before.attrs };
-    for (const [key, value] of Object.entries(m.attrs ?? {})) if (value !== null) attrs[key] = value;
+    for (const [key, value] of Object.entries(m.attrs ?? {}))
+      if (value !== null) attrs[key] = value;
     byType.set(m.type, { ...m, attrs });
   }
   return [...byType.values()];
