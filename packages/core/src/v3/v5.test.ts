@@ -16,8 +16,9 @@ const table = (controls?: string[]): NodeJSON => ({
   ...(controls ? { attrs: { controls } } : {}),
   content: [{ type: "tableRow", content: [{ type: "tableCell", content: [p()] }] }],
 });
+// The lowest version this content needs (ADR-0008): 5.
 const envelope = (overrides: Record<string, unknown> = {}) => ({
-  schemaVersion: SCHEMA_VERSION,
+  schemaVersion: 5,
   section: {},
   defaults: {},
   styles: [],
@@ -188,7 +189,7 @@ describe("schema v5", () => {
 
   it("migrates v4 by its version only, and refuses what v4 cannot hold", () => {
     const v4 = envelope({ schemaVersion: 4, content: doc(p(text("kept"))) });
-    expect(parseDocument(v4)).toEqual({ ...v4, schemaVersion: SCHEMA_VERSION });
+    expect(parseDocument(v4)).toEqual({ ...v4, schemaVersion: 5 });
     expect(() => parseDocument({ ...v4, stories: {} })).toThrow(/schema 5 and later/);
     expect(() => parseDocument({ ...v4, content: doc(p(reference)) })).toThrow(
       /noteReference is a schema 5 node \(the document says schema 4\)/,
@@ -215,5 +216,42 @@ describe("schema v5", () => {
     const stories = { rId1: { kind: "header", content: doc(p(text("H"))) } };
     const editor = createEditor({ document: parseDocument(envelope({ stories })) });
     expect(editor.getDocument()).toMatchObject({ schemaVersion: 5, stories });
+  });
+});
+
+describe("schema 6 (19.5)", () => {
+  const picture = (attrs: Record<string, unknown> = {}): NodeJSON => ({
+    type: "picture",
+    attrs: { resource: "img", width: 1, height: 1, ...attrs },
+  });
+  const para = (...content: NodeJSON[]): NodeJSON => ({ type: "paragraph", content });
+
+  it("is what a rotated or cropped picture needs, anywhere; else 5", () => {
+    expect(createDocument({ type: "doc", content: [para(picture())] }).schemaVersion).toBe(5);
+    const cropped = createDocument({ type: "doc", content: [para(picture({ crop: {} }))] });
+    expect(cropped.schemaVersion).toBe(6);
+    expect(parseDocument(cropped).schemaVersion).toBe(6);
+    const header = {
+      ...createDocument(),
+      stories: {
+        h: { kind: "header", content: { type: "doc", content: [para(picture({ rotation: 0 }))] } },
+      },
+    };
+    expect(parseDocument({ ...header, schemaVersion: 6 }).schemaVersion).toBe(6);
+    expect(() => parseDocument({ ...header, schemaVersion: 5 })).toThrow(/schema 6/);
+  });
+
+  it("goes back to 5 when the editor's pictures no longer need it", () => {
+    const editor = createEditor({
+      document: createDocument({ type: "doc", content: [para(picture({ rotation: 60_000 }))] }),
+    });
+    expect(editor.getDocument().schemaVersion).toBe(6);
+    const tr = editor.state.tr;
+    editor.state.doc.descendants((node, pos) => {
+      if (node.type.name === "picture")
+        tr.setNodeMarkup(pos, node.type, { ...node.attrs, rotation: null });
+    });
+    editor.dispatch(tr);
+    expect(editor.getDocument().schemaVersion).toBe(5);
   });
 });

@@ -8,7 +8,7 @@
 
 import type { FoliDocument, NodeJSON, ResourceJSON } from "@folijs/core";
 import { A, R } from "../import/ooxml.js";
-import { floatOf, PIC, WP } from "../import/pictures.js";
+import { cropOf, floatOf, PIC, rotationOf, WP } from "../import/pictures.js";
 import type { DocxPackage } from "../package.js";
 import { DocxError } from "../package.js";
 import type { XmlElement } from "../xml.js";
@@ -334,12 +334,16 @@ export function drawingXml(
   const ext = typeof attrs.ext === "string" ? attrs.ext : undefined;
   const part = media.part(String(attrs.resource));
   const float = attrs.float && typeof attrs.float === "object" ? (attrs.float as Json) : undefined;
+  // Missing: as the file has it (`ext`); given (0 and empty included): what to write.
+  const rotation = typeof attrs.rotation === "number" ? attrs.rotation : undefined;
+  const crop = attrs.crop && typeof attrs.crop === "object" ? (attrs.crop as Json) : undefined;
   if (ext) {
     const { element, source } = fragment(ext, namespaces);
     const anchor = kid(element, WP, "anchor");
     const inline = kid(element, WP, "inline") ?? anchor;
     // shortcut: a float changed from the file's is written fresh, losing what only its `ext`
-    // holds (cropping, effects, z-order, lock, wrap polygon, an SVG part, a click link); edit
+    // holds (effects, z-order, lock, wrap polygon, an SVG part, a click link; a crop or rotation
+    // the model left out); edit
     // `wp:positionH`/`wp:wrap*` in place once a command changes floats.
     const sameFloat = same(anchor ? (floatOf(anchor) ?? false) : undefined, float);
     const blip = descendants(element, (e) => e.ns === A && e.local === "blip")[0];
@@ -362,6 +366,23 @@ export function drawingXml(
         const size = kid(kid(spPr, A, "xfrm"), A, "ext");
         setAttr(source, size, "cx", width, edits);
         setAttr(source, size, "cy", height, edits);
+      }
+      // Rotation and crop (19.5): written into the file's own elements, the rest kept.
+      // Only a value the model gives that differs from what the file means: a crop or rotation
+      // the model left out (1.0 to 1.3's documents, or one it cannot hold) stays verbatim.
+      const shapeProps = descendants(element, (e) => e.ns === PIC && e.local === "spPr")[0];
+      const xfrm = kid(shapeProps, A, "xfrm");
+      if (
+        rotation !== undefined &&
+        rotationOf(attrOf(xfrm, "rot")?.value) !== (rotation || undefined)
+      )
+        setAttr(source, xfrm, "rot", rotation ? String(rotation) : undefined, edits);
+      const fill = descendants(element, (e) => e.ns === PIC && e.local === "blipFill")[0];
+      const rect = kid(fill, A, "srcRect");
+      if (crop && !same(cropOf(rect) ?? {}, sidesOf(crop))) {
+        const cropXml = srcRectXml(crop, blip.prefix);
+        if (rect) edits.push({ from: rect.start, to: rect.end, text: cropXml });
+        else if (cropXml) edits.push({ from: blip.end, to: blip.end, text: cropXml });
       }
       const docPr = kid(inline, WP, "docPr");
       const cNvPr = descendants(element, (e) => e.ns === PIC && e.local === "cNvPr")[0];
@@ -413,9 +434,33 @@ export function drawingXml(
     `<wp:cNvGraphicFramePr><a:graphicFrameLocks xmlns:a="${A}" noChangeAspect="1"/></wp:cNvGraphicFramePr>` +
     `<a:graphic xmlns:a="${A}"><a:graphicData uri="${PIC}"><pic:pic xmlns:pic="${PIC}">` +
     `<pic:nvPicPr><pic:cNvPr id="${id}" name="Picture ${id}"${descr}${titled}/><pic:cNvPicPr/></pic:nvPicPr>` +
-    `<pic:blipFill><a:blip xmlns:r="${R}" r:embed="${embed}"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill>` +
-    `<pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${width}" cy="${height}"/></a:xfrm>` +
+    `<pic:blipFill><a:blip xmlns:r="${R}" r:embed="${embed}"/>${srcRectXml(crop, "a")}<a:stretch><a:fillRect/></a:stretch></pic:blipFill>` +
+    `<pic:spPr><a:xfrm${rotation ? ` rot="${String(rotation)}"` : ""}><a:off x="0" y="0"/><a:ext cx="${width}" cy="${height}"/></a:xfrm>` +
     `<a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic>` +
     `</${tag}></w:drawing>`
   );
+}
+
+/** A `crop`'s sides that cut something (none: an empty object). */
+function sidesOf(crop: Json): Record<string, number> {
+  return Object.fromEntries(
+    Object.entries(crop).filter(([, v]) => typeof v === "number" && v !== 0),
+  ) as Record<string, number>;
+}
+
+/** A picture's `crop` as `a:srcRect` (with DrawingML's prefix there); "" when it has none. */
+function srcRectXml(crop: Json | undefined, prefix: string): string {
+  if (!crop) return "";
+  const sides = (
+    [
+      ["l", "left"],
+      ["t", "top"],
+      ["r", "right"],
+      ["b", "bottom"],
+    ] as const
+  )
+    .filter(([, side]) => typeof crop[side] === "number" && crop[side] !== 0)
+    .map(([local, side]) => ` ${local}="${crop[side]}"`)
+    .join("");
+  return sides ? `<${prefix ? `${prefix}:` : ""}srcRect${sides}/>` : "";
 }

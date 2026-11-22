@@ -2891,7 +2891,7 @@ import { type ContentOptions, type ParseOptions } from "./extensions.js";
  * The schema version of documents in the Word model (ADR-0005; v4 adds tables and pictures,
  * ADR-0006; v5 stories, fields, content controls and notes, ADR-0007).
  */
-export declare const SCHEMA_VERSION = 5;
+export declare const SCHEMA_VERSION = 6;
 /** Page setup of a section, in twips (1/1440 inch). Missing parts take Word's defaults. */
 export interface SectionJSON {
     pageSize?: {
@@ -3258,7 +3258,11 @@ export interface WordSettingsJSON {
 }
 /** A document in the Word model: the content tree and what Word keeps beside it. */
 export interface FoliDocument {
-    schemaVersion: typeof SCHEMA_VERSION;
+    /**
+     * The lowest schema its content needs (ADR-0008): 5 (1.0's) unless it holds what a later one
+     * added (6: a picture's rotation or crop, 1.4).
+     */
+    schemaVersion: 5 | typeof SCHEMA_VERSION;
     /** The last section's page setup (`w:body/w:sectPr`); earlier sections end at paragraphs. */
     section: SectionJSON;
     /** Document defaults (`w:docDefaults`). */

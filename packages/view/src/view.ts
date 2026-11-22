@@ -127,6 +127,7 @@ import {
   NOTE_NUMBER_ATTR,
   NOTE_REF_ATTR,
   PICTURE_ATTR,
+  PICTURE_IMAGE_ATTR,
   WORD_COLUMN_BREAK_ATTR,
 } from "./word/blocks.js";
 import {
@@ -3804,7 +3805,11 @@ export class EditorView {
     else this.writeSelection(true);
     const img = span.querySelector(`[${PICTURE_ATTR}]`) as HTMLElement | null;
     if (!img || !target?.closest("[data-foli-resize]") || !this.editable) return true;
+    // Its unrotated box (a rotated picture's rect is the rotated one's bounds).
+    const turned = img.style.transform;
+    img.style.transform = "";
     const rect = img.getBoundingClientRect();
+    img.style.transform = turned;
     const width = Number.parseFloat(img.style.width) || rect.width;
     const scale = rect.width / width || 1;
     this.resize = {
@@ -4524,8 +4529,12 @@ export class EditorView {
       if (resource.data !== undefined || /^https?:/i.test(resource.url ?? "")) return resource;
       const url = shown(key);
       if (url?.startsWith("data:image/")) return { contentType: resource.contentType, data: url };
-      const img = [...this.host.querySelectorAll(`img[${PICTURE_ATTR}]`)].find(
-        (element) => element.getAttribute(PICTURE_ATTR) === key,
+      // A cropped picture's image is inside its box (`PICTURE_IMAGE_ATTR`).
+      const img = [
+        ...this.host.querySelectorAll(`img[${PICTURE_ATTR}], img[${PICTURE_IMAGE_ATTR}]`),
+      ].find(
+        (element) =>
+          (element.getAttribute(PICTURE_ATTR) ?? element.getAttribute(PICTURE_IMAGE_ATTR)) === key,
       ) as HTMLImageElement | undefined;
       if (img?.complete && img.naturalWidth > 0) {
         try {

@@ -1,0 +1,59 @@
+{
+  "schemaVersion": 6,
+  "section": {
+    "pageSize": {
+      "width": 11906,
+      "height": 16838
+    }
+  },
+  "defaults": {},
+  "styles": [
+    {
+      "id": "Normal",
+      "type": "paragraph",
+      "name": "Normal",
+      "isDefault": true
+    }
+  ],
+  "numbering": {
+    "abstracts": [],
+    "instances": []
+  },
+  "comments": [],
+  "resources": {
+    "dot": {
+      "contentType": "image/png",
+      "data": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFBQIAX8jx0gAAAABJRU5ErkJggg=="
+    }
+  },
+  "content": {
+    "type": "doc",
+    "content": [
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "A rotated, cropped picture: "
+          },
+          {
+            "type": "picture",
+            "attrs": {
+              "resource": "dot",
+              "width": 914400,
+              "height": 457200,
+              "alt": "A dot",
+              "rotation": 5400000,
+              "crop": {
+                "left": 10000,
+                "top": 5000,
+                "right": 10000,
+                "bottom": 5000
+              }
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

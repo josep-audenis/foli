@@ -539,3 +539,101 @@ describe("floating pictures the model cannot hold", () => {
     }
   });
 });
+
+describe("rotation and crop (19.5)", () => {
+  const crop = { left: 10000, top: 5000, right: 12500, bottom: 2500 };
+
+  it("are written into a drawing read from the file, and taken off again", async () => {
+    const { document, package: pkg } = await importDocx(bytesOf("07-picture-report.docx"));
+    const turned = withPictures(document, (attrs, i) =>
+      i === 0 ? { ...attrs, rotation: 5_400_000, crop } : attrs,
+    );
+    // JSON edited by hand says the schema it needs (the editor's `getDocument` does it itself).
+    const out = await exportDocx({ ...turned, schemaVersion: 6 }, pkg);
+    const [first] = drawings((await readPackage(out)).text("/word/document.xml"));
+    expect(first).toMatch(/<a:xfrm[^>]* rot="5400000"/);
+    expect(first).toContain('<a:srcRect l="10000" t="5000" r="12500" b="2500"/>');
+    // What else the file held stays.
+    expect(first).toContain('wp14:anchorId="5506A26C"');
+    const again = (await importDocx(out)).document;
+    expect(again.schemaVersion).toBe(6);
+    expect(pictures(again)[0]?.attrs).toMatchObject({ rotation: 5_400_000, crop });
+    // Left out (as 1.0 to 1.3 kept them, in `ext` only): the file's stay.
+    const older = withPictures(again, ({ rotation: _r, crop: _c, ...attrs }) => attrs);
+    const [kept] = drawings(
+      (
+        await readPackage(
+          await exportDocx({ ...older, schemaVersion: 5 }, (await importDocx(out)).package),
+        )
+      ).text("/word/document.xml"),
+    );
+    expect(kept).toMatch(/<a:xfrm[^>]* rot="5400000"/);
+    expect(kept).toContain('<a:srcRect l="10000" t="5000" r="12500" b="2500"/>');
+    // Back to none, said so (0, no sides): the attribute and the element go.
+    const plain = withPictures(again, (attrs, i) =>
+      i === 0 ? { ...attrs, rotation: 0, crop: {} } : attrs,
+    );
+    const [back] = drawings(
+      (await readPackage(await exportDocx(plain, (await importDocx(out)).package))).text(
+        "/word/document.xml",
+      ),
+    );
+    expect(back).not.toContain("srcRect");
+    expect(back).not.toMatch(/<a:xfrm[^>]* rot=/);
+  });
+
+  it("are written in a new drawing", async () => {
+    const document = parseDocument({
+      ...createDocument({
+        type: "doc",
+        content: [
+          {
+            type: "paragraph",
+            content: [
+              {
+                type: "picture",
+                attrs: {
+                  resource: "img",
+                  width: 914400,
+                  height: 457200,
+                  alt: "A dot",
+                  rotation: 10_800_000,
+                  crop: { left: 25000 },
+                },
+              },
+            ],
+          },
+        ],
+      }),
+      resources: { img: { contentType: "image/png", data: `data:image/png;base64,${PNG}` } },
+    });
+    const out = await exportDocx(document);
+    const [drawing] = drawings((await readPackage(out)).text("/word/document.xml"));
+    expect(drawing).toContain('<a:srcRect l="25000"/>');
+    expect(pictures((await importDocx(out)).document)[0]?.attrs).toMatchObject({
+      rotation: 10_800_000,
+      crop: { left: 25000 },
+    });
+  });
+
+  it("are refused in a document that says schema 5", () => {
+    const v5 = {
+      ...createDocument({
+        type: "doc",
+        content: [
+          {
+            type: "paragraph",
+            content: [
+              {
+                type: "picture",
+                attrs: { resource: "img", width: 1, height: 1, rotation: 60000 },
+              },
+            ],
+          },
+        ],
+      }),
+      schemaVersion: 5,
+    };
+    expect(() => parseDocument(v5)).toThrow(/schema 6/);
+  });
+});

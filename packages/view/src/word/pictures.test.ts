@@ -29,6 +29,35 @@ const picture = (attrs: Record<string, unknown>): NodeJSON => ({
 });
 
 describe("a picture's element", () => {
+  it("shows its crop: a box of its size, the image scaled so the cut edges fall outside (19.5)", () => {
+    const image = imageSource({ img: { contentType: "image/png", data: DOT } });
+    const element = pictureElement(
+      picture({ alt: "A dot", crop: { left: 25000, right: 25000, top: 10000 } }).attrs ?? {},
+      document,
+      image,
+    );
+    expect(element.localName).toBe("span");
+    expect(element.getAttribute(PICTURE_ATTR)).toBe("img");
+    expect(element.getAttribute("aria-label")).toBe("A dot");
+    expect([element.style.width, element.style.height, element.style.overflow]).toEqual([
+      "96px",
+      "48px",
+      "hidden",
+    ]);
+    const img = element.querySelector("img") as HTMLImageElement;
+    expect(img.alt).toBe("A dot");
+    // Half the image's width shows: it is twice the box's, from a quarter to its left.
+    expect([img.style.width, img.style.left]).toEqual(["200%", "-50%"]);
+    expect(Number.parseFloat(img.style.height)).toBeCloseTo(111.11, 1);
+    expect(Number.parseFloat(img.style.top)).toBeCloseTo(-11.11, 1);
+  });
+
+  it("is rotated by its rotation, clockwise (19.5)", () => {
+    const image = imageSource({ img: { contentType: "image/png", data: DOT } });
+    const element = pictureElement(picture({ rotation: 5_400_000 }).attrs ?? {}, document, image);
+    expect(element.style.transform).toBe("rotate(90deg)");
+  });
+
   it("is its image at its size (96 px per inch), with its alt text", () => {
     const image = imageSource({ img: { contentType: "image/png", data: DOT } });
     const element = pictureElement(picture({ alt: "A dot" }).attrs ?? {}, document, image);
