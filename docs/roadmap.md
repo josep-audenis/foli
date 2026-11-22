@@ -2832,8 +2832,13 @@ agent's review.
     are not a second press. e2e in three browsers with synthetic touch pointer events. Not built:
     crop handles on the page, moved to After 1.0: the dialog crops by keyboard and pointer, and
     handles need a crop mode of their own.)
-- [ ] 19.6 Drag and drop of text: move inside the document (one undo step; delete and insert when
-  tracking), copy with Ctrl, a drop from outside as a paste; the drop caret shown.
+- [x] 19.6 Drag and drop of text: move inside the document (one undo step; delete and insert when
+  tracking), copy with Ctrl, a drop from outside as a paste; the drop caret shown. (Done in the
+  view: `dragstart` fills the drag as a copy fills the clipboard; a drop is a paste at the drop
+  point, and a move then deletes the dragged range mapped through it, joined to the paste's undo
+  step; Ctrl or Option copies; a drop inside the dragged text changes nothing; the selection
+  follows the pointer as the drop caret and comes back when the drag ends elsewhere. e2e in three
+  browsers with synthetic drag events and a real `DataTransfer`, tracking included.)
 - [ ] 19.7 Android: Backspace at a list paragraph's start removes its number; a paragraph split
   without `beforeinput` recovered from the DOM mutation's text, not discarded. Tests with
   recorded event sequences; device checks deferred (ADR-0003).
@@ -2884,7 +2889,7 @@ supplies, so a server without a browser cannot make PDFs).
 
 **Gaps users will meet** ([limitations.md](limitations.md); planned as Phase 19):
 
-- Dragging text does nothing; on Android, Backspace at a list paragraph's start may join it into
+- On Android, Backspace at a list paragraph's start may join it into
   the paragraph before; some Android keyboards insert paragraphs without the events the editor
   needs.
 - Pictures: no crop handles on the page (the dialog crops); resizing is refused while tracking.

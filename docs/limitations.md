@@ -116,7 +116,13 @@ checklist in [testing/ime.md](testing/ime.md)):
   containers (a web page's colored sections) and a link's own underline and color are not
   kept. A pasted
   plain-text URL becomes a link.
-- Drag and drop of text does nothing.
+- Drag and drop of text (19.6): the selection dragged moves where it is dropped (pasted there,
+  then deleted where it was: one undo step, tracked while tracking), copies with Ctrl or Option,
+  and text dragged from another application is pasted where it lands. Selected cells are not
+  dragged. The drop caret is the selection moved under the pointer (the dragged text is not
+  highlighted meanwhile). A drop into another view of the same document, or between the body and
+  a header, footer or note open on its page, copies rather than moves. Tested with synthetic drag
+  events (a real `DataTransfer`), not the browsers' own drag of selected text; not on touch.
 - Some Android keyboards insert paragraphs without the events the editor needs; such an edit is
   discarded with a `Foli:` console warning.
 ## Extensions, keys and the toolbar

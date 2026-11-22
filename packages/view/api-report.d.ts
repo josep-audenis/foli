@@ -778,6 +778,30 @@ export declare class EditorView {
     private portableResource;
     /** Copy writes the model's content (plain text, HTML, Foli JSON), never the browser's DOM. */
     private onCopy;
+    /** The selection as a copy gives it (plain text, HTML, Foli JSON), into `data`. */
+    private writeSelectionData;
+    /** The text being dragged from this view (19.6): its range, while the drag lasts. */
+    private dragged;
+    /**
+     * Dragging the selection (the browser starts it on selected text): the drag carries what a
+     * copy would. Selected cells are not dragged (their table cannot be cut from the grid).
+     */
+    private onDragStart;
+    /** A drag of this view's text that ended without a drop here: its selection back. */
+    private onTextDragEnd;
+    /** Whether a drop copies rather than moves: Ctrl (Windows, Linux) or Option (Apple), as Word. */
+    private static copies;
+    /** What a drag over the document carries that a drop takes: text, HTML or Foli's own. */
+    private static carriesText;
+    /** Where a drop of text would go: the caret shown there, the drop's effect said. */
+    private dragTextOver;
+    /**
+     * A drop of text: pasted where it lands (as a paste is: Foli's own content, else HTML, else
+     * plain text). Text dragged from here moves unless Ctrl or Option is held: pasted, then
+     * deleted where it was, one undo step (tracked as an insertion and a deletion while
+     * tracking). A drop inside the dragged text changes nothing.
+     */
+    private dropText;
     private onCut;
     private onPaste;
     /**
