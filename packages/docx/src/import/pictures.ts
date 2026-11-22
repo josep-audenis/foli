@@ -169,6 +169,9 @@ export function pictureAttrs(
   const alt = plain(docPr, "descr");
   const title = plain(docPr, "title");
   const decorative = plain(descendant(docPr, ADEC, "decorative"), "val");
+  const shape = descendant(data, PIC, "pic");
+  const rotation = rotationOf(plain(kid(kid(shape, PIC, "spPr"), A, "xfrm"), "rot"));
+  const crop = cropOf(kid(kid(shape, PIC, "blipFill"), A, "srcRect"));
   return {
     resource: key,
     width,
@@ -178,6 +181,34 @@ export function pictureAttrs(
     ...(title !== undefined ? { title } : {}),
     ...(decorative === "1" || decorative === "true" ? { decorative: true } : {}),
     ...(float ? { float } : {}),
+    ...(rotation ? { rotation } : {}),
+    ...(crop ? { crop } : {}),
     ext: sourceOf(context, drawing),
   };
+}
+
+/** `a:xfrm/@rot` as the model holds it: 1 to 21 599 999 (a turn is 21 600 000); none for 0. */
+function rotationOf(value: string | undefined): number | undefined {
+  const n = integer(value);
+  if (n === undefined) return undefined;
+  const turn = ((n % 21_600_000) + 21_600_000) % 21_600_000;
+  return turn || undefined;
+}
+
+/** `a:srcRect` as the model's `crop`: only the edges it cuts, none if it leaves nothing. */
+function cropOf(rect: XmlElement | undefined): Record<string, number> | undefined {
+  if (!rect) return undefined;
+  const out: Record<string, number> = {};
+  for (const [local, side] of [
+    ["l", "left"],
+    ["t", "top"],
+    ["r", "right"],
+    ["b", "bottom"],
+  ] as const) {
+    const n = integer(plain(rect, local));
+    if (n !== undefined && n !== 0 && n >= -1_000_000 && n <= 99_999) out[side] = n;
+  }
+  const across = (out.left ?? 0) + (out.right ?? 0);
+  const down = (out.top ?? 0) + (out.bottom ?? 0);
+  return Object.keys(out).length && across < 100_000 && down < 100_000 ? out : undefined;
 }

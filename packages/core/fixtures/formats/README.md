@@ -12,6 +12,7 @@ and compares them; `src/formats.test.ts` (docx) takes them through `.docx` too.
 | `v4-04-board-report.json`                |      4 | 0.5.0    | The corpus's 04 as 0.5.0 read it: tables, a picture, opaque notes and fields                  |
 | `v5-03-offer-letter-template.json`       |      5 | 0.6.0    | The corpus's 03 as 0.6.0 read it: content controls, merge fields, a header picture            |
 | `v5-09-pump-test-memo.json`              |      5 | 0.6.0    | The corpus's 09 as 0.6.0 read it: footnotes, endnotes, bookmarks, fields                      |
+| `v6.json`                                |      6 | 1.4.0    | A rotated and cropped picture (19.5); written by hand before 1.4.0's release, to check then   |
 
 `migrated/v1.json` and `migrated/v2.json` are what 1.x saves from the v1 and v2 fixtures (the
 migration to Word's model), reviewed when recorded in 12.11: a change to them is a change to

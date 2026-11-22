@@ -13,7 +13,7 @@ import { deepEqual } from "../model/attrs.js";
 import type { Attrs, Mark, MarkType, Node, Schema } from "../model/index.js";
 import { Step, StepResult } from "../transform/steps.js";
 import type { CommentJSON, FoliDocument, StoryJSON } from "../v3/document.js";
-import { parseContent } from "../v3/document.js";
+import { parseContent, schemaVersionOf } from "../v3/document.js";
 import { writeCustom } from "../v3/extensions.js";
 import { Resolver, type RunFormat } from "../v3/resolve.js";
 import { MARK_ATTRS } from "./mark.js";
@@ -29,7 +29,7 @@ export type WordEnvelope = Omit<FoliDocument, "content">;
  */
 export function documentJSON(envelope: WordEnvelope, doc: Node): FoliDocument {
   const { stories, comments, ...rest } = structuredClone(envelope);
-  return {
+  const out: FoliDocument = {
     ...rest,
     comments: comments.map((c) => ({ ...c, content: c.content.map(writeCustom) })),
     ...(stories && {
@@ -39,6 +39,9 @@ export function documentJSON(envelope: WordEnvelope, doc: Node): FoliDocument {
     }),
     content: writeCustom(doc.toJSON()),
   };
+  // Saved with the lowest schema its content needs now (ADR-0008).
+  out.schemaVersion = schemaVersionOf(out);
+  return out;
 }
 
 /** A story as the editor holds it: its tree, and what the envelope says beside it. */

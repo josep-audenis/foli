@@ -43,7 +43,7 @@ import {
  * The schema version of documents in the Word model (ADR-0005; v4 adds tables and pictures,
  * ADR-0006; v5 stories, fields, content controls and notes, ADR-0007).
  */
-export const SCHEMA_VERSION = 5;
+export const SCHEMA_VERSION = 6;
 
 /** Page setup of a section, in twips (1/1440 inch). Missing parts take Word's defaults. */
 export interface SectionJSON {
@@ -386,7 +386,11 @@ export interface WordSettingsJSON {
 
 /** A document in the Word model: the content tree and what Word keeps beside it. */
 export interface FoliDocument {
-  schemaVersion: typeof SCHEMA_VERSION;
+  /**
+   * The lowest schema its content needs (ADR-0008): 5 (1.0's) unless it holds what a later one
+   * added (6: a picture's rotation or crop, 1.4).
+   */
+  schemaVersion: 5 | typeof SCHEMA_VERSION;
   /** The last section's page setup (`w:body/w:sectPr`); earlier sections end at paragraphs. */
   section: SectionJSON;
   /** Document defaults (`w:docDefaults`). */
@@ -428,7 +432,23 @@ export function migrateToV4(doc: FoliDocumentV3): FoliDocumentV4 {
 
 /** Schema v4 → v5: the version only (what is opaque stays so until imported again). */
 export function migrateToV5(doc: FoliDocumentV4): FoliDocument {
-  return { ...doc, schemaVersion: SCHEMA_VERSION };
+  return { ...doc, schemaVersion: 5 };
+}
+
+/**
+ * The lowest schema `doc`'s content needs (ADR-0008: a document is saved with it, so an older
+ * 1.x reads it when it can): 6 for a picture rotated or cropped, else 5.
+ * @internal
+ */
+export function schemaVersionOf(
+  doc: Pick<FoliDocument, "content" | "comments" | "stories">,
+): FoliDocument["schemaVersion"] {
+  const trees = [
+    doc.content,
+    ...doc.comments.map((c) => ({ content: c.content })),
+    ...Object.values(doc.stories ?? {}).map((s) => s.content),
+  ];
+  return trees.some((tree) => laterNode(tree, 5)) ? SCHEMA_VERSION : 5;
 }
 
 /**
@@ -482,18 +502,22 @@ export function parseDocument(input: unknown, options: ParseOptions = {}): FoliD
   if (version === 1 || version === 2) {
     return parseDocument(migrateToV5(migrateToV4(migrateToV3(parseDocumentV2(input)))), options);
   }
-  if (version === 3 || version === 4) {
+  if (version === 3 || version === 4 || version === 5) {
     if (version === 3 && Object.hasOwn(input, "resources"))
       fail("resources", "unknown key (schema 4 and later)");
-    for (const key of V5_KEYS)
-      if (Object.hasOwn(input, key)) fail(key, "unknown key (schema 5 and later)");
+    if (version < 5)
+      for (const key of V5_KEYS)
+        if (Object.hasOwn(input, key)) fail(key, "unknown key (schema 5 and later)");
     const doc = parseDocument({ ...input, schemaVersion: SCHEMA_VERSION }, options);
     // What a later schema added is not in a document that says it is of an earlier one.
-    const later = laterSection(doc.section);
+    const later = version < 5 ? laterSection(doc.section) : undefined;
     if (later) fail("section", `${later} is of schema 5 (the document says schema ${version})`);
     for (const [path, content] of [
       ["content", doc.content],
       ...doc.comments.map((c, i) => [`comments[${i}].content`, { content: c.content }] as const),
+      ...Object.entries(doc.stories ?? {}).map(
+        ([id, s]) => [`stories[${JSON.stringify(id)}].content`, s.content] as const,
+      ),
     ] as const) {
       const found = laterNode(content, version);
       if (found)
@@ -502,6 +526,7 @@ export function parseDocument(input: unknown, options: ParseOptions = {}): FoliD
           `${found.name} is a schema ${found.schema} node (the document says schema ${version})`,
         );
     }
+    if (version === 5) return doc;
     if (version === 3)
       doc.styles.forEach((style, i) => {
         for (const key of ["table", "row", "cell", "conditions"]) {
@@ -590,7 +615,7 @@ export function parseDocument(input: unknown, options: ParseOptions = {}): FoliD
     | "controls"
     | "settings"
   >;
-  return {
+  const parsed: FoliDocument = {
     schemaVersion: SCHEMA_VERSION,
     section: envelope.section,
     defaults: envelope.defaults,
@@ -614,6 +639,8 @@ export function parseDocument(input: unknown, options: ParseOptions = {}): FoliD
     ...(envelope.settings === undefined ? {} : { settings: envelope.settings }),
     content: copied(content),
   };
+  parsed.schemaVersion = schemaVersionOf(parsed);
+  return parsed;
 }
 
 /** A node's JSON sharing nothing with the input its attributes came from, foreign types written back. */
@@ -722,11 +749,13 @@ function laterNode(
     if (!isRecord(node)) continue;
     const name = node.type as string;
     if (version < 4 && V4_NODES.has(name)) return { name, schema: 4 };
-    if (V5_NODES.has(name)) return { name, schema: 5 };
+    if (version < 5 && V5_NODES.has(name)) return { name, schema: 5 };
     const attrs = isRecord(node.attrs) ? node.attrs : {};
-    if (attrs.controls) return { name: "controls", schema: 5 };
-    const part = laterSection(attrs.section);
+    if (version < 5 && attrs.controls) return { name: "controls", schema: 5 };
+    const part = version < 5 ? laterSection(attrs.section) : undefined;
     if (part) return { name: part, schema: 5 };
+    if (name === "picture" && (attrs.rotation != null || attrs.crop != null))
+      return { name: "a picture's rotation or crop", schema: 6 };
     if (Array.isArray(node.content)) for (const child of node.content) stack.push(child);
   }
   return undefined;

@@ -334,6 +334,8 @@ export function drawingXml(
   const ext = typeof attrs.ext === "string" ? attrs.ext : undefined;
   const part = media.part(String(attrs.resource));
   const float = attrs.float && typeof attrs.float === "object" ? (attrs.float as Json) : undefined;
+  const rotation = typeof attrs.rotation === "number" ? String(attrs.rotation) : undefined;
+  const crop = attrs.crop && typeof attrs.crop === "object" ? (attrs.crop as Json) : undefined;
   if (ext) {
     const { element, source } = fragment(ext, namespaces);
     const anchor = kid(element, WP, "anchor");
@@ -363,6 +365,15 @@ export function drawingXml(
         setAttr(source, size, "cx", width, edits);
         setAttr(source, size, "cy", height, edits);
       }
+      // Rotation and crop (19.5): written into the file's own elements, the rest kept.
+      const shapeProps = descendants(element, (e) => e.ns === PIC && e.local === "spPr")[0];
+      setAttr(source, kid(shapeProps, A, "xfrm"), "rot", rotation, edits);
+      const fill = descendants(element, (e) => e.ns === PIC && e.local === "blipFill")[0];
+      const rect = kid(fill, A, "srcRect");
+      const cropXml = srcRectXml(crop, blip.prefix);
+      if (rect && cropXml !== source.slice(rect.start, rect.end))
+        edits.push({ from: rect.start, to: rect.end, text: cropXml });
+      else if (!rect && cropXml) edits.push({ from: blip.end, to: blip.end, text: cropXml });
       const docPr = kid(inline, WP, "docPr");
       const cNvPr = descendants(element, (e) => e.ns === PIC && e.local === "cNvPr")[0];
       for (const [local, value] of [
@@ -413,9 +424,26 @@ export function drawingXml(
     `<wp:cNvGraphicFramePr><a:graphicFrameLocks xmlns:a="${A}" noChangeAspect="1"/></wp:cNvGraphicFramePr>` +
     `<a:graphic xmlns:a="${A}"><a:graphicData uri="${PIC}"><pic:pic xmlns:pic="${PIC}">` +
     `<pic:nvPicPr><pic:cNvPr id="${id}" name="Picture ${id}"${descr}${titled}/><pic:cNvPicPr/></pic:nvPicPr>` +
-    `<pic:blipFill><a:blip xmlns:r="${R}" r:embed="${embed}"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill>` +
-    `<pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${width}" cy="${height}"/></a:xfrm>` +
+    `<pic:blipFill><a:blip xmlns:r="${R}" r:embed="${embed}"/>${srcRectXml(crop, "a")}<a:stretch><a:fillRect/></a:stretch></pic:blipFill>` +
+    `<pic:spPr><a:xfrm${rotation ? ` rot="${rotation}"` : ""}><a:off x="0" y="0"/><a:ext cx="${width}" cy="${height}"/></a:xfrm>` +
     `<a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic>` +
     `</${tag}></w:drawing>`
   );
+}
+
+/** A picture's `crop` as `a:srcRect` (with DrawingML's prefix there); "" when it has none. */
+function srcRectXml(crop: Json | undefined, prefix: string): string {
+  if (!crop) return "";
+  const sides = (
+    [
+      ["l", "left"],
+      ["t", "top"],
+      ["r", "right"],
+      ["b", "bottom"],
+    ] as const
+  )
+    .filter(([, side]) => typeof crop[side] === "number" && crop[side] !== 0)
+    .map(([local, side]) => ` ${local}="${crop[side]}"`)
+    .join("");
+  return sides ? `<${prefix ? `${prefix}:` : ""}srcRect${sides}/>` : "";
 }

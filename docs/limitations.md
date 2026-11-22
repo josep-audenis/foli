@@ -249,8 +249,11 @@ Custom nodes and marks, plugins and toolbar items ([extensions](guides/extension
   tested.
 - Pasting and dropping image files is tested in Chromium only (synthetic events carry no files
   in the other engines).
-- No cropping, rotation or touch resizing; resizing is refused while tracking (Foli does not
-  record a size change yet). Alt text changes are not tracked.
+- A picture's rotation and crop (schema 6, 19.5) are read from `.docx`, shown and written back;
+  a rotated picture keeps its unrotated room in the line (Word gives it the rotated box's), and
+  so does a float's wrapping. No commands or UI to rotate or crop yet, nor touch resizing;
+  resizing is refused while tracking (Foli does not record a size change yet). Alt text changes
+  are not tracked.
 - A picture copied into another document brings its image (12.11): its own `data:` or web URL,
   else the image the source view shows, as a `data:` URL; one shown from an object URL (a
   `.docx` package's JPEG or PNG) is read from the drawn image and comes as PNG, the same pixels

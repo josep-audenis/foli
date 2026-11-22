@@ -108,8 +108,37 @@ export function pictureElement(
   // Only a decorative picture is silent; one missing its alt text says so.
   const alt = decorative ? "" : own || NO_ALT_LABEL;
   const src = image?.(key);
+  const crop = cropOf(attrs.crop);
   let element: HTMLElement;
-  if (src) {
+  if (src && crop) {
+    // Cropped (19.5): a box of the picture's size showing its part of the image, scaled so the
+    // cut edges fall outside (percentages: a resize scales the box and the image with it).
+    element = doc.createElement("span");
+    element.setAttribute("role", "img");
+    if (alt) element.setAttribute("aria-label", alt);
+    else element.setAttribute("aria-hidden", "true");
+    element.style.overflow = "hidden";
+    element.style.position = "relative";
+    const img = doc.createElement("img");
+    img.src = src;
+    img.alt = "";
+    img.draggable = false;
+    img.referrerPolicy = "no-referrer";
+    img.setAttribute(PICTURE_IMAGE_ATTR, key);
+    const across = 100_000 - crop.left - crop.right;
+    const down = 100_000 - crop.top - crop.bottom;
+    Object.assign(img.style, {
+      position: "absolute",
+      display: "block",
+      maxWidth: "none",
+      maxHeight: "none",
+      width: `${(100_000 / across) * 100}%`,
+      height: `${(100_000 / down) * 100}%`,
+      left: `${(-crop.left / across) * 100}%`,
+      top: `${(-crop.top / down) * 100}%`,
+    });
+    element.append(img);
+  } else if (src) {
     const img = doc.createElement("img");
     img.src = src;
     img.alt = alt;
@@ -130,13 +159,39 @@ export function pictureElement(
   if (attrs.title) element.title = String(attrs.title);
   // In the line at its size, whatever the app's CSS says of images (`display: block`…).
   const style = element.style;
-  style.display = src ? "inline" : "inline-block";
+  style.display = src && !crop ? "inline" : "inline-block";
   style.verticalAlign = "baseline";
   style.maxWidth = "none";
   style.maxHeight = "none";
   style.width = width;
   style.height = height;
+  // shortcut: rotated in place: its line keeps the unrotated size (Word's effectExtent is not
+  // read); a float's wrapping too.
+  const rotation = Number(attrs.rotation);
+  if (rotation) style.transform = `rotate(${rotation / 60_000}deg)`;
   return element;
+}
+
+/**
+ * On a cropped picture's image, inside the element marked `PICTURE_ATTR`: its resource key.
+ * @internal
+ */
+export const PICTURE_IMAGE_ATTR = "data-foli-picture-image";
+
+/** A picture's `crop` with every side, or null for none. */
+function cropOf(
+  value: unknown,
+): { left: number; top: number; right: number; bottom: number } | null {
+  if (!value || typeof value !== "object") return null;
+  const c = value as Record<string, unknown>;
+  const side = (key: string) => (typeof c[key] === "number" ? (c[key] as number) : 0);
+  const crop = {
+    left: side("left"),
+    top: side("top"),
+    right: side("right"),
+    bottom: side("bottom"),
+  };
+  return crop.left || crop.top || crop.right || crop.bottom ? crop : null;
 }
 
 /**

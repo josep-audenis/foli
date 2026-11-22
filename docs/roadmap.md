@@ -2812,7 +2812,16 @@ agent's review.
   tables are all fixed, so none of them changes; e2e in three browsers on 06's table made
   autofit. Not Word's algorithm (percent and `auto` preferred widths, the page's room).)
 - [ ] 19.5 Pictures: rotation (`rot`, read, drawn, 90° commands) and cropping (`a:srcRect`, read,
-  drawn, a crop mode), written back to `.docx`; resizing with touch (pointer events).
+  drawn, a crop mode), written back to `.docx`; resizing with touch (pointer events). In three
+  PRs:
+  - [x] 19.5a Schema 6: the picture's `rotation` and `crop` attributes, read from `.docx`, drawn
+    (a cropped picture is a box of its size holding the image scaled past it; a rotation is a CSS
+    rotation) and written back into the file's own `a:xfrm` and `a:srcRect`. Documents are now
+    saved with the lowest schema their content needs (ADR-0008's rule, first used here:
+    `schemaVersionOf`), so only one holding a rotated or cropped picture says 6. A v6 fixture.
+  - [ ] 19.5b Commands and UI: rotate by 90°, a crop mode with handles, set from the picture
+    dialog too.
+  - [ ] 19.5c Touch resizing (pointer events) for the resize handle and the crop handles.
 - [ ] 19.6 Drag and drop of text: move inside the document (one undo step; delete and insert when
   tracking), copy with Ctrl, a drop from outside as a paste; the drop caret shown.
 - [ ] 19.7 Android: Backspace at a list paragraph's start removes its number; a paragraph split

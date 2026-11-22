@@ -127,6 +127,7 @@ import {
   NOTE_NUMBER_ATTR,
   NOTE_REF_ATTR,
   PICTURE_ATTR,
+  PICTURE_IMAGE_ATTR,
   WORD_COLUMN_BREAK_ATTR,
 } from "./word/blocks.js";
 import {
@@ -4500,8 +4501,12 @@ export class EditorView {
       if (resource.data !== undefined || /^https?:/i.test(resource.url ?? "")) return resource;
       const url = shown(key);
       if (url?.startsWith("data:image/")) return { contentType: resource.contentType, data: url };
-      const img = [...this.host.querySelectorAll(`img[${PICTURE_ATTR}]`)].find(
-        (element) => element.getAttribute(PICTURE_ATTR) === key,
+      // A cropped picture's image is inside its box (`PICTURE_IMAGE_ATTR`).
+      const img = [
+        ...this.host.querySelectorAll(`img[${PICTURE_ATTR}], img[${PICTURE_IMAGE_ATTR}]`),
+      ].find(
+        (element) =>
+          (element.getAttribute(PICTURE_ATTR) ?? element.getAttribute(PICTURE_IMAGE_ATTR)) === key,
       ) as HTMLImageElement | undefined;
       if (img?.complete && img.naturalWidth > 0) {
         try {

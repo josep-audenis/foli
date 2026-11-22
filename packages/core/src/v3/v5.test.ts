@@ -16,8 +16,9 @@ const table = (controls?: string[]): NodeJSON => ({
   ...(controls ? { attrs: { controls } } : {}),
   content: [{ type: "tableRow", content: [{ type: "tableCell", content: [p()] }] }],
 });
+// The lowest version this content needs (ADR-0008): 5.
 const envelope = (overrides: Record<string, unknown> = {}) => ({
-  schemaVersion: SCHEMA_VERSION,
+  schemaVersion: 5,
   section: {},
   defaults: {},
   styles: [],
@@ -188,7 +189,7 @@ describe("schema v5", () => {
 
   it("migrates v4 by its version only, and refuses what v4 cannot hold", () => {
     const v4 = envelope({ schemaVersion: 4, content: doc(p(text("kept"))) });
-    expect(parseDocument(v4)).toEqual({ ...v4, schemaVersion: SCHEMA_VERSION });
+    expect(parseDocument(v4)).toEqual({ ...v4, schemaVersion: 5 });
     expect(() => parseDocument({ ...v4, stories: {} })).toThrow(/schema 5 and later/);
     expect(() => parseDocument({ ...v4, content: doc(p(reference)) })).toThrow(
       /noteReference is a schema 5 node \(the document says schema 4\)/,

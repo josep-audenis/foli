@@ -335,6 +335,25 @@ const checkFloat: Check = shape(
   ["horizontal", "vertical", "wrap"],
 );
 
+/** A picture's rotation, clockwise, in 60 000ths of a degree (DrawingML's `a:xfrm/@rot`; schema 6). */
+const rotation = int(1, 21_599_999);
+
+/**
+ * What of a picture's image is cut off at each edge, in 1000ths of a percent of the image
+ * (DrawingML's `a:srcRect`: 25 000 is a quarter; negative adds space; schema 6). What is left
+ * must have a size: left + right and top + bottom stay under 100 000.
+ */
+const cropSide = int(-1_000_000, 99_999);
+const cropShape = shape({ left: cropSide, top: cropSide, right: cropSide, bottom: cropSide });
+const checkCrop: Check = (v) => {
+  const error = cropShape(v);
+  if (error) return error;
+  const c = v as Record<string, number | undefined>;
+  return (c.left ?? 0) + (c.right ?? 0) >= 100_000 || (c.top ?? 0) + (c.bottom ?? 0) >= 100_000
+    ? "must leave some of the image"
+    : undefined;
+};
+
 /** Marks that describe how text looks: what a style, a paragraph mark or a recorded change holds. */
 export const RUN_PROPERTY_MARKS = [
   "characterStyle",
@@ -718,7 +737,11 @@ export const schema = new Schema({
         /** Marked decorative: no alt text needed. */
         decorative: nullableAttr(bool),
         float: nullableAttr(checkFloat),
-        /** The `w:drawing` it was read from, verbatim (cropping, effects…). */
+        /** Clockwise, in 60 000ths of a degree (schema 6, 19.5). */
+        rotation: nullableAttr(rotation),
+        /** The image's edges cut off, in 1000ths of a percent (schema 6, 19.5). */
+        crop: nullableAttr(checkCrop),
+        /** The `w:drawing` it was read from, verbatim (effects, z-order…). */
         ext: nullableAttr(xml),
       },
     },
