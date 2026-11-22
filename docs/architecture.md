@@ -504,7 +504,13 @@ Known limits:
 - A line delete without a target range stops at the visual line edge, also for hard-line
   deletes. The fallback is tested only with synthetic events; whether every engine gives a
   target range for line deletes (macOS Cmd+Backspace, Ctrl+K) is part of the manual checks.
-- Drag and drop does nothing (both the drop and the drag source are prevented).
+- Drag and drop of text (19.6): `dragstart` fills the drag as `copy` fills the clipboard
+  (`writeSelectionData`); a drop is a `paste` at the drop point, and a move then deletes the
+  dragged range mapped through the paste's transactions (`joinHistory`: one undo step), only
+  once the paste changed the document. Android input (19.7): a boundary-only
+  `deleteContentBackward` runs as Backspace at a caret, and `readBack` reads an element the
+  browser split off a block's last fragment, holding exactly the text the block lost, as the next
+  block, replayed as Enter (`replaySplit`).
 - Paste maps HTML to schema v2 (7.8): tables become paragraphs and images are dropped. Word
   and Google Docs list markup is read best effort. The fixture corpus is hand-written
   approximations; real Word, Google Docs and LibreOffice captures are part of the open manual

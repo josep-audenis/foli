@@ -30,7 +30,7 @@ place that says what is in progress; check it before starting work.
 | 16 Code mode              | ✅ Done                  | —                       | Merged in #164–#176; `@folijs/mcp` 0.2.0 and `@folijs/agent` 0.2.0 on npm (2026-11-21), `run` behind `--code`; four security reviews; not tried in a client of its own |
 | 17 Toolbar for developers | ✅ Done                  | —                       | Merged in #167–#173; 1.2.0 on npm (2026-11-21), released with Phase 16 (#176)                                                                                          |
 | 18 Hint                   | ✅ Done                  | —                       | Merged in #180–#184; 1.3.0 and `@folijs/agent` 0.3.0 on npm (2026-11-22)                                                                                               |
-| 19 Editing gaps           | In progress              | `phase-19/editing-gaps` | Planned 2026-11-22; 19.1–19.8 to build                                                                                                                                 |
+| 19 Editing gaps           | In review                | `phase-19/editing-gaps` | 19.1–19.7 merged in #187–#200; docs done; the release of 1.4.0 (schema 6) waits for the owner                                                                          |
 
 Status values: `Ready` (dependencies met, nobody on it) · `In progress` · `In review` (PR open) ·
 `✅ Done` (merged, acceptance criteria met) · `Blocked by …`.
@@ -2849,7 +2849,10 @@ agent's review.
   target, a DOM split as the browser makes it); no recorded device sequences or device checks,
   deferred with the other manual checks.)
 - [ ] 19.8 Docs, size budgets, changesets; then 1.4.0, published with the owner's approval (the
-  Release workflow).
+  Release workflow). (Partly: docs (api.md, architecture.md, document-model.md,
+  limitations, the extensions guide, the PDF README) updated with each task; budgets raised with
+  their reasons (React 170.0, view 116.2 kB); a changeset per task. Not done: the release, which
+  waits for the owner, and then `v6.json` checked against what 1.4.0 writes.)
 
 ## After 1.0
 
