@@ -14,7 +14,7 @@ and refuses a file that does not match.
 ```bash
 pnpm build                # the checks use the built packages
 pnpm corpus:fetch         # once; again after the manifest changes
-pnpm corpus:run           # the Node pass: about 5 minutes of work, spread over the CPU's cores
+pnpm corpus:run           # the Node pass: about 5 minutes of work, on up to 6 worker threads
 pnpm corpus:render        # the renderer pass in Chromium, over the files the last run imported
 ```
 
@@ -23,16 +23,18 @@ manifest (all or nothing).
 
 ## A private folder
 
-```bash
+In PowerShell:
+
+```powershell
 pnpm build
-pnpm corpus:run C:\path\to\your\docx
-FOLI_CORPUS_RESULTS=.corpus-cache/results/<run>.jsonl pnpm corpus:render
+pnpm corpus:run "C:\path\to\your\docx"
+$env:FOLI_CORPUS_RESULTS = ".corpus-cache/results/<run>.jsonl"; pnpm corpus:render
 ```
 
 Every `.docx` under the folder is checked; files with the same bytes once. Nothing leaves the
 machine, and the results hold no document text: counts, element and attribute names, error
-messages cut short, and the files' paths (so the `.jsonl` itself is for you, not for an issue;
-the summary is safe to share).
+messages cut short, and the files' paths and names (so the `.jsonl` itself is for you, not for an
+issue; the summary is safe to share).
 
 ## What each file goes through
 
@@ -64,4 +66,4 @@ node -e "import('./scripts/corpus/check.mjs').then(async m => console.log(JSON.s
 
 A file Foli gets wrong: the issue template "A .docx Foli reads, writes or shows wrongly". Attach
 the file only if it may be public; otherwise a reduced copy, or the file's result line from the
-`.jsonl` with its `path` removed.
+`.jsonl` with its `path` and `names` removed.

@@ -1,6 +1,6 @@
 name: A .docx Foli reads, writes or shows wrongly
 description: Something lost, changed or refused when Foli opened or saved a Word file.
-labels: ["docx"]
+labels: ["bug"]
 body:
   - type: markdown
     attributes:
@@ -9,7 +9,7 @@ body:
         publicly.** If yours is private, a reduced copy is just as good: delete the text and
         pictures that do not matter, save it in Word, and check the problem is still there.
         Or run the corpus check on it locally (see `docs/testing/corpus.md`) and paste the
-        result line, which holds no document text.
+        result line with its `path` and `names` removed: the rest holds no document text.
   - type: textarea
     id: file
     attributes:
