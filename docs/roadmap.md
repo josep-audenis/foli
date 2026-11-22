@@ -31,7 +31,7 @@ place that says what is in progress; check it before starting work.
 | 17 Toolbar for developers | ✅ Done                  | —                     | Merged in #167–#173; 1.2.0 on npm (2026-11-21), released with Phase 16 (#176)                                                                                                                 |
 | 18 Hint                   | ✅ Done                  | —                     | Merged in #180–#184; 1.3.0 and `@folijs/agent` 0.3.0 on npm (2026-11-22)                                                                                                                      |
 | 19 Editing gaps           | ✅ Done                  | —                     | Merged in #187–#202; 1.4.0 (schema 6), `@folijs/agent` 0.3.1 and `@folijs/mcp` 0.2.2 on npm (2026-11-22); text boxes in find and crop handles left for later; Android and touch emulated only |
-| 20 Corpus run             | In progress              | `phase-20/corpus-run` | 20.1–20.4, 20.7 merged; 20.5 crashes and data loss fixed (#210–#213), owner to choose on refusals                                                                                             |
+| 20 Corpus run             | In progress              | `phase-20/corpus-run` | 20.1–20.5, 20.7 merged; 20.6 (Word on a sample) and 20.8 (docs, release) left                                                                                                                 |
 | 21 Hardening              | Ready                    | —                     | Planned 2026-11-22 from an audit of 1.4.0, nothing built: data loss, a hang and a PDF leak first                                                                                              |
 
 Status values: `Ready` (dependencies met, nobody on it) · `In progress` · `In review` (PR open) ·
@@ -2959,13 +2959,14 @@ review.
   comments, `w:proofErr`, `w:lastRenderedPageBreak`) aside, paragraphs matched by their text;
   before it, run merging made about 1 200 files look lossy. 20.5 follows the plan's order:
   crashes, then data loss.)
-- [ ] 20.5 Fixes, one PR each, in the ranked order: a reduced fixture (written by hand or by
+- [x] 20.5 Fixes, one PR each, in the ranked order: a reduced fixture (written by hand or by
   `build-word-corpus.ps1`) reproducing the loss, the fix, the class's count after it in the
   report. Crashes and data loss first, then refusals, then losses on export, then opaque content.
-  (In progress: crashes and data loss done, #210–#213: a run property written twice, a reference
-  to a missing note, tab characters in `w:t`, a field code holding elements, a second `w:pPr`; no
-  crash and no paragraph text changed in the whole set. Next: the owner chooses whether Strict
-  Open XML (71) and the markup-compatibility root (60) are fixed here or go to the backlog.)
+  (Done: crashes and data loss, #210–#213: a run property written twice, a reference to a
+  missing note, tab characters in `w:t`, a field code holding elements, a second `w:pPr`; no
+  crash and no paragraph text changed in the whole set. The refusals, Strict Open XML (71) and
+  the markup-compatibility root (60), went to the backlog by the owner's choice on 2026-11-22,
+  with the classes that change the file without changing what it shows.)
 - [ ] 20.6 Word on a sample (Windows with Word, `word-reference.ps1` on the originals and their
   exports): opens without a repair, pages, revisions and comments compared; differences added to
   the report.
@@ -3123,11 +3124,16 @@ first group and from .docx files the corpus does not cover.
 - Pastes from real Word, Google Docs and LibreOffice (fixtures are hand-written); spellcheck and
   autocorrect at a page's start or end.
 
-**Robustness** (the corpus run planned as Phase 20):
+**Robustness** (left by Phase 20's corpus run, [corpus-report.md](corpus-report.md)):
 
-- The corpus is 9 documents. Run import → export → compare over a large set of real .docx files
-  and report what is lost or refused.
-- Bug intake: an issue template that asks for the .docx (or a reduced one) and the browser.
+- Strict Open XML (71 files refused): Word's "Strict" format, the same parts under
+  `purl.oclc.org/ooxml` namespaces.
+- The document's root inside markup compatibility (60 files refused, all docx4j's `mc-root/*`).
+- What changes the file without changing what it shows (the report's rows 8 and 10–13): empty
+  hyperlinks dropped, field lock and dirty flags, `w:tblPr`/`w:tblGrid` added, a paragraph added
+  to an empty body, a break's default type dropped; POI's `Tika-792`, its `w:ins` and
+  `w:moveFrom` nested the other way round (row 9's last file); and the renderer's 10 files with a page
+  that overflows its sheet (row 14).
 
 **Speed** ([benchmarks.md](benchmarks.md)): Phase 5's targets at 100 pages, missed at 1.0. In
 Chromium: Enter's handler 9.9 ms and paint p95 35 ms (≤ 25), first layout 118 ms (≤ 60), full
