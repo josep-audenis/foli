@@ -31,7 +31,7 @@ place that says what is in progress; check it before starting work.
 | 17 Toolbar for developers | ✅ Done                  | —                     | Merged in #167–#173; 1.2.0 on npm (2026-11-21), released with Phase 16 (#176)                                                                                                                 |
 | 18 Hint                   | ✅ Done                  | —                     | Merged in #180–#184; 1.3.0 and `@folijs/agent` 0.3.0 on npm (2026-11-22)                                                                                                                      |
 | 19 Editing gaps           | ✅ Done                  | —                     | Merged in #187–#202; 1.4.0 (schema 6), `@folijs/agent` 0.3.1 and `@folijs/mcp` 0.2.2 on npm (2026-11-22); text boxes in find and crop handles left for later; Android and touch emulated only |
-| 20 Corpus run             | In progress              | `phase-20/corpus-run` | 20.1–20.4 merged (#206–#209); 20.5, the fixes, next                                                                                                                                           |
+| 20 Corpus run             | In progress              | `phase-20/corpus-run` | 20.1–20.4, 20.7 merged; 20.5 crashes and data loss fixed (#210–#213), owner to choose on refusals                                                                                             |
 
 Status values: `Ready` (dependencies met, nobody on it) · `In progress` · `In review` (PR open) ·
 `✅ Done` (merged, acceptance criteria met) · `Blocked by …`.
@@ -2961,11 +2961,18 @@ review.
 - [ ] 20.5 Fixes, one PR each, in the ranked order: a reduced fixture (written by hand or by
   `build-word-corpus.ps1`) reproducing the loss, the fix, the class's count after it in the
   report. Crashes and data loss first, then refusals, then losses on export, then opaque content.
+  (In progress: crashes and data loss done, #210–#213: a run property written twice, a reference
+  to a missing note, tab characters in `w:t`, a field code holding elements, a second `w:pPr`; no
+  crash and no paragraph text changed in the whole set. Next: the owner chooses whether Strict
+  Open XML (71) and the markup-compatibility root (60) are fixed here or go to the backlog.)
 - [ ] 20.6 Word on a sample (Windows with Word, `word-reference.ps1` on the originals and their
   exports): opens without a repair, pages, revisions and comments compared; differences added to
   the report.
-- [ ] 20.7 Bug intake: a GitHub issue template asking for the `.docx` (or a reduced one), the
-  browser and what was lost; `docs/testing/corpus.md` on running a private folder.
+- [x] 20.7 Bug intake: a GitHub issue template asking for the `.docx` (or a reduced one), the
+  browser and what was lost; `docs/testing/corpus.md` on running a private folder. (Done:
+  `.github/ISSUE_TEMPLATE/docx-file.yml`, public files only or a reduced copy or the result line;
+  [corpus.md](testing/corpus.md): the external set, a private folder, what each file goes through,
+  reading the results.)
 - [ ] 20.8 Docs (limitations from what the report found, the corpus README, `docs/testing/
   corpus.md`), the changesets; then a patch release with the fixes, published with the owner's
   approval (the Release workflow).
