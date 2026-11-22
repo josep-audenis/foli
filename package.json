@@ -25,7 +25,8 @@
     "api:update": "node scripts/api.mjs --update",
     "size": "node scripts/size.mjs",
     "mcp:e2e": "node scripts/corpus/mcp-roundtrip.mjs",
-    "examples": "node scripts/examples.mjs && playwright test --config playwright.examples.config.ts"
+    "examples": "node scripts/examples.mjs && playwright test --config playwright.examples.config.ts",
+    "corpus:fetch": "node scripts/corpus/fetch.mjs"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.14.0",

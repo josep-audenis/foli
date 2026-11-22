@@ -22,3 +22,6 @@ playwright-report/
 
 # Docs site pages, written from docs/ at build time (apps/site/src/docs/build.ts)
 apps/site/docs/
+
+# External corpus (Phase 20, ADR-0011): fetched by `pnpm corpus:fetch`, never committed
+.corpus-cache/
