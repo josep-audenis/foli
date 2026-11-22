@@ -99,7 +99,7 @@ describe("reading stories", () => {
   });
 
   it("keeps verbatim a reference to a note the package does not hold (tdf153255)", async () => {
-    const { document, package: pkg, report } = await load("09-pump-test-memo.docx");
+    const { package: pkg, report } = await load("09-pump-test-memo.docx");
     const source = pkg.text(pkg.mainDocument);
     const dangling = source.replace(
       /<\/w:body>/,
@@ -111,6 +111,7 @@ describe("reading stories", () => {
     );
     const again = await importDocx(changed);
     expect(JSON.stringify(again.document.content)).not.toContain("footnote:99");
+    expect(JSON.stringify(again.document.content)).toContain('"footnote:1"');
     expect(again.report.opaque["w:footnoteReference"]).toBe(1);
     // Exported as it was, the other references still notes.
     const out = await readPackage(await exportDocx(again.document, again.package));
