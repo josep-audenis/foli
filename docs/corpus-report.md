@@ -96,6 +96,7 @@ what it shows: the backlog, unless they fall out of the fixes above.
 
 ## Fixes
 
-| Row | Fix                                                                              | Files before |                           After |
-| --- | -------------------------------------------------------------------------------- | -----------: | ------------------------------: |
-| 1   | A run property written twice read as one mark, reported (`import/properties.ts`) |            3 | 0 (all three export equivalent) |
+| Row | Fix                                                                                   | Files before |                           After |
+| --- | ------------------------------------------------------------------------------------- | -----------: | ------------------------------: |
+| 1   | A run property written twice read as one mark, reported (`import/properties.ts`)      |            3 | 0 (all three export equivalent) |
+| 2   | A reference to a note the package lacks kept verbatim on import (`import/content.ts`) |            4 |  0 (all four export equivalent) |

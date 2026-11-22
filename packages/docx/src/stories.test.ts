@@ -98,6 +98,25 @@ describe("reading stories", () => {
     expect(report.opaque["w:footnoteReference"]).toBeUndefined();
   });
 
+  it("keeps verbatim a reference to a note the package does not hold (tdf153255)", async () => {
+    const { document, package: pkg, report } = await load("09-pump-test-memo.docx");
+    const source = pkg.text(pkg.mainDocument);
+    const dangling = source.replace(
+      /<\/w:body>/,
+      '<w:p><w:r><w:footnoteReference w:id="99"/></w:r></w:p></w:body>',
+    );
+    expect(report.opaque["w:footnoteReference"]).toBeUndefined();
+    const changed = await pkg.write(
+      new Map([[pkg.mainDocument, new TextEncoder().encode(dangling)]]),
+    );
+    const again = await importDocx(changed);
+    expect(JSON.stringify(again.document.content)).not.toContain("footnote:99");
+    expect(again.report.opaque["w:footnoteReference"]).toBe(1);
+    // Exported as it was, the other references still notes.
+    const out = await readPackage(await exportDocx(again.document, again.package));
+    expect(out.text(out.mainDocument)).toContain('w:footnoteReference w:id="99"');
+  });
+
   it("keeps verbatim what a story may not hold", async () => {
     const { document, package: pkg } = await load("08-newsletter.docx");
     const id = headerId(document);

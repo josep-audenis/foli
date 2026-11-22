@@ -44,6 +44,8 @@ export interface ContentContext extends Context {
    * The kind of story being read (ADR-0007), or a comment: what one may not hold stays verbatim.
    */
   readonly story?: "header" | "footer" | "footnote" | "endnote" | "comment";
+  /** The package's notes (`footnote:<id>`, `endnote:<id>`): a reference to another stays verbatim. */
+  readonly notes?: ReadonlySet<string>;
 }
 
 /** Tables nested deeper stay opaque: within the model's depth (three levels per table). */
@@ -710,10 +712,14 @@ function run(
           opaqueRun(el);
           break;
         }
+        const story = `${el.local === "footnoteReference" ? "footnote" : "endnote"}:${id}`;
+        // A reference to a note the package does not hold: as it was, not a note to export.
+        if (context.notes && !context.notes.has(story)) {
+          opaqueRun(el);
+          break;
+        }
         const bag = attributeBag(el, ["w:id", "w:customMarkFollows"], context);
-        const attrs: Record<string, unknown> = {
-          story: `${el.local === "footnoteReference" ? "footnote" : "endnote"}:${id}`,
-        };
+        const attrs: Record<string, unknown> = { story };
         if (on !== null) attrs.customMark = on;
         if (bag) attrs.attributes = bag;
         const leaf = valid(node("noteReference", marks, attrs), el, context);
