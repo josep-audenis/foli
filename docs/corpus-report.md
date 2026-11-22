@@ -10,75 +10,89 @@ pnpm build && pnpm corpus:fetch && pnpm corpus:run && pnpm corpus:render
 ```
 
 Each file goes through `scripts/corpus/check.mjs` in a worker (120 s, 2 GB heap): import; export
-with no edit, compared part by part with the file (elements, attribute values and each
-paragraph's text with its formatting, runs of one formatting joined; namespace prefixes, order,
-whitespace and what Word writes anew at every save, `rsid*`, `w14:paraId`, `w:proofErr` and
-`w:lastRenderedPageBreak`, aside); a second import of the export compared with the first; one
-character typed at the start, exported and read back. Then `renderDocument` lays out every file
-that imported, in Chromium (`apps/playground/word/corpus.word.ts`).
+with no edit, compared part by part with the file; a second import of the export compared with
+the first; one character typed at the document's start, exported and read back (against the
+unedited export's reading). Then `renderDocument` lays out every file that imported, in Chromium
+(`apps/playground/word/corpus.word.ts`).
+
+What the comparison counts: each part's elements and attribute values, prefixes and order aside,
+and each paragraph's text with the formatting of every character (runs of one formatting joined;
+text read as Word reads it: spaces around a `w:t` without `xml:space="preserve"` dropped; which
+element holds text, `w:t`, `w:delText` or `w:instrText`, kept). Not counted: what Word writes anew
+at every save (`rsid*`, `w14:paraId` and `w14:textId` outside comments, `w:proofErr`,
+`w:lastRenderedPageBreak`), and runs with nothing in them, which Foli drops (the import report
+lists them as dropped). Before these rules, runs joined on export made about 1 200 files look
+lossy.
 
 ## Outcomes
 
-| Outcome                                                     | Files | Share |
-| ----------------------------------------------------------- | ----: | ----: |
-| Imported, exported, read back, edited                       | 3 248 | 94.3% |
-| Refused with a reason (`DocxError`, `ZipError`)             |   186 |  5.4% |
-| Crash on export                                             |     4 |  0.1% |
-| Crash later (the edit's export read back otherwise)         |     4 |  0.1% |
-| Crash on import (the model refused what the importer built) |     3 |  0.1% |
-| Hung or killed its worker                                   |     0 |       |
+| Outcome                                                     | Files | Share of 3 445 |
+| ----------------------------------------------------------- | ----: | -------------: |
+| Imported, exported, read back                               | 3 252 |          94.4% |
+| …of which with no difference counted, read back the same    | 3 126 |          90.7% |
+| Refused with a reason (`DocxError`, `ZipError`)             |   186 |           5.4% |
+| Crash on export                                             |     4 |           0.1% |
+| Crash on import (the model refused what the importer built) |     3 |           0.1% |
+| Hung, or killed its worker                                  |     0 |                |
 
-Of the 3 248, 3 047 (93.8% of the distinct files) exported with no difference the comparison
-counts and read back the same; the rest are below.
+The edit: typed and read back in every file that exported; in 27 the document starts where a
+character cannot go (a table, a picture, opaque content), so nothing was typed.
 
-Times (Node, per file, the four steps together): median 33 ms, p95 250 ms; 248 s of work for all
-files (6 workers); the slowest file 20.5 s (`docx4j/docs/Docx4j_GettingStarted.docx`, 1 170 blocks).
+Times (Node, per file, the four steps together): median 32 ms, p95 228 ms; 269 s of work for all
+files (6 workers); the slowest 23 s (POI's `bug65649.docx`).
 
 **Renderer** (3 256 files that imported, 5 983 pages): every one laid out, no exception, no page
 error; median 10 ms, p95 54 ms, the slowest 9.1 s. 10 files have a page whose content overflows
-its sheet (e.g. LibreOffice's `fdo78659`, `tdf104061_tableSectionColumns`,
-`tdf120760_ZOrderInHeader`, `tdf131098_imageFill`, `tdf135595_HFtableWrap_c12`).
+its sheet (LibreOffice's `fdo78659`, `tdf104061_tableSectionColumns`,
+`tdf120760_ZOrderInHeader`, `tdf131098_imageFill`, `tdf135595_HFtableWrap_c12`, …).
 
 ## What goes wrong, ranked
 
-By how many distinct files show it. A file can be in several rows. "Cause" is from looking at
+By kind, then by how many distinct files show it. A file can be in several rows. "Cause" is from
 the examples, not yet confirmed by a fix.
 
-| #   | Class                                                                        | Files | Kind    | Examples (file names)                                                                                            | Cause, as far as seen                                                                                              |
-| --- | ---------------------------------------------------------------------------- | ----: | ------- | ---------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| 1   | Crash on import: duplicate mark in a style's or a level's run                |     3 | crash   | LibreOffice `i124106`, `tdf102466`, `tdf92335`                                                                   | A `w:rPr` holding one property twice is read as two marks of one type; the schema refuses it                       |
-| 2   | Crash on export: "a note reference has no note"                              |     4 | crash   | docx4j `c79-12-footnotes-r…`, `c79-13-endnotes-ro…`, `rn-08-rich-…`; LibreOffice `tdf153255`                     | A `w:footnoteReference` to a note the notes part does not hold (or no notes part): import keeps it, export refuses |
-| 3   | Paragraph text changed on export                                             |    24 | loss    | LibreOffice `fdo47669`, `fdo76098`, `fixed-date-field`; docx4j `tblHeaderTestTwo`                                | At least: a field's code loses its leading and trailing spaces (`" DATE \@…" "` → `"DATE \@…"`); others to see     |
-| 4   | Second import differs from the first                                         |    28 | loss    | docx4j `br2-3-instrtext-bare-header`, `cr065-decimals-probe`, `Docx4j_GettingStarted`, `sm-73-rfonts-in-one-rpr` | Export writes something import reads otherwise (a tab's type, kept run XML, a header's blocks)                     |
-| 5   | Hyperlink lost on export (`w:hyperlink`, its `r:id`, `w:history`)            |    13 | loss    | docx4j `hl-fields`, `revisions/cr068/word-*-accept-all`                                                          | Hyperlinks with tracked changes or fields inside                                                                   |
-| 6   | Paragraph properties lost (`w:pPr`, `w:ind`, `w:jc`, `w:numPr`, `w:spacing`) |     8 | loss    | docx4j `c79-40-ppr-nested-rpr`, `c79-41-ppr-numpr`, `c79-42-ppr-pprchange`, `rc-20-pPr-values`                   | A `w:pPr` written twice in one paragraph, or with a `w:pPrChange`: the second one's values are not kept            |
-| 7   | The edit's export does not read back with the edited text                    |     4 | loss    | docx4j `cr065-decimals-probe`, `Docx4j_GettingStarted`; LibreOffice `tdf57589_hashColor`, `xml_space`            | Probably the same as 3 or 4 on the typed paragraph                                                                 |
-| 8   | Field lock and dirty flags changed (`w:fldChar@w:fldLock`, `@w:dirty`)       |     8 | changed | docx4j `fields/cr067-*`                                                                                          | Flags normalized on export                                                                                         |
-| 9   | Table properties added (`w:tblPr`, `w:tblGrid`, `w:p`)                       |     6 | added   | LibreOffice `fdo53985`, `tdf104162`, `tdf108714`, `tdf111550`                                                    | Tables without a `w:tblPr` or `w:tblGrid` (Word always writes them) get them; harmless, but not as read            |
-| 10  | Paragraph formatted otherwise (`w:vanish`, `w:rFonts`)                       |     4 | changed | —                                                                                                                | To see                                                                                                             |
-| 11  | Comments' text changed                                                       |     4 | loss    | python-docx `comments-rich-para`                                                                                 | Runs in comments: a space between two runs lost                                                                    |
-| 12  | Tracked changes renested (`w:moveFrom` in `w:ins`)                           |     1 | changed | —                                                                                                                | Nesting of a move inside an insertion swapped                                                                      |
-| 13  | Renderer: a page overflows its sheet                                         |    10 | layout  | LibreOffice `fdo78659`, `tdf135595_HFtableWrap_c12`                                                              | Floats and tables in headers, image fills                                                                          |
+| #   | Class                                                           | Files | Kind     | Examples                                                                                               | Cause, as far as seen                                                                                                                                                                               |
+| --- | --------------------------------------------------------------- | ----: | -------- | ------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Crash on import: a run property twice                           |     3 | crash    | LibreOffice `i124106`, `tdf102466`, `tdf92335`                                                         | A style's or a numbering level's `w:rPr` holding one property twice is read as two marks of one type; the schema refuses it                                                                         |
+| 2   | Crash on export: "a note reference has no note"                 |     4 | crash    | docx4j `mc-root/c79-12-…`, `mc-root/c79-13-…`, `package-wiring/rn-08-…`; LibreOffice `tdf153255`       | A `w:footnoteReference` to a note the notes part does not hold: import keeps it, export refuses                                                                                                     |
+| 3   | Paragraph text changed on export                                |    52 | loss     | LibreOffice `fixed-date-field`, `fdo47669`, `fdo76316`, `xml_space`; docx4j `revisions/check20/*`      | Mixed: a field's code loses its leading and trailing spaces (about 14 files); spaces Word drops (no `xml:space="preserve"`) are kept by import and written back as kept (about 18); the rest to see |
+| 4   | Second import differs from the first                            |    28 | loss     | docx4j `cr065-decimals-probe`, `Docx4j_GettingStarted`, `sm-73-rfonts-in-one-rpr`; LibreOffice tables  | Mostly a table's kept `ext`/`gridExt` read otherwise (20 of 28); a tab's type, a header's blocks, a comment                                                                                         |
+| 5   | Tracked changes lost (`w:ins`, `w:del`)                         |     2 | loss     | LibreOffice `tdf157011_ins_del_empty_cols`; `testTrackChangesEmptyParagraphsInADeletion`               | Insertions and deletions of empty paragraphs or table columns                                                                                                                                       |
+| 6   | Paragraph properties lost (`w:pPr`, `w:ind`, `w:jc`, `w:numPr`) |     8 | loss     | docx4j `repeated/c79-40-…`, `c79-41-…`, `c79-42-…`, `rc-20-pPr-values`                                 | A `w:pPr` (or a property) written twice in one paragraph: one of them is kept. Synthetic, schema-invalid tests; the same family as 1 and 9                                                          |
+| 7   | Run properties lost (`w:rPr`)                                   |     5 | loss     | docx4j `repeated/*`                                                                                    | As 6, in runs                                                                                                                                                                                       |
+| 8   | Empty hyperlinks dropped (`w:hyperlink` with no run)            |    13 | changed  | docx4j `hl-fields`, `revisions/cr068/word-*-accept-all`; `stress008`, `glossaryWithEmail`, `tdf155736` | A `w:hyperlink` with nothing in it is not kept; it shows nothing                                                                                                                                    |
+| 9   | Paragraph formatted otherwise (`w:vanish`, `w:rFonts`, `w:b`)   |     6 | changed  | docx4j `sm-73-rfonts-in-one-rpr`, `sm-80-vanish-on-off`, `sm-81-vanish-off-on`; POI `Tika-792`         | A property written twice (on then off): the other one is kept                                                                                                                                       |
+| 10  | Field lock and dirty flags changed                              |     8 | changed  | docx4j `fields/cr067-*`                                                                                | `w:fldChar@w:fldLock` and `@w:dirty` normalized on export                                                                                                                                           |
+| 11  | Table properties added (`w:tblPr`, `w:tblGrid`)                 |     9 | added    | LibreOffice `fdo53985`, `tdf104162`, `tdf108714`, `tdf111550`                                          | A table without them gets them (Word always writes them)                                                                                                                                            |
+| 12  | A paragraph added to an empty body                              |     3 | added    | Open XML SDK `empty`, POI `Bug60341`, python-docx `default`                                            | A body needs a paragraph                                                                                                                                                                            |
+| 13  | A break's default type dropped (`w:br@w:type="textWrapping"`)   |     8 | harmless | LibreOffice `clearing-break`, `FDO76248`, `chart*`                                                     | The default value written as absent; `w:clear` kept                                                                                                                                                 |
+| 14  | Renderer: a page overflows its sheet                            |    10 | layout   | LibreOffice `fdo78659`, `tdf135595_HFtableWrap_c12`                                                    | Floats and tables in headers, image fills                                                                                                                                                           |
 
 ## Refused, by reason
 
-| Reason                                                                  | Files | What it is                                                                                    |
-| ----------------------------------------------------------------------- | ----: | --------------------------------------------------------------------------------------------- |
-| Strict Open XML (`purl.oclc.org/ooxml` namespaces)                      |    71 | A feature: Word's "Strict" format, read by Word, not by Foli yet                              |
-| `/word/document.xml: not a WordprocessingML document`                   |    60 | docx4j's `mc-root/*`: the document's root inside markup compatibility (`mc:AlternateContent`) |
-| Not a zip archive                                                       |    13 | Broken on purpose, or not a .docx                                                             |
-| An encrypted document or a legacy .doc                                  |     8 | Right to refuse                                                                               |
-| Duplicate entry in the zip                                              |     9 | Word refuses these too                                                                        |
-| Malformed XML, a DTD, an unclosed element, an attribute without a value |    11 | Broken on purpose (most are LibreOffice and docx4j tests of exactly this)                     |
-| No `w:body`; no `[Content_Types].xml`                                   |     4 | Broken                                                                                        |
+| Reason                                                                      | Files | What it is                                                                                    |
+| --------------------------------------------------------------------------- | ----: | --------------------------------------------------------------------------------------------- |
+| Strict Open XML (`purl.oclc.org/ooxml` namespaces)                          |    71 | A feature: Word's "Strict" format, which Word reads and Foli does not yet                     |
+| `/word/document.xml: not a WordprocessingML document`                       |    60 | docx4j's `mc-root/*`: the document's root inside markup compatibility (`mc:AlternateContent`) |
+| Malformed XML (a DTD, an unclosed element, an attribute without a value, …) |    18 | Broken on purpose (most are LibreOffice and docx4j tests of exactly this)                     |
+| Not a zip archive                                                           |    13 | Broken on purpose, or not a .docx                                                             |
+| Duplicate entry in the zip                                                  |    10 | Word refuses these too                                                                        |
+| An encrypted document or a legacy .doc                                      |     8 | Right to refuse                                                                               |
+| No `w:body`; no `[Content_Types].xml`                                       |     4 | Broken                                                                                        |
+| A damaged zip (a local header); the main part another kind (`themeManager`) |     2 | Broken, or not a word-processing document                                                     |
 
 ## What 20.5 fixes
 
-The plan's order: crashes and data loss first, then refusals, then losses on export. So rows 1
-and 2 (crashes), then 3–7 (text, hyperlinks, paragraph properties, read-back), each with a
-reduced fixture written for it and the class's count after the fix noted here. Then the owner
-chooses whether the markup-compatibility root (60) and Strict Open XML (71) are fixed here or
-go to the backlog; rows 8–13 go to the backlog unless they fall out of the fixes above.
+The plan's order: crashes and data loss first, then refusals, then losses on export.
+
+1. Crashes: rows 1 and 2.
+2. Data loss: rows 3 (field codes' spaces first; the kept spaces Word drops), 4, 5.
+3. The repeated-property family (rows 6, 7, 9, and 1's cause) once, if one fix covers it: their
+   inputs are synthetic and schema-invalid, so they come after real losses.
+
+Then the owner chooses whether the markup-compatibility root (60) and Strict Open XML (71) are
+fixed here or go to the backlog. Rows 8 and 10–14 change what the file holds without changing
+what it shows: the backlog, unless they fall out of the fixes above.
 
 ## Fixes
 
