@@ -73,9 +73,8 @@ describe("exportPdf", () => {
       "pdf",
     ]);
     expect(calls[1]?.arg).toEqual({ content: script });
-    expect(JSON.stringify((calls[3]?.arg as RenderInput).document.content)).toContain(
-      '"type":"acme:mention"',
-    );
+    const input = calls[3]?.arg as RenderInput | undefined;
+    expect(JSON.stringify(input?.document.content)).toContain('"type":"acme:mention"');
   });
 
   it("keeps the page off the network: its policy, and no web URL for a picture", async () => {
