@@ -31,6 +31,7 @@ place that says what is in progress; check it before starting work.
 | 17 Toolbar for developers | ✅ Done                  | —      | Merged in #167–#173; 1.2.0 on npm (2026-11-21), released with Phase 16 (#176)                                                                                                                 |
 | 18 Hint                   | ✅ Done                  | —      | Merged in #180–#184; 1.3.0 and `@folijs/agent` 0.3.0 on npm (2026-11-22)                                                                                                                      |
 | 19 Editing gaps           | ✅ Done                  | —      | Merged in #187–#202; 1.4.0 (schema 6), `@folijs/agent` 0.3.1 and `@folijs/mcp` 0.2.2 on npm (2026-11-22); text boxes in find and crop handles left for later; Android and touch emulated only |
+| 20 Corpus run             | Ready                    | —      | Planned 2026-11-22, nothing built: real .docx files through import, export and compare                                                                                                        |
 
 Status values: `Ready` (dependencies met, nobody on it) · `In progress` · `In review` (PR open) ·
 `✅ Done` (merged, acceptance criteria met) · `Blocked by …`.
@@ -2855,6 +2856,91 @@ agent's review.
   Release workflow): 1.4.0, agent 0.3.1, mcp 0.2.2, installed from npm and checked. `v6.json` then
   regenerated from 1.4.0 by `generate.mjs` (the other fixtures reproduced unchanged).)
 
+## Phase 20 — The corpus run: real .docx files · M → fixes in 1.4.x
+
+The robustness item of the After 1.0 backlog, picked by the owner on 2026-11-22: every phase so
+far was checked against the same nine synthetic documents (`corpus/word/`), written by Word for
+the features each phase built. Real files carry what nobody wrote them for. This phase runs
+import → export → compare over a large set of real `.docx` files, reports what is lost, refused
+or broken, and fixes what the report ranks first. Planned 2026-11-22, nothing built.
+
+Not in this phase: new features the report asks for (a ranked list for the next phase, not
+built here), speed work (the run records times; the misses of Phase 5 stay in the backlog),
+`.doc`, `.odt` or `.rtf`, files nobody may redistribute (a private folder is run the same way,
+by its owner, printing counts only), manual checks in Word beyond what automation reports.
+
+**Starts from (1.4.0):** `scripts/corpus/import-report.mjs` prints, for a folder, what each
+file's import made editable or kept opaque, counts and element names only, never text.
+`rewrite-corpus.mjs` writes each file back (`-same`, `-rewritten`, `-exported`, `-edited`)
+for Word to check; `word-reference.ps1` records what Word does with a file (pages, revisions,
+comments, notes; opened read-only, macros off) and `corpus/reference/word/` holds it for the nine.
+`importDocx` reports `opaque`, `dropped` and `unmodeledCount`; it refuses a damaged or too large
+package with a `DocxError`. Lossless export is claimed for what the model holds and for what it
+keeps verbatim; nothing measures it beyond the nine.
+
+**Sources, proposed (each license checked in 20.1 before anything is fetched):** the test files
+of projects that publish them: Apache POI's `test-data/document` (Apache-2.0), LibreOffice's
+`sw/qa/extras/ooxmlexport/data` and `ooxmlimport/data` (MPL-2.0), docx4j's sample documents
+(Apache-2.0), python-docx's test files (MIT), the Open XML SDK's test files (MIT). Together
+several thousand files, many written to break readers: odd structures, old Word versions,
+other writers (LibreOffice, Google Docs, WPS, generators). Fetched at a pinned commit into an
+ignored folder, each file checked against a manifest of its SHA-256; never committed.
+
+**Acceptance:** ADR-0011 records the sources (with their licenses and pinned commits), what is
+fetched and how (`pnpm corpus:fetch`, ignored cache, manifest of hashes), what the run checks and
+how a difference is classed, and that reports hold counts, element names and file names, never
+document text; at least 1 000 `.docx` files run; no file makes the run crash, hang or exceed a
+memory cap (each file in a worker with a time limit: a refusal is a `DocxError` with its
+message, counted as such); per file and in total: import refused or not (and why), opaque and
+dropped elements, unmodeled values, export without edits compared part by part with the file
+(parts added or lost, XML that differs once canonicalized: classed as lost content, changed
+values, reordered or reformatted only), a second import of the export equal to the first
+(idempotence), an edit then an export that `importDocx` and the schema accept, the read-only
+renderer laying it out in Chromium without an error (pages, time), times per step; a sample
+(the 50 files the report ranks most at risk, and 50 at random) opened by Word through automation
+on the owner's Windows machine: opens without a repair, and its pages, revisions and comments
+equal the original's; `docs/corpus-report.md` publishes the totals, the classes of loss ranked by
+how many files they touch, and each fix made; the fixes of what ranks first, each a PR with a
+reduced fixture written for it (never a third-party file committed), until the owner says the
+rest goes to the backlog; `pnpm corpus:run` documented (README, `docs/testing/corpus.md`), not
+in `pnpm check` (too long, and it needs the network once); a patch release with the fixes,
+published with the owner's approval.
+
+### Tasks
+
+Each task is a PR on `phase-20/corpus-run`, the build green after each, merged after an agent's
+review.
+
+- [ ] Claim phase, branch `phase-20/corpus-run`
+- [ ] 20.1 ADR-0011 and the fetch: each source's license read (a file whose license forbids
+  redistribution, or that has none, is left out), its commit pinned, `pnpm corpus:fetch` writing
+  the files into `.corpus-cache/` (ignored) and checking each against `corpus/external.json` (url,
+  commit, path, SHA-256, license, source). A file that fails its hash is refused, not run.
+- [ ] 20.2 The runner, `pnpm corpus:run [folder]`: each file in a worker thread (a time limit and
+  a heap cap; a worker that dies is that file's failure, the run goes on), the checks of the
+  acceptance in Node (import, report, export compared part by part, idempotence, an edit then an
+  export), results as JSON lines plus a summary; the part comparison canonicalizes XML
+  (namespace prefixes, attribute order, whitespace Word ignores) so only real differences count,
+  and names the element and attribute that differ. Tested on the nine and on hand-made broken
+  packages.
+- [ ] 20.3 The renderer pass: the files the Node pass imported, laid out by `renderDocument` in
+  Chromium (Playwright), pages and time recorded, an exception or a page that overflows its
+  sheet counted.
+- [ ] 20.4 The first run and the report: the whole set run, the results classed, `docs/corpus-
+  report.md` written; the classes ranked, each with how many files it touches and an example
+  element (no text). The owner picks with this ranking what 20.5 fixes.
+- [ ] 20.5 Fixes, one PR each, in the ranked order: a reduced fixture (written by hand or by
+  `build-word-corpus.ps1`) reproducing the loss, the fix, the class's count after it in the
+  report. Crashes and data loss first, then refusals, then losses on export, then opaque content.
+- [ ] 20.6 Word on a sample (Windows with Word, `word-reference.ps1` on the originals and their
+  exports): opens without a repair, pages, revisions and comments compared; differences added to
+  the report.
+- [ ] 20.7 Bug intake: a GitHub issue template asking for the `.docx` (or a reduced one), the
+  browser and what was lost; `docs/testing/corpus.md` on running a private folder.
+- [ ] 20.8 Docs (limitations from what the report found, the corpus README, `docs/testing/
+  corpus.md`), the changesets; then a patch release with the fixes, published with the owner's
+  approval (the Release workflow).
+
 ## After 1.0
 
 Not a phase yet: the backlog written down on 2026-11-21, from [limitations.md](limitations.md),
@@ -2872,7 +2958,7 @@ first group and from .docx files the corpus does not cover.
 - Pastes from real Word, Google Docs and LibreOffice (fixtures are hand-written); spellcheck and
   autocorrect at a page's start or end.
 
-**Robustness:**
+**Robustness** (the corpus run planned as Phase 20):
 
 - The corpus is 9 documents. Run import → export → compare over a large set of real .docx files
   and report what is lost or refused.
