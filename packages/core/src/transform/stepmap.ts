@@ -73,7 +73,7 @@ export class StepMap implements Mappable {
   recover(value: number): number {
     const range = Math.floor(value / RANGE_UNIT);
     let start = 0;
-    this.eachRange((index, _inStart, _inEnd, outStart) => {
+    eachRange(this, (index, _inStart, _inEnd, outStart) => {
       if (index === range) start = outStart;
       return index === range;
     });
@@ -82,7 +82,7 @@ export class StepMap implements Mappable {
 
   /** Calls `f` with each changed range in old and new coordinates. */
   forEach(f: (oldStart: number, oldEnd: number, newStart: number, newEnd: number) => void): void {
-    this.eachRange((_index, inStart, inEnd, outStart, outEnd) => {
+    eachRange(this, (_index, inStart, inEnd, outStart, outEnd) => {
       f(inStart, inEnd, outStart, outEnd);
     });
   }
@@ -102,21 +102,22 @@ export class StepMap implements Mappable {
   invert(): StepMap {
     return new StepMap(this.ranges, !this.inverted);
   }
+}
 
-  /** Visits the ranges in order with their bounds in input and output coordinates; `true` stops. */
-  private eachRange(
-    f: (index: number, inStart: number, inEnd: number, outStart: number, outEnd: number) => unknown,
-  ): void {
-    const { ranges, inverted } = this;
-    let shift = 0;
-    for (let i = 0; i < ranges.length; i += 3) {
-      const inSize = ranges[i + (inverted ? 2 : 1)] as number;
-      const outSize = ranges[i + (inverted ? 1 : 2)] as number;
-      const inStart = (ranges[i] as number) - (inverted ? shift : 0);
-      const outStart = inStart + shift;
-      if (f(i / 3, inStart, inStart + inSize, outStart, outStart + outSize) === true) return;
-      shift += outSize - inSize;
-    }
+/** Visits `map`'s ranges in order with their bounds in input and output coordinates; `true` stops. */
+function eachRange(
+  map: StepMap,
+  f: (index: number, inStart: number, inEnd: number, outStart: number, outEnd: number) => unknown,
+): void {
+  const { ranges, inverted } = map;
+  let shift = 0;
+  for (let i = 0; i < ranges.length; i += 3) {
+    const inSize = ranges[i + (inverted ? 2 : 1)] as number;
+    const outSize = ranges[i + (inverted ? 1 : 2)] as number;
+    const inStart = (ranges[i] as number) - (inverted ? shift : 0);
+    const outStart = inStart + shift;
+    if (f(i / 3, inStart, inStart + inSize, outStart, outStart + outSize) === true) return;
+    shift += outSize - inSize;
   }
 }
 

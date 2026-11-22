@@ -7,13 +7,12 @@ import type { Slice } from "./slice.js";
 /**
  * Replaces `$from..$to` with `slice`. Nodes cut open at either side of the range are joined
  * with the open nodes of the slice; every rebuilt node is validated against the schema.
- *
- * The result is built like a stream of tokens: the open ancestors of `$from` form a stack of
- * nodes under construction, the slice's content is fed into that stack (its open start lands in
- * the nodes already open, its open end leaves new nodes open), and finally the content after
- * `$to` closes the stack level by level.
  */
 export function replace($from: ResolvedPos, $to: ResolvedPos, slice: Slice): Node {
+  // The result is built like a stream of tokens: the open ancestors of `$from` form a stack of
+  // nodes under construction, the slice's content is fed into that stack (its open start lands
+  // in the nodes already open, its open end leaves new nodes open), and finally the content
+  // after `$to` closes the stack level by level.
   if (slice.openStart > $from.depth) {
     throw new ReplaceError("Inserted content is deeper than the insertion position");
   }

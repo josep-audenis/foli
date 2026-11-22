@@ -285,8 +285,8 @@ export class EditorState {
     return { state, transactions };
   }
 
-  /** Whether every plugin's filter (but the one at `skip`, which appended `tr`) lets `tr` through. */
   private passesFilters(tr: Transaction, skip = -1): boolean {
+    // Every plugin's filter but the one at `skip` (which appended `tr`) must let it through.
     for (let i = 0; i < this.plugins.length; i++) {
       if (i !== skip && this.plugins[i]?.spec.filterTransaction?.(tr, this) === false) return false;
     }

@@ -37,7 +37,11 @@ export class Slice {
     const holder = path.steps[path.steps.length - 1];
     // A node the slice cuts open is completed by the document around the replaced range, and
     // replace validates it once joined: checking it here would reject valid content.
-    if (holder && !this.isOpenNode(path.steps) && !holder.child.type.validContent(result)) {
+    if (
+      holder &&
+      !isOpenNode(path.steps, this.openStart, this.openEnd) &&
+      !holder.child.type.validContent(result)
+    ) {
       return null;
     }
     return new Slice(path.rebuild(result), this.openStart, this.openEnd);
@@ -59,14 +63,6 @@ export class Slice {
       this.openStart,
       this.openEnd,
     );
-  }
-
-  /** Whether the node reached through `steps` is one of the nodes this slice cuts open. */
-  private isOpenNode(steps: readonly Step[]): boolean {
-    const level = steps.length;
-    const first = steps.every((step) => step.index === 0);
-    const last = steps.every((step) => step.index === step.content.childCount - 1);
-    return (first && level <= this.openStart) || (last && level <= this.openEnd);
   }
 
   eq(other: Slice): boolean {
@@ -124,4 +120,12 @@ function descend(
       return result;
     },
   };
+}
+
+/** Whether the node reached through `steps` is one the slice cuts open (see `Slice`). */
+function isOpenNode(steps: readonly Step[], openStart: number, openEnd: number): boolean {
+  const level = steps.length;
+  const first = steps.every((step) => step.index === 0);
+  const last = steps.every((step) => step.index === step.content.childCount - 1);
+  return (first && level <= openStart) || (last && level <= openEnd);
 }
