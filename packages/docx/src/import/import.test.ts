@@ -224,10 +224,9 @@ describe("importing WordprocessingML", () => {
       indent: { left: 720, right: 360 },
       justification: "center",
     });
-    expect((blocks[0]?.attrs?.markFormat as { type: string }[]).map((m) => m.type).sort()).toEqual([
-      "bold",
-      "italic",
-    ]);
+    expect(
+      ((blocks[0]?.attrs?.markFormat ?? []) as { type: string }[]).map((m) => m.type).sort(),
+    ).toEqual(["bold", "italic"]);
     expect(report.unmodeled.join("\n")).toMatch(/a second w:pPr/);
   });
 
