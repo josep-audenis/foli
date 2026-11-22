@@ -3327,6 +3327,7 @@ export {};
  * a foreign node or mark holding its type and attributes, and written back as it was.
  */
 import type { Attrs, MarkSpec, NodeJSON, NodeSpec } from "../model/index.js";
+import { Schema } from "../model/index.js";
 import type { Plugin } from "../state/state.js";
 /** A custom node type: an inline leaf (`inline: true`) or a block leaf. */
 export interface ExtensionNodeSpec extends Omit<NodeSpec, "content" | "text"> {
@@ -3355,6 +3356,12 @@ export interface ContentOptions extends ParseOptions {
     /** Content to paste, which a table may end. */
     fragment?: boolean;
 }
+/**
+ * The Word schema with `extensions`' types (the Word schema itself when there are none). Throws
+ * a `RangeError` on a name that is not namespaced or is taken twice, or a node that is not a leaf.
+ * Not public: exported through `@folijs/core/internal` only.
+ */
+export declare function schemaWith(extensions: readonly Extension[] | undefined): Schema;
 /**
  * The text a custom node's JSON carries in memory (read from a `.docx` control), if any.
  */
