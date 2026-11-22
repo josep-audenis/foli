@@ -7,7 +7,7 @@
  */
 import type { Node as ModelNode } from "@folijs/core";
 import type { CellFormat, Resolver } from "@folijs/core/internal";
-import { borderJsonCss, PX_PER_TWIP } from "./blocks.js";
+import { borderJsonCss, PX_PER_TWIP, tableLayout } from "./blocks.js";
 
 /**
  * A block the view renders: its node, the position before it, and the cell format it is in.
@@ -192,8 +192,7 @@ export function frameElement(
   table.setAttribute(FRAME_ATTR, "");
   const { style } = table;
   style.borderCollapse = "collapse";
-  // shortcut: autofit tables keep the grid Word saved; widths are not recomputed from content.
-  style.tableLayout = "fixed";
+  style.tableLayout = tableLayout(frame.node.attrs.layout);
   const total = frame.grid.reduce((a, b) => a + b, 0);
   if (total) style.width = `${total * PX_PER_TWIP}px`;
   if (frame.css.justify === "center") style.margin = "0 auto";

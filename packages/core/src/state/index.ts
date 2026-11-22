@@ -237,6 +237,7 @@ export {
   Transaction,
 } from "./state.js";
 export {
+  columnAt,
   deleteColumns,
   deleteRows,
   deleteTable,

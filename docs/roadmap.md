@@ -2799,9 +2799,16 @@ agent's review.
   so a page used again does not keep them): functions cannot cross into the page. A custom block
   on read-only pages is kept whole unless taller than a page; copies (headers, notes, later
   parts) are snapshots and `destroy` is not called (limitations). Tested in jsdom and in Chromium's PDF (e2e).)
-- [ ] 19.4 Tables: a column width field in the table properties (keyboard, undoable); autofit
+- [x] 19.4 Tables: a column width field in the table properties (keyboard, undoable); autofit
   tables fitted to their content (Word's rules: preferred widths, minimum content width, the
-  page's width), a fixed table untouched; the `shortcut:` in `table.ts` removed.
+  page's width), a fixed table untouched; the `shortcut:` in `table.ts` removed. (Done: the Table
+  menu's Column width… dialog (`"columnWidth"`, cm, core's `columnAt` and `setColumnWidth`, one
+  undo step, not while tracking). Autofit tables are laid out by the browsers' automatic table
+  layout with Word's grid as the widths: measured in Chromium, Firefox and WebKit, saved widths
+  stay while content fits or wraps and only unbreakable content widens a column, taking from the
+  others, then widening the table. The corpus's tables are all fixed, so none of them changes;
+  e2e in three browsers on 06's table made autofit. Not Word's algorithm (percent and `auto` preferred widths, the page's room); each page's
+  part of a split table is laid out alone (a new `shortcut:`).)
 - [ ] 19.5 Pictures: rotation (`rot`, read, drawn, 90° commands) and cropping (`a:srcRect`, read,
   drawn, a crop mode), written back to `.docx`; resizing with touch (pointer events).
 - [ ] 19.6 Drag and drop of text: move inside the document (one undo step; delete and insert when
@@ -2859,8 +2866,6 @@ supplies, so a server without a browser cannot make PDFs).
 - Dragging text does nothing; on Android, Backspace at a list paragraph's start may join it into
   the paragraph before; some Android keyboards insert paragraphs without the events the editor
   needs.
-- Tables: autofit keeps Word's saved widths (no fitting to content); no keyboard way to set a
-  column's width.
 - Pictures: no cropping, rotation or touch resizing; resizing is refused while tracking.
 - Find does not look in text boxes (comments: 19.2).
 

@@ -1267,6 +1267,18 @@ export function opaqueBlock(
   };
 }
 
+/**
+ * How the browser lays a table's columns out (19.4). A fixed table keeps its grid. An autofit
+ * one (Word's default) keeps the widths Word saved as long as its content fits or wraps, and
+ * widens a column for what cannot break (a long word, a picture), taking from the others, as
+ * Word does: the browsers' automatic layout with the grid as the columns' widths and the table's
+ * width kept. shortcut: each page's part of a table split over pages is laid out on its own, so
+ * a column widened on one page is not on the others; measure the whole table once if that shows.
+ * @internal
+ */
+export const tableLayout = (layout: unknown): "fixed" | "auto" =>
+  layout === "fixed" ? "fixed" : "auto";
+
 /** The value of a WordprocessingML child's `w:val` (by local names). */
 function childValue(element: Element | null | undefined, name: string, attribute = "val") {
   for (const child of element?.children ?? []) {
@@ -1496,7 +1508,7 @@ function modelTable(
   const attrs = (node.attrs ?? {}) as Record<string, unknown>;
   const table = doc.createElement("table");
   table.style.borderCollapse = "collapse";
-  table.style.tableLayout = "fixed";
+  table.style.tableLayout = tableLayout(attrs.layout);
   const grid = (attrs.grid as number[] | undefined) ?? [];
   const total = grid.reduce((a, b) => a + b, 0);
   if (total) table.style.width = `${total * PX_PER_TWIP}px`;

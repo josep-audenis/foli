@@ -555,3 +555,45 @@ test("the table menu inserts a row from the keyboard; the menu, dialog and table
   await expect(table).toBeFocused();
   expect(await scan("#editor > .foli-page")).toEqual([]);
 });
+
+test("a fixed table keeps its grid; an autofit one widens a column for a word that cannot break (19.4)", async ({
+  page,
+}) => {
+  await open(page, "06-price-schedule.docx");
+  // Its text grows below: matched by its start.
+  const cell = page.locator("td", { hasText: /^Support item 35(\D|$)/ }).first();
+  const widths = () =>
+    cell.evaluate((td) => {
+      const row = td.closest("tr") as HTMLElement;
+      return {
+        table: Math.round(td.closest("table")?.getBoundingClientRect().width ?? 0),
+        cells: [...row.children].map((c) => Math.round(c.getBoundingClientRect().width)),
+      };
+    });
+  const settle = () => page.waitForTimeout(300);
+  const before = await widths();
+  await cell.click();
+  await page.keyboard.press("End");
+  await page.keyboard.type(" Pneumonoultramicroscopicsilicovolcanoconiosis");
+  await settle();
+  // The corpus's tables are fixed (`w:tblLayout fixed`): the word breaks, the grid stays.
+  expect(await widths()).toEqual(before);
+  // The same table as autofit (Word's default, and a table inserted in Foli).
+  await page.evaluate(() => {
+    const { editor } = window.foliEdit;
+    const tr = editor.state.tr;
+    editor.state.doc.descendants((node, pos) => {
+      if (node.type.name === "table")
+        tr.setNodeMarkup(pos, node.type, { ...node.attrs, layout: null });
+      return node.type.name !== "table";
+    });
+    editor.dispatch(tr);
+  });
+  await settle();
+  const after = await widths();
+  // Its column widened, the others giving what they can spare; past that the table grows (as
+  // Word's autofit does).
+  const column = before.cells.findIndex((w, i) => (after.cells[i] ?? 0) > w);
+  expect(column).toBeGreaterThanOrEqual(0);
+  expect(after.table).toBeGreaterThanOrEqual(before.table);
+});

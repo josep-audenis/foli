@@ -338,6 +338,36 @@ describe("FoliToolbar's table menu", () => {
     ).toBe("true");
   });
 
+  it("sets the caret's column width from the keyboard, in one undo step (19.4)", () => {
+    const editor = setup();
+    act(() => {
+      editor.select(6);
+      editor.run(insertTable(1, 2));
+    });
+    const before = tableIn(editor)?.attrs?.grid as number[];
+    openMenu();
+    fireEvent.click(item("Column width…"));
+    const field = screen.getByLabelText("Column width (cm)") as HTMLInputElement;
+    expect(document.activeElement).toBe(field);
+    expect(Number(field.value)).toBeCloseTo((before[0] as number) / (1440 / 2.54), 1);
+    fireEvent.change(field, { target: { value: "x" } });
+    fireEvent.submit(field.closest("form") as HTMLFormElement);
+    expect(screen.getByRole("alert").textContent).toContain("Enter a width");
+    fireEvent.change(field, { target: { value: "3,5" } });
+    fireEvent.submit(field.closest("form") as HTMLFormElement);
+    const after = tableIn(editor)?.attrs?.grid as number[];
+    expect(after[0]).toBe(Math.round(3.5 * (1440 / 2.54)));
+    // The next column gives the difference: the table keeps its width.
+    expect((after[0] as number) + (after[1] as number)).toBe(
+      (before[0] as number) + (before[1] as number),
+    );
+    expect(screen.queryByRole("dialog", { name: "Column width" })).toBe(null);
+    act(() => {
+      editor.commands.undo();
+    });
+    expect(tableIn(editor)?.attrs?.grid).toEqual(before);
+  });
+
   it("is keyboard-usable: ArrowDown opens it, arrows move, Escape closes back to its button", () => {
     setup();
     const button = screen.getByRole("button", { name: "Table" });
