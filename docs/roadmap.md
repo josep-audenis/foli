@@ -31,7 +31,7 @@ place that says what is in progress; check it before starting work.
 | 17 Toolbar for developers | ✅ Done                  | —                     | Merged in #167–#173; 1.2.0 on npm (2026-11-21), released with Phase 16 (#176)                                                                                                                 |
 | 18 Hint                   | ✅ Done                  | —                     | Merged in #180–#184; 1.3.0 and `@folijs/agent` 0.3.0 on npm (2026-11-22)                                                                                                                      |
 | 19 Editing gaps           | ✅ Done                  | —                     | Merged in #187–#202; 1.4.0 (schema 6), `@folijs/agent` 0.3.1 and `@folijs/mcp` 0.2.2 on npm (2026-11-22); text boxes in find and crop handles left for later; Android and touch emulated only |
-| 20 Corpus run             | In progress              | `phase-20/corpus-run` | 20.1–20.2 merged (#206, #207); 20.3, the renderer pass, in review                                                                                                                             |
+| 20 Corpus run             | In progress              | `phase-20/corpus-run` | 20.1–20.4 merged (#206–#209); 20.5, the fixes, next                                                                                                                                           |
 
 Status values: `Ready` (dependencies met, nobody on it) · `In progress` · `In review` (PR open) ·
 `✅ Done` (merged, acceptance criteria met) · `Blocked by …`.
@@ -2945,9 +2945,19 @@ review.
   markup view); pages, time, page errors and pages whose content overflows their sheet, as
   `<run>.render.jsonl` beside the run; 60 s a file, a hung or crashed tab replaced, a fresh page
   every 200 files. The nine: all laid out, no error, no overflow.)
-- [ ] 20.4 The first run and the report: the whole set run, the results classed, `docs/corpus-
+- [x] 20.4 The first run and the report: the whole set run, the results classed, `docs/corpus-
   report.md` written; the classes ranked, each with how many files it touches and an example
-  element (no text). The owner picks with this ranking what 20.5 fixes.
+  element (no text). The owner picks with this ranking what 20.5 fixes. (Done: [corpus-report.md](corpus-report.md).
+  3 445 distinct files: 3 252 import, export and read back (3 181, 92.3%, with no difference
+  counted), 186 refused with a reason (71 Strict Open XML, 60 with the document's root in markup
+  compatibility), 7 crash (3 on import: a run property twice; 4 on export: a note reference
+  without its note); none hangs. All 3 256 that import lay out in Chromium, 10 with a page that
+  overflows. Fourteen classes ranked. The comparison counts what Word shows: runs of one
+  formatting joined, empty runs aside, text as Word reads it (`xml:space`), `w:t`/`w:instrText`/
+  `w:delText` told apart, what Word writes anew at each save (`rsid*`, `w14:paraId` outside
+  comments, `w:proofErr`, `w:lastRenderedPageBreak`) aside, paragraphs matched by their text;
+  before it, run merging made about 1 200 files look lossy. 20.5 follows the plan's order:
+  crashes, then data loss.)
 - [ ] 20.5 Fixes, one PR each, in the ranked order: a reduced fixture (written by hand or by
   `build-word-corpus.ps1`) reproducing the loss, the fix, the class's count after it in the
   report. Crashes and data loss first, then refusals, then losses on export, then opaque content.

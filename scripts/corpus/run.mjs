@@ -138,7 +138,9 @@ export function summarize(results) {
           ? "export crash"
           : r.reimport?.crash || r.edit?.crash
             ? "later crash"
-            : "ok";
+            : r.edit?.lost
+              ? "edit lost"
+              : "ok";
     count(outcome, status);
     const seen = new Set();
     const mark = (key) => {
@@ -147,10 +149,19 @@ export function summarize(results) {
     };
     if (r.import === "crash") mark(`crash on import: ${r.error?.name} at ${r.error?.at}`);
     if (exportCrash) mark(`crash on export: ${exportCrash.name} at ${exportCrash.at}`);
-    for (const part of r.export?.lost ?? []) mark(`part lost: ${part}`);
-    for (const part of r.export?.added ?? []) mark(`part added: ${part}`);
+    // Parts of one kind together: header1.xml and header2.xml, image3.png and image7.png.
+    const kind = (part) => part.replace(/\d+/g, "N");
+    for (const part of r.export?.lost ?? []) mark(`part lost: ${kind(part)}`);
+    for (const part of r.export?.added ?? []) mark(`part added: ${kind(part)}`);
     for (const change of r.export?.changed ?? []) {
-      if (change.kind === "bytes") mark(`binary part changed: ${change.part}`);
+      if (change.kind === "bytes") mark(`binary part changed: ${kind(change.part)}`);
+      if (change.textChanged) mark(`paragraph text changed in ${kind(change.part)}`);
+      if (change.formatChanged) mark(`paragraph formatted otherwise in ${kind(change.part)}`);
+      // A difference in the paragraphs' runs that is neither (a stretch moved between them).
+      if (change.runs && !change.textChanged && !change.formatChanged)
+        mark(`runs moved between paragraphs in ${kind(change.part)}`);
+      for (const name of change.properties ?? []) mark(`run property changed: ${name}`);
+      for (const move of change.around ?? []) mark(`text moved out of or into: ${move}`);
       if (change.kind === "unreadable") mark(`part not compared: ${change.error?.name}`);
       for (const name of change.lost ?? []) mark(`element lost: ${name}`);
       for (const name of change.added ?? []) mark(`element added: ${name}`);
@@ -161,6 +172,7 @@ export function summarize(results) {
     if (r.reimport?.differs)
       mark(`second import differs at ${r.reimport.differs.split("/").slice(0, 3).join("/")}`);
     if (r.edit?.crash) mark(`edit then export: ${r.edit.crash.name}`);
+    if (r.edit?.lost) mark("edit: the typed character is not in the export");
   }
   const sorted = (map) => [...map].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
   return { files: results.length, outcome: sorted(outcome), classes: sorted(classes) };
