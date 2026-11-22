@@ -16,7 +16,9 @@ import {
   type Mark,
   type Node as ModelNode,
 } from "@folijs/core";
+import { schemaWith } from "@folijs/core/internal";
 import type { EditorView } from "./view.js";
+import type { CustomDrawing } from "./word/blocks.js";
 
 /**
  * Attributes put on a drawn element: `class` is added to its classes, `style` to its style, any
@@ -264,4 +266,50 @@ export function decorationsByBlock(
     }
   }
   return out;
+}
+
+/**
+ * Custom nodes and marks of `extensions` drawn by their views on read-only pages (19.3): a node
+ * read into the extensions' schema, then `render`; without a view, or when it fails, the node's
+ * `text` (its spec's), else as without extensions. Undefined when no extension is given.
+ * @internal
+ */
+export function customDrawing(
+  extensions: readonly Extension[] | undefined,
+): CustomDrawing | undefined {
+  if (!extensions?.length) return undefined;
+  const views = viewsOf(extensions as readonly ViewExtension[]);
+  const schema = schemaWith(extensions);
+  return {
+    node(json, doc) {
+      const type = schema.nodes[json.type];
+      if (!type) return null;
+      let node: ModelNode;
+      try {
+        node = schema.nodeFromJSON(json);
+      } catch {
+        // Attributes its spec refuses: drawn as without extensions.
+        return null;
+      }
+      const view = views.nodes.get(json.type);
+      if (view)
+        try {
+          return view.render(node, nodeViewDOM(doc));
+        } catch (error) {
+          reportError(error);
+        }
+      const text = type.spec.text?.(node.attrs);
+      return text === undefined ? null : doc.createTextNode(text);
+    },
+    mark(json) {
+      const view = views.marks.get(json.type);
+      if (!view) return null;
+      try {
+        return view(schema.markFromJSON(json));
+      } catch (error) {
+        reportError(error);
+        return null;
+      }
+    },
+  };
 }

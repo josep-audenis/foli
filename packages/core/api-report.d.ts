@@ -50,7 +50,7 @@ export { type AbstractNumberingJSON, type BorderJSON, type CellPropertiesJSON, t
 export { CommentStep, caretStop, controlSpot, copiedDefinitions, deleteSelectionKeepingTables, documentJSON, EnvelopeStep, editorCommand, type FittedPaste, fitPaste, fitPastedV2, keepTablesApart, noteKindOf, referencesIn, StoryStep, sameSpot, setComments, typedMarks, viewKeys, type WordContext, type WordDefinitions, type WordEnvelope, withEnvelope, wordContext, } from "./state/index.js";
 export type { EnvelopeKey, Story } from "./state/word.js";
 export type { Check } from "./v3/check.js";
-export { type CellFormat, type CellPlace, CUSTOM_TYPE, checkControl, checkSection, foreignTextOf, formatNumber, type ListMarker, type ParagraphFormat, Resolver, RUN_PROPERTY_MARKS, type RunFormat, schema, type TableFormat, tableConditions, withForeignText, } from "./v3/index.js";
+export { type CellFormat, type CellPlace, CUSTOM_TYPE, checkControl, checkSection, foreignTextOf, formatNumber, type ListMarker, type ParagraphFormat, Resolver, RUN_PROPERTY_MARKS, type RunFormat, schema, schemaWith, type TableFormat, tableConditions, withForeignText, } from "./v3/index.js";
 
 // model/attrs.d.ts
 export type Attrs = Readonly<Record<string, unknown>>;
@@ -3366,7 +3366,7 @@ export declare function withForeignText<T extends NodeJSON>(json: T, text: strin
 
 // v3/index.d.ts
 export { type AbstractNumberingJSON, type BorderJSON, type CellPropertiesJSON, type CommentJSON, type ControlJSON, checkControl, createDocument, type FoliDocument, type FoliDocumentV3, type FoliDocumentV4, type MeasureJSON, migrateToV4, migrateToV5, type NotePropertiesJSON, type NumberingInstanceJSON, type NumberingLevelJSON, type ParagraphPropertiesJSON, parseContent, parseDocument, type ResourceJSON, type RowPropertiesJSON, SCHEMA_VERSION, type SectionJSON, type StoryJSON, type StyleJSON, TABLE_CONDITIONS, type TableCondition, type TableConditionJSON, type TablePropertiesJSON, type ThemeJSON, type WordSettingsJSON, } from "./document.js";
-export { type ContentOptions, type Extension, type ExtensionNodeSpec, foreignTextOf, type ParseOptions, withForeignText, } from "./extensions.js";
+export { type ContentOptions, type Extension, type ExtensionNodeSpec, foreignTextOf, type ParseOptions, schemaWith, withForeignText, } from "./extensions.js";
 export { migrateToV3 } from "./migrate.js";
 export { type CellFormat, type CellPlace, formatNumber, type ListMarker, type ParagraphFormat, Resolver, type RunFormat, type TableFormat, tableConditions, } from "./resolve.js";
 export { CUSTOM_TYPE, checkSection, HIGHLIGHT_COLORS, JUSTIFICATIONS, type Justification, RUN_PROPERTY_MARKS, schema, } from "./schema.js";

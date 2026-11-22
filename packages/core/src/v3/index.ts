@@ -37,6 +37,7 @@ export {
   type ExtensionNodeSpec,
   foreignTextOf,
   type ParseOptions,
+  schemaWith,
   withForeignText,
 } from "./extensions.js";
 export { migrateToV3 } from "./migrate.js";

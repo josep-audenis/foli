@@ -282,6 +282,15 @@ hint (`view.hint`, Phase 18) is drawn the same way, in its own highlight (`foli-
 of, made into DOM ranges again after each render; for a header, footer or note that is not open,
 by paragraph index and character in the copies the pages draw, as their text has no positions.
 
+On read-only pages (19.3) the views come through `customDrawing(extensions)`: `renderBlocks`
+(`word/blocks.ts`, which draws JSON, not model nodes) asks it for each custom node, which it reads
+into the extensions' schema (`schemaWith`) for `render`, falling back to the spec's `text`; mark
+views' attributes go on the run's span. It reaches the helpers through module state set for the
+synchronous `renderBlocks` call rather than as a parameter of each (cells, opaque blocks). The
+editor gives it to `PageRegions` and `PageNotes` too, so headers, footers and notes drawn on the
+pages show custom content. `exportPdf` cannot pass functions into its page: the app's script sets
+`globalThis.foliPdfExtensions`, which the renderer takes (and deletes) before laying out.
+
 ## Editor view (`@folijs/view`)
 
 `packages/view/src/view.ts`, design per ADR-0003: one `contenteditable` host holding real pages.

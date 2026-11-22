@@ -15,6 +15,7 @@ import {
   type ViewExtension,
 } from "./extension.js";
 import { EditorView } from "./view.js";
+import { renderDocument } from "./word/pages.js";
 
 // The view's side of extensions (ADR-0008, 12.4): node views, mark views, decorations and plugin
 // views.
@@ -310,5 +311,66 @@ describe("plugin views", () => {
       host.remove();
     }
     error.mockRestore();
+  });
+});
+
+describe("custom content on read-only pages (19.3)", () => {
+  const draw = (extensions?: ViewExtension[]) => {
+    const container = document.createElement("div");
+    document.body.append(container);
+    const document_ = { ...createDocument({ type: "doc", content }) };
+    const pages = renderDocument(document_, container, extensions ? { extensions } : {});
+    return { container, pages };
+  };
+
+  it("draws custom nodes and marks with the extensions' views", () => {
+    const { container, pages } = draw([withoutView]);
+    expect(container.querySelector(".chip")?.textContent).toBe("@Ada");
+    expect(container.querySelector(".card p")?.textContent).toBe("Card c-1");
+    expect(container.querySelector(".topic")?.getAttribute("data-topic")).toBe("fin");
+    pages.destroy();
+    container.remove();
+  });
+
+  it("draws them in headers too", () => {
+    const container = document.createElement("div");
+    document.body.append(container);
+    const header = { type: "doc", content: [content[0] as NodeJSON] };
+    const pages = renderDocument(
+      {
+        ...createDocument({ type: "doc", content: [{ type: "paragraph" }] }),
+        section: { headers: { default: "h" } },
+        stories: { h: { kind: "header", content: header } },
+      },
+      container,
+      { extensions: [withoutView] },
+    );
+    expect(container.querySelector(".chip")?.textContent).toBe("@Ada");
+    pages.destroy();
+    container.remove();
+  });
+
+  it("draws them as their text without the extensions, or when a view fails", () => {
+    const { container } = draw();
+    expect(container.querySelector(".chip")).toBe(null);
+    expect(container.textContent).toContain("[acme:mention]");
+    container.remove();
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    const failing: ViewExtension = {
+      ...withoutView,
+      nodeViews: {
+        "acme:mention": {
+          render: () => {
+            throw new Error("no");
+          },
+        },
+      },
+    };
+    const again = draw([failing]);
+    // Its spec's text, as the editor shows a node without a view.
+    expect(again.container.textContent).toContain("Ask @Ada about");
+    expect(error).toHaveBeenCalled();
+    error.mockRestore();
+    again.container.remove();
   });
 });

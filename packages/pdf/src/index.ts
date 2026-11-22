@@ -60,6 +60,14 @@ export interface ExportPdfOptions {
    * Each face declared is loaded first.
    */
   styles?: string | undefined;
+  /**
+   * A script run in the page before the document is laid out, which sets
+   * `globalThis.foliPdfExtensions` to the editor's extensions (an array): custom nodes and marks
+   * then print with their node and mark views (19.3), else as their `.docx` text. The page has
+   * no `@folijs/*` module: bundle the extensions' own code into it. It is the app's code, run
+   * with the renderer's rights; never build it from a document.
+   */
+  extensions?: string | undefined;
 }
 
 export interface ExportedPdf {
@@ -173,6 +181,7 @@ export async function exportPdf(
   };
   const script = await rendererBundle();
   await page.setContent(PAGE);
+  if (options.extensions) await page.addScriptTag({ content: options.extensions });
   await page.addScriptTag({ content: script });
   const rendered = (await page.evaluate(
     (arg: RenderInput) =>
