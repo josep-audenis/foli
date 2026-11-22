@@ -1,5 +1,11 @@
 import { readdirSync, readFileSync } from "node:fs";
-import { type NodeJSON, parseDocument } from "@folijs/core";
+import {
+  createDocument,
+  createEditor,
+  insertHorizontalRule,
+  type NodeJSON,
+  parseDocument,
+} from "@folijs/core";
 import { describe, expect, it } from "vitest";
 import { exportDocx, importDocx } from "./index.js";
 
@@ -49,4 +55,23 @@ describe("0.x formats through .docx", () => {
         ).toBe(true);
     });
   }
+});
+
+describe("a horizontal line through .docx (19.1)", () => {
+  it("keeps the rule's paragraph border", async () => {
+    const editor = createEditor({
+      document: createDocument({
+        type: "doc",
+        content: [{ type: "paragraph", content: [{ type: "text", text: "abcd" }] }],
+      }),
+    });
+    editor.select(3);
+    expect(editor.run(insertHorizontalRule)).toBe(true);
+    const { document } = await importDocx(await exportDocx(editor.getDocument()));
+    expect(document.content.content?.map((b) => b.attrs?.borders ?? null)).toEqual([
+      null,
+      { bottom: { style: "single", size: 6, space: 1, color: "auto" } },
+      null,
+    ]);
+  });
 });

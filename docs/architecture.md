@@ -668,9 +668,8 @@ on the host outside the wrapper, closes it (`closeStory`). A `StoryStep` reachin
 redraws the story's other occurrences, and flows the pages only if a height changed; the renderer
 and the layout cache stay.
 
-Not yet in the editor: a
-horizontal rule button (a rule is a paragraph's bottom
-border). Links are drawn as `<a>` where `isSafeHref` takes the target (schema v3 keeps any),
+A horizontal rule is a paragraph's bottom border (`insertHorizontalRule`, the toolbar's Horizontal
+line, 19.1). Links are drawn as `<a>` where `isSafeHref` takes the target (schema v3 keeps any),
 inheriting the run's own color and underline (Word shows a link without the Hyperlink style
 plain), so Ctrl+click opens them (8.7d1). A link from another source (a paste without the
 document's id, a command) must have a safe target; the document's own keep theirs. Each render resolves the list numbers and open comment

@@ -238,6 +238,7 @@ export {
   deleteRows,
   deleteTable,
   insertColumn,
+  insertHorizontalRule,
   insertRow,
   insertTable,
   isHeaderRow,

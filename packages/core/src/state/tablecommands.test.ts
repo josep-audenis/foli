@@ -9,6 +9,7 @@ import {
   deleteRows,
   deleteTable,
   insertColumn,
+  insertHorizontalRule,
   insertRow,
   insertTable,
   isHeaderRow,
@@ -172,6 +173,104 @@ describe("insertTable", () => {
     expect(first.attrs.attributes).toBe(null);
     expect(second.attrs.section).toEqual({});
     expect(second.attrs.attributes).toEqual({ "w14:paraId": "1234ABCD" });
+  });
+});
+
+describe("insertHorizontalRule", () => {
+  const rule = { bottom: { style: "single", size: 6, space: 1, color: "auto" } };
+
+  it("splits the paragraph at the caret with Word's rule between, the caret after it", () => {
+    const editor = editorOf([p("abcd")]);
+    select(editor, 3);
+    expect(editor.run(insertHorizontalRule)).toBe(true);
+    expect(shape(editor)).toEqual(["ab", "", "cd"]);
+    expect(editor.state.doc.child(1).attrs.borders).toEqual(rule);
+    expect(caret(editor)).toBe("cd");
+    expect(editor.state.selection.$head.parentOffset).toBe(0);
+    valid(editor);
+  });
+
+  it("adds a paragraph to type in after a rule at the end of the document", () => {
+    const editor = editorOf([p("end")]);
+    select(editor, 4);
+    editor.run(insertHorizontalRule);
+    expect(shape(editor)).toEqual(["end", "", ""]);
+    expect(editor.state.selection.$head.index(0)).toBe(2);
+    valid(editor);
+  });
+
+  it("goes before a paragraph whose start holds the caret, in a table cell too", () => {
+    const editor = editorOf([p("x"), TABLE, p("y")]);
+    select(editor, inside(editor, "a2"));
+    editor.run(insertHorizontalRule);
+    expect(shape(editor)[1]).toEqual([
+      ["a1", "b1"],
+      ["a2", "b2"],
+      ["a3", "b3"],
+    ]);
+    const $head = editor.state.selection.$head;
+    expect($head.parent.textContent).toBe("a2");
+    expect($head.node(-1).child(0).attrs.borders).toEqual(rule);
+    valid(editor);
+  });
+
+  it("is a tracked insertion while tracking; rejecting removes it", () => {
+    const editor = editorOf([p("ab")], true);
+    select(editor, 2);
+    editor.run(insertHorizontalRule);
+    expect(shape(editor)).toEqual(["a", "", "b"]);
+    expect(editor.state.doc.child(1).attrs.revision).toMatchObject({ insertion: { author: "Me" } });
+    editor.commands.rejectAllChanges();
+    expect(shape(editor)).toEqual(["ab"]);
+    valid(editor);
+  });
+
+  it("stays in the paragraph's content controls", () => {
+    const inControl = { ...p("abcd"), attrs: { controls: ["c1"] } } as NodeJSON;
+    for (const at of [1, 3]) {
+      const editor = editorOf([inControl]);
+      select(editor, at);
+      editor.run(insertHorizontalRule);
+      const all: unknown[] = [];
+      editor.state.doc.forEach((b) => {
+        all.push(b.attrs.controls);
+      });
+      // At the start: the rule, then the paragraph; else the two halves around it.
+      expect(all).toEqual(Array(at === 1 ? 2 : 3).fill(["c1"]));
+    }
+  });
+
+  it("at a heading's end, goes on in the style that follows it, as Enter does", () => {
+    const heading = { ...p("Title"), attrs: { style: "Heading1" } } as NodeJSON;
+    const editor = createEditor({
+      document: {
+        ...documentOf(heading),
+        styles: [
+          { id: "Normal", type: "paragraph", name: "Normal", isDefault: true },
+          {
+            id: "Heading1",
+            type: "paragraph",
+            name: "heading 1",
+            basedOn: "Normal",
+            next: "Normal",
+          },
+        ],
+      } as FoliDocument,
+    });
+    select(editor, 6);
+    editor.run(insertHorizontalRule);
+    expect(editor.state.doc.child(0).attrs.style).toBe("Heading1");
+    expect(editor.state.doc.child(1).attrs.style).toBe(null);
+    expect(editor.state.doc.child(2).attrs.style).not.toBe("Heading1");
+    expect(editor.state.selection.$head.index(0)).toBe(2);
+  });
+
+  it("is one undo step", () => {
+    const editor = editorOf([p("abcd")]);
+    select(editor, 3);
+    editor.run(insertHorizontalRule);
+    editor.commands.undo();
+    expect(shape(editor)).toEqual(["abcd"]);
   });
 });
 

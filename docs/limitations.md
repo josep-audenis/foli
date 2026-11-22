@@ -84,7 +84,6 @@ checklist in [testing/ime.md](testing/ime.md)):
   paragraph holding a reference at the end of a column can move to the next page where Word ends
   the column with it. Number formats
   beyond Word's common ones show as decimal numbers. Shift+Alt+N is Foli's: Word has no such key.
-- No horizontal rule button (Word's rule is a paragraph's bottom border, kept and shown).
 - On Android, Backspace at a list paragraph's start may join it into the paragraph before
   instead of removing its number (untested on a device).
 - The toolbar's colors are a palette (seven text colors, Word's highlights; an app gives the

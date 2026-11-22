@@ -131,7 +131,7 @@ New comment (with `comments`: on the selection, written in the pane), Track chan
 previous and next change, Accept, Reject (the change at the caret or the selected ones),
 Accept all, Reject all ·
 undo, redo · Table (a menu), Table style (a box of the document's table styles and Word's Table
-Grid), Shading (a menu of light cell fills; both in a table, not while tracking) · Picture… (a dialog) · page break · Section, Header (menus) · Controls (a menu: rich text, plain text, drop-down list, combo box, date picker, check box, picture around a selected one, repeating section, Add repeating item, Control properties… (a dialog: title, tag, the two locks, list items, date format, line breaks)) · Fields (a menu: page number, date, Cross-reference… (a dialog of the document's headings and bookmarks), table of contents, update the selected fields or all of them, show field codes). A pointer pick in a box calls `onClickCommand`, like a button click.
+Grid), Shading (a menu of light cell fills; both in a table, not while tracking) · Picture… (a dialog) · page break, horizontal line · Section, Header (menus) · Controls (a menu: rich text, plain text, drop-down list, combo box, date picker, check box, picture around a selected one, repeating section, Add repeating item, Control properties… (a dialog: title, tag, the two locks, list items, date format, line breaks)) · Fields (a menu: page number, date, Cross-reference… (a dialog of the document's headings and bookmarks), table of contents, update the selected fields or all of them, show field codes). A pointer pick in a box calls `onClickCommand`, like a button click.
 Up and Down on a closed box apply each value they pass (Chrome and Firefox on Windows), one
 undo step each. Text color and highlight are menu buttons (WAI-ARIA menu, `menuitemradio`
 items) with a palette (Word's highlight colors; an app gives another, [Toolbar items](#toolbar-items)), the current color checked; arrow keys,
@@ -210,7 +210,7 @@ The built-in items are exported by name in `toolbarItems` (`ToolbarItemName`: `s
 `alignCenter`, `alignEnd`, `alignJustify`, `lineSpacing`, `bulletList`, `orderedList`, `outdent`,
 `indent`, `newComment`, `trackChanges`, `reviewView`, `previousChange`, `nextChange`,
 `acceptChange`, `rejectChange`, `acceptAll`, `rejectAll`, `undo`, `redo`, `table`, `tableStyle`,
-`cellShading`, `picture`, `pageBreak`, `section`, `headerFooter`, `fields`, `navigate`, `notes`,
+`cellShading`, `picture`, `pageBreak`, `horizontalRule`, `section`, `headerFooter`, `fields`, `navigate`, `notes`,
 `controls`), and the default toolbar is `defaultToolbarItems`, groups of them. `items` (or
 `FoliEditor`'s `toolbar`) takes groups of items to add, remove, reorder and regroup them; an
 empty group is left out, and New comment shows only with `comments`. An item's `key` is its
@@ -714,6 +714,8 @@ section)` lists those as `sectionFormatting`, and accepting and rejecting resolv
 
 Tables (on the table around the selection: a cell selection's rectangle, or the caret's cell):
 `insertTable(rows, columns)` (Word's Table Grid style, up to 1000 rows and 63 columns),
+`insertHorizontalRule` (Word's horizontal line, an empty paragraph with a bottom border, where
+a table would go),
 `insertRow(dir)`, `deleteRows`, `insertColumn(dir)`, `deleteColumns`, `deleteTable`,
 `mergeCells`, `splitCell`, `toggleHeaderRow` (`isHeaderRow(state)`), `setTableStyle(name |
 null)` (`tableStyles(state)`, `tableStyleAt(state)`), `setCellShading(fill | null)` (`RRGGBB`),

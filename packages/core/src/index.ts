@@ -167,6 +167,7 @@ export {
   insertDate,
   insertField,
   insertHardBreak,
+  insertHorizontalRule,
   insertLink,
   insertNote,
   insertPageBreak,
