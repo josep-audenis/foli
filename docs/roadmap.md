@@ -32,6 +32,7 @@ place that says what is in progress; check it before starting work.
 | 18 Hint                   | ✅ Done                  | —                     | Merged in #180–#184; 1.3.0 and `@folijs/agent` 0.3.0 on npm (2026-11-22)                                                                                                                      |
 | 19 Editing gaps           | ✅ Done                  | —                     | Merged in #187–#202; 1.4.0 (schema 6), `@folijs/agent` 0.3.1 and `@folijs/mcp` 0.2.2 on npm (2026-11-22); text boxes in find and crop handles left for later; Android and touch emulated only |
 | 20 Corpus run             | In progress              | `phase-20/corpus-run` | 20.1–20.4, 20.7 merged; 20.5 crashes and data loss fixed (#210–#213), owner to choose on refusals                                                                                             |
+| 21 Hardening              | Ready                    | —                     | Planned 2026-11-22 from an audit of 1.4.0, nothing built: data loss, a hang and a PDF leak first                                                                                              |
 
 Status values: `Ready` (dependencies met, nobody on it) · `In progress` · `In review` (PR open) ·
 `✅ Done` (merged, acceptance criteria met) · `Blocked by …`.
@@ -2977,12 +2978,140 @@ review.
   corpus.md`), the changesets; then a patch release with the fixes, published with the owner's
   approval (the Release workflow).
 
+## Phase 21 — Hardening: what the audit of 1.4.0 found · M → 1.4.x, agent and mcp patches
+
+An audit of every package on 2026-11-22 (one reviewer per area, told to skip what
+[limitations.md](limitations.md) already lists) found bugs that lose data, hang the editor or
+leak a document between users, none of them reported by a user yet. The owner chose on
+2026-11-22 to fix these as a phase before new features. Each item was found by reading the code;
+those marked "reproduced" were run by the auditor in a scratch test. Planned 2026-11-22, nothing
+built.
+
+Not in this phase: the features the audit listed (below, under After 1.0), Phase 20's corpus
+fixes (its own phase; 21.10 touches `packages/docx` only where Phase 20 has not), the speed
+targets of Phase 5, splitting `view.ts`, manual checks (ADR-0003), GitHub settings only the
+owner can change (branch protection, a reviewer on the `npm` environment: 21.12 writes them down
+for the owner).
+
+**Starts from (1.4.0, agent 0.3.1, mcp 0.2.2):** the code as the audit read it, file and line
+given with each task.
+
+**Acceptance:** each bug below has a test that fails before its fix and passes after; no
+`limitations.md` entry is added to explain one away unless the owner accepts it as a limit; the
+two "verify first" items (21.8) are either reproduced in a browser test and fixed, or written
+down in limitations.md as checked and not a bug; `pnpm check` green after each PR; the patch
+releases published with the owner's approval.
+
+### Tasks
+
+Each task is a PR on `phase-21/hardening`, the build green after each, merged after an agent's
+review. 21.1 to 21.6 lose data, hang or leak: they go first, in this order.
+
+- [ ] Claim phase, branch `phase-21/hardening`
+- [ ] 21.1 MCP: a save never writes over the file another open document came from
+  (`mcp/src/documents.ts`, `save` and `#mine`). Reproduced: open `a.docx`, save (writes
+  `a.agent.docx`), open `a.agent.docx`, edit, save (back to `a.agent.docx`), save the first
+  again: the second document's edits are gone. Refuse with a message naming the other document.
+- [ ] 21.2 Core: a date control's format cannot hang the editor (`core/src/state/controls.ts`,
+  `dateFromText`). Reproduced: `dateFormat: "hdhdhdhdhdhd"`, one keystroke 13 s (the format
+  becomes a regular expression of `\S+(\d+)` groups that backtracks). Read the format with a
+  linear tokenizer, as `find.ts` avoids regular expressions for the same reason; a test with a
+  hostile format under a time limit.
+- [ ] 21.3 Core and docx: duplicate comment ids. Reproduced: comments `1, 1, 2`;
+  `editComment(1)` loses the edit and `resolveComment(2)` overwrites the first comment.
+  `parseDocument` refuses duplicate comment ids; docx import (`import/parts.ts`) renumbers them
+  (and their anchors), as paste already renumbers. Same check for bookmark names and control
+  ids where a duplicate makes a command act on the wrong one.
+- [ ] 21.4 PDF: two `exportPdf` calls on one page cannot mix (`pdf/src/index.ts`). Today the
+  second `setContent` replaces the first's DOM while it renders: on a server with a pool of
+  pages, one user's PDF can hold another's document. A lock per page (exports on one page run
+  one after another), a `signal` (AbortSignal) and a `timeout` option; README: one export per
+  page at a time, keep `@folijs/pdf` external in bundlers (it loads `dist/renderer.js` beside
+  itself).
+- [ ] 21.5 View: the browser's page translation cannot rewrite the document. The host has no
+  `translate="no"`: Chrome's Translate changes the text nodes, `readBack` takes the change for
+  typing, and the translation is saved (as tracked changes while tracking). `translate="no"` on
+  the editing host and on `renderDocument`'s pages; an e2e test changing a text node the way a
+  translator does.
+- [ ] 21.6 Docx: a zip entry cannot stand in for another part. `zip.ts` refuses duplicate names
+  by lower case only; `package.ts` keys parts percent-decoded, so `word/%64ocument.xml` replaces
+  `word/document.xml` silently (probed). Refuse when the decoded key is already taken.
+- [ ] 21.7 Core, smaller bugs: a new tracked change reuses a table row's revision id
+  (`track.ts`, `maxRevisionIn` reads no row attrs: duplicate `w:id` on export); `MERGEFIELD \@`
+  takes any value `Date.parse` accepts (`"12"` becomes 2001-12-01; `fieldupdate.ts`): accept
+  ISO dates and the document locale's numeric form only; `SEQ \r` with no number restarts at 0;
+  `ordinal`, `roman` and `letters` given negative or fractional numbers; a reply whose parent
+  is missing cannot be resolved (`comments.ts`, `rootOf`); a string `schemaVersion` gets a
+  message saying it must be a number.
+- [ ] 21.8 View, smaller bugs: `w:widowControl="0"` honoured by the editor's flow and
+  `renderDocument` (core resolves it; `layout/flow.ts` keeps two lines always); Ctrl+click on a
+  link to a bookmark goes there (TOC entries, cross-references); `beforeinput` types the view
+  does not handle are left to the browser or warned about, not cancelled silently
+  (`view.ts`, the `preventDefault` before the switch; `formatJustify*`, `insertTranspose`…);
+  `render()` and `mountStory` leave the view consistent when they throw (try/finally); control
+  popup option ids unique per view; `renderDocument`'s print rules scoped to their own output.
+  Verify first, in a browser test: editing inside a shadow root (`hasFocus`, `getSelection`)
+  and in a same-origin iframe (`instanceof Element` across realms, `observeSizes`).
+- [ ] 21.9 React: `FoliComments` does no work while hidden or without threads, and none per
+  keystroke beyond what a change to its threads needs (today `measure()` queries every page and
+  forces a layout on each `doc` change); `upload` and `resource` held in refs so an inline
+  function does not reset the view each render (`FoliCanvas.tsx`); a built-in dialog closed by
+  an outside transaction gives the focus back; the font, size and style boxes apply on Enter,
+  not on each arrow. Tests counting renders and subscriptions.
+- [ ] 21.10 Docx export correctness: a new package writes `w:compat` with
+  `compatibilityMode=15` (today Word opens it in compatibility mode); `withSettings` writes
+  `doNotUseHTMLParagraphAutoSpacing` to an existing part; an existing relationship whose part is
+  missing is reused, not doubled; `xml:space` inherited from an ancestor; a border with both
+  `left` and `start` writes one; `docPrIds` reads single-quoted and UTF-16 parts; `.docm`,
+  `.dotm` and `.dotx` can be exported as `.docx` (an option, the content type changed, macros
+  dropped and reported). Checked against Phase 20's state first: what it fixed meanwhile is
+  struck here.
+- [ ] 21.11 Agent and MCP, what costs a model retries: `find` loosens the soft hyphen (U+00AD),
+  the non-breaking hyphen (U+2011) and the zero-width space, and a refusal quotes invisible and
+  look-alike characters escaped; the 200 000-character cut keeps the `more:` line and cuts at a
+  block; `null` for an optional argument is taken as absent; a save refused by the system (a
+  file open in Word) says so; cuts never split a surrogate pair; an invalid request with an id
+  is answered with it; `console.log` bound to stderr in `bin.ts`; a read gives a table cell's
+  grid column and marks merged cells.
+- [ ] 21.12 Tooling: `pnpm test:e2e` (three engines) and `pnpm examples` run in the Release
+  workflow before publishing; the site deploy runs `pnpm check` first; e2e configs do not reuse
+  a server on a fixed port another checkout may have started (`reuseExistingServer`, as the
+  bench config already does); `docs/contributing.md` lists both workflows. Written down for the
+  owner, who alone can set them: branch protection on `main` and a required reviewer on the
+  `npm` environment.
+- [ ] 21.13 Docs and release: limitations.md updated ("as of" its version, what this phase
+  fixed or accepted), the stale `shortcut:` comments the audit found (`core/src/state/word.ts`
+  v2, `mark.ts` Phase 9) removed or rewritten, changesets per package; patch releases
+  (packages at 1.4.x, agent, mcp) published with the owner's approval.
+
 ## After 1.0
 
 Not a phase yet: the backlog written down on 2026-11-21, from [limitations.md](limitations.md),
 [benchmarks.md](benchmarks.md) and ADR-0003's open risks. Nothing here is started. GitHub has
 no open issues, so there is no bug intake yet; real-world bugs are expected to come from the
 first group and from .docx files the corpus does not cover.
+
+**From the audit of 2026-11-22** (not in Phase 21; candidates for the next phases):
+
+- Word commands: superscript and subscript (the `verticalAlign` mark exists), clear formatting,
+  change case; Word's keys for them and for alignment, font size, headings, track changes and a
+  new comment ([keyboard.md](keyboard.md)); Ctrl+P through `view.print()` so fields update.
+- A status bar (words, pages), zoom, a ruler, format painter, showing ¶ marks, Paragraph and Font
+  dialogs; lengths in inches as well as centimetres.
+- Right-to-left paragraphs drawn (`w:bidi`, `w:rtl` resolved, `dir` set) and `w:lang` given to
+  the DOM (spellcheck, screen readers, hyphenation).
+- Styles created and changed through the API, as undoable steps.
+- Agent and MCP: comment text and tracked changes readable, a search tool, undo of the agent's
+  last call, a summary of its changes before `save`.
+- For integrators: steps as JSON (collaboration, a persisted history); `FoliEditor` not pulling
+  the toolbar, navigation and comments in when they are off; React 18 tested; a browser support
+  matrix and an ESM-only statement; server-side examples (`exportPdf`, agent, MCP); a dark
+  theme default for the `--foli-*` tokens.
+- Docx: media inflated on demand, not all at once; an `AbortSignal` and progress; export's
+  re-parsing of kept XML memoised (about 45% of export in a profile); a fuzzer over zip, XML and
+  import beside the corpus run.
+- Process: finished phases moved out of this file; SECURITY.md at the root; Dependabot or
+  Renovate and a license check; trusted publishing instead of the long-lived npm token.
 
 **Checks accepted as risks for 1.0** ([limitations.md](limitations.md#not-verified-by-hand)):
 
