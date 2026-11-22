@@ -110,10 +110,13 @@ writeFileSync(appEntry, `export { FoliEditor } from "${dist("react")}";\n`);
  * React and FoliEditor raised in 19.2 (163.8 kB, 166.0 allowed): the horizontal line button and
  * the find panel's comments (core's `findInComments`, `replaceInComments`, the list: about
  * 1.4 kB), with room for Phase 19's picture and table UI.
+ * View raised in 19.3 (113.5 kB, 116.2 allowed): custom nodes and marks drawn on read-only pages
+ * (`customDrawing`, about 0.4 kB), with room for 19.4–19.7 (autofit, crop and rotation, drag and
+ * drop of text, Android input), all in the view.
  */
 const BUNDLES = [
   { name: "@folijs/core", entry: dist("core"), budget: 88_000 },
-  { name: "@folijs/view", entry: dist("view"), budget: 116_250 },
+  { name: "@folijs/view", entry: dist("view"), budget: 119_000 },
   { name: "@folijs/react", entry: dist("react"), budget: 170_000 },
   { name: "FoliEditor only", entry: appEntry, budget: 170_000 },
   { name: "@folijs/docx", entry: dist("docx"), budget: 61_440 },
