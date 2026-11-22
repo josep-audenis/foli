@@ -27,7 +27,8 @@
     "mcp:e2e": "node scripts/corpus/mcp-roundtrip.mjs",
     "examples": "node scripts/examples.mjs && playwright test --config playwright.examples.config.ts",
     "corpus:fetch": "node scripts/corpus/fetch.mjs",
-    "corpus:run": "node scripts/corpus/run.mjs"
+    "corpus:run": "node scripts/corpus/run.mjs",
+    "corpus:render": "playwright test --config playwright.corpus.config.ts"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.14.0",
