@@ -1,6 +1,6 @@
 {
   "name": "@folijs/mcp",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "MCP server for the Foli document engine: an MCP client's model reads and edits .docx files through tools, every edit a tracked change. Node only.",
   "license": "MIT",
   "repository": {

@@ -1,5 +1,45 @@
 # @folijs/view
 
+## 1.4.0
+
+### Minor Changes
+
+- 4caade0: Android keyboards: Backspace at a numbered paragraph's start removes its number (the keyboard's
+  delete of the paragraph boundary is taken as Backspace at a caret), and a paragraph split inside
+  its text, made in the DOM without `beforeinput`, is read back as Enter instead of discarded.
+- 401daf8: Drag and drop of text: the selection dragged moves where it is dropped (one undo step, tracked
+  while tracking), Ctrl or Option copies it, and text dragged from another application is pasted
+  where it lands.
+- 532cecd: `renderDocument` takes `extensions`: custom nodes and marks draw with their node and mark views
+  on read-only pages, and so do the editor's headers, footers and notes as the pages show them.
+  `exportPdf` takes `extensions`, a script of the app's that sets `globalThis.foliPdfExtensions` in
+  the printing page.
+- 989af53: Schema 6: a picture's `rotation` (60 000ths of a degree) and `crop` (`left`, `top`, `right`,
+  `bottom`, 1000ths of a percent), read from `.docx`, drawn and written back. Documents are saved
+  with the lowest schema their content needs: one without a rotated or cropped picture still says
+  5, which 1.0 to 1.3 read; one with them says 6, which they refuse (as a newer document).
+  `SCHEMA_VERSION` is 6 and `FoliDocument["schemaVersion"]` is `5 | 6`.
+- ea3fa4c: A selected picture's resize handle works with a pen or a finger as with a mouse (pointer events;
+  the page does not scroll under it, and the handle is larger on coarse pointers).
+- fce706b: Autofit tables widen a column for content that cannot break (a long word, a picture), as Word
+  does, keeping Word's saved widths otherwise, the same on every page a table goes over; fixed
+  tables keep their grid. The Table menu has Column width… (`"columnWidth"` dialog) to set the
+  selection's column width from the keyboard; core's `columnAt(state)` gives that column and the
+  widths it may take. New toolbar strings: "Column width…", "Column width", "Column width (cm)",
+  "Enter a width in cm from {min} to {max}.", "This column cannot be made wider or narrower.".
+
+### Patch Changes
+
+- a466188: A hint in a header, footer or note now lands on its text in a table with a merged cell, and in the final and simple review views (deleted text, a paragraph joined to the next), where the drawn copy differs from the story.
+- Updated dependencies [249ccb7]
+- Updated dependencies [5aa59f0]
+- Updated dependencies [06fb3e1]
+- Updated dependencies [e13f0ef]
+- Updated dependencies [5386935]
+- Updated dependencies [989af53]
+- Updated dependencies [fce706b]
+  - @folijs/core@1.4.0
+
 ## 1.3.0
 
 ### Minor Changes
