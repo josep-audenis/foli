@@ -6,7 +6,7 @@
 
 <p align="center">
   A document-editing engine for the web with real pages and Word's document model.<br>
-  Its own model, transactions, view and layout. No ProseMirror, Tiptap or Lexical underneath.
+  Its own model, transactions, view and layout. No third-party editor engine underneath.
 </p>
 
 <p align="center">

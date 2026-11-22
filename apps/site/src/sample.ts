@@ -89,7 +89,7 @@ export const sample: FoliDocumentV2 = {
       h(2, "Under the hood"),
       p(
         t(
-          "There is no ProseMirror, Tiptap or Lexical underneath. Foli has its own document model, transactions with undo, a view that maps the screen back to positions, and a layout engine that measures real line boxes. When a line moves to the next page, the engine moved it.",
+          "There is no third-party editor engine underneath. Foli has its own document model, transactions with undo, a view that maps the screen back to positions, and a layout engine that measures real line boxes. When a line moves to the next page, the engine moved it.",
         ),
       ),
       p(t("This is the end of the sample. Keep typing: the pages keep coming.", "italic")),

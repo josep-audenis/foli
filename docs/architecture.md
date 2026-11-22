@@ -66,8 +66,7 @@ converts them into steps immediately.
 ## Editing engine (`@folijs/core`)
 
 Implemented headless in Phase 3 (`packages/core/src/transform/`, `packages/core/src/state/`).
-The design follows prosemirror-transform, -state, -history and -commands (MIT); the code is
-Foli's own (see `THIRD_PARTY_NOTICES.md`).
+The code is Foli's own; design credits are in `THIRD_PARTY_NOTICES.md`.
 
 - **Steps** change the document atomically and are invertible: `ReplaceStep`,
   `ReplaceAroundStep`, `AddMarkStep`, `RemoveMarkStep` and `NodeMarkupStep`. `NodeMarkupStep`
@@ -1019,8 +1018,8 @@ must have loaded, and the container must not be scaled (`transform`, `zoom`).
     heading).
   - **Closed** content (whole blocks) pasted into an empty textblock replaces it, so a pasted
     heading stays a heading. Elsewhere its first and last blocks join the text around the
-    selection; text after the selection then ends up in the last pasted block (ProseMirror's
-    open-slice behaviour). An opaque block at either end has no inside to join, so then the
+    selection; text after the selection then ends up in the last pasted block (open-slice
+    behaviour). An opaque block at either end has no inside to join, so then the
     blocks go in whole (`insertBlocks`): before or after the caret's paragraph, else between
     its two halves.
   - A paste starts a new undo step; typing right after it (within the 500 ms grouping window)
@@ -1152,8 +1151,7 @@ Planned, created only when needed:
 
 ## Dependency policy
 
-- **Forbidden in published packages:** any editor engine (ProseMirror, Tiptap, Lexical, Slate,
-  Quill, CKEditor, Draft.js, Editor.js …).
+- **Forbidden in published packages:** any third-party editor engine.
 - **Allowed:** general-purpose libraries under permissive licenses (MIT, Apache-2.0, BSD, ISC),
   after checking size and whether existing code already covers the need.
 - **Copied code:** only with provenance in `THIRD_PARTY_NOTICES.md` and preserved notices.
