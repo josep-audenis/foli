@@ -334,10 +334,12 @@ return 1`,
     expect(called).toBe(0);
   });
 
-  it("runs at once each get their own answers", async () => {
+  // Each run is a thread and a WebAssembly module of its own: on a 2-core machine (GitHub's
+  // runners) eight at once took one past 15 s. Four, with a minute: what is tested is the answers.
+  it("runs at once each get their own answers", { timeout: 120_000 }, async () => {
     const all = await Promise.all(
-      Array.from({ length: 8 }, (_, i) => run(`return host('n', ${i}).args[0]`)),
+      Array.from({ length: 4 }, (_, i) => run(`return host('n', ${i}).args[0]`, { ms: 60_000 })),
     );
-    expect(all.map((r) => r.ok && r.value)).toEqual(["0", "1", "2", "3", "4", "5", "6", "7"]);
+    expect(all.map((r) => r.ok && r.value)).toEqual(["0", "1", "2", "3"]);
   });
 });
