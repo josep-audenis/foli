@@ -142,7 +142,11 @@ export function census(source, parseXml, { paraIds = false } = {}) {
           (a) => a.local === "space" && a.ns === XML && a.value === "preserve",
         );
         const raw = child.children.map((c) => c.text ?? "").join("");
-        const value = preserve ? raw : raw.replace(/^[ \t\r\n]+|[ \t\r\n]+$/g, ""); // XML spaces only, not NBSP
+        // XML spaces only, not NBSP; a line end within is a space to Word.
+        const value = (preserve ? raw : raw.replace(/^[ \t\r\n]+|[ \t\r\n]+$/g, "")).replace(
+          /\r?\n/g,
+          " ",
+        );
         // Which element holds it: a field code or deleted text becoming text shows. An empty
         // one shows nothing.
         if (value) text += `\u0005${child.local}:${value}`;
@@ -331,7 +335,8 @@ export function keptCanonical(value) {
   const out = {};
   for (const [key, v] of Object.entries(value)) {
     if ((key === "ext" || key === "gridExt") && typeof v === "string") {
-      let xml = v.replace(/>\s+</g, "><");
+      // Pretty-printing holds a line end; a space in a text box's `w:t` does not.
+      let xml = v.replace(/>[ \t]*\r?\n\s*</g, "><");
       for (let last; last !== xml; ) {
         last = xml;
         xml = xml.replace(/<([\w:]+)><\/\1>/g, "");
