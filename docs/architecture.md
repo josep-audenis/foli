@@ -1107,7 +1107,7 @@ folder. Node only; no dependency but Foli's packages.
   `run` tool runs a script in QuickJS (WebAssembly) in a worker thread made for the run. The
   script calls `doc.replaceText(…)` as a function; under it the thread posts the call, waits
   on `Atomics.wait`, and the server's thread answers from the session: the same operations
-  the tools call. Only JSON crosses. The server ends the thread at the time limit. Before the
+  the tools call. Only JSON crosses. The server ends the thread at the time limit, counted from when the thread says it is ready (its start has a limit of its own). Before the
   script the session marks a checkpoint (`session.checkpoint()` of `@folijs/agent`: it
   keeps the body, and a rollback puts it back whole in one untracked change, with the handles); a run that fails goes back to it.
 - **What it is not:** no network transport; no code run unless started with `--code`.

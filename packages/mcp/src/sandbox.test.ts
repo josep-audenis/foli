@@ -335,11 +335,31 @@ return 1`,
   });
 
   // Each run is a thread and a WebAssembly module of its own: on a 2-core machine (GitHub's
-  // runners) eight at once took one past 15 s. Four, with a minute: what is tested is the answers.
+  // runners) eight at once took four past 15 s when the thread's start was the script's time.
   it("runs at once each get their own answers", { timeout: 120_000 }, async () => {
     const all = await Promise.all(
-      Array.from({ length: 4 }, (_, i) => run(`return host('n', ${i}).args[0]`, { ms: 60_000 })),
+      Array.from({ length: 8 }, (_, i) => run(`return host('n', ${i}).args[0]`)),
     );
-    expect(all.map((r) => r.ok && r.value)).toEqual(["0", "1", "2", "3"]);
+    expect(all.map((r) => r.ok && r.value)).toEqual(["0", "1", "2", "3", "4", "5", "6", "7"]);
+  });
+});
+
+describe("the clock", { timeout: 60_000 }, () => {
+  it("starts when the thread is ready: its start is not the script's time", async () => {
+    // A thread and QuickJS take tens of milliseconds to start, more than this script is given.
+    expect(await run("return host('n', 1).args[0]", { ms: 40 })).toMatchObject({
+      ok: true,
+      value: "1",
+    });
+  });
+
+  it("holds the thread's start to a limit of its own", async () => {
+    expect(await run("return 1", { start: 1 })).toEqual({
+      ok: false,
+      reason: "time",
+      message: "The sandbox did not start in 0.001 seconds.",
+      line: null,
+      calls: 0,
+    });
   });
 });
