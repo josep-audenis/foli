@@ -1,5 +1,5 @@
 /**
- * Find and replace over the body and every story (ADR-0007, 11.11), with the rules Word 16 was seen
+ * Find and replace over the body and every story (ADR-0007, 11.11), and in comments (19.2), with the rules Word 16 was seen
  * to follow through its object model: a match runs across runs, marks and whatever draws nothing
  * (field markers, bookmarks, comment anchors) but not across a note reference or a picture; a
  * straight quote finds curly ones and a space a no-break space, not the other way round; "whole
@@ -11,16 +11,18 @@
  * Word's own wildcards are another language.
  */
 import { Fragment, type Node, Slice } from "../model/index.js";
-import type { ControlJSON } from "../v3/document.js";
+import { Transform } from "../transform/index.js";
+import type { CommentJSON, ControlJSON } from "../v3/document.js";
 import { controlAt, controlsIn, readOnlyAt } from "./controls.js";
 import { createEditor, type Editor, type EditorDocument } from "./editor.js";
 import { fieldAround, fieldCodesShown, fieldsIn, isUnseen } from "./fields.js";
 import { inlineText, storyIdOf, withoutReview } from "./fieldupdate.js";
+import { closeHistory } from "./history.js";
 import { TextSelection } from "./selection.js";
 import type { EditorState, Transaction } from "./state.js";
 import { editTrees } from "./stories.js";
-import { trackState, trackTransaction } from "./track.js";
-import { storyBody, wordContext } from "./word.js";
+import { trackState, trackTransaction, untracked } from "./track.js";
+import { setComments, storyBody, wordContext } from "./word.js";
 
 export interface FindOptions {
   /** Capitals count. Default false. */
@@ -369,7 +371,7 @@ function withCaseOf(found: string, text: string): string {
 const cleaned = (text: string) => text.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, "");
 
 /** Puts `text` where `hit` is: in its first stretch, with that stretch's marks. */
-function applyHit(tr: Transaction, { parts }: Hit, text: string): number {
+function applyHit(tr: Transform, { parts }: Hit, text: string): number {
   const first = parts[0] as Hit["parts"][number];
   for (const part of parts.slice(1).reverse()) tr.delete(part.from, part.to);
   const marks = withoutReview(tr.doc.nodeAt(first.from)?.marks ?? []);
@@ -476,6 +478,108 @@ export function replaceAll(
 ): ReplaceReport {
   const hits = hitsOf(bodyState(editor.state), query, options);
   return replaceHits(editor, hits, text, options.matchCase === true, false);
+}
+
+// ---------- comments (19.2) ----------
+
+/** A place the query was found in a comment's text. */
+export interface CommentMatch {
+  /** The comment's `id`. */
+  comment: number;
+  /** Positions in the comment's own content: a `doc` of its blocks. */
+  from: number;
+  to: number;
+  /** The text found, as the comment has it. */
+  text: string;
+}
+
+const commentTrees = new WeakMap<CommentJSON, Node>();
+
+/** A comment's content as a tree of `state`'s schema, kept while the comment is the same. */
+function commentTree(state: EditorState, comment: CommentJSON): Node {
+  let tree = commentTrees.get(comment);
+  if (!tree || tree.type.schema !== state.schema) {
+    tree = state.schema.nodeFromJSON({ type: "doc", content: comment.content });
+    commentTrees.set(comment, tree);
+  }
+  return tree;
+}
+
+/**
+ * Every place `query` is in the document's comments (replies too), in the order the document
+ * stores them, with the rules of `findAll`. Find in the body and stories leaves comments out, as
+ * Word's "Main document" does.
+ */
+export function findInComments(
+  target: Editor | EditorDocument,
+  query: string,
+  options: FindOptions = {},
+): CommentMatch[] {
+  const editor = "getDocument" in target ? target : createEditor({ document: target });
+  const body = bodyState(editor.state);
+  const needle = needleFor(query, options);
+  if (!needle) return [];
+  // A comment holds no content controls of the document's.
+  const scope = { ...scopeOf(body), controls: undefined };
+  const out: CommentMatch[] = [];
+  for (const comment of wordContext(body)?.envelope.comments ?? []) {
+    const hits: Hit[] = [];
+    hitsIn(linesOf(commentTree(body, comment), scope, false), null, needle, hits);
+    for (const { match } of hits)
+      out.push({ comment: comment.id, from: match.from, to: match.to, text: match.text });
+  }
+  return out;
+}
+
+/**
+ * Replaces every match of `query` in the document's comments, with the rules of `replaceAll`,
+ * as one undo step; comments are not tracked changes (Word records none in them). A match on a
+ * field's code, a custom node, text deleted as a tracked change or a match over a field result's
+ * edge stays, and is counted in `refused`.
+ */
+export function replaceInComments(
+  editor: Editor,
+  query: string,
+  text: string,
+  options: FindOptions = {},
+): { replaced: number; refused: number } {
+  const body = bodyState(editor.state);
+  const comments = wordContext(body)?.envelope.comments ?? [];
+  const needle = needleFor(query, options);
+  const report = { replaced: 0, refused: 0 };
+  if (!needle) return report;
+  const scope = { ...scopeOf(body), controls: undefined };
+  const value = cleaned(text);
+  const next = comments.map((comment) => {
+    const tree = commentTree(body, comment);
+    const hits: Hit[] = [];
+    hitsIn(linesOf(tree, scope, false), null, needle, hits);
+    const done = hits.filter((hit) => {
+      const field = fieldAround(tree, hit.parts[0]?.from ?? 0);
+      // As `refusalOf`: a code, deleted text, or a match over a field result's edge.
+      const kept = hit.parts.some(
+        (part) =>
+          part.code ||
+          tree.nodeAt(part.from)?.marks.some((m) => m.type.name === "deletion") ||
+          fieldAround(tree, part.from) !== field,
+      );
+      if (kept) report.refused++;
+      return !kept;
+    });
+    if (!done.length) return comment;
+    const tr = new Transform(tree);
+    for (const hit of [...done].reverse())
+      applyHit(tr, hit, options.matchCase ? value : withCaseOf(hit.match.text, value));
+    report.replaced += done.length;
+    return { ...comment, content: (tr.doc.toJSON().content ?? []) as CommentJSON["content"] };
+  });
+  // Comments are the body's, whichever of its editors this is.
+  const host = storyBody(editor.state) ?? editor;
+  if (report.replaced)
+    host.dispatch(
+      setComments(body.tr.setMeta(untracked, true).setMeta(closeHistory, true), comments, next),
+    );
+  return report;
 }
 
 /**

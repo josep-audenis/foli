@@ -5,7 +5,15 @@ import type { ControlJSON, FoliDocument } from "../v3/document.js";
 import { createDocument, SCHEMA_VERSION } from "../v3/document.js";
 import { createEditor, type Editor } from "./editor.js";
 import { toggleFieldCodes } from "./fields.js";
-import { findAll, findInText, nextMatch, replace, replaceAll } from "./find.js";
+import {
+  findAll,
+  findInComments,
+  findInText,
+  nextMatch,
+  replace,
+  replaceAll,
+  replaceInComments,
+} from "./find.js";
 import { undoDepth } from "./history.js";
 import { rejectAllChanges } from "./review.js";
 import { setReviewView } from "./track.js";
@@ -495,5 +503,63 @@ describe("properties", () => {
           expect(editor.state.doc.textBetween(match.from, match.to).toLowerCase()).toBe("cat");
       }),
     );
+  });
+});
+
+describe("comments (19.2)", () => {
+  const comments: FoliDocument["comments"] = [
+    { id: 1, author: "A", content: [p("The cat sat."), p("Another cat")] },
+    { id: 2, author: "B", parent: 1, content: [p("no animals")] },
+    { id: 3, author: "C", content: [p("A ", t("Cat", "bold"), " again")] },
+  ];
+  const withComments = (track = false) => open([p("a cat in the body")], { comments }, track);
+
+  it("finds matches in every comment, with the comment's id, not in findAll", () => {
+    const editor = withComments();
+    expect(findInComments(editor, "cat").map((m) => [m.comment, m.text])).toEqual([
+      [1, "cat"],
+      [1, "cat"],
+      [3, "Cat"],
+    ]);
+    expect(findInComments(editor, "cat", { matchCase: true }).map((m) => m.comment)).toEqual([
+      1, 1,
+    ]);
+    expect(findAll(editor, "cat").length).toBe(1);
+    // Positions in the comment's own content.
+    const [first] = findInComments(editor, "cat");
+    expect(first).toMatchObject({ from: 5, to: 8 });
+    expect(findInComments(editor.getDocument(), "again").map((m) => m.comment)).toEqual([3]);
+    expect(findInComments(editor, "")).toEqual([]);
+  });
+
+  it("replaces in comments as one untracked undo step, keeping formatting and capitals", () => {
+    const editor = withComments(true);
+    expect(replaceInComments(editor, "cat", "dog")).toEqual({ replaced: 3, refused: 0 });
+    const [c1, , c3] = editor.getDocument().comments;
+    expect(c1?.content.map((b) => b.content?.map((n) => n.text).join(""))).toEqual([
+      "The dog sat.",
+      "Another dog",
+    ]);
+    expect(c3?.content[0]?.content?.[1]).toEqual({ ...t("Dog", "bold") });
+    // The body is untouched and nothing is tracked.
+    expect(paragraphs(editor)).toEqual(["a cat in the body"]);
+    expect(JSON.stringify(editor.getDocument().content)).not.toContain("insertion");
+    editor.commands.undo();
+    expect(editor.getDocument().comments).toEqual(comments);
+  });
+
+  it("leaves a match over a field result's edge, as replaceAll does", () => {
+    const editor = open([p("x")], {
+      comments: [{ id: 1, author: "A", content: [p("big ", ...field("DATE", "cat"), "s here")] }],
+    });
+    expect(replaceInComments(editor, "cats", "dogs")).toEqual({ replaced: 0, refused: 1 });
+    expect(replaceInComments(editor, "cat", "dog")).toEqual({ replaced: 1, refused: 0 });
+  });
+
+  it("does nothing when nothing matches", () => {
+    const editor = withComments();
+    const before = editor.state;
+    expect(replaceInComments(editor, "zebra", "x")).toEqual({ replaced: 0, refused: 0 });
+    expect(editor.state).toBe(before);
   });
 });
