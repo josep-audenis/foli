@@ -1,5 +1,3 @@
-// The structure helpers follow the design of prosemirror-transform's structure.ts (MIT, see
-// THIRD_PARTY_NOTICES.md); independent implementation on Foli's model.
 import type { Attrs, Node, NodeRange, NodeType } from "../model/index.js";
 
 /** A node type with attributes, as `findWrapping` returns and `Transform.wrap`/`split` take. */
@@ -8,32 +6,31 @@ export interface NodeTypeWithAttrs {
   attrs?: Attrs | null;
 }
 
-/** Whether the children of `node` before `start` and from `end` on are valid on their own. */
-function canCut(node: Node, start: number, end: number): boolean {
-  return (
-    (start === 0 || node.canReplace(start, node.childCount)) &&
-    (end === node.childCount || node.canReplace(0, end))
-  );
-}
-
 /**
  * The depth the blocks of `range` can be lifted to (out of their parent, e.g. out of a list
  * item), or null when they cannot be lifted. Ancestors are split around the range as needed.
  */
 export function liftTarget(range: NodeRange): number | null {
-  const content = range.parent.content.cutByIndex(range.startIndex, range.endIndex);
-  // The halves split off an ancestor before and after the range stay in the node above it.
-  let before = 0;
-  let after = 0;
-  for (let depth = range.depth; ; depth--) {
+  const moved = range.parent.content.cutByIndex(range.startIndex, range.endIndex);
+  // Once an ancestor is split, the part before (after) the range stays as a node of its own in
+  // the ancestor above, next to where the range would go.
+  let partBefore = false;
+  let partAfter = false;
+  for (let depth = range.depth; depth >= 0; depth--) {
     const node = range.$from.node(depth);
-    const index = range.$from.index(depth) + before;
-    const endIndex = range.$to.indexAfter(depth) - after;
-    if (depth < range.depth && node.canReplace(index, endIndex, content)) return depth;
-    if (depth === 0 || !canCut(node, index, endIndex)) return null;
-    if (index) before = 1;
-    if (endIndex < node.childCount) after = 1;
+    const start: number = range.$from.index(depth) + (partBefore ? 1 : 0);
+    const end: number = range.$to.indexAfter(depth) - (partAfter ? 1 : 0);
+    if (depth < range.depth && node.canReplace(start, end, moved)) return depth;
+    if (depth === 0) return null;
+    // What stays of `node` on either side of the range must be valid on its own.
+    const before: boolean = start > 0;
+    const after: boolean = end < node.childCount;
+    if (before && !node.canReplace(start, node.childCount)) return null;
+    if (after && !node.canReplace(0, end)) return null;
+    partBefore ||= before;
+    partAfter ||= after;
   }
+  return null;
 }
 
 /**
@@ -46,35 +43,19 @@ export function findWrapping(
   type: NodeType,
   attrs: Attrs | null = null,
 ): NodeTypeWithAttrs[] | null {
-  const around = wrappingOutside(range, type);
-  const inner = around && wrappingInside(range, type);
-  if (!around || !inner) return null;
-  return [
-    ...around.map((t) => ({ type: t, attrs: null })),
-    { type, attrs },
-    ...inner.map((t) => ({ type: t, attrs: null })),
-  ];
-}
-
-function wrappingOutside(range: NodeRange, type: NodeType): readonly NodeType[] | null {
   const { parent, startIndex, endIndex } = range;
-  const around = parent.contentMatchAt(startIndex).findWrapping(type);
-  if (!around) return null;
-  const outer = around[0] ?? type;
-  return parent.canReplaceWith(startIndex, endIndex, outer) ? around : null;
-}
-
-function wrappingInside(range: NodeRange, type: NodeType): readonly NodeType[] | null {
-  const { parent, startIndex, endIndex } = range;
+  // Wrappers the parent needs around `type`; the outermost replaces the range.
+  const outside = parent.contentMatchAt(startIndex).findWrapping(type);
+  if (!outside || !parent.canReplaceWith(startIndex, endIndex, outside[0] ?? type)) return null;
+  // Wrappers `type` needs around the blocks; the innermost must take all of them.
   const inside = type.contentMatch.findWrapping(parent.child(startIndex).type);
   if (!inside) return null;
-  let match = (inside[inside.length - 1] ?? type).contentMatch;
-  for (let i = startIndex; i < endIndex; i++) {
-    const next = match.matchType(parent.child(i).type);
-    if (!next) return null;
-    match = next;
+  const innermost = inside[inside.length - 1] ?? type;
+  if (!innermost.contentMatch.matchFragment(parent.content, startIndex, endIndex)?.validEnd) {
+    return null;
   }
-  return match.validEnd ? inside : null;
+  const bare = (t: NodeType): NodeTypeWithAttrs => ({ type: t, attrs: null });
+  return [...outside.map(bare), { type, attrs }, ...inside.map(bare)];
 }
 
 /**
@@ -92,27 +73,23 @@ export function canSplit(
   const base = $pos.depth - depth;
   if (base < 0) return false;
   if (typesAfter?.some((entry) => entry && !attrsValid(entry))) return false;
-  const innerType = typesAfter?.[depth - 1]?.type ?? $pos.parent.type;
-  if (
-    !$pos.parent.canReplace($pos.index(), $pos.parent.childCount) ||
-    !innerType.validContent($pos.parent.content.cutByIndex($pos.index(), $pos.parent.childCount))
-  ) {
-    return false;
-  }
-  for (let d = $pos.depth - 1, i = depth - 2; d > base; d--, i--) {
-    const node = $pos.node(d);
-    const index = $pos.index(d);
+  // Each split node, innermost first: the part before must stay valid, and the part after must
+  // be valid content for the type it gets.
+  for (let level = depth - 1; level >= 0; level--) {
+    const node = $pos.node(base + 1 + level);
+    const index = $pos.index(base + 1 + level);
     let rest = node.content.cutByIndex(index, node.childCount);
-    const override = typesAfter?.[i + 1];
-    if (override) {
-      rest = rest.replaceChild(0, override.type.createOpen(override.attrs));
-    }
-    const after = typesAfter?.[i]?.type ?? node.type;
-    if (!node.canReplace(index + 1, node.childCount) || !after.validContent(rest)) return false;
+    const innermost = level === depth - 1;
+    // Above the innermost, the split child is the start of the next level's part after.
+    const below = innermost ? undefined : typesAfter?.[level + 1];
+    if (below) rest = rest.replaceChild(0, below.type.createOpen(below.attrs));
+    const keeps = node.canReplace(innermost ? index : index + 1, node.childCount);
+    if (!keeps || !(typesAfter?.[level]?.type ?? node.type).validContent(rest)) return false;
   }
+  // The new node must fit next to the old one in the node that is not split.
   const index = $pos.indexAfter(base);
-  const baseType = typesAfter?.[0]?.type ?? $pos.node(base + 1).type;
-  return $pos.node(base).canReplaceWith(index, index, baseType);
+  const outerType = typesAfter?.[0]?.type ?? $pos.node(base + 1).type;
+  return $pos.node(base).canReplaceWith(index, index, outerType);
 }
 
 function attrsValid({ type, attrs }: NodeTypeWithAttrs): boolean {
@@ -128,15 +105,12 @@ function attrsValid({ type, attrs }: NodeTypeWithAttrs): boolean {
 export function canJoin(doc: Node, pos: number): boolean {
   if (pos <= 0 || pos >= doc.content.size) return false;
   const $pos = doc.resolve(pos);
-  const before = $pos.nodeBefore;
-  const after = $pos.nodeAfter;
+  const { nodeBefore: before, nodeAfter: after } = $pos;
   // A leaf after the boundary has no content to join: "joining" would delete it.
   if (!before || !after || before.isLeaf || after.isLeaf) return false;
+  // Even empty content needs types that take the same kind of content.
+  if (!before.type.compatibleContent(after.type)) return false;
   const index = $pos.index();
-  return (
-    // Empty content fits anywhere: the nodes' types must still take the same content.
-    before.type.compatibleContent(after.type) &&
-    before.canReplace(before.childCount, before.childCount, after.content) &&
-    $pos.parent.canReplace(index, index + 1)
-  );
+  const end = before.childCount;
+  return before.canReplace(end, end, after.content) && $pos.parent.canReplace(index, index + 1);
 }

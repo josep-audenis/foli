@@ -49,7 +49,8 @@ export class Slice {
     const { content, offset } = path.inner;
     const end = offset + (to - from);
     // `to` must be in the same node as `from`, and not inside a child node.
-    const { index, offset: start } = end <= content.size ? content.findIndex(end) : { index: -1, offset: -1 };
+    const { index, offset: start } =
+      end <= content.size ? content.findIndex(end) : { index: -1, offset: -1 };
     if (index < 0 || (start !== end && !content.child(index).isText)) {
       throw new RangeError("Removing a non-flat range");
     }

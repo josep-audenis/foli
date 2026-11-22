@@ -1,5 +1,3 @@
-// The step design follows prosemirror-transform (MIT, see THIRD_PARTY_NOTICES.md); this is an
-// independent implementation on Foli's model.
 import {
   type Attrs,
   FoliDocumentError,
@@ -29,14 +27,14 @@ export class StepResult {
 
   /** Runs `doc.replace`, turning schema/range violations into a failed result. */
   static fromReplace(doc: Node, from: number, to: number, slice: Slice): StepResult {
+    let result: Node;
     try {
-      return StepResult.ok(doc.replace(from, to, slice));
+      result = doc.replace(from, to, slice);
     } catch (error) {
-      if (error instanceof ReplaceError || error instanceof RangeError) {
-        return StepResult.fail(error.message);
-      }
-      throw error;
+      if (!(error instanceof ReplaceError || error instanceof RangeError)) throw error;
+      return StepResult.fail(error.message);
     }
+    return StepResult.ok(result);
   }
 }
 
@@ -60,6 +58,26 @@ export abstract class Step {
 }
 
 /**
+ * `from..to` moved through `mapping`, the start sticking right and the end left so the range
+ * does not grow over content inserted at its edges. Null when the whole range was deleted.
+ */
+function mapRange(
+  mapping: Mappable,
+  from: number,
+  to: number,
+): { from: number; to: number } | null {
+  const start = mapping.mapResult(from, 1);
+  const end = mapping.mapResult(to, -1);
+  return start.deleted && end.deleted ? null : { from: start.pos, to: end.pos };
+}
+
+/** `a` followed by `b`, for two slices that meet at closed edges. */
+function concat(a: Slice, b: Slice): Slice {
+  if (a.size === 0 && b.size === 0) return Slice.empty;
+  return new Slice(a.content.append(b.content), a.openStart, b.openEnd);
+}
+
+/**
  * Replaces `from..to` with a slice. A `structure` step only moves node boundaries (split, join):
  * it fails instead of deleting content that, after mapping through other changes, now sits in
  * its range.
@@ -75,7 +93,7 @@ export class ReplaceStep extends Step {
   }
 
   apply(doc: Node): StepResult {
-    if (this.structure && contentBetween(doc, this.from, this.to)) {
+    if (this.structure && !onlyBoundaries(doc, this.from, this.to)) {
       return StepResult.fail("Structure replace would overwrite content");
     }
     return StepResult.fromReplace(doc, this.from, this.to, this.slice);
@@ -86,14 +104,16 @@ export class ReplaceStep extends Step {
   }
 
   invert(doc: Node): Step {
-    return new ReplaceStep(this.from, this.from + this.slice.size, doc.slice(this.from, this.to));
+    // What the range held before goes back where the slice now is.
+    const removed = doc.slice(this.from, this.to);
+    return new ReplaceStep(this.from, this.from + this.slice.size, removed);
   }
 
   map(mapping: Mappable): Step | null {
-    const from = mapping.mapResult(this.from, 1);
-    const to = mapping.mapResult(this.to, -1);
-    if (from.deleted && to.deleted) return null;
-    return new ReplaceStep(from.pos, Math.max(from.pos, to.pos), this.slice, this.structure);
+    const range = mapRange(mapping, this.from, this.to);
+    if (!range) return null;
+    const to = Math.max(range.from, range.to);
+    return new ReplaceStep(range.from, to, this.slice, this.structure);
   }
 
   /**
@@ -101,20 +121,16 @@ export class ReplaceStep extends Step {
    * (e.g. consecutive keystrokes); null otherwise. Keeps typing history to one step per run.
    */
   merge(next: Step): ReplaceStep | null {
-    if (!(next instanceof ReplaceStep) || next.structure || this.structure) return null;
-    const join = (a: Slice, b: Slice) =>
-      a.size + b.size === 0
-        ? Slice.empty
-        : new Slice(a.content.append(b.content), a.openStart, b.openEnd);
-    if (this.from + this.slice.size === next.from && !this.slice.openEnd && !next.slice.openStart) {
-      return new ReplaceStep(
-        this.from,
-        this.to + (next.to - next.from),
-        join(this.slice, next.slice),
-      );
+    if (!(next instanceof ReplaceStep) || this.structure || next.structure) return null;
+    const end = this.from + this.slice.size;
+    // `next` continues right after what this step inserted.
+    if (next.from === end && this.slice.openEnd === 0 && next.slice.openStart === 0) {
+      const to = this.to + next.to - next.from;
+      return new ReplaceStep(this.from, to, concat(this.slice, next.slice));
     }
-    if (next.to === this.from && !this.slice.openStart && !next.slice.openEnd) {
-      return new ReplaceStep(next.from, this.to, join(next.slice, this.slice));
+    // `next` works backwards from where this step started (Backspace after Backspace).
+    if (next.to === this.from && this.slice.openStart === 0 && next.slice.openEnd === 0) {
+      return new ReplaceStep(next.from, this.to, concat(next.slice, this.slice));
     }
     return null;
   }
@@ -140,69 +156,64 @@ export class ReplaceAroundStep extends Step {
   }
 
   apply(doc: Node): StepResult {
-    if (
-      this.from < 0 ||
-      this.from > this.gapFrom ||
-      this.gapFrom > this.gapTo ||
-      this.gapTo > this.to ||
-      this.to > doc.content.size
-    ) {
-      return StepResult.fail(`Invalid gap range ${this.from}..${this.to}`);
-    }
-    if (
-      this.structure &&
-      (contentBetween(doc, this.from, this.gapFrom) || contentBetween(doc, this.gapTo, this.to))
-    ) {
+    const { from, to, gapFrom, gapTo } = this;
+    const ordered = 0 <= from && from <= gapFrom && gapFrom <= gapTo && gapTo <= to;
+    if (!ordered || to > doc.content.size)
+      return StepResult.fail(`Invalid gap range ${from}..${to}`);
+    if (this.structure && !(onlyBoundaries(doc, from, gapFrom) && onlyBoundaries(doc, gapTo, to))) {
       return StepResult.fail("Structure gap-replace would overwrite content");
     }
-    const gap = doc.slice(this.gapFrom, this.gapTo);
-    if (gap.openStart || gap.openEnd) return StepResult.fail("Gap is not a flat range");
-    let inserted: Slice | null;
+    const kept = doc.slice(gapFrom, gapTo);
+    if (kept.openStart !== 0 || kept.openEnd !== 0)
+      return StepResult.fail("Gap is not a flat range");
+    let filled: Slice | null;
     try {
-      inserted = this.slice.insertAt(this.insert, gap.content);
+      filled = this.slice.insertAt(this.insert, kept.content);
     } catch (error) {
-      if (error instanceof RangeError) return StepResult.fail(error.message);
-      throw error;
+      if (!(error instanceof RangeError)) throw error;
+      return StepResult.fail(error.message);
     }
-    if (!inserted) return StepResult.fail("Content does not fit in gap");
-    return StepResult.fromReplace(doc, this.from, this.to, inserted);
+    return filled
+      ? StepResult.fromReplace(doc, from, to, filled)
+      : StepResult.fail("Content does not fit in gap");
   }
 
   override getMap(): StepMap {
-    return new StepMap([
-      this.from,
-      this.gapFrom - this.from,
-      this.insert,
-      this.gapTo,
-      this.to - this.gapTo,
-      this.slice.size - this.insert,
-    ]);
+    // Two changed ranges: before the gap (becomes the slice up to `insert`) and after it.
+    const { from, to, gapFrom, gapTo, insert } = this;
+    return new StepMap([from, gapFrom - from, insert, gapTo, to - gapTo, this.slice.size - insert]);
   }
 
   invert(doc: Node): Step {
-    const gap = this.gapTo - this.gapFrom;
+    const gapSize = this.gapTo - this.gapFrom;
+    const gapStart = this.from + this.insert;
+    // The old content around the gap, without the gap itself, is what the inverse puts back.
+    const around = doc
+      .slice(this.from, this.to)
+      .removeBetween(this.gapFrom - this.from, this.gapTo - this.from);
     return new ReplaceAroundStep(
       this.from,
-      this.from + this.slice.size + gap,
-      this.from + this.insert,
-      this.from + this.insert + gap,
-      doc.slice(this.from, this.to).removeBetween(this.gapFrom - this.from, this.gapTo - this.from),
+      this.from + this.slice.size + gapSize,
+      gapStart,
+      gapStart + gapSize,
+      around,
       this.gapFrom - this.from,
       this.structure,
     );
   }
 
   map(mapping: Mappable): Step | null {
-    const from = mapping.mapResult(this.from, 1);
-    const to = mapping.mapResult(this.to, -1);
-    const gapFrom = this.from === this.gapFrom ? from.pos : mapping.map(this.gapFrom, -1);
-    const gapTo = this.to === this.gapTo ? to.pos : mapping.map(this.gapTo, 1);
-    if ((from.deleted && to.deleted) || gapFrom < from.pos || gapTo > to.pos) return null;
+    const range = mapRange(mapping, this.from, this.to);
+    if (!range) return null;
+    // The gap keeps its content: its edges stick inwards, unless they are the range's edges.
+    const gapFrom = this.gapFrom === this.from ? range.from : mapping.map(this.gapFrom, -1);
+    const gapTo = this.gapTo === this.to ? range.to : mapping.map(this.gapTo, 1);
+    if (gapFrom < range.from || gapTo > range.to) return null;
     // The content it moves is gone: a lift would only split its ancestors around nothing.
     if (this.gapTo > this.gapFrom && gapTo <= gapFrom) return null;
     return new ReplaceAroundStep(
-      from.pos,
-      to.pos,
+      range.from,
+      range.to,
       gapFrom,
       gapTo,
       this.slice,
@@ -213,43 +224,38 @@ export class ReplaceAroundStep extends Step {
 }
 
 /**
- * Whether `from..to` holds anything but node boundaries: text, a leaf, or a node that is not
- * the first or last along the path. Used by structure steps.
+ * Whether `from..to` holds nothing but node boundaries: closing tokens of nodes that end there,
+ * then opening tokens of nodes (each the first child of the one before) that start there. Text,
+ * a leaf or any other node in the range is content a structure step must not overwrite.
  */
-function contentBetween(doc: Node, from: number, to: number): boolean {
+function onlyBoundaries(doc: Node, from: number, to: number): boolean {
   // Out of range: nothing to protect, and the replace itself fails (it does not throw).
-  if (from < 0 || to > doc.content.size || from > to) return false;
+  if (from < 0 || to > doc.content.size || from >= to) return true;
   const $from = doc.resolve(from);
-  let dist = to - from;
-  let depth = $from.depth;
-  while (dist > 0 && depth > 0 && $from.indexAfter(depth) === $from.node(depth).childCount) {
-    depth--;
-    dist--;
+  let pos = from;
+  for (let depth = $from.depth; pos < to && depth > 0 && pos === $from.end(depth); depth--) pos++;
+  if (pos === to) return true;
+  let next = doc.resolve(pos).nodeAfter;
+  for (; pos < to; pos++) {
+    if (!next || next.isLeaf) return false;
+    next = next.firstChild;
   }
-  if (dist > 0) {
-    let next = $from.node(depth).maybeChild($from.indexAfter(depth));
-    while (dist > 0) {
-      if (!next || next.isLeaf) return true;
-      next = next.firstChild;
-      dist--;
-    }
-  }
-  return false;
+  return true;
 }
 
-/** Rebuilds inline nodes of a fragment with `f`, descending into block content. */
-function mapInline(
+/** `fragment` with `f` applied to every inline node, at any depth; `parent` holds `fragment`. */
+function eachInline(
   fragment: Fragment,
-  f: (node: Node, parent: Node) => Node,
   parent: Node,
+  f: (node: Node, parent: Node) => Node,
 ): Fragment {
-  const mapped: Node[] = [];
-  fragment.forEach((child) => {
-    let node = child.content.size ? child.copy(mapInline(child.content, f, child)) : child;
-    if (node.isInline) node = f(node, parent);
-    mapped.push(node);
-  });
-  return Fragment.fromArray(mapped);
+  const nodes: Node[] = [];
+  for (let i = 0; i < fragment.childCount; i++) {
+    const child = fragment.child(i);
+    const inner = child.content.size ? child.copy(eachInline(child.content, child, f)) : child;
+    nodes.push(inner.isInline ? f(inner, parent) : inner);
+  }
+  return Fragment.fromArray(nodes);
 }
 
 abstract class MarkStep extends Step {
@@ -265,31 +271,24 @@ abstract class MarkStep extends Step {
   protected abstract create(from: number, to: number): MarkStep;
 
   apply(doc: Node): StepResult {
-    if (this.from >= this.to || this.from < 0 || this.to > doc.content.size) {
-      return StepResult.fail(`Invalid mark range ${this.from}..${this.to}`);
+    const { from, to } = this;
+    if (from < 0 || from >= to || to > doc.content.size) {
+      return StepResult.fail(`Invalid mark range ${from}..${to}`);
     }
-    const old = doc.slice(this.from, this.to);
-    const $from = doc.resolve(this.from);
-    const parent = $from.node($from.sharedDepth(this.to));
-    const content = mapInline(
-      old.content,
-      (node, p) =>
-        p.type.allowsMarkType(this.mark.type) ? node.mark(this.change(node.marks)) : node,
-      parent,
+    const before = doc.slice(from, to);
+    const $from = doc.resolve(from);
+    const top = $from.node($from.sharedDepth(to));
+    const type = this.mark.type;
+    const content = eachInline(before.content, top, (node, parent) =>
+      parent.type.allowsMarkType(type) ? node.mark(this.change(node.marks)) : node,
     );
-    return StepResult.fromReplace(
-      doc,
-      this.from,
-      this.to,
-      new Slice(content, old.openStart, old.openEnd),
-    );
+    const slice = new Slice(content, before.openStart, before.openEnd);
+    return StepResult.fromReplace(doc, from, to, slice);
   }
 
   map(mapping: Mappable): Step | null {
-    const from = mapping.mapResult(this.from, 1);
-    const to = mapping.mapResult(this.to, -1);
-    if ((from.deleted && to.deleted) || from.pos >= to.pos) return null;
-    return this.create(from.pos, to.pos);
+    const range = mapRange(mapping, this.from, this.to);
+    return range && range.from < range.to ? this.create(range.from, range.to) : null;
   }
 }
 

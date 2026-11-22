@@ -1,5 +1,3 @@
-// Mark helpers follow the design of prosemirror-transform's addMark/removeMark (MIT, see
-// THIRD_PARTY_NOTICES.md); independent implementation.
 import { deepEqual } from "../model/attrs.js";
 import {
   type Attrs,
@@ -119,56 +117,45 @@ export class Transform {
    * the mark get a step, and marks it excludes are removed first, so every step inverts exactly.
    */
   addMark(from: number, to: number, mark: Mark): this {
-    const removed: { from: number; to: number; mark: Mark }[] = [];
-    const added: { from: number; to: number }[] = [];
+    const removals = new MarkRuns();
+    const additions: { from: number; to: number }[] = [];
     this.doc.nodesBetween(from, to, (node, pos, parent) => {
-      if (!node.isInline || !parent) return;
-      if (!parent.type.allowsMarkType(mark.type)) return;
-      // Unchanged when the mark is already there or an existing mark excludes it: no step.
-      const next = mark.addToSet(node.marks);
-      if (next === node.marks) return;
+      if (!node.isInline || !parent?.type.allowsMarkType(mark.type)) return;
+      const marks = mark.addToSet(node.marks);
+      // The mark is there already, or a mark on the node excludes it: nothing to do here.
+      if (marks === node.marks) return;
       const start = Math.max(pos, from);
       const end = Math.min(pos + node.nodeSize, to);
-      for (const old of node.marks) {
-        if (old.isInSet(next)) continue;
-        const last = removed[removed.length - 1];
-        if (last && last.to === start && last.mark.eq(old)) last.to = end;
-        else removed.push({ from: start, to: end, mark: old });
-      }
-      const last = added[added.length - 1];
-      if (last && last.to === start) last.to = end;
-      else added.push({ from: start, to: end });
+      // Marks the new one excludes go first, so that the add step's inverse is exact.
+      removals.add(
+        node.marks.filter((old) => !old.isInSet(marks)),
+        start,
+        end,
+      );
+      const last = additions[additions.length - 1];
+      if (last?.to === start) last.to = end;
+      else additions.push({ from: start, to: end });
     });
-    for (const r of removed) this.step(new RemoveMarkStep(r.from, r.to, r.mark));
-    for (const r of added) this.step(new AddMarkStep(r.from, r.to, mark));
+    for (const run of removals.runs) this.step(new RemoveMarkStep(run.from, run.to, run.mark));
+    for (const run of additions) this.step(new AddMarkStep(run.from, run.to, mark));
     return this;
   }
 
   /** Removes a mark (or every mark of a type) from inline content in `from..to`. */
   removeMark(from: number, to: number, mark: Mark | MarkType): this {
-    const matched: { from: number; to: number; mark: Mark; index: number }[] = [];
-    let index = 0;
+    const found = new MarkRuns();
     this.doc.nodesBetween(from, to, (node, pos) => {
       if (!node.isInline) return;
-      index++;
-      const found =
+      const marks =
         mark instanceof MarkType
           ? node.marks.filter((m) => m.type === mark)
           : mark.isInSet(node.marks)
             ? [mark]
             : [];
-      const end = Math.min(pos + node.nodeSize, to);
-      for (const style of found) {
-        const prev = matched.find((m) => m.index === index - 1 && m.mark.eq(style));
-        if (prev) {
-          prev.to = end;
-          prev.index = index;
-        } else {
-          matched.push({ from: Math.max(pos, from), to: end, mark: style, index });
-        }
-      }
+      // A run continues over consecutive inline nodes, even into the next block.
+      found.add(marks, Math.max(pos, from), Math.min(pos + node.nodeSize, to), true);
     });
-    for (const m of matched) this.step(new RemoveMarkStep(m.from, m.to, m.mark));
+    for (const run of found.runs) this.step(new RemoveMarkStep(run.from, run.to, run.mark));
     return this;
   }
 
@@ -187,25 +174,16 @@ export class Transform {
     const $pos = this.doc.resolve(pos);
     if (depth < 1 || depth > $pos.depth)
       throw new TransformError(`Cannot split ${depth} levels at ${pos}`);
-    let before = Fragment.empty;
-    let after = Fragment.empty;
-    for (let d = $pos.depth, i = depth - 1; d > $pos.depth - depth; d--, i--) {
-      before = Fragment.from($pos.node(d).copy(before));
-      const typeAfter = typesAfter?.[i];
-      let next: Node;
-      try {
-        next = typeAfter
-          ? typeAfter.type.createOpen(typeAfter.attrs, after)
-          : $pos.node(d).copy(after);
-      } catch (error) {
-        if (error instanceof FoliDocumentError) throw new TransformError(error.message);
-        throw error;
-      }
-      after = Fragment.from(next);
+    // Innermost split node first; `level` 0 is the outermost, as in `typesAfter`.
+    let head = Fragment.empty;
+    let tail = Fragment.empty;
+    for (let level = depth - 1; level >= 0; level--) {
+      const node = $pos.node($pos.depth - (depth - 1 - level));
+      head = Fragment.from(node.copy(head));
+      tail = Fragment.from(splitOff(node, typesAfter?.[level], tail));
     }
-    return this.step(
-      new ReplaceStep(pos, pos, new Slice(before.append(after), depth, depth), true),
-    );
+    const slice = new Slice(head.append(tail), depth, depth);
+    return this.step(new ReplaceStep(pos, pos, slice, true));
   }
 
   /**
@@ -229,26 +207,17 @@ export class Transform {
    * them). The blocks move inside without being re-created, so positions in them map through.
    */
   wrap(range: NodeRange, wrappers: readonly NodeTypeWithAttrs[]): this {
-    let content = Fragment.empty;
-    for (let i = wrappers.length - 1; i >= 0; i--) {
-      const wrapper = wrappers[i] as NodeTypeWithAttrs;
-      if (content.size && !wrapper.type.contentMatch.matchFragment(content)?.validEnd) {
-        throw new TransformError(`${wrapper.type.name} cannot hold the next wrapper`);
+    // Built from the innermost wrapper out: each must accept the one inside it.
+    const nested = wrappers.reduceRight((inner, { type, attrs }) => {
+      if (inner.size && !type.contentMatch.matchFragment(inner)?.validEnd) {
+        throw new TransformError(`${type.name} cannot hold the next wrapper`);
       }
-      content = Fragment.from(wrapper.type.createOpen(wrapper.attrs, content));
-    }
+      return Fragment.from(type.createOpen(attrs, inner));
+    }, Fragment.empty);
     const { start, end } = range;
-    return this.step(
-      new ReplaceAroundStep(
-        start,
-        end,
-        start,
-        end,
-        new Slice(content, 0, 0),
-        wrappers.length,
-        true,
-      ),
-    );
+    // The range is the gap: the empty wrappers go around it, the blocks move in unchanged.
+    const slice = new Slice(nested, 0, 0);
+    return this.step(new ReplaceAroundStep(start, end, start, end, slice, wrappers.length, true));
   }
 
   /**
@@ -256,41 +225,28 @@ export class Transform {
    * ancestors they leave around them; ancestors left empty on a side are removed.
    */
   lift(range: NodeRange, target: number): this {
-    const { $from, $to, depth } = range;
-    const gapStart = $from.before(depth + 1);
-    const gapEnd = $to.after(depth + 1);
-    let start = gapStart;
-    let end = gapEnd;
-    let before = Fragment.empty;
-    let openStart = 0;
-    for (let d = depth, splitting = false; d > target; d--) {
-      if (splitting || $from.index(d) > 0) {
-        splitting = true;
-        before = Fragment.from($from.node(d).copy(before));
-        openStart++;
-      } else {
-        start--;
-      }
-    }
-    let after = Fragment.empty;
-    let openEnd = 0;
-    for (let d = depth, splitting = false; d > target; d--) {
-      if (splitting || $to.after(d + 1) < $to.end(d)) {
-        splitting = true;
-        after = Fragment.from($to.node(d).copy(after));
-        openEnd++;
-      } else {
-        end++;
-      }
-    }
+    const { $from, $to, depth, start, end } = range;
+    const before = liftSide(
+      depth,
+      target,
+      (d) => $from.node(d),
+      (d) => $from.index(d) > 0,
+    );
+    const after = liftSide(
+      depth,
+      target,
+      (d) => $to.node(d),
+      (d) => $to.after(d + 1) < $to.end(d),
+    );
+    const slice = new Slice(before.split.append(after.split), before.open, after.open);
     return this.step(
       new ReplaceAroundStep(
+        start - before.dropped,
+        end + after.dropped,
         start,
         end,
-        gapStart,
-        gapEnd,
-        new Slice(before.append(after), openStart, openEnd),
-        before.size - openStart,
+        slice,
+        before.split.size - before.open,
         true,
       ),
     );
@@ -343,5 +299,85 @@ export class Transform {
     marks?: readonly Mark[],
   ): this {
     return this.step(new NodeMarkupStep(pos, type, attrs, marks));
+  }
+}
+
+/** The part of `node` after a split: `after` in a copy of it, or in `override`'s type. */
+function splitOff(
+  node: Node,
+  override: NodeTypeWithAttrs | null | undefined,
+  after: Fragment,
+): Node {
+  try {
+    return override ? override.type.createOpen(override.attrs, after) : node.copy(after);
+  } catch (error) {
+    if (error instanceof FoliDocumentError) throw new TransformError(error.message);
+    throw error;
+  }
+}
+
+/**
+ * One side of a lift, going up from the range's parent (`depth`) to `target`. Ancestors with
+ * nothing on this side of the range lose their token on this side (`dropped` counts them); from
+ * the first that has content there on, each is split, its copy left open in the slice.
+ */
+function liftSide(
+  depth: number,
+  target: number,
+  nodeAt: (depth: number) => Node,
+  hasContent: (depth: number) => boolean,
+): { split: Fragment; open: number; dropped: number } {
+  let split = Fragment.empty;
+  let open = 0;
+  let dropped = 0;
+  for (let d = depth, splitting = false; d > target; d--) {
+    splitting ||= hasContent(d);
+    if (splitting) {
+      split = Fragment.from(nodeAt(d).copy(split));
+      open++;
+    } else {
+      dropped++;
+    }
+  }
+  return { split, open, dropped };
+}
+
+/** A run of one mark over consecutive ranges: one mark step. */
+interface MarkRun {
+  from: number;
+  to: number;
+  mark: Mark;
+}
+
+/**
+ * Collects mark runs from ranges given in document order. A run grows while the ranges it is
+ * found in follow each other; a range without the mark ends it.
+ */
+class MarkRuns {
+  readonly runs: MarkRun[] = [];
+  /** The runs the previous range was part of, and where that range ended. */
+  private previous: MarkRun[] = [];
+  private previousEnd = -1;
+
+  /** `from..to` has `marks`; `continues` says whether it follows the previous range. */
+  add(
+    marks: readonly Mark[],
+    from: number,
+    to: number,
+    continues = from === this.previousEnd,
+  ): void {
+    const current: MarkRun[] = [];
+    for (const mark of marks) {
+      let run = continues ? this.previous.find((r) => r.mark.eq(mark)) : undefined;
+      if (run) {
+        run.to = to;
+      } else {
+        run = { from, to, mark };
+        this.runs.push(run);
+      }
+      current.push(run);
+    }
+    this.previous = current;
+    this.previousEnd = to;
   }
 }
