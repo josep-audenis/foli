@@ -138,12 +138,11 @@ export class ResolvedPos {
    * Null when no ancestor qualifies.
    */
   blockRange(other: ResolvedPos = this, pred?: (node: Node) => boolean): NodeRange | null {
-    if (other.pos < this.pos) return other.blockRange(this, pred);
-    const top = this.depth - (this.parent.inlineContent || this.pos === other.pos ? 1 : 0);
-    for (let depth = top; depth >= 0; depth--) {
-      if (other.pos <= this.end(depth) && (!pred || pred(this.node(depth)))) {
-        return new NodeRange(this, other, depth);
-      }
+    const [$start, $end] = other.pos < this.pos ? [other, this] : [this, other];
+    // Inside a textblock (or at a single position) the range is made of blocks: start above it.
+    const below = $start.parent.inlineContent || $start.pos === $end.pos ? 1 : 0;
+    for (let d = Math.min($start.sharedDepth($end.pos), $start.depth - below); d >= 0; d--) {
+      if (!pred || pred($start.node(d))) return new NodeRange($start, $end, d);
     }
     return null;
   }

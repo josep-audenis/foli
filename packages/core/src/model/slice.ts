@@ -31,24 +31,41 @@ export class Slice {
    * `pos`, which must accept it. Null when the content would not be valid there.
    */
   insertAt(pos: number, fragment: Fragment): Slice | null {
-    const content = insertInto(this.content, pos + this.openStart, fragment, {
-      parent: null,
-      level: 0,
-      onStart: true,
-      onEnd: true,
-      openStart: this.openStart,
-      openEnd: this.openEnd,
-    });
-    return content && new Slice(content, this.openStart, this.openEnd);
+    const path = descend(this.content, pos + this.openStart);
+    const { content, offset } = path.inner;
+    const result = content.cut(0, offset).append(fragment).append(content.cut(offset));
+    const holder = path.steps[path.steps.length - 1];
+    // A node the slice cuts open is completed by the document around the replaced range, and
+    // replace validates it once joined: checking it here would reject valid content.
+    if (holder && !this.isOpenNode(path.steps) && !holder.child.type.validContent(result)) {
+      return null;
+    }
+    return new Slice(path.rebuild(result), this.openStart, this.openEnd);
   }
 
   /** This slice without the flat range `from..to` (slice positions). */
   removeBetween(from: number, to: number): Slice {
+    const path = descend(this.content, from + this.openStart);
+    const { content, offset } = path.inner;
+    const end = offset + (to - from);
+    // `to` must be in the same node as `from`, and not inside a child node.
+    const { index, offset: start } = end <= content.size ? content.findIndex(end) : { index: -1, offset: -1 };
+    if (index < 0 || (start !== end && !content.child(index).isText)) {
+      throw new RangeError("Removing a non-flat range");
+    }
     return new Slice(
-      removeRange(this.content, from + this.openStart, to + this.openStart),
+      path.rebuild(content.cut(0, offset).append(content.cut(end))),
       this.openStart,
       this.openEnd,
     );
+  }
+
+  /** Whether the node reached through `steps` is one of the nodes this slice cuts open. */
+  private isOpenNode(steps: readonly Step[]): boolean {
+    const level = steps.length;
+    const first = steps.every((step) => step.index === 0);
+    const last = steps.every((step) => step.index === step.content.childCount - 1);
+    return (first && level <= this.openStart) || (last && level <= this.openEnd);
   }
 
   eq(other: Slice): boolean {
@@ -64,57 +81,46 @@ export class Slice {
   }
 }
 
-interface InsertPath {
-  /** The node holding `content`, null at the top of the slice. */
-  parent: Node | null;
-  /** Depth of `parent` in the slice (1 for a top-level node). */
-  level: number;
-  /** Whether `parent` is on the slice's first-child chain, and on its last-child chain. */
-  onStart: boolean;
-  onEnd: boolean;
-  openStart: number;
-  openEnd: number;
+/** One level of a descent: `child` is the node at `index` of `content`. */
+interface Step {
+  content: Fragment;
+  index: number;
+  child: Node;
 }
 
-function insertInto(
+/**
+ * Walks from `content` into the node whose content holds `pos` (a position inside text stays
+ * in the text's parent). `inner` is that content and the offset of `pos` in it; `rebuild` puts a
+ * replacement for it back into copies of the nodes walked through.
+ */
+function descend(
   content: Fragment,
-  dist: number,
-  insert: Fragment,
-  path: InsertPath,
-): Fragment | null {
-  const { index, offset } = content.findIndex(dist);
-  const child = content.maybeChild(index);
-  if (offset === dist || !child || child.isText) {
-    const result = content.cut(0, dist).append(insert).append(content.cut(dist));
-    const { parent, level } = path;
-    // An open node of the slice is completed by the document around the replaced range;
-    // replace validates it once joined. Checking it here would reject valid content.
-    const open = (path.onStart && level <= path.openStart) || (path.onEnd && level <= path.openEnd);
-    return parent && !open && !parent.type.validContent(result) ? null : result;
+  pos: number,
+): {
+  steps: Step[];
+  inner: { content: Fragment; offset: number };
+  rebuild: (inner: Fragment) => Fragment;
+} {
+  const steps: Step[] = [];
+  let rel = pos;
+  for (;;) {
+    const { index, offset } = content.findIndex(rel);
+    const child = content.maybeChild(index);
+    if (offset === rel || !child || child.isText) break;
+    steps.push({ content, index, child });
+    content = child.content;
+    rel -= offset + 1;
   }
-  const inner = insertInto(child.content, dist - offset - 1, insert, {
-    ...path,
-    parent: child,
-    level: path.level + 1,
-    onStart: path.onStart && index === 0,
-    onEnd: path.onEnd && index === content.childCount - 1,
-  });
-  return inner && content.replaceChild(index, child.copy(inner));
-}
-
-function removeRange(content: Fragment, from: number, to: number): Fragment {
-  const { index, offset } = content.findIndex(from);
-  const child = content.maybeChild(index);
-  const { index: indexTo, offset: offsetTo } = content.findIndex(to);
-  if (offset === from || !child || child.isText) {
-    if (offsetTo !== to && !content.child(indexTo).isText) {
-      throw new RangeError("Removing a non-flat range");
-    }
-    return content.cut(0, from).append(content.cut(to));
-  }
-  if (index !== indexTo) throw new RangeError("Removing a non-flat range");
-  return content.replaceChild(
-    index,
-    child.copy(removeRange(child.content, from - offset - 1, to - offset - 1)),
-  );
+  return {
+    steps,
+    inner: { content, offset: rel },
+    rebuild(inner) {
+      let result = inner;
+      for (let i = steps.length - 1; i >= 0; i--) {
+        const step = steps[i] as Step;
+        result = step.content.replaceChild(step.index, step.child.copy(result));
+      }
+      return result;
+    },
+  };
 }
