@@ -268,7 +268,7 @@ const MIN_PICTURE = 8;
 /** How long a hint takes to fade, after its time (18.1). */
 const HINT_FADE = 400;
 
-const STYLES = `[${FIELD_SELECTED_ATTR}]{background-color:rgba(0,0,0,.14)}@media print{[${FIELD_SELECTED_ATTR}]{background-color:transparent}}.foli-in-story>.foli-page>:not(.foli-region){opacity:.45}.foli-story-mount{pointer-events:auto;outline:1px dashed GrayText;outline-offset:2px}.foli-story-mount>[contenteditable=true]:focus{outline:none}@media print{.foli-in-story>.foli-page>:not(.foli-region){opacity:1}.foli-story-mount{outline:none}}.${CELL_CLASS}{box-shadow:inset 0 0 0 9999px rgba(0,120,215,.22)}[${CELLS_ATTR}] ::selection{background:transparent}[data-foli-no-alt]{outline:2px dashed #b45309;outline-offset:-2px}@media print{[data-foli-no-alt]{outline:none}}[${PICTURE_SELECTED_ATTR}]{position:relative;outline:2px solid Highlight}[${PICTURE_SELECTED_ATTR}] [data-foli-resize]{position:absolute;right:-5px;bottom:-5px;width:10px;height:10px;box-sizing:border-box;border:1px solid Canvas;background:Highlight;cursor:nwse-resize;touch-action:none;forced-color-adjust:none}@media (pointer:coarse){[${PICTURE_SELECTED_ATTR}] [data-foli-resize]{right:-12px;bottom:-12px;width:24px;height:24px}}@media print{[${PICTURE_SELECTED_ATTR}]{outline:none}[${PICTURE_SELECTED_ATTR}] [data-foli-resize]{display:none}}[${PLACEHOLDER_ATTR}]::before{content:attr(${PLACEHOLDER_ATTR});content:attr(${PLACEHOLDER_ATTR}) / "";float:inline-start;height:0;pointer-events:none;color:GrayText}${CONTROL_STYLES}${MATCH_STYLES}`;
+const STYLES = `[${FIELD_SELECTED_ATTR}]{background-color:rgba(0,0,0,.14)}@media print{[${FIELD_SELECTED_ATTR}]{background-color:transparent}}.foli-in-story>.foli-page>:not(.foli-region){opacity:.45}.foli-story-mount{pointer-events:auto;outline:1px dashed GrayText;outline-offset:2px}.foli-story-mount>[contenteditable=true]:focus{outline:none}@media print{.foli-in-story>.foli-page>:not(.foli-region){opacity:1}.foli-story-mount{outline:none}}.${CELL_CLASS}{box-shadow:inset 0 0 0 9999px rgba(0,120,215,.22)}[${CELLS_ATTR}] ::selection{background:transparent}[data-foli-no-alt]{outline:2px dashed #b45309;outline-offset:-2px}@media print{[data-foli-no-alt]{outline:none}}[${PICTURE_SELECTED_ATTR}]{position:relative;outline:2px solid Highlight}[${PICTURE_SELECTED_ATTR}] [data-foli-resize]{position:absolute;right:-5px;bottom:-5px;width:10px;height:10px;box-sizing:border-box;border:1px solid Canvas;background:Highlight;cursor:nwse-resize;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;forced-color-adjust:none}@media (any-pointer:coarse){[${PICTURE_SELECTED_ATTR}] [data-foli-resize]{right:-12px;bottom:-12px;width:24px;height:24px}}@media print{[${PICTURE_SELECTED_ATTR}]{outline:none}[${PICTURE_SELECTED_ATTR}] [data-foli-resize]{display:none}}[${PLACEHOLDER_ATTR}]::before{content:attr(${PLACEHOLDER_ATTR});content:attr(${PLACEHOLDER_ATTR}) / "";float:inline-start;height:0;pointer-events:none;color:GrayText}${CONTROL_STYLES}${MATCH_STYLES}`;
 
 /**
  * Adds the view's stylesheet once per document or shadow root, when a placeholder is first shown
@@ -668,6 +668,8 @@ export class EditorView {
     x: number;
     y: number;
     style: string;
+    /** The pointer resizing: a touch's or pen's id, or any mouse (a start from mousedown). */
+    pointer: number | "mouse";
   } | null = null;
   /** The app's URLs for pictures' images (`EditorViewOptions.resource`). */
   private resource: EditorViewOptions["resource"];
@@ -3814,6 +3816,10 @@ export class EditorView {
     const width = Number.parseFloat(img.style.width) || rect.width;
     const scale = rect.width / width || 1;
     this.resize = {
+      pointer:
+        "pointerId" in event && (event as PointerEvent).pointerType !== "mouse"
+          ? (event as PointerEvent).pointerId
+          : "mouse",
       pos,
       img,
       width: rect.width,
@@ -3830,10 +3836,16 @@ export class EditorView {
     doc.addEventListener("pointermove", this.onResizeMove);
     doc.addEventListener("pointerup", this.onResizeEnd);
     doc.addEventListener("pointercancel", this.onResizeCancel);
+    doc.addEventListener("contextmenu", this.onResizeMenu, true);
     doc.addEventListener("keydown", this.onResizeKey, true);
     doc.defaultView?.addEventListener("blur", this.onResizeCancel);
     return true;
   }
+
+  /** A long press while resizing brings no menu (it would cancel the touch). */
+  private onResizeMenu = (event: Event): void => {
+    event.preventDefault();
+  };
 
   /** When a touch or pen last pressed the resize handle (its emulated mouse events follow). */
   private touchedResize = Number.NEGATIVE_INFINITY;
@@ -3844,7 +3856,7 @@ export class EditorView {
    * afterwards are then not a second press.
    */
   private onPointerDown = (event: PointerEvent): void => {
-    if (event.pointerType === "mouse" || !event.isPrimary) return;
+    if (event.pointerType === "mouse" || !event.isPrimary || event.button !== 0) return;
     const target = event.target as Element | null;
     if (!target?.closest?.("[data-foli-resize]")) return;
     this.touchedResize = event.timeStamp;
@@ -3864,8 +3876,15 @@ export class EditorView {
     return { width, height: width * ratio };
   }
 
-  private onResizeMove = (event: MouseEvent): void => {
-    if (!this.resize) return;
+  /** Whether `event` is the resizing pointer's (another finger, or a mouse beside a pen, is not). */
+  private resizing(event: PointerEvent): boolean {
+    const pointer = this.resize?.pointer;
+    if (pointer === undefined) return false;
+    return pointer === "mouse" ? event.pointerType === "mouse" : event.pointerId === pointer;
+  }
+
+  private onResizeMove = (event: PointerEvent): void => {
+    if (!this.resize || !this.resizing(event)) return;
     if ((event.buttons & 1) === 0) {
       this.onResizeCancel();
       return;
@@ -3875,8 +3894,8 @@ export class EditorView {
     this.resize.img.style.height = `${height}px`;
   };
 
-  private onResizeEnd = (event: MouseEvent): void => {
-    if (!this.resize) return;
+  private onResizeEnd = (event: PointerEvent): void => {
+    if (!this.resize || !this.resizing(event)) return;
     const { width, height } = this.resizedTo(event);
     const r = this.endResize();
     if (!r) return;
@@ -3898,7 +3917,9 @@ export class EditorView {
     this.onResizeCancel();
   };
 
-  private onResizeCancel = (): void => {
+  private onResizeCancel = (event?: Event): void => {
+    // Another pointer's cancel (a second finger's pan) is not this resize's.
+    if (event && "pointerId" in event && !this.resizing(event as PointerEvent)) return;
     const r = this.endResize();
     if (r) r.img.setAttribute("style", r.style);
   };
@@ -3912,6 +3933,7 @@ export class EditorView {
     doc.removeEventListener("pointermove", this.onResizeMove);
     doc.removeEventListener("pointerup", this.onResizeEnd);
     doc.removeEventListener("pointercancel", this.onResizeCancel);
+    doc.removeEventListener("contextmenu", this.onResizeMenu, true);
     doc.removeEventListener("keydown", this.onResizeKey, true);
     doc.defaultView?.removeEventListener("blur", this.onResizeCancel);
     return r;

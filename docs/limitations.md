@@ -187,7 +187,7 @@ Custom nodes and marks, plugins and toolbar items ([extensions](guides/extension
   table, moves whole to the next page.
 - Rows pasted into a table fill its cells from the selected one; columns beyond the table's are
   dropped (not reported). Tables pasted from other applications become paragraphs.
-- A column's width is set by dragging its border or from the keyboard (Table, Column width…: the
+- A column's width is set by dragging its border with a mouse (not by touch) or from the keyboard (Table, Column width…: the
   selection's last column, the next one giving the difference and keeping 0.1 inch, so the
   dialog's range depends on it; a merged cell sets only its last column); a nested table's column
   borders cannot be dragged. Nested tables are drawn whole with their parent's row.
@@ -259,7 +259,9 @@ Custom nodes and marks, plugins and toolbar items ([extensions](guides/extension
   crop handles); a crop or rotation only in the drawing's XML (see above) cannot be changed there
   until the file is imported again; cropping a floating picture's left or top keeps its anchor
   offset, so what shows moves. A picture is resized by its handle with a mouse, a pen or a finger
-  (19.5c; touch tested with synthetic pointer events, not on a device);
+  (19.5c; touch tested with synthetic pointer events, not on a device; on a touch screen the
+  handle is 24 px and reaches past the picture, so a tap just beside a selected picture's corner
+  can land on it);
   resizing is refused while tracking (Foli does not record a size change yet). Alt text changes
   are not tracked.
 - A picture copied into another document brings its image (12.11): its own `data:` or web URL,

@@ -224,6 +224,10 @@ test("a finger on the handle resizes the picture too, the page not scrolling (19
       handle.dispatchEvent(new PointerEvent("pointerdown", at(x)));
       for (let i = 1; i <= 5; i++)
         document.dispatchEvent(new PointerEvent("pointermove", at(x - i * 20)));
+      // A second finger elsewhere neither moves nor ends it.
+      const other = { ...at(x + 300), pointerId: 8, isPrimary: false };
+      document.dispatchEvent(new PointerEvent("pointermove", other));
+      document.dispatchEvent(new PointerEvent("pointerup", { ...other, buttons: 0 }));
       document.dispatchEvent(new PointerEvent("pointerup", { ...at(x - 100), buttons: 0 }));
     },
     { x, y },

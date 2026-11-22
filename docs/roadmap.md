@@ -2887,7 +2887,7 @@ supplies, so a server without a browser cannot make PDFs).
 - Dragging text does nothing; on Android, Backspace at a list paragraph's start may join it into
   the paragraph before; some Android keyboards insert paragraphs without the events the editor
   needs.
-- Pictures: no cropping, rotation or touch resizing; resizing is refused while tracking.
+- Pictures: no crop handles on the page (the dialog crops); resizing is refused while tracking.
 - Find does not look in text boxes (comments: 19.2).
 
 **Pictures:** crop handles on the page (a crop mode, as Word's), left from 19.5c; a rotation
