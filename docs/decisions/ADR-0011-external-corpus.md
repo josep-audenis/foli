@@ -37,7 +37,10 @@ folders): the run counts each content once.
 **Reports hold no document text.** What the run writes (results, `docs/corpus-report.md`)
 holds counts, element and attribute names, file names and sizes, never text from a document: the
 files are public, but a private folder is run the same way by its owner, and a report must be
-safe to paste into an issue.
+safe to paste into an issue. The results files (`.corpus-cache/results/*.jsonl`) stay on the
+machine that ran them: they also hold each file's local path, for the renderer pass to find it.
+Error messages are the code's, capped (200 characters) but not rewritten: one that quotes a
+document's content is a bug to fix where it is thrown, as 20.2 did for the XML parser's.
 
 **What the run checks, and how a difference is classed** (20.2, 20.3): each file in a worker
 thread with a time limit and a heap cap (a worker that dies or times out is that file's failure,

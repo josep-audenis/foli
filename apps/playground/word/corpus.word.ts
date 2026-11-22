@@ -37,11 +37,19 @@ function runFile(): string | null {
   return last ? join(fileURLToPath(RESULTS), last) : null;
 }
 
+/** The Word page in `page`, its errors into `errors`; tried twice (a dev server's hiccup). */
 async function open(page: Page, errors: string[]) {
   page.removeAllListeners("pageerror");
   page.on("pageerror", (error) => errors.push(`${error.name}: ${error.message.slice(0, 120)}`));
-  await page.goto("/word.html");
-  await page.waitForFunction(() => "foliWord" in window);
+  for (let attempt = 1; ; attempt++) {
+    try {
+      await page.goto("/word.html");
+      await page.waitForFunction(() => "foliWord" in window);
+      return;
+    } catch (error) {
+      if (attempt === 2) throw error;
+    }
+  }
 }
 
 test("every imported file of the run lays out in Chromium", async ({ browser }) => {
@@ -59,12 +67,22 @@ test("every imported file of the run lays out in Chromium", async ({ browser }) 
   const errors: string[] = [];
   await open(page, errors);
   let done = 0;
+  let rendered = 0;
   for (const line of lines) {
-    if (!existsSync(line.path)) continue;
+    const record = (result: Record<string, unknown>) =>
+      appendFileSync(
+        out,
+        `${JSON.stringify({ sha256: line.sha256, names: line.names, ...result })}\n`,
+      );
+    if (!line.path || !existsSync(line.path)) {
+      record({ render: "missing" });
+      continue;
+    }
     const base64 = readFileSync(line.path).toString("base64");
     errors.length = 0;
     const start = Date.now();
     let result: Record<string, unknown>;
+    let timer: ReturnType<typeof setTimeout> | undefined;
     try {
       const shown = await Promise.race([
         page.evaluate(async (data) => {
@@ -77,9 +95,14 @@ test("every imported file of the run lays out in Chromium", async ({ browser }) 
           const overflowing = pages.filter((p) => p.scrollHeight > p.clientHeight + 1).length;
           return { pages: pages.length, overflowing };
         }, base64),
-        new Promise<never>((_, reject) => setTimeout(() => reject(new Error("timeout")), MS)),
+        new Promise<never>((_, reject) => {
+          timer = setTimeout(() => reject(new Error("timeout")), MS);
+        }),
       ]);
+      // A page error a timer or a promise of this document raises comes after its render.
+      await page.evaluate(() => new Promise((resolve) => setTimeout(resolve)));
       result = { render: errors.length ? "page error" : "ok", ...shown };
+      rendered++;
     } catch (error) {
       const message = String((error as Error).message);
       result = {
@@ -87,15 +110,16 @@ test("every imported file of the run lays out in Chromium", async ({ browser }) 
           message === "timeout" ? "timeout" : /crash|closed/i.test(message) ? "crash" : "error",
         error: message.split("\n")[0]?.slice(0, 160),
       };
+    }
+    clearTimeout(timer);
+    // This file's time and errors, before a replacement page could add its own.
+    record({ ms: Date.now() - start, errors: [...errors], ...result });
+    if (result.render !== "ok" && result.render !== "page error") {
       // A hung or crashed tab: a new one for the next file.
       await page.close().catch(() => {});
       page = await browser.newPage();
       await open(page, errors);
     }
-    appendFileSync(
-      out,
-      `${JSON.stringify({ sha256: line.sha256, names: line.names, ms: Date.now() - start, errors: [...errors], ...result })}\n`,
-    );
     // A fresh page now and then: one document's leftovers do not weigh on the next.
     if (++done % 200 === 0) {
       await page.close();
@@ -105,5 +129,7 @@ test("every imported file of the run lays out in Chromium", async ({ browser }) 
     }
   }
   await page.close();
-  console.log(`render results: ${out}`);
+  console.log(`render results: ${out} (${rendered} of ${lines.length} rendered)`);
+  // Nothing found to render is a broken run (results from before paths were recorded, say).
+  if (lines.length && !rendered) throw new Error("no file of the run could be rendered");
 });

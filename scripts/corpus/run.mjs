@@ -10,7 +10,7 @@
 import { createHash } from "node:crypto";
 import { appendFileSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { availableParallelism } from "node:os";
-import { join, relative } from "node:path";
+import { join, relative, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { isMainThread, parentPort, Worker } from "node:worker_threads";
 
@@ -109,7 +109,12 @@ export async function runAll(items, { threads = 4, limits = LIMITS, onResult = (
             await fresh();
           }
         }
-        const line = { sha256: item.sha256, names: item.names, path: item.path, ...result };
+        const line = {
+          sha256: item.sha256,
+          names: item.names,
+          path: resolve(item.path),
+          ...result,
+        };
         results.push(line);
         onResult(line);
       }
