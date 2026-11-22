@@ -306,6 +306,7 @@ export function runProperties(rPr: XmlElement | undefined, context: Context): Ma
   }
   // One property written twice (`w:rFonts` then `w:rFonts`, schema-invalid but written by some
   // tools): read in order, each setting what it names, as one mark; the model allows one a type.
+  // (`w:b`, `w:i`, `w:sz` and their twins are read from their first element only.)
   const byType = new Map<string, MarkJSON>();
   for (const m of marks) {
     if (!m) continue;
