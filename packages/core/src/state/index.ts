@@ -100,15 +100,18 @@ export {
   updateFields,
 } from "./fieldupdate.js";
 export {
+  type CommentMatch,
   type FindMatch,
   type FindOptions,
   findAll,
+  findInComments,
   findInText,
   nextMatch,
   type ReplaceRefusal,
   type ReplaceReport,
   replace,
   replaceAll,
+  replaceInComments,
 } from "./find.js";
 export {
   alignAt,

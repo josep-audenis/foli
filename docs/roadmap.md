@@ -2781,11 +2781,24 @@ agent's review.
   Insert group. Mid-paragraph it splits twice, as Enter would, so rejecting a tracked rule joins
   the text again; at a paragraph's start it goes before it. The border round-trips as `w:pBdr`
   (a docx test added).)
-- [ ] 19.2 Find in comments and text boxes: matches in comment bodies (going there opens the
+- [x] 19.2 Find in comments and text boxes: matches in comment bodies (going there opens the
   comment) and in text boxes kept opaque (going there selects the box); replace edits comments,
-  skips text boxes and reports them.
-- [ ] 19.3 Extensions in `renderDocument` and `exportPdf`: the same `extensions` array, node and
-  mark views drawn on read-only pages; headers, footers and notes too.
+  skips text boxes and reports them. (Done for comments: core's `findInComments` and
+  `replaceInComments` (one undo step, untracked, as Word records no changes in comments), kept
+  apart from `findAll` so its matches stay positions of the body and stories; the find panel
+  lists the comments found, each going to its thread's text, and offers Replace in comments.
+  Text boxes left out: the view does not draw them yet (opaque, `NOT_INLINE` in
+  `view/src/word/blocks.ts`), so a match would point at nothing on the page; find in them comes
+  with drawing them, After 1.0.)
+- [x] 19.3 Extensions in `renderDocument` and `exportPdf`: the same `extensions` array, node and
+  mark views drawn on read-only pages; headers, footers and notes too. (Done: `renderDocument`'s
+  `extensions`; the view's `customDrawing` reads each custom node into the extensions' schema and
+  calls its `render`, else draws its spec's `text`; mark views' attributes on runs; the editor's
+  headers, footers and notes as the pages show them use it too. `exportPdf`'s `extensions` is a
+  script run in the page before the renderer, setting `globalThis.foliPdfExtensions` (taken once,
+  so a page used again does not keep them): functions cannot cross into the page. A custom block
+  on read-only pages is kept whole unless taller than a page; copies (headers, notes, later
+  parts) are snapshots and `destroy` is not called (limitations). Tested in jsdom and in Chromium's PDF (e2e).)
 - [ ] 19.4 Tables: a column width field in the table properties (keyboard, undoable); autofit
   tables fitted to their content (Word's rules: preferred widths, minimum content width, the
   page's width), a fixed table untouched; the `shortcut:` in `table.ts` removed.
@@ -2846,12 +2859,10 @@ supplies, so a server without a browser cannot make PDFs).
 - Dragging text does nothing; on Android, Backspace at a list paragraph's start may join it into
   the paragraph before; some Android keyboards insert paragraphs without the events the editor
   needs.
-- `renderDocument` and `exportPdf` take no extensions, so custom nodes do not draw there.
 - Tables: autofit keeps Word's saved widths (no fitting to content); no keyboard way to set a
   column's width.
 - Pictures: no cropping, rotation or touch resizing; resizing is refused while tracking.
-- Find does not look in comments or text boxes.
-- No horizontal rule button; colors only from the toolbar's fixed palette.
+- Find does not look in text boxes (comments: 19.2).
 
 **Hint: show a place for a few seconds** (wanted by the owner; built in Phase 18, 1.3.0). An app, or an agent
 citing what it changed, points at a range, a block or a bookmark; the editor scrolls there and

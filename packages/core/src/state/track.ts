@@ -366,6 +366,8 @@ function rebuild(
     let group: number | null = null;
     /** Whether the group's first paragraph keeps content before the range (else it is gone). */
     let groupLive = false;
+    /** Where the group's last joined mark was: the paragraph after it ends the group. */
+    let groupEnd = 0;
     const merged: { at: At; node: Node; live: boolean }[] = [];
     doc.nodesBetween(from, to, (node, pos) => {
       if (node.isTextblock) {
@@ -383,6 +385,7 @@ function rebuild(
           doc.resolve(end).nodeAfter?.isTextblock
         ) {
           real.push([end - 1, end + 1]);
+          groupEnd = end;
           if (group === null) {
             groupLive = false;
             node.forEach((child, offset) => {
@@ -423,6 +426,12 @@ function rebuild(
       (own && own.attrs.author === author ? real : marked).push([s, e]);
       return false;
     });
+    // The range ended at a mark it joined for real (one's own paragraph deleted whole, up to its
+    // end): the paragraph after it, outside the range, is the group's last, whose mark is kept.
+    if (group !== null) {
+      const last = doc.resolve(groupEnd).nodeAfter;
+      if (last?.isTextblock) merged.push({ at: here(group), node: last, live: groupLive });
+    }
     for (const [table, list] of ownRows) {
       const node = doc.nodeAt(table);
       if (node && list.length === node.childCount) real.push([table, table + node.nodeSize]);

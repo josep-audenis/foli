@@ -578,9 +578,15 @@ came from JSON; it is selected and deleted whole, and written back exactly by
 the custom type again. In `.docx` a foreign node shows the text its control had when it was
 imported, while the document stays in memory; one loaded from JSON shows `[acme:mention]`.
 
-**Where views are not drawn.** `renderDocument` and `exportPdf` take no extensions: they draw a
-custom node as its text and a custom mark not at all. So do the headers, footers and notes as the
-pages show them, until one is opened for editing.
+**Read-only pages and PDF.** Give `renderDocument` the same array (`{ extensions }`) and its
+pages draw custom nodes and marks with their views; a view that fails or is missing draws the
+node's `text`. `exportPdf` runs in a page that has none of your modules: pass `extensions`, a
+script of your own that sets `globalThis.foliPdfExtensions` to the array (bundle the extension's
+code into it, without Foli's packages: `h` is handed to `render`). Decorations and plugin views
+are the editor's only. Without extensions a custom node shows as its text and a custom mark not
+at all. Read-only pages copy what `render` returns (headers, notes, a block's later parts): a
+view that draws later (a chart, a canvas) shows what it had drawn by then, and `destroy` is not
+called there.
 
 ## Safety: what is trusted
 

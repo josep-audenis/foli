@@ -272,3 +272,24 @@ describe("target (18.2)", () => {
     expect(session.target("b9999")).toMatchObject({ ok: false, code: "unknown-handle" });
   });
 });
+
+describe("a paragraph the session inserted, then deleted", () => {
+  it("leaves the document as it was: no tracked change, nothing joined on rejecting", async () => {
+    const { rejectAllChanges, trackedChanges } = await import("@folijs/core");
+    const { document } = await corpus("01-mutual-nda");
+    const session = openSession(document, { author: "Agent" });
+    const before = JSON.stringify(session.document().content);
+    const read = session.read({ limit: 3 });
+    const handle = (read.ok ? read.blocks[1]?.handle : "") as string;
+    for (const side of ["after", "before"] as const) {
+      const made =
+        side === "after" ? session.insertAfter(handle, "tmp") : session.insertBefore(handle, "tmp");
+      const inserted = (made.ok ? made.blocks[0]?.handle : "") as string;
+      expect(session.deleteBlock(inserted)).toMatchObject({ ok: true });
+      expect(trackedChanges(session.editor.state.doc), side).toEqual([]);
+      expect(JSON.stringify(session.document().content), side).toBe(before);
+    }
+    session.editor.run(rejectAllChanges());
+    expect(JSON.stringify(session.document().content)).toBe(before);
+  });
+});

@@ -44,6 +44,7 @@ export {
   RUN_PROPERTY_MARKS,
   type RunFormat,
   schema,
+  schemaWith,
   type TableFormat,
   tableConditions,
   withForeignText,

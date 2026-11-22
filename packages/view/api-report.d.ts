@@ -828,7 +828,7 @@ export {};
  * Word's spacing, keep rules, widow and orphan control and explicit breaks. Editing moves to
  * v3 in 8.7.
  */
-import { type FieldLayout, type FoliDocument, type ResourceJSON, type ReviewView } from "@folijs/core";
+import { type Extension, type FieldLayout, type FoliDocument, type ResourceJSON, type ReviewView } from "@folijs/core";
 export type { ReviewView } from "./blocks.js";
 /** The class of each page element. */
 export declare const WORD_PAGE_CLASS = "foli-word-page";
@@ -877,13 +877,18 @@ export interface RenderDocumentOptions {
      * resource's own image `data:` URL or web URL (fetched as it is shown).
      */
     resource?: (key: string, resource: ResourceJSON) => string | null | undefined;
+    /**
+     * The editor's extensions: custom nodes and marks drawn by their node and mark views (19.3),
+     * else as their `.docx` text. Give the same array the document was read with.
+     */
+    extensions?: readonly Extension[];
 }
 /**
  * Lays a v3 document out on pages inside `container`: every section's page setup, its columns
  * (a band per section on a page), continuous sections, Word's blank pages, headers and footers
  * with their page fields, footnotes at their columns' feet and endnotes after the text.
  */
-export declare function renderDocument(document: FoliDocument, container: HTMLElement, options?: RenderDocumentOptions): DocumentPages;
+export declare function renderDocument(document: FoliDocument, container: HTMLElement, given?: RenderDocumentOptions): DocumentPages;
 
 // word/regions.d.ts
 export {};

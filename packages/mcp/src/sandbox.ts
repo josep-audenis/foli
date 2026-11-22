@@ -10,8 +10,16 @@ import { MessageChannel, Worker } from "node:worker_threads";
 
 /** @internal */
 export interface SandboxLimits {
-  /** Wall-clock time for the whole run, the host's answers included. */
+  /**
+   * Wall-clock time for the script, the host's answers included: from the moment the thread
+   * says it is ready (QuickJS loaded, the prelude run) to the script's answer.
+   */
   ms: number;
+  /**
+   * Wall-clock time for the thread to get ready, before the script's clock starts: a thread
+   * and a WebAssembly module of its own, which a busy machine may take seconds to start.
+   */
+  start: number;
   /**
    * The script's memory, in bytes: all the WebAssembly module may hold, the engine's own few
    * megabytes included.
@@ -22,7 +30,12 @@ export interface SandboxLimits {
 }
 
 /** @internal */
-export const SANDBOX_LIMITS: SandboxLimits = { ms: 10_000, memory: 64 * 1024 * 1024, calls: 5_000 };
+export const SANDBOX_LIMITS: SandboxLimits = {
+  ms: 10_000,
+  start: 30_000,
+  memory: 64 * 1024 * 1024,
+  calls: 5_000,
+};
 
 /**
  * @internal
@@ -90,8 +103,9 @@ const lineOf = (stack: string): number | null => {
 /**
  * @internal
  * Runs `code` as a function's body, after `prelude` (the server's own code, which builds what
- * the script sees over `__call`). Never throws. The script itself never has longer than
- * `limits.ms`; the time is kept in the host's thread, so the answer comes when the host
+ * the script sees over `__call`). Never throws. The thread has `limits.start` to get ready,
+ * then the script itself never has longer than `limits.ms`; the time is kept in the host's
+ * thread, so the answer comes when the host
  * function that is running at that moment has returned: a host function must be bounded.
  */
 export function runScript(
@@ -138,10 +152,18 @@ export function runScript(
     };
     const failed = (reason: "time" | "calls" | "host" | "crash", message: string) =>
       end({ ok: false, reason, message, line: null, calls });
-    const timer = setTimeout(
-      () => failed("time", `It did not finish in ${limits.ms / 1000} seconds.`),
-      limits.ms,
+    // The thread's start is not the script's time: on a busy machine it alone took seconds.
+    let timer = setTimeout(
+      () => failed("time", `The sandbox did not start in ${limits.start / 1000} seconds.`),
+      limits.start,
     );
+    const ready = () => {
+      clearTimeout(timer);
+      timer = setTimeout(
+        () => failed("time", `It did not finish in ${limits.ms / 1000} seconds.`),
+        limits.ms,
+      );
+    };
 
     port1.on("message", (message: { name: string; args: string }) => {
       if (settled) return;
@@ -170,9 +192,14 @@ export function runScript(
     worker.on(
       "message",
       (
-        message: { value: unknown } | { error: { name: string; message: string; stack: string } },
+        message:
+          | { ready: true }
+          | { value: unknown }
+          | { error: { name: string; message: string; stack: string } },
       ) => {
-        if ("error" in message) {
+        if ("ready" in message) {
+          if (!settled) ready();
+        } else if ("error" in message) {
           const { name, message: text, stack } = message.error;
           const memory = name === "InternalError" && text === "out of memory";
           end({

@@ -51,7 +51,7 @@ const schemas = new WeakMap<readonly Extension[], Schema>();
 /**
  * The Word schema with `extensions`' types (the Word schema itself when there are none). Throws
  * a `RangeError` on a name that is not namespaced or is taken twice, or a node that is not a leaf.
- * @internal
+ * Not public: exported through `@folijs/core/internal` only.
  */
 export function schemaWith(extensions: readonly Extension[] | undefined): Schema {
   if (!extensions?.length) return wordSchema;

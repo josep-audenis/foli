@@ -4,7 +4,14 @@
  * from those pages (and once more from the pages that gives, as the editor's update does), makes
  * links and bookmarks PDF links, and adds the print rules the editor uses.
  */
-import { createEditor, type Field, isSafeHref, parseDocument, updateFields } from "@folijs/core";
+import {
+  createEditor,
+  type Extension,
+  type Field,
+  isSafeHref,
+  parseDocument,
+  updateFields,
+} from "@folijs/core";
 import { type DocumentPages, renderDocument } from "@folijs/view";
 import type { Rendered, RenderInput } from "./index.js";
 
@@ -72,11 +79,17 @@ async function render({ document: json, images, review, styles }: RenderInput): 
   const container = doc.body;
   // Never the resource's own URL: only what `exportPdf` made into `data:` URLs (null: a box).
   const resource = (key: string) => images[key] ?? null;
+  // The app's extensions, set by its script before this one (`ExportPdfOptions.extensions`).
+  const global = globalThis as { foliPdfExtensions?: unknown };
+  const given = global.foliPdfExtensions;
+  // Taken once: a page used again for another export keeps its globals across `setContent`.
+  delete global.foliPdfExtensions;
+  const extensions = Array.isArray(given) ? (given as Extension[]) : [];
   const show = (document: RenderInput["document"]): DocumentPages =>
-    renderDocument(document, container, { review, resource });
-  const document = parseDocument(json);
+    renderDocument(document, container, { review, resource, extensions });
+  const document = parseDocument(json, { extensions });
   let pages = show(document);
-  const editor = createEditor({ document });
+  const editor = createEditor({ document, extensions });
   const report = updateFields(editor, { layout: pages.fieldLayout });
   if (report.updated) {
     pages.destroy();

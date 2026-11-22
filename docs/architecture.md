@@ -238,6 +238,13 @@ when typing and undo is one step. A floor on revision ids keeps the trees' new i
 checked first: code, deleted text, a field's or control's edge, then, inside a control, a dry run
 through the filter. Bookmark changes go through `editTrees` untracked. A custom node adds its
 `text(attrs)` as one piece standing for one position, as a field code does.
+Comments (19.2) are searched apart: `findInComments` reads each comment's content as a tree of the
+editor's schema (kept per comment object in a `WeakMap`; `setComments` makes new objects, so an
+edited comment is read again) through the same lines, and its matches name the comment, not a
+story, so `findAll`'s matches stay positions the view and `goTo` can use. `replaceInComments`
+edits those trees with a `Transform` and sets the comments in one untracked body transaction (Word
+records no tracked changes in comments), refusing what `refusalOf` refuses except controls, which
+comments do not hold.
 
 Custom nodes and marks (12.3, ADR-0008, `v3/extensions.ts`): `schemaWith(extensions)` builds the
 Word schema plus the extensions' types (checked: namespaced, not taken twice, leaves), cached for
@@ -273,6 +280,15 @@ hint (`view.hint`, Phase 18) is drawn the same way, in its own highlight (`foli-
 `foli-hint-fading`): its range kept as positions, mapped through each transaction the view hears
 of, made into DOM ranges again after each render; for a header, footer or note that is not open,
 by paragraph index and character in the copies the pages draw, as their text has no positions.
+
+On read-only pages (19.3) the views come through `customDrawing(extensions)`: `renderBlocks`
+(`word/blocks.ts`, which draws JSON, not model nodes) asks it for each custom node, which it reads
+into the extensions' schema (`schemaWith`) for `render`, falling back to the spec's `text`; mark
+views' attributes go on the run's span. It reaches the helpers through module state set for the
+synchronous `renderBlocks` call rather than as a parameter of each (cells, opaque blocks). The
+editor gives it to `PageRegions` and `PageNotes` too, so headers, footers and notes drawn on the
+pages show custom content. `exportPdf` cannot pass functions into its page: the app's script sets
+`globalThis.foliPdfExtensions`, which the renderer takes (and deletes) before laying out.
 
 ## Editor view (`@folijs/view`)
 
@@ -1106,7 +1122,7 @@ folder. Node only; no dependency but Foli's packages.
   `run` tool runs a script in QuickJS (WebAssembly) in a worker thread made for the run. The
   script calls `doc.replaceText(…)` as a function; under it the thread posts the call, waits
   on `Atomics.wait`, and the server's thread answers from the session: the same operations
-  the tools call. Only JSON crosses. The server ends the thread at the time limit. Before the
+  the tools call. Only JSON crosses. The server ends the thread at the time limit, counted from when the thread says it is ready (its start has a limit of its own). Before the
   script the session marks a checkpoint (`session.checkpoint()` of `@folijs/agent`: it
   keeps the body, and a rollback puts it back whole in one untracked change, with the handles); a run that fails goes back to it.
 - **What it is not:** no network transport; no code run unless started with `--code`.
@@ -1307,7 +1323,7 @@ since 1.0.0):
   (page number, date, cross-reference dialog, table of contents, update, show codes), Navigate,
   Notes (insert, go between note and reference, a Note options dialog) and Controls (insert each
   kind, a properties dialog). `FoliNavigation` (11.11, inside `FoliEditor`) is the find, replace
-  and go to panel, the bookmarks dialog and the outline, and takes Word's keys (Ctrl+F, Ctrl+H,
+  and go to panel (which lists the comments a search finds, 19.2), the bookmarks dialog and the outline, and takes Word's keys (Ctrl+F, Ctrl+H,
   Ctrl+G, F3, Shift+F3, Ctrl+Shift+F5) while the focus is in the document or its panels. Each
   menu and dialog is keyboard-usable and axe-clean in three engines.
 

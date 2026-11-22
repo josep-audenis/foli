@@ -55,6 +55,28 @@ describe("exportPdf", () => {
     expect(result).toEqual({ pdf: PDF, pages: 3, fields: FIELDS });
   });
 
+  it("runs the app's extensions script before the renderer, the custom content kept (19.3)", async () => {
+    const { page, calls } = fakePage();
+    const script = "globalThis.foliPdfExtensions = [];";
+    const document = createDocument({
+      type: "doc",
+      content: [
+        { type: "paragraph", content: [{ type: "acme:mention", attrs: { label: "Ada" } }] },
+      ],
+    });
+    await exportPdf(document, { page, extensions: script });
+    expect(calls.map((c) => c.method)).toEqual([
+      "setContent",
+      "addScriptTag",
+      "addScriptTag",
+      "evaluate",
+      "pdf",
+    ]);
+    expect(calls[1]?.arg).toEqual({ content: script });
+    const input = calls[3]?.arg as RenderInput | undefined;
+    expect(JSON.stringify(input?.document.content)).toContain('"type":"acme:mention"');
+  });
+
   it("keeps the page off the network: its policy, and no web URL for a picture", async () => {
     const { page, calls } = fakePage();
     await exportPdf(pictured(), { page });

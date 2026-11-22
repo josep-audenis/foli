@@ -134,6 +134,50 @@ test("a document makes the exporting page request nothing: no picture, font or s
   expect(requests).toEqual([]);
 });
 
+test("custom nodes and marks print with the app's extensions (19.3)", async ({ page, context }) => {
+  const document = {
+    schemaVersion: 5,
+    section: {},
+    styles: [{ id: "Normal", type: "paragraph", name: "Normal", isDefault: true }],
+    defaults: {},
+    numbering: { abstracts: [], instances: [] },
+    comments: [],
+    content: {
+      type: "doc",
+      content: [
+        {
+          type: "paragraph",
+          content: [
+            { type: "text", text: "Ask " },
+            { type: "acme:mention", attrs: { label: "Ada" } },
+          ],
+        },
+        { type: "acme:card", attrs: { id: "c-1" } },
+      ],
+    },
+  };
+  // The app's own code, bundled for the page: plain objects, no module of Foli's.
+  const extensions = `globalThis.foliPdfExtensions = [{
+    name: "acme",
+    nodes: {
+      "acme:mention": { inline: true, attrs: { label: {} }, text: (a) => "@" + a.label },
+      "acme:card": { attrs: { id: {} }, text: (a) => "Card " + a.id },
+    },
+    nodeViews: {
+      "acme:mention": { render: (node, { h }) => h("b", null, "Mention of " + node.attrs.label) },
+      "acme:card": { render: (node, { h }) => h("div", null, h("p", null, "Drawn card " + node.attrs.id)) },
+    },
+  }];`;
+  const printing = await context.newPage();
+  const drawn = await exportPdf(document as never, { page: printing, extensions });
+  const plain = await exportPdf(document as never, { page: printing });
+  await printing.close();
+  const text = words((await read(page, drawn.pdf)).pages[0]?.text ?? "");
+  expect(text).toContain("Ask Mention of Ada");
+  expect(text).toContain("Drawn card c-1");
+  expect(words((await read(page, plain.pdf)).pages[0]?.text ?? "")).not.toContain("Mention of");
+});
+
 test("fields are updated from the pages first; links are links, internal ones too", async ({
   page,
   context,

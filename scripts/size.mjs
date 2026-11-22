@@ -107,15 +107,18 @@ writeFileSync(appEntry, `export { FoliEditor } from "${dist("react")}";\n`);
  * headroom left since 12.3. Raised in 18.2 (113.1 kB, 113.5 allowed): a hint in a header, footer
  * or note, marked in the copies the pages draw (about 0.5 kB). React and FoliEditor with it
  * (162.3 kB, 163.1 allowed): they carry the view, with room for 18.3's `hint` on the ref.
- * React raised by 250 bytes (163.3 allowed) for the rewrite of core's replace, transform and
- * state code as Foli's own: it was 8 bytes under its limit, and the rewrite (smaller minified)
- * gzips about 0.1 kB larger.
+ * React and FoliEditor raised in 19.2 (163.8 kB, 166.0 allowed): the horizontal line button and
+ * the find panel's comments (core's `findInComments`, `replaceInComments`, the list: about
+ * 1.4 kB), with room for Phase 19's picture and table UI.
+ * View raised in 19.3 (113.5 kB, 116.2 allowed): custom nodes and marks drawn on read-only pages
+ * (`customDrawing`, about 0.4 kB), with room for 19.4–19.7 (autofit, crop and rotation, drag and
+ * drop of text, Android input), all in the view.
  */
 const BUNDLES = [
   { name: "@folijs/core", entry: dist("core"), budget: 88_000 },
-  { name: "@folijs/view", entry: dist("view"), budget: 116_250 },
-  { name: "@folijs/react", entry: dist("react"), budget: 167_250 },
-  { name: "FoliEditor only", entry: appEntry, budget: 167_000 },
+  { name: "@folijs/view", entry: dist("view"), budget: 119_000 },
+  { name: "@folijs/react", entry: dist("react"), budget: 170_000 },
+  { name: "FoliEditor only", entry: appEntry, budget: 170_000 },
   { name: "@folijs/docx", entry: dist("docx"), budget: 61_440 },
   { name: "@folijs/pdf", entry: dist("pdf"), budget: 18_800 },
   { name: "@folijs/agent", entry: dist("agent"), budget: 77_500 },

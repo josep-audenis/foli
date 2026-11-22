@@ -123,10 +123,15 @@ checklist in [testing/ime.md](testing/ime.md)):
 
 Custom nodes and marks, plugins and toolbar items ([extensions](guides/extensions.md)).
 
-- Node views, mark views and decorations draw only in the editor (`EditorView`): `renderDocument` and `exportPdf` take no extensions, so they draw a
-  custom node as its `.docx` text or its type in brackets and a custom mark not at all; the same
-  for headers, footers and notes as the pages show them, until one is opened for editing on its
-  page. A custom block in a table cell is kept whole (it does not split between pages); a split
+- Node and mark views draw in the editor and, given the `extensions` (19.3), in `renderDocument`
+  and `exportPdf` (a script setting `globalThis.foliPdfExtensions` in the page) and in headers,
+  footers and notes as the pages show them; without them a custom node is its `.docx` text or its
+  type in brackets and a custom mark is not drawn. Decorations and plugin views are the editor's
+  only. On read-only pages, and in headers, footers and notes, what `render` returned is copied:
+  the copies do not follow later changes to it (a chart drawn afterwards, a canvas's pixels) and
+  `destroy` is not called; a custom block is kept whole unless taller than a page. In `exportPdf`
+  a custom node whose attributes its spec refuses throws inside the page (Node validates without
+  the extensions), and a script that fails prints the document without the views, silently. A custom block in a table cell is kept whole (it does not split between pages); a split
   block node view is drawn once per page (its `render` runs per part, each part's `destroy` when
   dropped). A node view's DOM is never read back: what it changes later is not checked, and
   `h`'s checks cover only what `h` makes. Decorations take body
@@ -259,8 +264,8 @@ Custom nodes and marks, plugins and toolbar items ([extensions](guides/extension
 
 ## Finding and going places
 
-- Find reads the body and the stories, table cells included: not comments, text boxes or other
-  content kept opaque. A match stays inside a paragraph; `^p`-style codes, wildcards and regular
+- Find reads the body and the stories, table cells included; comments apart (`findInComments`, a
+  list in the find panel): not text boxes or other content kept opaque (text boxes are not drawn). A match stays inside a paragraph; `^p`-style codes, wildcards and regular
   expressions are not offered (a pattern could hang the page), nor replacing formatting.
 - Replacing keeps bookmarks and comment anchors found inside the match, where Word loses them; text
   already deleted as a tracked change is refused and reported, where Word adds the replacement
@@ -293,6 +298,10 @@ Custom nodes and marks, plugins and toolbar items ([extensions](guides/extension
 - While tracking, an edit that would delete or insert content Foli keeps verbatim (an opaque
   block) is not made; tables are tracked row by row. Moves are kept and shown from imported files but not
   recorded: moving text records a deletion and an insertion.
+- Your own inserted paragraph, deleted whole while tracking, goes without a trace when another
+  paragraph follows it. As the last paragraph of the document or of a cell it stays, empty and
+  marked as your insertion: rejecting removes it, accepting keeps an empty paragraph the same
+  edits made untracked would not have. (`@folijs/agent`'s `deleteBlock` removes it there itself.)
 - Accepting removes a paragraph whose text and mark are both deleted whole, as Word does; the
   same edits made untracked, one after another, may have kept its properties on the joined
   paragraph. Enter in a paragraph next to a deleted paragraph mark splits that paragraph as it
@@ -344,9 +353,6 @@ Unstable (0.x). Details in the [package README](../packages/agent/README.md).
   reader's limits (64 MB unpacked): a document whose fields hold long instructions can need
   several hundred MB to open and to save (a 385 KB file holding 62 MB of field
   instructions: 700 MB open, 1.34 GB for a save; measured on Windows, Node 25).
-- A paragraph the session inserted and then deleted leaves a tracked paragraph insertion on
-  the paragraph before it: rejecting every change then joins that paragraph with the next
-  (found by the review of #165; not fixed).
 - `updateFields` returns no blocks, and leaves page numbers as they are: they need a page
   layout the session does not have. It leaves a table of contents as it is unless
   `contents: true`; one built that way has its entries' page numbers empty until Word updates
@@ -375,7 +381,7 @@ Unstable (0.x). Details in the [package README](../packages/mcp/README.md) and
   plain JavaScript as QuickJS runs it: no `await` that waits for anything, no timers, no
   imports, no `Intl`. 10 seconds, 64 MB, 5,000 calls to the document, 2,000 paragraphs inserted and a million characters given a run, not
   configurable. It works on one open document, and cannot open or save. A run costs about
-  55 ms before the script starts. Its answer shows 40 changed blocks at most. `doc` has the
+  55 ms before the script starts, not counted in its 10 seconds. Its answer shows 40 changed blocks at most. `doc` has the
   tools' operations and no more: no reading in parts (`blocks()` is the whole body), nothing
   of the editor under it.
 - Documents live in memory: unsaved edits are lost when the server stops, and nothing is saved
