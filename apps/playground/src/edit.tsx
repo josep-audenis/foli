@@ -180,7 +180,8 @@ declare global {
       readonly editor: Editor;
       /** The view, for tests that map DOM points (`posFromDOM`). */
       readonly view: EditorView;
-      load(document: FoliDocument): void;
+      /** `trackChanges`: tracking on, as a `.docx` with `w:trackRevisions` opens. */
+      load(document: FoliDocument, trackChanges?: boolean): void;
       /** Opens a .docx (base64), as the file input does. */
       loadDocx(base64: string): Promise<void>;
       sample: FoliDocument;
@@ -205,7 +206,7 @@ window.foliEdit = {
   get view() {
     return view;
   },
-  load: (document) => load(document),
+  load: (document, trackChanges) => load(document, undefined, trackChanges),
   loadDocx: async (base64) => {
     const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
     const imported = await importDocx(bytes);

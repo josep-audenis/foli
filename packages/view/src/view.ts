@@ -33,6 +33,7 @@ import {
   insertPicture,
   insertText,
   isSafeHref,
+  joinHistory,
   type Node as ModelNode,
   marksAt,
   type NavigationRequest,
@@ -834,6 +835,8 @@ export class EditorView {
     this.listen("copy", this.onCopy);
     this.listen("cut", this.onCut);
     this.listen("paste", this.onPaste);
+    this.listen("dragstart", this.onDragStart);
+    this.listen("dragend", this.onTextDragEnd);
     this.listen("dragover", this.onDragOver);
     this.listen("drop", this.onDrop);
     this.listen("click", this.onClick);
@@ -3955,7 +3958,10 @@ export class EditorView {
     [...(event.dataTransfer?.types ?? [])].includes("Files");
 
   private onDragOver = (event: DragEvent): void => {
-    if (!EditorView.carriesFiles(event)) return;
+    if (!EditorView.carriesFiles(event)) {
+      if (EditorView.carriesText(event)) this.dragTextOver(event);
+      return;
+    }
     // Files dropped here never open in the page (unsaved work would be lost).
     event.preventDefault();
     const images = [...(event.dataTransfer?.items ?? [])].some((i) => i.type.startsWith("image/"));
@@ -3964,7 +3970,10 @@ export class EditorView {
   };
 
   private onDrop = (event: DragEvent): void => {
-    if (!EditorView.carriesFiles(event)) return;
+    if (!EditorView.carriesFiles(event)) {
+      if (EditorView.carriesText(event)) this.dropText(event);
+      return;
+    }
     event.preventDefault();
     const files = this.imageFiles(event.dataTransfer);
     if (!files.length || this.composing) return;
@@ -4601,9 +4610,14 @@ export class EditorView {
   /** Copy writes the model's content (plain text, HTML, Foli JSON), never the browser's DOM. */
   private onCopy = (event: ClipboardEvent): void => {
     this.syncSelection();
-    const { selection, doc } = this.state;
-    if (selection.empty || !event.clipboardData) return;
+    if (this.state.selection.empty || !event.clipboardData) return;
     event.preventDefault();
+    this.writeSelectionData(event.clipboardData);
+  };
+
+  /** The selection as a copy gives it (plain text, HTML, Foli JSON), into `data`. */
+  private writeSelectionData(data: DataTransfer): void {
+    const { selection, doc } = this.state;
     const context = wordContext(this.state) as WordContext;
     // Selected cells are copied as a table of their own (ADR-0006).
     const table = selection instanceof CellSelection ? cellsAsTable(selection) : null;
@@ -4615,10 +4629,107 @@ export class EditorView {
       this.host.ownerDocument,
       { context, ratio: this.lineRatio, portable: this.portableResource(context) },
     );
-    event.clipboardData.setData("text/plain", table ? cellsText(table) : text);
-    event.clipboardData.setData("text/html", html);
-    event.clipboardData.setData(FOLI_MIME, json);
+    data.setData("text/plain", table ? cellsText(table) : text);
+    data.setData("text/html", html);
+    data.setData(FOLI_MIME, json);
+  }
+
+  /** The text being dragged from this view (19.6): its range, while the drag lasts. */
+  private dragged: { from: number; to: number; doc: ModelNode; selection: Selection } | null = null;
+
+  /**
+   * Dragging the selection (the browser starts it on selected text): the drag carries what a
+   * copy would. Selected cells are not dragged (their table cannot be cut from the grid).
+   */
+  private onDragStart = (event: DragEvent): void => {
+    this.syncSelection();
+    const { selection, doc } = this.state;
+    if (!event.dataTransfer || selection.empty || selection instanceof CellSelection) {
+      event.preventDefault();
+      return;
+    }
+    this.writeSelectionData(event.dataTransfer);
+    event.dataTransfer.effectAllowed = this.editable ? "copyMove" : "copy";
+    this.dragged = { from: selection.from, to: selection.to, doc, selection };
   };
+
+  /** A drag of this view's text that ended without a drop here: its selection back. */
+  private onTextDragEnd = (): void => {
+    const dragged = this.dragged;
+    this.dragged = null;
+    if (dragged && this.state.doc === dragged.doc && !this.state.selection.eq(dragged.selection))
+      this.dispatch(this.state.tr.setSelection(dragged.selection));
+  };
+
+  /** Whether a drop copies rather than moves: Ctrl (Windows, Linux) or Option (Apple). */
+  private static copies(event: DragEvent): boolean {
+    return event.ctrlKey || event.altKey;
+  }
+
+  /** What a drag over the document carries that a drop takes: text, HTML or Foli's own. */
+  private static carriesText(event: DragEvent): boolean {
+    const types = [...(event.dataTransfer?.types ?? [])];
+    return types.some((t) => t === "text/plain" || t === "text/html" || t === FOLI_MIME);
+  }
+
+  /** Where a drop of text would go: the caret shown there, the drop's effect said. */
+  private dragTextOver(event: DragEvent): void {
+    event.preventDefault();
+    const data = event.dataTransfer;
+    const pos = this.editable ? this.posAtPoint(event.clientX, event.clientY) : null;
+    if (data)
+      data.dropEffect =
+        pos === null ? "none" : this.dragged && !EditorView.copies(event) ? "move" : "copy";
+    // The drop caret: the selection at the pointer (the dragged range is kept apart).
+    if (pos !== null && !this.composing && this.state.selection.head !== pos)
+      this.dispatch(this.state.tr.setSelection(TextSelection.near(this.state.doc.resolve(pos))));
+  }
+
+  /**
+   * A drop of text: pasted where it lands (as a paste is: Foli's own content, else HTML, else
+   * plain text). Text dragged from here moves unless Ctrl or Option is held: pasted, then
+   * deleted where it was, one undo step (tracked as an insertion and a deletion while
+   * tracking). A drop inside the dragged text changes nothing.
+   */
+  private dropText(event: DragEvent): void {
+    event.preventDefault();
+    const dragged = this.dragged;
+    this.dragged = null;
+    const data = event.dataTransfer;
+    if (!data || !this.editable || this.composing) return;
+    const pos = this.posAtPoint(event.clientX, event.clientY);
+    if (pos === null) return;
+    const move = !!dragged && dragged.doc === this.state.doc && !EditorView.copies(event);
+    if (move && pos >= dragged.from && pos <= dragged.to) {
+      this.dispatch(this.state.tr.setSelection(dragged.selection));
+      return;
+    }
+    this.dispatch(this.state.tr.setSelection(TextSelection.near(this.state.doc.resolve(pos))));
+    if (!move) {
+      this.paste(data);
+      return;
+    }
+    // The dragged range, followed through the paste's transactions.
+    let { from, to } = dragged;
+    const unsubscribe = this.editor.subscribe((_state, transactions) => {
+      for (const tr of transactions) {
+        from = tr.mapping.map(from, 1);
+        to = tr.mapping.map(to, -1);
+      }
+    });
+    let pasted: boolean;
+    try {
+      pasted = this.paste(data, false);
+    } finally {
+      unsubscribe();
+    }
+    if (!pasted || to <= from) return;
+    // What was pasted stays selected, the place it left emptied: one undo step with the paste.
+    const { selection } = this.state;
+    const tr = this.state.tr.delete(from, to).setMeta(joinHistory, true);
+    tr.setSelection(selection.map(tr.doc, tr.mapping));
+    this.dispatch(tr);
+  }
 
   private onCut = (event: ClipboardEvent): void => {
     this.onCopy(event);
