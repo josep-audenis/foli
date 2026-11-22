@@ -91,7 +91,7 @@ The plan's order: crashes and data loss first, then refusals, then losses on exp
    inputs are synthetic and schema-invalid, so they come after real losses.
 
 Then the owner chooses whether the markup-compatibility root (60) and Strict Open XML (71) are
-fixed here or go to the backlog. Rows 8 and 10–14 change what the file holds without changing
+fixed here or go to the backlog (chosen on 2026-11-22: the backlog, both). Rows 8 and 10–14 change what the file holds without changing
 what it shows: the backlog, unless they fall out of the fixes above.
 
 ## Fixes
