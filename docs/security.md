@@ -102,7 +102,7 @@ A script cannot turn tracking off, change the author, or reach a document that i
 has no editor, only `doc`. What it can do is what a patient series of tool calls can: edit
 every block of the open documents, as tracked changes. Known and accepted: while a script
 runs the server answers nothing else: the thread's start (under 0.1 s on an idle machine, 30 s at most), 10 seconds, then the call under way and the
-taking back (10.0 to 10.2 s in all for the worst scripts four reviews found; measured, not proved); QuickJS and the WebAssembly
+taking back (10.0 to 10.2 s after the start for the worst scripts four reviews found; measured, not proved); QuickJS and the WebAssembly
 engine are trusted to hold the script (a flaw in either is a flaw here); fuzzed with scripts
 made of the operations and of the ways a run can end, not with scripts written to break
 QuickJS itself.

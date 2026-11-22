@@ -346,8 +346,9 @@ return 1`,
 
 describe("the clock", { timeout: 60_000 }, () => {
   it("starts when the thread is ready: its start is not the script's time", async () => {
-    // A thread and QuickJS take tens of milliseconds to start, more than this script is given.
-    expect(await run("return host('n', 1).args[0]", { ms: 40 })).toMatchObject({
+    // The prelude is part of the start: one that takes 400 ms, then a script given 200 ms.
+    const slow = `${PRELUDE}\nconst t = Date.now(); while (Date.now() - t < 400) {}`;
+    expect(await runScript("return 1", slow, echo, { ...SANDBOX_LIMITS, ms: 200 })).toMatchObject({
       ok: true,
       value: "1",
     });
