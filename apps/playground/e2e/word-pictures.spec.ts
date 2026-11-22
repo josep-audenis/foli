@@ -193,6 +193,51 @@ test("a click selects a picture; dragging its handle resizes it, the aspect rati
   expect((await firstPicture(page)).width).toBe(after.width);
 });
 
+test("a finger on the handle resizes the picture too, the page not scrolling (19.5c)", async ({
+  page,
+}) => {
+  await open(page, "07-picture-report.docx");
+  const before = await firstPicture(page);
+  await pictures(page).first().click();
+  const handle = editor(page).locator("[data-foli-resize]");
+  await expect(handle).toHaveCount(1);
+  expect(await handle.evaluate((e) => getComputedStyle(e).touchAction)).toBe("none");
+  const box = await handle.boundingBox();
+  if (!box) throw new Error("no handle");
+  const x = box.x + box.width / 2;
+  const y = box.y + box.height / 2;
+  // A touch: pointer events with pointerType "touch" (Playwright's touchscreen only taps).
+  await page.evaluate(
+    ({ x, y }) => {
+      const at = (cx: number) => ({
+        bubbles: true,
+        cancelable: true,
+        pointerType: "touch",
+        isPrimary: true,
+        pointerId: 7,
+        clientX: cx,
+        clientY: y,
+        button: 0,
+        buttons: 1,
+      });
+      const handle = document.querySelector("[data-foli-resize]") as Element;
+      handle.dispatchEvent(new PointerEvent("pointerdown", at(x)));
+      for (let i = 1; i <= 5; i++)
+        document.dispatchEvent(new PointerEvent("pointermove", at(x - i * 20)));
+      // A second finger elsewhere neither moves nor ends it.
+      const other = { ...at(x + 300), pointerId: 8, isPrimary: false };
+      document.dispatchEvent(new PointerEvent("pointermove", other));
+      document.dispatchEvent(new PointerEvent("pointerup", { ...other, buttons: 0 }));
+      document.dispatchEvent(new PointerEvent("pointerup", { ...at(x - 100), buttons: 0 }));
+    },
+    { x, y },
+  );
+  await expect.poll(async () => (await firstPicture(page)).width).toBeLessThan(before.width);
+  const after = await firstPicture(page);
+  expect(Math.abs(before.width - after.width - 100 * 9525)).toBeLessThan(3 * 9525);
+  expect(Math.abs(after.height / after.width - before.height / before.width)).toBeLessThan(0.01);
+});
+
 test("image files are inserted through the upload hook at their natural size", async ({ page }) => {
   await open(page, "07-picture-report.docx");
   const inserted = await page.evaluate(async () => {

@@ -666,8 +666,20 @@ export declare class EditorView {
      * starts a resize that keeps its aspect ratio (`setPictureSize` on release, Escape cancels).
      */
     private pictureMouseDown;
+    /** A long press while resizing brings no menu (it would cancel the touch). */
+    private onResizeMenu;
+    /** When a touch or pen last pressed the resize handle (its emulated mouse events follow). */
+    private touchedResize;
+    /**
+     * A touch or pen on a selected picture's resize handle starts a resize, as a mouse does (the
+     * page does not scroll under it: `touch-action: none`); the mouse events the browser emulates
+     * afterwards are then not a second press.
+     */
+    private onPointerDown;
     /** The size (layout px) a resize gives at the pointer: the larger move, the ratio kept. */
     private resizedTo;
+    /** Whether `event` is the resizing pointer's (another finger, or a mouse beside a pen, is not). */
+    private resizing;
     private onResizeMove;
     private onResizeEnd;
     private onResizeKey;

@@ -2811,7 +2811,7 @@ agent's review.
   borders, so every page has the same columns and the flow places what it measured. The corpus's
   tables are all fixed, so none of them changes; e2e in three browsers on 06's table made
   autofit. Not Word's algorithm (percent and `auto` preferred widths, the page's room).)
-- [ ] 19.5 Pictures: rotation (`rot`, read, drawn, 90° commands) and cropping (`a:srcRect`, read,
+- [x] 19.5 Pictures: rotation (`rot`, read, drawn, 90° commands) and cropping (`a:srcRect`, read,
   drawn, a crop mode), written back to `.docx`; resizing with touch (pointer events). In three
   PRs:
   - [x] 19.5a Schema 6: the picture's `rotation` and `crop` attributes, read from `.docx`, drawn
@@ -2825,8 +2825,13 @@ agent's review.
     step (the dialog's Apply makes one per thing changed), refused while tracking; the picture dialog's Rotation field with Rotate left and right
     90°, and Crop (%) by side. Not built: crop handles on the page, kept for 19.5c with the
     pointer events touch needs.)
-  - [ ] 19.5c Crop handles on the page, and touch (pointer events) for them and the resize
-    handle.
+  - [x] 19.5c Crop handles on the page, and touch (pointer events) for them and the resize
+    handle. (Done: touch. The resize handle's moves and release are pointer events, so a mouse, a
+    pen and a finger resize alike; a touch or pen press on the handle starts it (`touch-action:
+    none`, a 24 px handle on coarse pointers), and the mouse events the browser emulates after it
+    are not a second press. e2e in three browsers with synthetic touch pointer events. Not built:
+    crop handles on the page, moved to After 1.0: the dialog crops by keyboard and pointer, and
+    handles need a crop mode of their own.)
 - [ ] 19.6 Drag and drop of text: move inside the document (one undo step; delete and insert when
   tracking), copy with Ctrl, a drop from outside as a paste; the drop caret shown.
 - [ ] 19.7 Android: Backspace at a list paragraph's start removes its number; a paragraph split
@@ -2882,8 +2887,11 @@ supplies, so a server without a browser cannot make PDFs).
 - Dragging text does nothing; on Android, Backspace at a list paragraph's start may join it into
   the paragraph before; some Android keyboards insert paragraphs without the events the editor
   needs.
-- Pictures: no cropping, rotation or touch resizing; resizing is refused while tracking.
+- Pictures: no crop handles on the page (the dialog crops); resizing is refused while tracking.
 - Find does not look in text boxes (comments: 19.2).
+
+**Pictures:** crop handles on the page (a crop mode, as Word's), left from 19.5c; a rotation
+handle; a rotated picture's room in its line (Word's `effectExtent`).
 
 **Hint: show a place for a few seconds** (wanted by the owner; built in Phase 18, 1.3.0). An app, or an agent
 citing what it changed, points at a range, a block or a bookmark; the editor scrolls there and
