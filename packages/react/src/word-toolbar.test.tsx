@@ -510,6 +510,49 @@ describe("FoliToolbar's picture dialog", () => {
     });
   });
 
+  it("rotates by 90° steps and crops in percent, the image keeping its scale (19.5)", () => {
+    const editor = withPicture();
+    act(() =>
+      editor.dispatch(editor.state.tr.setSelection(NodeSelection.create(editor.state.doc, 2))),
+    );
+    const before = editor.state.doc.nodeAt(2)?.attrs ?? {};
+    fireEvent.click(button());
+    const dialog = screen.getByRole("dialog", { name: "Edit picture" });
+    const rotation = screen.getByLabelText("Rotation (degrees)") as HTMLInputElement;
+    expect(rotation.value).toBe("0");
+    fireEvent.click(screen.getByRole("button", { name: "Rotate left 90°" }));
+    expect(rotation.value).toBe("270");
+    fireEvent.click(screen.getByRole("button", { name: "Rotate right 90°" }));
+    fireEvent.click(screen.getByRole("button", { name: "Rotate right 90°" }));
+    expect(rotation.value).toBe("90");
+    fireEvent.change(screen.getByLabelText("Left"), { target: { value: "60" } });
+    fireEvent.change(screen.getByLabelText("Right"), { target: { value: "40" } });
+    fireEvent.submit(dialog.querySelector("form") as HTMLFormElement);
+    // Nothing would be left: the dialog says so and stays.
+    expect(screen.getByRole("alert").textContent).toContain("Enter what to crop in percent");
+    // The size fields follow a crop typed in (here a quarter of the width, once valid).
+    expect(document.activeElement).toBe(screen.getByLabelText("Left"));
+    fireEvent.change(screen.getByLabelText("Right"), { target: { value: "15" } });
+    expect((screen.getByLabelText("Width (px)") as HTMLInputElement).value).toBe(
+      String(Math.round((Number(before.width) / 9525) * 0.25)),
+    );
+    fireEvent.submit(dialog.querySelector("form") as HTMLFormElement);
+    expect(screen.queryByRole("dialog")).toBe(null);
+    const after = editor.state.doc.nodeAt(2)?.attrs ?? {};
+    expect(after.rotation).toBe(5_400_000);
+    expect(after.crop).toEqual({ left: 60_000, right: 15_000 });
+    // A quarter of the width shows: the picture is a quarter as wide, as tall as before.
+    expect(after.width).toBe(Math.round(Number(before.width) * 0.25));
+    expect(after.height).toBe(before.height);
+    // Opened again and applied untouched: nothing changes.
+    const depth = undoDepth(editor.state);
+    fireEvent.click(button());
+    fireEvent.submit(
+      screen.getByRole("dialog", { name: "Edit picture" }).querySelector("form") as HTMLFormElement,
+    );
+    expect(undoDepth(editor.state)).toBe(depth);
+  });
+
   it("asks for alt text unless the picture is decorative", () => {
     const editor = withPicture();
     act(() =>

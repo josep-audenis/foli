@@ -297,6 +297,29 @@
   outline-offset: 1px;
 }
 
+/* A picture's crop sides (19.5): one row of four short fields. */
+.foli-picture-crop {
+  display: flex;
+  flex: 1 1 100%;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 4px 8px 8px;
+  border: 1px solid var(--foli-border-color);
+  border-radius: 4px;
+}
+
+.foli-picture-crop span {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.foli-link-dialog .foli-picture-crop input {
+  flex: 0 0 5em;
+}
+
 /* Find and replace, bookmarks (FoliNavigation): over the pages, not moving them. */
 .foli-navigation {
   display: contents;

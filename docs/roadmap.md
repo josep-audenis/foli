@@ -2819,9 +2819,14 @@ agent's review.
     rotation) and written back into the file's own `a:xfrm` and `a:srcRect`. Documents are now
     saved with the lowest schema their content needs (ADR-0008's rule, first used here:
     `schemaVersionOf`), so only one holding a rotated or cropped picture says 6. A v6 fixture.
-  - [ ] 19.5b Commands and UI: rotate by 90°, a crop mode with handles, set from the picture
-    dialog too.
-  - [ ] 19.5c Touch resizing (pointer events) for the resize handle and the crop handles.
+  - [x] 19.5b Commands and UI: rotate by 90°, a crop mode with handles, set from the picture
+    dialog too. (Done: core's `setPictureRotation` (modulo a turn) and `setPictureCrop` (the
+    image keeps its scale, so the picture's size follows, as Word's crop does), each its own undo
+    step (the dialog's Apply makes one per thing changed), refused while tracking; the picture dialog's Rotation field with Rotate left and right
+    90°, and Crop (%) by side. Not built: crop handles on the page, kept for 19.5c with the
+    pointer events touch needs.)
+  - [ ] 19.5c Crop handles on the page, and touch (pointer events) for them and the resize
+    handle.
 - [ ] 19.6 Drag and drop of text: move inside the document (one undo step; delete and insert when
   tracking), copy with Ctrl, a drop from outside as a paste; the drop caret shown.
 - [ ] 19.7 Android: Backspace at a list paragraph's start removes its number; a paragraph split

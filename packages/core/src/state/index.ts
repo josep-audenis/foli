@@ -183,8 +183,11 @@ export {
 export {
   insertPicture,
   type NewPicture,
+  type PictureCrop,
   selectedPicture,
   setPictureAlt,
+  setPictureCrop,
+  setPictureRotation,
   setPictureSize,
 } from "./pictures.js";
 export {
