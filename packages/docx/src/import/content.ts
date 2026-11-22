@@ -597,7 +597,14 @@ function run(
       case "t":
       case "delText":
         // A line end in a `w:t` is white space to Word, not a break (`w:br`, `w:cr`).
-        text(spaced(el).replace(/\n/g, " "));
+        // A tab character in it is a tab, as Word shows it and as the export writes it.
+        spaced(el)
+          .replace(/\n/g, " ")
+          .split("\t")
+          .forEach((piece, i) => {
+            if (i) out.push(node("tab", marks));
+            text(piece);
+          });
         break;
       case "tab":
         out.push(node("tab", marks));
@@ -690,6 +697,11 @@ function run(
       }
       case "instrText":
       case "delInstrText": {
+        // Elements in it (a `w:br`, as docx4j's br2-3 test writes): not a code string, kept.
+        if (elements(el).length) {
+          opaqueRun(el);
+          break;
+        }
         const bag = attributeBag(el, ["xml:space"], context);
         const attrs: Record<string, unknown> = { text: spaced(el) };
         if (bag) attrs.attributes = bag;

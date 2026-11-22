@@ -96,7 +96,14 @@ what it shows: the backlog, unless they fall out of the fixes above.
 
 ## Fixes
 
-| Row | Fix                                                                                   | Files before |                           After |
-| --- | ------------------------------------------------------------------------------------- | -----------: | ------------------------------: |
-| 1   | A run property written twice read as one mark, reported (`import/properties.ts`)      |            3 | 0 (all three export equivalent) |
-| 2   | A reference to a note the package lacks kept verbatim on import (`import/content.ts`) |            4 |  0 (all four export equivalent) |
+| Row  | Fix                                                                                                                                                                                                               | Files before |                           After |
+| ---- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -----------: | ------------------------------: |
+| 1    | A run property written twice read as one mark, reported (`import/properties.ts`)                                                                                                                                  |            3 | 0 (all three export equivalent) |
+| 2    | A reference to a note the package lacks kept verbatim on import (`import/content.ts`)                                                                                                                             |            4 |  0 (all four export equivalent) |
+| 3, 4 | A `w:instrText` holding elements (a `w:br`) kept verbatim; a tab character in `w:t` read as a tab, as the export writes it (`import/content.ts`)                                                                  |     2 and 28 |           1 (`tdf108806`) and 0 |
+| 4    | Not a fix: of the 28, 22 differed only in kept XML (`ext`, `gridExt`) by white space between elements or an empty container (`<w:tblPr></w:tblPr>`); the comparison now reads kept XML that way (`keptCanonical`) |           22 |                               0 |
+| 9    | Row 1's fix: the three docx4j `sm-*` files read their doubled property as one                                                                                                                                     |            4 |                  1 (`Tika-792`) |
+
+After these (a run of the whole set, 2026-11-22): 3 259 of 3 445 import, export and read back
+(3 203, 93.0%, with no difference counted), 186 refused, no crash, no second import that
+differs.
