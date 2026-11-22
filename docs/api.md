@@ -110,7 +110,9 @@ no changing bookmarks).
   on, Shift+Enter back, F3 and Shift+F3 too, with the panel closed as well. A match in a header,
   footer or note opens it where it is, and a match in the body leaves it. Match case, Whole words.
   Replace shows a match first and replaces it on the second press; Replace all is one undo step and
-  says what it left and why. Go to takes a page, a bookmark or a heading. Escape closes it and
+  says what it left and why. Comments are searched apart (`.foli-find-comments`): the panel lists
+  the comments holding the query, each a button that selects the text its thread is on, and in
+  Replace a Replace in comments button. Go to takes a page, a bookmark or a heading. Escape closes it and
   gives the focus back.
 - **Bookmarks** (`.foli-bookmarks`): Ctrl+Shift+F5. Add at the selection (a name in use moves that
   bookmark, as in Word), Go to, Rename, Delete; Hidden bookmarks lists Word's own.
@@ -794,13 +796,15 @@ value or shown text (a combo box takes any text, a drop-down list only its items
 
 Find and replace (11.11), by the rules Word was seen to follow (ADR-0007):
 
-| Function                                     | Does                                                                                                                 |
-| -------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| `findAll(editorOrDocument, query, options?)` | `FindMatch[]` (`story`, null for the body; `from`, `to`; `text`), the body then each story. `matchCase`, `wholeWord` |
-| `replace(editor, match, text, options?)`     | One match, the caret after it                                                                                        |
-| `replaceAll(editor, query, text, options?)`  | Every match, in every story: one undo step, tracked when tracking is on                                              |
-| `nextMatch(editor, matches, backward?)`      | The match after (before) the selection, around the end                                                               |
-| `findInText(text, query, options?)`          | The same matching over a plain string: `[from, to]` pairs                                                            |
+| Function                                            | Does                                                                                                                                                          |
+| --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `findAll(editorOrDocument, query, options?)`        | `FindMatch[]` (`story`, null for the body; `from`, `to`; `text`), the body then each story. `matchCase`, `wholeWord`                                          |
+| `replace(editor, match, text, options?)`            | One match, the caret after it                                                                                                                                 |
+| `replaceAll(editor, query, text, options?)`         | Every match, in every story: one undo step, tracked when tracking is on                                                                                       |
+| `nextMatch(editor, matches, backward?)`             | The match after (before) the selection, around the end                                                                                                        |
+| `findInText(text, query, options?)`                 | The same matching over a plain string: `[from, to]` pairs                                                                                                     |
+| `findInComments(editorOrDocument, query, options?)` | `CommentMatch[]` (`comment`, its id; `from`, `to` in its content; `text`): every comment and reply, not in `findAll` (Word's "Main document" leaves them out) |
+| `replaceInComments(editor, query, text, options?)`  | Every match in the comments, one undo step, never tracked: `{ replaced, refused }` (field codes, custom nodes, deleted text stay)                             |
 
 What is found is what shows: a field's code only while codes are shown (its result then not), text
 deleted as a tracked change only in the `markup` review view, no control's placeholder, no hidden

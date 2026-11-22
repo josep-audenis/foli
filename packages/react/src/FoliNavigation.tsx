@@ -1,5 +1,7 @@
 import {
   type BookmarkInfo,
+  type CommentMatch,
+  commentAnchors,
   deleteBookmark,
   documentOutline,
   type Editor,
@@ -7,6 +9,7 @@ import {
   type FindMatch,
   fieldCodesShown,
   findAll,
+  findInComments,
   goTo,
   insertBookmark,
   listBookmarks,
@@ -18,6 +21,7 @@ import {
   renameBookmark,
   replace,
   replaceAll,
+  replaceInComments,
   type Transaction,
   trackState,
 } from "@folijs/core";
@@ -111,6 +115,7 @@ function searchKey(state: EditorState): readonly unknown[] {
     state.doc,
     wordContext(state)?.envelope.stories,
     wordContext(state)?.envelope.controls,
+    wordContext(state)?.envelope.comments,
     trackState(state)?.view,
     fieldCodesShown(state),
   ];
@@ -304,6 +309,12 @@ function FindPanel({
   const [message, setMessage] = useState("");
   const [version, setVersion] = useState(0);
   const options = useMemo(() => ({ matchCase, wholeWord }), [matchCase, wholeWord]);
+  // Comments are searched apart, as Word's "Main document" leaves them out (19.2).
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `version` stands for the document
+  const inComments = useMemo(
+    () => findInComments(body, query, options),
+    [body, query, options, version],
+  );
 
   const [focusing, setFocusing] = useState(0);
   // biome-ignore lint/correctness/useExhaustiveDependencies: each request focuses the panel again
@@ -420,6 +431,29 @@ function FindPanel({
     const fresh = findAll(body, query, options);
     setFound({ matches: fresh, current: nextMatch(body, fresh), scroll: false });
     setMessage(reportText(report));
+  };
+
+  /** Selects the text comment `id` (or the comment it replies to) is on. */
+  const toComment = (id: number) => {
+    const byId = new Map((wordContext(body.state)?.envelope.comments ?? []).map((c) => [c.id, c]));
+    let root = byId.get(id);
+    const seen = new Set<number>();
+    while (root?.parent !== undefined && byId.has(root.parent) && !seen.has(root.id)) {
+      seen.add(root.id);
+      root = byId.get(root.parent);
+    }
+    const a = root && commentAnchors(body.state.doc).get(root.id);
+    const from = a?.start ?? a?.reference;
+    const to = a?.end ?? a?.reference;
+    if (from === undefined || to === undefined || !goTo(body, { story: null, from, to }))
+      setMessage("This comment is on no text the pages show.");
+    else setMessage("");
+  };
+  const allInComments = () => {
+    const { replaced, refused } = replaceInComments(body, query, replacement, options);
+    setMessage(
+      `Replaced ${replaced} in comments.${refused ? ` ${refused} left as they are.` : ""}`,
+    );
   };
 
   const onKeyDown = (event: KeyboardEvent) => {
@@ -560,10 +594,59 @@ function FindPanel({
             <p role="status" className="foli-find-status">
               {status}
             </p>
+            {query && inComments.length > 0 && (
+              <CommentMatches
+                body={body}
+                matches={inComments}
+                onGo={toComment}
+                onReplace={mode === "replace" ? allInComments : null}
+              />
+            )}
           </form>
         )}
       </div>
     </div>
+  );
+}
+
+/** The comments a search found text in: one button each, going to the text it is on. */
+function CommentMatches({
+  body,
+  matches,
+  onGo,
+  onReplace,
+}: {
+  body: Editor;
+  matches: readonly CommentMatch[];
+  onGo(id: number): void;
+  onReplace: (() => void) | null;
+}) {
+  const comments = wordContext(body.state)?.envelope.comments ?? [];
+  const ids = [...new Set(matches.map((m) => m.comment))];
+  return (
+    <section className="foli-find-comments" aria-label="Found in comments">
+      <p>{`${matches.length} in comments`}</p>
+      <ul>
+        {ids.map((id) => {
+          const comment = comments.find((c) => c.id === id);
+          const text = (comment?.content ?? [])
+            .map((b) => (b.content ?? []).map((n) => n.text ?? "").join(""))
+            .join(" ");
+          return (
+            <li key={id}>
+              <button type="button" onClick={() => onGo(id)}>
+                {`${comment?.author ?? ""}: ${text.length > 60 ? `${text.slice(0, 59)}…` : text}`}
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+      {onReplace && (
+        <button type="button" onClick={onReplace}>
+          Replace in comments
+        </button>
+      )}
+    </section>
   );
 }
 

@@ -259,8 +259,8 @@ Custom nodes and marks, plugins and toolbar items ([extensions](guides/extension
 
 ## Finding and going places
 
-- Find reads the body and the stories, table cells included: not comments, text boxes or other
-  content kept opaque. A match stays inside a paragraph; `^p`-style codes, wildcards and regular
+- Find reads the body and the stories, table cells included; comments apart (`findInComments`, a
+  list in the find panel): not text boxes or other content kept opaque (text boxes are not drawn). A match stays inside a paragraph; `^p`-style codes, wildcards and regular
   expressions are not offered (a pattern could hang the page), nor replacing formatting.
 - Replacing keeps bookmarks and comment anchors found inside the match, where Word loses them; text
   already deleted as a tracked change is refused and reported, where Word adds the replacement
