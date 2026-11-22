@@ -789,7 +789,7 @@ export declare class EditorView {
     private onDragStart;
     /** A drag of this view's text that ended without a drop here: its selection back. */
     private onTextDragEnd;
-    /** Whether a drop copies rather than moves: Ctrl (Windows, Linux) or Option (Apple). */
+    /** Whether a drop copies rather than moves: Ctrl (Windows, Linux) or Option (Apple), as Word. */
     private static copies;
     /** What a drag over the document carries that a drop takes: text, HTML or Foli's own. */
     private static carriesText;

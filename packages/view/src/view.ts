@@ -4644,10 +4644,20 @@ export class EditorView {
   private onDragStart = (event: DragEvent): void => {
     this.syncSelection();
     const { selection, doc } = this.state;
-    if (!event.dataTransfer || selection.empty || selection instanceof CellSelection) {
+    // Selected cells are not dragged (their table cannot be cut from the grid).
+    if (selection instanceof CellSelection) {
       event.preventDefault();
       return;
     }
+    // Not the selected text (a link or an image the browser drags): the browser's own drag.
+    const range = this.host.ownerDocument.getSelection();
+    const target = event.target as Node | null;
+    const fromSelection =
+      !!target &&
+      !!range?.rangeCount &&
+      !range.isCollapsed &&
+      range.getRangeAt(0).intersectsNode(target);
+    if (!event.dataTransfer || selection.empty || !fromSelection) return;
     this.writeSelectionData(event.dataTransfer);
     event.dataTransfer.effectAllowed = this.editable ? "copyMove" : "copy";
     this.dragged = { from: selection.from, to: selection.to, doc, selection };
@@ -4661,9 +4671,9 @@ export class EditorView {
       this.dispatch(this.state.tr.setSelection(dragged.selection));
   };
 
-  /** Whether a drop copies rather than moves: Ctrl (Windows, Linux) or Option (Apple). */
+  /** Whether a drop copies rather than moves: Ctrl (Windows, Linux) or Option (Apple), as Word. */
   private static copies(event: DragEvent): boolean {
-    return event.ctrlKey || event.altKey;
+    return IS_MAC ? event.altKey : event.ctrlKey;
   }
 
   /** What a drag over the document carries that a drop takes: text, HTML or Foli's own. */
@@ -4676,7 +4686,8 @@ export class EditorView {
   private dragTextOver(event: DragEvent): void {
     event.preventDefault();
     const data = event.dataTransfer;
-    const pos = this.editable ? this.posAtPoint(event.clientX, event.clientY) : null;
+    // Nothing goes into the body while a header, footer or note is open on its page.
+    const pos = this.editable && !this.mount ? this.posAtPoint(event.clientX, event.clientY) : null;
     if (data)
       data.dropEffect =
         pos === null ? "none" : this.dragged && !EditorView.copies(event) ? "move" : "copy";
@@ -4694,11 +4705,14 @@ export class EditorView {
   private dropText(event: DragEvent): void {
     event.preventDefault();
     const dragged = this.dragged;
-    this.dragged = null;
     const data = event.dataTransfer;
-    if (!data || !this.editable || this.composing) return;
-    const pos = this.posAtPoint(event.clientX, event.clientY);
+    const pos =
+      data && this.editable && !this.mount && !this.composing
+        ? this.posAtPoint(event.clientX, event.clientY)
+        : null;
+    // Refused here: `dragend` puts the dragged selection back.
     if (pos === null) return;
+    this.dragged = null;
     const move = !!dragged && dragged.doc === this.state.doc && !EditorView.copies(event);
     if (move && pos >= dragged.from && pos <= dragged.to) {
       this.dispatch(this.state.tr.setSelection(dragged.selection));
@@ -4706,24 +4720,32 @@ export class EditorView {
     }
     this.dispatch(this.state.tr.setSelection(TextSelection.near(this.state.doc.resolve(pos))));
     if (!move) {
-      this.paste(data);
+      this.paste(data as DataTransfer);
       return;
     }
     // The dragged range, followed through the paste's transactions.
     let { from, to } = dragged;
+    const before = this.state.doc;
     const unsubscribe = this.editor.subscribe((_state, transactions) => {
       for (const tr of transactions) {
         from = tr.mapping.map(from, 1);
         to = tr.mapping.map(to, -1);
       }
     });
-    let pasted: boolean;
     try {
-      pasted = this.paste(data, false);
+      this.paste(data as DataTransfer, false);
     } finally {
       unsubscribe();
     }
-    if (!pasted || to <= from) return;
+    // Deleted only once it is where it was dropped: a target that refused it (a locked control,
+    // a change that could not be tracked) leaves the text where it was.
+    if (this.state.doc === before) {
+      this.dispatch(
+        this.state.tr.setSelection(dragged.selection.map(this.state.doc, this.state.tr.mapping)),
+      );
+      return;
+    }
+    if (to <= from) return;
     // What was pasted stays selected, the place it left emptied: one undo step with the paste.
     const { selection } = this.state;
     const tr = this.state.tr.delete(from, to).setMeta(joinHistory, true);
