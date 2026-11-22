@@ -30,6 +30,7 @@ place that says what is in progress; check it before starting work.
 | 16 Code mode              | ✅ Done                  | —               | Merged in #164–#176; `@folijs/mcp` 0.2.0 and `@folijs/agent` 0.2.0 on npm (2026-11-21), `run` behind `--code`; four security reviews; not tried in a client of its own |
 | 17 Toolbar for developers | ✅ Done                  | —               | Merged in #167–#173; 1.2.0 on npm (2026-11-21), released with Phase 16 (#176)                                                                                          |
 | 18 Hint                   | In review                | `phase-18/hint` | 18.1–18.3 built in #182 (e2e in three browsers); the release of 1.3.0 and agent 0.3.0 waits for the owner                                                              |
+| 19 Editing gaps           | In progress              | `phase-19/editing-gaps` | Planned 2026-11-22; 19.1–19.8 to build                                                                                                                                 |
 
 Status values: `Ready` (dependencies met, nobody on it) · `In progress` · `In review` (PR open) ·
 `✅ Done` (merged, acceptance criteria met) · `Blocked by …`.
@@ -2723,6 +2724,72 @@ review.
   what is built; budgets met, view and React raised with their reasons; four changesets (core,
   view, React minor; agent minor). Not done: the release, which waits for the owner.)
 
+## Phase 19 — Editing gaps · M → 1.4.0
+
+The "gaps users will meet" of the After 1.0 backlog, picked up by the owner on 2026-11-22: what
+a person editing a document hits first. Planned 2026-11-22; being built: see the tasks.
+
+Not in this phase: a color picker in the built-in menus by default (the `custom` field exists
+since Phase 17, an app turns it on), tracking a picture's size change (resizing stays refused
+while tracking), replacing inside text boxes or other opaque content, custom container nodes,
+checks on a real Android device (deferred as the other manual checks, ADR-0003).
+
+**Starts from (1.3.0):** Word's horizontal rule is a paragraph's bottom border, kept and drawn,
+with no button. `setTextColor` takes any `#rrggbb`. `findAll` reads the body and the stories
+(`core/src/state/find.ts`), not comments (`CommentJSON` in the document) nor opaque content.
+`renderDocument` and `exportPdf` take no extensions: node views are only `EditorView`'s. Autofit
+tables keep Word's saved grid (`view/src/word/table.ts`, a `shortcut:`); a column's width is set
+only by dragging its border. A picture keeps its DrawingML, and export writes back its size
+(`a:xfrm`); rotation (`rot`) and cropping (`a:srcRect`) are neither read nor drawn; resizing
+takes a mouse. The view handles only dropped image files (`onDrop`); dragging text does nothing.
+On Android, Backspace at a list paragraph's start may join it into the one before, and some
+keyboards split paragraphs without the `beforeinput` the editor needs (the edit is discarded with
+a warning).
+
+**Acceptance:** a toolbar button inserts a horizontal rule as Word writes one (a paragraph's
+bottom border), tracked when tracking is on, and it round-trips through `.docx`; find (and
+`findAll`) also reports matches in comments and in text boxes, each match saying where it is,
+going to one opens its comment or selects its text box, and replace skips what it cannot edit
+and reports it; `renderDocument` and `exportPdf` take `extensions` and draw custom nodes and
+marks with the editor's views; autofit tables are fitted to their content within Word's rules
+(a fixed table keeps its grid), and a column's width can be set from the keyboard (a table
+properties field, undoable); a picture can be rotated (90° steps and Word's own rotation shown)
+and cropped (Word's crop shown, a crop mode with handles), both kept through `.docx`, and
+resized by touch; text can be dragged: moved within the document (a tracked move as delete and
+insert when tracking), copied with Ctrl, dropped from another application as a paste; on
+Android, Backspace at a list paragraph's start removes its number, and a paragraph split without
+`beforeinput` is recovered instead of discarded (tested with the event sequences of Gboard and
+Samsung Keyboard as recorded in public bug reports, not on a device); e2e in Chromium, Firefox
+and WebKit with axe for each new piece of UI; limitations, `api.md`, `architecture.md`,
+`keyboard.md` updated; size budgets met or raised with a reason; changesets; 1.4.0 published
+with the owner's approval.
+
+### Tasks
+
+Each task is a PR on `phase-19/editing-gaps`, the build green after each, merged after an
+agent's review.
+
+- [x] Claim phase, branch `phase-19/editing-gaps`
+- [ ] 19.1 Horizontal rule: a command and a toolbar button inserting Word's rule (an empty
+  paragraph with a bottom border, as Word's AutoFormat makes it), tracked, round-tripped.
+- [ ] 19.2 Find in comments and text boxes: matches in comment bodies (going there opens the
+  comment) and in text boxes kept opaque (going there selects the box); replace edits comments,
+  skips text boxes and reports them.
+- [ ] 19.3 Extensions in `renderDocument` and `exportPdf`: the same `extensions` array, node and
+  mark views drawn on read-only pages; headers, footers and notes too.
+- [ ] 19.4 Tables: a column width field in the table properties (keyboard, undoable); autofit
+  tables fitted to their content (Word's rules: preferred widths, minimum content width, the
+  page's width), a fixed table untouched; the `shortcut:` in `table.ts` removed.
+- [ ] 19.5 Pictures: rotation (`rot`, read, drawn, 90° commands) and cropping (`a:srcRect`, read,
+  drawn, a crop mode), written back to `.docx`; resizing with touch (pointer events).
+- [ ] 19.6 Drag and drop of text: move inside the document (one undo step; delete and insert when
+  tracking), copy with Ctrl, a drop from outside as a paste; the drop caret shown.
+- [ ] 19.7 Android: Backspace at a list paragraph's start removes its number; a paragraph split
+  without `beforeinput` recovered from the DOM mutation's text, not discarded. Tests with
+  recorded event sequences; device checks deferred (ADR-0003).
+- [ ] 19.8 Docs, size budgets, changesets; then 1.4.0, published with the owner's approval (the
+  Release workflow).
+
 ## After 1.0
 
 Not a phase yet: the backlog written down on 2026-11-21, from [limitations.md](limitations.md),
@@ -2765,7 +2832,7 @@ fonts measured. WebAssembly is useful only as a portable sandbox (QuickJS, in
 writer that does not need Chromium (`exportPdf` prints through a headless Chromium page the app
 supplies, so a server without a browser cannot make PDFs).
 
-**Gaps users will meet** ([limitations.md](limitations.md)):
+**Gaps users will meet** ([limitations.md](limitations.md); planned as Phase 19):
 
 - Dragging text does nothing; on Android, Backspace at a list paragraph's start may join it into
   the paragraph before; some Android keyboards insert paragraphs without the events the editor
