@@ -334,6 +334,15 @@ export function paragraph(p: XmlElement, context: ContentContext): NodeJSON {
   const pPr = child(p, "pPr");
   if (context.story && pPr && child(pPr, "sectPr")) return opaqueOf(p, context);
   const attrs: Record<string, unknown> = paragraphProperties(pPr, context, true);
+  // A second `w:pPr` (schema-invalid; docx4j's `repeated` tests): read into the first, in order,
+  // property by property, as Word 365 resaves it. Its elements the model does not hold are lost.
+  for (const more of elements(p)
+    .filter((e) => isW(e, "pPr"))
+    .slice(1)) {
+    context.report.unmodeled(more.name, "a second w:pPr, read into the first");
+    const { ext: _, ...read } = paragraphProperties(more, context, true);
+    mergeInto(attrs, read);
+  }
   const bag = attributeBag(p, [], context);
   if (bag) setParagraph(attrs, "attributes", bag, p.name, context);
   const content: NodeJSON[] = [];
@@ -343,6 +352,25 @@ export function paragraph(p: XmlElement, context: ContentContext): NodeJSON {
     ...(Object.keys(attrs).length ? { attrs } : {}),
     ...(content.length ? { content } : {}),
   };
+}
+
+/**
+ * `from`'s values into `into`: objects merged key by key, marks (the paragraph mark's
+ * `markFormat`) by type, anything else replaced.
+ */
+function mergeInto(into: Record<string, unknown>, from: Record<string, unknown>): void {
+  const isObject = (v: unknown): v is Record<string, unknown> =>
+    typeof v === "object" && v !== null && !Array.isArray(v);
+  for (const [key, value] of Object.entries(from)) {
+    const before = into[key];
+    if (key === "markFormat" && Array.isArray(before) && Array.isArray(value)) {
+      const types = new Set(value.map((m: MarkJSON) => m.type));
+      into[key] = [...before.filter((m: MarkJSON) => !types.has(m.type)), ...value];
+    } else if (isObject(before) && isObject(value)) {
+      into[key] = { ...before };
+      mergeInto(into[key] as Record<string, unknown>, value);
+    } else into[key] = value;
+  }
 }
 
 /** `marks` with `m` added; undefined when `m` is missing or one of its type is already there. */

@@ -216,6 +216,21 @@ describe("importing the Word corpus", () => {
 });
 
 describe("importing WordprocessingML", () => {
+  it("reads a second w:pPr into the first, as Word resaves it (docx4j's repeated tests)", async () => {
+    const { blocks, report } = await blocksOf(
+      '<w:p><w:pPr><w:ind w:left="720"/><w:rPr><w:b/></w:rPr></w:pPr><w:pPr><w:ind w:right="360"/><w:jc w:val="center"/><w:rPr><w:i/></w:rPr></w:pPr><w:r><w:t>a</w:t></w:r></w:p>',
+    );
+    expect(blocks[0]?.attrs).toMatchObject({
+      indent: { left: 720, right: 360 },
+      justification: "center",
+    });
+    expect((blocks[0]?.attrs?.markFormat as { type: string }[]).map((m) => m.type).sort()).toEqual([
+      "bold",
+      "italic",
+    ]);
+    expect(report.unmodeled.join("\n")).toMatch(/a second w:pPr/);
+  });
+
   it("reads a tab character in w:t as a tab (LibreOffice's xml_space)", async () => {
     const { blocks } = await blocksOf("<w:p><w:r><w:t>a	b</w:t></w:r></w:p>");
     expect(blocks[0]?.content?.map((n) => n.text ?? n.type)).toEqual(["a", "tab", "b"]);
