@@ -279,3 +279,35 @@ describe("hint (18.2)", () => {
     expect(hint(editor, { bookmark: "Intro" })).toBe(false);
   });
 });
+
+describe("one's own inserted paragraph, deleted whole while tracking", () => {
+  it("goes without a trace: the paragraph after it keeps its own mark", async () => {
+    const { rejectAllChanges, trackedChanges } = await import("./state/index.js");
+    const editor = createEditor({
+      document: documentOf([p("One"), p("Two"), p("Three")]),
+      author: "Me",
+      trackChanges: true,
+    });
+    const original = JSON.stringify(editor.getDocument().content);
+    const { schema } = editor.state;
+    // A paragraph inserted after "One", as a node, the way an agent inserts it.
+    editor.dispatch(
+      editor.state.tr.insert(
+        5,
+        (schema.nodes.paragraph as never as { create: (a: null, c: unknown) => never }).create(
+          null,
+          schema.text("New"),
+        ),
+      ),
+    );
+    expect(paragraphs(editor)).toEqual(["One", "New", "Two", "Three"]);
+    const node = editor.state.doc.nodeAt(5);
+    editor.dispatch(editor.state.tr.delete(5, 5 + (node?.nodeSize ?? 0)));
+    expect(paragraphs(editor)).toEqual(["One", "Two", "Three"]);
+    expect(trackedChanges(editor.state.doc)).toEqual([]);
+    expect(JSON.stringify(editor.getDocument().content)).toBe(original);
+    // Rejecting what is left joins nothing.
+    editor.run(rejectAllChanges());
+    expect(paragraphs(editor)).toEqual(["One", "Two", "Three"]);
+  });
+});

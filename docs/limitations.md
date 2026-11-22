@@ -344,9 +344,6 @@ Unstable (0.x). Details in the [package README](../packages/agent/README.md).
   reader's limits (64 MB unpacked): a document whose fields hold long instructions can need
   several hundred MB to open and to save (a 385 KB file holding 62 MB of field
   instructions: 700 MB open, 1.34 GB for a save; measured on Windows, Node 25).
-- A paragraph the session inserted and then deleted leaves a tracked paragraph insertion on
-  the paragraph before it: rejecting every change then joins that paragraph with the next
-  (found by the review of #165; not fixed).
 - `updateFields` returns no blocks, and leaves page numbers as they are: they need a page
   layout the session does not have. It leaves a table of contents as it is unless
   `contents: true`; one built that way has its entries' page numbers empty until Word updates
