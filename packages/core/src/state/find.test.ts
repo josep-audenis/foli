@@ -548,6 +548,14 @@ describe("comments (19.2)", () => {
     expect(editor.getDocument().comments).toEqual(comments);
   });
 
+  it("leaves a match over a field result's edge, as replaceAll does", () => {
+    const editor = open([p("x")], {
+      comments: [{ id: 1, author: "A", content: [p("big ", ...field("DATE", "cat"), "s here")] }],
+    });
+    expect(replaceInComments(editor, "cats", "dogs")).toEqual({ replaced: 0, refused: 1 });
+    expect(replaceInComments(editor, "cat", "dog")).toEqual({ replaced: 1, refused: 0 });
+  });
+
   it("does nothing when nothing matches", () => {
     const editor = withComments();
     const before = editor.state;

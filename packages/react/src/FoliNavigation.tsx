@@ -304,6 +304,7 @@ function FindPanel({
   const mode = readOnly && asked === "replace" ? "find" : asked;
   const id = useId();
   const input = useRef<HTMLInputElement>(null);
+  const replaceInput = useRef<HTMLInputElement>(null);
   const [replacement, setReplacement] = useState("");
   const [found, setFound] = useState<Found>({ matches: [], current: null, scroll: false });
   const [message, setMessage] = useState("");
@@ -454,6 +455,8 @@ function FindPanel({
     setMessage(
       `Replaced ${replaced} in comments.${refused ? ` ${refused} left as they are.` : ""}`,
     );
+    // The list goes once nothing is left to find: the focus stays in the panel.
+    replaceInput.current?.focus();
   };
 
   const onKeyDown = (event: KeyboardEvent) => {
@@ -494,6 +497,9 @@ function FindPanel({
               found.current?.story ? `, in a ${storyName(body, found.current)}` : ""
             }`
           : "No results");
+  // Comments are counted in the status too: it is what a screen reader hears.
+  const statusText =
+    query && !message && inComments.length ? `${status}, ${inComments.length} in comments` : status;
   const tabs: [PanelMode, string][] = [
     ["find", "Find"],
     ...(readOnly ? [] : ([["replace", "Replace"]] as [PanelMode, string][])),
@@ -552,6 +558,7 @@ function FindPanel({
               <>
                 <label htmlFor={`${id}-with`}>Replace with</label>
                 <input
+                  ref={replaceInput}
                   id={`${id}-with`}
                   type="text"
                   value={replacement}
@@ -592,7 +599,7 @@ function FindPanel({
               </>
             )}
             <p role="status" className="foli-find-status">
-              {status}
+              {statusText}
             </p>
             {query && inComments.length > 0 && (
               <CommentMatches
@@ -625,7 +632,7 @@ function CommentMatches({
   const ids = [...new Set(matches.map((m) => m.comment))];
   return (
     <section className="foli-find-comments" aria-label="Found in comments">
-      <p>{`${matches.length} in comments`}</p>
+      <p aria-hidden="true">{`${matches.length} in comments`}</p>
       <ul>
         {ids.map((id) => {
           const comment = comments.find((c) => c.id === id);

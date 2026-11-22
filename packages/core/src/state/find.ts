@@ -534,8 +534,8 @@ export function findInComments(
 /**
  * Replaces every match of `query` in the document's comments, with the rules of `replaceAll`,
  * as one undo step; comments are not tracked changes (Word records none in them). A match on a
- * field's code, a custom node or text deleted as a tracked change stays, and is counted in
- * `refused`.
+ * field's code, a custom node, text deleted as a tracked change or a match over a field result's
+ * edge stays, and is counted in `refused`.
  */
 export function replaceInComments(
   editor: Editor,
@@ -555,9 +555,13 @@ export function replaceInComments(
     const hits: Hit[] = [];
     hitsIn(linesOf(tree, scope, false), null, needle, hits);
     const done = hits.filter((hit) => {
+      const field = fieldAround(tree, hit.parts[0]?.from ?? 0);
+      // As `refusalOf`: a code, deleted text, or a match over a field result's edge.
       const kept = hit.parts.some(
         (part) =>
-          part.code || tree.nodeAt(part.from)?.marks.some((m) => m.type.name === "deletion"),
+          part.code ||
+          tree.nodeAt(part.from)?.marks.some((m) => m.type.name === "deletion") ||
+          fieldAround(tree, part.from) !== field,
       );
       if (kept) report.refused++;
       return !kept;

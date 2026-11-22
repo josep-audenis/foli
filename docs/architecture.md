@@ -239,6 +239,13 @@ when typing and undo is one step. A floor on revision ids keeps the trees' new i
 checked first: code, deleted text, a field's or control's edge, then, inside a control, a dry run
 through the filter. Bookmark changes go through `editTrees` untracked. A custom node adds its
 `text(attrs)` as one piece standing for one position, as a field code does.
+Comments (19.2) are searched apart: `findInComments` reads each comment's content as a tree of the
+editor's schema (kept per comment object in a `WeakMap`; `setComments` makes new objects, so an
+edited comment is read again) through the same lines, and its matches name the comment, not a
+story, so `findAll`'s matches stay positions the view and `goTo` can use. `replaceInComments`
+edits those trees with a `Transform` and sets the comments in one untracked body transaction (Word
+records no tracked changes in comments), refusing what `refusalOf` refuses except controls, which
+comments do not hold.
 
 Custom nodes and marks (12.3, ADR-0008, `v3/extensions.ts`): `schemaWith(extensions)` builds the
 Word schema plus the extensions' types (checked: namespaced, not taken twice, leaves), cached for
@@ -1309,7 +1316,7 @@ since 1.0.0):
   (page number, date, cross-reference dialog, table of contents, update, show codes), Navigate,
   Notes (insert, go between note and reference, a Note options dialog) and Controls (insert each
   kind, a properties dialog). `FoliNavigation` (11.11, inside `FoliEditor`) is the find, replace
-  and go to panel, the bookmarks dialog and the outline, and takes Word's keys (Ctrl+F, Ctrl+H,
+  and go to panel (which lists the comments a search finds, 19.2), the bookmarks dialog and the outline, and takes Word's keys (Ctrl+F, Ctrl+H,
   Ctrl+G, F3, Shift+F3, Ctrl+Shift+F5) while the focus is in the document or its panels. Each
   menu and dialog is keyboard-usable and axe-clean in three engines.
 

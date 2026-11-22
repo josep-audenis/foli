@@ -1458,8 +1458,8 @@ export declare function findInComments(target: Editor | EditorDocument, query: s
 /**
  * Replaces every match of `query` in the document's comments, with the rules of `replaceAll`,
  * as one undo step; comments are not tracked changes (Word records none in them). A match on a
- * field's code, a custom node or text deleted as a tracked change stays, and is counted in
- * `refused`.
+ * field's code, a custom node, text deleted as a tracked change or a match over a field result's
+ * edge stays, and is counted in `refused`.
  */
 export declare function replaceInComments(editor: Editor, query: string, text: string, options?: FindOptions): {
     replaced: number;

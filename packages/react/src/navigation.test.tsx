@@ -279,6 +279,9 @@ describe("find and replace panel", () => {
       "two dogs",
     ]);
     expect(screen.getByRole("status").textContent).toBe("Replaced 2 in comments.");
+    expect(document.activeElement).toBe(screen.getByLabelText("Replace with"));
+    type("Find what", "dog");
+    expect(screen.getByRole("status").textContent).toBe("No results, 2 in comments");
   });
 
   it("says what it left", () => {
