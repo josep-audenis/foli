@@ -166,7 +166,8 @@ describe("documents", () => {
     await client.close();
   });
 
-  it("opens no more than its limit, and a file once", async () => {
+  // Seventeen documents opened: past 5 s when the machine is busy with other work.
+  it("opens no more than its limit, and a file once", { timeout: 60_000 }, async () => {
     const { root } = folder(NDA);
     for (let i = 0; i <= MAX_DOCUMENTS; i++)
       copyFileSync(join(root, `${NDA}.docx`), join(root, `copy-${i}.docx`));

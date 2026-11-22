@@ -281,10 +281,9 @@ Custom nodes and marks, plugins and toolbar items ([extensions](guides/extension
   one lighter colour for 0.4 s, not a smooth fade. In a header, footer or note that is not open
   it marks the drawn copies by their text, so a page number drawn in the same paragraph with
   another length than the story's own shifts what follows it; a change to that story ends the
-  hint. A point shows its whole paragraph. In a story, a vertically merged cell's paragraphs,
-  a paragraph joined to the next in the final review view, deleted text and field codes shown
-  make the copy's paragraphs or characters differ from the story's: the mark is then off by
-  them.
+  hint. A point shows its whole paragraph. In a story, field codes shown and content Foli keeps
+  verbatim with text in it are drawn but not counted: a mark after them in the same paragraph
+  is off by them. (Merged cells and the final and simple review views are counted as drawn.)
 - A match in a header no page shows (an unused first-page or even-page variant) is found and
   replaced but cannot be gone to. A read-only view does not open stories.
 - Go to takes a page's place in the document, not the number printed on it. Renaming a bookmark

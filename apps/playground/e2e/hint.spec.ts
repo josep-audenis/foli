@@ -214,3 +214,81 @@ test("in a header with a tab and in a note with its number, the mark is on the s
   expect(await hint(page, { story: "footnote:1", from: 5, to: 8 }, 3000)).toBe(true);
   expect(await marks(page)).toEqual(["cat"]);
 });
+
+test("in a header's copy: the final view's joined paragraph and deleted text, a merged cell", async ({
+  page,
+}) => {
+  const doc = sample() as { stories: Json };
+  const change = { id: 90, author: "Someone", date: "2026-01-01T00:00:00Z" };
+  const cell = (content: Json[], attrs?: Json) => ({
+    type: "tableCell",
+    ...(attrs ? { attrs } : {}),
+    content,
+  });
+  doc.stories = {
+    h1: {
+      kind: "header",
+      content: {
+        type: "doc",
+        content: [
+          // Its mark deleted: in the final view it joins the next paragraph.
+          { type: "paragraph", attrs: { revision: { deletion: change } }, content: [text("Gone")] },
+          {
+            type: "paragraph",
+            content: [
+              text("Left "),
+              { type: "text", text: "removed ", marks: [{ type: "deletion", attrs: change }] },
+              text("cat right"),
+            ],
+          },
+          {
+            type: "table",
+            content: [
+              {
+                type: "tableRow",
+                content: [cell([paragraph("Top")], { vMerge: "restart" }), cell([paragraph("A")])],
+              },
+              {
+                type: "tableRow",
+                content: [
+                  cell([paragraph("covered")], { vMerge: "continue" }),
+                  cell([paragraph("dog")]),
+                ],
+              },
+            ],
+          },
+          paragraph("end"),
+        ],
+      },
+    },
+  };
+  await page.goto("/edit.html");
+  await page.waitForFunction(() => !!window.foliEdit);
+  await page.evaluate((d) => window.foliEdit.load(d as never), doc);
+  await page.evaluate(() => window.foliEdit.editor.commands.setReviewView("final"));
+  // The header drawn again for the final view: its two first paragraphs as one.
+  await page.waitForFunction(() =>
+    [...document.querySelectorAll(".foli-region-content")].some((r) =>
+      /GoneLeft cat right/.test(r.textContent ?? ""),
+    ),
+  );
+  // Where "cat" and "dog" are in the story's own positions.
+  const at = (needle: string) =>
+    page.evaluate((n) => {
+      let found: [number, number] | null = null;
+      window.foliEdit.editor.story("h1")?.state.doc.descendants((node, pos) => {
+        if (!found && node.isTextblock && node.textContent.includes(n)) {
+          const i = pos + 1 + node.textContent.indexOf(n);
+          found = [i, i + n.length];
+        }
+        return !found;
+      });
+      return found as unknown as [number, number];
+    }, needle);
+  const [catFrom, catTo] = await at("cat");
+  expect(await hint(page, { story: "h1", from: catFrom, to: catTo }, 3000)).toBe(true);
+  expect(new Set(await marks(page))).toEqual(new Set(["cat"]));
+  const [dogFrom, dogTo] = await at("dog");
+  expect(await hint(page, { story: "h1", from: dogFrom, to: dogTo }, 3000)).toBe(true);
+  expect(new Set(await marks(page))).toEqual(new Set(["dog"]));
+});
