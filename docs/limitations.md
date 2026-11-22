@@ -258,7 +258,8 @@ Custom nodes and marks, plugins and toolbar items ([extensions](guides/extension
   image's scale as Word does; each change is its own undo step), not by dragging on the page (no
   crop handles); a crop or rotation only in the drawing's XML (see above) cannot be changed there
   until the file is imported again; cropping a floating picture's left or top keeps its anchor
-  offset, so what shows moves; no touch resizing;
+  offset, so what shows moves. A picture is resized by its handle with a mouse, a pen or a finger
+  (19.5c; touch tested with synthetic pointer events, not on a device);
   resizing is refused while tracking (Foli does not record a size change yet). Alt text changes
   are not tracked.
 - A picture copied into another document brings its image (12.11): its own `data:` or web URL,
