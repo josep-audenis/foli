@@ -11,6 +11,8 @@ const PORT = 5176;
 export default defineConfig({
   testDir: "apps/playground/word",
   testMatch: "**/*.word.ts",
+  // The corpus run's renderer pass has a config of its own (`pnpm corpus:render`).
+  testIgnore: "**/corpus.word.ts",
   workers: 1,
   reporter: [["list"]],
   projects: [

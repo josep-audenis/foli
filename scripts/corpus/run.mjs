@@ -109,7 +109,7 @@ export async function runAll(items, { threads = 4, limits = LIMITS, onResult = (
             await fresh();
           }
         }
-        const line = { sha256: item.sha256, names: item.names, ...result };
+        const line = { sha256: item.sha256, names: item.names, path: item.path, ...result };
         results.push(line);
         onResult(line);
       }

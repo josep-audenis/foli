@@ -31,7 +31,7 @@ place that says what is in progress; check it before starting work.
 | 17 Toolbar for developers | ✅ Done                  | —                     | Merged in #167–#173; 1.2.0 on npm (2026-11-21), released with Phase 16 (#176)                                                                                                                 |
 | 18 Hint                   | ✅ Done                  | —                     | Merged in #180–#184; 1.3.0 and `@folijs/agent` 0.3.0 on npm (2026-11-22)                                                                                                                      |
 | 19 Editing gaps           | ✅ Done                  | —                     | Merged in #187–#202; 1.4.0 (schema 6), `@folijs/agent` 0.3.1 and `@folijs/mcp` 0.2.2 on npm (2026-11-22); text boxes in find and crop handles left for later; Android and touch emulated only |
-| 20 Corpus run             | In progress              | `phase-20/corpus-run` | 20.1 merged (#206); 20.2, the runner, in review                                                                                                                                               |
+| 20 Corpus run             | In progress              | `phase-20/corpus-run` | 20.1–20.2 merged (#206, #207); 20.3, the renderer pass, in review                                                                                                                             |
 
 Status values: `Ready` (dependencies met, nobody on it) · `In progress` · `In review` (PR open) ·
 `✅ Done` (merged, acceptance criteria met) · `Blocked by …`.
@@ -2937,9 +2937,14 @@ review.
   the nine: all import, export and read back; differences already show (runs merged on export,
   `w:lastRenderedPageBreak` dropped), for 20.4 to class. Four hand-made broken packages (random
   bytes, a truncated file, an empty one, a zip that is not a .docx) are refused, none crashes.)
-- [ ] 20.3 The renderer pass: the files the Node pass imported, laid out by `renderDocument` in
+- [x] 20.3 The renderer pass: the files the Node pass imported, laid out by `renderDocument` in
   Chromium (Playwright), pages and time recorded, an exception or a page that overflows its
-  sheet counted.
+  sheet counted. (Done: `pnpm corpus:render`
+  (`playwright.corpus.config.ts`, the Word page's setup; `corpus:pages` leaves it out): each
+  file the latest `corpus:run` imported, through the Word page's `render` (`renderDocument`,
+  markup view); pages, time, page errors and pages whose content overflows their sheet, as
+  `<run>.render.jsonl` beside the run; 60 s a file, a hung or crashed tab replaced, a fresh page
+  every 200 files. The nine: all laid out, no error, no overflow.)
 - [ ] 20.4 The first run and the report: the whole set run, the results classed, `docs/corpus-
   report.md` written; the classes ranked, each with how many files it touches and an example
   element (no text). The owner picks with this ranking what 20.5 fixes.
