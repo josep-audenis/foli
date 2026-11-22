@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync } from "node:fs";
 import type { NodeJSON } from "@folijs/core";
 import { describe, expect, it } from "vitest";
-import { importDocx } from "../index.js";
+import { exportDocx, importDocx, readPackage } from "../index.js";
 import { docx } from "../testing/package.js";
 import type { XmlElement } from "../xml.js";
 
@@ -216,6 +216,20 @@ describe("importing the Word corpus", () => {
 });
 
 describe("importing WordprocessingML", () => {
+  it("reads a tab character in w:t as a tab (LibreOffice's xml_space)", async () => {
+    const { blocks } = await blocksOf("<w:p><w:r><w:t>a	b</w:t></w:r></w:p>");
+    expect(blocks[0]?.content?.map((n) => n.text ?? n.type)).toEqual(["a", "tab", "b"]);
+  });
+
+  it("keeps verbatim a field code holding elements (docx4j's br2-3)", async () => {
+    const instr = '<w:instrText xml:space="preserve"> <w:br/> A </w:instrText>';
+    const result = await blocksOf(`<w:p><w:r>${instr}</w:r></w:p>`);
+    expect(JSON.stringify(result.blocks)).not.toContain('"fieldCode"');
+    expect(result.report.opaque["w:instrText"]).toBe(1);
+    const out = await readPackage(await exportDocx(result.document, result.package));
+    expect(out.text(out.mainDocument)).toContain(instr);
+  });
+
   it("reads a run property written twice as one mark (LibreOffice's tdf92335)", async () => {
     const { blocks, report } = await blocksOf(
       `<w:p><w:r><w:rPr><w:rFonts w:ascii="Symbol" w:hAnsi="Symbol"/><w:color w:val="FF0000"/><w:rFonts w:cs="OpenSymbol" w:hAnsi="Wingdings"/><w:color w:val="00FF00"/></w:rPr><w:t>a</w:t></w:r></w:p>`,

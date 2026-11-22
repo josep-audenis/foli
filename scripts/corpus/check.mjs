@@ -142,7 +142,11 @@ export function census(source, parseXml, { paraIds = false } = {}) {
           (a) => a.local === "space" && a.ns === XML && a.value === "preserve",
         );
         const raw = child.children.map((c) => c.text ?? "").join("");
-        const value = preserve ? raw : raw.replace(/^[ \t\r\n]+|[ \t\r\n]+$/g, ""); // XML spaces only, not NBSP
+        // XML spaces only, not NBSP; a line end within is a space to Word.
+        const value = (preserve ? raw : raw.replace(/^[ \t\r\n]+|[ \t\r\n]+$/g, "")).replace(
+          /\r?\n/g,
+          " ",
+        );
         // Which element holds it: a field code or deleted text becoming text shows. An empty
         // one shows nothing.
         if (value) text += `\u0005${child.local}:${value}`;
@@ -321,6 +325,31 @@ function paragraphChanges(a, b) {
 const textLength = (node) =>
   (node.text?.length ?? 0) + (node.content ?? []).reduce((n, child) => n + textLength(child), 0);
 
+/**
+ * A document's JSON with its kept XML (`ext`, `gridExt`) as Word reads it: white space between
+ * elements and empty containers (`<w:tblPr></w:tblPr>`, the export's own) say nothing.
+ */
+export function keptCanonical(value) {
+  if (Array.isArray(value)) return value.map(keptCanonical);
+  if (typeof value !== "object" || value === null) return value;
+  const out = {};
+  for (const [key, v] of Object.entries(value)) {
+    if ((key === "ext" || key === "gridExt") && typeof v === "string") {
+      // Pretty-printing holds a line end; a space in a text box's `w:t` does not.
+      let xml = v.replace(/>[ \t]*\r?\n\s*</g, "><");
+      for (let last; last !== xml; ) {
+        last = xml;
+        xml = xml.replace(/<([\w:]+)><\/\1>/g, "");
+      }
+      if (xml) out[key] = xml;
+    } else out[key] = keptCanonical(v);
+  }
+  // Attributes left empty once their kept XML went: as if never there.
+  if (out.attrs && typeof out.attrs === "object" && !Object.keys(out.attrs).length)
+    delete out.attrs;
+  return out;
+}
+
 /** The first key path where two JSON values differ (keys and indexes only, never values). */
 export function firstDifference(a, b, path = "") {
   if (a === b) return null;
@@ -406,8 +435,8 @@ export async function checkFile(bytes) {
   try {
     const again = await timed("reimport", () => importDocx(exported));
     const difference = firstDifference(
-      JSON.parse(JSON.stringify(document)),
-      JSON.parse(JSON.stringify(again.document)),
+      keptCanonical(JSON.parse(JSON.stringify(document))),
+      keptCanonical(JSON.parse(JSON.stringify(again.document))),
     );
     result.reimport = difference ? { differs: difference } : "same";
   } catch (error) {

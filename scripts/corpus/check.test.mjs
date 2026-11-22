@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { parseXml } from "../../packages/docx/src/xml.ts";
-import { compareXml, firstDifference } from "./check.mjs";
+import { compareXml, firstDifference, keptCanonical } from "./check.mjs";
 import { runAll, summarize } from "./run.mjs";
 
 const W = 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"';
@@ -53,6 +53,10 @@ describe("the corpus run's comparison (20.2)", () => {
     // Spaces Word keeps lost, and spaces Word drops anyway.
     expect(eq(p(r('<w:t xml:space="preserve">a </w:t>')), p(r("<w:t>a </w:t>")))).toBe("content");
     expect(eq(p(r("<w:t> a </w:t>")), p(r("<w:t>a</w:t>")))).toBe("equivalent");
+    // A line end within the text is a space to Word (LibreOffice's tdf108806).
+    expect(
+      eq(p(r('<w:t xml:space="preserve">a\nb</w:t>')), p(r('<w:t xml:space="preserve">a b</w:t>'))),
+    ).toBe("equivalent");
     // A no-break space is text, not XML space: Word keeps it.
     expect(eq(p(r("<w:t>a </w:t>")), p(r("<w:t>a</w:t>")))).toBe("content");
     // A run moved into the next paragraph.
@@ -85,6 +89,15 @@ describe("the corpus run's comparison (20.2)", () => {
   it("gives the first differing key path, without values", () => {
     expect(firstDifference({ a: [1, { b: "x" }] }, { a: [1, { b: "y" }] })).toBe("/a/1/b");
     expect(firstDifference({ a: 1 }, { a: 1 })).toBe(null);
+    // Kept XML: white space between elements and empty containers say nothing.
+    const kept = (attrs) => keptCanonical({ type: "table", attrs });
+    expect(kept({ ext: "<w:pPr>\n  <w:jc/>\n  <w:rPr></w:rPr></w:pPr>" })).toEqual(
+      kept({ ext: "<w:pPr><w:jc/></w:pPr>" }),
+    );
+    expect(kept({ ext: "<w:tblPr></w:tblPr>", gridExt: "<w:tblGrid></w:tblGrid>" })).toEqual({
+      type: "table",
+    });
+    expect(kept({ ext: "<w:pPr><w:jc/></w:pPr>" })).not.toEqual(kept({ ext: "<w:pPr></w:pPr>" }));
   });
 
   it("keeps files that kill their worker from stopping the run, each tried twice", async () => {
