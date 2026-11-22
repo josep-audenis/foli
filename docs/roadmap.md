@@ -2353,7 +2353,7 @@ review.
   real-client step: `@folijs/mcp` 0.1.0 and `@folijs/agent` 0.1.2 on npm (#162, the Release
   workflow). After it, `npx -y @folijs/mcp@0.1.0 --root <folder>` was started from npm
   outside the repository by the SDK's client: 14 tools, a document opened, edited and saved.
-  Still open: a model in a client of its own, Claude Code's or Claude Desktop's.)
+  A model in a client of its own: done 2026-11-22, see "Agent editing" under After 1.0.)
 
 ## Phase 15 — Toolbar customization · S → 1.1.0
 
@@ -2884,11 +2884,16 @@ reduced motion respected (no fade, no smooth scroll). A requirement if pages are
 page before scrolling. Today every page is in the DOM, so a far page is reached. (An editor
 compared before 1.0 failed exactly there: pages not yet rendered could not be gone to.)
 
-**Agent editing:** the library is built and released (Phase 13, `@folijs/agent` 0.1.0). After
-it: an MCP server over it as its own package (`@folijs/mcp`, Phase 14, 0.1.0), then a
-sandboxed `run` tool inside that server (code mode, Phase 16, mcp 0.2.0). The hint
-above (Phase 18) is independent and is what lets an agent show what it changed. Explored:
-[explorations/agent-editing.md](explorations/agent-editing.md).
+**Agent editing:** built and released: the library (Phase 13, `@folijs/agent`), the MCP server
+(Phase 14, `@folijs/mcp`), code mode (Phase 16) and the hint (Phase 18, 1.3.0). Explored:
+[explorations/agent-editing.md](explorations/agent-editing.md). A model in a real client, checked
+2026-11-22: Claude Code started the published `@folijs/mcp` 0.2.1 (`npx -y @folijs/mcp --root .
+--code`); the model, through its own tools, opened the corpus services agreement (already
+redlined in Word by two authors), raised the 2027 support fees with one `run` (12 cells) and a
+comment, and saved: 24 tracked changes and the comment by `claude-code`, the client's name,
+beside Word's; rejecting them gives the original text; Word 16 opens it (31 revisions, 5
+comments). Left, not built on purpose: headers, footers and notes through the tools, tables
+inserted, accepting or rejecting changes (the person's part), a network transport.
 
 **Optional, later:** real-time collaboration (steps and mapping enable a central-authority
 protocol; a CRDT binding evaluated separately; steps have no JSON form yet), headless

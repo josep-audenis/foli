@@ -286,10 +286,9 @@ Custom nodes and marks, plugins and toolbar items ([extensions](guides/extension
   one lighter colour for 0.4 s, not a smooth fade. In a header, footer or note that is not open
   it marks the drawn copies by their text, so a page number drawn in the same paragraph with
   another length than the story's own shifts what follows it; a change to that story ends the
-  hint. A point shows its whole paragraph. In a story, a vertically merged cell's paragraphs,
-  a paragraph joined to the next in the final review view, deleted text and field codes shown
-  make the copy's paragraphs or characters differ from the story's: the mark is then off by
-  them.
+  hint. A point shows its whole paragraph. In a story, field codes shown and content Foli keeps
+  verbatim with text in it are drawn but not counted: a mark after them in the same paragraph
+  is off by them. (Merged cells and the final and simple review views are counted as drawn.)
 - A match in a header no page shows (an unused first-page or even-page variant) is found and
   replaced but cannot be gone to. A read-only view does not open stories.
 - Go to takes a page's place in the document, not the number printed on it. Renaming a bookmark
@@ -303,10 +302,10 @@ Custom nodes and marks, plugins and toolbar items ([extensions](guides/extension
 - While tracking, an edit that would delete or insert content Foli keeps verbatim (an opaque
   block) is not made; tables are tracked row by row. Moves are kept and shown from imported files but not
   recorded: moving text records a deletion and an insertion.
-- Your own inserted paragraph, deleted whole while tracking, goes without a trace when another
-  paragraph follows it. As the last paragraph of the document or of a cell it stays, empty and
-  marked as your insertion: rejecting removes it, accepting keeps an empty paragraph the same
-  edits made untracked would not have. (`@folijs/agent`'s `deleteBlock` removes it there itself.)
+- Your own inserted paragraph, deleted whole while tracking, goes without a trace, at the end of
+  the document or of a cell too, except as the last after a table (a table cannot end the
+  document or a cell) or when it holds someone else's text: it stays then, and accepting keeps
+  an empty paragraph the same edits made untracked would not have.
 - Accepting removes a paragraph whose text and mark are both deleted whole, as Word does; the
   same edits made untracked, one after another, may have kept its properties on the joined
   paragraph. Enter in a paragraph next to a deleted paragraph mark splits that paragraph as it

@@ -347,6 +347,16 @@ function rebuild(
     date: (mark.attrs.date as string | null) ?? date,
   });
 
+  /** Whether all a paragraph holds is `author`'s own insertion (or no text at all). */
+  const ownContent = (node: Node): boolean => {
+    let own = true;
+    node.forEach((child) => {
+      if (MARKERS.has(child.type.name)) return;
+      if (insertion.isInSet(child.marks)?.attrs.author !== author) own = false;
+    });
+    return own;
+  };
+
   /** Records `from..to` (current positions) as deleted; returns where the kept content ends. */
   const deleteRange = (from: number, to: number, inserting: boolean): { start: At; end: At } => {
     const doc = out.doc;
@@ -378,6 +388,27 @@ function rebuild(
         const crossed =
           (from < end && to > end) ||
           (from <= pos && to >= end && (inserting || !!doc.resolve(end).nodeAfter));
+        // One's own paragraph, last of the document or of a cell, deleted whole: its mark cannot
+        // join a paragraph after it, so it goes with the paragraph before it, as if never there.
+        // Several of one's own, the last of them last: from where the first starts (a group of
+        // own paragraphs joined for real, none of whose content stays).
+        const first = group !== null && !groupLive && from <= group ? group : pos;
+        if (
+          (group === null || first === group) &&
+          !inserting &&
+          from <= pos &&
+          to >= end &&
+          !doc.resolve(end).nodeAfter &&
+          doc.resolve(first).nodeBefore?.isTextblock &&
+          !revision?.deletion &&
+          revision?.insertion?.author === author &&
+          !node.attrs.section &&
+          ownContent(node)
+        ) {
+          real.push([first, end]);
+          group = null;
+          return false;
+        }
         if (
           crossed &&
           !revision?.deletion &&

@@ -2025,20 +2025,44 @@ export class EditorView {
       // Each paragraph of the story it covers, by its index and its text's characters.
       const tree = wordContext(this.state)?.stories.get(story)?.doc;
       const spans: { block: number; from: number; to: number }[] = [];
+      // What the copy draws, as `renderBlocks` draws it: no cell a merge covers; outside the
+      // markup view no deleted text, and a paragraph whose mark is deleted joined to the next.
+      const hidden = this.review !== "markup";
       let block = 0;
-      tree?.descendants((node, pos) => {
+      /** The text of paragraphs joined into the one drawn next: its characters come after it. */
+      let carry = 0;
+      tree?.descendants((node, pos, parent, index) => {
+        if (node.type.name === "tableCell" && node.attrs.vMerge === "continue") return false;
         if (!node.isTextblock) return true;
         const start = pos + 1;
         const end = start + node.content.size;
-        if (end >= from && start <= to) {
-          const text = (a: number) =>
-            // A tab is drawn as one; numbers and other leaves are skipped on both sides.
-            tree.textBetween(start, Math.max(start, Math.min(a, end)), "", (leaf) =>
-              leaf.type.name === "tab" ? "	" : "",
-            ).length;
-          spans.push({ block, from: text(from), to: text(to) });
+        /** The characters drawn before position `a`: text, and a tab as one. */
+        const shown = (a: number) => {
+          let n = 0;
+          node.forEach((child, offset) => {
+            const at = start + offset;
+            if (at >= a) return;
+            if (hidden && child.marks.some((m) => m.type.name === "deletion")) return;
+            if (child.isText) n += Math.min(child.nodeSize, a - at);
+            else if (child.type.name === "tab") n += 1;
+          });
+          return n;
+        };
+        if (end >= from && start <= to)
+          spans.push({ block, from: carry + shown(from), to: carry + shown(to) });
+        const revision = node.attrs.revision as { deletion?: unknown } | null;
+        const joins =
+          hidden &&
+          node.type.name === "paragraph" &&
+          !!revision?.deletion &&
+          // Only the story's own paragraphs: a cell's are drawn apart, joined or not.
+          parent === tree &&
+          parent.maybeChild(index + 1)?.type.name === "paragraph";
+        if (joins) carry += shown(end);
+        else {
+          block++;
+          carry = 0;
         }
-        block++;
         return false;
       });
       for (const copy of this.storyCopies(story, true)) ranges.push(...rangesInCopy(copy, spans));
