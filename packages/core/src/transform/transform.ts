@@ -117,7 +117,7 @@ export class Transform {
    * the mark get a step, and marks it excludes are removed first, so every step inverts exactly.
    */
   addMark(from: number, to: number, mark: Mark): this {
-    const removals = new MarkRuns();
+    const [removals, removeRun] = markRuns();
     const additions: { from: number; to: number }[] = [];
     this.doc.nodesBetween(from, to, (node, pos, parent) => {
       if (!node.isInline || !parent?.type.allowsMarkType(mark.type)) return;
@@ -127,7 +127,7 @@ export class Transform {
       const start = Math.max(pos, from);
       const end = Math.min(pos + node.nodeSize, to);
       // Marks the new one excludes go first, so that the add step's inverse is exact.
-      removals.add(
+      removeRun(
         node.marks.filter((old) => !old.isInSet(marks)),
         start,
         end,
@@ -136,14 +136,14 @@ export class Transform {
       if (last?.to === start) last.to = end;
       else additions.push({ from: start, to: end });
     });
-    for (const run of removals.runs) this.step(new RemoveMarkStep(run.from, run.to, run.mark));
+    for (const run of removals) this.step(new RemoveMarkStep(run.from, run.to, run.mark));
     for (const run of additions) this.step(new AddMarkStep(run.from, run.to, mark));
     return this;
   }
 
   /** Removes a mark (or every mark of a type) from inline content in `from..to`. */
   removeMark(from: number, to: number, mark: Mark | MarkType): this {
-    const found = new MarkRuns();
+    const [found, addRun] = markRuns();
     this.doc.nodesBetween(from, to, (node, pos) => {
       if (!node.isInline) return;
       const marks =
@@ -153,9 +153,9 @@ export class Transform {
             ? [mark]
             : [];
       // A run continues over consecutive inline nodes, even into the next block.
-      found.add(marks, Math.max(pos, from), Math.min(pos + node.nodeSize, to), true);
+      addRun(marks, Math.max(pos, from), Math.min(pos + node.nodeSize, to), true);
     });
-    for (const run of found.runs) this.step(new RemoveMarkStep(run.from, run.to, run.mark));
+    for (const run of found) this.step(new RemoveMarkStep(run.from, run.to, run.mark));
     return this;
   }
 
@@ -350,34 +350,38 @@ interface MarkRun {
 }
 
 /**
- * Collects mark runs from ranges given in document order. A run grows while the ranges it is
- * found in follow each other; a range without the mark ends it.
+ * Collects mark runs from ranges given in document order: `add(marks, from, to, continues)`
+ * says `from..to` has `marks`. A run grows while the ranges it is found in follow each other
+ * (`continues`, by default when `from` is where the previous range ended); a range without the
+ * mark ends it.
  */
-class MarkRuns {
-  readonly runs: MarkRun[] = [];
-  /** The runs the previous range was part of, and where that range ended. */
-  private previous: MarkRun[] = [];
-  private previousEnd = -1;
-
-  /** `from..to` has `marks`; `continues` says whether it follows the previous range. */
-  add(
+function markRuns(): [
+  MarkRun[],
+  (marks: readonly Mark[], from: number, to: number, continues?: boolean) => void,
+] {
+  const runs: MarkRun[] = [];
+  // The runs the previous range was part of, and where that range ended.
+  let previous: MarkRun[] = [];
+  let previousEnd = -1;
+  const add = (
     marks: readonly Mark[],
     from: number,
     to: number,
-    continues = from === this.previousEnd,
-  ): void {
+    continues = from === previousEnd,
+  ) => {
     const current: MarkRun[] = [];
     for (const mark of marks) {
-      let run = continues ? this.previous.find((r) => r.mark.eq(mark)) : undefined;
+      let run = continues ? previous.find((r) => r.mark.eq(mark)) : undefined;
       if (run) {
         run.to = to;
       } else {
         run = { from, to, mark };
-        this.runs.push(run);
+        runs.push(run);
       }
       current.push(run);
     }
-    this.previous = current;
-    this.previousEnd = to;
-  }
+    previous = current;
+    previousEnd = to;
+  };
+  return [runs, add];
 }

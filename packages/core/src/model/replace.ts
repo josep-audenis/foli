@@ -25,9 +25,7 @@ export function replace($from: ResolvedPos, $to: ResolvedPos, slice: Slice): Nod
   let top = 0;
   while (top < base && $from.index(top) === $to.index(top)) top++;
 
-  const builder = new Builder($from, top);
-  builder.feed(base, slice.content, slice.openStart, slice.openEnd);
-  let node = builder.finish($to);
+  let node = build($from, $to, slice, top);
   for (let depth = top - 1; depth >= 0; depth--) {
     const parent = $from.node(depth);
     node = parent.copy(parent.content.replaceChild($from.index(depth), node));
@@ -43,83 +41,67 @@ interface Open {
   children: Node[];
 }
 
-class Builder {
-  private readonly stack: Open[] = [];
-
-  /** Opens the ancestors of `$from` from `top` down, each holding its content before `$from`. */
-  constructor(
-    $from: ResolvedPos,
-    private readonly top: number,
-  ) {
-    for (let depth = top; depth <= $from.depth; depth++) {
-      const node = $from.node(depth);
-      const children: Node[] = [];
-      const end = $from.index(depth);
-      for (let i = 0; i < end; i++) children.push(node.child(i));
-      if (depth === $from.depth && $from.textOffset) children.push($from.nodeBefore as Node);
-      this.stack.push({ node, joined: node, children });
-    }
+/** The node at depth `top`, rebuilt as described in `replace`. */
+function build($from: ResolvedPos, $to: ResolvedPos, slice: Slice, top: number): Node {
+  // The nodes under construction, from depth `top` down.
+  const stack: Open[] = [];
+  for (let depth = top; depth <= $from.depth; depth++) {
+    const node = $from.node(depth);
+    const children = node.content.content.slice(0, $from.index(depth));
+    if (depth === $from.depth && $from.textOffset) children.push($from.nodeBefore as Node);
+    stack.push({ node, joined: node, children });
   }
-
-  /** The open node at `depth`, if the stack reaches it. */
-  private at(depth: number): Open | undefined {
-    return this.stack[depth - this.top];
-  }
-
+  const at = (depth: number) => stack[depth - top] as Open;
   /** Closes the open nodes deeper than `depth`, each into its parent. */
-  private closeBelow(depth: number): void {
-    while (this.stack.length > depth - this.top + 1) {
-      const open = this.stack.pop() as Open;
-      (this.stack[this.stack.length - 1] as Open).children.push(complete(open));
+  const closeBelow = (depth: number) => {
+    while (stack.length > depth - top + 1) {
+      const open = stack.pop() as Open;
+      (stack[stack.length - 1] as Open).children.push(complete(open));
     }
-  }
-
+  };
   /**
    * Adds `content` to the open node at `depth`. With `openStart`, its first child continues the
    * node open one level deeper; with `openEnd`, its last child stays open for what follows.
    */
-  feed(depth: number, content: Fragment, openStart: number, openEnd: number): void {
+  const feed = (depth: number, content: Fragment, openStart: number, openEnd: number) => {
     const last = content.childCount - 1;
     content.forEach((child, _offset, i) => {
       if (i === 0 && openStart > 0) {
-        const inner = this.at(depth + 1) as Open;
+        const inner = at(depth + 1);
         mustJoin(inner.node, child);
         inner.joined = child;
-        this.feed(depth + 1, child.content, openStart - 1, i === last && openEnd ? openEnd - 1 : 0);
+        feed(depth + 1, child.content, openStart - 1, i === last && openEnd ? openEnd - 1 : 0);
         return;
       }
-      this.closeBelow(depth);
+      closeBelow(depth);
       if (i === last && openEnd > 0) {
-        this.stack.push({ node: child, joined: child, children: [] });
-        this.feed(depth + 1, child.content, 0, openEnd - 1);
+        stack.push({ node: child, joined: child, children: [] });
+        feed(depth + 1, child.content, 0, openEnd - 1);
       } else {
-        (this.at(depth) as Open).children.push(child);
+        at(depth).children.push(child);
       }
     });
-  }
+  };
 
-  /** Appends the content after `$to` at every level and closes the stack into one node. */
-  finish($to: ResolvedPos): Node {
-    this.closeBelow($to.depth);
-    if (this.stack.length !== $to.depth - this.top + 1) {
-      throw new ReplaceError("Inconsistent open depths");
+  feed($from.depth - slice.openStart, slice.content, slice.openStart, slice.openEnd);
+  // The content after `$to` at every level, closing the stack into one node.
+  closeBelow($to.depth);
+  if (stack.length !== $to.depth - top + 1) throw new ReplaceError("Inconsistent open depths");
+  for (let depth = $to.depth; depth >= top; depth--) {
+    const open = at(depth);
+    const after = $to.node(depth);
+    mustJoin(open.joined, after);
+    let index = $to.index(depth);
+    if (depth < $to.depth) {
+      index++;
+    } else if ($to.textOffset) {
+      open.children.push($to.nodeAfter as Node);
+      index++;
     }
-    for (let depth = $to.depth; depth >= this.top; depth--) {
-      const open = this.at(depth) as Open;
-      const after = $to.node(depth);
-      mustJoin(open.joined, after);
-      let index = $to.index(depth);
-      if (depth < $to.depth) {
-        index++;
-      } else if ($to.textOffset) {
-        open.children.push($to.nodeAfter as Node);
-        index++;
-      }
-      for (; index < after.childCount; index++) open.children.push(after.child(index));
-      if (depth > this.top) this.closeBelow(depth - 1);
-    }
-    return complete(this.stack[0] as Open);
+    for (; index < after.childCount; index++) open.children.push(after.child(index));
+    if (depth > top) closeBelow(depth - 1);
   }
+  return complete(stack[0] as Open);
 }
 
 /** Throws unless `next`'s content can continue `node`'s. */

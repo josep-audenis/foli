@@ -31,26 +31,24 @@ export class Slice {
    * `pos`, which must accept it. Null when the content would not be valid there.
    */
   insertAt(pos: number, fragment: Fragment): Slice | null {
-    const path = descend(this.content, pos + this.openStart);
-    const { content, offset } = path.inner;
+    const [steps, content, offset] = descend(this.content, pos + this.openStart);
     const result = content.cut(0, offset).append(fragment).append(content.cut(offset));
-    const holder = path.steps[path.steps.length - 1];
+    const holder = steps[steps.length - 1];
     // A node the slice cuts open is completed by the document around the replaced range, and
     // replace validates it once joined: checking it here would reject valid content.
     if (
       holder &&
-      !isOpenNode(path.steps, this.openStart, this.openEnd) &&
+      !isOpenNode(steps, this.openStart, this.openEnd) &&
       !holder.child.type.validContent(result)
     ) {
       return null;
     }
-    return new Slice(path.rebuild(result), this.openStart, this.openEnd);
+    return new Slice(rebuild(steps, result), this.openStart, this.openEnd);
   }
 
   /** This slice without the flat range `from..to` (slice positions). */
   removeBetween(from: number, to: number): Slice {
-    const path = descend(this.content, from + this.openStart);
-    const { content, offset } = path.inner;
+    const [steps, content, offset] = descend(this.content, from + this.openStart);
     const end = offset + (to - from);
     // `to` must be in the same node as `from`, and not inside a child node.
     const { index, offset: start } =
@@ -59,7 +57,7 @@ export class Slice {
       throw new RangeError("Removing a non-flat range");
     }
     return new Slice(
-      path.rebuild(content.cut(0, offset).append(content.cut(end))),
+      rebuild(steps, content.cut(0, offset).append(content.cut(end))),
       this.openStart,
       this.openEnd,
     );
@@ -87,39 +85,27 @@ interface Step {
 
 /**
  * Walks from `content` into the node whose content holds `pos` (a position inside text stays
- * in the text's parent). `inner` is that content and the offset of `pos` in it; `rebuild` puts a
- * replacement for it back into copies of the nodes walked through.
+ * in the text's parent): the levels walked through, that content, and `pos`'s offset in it.
  */
-function descend(
-  content: Fragment,
-  pos: number,
-): {
-  steps: Step[];
-  inner: { content: Fragment; offset: number };
-  rebuild: (inner: Fragment) => Fragment;
-} {
+function descend(content: Fragment, pos: number): [Step[], Fragment, number] {
   const steps: Step[] = [];
   let rel = pos;
   for (;;) {
     const { index, offset } = content.findIndex(rel);
     const child = content.maybeChild(index);
-    if (offset === rel || !child || child.isText) break;
+    if (offset === rel || !child || child.isText) return [steps, content, rel];
     steps.push({ content, index, child });
     content = child.content;
     rel -= offset + 1;
   }
-  return {
-    steps,
-    inner: { content, offset: rel },
-    rebuild(inner) {
-      let result = inner;
-      for (let i = steps.length - 1; i >= 0; i--) {
-        const step = steps[i] as Step;
-        result = step.content.replaceChild(step.index, step.child.copy(result));
-      }
-      return result;
-    },
-  };
+}
+
+/** Puts `inner` back in place of the content `descend` reached through `steps`. */
+function rebuild(steps: readonly Step[], inner: Fragment): Fragment {
+  return steps.reduceRight(
+    (result, { content, index, child }) => content.replaceChild(index, child.copy(result)),
+    inner,
+  );
 }
 
 /** Whether the node reached through `steps` is one the slice cuts open (see `Slice`). */

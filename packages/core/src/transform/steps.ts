@@ -27,14 +27,12 @@ export class StepResult {
 
   /** Runs `doc.replace`, turning schema/range violations into a failed result. */
   static fromReplace(doc: Node, from: number, to: number, slice: Slice): StepResult {
-    let result: Node;
     try {
-      result = doc.replace(from, to, slice);
+      return StepResult.ok(doc.replace(from, to, slice));
     } catch (error) {
       if (!(error instanceof ReplaceError || error instanceof RangeError)) throw error;
       return StepResult.fail(error.message);
     }
-    return StepResult.ok(result);
   }
 }
 
