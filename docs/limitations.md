@@ -293,6 +293,10 @@ Custom nodes and marks, plugins and toolbar items ([extensions](guides/extension
 - While tracking, an edit that would delete or insert content Foli keeps verbatim (an opaque
   block) is not made; tables are tracked row by row. Moves are kept and shown from imported files but not
   recorded: moving text records a deletion and an insertion.
+- Your own inserted paragraph, deleted whole while tracking, goes without a trace when another
+  paragraph follows it. As the last paragraph of the document or of a cell it stays, empty and
+  marked as your insertion: rejecting removes it, accepting keeps an empty paragraph the same
+  edits made untracked would not have. (`@folijs/agent`'s `deleteBlock` removes it there itself.)
 - Accepting removes a paragraph whose text and mark are both deleted whole, as Word does; the
   same edits made untracked, one after another, may have kept its properties on the joined
   paragraph. Enter in a paragraph next to a deleted paragraph mark splits that paragraph as it
@@ -344,9 +348,6 @@ Unstable (0.x). Details in the [package README](../packages/agent/README.md).
   reader's limits (64 MB unpacked): a document whose fields hold long instructions can need
   several hundred MB to open and to save (a 385 KB file holding 62 MB of field
   instructions: 700 MB open, 1.34 GB for a save; measured on Windows, Node 25).
-- A paragraph the session inserted and then deleted leaves a tracked paragraph insertion on
-  the paragraph before it: rejecting every change then joins that paragraph with the next
-  (found by the review of #165; not fixed).
 - `updateFields` returns no blocks, and leaves page numbers as they are: they need a page
   layout the session does not have. It leaves a table of contents as it is unless
   `contents: true`; one built that way has its entries' page numbers empty until Word updates
