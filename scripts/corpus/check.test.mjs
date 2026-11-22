@@ -24,10 +24,20 @@ describe("the corpus run's comparison (20.2)", () => {
     );
     const b = doc('<w:p><w:r w:rsidR="00AB"><w:t>Secret</w:t></w:r></w:p>');
     const diff = compareXml(a, b, parseXml);
-    expect(diff).toMatchObject({ kind: "content", textLost: 6, text: ["w:t"] });
+    expect(diff).toMatchObject({ kind: "content", textLost: 6, runs: 1 });
     expect(diff.lost).toEqual(["w:pPr", "w:jc"]);
-    expect(diff.changed).toEqual(["w:jc@w:val", "w:r@w:rsidR"]);
+    expect(diff.changed).toEqual(["w:jc@w:val"]);
     expect(JSON.stringify(diff)).not.toContain("Secret");
+  });
+
+  it("takes runs joined, Word's volatile marks and rsids as no difference; a format change as one", () => {
+    const split = doc(
+      '<w:p w:rsidR="1"><w:r w:rsidRPr="2"><w:rPr><w:b/></w:rPr><w:t>He</w:t></w:r><w:proofErr w:type="spellStart"/><w:r><w:rPr><w:b/></w:rPr><w:lastRenderedPageBreak/><w:t xml:space="preserve">llo</w:t></w:r></w:p>',
+    );
+    const joined = doc("<w:p><w:r><w:rPr><w:b/></w:rPr><w:t>Hello</w:t></w:r></w:p>");
+    expect(compareXml(split, joined, parseXml)).toEqual({ kind: "equivalent" });
+    const italic = doc("<w:p><w:r><w:rPr><w:i/></w:rPr><w:t>Hello</w:t></w:r></w:p>");
+    expect(compareXml(joined, italic, parseXml)).toMatchObject({ kind: "content", runs: 1 });
   });
 
   it("sees a lost space, text of the same length, text moved, another namespace", () => {

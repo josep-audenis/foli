@@ -63,26 +63,116 @@ function census(source, parseXml) {
   const elements = new Map();
   const values = new Map();
   const texts = new Map();
+  /** Each paragraph's text with its formatting, runs of one formatting joined (see `runs`). */
+  const formatted = new Map();
+  const volatile = new Map();
   let chars = 0;
   const add = (map, key) => map.set(key, (map.get(key) ?? 0) + 1);
-  const walk = (element) => {
+  const attributesOf = (element) =>
+    element.attributes.filter((a) => !(a.prefix === "xmlns" || (!a.prefix && a.local === "xmlns")));
+  const walk = (element, context = null) => {
     const key = keyOf(element);
+    // Word writes these again each time it saves: not content (counted apart).
+    if (VOLATILE_ELEMENTS.has(key)) return void add(volatile, shown(key));
+    if (key === `${W}|p`) return paragraph(element);
+    if (key === `${W}|r` && context) return run(element, context);
     add(elements, key);
-    for (const attribute of element.attributes) {
-      if (attribute.prefix === "xmlns" || (!attribute.prefix && attribute.local === "xmlns"))
+    for (const attribute of attributesOf(element)) {
+      if (volatileAttribute(attribute)) {
+        add(volatile, `${shown(key)}@${shown(keyOf(attribute))}`);
         continue;
+      }
       add(values, `${key}@${keyOf(attribute)}\u0000${attribute.value}`);
     }
+    const inner = context ? `${context}/${shown(key)}` : context;
     for (const child of element.children) {
-      if (child.kind === "element") walk(child);
+      if (child.kind === "element") walk(child, inner);
       else if (child.kind === "text" && child.text.trim()) {
         add(texts, `${key}\u0000${child.text}`);
         chars += child.text.length;
       }
     }
   };
+  /** A paragraph: its properties counted as elements, its runs as formatted text. */
+  let pieces = null;
+  const paragraphs = [];
+  const paragraph = (element) => {
+    const outer = pieces;
+    pieces = [];
+    add(elements, `${W}|p`);
+    for (const attribute of attributesOf(element))
+      if (volatileAttribute(attribute)) add(volatile, `w:p@${shown(keyOf(attribute))}`);
+      else add(values, `${W}|p@${keyOf(attribute)}\u0000${attribute.value}`);
+    for (const child of element.children) if (child.kind === "element") walk(child, "p");
+    // Runs next to each other with the same formatting are one: how many runs a writer made
+    // of a text is not content.
+    const joined = [];
+    for (const piece of pieces) {
+      const last = joined[joined.length - 1];
+      if (last && last.sig === piece.sig) last.text += piece.text;
+      else joined.push({ ...piece });
+    }
+    for (const { sig, text } of joined) {
+      add(formatted, `${sig}\u0000${text}`);
+      chars += text.length;
+    }
+    paragraphs.push(joined);
+    pieces = outer;
+  };
+  /** A run: its formatting as a signature, its text, other content (a drawing…) walked. */
+  const run = (element, context) => {
+    let format = "";
+    let text = "";
+    for (const child of element.children) {
+      if (child.kind !== "element") continue;
+      const key = keyOf(child);
+      if (key === `${W}|rPr`) format = canonical(child);
+      else if (RUN_TEXT.has(key)) text += child.children.map((c) => c.text ?? "").join("");
+      else if (RUN_MARKS[key]) text += RUN_MARKS[key];
+      else if (VOLATILE_ELEMENTS.has(key)) add(volatile, shown(key));
+      else {
+        // Content of its own (a drawing, a field character, a note reference): counted as
+        // elements, and a mark in the text so that joining runs cannot hide it.
+        walk(child, null);
+        text += `\u0001${shown(key)}\u0001`;
+      }
+    }
+    pieces.push({ sig: `${context}\u0002${format}`, text });
+  };
   walk(parseXml(source).root);
-  return { elements, values, texts, chars };
+  return { elements, values, texts, formatted, paragraphs, volatile, chars };
+}
+
+const W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+const W14 = "http://schemas.microsoft.com/office/word/2010/wordml";
+/** Written anew by Word at each save: spelling marks, where its last layout broke pages. */
+const VOLATILE_ELEMENTS = new Set([`${W}|proofErr`, `${W}|lastRenderedPageBreak`]);
+/** Revision-session ids and paragraph ids, likewise. */
+const volatileAttribute = (a) =>
+  (a.ns === W && a.local.startsWith("rsid")) ||
+  (a.ns === W14 && (a.local === "paraId" || a.local === "textId"));
+/** A run's text elements (`xml:space` aside: the text itself is compared). */
+const RUN_TEXT = new Set([`${W}|t`, `${W}|delText`, `${W}|instrText`, `${W}|delInstrText`]);
+/** A run's characters that are elements. */
+const RUN_MARKS = {
+  [`${W}|tab`]: "\t",
+  [`${W}|br`]: "\n",
+  [`${W}|cr`]: "\n",
+  [`${W}|noBreakHyphen`]: "‑",
+  [`${W}|softHyphen`]: "­",
+};
+/** An element as a string its order of attributes and children does not change. */
+function canonical(element) {
+  const attributes = element.attributes
+    .filter((a) => !(a.prefix === "xmlns" || (!a.prefix && a.local === "xmlns")))
+    .filter((a) => !volatileAttribute(a))
+    .map((a) => `${keyOf(a)}=${a.value}`)
+    .sort();
+  const children = element.children
+    .filter((c) => c.kind === "element")
+    .map(canonical)
+    .sort();
+  return `<${keyOf(element)} ${attributes.join(" ")}>${children.join("")}</>`;
 }
 
 /**
@@ -111,17 +201,75 @@ export function compareXml(original, exported, parseXml) {
   const text = new Set();
   differs(a.texts, b.texts, text);
   differs(b.texts, a.texts, text);
-  if (!lost.length && !added.length && !changed.size && !text.size) return { kind: "equivalent" };
+  // A paragraph's text or a stretch's formatting not the same (joined runs aside).
+  const same = (x, y) => [...x].every(([key, n]) => y.get(key) === n) && x.size === y.size;
+  const runs = !same(a.formatted, b.formatted);
+  if (!lost.length && !added.length && !changed.size && !text.size && !runs)
+    return { kind: "equivalent" };
   return {
     kind: "content",
     lost,
     added,
     changed: [...changed],
     text: [...text],
+    // How many stretches of text with one formatting are the original's and not the export's,
+    // and what of them changed: their text, or (the same text) which run properties.
+    runs: runs ? [...a.formatted].filter(([k, n]) => (b.formatted.get(k) ?? 0) < n).length : 0,
+    ...(runs ? paragraphChanges(a.paragraphs, b.paragraphs) : {}),
     textLost: Math.max(a.chars - b.chars, 0),
     textAdded: Math.max(b.chars - a.chars, 0),
   };
 }
+
+/**
+ * Paragraphs of `a` matched with `b`'s by their text: how many have no paragraph of the same text
+ * in `b` (text changed), and, for those that do but are formatted otherwise, the run properties
+ * or the surroundings (a hyperlink, a tracked change) that differ, by name. The text matches
+ * paragraphs; it is never reported.
+ */
+function paragraphChanges(a, b) {
+  const textOf = (pieces) => pieces.map((p) => p.text).join("");
+  const free = new Map();
+  for (const pieces of b) {
+    const text = textOf(pieces);
+    free.set(text, [...(free.get(text) ?? []), pieces]);
+  }
+  // Each character's formatting: where two paragraphs of one text split their runs apart.
+  const perChar = (pieces) => pieces.flatMap((p) => Array.from(p.text, () => p.sig));
+  const tokens = (format) => new Set(format.match(/<[^>]*>/g) ?? []);
+  const names = (list) => list.map((t) => shown(t.slice(1).split(" ")[0]));
+  let textChanged = 0;
+  let formatChanged = 0;
+  const properties = new Set();
+  const around = new Set();
+  for (const pieces of a) {
+    const twin = free.get(textOf(pieces))?.shift();
+    if (!twin) {
+      textChanged++;
+      continue;
+    }
+    const x = perChar(pieces);
+    const y = perChar(twin);
+    const pairs = new Set();
+    for (let i = 0; i < x.length; i++) if (x[i] !== y[i]) pairs.add(`${x[i]}\u0003${y[i]}`);
+    if (pairs.size) formatChanged++;
+    for (const pair of pairs) {
+      const [sig, other] = pair.split("\u0003");
+      const [context, format] = sig.split("\u0002");
+      const [otherContext, otherFormat] = other.split("\u0002");
+      if (context !== otherContext) around.add(`${context} → ${otherContext}`);
+      const p = tokens(format);
+      const q = tokens(otherFormat);
+      for (const name of names([...p].filter((t) => !q.has(t)))) properties.add(name);
+      for (const name of names([...q].filter((t) => !p.has(t)))) properties.add(name);
+    }
+  }
+  return { textChanged, formatChanged, properties: [...properties], around: [...around] };
+}
+
+/** How many characters of text a JSON tree holds (its text nodes). */
+const textLength = (node) =>
+  (node.text?.length ?? 0) + (node.content ?? []).reduce((n, child) => n + textLength(child), 0);
 
 /** The first key path where two JSON values differ (keys and indexes only, never values). */
 export function firstDifference(a, b, path = "") {
@@ -225,8 +373,9 @@ export async function checkFile(bytes) {
       const typed = editor.state.doc.textContent.length === before + 1;
       const out = await exportDocx(editor.getDocument(), imported.package);
       const back = (await importDocx(out)).document;
-      if (typed && JSON.stringify(back.content).length <= JSON.stringify(document.content).length)
-        throw new Error("the typed character was not in the export");
+      // Every character of the document's text and the typed one, read back from the file.
+      if (typed && textLength(back.content) !== textLength(document.content) + 1)
+        throw new Error("the export's text is not the edited text");
       result.edit = typed ? "ok" : "not typed";
     });
   } catch (error) {
