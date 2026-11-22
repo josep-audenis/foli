@@ -311,3 +311,62 @@ describe("one's own inserted paragraph, deleted whole while tracking", () => {
     expect(paragraphs(editor)).toEqual(["One", "Two", "Three"]);
   });
 });
+
+describe("one's own inserted paragraph, deleted whole, at the end of the document or of a cell", () => {
+  it.each(["the document", "a cell"])("goes with nothing left, at the end of %s", async (where) => {
+    const { acceptAllChanges, rejectAllChanges, trackedChanges } = await import("./state/index.js");
+    const content =
+      where === "a cell"
+        ? [
+            p("Before"),
+            {
+              type: "table",
+              content: [
+                { type: "tableRow", content: [{ type: "tableCell", content: [p("Cell")] }] },
+              ],
+            },
+            p("After"),
+          ]
+        : [p("One"), p("Two")];
+    const editor = createEditor({
+      document: documentOf(content as never),
+      author: "Me",
+      trackChanges: true,
+    });
+    const original = JSON.stringify(editor.getDocument().content);
+    // Where the last paragraph of the document, or of the cell, ends.
+    let end = editor.state.doc.content.size;
+    if (where === "a cell")
+      editor.state.doc.descendants((node, pos) => {
+        if (node.isTextblock && node.textContent === "Cell") end = pos + node.nodeSize;
+        return true;
+      });
+    const { schema } = editor.state;
+    const made = (
+      schema.nodes.paragraph as never as { create: (a: null, c: unknown) => never }
+    ).create(null, schema.text("New"));
+    editor.dispatch(editor.state.tr.insert(end, made));
+    const node = editor.state.doc.nodeAt(end);
+    expect(node?.textContent).toBe("New");
+    editor.dispatch(editor.state.tr.delete(end, end + (node?.nodeSize ?? 0)));
+    expect(trackedChanges(editor.state.doc)).toEqual([]);
+    expect(JSON.stringify(editor.getDocument().content)).toBe(original);
+    editor.run(acceptAllChanges());
+    editor.run(rejectAllChanges());
+    expect(JSON.stringify(editor.getDocument().content)).toBe(original);
+  });
+
+  it("still keeps a paragraph that holds another author's text, as a deletion", async () => {
+    const { trackedChanges } = await import("./state/index.js");
+    const editor = createEditor({
+      document: documentOf([p("One"), p("Two")]),
+      author: "Me",
+      trackChanges: true,
+    });
+    const node = editor.state.doc.lastChild;
+    const at = editor.state.doc.content.size - (node?.nodeSize ?? 0);
+    editor.dispatch(editor.state.tr.delete(at, at + (node?.nodeSize ?? 0)));
+    expect(paragraphs(editor)).toEqual(["One", "Two"]);
+    expect(trackedChanges(editor.state.doc).length).toBeGreaterThan(0);
+  });
+});

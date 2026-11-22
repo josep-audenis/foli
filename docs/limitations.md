@@ -298,10 +298,6 @@ Custom nodes and marks, plugins and toolbar items ([extensions](guides/extension
 - While tracking, an edit that would delete or insert content Foli keeps verbatim (an opaque
   block) is not made; tables are tracked row by row. Moves are kept and shown from imported files but not
   recorded: moving text records a deletion and an insertion.
-- Your own inserted paragraph, deleted whole while tracking, goes without a trace when another
-  paragraph follows it. As the last paragraph of the document or of a cell it stays, empty and
-  marked as your insertion: rejecting removes it, accepting keeps an empty paragraph the same
-  edits made untracked would not have. (`@folijs/agent`'s `deleteBlock` removes it there itself.)
 - Accepting removes a paragraph whose text and mark are both deleted whole, as Word does; the
   same edits made untracked, one after another, may have kept its properties on the joined
   paragraph. Enter in a paragraph next to a deleted paragraph mark splits that paragraph as it
