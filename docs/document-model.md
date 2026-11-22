@@ -47,7 +47,7 @@ Rules:
 ## Content JSON shape
 
 Every node is `{ type, attrs?, content?, text?, marks? }`. This shape is permanent: it is
-familiar to developers who know ProseMirror-style JSON and simple for Rust and other consumers.
+familiar to developers who know tree-shaped rich-text JSON and simple for Rust and other consumers.
 
 ### Normalization (canonical form)
 
@@ -115,7 +115,7 @@ Changing a block's type keeps the alignment.
 **Colors** are stored as lowercase `#rrggbb` only (`isColor`); paste and the UI convert other
 CSS colors before they reach the document, so equal colors serialize equally.
 
-`hardBreak` may carry marks (as in other ProseMirror-style models), so formatting continues
+`hardBreak` may carry marks (as in other tree-shaped rich-text models), so formatting continues
 across a line break.
 
 `pageBreak` (added in Phase 5.3, before any release) is an explicit page break. It is inline,
@@ -360,7 +360,7 @@ the marks `bold`, `italic`, `underline`, `strike`. Every v1 document is a valid 
 
 ## The model (`packages/core/src/model/`)
 
-Concepts proven by ProseMirror, implemented independently (ADR-0002).
+Implemented independently (ADR-0002).
 
 ### Schema
 

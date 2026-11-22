@@ -221,8 +221,7 @@ calling it flaky.
 - Tests next to code (`*.test.ts[x]`). DOM tests opt in with `// @vitest-environment jsdom`.
 - Editing logic belongs in `packages/*`, never in `apps/playground`.
 - Never silently drop or "repair" document content; throw `FoliDocumentError`.
-- No editor-engine dependencies (ProseMirror, Tiptap, Lexical, Slate, Quill, CKEditor, …) in
-  published packages — see [ADR-0002](decisions/ADR-0002-own-editing-engine.md).
+- No third-party editor-engine dependencies in published packages — see [ADR-0002](decisions/ADR-0002-own-editing-engine.md).
 - Studying other engines is encouraged; prefer reimplementing. If you copy code, it must be
   permissively licensed and recorded in `THIRD_PARTY_NOTICES.md` (source URL, commit, license,
   what changed), with the original notices kept.
