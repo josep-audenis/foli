@@ -1,54 +1,78 @@
-# Foli
+<p align="center">
+  <img src="apps/site/public/favicon.svg" alt="" width="72" height="82">
+</p>
 
-An open-source document-editing engine for the web, built from the ground up: its own document
-model, transactions, view and layout, designed around native pagination, with first-class React
-integration.
+<h1 align="center">Foli</h1>
 
-> **Status: 1.1.0 on [npm](https://www.npmjs.com/package/@folijs/react)
-> ([docs](https://foli.josepaudenis.com/docs/)).** Foli edits documents
-> with its own model, engine and view (no ProseMirror/Tiptap/Lexical) on real pages: paragraphs
-> split across pages at a line, explicit page breaks, widow/orphan, keep-with-next and
-> keep-lines-together rules, incremental reflow, print with one sheet per page. Documents use
-> Word's model ([ADR-0005](docs/decisions/ADR-0005-word-compatible-model.md)): paragraph styles
-> (headings are Word's heading styles), lists as Word's numbering, fonts, sizes, line and
-> paragraph spacing, indents; bold, italic, underline, strikethrough, links, text color,
-> highlight; alignment; undo/redo; IME; copy/cut/paste (HTML from Word, Google Docs and web
-> pages mapped to the model). Each section is laid out with its own page size and margins.
-> `.docx` import and lossless export (`@folijs/docx`): what the editor does not model yet is
-> kept and written back. Review as in Word (0.4.0): tracked
-> changes recorded while you type (insertions, deletions, formatting), shown as all markup, simple
-> markup or no markup, accepted and rejected one by one, by selection, by author or all; comments
-> with replies and resolved state in a pane beside the pages; both round-trip with Word. Tables
-> and pictures as Word models them (0.5.0): tables split across pages by row with repeated
-> header rows, merged cells, table styles, cell selection, table commands and a table menu,
-> tracked row changes; inline and floating pictures (square, top and bottom, behind and in front
-> of text), resized, inserted through an upload hook; alt text is required in the picture dialog,
-> and a picture pasted or dropped without it is marked. Sections, fields, templates and PDF
-> (0.6.0): sections with their own page setup and columns, section breaks; headers and footers
-> (first, even and default) edited in place on the pages; footnotes and endnotes at their pages'
-> foot; fields shown with their results and updated from the pages (page numbers, dates,
-> cross-references, tables of contents, merge fields from data); content controls (text, rich
-> text, drop-down, combo box, date, check box, repeating sections) filled from the UI or the API;
-> bookmarks, the document outline, find and replace across every story; `exportPdf`
-> (`@folijs/pdf`) prints Foli's own pages to PDF with a headless Chromium. React components
-> with a toolbar and server rendering. Extensions (1.0): custom nodes and marks on Word's schema,
-> drawn by node and mark views, saved in the JSON and through `.docx` as tagged content controls;
-> plugins with commands, keymaps (the view's own keys overridable or listed as reserved),
-> decorations and plugin views; toolbar items.
->
-> **What 1.0 promises** ([ADR-0008](docs/decisions/ADR-0008-1.0-contract-and-extensions.md),
-> [versions and deprecation](docs/deprecation.md)): each package's public API, as its entry
-> exports it and its API report records it, changes only by semver: nothing removed or changed
-> before 2.0, a removal deprecated first (`@deprecated`, a development warning where cheap). Every
-> 1.x reads every saved format, v1 to v5 (0.1.0 to 0.6.0) and any a 1.x minor adds (only by
-> adding, with a migration); a document is saved with the lowest version its content needs, and an
-> older 1.x refuses, never drops, a document that needs a newer one. Known risks: the manual IME,
-> screen-reader, macOS, real-paste and Safari checks were never run on real devices (accepted by
-> the owner for 1.0), and at 100 pages the first layout, the re-flow and Enter miss Phase 5's speed
-> targets (typing meets them in Chromium, not in Firefox): read the [known limitations](docs/limitations.md). Moving from 0.x:
-> [migration guide](docs/guides/migrating-from-0x.md).
+<p align="center">
+  A document-editing engine for the web with real pages and Word's document model.<br>
+  Its own model, transactions, view and layout. No ProseMirror, Tiptap or Lexical underneath.
+</p>
 
-## Usage
+<p align="center">
+  <a href="https://www.npmjs.com/package/@folijs/react"><img src="https://img.shields.io/npm/v/@folijs/react?label=%40folijs%2Freact&color=1d1d1b" alt="npm version"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/josep-audenis/foli?color=1d1d1b" alt="MIT license"></a>
+  <img src="https://img.shields.io/badge/TypeScript-strict-1d1d1b?logo=typescript&logoColor=white" alt="TypeScript">
+  <img src="https://img.shields.io/badge/.docx-lossless-1d1d1b" alt="Lossless .docx">
+  <a href="https://foli.josepaudenis.com/docs/"><img src="https://img.shields.io/badge/docs-foli.josepaudenis.com-1d1d1b" alt="Docs"></a>
+</p>
+
+<p align="center">
+  <a href="https://foli.josepaudenis.com/docs/">Docs</a> ·
+  <a href="https://foli.josepaudenis.com/test/">Try the editor</a> ·
+  <a href="docs/getting-started.md">Getting started</a> ·
+  <a href="docs/limitations.md">Known limitations</a>
+</p>
+
+## Features
+
+- **Real pages.** Paragraphs split across pages at a line; explicit page breaks; widow/orphan,
+  keep-with-next and keep-lines-together; incremental reflow; print with one sheet per page.
+- **Word's model** ([ADR-0005](docs/decisions/ADR-0005-word-compatible-model.md)). Paragraph
+  styles (headings are Word's heading styles), lists as Word's numbering, fonts, sizes, line and
+  paragraph spacing, indents, bold, italic, underline, strikethrough, links, text color,
+  highlight, alignment. Undo/redo, IME, copy/cut/paste (HTML from Word, Google Docs and web pages
+  mapped to the model).
+- **Lossless `.docx`** (`@folijs/docx`). Import and export; what the editor does not model yet is
+  kept and written back.
+- **Review as in Word.** Tracked changes recorded while you type (insertions, deletions,
+  formatting), shown as all, simple or no markup, accepted or rejected one by one, by selection,
+  by author or all. Comments with replies and resolved state in a pane beside the pages. Both
+  round-trip with Word.
+- **Tables and pictures.** Tables split by row with repeated header rows, merged cells, table
+  styles, cell selection, a table menu, tracked row changes. Inline and floating pictures
+  (square, top and bottom, behind and in front of text), resized, inserted through an upload hook;
+  alt text required in the picture dialog, pictures pasted without it are marked.
+- **Sections, fields and templates.** Per-section page size, margins and columns; headers and
+  footers (first, even, default) edited in place; footnotes and endnotes; fields (page numbers,
+  dates, cross-references, tables of contents, merge fields); content controls (text, rich text,
+  drop-down, combo box, date, check box, repeating sections); bookmarks, outline, find and replace
+  across every story.
+- **PDF** (`@folijs/pdf`). `exportPdf` prints Foli's own pages to PDF with a headless Chromium.
+- **React** components with a toolbar and server rendering; a framework-free view too.
+- **Extensions.** Custom nodes and marks on Word's schema with node and mark views, saved in the
+  JSON and through `.docx` as tagged content controls; plugins with commands, keymaps,
+  decorations, plugin views and toolbar items.
+- **Agents** (0.x). `@folijs/agent` lets an LLM edit a document by block handles, and
+  `@folijs/mcp` exposes `.docx` editing to MCP clients; every edit is a tracked change.
+
+## Stability
+
+Each package's public API, as its entry exports it and its API report records it, changes only by
+semver: nothing removed or changed before 2.0, a removal deprecated first
+([ADR-0008](docs/decisions/ADR-0008-1.0-contract-and-extensions.md),
+[versions and deprecation](docs/deprecation.md)). Every 1.x reads every saved format from v1
+(0.1.0) on; a document is saved with the lowest version its content needs, and an older 1.x
+refuses, never drops, a document that needs a newer one. Moving from 0.x: the
+[migration guide](docs/guides/migrating-from-0x.md).
+
+> [!WARNING]
+> The manual IME, screen-reader, macOS, real-paste and Safari checks have not been run on real
+> devices, and at 100 pages the first layout, the re-flow and Enter miss Phase 5's speed targets
+> (typing meets them in Chromium, not in Firefox). Read the [known limitations](docs/limitations.md)
+> before using Foli.
+
+## Quick start
 
 ```bash
 npm install @folijs/react @folijs/view @folijs/core react react-dom
@@ -82,17 +106,17 @@ toolbar, Next.js and using the view without React. Before using Foli, read the
 
 ## Packages
 
-| Package                              | Purpose                                                                                          |
-| ------------------------------------ | ------------------------------------------------------------------------------------------------ |
-| [`@folijs/core`](packages/core)      | Document model and headless editing engine: schema, nodes, steps, history, commands. No DOM.     |
-| [`@folijs/view`](packages/view)      | Framework-agnostic editable DOM view (`EditorView`): rendering, input, selection.                |
-| [`@folijs/react`](packages/react)    | React components and default stylesheet.                                                         |
-| [`@folijs/docx`](packages/docx)      | `.docx` import to Foli's Word model and lossless export. No DOM.                                 |
-| [`@folijs/pdf`](packages/pdf)        | PDF from Foli's pages (`exportPdf`), printed by a headless Chromium page the app supplies.       |
-| [`@folijs/agent`](packages/agent)    | An LLM agent reads and edits a document by block handles; every edit a tracked change. 0.x.      |
-| [`@folijs/mcp`](packages/mcp)        | MCP server: an MCP client's model edits `.docx` files in a folder through tools. 0.x.            |
-| [`apps/playground`](apps/playground) | Demo app; consumes the packages like a third party would.                                        |
-| [`apps/site`](apps/site)             | Landing page, the real editor at `/test`, the docs at `/docs`; `pnpm --filter @folijs/site dev`. |
+| Package                              | Version                                                                                                               | Purpose                                                                                          |
+| ------------------------------------ | --------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| [`@folijs/core`](packages/core)      | [![npm](https://img.shields.io/npm/v/@folijs/core?label=&color=1d1d1b)](https://www.npmjs.com/package/@folijs/core)   | Document model and headless editing engine: schema, nodes, steps, history, commands. No DOM.     |
+| [`@folijs/view`](packages/view)      | [![npm](https://img.shields.io/npm/v/@folijs/view?label=&color=1d1d1b)](https://www.npmjs.com/package/@folijs/view)   | Framework-agnostic editable DOM view (`EditorView`): rendering, input, selection.                |
+| [`@folijs/react`](packages/react)    | [![npm](https://img.shields.io/npm/v/@folijs/react?label=&color=1d1d1b)](https://www.npmjs.com/package/@folijs/react) | React components and default stylesheet.                                                         |
+| [`@folijs/docx`](packages/docx)      | [![npm](https://img.shields.io/npm/v/@folijs/docx?label=&color=1d1d1b)](https://www.npmjs.com/package/@folijs/docx)   | `.docx` import to Foli's Word model and lossless export. No DOM.                                 |
+| [`@folijs/pdf`](packages/pdf)        | [![npm](https://img.shields.io/npm/v/@folijs/pdf?label=&color=1d1d1b)](https://www.npmjs.com/package/@folijs/pdf)     | PDF from Foli's pages (`exportPdf`), printed by a headless Chromium page the app supplies.       |
+| [`@folijs/agent`](packages/agent)    | [![npm](https://img.shields.io/npm/v/@folijs/agent?label=&color=1d1d1b)](https://www.npmjs.com/package/@folijs/agent) | An LLM agent reads and edits a document by block handles; every edit a tracked change. 0.x.      |
+| [`@folijs/mcp`](packages/mcp)        | [![npm](https://img.shields.io/npm/v/@folijs/mcp?label=&color=1d1d1b)](https://www.npmjs.com/package/@folijs/mcp)     | MCP server: an MCP client's model edits `.docx` files in a folder through tools. 0.x.            |
+| [`apps/playground`](apps/playground) |                                                                                                                       | Demo app; consumes the packages like a third party would.                                        |
+| [`apps/site`](apps/site)             |                                                                                                                       | Landing page, the real editor at `/test`, the docs at `/docs`; `pnpm --filter @folijs/site dev`. |
 
 ## Documentation
 
@@ -132,4 +156,4 @@ pnpm check   # lint, typecheck, tests, build, package checks, API reports, sizes
 
 ## License
 
-MIT
+[MIT](LICENSE) © 2026 Josep Audenis
