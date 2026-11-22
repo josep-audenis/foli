@@ -21,6 +21,24 @@ import {
   Resolver,
   type RunFormat,
 } from "@folijs/core/internal";
+import { applyAttrs, type DecorationAttrs } from "../extension.js";
+
+/**
+ * Custom nodes and marks drawn by extensions' node and mark views outside the editor
+ * (`renderDocument`, `exportPdf`, the pages' headers, footers and notes; 19.3): a node's DOM, or
+ * null when no view draws it (it is then drawn as without extensions); a mark's attributes.
+ * @internal
+ */
+export interface CustomDrawing {
+  node(json: NodeJSON, doc: Document): Node | null;
+  mark(json: MarkJSON): DecorationAttrs | null;
+}
+
+/**
+ * The drawing of the `renderBlocks` call running now. shortcut: module state rather than a
+ * parameter of every helper (cells, opaque blocks); fine while drawing stays synchronous.
+ */
+let drawing: CustomDrawing | undefined;
 
 /**
  * Marks the <br> of an explicit page break (the page flow ends the page after its line).
@@ -392,6 +410,8 @@ export interface BlockOptions {
   resolver?: Resolver;
   /** What note references show, by story, and what a note's own mark shows (never stored). */
   notes?: { references?: ReadonlyMap<string, string>; mark?: string };
+  /** Custom nodes and marks drawn by extensions (19.3). */
+  custom?: CustomDrawing | undefined;
 }
 
 /**
@@ -712,6 +732,20 @@ export function renderBlocks(
   document: FoliDocument,
   doc: Document,
   options: BlockOptions = {},
+): WordBlock[] {
+  const outer = drawing;
+  drawing = options.custom;
+  try {
+    return renderBlocksNow(document, doc, options);
+  } finally {
+    drawing = outer;
+  }
+}
+
+function renderBlocksNow(
+  document: FoliDocument,
+  doc: Document,
+  options: BlockOptions,
 ): WordBlock[] {
   const review = options.review ?? "markup";
   const codes = options.fieldCodes === true;
@@ -1098,6 +1132,7 @@ function renderInline(
     const code =
       display.braces.get(index) ?? (codes && node.type === "fieldCode" ? String(attrs.text) : "");
     let text: string;
+    let drawn: Node | null = null;
     if (code) text = code;
     else if (node.type === "text") text = node.text ?? "";
     else if (node.type === "tab") text = "\t";
@@ -1105,8 +1140,10 @@ function renderInline(
       text = context.notes?.references?.get(String(attrs.story)) ?? "";
     else if (node.type === "noteMark") text = context.notes?.mark ?? "";
     // A custom node without its extension here (ADR-0008): its `.docx` text, else its type.
-    else if (CUSTOM_TYPE.test(node.type)) text = foreignTextOf(node) ?? `[${node.type}]`;
-    else if (node.type === "opaqueInline") {
+    else if (CUSTOM_TYPE.test(node.type)) {
+      drawn = drawing?.node(node, doc) ?? null;
+      text = drawn ? "" : (foreignTextOf(node) ?? `[${node.type}]`);
+    } else if (node.type === "opaqueInline") {
       const xml = parseOpaque(String(attrs.xml ?? ""), doc);
       const separator = separatorElement(xml, doc);
       if (separator) {
@@ -1126,7 +1163,14 @@ function renderInline(
     const run = resolver.run(paragraphRun, marks);
     let element: HTMLElement = doc.createElement("span");
     styleRun(element, run, lineHeight(paragraph, run, ratio(fontStack(latin(run)))));
-    element.textContent = text;
+    if (drawn) {
+      element.dataset.foliCustom = node.type;
+      element.append(drawn);
+    } else element.textContent = text;
+    for (const mark of marks) {
+      const custom = CUSTOM_TYPE.test(mark.type) ? drawing?.mark(mark) : null;
+      if (custom) applyAttrs(element, custom);
+    }
     if (node.type === "noteReference") element.setAttribute(NOTE_REF_ATTR, String(attrs.story));
     if (node.type === "noteReference" || node.type === "noteMark")
       element.setAttribute(NOTE_NUMBER_ATTR, "");
@@ -1173,6 +1217,16 @@ export function opaqueBlock(
   /** The list marker of the next cell paragraph drawn (lists are numbered through tables). */
   markerOf: () => ListMarker | null = () => null,
 ): WordBlock {
+  const drawn = CUSTOM_TYPE.test(node.type) ? drawing?.node(node, doc) : null;
+  if (drawn) {
+    // A custom block drawn by its node view: kept whole on one page (as in a table cell).
+    const box = doc.createElement("div");
+    box.dataset.foliCustom = node.type;
+    box.style.display = "flow-root";
+    box.append(drawn);
+    const keep = { keepNext: false, keepLines: true, pageBreakBefore: false, section: null };
+    return { element: box, nodes: [index], before: 0, after: 0, ...keep };
+  }
   const attrs = (node.attrs ?? {}) as Record<string, unknown>;
   const element = doc.createElement("div");
   element.dataset.foliOpaque = String(attrs.label ?? "");

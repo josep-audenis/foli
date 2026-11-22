@@ -123,10 +123,15 @@ checklist in [testing/ime.md](testing/ime.md)):
 
 Custom nodes and marks, plugins and toolbar items ([extensions](guides/extensions.md)).
 
-- Node views, mark views and decorations draw only in the editor (`EditorView`): `renderDocument` and `exportPdf` take no extensions, so they draw a
-  custom node as its `.docx` text or its type in brackets and a custom mark not at all; the same
-  for headers, footers and notes as the pages show them, until one is opened for editing on its
-  page. A custom block in a table cell is kept whole (it does not split between pages); a split
+- Node and mark views draw in the editor and, given the `extensions` (19.3), in `renderDocument`
+  and `exportPdf` (a script setting `globalThis.foliPdfExtensions` in the page) and in headers,
+  footers and notes as the pages show them; without them a custom node is its `.docx` text or its
+  type in brackets and a custom mark is not drawn. Decorations and plugin views are the editor's
+  only. On read-only pages, and in headers, footers and notes, what `render` returned is copied:
+  the copies do not follow later changes to it (a chart drawn afterwards, a canvas's pixels) and
+  `destroy` is not called; a custom block is kept whole unless taller than a page. In `exportPdf`
+  a custom node whose attributes its spec refuses throws inside the page (Node validates without
+  the extensions), and a script that fails prints the document without the views, silently. A custom block in a table cell is kept whole (it does not split between pages); a split
   block node view is drawn once per page (its `render` runs per part, each part's `destroy` when
   dropped). A node view's DOM is never read back: what it changes later is not checked, and
   `h`'s checks cover only what `h` makes. Decorations take body

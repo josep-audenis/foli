@@ -91,6 +91,7 @@ import {
 import { docFromClipboard, FOLI_MIME, serializeRange } from "./clipboard.js";
 import {
   checkAttrs,
+  customDrawing,
   type Decoration,
   type Drawn,
   decorationsByBlock,
@@ -774,6 +775,8 @@ export class EditorView {
       resource: (key: string, resource: ResourceJSON) => this.resource?.(key, resource),
       measureIn: () => this.pages[0] ?? host,
       scale: () => this.scale(),
+      // Headers, footers and notes as the pages show them draw custom content too (19.3).
+      custom: customDrawing(editor.extensions),
     };
     this.regions = this.paged
       ? new PageRegions(host.ownerDocument, storyOptions, new WeakMap())

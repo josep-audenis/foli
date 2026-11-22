@@ -1037,7 +1037,7 @@ const view = new EditorView(host, editor, { editable: true, placeholder: "" });
   (null when the browser cannot show it); `textWidthEmu(state)`: the widest a picture is
   inserted, in EMU (the last section's text width: shortcut, not the caret's section);
   `EMU_PER_PX` (9525). For an app's own picture insert, as the toolbar's dialog does it.
-- `renderDocument(document, container, { review?, resource?, fieldCodes? }): DocumentPages` (a read-only view, no
+- `renderDocument(document, container, { review?, resource?, fieldCodes?, extensions? }): DocumentPages` (`extensions`: custom nodes and marks drawn with their views, 19.3; a read-only view, no
   editor; `RenderDocumentOptions`): lays a schema v3 document out on
   pages (`.foli-word-page`, `WORD_PAGE_CLASS`) appended to `container`, formatted as Word
   formats it. `review`: `"markup"` (default: insertions underlined, deletions struck through,
@@ -1243,7 +1243,10 @@ version (since 1.0.0). Details: the
   `{ data, contentType }`, as a `.docx` package part is, an image `data:` URL, `null` for its
   box, `undefined` for the resource's own `data:` URL; a web URL prints the box), `review`
   (`"markup"`, the default; `"simple"`; `"final"`), `styles` (CSS added first, such as
-  `@font-face` rules with `data:` URLs; every face declared is loaded before the layout).
+  `@font-face` rules with `data:` URLs; every face declared is loaded before the layout),
+  `extensions` (a script of the app's run in the page first, setting
+  `globalThis.foliPdfExtensions` to its extensions: custom nodes and marks print with their views;
+  it runs with the renderer's rights, so never build it from a document).
 - The page loads nothing from the network: its Content Security Policy allows `data:` images and
   fonts, inline scripts and styles only, so a document cannot make the exporting server request
   an address. An image not decoded after 10 seconds prints without it.

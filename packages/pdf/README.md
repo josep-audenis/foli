@@ -30,7 +30,8 @@ await browser.close();
 What it does, in the page (its content is replaced):
 
 1. Adds the package's renderer (`dist/renderer.js`: `@folijs/core` and `@folijs/view`'s read-only
-   renderer, bundled; your app needs nothing else) and the CSS you give (`styles`).
+   renderer, bundled; your app needs nothing else) and the CSS you give (`styles`), after your
+   `extensions` script if you give one (custom nodes, below).
 2. Lays the document out on pages: every section's page size, margins and columns, headers and
    footers, footnotes and endnotes, tables, pictures, tracked changes as `review` says (`markup`,
    the default; `simple`; `final`).
@@ -73,6 +74,14 @@ one `resources` returns) prints the picture's box, and the page's Content Securi
 'unsafe-inline'`) blocks every other request, those of `styles` included (`@import`, a web font).
 To print a web image, fetch it yourself (checking the address) and give its bytes. Links are kept
 in the PDF but never followed.
+
+## Custom nodes and marks
+
+Functions cannot be passed into the page, so an editor's extensions come as a script of your own,
+`extensions`, run there before the renderer: it sets `globalThis.foliPdfExtensions` to the
+extensions array (bundle their code into it; `h` is given to `render`). Without it custom nodes
+print as their `.docx` text. A script that fails prints the document without the views, with no
+error; it runs with the renderer's rights, so never build it from a document.
 
 ## Puppeteer
 

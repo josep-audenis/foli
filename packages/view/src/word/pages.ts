@@ -5,6 +5,7 @@
  * v3 in 8.7.
  */
 import {
+  type Extension,
   type FieldLayout,
   type FoliDocument,
   noteNumbers,
@@ -16,6 +17,7 @@ import {
   type SectionJSON,
 } from "@folijs/core";
 import { Resolver } from "@folijs/core/internal";
+import { customDrawing } from "../extension.js";
 import {
   type BlockBox,
   type FlowNote,
@@ -223,6 +225,11 @@ export interface RenderDocumentOptions {
    * resource's own image `data:` URL or web URL (fetched as it is shown).
    */
   resource?: (key: string, resource: ResourceJSON) => string | null | undefined;
+  /**
+   * The editor's extensions: custom nodes and marks drawn by their node and mark views (19.3),
+   * else as their `.docx` text. Give the same array the document was read with.
+   */
+  extensions?: readonly Extension[];
 }
 
 /**
@@ -233,8 +240,10 @@ export interface RenderDocumentOptions {
 export function renderDocument(
   document: FoliDocument,
   container: HTMLElement,
-  options: RenderDocumentOptions = {},
+  given: RenderDocumentOptions = {},
 ): DocumentPages {
+  const { extensions, ...rest } = given;
+  const options = { ...rest, custom: customDrawing(extensions) };
   const doc = container.ownerDocument;
   // What notes show: numbers depend on the pages only where they restart on each.
   const model = document.stories ? parseContent(document.content) : null;

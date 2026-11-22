@@ -2790,8 +2790,15 @@ agent's review.
   Text boxes left out: the view does not draw them yet (opaque, `NOT_INLINE` in
   `view/src/word/blocks.ts`), so a match would point at nothing on the page; find in them comes
   with drawing them, After 1.0.)
-- [ ] 19.3 Extensions in `renderDocument` and `exportPdf`: the same `extensions` array, node and
-  mark views drawn on read-only pages; headers, footers and notes too.
+- [x] 19.3 Extensions in `renderDocument` and `exportPdf`: the same `extensions` array, node and
+  mark views drawn on read-only pages; headers, footers and notes too. (Done: `renderDocument`'s
+  `extensions`; the view's `customDrawing` reads each custom node into the extensions' schema and
+  calls its `render`, else draws its spec's `text`; mark views' attributes on runs; the editor's
+  headers, footers and notes as the pages show them use it too. `exportPdf`'s `extensions` is a
+  script run in the page before the renderer, setting `globalThis.foliPdfExtensions` (taken once,
+  so a page used again does not keep them): functions cannot cross into the page. A custom block
+  on read-only pages is kept whole unless taller than a page; copies (headers, notes, later
+  parts) are snapshots and `destroy` is not called (limitations). Tested in jsdom and in Chromium's PDF (e2e).)
 - [ ] 19.4 Tables: a column width field in the table properties (keyboard, undoable); autofit
   tables fitted to their content (Word's rules: preferred widths, minimum content width, the
   page's width), a fixed table untouched; the `shortcut:` in `table.ts` removed.
@@ -2852,7 +2859,6 @@ supplies, so a server without a browser cannot make PDFs).
 - Dragging text does nothing; on Android, Backspace at a list paragraph's start may join it into
   the paragraph before; some Android keyboards insert paragraphs without the events the editor
   needs.
-- `renderDocument` and `exportPdf` take no extensions, so custom nodes do not draw there.
 - Tables: autofit keeps Word's saved widths (no fitting to content); no keyboard way to set a
   column's width.
 - Pictures: no cropping, rotation or touch resizing; resizing is refused while tracking.

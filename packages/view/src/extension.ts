@@ -16,7 +16,9 @@ import {
   type Mark,
   type Node as ModelNode,
 } from "@folijs/core";
+import { schemaWith } from "@folijs/core/internal";
 import type { EditorView } from "./view.js";
+import type { CustomDrawing } from "./word/blocks.js";
 
 /**
  * Attributes put on a drawn element: `class` is added to its classes, `style` to its style, any
@@ -264,4 +266,57 @@ export function decorationsByBlock(
     }
   }
   return out;
+}
+
+/**
+ * Custom nodes and marks of `extensions` drawn by their views on read-only pages (19.3): a node
+ * read into the extensions' schema, then `render`; without a view, or when it fails, the node's
+ * `text` (its spec's), else as without extensions. Undefined when no extension is given.
+ * shortcut: no `destroy` and no later changes: the pages copy what `render` returned (headers,
+ * notes, a block's parts on later pages); keep the drawn roots for `destroy` if a view needs it.
+ * @internal
+ */
+export function customDrawing(
+  extensions: readonly Extension[] | undefined,
+): CustomDrawing | undefined {
+  if (!extensions?.length) return undefined;
+  const views = viewsOf(extensions as readonly ViewExtension[]);
+  const schema = schemaWith(extensions);
+  return {
+    node(json, doc) {
+      const type = schema.nodes[json.type];
+      if (!type) return null;
+      let node: ModelNode;
+      try {
+        // Without its marks: one of an extension not given would refuse the node (a view draws
+        // the node, its run carries the marks).
+        node = schema.nodeFromJSON({ ...json, marks: undefined });
+      } catch {
+        // Attributes its spec refuses: drawn as without extensions.
+        return null;
+      }
+      const view = views.nodes.get(json.type);
+      if (view)
+        try {
+          return view.render(node, nodeViewDOM(doc));
+        } catch (error) {
+          reportError(error);
+        }
+      const text = type.spec.text?.(node.attrs);
+      return text === undefined ? null : doc.createTextNode(text);
+    },
+    mark(json) {
+      const view = views.marks.get(json.type);
+      if (!view) return null;
+      try {
+        const attrs = view(schema.markFromJSON(json));
+        // Refused here, as the editor refuses them: never thrown out of the whole render.
+        checkAttrs(attrs);
+        return attrs;
+      } catch (error) {
+        reportError(error);
+        return null;
+      }
+    },
+  };
 }
