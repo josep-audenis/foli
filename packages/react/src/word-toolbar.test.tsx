@@ -143,6 +143,16 @@ describe("FoliToolbar on a schema v3 document", () => {
     expect(stops.filter((e) => e.tabIndex === 0)).toHaveLength(1);
   });
 
+  it("inserts Word's horizontal line: a paragraph's bottom border", () => {
+    const editor = setup();
+    act(() => editor.select(6));
+    act(() => (screen.getByRole("button", { name: "Horizontal line" }) as HTMLElement).click());
+    expect(attrs(editor)[1]).toEqual({
+      borders: { bottom: { style: "single", size: 6, space: 1, color: "auto" } },
+    });
+    expect(editor.getDocument().content.content).toHaveLength(4);
+  });
+
   it("tracks changes, shows them, goes to them, accepts and rejects them", () => {
     const editor = setup();
     const button = (name: string) => screen.getByRole("button", { name });

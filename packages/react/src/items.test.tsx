@@ -99,6 +99,7 @@ const NAMES = {
   cellShading: 1,
   picture: 1,
   pageBreak: 1,
+  horizontalRule: 1,
   section: 1,
   headerFooter: 1,
   fields: 1,

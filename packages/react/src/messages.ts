@@ -98,6 +98,7 @@ export const toolbarMessages = [
   "Height (px)",
   "Highlight",
   "Home",
+  "Horizontal line",
   "I",
   "I, II, III",
   "Image",

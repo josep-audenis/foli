@@ -210,7 +210,7 @@ The built-in items are exported by name in `toolbarItems` (`ToolbarItemName`: `s
 `alignCenter`, `alignEnd`, `alignJustify`, `lineSpacing`, `bulletList`, `orderedList`, `outdent`,
 `indent`, `newComment`, `trackChanges`, `reviewView`, `previousChange`, `nextChange`,
 `acceptChange`, `rejectChange`, `acceptAll`, `rejectAll`, `undo`, `redo`, `table`, `tableStyle`,
-`cellShading`, `picture`, `pageBreak`, `section`, `headerFooter`, `fields`, `navigate`, `notes`,
+`cellShading`, `picture`, `pageBreak`, `horizontalRule`, `section`, `headerFooter`, `fields`, `navigate`, `notes`,
 `controls`), and the default toolbar is `defaultToolbarItems`, groups of them. `items` (or
 `FoliEditor`'s `toolbar`) takes groups of items to add, remove, reorder and regroup them; an
 empty group is left out, and New comment shows only with `comments`. An item's `key` is its
@@ -714,6 +714,8 @@ section)` lists those as `sectionFormatting`, and accepting and rejecting resolv
 
 Tables (on the table around the selection: a cell selection's rectangle, or the caret's cell):
 `insertTable(rows, columns)` (Word's Table Grid style, up to 1000 rows and 63 columns),
+`insertHorizontalRule` (Word's horizontal line, an empty paragraph with a bottom border, where
+a table would go),
 `insertRow(dir)`, `deleteRows`, `insertColumn(dir)`, `deleteColumns`, `deleteTable`,
 `mergeCells`, `splitCell`, `toggleHeaderRow` (`isHeaderRow(state)`), `setTableStyle(name |
 null)` (`tableStyles(state)`, `tableStyleAt(state)`), `setCellShading(fill | null)` (`RRGGBB`),

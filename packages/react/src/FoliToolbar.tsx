@@ -30,6 +30,7 @@ import {
   insertControl,
   insertCrossReference,
   insertDate,
+  insertHorizontalRule,
   insertNote,
   insertPageBreak,
   insertPageNumber,
@@ -1164,6 +1165,13 @@ const GROUPS: Item[][] = [
       command: insertPageBreak,
     },
     {
+      key: "horizontalRule",
+      label: "Horizontal line",
+      text: "Horizontal line",
+      enabled: (state) => wordContext(state) !== null && hasTextblock(state),
+      command: insertHorizontalRule,
+    },
+    {
       key: "section",
       label: "Section",
       text: "Section",
@@ -1245,6 +1253,7 @@ export type ToolbarItemName =
   | "cellShading"
   | "picture"
   | "pageBreak"
+  | "horizontalRule"
   | "section"
   | "headerFooter"
   | "fields"
@@ -1318,7 +1327,11 @@ export const defaultToolbarTabs: readonly (ToolbarTab & {
     {
       key: "insert",
       label: "Insert",
-      items: [[t.table, t.picture, t.link], [t.pageBreak], [t.fields, t.notes, t.controls]],
+      items: [
+        [t.table, t.picture, t.link],
+        [t.pageBreak, t.horizontalRule],
+        [t.fields, t.notes, t.controls],
+      ],
     },
     {
       key: "layout",
