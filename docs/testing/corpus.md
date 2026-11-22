@@ -56,7 +56,7 @@ page errors, and pages whose content overflows the sheet.
 
 On Windows with Word: `node scripts/corpus/word-sample.mjs export <run>.jsonl <dir>` copies a
 sample and Foli's exports to `<dir>` (outside the repository), `word-reference.ps1` measures each
-half in Word, and `word-sample.mjs compare <dir>` lists what Word measured differently (the
+half in Word (into new, empty folders), and `word-sample.mjs compare <dir>` lists what Word measured differently (the
 script's header has the commands).
 
 ## Reading the results

@@ -1,15 +1,19 @@
 // Word on a sample of the corpus run (Phase 20.6). Two steps around word-reference.ps1:
 //
+// After `pnpm build` (the export uses packages/docx/dist):
+//
 //   node scripts/corpus/word-sample.mjs export <run>.jsonl <dir> [per-project = 30]
 //     copies the first files (by SHA-256) of each project that imported, exported and read back
 //     to <dir>/orig, and Foli's export of each (no edit) to <dir>/export;
 //   powershell -File scripts/corpus/word-reference.ps1 -In <dir>\orig -Out <dir>\ref-orig
 //   powershell -File scripts/corpus/word-reference.ps1 -In <dir>\export -Out <dir>\ref-export
+//   (into new, empty ref-* folders: word-reference.ps1 keeps an earlier JSON when it fails)
 //   node scripts/corpus/word-sample.mjs compare <dir>
 //     prints, for each file, what Word measured differently in the export (field names and
 //     indices, no text), then the counts.
 //
-// <dir> must be outside the repository: the measurements hold the documents' text.
+// <dir> must be outside the repository: the measurements hold the documents' text, and the
+// output names the files.
 import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -79,11 +83,12 @@ if (mode === "export") {
     count.compared++;
     const diffs = [];
     for (const key of new Set([...Object.keys(a), ...Object.keys(b)])) {
-      if (key === "file" || same(a[key], b[key])) continue;
+      if (same(a[key], b[key])) continue;
       keys[key] = (keys[key] ?? 0) + 1;
       const [x, y] = [a[key], b[key]];
       if (Array.isArray(x) && Array.isArray(y)) {
-        const first = x.findIndex((item, i) => !same(item, y[i]));
+        const differs = x.findIndex((item, i) => !same(item, y[i]));
+        const first = differs >= 0 ? differs : Math.min(x.length, y.length);
         const fields =
           first >= 0 && x[first] && typeof x[first] === "object"
             ? Object.keys(x[first]).filter((k) => !same(x[first][k], y[first]?.[k]))
