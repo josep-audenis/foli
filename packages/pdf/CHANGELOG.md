@@ -1,5 +1,25 @@
 # @folijs/pdf
 
+## 1.4.0
+
+### Minor Changes
+
+- 532cecd: `renderDocument` takes `extensions`: custom nodes and marks draw with their node and mark views
+  on read-only pages, and so do the editor's headers, footers and notes as the pages show them.
+  `exportPdf` takes `extensions`, a script of the app's that sets `globalThis.foliPdfExtensions` in
+  the printing page.
+
+### Patch Changes
+
+- Updated dependencies [249ccb7]
+- Updated dependencies [5aa59f0]
+- Updated dependencies [06fb3e1]
+- Updated dependencies [e13f0ef]
+- Updated dependencies [5386935]
+- Updated dependencies [989af53]
+- Updated dependencies [fce706b]
+  - @folijs/core@1.4.0
+
 ## 1.3.0
 
 ### Patch Changes

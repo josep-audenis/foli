@@ -1,5 +1,46 @@
 # @folijs/react
 
+## 1.4.0
+
+### Minor Changes
+
+- 249ccb7: `findInComments` and `replaceInComments` search and replace in comments and replies (one undo
+  step, not tracked). The find panel lists the comments a search finds, each going to the text its
+  thread is on, and offers Replace in comments.
+- 5aa59f0: `insertHorizontalRule` inserts Word's horizontal line (an empty paragraph with a bottom border),
+  tracked while tracking; the toolbar's Insert group has a Horizontal line button
+  (`horizontalRule`); its new toolbar string is "Horizontal line".
+- 5386935: `setPictureRotation` and `setPictureCrop` (the image keeps its scale, as Word's crop does). The
+  picture dialog has Rotation (with Rotate left and right 90°) and Crop (%) by side. New toolbar
+  strings: "Rotation (degrees)", "Rotate left 90°", "Rotate right 90°", "Crop (%)", "Left", "Top",
+  "Right", "Bottom", "Enter a rotation in degrees.", "Enter what to crop in percent, leaving
+  some of the picture.", "This picture's crop or rotation is the file's: import it again to change
+  it.", "The size, rotation and crop do not change while changes are
+  tracked.".
+- fce706b: Autofit tables widen a column for content that cannot break (a long word, a picture), as Word
+  does, keeping Word's saved widths otherwise, the same on every page a table goes over; fixed
+  tables keep their grid. The Table menu has Column width… (`"columnWidth"` dialog) to set the
+  selection's column width from the keyboard; core's `columnAt(state)` gives that column and the
+  widths it may take. New toolbar strings: "Column width…", "Column width", "Column width (cm)",
+  "Enter a width in cm from {min} to {max}.", "This column cannot be made wider or narrower.".
+
+### Patch Changes
+
+- Updated dependencies [4caade0]
+- Updated dependencies [401daf8]
+- Updated dependencies [532cecd]
+- Updated dependencies [249ccb7]
+- Updated dependencies [a466188]
+- Updated dependencies [5aa59f0]
+- Updated dependencies [06fb3e1]
+- Updated dependencies [e13f0ef]
+- Updated dependencies [5386935]
+- Updated dependencies [989af53]
+- Updated dependencies [ea3fa4c]
+- Updated dependencies [fce706b]
+  - @folijs/view@1.4.0
+  - @folijs/core@1.4.0
+
 ## 1.3.0
 
 ### Minor Changes

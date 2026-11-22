@@ -1,5 +1,44 @@
 # @folijs/core
 
+## 1.4.0
+
+### Minor Changes
+
+- 249ccb7: `findInComments` and `replaceInComments` search and replace in comments and replies (one undo
+  step, not tracked). The find panel lists the comments a search finds, each going to the text its
+  thread is on, and offers Replace in comments.
+- 5aa59f0: `insertHorizontalRule` inserts Word's horizontal line (an empty paragraph with a bottom border),
+  tracked while tracking; the toolbar's Insert group has a Horizontal line button
+  (`horizontalRule`); its new toolbar string is "Horizontal line".
+- 5386935: `setPictureRotation` and `setPictureCrop` (the image keeps its scale, as Word's crop does). The
+  picture dialog has Rotation (with Rotate left and right 90°) and Crop (%) by side. New toolbar
+  strings: "Rotation (degrees)", "Rotate left 90°", "Rotate right 90°", "Crop (%)", "Left", "Top",
+  "Right", "Bottom", "Enter a rotation in degrees.", "Enter what to crop in percent, leaving
+  some of the picture.", "This picture's crop or rotation is the file's: import it again to change
+  it.", "The size, rotation and crop do not change while changes are
+  tracked.".
+- 989af53: Schema 6: a picture's `rotation` (60 000ths of a degree) and `crop` (`left`, `top`, `right`,
+  `bottom`, 1000ths of a percent), read from `.docx`, drawn and written back. Documents are saved
+  with the lowest schema their content needs: one without a rotated or cropped picture still says
+  5, which 1.0 to 1.3 read; one with them says 6, which they refuse (as a newer document).
+  `SCHEMA_VERSION` is 6 and `FoliDocument["schemaVersion"]` is `5 | 6`.
+- fce706b: Autofit tables widen a column for content that cannot break (a long word, a picture), as Word
+  does, keeping Word's saved widths otherwise, the same on every page a table goes over; fixed
+  tables keep their grid. The Table menu has Column width… (`"columnWidth"` dialog) to set the
+  selection's column width from the keyboard; core's `columnAt(state)` gives that column and the
+  widths it may take. New toolbar strings: "Column width…", "Column width", "Column width (cm)",
+  "Enter a width in cm from {min} to {max}.", "This column cannot be made wider or narrower.".
+
+### Patch Changes
+
+- 06fb3e1: The replace algorithm, step maps, steps, structure checks, selections, transactions and history
+  helpers are rewritten as Foli's own code, with the same API and saved format. One edge case
+  changes: a structure step (split, join, wrap, lift) mapped onto a range that starts inside a text
+  node now fails instead of deleting the rest of that text.
+  `addMark` also joins the removal of marks the new mark excludes into one step per mark over
+  consecutive text (it made one per text node before); the document is the same.
+- e13f0ef: Deleting a whole paragraph you inserted yourself while tracking changes now removes it without a trace, at the end of the document or of a cell too (several together included). Before, when the deletion ended at that paragraph's end, the paragraph after it took its "inserted" mark, and rejecting every change then joined that paragraph with the next one. `@folijs/agent` met it as an insert followed by `deleteBlock`.
+
 ## 1.3.0
 
 ### Minor Changes

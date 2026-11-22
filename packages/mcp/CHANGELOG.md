@@ -1,5 +1,21 @@
 # @folijs/mcp
 
+## 0.2.2
+
+### Patch Changes
+
+- 5ed16bc: Code mode: a run's 10 seconds count from when its sandbox is ready, not from when its thread is started. On a busy machine starting the thread and QuickJS alone took seconds, and a short script could fail with "It did not finish in 10 seconds" without having run. The start has a limit of its own, 30 seconds ("The sandbox did not start in 30 seconds.").
+- Updated dependencies [249ccb7]
+- Updated dependencies [5aa59f0]
+- Updated dependencies [06fb3e1]
+- Updated dependencies [e13f0ef]
+- Updated dependencies [5386935]
+- Updated dependencies [989af53]
+- Updated dependencies [fce706b]
+  - @folijs/core@1.4.0
+  - @folijs/docx@1.4.0
+  - @folijs/agent@0.3.1
+
 ## 0.2.1
 
 ### Patch Changes
