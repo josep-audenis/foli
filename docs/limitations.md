@@ -426,7 +426,9 @@ Unstable (0.x). Details in the [package README](../packages/mcp/README.md) and
 
 Details in the [package README](../packages/docx/README.md).
 
-- Strict Open XML documents are refused (`DocxError`) until a real file needs them. Encrypted
+- Strict Open XML documents are refused (`DocxError`): 71 of the corpus run's 3 445 files, on
+  the backlog. So is a document whose root is inside markup compatibility (`mc:AlternateContent`,
+  60 files, all docx4j tests). Encrypted
   zip entries, ZIP64 and compression methods other than stored and deflate are refused too.
 - A package may hold at most 10 000 entries, 512 MiB uncompressed and 4 000 000 XML nodes in the
   parts read, a paragraph counting four (`maxEntries`, `maxSize`, `maxNodes`; lower them on a
