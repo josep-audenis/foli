@@ -52,6 +52,13 @@ then recorded as such):
 The renderer pass lays out every imported file with `renderDocument` in Chromium: pages, time,
 page errors, and pages whose content overflows the sheet.
 
+## Word on a sample
+
+On Windows with Word: `node scripts/corpus/word-sample.mjs export <run>.jsonl <dir>` copies a
+sample and Foli's exports to `<dir>` (outside the repository), `word-reference.ps1` measures each
+half in Word, and `word-sample.mjs compare <dir>` lists what Word measured differently (the
+script's header has the commands).
+
 ## Reading the results
 
 `.corpus-cache/results/<time>.jsonl` has a line per distinct file; `<time>.summary.json` counts
