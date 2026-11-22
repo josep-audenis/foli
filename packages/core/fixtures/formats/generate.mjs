@@ -1,4 +1,4 @@
-// Writes the 0.x format fixtures, each saved by the release that wrote that schema version, from
+// Writes the format fixtures (0.x, and 1.x minors that add one), each saved by the release that wrote that schema version, from
 // its git tag: `node packages/core/fixtures/formats/generate.mjs` (then `pnpm format`). The
 // fixtures stand for documents already saved: run this only to add a format, never to "update"
 // one. See README.md here.
@@ -175,6 +175,32 @@ try {
       const parsed = core.parseDocument(JSON.parse(JSON.stringify(document)));
       save(`v${parsed.schemaVersion}-${file}.json`, parsed);
     }
+  }
+
+  // v6 (1.4.0): a picture rotated and cropped by 1.4.0's own commands, saved by its editor.
+  {
+    const { core } = await release("1.4.0");
+    const dot =
+      "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFBQIAX8jx0gAAAABJRU5ErkJggg==";
+    const editor = core.createEditor({
+      document: core.createDocument({
+        type: "doc",
+        content: [{ type: "paragraph", content: [t("A rotated, cropped picture: ")] }],
+      }),
+    });
+    editor.select(29);
+    editor.run(
+      core.insertPicture({
+        contentType: "image/png",
+        data: dot,
+        width: 914400,
+        height: 457200,
+        alt: "A dot",
+      }),
+    );
+    editor.run(core.setPictureRotation(29, 5_400_000));
+    editor.run(core.setPictureCrop(29, { left: 10000, top: 5000, right: 10000, bottom: 5000 }));
+    save("v6.json", core.parseDocument(JSON.parse(JSON.stringify(editor.getDocument()))));
   }
 } finally {
   rmSync(work, { recursive: true, force: true });
