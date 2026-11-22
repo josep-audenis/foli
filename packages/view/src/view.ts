@@ -2047,7 +2047,9 @@ export class EditorView {
           hidden &&
           node.type.name === "paragraph" &&
           !!revision?.deletion &&
-          parent?.maybeChild(index + 1)?.type.name === "paragraph";
+          // Only the story's own paragraphs: a cell's are drawn apart, joined or not.
+          parent === tree &&
+          parent.maybeChild(index + 1)?.type.name === "paragraph";
         if (joins) carry += shown(end);
         else {
           block++;

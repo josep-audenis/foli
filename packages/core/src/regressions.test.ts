@@ -370,3 +370,30 @@ describe("one's own inserted paragraph, deleted whole, at the end of the documen
     expect(trackedChanges(editor.state.doc).length).toBeGreaterThan(0);
   });
 });
+
+describe("several of one's own paragraphs, deleted together at the document's end", () => {
+  it("go with nothing left", async () => {
+    const { acceptAllChanges, rejectAllChanges, trackedChanges } = await import("./state/index.js");
+    const editor = createEditor({
+      document: documentOf([p("One"), p("Two")]),
+      author: "Me",
+      trackChanges: true,
+    });
+    const original = JSON.stringify(editor.getDocument().content);
+    const { schema } = editor.state;
+    const make = (t: string) =>
+      (schema.nodes.paragraph as never as { create: (a: null, c: unknown) => never }).create(
+        null,
+        schema.text(t),
+      );
+    const start = editor.state.doc.content.size;
+    editor.dispatch(editor.state.tr.insert(start, [make("New1"), make("New2")] as never));
+    expect(paragraphs(editor)).toEqual(["One", "Two", "New1", "New2"]);
+    editor.dispatch(editor.state.tr.delete(start, editor.state.doc.content.size));
+    expect(trackedChanges(editor.state.doc)).toEqual([]);
+    expect(JSON.stringify(editor.getDocument().content)).toBe(original);
+    editor.run(acceptAllChanges());
+    editor.run(rejectAllChanges());
+    expect(JSON.stringify(editor.getDocument().content)).toBe(original);
+  });
+});

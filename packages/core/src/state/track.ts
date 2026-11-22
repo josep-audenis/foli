@@ -390,20 +390,23 @@ function rebuild(
           (from <= pos && to >= end && (inserting || !!doc.resolve(end).nodeAfter));
         // One's own paragraph, last of the document or of a cell, deleted whole: its mark cannot
         // join a paragraph after it, so it goes with the paragraph before it, as if never there.
-        const $at = doc.resolve(pos);
+        // Several of one's own, the last of them last: from where the first starts (a group of
+        // own paragraphs joined for real, none of whose content stays).
+        const first = group !== null && !groupLive && from <= group ? group : pos;
         if (
-          group === null &&
+          (group === null || first === group) &&
           !inserting &&
           from <= pos &&
           to >= end &&
           !doc.resolve(end).nodeAfter &&
-          $at.nodeBefore?.isTextblock &&
+          doc.resolve(first).nodeBefore?.isTextblock &&
           !revision?.deletion &&
           revision?.insertion?.author === author &&
           !node.attrs.section &&
           ownContent(node)
         ) {
-          real.push([pos, end]);
+          real.push([first, end]);
+          group = null;
           return false;
         }
         if (

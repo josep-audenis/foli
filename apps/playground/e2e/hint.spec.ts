@@ -292,3 +292,61 @@ test("in a header's copy: the final view's joined paragraph and deleted text, a 
   expect(await hint(page, { story: "h1", from: dogFrom, to: dogTo }, 3000)).toBe(true);
   expect(new Set(await marks(page))).toEqual(new Set(["dog"]));
 });
+
+test("in a header's table, a cell's paragraph with a deleted mark is not joined (final view)", async ({
+  page,
+}) => {
+  const doc = sample() as { stories: Json };
+  const change = { id: 91, author: "Someone", date: "2026-01-01T00:00:00Z" };
+  doc.stories = {
+    h1: {
+      kind: "header",
+      content: {
+        type: "doc",
+        content: [
+          {
+            type: "table",
+            content: [
+              {
+                type: "tableRow",
+                content: [
+                  {
+                    type: "tableCell",
+                    content: [
+                      {
+                        type: "paragraph",
+                        attrs: { revision: { deletion: change } },
+                        content: [text("Gone")],
+                      },
+                      paragraph("Kept"),
+                    ],
+                  },
+                ],
+              },
+            ],
+          },
+          paragraph("the cat line"),
+        ],
+      },
+    },
+  };
+  await page.goto("/edit.html");
+  await page.waitForFunction(() => !!window.foliEdit);
+  await page.evaluate((d) => window.foliEdit.load(d as never), doc);
+  await page.evaluate(() => window.foliEdit.editor.commands.setReviewView("final"));
+  await page.waitForFunction(() =>
+    [...document.querySelectorAll(".foli-region-content")].some((r) =>
+      /the cat line/.test(r.textContent ?? ""),
+    ),
+  );
+  const [from, to] = await page.evaluate(() => {
+    let found: [number, number] = [0, 0];
+    window.foliEdit.editor.story("h1")?.state.doc.descendants((node, pos) => {
+      if (node.isTextblock && node.textContent === "the cat line") found = [pos + 5, pos + 8];
+      return true;
+    });
+    return found;
+  });
+  expect(await hint(page, { story: "h1", from, to }, 3000)).toBe(true);
+  expect(new Set(await marks(page))).toEqual(new Set(["cat"]));
+});
