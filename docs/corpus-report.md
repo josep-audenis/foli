@@ -110,3 +110,28 @@ the fixes above.
 
 After these (a run of the whole set, 2026-11-22): 3 259 of 3 445 import, export and read back
 (3 204, 93.0%, with no difference counted), 186 refused, no crash, no paragraph text changed; the second import differs only in the 8 merged `w:pPr` files.
+
+## Word on a sample
+
+20.6, 2026-11-22, Word 365 on Windows: `scripts/corpus/word-sample.mjs` took the first 30 files
+(by SHA-256) of each project that import, export and read back (150: five projects, 30 each), and Foli's export of each with no edit;
+`word-reference.ps1` measured both in Word (opened without a repair, pages, each paragraph's
+text, page, line and list number, revisions, comments, notes, fields, bookmarks, content controls,
+pictures, sections and their headers and footers).
+
+| Outcome                                                                    | Files |
+| -------------------------------------------------------------------------- | ----: |
+| Word opens both and measures the same                                      |   142 |
+| Word opens both and measures a difference                                  |     1 |
+| Word refuses both (`UnknownElement`, POI's OPC compliance tests, two more) |     4 |
+| Word refuses the original as damaged and opens the export                  |     1 |
+| Opened both, not measured: a signed document, a protected one              |     2 |
+| Word opens the original and refuses the export                             |     0 |
+
+The difference: docx4j's `ArialUnicodeMS` has three paragraphs holding a literal soft hyphen
+(U+00AD) in `w:t`. Foli's model holds one character for both that and the `w:softHyphen`
+element, and the export writes the element, so Word shows an optional hyphen where it showed
+the character. The same holds for U+2011 and `w:noBreakHyphen`. Keeping them apart needs a
+model change: on the backlog. The file Word calls damaged
+is POI's `stress005`; Foli's export of it opens, read-only as the file asks (`w:documentProtection`),
+so Word could not measure it.

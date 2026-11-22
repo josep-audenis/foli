@@ -31,7 +31,7 @@ place that says what is in progress; check it before starting work.
 | 17 Toolbar for developers | ✅ Done                  | —                     | Merged in #167–#173; 1.2.0 on npm (2026-11-21), released with Phase 16 (#176)                                                                                                                 |
 | 18 Hint                   | ✅ Done                  | —                     | Merged in #180–#184; 1.3.0 and `@folijs/agent` 0.3.0 on npm (2026-11-22)                                                                                                                      |
 | 19 Editing gaps           | ✅ Done                  | —                     | Merged in #187–#202; 1.4.0 (schema 6), `@folijs/agent` 0.3.1 and `@folijs/mcp` 0.2.2 on npm (2026-11-22); text boxes in find and crop handles left for later; Android and touch emulated only |
-| 20 Corpus run             | In progress              | `phase-20/corpus-run` | 20.1–20.5, 20.7 merged; 20.6 (Word on a sample) and 20.8 (docs, release) left                                                                                                                 |
+| 20 Corpus run             | In progress              | `phase-20/corpus-run` | 20.1–20.7 merged; 20.8 (docs, release) left                                                                                                                                                   |
 | 21 Hardening              | Ready                    | —                     | Planned 2026-11-22 from an audit of 1.4.0, nothing built: data loss, a hang and a PDF leak first                                                                                              |
 
 Status values: `Ready` (dependencies met, nobody on it) · `In progress` · `In review` (PR open) ·
@@ -2967,9 +2967,11 @@ review.
   crash and no paragraph text changed in the whole set. The refusals, Strict Open XML (71) and
   the markup-compatibility root (60), went to the backlog by the owner's choice on 2026-11-22,
   with the classes that change the file without changing what it shows.)
-- [ ] 20.6 Word on a sample (Windows with Word, `word-reference.ps1` on the originals and their
+- [x] 20.6 Word on a sample (Windows with Word, `word-reference.ps1` on the originals and their
   exports): opens without a repair, pages, revisions and comments compared; differences added to
-  the report.
+  the report. (Done: `scripts/corpus/word-sample.mjs`, 150 files, 30 a project: no export Word
+  refuses, 142 of the 143 it measured the same; the one: a literal U+00AD written back
+  as `w:softHyphen`. [corpus-report.md](corpus-report.md#word-on-a-sample).)
 - [x] 20.7 Bug intake: a GitHub issue template asking for the `.docx` (or a reduced one), the
   browser and what was lost; `docs/testing/corpus.md` on running a private folder. (Done:
   `.github/ISSUE_TEMPLATE/docx-file.yml`, public files only or a reduced copy or the result line;
@@ -3134,6 +3136,8 @@ first group and from .docx files the corpus does not cover.
   to an empty body, a break's default type dropped; POI's `Tika-792`, its `w:ins` and
   `w:moveFrom` nested the other way round (row 9's last file); and the renderer's 10 files with a page
   that overflows its sheet (row 14).
+- A literal soft hyphen (U+00AD) or non-breaking hyphen (U+2011) in `w:t` is read as
+  `w:softHyphen` / `w:noBreakHyphen` and written back as the element (Word on a sample, 20.6).
 
 **Speed** ([benchmarks.md](benchmarks.md)): Phase 5's targets at 100 pages, missed at 1.0. In
 Chromium: Enter's handler 9.9 ms and paint p95 35 ms (≤ 25), first layout 118 ms (≤ 60), full
