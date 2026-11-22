@@ -157,6 +157,7 @@ import { measureLineRatio } from "./word/pages.js";
 import { PageRegions, REGION_CONTENT_CLASS } from "./word/regions.js";
 import {
   collect,
+  drawnColumns,
   type FlowItem,
   FRAME_ATTR,
   type Frame,
@@ -201,6 +202,11 @@ export interface TableMeasure {
   tops: Map<number, number | null>;
   /** Where the table may break: inside rows that may split, and between rows (sorted). */
   breaks?: number[];
+  /**
+   * An autofit table's columns as the whole table drew them, in twips (19.4): its parts on the
+   * pages are drawn at these, so they lay out as measured; undefined for a fixed table.
+   */
+  columns?: number[] | undefined;
 }
 
 /** Word's paragraph spacing for a schema v3 document (`flow`'s `word` spacing). */
@@ -1535,6 +1541,7 @@ export class EditorView {
           frames.set(node, { ...kept, pages: pagesOf });
           return pagesOf;
         }
+        const columns = this.measures.get(node)?.table?.columns;
         const wrappers = cut.parts.map((part, k) =>
           frameElement(
             item.frame,
@@ -1543,6 +1550,7 @@ export class EditorView {
             (r, c) =>
               this.cellContent(item.frame, r, c, blocks, (u, f) => cut.partOf.get(u)?.[f] === k),
             doc_,
+            columns,
           ),
         );
         frames.set(node, { wrappers, pages: pagesOf, key });
@@ -3608,7 +3616,7 @@ export class EditorView {
    */
   private columnBorder(
     event: MouseEvent,
-  ): { table: ModelNode; column: number; perTwip: number; rect: DOMRect } | null {
+  ): { table: ModelNode; column: number; perTwip: number; rect: DOMRect; width: number } | null {
     if (!this.editable || this.composing || trackState(this.state)?.on) return null;
     const target = event.target as Element | null;
     const wrapper = target?.closest?.(`[${FRAME_ATTR}="table"]`);
@@ -3617,7 +3625,11 @@ export class EditorView {
     let table: ModelNode | undefined;
     for (const [node, frame] of this.frames)
       if (frame.wrappers.includes(wrapper as HTMLElement)) table = node;
-    const grid = (table?.attrs.grid as number[] | undefined) ?? [];
+    // As drawn: an autofit table's measured columns, else its grid.
+    const grid =
+      (table && this.measures.get(table)?.table?.columns) ??
+      (table?.attrs.grid as number[] | undefined) ??
+      [];
     const total = grid.reduce((a, b) => a + b, 0);
     if (!table || !total) return null;
     const rect = element.getBoundingClientRect();
@@ -3641,7 +3653,9 @@ export class EditorView {
     else if (element.contains(target)) columns = [];
     else columns = [grid.length - 1];
     const column = columns.find(near);
-    return column === undefined ? null : { table, column, perTwip, rect };
+    return column === undefined
+      ? null
+      : { table, column, perTwip, rect, width: grid[column] as number };
   }
 
   /** The pointer over a column border shows that it can be dragged. */
@@ -3686,8 +3700,7 @@ export class EditorView {
       zIndex: "2147483647",
     });
     doc.body.append(guide);
-    const width = (border.table.attrs.grid as number[])[border.column] as number;
-    this.drag = { ...border, width, startX: event.clientX, guide };
+    this.drag = { ...border, startX: event.clientX, guide };
     doc.addEventListener("mousemove", this.onDragMove);
     doc.addEventListener("mouseup", this.onDragEnd);
     doc.addEventListener("keydown", this.onDragKey, true);
@@ -4779,7 +4792,7 @@ function measureTable(
     marginTop: 0,
     marginBottom: 0,
     box: 0,
-    table: { rows, tops },
+    table: { rows, tops, columns: drawnColumns(frame, wrapper, scale) },
   };
 }
 

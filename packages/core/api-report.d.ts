@@ -2232,13 +2232,16 @@ export declare function setTableStyle(name: string | null): Command;
 export declare function setCellShading(fill: string | null): Command;
 /**
  * The grid column whose right border `setColumnWidth` moves for the selection (the last column
- * it covers), with its table's position and its width in twips; null outside a table (19.4: what
- * a keyboard's column width dialog sets).
+ * it covers), with its table's position, its width and the widths it may take (`min`, `max`; the
+ * next column keeps 0.1 inch), in twips; null outside a table (19.4: what a keyboard's column
+ * width dialog sets). `max` is below `min` when the two columns have no room to give.
  */
 export declare function columnAt(state: EditorState): {
     pos: number;
     column: number;
     width: number;
+    min: number;
+    max: number;
 } | null;
 /**
  * Sets grid column `column` of the table at `pos` to `width` twips, as dragging its right border

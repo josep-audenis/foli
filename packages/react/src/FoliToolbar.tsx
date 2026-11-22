@@ -3169,10 +3169,6 @@ const NOTE_FORMATS = [
   ["chicago", "*, †, ‡"],
 ] as const;
 
-/**
- * How notes are placed and numbered, for the whole document as Word's dialog applies it: where
- * they go, the number format, where numbers start and when they restart; Escape cancels.
- */
 /** The width of the selection's table column, in cm (19.4): what dragging its border sets. */
 function ColumnWidthDialog({
   editor,
@@ -3193,14 +3189,23 @@ function ColumnWidthDialog({
   }, []);
   const apply = (event: FormEvent) => {
     event.preventDefault();
-    const twips = toTwips(width, MIN_COLUMN_TWIPS);
-    if (!at || twips === null) {
+    // The width shown, unchanged: nothing to do (cm round to a few twips).
+    if (at && width === toCm(at.width)) {
+      onClose(false);
+      return;
+    }
+    const twips = at && toTwips(width, at.min);
+    if (
+      !at ||
+      twips === null ||
+      twips > at.max ||
+      !editor.run(setColumnWidth(at.pos, at.column, twips))
+    ) {
       setInvalid(true);
       field.current?.focus();
       return;
     }
-    // The same width again changes nothing: a plain close.
-    onClose(twips !== at.width && editor.run(setColumnWidth(at.pos, at.column, twips)));
+    onClose(true);
   };
   return (
     <div
@@ -3234,7 +3239,13 @@ function ColumnWidthDialog({
         </button>
         {invalid && (
           <p id={`${id}-error`} className="foli-link-error" role="alert">
-            {t("Enter a width in cm from 0.26 to 55.88.")}
+            {at && at.max >= at.min
+              ? t("Enter a width in cm from {min} to {max}.", {
+                  // Rounded inwards: each end, typed back, is in range.
+                  min: String(Math.ceil((at.min / TWIPS_PER_CM) * 100) / 100),
+                  max: String(Math.floor((at.max / TWIPS_PER_CM) * 100) / 100),
+                })
+              : t("This column cannot be made wider or narrower.")}
           </p>
         )}
       </form>
@@ -3242,6 +3253,10 @@ function ColumnWidthDialog({
   );
 }
 
+/**
+ * How notes are placed and numbered, for the whole document as Word's dialog applies it: where
+ * they go, the number format, where numbers start and when they restart; Escape cancels.
+ */
 function NoteOptionsDialog({
   editor,
   onClose,
@@ -3529,8 +3544,6 @@ function ControlDialog({
 }
 
 const TWIPS_PER_CM = 1440 / 2.54;
-/** The narrowest column `setColumnWidth` makes, in twips (0.1 inch). */
-const MIN_COLUMN_TWIPS = 144;
 const MAX_TWIPS = 31_680;
 /** Word's limit on a section's columns. */
 const MAX_SECTION_COLUMNS = 45;

@@ -1272,8 +1272,8 @@ export function opaqueBlock(
  * one (Word's default) keeps the widths Word saved as long as its content fits or wraps, and
  * widens a column for what cannot break (a long word, a picture), taking from the others, as
  * Word does: the browsers' automatic layout with the grid as the columns' widths and the table's
- * width kept. shortcut: each page's part of a table split over pages is laid out on its own, so
- * a column widened on one page is not on the others; measure the whole table once if that shows.
+ * width kept. The editor draws a split table's parts at the columns its whole table drew
+ * (`drawnColumns`), so every page has the same; read-only pages clip one whole table.
  * @internal
  */
 export const tableLayout = (layout: unknown): "fixed" | "auto" =>

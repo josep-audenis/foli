@@ -184,6 +184,8 @@ export function frameElement(
   headers: readonly number[],
   content: (row: number, cell: number) => readonly Node[],
   doc: Document,
+  /** An autofit table's columns as the whole table drew them (twips): its parts keep them. */
+  columns?: readonly number[],
 ): HTMLElement {
   const wrapper = doc.createElement("div");
   wrapper.setAttribute(FRAME_ATTR, "table");
@@ -192,14 +194,17 @@ export function frameElement(
   table.setAttribute(FRAME_ATTR, "");
   const { style } = table;
   style.borderCollapse = "collapse";
-  style.tableLayout = tableLayout(frame.node.attrs.layout);
-  const total = frame.grid.reduce((a, b) => a + b, 0);
+  const measured = columns?.length === frame.grid.length ? columns : undefined;
+  // A part of a measured autofit table: fixed at the columns the whole table drew.
+  style.tableLayout = measured ? "fixed" : tableLayout(frame.node.attrs.layout);
+  const grid = measured ?? frame.grid;
+  const total = grid.reduce((a, b) => a + b, 0);
   if (total) style.width = `${total * PX_PER_TWIP}px`;
   if (frame.css.justify === "center") style.margin = "0 auto";
   else if (frame.css.justify === "right") style.marginLeft = "auto";
   else style.marginLeft = frame.css.marginLeft;
   const colgroup = doc.createElement("colgroup");
-  for (const width of frame.grid) {
+  for (const width of grid) {
     const col = doc.createElement("col");
     col.style.width = `${width * PX_PER_TWIP}px`;
     colgroup.append(col);
@@ -288,4 +293,47 @@ function covered(frame: Frame, r: number, column: number, shown: readonly number
     n++;
   }
   return n;
+}
+
+/**
+ * The columns of `wrapper`, a table of `frame` drawn whole, as the browser laid them out, in
+ * twips: from the edges of its cells (each cell is the grid columns it spans). Undefined for a
+ * fixed table, where they are its grid, or when an edge has no cell to read it from.
+ * @internal
+ */
+export function drawnColumns(
+  frame: Frame,
+  wrapper: HTMLElement,
+  /** CSS px on screen per layout px (the view's zoom). */
+  scale = 1,
+): number[] | undefined {
+  if (tableLayout(frame.node.attrs.layout) === "fixed" || !frame.grid.length) return undefined;
+  const table = wrapper.querySelector(`:scope > table[${FRAME_ATTR}]`);
+  const trs = table?.querySelectorAll(`:scope > tbody > tr:not([${REPEATED_ATTR}])`) ?? [];
+  if (trs.length !== frame.rows.length) return undefined;
+  const edges = new Map<number, number>();
+  // The outer edges are the table's: a cell's box holds only half of a collapsed border.
+  const box = table?.getBoundingClientRect();
+  if (box) {
+    edges.set(0, box.left);
+    edges.set(frame.grid.length, box.right);
+  }
+  trs.forEach((tr, r) => {
+    const cells = (frame.rows[r] as FrameRow).cells;
+    [...tr.children].forEach((td, i) => {
+      const cell = cells[i];
+      if (!cell || (td as HTMLElement).style.display === "none") return;
+      const box = td.getBoundingClientRect();
+      if (!edges.has(cell.column)) edges.set(cell.column, box.left);
+      if (!edges.has(cell.column + cell.span)) edges.set(cell.column + cell.span, box.right);
+    });
+  });
+  const out: number[] = [];
+  for (let k = 0; k < frame.grid.length; k++) {
+    const left = edges.get(k);
+    const right = edges.get(k + 1);
+    if (left === undefined || right === undefined) return undefined;
+    out.push(Math.max(Math.round((right - left) / scale / PX_PER_TWIP), 1));
+  }
+  return out;
 }

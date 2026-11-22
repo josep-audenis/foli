@@ -182,14 +182,15 @@ Custom nodes and marks, plugins and toolbar items ([extensions](guides/extension
   wraps, and widen a column for what cannot break (a long word, a picture), taking from the
   others, then growing past the saved width when they cannot give more; this is the browsers' automatic table layout, close to Word's but not its algorithm
   (preferred widths in percent or `auto`, and the room left on the page, are not weighed as Word
-  does), and each page's part of a split table is laid out on its own. Border conflicts are resolved by the browser's `border-collapse`, close to Word's rules.
+  does). Border conflicts are resolved by the browser's `border-collapse`, close to Word's rules.
 - A row splits across pages between its lines; a row in a vertical merge, or holding a nested
   table, moves whole to the next page.
 - Rows pasted into a table fill its cells from the selected one; columns beyond the table's are
   dropped (not reported). Tables pasted from other applications become paragraphs.
 - A column's width is set by dragging its border or from the keyboard (Table, Column width…: the
-  selection's last column, the next one giving the difference); a nested table's column borders
-  cannot be dragged. Nested tables are drawn whole with their parent's row.
+  selection's last column, the next one giving the difference and keeping 0.1 inch, so the
+  dialog's range depends on it; a merged cell sets only its last column); a nested table's column
+  borders cannot be dragged. Nested tables are drawn whole with their parent's row.
 - Table styles: banding, the first and last column and inside borders count cells, not grid
   columns, so a table with merged cells or rows starting late (`gridBefore`) may be formatted
   differently from Word; a style's whole-table conditional format (`wholeTable`) is kept

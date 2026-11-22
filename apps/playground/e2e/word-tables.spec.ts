@@ -560,40 +560,60 @@ test("a fixed table keeps its grid; an autofit one widens a column for a word th
   page,
 }) => {
   await open(page, "06-price-schedule.docx");
-  // Its text grows below: matched by its start.
+  // Its text grows below: matched by its start (on page 2: the table goes over two pages).
   const cell = page.locator("td", { hasText: /^Support item 35(\D|$)/ }).first();
-  const widths = () =>
-    cell.evaluate((td) => {
-      const row = td.closest("tr") as HTMLElement;
-      return {
-        table: Math.round(td.closest("table")?.getBoundingClientRect().width ?? 0),
-        cells: [...row.children].map((c) => Math.round(c.getBoundingClientRect().width)),
-      };
-    });
+  /** Each page's part of the first table: its width and its first body row's cells. */
+  const parts = () =>
+    page.evaluate(() =>
+      [...document.querySelectorAll("section.foli-page")].flatMap((section) => {
+        const table = section.querySelector(":scope > [data-foli-frame=table] > table");
+        const row = table?.querySelector(":scope > tbody > tr:not([data-foli-repeated])");
+        if (!table || !row) return [];
+        const width = (e: Element) => Math.round(e.getBoundingClientRect().width);
+        return [{ table: width(table), cells: [...row.children].map(width) }];
+      }),
+    );
   const settle = () => page.waitForTimeout(300);
-  const before = await widths();
+  /** Within a px: the automatic layout shares collapsed borders a little otherwise. */
+  const near = (a: Awaited<ReturnType<typeof parts>>, b: Awaited<ReturnType<typeof parts>>) => {
+    expect(a.length).toBe(b.length);
+    a.forEach((part, p) => {
+      const other = b[p];
+      expect(Math.abs(part.table - (other?.table ?? 0))).toBeLessThanOrEqual(1);
+      part.cells.forEach((w, i) => {
+        expect(Math.abs(w - (other?.cells[i] ?? 0))).toBeLessThanOrEqual(1);
+      });
+    });
+  };
+  const autofit = () =>
+    page.evaluate(() => {
+      const { editor } = window.foliEdit;
+      const tr = editor.state.tr;
+      editor.state.doc.descendants((node, pos) => {
+        if (node.type.name === "table")
+          tr.setNodeMarkup(pos, node.type, { ...node.attrs, layout: null });
+        return node.type.name !== "table";
+      });
+      editor.dispatch(tr);
+    });
+  const before = await parts();
+  expect(before.length).toBe(2);
+  // Made autofit (Word's default) with content that fits: Word's saved widths stay.
+  await autofit();
+  await settle();
+  near(await parts(), before);
+  // The corpus's own table is fixed: put it back, and a long word breaks, the grid stays.
+  await page.evaluate(() => window.foliEdit.editor.commands.undo());
+  await settle();
   await cell.click();
   await page.keyboard.press("End");
   await page.keyboard.type(" Pneumonoultramicroscopicsilicovolcanoconiosis");
   await settle();
-  // The corpus's tables are fixed (`w:tblLayout fixed`): the word breaks, the grid stays.
-  expect(await widths()).toEqual(before);
-  // The same table as autofit (Word's default, and a table inserted in Foli).
-  await page.evaluate(() => {
-    const { editor } = window.foliEdit;
-    const tr = editor.state.tr;
-    editor.state.doc.descendants((node, pos) => {
-      if (node.type.name === "table")
-        tr.setNodeMarkup(pos, node.type, { ...node.attrs, layout: null });
-      return node.type.name !== "table";
-    });
-    editor.dispatch(tr);
-  });
+  expect(await parts()).toEqual(before);
+  // Autofit: the column widens, on both pages alike (the word is on page 2).
+  await autofit();
   await settle();
-  const after = await widths();
-  // Its column widened, the others giving what they can spare; past that the table grows (as
-  // Word's autofit does).
-  const column = before.cells.findIndex((w, i) => (after.cells[i] ?? 0) > w);
-  expect(column).toBeGreaterThanOrEqual(0);
-  expect(after.table).toBeGreaterThanOrEqual(before.table);
+  const after = await parts();
+  expect(after[1]?.cells.some((w, i) => w > (before[1]?.cells[i] ?? 0) + 20)).toBe(true);
+  near([after[0] as (typeof after)[number]], [after[1] as (typeof after)[number]]);
 });

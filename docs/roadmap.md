@@ -2806,9 +2806,11 @@ agent's review.
   undo step, not while tracking). Autofit tables are laid out by the browsers' automatic table
   layout with Word's grid as the widths: measured in Chromium, Firefox and WebKit, saved widths
   stay while content fits or wraps and only unbreakable content widens a column, taking from the
-  others, then widening the table. The corpus's tables are all fixed, so none of them changes;
-  e2e in three browsers on 06's table made autofit. Not Word's algorithm (percent and `auto` preferred widths, the page's room); each page's
-  part of a split table is laid out alone (a new `shortcut:`).)
+  others, then widening the table. The whole table is laid out once and its drawn columns
+  (`drawnColumns`) are kept for its parts on each page (drawn fixed at them) and for dragging
+  borders, so every page has the same columns and the flow places what it measured. The corpus's
+  tables are all fixed, so none of them changes; e2e in three browsers on 06's table made
+  autofit. Not Word's algorithm (percent and `auto` preferred widths, the page's room).)
 - [ ] 19.5 Pictures: rotation (`rot`, read, drawn, 90° commands) and cropping (`a:srcRect`, read,
   drawn, a crop mode), written back to `.docx`; resizing with touch (pointer events).
 - [ ] 19.6 Drag and drop of text: move inside the document (one undo step; delete and insert when

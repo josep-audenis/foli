@@ -9,6 +9,7 @@ import {
   NodeSelection,
   type OpenStory,
   trackState,
+  undoDepth,
 } from "@folijs/core";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { StrictMode } from "react";
@@ -350,11 +351,27 @@ describe("FoliToolbar's table menu", () => {
     const field = screen.getByLabelText("Column width (cm)") as HTMLInputElement;
     expect(document.activeElement).toBe(field);
     expect(Number(field.value)).toBeCloseTo((before[0] as number) / (1440 / 2.54), 1);
-    fireEvent.change(field, { target: { value: "x" } });
+    const depth = undoDepth(editor.state);
+    // Unchanged: closes without touching the table.
     fireEvent.submit(field.closest("form") as HTMLFormElement);
-    expect(screen.getByRole("alert").textContent).toContain("Enter a width");
-    fireEvent.change(field, { target: { value: "3,5" } });
-    fireEvent.submit(field.closest("form") as HTMLFormElement);
+    expect(screen.queryByRole("dialog", { name: "Column width" })).toBe(null);
+    expect(undoDepth(editor.state)).toBe(depth);
+    openMenu();
+    fireEvent.click(item("Column width…"));
+    const again = screen.getByLabelText("Column width (cm)") as HTMLInputElement;
+    fireEvent.change(again, { target: { value: "x" } });
+    fireEvent.submit(again.closest("form") as HTMLFormElement);
+    // The range this column may take: the next one keeps 0.1 inch.
+    const max = ((before[0] as number) + (before[1] as number) - 144) / (1440 / 2.54);
+    expect(screen.getByRole("alert").textContent).toBe(
+      `Enter a width in cm from 0.26 to ${Math.floor(max * 100) / 100}.`,
+    );
+    fireEvent.change(again, { target: { value: "50" } });
+    fireEvent.submit(again.closest("form") as HTMLFormElement);
+    expect(screen.getByRole("alert")).toBeTruthy();
+    expect(tableIn(editor)?.attrs?.grid).toEqual(before);
+    fireEvent.change(again, { target: { value: "3,5" } });
+    fireEvent.submit(again.closest("form") as HTMLFormElement);
     const after = tableIn(editor)?.attrs?.grid as number[];
     expect(after[0]).toBe(Math.round(3.5 * (1440 / 2.54)));
     // The next column gives the difference: the table keeps its width.

@@ -284,9 +284,23 @@ describe("columnAt", () => {
     const editor = editorOf([p("x"), sized, p("y")]);
     select(editor, inside(editor, "b2"));
     const tablePos = editor.state.doc.child(0).nodeSize;
-    expect(columnAt(editor.state)).toEqual({ pos: tablePos, column: 1, width: 2000 });
+    // The last column: up to Word's largest measure.
+    expect(columnAt(editor.state)).toEqual({
+      pos: tablePos,
+      column: 1,
+      width: 2000,
+      min: 144,
+      max: 31_680,
+    });
     selectCells(editor, "a1", "a3");
-    expect(columnAt(editor.state)).toEqual({ pos: tablePos, column: 0, width: 1000 });
+    // Another: the next keeps 0.1 inch.
+    expect(columnAt(editor.state)).toEqual({
+      pos: tablePos,
+      column: 0,
+      width: 1000,
+      min: 144,
+      max: 2856,
+    });
     select(editor, 1);
     expect(columnAt(editor.state)).toBe(null);
   });
