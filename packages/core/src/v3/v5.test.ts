@@ -220,11 +220,11 @@ describe("schema v5", () => {
 });
 
 describe("schema 6 (19.5)", () => {
-  const picture = (attrs: Record<string, unknown> = {}) => ({
+  const picture = (attrs: Record<string, unknown> = {}): NodeJSON => ({
     type: "picture",
     attrs: { resource: "img", width: 1, height: 1, ...attrs },
   });
-  const para = (...content: unknown[]) => ({ type: "paragraph", content });
+  const para = (...content: NodeJSON[]): NodeJSON => ({ type: "paragraph", content });
 
   it("is what a rotated or cropped picture needs, anywhere; else 5", () => {
     expect(createDocument({ type: "doc", content: [para(picture())] }).schemaVersion).toBe(5);
