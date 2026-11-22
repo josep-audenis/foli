@@ -470,7 +470,12 @@ function reference(name: string, at: number): string {
     : /^#[0-9]+$/.test(name)
       ? Number.parseInt(name.slice(1), 10)
       : -1;
-  if (code === -1) throw new XmlError(`Unknown entity &${name};`, at);
+  // The name only when it looks like one: a stray `&` would quote the text up to the next `;`.
+  if (code === -1)
+    throw new XmlError(
+      /^[A-Za-z_][\w.-]{0,31}$/.test(name) ? `Unknown entity &${name};` : "A bare & in text",
+      at,
+    );
   const legal =
     code === 0x9 ||
     code === 0xa ||

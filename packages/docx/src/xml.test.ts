@@ -155,6 +155,8 @@ describe("parseXml", () => {
       ["<![CDATA[x]]><a/>", /CDATA outside the root element/],
       ['<!DOCTYPE a [<!ENTITY e "x">]><a>&e;</a>', /Document type declarations are not allowed/],
       ["<a>&e;</a>", /Unknown entity &e;/],
+      // Never the text after a stray &: it could be the document's.
+      ["<a>Smith & Jones terms; x</a>", /^A bare & in text/],
       ["<a>a & b</a>", /"&" without a reference/],
       ["<a>&#0;</a>", /illegal character/],
       ["<a>&#xFFFE;</a>", /illegal character/],

@@ -31,7 +31,7 @@ place that says what is in progress; check it before starting work.
 | 17 Toolbar for developers | ✅ Done                  | —                     | Merged in #167–#173; 1.2.0 on npm (2026-11-21), released with Phase 16 (#176)                                                                                                                 |
 | 18 Hint                   | ✅ Done                  | —                     | Merged in #180–#184; 1.3.0 and `@folijs/agent` 0.3.0 on npm (2026-11-22)                                                                                                                      |
 | 19 Editing gaps           | ✅ Done                  | —                     | Merged in #187–#202; 1.4.0 (schema 6), `@folijs/agent` 0.3.1 and `@folijs/mcp` 0.2.2 on npm (2026-11-22); text boxes in find and crop handles left for later; Android and touch emulated only |
-| 20 Corpus run             | In progress              | `phase-20/corpus-run` | 20.1 in review: 3 551 real .docx files from five sources, fetched by hash                                                                                                                     |
+| 20 Corpus run             | In progress              | `phase-20/corpus-run` | 20.1 merged (#206); 20.2, the runner, in review                                                                                                                                               |
 
 Status values: `Ready` (dependencies met, nobody on it) · `In progress` · `In review` (PR open) ·
 `✅ Done` (merged, acceptance criteria met) · `Blocked by …`.
@@ -2921,13 +2921,22 @@ review.
   holds 3 551 files (94.5 MB; 3 445 distinct by hash): POI 181, LibreOffice 1 540, docx4j 1 365, python-docx 46, Open XML
   SDK 419. `pnpm corpus:fetch` downloads what is missing and checks every hash (a mismatch is
   deleted and refused); `--update` lists the trees again. Files over 25 MB are left out.)
-- [ ] 20.2 The runner, `pnpm corpus:run [folder]`: each file in a worker thread (a time limit and
+- [x] 20.2 The runner, `pnpm corpus:run [folder]`: each file in a worker thread (a time limit and
   a heap cap; a worker that dies is that file's failure, the run goes on), the checks of the
   acceptance in Node (import, report, export compared part by part, idempotence, an edit then an
   export), results as JSON lines plus a summary; the part comparison canonicalizes XML
   (namespace prefixes, attribute order, whitespace Word ignores) so only real differences count,
   and names the element and attribute that differ. Tested on the nine and on hand-made broken
-  packages.
+  packages. (Done: `scripts/corpus/check.mjs` (the checks of one file on the
+  built packages: never throws, a `DocxError`, `ZipError` or `XmlError` is a refusal, anything
+  else a crash with the first frame in Foli's code) and `run.mjs` (a pool of workers, each file
+  with 120 s and a 2 GB heap, a hung or dead worker replaced; files run once per distinct
+  content; `.corpus-cache/results/<time>.jsonl` and a summary of outcomes and of the classes of
+  difference by how many files they touch). The comparison counts elements, attribute values and
+  text characters per part, prefixes, order and whitespace aside, and reports names only. On
+  the nine: all import, export and read back; differences already show (runs merged on export,
+  `w:lastRenderedPageBreak` dropped), for 20.4 to class. Four hand-made broken packages (random
+  bytes, a truncated file, an empty one, a zip that is not a .docx) are refused, none crashes.)
 - [ ] 20.3 The renderer pass: the files the Node pass imported, laid out by `renderDocument` in
   Chromium (Playwright), pages and time recorded, an exception or a page that overflows its
   sheet counted.
