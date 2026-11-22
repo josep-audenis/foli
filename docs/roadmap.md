@@ -2912,13 +2912,13 @@ Each task is a PR on `phase-20/corpus-run`, the build green after each, merged a
 review.
 
 - [x] Claim phase, branch `phase-20/corpus-run`
-- [x] 20.1 ADR-0011 and the fetch: each source's license read (a file whose license forbids
-  redistribution, or that has none, is left out), its commit pinned, `pnpm corpus:fetch` writing
+- [x] 20.1 ADR-0011 and the fetch: each source's license read (repository-level: many files are
+  bug-report attachments with no license of their own; none is redistributed), its commit pinned, `pnpm corpus:fetch` writing
   the files into `.corpus-cache/` (ignored) and checking each against `corpus/external.json` (url,
   commit, path, SHA-256, license, source). A file that fails its hash is refused, not run. (Done:
   ADR-0011; the five sources' licenses read (Apache-2.0 for POI and docx4j, MPL-2.0 for
   LibreOffice, MIT for python-docx and the Open XML SDK) and their commits pinned; the manifest
-  holds 3 551 files (99 MB): POI 181, LibreOffice 1 540, docx4j 1 365, python-docx 46, Open XML
+  holds 3 551 files (94.5 MB; 3 445 distinct by hash): POI 181, LibreOffice 1 540, docx4j 1 365, python-docx 46, Open XML
   SDK 419. `pnpm corpus:fetch` downloads what is missing and checks every hash (a mismatch is
   deleted and refused); `--update` lists the trees again. Files over 25 MB are left out.)
 - [ ] 20.2 The runner, `pnpm corpus:run [folder]`: each file in a worker thread (a time limit and

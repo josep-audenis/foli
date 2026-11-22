@@ -20,7 +20,7 @@ pinned in `scripts/corpus/fetch.mjs` and recorded in `corpus/external.json`:
 | python-docx  | `python-openxml/python-docx` | every `.docx` (test files)                          | MIT (`LICENSE`)               |    46 |
 | open-xml-sdk | `dotnet/Open-XML-SDK`        | every `.docx` (test assets)                         | MIT (`LICENSE`)               |   419 |
 
-Counts are the pinned trees' `.docx` blobs (2026-11-22, before the 25 MB cap); the manifest has
+Counts are the pinned trees' `.docx` blobs (2026-11-22, none over the 25 MB cap: the largest is 2.96 MB); the manifest has
 what was fetched. Many come from those projects' bug reports: documents people attached to show
 a reader failing, which is what this run is for. The licenses are the repositories'; nothing of
 them is redistributed by Foli.
@@ -30,7 +30,9 @@ them is redistributed by Foli.
 records; a file that differs is deleted and reported, never run. `--update` lists the pinned
 trees again (GitHub's API; `GITHUB_TOKEN` for its rate limit) and rewrites the manifest: done
 when a source's commit is moved, in a PR of its own. A file over 25 MB is left out. Paths are
-checked to stay inside the cache.
+checked before any request: plain names in their source's folder of the cache. 106 of the
+files are copies of others (3 445 distinct by hash, mostly LibreOffice's export and import
+folders): the run counts each content once.
 
 **Reports hold no document text.** What the run writes (results, `docs/corpus-report.md`)
 holds counts, element and attribute names, file names and sizes, never text from a document: the

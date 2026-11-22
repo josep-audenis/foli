@@ -12,6 +12,7 @@
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, normalize, sep } from "node:path";
+import { pathToFileURL } from "node:url";
 
 const root = join(import.meta.dirname, "..", "..");
 const manifestPath = join(root, "corpus", "external.json");
@@ -20,7 +21,7 @@ export const cache = join(root, ".corpus-cache");
 const MAX_BYTES = 25 * 1024 * 1024;
 
 /** The sources, as ADR-0011 records them: what of each repository is fetched. */
-const SOURCES = [
+export const SOURCES = [
   {
     name: "poi",
     repo: "apache/poi",
@@ -90,25 +91,45 @@ async function listDocx(source, prefix) {
     .map((e) => (prefix ? `${prefix}/${e.path}` : e.path));
 }
 
-/** Where a manifest file lives in the cache, refused if its path leaves it. */
+/**
+ * Where a manifest file lives in the cache: `<source>/<path>`, refused unless the source is a
+ * plain name and every path segment a plain file or folder name (no `..`, no empty segment, no
+ * `\` or `:`: no other source's folder, no drive, no NTFS stream).
+ */
 export function cachePath(file) {
-  const path = normalize(join(cache, file.source, file.path));
-  if (!path.startsWith(normalize(cache) + sep)) throw new Error(`refused path ${file.path}`);
-  return path;
+  const segments = String(file.path).split("/");
+  const plain = segments.every((s) => s && s !== "." && s !== ".." && !/[\\:]/.test(s));
+  if (!/^[a-z0-9-]+$/.test(String(file.source)) || !plain)
+    throw new Error(`refused path ${file.source}/${file.path}`);
+  return normalize(join(cache, file.source, ...segments));
 }
 
 const sha256 = (bytes) => createHash("sha256").update(bytes).digest("hex");
 
-async function download(source, path) {
+/** A file's bytes at its source's commit, no more than `limit`; three tries. */
+async function download(source, path, limit = MAX_BYTES) {
   const url = `https://raw.githubusercontent.com/${source.repo}/${source.commit}/${path
     .split("/")
     .map(encodeURIComponent)
     .join("/")}`;
-  const response = await fetch(url, { headers: { "User-Agent": headers["User-Agent"] } });
-  if (!response.ok) throw new Error(`${url}: ${response.status}`);
-  const bytes = new Uint8Array(await response.arrayBuffer());
-  if (bytes.length > MAX_BYTES) throw new Error(`${url}: over ${MAX_BYTES} bytes`);
-  return bytes;
+  for (let attempt = 1; ; attempt++) {
+    try {
+      const response = await fetch(url, { headers: { "User-Agent": headers["User-Agent"] } });
+      if (!response.ok) throw new Error(`${response.status}`);
+      // Counted as it arrives: a body over the limit is never held whole.
+      const chunks = [];
+      let size = 0;
+      for await (const chunk of response.body) {
+        size += chunk.length;
+        if (size > limit) throw Object.assign(new Error(`over ${limit} bytes`), { final: true });
+        chunks.push(chunk);
+      }
+      return new Uint8Array(Buffer.concat(chunks));
+    } catch (error) {
+      if (error.final || attempt === 3) throw new Error(`${url}: ${error.message}`);
+      await new Promise((resolve) => setTimeout(resolve, 1000 * attempt));
+    }
+  }
 }
 
 /** Runs `task` over `items`, `limit` at a time. */
@@ -127,18 +148,27 @@ async function update() {
     for (const prefix of source.paths)
       for (const path of await listDocx(source, prefix)) files.push({ source: source.name, path });
   const bySource = Object.fromEntries(SOURCES.map((s) => [s.name, s]));
+  const failed = [];
   await pool(files, 8, async (file) => {
-    const bytes = await download(bySource[file.source], file.path);
-    file.size = bytes.length;
-    file.sha256 = sha256(bytes);
-    const at = cachePath(file);
-    mkdirSync(dirname(at), { recursive: true });
-    writeFileSync(at, bytes);
+    try {
+      const at = cachePath(file);
+      const bytes = await download(bySource[file.source], file.path);
+      file.size = bytes.length;
+      file.sha256 = sha256(bytes);
+      mkdirSync(dirname(at), { recursive: true });
+      writeFileSync(at, bytes);
+    } catch (error) {
+      failed.push(`${file.source}/${file.path}: ${error.message}`);
+    }
   });
-  files.sort((a, b) => (a.source + a.path < b.source + b.path ? -1 : 1));
-  const sources = SOURCES.map(({ paths, ...rest }) => ({ ...rest, paths }));
-  writeFileSync(manifestPath, `${JSON.stringify({ sources, files }, null, 1)}\n`);
-  console.log(`manifest: ${files.length} files from ${sources.length} sources`);
+  // All or nothing: a manifest is never written with files missing.
+  if (failed.length) {
+    for (const line of failed) console.error(`  failed: ${line}`);
+    throw new Error(`${failed.length} files could not be fetched; the manifest is unchanged`);
+  }
+  files.sort((a, b) => a.source.localeCompare(b.source) || a.path.localeCompare(b.path));
+  writeFileSync(manifestPath, `${JSON.stringify({ sources: SOURCES, files }, null, 1)}\n`);
+  console.log(`manifest: ${files.length} files from ${SOURCES.length} sources`);
 }
 
 /** Downloads what the cache lacks and checks every file; returns the files that are good. */
@@ -151,7 +181,7 @@ export async function fetchAll({ log = console.log } = {}) {
     const at = cachePath(file);
     if (!existsSync(at)) {
       try {
-        const bytes = await download(bySource[file.source], file.path);
+        const bytes = await download(bySource[file.source], file.path, file.size);
         mkdirSync(dirname(at), { recursive: true });
         writeFileSync(at, bytes);
         fetched++;
@@ -170,7 +200,8 @@ export async function fetchAll({ log = console.log } = {}) {
   return { files: files.filter((f) => existsSync(cachePath(f))), bad };
 }
 
-if (import.meta.main) {
+// Run as a script (not imported by the runner or the test); as scripts/api.mjs does.
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   if (process.argv.includes("--update")) await update();
   else if ((await fetchAll()).bad.length) process.exitCode = 1;
 }
