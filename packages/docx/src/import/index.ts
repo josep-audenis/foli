@@ -22,7 +22,7 @@ import { child, isW, REL, W_STRICT } from "./ooxml.js";
 import { comments, numbering, styles, theme } from "./parts.js";
 import { section } from "./properties.js";
 import { type ImportReport, Recorder } from "./report.js";
-import { canonicalStories, readStories } from "./stories.js";
+import { canonicalStories, noteIds, readStories } from "./stories.js";
 
 export interface DocxImport {
   /** The document in the current schema (v5), validated. */
@@ -68,6 +68,7 @@ export function importPackage(pkg: DocxPackage): DocxImport {
 
   const resources = new Map<string, ResourceJSON>();
   const controls = new Map<string, ControlJSON>();
+  const notes = noteIds(pkg);
   const contextFor = (part: string, source: string): ContentContext => {
     report.part = part;
     // One lookup table per part: hyperlinks resolve in constant time.
@@ -86,6 +87,7 @@ export function importPackage(pkg: DocxPackage): DocxImport {
       resources,
       controls,
       ordinals: { next: 0 },
+      notes,
     };
   };
   const related = (
