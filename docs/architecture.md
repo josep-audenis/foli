@@ -66,8 +66,7 @@ converts them into steps immediately.
 ## Editing engine (`@folijs/core`)
 
 Implemented headless in Phase 3 (`packages/core/src/transform/`, `packages/core/src/state/`).
-The design follows prosemirror-transform, -state, -history and -commands (MIT); the code is
-Foli's own (see `THIRD_PARTY_NOTICES.md`).
+The code is Foli's own; design credits are in `THIRD_PARTY_NOTICES.md`.
 
 - **Steps** change the document atomically and are invertible: `ReplaceStep`,
   `ReplaceAroundStep`, `AddMarkStep`, `RemoveMarkStep` and `NodeMarkupStep`. `NodeMarkupStep`
@@ -239,6 +238,13 @@ when typing and undo is one step. A floor on revision ids keeps the trees' new i
 checked first: code, deleted text, a field's or control's edge, then, inside a control, a dry run
 through the filter. Bookmark changes go through `editTrees` untracked. A custom node adds its
 `text(attrs)` as one piece standing for one position, as a field code does.
+Comments (19.2) are searched apart: `findInComments` reads each comment's content as a tree of the
+editor's schema (kept per comment object in a `WeakMap`; `setComments` makes new objects, so an
+edited comment is read again) through the same lines, and its matches name the comment, not a
+story, so `findAll`'s matches stay positions the view and `goTo` can use. `replaceInComments`
+edits those trees with a `Transform` and sets the comments in one untracked body transaction (Word
+records no tracked changes in comments), refusing what `refusalOf` refuses except controls, which
+comments do not hold.
 
 Custom nodes and marks (12.3, ADR-0008, `v3/extensions.ts`): `schemaWith(extensions)` builds the
 Word schema plus the extensions' types (checked: namespaced, not taken twice, leaves), cached for
@@ -1012,8 +1018,8 @@ must have loaded, and the container must not be scaled (`transform`, `zoom`).
     heading).
   - **Closed** content (whole blocks) pasted into an empty textblock replaces it, so a pasted
     heading stays a heading. Elsewhere its first and last blocks join the text around the
-    selection; text after the selection then ends up in the last pasted block (ProseMirror's
-    open-slice behaviour). An opaque block at either end has no inside to join, so then the
+    selection; text after the selection then ends up in the last pasted block (open-slice
+    behaviour). An opaque block at either end has no inside to join, so then the
     blocks go in whole (`insertBlocks`): before or after the caret's paragraph, else between
     its two halves.
   - A paste starts a new undo step; typing right after it (within the 500 ms grouping window)
@@ -1107,7 +1113,7 @@ folder. Node only; no dependency but Foli's packages.
   `run` tool runs a script in QuickJS (WebAssembly) in a worker thread made for the run. The
   script calls `doc.replaceText(…)` as a function; under it the thread posts the call, waits
   on `Atomics.wait`, and the server's thread answers from the session: the same operations
-  the tools call. Only JSON crosses. The server ends the thread at the time limit. Before the
+  the tools call. Only JSON crosses. The server ends the thread at the time limit, counted from when the thread says it is ready (its start has a limit of its own). Before the
   script the session marks a checkpoint (`session.checkpoint()` of `@folijs/agent`: it
   keeps the body, and a rollback puts it back whole in one untracked change, with the handles); a run that fails goes back to it.
 - **What it is not:** no network transport; no code run unless started with `--code`.
@@ -1145,8 +1151,7 @@ Planned, created only when needed:
 
 ## Dependency policy
 
-- **Forbidden in published packages:** any editor engine (ProseMirror, Tiptap, Lexical, Slate,
-  Quill, CKEditor, Draft.js, Editor.js …).
+- **Forbidden in published packages:** any third-party editor engine.
 - **Allowed:** general-purpose libraries under permissive licenses (MIT, Apache-2.0, BSD, ISC),
   after checking size and whether existing code already covers the need.
 - **Copied code:** only with provenance in `THIRD_PARTY_NOTICES.md` and preserved notices.
@@ -1309,7 +1314,7 @@ since 1.0.0):
   (page number, date, cross-reference dialog, table of contents, update, show codes), Navigate,
   Notes (insert, go between note and reference, a Note options dialog) and Controls (insert each
   kind, a properties dialog). `FoliNavigation` (11.11, inside `FoliEditor`) is the find, replace
-  and go to panel, the bookmarks dialog and the outline, and takes Word's keys (Ctrl+F, Ctrl+H,
+  and go to panel (which lists the comments a search finds, 19.2), the bookmarks dialog and the outline, and takes Word's keys (Ctrl+F, Ctrl+H,
   Ctrl+G, F3, Shift+F3, Ctrl+Shift+F5) while the focus is in the document or its panels. Each
   menu and dialog is keyboard-usable and axe-clean in three engines.
 

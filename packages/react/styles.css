@@ -373,6 +373,17 @@
   margin: 0;
 }
 
+.foli-find-comments {
+  flex-basis: 100%;
+}
+
+.foli-find-comments p,
+.foli-find-comments ul {
+  margin: 0 0 0.25em;
+  padding: 0;
+  list-style: none;
+}
+
 @media (forced-colors: active) {
   .foli-find-modes [aria-selected="true"] {
     outline: 2px solid Highlight;

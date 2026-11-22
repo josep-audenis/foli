@@ -83,7 +83,7 @@ describe("paste as plain text", () => {
 });
 
 describe("htmlToDoc", () => {
-  it("reads <p>&nbsp;</p> (Outlook's, TinyMCE's empty line) as an empty paragraph", () => {
+  it("reads <p>&nbsp;</p> (Outlook's and web editors' empty line) as an empty paragraph", () => {
     const blocks = htmlToDoc("<p>a</p><p>&nbsp;</p><p>b</p>")?.content ?? [];
     expect(blocks.map((block) => (block as NodeJSON).content?.length ?? 0)).toEqual([1, 0, 1]);
   });

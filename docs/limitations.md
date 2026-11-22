@@ -259,8 +259,8 @@ Custom nodes and marks, plugins and toolbar items ([extensions](guides/extension
 
 ## Finding and going places
 
-- Find reads the body and the stories, table cells included: not comments, text boxes or other
-  content kept opaque. A match stays inside a paragraph; `^p`-style codes, wildcards and regular
+- Find reads the body and the stories, table cells included; comments apart (`findInComments`, a
+  list in the find panel): not text boxes or other content kept opaque (text boxes are not drawn). A match stays inside a paragraph; `^p`-style codes, wildcards and regular
   expressions are not offered (a pattern could hang the page), nor replacing formatting.
 - Replacing keeps bookmarks and comment anchors found inside the match, where Word loses them; text
   already deleted as a tracked change is refused and reported, where Word adds the replacement
@@ -376,7 +376,7 @@ Unstable (0.x). Details in the [package README](../packages/mcp/README.md) and
   plain JavaScript as QuickJS runs it: no `await` that waits for anything, no timers, no
   imports, no `Intl`. 10 seconds, 64 MB, 5,000 calls to the document, 2,000 paragraphs inserted and a million characters given a run, not
   configurable. It works on one open document, and cannot open or save. A run costs about
-  55 ms before the script starts. Its answer shows 40 changed blocks at most. `doc` has the
+  55 ms before the script starts, not counted in its 10 seconds. Its answer shows 40 changed blocks at most. `doc` has the
   tools' operations and no more: no reading in parts (`blocks()` is the whole body), nothing
   of the editor under it.
 - Documents live in memory: unsaved edits are lost when the server stops, and nothing is saved

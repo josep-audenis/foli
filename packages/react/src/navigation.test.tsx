@@ -240,6 +240,50 @@ describe("find and replace panel", () => {
     expect(screen.getByRole("status").textContent).toBe("Replaced 3.");
   });
 
+  it("lists the comments a search finds, goes to their text and replaces in them", () => {
+    const content: NodeJSON[] = [
+      {
+        type: "paragraph",
+        content: [
+          { type: "text", text: "see " },
+          { type: "commentStart", attrs: { id: 1 } },
+          { type: "text", text: "here" },
+          { type: "commentEnd", attrs: { id: 1 } },
+          { type: "commentReference", attrs: { id: 1 } },
+        ],
+      },
+    ];
+    const editor = createEditor({
+      document: {
+        ...documentOf(...content),
+        comments: [
+          { id: 1, author: "Ann", content: [p("a cat")] },
+          { id: 2, author: "Bo", parent: 1, content: [p("two cats")] },
+        ],
+      },
+    });
+    fakeView(editor);
+    render(<FoliNavigation editor={editor} />);
+    ask(editor, "replace");
+    type("Find what", "cat");
+    const found = screen.getByRole("region", { name: "Found in comments" });
+    expect(within(found).getByText("2 in comments")).toBeTruthy();
+    // A reply goes to the text its thread is on.
+    fireEvent.click(within(found).getByRole("button", { name: "Bo: two cats" }));
+    const { from, to } = editor.state.selection;
+    expect(editor.state.doc.textBetween(from, to)).toBe("here");
+    type("Replace with", "dog");
+    fireEvent.click(within(found).getByRole("button", { name: "Replace in comments" }));
+    expect(editor.getDocument().comments.map((c) => c.content[0]?.content?.[0]?.text)).toEqual([
+      "a dog",
+      "two dogs",
+    ]);
+    expect(screen.getByRole("status").textContent).toBe("Replaced 2 in comments.");
+    expect(document.activeElement).toBe(screen.getByLabelText("Replace with"));
+    type("Find what", "dog");
+    expect(screen.getByRole("status").textContent).toBe("No results, 2 in comments");
+  });
+
   it("says what it left", () => {
     const { editor } = setup({
       type: "paragraph",
