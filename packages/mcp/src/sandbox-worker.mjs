@@ -88,7 +88,10 @@ const told = (result) => {
 
 const ready = told(vm.evalCode(prelude, "prelude"));
 if (ready.error) parentPort.postMessage({ error: { ...ready.error, name: "PreludeError" } });
-else
+else {
+  // Sent before any of the script runs: the script's clock starts here, and nothing the
+  // script does can put this off.
+  parentPort.postMessage({ ready: true });
   parentPort.postMessage(
     // The script is a function's body: `return` gives its answer. The value is made text in
     // the sandbox, under its limits; undefined (nothing returned) is told apart.
@@ -99,3 +102,4 @@ else
       ),
     ),
   );
+}
