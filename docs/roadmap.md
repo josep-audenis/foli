@@ -2998,11 +2998,12 @@ first group and from .docx files the corpus does not cover.
 **Robustness** (left by Phase 20's corpus run, [corpus-report.md](corpus-report.md)):
 
 - Strict Open XML (71 files refused): Word's "Strict" format, the same parts under
-  `purl.oclc.org/ooxml` namespaces and with ISO units.
+  `purl.oclc.org/ooxml` namespaces.
 - The document's root inside markup compatibility (60 files refused, all docx4j's `mc-root/*`).
 - What changes the file without changing what it shows (the report's rows 8 and 10–13): empty
   hyperlinks dropped, field lock and dirty flags, `w:tblPr`/`w:tblGrid` added, a paragraph added
-  to an empty body, a break's default type dropped; and the renderer's 10 files with a page
+  to an empty body, a break's default type dropped; POI's `Tika-792`, its `w:ins` and
+  `w:moveFrom` nested the other way round (row 9's last file); and the renderer's 10 files with a page
   that overflows its sheet (row 14).
 
 **Speed** ([benchmarks.md](benchmarks.md)): Phase 5's targets at 100 pages, missed at 1.0. In
