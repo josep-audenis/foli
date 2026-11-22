@@ -2774,8 +2774,8 @@ agent's review.
   paragraph with a bottom border, as Word's AutoFormat makes it), tracked, round-tripped. (Done:
   core's `insertHorizontalRule`, the toolbar's `horizontalRule` item, "Horizontal line", in the
   Insert group. Mid-paragraph it splits twice, as Enter would, so rejecting a tracked rule joins
-  the text again; at a paragraph's start it goes before it. The border already round-trips as
-  `w:pBdr`, tested since 8.)
+  the text again; at a paragraph's start it goes before it. The border round-trips as `w:pBdr`
+  (a docx test added).)
 - [ ] 19.2 Find in comments and text boxes: matches in comment bodies (going there opens the
   comment) and in text boxes kept opaque (going there selects the box); replace edits comments,
   skips text boxes and reports them.
