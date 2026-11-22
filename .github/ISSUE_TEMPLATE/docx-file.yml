@@ -1,0 +1,45 @@
+name: A .docx Foli reads, writes or shows wrongly
+description: Something lost, changed or refused when Foli opened or saved a Word file.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks: a real file is the fastest way to a fix. **Attach only a file you may share
+        publicly.** If yours is private, a reduced copy is just as good: delete the text and
+        pictures that do not matter, save it in Word, and check the problem is still there.
+        Or run the corpus check on it locally (see `docs/testing/corpus.md`) and paste the
+        result line with its `path` and `names` removed: the rest holds no document text.
+  - type: textarea
+    id: file
+    attributes:
+      label: The file
+      description: Drag the .docx (or a reduced one) here, or paste the corpus check's result line.
+    validations:
+      required: true
+  - type: dropdown
+    id: step
+    attributes:
+      label: Where it goes wrong
+      options:
+        - Import refuses the file, or throws
+        - Something is lost or changed after import, then export
+        - It looks wrong in the editor or in renderDocument
+        - Word complains about the exported file (repair, or content missing)
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What was lost or changed
+      description: What Word shows that Foli does not (a screenshot of each helps), and the error message if there is one.
+    validations:
+      required: true
+  - type: input
+    id: versions
+    attributes:
+      label: Versions
+      description: "@folijs/docx version, browser (or Node) and its version, the Word that made the file if you know it."
+    validations:
+      required: true
