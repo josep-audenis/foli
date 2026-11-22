@@ -121,7 +121,9 @@ export function pictureElement(
     element.style.position = "relative";
     const img = doc.createElement("img");
     img.src = src;
-    img.alt = "";
+    // Its box is the image to assistive technology (its children are not read); the alt text
+    // stays here for a copy's HTML.
+    img.alt = alt;
     img.draggable = false;
     img.referrerPolicy = "no-referrer";
     img.setAttribute(PICTURE_IMAGE_ATTR, key);

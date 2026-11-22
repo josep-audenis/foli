@@ -187,16 +187,23 @@ export function pictureAttrs(
   };
 }
 
-/** `a:xfrm/@rot` as the model holds it: 1 to 21 599 999 (a turn is 21 600 000); none for 0. */
-function rotationOf(value: string | undefined): number | undefined {
+/**
+ * `a:xfrm/@rot` as the model holds it: 1 to 21 599 999 (a turn is 21 600 000); none for 0.
+ * @internal
+ */
+export function rotationOf(value: string | undefined): number | undefined {
   const n = integer(value);
   if (n === undefined) return undefined;
   const turn = ((n % 21_600_000) + 21_600_000) % 21_600_000;
   return turn || undefined;
 }
 
-/** `a:srcRect` as the model's `crop`: only the edges it cuts, none if it leaves nothing. */
-function cropOf(rect: XmlElement | undefined): Record<string, number> | undefined {
+/**
+ * `a:srcRect` as the model's `crop`: only the edges it cuts, none if it cuts nothing or the model
+ * cannot hold it (then the file's element is kept as it is).
+ * @internal
+ */
+export function cropOf(rect: XmlElement | undefined): Record<string, number> | undefined {
   if (!rect) return undefined;
   const out: Record<string, number> = {};
   for (const [local, side] of [

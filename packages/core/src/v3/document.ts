@@ -470,7 +470,7 @@ export function createDocument(
     ),
   );
   const base = blank.section;
-  return {
+  const made: FoliDocument = {
     ...blank,
     // The default (A4) section has only pageSize and margins: each merged part by part.
     section: {
@@ -480,6 +480,9 @@ export function createDocument(
     },
     content,
   };
+  // The version its content needs (6 for a rotated or cropped picture).
+  made.schemaVersion = schemaVersionOf(made);
+  return made;
 }
 
 /**

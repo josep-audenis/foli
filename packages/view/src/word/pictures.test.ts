@@ -45,7 +45,7 @@ describe("a picture's element", () => {
       "hidden",
     ]);
     const img = element.querySelector("img") as HTMLImageElement;
-    expect(img.alt).toBe("");
+    expect(img.alt).toBe("A dot");
     // Half the image's width shows: it is twice the box's, from a quarter to its left.
     expect([img.style.width, img.style.left]).toEqual(["200%", "-50%"]);
     expect(Number.parseFloat(img.style.height)).toBeCloseTo(111.11, 1);

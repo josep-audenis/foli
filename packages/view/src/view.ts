@@ -3781,7 +3781,11 @@ export class EditorView {
     else this.writeSelection(true);
     const img = span.querySelector(`[${PICTURE_ATTR}]`) as HTMLElement | null;
     if (!img || !target?.closest("[data-foli-resize]") || !this.editable) return true;
+    // Its unrotated box (a rotated picture's rect is the rotated one's bounds).
+    const turned = img.style.transform;
+    img.style.transform = "";
     const rect = img.getBoundingClientRect();
+    img.style.transform = turned;
     const width = Number.parseFloat(img.style.width) || rect.width;
     const scale = rect.width / width || 1;
     this.resize = {

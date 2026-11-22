@@ -335,16 +335,25 @@ const checkFloat: Check = shape(
   ["horizontal", "vertical", "wrap"],
 );
 
-/** A picture's rotation, clockwise, in 60 000ths of a degree (DrawingML's `a:xfrm/@rot`; schema 6). */
-const rotation = int(1, 21_599_999);
+/**
+ * A picture's rotation, clockwise, in 60 000ths of a degree (DrawingML's `a:xfrm/@rot`; schema 6):
+ * 0 is none, said so; missing (null) is "as its `ext` has it" (documents of 1.0 to 1.3 kept a
+ * file's rotation there only).
+ */
+const rotation = int(0, 21_599_999);
 
 /**
  * What of a picture's image is cut off at each edge, in 1000ths of a percent of the image
  * (DrawingML's `a:srcRect`: 25 000 is a quarter; negative adds space; schema 6). What is left
- * must have a size: left + right and top + bottom stay under 100 000.
+ * must have a size: left + right and top + bottom stay under 100 000. All sides 0 (or none
+ * given) is no crop, said so; missing (null) is "as its `ext` has it", as for `rotation`.
  */
 const cropSide = int(-1_000_000, 99_999);
-const cropShape = shape({ left: cropSide, top: cropSide, right: cropSide, bottom: cropSide });
+const cropShape = shape(
+  { left: cropSide, top: cropSide, right: cropSide, bottom: cropSide },
+  [],
+  true,
+);
 const checkCrop: Check = (v) => {
   const error = cropShape(v);
   if (error) return error;

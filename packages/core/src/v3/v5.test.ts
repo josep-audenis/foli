@@ -218,3 +218,40 @@ describe("schema v5", () => {
     expect(editor.getDocument()).toMatchObject({ schemaVersion: 5, stories });
   });
 });
+
+describe("schema 6 (19.5)", () => {
+  const picture = (attrs: Record<string, unknown> = {}) => ({
+    type: "picture",
+    attrs: { resource: "img", width: 1, height: 1, ...attrs },
+  });
+  const para = (...content: unknown[]) => ({ type: "paragraph", content });
+
+  it("is what a rotated or cropped picture needs, anywhere; else 5", () => {
+    expect(createDocument({ type: "doc", content: [para(picture())] }).schemaVersion).toBe(5);
+    const cropped = createDocument({ type: "doc", content: [para(picture({ crop: {} }))] });
+    expect(cropped.schemaVersion).toBe(6);
+    expect(parseDocument(cropped).schemaVersion).toBe(6);
+    const header = {
+      ...createDocument(),
+      stories: {
+        h: { kind: "header", content: { type: "doc", content: [para(picture({ rotation: 0 }))] } },
+      },
+    };
+    expect(parseDocument({ ...header, schemaVersion: 6 }).schemaVersion).toBe(6);
+    expect(() => parseDocument({ ...header, schemaVersion: 5 })).toThrow(/schema 6/);
+  });
+
+  it("goes back to 5 when the editor's pictures no longer need it", () => {
+    const editor = createEditor({
+      document: createDocument({ type: "doc", content: [para(picture({ rotation: 60_000 }))] }),
+    });
+    expect(editor.getDocument().schemaVersion).toBe(6);
+    const tr = editor.state.tr;
+    editor.state.doc.descendants((node, pos) => {
+      if (node.type.name === "picture")
+        tr.setNodeMarkup(pos, node.type, { ...node.attrs, rotation: null });
+    });
+    editor.dispatch(tr);
+    expect(editor.getDocument().schemaVersion).toBe(5);
+  });
+});

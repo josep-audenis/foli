@@ -558,9 +558,20 @@ describe("rotation and crop (19.5)", () => {
     const again = (await importDocx(out)).document;
     expect(again.schemaVersion).toBe(6);
     expect(pictures(again)[0]?.attrs).toMatchObject({ rotation: 5_400_000, crop });
-    // Back to none: the attribute and the element go.
+    // Left out (as 1.0 to 1.3 kept them, in `ext` only): the file's stay.
+    const older = withPictures(again, ({ rotation: _r, crop: _c, ...attrs }) => attrs);
+    const [kept] = drawings(
+      (
+        await readPackage(
+          await exportDocx({ ...older, schemaVersion: 5 }, (await importDocx(out)).package),
+        )
+      ).text("/word/document.xml"),
+    );
+    expect(kept).toMatch(/<a:xfrm[^>]* rot="5400000"/);
+    expect(kept).toContain('<a:srcRect l="10000" t="5000" r="12500" b="2500"/>');
+    // Back to none, said so (0, no sides): the attribute and the element go.
     const plain = withPictures(again, (attrs, i) =>
-      i === 0 ? { ...attrs, rotation: null, crop: null } : attrs,
+      i === 0 ? { ...attrs, rotation: 0, crop: {} } : attrs,
     );
     const [back] = drawings(
       (await readPackage(await exportDocx(plain, (await importDocx(out)).package))).text(
@@ -594,7 +605,6 @@ describe("rotation and crop (19.5)", () => {
           },
         ],
       }),
-      schemaVersion: 6,
       resources: { img: { contentType: "image/png", data: `data:image/png;base64,${PNG}` } },
     });
     const out = await exportDocx(document);

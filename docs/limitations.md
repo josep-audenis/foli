@@ -251,7 +251,9 @@ Custom nodes and marks, plugins and toolbar items ([extensions](guides/extension
   in the other engines).
 - A picture's rotation and crop (schema 6, 19.5) are read from `.docx`, shown and written back;
   a rotated picture keeps its unrotated room in the line (Word gives it the rotated box's), and
-  so does a float's wrapping. No commands or UI to rotate or crop yet, nor touch resizing;
+  so does a float's wrapping. A document saved as JSON by 1.0 to 1.3 kept a file's crop and
+  rotation only in the drawing's XML: they are written back to `.docx` as they were, but not
+  shown until the file is imported again. No commands or UI to rotate or crop yet, nor touch resizing;
   resizing is refused while tracking (Foli does not record a size change yet). Alt text changes
   are not tracked.
 - A picture copied into another document brings its image (12.11): its own `data:` or web URL,
