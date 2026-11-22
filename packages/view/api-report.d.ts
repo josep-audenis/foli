@@ -620,6 +620,11 @@ export declare class EditorView {
      * apply. Code can always change the document through the editor.
      */
     private dispatch;
+    /**
+     * Whether the event's target range holds nothing but the boundary between the caret's block
+     * and the one before or after it (no text in between): a one-character delete at a caret.
+     */
+    private boundaryOnly;
     /** Selects the event's target range when the browser gives a non-empty one (spellcheck, deletes). */
     private selectTargetRange;
     private onBeforeInput;
@@ -767,6 +772,13 @@ export declare class EditorView {
      * touched blocks if it shows in profiles.
      */
     private readBack;
+    /** The document text DOM `node` shows, as `readBack` reads it (hard breaks one character). */
+    private textIn;
+    /**
+     * Replays a split read back from the DOM: `parts[0]` in place of `range`, then for each next
+     * part Enter and its text. The browser's DOM is then drawn again from the model.
+     */
+    private replaySplit;
     /** Rebuilds every block that is not reused and puts the selection back. */
     private rerender;
     /**

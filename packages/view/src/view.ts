@@ -3520,6 +3520,31 @@ export class EditorView {
     return true;
   }
 
+  /**
+   * Whether the event's target range holds nothing but the boundary between the caret's block
+   * and the one before or after it (no text in between): a one-character delete at a caret.
+   */
+  private boundaryOnly(event: InputEvent, forward: boolean): boolean {
+    const range = event.getTargetRanges?.()[0];
+    const { selection, doc } = this.state;
+    if (!range || range.collapsed || !selection.empty) return false;
+    const from = this.posFromDOM(range.startContainer, range.startOffset);
+    const to = this.posFromDOM(range.endContainer, range.endOffset);
+    if (from === null || to === null || from >= to) return false;
+    // Backward: the boundary before the caret; forward: the one after it.
+    if (selection.head !== (forward ? from : to)) return false;
+    const $from = doc.resolve(from);
+    const $to = doc.resolve(to);
+    return (
+      $from.parent.isTextblock &&
+      $to.parent.isTextblock &&
+      $from.parent !== $to.parent &&
+      $from.parentOffset === $from.parent.content.size &&
+      $to.parentOffset === 0 &&
+      doc.textBetween(from, to) === ""
+    );
+  }
+
   /** Selects the event's target range when the browser gives a non-empty one (spellcheck, deletes). */
   private selectTargetRange(event: InputEvent): void {
     const range = event.getTargetRanges?.()[0];
@@ -3571,7 +3596,12 @@ export class EditorView {
       }
     }
     if (!type.startsWith("delete") || type === "deleteByDrag") return;
-    this.selectTargetRange(event);
+    // Android keyboards send Backspace at a paragraph's start as a delete of the boundary
+    // before it (a target range from the paragraph before's end to the caret): that is the key
+    // at a caret, so a numbered paragraph loses its number rather than joining the one before.
+    const char = type === "deleteContentBackward" || type === "deleteContentForward";
+    if (!(char && this.boundaryOnly(event, type === "deleteContentForward")))
+      this.selectTargetRange(event);
     if (this.state.selection.empty && type.includes("Line")) {
       // No target range: let the browser find the line edge, never delete a character instead.
       // shortcut: hard-line deletes also stop at the visual line edge here; Chromium, Firefox and WebKit all give a range.
@@ -4450,7 +4480,7 @@ export class EditorView {
       else node.childNodes.forEach(walk);
     };
     // Block-level nodes: inside pages and tables, and anything else in the host.
-    let stray = false;
+    const strays = new Set<Node>();
     const collect = (parent: Node) => {
       for (const child of parent.childNodes) {
         if (this.owner.has(child)) continue;
@@ -4459,11 +4489,34 @@ export class EditorView {
         if (this.holdsBlocks(child)) collect(child);
         // Text outside every block (an element the browser added): a block the model does not
         // have. An empty stray node (an extension's marker) holds none; the re-render removes it.
-        else if (child.textContent) stray = true;
+        else if (child.textContent) strays.add(child);
       }
     };
     collect(this.host);
-    if (stray) {
+    // A block the browser split off one of ours (Enter on a keyboard that sends no
+    // `beforeinput`): the element right after it, read as the next block. Any other stray
+    // element is a block the model does not have.
+    const splitOff = new Map<Node, Node[]>();
+    for (const node of strays) {
+      let before = node.previousSibling;
+      const chain = [node];
+      while (before && strays.has(before)) {
+        chain.unshift(before);
+        before = before.previousSibling;
+      }
+      const desc = before ? this.owner.get(before) : undefined;
+      if (!before || !desc || splitOff.has(before)) continue;
+      // After the block's last fragment only (a fragment's tail is not the paragraph's), and
+      // holding exactly what the block lost (an element an extension or a translator put
+      // there holds text of its own: still discarded).
+      const shown = desc.fragments.filter((fragment) => this.host.contains(fragment));
+      if (shown[shown.length - 1] !== before) continue;
+      const kept = shown.map((fragment) => this.textIn(fragment, hardBreaks)).join("");
+      const moved = chain.map((part) => this.textIn(part, hardBreaks)).join("");
+      if (kept + moved === textOfBlock(desc.node)) splitOff.set(before, chain);
+    }
+    const placed = new Set([...splitOff.values()].flat());
+    if ([...strays].some((node) => !placed.has(node))) {
       // shortcut: a change that adds blocks cannot be read back yet; it is dropped.
       console.warn("Foli: discarded a DOM change that adds blocks or line breaks");
       this.rerender();
@@ -4494,6 +4547,11 @@ export class EditorView {
       if (!first) domText += BLOCK_SEPARATOR;
       first = false;
       for (const fragment of shown) walk(fragment);
+      // What the browser split off its last fragment, as blocks of their own.
+      for (const node of splitOff.get(shown[shown.length - 1] as Node) ?? []) {
+        domText += BLOCK_SEPARATOR;
+        walk(node);
+      }
     }
 
     const { doc } = this.state;
@@ -4546,14 +4604,20 @@ export class EditorView {
       domEnd++;
     }
     const inserted = domText.slice(start, domEnd);
-    if (inserted.includes(BLOCK_SEPARATOR) || inserted.includes(HARD_BREAK)) {
-      // shortcut: a change that adds blocks or line breaks cannot be read back yet; it is dropped.
+    // One transaction: the command runs on a state with the changed range selected.
+    const range = TextSelection.create(doc, posAt(start), posAt(end));
+    if (inserted.includes(BLOCK_SEPARATOR) && !inserted.includes(HARD_BREAK)) {
+      // A paragraph split the browser made without `beforeinput` (some Android keyboards): its
+      // text and Enter, replayed on the model (Enter as the key does it: a list item splits).
+      this.replaySplit(range, inserted.split(BLOCK_SEPARATOR));
+      return;
+    }
+    if (inserted.includes(HARD_BREAK)) {
+      // shortcut: a change that adds line breaks cannot be read back yet; it is dropped.
       console.warn("Foli: discarded a DOM change that adds blocks or line breaks");
       this.rerender();
       return;
     }
-    // One transaction: the command runs on a state with the changed range selected.
-    const range = TextSelection.create(doc, posAt(start), posAt(end));
     const selected = this.state.apply(this.state.tr.setSelection(range));
     const command = inserted ? insertText(inserted) : deleteSelection;
     // A filtered or read-only transaction renders nothing: still drop the browser's DOM.
@@ -4562,6 +4626,31 @@ export class EditorView {
       applied = this.dispatch(tr);
     });
     if (!applied || this.dirty.size) this.rerender();
+  }
+
+  /** The document text DOM `node` shows, as `readBack` reads it (hard breaks one character). */
+  private textIn(node: Node, hardBreaks: ReadonlySet<Node>): string {
+    if (node.nodeType === Node.TEXT_NODE) return (node as Text).data;
+    if (hardBreaks.has(node)) return HARD_BREAK;
+    if ((node as Element).getAttribute?.("contenteditable") === "false") return "";
+    return [...node.childNodes].map((child) => this.textIn(child, hardBreaks)).join("");
+  }
+
+  /**
+   * Replays a split read back from the DOM: `parts[0]` in place of `range`, then for each next
+   * part Enter and its text. The browser's DOM is then drawn again from the model.
+   */
+  private replaySplit(range: TextSelection, parts: readonly string[]): void {
+    const was = this.state.doc;
+    this.dispatch(this.state.tr.setSelection(range));
+    parts.forEach((part, i) => {
+      if (i > 0 && !this.runKey("Enter")) this.run(splitBlock);
+      if (part) this.run(insertText(part));
+      else if (i === 0 && !range.empty) this.run(deleteSelection);
+    });
+    if (this.state.doc === was)
+      console.warn("Foli: a paragraph split from the keyboard was refused");
+    this.rerender();
   }
 
   /** Rebuilds every block that is not reused and puts the selection back. */

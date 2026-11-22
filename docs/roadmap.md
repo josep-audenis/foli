@@ -2839,9 +2839,15 @@ agent's review.
   step; Ctrl or Option copies; a drop inside the dragged text changes nothing; the selection
   follows the pointer as the drop caret and comes back when the drag ends elsewhere. e2e in three
   browsers with synthetic drag events and a real `DataTransfer`, tracking included.)
-- [ ] 19.7 Android: Backspace at a list paragraph's start removes its number; a paragraph split
+- [x] 19.7 Android: Backspace at a list paragraph's start removes its number; a paragraph split
   without `beforeinput` recovered from the DOM mutation's text, not discarded. Tests with
-  recorded event sequences; device checks deferred (ADR-0003).
+  recorded event sequences; device checks deferred (ADR-0003). (Done in the view: a
+  `deleteContentBackward` whose target range is only the boundary before the caret's paragraph
+  runs as Backspace at a caret (the list binding lifts the number); a block the browser split off
+  one of the view's, the element right after it, is read back as the next block and the change
+  replayed as the text and Enter. e2e in three browsers with emulated events (a `StaticRange`
+  target, a DOM split as the browser makes it); no recorded device sequences or device checks,
+  deferred with the other manual checks.)
 - [ ] 19.8 Docs, size budgets, changesets; then 1.4.0, published with the owner's approval (the
   Release workflow).
 
@@ -2889,9 +2895,8 @@ supplies, so a server without a browser cannot make PDFs).
 
 **Gaps users will meet** ([limitations.md](limitations.md); planned as Phase 19):
 
-- On Android, Backspace at a list paragraph's start may join it into
-  the paragraph before; some Android keyboards insert paragraphs without the events the editor
-  needs.
+- Android input (19.7) emulated only, not checked on a device; an Enter at a paragraph's very
+  start or end from a keyboard that sends no `beforeinput` is lost.
 - Pictures: no crop handles on the page (the dialog crops); resizing is refused while tracking.
 - Find does not look in text boxes (comments: 19.2).
 

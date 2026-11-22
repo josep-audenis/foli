@@ -84,8 +84,9 @@ checklist in [testing/ime.md](testing/ime.md)):
   paragraph holding a reference at the end of a column can move to the next page where Word ends
   the column with it. Number formats
   beyond Word's common ones show as decimal numbers. Shift+Alt+N is Foli's: Word has no such key.
-- On Android, Backspace at a list paragraph's start may join it into the paragraph before
-  instead of removing its number (untested on a device).
+- On Android, Backspace at a list paragraph's start removes its number, as on a desktop: the
+  keyboard's delete of the boundary before the paragraph is taken as the key at a caret (19.7;
+  emulated, untested on a device).
 - The toolbar's colors are a palette (seven text colors, Word's highlights; an app gives the
   menus another one, and the browser's color field with `custom`,
   [api.md](api.md#toolbar-items): checked by its tests only, not by hand in each browser; a
@@ -123,8 +124,11 @@ checklist in [testing/ime.md](testing/ime.md)):
   highlighted meanwhile). A drop into another view of the same document, or between the body and
   a header, footer or note open on its page, copies rather than moves. Tested with synthetic drag
   events (a real `DataTransfer`), not the browsers' own drag of selected text; not on touch.
-- Some Android keyboards insert paragraphs without the events the editor needs; such an edit is
-  discarded with a `Foli:` console warning.
+- Some Android keyboards split a paragraph without `beforeinput`, the browser changing the DOM:
+  a paragraph split inside its text is read back and replayed as Enter (19.7; emulated,
+  untested on a device). Such an Enter at a paragraph's very start or end (an empty paragraph
+  added) is lost, and any other block or line break the browser adds is discarded with a `Foli:`
+  console warning.
 ## Extensions, keys and the toolbar
 
 Custom nodes and marks, plugins and toolbar items ([extensions](guides/extensions.md)).
