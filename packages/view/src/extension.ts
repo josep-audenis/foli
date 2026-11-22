@@ -272,6 +272,8 @@ export function decorationsByBlock(
  * Custom nodes and marks of `extensions` drawn by their views on read-only pages (19.3): a node
  * read into the extensions' schema, then `render`; without a view, or when it fails, the node's
  * `text` (its spec's), else as without extensions. Undefined when no extension is given.
+ * shortcut: no `destroy` and no later changes: the pages copy what `render` returned (headers,
+ * notes, a block's parts on later pages); keep the drawn roots for `destroy` if a view needs it.
  * @internal
  */
 export function customDrawing(
@@ -286,7 +288,9 @@ export function customDrawing(
       if (!type) return null;
       let node: ModelNode;
       try {
-        node = schema.nodeFromJSON(json);
+        // Without its marks: one of an extension not given would refuse the node (a view draws
+        // the node, its run carries the marks).
+        node = schema.nodeFromJSON({ ...json, marks: undefined });
       } catch {
         // Attributes its spec refuses: drawn as without extensions.
         return null;
@@ -305,7 +309,10 @@ export function customDrawing(
       const view = views.marks.get(json.type);
       if (!view) return null;
       try {
-        return view(schema.markFromJSON(json));
+        const attrs = view(schema.markFromJSON(json));
+        // Refused here, as the editor refuses them: never thrown out of the whole render.
+        checkAttrs(attrs);
+        return attrs;
       } catch (error) {
         reportError(error);
         return null;

@@ -127,7 +127,11 @@ Custom nodes and marks, plugins and toolbar items ([extensions](guides/extension
   and `exportPdf` (a script setting `globalThis.foliPdfExtensions` in the page) and in headers,
   footers and notes as the pages show them; without them a custom node is its `.docx` text or its
   type in brackets and a custom mark is not drawn. Decorations and plugin views are the editor's
-  only. On read-only pages a custom block is kept whole (it does not split between pages). A custom block in a table cell is kept whole (it does not split between pages); a split
+  only. On read-only pages, and in headers, footers and notes, what `render` returned is copied:
+  the copies do not follow later changes to it (a chart drawn afterwards, a canvas's pixels) and
+  `destroy` is not called; a custom block is kept whole unless taller than a page. In `exportPdf`
+  a custom node whose attributes its spec refuses throws inside the page (Node validates without
+  the extensions), and a script that fails prints the document without the views, silently. A custom block in a table cell is kept whole (it does not split between pages); a split
   block node view is drawn once per page (its `render` runs per part, each part's `destroy` when
   dropped). A node view's DOM is never read back: what it changes later is not checked, and
   `h`'s checks cover only what `h` makes. Decorations take body

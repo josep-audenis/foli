@@ -2797,7 +2797,8 @@ agent's review.
   headers, footers and notes as the pages show them use it too. `exportPdf`'s `extensions` is a
   script run in the page before the renderer, setting `globalThis.foliPdfExtensions` (taken once,
   so a page used again does not keep them): functions cannot cross into the page. A custom block
-  on read-only pages is kept whole. Tested in jsdom and in Chromium's PDF (e2e).)
+  on read-only pages is kept whole unless taller than a page; copies (headers, notes, later
+  parts) are snapshots and `destroy` is not called (limitations). Tested in jsdom and in Chromium's PDF (e2e).)
 - [ ] 19.4 Tables: a column width field in the table properties (keyboard, undoable); autofit
   tables fitted to their content (Word's rules: preferred widths, minimum content width, the
   page's width), a fixed table untouched; the `shortcut:` in `table.ts` removed.

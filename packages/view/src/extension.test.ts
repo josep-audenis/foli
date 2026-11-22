@@ -332,6 +332,42 @@ describe("custom content on read-only pages (19.3)", () => {
     container.remove();
   });
 
+  it("refuses a mark view's unsafe attributes and keeps a node whose mark is unknown", () => {
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    const unsafe: ViewExtension = {
+      ...withoutView,
+      markViews: { "acme:topic": () => ({ onclick: "x()" }) },
+    };
+    const blocks: NodeJSON[] = [
+      {
+        type: "paragraph",
+        content: [
+          {
+            type: "acme:mention",
+            attrs: { id: "u-1", label: "Ada" },
+            marks: [{ type: "zed:other" }],
+          },
+          {
+            type: "text",
+            text: "budget",
+            marks: [{ type: "acme:topic", attrs: { topic: "fin" } }],
+          },
+        ],
+      },
+    ];
+    const container = document.createElement("div");
+    document.body.append(container);
+    const pages = renderDocument(createDocument({ type: "doc", content: blocks }), container, {
+      extensions: [unsafe],
+    });
+    expect(container.querySelector(".chip")?.textContent).toBe("@Ada");
+    expect(container.querySelector("[onclick]")).toBe(null);
+    expect(error).toHaveBeenCalled();
+    error.mockRestore();
+    pages.destroy();
+    container.remove();
+  });
+
   it("draws them in headers too", () => {
     const container = document.createElement("div");
     document.body.append(container);
@@ -351,10 +387,11 @@ describe("custom content on read-only pages (19.3)", () => {
   });
 
   it("draws them as their text without the extensions, or when a view fails", () => {
-    const { container } = draw();
-    expect(container.querySelector(".chip")).toBe(null);
-    expect(container.textContent).toContain("[acme:mention]");
-    container.remove();
+    const plain = draw();
+    expect(plain.container.querySelector(".chip")).toBe(null);
+    expect(plain.container.textContent).toContain("[acme:mention]");
+    plain.pages.destroy();
+    plain.container.remove();
     const error = vi.spyOn(console, "error").mockImplementation(() => {});
     const failing: ViewExtension = {
       ...withoutView,
@@ -371,6 +408,7 @@ describe("custom content on read-only pages (19.3)", () => {
     expect(again.container.textContent).toContain("Ask @Ada about");
     expect(error).toHaveBeenCalled();
     error.mockRestore();
+    again.pages.destroy();
     again.container.remove();
   });
 });

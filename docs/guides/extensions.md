@@ -584,7 +584,9 @@ node's `text`. `exportPdf` runs in a page that has none of your modules: pass `e
 script of your own that sets `globalThis.foliPdfExtensions` to the array (bundle the extension's
 code into it, without Foli's packages: `h` is handed to `render`). Decorations and plugin views
 are the editor's only. Without extensions a custom node shows as its text and a custom mark not
-at all.
+at all. Read-only pages copy what `render` returns (headers, notes, a block's later parts): a
+view that draws later (a chart, a canvas) shows what it had drawn by then, and `destroy` is not
+called there.
 
 ## Safety: what is trusted
 
