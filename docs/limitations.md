@@ -255,7 +255,10 @@ Custom nodes and marks, plugins and toolbar items ([extensions](guides/extension
   rotation only in the drawing's XML: they are written back to `.docx` as they were, but not
   shown until the file is imported again. They are set in the picture dialog (Rotation, the two
   90° buttons, Crop in percent; core's `setPictureRotation` and `setPictureCrop`, which keeps the
-  image's scale as Word does), not by dragging on the page (no crop handles); no touch resizing;
+  image's scale as Word does; each change is its own undo step), not by dragging on the page (no
+  crop handles); a crop or rotation only in the drawing's XML (see above) cannot be changed there
+  until the file is imported again; cropping a floating picture's left or top keeps its anchor
+  offset, so what shows moves; no touch resizing;
   resizing is refused while tracking (Foli does not record a size change yet). Alt text changes
   are not tracked.
 - A picture copied into another document brings its image (12.11): its own `data:` or web URL,
