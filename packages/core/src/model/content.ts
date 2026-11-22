@@ -105,32 +105,27 @@ export class ContentMatch {
    * be creatable without attributes; inner wrappers must leave their parent complete.
    */
   findWrapping(target: NodeType): readonly NodeType[] | null {
-    interface Step {
+    // Breadth first, one wrapper longer per round, so the first chain found is a shortest one.
+    // A type is tried in one chain only: the first (shortest) chain to reach it.
+    interface Chain {
       match: ContentMatch;
-      type: NodeType | null;
-      via: Step | null;
+      types: readonly NodeType[];
     }
-    const seen = new Set<NodeType>();
-    const active: Step[] = [{ match: this, type: null, via: null }];
-    while (active.length) {
-      const current = active.shift() as Step;
-      if (current.match.matchType(target)) {
-        const result: NodeType[] = [];
-        for (let step: Step | null = current; step?.type; step = step.via) result.push(step.type);
-        return result.reverse();
-      }
-      for (const type of current.match.nextTypes) {
-        const next = current.match.matchType(type);
-        if (
-          !type.isLeaf &&
-          !type.hasRequiredAttrs() &&
-          !seen.has(type) &&
-          (!current.type || next?.validEnd)
-        ) {
-          seen.add(type);
-          active.push({ match: type.contentMatch, type, via: current });
+    const tried = new Set<NodeType>();
+    let round: Chain[] = [{ match: this, types: [] }];
+    while (round.length) {
+      const longer: Chain[] = [];
+      for (const { match, types } of round) {
+        if (match.matchType(target)) return types;
+        for (const type of match.nextTypes) {
+          if (type.isLeaf || type.hasRequiredAttrs() || tried.has(type)) continue;
+          // A wrapper inside another must be all that one needs.
+          if (types.length && !match.matchType(type)?.validEnd) continue;
+          tried.add(type);
+          longer.push({ match: type.contentMatch, types: [...types, type] });
         }
       }
+      round = longer;
     }
     return null;
   }

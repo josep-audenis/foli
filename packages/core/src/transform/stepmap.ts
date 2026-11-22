@@ -1,6 +1,3 @@
-// The design follows prosemirror-transform's StepMap/Mapping (MIT, see THIRD_PARTY_NOTICES.md);
-// this is an independent implementation.
-
 export interface MapResult {
   /** The mapped position. */
   pos: number;
@@ -16,10 +13,9 @@ export interface Mappable {
   mapResult(pos: number, assoc?: number): MapResult;
 }
 
-const FACTOR = 0x10000;
-const makeRecover = (index: number, offset: number) => index + offset * FACTOR;
-const recoverIndex = (value: number) => value % FACTOR;
-const recoverOffset = (value: number) => (value - recoverIndex(value)) / FACTOR;
+// A `recover` value packs which range of a map a position fell in and how far into it.
+const RANGE_UNIT = 2 ** 32;
+const packRecover = (range: number, offset: number) => range * RANGE_UNIT + offset;
 
 /**
  * How one step moved positions: a sorted flat list of `[start, oldSize, newSize]` triples in the
@@ -38,35 +34,35 @@ export class StepMap implements Mappable {
    * range at pure insertions, where the side decides which side of the new content `pos` ends up.
    */
   mapResult(pos: number, assoc = 1, sides?: readonly number[]): MapResult {
-    let diff = 0;
-    const oldIndex = this.inverted ? 2 : 1;
-    const newIndex = this.inverted ? 1 : 2;
-    for (let i = 0; i < this.ranges.length; i += 3) {
-      const start = (this.ranges[i] as number) - (this.inverted ? diff : 0);
-      if (start > pos) break;
-      const oldSize = this.ranges[i + oldIndex] as number;
-      const newSize = this.ranges[i + newIndex] as number;
-      const end = start + oldSize;
-      if (pos <= end) {
-        const side = !oldSize
-          ? sides?.[i / 3] || assoc
-          : pos === start
-            ? -1
-            : pos === end
-              ? 1
-              : assoc;
-        // Recoverable unless the position sits on the range edge it associates with; a start edge
-        // with right association must be recoverable, or it drifts past re-inserted content.
-        const recoverable = pos !== (assoc < 0 ? start : end);
-        return {
-          pos: start + diff + (side < 0 ? 0 : newSize),
-          deleted: pos > start && pos < end,
-          recover: recoverable ? makeRecover(i / 3, pos - start) : null,
-        };
+    const { ranges, inverted } = this;
+    // How far output positions are ahead of input positions after the ranges seen so far.
+    let shift = 0;
+    for (let i = 0; i < ranges.length; i += 3) {
+      const inSize = ranges[i + (inverted ? 2 : 1)] as number;
+      const outSize = ranges[i + (inverted ? 1 : 2)] as number;
+      // `ranges` use the coordinates before the step: an inverted map's output coordinates.
+      const inStart = (ranges[i] as number) - (inverted ? shift : 0);
+      if (pos < inStart) break;
+      const inEnd = inStart + inSize;
+      if (pos > inEnd) {
+        shift += outSize - inSize;
+        continue;
       }
-      diff += newSize - oldSize;
+      // `pos` touches this range: it goes before or after the range's new content.
+      let after: boolean;
+      if (inSize === 0) after = (sides?.[i / 3] || assoc) >= 0;
+      else if (pos === inStart) after = false;
+      else if (pos === inEnd) after = true;
+      else after = assoc >= 0;
+      // The edge `pos` sticks to maps exactly; anywhere else a mirror can restore it.
+      const exact = pos === (assoc < 0 ? inStart : inEnd);
+      return {
+        pos: inStart + shift + (after ? outSize : 0),
+        deleted: pos > inStart && pos < inEnd,
+        recover: exact ? null : packRecover(i / 3, pos - inStart),
+      };
     }
-    return { pos: pos + diff, deleted: false, recover: null };
+    return { pos: pos + shift, deleted: false, recover: null };
   }
 
   map(pos: number, assoc = 1): number {
@@ -75,29 +71,20 @@ export class StepMap implements Mappable {
 
   /** Position in this map's output for a `recover` value produced by its mirror. */
   recover(value: number): number {
-    let diff = 0;
-    const index = recoverIndex(value);
-    if (!this.inverted) {
-      for (let i = 0; i < index; i++) {
-        diff += (this.ranges[i * 3 + 2] as number) - (this.ranges[i * 3 + 1] as number);
-      }
-    }
-    return (this.ranges[index * 3] as number) + diff + recoverOffset(value);
+    const range = Math.floor(value / RANGE_UNIT);
+    let start = 0;
+    eachRange(this, (index, _inStart, _inEnd, outStart) => {
+      if (index === range) start = outStart;
+      return index === range;
+    });
+    return start + (value - range * RANGE_UNIT);
   }
 
   /** Calls `f` with each changed range in old and new coordinates. */
   forEach(f: (oldStart: number, oldEnd: number, newStart: number, newEnd: number) => void): void {
-    const oldIndex = this.inverted ? 2 : 1;
-    const newIndex = this.inverted ? 1 : 2;
-    for (let i = 0, diff = 0; i < this.ranges.length; i += 3) {
-      const start = this.ranges[i] as number;
-      const oldStart = start - (this.inverted ? diff : 0);
-      const newStart = start + (this.inverted ? 0 : diff);
-      const oldSize = this.ranges[i + oldIndex] as number;
-      const newSize = this.ranges[i + newIndex] as number;
-      f(oldStart, oldStart + oldSize, newStart, newStart + newSize);
-      diff += newSize - oldSize;
-    }
+    eachRange(this, (_index, inStart, inEnd, outStart, outEnd) => {
+      f(inStart, inEnd, outStart, outEnd);
+    });
   }
 
   /**
@@ -106,14 +93,31 @@ export class StepMap implements Mappable {
    */
   sides(pos: number): (-1 | 0 | 1)[] {
     const sides: (-1 | 0 | 1)[] = [];
-    this.forEach((oldStart, oldEnd) => {
-      sides.push(pos <= oldStart ? -1 : pos >= oldEnd ? 1 : 0);
+    this.forEach((start, end) => {
+      sides.push(pos <= start ? -1 : pos >= end ? 1 : 0);
     });
     return sides;
   }
 
   invert(): StepMap {
     return new StepMap(this.ranges, !this.inverted);
+  }
+}
+
+/** Visits `map`'s ranges in order with their bounds in input and output coordinates; `true` stops. */
+function eachRange(
+  map: StepMap,
+  f: (index: number, inStart: number, inEnd: number, outStart: number, outEnd: number) => unknown,
+): void {
+  const { ranges, inverted } = map;
+  let shift = 0;
+  for (let i = 0; i < ranges.length; i += 3) {
+    const inSize = ranges[i + (inverted ? 2 : 1)] as number;
+    const outSize = ranges[i + (inverted ? 1 : 2)] as number;
+    const inStart = (ranges[i] as number) - (inverted ? shift : 0);
+    const outStart = inStart + shift;
+    if (f(i / 3, inStart, inStart + inSize, outStart, outStart + outSize) === true) return;
+    shift += outSize - inSize;
   }
 }
 
@@ -138,23 +142,21 @@ export class Mapping implements Mappable {
   }
 
   appendMap(map: StepMap, mirrors?: number): void {
-    this.to = this.maps.push(map);
-    if (mirrors !== undefined) {
-      this.mirror.set(this.maps.length - 1, mirrors);
-      this.mirror.set(mirrors, this.maps.length - 1);
-    }
+    const index = this.maps.length;
+    this.maps.push(map);
+    this.to = index + 1;
+    if (mirrors === undefined) return;
+    this.mirror.set(index, mirrors);
+    this.mirror.set(mirrors, index);
   }
 
   appendMapping(mapping: Mapping): void {
-    const startSize = this.maps.length;
+    const shift = this.maps.length - mapping.from;
     for (let i = mapping.from; i < mapping.to; i++) {
-      const mirror = mapping.getMirror(i);
-      this.appendMap(
-        mapping.maps[i] as StepMap,
-        mirror !== undefined && mirror < i && mirror >= mapping.from
-          ? startSize + mirror - mapping.from
-          : undefined,
-      );
+      // Keep a pair only when both maps are in `mapping`'s view: the earlier one is copied by now.
+      const partner = mapping.getMirror(i);
+      const keep = partner !== undefined && partner >= mapping.from && partner < i;
+      this.appendMap(mapping.maps[i] as StepMap, keep ? partner + shift : undefined);
     }
   }
 
@@ -168,20 +170,19 @@ export class Mapping implements Mappable {
 
   mapResult(pos: number, assoc = 1): MapResult {
     let deleted = false;
+    let current = pos;
     for (let i = this.from; i < this.to; i++) {
-      const map = this.maps[i] as StepMap;
-      const result = map.mapResult(pos, assoc);
-      if (result.recover !== null) {
-        const corr = this.getMirror(i);
-        if (corr !== undefined && corr > i && corr < this.to) {
-          i = corr;
-          pos = (this.maps[corr] as StepMap).recover(result.recover);
-          continue;
-        }
+      const result = (this.maps[i] as StepMap).mapResult(current, assoc);
+      const partner = result.recover === null ? undefined : this.mirror.get(i);
+      if (partner !== undefined && partner > i && partner < this.to) {
+        // The mirror re-creates what this map removed: continue from the restored position.
+        current = (this.maps[partner] as StepMap).recover(result.recover as number);
+        i = partner;
+        continue;
       }
       deleted ||= result.deleted;
-      pos = result.pos;
+      current = result.pos;
     }
-    return { pos, deleted, recover: null };
+    return { pos: current, deleted, recover: null };
   }
 }

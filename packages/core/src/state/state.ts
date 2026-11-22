@@ -89,21 +89,23 @@ export class Transaction extends Transform {
   }
 
   get selection(): Selection {
-    if (this.selectionStep < this.steps.length) {
-      this.currentSelection = this.currentSelection.map(
-        this.doc,
-        this.mapping.slice(this.selectionStep),
-      );
-      this.selectionStep = this.steps.length;
+    // Mapped lazily: only through the steps added since it was last read or set.
+    const pending = this.steps.length;
+    if (this.selectionStep !== pending) {
+      const since = this.mapping.slice(this.selectionStep);
+      this.currentSelection = this.currentSelection.map(this.doc, since);
+      this.selectionStep = pending;
     }
     return this.currentSelection;
   }
 
   setSelection(selection: Selection): this {
-    if (selection.$anchor.doc !== this.doc)
+    if (selection.$anchor.doc !== this.doc) {
       throw new RangeError("Selection is not in this document");
+    }
     // Marks toggled at a caret are for what is typed there: they do not follow the selection.
-    if (!this.storedMarksSet && !selection.eq(this.selection)) this.storedMarks = null;
+    const moved = !selection.eq(this.selection);
+    if (moved && !this.storedMarksSet) this.storedMarks = null;
     this.currentSelection = selection;
     this.selectionStep = this.steps.length;
     return this;
@@ -258,43 +260,47 @@ export class EditorState {
     if (!this.passesFilters(root)) return { state: this, transactions: [] };
     const transactions = [root];
     let state = this.applyInner(root);
-    const seen: { state: EditorState; count: number }[] = [];
-    for (let round = 0; ; round++) {
+    // Per plugin: how many of the transactions it has been shown, and the state before the rest.
+    const shown = this.plugins.map(() => ({ count: 0, before: this as EditorState }));
+    for (let round = 0, appended = true; appended; round++) {
       // A plugin that appends on every round would otherwise hang the editor.
       if (round > 100) throw new RangeError("appendTransaction did not settle after 100 rounds");
-      let appended = false;
-      this.plugins.forEach((plugin, i) => {
-        const append = plugin.spec.appendTransaction;
-        if (!append) return;
-        const prev = seen[i] ?? { state: this, count: 0 };
-        const tr =
-          prev.count < transactions.length
-            ? append(transactions.slice(prev.count), prev.state, state)
-            : null;
+      appended = false;
+      for (let i = 0; i < this.plugins.length; i++) {
+        const append = this.plugins[i]?.spec.appendTransaction;
+        const seen = shown[i];
+        if (!append || !seen) continue;
+        const fresh = transactions.slice(seen.count);
+        const tr = fresh.length ? append(fresh, seen.before, state) : null;
         if (tr && state.passesFilters(tr, i)) {
           tr.setMeta("appendedTransaction", root);
           transactions.push(tr);
           state = state.applyInner(tr);
           appended = true;
         }
-        seen[i] = { state, count: transactions.length };
-      });
-      if (!appended) return { state, transactions };
+        seen.count = transactions.length;
+        seen.before = state;
+      }
     }
+    return { state, transactions };
   }
 
-  private passesFilters(tr: Transaction, ignore = -1): boolean {
-    return this.plugins.every(
-      (plugin, i) => i === ignore || plugin.spec.filterTransaction?.(tr, this) !== false,
-    );
+  private passesFilters(tr: Transaction, skip = -1): boolean {
+    // Every plugin's filter but the one at `skip` (which appended `tr`) must let it through.
+    for (let i = 0; i < this.plugins.length; i++) {
+      if (i !== skip && this.plugins[i]?.spec.filterTransaction?.(tr, this) === false) return false;
+    }
+    return true;
   }
 
   private applyInner(tr: Transaction): EditorState {
     if (tr.before !== this.doc) throw new RangeError("Transaction was not created from this state");
-    const next = new EditorState(tr.doc, tr.selection, tr.storedMarks, this.plugins, new Map());
+    const fields = new Map<Plugin, unknown>();
+    const next = new EditorState(tr.doc, tr.selection, tr.storedMarks, this.plugins, fields);
+    // Fields are computed in plugin order; a field's `apply` sees the new state as it fills.
     for (const plugin of this.plugins) {
       const field = plugin.spec.state;
-      if (field) next.fields.set(plugin, field.apply(tr, this.fields.get(plugin), this, next));
+      if (field) fields.set(plugin, field.apply(tr, this.fields.get(plugin), this, next));
     }
     return next;
   }

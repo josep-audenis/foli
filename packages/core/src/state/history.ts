@@ -140,44 +140,52 @@ export function history({ newGroupDelay = 500, depth = 100 }: HistoryOptions = {
 
 /** Puts `inverted` (applied first) before `steps`, merging adjacent steps (typing runs). */
 function prepend(inverted: readonly Step[], steps: readonly Step[]): Step[] {
-  const last = inverted[inverted.length - 1];
-  const first = steps[0];
+  const joined = [...inverted, ...steps];
+  const at = inverted.length - 1;
+  const left = joined[at];
+  const right = joined[at + 1];
+  if (!left || !right) return joined;
+  // The newest inverse meets the oldest stored one: consecutive keystrokes become one step.
   const merged =
-    last instanceof ReplaceStep && first
-      ? last.merge(first)
-      : last instanceof StoryStep && first instanceof StoryStep
-        ? last.merge(first)
+    left instanceof ReplaceStep
+      ? left.merge(right)
+      : left instanceof StoryStep && right instanceof StoryStep
+        ? left.merge(right)
         : null;
-  return merged ? [...inverted.slice(0, -1), merged, ...steps.slice(1)] : [...inverted, ...steps];
+  if (merged) joined.splice(at, 2, merged);
+  return joined;
 }
 
 /** Whether `tr`'s first change touches a range changed by the previous recorded transaction. */
 function isAdjacent(prev: readonly number[] | null, tr: Transaction): boolean {
   const first = tr.mapping.maps[0];
   if (!prev || !first) return false;
-  let adjacent = false;
+  let touches = false;
   first.forEach((start, end) => {
-    for (let i = 0; i < prev.length; i += 2) {
-      if (start <= (prev[i + 1] as number) && end >= (prev[i] as number)) adjacent = true;
+    for (let i = 0; i + 1 < prev.length && !touches; i += 2) {
+      touches = start <= (prev[i + 1] as number) && end >= (prev[i] as number);
     }
   });
-  return adjacent;
+  return touches;
 }
 
 /** Ranges changed by `tr`, in positions of its final document. */
 function changedRanges(tr: Transaction): number[] {
+  const { maps } = tr.mapping;
   const ranges: number[] = [];
-  tr.mapping.maps.forEach((map, i) => {
-    const rest = tr.mapping.slice(i + 1);
-    map.forEach((_oldStart, _oldEnd, newStart, newEnd) => {
-      ranges.push(rest.map(newStart, -1), rest.map(newEnd, 1));
+  for (let i = 0; i < maps.length; i++) {
+    // Each range in its step's output, then moved through the steps after it.
+    const later = tr.mapping.slice(i + 1);
+    (maps[i] as StepMap).forEach((_from, _to, start, end) => {
+      ranges.push(later.map(start, -1), later.map(end, 1));
     });
-  });
+  }
   return ranges;
 }
 
 function mapRanges(ranges: readonly number[] | null, mapping: Mappable): number[] | null {
-  return ranges && ranges.map((pos, i) => mapping.map(pos, i % 2 ? 1 : -1));
+  // Starts stick left, ends right: the ranges keep what was inserted at their edges.
+  return ranges?.map((pos, i) => mapping.map(pos, i % 2 === 0 ? -1 : 1)) ?? null;
 }
 
 /**
