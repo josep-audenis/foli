@@ -70,9 +70,9 @@ export abstract class Selection {
    */
   static near($pos: ResolvedPos, bias = 1): Selection {
     if ($pos.parent.inlineContent) return new TextSelection($pos, $pos);
-    const doc = $pos.doc;
-    const pos = findTextPos(doc, $pos.pos, bias) ?? findTextPos(doc, $pos.pos, -bias);
-    return pos === null ? new AllSelection(doc) : TextSelection.create(doc, pos);
+    const { doc } = $pos;
+    const found = textPosFrom(doc, $pos.pos, bias) ?? textPosFrom(doc, $pos.pos, -bias);
+    return found === null ? new AllSelection(doc) : TextSelection.create(doc, found);
   }
 
   static atStart(doc: Node): Selection {
@@ -104,17 +104,18 @@ export abstract class Selection {
 }
 
 /**
- * Nearest position inside a textblock from `pos` in direction `dir`, or null.
- * shortcut: scans the whole document; fine for headless use, revisit if it shows in profiles (Phase 4).
+ * The closest position inside a textblock from `pos` in direction `dir` (the start of the first
+ * textblock starting at or after it, or the end of the last one ending at or before it), or null.
  */
-function findTextPos(doc: Node, pos: number, dir: number): number | null {
+function textPosFrom(doc: Node, pos: number, dir: number): number | null {
   let found: number | null = null;
-  doc.descendants((node, p) => {
+  const [from, to] = dir > 0 ? [pos, doc.content.size] : [0, pos];
+  doc.nodesBetween(from, to, (node, at) => {
+    if (dir > 0 && found !== null) return false;
     if (!node.isTextblock) return true;
-    const start = p + 1;
+    const start = at + 1;
     const end = start + node.content.size;
-    if (dir > 0 && start >= pos && found === null) found = start;
-    if (dir < 0 && end <= pos) found = end;
+    if (dir > 0 ? start >= pos : end <= pos) found = dir > 0 ? start : end;
     return false;
   });
   return found;
@@ -142,17 +143,22 @@ export class TextSelection extends Selection {
 
   /** Like `create`, but snaps ends that are not in inline content to the nearest valid position. */
   static between($anchor: ResolvedPos, $head: ResolvedPos): Selection {
-    const dir = $head.pos >= $anchor.pos ? 1 : -1;
-    const head = $head.parent.inlineContent ? $head : Selection.near($head, dir).$head;
-    const anchor = $anchor.parent.inlineContent ? $anchor : Selection.near($anchor, -dir).$head;
-    if (!head.parent.inlineContent || !anchor.parent.inlineContent)
-      return Selection.near($head, dir);
-    return new TextSelection(outOfSurrogatePair(anchor), outOfSurrogatePair(head));
+    const dir = $head.pos < $anchor.pos ? -1 : 1;
+    // Each end not in inline content moves to text: the head onwards, the anchor back towards it.
+    const inText = ($pos: ResolvedPos, towards: number) =>
+      $pos.parent.inlineContent ? $pos : Selection.near($pos, towards).$head;
+    const head = inText($head, dir);
+    const anchor = inText($anchor, -dir);
+    if (head.parent.inlineContent && anchor.parent.inlineContent) {
+      return new TextSelection(outOfSurrogatePair(anchor), outOfSurrogatePair(head));
+    }
+    return Selection.near($head, dir);
   }
 
   map(doc: Node, mapping: Mappable): Selection {
     const $head = doc.resolve(mapping.map(this.head));
     if (!$head.parent.inlineContent) return Selection.near($head);
+    // An anchor that lands outside text collapses the selection onto the head.
     const $anchor = doc.resolve(mapping.map(this.anchor));
     return new TextSelection($anchor.parent.inlineContent ? $anchor : $head, $head);
   }
@@ -170,8 +176,8 @@ export class NodeSelection extends Selection {
   readonly node: Node;
 
   constructor($pos: ResolvedPos) {
-    const node = $pos.nodeAfter;
-    if (!node || $pos.textOffset || !NodeSelection.isSelectable(node)) {
+    const node = $pos.textOffset ? null : $pos.nodeAfter;
+    if (!node || !NodeSelection.isSelectable(node)) {
       throw new RangeError(`No selectable node at position ${$pos.pos}`);
     }
     super($pos, $pos.doc.resolve($pos.pos + node.nodeSize));
@@ -188,22 +194,17 @@ export class NodeSelection extends Selection {
 
   /** Still the same node when it survives the mapping; a text selection near it otherwise. */
   map(doc: Node, mapping: Mappable): Selection {
-    const from = mapping.mapResult(this.anchor, 1);
-    const to = mapping.mapResult(this.head, -1);
-    const $pos = doc.resolve(from.pos);
-    const node = $pos.nodeAfter;
-    // The node now at the start must still end at the mapped end: otherwise it was deleted
-    // (both ends collapse) or its content moved out (a lift maps its edges onto a child's).
-    if (
-      from.deleted ||
-      to.deleted ||
-      !node ||
-      $pos.textOffset ||
-      from.pos + node.nodeSize !== to.pos
-    ) {
-      return Selection.near($pos);
-    }
-    return NodeSelection.isSelectable(node) ? new NodeSelection($pos) : Selection.near($pos);
+    const start = mapping.mapResult(this.anchor, 1);
+    const end = mapping.mapResult(this.head, -1);
+    const $start = doc.resolve(start.pos);
+    if (start.deleted || end.deleted) return Selection.near($start);
+    // Still the same node only if the node now at the start ends at the mapped end: a lift, for
+    // one, maps the node's edges onto those of a child it moved out.
+    const node = $start.textOffset ? null : $start.nodeAfter;
+    const same = node !== null && start.pos + node.nodeSize === end.pos;
+    return same && NodeSelection.isSelectable(node)
+      ? new NodeSelection($start)
+      : Selection.near($start);
   }
 
   toJSON(): SelectionJSON {
@@ -233,15 +234,13 @@ export class AllSelection extends Selection {
 export function marksAt($pos: ResolvedPos): readonly Mark[] {
   if (!$pos.parent.inlineContent) return Mark.none;
   if ($pos.textOffset) return $pos.parent.child($pos.index()).marks;
-  const before = $pos.nodeBefore;
-  const after = $pos.nodeAfter;
-  const main = before ?? after;
-  const other = before ? after : null;
-  let marks = main?.marks ?? Mark.none;
-  for (const mark of marks) {
-    if (!mark.type.inclusive && !(other && mark.isInSet(other.marks))) {
-      marks = mark.removeFromSet(marks);
-    }
-  }
-  return marks;
+  const { nodeBefore, nodeAfter } = $pos;
+  // Typing continues the text before the caret; at the start of a block, the text after it.
+  const source = nodeBefore ?? nodeAfter;
+  if (!source) return Mark.none;
+  const across = nodeBefore ? nodeAfter : null;
+  const kept = source.marks.filter(
+    (mark) => mark.type.inclusive || (across !== null && mark.isInSet(across.marks)),
+  );
+  return kept.length === source.marks.length ? source.marks : kept;
 }

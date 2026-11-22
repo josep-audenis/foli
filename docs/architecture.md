@@ -66,7 +66,7 @@ converts them into steps immediately.
 ## Editing engine (`@folijs/core`)
 
 Implemented headless in Phase 3 (`packages/core/src/transform/`, `packages/core/src/state/`).
-The code is Foli's own; design credits are in `THIRD_PARTY_NOTICES.md`.
+The code is Foli's own.
 
 - **Steps** change the document atomically and are invertible: `ReplaceStep`,
   `ReplaceAroundStep`, `AddMarkStep`, `RemoveMarkStep` and `NodeMarkupStep`. `NodeMarkupStep`
