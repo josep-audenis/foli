@@ -1,6 +1,6 @@
-# 0.x format fixtures
+# Format fixtures
 
-One document per schema version 0.x saved, each written by the release that saved that version
+One document per schema version (0.x, and each 1.x minor that adds one), each written by the release that saved that version
 (ADR-0008: every 1.x reads every earlier format). `src/v3/formats.test.ts` (core) loads, saves
 and compares them; `src/formats.test.ts` (docx) takes them through `.docx` too.
 
@@ -12,7 +12,7 @@ and compares them; `src/formats.test.ts` (docx) takes them through `.docx` too.
 | `v4-04-board-report.json`                |      4 | 0.5.0    | The corpus's 04 as 0.5.0 read it: tables, a picture, opaque notes and fields                  |
 | `v5-03-offer-letter-template.json`       |      5 | 0.6.0    | The corpus's 03 as 0.6.0 read it: content controls, merge fields, a header picture            |
 | `v5-09-pump-test-memo.json`              |      5 | 0.6.0    | The corpus's 09 as 0.6.0 read it: footnotes, endnotes, bookmarks, fields                      |
-| `v6.json`                                |      6 | 1.4.0    | A rotated and cropped picture (19.5); written by hand before 1.4.0's release, to check then   |
+| `v6.json`                                |      6 | 1.4.0    | A picture rotated and cropped by 1.4.0's commands (19.5), saved by its editor                 |
 
 `migrated/v1.json` and `migrated/v2.json` are what 1.x saves from the v1 and v2 fixtures (the
 migration to Word's model), reviewed when recorded in 12.11: a change to them is a change to

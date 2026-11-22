@@ -2852,8 +2852,8 @@ agent's review.
   Release workflow). (Partly: docs (api.md, architecture.md, document-model.md,
   limitations, the extensions guide, the PDF README) updated with each task; budgets raised with
   their reasons (React 170.0, view 116.2 kB); a changeset per task. Released 2026-11-22 (#202, the
-  Release workflow): 1.4.0, agent 0.3.1, mcp 0.2.2, installed from npm and checked. Left: `v6.json`
-  regenerated from 1.4.0 with `generate.mjs`.)
+  Release workflow): 1.4.0, agent 0.3.1, mcp 0.2.2, installed from npm and checked. `v6.json` then
+  regenerated from 1.4.0 by `generate.mjs` (the other fixtures reproduced unchanged).)
 
 ## After 1.0
 

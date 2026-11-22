@@ -13,11 +13,16 @@ const paragraph = (text: string): Json => ({
   content: [{ type: "text", text }],
 });
 
-async function open(page: Page, texts: string[], tracking = false): Promise<void> {
+async function open(
+  page: Page,
+  texts: string[],
+  tracking = false,
+  more: { blocks?: Json[]; controls?: Json } = {},
+): Promise<void> {
   await page.goto("/edit.html");
   await page.waitForFunction(() => "foliEdit" in window);
   await page.evaluate(
-    ({ content, tracking }) =>
+    ({ content, tracking, more }) =>
       window.foliEdit.load(
         {
           schemaVersion: 5,
@@ -26,11 +31,12 @@ async function open(page: Page, texts: string[], tracking = false): Promise<void
           styles: [{ id: "Normal", type: "paragraph", name: "Normal", isDefault: true }],
           numbering: { abstracts: [], instances: [] },
           comments: [],
+          ...(more.controls ? { controls: more.controls } : {}),
           content: { type: "doc", content },
         } as never,
         tracking,
       ),
-    { content: texts.map(paragraph), tracking },
+    { content: [...texts.map(paragraph), ...(more.blocks ?? [])], tracking, more },
   );
   await editor(page).focus();
 }
@@ -141,4 +147,23 @@ test("a move while tracking is a tracked deletion and a tracked insertion", asyn
   });
   expect(marks).toEqual(["deletion:beta ", "insertion:beta "]);
   expect(await page.evaluate(() => window.foliEdit.validate())).toBe(true);
+});
+
+test("a drop into a content-locked control is refused, the dragged text left where it was", async ({
+  page,
+}) => {
+  const locked: Json = {
+    type: "paragraph",
+    content: [
+      { type: "controlStart", attrs: { id: "c1" } },
+      { type: "text", text: "locked text" },
+      { type: "controlEnd", attrs: { id: "c1" } },
+    ],
+  };
+  await open(page, ["alpha beta gamma"], false, {
+    blocks: [locked],
+    controls: { c1: { kind: "richText", lock: "contentLocked" } },
+  });
+  await drag(page, "beta ", "text");
+  expect(await texts(page)).toEqual(["alpha beta gamma", "locked text"]);
 });
