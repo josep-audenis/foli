@@ -96,4 +96,6 @@ what it shows: the backlog, unless they fall out of the fixes above.
 
 ## Fixes
 
-None yet (20.5).
+| Row | Fix                                                                              | Files before |                           After |
+| --- | -------------------------------------------------------------------------------- | -----------: | ------------------------------: |
+| 1   | A run property written twice read as one mark, reported (`import/properties.ts`) |            3 | 0 (all three export equivalent) |

@@ -216,6 +216,21 @@ describe("importing the Word corpus", () => {
 });
 
 describe("importing WordprocessingML", () => {
+  it("reads a run property written twice as one mark (LibreOffice's tdf92335)", async () => {
+    const { blocks, report } = await blocksOf(
+      `<w:p><w:r><w:rPr><w:rFonts w:ascii="Symbol" w:hAnsi="Symbol"/><w:color w:val="FF0000"/><w:rFonts w:cs="OpenSymbol" w:hAnsi="Wingdings"/><w:color w:val="00FF00"/></w:rPr><w:t>a</w:t></w:r></w:p>`,
+    );
+    const marks = blocks[0]?.content?.[0]?.marks ?? [];
+    expect(marks.filter((m) => m.type === "font")).toHaveLength(1);
+    expect(marks.find((m) => m.type === "font")?.attrs).toMatchObject({
+      ascii: "Symbol",
+      hAnsi: "Wingdings",
+      cs: "OpenSymbol",
+    });
+    expect(marks.find((m) => m.type === "color")?.attrs).toMatchObject({ value: "00FF00" });
+    expect(report.unmodeled.join("\n")).toMatch(/written twice \(font\)/);
+  });
+
   it("reads runs, breaks, hyphens and toggles", async () => {
     const { blocks, report } = await blocksOf(
       `<w:p w14:paraId="12AB34CD" w:rsidR="00AA"><w:pPr><w:jc w:val="center"/><w:ind w:start="720" w:firstLine="360"/></w:pPr>` +

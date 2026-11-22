@@ -304,7 +304,24 @@ export function runProperties(rPr: XmlElement | undefined, context: Context): Ma
       }
     }
   }
-  return marks.filter((m): m is MarkJSON => m !== undefined);
+  // One property written twice (`w:rFonts` then `w:rFonts`, schema-invalid but written by some
+  // tools): read in order, each setting what it names, as one mark; the model allows one a type.
+  // (`w:b`, `w:i`, `w:sz` and their twins are read from their first element only.)
+  const byType = new Map<string, MarkJSON>();
+  for (const m of marks) {
+    if (!m) continue;
+    const before = byType.get(m.type);
+    if (!before) {
+      byType.set(m.type, m);
+      continue;
+    }
+    context.report.unmodeled(name("rPr"), `a property written twice (${m.type}), read as one`);
+    const attrs = { ...before.attrs };
+    for (const [key, value] of Object.entries(m.attrs ?? {}))
+      if (value !== null) attrs[key] = value;
+    byType.set(m.type, { ...m, attrs });
+  }
+  return [...byType.values()];
 }
 
 /** A paragraph mark's tracked insertion and deletion (`w:pPr/w:rPr/w:ins`, `w:del`, moves). */
