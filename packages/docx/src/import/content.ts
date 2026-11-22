@@ -331,14 +331,15 @@ function withLabel(attrs: Record<string, unknown>, value: string | null): Record
 /** @internal */
 export function paragraph(p: XmlElement, context: ContentContext): NodeJSON {
   // A story ends no section: such a paragraph stays as it is.
-  const pPr = child(p, "pPr");
-  if (context.story && pPr && child(pPr, "sectPr")) return opaqueOf(p, context);
+  const pPrs = elements(p).filter((e) => isW(e, "pPr"));
+  const pPr = pPrs[0];
+  if (context.story && pPrs.some((e) => child(e, "sectPr"))) return opaqueOf(p, context);
   const attrs: Record<string, unknown> = paragraphProperties(pPr, context, true);
   // A second `w:pPr` (schema-invalid; docx4j's `repeated` tests): read into the first, in order,
   // property by property, as Word 365 resaves it. Its elements the model does not hold are lost.
-  for (const more of elements(p)
-    .filter((e) => isW(e, "pPr"))
-    .slice(1)) {
+  // shortcut: tab stops (an array) are replaced, not merged by position; merge them if a real
+  // file needs it.
+  for (const more of pPrs.slice(1)) {
     context.report.unmodeled(more.name, "a second w:pPr, read into the first");
     const { ext: _, ...read } = paragraphProperties(more, context, true);
     mergeInto(attrs, read);

@@ -135,6 +135,29 @@ describe("reading stories", () => {
     expect(blocks.at(-1)?.type).toBe("opaqueBlock");
     expect(() => parseDocument(again.document)).not.toThrow();
   });
+
+  it("keeps verbatim a story paragraph whose second w:pPr ends a section", async () => {
+    const { document, package: pkg } = await load("08-newsletter.docx");
+    const id = headerId(document);
+    const name = pkg.relationships(pkg.mainDocument).find((r) => r.id === id)?.partName as string;
+    const changed = await pkg.write(
+      new Map([
+        [
+          name,
+          new TextEncoder().encode(
+            pkg
+              .text(name)
+              .replace(
+                /<\/w:hdr>$/,
+                '<w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:pPr><w:sectPr/></w:pPr></w:p></w:hdr>',
+              ),
+          ),
+        ],
+      ]),
+    );
+    const again = await importDocx(changed);
+    expect(again.document.stories?.[id]?.content.content?.at(-1)?.type).toBe("opaqueBlock");
+  });
 });
 
 describe("writing stories", () => {
