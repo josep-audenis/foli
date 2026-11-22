@@ -84,6 +84,8 @@ import {
   setNoteProperties,
   setParagraphStyle,
   setPictureAlt,
+  setPictureCrop,
+  setPictureRotation,
   setPictureSize,
   setReviewView,
   setSectionSetup,
@@ -3824,6 +3826,9 @@ const MAX_PICTURE_PX = Math.floor(2_147_483_647 / EMU_PER_PX);
  * not while tracking changes), Apply and Cancel. Escape cancels; a field that is wrong is marked
  * and announced.
  */
+type CropSide = "left" | "top" | "right" | "bottom";
+const CROP_SIDES: readonly CropSide[] = ["left", "top", "right", "bottom"];
+
 function PictureDialog({
   editor,
   pos,
@@ -3846,7 +3851,34 @@ function PictureDialog({
   const [width, setWidth] = useState(picture ? px(attrs.width) : "");
   const [height, setHeight] = useState(picture ? px(attrs.height) : "");
   const [keep, setKeep] = useState(true);
-  const [error, setError] = useState<"file" | "alt" | "size" | "failed" | null>(null);
+  // Rotation in degrees, crop in percent (19.5): the model's 60 000ths and 1000ths shown plainly.
+  const degrees = (Number(attrs.rotation) || 0) / 60_000;
+  const [rotation, setRotation] = useState(String(Number(degrees.toFixed(2))));
+  const cropAttr = (attrs.crop ?? {}) as Record<string, number | undefined>;
+  const percent = (side: string) => String((cropAttr[side] ?? 0) / 1000);
+  const [crop, setCrop] = useState<Record<CropSide, string>>(() => ({
+    left: percent("left"),
+    top: percent("top"),
+    right: percent("right"),
+    bottom: percent("bottom"),
+  }));
+  const [error, setError] = useState<
+    "file" | "alt" | "size" | "rotation" | "crop" | "failed" | null
+  >(null);
+  const rotationField = useRef<HTMLInputElement>(null);
+  const cropField = useRef<HTMLInputElement>(null);
+  const cropLabels: Record<CropSide, string> = {
+    left: t("Left"),
+    top: t("Top"),
+    right: t("Right"),
+    bottom: t("Bottom"),
+  };
+  /** The rotation field turned by `by` degrees, kept from 0 to 360. */
+  const rotateBy = (by: number) => {
+    const now = Number(rotation.replace(",", ".")) || 0;
+    setRotation(String((((now + by) % 360) + 360) % 360));
+    setError(null);
+  };
   const [busy, setBusy] = useState(false);
   const fileField = useRef<HTMLInputElement>(null);
   const altField = useRef<HTMLInputElement>(null);
@@ -3879,6 +3911,8 @@ function PictureDialog({
     file: t("Choose an image file."),
     alt: t("Describe the picture, or mark it as decorative."),
     size: t("Enter a width and height in pixels, from 1 to {max}.", { max: MAX_PICTURE_PX }),
+    rotation: t("Enter a rotation in degrees."),
+    crop: t("Enter what to crop in percent, from 0, leaving some of the picture."),
     failed: t("The picture could not be inserted: the file could not be read or uploaded here."),
   };
   const invalid = (field: string) => (error === field ? true : undefined);
@@ -3890,6 +3924,8 @@ function PictureDialog({
       file: fileField,
       alt: altField,
       size: widthField,
+      rotation: rotationField,
+      crop: cropField,
       failed: fileField,
     }[field].current;
     target?.focus();
@@ -3916,7 +3952,33 @@ function PictureDialog({
         fail("size");
         return;
       }
+      const turned = Number(rotation.trim().replace(",", "."));
+      const rotationChanged = !tracking && turned !== degrees;
+      if (rotationChanged && (!rotation.trim() || !Number.isFinite(turned))) {
+        fail("rotation");
+        return;
+      }
+      const cut = Object.fromEntries(
+        CROP_SIDES.map((side) => [side, Number(crop[side].trim().replace(",", ".") || "0")]),
+      ) as Record<CropSide, number>;
+      const cropChanged = !tracking && CROP_SIDES.some((side) => crop[side] !== percent(side));
+      const cropValid =
+        CROP_SIDES.every((side) => Number.isFinite(cut[side]) && cut[side] >= 0) &&
+        cut.left + cut.right < 100 &&
+        cut.top + cut.bottom < 100;
+      if (cropChanged && !cropValid) {
+        fail("crop");
+        return;
+      }
       editor.run(setPictureAlt(pos, alt, decorative));
+      if (rotationChanged) editor.run(setPictureRotation(pos, turned * 60_000));
+      if (cropChanged)
+        editor.run(
+          setPictureCrop(
+            pos,
+            Object.fromEntries(CROP_SIDES.map((side) => [side, cut[side] * 1000])),
+          ),
+        );
       if (sizeChanged && !tracking)
         editor.run(setPictureSize(pos, Math.round(w * EMU_PER_PX), Math.round(h * EMU_PER_PX)));
       onClose(true);
@@ -4065,8 +4127,55 @@ function PictureDialog({
               />
               {t("Keep proportions")}
             </label>
+            <label htmlFor={`${id}-rotation`}>{t("Rotation (degrees)")}</label>
+            <input
+              ref={rotationField}
+              id={`${id}-rotation`}
+              type="text"
+              inputMode="decimal"
+              value={rotation}
+              disabled={tracking}
+              aria-invalid={invalid("rotation")}
+              aria-describedby={
+                [described("rotation"), sizeNote].filter(Boolean).join(" ") || undefined
+              }
+              onChange={(event) => {
+                setRotation(event.target.value);
+                setError(null);
+              }}
+            />
+            <button type="button" disabled={tracking} onClick={() => rotateBy(-90)}>
+              {t("Rotate left 90°")}
+            </button>
+            <button type="button" disabled={tracking} onClick={() => rotateBy(90)}>
+              {t("Rotate right 90°")}
+            </button>
+            <fieldset className="foli-picture-crop" disabled={tracking}>
+              <legend>{t("Crop (%)")}</legend>
+              {CROP_SIDES.map((side, i) => (
+                <span key={side}>
+                  <label htmlFor={`${id}-crop-${side}`}>{cropLabels[side]}</label>
+                  <input
+                    ref={i === 0 ? cropField : undefined}
+                    id={`${id}-crop-${side}`}
+                    type="text"
+                    inputMode="decimal"
+                    value={crop[side]}
+                    aria-invalid={invalid("crop")}
+                    aria-describedby={described("crop")}
+                    onChange={(event) => {
+                      const value = event.target.value;
+                      setCrop((c) => ({ ...c, [side]: value }));
+                      setError(null);
+                    }}
+                  />
+                </span>
+              ))}
+            </fieldset>
             {tracking && (
-              <p id={sizeNote}>{t("The size does not change while changes are tracked.")}</p>
+              <p id={sizeNote}>
+                {t("The size, rotation and crop do not change while changes are tracked.")}
+              </p>
             )}
           </>
         )}

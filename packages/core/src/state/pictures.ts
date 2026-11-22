@@ -14,7 +14,7 @@ import { deleteSelectionKeepingTables } from "./commands.js";
 import { closeHistory } from "./history.js";
 import { typedMarks } from "./mark.js";
 import { marksAt, NodeSelection, TextSelection } from "./selection.js";
-import type { Command, EditorState } from "./state.js";
+import type { Command, EditorState, Transaction } from "./state.js";
 import { trackState, untracked } from "./track.js";
 import { withEnvelope, wordContext } from "./word.js";
 
@@ -139,6 +139,88 @@ export function setPictureSize(pos: number, width: number, height: number): Comm
         tr.setSelection(NodeSelection.create(tr.doc, pos));
     });
   };
+}
+
+/** A picture's crop, each side in 1000ths of a percent of its image (25 000: a quarter). */
+export interface PictureCrop {
+  left?: number;
+  top?: number;
+  right?: number;
+  bottom?: number;
+}
+
+/** A turn, in DrawingML's 60 000ths of a degree. */
+const TURN = 21_600_000;
+
+/**
+ * Sets the rotation of the picture at `pos`, clockwise in 60 000ths of a degree (90°: 5 400 000;
+ * any value is taken modulo a turn, 0 is none). Not while tracking (Foli does not record it).
+ */
+export function setPictureRotation(pos: number, rotation: number): Command {
+  return (state, dispatch) => {
+    const node = pictureAt(state, pos);
+    if (!node || trackState(state)?.on === true || !Number.isFinite(rotation)) return false;
+    const turn = ((Math.round(rotation) % TURN) + TURN) % TURN;
+    if (node.attrs.rotation === turn) return false;
+    return changePicture(state, dispatch, pos, node, { rotation: turn });
+  };
+}
+
+/**
+ * Crops the picture at `pos` to `crop` (sides missing or 0 cut nothing; `{}` takes a crop off),
+ * as Word does: the image keeps its scale, so the picture's size grows or shrinks with what
+ * shows of it. Refused when nothing would be left, or while tracking.
+ */
+export function setPictureCrop(pos: number, crop: PictureCrop): Command {
+  return (state, dispatch) => {
+    const node = pictureAt(state, pos);
+    if (!node || trackState(state)?.on === true) return false;
+    const side = (c: PictureCrop | null | undefined, key: keyof PictureCrop) => {
+      const v = c?.[key];
+      return typeof v === "number" && Number.isFinite(v) ? Math.round(v) : 0;
+    };
+    const old = node.attrs.crop as PictureCrop | null;
+    const next = {
+      left: side(crop, "left"),
+      top: side(crop, "top"),
+      right: side(crop, "right"),
+      bottom: side(crop, "bottom"),
+    };
+    const across = 100_000 - next.left - next.right;
+    const down = 100_000 - next.top - next.bottom;
+    if (across <= 0 || down <= 0) return false;
+    const wasAcross = 100_000 - side(old, "left") - side(old, "right");
+    const wasDown = 100_000 - side(old, "top") - side(old, "bottom");
+    const width = Math.round((Number(node.attrs.width) / wasAcross) * across);
+    const height = Math.round((Number(node.attrs.height) / wasDown) * down);
+    if (!validSize(width) || !validSize(height)) return false;
+    const sides = Object.fromEntries(Object.entries(next).filter(([, v]) => v !== 0));
+    if (old !== null && JSON.stringify(sides) === JSON.stringify(sidesOf(old))) return false;
+    return changePicture(state, dispatch, pos, node, { crop: sides, width, height });
+  };
+}
+
+const sidesOf = (crop: PictureCrop) =>
+  Object.fromEntries(
+    (["left", "top", "right", "bottom"] as const)
+      .filter((k) => typeof crop[k] === "number" && crop[k] !== 0)
+      .map((k) => [k, crop[k]]),
+  );
+
+/** `attrs` on the picture at `pos`, as one undo step, the picture kept selected. */
+function changePicture(
+  state: EditorState,
+  dispatch: ((tr: Transaction) => void) | undefined,
+  pos: number,
+  node: Node,
+  attrs: Record<string, unknown>,
+): boolean {
+  return attempt(state, dispatch, (tr) => {
+    tr.setMeta(closeHistory, true);
+    tr.setNodeMarkup(pos, node.type, { ...node.attrs, ...attrs });
+    if (state.selection instanceof NodeSelection && state.selection.from === pos)
+      tr.setSelection(NodeSelection.create(tr.doc, pos));
+  });
 }
 
 /**

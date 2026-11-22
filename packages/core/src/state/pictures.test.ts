@@ -2,9 +2,18 @@ import { describe, expect, it } from "vitest";
 import type { NodeJSON } from "../model/index.js";
 import { parseDocument } from "../v3/document.js";
 import { createEditor } from "./editor.js";
-import { insertPicture, selectedPicture, setPictureAlt, setPictureSize } from "./pictures.js";
+import { undoDepth } from "./history.js";
+import {
+  insertPicture,
+  selectedPicture,
+  setPictureAlt,
+  setPictureCrop,
+  setPictureRotation,
+  setPictureSize,
+} from "./pictures.js";
 import { NodeSelection, TextSelection } from "./selection.js";
 import { CellSelection } from "./tables.js";
+import { setTrackChanges } from "./track.js";
 
 /** Picture commands (10.8, ADR-0006). */
 
@@ -230,5 +239,52 @@ describe("review findings", () => {
     expect(editor.run(setPictureAlt(3, "A dot"))).toBe(false);
     expect(editor.run(setPictureAlt(3, "A dot", true))).toBe(true);
     expect(editor.state.doc.nodeAt(3)?.attrs).toMatchObject({ alt: null, decorative: true });
+  });
+});
+
+describe("a picture's rotation and crop (19.5)", () => {
+  const withPicture = (tracking = false) => {
+    const editor = editorOf([p("abcd")]);
+    caret(editor, 3);
+    editor.run(insertPicture({ ...dot, alt: "A dot" }));
+    editor.dispatch(editor.state.tr.setSelection(NodeSelection.create(editor.state.doc, 3)));
+    if (tracking) expect(editor.run(setTrackChanges(true, "Me"))).toBe(true);
+    return editor;
+  };
+  const attrs = (editor: Editor) => selectedPicture(editor.state)?.node.attrs;
+
+  it("rotate, modulo a turn, each one undo step, the picture still selected", () => {
+    const editor = withPicture();
+    const depth = undoDepth(editor.state);
+    expect(editor.run(setPictureRotation(3, 5_400_000))).toBe(true);
+    expect(attrs(editor)?.rotation).toBe(5_400_000);
+    expect(editor.run(setPictureRotation(3, -5_400_000))).toBe(true);
+    expect(attrs(editor)?.rotation).toBe(16_200_000);
+    expect(editor.run(setPictureRotation(3, 16_200_000))).toBe(false);
+    expect(undoDepth(editor.state)).toBe(depth + 2);
+    expect(editor.getDocument().schemaVersion).toBe(6);
+  });
+
+  it("crop as Word does: the image keeps its scale, the picture's size follows", () => {
+    const editor = withPicture();
+    // A quarter off each side: half the width shows, so the picture is half as wide.
+    expect(editor.run(setPictureCrop(3, { left: 25_000, right: 25_000 }))).toBe(true);
+    expect(attrs(editor)).toMatchObject({
+      crop: { left: 25_000, right: 25_000 },
+      width: 457_200,
+      height: 457_200,
+    });
+    // Taken off again: the whole image at its scale.
+    expect(editor.run(setPictureCrop(3, {}))).toBe(true);
+    expect(attrs(editor)).toMatchObject({ crop: {}, width: 914_400, height: 457_200 });
+    expect(editor.run(setPictureCrop(3, {}))).toBe(false);
+    // Nothing would be left.
+    expect(editor.run(setPictureCrop(3, { left: 60_000, right: 40_000 }))).toBe(false);
+  });
+
+  it("are refused while tracking", () => {
+    const editor = withPicture(true);
+    expect(editor.run(setPictureRotation(3, 5_400_000))).toBe(false);
+    expect(editor.run(setPictureCrop(3, { top: 10_000 }))).toBe(false);
   });
 });

@@ -731,7 +731,10 @@ Pictures: `insertPicture({ contentType, url? | data?, width, height, alt?, title
 decorative? }, { requireAlt = true })` (size in EMU; alt text required unless `decorative` or
 `requireAlt: false`, which the view uses for pasted and dropped files; the image becomes a new
 resource of the document; tracked while tracking), `setPictureSize(pos, width, height)` (not
-while tracking), `setPictureAlt(pos, alt, decorative?)`, `selectedPicture(state)` (a node
+while tracking), `setPictureRotation(pos, rotation)` (clockwise, 60 000ths of a degree, modulo a
+turn) and `setPictureCrop(pos, crop)` (`PictureCrop`: sides in 1000ths of a percent; the image
+keeps its scale, so the size follows; `{}` takes the crop off), neither while tracking, 19.5;
+`setPictureAlt(pos, alt, decorative?)`, `selectedPicture(state)` (a node
 selection of a picture, and its position).
 
 Fields (11.8, ADR-0007; markers in the model, see
