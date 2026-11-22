@@ -772,6 +772,8 @@ export declare class EditorView {
      * touched blocks if it shows in profiles.
      */
     private readBack;
+    /** The document text DOM `node` shows, as `readBack` reads it (hard breaks one character). */
+    private textIn;
     /**
      * Replays a split read back from the DOM: `parts[0]` in place of `range`, then for each next
      * part Enter and its text. The browser's DOM is then drawn again from the model.

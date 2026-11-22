@@ -2895,7 +2895,8 @@ supplies, so a server without a browser cannot make PDFs).
 
 **Gaps users will meet** ([limitations.md](limitations.md); planned as Phase 19):
 
-- Android input (19.7) emulated only, not checked on a device.
+- Android input (19.7) emulated only, not checked on a device; an Enter at a paragraph's very
+  start or end from a keyboard that sends no `beforeinput` is lost.
 - Pictures: no crop handles on the page (the dialog crops); resizing is refused while tracking.
 - Find does not look in text boxes (comments: 19.2).
 

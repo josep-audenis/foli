@@ -125,9 +125,10 @@ checklist in [testing/ime.md](testing/ime.md)):
   a header, footer or note open on its page, copies rather than moves. Tested with synthetic drag
   events (a real `DataTransfer`), not the browsers' own drag of selected text; not on touch.
 - Some Android keyboards split a paragraph without `beforeinput`, the browser changing the DOM:
-  the paragraph split off is read back and replayed as Enter (19.7; emulated, untested on a
-  device). Any other block the browser adds, and a line break it adds, is still discarded with a
-  `Foli:` console warning.
+  a paragraph split inside its text is read back and replayed as Enter (19.7; emulated,
+  untested on a device). Such an Enter at a paragraph's very start or end (an empty paragraph
+  added) is lost, and any other block or line break the browser adds is discarded with a `Foli:`
+  console warning.
 ## Extensions, keys and the toolbar
 
 Custom nodes and marks, plugins and toolbar items ([extensions](guides/extensions.md)).

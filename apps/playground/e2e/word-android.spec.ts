@@ -116,3 +116,25 @@ test("a paragraph split in the DOM without beforeinput is read back as Enter", a
   await page.keyboard.type("X");
   expect((await blocks(page))[1]?.[0]).toBe("Xcd");
 });
+
+test("an element with text of its own after a paragraph is still discarded, not a paragraph", async ({
+  page,
+}) => {
+  await open(page, [paragraph("abcd"), paragraph("end")]);
+  const warnings: string[] = [];
+  page.on("console", (message) => {
+    if (message.type() === "warning") warnings.push(message.text());
+  });
+  await page.evaluate((find) => {
+    const at = new Function(`return (${find})`)() as typeof textNode;
+    const block = at("abcd").node.parentElement?.closest("p, div[style]") as HTMLElement;
+    const foreign = document.createElement("div");
+    foreign.textContent = "Translated: abcd";
+    block.after(foreign);
+  }, textNode.toString());
+  await expect.poll(() => warnings.some((w) => w.includes("discarded"))).toBe(true);
+  expect(await blocks(page)).toEqual([
+    ["abcd", false],
+    ["end", false],
+  ]);
+});

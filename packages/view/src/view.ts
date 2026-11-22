@@ -3524,15 +3524,15 @@ export class EditorView {
    * Whether the event's target range holds nothing but the boundary between the caret's block
    * and the one before or after it (no text in between): a one-character delete at a caret.
    */
-  private boundaryOnly(event: InputEvent): boolean {
+  private boundaryOnly(event: InputEvent, forward: boolean): boolean {
     const range = event.getTargetRanges?.()[0];
     const { selection, doc } = this.state;
     if (!range || range.collapsed || !selection.empty) return false;
     const from = this.posFromDOM(range.startContainer, range.startOffset);
     const to = this.posFromDOM(range.endContainer, range.endOffset);
     if (from === null || to === null || from >= to) return false;
-    const caret = selection.head;
-    if (caret !== from && caret !== to) return false;
+    // Backward: the boundary before the caret; forward: the one after it.
+    if (selection.head !== (forward ? from : to)) return false;
     const $from = doc.resolve(from);
     const $to = doc.resolve(to);
     return (
@@ -3599,7 +3599,9 @@ export class EditorView {
     // Android keyboards send Backspace at a paragraph's start as a delete of the boundary
     // before it (a target range from the paragraph before's end to the caret): that is the key
     // at a caret, so a numbered paragraph loses its number rather than joining the one before.
-    if (!this.boundaryOnly(event)) this.selectTargetRange(event);
+    const char = type === "deleteContentBackward" || type === "deleteContentForward";
+    if (!(char && this.boundaryOnly(event, type === "deleteContentForward")))
+      this.selectTargetRange(event);
     if (this.state.selection.empty && type.includes("Line")) {
       // No target range: let the browser find the line edge, never delete a character instead.
       // shortcut: hard-line deletes also stop at the visual line edge here; Chromium, Firefox and WebKit all give a range.
@@ -4502,7 +4504,16 @@ export class EditorView {
         chain.unshift(before);
         before = before.previousSibling;
       }
-      if (before && this.owner.has(before) && !splitOff.has(before)) splitOff.set(before, chain);
+      const desc = before ? this.owner.get(before) : undefined;
+      if (!before || !desc || splitOff.has(before)) continue;
+      // After the block's last fragment only (a fragment's tail is not the paragraph's), and
+      // holding exactly what the block lost (an element an extension or a translator put
+      // there holds text of its own: still discarded).
+      const shown = desc.fragments.filter((fragment) => this.host.contains(fragment));
+      if (shown[shown.length - 1] !== before) continue;
+      const kept = shown.map((fragment) => this.textIn(fragment, hardBreaks)).join("");
+      const moved = chain.map((part) => this.textIn(part, hardBreaks)).join("");
+      if (kept + moved === textOfBlock(desc.node)) splitOff.set(before, chain);
     }
     const placed = new Set([...splitOff.values()].flat());
     if ([...strays].some((node) => !placed.has(node))) {
@@ -4615,6 +4626,14 @@ export class EditorView {
       applied = this.dispatch(tr);
     });
     if (!applied || this.dirty.size) this.rerender();
+  }
+
+  /** The document text DOM `node` shows, as `readBack` reads it (hard breaks one character). */
+  private textIn(node: Node, hardBreaks: ReadonlySet<Node>): string {
+    if (node.nodeType === Node.TEXT_NODE) return (node as Text).data;
+    if (hardBreaks.has(node)) return HARD_BREAK;
+    if ((node as Element).getAttribute?.("contenteditable") === "false") return "";
+    return [...node.childNodes].map((child) => this.textIn(child, hardBreaks)).join("");
   }
 
   /**
