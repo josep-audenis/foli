@@ -1,5 +1,17 @@
 # @folijs/agent
 
+## 0.3.0
+
+### Minor Changes
+
+- e722812: `session.target(handle)`: where a block's content is in `session.editor`, as a `DocumentTarget` for core's `hint` or `goTo`, so an app can show an agent's change.
+
+### Patch Changes
+
+- Updated dependencies [85d54c1]
+- Updated dependencies [753b774]
+  - @folijs/core@1.3.0
+
 ## 0.2.0
 
 ### Minor Changes
