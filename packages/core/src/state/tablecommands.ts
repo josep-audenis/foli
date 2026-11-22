@@ -723,6 +723,25 @@ export function setCellShading(fill: string | null): Command {
 const MIN_COLUMN = 144;
 
 /**
+ * The grid column whose right border `setColumnWidth` moves for the selection (the last column
+ * it covers), with its table's position, its width and the widths it may take (`min`, `max`; the
+ * next column keeps 0.1 inch), in twips; null outside a table (19.4: what a keyboard's column
+ * width dialog sets). `max` is below `min` when the two columns have no room to give.
+ */
+export function columnAt(
+  state: EditorState,
+): { pos: number; column: number; width: number; min: number; max: number } | null {
+  const found = around(state);
+  if (!found) return null;
+  const grid = found.table.attrs.grid as number[];
+  const width = grid[found.right];
+  if (width === undefined) return null;
+  const after = grid[found.right + 1];
+  const max = after === undefined ? MAX_TWIPS : width + after - MIN_COLUMN;
+  return { pos: found.pos, column: found.right, width, min: MIN_COLUMN, max };
+}
+
+/**
  * Sets grid column `column` of the table at `pos` to `width` twips, as dragging its right border
  * does in Word: the column after it gives or takes the difference (the table keeps its width),
  * neither narrower than 0.1 inch; the last column's border widens or narrows the table. The

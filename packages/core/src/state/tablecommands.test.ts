@@ -5,6 +5,7 @@ import { parseContent } from "../v3/document.js";
 import { createEditor } from "./editor.js";
 import { TextSelection } from "./selection.js";
 import {
+  columnAt,
   deleteColumns,
   deleteRows,
   deleteTable,
@@ -271,6 +272,37 @@ describe("insertHorizontalRule", () => {
     editor.run(insertHorizontalRule);
     editor.commands.undo();
     expect(shape(editor)).toEqual(["abcd"]);
+  });
+});
+
+describe("columnAt", () => {
+  it("gives the caret's (or a cell selection's last) grid column, its table and width", () => {
+    const sized = {
+      ...TABLE,
+      attrs: { grid: [1000, 2000] },
+    } as NodeJSON;
+    const editor = editorOf([p("x"), sized, p("y")]);
+    select(editor, inside(editor, "b2"));
+    const tablePos = editor.state.doc.child(0).nodeSize;
+    // The last column: up to Word's largest measure.
+    expect(columnAt(editor.state)).toEqual({
+      pos: tablePos,
+      column: 1,
+      width: 2000,
+      min: 144,
+      max: 31_680,
+    });
+    selectCells(editor, "a1", "a3");
+    // Another: the next keeps 0.1 inch.
+    expect(columnAt(editor.state)).toEqual({
+      pos: tablePos,
+      column: 0,
+      width: 1000,
+      min: 144,
+      max: 2856,
+    });
+    select(editor, 1);
+    expect(columnAt(editor.state)).toBe(null);
   });
 });
 

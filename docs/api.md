@@ -300,7 +300,7 @@ code that annotates one of them as `ToolbarButton` names the new type, or `Toolb
   focus from the document unless the control prevents it on `mousedown`.
 
 - `dialog: "link" | "picture" | "insertTable" | "pageSetup" | "crossReference" |
-  "controlProperties" | "noteOptions"` (`ToolbarDialogName`): the button opens that dialog of
+  "controlProperties" | "noteOptions" | "columnWidth"` (`ToolbarDialogName`): the button opens that dialog of
   the toolbar's own, as its built-in item or menu entry does (`"link"` as Mod-K does); a
   dialog closed without applying gives the focus back to the button (the link dialog, to where
   it was), one that applied calls `onClickCommand`. Without `enabled` it is enabled where the
@@ -721,7 +721,8 @@ a table would go),
 `insertRow(dir)`, `deleteRows`, `insertColumn(dir)`, `deleteColumns`, `deleteTable`,
 `mergeCells`, `splitCell`, `toggleHeaderRow` (`isHeaderRow(state)`), `setTableStyle(name |
 null)` (`tableStyles(state)`, `tableStyleAt(state)`), `setCellShading(fill | null)` (`RRGGBB`),
-`setColumnWidth(tablePos, column, twips)`; `CellSelection`, `extendCellSelection(axis, dir)`,
+`setColumnWidth(tablePos, column, twips)` (`columnAt(state)`: the selection's column, its table
+and width, 19.4); `CellSelection`, `extendCellSelection(axis, dir)`,
 `goToCell(dir)`, `goToCellVertically(dir)`, `cellsAsTable(selection)`, `pasteCells(tr, table)`.
 Rows inserted and deleted while tracking are tracked; column, merge, split, header, style,
 shading and width commands do not apply while tracking.

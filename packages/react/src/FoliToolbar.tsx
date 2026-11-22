@@ -10,6 +10,7 @@ import {
   canOutdent,
   changeIndent,
   colorAt,
+  columnAt,
   controlAt,
   controlProperties,
   convertNotes,
@@ -71,6 +72,7 @@ import {
   selectedPicture,
   setAlign,
   setCellShading,
+  setColumnWidth,
   setControlProperties,
   setDifferentEvenPages,
   setDifferentFirstPage,
@@ -343,7 +345,8 @@ export interface ToolbarColorMenu extends ToolbarItemBase {
 /**
  * The toolbar's own dialogs, for `ToolbarDialog.dialog`: `"link"` (as Mod-K), `"picture"`
  * (insert, or edit the selected one), `"insertTable"`, `"pageSetup"` (the caret's section),
- * `"crossReference"`, `"controlProperties"` (the content control at the caret), `"noteOptions"`.
+ * `"crossReference"`, `"controlProperties"` (the content control at the caret), `"noteOptions"`,
+ * `"columnWidth"` (the width of the selection's column, 19.4).
  */
 export type ToolbarDialogName =
   | "link"
@@ -352,7 +355,8 @@ export type ToolbarDialogName =
   | "pageSetup"
   | "crossReference"
   | "controlProperties"
-  | "noteOptions";
+  | "noteOptions"
+  | "columnWidth";
 
 /** What an app's dialog gets. */
 export interface ToolbarDialogProps {
@@ -533,6 +537,12 @@ const TABLE_ACTIONS: readonly Action[] = [
   { key: "deleteTable", label: "Delete table", command: deleteTable },
   { key: "mergeCells", label: "Merge cells", command: mergeCells },
   { key: "splitCell", label: "Split cell", command: splitCell },
+  {
+    key: "columnWidth",
+    label: "Column width…",
+    dialog: "columnWidth",
+    command: canFormatTable,
+  },
   {
     key: "headerRow",
     label: "Repeat as header row",
@@ -1397,6 +1407,7 @@ const DIALOG_APPLIES: Record<ToolbarDialogName, (state: EditorState) => boolean>
   crossReference: (state) => wordContext(state) !== null && insertPageBreak(state),
   controlProperties: (state) => selectedControl(state) !== null,
   noteOptions: (state) => wordContext(state) !== null,
+  columnWidth: canFormatTable,
 };
 
 /**
@@ -1877,6 +1888,10 @@ export function FoliToolbar({
   }, [disabled]);
   // The note options dialog (from the notes menu).
   const [noteDialog, setNoteDialog] = useState<{ restore: HTMLElement | null } | null>(null);
+  const [columnDialog, setColumnDialog] = useState<{ restore: HTMLElement | null } | null>(null);
+  useEffect(() => {
+    if (disabled) setColumnDialog(null);
+  }, [disabled]);
   useEffect(() => {
     if (disabled) setNoteDialog(null);
   }, [disabled]);
@@ -1900,7 +1915,8 @@ export function FoliToolbar({
       setupDialog ||
       referenceDialog ||
       controlDialog ||
-      noteDialog,
+      noteDialog ||
+      columnDialog,
   );
   // A dialog opens under the toolbar, where the More panel is: the panel closes for it.
   const anyDialog = builtInDialog || appDialog !== null;
@@ -1943,6 +1959,7 @@ export function FoliToolbar({
       }
       closeDialogs();
       if (name === "noteOptions") setNoteDialog({ restore });
+      else if (name === "columnWidth") setColumnDialog({ restore });
       else if (name === "controlProperties") setControlDialog({ restore, selection });
       else if (name === "crossReference") setReferenceDialog({ restore, selection });
       else setSetupDialog({ restore, selection });
@@ -1957,6 +1974,7 @@ export function FoliToolbar({
     setReferenceDialog(null);
     setControlDialog(null);
     setNoteDialog(null);
+    setColumnDialog(null);
   }
 
   // Another tab: its items from the first, and nothing of the last tab's left open.
@@ -2460,6 +2478,17 @@ export function FoliToolbar({
             const { restore } = referenceDialog;
             setReferenceDialog(null);
             if (inserted && onClickCommand) onClickCommand();
+            else giveBack(restore);
+          }}
+        />
+      )}
+      {columnDialog && !disabled && (
+        <ColumnWidthDialog
+          editor={editor}
+          onClose={(applied) => {
+            const { restore } = columnDialog;
+            setColumnDialog(null);
+            if (applied && onClickCommand) onClickCommand();
             else giveBack(restore);
           }}
         />
@@ -3139,6 +3168,90 @@ const NOTE_FORMATS = [
   ["upperRoman", "I, II, III"],
   ["chicago", "*, †, ‡"],
 ] as const;
+
+/** The width of the selection's table column, in cm (19.4): what dragging its border sets. */
+function ColumnWidthDialog({
+  editor,
+  onClose,
+}: {
+  editor: Editor;
+  onClose: (applied: boolean) => void;
+}) {
+  const t = useT();
+  const [at] = useState(() => columnAt(editor.state));
+  const [width, setWidth] = useState(() => (at ? toCm(at.width) : ""));
+  const [invalid, setInvalid] = useState(false);
+  const field = useRef<HTMLInputElement>(null);
+  const id = useId();
+  useEffect(() => {
+    field.current?.focus();
+    field.current?.select();
+  }, []);
+  const apply = (event: FormEvent) => {
+    event.preventDefault();
+    // The width shown, unchanged: nothing to do (cm round to a few twips).
+    if (at && width === toCm(at.width)) {
+      onClose(false);
+      return;
+    }
+    const twips = at && toTwips(width, at.min);
+    if (
+      !at ||
+      twips === null ||
+      twips > at.max ||
+      !editor.run(setColumnWidth(at.pos, at.column, twips))
+    ) {
+      setInvalid(true);
+      field.current?.focus();
+      return;
+    }
+    onClose(true);
+  };
+  return (
+    <div
+      role="dialog"
+      aria-label={t("Column width")}
+      className="foli-link-dialog foli-table-dialog"
+      onKeyDown={(event) => {
+        if (event.key !== "Escape") return;
+        event.preventDefault();
+        onClose(false);
+      }}
+    >
+      <form onSubmit={apply} noValidate>
+        <label htmlFor={`${id}-width`}>{t("Column width (cm)")}</label>
+        <input
+          ref={field}
+          id={`${id}-width`}
+          type="text"
+          inputMode="decimal"
+          value={width}
+          aria-invalid={invalid || undefined}
+          aria-describedby={invalid ? `${id}-error` : undefined}
+          onChange={(event) => {
+            setWidth(event.target.value);
+            setInvalid(false);
+          }}
+        />
+        <button type="submit">{t("Apply")}</button>
+        <button type="button" onClick={() => onClose(false)}>
+          {t("Cancel")}
+        </button>
+        {invalid && (
+          <p id={`${id}-error`} className="foli-link-error" role="alert">
+            {at && at.max >= at.min
+              ? t("Enter a width in cm from {min} to {max}.", {
+                  // Rounded inwards: each end, typed back, is in range.
+                  min: String(Math.ceil((at.min / TWIPS_PER_CM) * 100) / 100),
+                  max: String(Math.floor((at.max / TWIPS_PER_CM) * 100) / 100),
+                })
+              : t("This column cannot be made wider or narrower.")}
+          </p>
+        )}
+      </form>
+    </div>
+  );
+}
 
 /**
  * How notes are placed and numbered, for the whole document as Word's dialog applies it: where

@@ -97,6 +97,7 @@ export {
   changeIndent,
   closeHistory,
   colorAt,
+  columnAt,
   commentAnchors,
   controlAt,
   controlIsReadOnly,
