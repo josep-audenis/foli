@@ -142,7 +142,7 @@ export function census(source, parseXml, { paraIds = false } = {}) {
           (a) => a.local === "space" && a.ns === XML && a.value === "preserve",
         );
         const raw = child.children.map((c) => c.text ?? "").join("");
-        const value = preserve ? raw : raw.trim();
+        const value = preserve ? raw : raw.replace(/^[ \t\r\n]+|[ \t\r\n]+$/g, ""); // XML spaces only, not NBSP
         // Which element holds it: a field code or deleted text becoming text shows. An empty
         // one shows nothing.
         if (value) text += `\u0005${child.local}:${value}`;

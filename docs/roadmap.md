@@ -2948,7 +2948,7 @@ review.
 - [x] 20.4 The first run and the report: the whole set run, the results classed, `docs/corpus-
   report.md` written; the classes ranked, each with how many files it touches and an example
   element (no text). The owner picks with this ranking what 20.5 fixes. (Done: [corpus-report.md](corpus-report.md).
-  3 445 distinct files: 3 252 import, export and read back (3 126, 90.7%, with no difference
+  3 445 distinct files: 3 252 import, export and read back (3 181, 92.3%, with no difference
   counted), 186 refused with a reason (71 Strict Open XML, 60 with the document's root in markup
   compatibility), 7 crash (3 on import: a run property twice; 4 on export: a note reference
   without its note); none hangs. All 3 256 that import lay out in Chromium, 10 with a page that

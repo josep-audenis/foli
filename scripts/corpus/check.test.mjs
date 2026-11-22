@@ -53,6 +53,8 @@ describe("the corpus run's comparison (20.2)", () => {
     // Spaces Word keeps lost, and spaces Word drops anyway.
     expect(eq(p(r('<w:t xml:space="preserve">a </w:t>')), p(r("<w:t>a </w:t>")))).toBe("content");
     expect(eq(p(r("<w:t> a </w:t>")), p(r("<w:t>a</w:t>")))).toBe("equivalent");
+    // A no-break space is text, not XML space: Word keeps it.
+    expect(eq(p(r("<w:t>a </w:t>")), p(r("<w:t>a</w:t>")))).toBe("content");
     // A run moved into the next paragraph.
     const b = (t) => r(`<w:t>${t}</w:t>`, "<w:b/>");
     const i = (t) => r(`<w:t>${t}</w:t>`, "<w:i/>");
