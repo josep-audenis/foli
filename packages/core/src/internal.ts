@@ -29,6 +29,7 @@ export {
   withEnvelope,
   wordContext,
 } from "./state/index.js";
+export { withTrackState } from "./state/track.js";
 export type { EnvelopeKey, Story } from "./state/word.js";
 export type { Check } from "./v3/check.js";
 export {

@@ -51,6 +51,8 @@ export interface TrackState {
   readonly author: string;
   /** How changes show in a view of the editor (default `markup`). */
   readonly view?: ReviewView;
+  /** @internal On whatever the document's setting says (an agent's session). */
+  readonly pinned?: boolean;
 }
 
 const key = new PluginKey<TrackState>("track");
@@ -109,7 +111,7 @@ interface ParagraphRevision {
 /** `value` with `on` as the document's settings say, when they say (ADR-0012). */
 function withSettings(value: TrackState, state: EditorState): TrackState {
   const on = wordContext(state)?.envelope.settings?.trackRevisions;
-  return on === undefined || on === value.on ? value : { ...value, on };
+  return value.pinned || on === undefined || on === value.on ? value : { ...value, on };
 }
 
 /** @internal */
@@ -129,10 +131,7 @@ export function trackState(state: EditorState): TrackState | null {
   return key.getState(state) ?? null;
 }
 
-/**
- * Makes `tr` set the tracking state (a story's editor passes its change to the body).
- * @internal
- */
+/** Makes `tr` set the tracking state (a story's editor passes its change to the body). */
 export const withTrackState = (tr: Transaction, state: TrackState): Transaction =>
   tr.setMeta(key, state);
 
@@ -148,7 +147,8 @@ export function setTrackChanges(on: boolean, author?: string): Command {
     if (!dispatch) return true;
     const tr = state.tr.setMeta(key, { ...current, on, author: author ?? current.author });
     const before = wordContext(state)?.envelope.settings?.trackRevisions;
-    if (wordContext(state) && before !== on)
+    // Off where the document never said: this editor's alone (no schema 7 for nothing).
+    if (wordContext(state) && before !== on && !(before === undefined && !on))
       tr.step(new EnvelopeStep("settings", before, on, ["trackRevisions"])).setMeta(
         "addToHistory",
         false,
