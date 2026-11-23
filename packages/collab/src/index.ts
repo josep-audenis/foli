@@ -12,6 +12,7 @@ import {
   type Extension,
   type FoliDocument,
   FoliDocumentError,
+  type Node,
   remote,
   Step,
   type StepJSON,
@@ -66,6 +67,8 @@ export interface AuthorityLimits {
   steps?: number;
   /** Steps kept to catch clients up; older ones give way to a snapshot. Default 10 000. */
   log?: number;
+  /** The kept steps' size, in characters of their JSON. Default 50 000 000. */
+  logSize?: number;
 }
 
 export interface AuthorityOptions<P = unknown> {
@@ -73,6 +76,8 @@ export interface AuthorityOptions<P = unknown> {
   document: EditorDocument;
   /** Its version (a stored snapshot's). Default 0. */
   version?: number;
+  /** A stored log (`authority.log`) ending at `version`: clients behind are caught up from it. */
+  log?: Broadcast;
   /** The package it was imported from (`DocxImport.package`), kept as it is for export. */
   package?: P;
   limits?: AuthorityLimits;
@@ -85,8 +90,12 @@ export interface AuthorityOptions<P = unknown> {
 export interface Authority<P = unknown> {
   /** The number of steps accepted so far. */
   readonly version: number;
-  /** A client's message (its JSON text, or the value it parses to). */
-  receive(message: string | StepsMessage): Received;
+  /**
+   * A client's message (its JSON text, or the value it parses to). `clientID`: who sent it, as
+   * the app's connection knows (authenticated); a message claiming another is refused. Without
+   * it the message's own `clientID` is taken. The authority's own id (`AUTHORITY`) is refused.
+   */
+  receive(message: string | StepsMessage, clientID?: ClientID): Received;
   /** What a client at `version` misses: the steps since, or a snapshot when the log no longer has them. */
   stepsSince(version: number): CatchUp<P>;
   snapshot(): Snapshot<P>;
@@ -94,11 +103,29 @@ export interface Authority<P = unknown> {
   readonly log: Readonly<Broadcast>;
 }
 
-const DEFAULTS = { messageSize: 4_000_000, steps: 1000, log: 10_000 } as const;
+const DEFAULTS = { messageSize: 4_000_000, steps: 1000, log: 10_000, logSize: 50_000_000 } as const;
+
+/** How deep the document may nest (core reads JSON up to 300 levels; a little under). */
+const MAX_DEPTH = 250;
 
 const isClientID = (v: unknown): v is ClientID =>
   (typeof v === "string" && v.length > 0 && v.length <= 256) ||
   (typeof v === "number" && Number.isSafeInteger(v));
+
+/** The deepest nesting of `doc`, walked without recursion; stops past `limit`. */
+function depthOf(doc: Node, limit: number): number {
+  let deepest = 0;
+  const stack: [Node, number][] = [[doc, 0]];
+  while (stack.length) {
+    const [node, depth] = stack.pop() as [Node, number];
+    if (depth > deepest) deepest = depth;
+    if (deepest > limit) return deepest;
+    node.forEach((child) => {
+      if (!child.isLeaf) stack.push([child, depth + 1]);
+    });
+  }
+  return deepest;
+}
 
 /** The authority of one document. */
 export function createAuthority<P = unknown>(options: AuthorityOptions<P>): Authority<P> {
@@ -107,22 +134,66 @@ export function createAuthority<P = unknown>(options: AuthorityOptions<P>): Auth
     document: options.document,
     ...(options.extensions ? { extensions: options.extensions } : {}),
   });
+  const given = options.version ?? 0;
+  if (!Number.isSafeInteger(given) || given < 0)
+    throw new RangeError("createAuthority: version must be a non-negative integer");
   /** The version of the first step kept. */
-  let base = options.version ?? 0;
+  let base = given;
   const steps: StepJSON[] = [];
   const clientIDs: ClientID[] = [];
+  /** Each kept step's size (characters of its JSON) and their sum. */
+  const sizes: number[] = [];
+  let logSize = 0;
   const version = () => base + steps.length;
   const refuse = (reason: Refusal, message?: string): Received => ({
     ok: false,
     reason,
     version: version(),
-    ...(message ? { message } : {}),
+    ...(message ? { message: message.slice(0, 500) } : {}),
   });
-  const snapshot = (): Snapshot<P> => ({
-    version: version(),
-    document: editor.getDocument(),
-    ...(options.package === undefined ? {} : { package: options.package }),
-  });
+  let cached: { state: unknown; snapshot: Snapshot<P> } | null = null;
+  const snapshot = (): Snapshot<P> => {
+    if (cached?.state !== editor.state)
+      cached = {
+        state: editor.state,
+        snapshot: {
+          version: version(),
+          document: editor.getDocument(),
+          ...(options.package === undefined ? {} : { package: options.package }),
+        },
+      };
+    // A copy of the document (the caller may change it); the package as it was given.
+    return { ...cached.snapshot, document: JSON.parse(JSON.stringify(cached.snapshot.document)) };
+  };
+  const keep = (json: readonly StepJSON[], authors: readonly ClientID[]) => {
+    json.forEach((step, i) => {
+      const size = JSON.stringify(step).length;
+      steps.push(step);
+      clientIDs.push(authors[i] as ClientID);
+      sizes.push(size);
+      logSize += size;
+    });
+    // Over either limit: the oldest steps give way (a client behind them gets a snapshot).
+    let drop = 0;
+    while (steps.length - drop > limits.log || (logSize > limits.logSize && drop < steps.length)) {
+      logSize -= sizes[drop] as number;
+      drop++;
+    }
+    if (drop) {
+      steps.splice(0, drop);
+      clientIDs.splice(0, drop);
+      sizes.splice(0, drop);
+      base += drop;
+    }
+  };
+  // A stored log, to catch clients up after a restart: it must end at the version given.
+  if (options.log) {
+    const { version: from, steps: logged, clientIDs: ids } = options.log;
+    if (from + logged.length !== base || ids.length !== logged.length)
+      throw new RangeError("createAuthority: the log does not end at the document's version");
+    base = from;
+    keep(logged, ids);
+  }
 
   return {
     get version() {
@@ -132,7 +203,7 @@ export function createAuthority<P = unknown>(options: AuthorityOptions<P>): Auth
       return { version: base, steps: [...steps], clientIDs: [...clientIDs] };
     },
     snapshot,
-    receive(message) {
+    receive(message, connection) {
       let value: unknown = message;
       if (typeof message === "string") {
         if (message.length > limits.messageSize) return refuse("too-large");
@@ -141,54 +212,65 @@ export function createAuthority<P = unknown>(options: AuthorityOptions<P>): Auth
         } catch {
           return refuse("malformed", "not JSON");
         }
-      } else if (JSON.stringify(message).length > limits.messageSize) return refuse("too-large");
+      } else {
+        let size: number;
+        try {
+          size = JSON.stringify(message).length;
+        } catch {
+          return refuse("malformed", "not JSON");
+        }
+        if (size > limits.messageSize) return refuse("too-large");
+      }
       if (typeof value !== "object" || value === null) return refuse("malformed");
-      const { version: from, clientID, steps: given } = value as Partial<StepsMessage>;
-      if (!isClientID(clientID)) return refuse("malformed", "clientID");
-      if (!Array.isArray(given) || !given.length) return refuse("malformed", "steps");
+      const { version: from, steps: sent } = value as Partial<StepsMessage>;
+      // Who sent it is the connection's to say (authenticated by the app), not the message's.
+      const clientID = connection ?? (value as Partial<StepsMessage>).clientID;
+      if (!isClientID(clientID) || String(clientID) === String(AUTHORITY))
+        return refuse("malformed", "clientID");
+      const claimed = (value as Partial<StepsMessage>).clientID;
+      if (
+        connection !== undefined &&
+        claimed !== undefined &&
+        String(claimed) !== String(connection)
+      )
+        return refuse("unauthorized", "clientID is not the connection's");
+      if (!Array.isArray(sent) || !sent.length) return refuse("malformed", "steps");
       if (typeof from !== "number" || !Number.isSafeInteger(from) || from < 0)
         return refuse("malformed", "version");
-      if (given.length > limits.steps) return refuse("too-large");
+      if (sent.length > limits.steps) return refuse("too-large");
       if (from !== version()) return refuse("stale");
       const { schema } = editor.state;
       let parsed: Step[];
       try {
-        parsed = given.map((json) => Step.fromJSON(schema, json));
+        parsed = sent.map((json) => Step.fromJSON(schema, json));
       } catch (error) {
         if (error instanceof FoliDocumentError) return refuse("malformed", error.message);
         throw error;
       }
       if (options.authorize && !options.authorize(clientID, parsed)) return refuse("unauthorized");
-      // Applied as clients apply it: the word plugin checks envelope and story steps.
+      // Applied as clients apply it (the word plugin checks envelope and story steps), with
+      // Word's rules concurrent edits can break and the schema does not hold restored, in one
+      // transaction: a step that would break the document changes nothing.
       const before = editor.state;
       const tr = before.tr.setMeta(remote, true);
-      for (const step of parsed) {
-        const result = tr.maybeStep(step);
-        if (result.failed) return refuse("invalid", result.failed);
+      try {
+        for (const step of parsed) {
+          const result = tr.maybeStep(step);
+          if (result.failed) return refuse("invalid", result.failed);
+        }
+        if (depthOf(tr.doc, MAX_DEPTH) > MAX_DEPTH) return refuse("too-large", "nested too deep");
+        keepTablesApart(tr);
+        editor.dispatch(tr);
+      } catch (error) {
+        if (error instanceof RangeError) return refuse("invalid", error.message);
+        throw error;
       }
-      editor.dispatch(tr);
       if (editor.state === before) return refuse("invalid", "refused by the document's rules");
       // The JSON as read back: what every client gets is what the authority applied.
-      const json = parsed.map((step) => step.toJSON());
-      const authors: ClientID[] = json.map(() => clientID);
-      const fix = editor.state.tr.setMeta(remote, true);
-      keepTablesApart(fix);
-      if (fix.docChanged) {
-        editor.dispatch(fix);
-        for (const step of fix.steps) {
-          json.push(step.toJSON());
-          authors.push(AUTHORITY);
-        }
-      }
+      const json = tr.steps.map((step) => step.toJSON());
+      const authors: ClientID[] = json.map((_, i) => (i < parsed.length ? clientID : AUTHORITY));
       const start = version();
-      steps.push(...json);
-      clientIDs.push(...authors);
-      if (steps.length > limits.log) {
-        const drop = steps.length - limits.log;
-        steps.splice(0, drop);
-        clientIDs.splice(0, drop);
-        base += drop;
-      }
+      keep(json, authors);
       return {
         ok: true,
         version: version(),

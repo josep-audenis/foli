@@ -1293,10 +1293,13 @@ The authority of a shared document (0.x, unstable; ADR-0012; [package README](..
 
 - `createAuthority({ document, version?, package?, limits?, authorize?, extensions? })`:
   `Authority`. `limits` (`AuthorityLimits`): `messageSize` (characters of a message's JSON,
-  default 4 000 000), `steps` (per message, 1000), `log` (steps kept, 10 000). `authorize(clientID,
+  default 4 000 000), `steps` (per message, 1000), `log` (steps kept, 10 000), `logSize` (their JSON's characters,
+  50 000 000); `log` in the options restores a stored log ending at `version`. A document nested
+  deeper than 250 levels is refused (`too-large`). `authorize(clientID,
   steps)` false refuses a client's steps.
-- `authority.receive(message)`: a client's `{ version, clientID, steps }` (`StepsMessage`, its JSON
-  text or the parsed value). `Received`: `{ ok: true, version, broadcast }` (`Broadcast`:
+- `authority.receive(message, clientID?)`: a client's `{ version, clientID, steps }`
+  (`StepsMessage`, its JSON text or the parsed value) and the client id the app's connection
+  authenticated (a message claiming another, or `AUTHORITY`, is refused). `Received`: `{ ok: true, version, broadcast }` (`Broadcast`:
   `{ version, steps, clientIDs }`, for every client, the sender too) or `{ ok: false, reason,
   version, message? }` (`Refusal`: `stale`, `malformed`, `invalid`, `too-large`, `unauthorized`),
   nothing changed.

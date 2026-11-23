@@ -58,12 +58,16 @@ export interface AuthorityLimits {
     steps?: number;
     /** Steps kept to catch clients up; older ones give way to a snapshot. Default 10 000. */
     log?: number;
+    /** The kept steps' size, in characters of their JSON. Default 50 000 000. */
+    logSize?: number;
 }
 export interface AuthorityOptions<P = unknown> {
     /** The document (a snapshot's, or a new one), as `createEditor` reads it. */
     document: EditorDocument;
     /** Its version (a stored snapshot's). Default 0. */
     version?: number;
+    /** A stored log (`authority.log`) ending at `version`: clients behind are caught up from it. */
+    log?: Broadcast;
     /** The package it was imported from (`DocxImport.package`), kept as it is for export. */
     package?: P;
     limits?: AuthorityLimits;
@@ -75,8 +79,12 @@ export interface AuthorityOptions<P = unknown> {
 export interface Authority<P = unknown> {
     /** The number of steps accepted so far. */
     readonly version: number;
-    /** A client's message (its JSON text, or the value it parses to). */
-    receive(message: string | StepsMessage): Received;
+    /**
+     * A client's message (its JSON text, or the value it parses to). `clientID`: who sent it, as
+     * the app's connection knows (authenticated); a message claiming another is refused. Without
+     * it the message's own `clientID` is taken. The authority's own id (`AUTHORITY`) is refused.
+     */
+    receive(message: string | StepsMessage, clientID?: ClientID): Received;
     /** What a client at `version` misses: the steps since, or a snapshot when the log no longer has them. */
     stepsSince(version: number): CatchUp<P>;
     snapshot(): Snapshot<P>;

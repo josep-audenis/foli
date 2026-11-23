@@ -20,8 +20,9 @@ const authority = createAuthority({
   authorize: (clientID) => canEdit(clientID),
 });
 
-// A client's message (`{ version, clientID, steps }`, from `sendableSteps` in @folijs/core):
-const result = authority.receive(text);
+// A client's message (`{ version, steps }`, from `sendableSteps` in @folijs/core), with the
+// client id your connection authenticated (never the one the message claims):
+const result = authority.receive(text, connection.clientID);
 if (result.ok)
   broadcastToEveryone(result.broadcast); // the sender too: it confirms its steps
 else reply(result); // `stale`: the client catches up (`stepsSince`), rebases, sends again
@@ -34,4 +35,6 @@ The client side is `collab`, `sendableSteps`, `receiveTransaction` and `getVersi
 `@folijs/core`. Refusals: `stale`, `malformed`, `invalid` (a step does not apply, or an envelope
 or story step no longer finds what it changes), `too-large` (`limits`: message size, steps per
 message) and `unauthorized`. The log keeps `limits.log` steps (default 10 000); a client further
-behind gets a snapshot.
+behind gets a snapshot. Pass `log` (`authority.log`, stored) and `version` to start again after a
+restart. Locked content controls are not checked again by the authority (their rules depend on
+the command that made an edit): an app whose clients may be hostile checks them in `authorize`.
