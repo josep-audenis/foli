@@ -613,10 +613,10 @@ function dateFromText(control: ControlJSON, text: string): string | null {
     }
     const start = at;
     if ("digits" in part) {
-      while (at < input.length && /[0-9]/.test(input[at] as string)) at++;
       // Two numbers with nothing between (`ddMMyyyy`): each its format's width.
       const next = parts[i + 1];
-      if (next && "digits" in next) at = Math.min(at, start + part.width);
+      const end = next && "digits" in next ? start + part.width : input.length;
+      while (at < end && /[0-9]/.test(input[at] as string)) at++;
       if (at === start) return null;
       const value = Number(input.slice(start, at));
       const field = part.digits;
@@ -625,7 +625,9 @@ function dateFromText(control: ControlJSON, text: string): string | null {
       else if (field[0] === "M") month = value;
       continue;
     }
-    while (at < input.length && /\p{L}/u.test(input[at] as string)) at++;
+    // An am/pm marker as people type it too: `p.m.`.
+    const letter = part.word || part.dot ? /\p{L}/u : /[\p{L}.]/u;
+    while (at < input.length && letter.test(input[at] as string)) at++;
     if (at === start) return null;
     const word = input.slice(start, at).toLowerCase();
     const next = parts[i + 1];

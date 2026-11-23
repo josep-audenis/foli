@@ -147,6 +147,14 @@ describe("regressions: content controls", () => {
     const started = performance.now();
     expect(editor.run(insertText(`${"1".repeat(32)}!`))).toBe(true);
     expect(performance.now() - started).toBeLessThan(500);
+    // A long format of numbers side by side reads the text once, not once a number.
+    const long = open([p("a", ...control("d", "x"), "b")], {
+      controls: { d: { kind: "date", dateFormat: "dh".repeat(127) } },
+    });
+    long.select(3, 4);
+    const again = performance.now();
+    expect(long.run(insertText("1".repeat(200000)))).toBe(true);
+    expect(performance.now() - again).toBeLessThan(1000);
   });
 
   it.each([
@@ -155,6 +163,7 @@ describe("regressions: content controls", () => {
     ["MMM d, yyyy", "mar. 5, 2024", "2024-03-05T00:00:00Z"],
     ["dddd, MMMM d, yyyy", "Tuesday, March 5, 2024", "2024-03-05T00:00:00Z"],
     ["'on' d/M/yy", "on 5/3/24", "2024-03-05T00:00:00Z"],
+    ["M/d/yyyy h:mm am/pm", "3/5/2024 3:05 p.m.", "2024-03-05T00:00:00Z"],
     ["d/M/yyyy", "5/3/2024x", undefined],
   ])("reads a date typed in the format %s", (dateFormat, typed, date) => {
     const editor = open([p("a", ...control("d", "x"), "b")], {
