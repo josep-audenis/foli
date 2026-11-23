@@ -1,5 +1,5 @@
 import fc from "fast-check";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { NodeJSON } from "../model/index.js";
 import { Step, type StepJSON } from "../transform/steps.js";
 import { TransformError } from "../transform/transform.js";
@@ -159,8 +159,13 @@ function attempt(edit: () => unknown): void {
   }
 }
 
+/** How many times each kind of edit changed a client's document, over all runs. */
+const changed = new Map<string, number>();
+
 function run(client: Client, o: Op, serial: number): void {
   const { editor } = client;
+  const before = editor.state.doc;
+  const stories = editor.getDocument().stories;
   const from = near(editor, Math.min(o.a, o.b));
   const to = near(editor, Math.max(o.a, o.b));
   attempt(() => {
@@ -198,6 +203,8 @@ function run(client: Client, o: Op, serial: number): void {
       editor.run(insertNote("footnote"));
     } else if (o.kind === "undo") editor.commands.undo();
   });
+  if (editor.state.doc !== before || editor.getDocument().stories !== stories)
+    changed.set(o.kind, (changed.get(o.kind) ?? 0) + 1);
 }
 
 /** Everyone sends and receives until nothing is left. */
@@ -214,13 +221,22 @@ function settle(hub: Hub): void {
 }
 
 function simulate(count: number, ops: readonly Op[]): Hub {
-  const hub = new Hub();
-  for (let id = 1; id <= count; id++) new Client(id, hub);
-  ops.forEach((o, serial) => {
-    run(hub.clients[o.client % count] as Client, o, serial);
-  });
-  settle(hub);
-  return hub;
+  // A clock the run sets: each op 0 to 900 ms after the last (undo groups typing closer than
+  // 500 ms), the same on every run of these ops.
+  let now = Date.UTC(2026, 10, 23);
+  const clock = vi.spyOn(Date, "now").mockImplementation(() => now);
+  try {
+    const hub = new Hub();
+    for (let id = 1; id <= count; id++) new Client(id, hub);
+    ops.forEach((o, serial) => {
+      now += Math.floor(o.b * 900);
+      run(hub.clients[o.client % count] as Client, o, serial);
+    });
+    settle(hub);
+    return hub;
+  } finally {
+    clock.mockRestore();
+  }
 }
 
 describe("undo in a shared document (22.7)", () => {
@@ -257,18 +273,36 @@ describe("collaboration converges (22.7, 1000 runs)", () => {
     () => {
       const logged: number[] = [];
       fc.assert(
-        fc.property(fc.integer({ min: 2, max: 5 }), fc.array(op, { maxLength: 30 }), (n, ops) => {
-          const hub = simulate(n, ops);
-          const expected = hub.editor.getDocument();
-          for (const client of hub.clients) expect(client.editor.getDocument()).toEqual(expected);
-          expect(() => parseDocument(structuredClone(expected))).not.toThrow();
-          expect(hub.refused).toBe(0);
-          logged.push(hub.log.length);
-        }),
+        fc.property(
+          fc.integer({ min: 2, max: 5 }),
+          fc.array(op, { minLength: 10, maxLength: 40 }),
+          (n, ops) => {
+            const hub = simulate(n, ops);
+            const expected = hub.editor.getDocument();
+            for (const client of hub.clients) expect(client.editor.getDocument()).toEqual(expected);
+            expect(() => parseDocument(structuredClone(expected))).not.toThrow();
+            expect(hub.refused).toBe(0);
+            logged.push(hub.log.length);
+          },
+        ),
         { numRuns: 1000 },
       );
-      // The runs did collaborate: most made steps the hub ordered.
-      expect(logged.filter((n) => n > 5).length).toBeGreaterThan(300);
+      // The runs did collaborate: most made steps the hub ordered, with every kind of edit.
+      expect(logged.filter((n) => n > 5).length).toBeGreaterThan(500);
+      for (const kind of [
+        "type",
+        "delete",
+        "bold",
+        "list",
+        "style",
+        "table",
+        "comment",
+        "track",
+        "header",
+        "note",
+        "undo",
+      ])
+        expect(changed.get(kind) ?? 0, kind).toBeGreaterThan(50);
     },
     TIMEOUT,
   );
