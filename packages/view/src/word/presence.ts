@@ -6,7 +6,7 @@
  * shortcut: the body only; a presence in a header, footer or note is not drawn there.
  */
 
-/** One peer as the view draws it. */
+/** @internal One peer as the view draws it. */
 export interface PeerDrawing {
   readonly name: string;
   /** `#rgb` or `#rrggbb` (checked by core when received). */

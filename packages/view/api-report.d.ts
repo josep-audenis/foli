@@ -977,19 +977,7 @@ export declare function renderDocument(document: FoliDocument, container: HTMLEl
  * blinking, no animation, so reduced motion has nothing to stop.
  * shortcut: the body only; a presence in a header, footer or note is not drawn there.
  */
-/** One peer as the view draws it. */
-export interface PeerDrawing {
-    readonly name: string;
-    /** `#rgb` or `#rrggbb` (checked by core when received). */
-    readonly color: string;
-    readonly ranges: readonly Range[];
-    /** Where the caret is on the screen (viewport coordinates), or null when not drawn. */
-    readonly caret: {
-        left: number;
-        top: number;
-        height: number;
-    } | null;
-}
+export {};
 
 // word/regions.d.ts
 export {};
