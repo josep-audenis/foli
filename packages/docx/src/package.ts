@@ -6,6 +6,7 @@
 
 import {
   type ParseXmlOptions,
+  parseXml,
   parseXmlCosting,
   type XmlDocument,
   type XmlElement,
@@ -217,7 +218,10 @@ export class DocxPackage {
   async write(
     replace: ReadonlyMap<string, Uint8Array> = new Map(),
     add: readonly NewPart[] = [],
+    /** Parts left out of the file, their `Override`s with them; `main`: the main part's new type. */
+    change: { drop?: readonly string[]; main?: string } = {},
   ): Promise<Uint8Array<ArrayBuffer>> {
+    const dropped = new Set((change.drop ?? []).map(key));
     const pending = new Map<string, Uint8Array>();
     for (const [name, data] of replace) {
       const part = this.part(name);
@@ -243,8 +247,31 @@ export class DocxPackage {
         );
       }
     }
-    if (overrides.length) {
-      const types = this.#contentTypesText;
+    if (overrides.length || dropped.size || change.main) {
+      let types = this.#contentTypesText;
+      let mainTyped = false;
+      if (dropped.size || change.main) {
+        // From the end: earlier positions stay.
+        const root = parseXml(types).root;
+        const children = root.children.filter((c): c is XmlElement => c.kind === "element");
+        for (const child of children.reverse()) {
+          if (child.local !== "Override") continue;
+          const name = key(attribute(child, "PartName") ?? "");
+          if (dropped.has(name)) types = types.slice(0, child.start) + types.slice(child.end);
+          else if (change.main && name === key(this.mainDocument)) {
+            mainTyped = true;
+            types =
+              types.slice(0, child.start) +
+              `<${this.#contentTypesPrefix}Override PartName="${escapeXml(this.mainDocument)}" ContentType="${escapeXml(change.main)}"/>` +
+              types.slice(child.end);
+          }
+        }
+      }
+      // Typed by its extension's Default: an Override says the new type.
+      if (change.main && !mainTyped)
+        overrides.push(
+          `<${this.#contentTypesPrefix}Override PartName="${escapeXml(this.mainDocument)}" ContentType="${escapeXml(change.main)}"/>`,
+        );
       const close = types.lastIndexOf("</");
       pending.set(
         key(CONTENT_TYPES),
@@ -253,6 +280,7 @@ export class DocxPackage {
     }
     const entries: ZipEntry[] = [];
     for (const entry of this.#entries) {
+      if (dropped.has(key(partName(entry.name)))) continue;
       const data = pending.get(key(partName(entry.name)));
       entries.push(data ? await deflateEntry(entry.name, data, entry) : entry);
     }

@@ -42,6 +42,14 @@ export interface ExportOptions {
      * written as it was read (a `.docx` control's text, else `[type]`).
      */
     extensions?: readonly Extension[];
+    /**
+     * With `original` a macro-enabled document (`.docm`) or a template (`.dotx`, `.dotm`): written
+     * as a plain `.docx` instead, its main part a document's and its VBA project (the project,
+     * its data and their relationships) left out. Each part left out is passed to `dropped`.
+     */
+    asDocument?: boolean;
+    /** The parts `asDocument` left out (a `.docm`'s macros): say so to the user. */
+    dropped?: (parts: readonly string[]) => void;
 }
 /**
  * The document as a `.docx`. With `original` (the package it was imported from), the parts
@@ -285,7 +293,12 @@ export declare class DocxPackage {
      * is copied from the original file as it was stored. Entries keep their order; added ones
      * come last.
      */
-    write(replace?: ReadonlyMap<string, Uint8Array>, add?: readonly NewPart[]): Promise<Uint8Array<ArrayBuffer>>;
+    write(replace?: ReadonlyMap<string, Uint8Array>, add?: readonly NewPart[], 
+    /** Parts left out of the file, their `Override`s with them; `main`: the main part's new type. */
+    change?: {
+        drop?: readonly string[];
+        main?: string;
+    }): Promise<Uint8Array<ArrayBuffer>>;
 }
 /** A part to add to a package. */
 export interface NewPart {

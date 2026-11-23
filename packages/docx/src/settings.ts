@@ -233,20 +233,74 @@ export function withSettings(source: string, root: XmlElement, settings: WordSet
       .join("");
     put(local, notesXml(prefix, local, wanted, kept));
   }
+  if (settings.doNotUseHTMLParagraphAutoSpacing) {
+    const compat = elementsOf(current).find((c) => isW(c, "compat"));
+    const flag = compat && elementsOf(compat).find((c) => isW(c, SPACING));
+    const element = `<${prefix}${SPACING}/>`;
+    if (!compat) put("compat", `<${prefix}compat>${element}</${prefix}compat>`);
+    else if (!flag || !toggle(flag)) {
+      // In CT_Compat's order: after the options before it, before the rest and compatSetting.
+      const after = elementsOf(compat)
+        .filter((c) => c.ns === W && SPACING_AFTER.has(c.local))
+        .at(-1);
+      const at = flag ? flag.start : after ? after.end : compat.openEnd;
+      const end = flag ? flag.end : at;
+      text =
+        compat.openEnd === compat.end
+          ? `${text.slice(0, compat.openEnd - 2)}>${element}</${compat.name}>${text.slice(compat.end)}`
+          : text.slice(0, at) + element + text.slice(end);
+      current = parseXml(text).root;
+    }
+  }
   return text;
 }
 
+const SPACING = "doNotUseHTMLParagraphAutoSpacing";
+/** The `w:compat` options CT_Compat puts before `doNotUseHTMLParagraphAutoSpacing`. */
+const SPACING_AFTER = new Set(
+  (
+    "useSingleBorderforContiguousCells wpJustification noTabHangInd noLeading spaceForUL " +
+    "noColumnBalance balanceSingleByteDoubleByteWidth noExtraLineSpacing doNotLeaveBackslashAlone " +
+    "ulTrailSpace doNotExpandShiftReturn spacingInWholePoints lineWrapLikeWord6 " +
+    "printBodyTextBeforeHeader printColBlack wpSpaceWidth showBreaksInFrames subFontBySize " +
+    "suppressBottomSpacing suppressTopSpacing suppressSpacingAtTopOfPage suppressTopSpacingWP " +
+    "suppressSpBfAfterPgBrk swapBordersFacingPages convMailMergeEsc truncateFontHeightsLikeWP6 " +
+    "mwSmallCaps usePrinterMetrics doNotSuppressParagraphBorders wrapTrailSpaces " +
+    "footnoteLayoutLikeWW8 shapeLayoutLikeWW8 alignTablesRowByRow forgetLastTabAlignment " +
+    "adjustLineHeightInTable autoSpaceLikeWord95 noSpaceRaiseLower"
+  ).split(" "),
+);
+
 /**
- * A new settings part.
+ * A new settings part. `fresh`: a package Foli made, which says it is Word 2013's
+ * (`compatibilityMode` 15): without it Word opens it in compatibility mode.
  * @internal
  */
-export function newSettingsXml(trackRevisions: boolean, settings: WordSettingsJSON = {}): string {
+export function newSettingsXml(
+  trackRevisions: boolean,
+  settings: WordSettingsJSON = {},
+  fresh = false,
+): string {
+  const compat =
+    (settings.doNotUseHTMLParagraphAutoSpacing ? `<w:${SPACING}/>` : "") +
+    (fresh
+      ? [
+          ["compatibilityMode", "15"],
+          ["overrideTableStyleFontSizeAndJustification", "1"],
+          ["enableOpenTypeFeatures", "1"],
+          ["doNotFlipMirrorIndents", "1"],
+          ["differentiateMultirowTableHeaders", "1"],
+        ]
+          .map(
+            ([name, value]) =>
+              `<w:compatSetting w:name="${name}" w:uri="http://schemas.microsoft.com/office/word" w:val="${value}"/>`,
+          )
+          .join("")
+      : "");
   const children =
     (trackRevisions ? "<w:trackRevisions/>" : "") +
     (settings.evenAndOddHeaders ? "<w:evenAndOddHeaders/>" : "") +
     NOTES.map(([key, local]) => notesXml("w:", local, settings[key] ?? {})).join("") +
-    (settings.doNotUseHTMLParagraphAutoSpacing
-      ? "<w:compat><w:doNotUseHTMLParagraphAutoSpacing/></w:compat>"
-      : "");
+    (compat ? `<w:compat>${compat}</w:compat>` : "");
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\r\n<w:settings xmlns:w="${W}">${children}</w:settings>`;
 }

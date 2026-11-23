@@ -19,7 +19,7 @@ import { customToWord } from "../custom.js";
 import { controlsUsed, packageStories } from "../import/index.js";
 import { child, isW, REL, W } from "../import/ooxml.js";
 import { noteIds } from "../import/stories.js";
-import { DocxError, type DocxPackage, type NewPart } from "../package.js";
+import { DocxError, type DocxPackage, type NewPart, readPackage } from "../package.js";
 import { newSettingsXml, withSettings, withTrackRevisions } from "../settings.js";
 import { parseXml, type XmlElement } from "../xml.js";
 import { deflateEntry, writeZip } from "../zip.js";
@@ -215,6 +215,37 @@ export interface ExportOptions {
    * written as it was read (a `.docx` control's text, else `[type]`).
    */
   extensions?: readonly Extension[];
+  /**
+   * With `original` a macro-enabled document (`.docm`) or a template (`.dotx`, `.dotm`): written
+   * as a plain `.docx` instead, its main part a document's and its VBA project (the project,
+   * its data and their relationships) left out. Each part left out is passed to `dropped`.
+   */
+  asDocument?: boolean;
+  /** The parts `asDocument` left out (a `.docm`'s macros): say so to the user. */
+  dropped?: (parts: readonly string[]) => void;
+}
+
+const DOCUMENT_MAIN =
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml";
+const VBA = /\/relationships\/vbaProject$/;
+
+/**
+ * `pkg`'s macros: the VBA project the main part relates and every part it relates in turn (its
+ * data, its signatures), with their relationships parts. What a `.docx` cannot hold.
+ */
+function macroParts(pkg: DocxPackage): string[] {
+  const out = new Set<string>();
+  const visit = (source: string, all: boolean) => {
+    for (const r of pkg.relationships(source)) {
+      if (r.external || !r.partName || out.has(r.partName) || !(all || VBA.test(r.type))) continue;
+      out.add(r.partName);
+      const rels = relationshipsPartName(r.partName);
+      if (pkg.part(rels)) out.add(rels);
+      visit(r.partName, true);
+    }
+  };
+  visit(pkg.mainDocument, false);
+  return [...out].filter((name) => pkg.part(name));
 }
 
 /**
@@ -271,9 +302,39 @@ export async function exportDocx(
     : [];
   const bytes = await pictureBytes(doc, original, options.resource);
   const media = new Media(doc, original, bytes, rewritten);
-  return original
-    ? intoPackage(doc, original, originals, unchanged, referenced.isReferenced, options, media)
-    : newPackage(doc, referenced.isReferenced, options, media);
+  if (!original) return newPackage(doc, referenced.isReferenced, options, media);
+  const written = await intoPackage(
+    doc,
+    original,
+    originals,
+    unchanged,
+    referenced.isReferenced,
+    options,
+    media,
+  );
+  const main = original.part(original.mainDocument)?.contentType;
+  if (!options.asDocument || main === DOCUMENT_MAIN) return written;
+  // The written package again: the main part's relationships to the macros go with them.
+  const out = await readPackage(written);
+  const drop = macroParts(out);
+  const relsName = relationshipsPartName(out.mainDocument);
+  const replace = new Map<string, Uint8Array>();
+  if (drop.length && out.part(relsName)) {
+    const { root, source } = out.xml(relsName);
+    let text = source;
+    for (const child of [...root.children].reverse())
+      if (
+        child.kind === "element" &&
+        child.local === "Relationship" &&
+        VBA.test(child.attributes.find((a) => a.local === "Type")?.value ?? "")
+      )
+        text = text.slice(0, child.start) + text.slice(child.end);
+    replace.set(relsName, new TextEncoder().encode(text));
+  }
+  // What a user would miss: the parts, not their relationships parts.
+  const said = drop.filter((name) => !name.endsWith(".rels"));
+  if (said.length) options.dropped?.(said);
+  return out.write(replace, [], { drop, main: DOCUMENT_MAIN });
 }
 
 /**
@@ -459,6 +520,17 @@ async function intoPackage(
       return existing.name;
     }
     if (!needed) return undefined;
+    const pointed = relationship?.partName;
+    if (
+      pointed &&
+      /^\/[^/]/.test(pointed) &&
+      !pointed.endsWith("/") &&
+      !/\/_rels\/|^\/\[content_types\]\.xml$/i.test(pointed)
+    ) {
+      // Related, but the package lacks the part: made where the relationship points.
+      add.push({ name: pointed, data: encoder.encode(write(undefined, namespaces)), contentType });
+      return pointed;
+    }
     if (pkg.part(defaultName)) {
       // There, but not related to the document: written in place, then related.
       const { o, ns } = originalOf(defaultName);
@@ -738,13 +810,13 @@ async function newPackage(
       );
     }
   }
-  if (options.trackRevisions || doc.settings)
-    add(
-      "/word/settings.xml",
-      REL.settings,
-      CT.settings,
-      newSettingsXml(!!options.trackRevisions, doc.settings),
-    );
+  // Always: it says which Word the package is for (not compatibility mode).
+  add(
+    "/word/settings.xml",
+    REL.settings,
+    CT.settings,
+    newSettingsXml(!!options.trackRevisions, doc.settings, true),
+  );
   parts.push({
     name: "/word/_rels/document.xml.rels",
     text: rels.xml(undefined),

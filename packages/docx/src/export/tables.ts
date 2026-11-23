@@ -61,7 +61,17 @@ const MARGIN_SIDES = ["top", "left", "start", "bottom", "right", "end"];
 function sidesXml(name: string, value: unknown, sides: readonly string[], one: typeof borderXml) {
   if (!value) return "";
   const v = value as Json;
-  return el(name, {}, sides.map((side) => one(side, v[side])).join(""));
+  // `start` is `left` (`end` is `right`) under another name: a file with both gets `left`, as
+  // Word writes it, never two elements for one side.
+  const twin: Record<string, string> = { start: "left", end: "right" };
+  return el(
+    name,
+    {},
+    sides
+      .filter((side) => !(twin[side] && v[twin[side] as string] != null))
+      .map((side) => one(side, v[side]))
+      .join(""),
+  );
 }
 
 function shadingXml(value: unknown): string {

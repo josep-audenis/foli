@@ -104,9 +104,14 @@ export async function pictureBytes(
   return out;
 }
 
-/** `wp:docPr` ids (any prefix) in XML text. */
-const docPrIds = (xml: string) =>
-  [...xml.matchAll(/<(?:[\w.-]+:)?docPr\b[^>]*?\bid="(\d+)"/g)].map((m) => Number(m[1]));
+/**
+ * `wp:docPr` ids (any prefix, either quote) in XML text.
+ * @internal
+ */
+export const docPrIds = (xml: string) =>
+  [...xml.matchAll(/<(?:[\w.-]+:)?docPr\b[^>]*?\bid\s*=\s*(["'])(\d+)\1/g)].map((m) =>
+    Number(m[2]),
+  );
 
 /**
  * The media parts pictures need, allocated as they are written, and the drawings' ids.
@@ -147,8 +152,14 @@ export class Media {
     });
     const skip = new Set(rewritten.map((n) => n.toLowerCase()));
     for (const part of pkg?.parts ?? [])
-      if (part.contentType.endsWith("+xml") && !skip.has(part.name.toLowerCase()))
-        reserve(new TextDecoder().decode(part.data));
+      if (part.contentType.endsWith("+xml") && !skip.has(part.name.toLowerCase())) {
+        // As the package reads text (UTF-16 by its byte order mark); bytes it refuses hold none.
+        let text = "";
+        try {
+          text = pkg?.text(part.name) ?? "";
+        } catch {}
+        reserve(text);
+      }
     this.#nextId = max + 1;
   }
 

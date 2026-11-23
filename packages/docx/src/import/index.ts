@@ -17,7 +17,7 @@ import {
 } from "../package.js";
 import { readSettings, trackRevisionsOf } from "../settings.js";
 import type { XmlElement } from "../xml.js";
-import { blocks, type ContentContext, Moves } from "./content.js";
+import { blocks, type ContentContext, Moves, preservedIn } from "./content.js";
 import { child, isW, REL, W_STRICT } from "./ooxml.js";
 import { comments, numbering, styles, theme } from "./parts.js";
 import { section } from "./properties.js";
@@ -77,11 +77,17 @@ export function importPackage(pkg: DocxPackage): DocxImport {
       byId ??= new Map(pkg.relationships(part).map((r) => [r.id, r]));
       return byId.get(id);
     };
+    // Read once a part, when a text first asks.
+    let preserved: WeakSet<XmlElement> | undefined;
     return {
       source,
       report,
       pkg,
       part,
+      preserved: (el: XmlElement) => {
+        preserved ??= preservedIn(pkg.xml(part).root);
+        return preserved.has(el);
+      },
       moves: new Moves(),
       relationship,
       resources,
@@ -206,11 +212,17 @@ export function packageStories(pkg: DocxPackage): {
   const controls = new Map<string, ControlJSON>();
   const stories = canonicalStories(pkg, (part, source) => {
     const byId = new Map(pkg.relationships(part).map((r) => [r.id, r]));
+    // Read once a part, when a text first asks.
+    let preserved: WeakSet<XmlElement> | undefined;
     return {
       source,
       report,
       pkg,
       part,
+      preserved: (el: XmlElement) => {
+        preserved ??= preservedIn(pkg.xml(part).root);
+        return preserved.has(el);
+      },
       moves: new Moves(),
       relationship: (id) => byId.get(id),
       resources,
