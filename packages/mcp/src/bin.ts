@@ -15,6 +15,10 @@ if ("print" in args) {
 }
 
 const log = (message: string) => process.stderr.write(`foli-mcp: ${message}\n`);
+// stdout is the protocol's: a stray `console.log` (a dependency's) must not break a message.
+console.log = console.error;
+console.info = console.error;
+console.debug = console.error;
 // The client went away: nothing to say, and nobody to say it to.
 process.stdout.on("error", () => process.exit(0));
 try {

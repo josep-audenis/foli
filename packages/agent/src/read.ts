@@ -20,11 +20,15 @@ export interface Block {
    * is.
    */
   text: string;
-  /** A table's size: its rows, and the cells of its longest row. */
+  /** A table's size: its rows, and its grid's columns (a merged cell spans several). */
   rows?: number;
   columns?: number;
-  /** Where a block in a table is: its table's handle, row and cell in the row, from 1. */
-  cell?: { table: string; row: number; column: number };
+  /**
+   * Where a block in a table is: its table's handle, row and grid column, from 1; `span`, the
+   * grid columns a cell merged across covers; `merged`, a cell merged with the ones below
+   * (`down`) or part of the cell above (`up`, its text shown there).
+   */
+  cell?: { table: string; row: number; column: number; span?: number; merged?: "down" | "up" };
   /** How many tables it is inside: 0 in the body. */
   depth: number;
   /** It holds tracked changes not yet accepted or rejected (anyone's). */
@@ -196,12 +200,25 @@ export function readBlocks(state: EditorState, handles: Handles): Block[] {
           if (revisionOf(row)) table.changed = true;
           if (revisionOf(row)?.deletion) return;
           rows++;
-          columns = Math.max(columns, row.childCount);
           const rowStart = pos + 1 + rowOffset + 1;
-          row.forEach((cellNode, cellOffset, column) => {
-            const place = { table: handle, row: rows, column: column + 1 };
+          // The grid column each cell starts at: the cells before it, and what they span.
+          let grid = 1;
+          row.forEach((cellNode, cellOffset) => {
+            const span = (cellNode.attrs.gridSpan as number | null) ?? 1;
+            const merge = cellNode.attrs.vMerge as string | null;
+            const place = {
+              table: handle,
+              row: rows,
+              column: grid,
+              ...(span > 1 ? { span } : {}),
+              ...(merge
+                ? { merged: merge === "restart" ? ("down" as const) : ("up" as const) }
+                : {}),
+            };
             walk(cellNode, rowStart + cellOffset + 1, place, depth + 1);
+            grid += span;
           });
+          columns = Math.max(columns, grid - 1);
         });
         table.rows = rows;
         table.columns = columns;
@@ -262,7 +279,13 @@ const count = (n: number | undefined, what: string) => `${n} ${what}${n === 1 ? 
 export function formatBlocks(blocks: readonly Block[]): string {
   const line = (block: Block): string => {
     const start = `[${block.handle}] ${"  ".repeat(block.depth)}`;
-    const where = block.cell ? [`r${block.cell.row} c${block.cell.column}`] : [];
+    const at = block.cell;
+    const where = at
+      ? [
+          `r${at.row} c${at.column}${at.span ? `-${at.column + at.span - 1}` : ""}`,
+          ...(at.merged === "down" ? ["merged down"] : at.merged === "up" ? ["merged up"] : []),
+        ]
+      : [];
     const flags = [
       ...(block.changed ? ["changed"] : []),
       ...(block.comments ? [count(block.comments, "comment")] : []),

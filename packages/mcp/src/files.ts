@@ -188,9 +188,15 @@ export function write(file: string, bytes: Uint8Array, replace: boolean): Checke
     // Nothing was there: it must still not be, or it is someone else's.
     if (there === "nothing" && standing(file) !== "nothing") throw new Error("taken");
     renameSync(temporary, file);
-  } catch {
+  } catch (error) {
     // Only what was made here: a file that stood at that name is someone's.
     if (made) rmSync(temporary, { force: true });
+    const code = (error as { code?: unknown }).code;
+    // Windows refuses to replace a file another program has open (Word does).
+    if (code === "EBUSY" || code === "EPERM" || code === "EACCES")
+      return no(
+        `${name} could not be written: the system refused (${code}). It may be open in another program, such as Word: close it there, or save under another name.`,
+      );
     return no(`${name} could not be written.`);
   }
   return { ok: true, file };

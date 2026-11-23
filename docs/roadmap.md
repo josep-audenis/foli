@@ -3085,7 +3085,7 @@ review. 21.1 to 21.6 lose data, hang or leak: they go first, in this order.
   struck here.
   (Done: Phase 20 had fixed none of these, its fixes were the import's (20.5), so nothing is
   struck. The macro option is `asDocument`, its report the `dropped` callback.)
-- [ ] 21.11 Agent and MCP, what costs a model retries: `find` loosens the soft hyphen (U+00AD),
+- [x] 21.11 Agent and MCP, what costs a model retries: `find` loosens the soft hyphen (U+00AD),
   the non-breaking hyphen (U+2011) and the zero-width space, and a refusal quotes invisible and
   look-alike characters escaped; the 200 000-character cut keeps the `more:` line and cuts at a
   block; `null` for an optional argument is taken as absent; a save refused by the system (a

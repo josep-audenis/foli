@@ -17,6 +17,26 @@ export const MAX_MESSAGE_BYTES = 8 * 1024 * 1024;
  */
 export const MAX_RESULT_CHARS = 200_000;
 
+/**
+ * @internal
+ * `text` within `MAX_RESULT_CHARS`: cut at a line's end (a read's block, never inside one nor
+ * a surrogate pair), its `(more: …)` line kept, so the model can go on reading.
+ */
+export function cutResult(text: string): string {
+  if (text.length <= MAX_RESULT_CHARS) return text;
+  const lines = text.split("\n");
+  const more = lines.at(-1)?.startsWith("(more:") ? `\n${lines.at(-1)}` : "";
+  const room = MAX_RESULT_CHARS - more.length - 200;
+  let end = text.lastIndexOf("\n", room);
+  if (end <= 0) {
+    // One line longer than the room: cut inside it, not between a surrogate pair's halves.
+    end = room;
+    const low = text.charCodeAt(end);
+    if (low >= 0xdc00 && low <= 0xdfff) end--;
+  }
+  return `${text.slice(0, end)}\n(cut: ${text.length} characters in all, the first ${end} shown. Ask for less at a time.)${more}`;
+}
+
 /** What a tool gives back: text for the model; `isError` when it should act on it and try again. */
 export interface ToolResult {
   text: string;
@@ -124,7 +144,21 @@ export async function serve(
       throw new RpcError(INVALID_PARAMS, "tools/call needs the tool's name");
     const tool = tools.get(params.name);
     if (!tool) throw new RpcError(INVALID_PARAMS, `Unknown tool: ${params.name}`);
-    const args = params.arguments ?? {};
+    const given = params.arguments ?? {};
+    // `null` for an argument that may be left out is leaving it out: models send it so.
+    const required = new Set(tool.inputSchema.required ?? []);
+    const properties = tool.inputSchema.properties ?? {};
+    const takesNull = (key: string) => {
+      const property = Object.hasOwn(properties, key) ? properties[key] : undefined;
+      return !property || invalid(null, property) === null;
+    };
+    const args = isRecord(given)
+      ? Object.fromEntries(
+          Object.entries(given).filter(
+            ([key, value]) => value !== null || required.has(key) || takesNull(key),
+          ),
+        )
+      : given;
     let result: ToolResult;
     // Wrong arguments are the model's to correct: said as a result it reads, not as an error
     // of the protocol, which clients may keep from it.
@@ -137,10 +171,7 @@ export async function serve(
         options.log?.(`${tool.name} threw: ${where(error)}`);
         result = { text: `${tool.name} failed inside the server.`, isError: true };
       }
-    const text =
-      result.text.length > MAX_RESULT_CHARS
-        ? `${result.text.slice(0, MAX_RESULT_CHARS)}\n(cut: ${result.text.length} characters in all, the first ${MAX_RESULT_CHARS} shown. Ask for less at a time.)`
-        : result.text;
+    const text = cutResult(result.text);
     return {
       content: [{ type: "text", text }],
       ...(result.isError ? { isError: true } : {}),
@@ -193,7 +224,12 @@ export async function serve(
     }
     // No batches: the protocol dropped them (2025-06-18), and no client found sends them.
     if (!isRecord(message) || message.jsonrpc !== "2.0")
-      return fail(null, INVALID_REQUEST, "Invalid request: not a JSON-RPC 2.0 message");
+      return fail(
+        // With the id it has, if any: the client can tell which request was wrong.
+        isRecord(message) && isId(message.id) ? message.id : null,
+        INVALID_REQUEST,
+        "Invalid request: not a JSON-RPC 2.0 message",
+      );
     const { id, method } = message;
     if (typeof method !== "string") {
       // A response: the server asks nothing, so there is nothing it answers.
