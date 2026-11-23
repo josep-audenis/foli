@@ -1,5 +1,18 @@
 # @folijs/react
 
+## 1.6.0
+
+### Patch Changes
+
+- Updated dependencies [70f9683]
+- Updated dependencies [74c437a]
+- Updated dependencies [42fae0f]
+- Updated dependencies [fdd1ea8]
+- Updated dependencies [fb9277f]
+- Updated dependencies [eb3818a]
+  - @folijs/core@1.6.0
+  - @folijs/view@1.6.0
+
 ## 1.5.0
 
 ### Minor Changes
