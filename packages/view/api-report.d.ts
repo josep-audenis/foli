@@ -451,6 +451,8 @@ export declare class EditorView {
     private drawMatches;
     /** Other people's selections marked and carets with their names (22.9); nothing in the document. */
     private drawPeers;
+    /** Whether the block at `pos` is on a page in `near` (always, unpaged). */
+    private blockNear;
     /** Where the caret at `pos` is drawn, in viewport coordinates; null where none shows. */
     private caretAt;
     /** While peers show, scrolling and resizing move their carets, once per frame. */

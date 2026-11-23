@@ -31,7 +31,10 @@ function fakeHighlights() {
 const doc = () =>
   createDocument({
     type: "doc",
-    content: [{ type: "paragraph", content: [{ type: "text", text: "Hello world" }] }],
+    content: [
+      { type: "paragraph", content: [{ type: "text", text: "Hello world" }] },
+      { type: "paragraph", content: [{ type: "text", text: "Second line" }] },
+    ],
   });
 
 describe("presence in the view (22.9)", () => {
@@ -59,5 +62,19 @@ describe("presence in the view (22.9)", () => {
     editor.dispatch(removePresence(editor.state, 2));
     expect(marked("foli-peer-3366cc")).toEqual([]);
     expect(document.querySelectorAll("[data-foli-peer]")).toHaveLength(0);
+  });
+
+  it("marks a selection across paragraphs in each of them", () => {
+    const marked = fakeHighlights();
+    const host = document.createElement("div");
+    document.body.append(host);
+    const editor = createEditor({ document: doc(), plugins: [collab({ clientID: 1 })] });
+    views.push(new EditorView(host, editor));
+    const other = createEditor({ document: doc(), plugins: [collab({ clientID: 2 })] });
+    other.select(7, 20);
+    editor.dispatch(
+      receivePresence(editor.state, presenceMessage(other.state, { name: "Bob", color: "#c33" })),
+    );
+    expect(marked("foli-peer-c33")).toEqual(["world", "Second"]);
   });
 });
