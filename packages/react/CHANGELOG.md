@@ -1,5 +1,23 @@
 # @folijs/react
 
+## 1.5.0
+
+### Minor Changes
+
+- b64c398: Comments pane: every comment of a thread has Reply (a reply to a reply goes at the end of its thread, as Word keeps them). New `onlyOwnComments` prop on `FoliComments` and `FoliEditor`: Edit and Delete show only on the comments of the editor's `author` (by name; it hides the buttons, the commands still change any comment).
+
+### Patch Changes
+
+- 75e6c09: `FoliComments` measures nothing while hidden or without threads, and measures once a frame while typing instead of on every change; `FoliCanvas` calls the latest `upload` through one function, so an inline one is no change of the view's options (a new `resource` still draws the pictures again: keep it memoized); a built-in toolbar dialog closed by an edit from elsewhere gives the focus back to where it came from; the font, size and style boxes stepped with the arrow keys (not on Apple platforms, where the arrows open the list) apply on Enter or Tab, one undo step, not one per value passed; Escape or leaving the box another way drops the value.
+- Updated dependencies [084bac7]
+- Updated dependencies [d05fc3e]
+- Updated dependencies [125371e]
+- Updated dependencies [836abd3]
+- Updated dependencies [7cd3e1e]
+- Updated dependencies [b8ea534]
+  - @folijs/core@1.5.0
+  - @folijs/view@1.5.0
+
 ## 1.4.0
 
 ### Minor Changes

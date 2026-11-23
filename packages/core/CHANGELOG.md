@@ -1,5 +1,15 @@
 # @folijs/core
 
+## 1.5.0
+
+### Patch Changes
+
+- 084bac7: What cost a model retries: find (the editor's and the agent's) looks through soft hyphens and zero-width spaces and takes a non-breaking hyphen as `-`; an agent refusal quotes invisible and look-alike characters escaped (`‑`) and never cuts a surrogate pair; `read` gives a table cell's grid column, the columns a merged cell spans and a vertical merge, and a table's grid columns. In the MCP server: a result over 200 000 characters is cut at a block's end and keeps its `(more: …)` line; `null` for an argument that may be left out is taken as leaving it out; a save the system refuses (a file open in Word) says so; a request that is not JSON-RPC 2.0 is answered with its id; `console.log` goes to stderr, never into the protocol.
+- d05fc3e: Smaller fixes from the audit of 1.4.0: a new tracked change no longer reuses a table row's revision id (a duplicate `w:id` on export); a `MERGEFIELD` with a date picture (`\@`) reads ISO dates only (a space for the `T` too), not what `Date.parse` guesses (`"12"` was 2001-12-01; `2024-3-5` now shows as written), and a value that is no real day shows as written instead of `NaN`; `SEQ \r` with no number counts on instead of restarting at 0; roman, letter and ordinal numbers of fractions show their digits, and negative ordinals take their size's suffix (`-1st`); a reply whose parent is missing can be resolved; a string `schemaVersion` gets a message saying it must be a number.
+- 125371e: A date content control reads typed text with a linear matcher instead of a regular expression built from its format: a hostile format (`hdhdhdhdhdhd`) no longer hangs the editor for seconds on one keystroke.
+- 836abd3: Comments that repeat an id (`1, 1, 2`, as 1.4 imported a damaged `.docx`) are each given an id of their own when a document is read (`parseDocument`, so also `importDocx`, `createEditor` and paste): the first keeps it, each later one gets a fresh id with its anchors. Before, editing or resolving one by id changed the other. A reply to a repeated id stays the first's.
+- 7cd3e1e: Smaller fixes from the audit of 1.4.0 in the view: `w:widowControl="0"` is honoured by the editor's pages and `renderDocument` (a paragraph splits at any line), and core resolves a `widowControl` set nowhere as on, as Word does; Ctrl+click (Cmd+click) on a link to a bookmark, a table of contents' entry (`HYPERLINK \l`) or a cross-reference with `\h` goes to the bookmark; a `beforeinput` the view does not carry out (`formatJustifyCenter`, `insertTranspose`…) is said once in the console instead of dropped silently, and `formatIndent`, `formatOutdent` and `insertFromYank` are carried out; a header or footer whose view fails to open leaves the body editable; a render that throws draws everything again next time; a drop-down's option ids are unique per view; `renderDocument`'s print rules apply to its own pages only; an editor inside a shadow root reads its focus and selection there (Chromium, Firefox; not WebKit, see limitations).
+
 ## 1.4.0
 
 ### Minor Changes
