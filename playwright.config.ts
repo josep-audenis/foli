@@ -47,6 +47,8 @@ export default defineConfig({
   webServer: APPS.map((app) => ({
     command: app.command ?? `pnpm --filter ${app.filter} dev --port ${app.port} --strictPort`,
     url: `http://localhost:${app.port}`,
-    reuseExistingServer: !process.env.CI,
+    // Never another checkout's server on the same port (a worktree's, a dev server left open):
+    // a port in use fails the run instead of testing other code.
+    reuseExistingServer: false,
   })),
 });

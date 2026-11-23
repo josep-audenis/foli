@@ -37,6 +37,9 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
+      # What goes live passed the checks (a push to main may skip the local hook).
+      - run: pnpm check
+
       - run: pnpm --filter @folijs/site build
 
       - name: Deploy to Cloudflare Pages
