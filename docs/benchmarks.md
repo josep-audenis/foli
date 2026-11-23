@@ -488,7 +488,13 @@ key searched again and marked every match: 8.2 s for ten keys in the reviewer's 
 with the `collab` plugin, and three headless editors of it in the page, each typing a character
 into a paragraph of the document's second half every 50 ms (60 remote steps a second in all)
 through an in-page authority (`@folijs/collab`, no network delay). The user types and presses
-Enter on page 1 as in the single-user case, which runs beside it as the baseline. Like every
+Enter on page 1 as in the single-user case, which runs beside it as the baseline (not itself one
+of `pnpm bench`'s tracked cases). The case checks that the others' steps reached the measured
+editor while it typed (its version past 100). The layout column was measured with the others'
+setup inside it; since #250 it is measured before them. A second Chromium run after that change, on a quieter
+machine: layout 51.6 ms, type paint p50 / p95 11.1 / 24.3 ms, Enter handler 10 ms, Enter paint
+p50 / p95 20.0 / 34.4 ms: Enter still misses, typing at the target's edge; runs vary by about
+30%. Like every
 case, each change reads the whole document back (`onChange`), remote ones included. One run,
 2026-11-23, the owner's laptop with other sessions running (cells may be off by ~30%):
 
