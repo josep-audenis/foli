@@ -159,4 +159,79 @@ describe("exportPdf", () => {
     expect(calls).toEqual([]);
     await expect(fresh(createDocument(), { page })).resolves.toMatchObject({ pages: 3 });
   });
+
+  /** A page holding one document at a time, slow enough for two exports to overlap. */
+  function sharedPage() {
+    let shown = "";
+    const tick = () => new Promise((resolve) => setTimeout(resolve, 5));
+    const page: PdfPage = {
+      setContent: async () => {
+        shown = "";
+        await tick();
+      },
+      addScriptTag: async () => tick(),
+      evaluate: async (_fn, arg) => {
+        await tick();
+        shown = String(
+          (arg.document.content.content?.[0]?.content?.[0] as { text?: string })?.text,
+        );
+        return { pages: 1, fields: FIELDS } satisfies Rendered;
+      },
+      pdf: async () => {
+        await tick();
+        return new TextEncoder().encode(shown);
+      },
+    };
+    return page;
+  }
+  const saying = (text: string) =>
+    createDocument({
+      type: "doc",
+      content: [{ type: "paragraph", content: [{ type: "text", text }] }],
+    });
+  const text = (result: { pdf: Uint8Array }) => new TextDecoder().decode(result.pdf);
+
+  it("runs two exports on one page one after the other, never mixed (21.4)", async () => {
+    const page = sharedPage();
+    const [a, b] = await Promise.all([
+      exportPdf(saying("first user's"), { page }),
+      exportPdf(saying("second user's"), { page }),
+    ]);
+    expect([text(a), text(b)]).toEqual(["first user's", "second user's"]);
+  });
+
+  it("stops on its signal or timeout, and the next export on the page still waits for it", async () => {
+    const page = sharedPage();
+    const stop = new AbortController();
+    stop.abort(new Error("gone"));
+    await expect(exportPdf(saying("a"), { page, signal: stop.signal })).rejects.toThrow("gone");
+    // Given up while it renders: the page stays its until it stops.
+    const log: string[] = [];
+    const { setContent, evaluate } = page;
+    page.setContent = async (html) => {
+      log.push("setContent");
+      return setContent(html);
+    };
+    let rendering = () => {};
+    const rendered = new Promise<void>((resolve) => {
+      rendering = resolve;
+    });
+    page.evaluate = async (fn, arg) => {
+      rendering();
+      const result = await evaluate(fn, arg);
+      log.push("evaluated");
+      return result;
+    };
+    const quit = new AbortController();
+    const slow = exportPdf(saying("slow"), { page, signal: quit.signal });
+    await rendered;
+    quit.abort(new Error("given up"));
+    await expect(slow).rejects.toThrow("given up");
+    const next = exportPdf(saying("next"), { page });
+    expect(text(await next)).toBe("next");
+    expect(log).toEqual(["setContent", "evaluated", "setContent", "evaluated"]);
+    await expect(exportPdf(saying("x"), { page, timeout: 1 })).rejects.toThrow();
+    await expect(exportPdf(saying("x"), { page, timeout: 1.5 })).rejects.toThrow(TypeError);
+    await expect(exportPdf(saying("x"), { page, timeout: 0 })).rejects.toThrow(TypeError);
+  });
 });

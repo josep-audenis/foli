@@ -3033,7 +3033,7 @@ review. 21.1 to 21.6 lose data, hang or leak: they go first, in this order.
   them still opens; a reply to a repeated id stays the first's. Bookmark names and control ids need no
   check: a repeated bookmark name acts as in Word, the first found and every one renamed
   together; `importDocx` gives each control an id of its own and paste renumbers them.)
-- [ ] 21.4 PDF: two `exportPdf` calls on one page cannot mix (`pdf/src/index.ts`). Today the
+- [x] 21.4 PDF: two `exportPdf` calls on one page cannot mix (`pdf/src/index.ts`). Today the
   second `setContent` replaces the first's DOM while it renders: on a server with a pool of
   pages, one user's PDF can hold another's document. A lock per page (exports on one page run
   one after another), a `signal` (AbortSignal) and a `timeout` option; README: one export per

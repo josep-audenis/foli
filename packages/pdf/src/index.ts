@@ -69,6 +69,13 @@ export interface ExportPdfOptions {
    * views out without an error; a custom node whose attributes its spec refuses throws in the page.
    */
   extensions?: string | undefined;
+  /** Stops the export: the call rejects with the signal's reason. */
+  signal?: AbortSignal | undefined;
+  /**
+   * Milliseconds after which the export stops, as `signal` does (a `TimeoutError`): counted from
+   * the call, the wait for earlier exports on the page included.
+   */
+  timeout?: number | undefined;
 }
 
 export interface ExportedPdf {
@@ -160,11 +167,20 @@ function rendererBundle(): Promise<string> {
 }
 
 /**
+ * The export each page is running, if any: exports on one page run one after another, never
+ * mixed (the second `setContent` would replace the first's document while it prints).
+ */
+const running = new WeakMap<PdfPage, Promise<unknown>>();
+
+/**
  * Prints `document` to PDF with `options.page`: laid out on Foli's pages, fields updated from
  * them (`PAGE`, `NUMPAGES`, `PAGEREF`, tables of contents…), headers, footers, notes, columns
  * and sections as the editor shows them; each sheet its section's page size; links kept and
  * headings as PDF bookmarks. The page's content is replaced. `document` is validated first
  * (`parseDocument`): an invalid one throws before the page is touched.
+ *
+ * Exports given one page run one after another, never mixed. `signal` and `timeout` reject the
+ * call; the export on the page stops at its next step, and the page is free once it has.
  */
 export async function exportPdf(
   document: FoliDocument,
@@ -174,16 +190,51 @@ export async function exportPdf(
   const { page } = options;
   if (!page || typeof page.pdf !== "function" || typeof page.evaluate !== "function")
     throw new TypeError("@folijs/pdf: options.page must be a Playwright or Puppeteer page");
+  const { timeout } = options;
+  if (timeout !== undefined && !(Number.isInteger(timeout) && timeout > 0 && timeout < 2 ** 31))
+    throw new TypeError("@folijs/pdf: options.timeout must be a whole number of milliseconds");
+  const signals = [options.signal, timeout ? AbortSignal.timeout(timeout) : null].filter(
+    (s): s is AbortSignal => !!s,
+  );
+  // One signal is used as it is: `any` of an app's long-lived signal on every call is avoided.
+  const stop = signals.length === 1 ? (signals[0] as AbortSignal) : AbortSignal.any(signals);
+  stop.throwIfAborted();
   const input: RenderInput = {
     document: valid,
     images: images(valid, options.resources),
     review: options.review ?? "markup",
     styles: options.styles ?? "",
   };
+  const before = running.get(page) ?? Promise.resolve();
+  const work = before.then(() => print(page, input, options.extensions, stop));
+  // The page stays taken until this export is done with it, even one its caller gave up on.
+  const done = work.catch(() => {});
+  running.set(page, done);
+  void done.then(() => {
+    if (running.get(page) === done) running.delete(page);
+  });
+  return new Promise((resolve, reject) => {
+    const abort = () => reject(stop.reason);
+    stop.addEventListener("abort", abort, { once: true });
+    work.then(resolve, reject).finally(() => stop.removeEventListener("abort", abort));
+  });
+}
+
+/** One export on `page`, which no other export uses meanwhile; `stop` checked between steps. */
+async function print(
+  page: PdfPage,
+  input: RenderInput,
+  extensions: string | undefined,
+  stop: AbortSignal,
+): Promise<ExportedPdf> {
+  stop.throwIfAborted();
   const script = await rendererBundle();
+  stop.throwIfAborted();
   await page.setContent(PAGE);
-  if (options.extensions) await page.addScriptTag({ content: options.extensions });
+  stop.throwIfAborted();
+  if (extensions) await page.addScriptTag({ content: extensions });
   await page.addScriptTag({ content: script });
+  stop.throwIfAborted();
   const rendered = (await page.evaluate(
     (arg: RenderInput) =>
       (
@@ -191,6 +242,7 @@ export async function exportPdf(
       ).foliPdf.render(arg),
     input,
   )) as Rendered;
+  stop.throwIfAborted();
   const pdf = await page.pdf({
     preferCSSPageSize: true,
     printBackground: true,
