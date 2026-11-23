@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Foli: two editors, one document</title>
+    <style>
+      body { margin: 0; background: #e8e8e8; font-family: system-ui, sans-serif; }
+      h1 { font-size: 1.1rem; margin: 12px 16px 0; }
+      .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; padding: 16px; }
+      .side h2 { font-size: 1rem; margin: 0 0 8px; }
+      .side > div { display: flex; flex-direction: column; align-items: center; gap: 16px; outline: none; }
+      .side .foli-page { background: #fff; color: #000; box-shadow: 0 1px 4px rgb(0 0 0 / 0.25); }
+      label { margin: 0 16px; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Two editors, one document (an in-memory authority)</h1>
+      <label><input type="range" id="delay" min="0" max="2000" value="300" /> Delay (ms)</label>
+      <div class="pair">
+        <section class="side"><h2>Ann</h2><div id="ann"></div></section>
+        <section class="side"><h2>Bob</h2><div id="bob"></div></section>
+      </div>
+    </main>
+    <script type="module" src="/src/collab.ts"></script>
+  </body>
+</html>
