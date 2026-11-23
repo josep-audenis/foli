@@ -5,9 +5,6 @@
  * underline and strike toggles act on the formatting text shows (a heading's style bold
  * included), and Backspace and Delete step over the invisible markers (bookmarks, comment
  * ranges) and select opaque content before deleting it.
- *
- * shortcut: v2 and v3 editing live side by side until 8.7d makes v3 the only schema; then these
- * become the commands themselves.
  */
 import { deepEqual } from "../model/attrs.js";
 import type { Attrs, Mark, MarkType, Node, Schema } from "../model/index.js";

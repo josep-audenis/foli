@@ -116,7 +116,10 @@ documents, as tracked changes.
 ## Limits
 
 - Files up to 64 MB, 64 MB unpacked; at most 16 documents open, and about 3 million characters
-  of body among them. A tool's answer is cut at 200,000 characters.
+  of body among them. A tool's answer over 200,000 characters is cut at a block's end; a
+  read's `(more: …)` line then names the first block cut away.
+- `null` for an argument that may be left out counts as leaving it out. A save the system
+  refuses (the file open in Word, a folder not writable) says so.
 - The body only: headers, footers and notes are not read (`update_fields` updates their
   fields).
 - No pages: `update_fields` leaves page numbers as they are, and a table of contents too

@@ -1611,8 +1611,9 @@ export declare function listKeymap(): Plugin;
  */
 import type { Mark } from "../model/index.js";
 /**
- * The marks text typed among `marks` gets: without tracked-change marks.
- * shortcut: until Phase 9 records changes, typed text is never marked as one.
+ * The marks text typed among `marks` gets: without tracked-change marks, never part of
+ * someone's recorded change. While tracking, the typing is recorded as the typist's own
+ * insertion afterwards (`track.ts`).
  */
 export declare function typedMarks(marks: readonly Mark[]): readonly Mark[];
 

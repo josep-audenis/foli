@@ -242,7 +242,9 @@ interface FoliDocument {
 
 **Validation** (`parseDocument`) is the trust boundary: it accepts what Word opens and
 rejects only what the engine cannot work with. Accepted: duplicate ids (the first wins, as in
-Word), a numbering instance or a reply whose target is missing, references to styles that do
+Word; comments that repeat an id are given ids of their own instead, the first keeping it and
+each later one a fresh id with its anchors, as a command by id must act on one comment; a reply
+to a repeated id stays the first's), a numbering instance or a reply whose target is missing, references to styles that do
 not exist, empty authors and initials, a paragraph mark both inserted and deleted, `firstLine`
 with `hanging` (Word applies `hanging`). Rejected: wrong types, values out of Word's ranges,
 unknown keys (inherited names such as `__proto__` included: only own keys are looked up), and
