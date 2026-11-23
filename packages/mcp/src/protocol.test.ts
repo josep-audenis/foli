@@ -1,3 +1,4 @@
+import { invalid } from "@folijs/agent";
 import { describe, expect, it } from "vitest";
 import {
   MAX_MESSAGE_BYTES,
@@ -6,7 +7,7 @@ import {
   serve,
   type Tool,
 } from "./protocol.js";
-import { invalid, published } from "./schema.js";
+import { published } from "./schema.js";
 import { connect, message, wire } from "./testing/client.js";
 
 const echo: Tool = {

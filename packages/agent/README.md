@@ -146,27 +146,25 @@ session.updateFields({ data: { CandidateFirstName: "Ada" } });
 
 ## For the model
 
-The session is a library: an app gives its methods to a model as tools. `@folijs/mcp` does that
-for MCP clients, over `.docx` files in a folder. What a model needs to be told fits in a system prompt:
+The session is a library: an app gives its operations to a model as tools. The tools come with
+the package, with the words a model reads (names, descriptions, JSON Schemas): an app that runs
+its own model loop writes no schema of its own (ADR-0013).
 
-```text
-You edit a document through tools. read gives it a line per block:
-  [b7] Clause, 1.1, changed: text
-[b7] is the block's handle: pass it to the other tools. After it come where the block is in a
-table (r1 c1: row and grid column; c1-2 a cell spanning two; "merged down" or "merged up" a
-vertical merge, its text in the top cell), its style, its list number, "changed" if it has tracked changes, its comments;
-after the colon, its text. ↵ is a line break. A line "table, 3 rows, 2 columns" is a table: its
-cells' blocks follow, indented. A line "not editable: …" is content you cannot change.
-Words in brackets ([picture], [note], [empty: Offer date]) are not text: never put them in
-find. [empty: …] is a content control to fill with fillControl; «Name» is a merge field to fill
-with updateFields.
-A handle stays its block's while you edit; a deleted block's is refused. A tool that changes
-the document returns the blocks it changed as they are now: do not read again to check (after
-updateFields do: it returns none). A refusal says what to do instead: follow it.
-Give find the exact text from the line, with its capitals, long enough to be there once.
-Every edit you make is a tracked change a person will accept or reject: change only what the
-task asks, and use comment to explain a change that is not obvious.
+```ts
+import { agentTools, INSTRUCTIONS, openSession } from "@folijs/agent";
+
+const session = openSession(document, { author: "Agent" });
+const tools = agentTools(session);
+// Give the model INSTRUCTIONS (a system prompt's part) and, for each tool, its name,
+// description and inputSchema. Pass each call it makes to the tool's run:
+const answer = tools.find((t) => t.name === call.name)?.run(call.arguments);
+// answer.text goes back to the model; answer.isError marks a refusal it can act on.
 ```
+
+`run` checks the arguments against the schema and answers in words when they do not fit.
+`AGENT_TOOLS` are the same tools over any session (`run(session, args)`), for an app that holds
+several. `@folijs/mcp` serves these tools to MCP clients, over `.docx` files in a folder, and
+its code mode gives a script the same operations.
 
 ## Showing what changed
 
