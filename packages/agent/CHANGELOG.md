@@ -1,5 +1,18 @@
 # @folijs/agent
 
+## 0.3.3
+
+### Patch Changes
+
+- fbd237f: A session tracks its edits whatever the document's own tracking switch says (`settings.trackRevisions`, new in `@folijs/core` 1.6), without changing that setting: a document saved with tracking off still gets the agent's edits as tracked changes, and is saved with tracking off. Works with `@folijs/core` 1.6 (a style or list the session adds is now undone with its edit, as in the editor).
+- Updated dependencies [70f9683]
+- Updated dependencies [74c437a]
+- Updated dependencies [42fae0f]
+- Updated dependencies [fdd1ea8]
+- Updated dependencies [fb9277f]
+- Updated dependencies [eb3818a]
+  - @folijs/core@1.6.0
+
 ## 0.3.2
 
 ### Patch Changes
