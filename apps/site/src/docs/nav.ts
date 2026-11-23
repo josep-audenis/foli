@@ -7,7 +7,7 @@
 export type Entry =
   /** `title` in place of the file's first heading (a package README's is its package name). */
   | { md: string; title?: string }
-  | { api: "core" | "view" | "react" | "docx" | "pdf" | "agent" }
+  | { api: "core" | "view" | "react" | "docx" | "pdf" | "agent" | "collab" }
   | { changelog: true }
   | { example: string };
 
@@ -31,6 +31,7 @@ export const NAV: Group[] = [
       { md: "packages/pdf/README.md", title: "PDF" },
       { md: "packages/agent/README.md", title: "Agents" },
       { md: "packages/mcp/README.md", title: "MCP server" },
+      { md: "docs/guides/collaboration.md" },
       { md: "docs/guides/migrating-from-0x.md" },
     ],
   },
@@ -49,6 +50,7 @@ export const NAV: Group[] = [
       { api: "docx" },
       { api: "pdf" },
       { api: "agent" },
+      { api: "collab" },
       { changelog: true },
     ],
   },

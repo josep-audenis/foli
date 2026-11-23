@@ -1093,6 +1093,33 @@ must have loaded, and the container must not be scaled (`transform`, `zoom`).
   border) does not read back as a rule. Between Foli editors the Foli JSON is read first.
   Fixtures: `packages/view/fixtures/clipboard/`.
 
+## Collaboration (Phase 22, ADR-0012)
+
+A central authority orders every step; clients rebase. The loop:
+
+1. An editor has the `collab` plugin (`state/collab.ts`): every local transaction's steps are
+   kept as unconfirmed, with their inverses. `sendableSteps` gives them with the authority's
+   version the editor has.
+2. The app sends them; `@folijs/collab`'s authority (`createAuthority`) refuses a stale version,
+   reads each step as untrusted JSON (`Step.fromJSON`), asks the app's `authorize`, and applies
+   them to its own headless editor as a `remote` transaction (the word plugin's filter refuses
+   an envelope or story step whose `before` or tree no longer holds). Accepted: the version
+   moves on and the steps are broadcast with their authors' client ids; the log is compacted to
+   a snapshot past `limits.log` steps or `limits.logSize` characters.
+3. Each client applies broadcasts in version order with `receiveTransaction`: its own steps at
+   the start confirm its unconfirmed ones; otherwise its unconfirmed steps are inverted, the
+   others' applied, and its own mapped over them and applied again (mirrored maps, so positions
+   inside them come back); an envelope step is merged over what changed (`EnvelopeStep.rebase`,
+   `merge3`), a story edit that no longer applies is left out. The transaction is `remote`:
+   history maps its events over it without recording it, tracking leaves it, the appending
+   plugins add nothing.
+
+What makes the steps enough: the envelope's changes are `EnvelopeStep`s per entry (22.3), a
+story's edits are its own steps inside a `StoryEditStep` whose map carries the story's positions
+(22.4), new ids take the client's class (22.5), every step has a JSON form (22.2). Presence
+(22.9) is plugin state of `collab`: the others' selections mapped through every change, drawn by
+the view with the Custom Highlight API and fixed caret labels.
+
 ## Agent editing
 
 `@folijs/agent` (`packages/agent`, Phase 13) is a facade over the headless editor for an LLM
@@ -1172,13 +1199,14 @@ foli/
 │   ├── docx/  @folijs/docx   DOCX import to Word's model (schema v5) and lossless export; package (zip, parts, relationships), XML keeping source text. No DOM.
 │   ├── pdf/   @folijs/pdf    exportPdf: a document printed by the app's headless Chromium page; ships the read-only renderer as a page script.
 │   ├── agent/ @folijs/agent  openSession: a document read and edited by an LLM agent through block handles, every edit tracked. 0.x. No DOM, no Node.
-│   └── mcp/   @folijs/mcp    foli-mcp: an MCP server over @folijs/agent and @folijs/docx for .docx files in a folder. 0.x. Node only.
+│   ├── mcp/   @folijs/mcp    foli-mcp: an MCP server over @folijs/agent and @folijs/docx for .docx files in a folder. 0.x. Node only.
+│   └── collab/ @folijs/collab createAuthority: the authority of a shared document (Phase 22). 0.x. No DOM, no Node.
 ├── spikes/two-page/     Phase 1 spike; throwaway, never published.
 ├── examples/            Example apps installing the packed packages (6.4, 12.10); never published.
 └── docs/
 ```
 
-Dependency direction: `playground → react → view → core`, `docx → core`, `pdf → core`
+Dependency direction: `playground → react → view → core`, `docx → core`, `pdf → core`, `collab → core`
 (and `view`, bundled at build time into `pdf`'s page script, `dist/renderer.js`), and
 `playground → docx, pdf`. Never the reverse.
 

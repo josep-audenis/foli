@@ -342,7 +342,7 @@ function pages(root: string): Page[] {
   );
 }
 
-const PACKAGES = ["core", "view", "react", "docx", "pdf", "agent"] as const;
+const PACKAGES = ["core", "view", "react", "docx", "pdf", "agent", "collab"] as const;
 
 function body(page: Page, ctx: Context, root: string): string {
   const { entry } = page;
@@ -355,7 +355,7 @@ function body(page: Page, ctx: Context, root: string): string {
       return markdown(read(path), { ...ctx, from: path, shift: 1, prefix: `${pkg}-` });
     });
     const intro = markdown(
-      "Each package's `CHANGELOG.md`, written by Changesets at each release. The packages share one version, except `@folijs/agent`, which has its own (0.x).",
+      "Each package's `CHANGELOG.md`, written by Changesets at each release. The packages share one version, except `@folijs/agent` and `@folijs/collab`, which have their own (0.x).",
       ctx,
     );
     return `<h1 id="changelog">Changelog</h1>\n${intro}\n${parts.join("\n")}`;
