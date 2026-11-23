@@ -359,12 +359,23 @@ function themeFont(theme: ThemeJSON | undefined, ref: string): string | null {
   return name || null;
 }
 
+const WORDS = new Set([
+  "upperRoman",
+  "lowerRoman",
+  "upperLetter",
+  "lowerLetter",
+  "ordinal",
+  "chicago",
+]);
+
 /** A counter in a number format (ST_NumberFormat); formats Foli does not know show as decimal. */
 export function formatNumber(n: number, format: string | undefined): string {
-  if (format === "none") return "";
-  // A fraction has no roman, letter or ordinal form: its digits.
-  if (!Number.isInteger(n)) return String(n);
+  // shortcut: a fraction has no roman, letter or ordinal form here, only its digits; check what
+  // Word shows (a formula field's `\* ROMAN` of 3.5) when a document needs it.
+  if (!Number.isInteger(n) && WORDS.has(format ?? "")) return String(n);
   switch (format ?? "decimal") {
+    case "none":
+      return "";
     case "decimalZero":
       return n >= 0 && n < 10 ? `0${n}` : String(n);
     case "upperRoman":

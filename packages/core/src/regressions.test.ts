@@ -530,6 +530,8 @@ describe("smaller bugs of the audit (21.7)", () => {
     expect(merged("12")).toBe("12");
     expect(merged("March 5")).toBe("March 5");
     expect(merged("2024-03-05")).toBe("2024-03-05");
+    expect(merged("2024-03-05 10:00")).toBe("2024-03-05");
+    expect(merged("2024-13-45")).toBe("2024-13-45");
     expect(merged("2024-03-05T10:00:00Z")).toMatch(/^2024-03-0[45]$/);
   });
 
