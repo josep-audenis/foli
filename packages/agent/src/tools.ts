@@ -39,7 +39,7 @@ export interface AgentTool {
   /** Its arguments, as a JSON Schema object. */
   inputSchema: JsonSchema & { type: "object" };
   /** Does what the model asked; arguments that do not fit the schema are refused in words. */
-  run(args: Record<string, unknown>): ToolAnswer;
+  run(args?: Record<string, unknown>): ToolAnswer;
 }
 
 /**
@@ -63,7 +63,10 @@ export interface ToolDefinition {
   name: string;
   description: string;
   inputSchema: JsonSchema & { type: "object" };
-  /** Arguments are taken as checked against `inputSchema`; others may be there. */
+  /**
+   * Arguments are taken as checked against `inputSchema` (`invalid` first: `agentTools` does);
+   * others may be there.
+   */
   run(session: Session, args: Record<string, unknown>): ToolAnswer;
   /** Its methods in code mode, in the order they are listed. */
   methods: readonly ScriptMethod[];
@@ -420,7 +423,7 @@ export function agentTools(session: Session): AgentTool[] {
     name,
     description,
     inputSchema,
-    run(a) {
+    run(a = {}) {
       const wrong = invalid(a, inputSchema);
       return wrong
         ? { text: `Wrong arguments for ${name}: ${wrong}.`, isError: true }

@@ -37,6 +37,14 @@ describe("agentTools (ADR-0013)", () => {
     expect(session.editor.state.doc).toBe(before);
   });
 
+  it("takes no arguments as none", async () => {
+    const { document } = await importDocx(readFileSync(new URL("01-mutual-nda.docx", CORPUS)));
+    const styles = agentTools(openSession(document, { author: "Agent" })).find(
+      (t) => t.name === "list_styles",
+    );
+    expect(styles?.run().isError).toBeUndefined();
+  });
+
   it("names every code-mode method once", () => {
     const names = AGENT_TOOLS.flatMap((t) => t.methods.map((m) => m.name));
     expect(new Set(names).size).toBe(names.length);

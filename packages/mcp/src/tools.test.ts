@@ -45,6 +45,7 @@ describe("the tools a client lists", () => {
   it("are these, each described, with a schema the SDK's client takes", async () => {
     const { client } = await opened("01-mutual-nda");
     expect(client.getInstructions()).toBe(INSTRUCTIONS);
+    expect(INSTRUCTIONS).toContain("Start with open, then work on what read shows.");
     const { tools } = await client.listTools();
     expect(tools.map((t) => t.name)).toEqual([
       "open",

@@ -163,7 +163,8 @@ const answer = tools.find((t) => t.name === call.name)?.run(call.arguments);
 
 `run` checks the arguments against the schema and answers in words when they do not fit.
 `AGENT_TOOLS` are the same tools over any session (`run(session, args)`), for an app that holds
-several. `@folijs/mcp` serves these tools to MCP clients, over `.docx` files in a folder, and
+several: check a call's arguments with `invalid(args, tool.inputSchema)` first, as `agentTools`
+does. Limits on how much a model may add are the app's (the MCP server has its own). `@folijs/mcp` serves these tools to MCP clients, over `.docx` files in a folder, and
 its code mode gives a script the same operations.
 
 ## Showing what changed

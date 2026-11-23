@@ -35,7 +35,11 @@
    them (`r1 c1`, the column being the grid column; a cell spanning two is named by its first).
    A cell is its table's handle with a row and a column, or the handle of a paragraph in it,
    which stands for its cell. A model reads indexes it can see; a handle per row or cell would
-   double the lines of a read.
+   double the lines of a read. The indexes are `read`'s, and the table tools resolve them by the
+   same walk: rows as they are with every change accepted (a row deleted as a tracked change is
+   not counted), columns of the grid. A column inside a span names the spanning cell; a cell
+   merged up names the top cell of its merge, which holds the text. `read` does not count a
+   row's `gridBefore` today; 23.3 makes it, so that `c` is the grid column core counts.
 5. **How `on` names text for formatting.** As `comment` already does: `on` is text of the block
    exactly as `read` shows it, there once, or with `all` every place it is. Without `on` the
    whole block is formatted. Positions are never asked of a model.
@@ -59,8 +63,10 @@ tools and about 15,000 characters with schemas, `run` included.
 ## Consequences
 
 - `@folijs/agent` gains a public surface (`AGENT_TOOLS`, `agentTools`, `INSTRUCTIONS`,
-  `READ_LIMIT`, `invalid`, the `JsonSchema` types): changing a description is now a change to
-  the agent package, released with it.
+  `READ_LIMIT`, `invalid`, the `JsonSchema` types, `AgentTool`, `ToolDefinition`,
+  `ScriptMethod`, `ToolAnswer`): changing a description, or what code mode counts of a method,
+  is now a change to the agent package, released with it (0.x).
+- `agentTools` has no limit on how much a model adds; the app sets its own, as the server does.
 - The server and code mode cannot drift from the library: a tool or a method is added once.
 - Rejected: a tool per core command (about 40 tools, several times today's context cost);
   generating schemas from TypeScript types (a dependency or a build step, and descriptions are

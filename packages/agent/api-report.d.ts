@@ -341,7 +341,7 @@ export interface AgentTool {
         type: "object";
     };
     /** Does what the model asked; arguments that do not fit the schema are refused in words. */
-    run(args: Record<string, unknown>): ToolAnswer;
+    run(args?: Record<string, unknown>): ToolAnswer;
 }
 /**
  * A method of code mode's `doc` (ADR-0010): what a script calls instead of a tool. A refusal
@@ -365,7 +365,10 @@ export interface ToolDefinition {
     inputSchema: JsonSchema & {
         type: "object";
     };
-    /** Arguments are taken as checked against `inputSchema`; others may be there. */
+    /**
+     * Arguments are taken as checked against `inputSchema` (`invalid` first: `agentTools` does);
+     * others may be there.
+     */
     run(session: Session, args: Record<string, unknown>): ToolAnswer;
     /** Its methods in code mode, in the order they are listed. */
     methods: readonly ScriptMethod[];
