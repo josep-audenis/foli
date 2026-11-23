@@ -4,7 +4,14 @@ import { AddMarkStep, RemoveMarkStep, ReplaceStep, type Step } from "../transfor
 import { TransformError } from "../transform/transform.js";
 import { Selection, type SelectionJSON } from "./selection.js";
 import { type Command, type EditorState, Plugin, PluginKey, type Transaction } from "./state.js";
-import { StoryStep, storedStepsApply, storyBody, wordContext } from "./word.js";
+import {
+  StoryEditStep,
+  StoryStep,
+  storedStepsApply,
+  storyBody,
+  storyStepsApply,
+  wordContext,
+} from "./word.js";
 
 /** One undoable unit: inverted steps in the order they apply, and the selection to restore. */
 interface HistoryEvent {
@@ -151,7 +158,9 @@ function prepend(inverted: readonly Step[], steps: readonly Step[]): Step[] {
       ? left.merge(right)
       : left instanceof StoryStep && right instanceof StoryStep
         ? left.merge(right)
-        : null;
+        : left instanceof StoryEditStep && right instanceof StoryEditStep
+          ? left.merge(right)
+          : null;
   if (merged) joined.splice(at, 2, merged);
   return joined;
 }
@@ -199,6 +208,22 @@ class RebaseMapping implements Mappable {
   private readonly rebased: (StepMap | null)[] = [];
 
   constructor(private readonly base: Mappable) {}
+
+  /** A story's positions through the same path: the originals taken back, the base, the rebased. */
+  storyMapping(id: string): Mapping | undefined {
+    const m = new Mapping();
+    const count = this.inverted.length;
+    for (let i = count - 1; i >= 0; i--) m.appendMap(this.inverted[i] as StepMap);
+    if (this.base instanceof Mapping) m.appendMapping(this.base);
+    else {
+      const story = this.base.storyMapping?.(id);
+      if (story) m.appendMapping(story);
+    }
+    this.rebased.forEach((map, i) => {
+      if (map) m.appendMap(map, count - 1 - i);
+    });
+    return m.storyMapping(id);
+  }
 
   push(original: Step, rebased: Step | null): void {
     this.inverted.push(original.getMap().invert());
@@ -338,6 +363,8 @@ function historyCommand(redo: boolean): Command {
       }
       const selection = remap ? mapSelection(event.selection, remap) : event.selection;
       tr.setSelection(Selection.fromJSON(tr.doc, selection));
+      // Story edits mapped on the way have no tree to invert against yet.
+      if (context) storyStepsApply(context.stories, tr.steps);
       const reverse: HistoryEvent = {
         steps: tr.steps.map((step, i) => step.invert(tr.docs[i] as Node)).reverse(),
         selection: state.selection.toJSON(),

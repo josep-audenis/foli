@@ -280,6 +280,7 @@ export {
   CommentStep,
   documentJSON,
   EnvelopeStep,
+  StoryEditStep,
   StoryStep,
   setComments,
   type WordContext,

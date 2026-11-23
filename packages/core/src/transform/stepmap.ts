@@ -11,6 +11,18 @@ export interface MapResult {
 export interface Mappable {
   map(pos: number, assoc?: number): number;
   mapResult(pos: number, assoc?: number): MapResult;
+  /**
+   * The positions of story `id` (a header, footer or note, ADR-0012) mapped through the story
+   * steps this mapping holds, when it can tell.
+   * @internal
+   */
+  storyMapping?(id: string): Mapping | undefined;
+}
+
+/** What a step inside a story did to the story's own positions: its maps, under the story's id. */
+export interface StoryMaps {
+  readonly id: string;
+  readonly maps: readonly StepMap[];
 }
 
 // A `recover` value packs which range of a map a position fell in and how far into it.
@@ -27,6 +39,8 @@ export class StepMap implements Mappable {
   constructor(
     readonly ranges: readonly number[],
     readonly inverted = false,
+    /** @internal A story step's: what it did inside the story. The body's positions do not move. */
+    readonly storyMaps: StoryMaps | null = null,
   ) {}
 
   /**
@@ -100,7 +114,12 @@ export class StepMap implements Mappable {
   }
 
   invert(): StepMap {
-    return new StepMap(this.ranges, !this.inverted);
+    const story = this.storyMaps;
+    return new StepMap(
+      this.ranges,
+      !this.inverted,
+      story && { id: story.id, maps: story.maps.map((m) => m.invert()).reverse() },
+    );
   }
 }
 
@@ -162,6 +181,32 @@ export class Mapping implements Mappable {
 
   getMirror(n: number): number | undefined {
     return this.mirror.get(n);
+  }
+
+  /**
+   * Story `id`'s positions through the story steps of this mapping, in order; a mirrored pair of
+   * them (a story step taken back and applied again) stays mirrored inside.
+   * @internal
+   */
+  storyMapping(id: string): Mapping {
+    const out = new Mapping();
+    const starts = new Map<number, number>();
+    for (let i = this.from; i < this.to; i++) {
+      const story = (this.maps[i] as StepMap).storyMaps;
+      if (story?.id !== id) continue;
+      starts.set(i, out.maps.length);
+      const partner = this.mirror.get(i);
+      const count = story.maps.length;
+      // Mirrored inside only when both hold the same steps (a mapped one may have dropped some).
+      const same =
+        partner !== undefined && (this.maps[partner] as StepMap).storyMaps?.maps.length === count;
+      const pair = same && partner < i ? starts.get(partner) : undefined;
+      story.maps.forEach((map, k) => {
+        // An inverted story map lists its inner maps in reverse.
+        out.appendMap(map, pair === undefined ? undefined : pair + count - 1 - k);
+      });
+    }
+    return out;
   }
 
   map(pos: number, assoc = 1): number {

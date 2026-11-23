@@ -27,6 +27,7 @@ import {
   setEnvelopeValue,
   storyAfter,
   storyBody,
+  storyEdit,
   storyState,
   type WordEnvelope,
   withEnvelope,
@@ -499,7 +500,7 @@ export function resolveStoryChanges(
   const inner = storyState(state, story.doc);
   const storyTr = inner.tr;
   resolve(inner, storyTr, changes, accept);
-  tr.step(new StoryStep(id, story, { ...story, doc: storyTr.doc }));
+  tr.step(storyEdit(id, story, [storyTr], storyTr.doc));
 }
 
 function command(
@@ -558,9 +559,10 @@ function command(
           });
           const storyTr = inner.tr.setMeta(controlEdit, edit);
           resolve(inner, storyTr, inStory, accept);
-          const done = inner.applyTransaction(storyTr).state;
+          const result = inner.applyTransaction(storyTr);
+          const done = result.state;
           envelope = wordContext(done)?.envelope;
-          tr.step(new StoryStep(id, story, { ...story, doc: done.doc }));
+          tr.step(storyEdit(id, story, result.transactions, done.doc));
         }
         if (envelope && envelope !== base) {
           if (envelope.styles !== base?.styles)

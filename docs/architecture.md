@@ -232,7 +232,7 @@ lines, a paragraph's searchable text with the pieces of the tree behind it, kept
 `WeakMap` while what shows stays the same (codes, review view, controls), so a keystroke in the panel
 is an `indexOf` per line. What draws nothing adds no text, so a match runs across it; what draws
 something else adds a barrier character. `replaceAll` builds one edit per tree and `editTrees` (in
-`state/stories.ts`) makes them one body transaction, each story's as a `StoryStep` after its own
+`state/stories.ts`) makes them one body transaction, each story's as a `StoryEditStep` after its own
 tracking, filters and appended transactions, so tracking, control locks and placeholders work as
 when typing and undo is one step. A floor on revision ids keeps the trees' new ids apart. A match is
 checked first: code, deleted text, a field's or control's edge, then, inside a control, a dry run
@@ -673,14 +673,21 @@ Left at a numbered paragraph's start step over the boundary themselves.
 
 **Stories (11.7, ADR-0007).** The word plugin's context holds each story as a tree
 (`context.stories`, `Story`), mirrored as JSON in the envelope. `StoryStep(id, before, after, ...)`
-changes one in a body transaction; it maps nothing and inverts by swapping. `editor.story(id)`
+creates, removes or replaces one in a body transaction; it maps nothing and inverts by swapping.
+An edit inside an existing story is a `StoryEditStep(id, steps)` (22.4, ADR-0012): the story's own
+steps. Its map moves no body position but carries the story's maps (`StepMap.storyMaps`), so a
+`Mapping` gives a story's positions (`mapping.storyMapping(id)`, mirrored pairs kept) and two edits
+of one footer map over each other as body edits do; the word plugin's filter refuses one whose
+steps do not apply to the story, and records the tree each applies to so it can be inverted. `editor.story(id)`
 (`state/stories.ts`) gives an `Editor` with its own `EditorState` (selection, stored marks, the
 word context and tracking state of the body's, no history): its `dispatch` computes the next state,
-sends the body a `StoryStep` (and the comment and envelope steps, the numbering, styles and
-resources it changed, a change of tracking), and takes the state only if the body then holds its
+sends the body a `StoryEditStep` (and the comment and envelope steps it made, a change of
+tracking), and takes the state only if the body then holds its
 tree. `undo` and `redo` on a story's state run on the body (`storyBody`); history groups story
 typing by the story's own transaction (`storyEdit` meta) and merges consecutive steps of a story.
-A stale `StoryStep` or `EnvelopeStep` drops its whole event (`storedStepsApply`). Revision and
+A stale `StoryStep` or `EnvelopeStep`, or a `StoryEditStep` that no longer applies, drops its
+whole event (`storedStepsApply`); a story edit made outside history is mapped over, as in the
+body. A story editor maps its caret over a story edit that gives no selection (another editor's). Revision and
 bookmark ids are allocated over every tree (`otherTrees`), and accepting or rejecting all changes
 reaches every story.
 

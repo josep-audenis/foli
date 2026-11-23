@@ -27,6 +27,7 @@ import {
   EnvelopeStep,
   type Story,
   type StoryBody,
+  StoryEditStep,
   StoryStep,
   storyBody,
   storyBodyKey,
@@ -73,8 +74,19 @@ function carryStoryChange(
   let after = story;
   if (next.doc !== before.doc) {
     after = { ...story, doc: next.doc };
+    // The story's own steps (22.4): another editor's edit of the story maps over them.
+    const steps = transactions.flatMap((t) =>
+      t.steps.filter((s) => !(s instanceof CommentStep || s instanceof EnvelopeStep)),
+    );
     bodyTr.step(
-      new StoryStep(id, story, after, before.selection.toJSON(), next.selection.toJSON()),
+      new StoryEditStep(
+        id,
+        steps,
+        before.selection.toJSON(),
+        next.selection.toJSON(),
+        before.doc,
+        next.doc,
+      ),
     );
   }
   let patched = false;
@@ -261,7 +273,7 @@ export class StoryEditing {
         this.own = false;
       }
       // Refused by the body: the story stays as it was.
-      if (after !== story && wordContext(host.state)?.stories.get(id) !== after) return;
+      if (after !== story && wordContext(host.state)?.stories.get(id)?.doc !== after.doc) return;
     }
     this.state = this.current(next);
     this.notify(result.transactions);
@@ -276,12 +288,21 @@ export class StoryEditing {
       return;
     }
     const { state } = this;
-    let selection: SelectionJSON | null = null;
-    for (const tr of transactions)
+    // The selection the change gives (undo, redo), else this one mapped through it (another
+    // editor's edit of the story).
+    let json = state.selection.toJSON();
+    for (const tr of transactions) {
+      let given: SelectionJSON | null = null;
       for (const step of tr.steps)
-        if (step instanceof StoryStep && step.id === this.id) selection = step.selectionAfter;
+        if ((step instanceof StoryStep || step instanceof StoryEditStep) && step.id === this.id)
+          given = step.selectionAfter;
+      if (given) json = given;
+      else {
+        const mapping = tr.mapping.storyMapping(this.id);
+        json = { ...json, anchor: mapping.map(json.anchor), head: mapping.map(json.head) };
+      }
+    }
     if (tree.doc !== state.doc) {
-      const json = selection ?? state.selection.toJSON();
       this.state = this.current(state.withDocument(tree.doc, Selection.fromJSON(tree.doc, json)));
       this.notify([]);
       return;

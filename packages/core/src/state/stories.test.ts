@@ -147,7 +147,7 @@ describe("editing a story", () => {
     expect(notified).toBe(1);
   });
 
-  it("drops an undo whose story changed outside history, whole", () => {
+  it("maps an undo over a change of its story made outside history (22.4)", () => {
     const editor = createEditor({ document: documentOf() });
     const head = story(editor);
     head.select(5);
@@ -157,9 +157,9 @@ describe("editing a story", () => {
     head.dispatch(head.state.tr.insertText("?", 6, 6).setMeta("addToHistory", false));
     const depth = undoDepth(editor.state);
     expect(editor.commands.undo()).toBe(true);
-    expect(textOf(head)).toBe("head!?");
+    expect(textOf(head)).toBe("head?");
     expect(undoDepth(editor.state)).toBe(depth - 1);
-    expect(redoDepth(editor.state)).toBe(0);
+    expect(redoDepth(editor.state)).toBe(1);
     // The older event still applies.
     editor.commands.undo();
     expect(textOf(editor)).toBe("body");

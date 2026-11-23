@@ -29,6 +29,7 @@ import {
   type Story,
   StoryStep,
   storyBody,
+  storyEdit,
   type WordContext,
   type WordEnvelope,
   withEnvelope,
@@ -1546,15 +1547,13 @@ function storyRun(editor: Editor, id: string, story: Story, body: Run, out: Tran
     body.report.skipped.push({ instruction: "", story: id, reason: "untrackable" });
     return;
   }
-  const next = state.applyTransaction(tracked).state;
+  const result = state.applyTransaction(tracked);
+  const next = result.state;
   out.step(
-    new StoryStep(
-      id,
-      story,
-      { ...story, doc: next.doc },
+    storyEdit(id, story, result.transactions, next.doc, [
       state.selection.toJSON(),
       next.selection.toJSON(),
-    ),
+    ]),
   );
 }
 

@@ -17,6 +17,7 @@ export {
   keepTablesApart,
   noteKindOf,
   referencesIn,
+  StoryEditStep,
   StoryStep,
   sameSpot,
   setComments,
