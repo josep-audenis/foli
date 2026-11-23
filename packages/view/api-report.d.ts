@@ -330,6 +330,10 @@ export declare class EditorView {
     private found;
     private matchStory;
     private readonly matchMarks;
+    /** Other people's selections and carets (22.9). */
+    private readonly peerMarks;
+    private peerFrame;
+    private peersShown;
     private readonly hintMarks;
     /** The hint shown, as positions of the body (18.1). */
     private shownHint;
@@ -445,6 +449,15 @@ export declare class EditorView {
     /** The pages on the screen and a screen around it: only these carry marks. */
     private pagesNearView;
     private drawMatches;
+    /** Other people's selections marked and carets with their names (22.9); nothing in the document. */
+    private drawPeers;
+    /** Whether the block at `pos` is on a page in `near` (always, unpaged). */
+    private blockNear;
+    /** Where the caret at `pos` is drawn, in viewport coordinates; null where none shows. */
+    private caretAt;
+    /** While peers show, scrolling and resizing move their carets, once per frame. */
+    private showPeers;
+    private readonly onPeerScroll;
     /** Scrolling brings other pages near: their marks are drawn, once per frame. */
     private readonly onMatchScroll;
     /** What find shows here, marked; a story's view is told by its page's view. */
@@ -957,6 +970,16 @@ export interface RenderDocumentOptions {
  * with their page fields, footnotes at their columns' feet and endnotes after the text.
  */
 export declare function renderDocument(document: FoliDocument, container: HTMLElement, given?: RenderDocumentOptions): DocumentPages;
+
+// word/presence.d.ts
+/**
+ * Other people editing the document (22.9, ADR-0012): their selections marked through the CSS
+ * Custom Highlight API, as find marks matches (nothing added to the pages, the document or its
+ * undo), and a caret with their name drawn over the page in their colour. Nothing moves: no
+ * blinking, no animation, so reduced motion has nothing to stop.
+ * shortcut: the body only; a presence in a header, footer or note is not drawn there.
+ */
+export {};
 
 // word/regions.d.ts
 export {};
