@@ -131,17 +131,22 @@ writeFileSync(appEntry, `export { FoliEditor } from "${dist("react")}";\n`);
  * 175.8 and 80.1 allowed): steps read from JSON as untrusted input (every step's parser, the
  * envelope's and stories' checks), which every package that loads the editor carries, with room
  * for Phase 22's envelope steps, story steps and the collab plugin.
+ * Agent raised again in 22.6 (80.1 kB, 84.0 allowed): core's story edits, ids per client and
+ * received transactions, which the session's editor carries.
  * Collab added in 22.8 (80.1 allowed): the authority is `createEditor` (it applies every step as
  * the clients do), so nearly all of it is core, which a server that edits already loads.
+ * Core, view, React and FoliEditor raised in 22.9 (91.6, 123.9, 175.6 and 173.7 kB; 94.7, 127.0,
+ * 179.7 and 179.7 allowed): presence (core's peers mapped through every change, the view's
+ * marks and carets) on bundles at their limit after the collab plugin.
  */
 const BUNDLES = [
-  { name: "@folijs/core", entry: dist("core"), budget: 94_000 },
-  { name: "@folijs/view", entry: dist("view"), budget: 127_000 },
-  { name: "@folijs/react", entry: dist("react"), budget: 180_000 },
-  { name: "FoliEditor only", entry: appEntry, budget: 180_000 },
+  { name: "@folijs/core", entry: dist("core"), budget: 97_000 },
+  { name: "@folijs/view", entry: dist("view"), budget: 130_000 },
+  { name: "@folijs/react", entry: dist("react"), budget: 184_000 },
+  { name: "FoliEditor only", entry: appEntry, budget: 184_000 },
   { name: "@folijs/docx", entry: dist("docx"), budget: 65_000 },
   { name: "@folijs/pdf", entry: dist("pdf"), budget: 18_800 },
-  { name: "@folijs/agent", entry: dist("agent"), budget: 82_000 },
+  { name: "@folijs/agent", entry: dist("agent"), budget: 86_000 },
   { name: "@folijs/collab", entry: dist("collab"), budget: 82_000 },
 ];
 /** Bundles built as they ship (minified scripts): their gzipped bytes, with their budget. */
