@@ -17,7 +17,11 @@ export interface FoliCanvasProps {
    * `data:` URL, opting in). Without it, pictures are not pasted, dropped or inserted.
    */
   upload?: EditorViewOptions["upload"] | undefined;
-  /** The URL to show a picture's image from (`packageImages` for a .docx package's images). */
+  /**
+   * The URL to show a picture's image from (`packageImages` for a .docx package's images). A new
+   * function draws every picture again: keep it the same between renders (`useMemo`,
+   * `useCallback`) and give a new one only with new images.
+   */
   resource?: EditorViewOptions["resource"] | undefined;
   className?: string | undefined;
 }
@@ -50,9 +54,25 @@ export const FoliCanvas = forwardRef<FoliCanvasHandle, FoliCanvasProps>(function
 
   useImperativeHandle(ref, () => ({ focus: () => viewRef.current?.focus() }), []);
 
+  // The app's latest upload, called through one function: an inline one, new each render, is
+  // not a change of the view's options. (A new `resource` is: it draws the pictures again, as a
+  // new package's images need even when the document came first.)
+  const latestUpload = useRef(upload);
+  latestUpload.current = upload;
+  const stableUpload = useRef<NonNullable<FoliCanvasProps["upload"]>>(
+    (file) => latestUpload.current?.(file) ?? Promise.reject(new Error("No upload")),
+  ).current;
+  const uploadOption = upload ? stableUpload : null;
+  const resourceOption = resource;
+
   // The options at the moment the view is made: its first render already uses them (no web
   // image fetched before the app's resolver is in place).
-  const options = { editable: !readOnly, placeholder, upload, resource };
+  const options = {
+    editable: !readOnly,
+    placeholder,
+    upload: uploadOption,
+    resource: resourceOption,
+  };
   const optionsRef = useRef(options);
   optionsRef.current = options;
 
@@ -70,8 +90,13 @@ export const FoliCanvas = forwardRef<FoliCanvasHandle, FoliCanvasProps>(function
   // Runs after the view is created (effects run in order): for a new view, and when the props change.
   // biome-ignore lint/correctness/useExhaustiveDependencies: a new editor means a new view, which needs the options too.
   useIsomorphicLayoutEffect(() => {
-    viewRef.current?.setOptions({ editable: !readOnly, placeholder, upload, resource });
-  }, [editor, readOnly, placeholder, upload, resource]);
+    viewRef.current?.setOptions({
+      editable: !readOnly,
+      placeholder,
+      upload: uploadOption,
+      resource: resourceOption,
+    });
+  }, [editor, readOnly, placeholder, uploadOption, resourceOption]);
 
   return (
     <div className={className ? `foli-canvas ${className}` : "foli-canvas"}>

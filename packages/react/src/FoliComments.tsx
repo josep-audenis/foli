@@ -199,9 +199,11 @@ export function FoliComments({
     }
   }, [comments, documentId, readOnly]);
 
-  // Each thread next to its text, pushed down below the one before.
+  // Each thread next to its text, pushed down below the one before. Nothing to place while
+  // hidden or without threads: no query of the pages, no layout forced.
   const measure = () => {
     const root = pane.current;
+    if (hidden || !threads.length) return;
     const container = root && pagesAround(root);
     if (!root || !container) return;
     const paneTop = root.getBoundingClientRect().top;
@@ -235,11 +237,23 @@ export function FoliComments({
   const measureRef = useRef(measure);
   measureRef.current = measure;
   // biome-ignore lint/correctness/useExhaustiveDependencies: measured after every change of what it shows.
-  useIsomorphicLayoutEffect(measure, [doc, comments, writing, threads.length]);
+  useIsomorphicLayoutEffect(measure, [comments, writing, threads.length, hidden]);
+  // Typing moves the text: measured once a frame, not once a keystroke, and only with threads.
+  const frame = useRef(0);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `doc` changes move the anchors.
+  useEffect(() => {
+    if (hidden || !threads.length || frame.current || typeof requestAnimationFrame === "undefined")
+      return;
+    frame.current = requestAnimationFrame(() => {
+      frame.current = 0;
+      measureRef.current();
+    });
+  }, [doc]);
+  useEffect(() => () => cancelAnimationFrame(frame.current), []);
   const observer = useRef<ResizeObserver | null>(null);
   // After each render until the pages are there: a pane mounted before the canvas has none yet.
   useEffect(() => {
-    if (observer.current || typeof ResizeObserver === "undefined") return;
+    if (hidden || observer.current || typeof ResizeObserver === "undefined") return;
     const container = pane.current && pagesAround(pane.current);
     if (!container) return;
     observer.current = new ResizeObserver(() => measureRef.current());
