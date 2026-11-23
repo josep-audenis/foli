@@ -205,3 +205,56 @@ describe("the authority (22.8)", () => {
       if (original.part(name)) expect(x.text(name), name).toBe(original.text(name));
   });
 });
+
+describe("authorship (22.10)", () => {
+  it("each client's tracked changes and comments carry its user's name, received or not", async () => {
+    const authority = createAuthority({ document: DOCUMENT });
+    const ann = createEditor({
+      document: DOCUMENT,
+      author: "Ann",
+      plugins: [collab({ clientID: 1 })],
+    });
+    const bob = createEditor({
+      document: DOCUMENT,
+      author: "Bob",
+      plugins: [collab({ clientID: 2 })],
+    });
+    ann.commands.setTrackChanges(true);
+    const on = authority.receive(message(ann));
+    if (!on.ok) throw new Error(on.reason);
+    apply(ann, on.broadcast);
+    apply(bob, on.broadcast);
+    // The switch is the document's: Bob tracks too, in his own name.
+    expect(bob.trackingChanges).toBe(true);
+    ann.select(1);
+    ann.commands.insertText("Ann's ");
+    ann.select(15, 20);
+    ann.commands.addComment("Ann asks");
+    bob.select(20);
+    bob.commands.insertText(" Bob's");
+    for (const editor of [ann, bob]) {
+      // Each sends after receiving what the other sent first.
+      for (const other of [ann, bob]) {
+        const missed = authority.stepsSince(getVersion(other.state));
+        if ("snapshot" in missed) throw new Error("compacted");
+        if (missed.steps.length) apply(other, missed);
+      }
+      const result = authority.receive(message(editor));
+      if (!result.ok) throw new Error(result.reason);
+    }
+    for (const editor of [ann, bob]) {
+      const missed = authority.stepsSince(getVersion(editor.state));
+      if (!("snapshot" in missed) && missed.steps.length) apply(editor, missed);
+    }
+    const document = authority.snapshot().document;
+    expect(ann.getDocument()).toEqual(document);
+    expect(bob.getDocument()).toEqual(document);
+    const authors = (json: unknown): string[] =>
+      [...JSON.stringify(json).matchAll(/"author":"(\w+)"/g)].map((m) => m[1] as string);
+    expect(new Set(authors(document.content))).toEqual(new Set(["Ann", "Bob"]));
+    expect(document.comments.map((c) => c.author)).toEqual(["Ann"]);
+    const xml = (await readPackage(await exportDocx(document))).text("/word/document.xml");
+    expect(xml).toContain('w:author="Ann"');
+    expect(xml).toContain('w:author="Bob"');
+  });
+});

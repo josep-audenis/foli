@@ -892,6 +892,9 @@ Real-time editing by several people through a central authority (1.6, ADR-0012; 
   rebased over them. It is `remote`: not undoable, not tracked; undo maps the user's own changes
   over it. Apply broadcasts in version order (keep a later one until those before it arrive).
 - `getVersion(state)`: the authority's version this editor has.
+- Authorship (22.10): each editor's tracked changes and comments carry its own `author`; a
+  received step keeps the author it was made with (it is not tracked again). The tracking switch
+  is the document's: one client turning it on turns it on for everyone, each in their own name.
 - Presence (22.9): `presenceMessage(state, { name, color })` (`PresenceMessage`: client id,
   name, a `#rgb`/`#rrggbb` colour, the selection mapped back to the authority's version, the
   version) to send the others when the selection changes and after receiving steps;
