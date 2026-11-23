@@ -34,6 +34,7 @@ place that says what is in progress; check it before starting work.
 | 20 Corpus run             | ✅ Done                  | —                    | Merged in #206–#222; its five `@folijs/docx` fixes ship with Phase 21's release (owner, 2026-11-23)                                                                                           |
 | 21 Hardening              | In progress              | `phase-21/hardening` | Planned 2026-11-22 from an audit of 1.4.0; claimed 2026-11-23, tasks in order: data loss, a hang and a PDF leak first                                                                         |
 | 22 Collaboration          | Blocked by 21            | —                    | Planned 2026-11-23, nothing built: central authority over steps; fixes go before features (Phase 21)                                                                                          |
+| 23 Agent editing parity   | Blocked by 21            | —                    | Planned 2026-11-23, nothing built: the agent edits tables, formatting, lists, pictures, headers and review as a user can                                                                      |
 
 Status values: `Ready` (dependencies met, nobody on it) · `In progress` · `In review` (PR open) ·
 `✅ Done` (merged, acceptance criteria met) · `Blocked by …`.
@@ -94,27 +95,28 @@ Foli's engine is not credible until all five pass in Chromium, Firefox and WebKi
 
 ## Overview
 
-| Phase | Name                      | Outcome                                                                           | Release             | Size |
-| ----- | ------------------------- | --------------------------------------------------------------------------------- | ------------------- | ---- |
-| 0     | Foundation                | Monorepo, docs, own schema v1, read-only view                                     | —                   | ✅   |
-| 1     | Architecture spike        | Two-page editable surface validated → ADR-0003                                    | —                   | M    |
-| 2     | Document model            | Schema, immutable nodes, positions, slices, JSON                                  | —                   | L    |
-| 3     | Transactions & history    | Steps, mapping, state, undo/redo, commands, headless editor                       | —                   | L    |
-| 4     | Editor view               | Editable DOM view: input, selection, IME, clipboard                               | 0.0.x canary        | XL   |
-| 5     | Native pagination         | Real pages, fragments, incremental reflow, print                                  | —                   | XL   |
-| 6     | React API & first release | `FoliEditor`, hooks, toolbar, packaging                                           | **0.1.0**           | M    |
-| 7     | Rich content              | Lists, links, alignment, color, highlight, rules                                  | 0.2.0               | L    |
-| 8     | Word model & DOCX         | Schema v3 (Word-shaped), styles, numbering, lossless DOCX                         | 0.3.0               | XL   |
-| 9     | Review                    | Tracked changes and comments, Word-compatible                                     | 0.4.0               | XL   |
-| 10    | Tables & images           | Word tables across pages, inline and floating images                              | 0.5.0               | XL   |
-| 11    | Sections & templates      | Headers/footers, fields, content controls, notes, PDF                             | 0.6.0               | L    |
-| 12    | Ecosystem & 1.0           | Extension API freeze, docs site, performance tracking                             | **1.0.0**           | L    |
-| 13    | Agent library             | `@folijs/agent`: an LLM edits a document without positions                        | agent 0.1.0         | M    |
-| 14    | MCP server                | `@folijs/mcp`: the agent library as tools for any MCP client                      | mcp 0.1.0           | M    |
-| 16    | Code mode                 | `run` in `@folijs/mcp`: a script over the document, sandboxed                     | mcp 0.2.0           | M    |
-| 17    | Toolbar for developers    | Tabs an app controls, the built-in dialogs and strings open to it, overflow       | 1.2.0               | M    |
-| 18    | Hint                      | Show a place for a few seconds: an app's, or an agent's change                    | 1.3.0               | S    |
-| 22    | Collaboration             | Real-time editing by several people: steps over the app's transport, an authority | 1.5.0, collab 0.1.0 | L    |
+| Phase | Name                      | Outcome                                                                           | Release                | Size |
+| ----- | ------------------------- | --------------------------------------------------------------------------------- | ---------------------- | ---- |
+| 0     | Foundation                | Monorepo, docs, own schema v1, read-only view                                     | —                      | ✅   |
+| 1     | Architecture spike        | Two-page editable surface validated → ADR-0003                                    | —                      | M    |
+| 2     | Document model            | Schema, immutable nodes, positions, slices, JSON                                  | —                      | L    |
+| 3     | Transactions & history    | Steps, mapping, state, undo/redo, commands, headless editor                       | —                      | L    |
+| 4     | Editor view               | Editable DOM view: input, selection, IME, clipboard                               | 0.0.x canary           | XL   |
+| 5     | Native pagination         | Real pages, fragments, incremental reflow, print                                  | —                      | XL   |
+| 6     | React API & first release | `FoliEditor`, hooks, toolbar, packaging                                           | **0.1.0**              | M    |
+| 7     | Rich content              | Lists, links, alignment, color, highlight, rules                                  | 0.2.0                  | L    |
+| 8     | Word model & DOCX         | Schema v3 (Word-shaped), styles, numbering, lossless DOCX                         | 0.3.0                  | XL   |
+| 9     | Review                    | Tracked changes and comments, Word-compatible                                     | 0.4.0                  | XL   |
+| 10    | Tables & images           | Word tables across pages, inline and floating images                              | 0.5.0                  | XL   |
+| 11    | Sections & templates      | Headers/footers, fields, content controls, notes, PDF                             | 0.6.0                  | L    |
+| 12    | Ecosystem & 1.0           | Extension API freeze, docs site, performance tracking                             | **1.0.0**              | L    |
+| 13    | Agent library             | `@folijs/agent`: an LLM edits a document without positions                        | agent 0.1.0            | M    |
+| 14    | MCP server                | `@folijs/mcp`: the agent library as tools for any MCP client                      | mcp 0.1.0              | M    |
+| 16    | Code mode                 | `run` in `@folijs/mcp`: a script over the document, sandboxed                     | mcp 0.2.0              | M    |
+| 17    | Toolbar for developers    | Tabs an app controls, the built-in dialogs and strings open to it, overflow       | 1.2.0                  | M    |
+| 18    | Hint                      | Show a place for a few seconds: an app's, or an agent's change                    | 1.3.0                  | S    |
+| 22    | Collaboration             | Real-time editing by several people: steps over the app's transport, an authority | 1.5.0, collab 0.1.0    | L    |
+| 23    | Agent editing parity      | Tables, formatting, lists, pictures, headers: the agent edits as a user does      | agent 0.4.0, mcp 0.3.0 | M    |
 
 ```
 P0 ─┬─► P1 spike ────────────────┐
@@ -3238,6 +3240,143 @@ lets the agent library return steps); 22.7 onwards build it.
 - [ ] 22.13 Docs and release: architecture.md (the collab loop), api.md, a site page (how to
   wire a transport and a store), limitations.md (no CRDT, no long offline, what the app must
   do), changesets; 1.5.0 and `@folijs/collab` 0.1.0 published with the owner's approval.
+
+## Phase 23 — Agent editing parity · M → agent 0.4.0, mcp 0.3.0, core patches
+
+The agent does what a person does in the editor, not only text: it inserts tables and edits
+their rows, columns, cells and styles; formats text (bold, italic, font, size, colour,
+highlight, links) and paragraphs (alignment, spacing, indentation, lists); inserts pictures,
+breaks and notes; edits headers and footers; accepts and rejects changes. Asked for by the owner
+on 2026-11-23 after trying the MCP server: the agent could not add a table or a row. Planned the
+same day, nothing built.
+
+The work lives in `@folijs/agent`: an app that runs its own model loop, without MCP, gets every
+operation as a session method and the tool definitions to give its model (names, descriptions,
+JSON Schemas, the instructions), so it writes no schema of its own. `@folijs/mcp` and code mode
+(`run`) are built from the same definitions and add nothing an app could not do with the
+package alone. Most operations wrap core commands the editor already has, taking handles
+instead of positions. Tools are few (one per area, an `action` field), not one per command:
+every tool's description costs the model context.
+
+Not in this phase: the agent editing a shared document (Phase 22 leaves it out too); a picture
+from a URL (the MCP server reads files under its root only); comments' own formatting; text
+boxes and other opaque content; Word features the editor itself lacks (the After 1.0 backlog).
+
+**Starts from (agent 0.3.x, mcp 0.2.x), checked 2026-11-23:**
+
+- The session's operations (`agent/src/operations.ts`, `templates.ts`): `replaceText`,
+  `insertAfter`/`insertBefore` (paragraphs only), `deleteBlock` (a paragraph or a whole table),
+  `setStyle` (paragraph style), `comment`, `fillControl`, `updateFields`. limitations.md says
+  so: "No operation inserts a table or a picture, changes a run's formatting (bold, color), or
+  accepts or rejects changes." `session.editor` reaches the rest by positions, but neither the
+  MCP tools nor `run` expose it.
+- The tool definitions (names, descriptions, JSON Schemas) exist only in `@folijs/mcp`
+  (`mcp/src/tools.ts`), tied to the server; an app using `@folijs/agent` directly writes its
+  own, from the README's suggested system prompt.
+- Core has the commands: tables (`tablecommands.ts`: `insertTable`, `insertRow`,
+  `insertColumn`, row and column deletion, merge and split, header rows, `setTableStyle`,
+  `setCellShading`, `setColumnWidth`), marks and run formatting (`toggleMark`, `setFontFamily`,
+  `setFontSize`, `setTextColor`, `setHighlight`), paragraphs (`setAlign`, `setLineSpacing`,
+  `setParagraphSpacing`, `changeIndent`), lists (`toggleList`, `sinkListItem`,
+  `liftListItem`), links (`insertLink`, `setLink`, `removeLink`), `insertPicture`,
+  `insertNote`, `insertSectionBreak`, `insertHorizontalRule`, page breaks, and review
+  (`acceptChange`/`rejectChange` and the rest of `review.ts`).
+- Every agent edit is a tracked change, and while tracking core refuses column commands,
+  merging and splitting cells, header rows, table styles, shading and column widths
+  (`tablecommands.ts`; limitations.md, Tables). Rows are tracked; run and paragraph formatting
+  are tracked as formatting changes (`track.ts`).
+- `read` shows a paragraph's style, list number and changes, not its run formatting: the model
+  cannot see what is bold before changing it.
+- Only the body is read and edited; headers, footers and notes' text are not shown.
+- Links are not recorded while tracking: `link` is not in `RUN_PROPERTY_MARKS`
+  (`v3/schema.ts`), so `recordRun` (`track.ts`) skips it and rejecting all leaves a link added.
+- `run`'s API is written by hand in `mcp/src/code.ts` (`METHODS`, a `switch` of methods,
+  `DOC_TYPES`), apart from the MCP tools.
+
+**Acceptance:**
+
+- Each area below is a `@folijs/agent` session method by handle, usable with no MCP server,
+  with refusals a model can act on (as today's: a code and a sentence saying what to do
+  instead) and tests in `agent` alone (`scenarios.test.ts` style: an edit, the read after it,
+  export, reject all gives the document back where it can); then its tool in `agentTools`,
+  the MCP server and `run`.
+- `agentTools(session)` in `@folijs/agent`: each tool's name, description, JSON Schema and a
+  function that runs it on the session, and the instructions text; an app maps them to its
+  model's tool format. `@folijs/mcp` builds its tools and `run`'s methods and types from it,
+  and adds what is the server's: `open`, `save`, `close`, `list_documents`, `run` and its
+  sandbox, the `document` argument, and the wrapper around each call (checkpoint, size limit,
+  rollback).
+- Tables: insert a table (rows, columns, optional header row and cell text) next to a block;
+  insert and delete rows and columns; merge and split cells; set the table style, a cell's
+  shading, a column's width, header rows. While tracking, each is a tracked change Word shows
+  and round-trips, or is refused with the reason (23.2 decides which, from what Word writes).
+- Text formatting on a block or on text in it (`on`, as `comment` takes it): bold, italic,
+  underline, strikethrough, superscript, subscript, font, size, colour, highlight: tracked as
+  formatting changes. Links added, changed and removed: tracked as Word records them (a
+  hyperlink field's insertion and deletion), or refused while tracking with the reason; 23.2
+  decides, as for tables.
+- Paragraph formatting: alignment, spacing before and after, line spacing, indentation; lists
+  (bulleted, numbered, a level in or out, a number removed). Tracked.
+- Insert: pictures (bytes and type in the package, a file under the root in the MCP server;
+  alt text required, size), page and section breaks, horizontal rules, footnotes and endnotes
+  (with their text).
+- Headers and footers: read and edited with the same operations, their blocks' handles marked
+  as theirs in a read.
+- Review: list the document's tracked changes (author, kind, text), accept or reject one, all,
+  or all by an author. Off unless asked for (a session option in the package, `--review` in the
+  MCP server, as `--code` is): a model accepting a person's changes is not undone by rejecting
+  the agent's.
+- `read` can show run formatting (an option, off by default so reads stay short).
+- READMEs, limitations.md, the MCP server's instructions and tool descriptions updated;
+  `pnpm check` green after each PR; agent 0.4.0, mcp 0.3.0 (and any core patch) published with
+  the owner's approval.
+
+### Tasks
+
+Each task is a PR on `phase-23/agent-parity`, the build green after each, merged after an
+agent's review. Starts after Phase 21 (21.7 and 21.11 change `track.ts` and the agent's read of
+table cells). Independent of Phase 22, but 22.5 and 22.6 also change `track.ts`: whichever
+lands second merges the other in (no rebase: force push is blocked).
+
+- [ ] Claim phase, branch `phase-23/agent-parity`
+- [ ] 23.1 ADR-0013 Agent tools: one tool per area with an `action` field (the list above),
+  how a handle names a table, row, column or cell (the table's handle and indexes, as `read`
+  prints `r1 c1`), and how `on` names text in a block for formatting. Then `agentTools(session)`
+  in `@folijs/agent` for today's operations, moved from `mcp/src/tools.ts`; the MCP tools and
+  `run`'s `METHODS`, method switch and `DOC_TYPES` (`mcp/src/code.ts`) built from it, the
+  per-call wrapper staying in `mcp`, with no change a model sees (`server.test.ts` and
+  `code.test.ts` unchanged). Tool count and description length measured before and after.
+  Each later task adds its operation to the session first, then its tool to `agentTools`,
+  which gives it to MCP and `run` too.
+- [ ] 23.2 Core: table structure and links while tracking. What Word records for each table
+  command (`w:tblPrChange`, `w:tcPrChange`, `w:trPrChange`, `w:tblGridChange`, `w:cellIns`,
+  `w:cellDel`, `w:cellMerge`) and for a link, from ECMA-376 and from tracked tables in the
+  Phase 20 corpus; files saved by Word 365 only if the owner supplies them (no manual check is
+  waited for). Track in core what is recorded that way and round-trips; keep refusing the rest
+  while tracking with a reason the agent passes on (the fallback for all of it if the sources
+  disagree). Findings and the list of what stays refused in limitations.md.
+- [ ] 23.3 Agent: tables. `insertTable` next to a block (rows, columns, header row,
+  cell text), rows and columns in and out, merge and split, style, shading, widths, header
+  rows; one tool `edit_table`; `run` methods.
+- [ ] 23.4 Agent: text formatting and links on a block or on `on` text; `read` option
+  showing run formatting; one tool `format_text`.
+- [ ] 23.5 Agent: paragraph formatting and lists; one tool `format_paragraph`.
+- [ ] 23.6 Agent: insert pictures (bytes and type in the package; in the MCP server a path
+  under the root, size limits as `open`'s; alt text), page and section breaks, horizontal
+  rules, footnotes and endnotes; one tool `insert`.
+- [ ] 23.7 Agent: headers and footers read and edited (the stories), handles marked
+  with their story in a read; the existing tools take them.
+- [ ] 23.8 Agent: review (list changes, accept or reject), a session option turning it on;
+  the tools behind `--review` in the MCP server.
+- [ ] 23.9 A scenario per area run twice with a model's kind of calls: through `agentTools`
+  on a session alone (no MCP), and through the MCP server (`mcp/src/server.test.ts` with
+  `testing/client.ts`): build a table from data, add a row to an existing one, format a
+  heading, make a list, insert a picture; each exported and opened again. Then a fresh model
+  given only the tools' own words does the same tasks, as in 14.8 and 16.6; what it got wrong
+  goes into the descriptions, and the result is recorded here.
+- [ ] 23.10 Docs and release: agent and MCP READMEs, limitations.md (Agent editing), the
+  server's instructions, the site's agent page; changesets; agent 0.4.0 and mcp 0.3.0 (and any
+  core patch) published with the owner's approval.
 
 ## After 1.0
 
