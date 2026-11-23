@@ -251,6 +251,32 @@ describe("readPackage", () => {
     expect(pkg.part("/word%2Fdocument.xml")).toBeUndefined();
   });
 
+  it("refuses two entries that name one part (21.6)", async () => {
+    const files = {
+      "[Content_Types].xml": TYPES,
+      "_rels/.rels": ROOT_RELS,
+      "word/document.xml": "<document/>",
+    };
+    // Percent-encoded, the second would silently stand in for the first.
+    for (const other of ["word/%64ocument.xml", "WORD/%64OCUMENT.XML", "%5BContent_Types%5D.xml"])
+      await expect(readPackage(await zip({ ...files, [other]: "<other/>" }))).rejects.toThrow(
+        DocxError,
+      );
+    // Nor two types for one part (the same one twice is only redundant).
+    const typed = (...overrides: string[]) =>
+      TYPES.replace("</Types>", `${overrides.join("")}</Types>`);
+    const other = (name: string, type: string) =>
+      `<Override PartName="${name}" ContentType="${type}"/>`;
+    const types = typed(other("/word/a.xml", "text/plain"), other("/WORD/%61.xml", "text/xml"));
+    await expect(
+      readPackage(await zip({ ...files, "[Content_Types].xml": types })),
+    ).rejects.toThrow(DocxError);
+    const same = typed(other("/word/a.xml", "text/xml"), other("/WORD/%61.xml", "text/xml"));
+    await expect(
+      readPackage(await zip({ ...files, "[Content_Types].xml": same })),
+    ).resolves.toBeDefined();
+  });
+
   it("requires the main part to be WordprocessingML", async () => {
     const types = (main: string) => TYPES.replace(MAIN, main);
     const files = (main: string) => ({

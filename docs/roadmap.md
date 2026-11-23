@@ -3046,7 +3046,7 @@ review. 21.1 to 21.6 lose data, hang or leak: they go first, in this order.
   typing, and the translation is saved (as tracked changes while tracking). `translate="no"` on
   the editing host and on `renderDocument`'s pages; an e2e test changing a text node the way a
   translator does.
-- [ ] 21.6 Docx: a zip entry cannot stand in for another part. `zip.ts` refuses duplicate names
+- [x] 21.6 Docx: a zip entry cannot stand in for another part. `zip.ts` refuses duplicate names
   by lower case only; `package.ts` keys parts percent-decoded, so `word/%64ocument.xml` replaces
   `word/document.xml` silently (probed). Refuse when the decoded key is already taken.
 - [ ] 21.7 Core, smaller bugs: a new tracked change reuses a table row's revision id
