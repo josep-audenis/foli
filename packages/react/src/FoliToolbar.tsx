@@ -1479,6 +1479,9 @@ const sameGroups = (a: ToolbarGroups | undefined, b: ToolbarGroups | undefined) 
  * `aria-pressed`; a button whose command cannot run now is `aria-disabled` (still focusable).
  * Clicks leave the focus and selection in the document.
  */
+/** Keys that step a closed select box through its values. */
+const STEP_KEYS = new Set(["ArrowUp", "ArrowDown", "Home", "End", "PageUp", "PageDown"]);
+
 export function FoliToolbar({
   editor: given,
   disabled = false,
@@ -1669,6 +1672,11 @@ export function FoliToolbar({
   shown.current = items;
   // Whether a select box was last used with the pointer (its pick then goes back to the document).
   const pointer = useRef(false);
+  // A select box's value picked with the keyboard (Up and Down on a closed box): applied on
+  // Enter or when the box loses the focus, not on each value passed; Escape drops it.
+  const [pending, setPending] = useState<{ key: string; value: string } | null>(null);
+  // The last key on a select box steps through its values (Up, Down…): a change then is held.
+  const stepped = useRef(false);
   // The open menu (a menu button's key), if any.
   const [menu, setMenu] = useState<string | null>(null);
   // The color fields behind "More colors…" (by item key), and what the last one opened on.
@@ -1931,6 +1939,27 @@ export function FoliToolbar({
   useEffect(() => {
     if (disabled || builtInDialog || appDialogGone) setAppDialog(null);
   }, [disabled, builtInDialog, appDialogGone]);
+  // A built-in dialog closed by the editor (an edit or a selection from elsewhere), not by its
+  // own buttons: the focus it held went with it, back to where it came from.
+  const openDialog =
+    dialog ??
+    tableDialog ??
+    pictureDialog ??
+    setupDialog ??
+    referenceDialog ??
+    controlDialog ??
+    noteDialog ??
+    columnDialog;
+  const lastRestore = useRef<HTMLElement | null | undefined>(undefined);
+  useEffect(() => {
+    const was = lastRestore.current;
+    lastRestore.current = openDialog ? openDialog.restore : undefined;
+    if (openDialog || was === undefined || typeof document === "undefined") return;
+    const active = document.activeElement;
+    if (active && active !== document.body) return;
+    if (was?.isConnected) giveBack(was);
+    else onClickCommand?.();
+  });
 
   // One dialog at a time: opening one closes the rest (`keep` reopens itself, counting requests).
   // A built-in dialog, from its menu entry or from an item that names it; the focus goes back
@@ -2220,6 +2249,11 @@ export function FoliToolbar({
                 if (item.select) {
                   const { select } = item;
                   const value = state?.value ?? "";
+                  const held = pending?.key === item.key ? pending.value : null;
+                  const apply = () => {
+                    setPending(null);
+                    if (held !== null && held !== value && !off) editor.run(select.pick(held));
+                  };
                   // Read now: the list may come from outside the editor (the state's copy of it
                   // only makes the toolbar render again when it changes with the document).
                   const options = select.options(editor.state);
@@ -2235,18 +2269,32 @@ export function FoliToolbar({
                       // Still focusable when it cannot apply, like the buttons.
                       aria-disabled={off || undefined}
                       tabIndex={i === active ? 0 : -1}
-                      value={value}
+                      value={held ?? value}
                       onFocus={() => setActive(i)}
+                      onBlur={apply}
                       onMouseDown={() => {
                         pointer.current = true;
+                        stepped.current = false;
                       }}
-                      onKeyDown={() => {
+                      onKeyDown={(event) => {
                         pointer.current = false;
+                        stepped.current = STEP_KEYS.has(event.key);
+                        if (event.key === "Escape" && held !== null) {
+                          event.preventDefault();
+                          event.stopPropagation();
+                          setPending(null);
+                        }
                       }}
-                      // shortcut: Up and Down on a closed box apply each value they pass (Chrome
-                      // and Firefox on Windows), one undo step each; apply on Enter if it matters.
+                      // After the change an open list's Enter makes.
+                      onKeyUp={(event) => {
+                        if (event.key === "Enter") apply();
+                      }}
                       onChange={(event) => {
                         if (off) return;
+                        if (stepped.current) {
+                          setPending({ key: item.key, value: event.target.value });
+                          return;
+                        }
                         editor.run(select.pick(event.target.value));
                         if (pointer.current) onClickCommand?.();
                       }}

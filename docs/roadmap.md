@@ -3069,7 +3069,7 @@ review. 21.1 to 21.6 lose data, hang or leak: they go first, in this order.
   did not (focus and selection read from the document): fixed for Chromium, Firefox worked,
   WebKit has no selection inside a shadow root and is written down in limitations.md for the
   owner to accept. Core's `widowControl` set nowhere now resolves as on, as Word does.)
-- [ ] 21.9 React: `FoliComments` does no work while hidden or without threads, and none per
+- [x] 21.9 React: `FoliComments` does no work while hidden or without threads, and none per
   keystroke beyond what a change to its threads needs (today `measure()` queries every page and
   forces a layout on each `doc` change); `upload` and `resource` held in refs so an inline
   function does not reset the view each render (`FoliCanvas.tsx`); a built-in dialog closed by
