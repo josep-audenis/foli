@@ -48,6 +48,17 @@ What it does, in the page (its content is replaced):
 
 The document is validated first (`parseDocument`): an invalid one throws before the page is used.
 
+## On a server
+
+- **One export per page at a time.** A page shows one document: exports given the same page run
+  one after another, never mixed, so one user's PDF never holds another's. For exports at once,
+  give each its own page (a pool of pages).
+- **`signal` and `timeout`** (milliseconds) stop an export: the call rejects at once; the export
+  on the page stops at its next step, and the page's next export waits for it. A hung page is
+  still the app's to close.
+- **Keep `@folijs/pdf` external in a bundler** (esbuild's `external`, webpack's `externals`): it
+  reads `dist/renderer.js` from beside its own file, which a bundle does not have.
+
 ## Fonts
 
 Chromium lays the text out with the fonts it has: the machine's, and those the page loads. A

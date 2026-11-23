@@ -159,4 +159,55 @@ describe("exportPdf", () => {
     expect(calls).toEqual([]);
     await expect(fresh(createDocument(), { page })).resolves.toMatchObject({ pages: 3 });
   });
+
+  /** A page holding one document at a time, slow enough for two exports to overlap. */
+  function sharedPage() {
+    let shown = "";
+    const tick = () => new Promise((resolve) => setTimeout(resolve, 5));
+    const page: PdfPage = {
+      setContent: async () => {
+        shown = "";
+        await tick();
+      },
+      addScriptTag: async () => tick(),
+      evaluate: async (_fn, arg) => {
+        await tick();
+        shown = String(
+          (arg.document.content.content?.[0]?.content?.[0] as { text?: string })?.text,
+        );
+        return { pages: 1, fields: FIELDS } satisfies Rendered;
+      },
+      pdf: async () => {
+        await tick();
+        return new TextEncoder().encode(shown);
+      },
+    };
+    return page;
+  }
+  const saying = (text: string) =>
+    createDocument({
+      type: "doc",
+      content: [{ type: "paragraph", content: [{ type: "text", text }] }],
+    });
+  const text = (result: { pdf: Uint8Array }) => new TextDecoder().decode(result.pdf);
+
+  it("runs two exports on one page one after the other, never mixed (21.4)", async () => {
+    const page = sharedPage();
+    const [a, b] = await Promise.all([
+      exportPdf(saying("first user's"), { page }),
+      exportPdf(saying("second user's"), { page }),
+    ]);
+    expect([text(a), text(b)]).toEqual(["first user's", "second user's"]);
+  });
+
+  it("stops on its signal or timeout, and the next export on the page still waits for it", async () => {
+    const page = sharedPage();
+    const stop = new AbortController();
+    stop.abort(new Error("gone"));
+    await expect(exportPdf(saying("a"), { page, signal: stop.signal })).rejects.toThrow("gone");
+    const slow = exportPdf(saying("slow"), { page, timeout: 1 });
+    const next = exportPdf(saying("next"), { page });
+    await expect(slow).rejects.toThrow();
+    expect(text(await next)).toBe("next");
+  });
 });
