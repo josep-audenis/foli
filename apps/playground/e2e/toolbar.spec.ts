@@ -68,8 +68,8 @@ test("keyboard only: Tab to the toolbar, arrows to a style, Tab back to typing",
   const style = page.getByRole("combobox", { name: "Paragraph style" });
   await page.keyboard.press("Shift+Tab");
   await expect(style).toBeFocused();
-  // Arrows in the toolbar go to Bold and back; Down on the style box takes the next style
-  // after Normal (Heading 1), as a closed select does on Windows.
+  // Arrows in the toolbar go to Bold and back; Down on the style box steps to the next style
+  // after Normal (Heading 1), as a closed select does on Windows, and Tab applies it (21.9).
   await page.keyboard.press("ArrowRight");
   await page.keyboard.press("ArrowRight");
   await page.keyboard.press("ArrowRight");
@@ -77,9 +77,12 @@ test("keyboard only: Tab to the toolbar, arrows to a style, Tab back to typing",
   for (let i = 0; i < 3; i++) await page.keyboard.press("ArrowLeft");
   await expect(style).toBeFocused();
   await page.keyboard.press("ArrowDown");
-  await expect(blocks(page).nth(1)).toHaveJSProperty("tagName", "H1");
-  // The toolbar is one tab stop: Tab goes to the document, where the caret was.
+  await expect(style).toHaveValue("Heading1");
+  await expect(blocks(page).nth(1)).toHaveJSProperty("tagName", "P");
+  // The toolbar is one tab stop: Tab applies the style and goes to the document, where the
+  // caret was.
   await page.keyboard.press("Tab");
+  await expect(blocks(page).nth(1)).toHaveJSProperty("tagName", "H1");
   await expect(editor(page)).toBeFocused();
   await page.keyboard.type("> ");
   await expect(blocks(page).nth(1)).toHaveText(/^> Edited by Foli/);
