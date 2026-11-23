@@ -83,6 +83,7 @@ swap.textContent =
  * mounted editor sends its own steps and receives theirs, as over a network with no delay.
  */
 let others: ReturnType<typeof setInterval>[] = [];
+let measured: Editor | null = null;
 function collaborate(document: FoliDocument, own: Editor, count: number): void {
   for (const timer of others) clearInterval(timer);
   others = [];
@@ -156,10 +157,16 @@ const bench = {
       ),
     );
     const mounted = handle as FoliEditorHandle | null;
-    if (remote && mounted) collaborate(document, mounted.editor, remote);
     const layoutMs = performance.now() - start;
+    // After the layout's time: setting the others up is not the document's layout.
+    if (remote && mounted) collaborate(document, mounted.editor, remote);
+    measured = mounted?.editor ?? null;
     await painted();
     return { layoutMs, paintMs: performance.now() - start, pages: pages() };
+  },
+  /** The authority's version the mounted editor has: how many steps reached it. */
+  version(): number {
+    return measured ? getVersion(measured.state) : -1;
   },
   /** The timing of the last key pressed, once its frame is painted. */
   lastKey(): Promise<KeySample> {

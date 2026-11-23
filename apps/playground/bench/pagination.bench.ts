@@ -77,6 +77,8 @@ for (const { sections, lists, remote } of CASES) {
     let typedChars = 0;
     const typed = await keys(() => page.keyboard.type(TYPED[typedChars++] ?? ""), TYPED.length);
     const enters = await keys(() => page.keyboard.press("Enter"), ENTERS);
+    // The others' steps did reach the editor while it typed (else this measured one user).
+    if (remote) expect(await page.evaluate(() => window.foliBench.version())).toBeGreaterThan(100);
 
     const reflows: { ms: number; pages: number; font: string }[] = [];
     for (let i = 0; i < REFLOWS; i++) {
