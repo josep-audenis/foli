@@ -134,6 +134,10 @@ export class DocxPackage {
     entries.forEach((entry, i) => {
       if (i === index || entry.name.endsWith("/")) return;
       const name = partName(entry.name);
+      // `word/%64ocument.xml` is `word/document.xml`: one of them would silently stand in.
+      const taken =
+        key(name) === key(CONTENT_TYPES) ? CONTENT_TYPES : this.#byName.get(key(name))?.name;
+      if (taken) throw new DocxError(`Damaged .docx: ${name} and ${taken} name one part`);
       const contentType =
         types.overrides.get(key(name)) ?? types.defaults.get(extension(name)) ?? "";
       const part = { name, contentType, data: data[i] as Uint8Array };

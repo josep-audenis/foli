@@ -251,6 +251,19 @@ describe("readPackage", () => {
     expect(pkg.part("/word%2Fdocument.xml")).toBeUndefined();
   });
 
+  it("refuses two entries that name one part (21.6)", async () => {
+    const files = {
+      "[Content_Types].xml": TYPES,
+      "_rels/.rels": ROOT_RELS,
+      "word/document.xml": "<document/>",
+    };
+    // Percent-encoded, the second would silently stand in for the first.
+    for (const other of ["word/%64ocument.xml", "WORD/%64OCUMENT.XML", "%5BContent_Types%5D.xml"])
+      await expect(readPackage(await zip({ ...files, [other]: "<other/>" }))).rejects.toThrow(
+        DocxError,
+      );
+  });
+
   it("requires the main part to be WordprocessingML", async () => {
     const types = (main: string) => TYPES.replace(MAIN, main);
     const files = (main: string) => ({
