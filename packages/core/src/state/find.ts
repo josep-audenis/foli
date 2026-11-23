@@ -74,8 +74,34 @@ const LOOSE: Readonly<Record<string, string>> = {
   "“": '"',
   "”": '"',
   " ": " ",
+  // The non-breaking hyphen.
+  "\u2011": "-",
 };
-const LOOSE_CHARS = /[‘’“” ]/g;
+const LOOSE_CHARS = /[‘’“” \u2011]/g;
+/** What find looks through, as Word does: the soft hyphen and the zero-width space. */
+const UNSEEN = /[\u00ad\u200b]/;
+
+/**
+ * `text` without the characters find looks through; `map` (when any went) gives each kept
+ * character's offset in `text`, and `text.length` after the last.
+ */
+function seen(text: string): { text: string; map: number[] | null } {
+  if (!UNSEEN.test(text)) return { text, map: null };
+  let out = "";
+  const map: number[] = [];
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i] as string;
+    if (UNSEEN.test(c)) continue;
+    out += c;
+    map.push(i);
+  }
+  map.push(text.length);
+  return { text: out, map };
+}
+
+/** A found `[from, to)` of `seen`'s text as offsets in the text it came from. */
+const unseen = (map: number[] | null, from: number, to: number): [number, number] =>
+  map ? [map[from] as number, (map[to - 1] as number) + 1] : [from, to];
 const loosen = (text: string) => text.replace(LOOSE_CHARS, (c) => LOOSE[c] as string);
 /** Letters, digits and what combines with them. */
 const WORD_CHAR = /^[\p{L}\p{N}\p{M}]/u;
@@ -103,7 +129,8 @@ interface Needle {
   exact: number[];
 }
 
-function needleFor(query: string, { matchCase = false, wholeWord = false }: FindOptions) {
+function needleFor(given: string, { matchCase = false, wholeWord = false }: FindOptions) {
+  const query = seen(given).text;
   if (!query || query.includes(BARRIER)) return null;
   const plain = loosen(query);
   const exact: number[] = [];
@@ -156,9 +183,10 @@ export function findInText(
   const needle = needleFor(query, options);
   if (!needle) return [];
   const out: [number, number][] = [];
-  const plain = loosen(text);
-  eachHit(text, needle.matchCase ? plain : fold(plain), needle, (from, to) => {
-    out.push([from, to]);
+  const shown = seen(text);
+  const plain = loosen(shown.text);
+  eachHit(shown.text, needle.matchCase ? plain : fold(plain), needle, (from, to) => {
+    out.push(unseen(shown.map, from, to));
   });
   return out;
 }
@@ -180,6 +208,8 @@ interface Line {
   pieces: Piece[];
   plain?: string;
   folded?: string;
+  /** Its text without what find looks through (`seen`). */
+  shown?: { text: string; map: number[] | null };
 }
 
 /** What shows, which decides what can be found. */
@@ -286,11 +316,14 @@ interface Hit {
 
 function hitsIn(lines: readonly Line[], story: string | null, needle: Needle, out: Hit[]): void {
   for (const line of lines) {
-    line.plain ??= loosen(line.text);
+    line.shown ??= seen(line.text);
+    const { map } = line.shown;
+    line.plain ??= loosen(line.shown.text);
     if (!needle.matchCase) line.folded ??= fold(line.plain);
     const haystack = needle.matchCase ? line.plain : (line.folded as string);
     if (haystack.length < needle.text.length) continue;
-    eachHit(line.text, haystack, needle, (a, b) => {
+    eachHit(line.shown.text, haystack, needle, (shownFrom, shownTo) => {
+      const [a, b] = unseen(map, shownFrom, shownTo);
       const parts: Hit["parts"] = [];
       for (const { at, length, pos, code } of line.pieces) {
         const start = Math.max(a, at);

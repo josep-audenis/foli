@@ -38,7 +38,9 @@ every tracked change accepted:
   removed, or joined into the one after it, loses its own. (A paragraph is its paragraph mark,
   as in Word: Enter in the middle of one leaves the handle on the text after the caret.) Undo
   does not bring a lost handle back: read again.
-- Then: where the block is in a table (`r1 c1`), its paragraph style, its list number, `changed`
+- Then: where the block is in a table (`r1 c1`: row and grid column; `c1-2` a cell spanning two
+  grid columns; `merged down` / `merged up` a vertical merge, its text in the top cell), its
+  paragraph style, its list number, `changed`
   when it holds tracked changes, how many comments are anchored in it.
 - After the colon, the text. A line break inside a paragraph shows as `↵`. What is not text
   stands in brackets: `[picture]`, `[note]`, `[page break]`, `[empty: Offer date]` (a content
@@ -149,7 +151,8 @@ for MCP clients, over `.docx` files in a folder. What a model needs to be told f
 You edit a document through tools. read gives it a line per block:
   [b7] Clause, 1.1, changed: text
 [b7] is the block's handle: pass it to the other tools. After it come where the block is in a
-table (r1 c1), its style, its list number, "changed" if it has tracked changes, its comments;
+table (r1 c1: row and grid column; c1-2 a cell spanning two; "merged down" or "merged up" a
+vertical merge, its text in the top cell), its style, its list number, "changed" if it has tracked changes, its comments;
 after the colon, its text. ↵ is a line break. A line "table, 3 rows, 2 columns" is a table: its
 cells' blocks follow, indented. A line "not editable: …" is content you cannot change.
 Words in brackets ([picture], [note], [empty: Offer date]) are not text: never put them in

@@ -72,8 +72,21 @@ const typed = (text: string) =>
     // biome-ignore lint/suspicious/noControlCharactersInRegex: control characters are what goes
     .replace(/[\u0000-\u0008\u000B-\u001F]/g, "");
 
+/** Invisible and look-alike characters: in a quote a model reads them as `\u2011`, not as `-`. */
+const LOOKALIKE = /[\u00a0\u00ad\u2007\u2010-\u2015\u2018-\u201f\u200b-\u200f\u202f\u2060\ufeff]/g;
+
+/** `text` cut to `most` characters, never between the halves of a surrogate pair. */
+const cut = (text: string, most: number): string => {
+  if (text.length <= most) return text;
+  const low = text.charCodeAt(most);
+  return text.slice(0, low >= 0xdc00 && low <= 0xdfff ? most - 1 : most);
+};
+
 const quote = (text: string, most = 80) =>
-  JSON.stringify(text.length > most ? `${text.slice(0, most - 3)}…` : text);
+  JSON.stringify(text.length > most ? `${cut(text, most - 3)}…` : text).replace(
+    LOOKALIKE,
+    (c) => `\\u${c.charCodeAt(0).toString(16).padStart(4, "0")}`,
+  );
 
 /** @internal Why `handle` names no block now, or the block. */
 export function resolve(context: Context, handle: string): Refusal | { pos: number; node: Node } {

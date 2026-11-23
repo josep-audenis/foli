@@ -152,6 +152,8 @@ describe("what is not a message", () => {
     expect(await error('"text"')).toBe(-32600);
     expect(await error("null")).toBe(-32600);
     expect(await error('{"jsonrpc":"1.0","id":1,"method":"ping"}')).toBe(-32600);
+    // Answered with its id: the client can tell which request was wrong (21.11).
+    expect(((await raw('{"jsonrpc":"1.0","id":7,"method":"ping"}')) as { id: unknown }).id).toBe(7);
     expect(await error('{"jsonrpc":"2.0","id":1}')).toBe(-32600);
     expect(await error('{"jsonrpc":"2.0","id":{},"method":"ping"}')).toBe(-32600);
     expect(await error('{"jsonrpc":"2.0","id":1,"method":"resources/list"}')).toBe(-32601);
@@ -302,7 +304,7 @@ describe("what is not a message", () => {
     const text = (result.content as { text: string }[])[0]?.text ?? "";
     expect(text.length).toBeLessThan(MAX_RESULT_CHARS + 200);
     expect(text).toMatch(
-      /\n\(cut: 200005 characters in all, the first 200000 shown\. Ask for less at a time\.\)$/,
+      /\n\(cut: 200005 characters in all, the first 199700 shown\. Ask for less at a time\.\)$/,
     );
     const whole = await client.callTool({ name: "echo", arguments: { text: "y".repeat(1000) } });
     expect((whole.content as { text: string }[])[0]?.text).toHaveLength(1000);

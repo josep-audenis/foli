@@ -15,7 +15,7 @@ import { exportDocx, importDocx } from "@folijs/docx";
 import { afterEach, describe, expect, it } from "vitest";
 import { Documents } from "./documents.js";
 import { fileRules } from "./files.js";
-import { serve } from "./protocol.js";
+import { cutResult, MAX_RESULT_CHARS, serve } from "./protocol.js";
 import { foliServer } from "./server.js";
 import { connect } from "./testing/client.js";
 
@@ -190,5 +190,31 @@ describe("regressions", () => {
     const { document } = await importDocx(readFileSync(join(root, "01-mutual-nda.agent.docx")));
     expect(JSON.stringify(document)).toContain("BILATERAL");
     await client.close();
+  });
+
+  it("takes null for an argument that may be left out as leaving it out (21.11)", async () => {
+    const root = folder();
+    const { client, call } = await server(root);
+    await call("open", { path: NDA });
+    const read = await call("read", { document: null, from: null });
+    expect(read.refused).toBe(false);
+    expect(read.text).toContain("[b1]");
+    await client.close();
+  });
+
+  it("cuts a long result at a block's end and keeps where to read on (21.11)", () => {
+    const line = (n: number) => `[b${String(n).padStart(3, "0")}] ${"x".repeat(990)}`;
+    const lines = Array.from({ length: 400 }, (_, n) => line(n));
+    const text = `${lines.join("\n")}\n(more: read from "b400")`;
+    const cut = cutResult(text);
+    expect(cut.length).toBeLessThanOrEqual(MAX_RESULT_CHARS);
+    const kept = cut.split("\n").filter((l) => l.startsWith("[b"));
+    expect(kept.every((l) => l.length === line(0).length)).toBe(true);
+    // Read on from the first block cut away, not from where the whole read would have gone on.
+    const first = /^\[(b\d+)\]/.exec(lines[kept.length] as string)?.[1];
+    expect(cut.endsWith(`\n(more: read from "${first}")`)).toBe(true);
+    // One line longer than all the room: never half a surrogate pair.
+    const emoji = cutResult("😀".repeat(MAX_RESULT_CHARS));
+    expect(emoji).not.toMatch(/[\ud800-\udbff](?![\udc00-\udfff])/);
   });
 });

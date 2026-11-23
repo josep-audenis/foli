@@ -125,10 +125,12 @@ writeFileSync(appEntry, `export { FoliEditor } from "${dist("react")}";\n`);
  * Docx raised in 21.10 (61.4 kB, 63.5 allowed): export correctness (Word 2013's compatibility
  * settings in a new package, the spacing flag into an existing part, a related part made where
  * it points) and `asDocument`, a .docm or template written as a .docx without its macros.
+ * View raised in 21.11 (118.2 kB, 120.1 allowed): it carries core's find, which now looks
+ * through soft hyphens and zero-width spaces (an offset map).
  */
 const BUNDLES = [
   { name: "@folijs/core", entry: dist("core"), budget: 90_000 },
-  { name: "@folijs/view", entry: dist("view"), budget: 121_000 },
+  { name: "@folijs/view", entry: dist("view"), budget: 123_000 },
   { name: "@folijs/react", entry: dist("react"), budget: 176_640 },
   { name: "FoliEditor only", entry: appEntry, budget: 176_640 },
   { name: "@folijs/docx", entry: dist("docx"), budget: 65_000 },
