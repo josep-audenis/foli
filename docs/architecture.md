@@ -418,7 +418,10 @@ and benchmarks (5.7, [benchmarks.md](benchmarks.md)); overview in [pagination.md
   `Mod-Ctrl-Meta-Alt-Shift-key` (`Mod` = Cmd on Apple platforms, Ctrl elsewhere; with Mod or Alt,
   non-Latin layouts and macOS Option characters fall back to the physical key). Everything else arrives as `beforeinput` and is always
   prevented. It maps to commands: insertText, insertReplacementText (target range),
-  insertParagraph, insertLineBreak, the delete types, historyUndo/Redo, and format*.
+  insertParagraph, insertLineBreak, the delete types, historyUndo/Redo, formatBold and the
+  other mark toggles, formatIndent/Outdent and insertFromYank. Any other type (formatJustify*,
+  insertTranspose…) changes nothing and is said once per view in the console; paste and drop
+  have their own handlers.
   - Deletes use the browser's target range. Without one, characters and words use the core's
     grapheme and word boundaries; line deletes extend the DOM selection to the visual line edge
     (`Selection.modify`) and never fall back to deleting a character.

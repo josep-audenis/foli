@@ -110,7 +110,8 @@ editor state ──► measure the blocks without a cached measurement (DOM read
     with hand-written fixture HTML) ends its page;
   - widows and orphans: at least 2 lines of a split block on each page (`FlowRules`; a block too
     short for both moves whole; not applied across a page break, nor where only an empty page
-    could hold the lines);
+    could hold the lines); a paragraph with `w:widowControl="0"` splits at any line instead
+    (`anyLine`), and one that sets it nowhere has it on, as Word does;
   - a paragraph with keep with next (headings through their style) keeps with the next block
     (chains too); keep lines together moves a paragraph that fits on a page whole; page break
     before starts a paragraph on a new page;

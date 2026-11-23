@@ -74,7 +74,9 @@ session.comment("b25", "Why three years?", { on: "three (3) years" });
 - **`replaceText(handle, find, replacement, { all })`**: `find` is text as `read` shows it,
   capitals and spaces included. It must be in the block exactly once, or `all` replaces every
   place. The replacement takes the formatting of what it replaces; `""` deletes. `↵` or `\n`
-  is a line break. What `read` shows in brackets is not text and cannot be in `find`.
+  is a line break. What `read` shows in brackets is not text and cannot be in `find`. Find
+  looks through soft hyphens and zero-width spaces and takes a non-breaking hyphen as `-`; a
+  refusal quotes invisible and look-alike characters escaped (`\u2011`).
 - **`insertAfter` / `insertBefore(handle, paragraphs)`**: one paragraph or a list, next to a
   paragraph, a table or anything else read. A new paragraph is formatted as Enter there gives
   in Word: as the paragraph next to it (style, numbering, indentation), or after a heading as

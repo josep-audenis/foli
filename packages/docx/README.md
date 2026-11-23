@@ -86,14 +86,18 @@ from `commentsExtended`), sections, headers, footers, footnotes, endnotes and se
   `w:noBreakHyphen` and `w:softHyphen` (read as U+2011 and U+00AD), an explicit
   `w:type="textWrapping"` on a break, XML comments, processing instructions and whitespace
   between elements, and the empty paragraph given to an empty body or comment. Text is read as
-  Word reads it: without `xml:space="preserve"`, whitespace at the ends of a `w:t` is not text.
+  Word reads it: without `xml:space="preserve"` (on the `w:t` or an element around it), whitespace
+  at the ends of a `w:t` is not text.
 
 **Settings.** Of `settings.xml`, `w:trackRevisions` is read (`DocxImport.trackRevisions`)
 and, when `exportDocx` is given `trackRevisions`, written; `w:evenAndOddHeaders` and the note
 properties of `w:footnotePr` and `w:endnotePr` are the document's `settings`, written when they
 differ from the part (the separators listed in those elements stay). Each is added in its place
 among the settings, or removed; the rest of the part is kept byte for byte, and all of it when
-nothing differs. A new package gets a settings part only with tracking on or `settings`.
+nothing differs. A new package always gets a settings part: it says the file is for Word 2013
+and later (`w:compat`, `compatibilityMode` 15), so Word does not open it in compatibility mode.
+With `asDocument`, a `.docm`, `.dotm` or `.dotx` is written as a plain `.docx`: its main part a
+document's and its VBA project (its data and signatures) left out, each part passed to `dropped`.
 
 **Export** (`exportDocx(document, package?, options?)`) writes the parts the editor owns
 (`document.xml`, `styles.xml`, `numbering.xml`, `comments.xml`, `commentsExtended.xml`,

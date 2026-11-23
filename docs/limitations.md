@@ -1,6 +1,8 @@
 # Known limitations
 
-What Foli does not do yet, or does with caveats, as of 1.0.0. Read it before you ship. The
+What Foli does not do yet, or does with caveats, as of 1.5.0 (`@folijs/agent` 0.3.2,
+`@folijs/mcp` 0.2.3: Phase 21 fixed what an audit of 1.4.0 found; what it left is marked
+"Phase 21" below). Read it before you ship. The
 owner decided on 2026-11-20 that each of these ships in 1.0 as a known limit (the one picked as a
 blocker, pictures losing their images when copied into another document, was fixed first, in
 12.11); 1.x minors may lift them. Details
@@ -60,7 +62,9 @@ checklist in [testing/ime.md](testing/ime.md)):
   fixed text can be edited; a picture control keeps its picture (no way to choose another). The
   placeholder text given to `insertControl` does not survive a save (no glossary entry is written),
   and a control's own tracked deletion is saved as its content's. An empty block control stays
-  opaque.
+  opaque. A date typed in a Russian or Ukrainian date control is not read as a date: the month
+  names the browser gives are the standalone forms, the typed date uses another (Phase 21, found
+  in review, not fixed).
 - Fields (11.8) show their stored results until updated (F9, the Fields menu, `updateFields`,
   `view.print()`); the browser's own Print menu does not update them. Updated: `PAGE`, `NUMPAGES`,
   `SECTIONPAGES`, `DATE`, `TIME`, `SEQ`, `REF`, `PAGEREF`, `TOC`, `MERGEFIELD`. Any other field
@@ -76,7 +80,11 @@ checklist in [testing/ime.md](testing/ime.md)):
   contents entries are plain: a heading's own italics are not carried over. Date names are in
   English. Codes shown cannot be edited there (Word's code editing, Shift+F9 for one field and
   Ctrl+F9 are not built); the last paragraph of a table of contents stays as an empty line under
-  its code. A field's own `w:dirty` is kept after an update.
+  its code. A field's own `w:dirty` is kept after an update. A `MERGEFIELD` with a date picture
+  (`\@`) reads its value as a date only in ISO form (`2026-03-05`, a time after it or not); a
+  date in a language's own numeric form (`5/3/2026`) shows as written (Phase 21: the document's
+  language is not known there). A fraction in a roman, letter or ordinal number format shows its
+  digits; Word's own output there was not checked (Phase 21).
 - Notes: a note's lines take no widow or orphan control and `w:continuationNotice` is not drawn. A
   reference kept verbatim in opaque content takes no number. Footnotes set beneath the text in a
   section with columns go to the foot. Options apply to the whole document, not to one section.
@@ -294,7 +302,10 @@ Custom nodes and marks, plugins and toolbar items ([extensions](guides/extension
 
 - Find reads the body and the stories, table cells included; comments apart (`findInComments`, a
   list in the find panel): not text boxes or other content kept opaque (text boxes are not drawn). A match stays inside a paragraph; `^p`-style codes, wildcards and regular
-  expressions are not offered (a pattern could hang the page), nor replacing formatting.
+  expressions are not offered (a pattern could hang the page), nor replacing formatting. Find
+  looks through soft hyphens and zero-width spaces (`cooperate` finds `co-operate` broken by a
+  soft hyphen), so a zero-width space does not end a word for "whole word" either, which matters
+  in Thai text that separates words with it (Phase 21).
 - Replacing keeps bookmarks and comment anchors found inside the match, where Word loses them; text
   already deleted as a tracked change is refused and reported, where Word adds the replacement
   after it. In the review views that hide deleted text a match runs across it, as the reader sees
@@ -438,7 +449,10 @@ Details in the [package README](../packages/docx/README.md).
 - Strict Open XML documents are refused (`DocxError`): 71 of the corpus run's 3 445 files, on
   the backlog. So is a document whose root is inside markup compatibility (`mc:AlternateContent`,
   60 files, all docx4j tests). Encrypted zip entries, ZIP64 and compression methods other than
-  stored and deflate are refused too.
+  stored and deflate are refused too. A package whose zip entries name one part twice
+  (`word/document.xml` and `word/%64ocument.xml`) is refused; a name that is no valid part name
+  (a leading `/`, a backslash, a `..` segment) is kept as a part of its own, as Word's own reading
+  of such names was not checked (Phase 21).
 - A package may hold at most 10 000 entries, 512 MiB uncompressed and 4 000 000 XML nodes in the
   parts read, a paragraph counting four (`maxEntries`, `maxSize`, `maxNodes`; lower them on a
   server). A 659-page document of dense tables counts 1.9 million and takes about 0.8 GB to

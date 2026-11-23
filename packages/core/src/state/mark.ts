@@ -63,8 +63,9 @@ export function keepLastMark(tr: Transform, pos: number, last: Node, tail = 0): 
 const REVIEW_MARKS = new Set(["insertion", "deletion", "formatChange"]);
 
 /**
- * The marks text typed among `marks` gets: without tracked-change marks.
- * shortcut: until Phase 9 records changes, typed text is never marked as one.
+ * The marks text typed among `marks` gets: without tracked-change marks, never part of
+ * someone's recorded change. While tracking, the typing is recorded as the typist's own
+ * insertion afterwards (`track.ts`).
  */
 export function typedMarks(marks: readonly Mark[]): readonly Mark[] {
   return marks.some((m) => REVIEW_MARKS.has(m.type.name))

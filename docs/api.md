@@ -1035,7 +1035,11 @@ const view = new EditorView(host, editor, { editable: true, placeholder: "" });
   `view.paste(data, autolink = true)` pastes clipboard data from code.
 - Links: a click places the caret (no navigation, read-only mode too); Ctrl+click (Cmd+click
   on Apple platforms) opens the link's href, read from the document, in a new tab with
-  `noopener,noreferrer`.
+  `noopener,noreferrer`, and goes to the bookmark a link to one names (a link's anchor, a table
+  of contents' entry, `HYPERLINK \l`, a cross-reference with `\h`).
+- The editing host gets `translate="no"` (and so do `renderDocument`'s pages): a browser's page
+  translation would rewrite the text, which the view would read back as typing. `destroy()`
+  gives the host its own `translate` back.
 - `keyName(event)`: the key name `handleKey` expects (`"Mod-b"`, `"Shift-Enter"`); with Mod or Alt
   a letter or digit is named by its physical key when the character is not a–z or 0–9
   (`Alt-Shift-n` for Option+Shift+N on macOS), except a character AltGr types on Windows and Linux
@@ -1149,7 +1153,9 @@ Details (what import keeps, what export writes, limits): the
   tracks changes in the file; left out, as the package has it), `resource(key, resource)` (the
   bytes of a picture's image the package does not hold and no `data:` URL gives: an app's
   upload; without them the export fails), `extensions` (the custom types: their `text(attrs)`
-  is what a node's control shows). Custom nodes and marks go out as content controls tagged
+  is what a node's control shows), `asDocument` (a `.docm`, `.dotm` or `.dotx` written as a
+  plain `.docx`: its main part a document's, its VBA project left out) and `dropped(parts)`
+  (the parts `asDocument` left out, to tell the user). Custom nodes and marks go out as content controls tagged
   `foli:` and the type and attributes as JSON (ADR-0008): a node a plain text control, contents
   locked, showing its text (a block node one around a paragraph); each run of a mark a rich text
   control. A tag over 255 characters throws a `DocxError` naming the type. `importDocx` turns
@@ -1254,7 +1260,10 @@ version (since 1.0.0). Details: the
   `@font-face` rules with `data:` URLs; every face declared is loaded before the layout),
   `extensions` (a script of the app's run in the page first, setting
   `globalThis.foliPdfExtensions` to its extensions: custom nodes and marks print with their views;
-  it runs with the renderer's rights, so never build it from a document).
+  it runs with the renderer's rights, so never build it from a document), `signal` (an
+  `AbortSignal`) and `timeout` (whole milliseconds from the call): either rejects the call at
+  once; the export stops at its next step on the page. Exports given one page run one after
+  another, never mixed: give concurrent exports a page each.
 - The page loads nothing from the network: its Content Security Policy allows `data:` images and
   fonts, inline scripts and styles only, so a document cannot make the exporting server request
   an address. An image not decoded after 10 seconds prints without it.

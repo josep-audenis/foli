@@ -9,32 +9,32 @@ leaves `main` green with a working playground.
 **Update this table in the same PR that starts, advances or finishes a phase.** It is the only
 place that says what is in progress; check it before starting work.
 
-| Phase                     | Status                   | Branch               | Notes                                                                                                                                                                                         |
-| ------------------------- | ------------------------ | -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 0 Foundation              | ✅ Done                  | —                    |                                                                                                                                                                                               |
-| 1 Architecture spike      | ✅ Done (G1 provisional) | —                    | Merged in #1; ADR-0003 accepted provisionally; IME, dead-key and screen-reader checks open                                                                                                    |
-| 2 Document model          | ✅ Done                  | —                    | Merged in #2                                                                                                                                                                                  |
-| 3 Transactions & history  | ✅ Done                  | —                    | Merged in #4; gate G2 passed                                                                                                                                                                  |
-| 4 Editor view             | ✅ Done (G3 provisional) | —                    | Merged in #8–#13; manual checks (4.6) deferred, open risks in ADR-0003                                                                                                                        |
-| 5 Native pagination       | ✅ Done (G4 provisional) | —                    | Merged in #15–#22; page-break manual checks open, risks in ADR-0003                                                                                                                           |
-| 6 React API & 0.1.0       | ✅ Done                  | —                    | Merged in #23–#31; 0.1.0 on npm; manual checks shipped as known risks (ADR-0003)                                                                                                              |
-| 7 Rich content            | ✅ Done                  | —                    | Merged in #33–#41; 0.2.0 on npm; list-document benchmark misses accepted (known limit)                                                                                                        |
-| 8 Word model & DOCX       | ✅ Done                  | —                    | Merged in #44–#61; 0.3.0 on npm (`@folijs/docx` first released); gate G5 passed                                                                                                               |
-| 9 Review                  | ✅ Done                  | —                    | Merged in #63–#72; 0.4.0 on npm                                                                                                                                                               |
-| 10 Tables & images        | ✅ Done                  | —                    | Merged in #73–#97 (#90, the landing page, went to main); 0.5.0 on npm; two misses accepted                                                                                                    |
-| 11 Sections & templates   | ✅ Done                  | —                    | Merged in #100–#118 (#106, #107, #110, #112 and #113, the site, went to main); 0.6.0 on npm; misses accepted                                                                                  |
-| 12 Ecosystem & 1.0        | ✅ Done                  | —                    | Merged in #120–#133; 1.0.0 on npm (2026-11-20); Phase 5 speed misses and manual checks accepted as 1.0 risks                                                                                  |
-| 13 Agent library          | ✅ Done                  | —                    | Merged in #138–#146; `@folijs/agent` 0.1.0 on npm (2026-11-21)                                                                                                                                |
-| 14 MCP server             | ✅ Done                  | —                    | Merged in #148–#162; `@folijs/mcp` 0.1.0 on npm (2026-11-21); a model in a client of its own is not tried (see 14.8)                                                                          |
-| 15 Toolbar                | ✅ Done                  | —                    | Merged in #149–#160; 1.1.0 on npm (2026-11-21); the release's bench ran on a busy machine (see #160)                                                                                          |
-| 16 Code mode              | ✅ Done                  | —                    | Merged in #164–#176; `@folijs/mcp` 0.2.0 and `@folijs/agent` 0.2.0 on npm (2026-11-21), `run` behind `--code`; four security reviews; not tried in a client of its own                        |
-| 17 Toolbar for developers | ✅ Done                  | —                    | Merged in #167–#173; 1.2.0 on npm (2026-11-21), released with Phase 16 (#176)                                                                                                                 |
-| 18 Hint                   | ✅ Done                  | —                    | Merged in #180–#184; 1.3.0 and `@folijs/agent` 0.3.0 on npm (2026-11-22)                                                                                                                      |
-| 19 Editing gaps           | ✅ Done                  | —                    | Merged in #187–#202; 1.4.0 (schema 6), `@folijs/agent` 0.3.1 and `@folijs/mcp` 0.2.2 on npm (2026-11-22); text boxes in find and crop handles left for later; Android and touch emulated only |
-| 20 Corpus run             | ✅ Done                  | —                    | Merged in #206–#222; its five `@folijs/docx` fixes ship with Phase 21's release (owner, 2026-11-23)                                                                                           |
-| 21 Hardening              | In progress              | `phase-21/hardening` | Planned 2026-11-22 from an audit of 1.4.0; claimed 2026-11-23, tasks in order: data loss, a hang and a PDF leak first                                                                         |
-| 22 Collaboration          | Blocked by 21            | —                    | Planned 2026-11-23, nothing built: central authority over steps; fixes go before features (Phase 21)                                                                                          |
-| 23 Agent editing parity   | Blocked by 21            | —                    | Planned 2026-11-23, nothing built: the agent edits tables, formatting, lists, pictures, headers and review as a user can                                                                      |
+| Phase                     | Status                   | Branch | Notes                                                                                                                                                                                         |
+| ------------------------- | ------------------------ | ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0 Foundation              | ✅ Done                  | —      |                                                                                                                                                                                               |
+| 1 Architecture spike      | ✅ Done (G1 provisional) | —      | Merged in #1; ADR-0003 accepted provisionally; IME, dead-key and screen-reader checks open                                                                                                    |
+| 2 Document model          | ✅ Done                  | —      | Merged in #2                                                                                                                                                                                  |
+| 3 Transactions & history  | ✅ Done                  | —      | Merged in #4; gate G2 passed                                                                                                                                                                  |
+| 4 Editor view             | ✅ Done (G3 provisional) | —      | Merged in #8–#13; manual checks (4.6) deferred, open risks in ADR-0003                                                                                                                        |
+| 5 Native pagination       | ✅ Done (G4 provisional) | —      | Merged in #15–#22; page-break manual checks open, risks in ADR-0003                                                                                                                           |
+| 6 React API & 0.1.0       | ✅ Done                  | —      | Merged in #23–#31; 0.1.0 on npm; manual checks shipped as known risks (ADR-0003)                                                                                                              |
+| 7 Rich content            | ✅ Done                  | —      | Merged in #33–#41; 0.2.0 on npm; list-document benchmark misses accepted (known limit)                                                                                                        |
+| 8 Word model & DOCX       | ✅ Done                  | —      | Merged in #44–#61; 0.3.0 on npm (`@folijs/docx` first released); gate G5 passed                                                                                                               |
+| 9 Review                  | ✅ Done                  | —      | Merged in #63–#72; 0.4.0 on npm                                                                                                                                                               |
+| 10 Tables & images        | ✅ Done                  | —      | Merged in #73–#97 (#90, the landing page, went to main); 0.5.0 on npm; two misses accepted                                                                                                    |
+| 11 Sections & templates   | ✅ Done                  | —      | Merged in #100–#118 (#106, #107, #110, #112 and #113, the site, went to main); 0.6.0 on npm; misses accepted                                                                                  |
+| 12 Ecosystem & 1.0        | ✅ Done                  | —      | Merged in #120–#133; 1.0.0 on npm (2026-11-20); Phase 5 speed misses and manual checks accepted as 1.0 risks                                                                                  |
+| 13 Agent library          | ✅ Done                  | —      | Merged in #138–#146; `@folijs/agent` 0.1.0 on npm (2026-11-21)                                                                                                                                |
+| 14 MCP server             | ✅ Done                  | —      | Merged in #148–#162; `@folijs/mcp` 0.1.0 on npm (2026-11-21); a model in a client of its own is not tried (see 14.8)                                                                          |
+| 15 Toolbar                | ✅ Done                  | —      | Merged in #149–#160; 1.1.0 on npm (2026-11-21); the release's bench ran on a busy machine (see #160)                                                                                          |
+| 16 Code mode              | ✅ Done                  | —      | Merged in #164–#176; `@folijs/mcp` 0.2.0 and `@folijs/agent` 0.2.0 on npm (2026-11-21), `run` behind `--code`; four security reviews; not tried in a client of its own                        |
+| 17 Toolbar for developers | ✅ Done                  | —      | Merged in #167–#173; 1.2.0 on npm (2026-11-21), released with Phase 16 (#176)                                                                                                                 |
+| 18 Hint                   | ✅ Done                  | —      | Merged in #180–#184; 1.3.0 and `@folijs/agent` 0.3.0 on npm (2026-11-22)                                                                                                                      |
+| 19 Editing gaps           | ✅ Done                  | —      | Merged in #187–#202; 1.4.0 (schema 6), `@folijs/agent` 0.3.1 and `@folijs/mcp` 0.2.2 on npm (2026-11-22); text boxes in find and crop handles left for later; Android and touch emulated only |
+| 20 Corpus run             | ✅ Done                  | —      | Merged in #206–#222; its five `@folijs/docx` fixes ship with Phase 21's release (owner, 2026-11-23)                                                                                           |
+| 21 Hardening              | ✅ Done                  | —      | Merged in #220–#236; the release (1.5.0: a pending React changeset is minor; `@folijs/agent` 0.3.2, `@folijs/mcp` 0.2.3) waits for the owner's approval                                       |
+| 22 Collaboration          | Ready                    | —      | Planned 2026-11-23, nothing built: central authority over steps; Phase 21 is done                                                                                                             |
+| 23 Agent editing parity   | Ready                    | —      | Planned 2026-11-23, nothing built: the agent edits tables, formatting, lists, pictures, headers and review as a user can                                                                      |
 
 Status values: `Ready` (dependencies met, nobody on it) · `In progress` · `In review` (PR open) ·
 `✅ Done` (merged, acceptance criteria met) · `Blocked by …`.
@@ -2993,8 +2993,8 @@ An audit of every package on 2026-11-22 (one reviewer per area, told to skip wha
 [limitations.md](limitations.md) already lists) found bugs that lose data, hang the editor or
 leak a document between users, none of them reported by a user yet. The owner chose on
 2026-11-22 to fix these as a phase before new features. Each item was found by reading the code;
-those marked "reproduced" were run by the auditor in a scratch test. Planned 2026-11-22, nothing
-built.
+those marked "reproduced" were run by the auditor in a scratch test. Planned 2026-11-22; built
+2026-11-23 (#220–#236), each task reviewed by an agent before its merge.
 
 Not in this phase: the features the audit listed (below, under After 1.0), Phase 20's corpus
 fixes (its own phase; 21.10 touches `packages/docx` only where Phase 20 has not), the speed
@@ -3101,12 +3101,17 @@ review. 21.1 to 21.6 lose data, hang or leak: they go first, in this order.
   (Done: the browser tests and examples run in a Windows job the publish waits for, as the
   visual snapshots are Windows'; not run in GitHub yet, the first release will. Branch
   protection and the reviewer on `npm` written in contributing.md for the owner.)
-- [ ] 21.13 Docs and release: limitations.md updated ("as of" its version, what this phase
+- [x] 21.13 Docs and release: limitations.md updated ("as of" its version, what this phase
   fixed or accepted), the stale `shortcut:` comments the audit found (`core/src/state/word.ts`
   v2, `mark.ts` Phase 9) removed or rewritten, changesets per package; patch releases
   (packages at 1.4.x, agent, mcp) published with the owner's approval.
+  (Done but the release: docs, limitations.md and changesets ready; the shortcuts rewritten.
+  Waiting for the owner: approval to publish, and acceptance of two limits written down in
+  limitations.md, editing in a shadow root in WebKit and Russian and Ukrainian date controls.
+  The new options (`exportPdf`'s `signal` and `timeout`, `exportDocx`'s `asDocument` and
+  `dropped`) are under patch changesets; the owner may prefer minor versions.)
 
-## Phase 22 — Real-time collaboration · L → 1.5.0, `@folijs/collab` 0.1.0
+## Phase 22 — Real-time collaboration · L → 1.6.0, `@folijs/collab` 0.1.0
 
 Several people edit one document at once, as in Google Docs: each sees the others' typing,
 cursors and names within a moment, and the document stays a lossless Word document. Asked for
