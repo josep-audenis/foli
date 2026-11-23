@@ -35,11 +35,8 @@ export function idSlot(clientID: string | number): number {
   return hash % ID_SPACE;
 }
 
-/**
- * Gives an editor's new ids `clientID`'s class.
- * @internal
- */
-export const idSlotPlugin = (clientID: string | number): Plugin<SlotState> =>
+/** Gives an editor's new ids `clientID`'s class (what `collab` does, without the rest). */
+export const idSlotPlugin = (clientID: string | number): Plugin<{ readonly slot: number }> =>
   new Plugin({
     key: collabKey,
     state: { init: () => ({ slot: idSlot(clientID) }), apply: (_tr, value) => value },

@@ -201,7 +201,9 @@ function settle(hub: Hub): void {
 function simulate(count: number, ops: readonly Op[]): Hub {
   const hub = new Hub();
   for (let id = 1; id <= count; id++) new Client(id, hub);
-  ops.forEach((o, serial) => run(hub.clients[o.client % count] as Client, o, serial));
+  ops.forEach((o, serial) => {
+    run(hub.clients[o.client % count] as Client, o, serial);
+  });
   settle(hub);
   return hub;
 }

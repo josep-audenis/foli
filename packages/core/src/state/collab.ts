@@ -8,7 +8,7 @@
  */
 import type { Node } from "../model/index.js";
 import type { Step } from "../transform/steps.js";
-import { collabKey, idSlot, type SlotState } from "./ids.js";
+import { collabKey, idSlot } from "./ids.js";
 import { type EditorState, isRemote, Plugin, remote, type Transaction } from "./state.js";
 import { afterEnvelopeSteps, EnvelopeStep, storyStepsApply, wordContext } from "./word.js";
 
@@ -28,7 +28,8 @@ interface Unconfirmed {
   readonly inverted: Step;
 }
 
-interface CollabState extends SlotState {
+interface CollabState {
+  readonly slot: number;
   readonly version: number;
   readonly clientID: string | number;
   readonly unconfirmed: readonly Unconfirmed[];
