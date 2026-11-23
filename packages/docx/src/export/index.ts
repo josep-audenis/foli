@@ -227,24 +227,24 @@ export interface ExportOptions {
 
 const DOCUMENT_MAIN =
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml";
-const VBA = /\/relationships\/(vbaProject|wordVbaData|keyMapCustomizations)$/;
+const VBA = /\/relationships\/vbaProject$/;
 
 /**
- * `pkg`'s macros (the VBA project, what it relates, the keyboard customizations that run them)
- * and the main part's relationships to them: what a `.docx` cannot hold.
+ * `pkg`'s macros: the VBA project the main part relates and every part it relates in turn (its
+ * data, its signatures), with their relationships parts. What a `.docx` cannot hold.
  */
 function macroParts(pkg: DocxPackage): string[] {
   const out = new Set<string>();
-  const visit = (source: string) => {
+  const visit = (source: string, all: boolean) => {
     for (const r of pkg.relationships(source)) {
-      if (r.external || !r.partName || !VBA.test(r.type) || out.has(r.partName)) continue;
+      if (r.external || !r.partName || out.has(r.partName) || !(all || VBA.test(r.type))) continue;
       out.add(r.partName);
       const rels = relationshipsPartName(r.partName);
       if (pkg.part(rels)) out.add(rels);
-      visit(r.partName);
+      visit(r.partName, true);
     }
   };
-  visit(pkg.mainDocument);
+  visit(pkg.mainDocument, false);
   return [...out].filter((name) => pkg.part(name));
 }
 
@@ -331,7 +331,9 @@ export async function exportDocx(
         text = text.slice(0, child.start) + text.slice(child.end);
     replace.set(relsName, new TextEncoder().encode(text));
   }
-  if (drop.length) options.dropped?.(drop);
+  // What a user would miss: the parts, not their relationships parts.
+  const said = drop.filter((name) => !name.endsWith(".rels"));
+  if (said.length) options.dropped?.(said);
   return out.write(replace, [], { drop, main: DOCUMENT_MAIN });
 }
 
@@ -518,14 +520,16 @@ async function intoPackage(
       return existing.name;
     }
     if (!needed) return undefined;
-    if (relationship?.partName) {
+    const pointed = relationship?.partName;
+    if (
+      pointed &&
+      /^\/[^/]/.test(pointed) &&
+      !pointed.endsWith("/") &&
+      !/\/_rels\/|^\/\[content_types\]\.xml$/i.test(pointed)
+    ) {
       // Related, but the package lacks the part: made where the relationship points.
-      add.push({
-        name: relationship.partName,
-        data: encoder.encode(write(undefined, namespaces)),
-        contentType,
-      });
-      return relationship.partName;
+      add.push({ name: pointed, data: encoder.encode(write(undefined, namespaces)), contentType });
+      return pointed;
     }
     if (pkg.part(defaultName)) {
       // There, but not related to the document: written in place, then related.

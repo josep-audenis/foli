@@ -284,7 +284,18 @@ export function newSettingsXml(
   const compat =
     (settings.doNotUseHTMLParagraphAutoSpacing ? `<w:${SPACING}/>` : "") +
     (fresh
-      ? '<w:compatSetting w:name="compatibilityMode" w:uri="http://schemas.microsoft.com/office/word" w:val="15"/>'
+      ? [
+          ["compatibilityMode", "15"],
+          ["overrideTableStyleFontSizeAndJustification", "1"],
+          ["enableOpenTypeFeatures", "1"],
+          ["doNotFlipMirrorIndents", "1"],
+          ["differentiateMultirowTableHeaders", "1"],
+        ]
+          .map(
+            ([name, value]) =>
+              `<w:compatSetting w:name="${name}" w:uri="http://schemas.microsoft.com/office/word" w:val="${value}"/>`,
+          )
+          .join("")
       : "");
   const children =
     (trackRevisions ? "<w:trackRevisions/>" : "") +

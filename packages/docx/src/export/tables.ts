@@ -68,7 +68,7 @@ function sidesXml(name: string, value: unknown, sides: readonly string[], one: t
     name,
     {},
     sides
-      .filter((side) => !(twin[side] && v[twin[side] as string] !== undefined))
+      .filter((side) => !(twin[side] && v[twin[side] as string] != null))
       .map((side) => one(side, v[side]))
       .join(""),
   );

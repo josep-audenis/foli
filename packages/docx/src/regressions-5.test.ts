@@ -100,14 +100,15 @@ describe("21.10", () => {
 describe("a .docm written as a .docx (21.10)", () => {
   const W_NS = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
   const OFFICE = "http://schemas.microsoft.com/office/2006/relationships";
-  const docm = async () => {
+  const docm = async (mainByDefault = false) => {
     const files: Record<string, string> = {
-      "[Content_Types].xml": `<?xml version="1.0"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Default Extension="bin" ContentType="application/vnd.ms-office.vbaProject"/><Override PartName="/word/document.xml" ContentType="application/vnd.ms-word.document.macroEnabled.main+xml"/><Override PartName="/word/vbaData.xml" ContentType="application/vnd.ms-word.vbaData+xml"/></Types>`,
+      "[Content_Types].xml": `<?xml version="1.0"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="${mainByDefault ? "application/vnd.ms-word.document.macroEnabled.main+xml" : "application/xml"}"/><Default Extension="bin" ContentType="application/vnd.ms-office.vbaProject"/>${mainByDefault ? "" : '<Override PartName="/word/document.xml" ContentType="application/vnd.ms-word.document.macroEnabled.main+xml"/>'}<Override PartName="/word/vbaData.xml" ContentType="application/vnd.ms-word.vbaData+xml"/></Types>`,
       "_rels/.rels": `<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>`,
       "word/document.xml": `<w:document xmlns:w="${W_NS}"><w:body><w:p><w:r><w:t>Macro text</w:t></w:r></w:p></w:body></w:document>`,
       "word/_rels/document.xml.rels": `<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId9" Type="${OFFICE}/vbaProject" Target="vbaProject.bin"/></Relationships>`,
       "word/vbaProject.bin": "VBA",
-      "word/_rels/vbaProject.bin.rels": `<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="${OFFICE}/wordVbaData" Target="vbaData.xml"/></Relationships>`,
+      "word/_rels/vbaProject.bin.rels": `<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="${OFFICE}/wordVbaData" Target="vbaData.xml"/><Relationship Id="rId2" Type="${OFFICE}/vbaProjectSignature" Target="vbaProjectSignature.bin"/></Relationships>`,
+      "word/vbaProjectSignature.bin": "SIG",
       "word/vbaData.xml": `<wne:vbaSuppData xmlns:wne="http://schemas.microsoft.com/office/word/2006/wordml"/>`,
     };
     const entries = [];
@@ -128,9 +129,9 @@ describe("a .docm written as a .docx (21.10)", () => {
       },
     });
     expect([...dropped].sort()).toEqual([
-      "/word/_rels/vbaProject.bin.rels",
       "/word/vbaData.xml",
       "/word/vbaProject.bin",
+      "/word/vbaProjectSignature.bin",
     ]);
     const out = await readPackage(bytes);
     expect(out.parts.map((p) => p.name).filter((n) => /vba/i.test(n))).toEqual([]);
@@ -138,5 +139,13 @@ describe("a .docm written as a .docx (21.10)", () => {
       "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml",
     );
     expect(out.text("/word/_rels/document.xml.rels")).not.toContain("vbaProject");
+  });
+
+  it("is a document when its main part was typed by a Default", async () => {
+    const { document, package: pkg } = await importDocx(await docm(true));
+    const out = await readPackage(await exportDocx(document, pkg, { asDocument: true }));
+    expect(out.part("/word/document.xml")?.contentType).toBe(
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml",
+    );
   });
 });

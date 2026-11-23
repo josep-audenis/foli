@@ -823,7 +823,7 @@ function run(
 function spaced(el: XmlElement, context: ContentContext): string {
   const value = textOf(el);
   const preserve =
-    context.preserved?.(el) ??
+    context.preserved?.(el) ||
     el.attributes.some((a) => a.local === "space" && a.prefix === "xml" && a.value === "preserve");
   return preserve ? value : value.replace(/^[ \t\r\n]+|[ \t\r\n]+$/g, "");
 }

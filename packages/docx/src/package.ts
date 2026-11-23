@@ -249,6 +249,7 @@ export class DocxPackage {
     }
     if (overrides.length || dropped.size || change.main) {
       let types = this.#contentTypesText;
+      let mainTyped = false;
       if (dropped.size || change.main) {
         // From the end: earlier positions stay.
         const root = parseXml(types).root;
@@ -257,13 +258,20 @@ export class DocxPackage {
           if (child.local !== "Override") continue;
           const name = key(attribute(child, "PartName") ?? "");
           if (dropped.has(name)) types = types.slice(0, child.start) + types.slice(child.end);
-          else if (change.main && name === key(this.mainDocument))
+          else if (change.main && name === key(this.mainDocument)) {
+            mainTyped = true;
             types =
               types.slice(0, child.start) +
               `<${this.#contentTypesPrefix}Override PartName="${escapeXml(this.mainDocument)}" ContentType="${escapeXml(change.main)}"/>` +
               types.slice(child.end);
+          }
         }
       }
+      // Typed by its extension's Default: an Override says the new type.
+      if (change.main && !mainTyped)
+        overrides.push(
+          `<${this.#contentTypesPrefix}Override PartName="${escapeXml(this.mainDocument)}" ContentType="${escapeXml(change.main)}"/>`,
+        );
       const close = types.lastIndexOf("</");
       pending.set(
         key(CONTENT_TYPES),
