@@ -184,9 +184,9 @@ describe("regressions", () => {
     expect((await call("save", { document: "d1" })).text).toBe(
       "Saved d1 as 01-mutual-nda.agent-2.docx.",
     );
-    expect(
-      (await call("save", { document: "d1", path: "01-mutual-nda.agent.docx" })).refused,
-    ).toBe(true);
+    expect((await call("save", { document: "d1", path: "01-mutual-nda.agent.docx" })).refused).toBe(
+      true,
+    );
     const { document } = await importDocx(readFileSync(join(root, "01-mutual-nda.agent.docx")));
     expect(JSON.stringify(document)).toContain("BILATERAL");
     await client.close();
