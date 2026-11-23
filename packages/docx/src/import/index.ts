@@ -84,7 +84,10 @@ export function importPackage(pkg: DocxPackage): DocxImport {
       report,
       pkg,
       part,
-      preserved: (el: XmlElement) => (preserved ??= preservedIn(pkg.xml(part).root)).has(el),
+      preserved: (el: XmlElement) => {
+        preserved ??= preservedIn(pkg.xml(part).root);
+        return preserved.has(el);
+      },
       moves: new Moves(),
       relationship,
       resources,
@@ -216,7 +219,10 @@ export function packageStories(pkg: DocxPackage): {
       report,
       pkg,
       part,
-      preserved: (el: XmlElement) => (preserved ??= preservedIn(pkg.xml(part).root)).has(el),
+      preserved: (el: XmlElement) => {
+        preserved ??= preservedIn(pkg.xml(part).root);
+        return preserved.has(el);
+      },
       moves: new Moves(),
       relationship: (id) => byId.get(id),
       resources,
