@@ -476,7 +476,7 @@ pictures 4, review 9 files).
 
 ## External test files (`external.json`)
 
-About 3 500 test documents of Apache POI, LibreOffice, docx4j, python-docx and the Open XML
+3 551 test documents (3 445 distinct) of Apache POI, LibreOffice, docx4j, python-docx and the Open XML
 SDK, pinned by commit and SHA-256, downloaded into `.corpus-cache/` and never committed
 ([ADR-0011](../docs/decisions/ADR-0011-external-corpus.md), Phase 20). `pnpm corpus:fetch`,
 `pnpm corpus:run`, `pnpm corpus:render` and the Word sample (`scripts/corpus/word-sample.mjs`):

@@ -427,11 +427,13 @@ Unstable (0.x). Details in the [package README](../packages/mcp/README.md) and
 Details in the [package README](../packages/docx/README.md).
 
 - Checked over 3 445 external test files ([corpus-report.md](corpus-report.md)): 3 259 import,
-  export and read back, 3 204 of them with no difference counted, none crashes. What still
-  differs changes the file, not what it shows: an empty `w:hyperlink` dropped, field lock and
-  dirty flags normalized, `w:tblPr`/`w:tblGrid` written for a table without them, a paragraph
-  added to an empty body, a break's default type left out. In Word, 150 of them and their
-  exports measure the same but one: a literal soft hyphen (U+00AD) or non-breaking hyphen
+  export and read back, 3 204 of them with no difference counted, none crashes. Most of what
+  still differs changes the file, not what it shows: an empty `w:hyperlink` dropped, field lock
+  and dirty flags normalized, `w:tblPr`/`w:tblGrid` written for a table without them, a
+  paragraph added to an empty body, a break's default type left out. Besides: 8 files with two
+  `w:pPr` in a paragraph get one, merged as Word merges them; one POI file has its `w:ins` and
+  `w:moveFrom` nested the other way round. In Word, of a sample of 150, the 143 Word measured
+  measure the same in the export but one: a literal soft hyphen (U+00AD) or non-breaking hyphen
   (U+2011) in `w:t` comes back as `w:softHyphen` / `w:noBreakHyphen`.
 - Strict Open XML documents are refused (`DocxError`): 71 of the corpus run's 3 445 files, on
   the backlog. So is a document whose root is inside markup compatibility (`mc:AlternateContent`,
