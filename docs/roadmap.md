@@ -3121,8 +3121,17 @@ server editing a shared document; a hosted service.
 - Most envelope changes are not steps: styles, numbering, resources and the rest go through
   `withEnvelope`, a transaction meta (about 15 callers: `wordformat.ts`, `notes.ts`,
   `pictures.ts`, `controls.ts`, `fieldupdate.ts`, `tablecommands.ts`, `review.ts`,
-  `stories.ts`, the view, the agent). Steps alone would not carry them to other clients.
-  `EnvelopeStep` covers only `section`, `settings` and `controls`.
+  `stories.ts`, the view, the agent). Steps alone would not carry them to other clients, and
+  history does not record them (undo leaves a style change as it is). `EnvelopeStep` covers
+  `section`, `settings` and `controls`; `withEnvelope` cannot change `settings` or comments
+  (`word.ts:391`), and changes `section` and `controls` too, beside `EnvelopeStep`.
+- Whether edits are tracked (`w:trackRevisions`) is the track plugin's state, set by meta
+  (`track.ts:137`), an editor option and an `exportDocx` argument: not part of the document,
+  so neither other clients nor a server's snapshot would have it. Every dispatched transaction
+  goes through `trackTransaction` (`editor.ts:603`), so a received one would be tracked again.
+- Two plugins filter transactions by their metas (locked controls, `controls.ts:417`; stories,
+  `stories.ts:211`): a received transaction carries none, so an edit the sender was allowed to
+  make could be refused on another client, and the documents would part.
 - `StoryStep` replaces a whole header, footer or note (`before`/`after`) and maps to itself: two
   people typing in one header at once would overwrite each other.
 - New ids are the largest in the document plus one (`nextRevisionId`, `track.ts:223`; comments,
@@ -3173,10 +3182,13 @@ lets the agent library return steps); 22.7 onwards build it.
   registry (`Step.jsonID`) so an extension can add its own; slices keep `ext`, `attributes` and
   opaque nodes. Property test: random transactions → JSON → applied on a second state give the
   same document. `fromJSON` validates its input (a trust boundary: it will read the network).
-- [ ] 22.3 Envelope changes as steps: `withEnvelope` keeps its signature but adds a step for each
-  envelope key it changes (styles, numbering, resources…), with `before` and `after` so a
-  change made from a stale value is refused. Undo and redo unchanged; tests for each caller
-  listed above.
+- [ ] 22.3 Envelope changes as steps: `withEnvelope` keeps its signature but adds an
+  `EnvelopeStep` for each key it changes (`styles`, `numbering`, `resources`, `section`,
+  `controls` and the rest it can change; a list in the ADR), with `before` and `after` so a
+  change made from a stale value is refused. This changes undo: a style or numbering change is
+  undone with the edit it came with (today it stays); limitations.md and the changeset say so.
+  The tracking switch becomes a `settings` value carried by a step, read by the track plugin
+  and by `exportDocx` when no argument is given. Tests for each caller listed above.
 - [ ] 22.4 Stories that merge: a story change carries the story's own steps (story id + steps)
   instead of the whole story, so two edits in one header rebase. `StoryStep` kept for
   creating and removing a story. Tests: two transactions in one footer, applied in either order,
@@ -3185,9 +3197,12 @@ lets the agent library return steps); 22.7 onwards build it.
   never collide between two editors of one document (an id space per client, from its
   `clientID`). Export unchanged for a single editor. Test: two editors tracking changes at once,
   exported, have unique `w:id`s.
-- [ ] 22.6 Appended transactions run once: the four plugins skip transactions that came from
-  another client (a `remote` meta set by 22.7), since the sender already sent their steps.
-  Test: two editors stay identical after edits that trigger each plugin.
+- [ ] 22.6 Received transactions are applied as they are: this task defines a `remote` meta
+  (22.7 sets it; the tests here set it by hand). With it, the four appending plugins add
+  nothing (the sender already sent their steps), the filters of locked controls and stories let
+  it through (the sender's checks held, and the authority's `authorize` decides), and
+  `trackTransaction` leaves it untracked. Test: two editors stay identical after edits that
+  trigger each plugin and filter, tracking on.
 - [ ] 22.7 The client plugin (`packages/core`, headless): `collab({ version, clientID })`,
   `sendableSteps(state)`, `receiveTransaction(state, steps, clientIDs)`, `getVersion(state)`.
   Unconfirmed steps are rebased over received ones through mapping; history takes received
