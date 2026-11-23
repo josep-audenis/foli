@@ -474,6 +474,15 @@ as 16.0.20527's but for the build number): the same numbers on screen and in the
 round trip passes again (sections 4, stories 24, fields 24, controls 9, find 9, tables 10,
 pictures 4, review 9 files).
 
+## External test files (`external.json`)
+
+3 551 test documents (3 445 distinct) of Apache POI, LibreOffice, docx4j, python-docx and the Open XML
+SDK, pinned by commit and SHA-256, downloaded into `.corpus-cache/` and never committed
+([ADR-0011](../docs/decisions/ADR-0011-external-corpus.md), Phase 20). `pnpm corpus:fetch`,
+`pnpm corpus:run`, `pnpm corpus:render` and the Word sample (`scripts/corpus/word-sample.mjs`):
+[docs/testing/corpus.md](../docs/testing/corpus.md); the results:
+[docs/corpus-report.md](../docs/corpus-report.md).
+
 ## Private documents
 
 Real documents (contracts, templates) are never committed. Keep them in a folder outside the
