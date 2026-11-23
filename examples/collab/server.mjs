@@ -2,9 +2,13 @@
 // (`@folijs/collab`), a JSON file as its store, and the built page. What the app keeps (ADR-0012):
 // the transport, the store, who the clients are. Run `npm run build` first, then
 // `node server.mjs [--port 5184] [--store store.json]`.
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+//
+// An example, not a product: no login (a client is whoever holds its token), any page may
+// connect (no Origin check). An app authenticates its users and checks who may edit (`authorize`).
+import { randomUUID } from "node:crypto";
+import { existsSync, readFileSync, renameSync, statSync, writeFileSync } from "node:fs";
 import { createServer } from "node:http";
-import { extname, join, normalize } from "node:path";
+import { extname, join, normalize, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createAuthority } from "@folijs/collab";
 import { createDocument } from "@folijs/core";
@@ -18,8 +22,9 @@ const port = Number(arg("port", "5184"));
 const here = fileURLToPath(new URL(".", import.meta.url));
 const store = join(here, arg("store", "store.json"));
 const dist = join(here, "dist");
+const MESSAGE_SIZE = 4_000_000;
 
-// The stored snapshot, or a new document with a paragraph to edit.
+// The stored snapshot and log, or a new document with a paragraph to edit.
 const saved = existsSync(store) ? JSON.parse(readFileSync(store, "utf8")) : null;
 const authority = createAuthority({
   document:
@@ -29,15 +34,43 @@ const authority = createAuthority({
       content: [{ type: "paragraph", content: [{ type: "text", text: "Edit this together." }] }],
     }),
   version: saved?.version ?? 0,
+  ...(saved?.log ? { log: saved.log } : {}),
+  limits: { messageSize: MESSAGE_SIZE },
 });
-const persist = () => writeFileSync(store, JSON.stringify(authority.snapshot()));
+/** Who the clients are: the secret token each was given, and its id. Kept with the document. */
+const tokens = new Map(Object.entries(saved?.tokens ?? {}));
+/** Small integers, one per client ever seen: they also keep the clients' new ids apart. */
+let nextClient = saved?.nextClient ?? 1;
+
+// Written whole to a file beside it and renamed over it (a crash never leaves half a store),
+// at most once a tick (a burst of batches is one write).
+let pending = false;
+const persist = () => {
+  if (pending) return;
+  pending = true;
+  setImmediate(() => {
+    pending = false;
+    const data = {
+      ...authority.snapshot(),
+      log: authority.log,
+      tokens: Object.fromEntries(tokens),
+      nextClient,
+    };
+    writeFileSync(`${store}.tmp`, JSON.stringify(data));
+    renameSync(`${store}.tmp`, store);
+  });
+};
 
 const TYPES = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css" };
 const server = createServer((request, response) => {
   const path = new URL(request.url ?? "/", "http://localhost").pathname;
-  // Only files under dist/, never outside it.
+  // Only files under dist/, never outside it, never a folder.
   const file = normalize(join(dist, path === "/" ? "index.html" : path));
-  if (!file.startsWith(dist) || !existsSync(file)) {
+  let found = false;
+  try {
+    found = file.startsWith(dist + sep) && statSync(file).isFile();
+  } catch {}
+  if (!found) {
     response.writeHead(404).end();
     return;
   }
@@ -45,16 +78,17 @@ const server = createServer((request, response) => {
   response.end(readFileSync(file));
 });
 
-const sockets = new WebSocketServer({ server, maxPayload: 4_000_000 });
-/** Small integers, one per connection: they also keep the clients' new ids apart. */
-let nextClient = 1;
+const sockets = new WebSocketServer({ server, maxPayload: MESSAGE_SIZE });
+/** The ids connected now: a token is honoured by one connection at a time. */
+const connected = new Set();
 const send = (socket, message) => socket.readyState === 1 && socket.send(JSON.stringify(message));
 const everyone = (message) => {
   for (const socket of sockets.clients) send(socket, message);
 };
 
 sockets.on("connection", (socket) => {
-  // Who it is: told by its first message (`hello`), a new id unless it comes back with one.
+  // Who it is: told by its first message (`hello`), through the token it was given; a new client
+  // otherwise. A client never names its own id.
   let clientID = null;
   socket.on("message", (data) => {
     let message;
@@ -65,16 +99,24 @@ sockets.on("connection", (socket) => {
     }
     if (clientID === null) {
       if (message?.type !== "hello") return;
-      const back = Number.isSafeInteger(message.clientID) && message.clientID < nextClient;
-      clientID = back ? message.clientID : nextClient++;
+      const known = typeof message.token === "string" ? tokens.get(message.token) : undefined;
+      const back = known !== undefined && !connected.has(known);
+      let token = message.token;
+      if (back) clientID = known;
+      else {
+        clientID = nextClient++;
+        token = randomUUID();
+        tokens.set(token, clientID);
+        persist();
+      }
+      connected.add(clientID);
       // Back from a version the log still has: the steps since. Otherwise the whole document.
       const missed = back ? authority.stepsSince(Number(message.version)) : null;
       if (missed && !("snapshot" in missed)) send(socket, { type: "steps", ...missed });
-      else send(socket, { type: "init", clientID, snapshot: authority.snapshot() });
+      else send(socket, { type: "init", clientID, token, snapshot: authority.snapshot() });
       return;
     }
     if (message?.type === "steps") {
-      // The client's id is the connection's, whatever the message says.
       const result = authority.receive(message, clientID);
       if (result.ok) {
         persist();
@@ -90,7 +132,9 @@ sockets.on("connection", (socket) => {
     }
   });
   socket.on("close", () => {
-    if (clientID !== null) everyone({ type: "leave", clientID });
+    if (clientID === null) return;
+    connected.delete(clientID);
+    everyone({ type: "leave", clientID });
   });
 });
 

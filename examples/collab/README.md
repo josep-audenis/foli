@@ -13,3 +13,9 @@ npm install && npm run build && npm start   # http://localhost:5184/?name=Ann
 
 Open it in two windows with different names. `pnpm examples` at the repository root builds it
 from the packed packages and runs `examples/e2e/collab.spec.ts` against it.
+
+An example, not a product: there is no login (a client is whoever holds the token the server
+gave it), and any page may connect to the server (no Origin check). An app authenticates its
+users, passes their ids to `authority.receive(message, clientID)` and decides who may edit
+(`authorize`). The store holds the snapshot, the log (so clients catch up after a restart) and
+the clients' tokens.
