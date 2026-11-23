@@ -44,6 +44,11 @@ export interface FoliCommentsProps {
     className?: string | undefined;
     /** Not shown (still following the editor: a comment made meanwhile opens for writing). */
     hidden?: boolean | undefined;
+    /**
+     * Edit and delete only the editor's author's comments (`createEditor({ author })`, by name).
+     * It hides the buttons, it does not guard the document: commands still change any comment.
+     */
+    onlyOwnComments?: boolean | undefined;
 }
 /**
  * The comments pane: the document's comment threads beside the pages, each next to its text,
@@ -53,7 +58,7 @@ export interface FoliCommentsProps {
  * writing, and goes when cancelled empty. Render it beside the pages (`FoliEditor` does): it
  * finds the comments' text in the nearest ancestor holding them.
  */
-export declare function FoliComments({ editor: editorProp, readOnly, label, className, hidden, }: FoliCommentsProps): import("react").JSX.Element;
+export declare function FoliComments({ editor: editorProp, readOnly, label, className, hidden, onlyOwnComments, }: FoliCommentsProps): import("react").JSX.Element;
 
 // FoliEditor.d.ts
 import { type DocumentTarget, type Editor, type EditorDocument, type Extension, type FoliDocument, type Plugin, type ReviewView, type Transaction } from "@folijs/core";
@@ -120,6 +125,8 @@ export interface FoliEditorProps extends Omit<FoliCanvasProps, "editor"> {
      * document has comments, `true` always, `false` never.
      */
     comments?: boolean | "auto" | undefined;
+    /** The comments pane edits and deletes only `author`'s comments (`FoliComments`). */
+    onlyOwnComments?: boolean | undefined;
     /** Rendered between the toolbar and the pages, inside the editor's context. */
     children?: ReactNode | undefined;
 }

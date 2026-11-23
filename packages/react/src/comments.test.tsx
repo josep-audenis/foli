@@ -31,9 +31,16 @@ const document3 = (comments: FoliDocument["comments"]): FoliDocument => ({
 });
 const note = (text: string) => [{ type: "paragraph", content: [{ type: "text", text }] }];
 
-function setup(comments: FoliDocument["comments"]) {
+function setup(comments: FoliDocument["comments"], onlyOwnComments?: boolean) {
   const ref = createRef<FoliEditorHandle>();
-  render(<FoliEditor ref={ref} initialContent={document3(comments)} author="Me" />);
+  render(
+    <FoliEditor
+      ref={ref}
+      initialContent={document3(comments)}
+      author="Me"
+      onlyOwnComments={onlyOwnComments}
+    />,
+  );
   return (ref.current as FoliEditorHandle).editor;
 }
 const pane = () => screen.getByRole("complementary", { name: "Comments" });
@@ -194,5 +201,48 @@ describe("FoliComments in FoliEditor", () => {
       />,
     );
     expect(within(pane()).queryAllByRole("button")).toEqual([]);
+  });
+
+  it("replies to a reply at the end of its thread", () => {
+    const editor = setup([
+      { id: 0, author: "Ana", content: note("Which world?") },
+      { id: 1, author: "Ben", content: note("This one"), parent: 0 },
+    ]);
+    const thread = within(pane()).getByRole("article", { name: "Comment by Ana" });
+    fireEvent.click(within(thread).getByRole("button", { name: "Reply to Ben" }));
+    fireEvent.change(within(thread).getByRole("textbox", { name: "Reply" }), {
+      target: { value: "Agreed" },
+    });
+    fireEvent.click(within(thread).getByRole("button", { name: "Save" }));
+    expect(editor.getDocument().comments.map((c) => [c.author, c.parent])).toEqual([
+      ["Ana", undefined],
+      ["Ben", 0],
+      ["Me", 0],
+    ]);
+  });
+
+  it("edits and deletes only the author's own comments when asked", () => {
+    const comments = [
+      { id: 0, author: "Ana", content: note("Which world?") },
+      { id: 1, author: "Me", content: note("This one"), parent: 0 },
+    ];
+    setup(comments, true);
+    const thread = within(pane()).getByRole("article", { name: "Comment by Ana" });
+    const names = () =>
+      within(thread)
+        .queryAllByRole("button")
+        .map((b) => b.getAttribute("aria-label") ?? b.textContent);
+    expect(names()).toEqual([
+      "Reply",
+      "Resolve",
+      "Reply to Me",
+      "Edit reply by Me",
+      "Delete reply by Me",
+    ]);
+    cleanup();
+    // Off (the default): every comment.
+    setup(comments);
+    expect(within(pane()).getByRole("button", { name: "Edit comment by Ana" })).toBeTruthy();
+    expect(within(pane()).getByRole("button", { name: "Delete comment by Ana" })).toBeTruthy();
   });
 });

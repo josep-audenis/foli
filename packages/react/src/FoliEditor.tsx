@@ -93,6 +93,8 @@ export interface FoliEditorProps extends Omit<FoliCanvasProps, "editor"> {
    * document has comments, `true` always, `false` never.
    */
   comments?: boolean | "auto" | undefined;
+  /** The comments pane edits and deletes only `author`'s comments (`FoliComments`). */
+  onlyOwnComments?: boolean | undefined;
   /** Rendered between the toolbar and the pages, inside the editor's context. */
   children?: ReactNode | undefined;
 }
@@ -124,6 +126,7 @@ export const FoliEditor = forwardRef<FoliEditorHandle, FoliEditorProps>(function
     toolbar = true,
     toolbarProps,
     comments = "auto",
+    onlyOwnComments,
     children,
     ...canvas
   },
@@ -208,6 +211,7 @@ export const FoliEditor = forwardRef<FoliEditorHandle, FoliEditorProps>(function
             editor={editor}
             readOnly={canvas.readOnly}
             hidden={comments === "auto" && !hasComments}
+            onlyOwnComments={onlyOwnComments}
           />
         )}
       </div>
