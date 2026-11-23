@@ -1264,6 +1264,12 @@ version. Details, the read format and examples: the
   `session.editor`, for core's `hint` or `goTo` in a view of that editor (0.3).
 - `session.document()`: the document to save or export. `session.editor`: the headless editor
   under the session, for what it has no operation for; `session.author`.
+- Tools for a model (0.4, ADR-0013): `agentTools(session)` → `AgentTool[]` (`name`,
+  `description`, `inputSchema`, `run(args)` → `ToolAnswer` `{ text, isError? }`, arguments
+  checked first); `AGENT_TOOLS`: `ToolDefinition[]`, the same over any session
+  (`run(session, args)`, and `methods`: `ScriptMethod[]`, code mode's); `INSTRUCTIONS`, said to
+  the model once; `READ_LIMIT` (200); `invalid(value, schema)`, why arguments do not fit a
+  `JsonSchema`, or null.
 
 ## `@folijs/mcp`
 
@@ -1276,7 +1282,7 @@ Foli's packages, at exact versions.
   anything with `write` (`Output`): JSON-RPC 2.0, a message a line, `initialize`, `ping`,
   `tools/list`, `tools/call`. Resolves when `input` ends. `ServerOptions`: `name`, `version`,
   `instructions`, `tools`, `onClient(name)`, `log(message)`.
-- `Tool`: `name`, `description`, `inputSchema` (`JsonSchema`, the subset the server checks:
+- `Tool`: `name`, `description`, `inputSchema` (`JsonSchema`, `@folijs/agent`'s, the subset the server checks:
   types, `description`, `properties`, `required`, `additionalProperties`, `items`, `enum`,
   `minimum`, `maximum`; `JsonSchemaOrAny` adds `anyOf`), and
   `run(args)` returning a `ToolResult` `{ text, isError? }` or a promise of one. Arguments are

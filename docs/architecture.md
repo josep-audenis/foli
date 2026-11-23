@@ -1174,14 +1174,15 @@ folder. Node only; no dependency but Foli's packages.
 - **Documents** (`documents.ts`): `open` imports a file (`@folijs/docx`) into an
   `@folijs/agent` session kept under an id until `close`; limits on a file, on how many are
   open and on what they hold together bound the memory.
-- **Tools** (`tools.ts`): one per operation of the library, returning its text; the server's
-  `instructions` are the read format. `server.ts` puts it together (`foliServer`); `bin.ts` is
+- **Tools** (`tools.ts`): `@folijs/agent`'s `AGENT_TOOLS` (ADR-0013) with a `document`
+  argument each, in a checkpoint and weight check per call, and the file tools; the server's
+  `instructions` are the library's `INSTRUCTIONS` with where documents come from and go. `server.ts` puts it together (`foliServer`); `bin.ts` is
   the command line.
 - **Code mode** (`code.ts`, `sandbox.ts`, `sandbox-worker.mjs`; ADR-0010), with `--code`: the
   `run` tool runs a script in QuickJS (WebAssembly) in a worker thread made for the run. The
   script calls `doc.replaceText(…)` as a function; under it the thread posts the call, waits
-  on `Atomics.wait`, and the server's thread answers from the session: the same operations
-  the tools call. Only JSON crosses. The server ends the thread at the time limit, counted from when the thread says it is ready (its start has a limit of its own). Before the
+  on `Atomics.wait`, and the server's thread answers from the session: the `methods` of the
+  same tool definitions. Only JSON crosses. The server ends the thread at the time limit, counted from when the thread says it is ready (its start has a limit of its own). Before the
   script the session marks a checkpoint (`session.checkpoint()` of `@folijs/agent`: it
   keeps the body, and a rollback puts it back whole in one untracked change, with the handles); a run that fails goes back to it.
 - **What it is not:** no network transport; no code run unless started with `--code`.

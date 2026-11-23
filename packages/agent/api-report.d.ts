@@ -7,8 +7,10 @@ export {};
 export type { Changed, CommentOptions, NewParagraph, ReplaceOptions } from "./operations.js";
 export { type Block, formatBlocks } from "./read.js";
 export type { Ok, Refusal, Result } from "./result.js";
+export { invalid, type JsonSchema, type JsonSchemaOrAny } from "./schema.js";
 export { type Checkpoint, openSession, type ReadOptions, type ReadResult, type Session, type SessionOptions, } from "./session.js";
 export type { Control, Unfilled, UpdateFieldsOptions } from "./templates.js";
+export { AGENT_TOOLS, type AgentTool, agentTools, INSTRUCTIONS, READ_LIMIT, type ScriptMethod, type ToolAnswer, type ToolDefinition, } from "./tools.js";
 
 // operations.d.ts
 import { type Block } from "./read.js";
@@ -99,6 +101,32 @@ export type Ok<T = object> = {
     ok: true;
 } & T;
 export type Result<T = object> = Ok<T> | Refusal;
+
+// schema.d.ts
+/**
+ * The part of JSON Schema the tools' arguments use (ADR-0013), and its check. Small on purpose:
+ * the arguments are flat objects of strings, numbers, booleans and short lists.
+ */
+export interface JsonSchema {
+    type: "object" | "string" | "integer" | "number" | "boolean" | "array" | "null";
+    description?: string;
+    /** An object's properties; nothing else is allowed in it. */
+    properties?: Record<string, JsonSchemaOrAny>;
+    required?: readonly string[];
+    additionalProperties?: boolean;
+    /** An array's items. */
+    items?: JsonSchemaOrAny;
+    enum?: readonly (string | number | boolean | null)[];
+    minimum?: number;
+    maximum?: number;
+}
+/** A schema, or one of several (`anyOf`): a value that fits any of them fits. */
+export type JsonSchemaOrAny = JsonSchema | {
+    anyOf: readonly JsonSchema[];
+    description?: string;
+};
+/** Why `value` does not fit `schema`, in words for a model, or null when it fits. */
+export declare function invalid(value: unknown, schema: JsonSchemaOrAny, path?: string): string | null;
 
 // session.d.ts
 import { type DocumentTarget, type Editor, type EditorDocument, type Extension, type FieldsReport, type FoliDocument } from "@folijs/core";
@@ -287,3 +315,69 @@ export interface UpdateFieldsOptions {
      */
     contents?: boolean;
 }
+
+// tools.d.ts
+import { type JsonSchema } from "./schema.js";
+import type { Session } from "./session.js";
+/** Blocks the `read` tool gives when it is not told how many. */
+export declare const READ_LIMIT = 200;
+/**
+ * What to say to the model once, before the tools (a system prompt's part). Each tool's
+ * description stands without it.
+ */
+export declare const INSTRUCTIONS = "These tools read and edit Word documents (.docx). Every edit is a tracked change a person will accept or reject in Word: change only what the task asks, and use comment to explain a change that is not obvious.\n\nWork on what read shows. read gives the document a line per block:\n  [b7] Clause, 1.1, changed: text\n[b7] is the block's handle: pass it to the other tools. After it come where the block is in a table (r1 c1: row and grid column; c1-2 a cell spanning two; \"merged down\" or \"merged up\" a vertical merge, its text in the top cell), its style, its list number, \"changed\" if it has tracked changes, its comments; after the colon, its text. \u21B5 is a line break. A line \"table, 3 rows, 2 columns\" is a table: its cells' blocks follow, indented. A line \"not editable: \u2026\" is content you cannot change.\nWords in brackets ([picture], [note], [empty: Offer date]) are not text: never put them in find. [empty: \u2026] is a content control to fill with fill_control; \u00ABName\u00BB is a merge field to fill with update_fields.\nA handle stays its block's while you edit; a deleted block's is refused. A tool that changes the document returns the blocks it changed as they are now: do not read again to check (after update_fields do: it returns none). When a tool refuses, its message says what to do instead: follow it.\nOnly the body is read and edited: headers, footers and the text of notes ([note]) are not shown.";
+/** What a tool answers the model: text, and whether it is a refusal. */
+export interface ToolAnswer {
+    text: string;
+    isError?: boolean;
+}
+/** A tool bound to a session: give the model its name, description and schema; call `run`. */
+export interface AgentTool {
+    name: string;
+    /** For the model: what it does, when to use it, what it returns. */
+    description: string;
+    /** Its arguments, as a JSON Schema object. */
+    inputSchema: JsonSchema & {
+        type: "object";
+    };
+    /** Does what the model asked; arguments that do not fit the schema are refused in words. */
+    run(args?: Record<string, unknown>): ToolAnswer;
+}
+/**
+ * A method of code mode's `doc` (ADR-0010): what a script calls instead of a tool. A refusal
+ * is thrown as an `Error` with its message.
+ */
+export interface ScriptMethod {
+    name: string;
+    /** Its line in the summary of `doc` a model is given. */
+    signature: string;
+    /**
+     * What a run counts of it: `edit`, the blocks its value's `blocks` are; `insert`, those and
+     * how many; `delete`, a block deleted or emptied; `fields`, fields updated.
+     */
+    effect?: "edit" | "insert" | "delete" | "fields";
+    call(session: Session, args: readonly unknown[]): unknown;
+}
+/** A tool over any session: what `agentTools` binds, and what a server serves. */
+export interface ToolDefinition {
+    name: string;
+    description: string;
+    inputSchema: JsonSchema & {
+        type: "object";
+    };
+    /**
+     * Arguments are taken as checked against `inputSchema` (`invalid` first: `agentTools` does);
+     * others may be there.
+     */
+    run(session: Session, args: Record<string, unknown>): ToolAnswer;
+    /** Its methods in code mode, in the order they are listed. */
+    methods: readonly ScriptMethod[];
+}
+/** The tools, in the order a model is given them. */
+export declare const AGENT_TOOLS: readonly ToolDefinition[];
+/**
+ * The tools over one session, for an app that runs its own model loop: give the model
+ * `INSTRUCTIONS` and each tool's name, description and schema, and pass its calls to `run`.
+ * A call whose arguments do not fit the schema is answered with why, as a refusal.
+ */
+export declare function agentTools(session: Session): AgentTool[];

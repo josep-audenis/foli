@@ -19,11 +19,6 @@ export type { JsonSchema, JsonSchemaOrAny } from "./schema.js";
 export { type FoliServerOptions, foliServer } from "./server.js";
 
 // protocol.d.ts
-/**
- * The Model Context Protocol, as much of it as a server with tools speaks over stdio
- * (ADR-0009): JSON-RPC 2.0, one message per line, `initialize`, `ping`, `tools/list` and
- * `tools/call`. Written here and not taken from the SDK, whose client checks it in the tests.
- */
 import { type JsonSchema } from "./schema.js";
 /** The protocol versions answered, newest first. A client asking for another gets the newest. */
 export declare const PROTOCOL_VERSIONS: readonly ["2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05"];
@@ -83,28 +78,7 @@ export declare function serve(input: AsyncIterable<Uint8Array | string>, output:
 export {};
 
 // schema.d.ts
-/**
- * The part of JSON Schema the tools' arguments use, and its check. Small on purpose: the
- * arguments are flat objects of strings, numbers, booleans and short lists.
- */
-export interface JsonSchema {
-    type: "object" | "string" | "integer" | "number" | "boolean" | "array" | "null";
-    description?: string;
-    /** An object's properties; nothing else is allowed in it. */
-    properties?: Record<string, JsonSchemaOrAny>;
-    required?: readonly string[];
-    additionalProperties?: boolean;
-    /** An array's items. */
-    items?: JsonSchemaOrAny;
-    enum?: readonly (string | number | boolean | null)[];
-    minimum?: number;
-    maximum?: number;
-}
-/** A schema, or one of several (`anyOf`): a value that fits any of them fits. */
-export type JsonSchemaOrAny = JsonSchema | {
-    anyOf: readonly JsonSchema[];
-    description?: string;
-};
+export type { JsonSchema, JsonSchemaOrAny } from "@folijs/agent";
 
 // server.d.ts
 import type { ServerOptions } from "./protocol.js";

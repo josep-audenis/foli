@@ -3,7 +3,7 @@
  * sees `doc`, whose methods are the functions below over the document's session: what the
  * tools do, and nothing the tools cannot. A run that fails is taken back whole.
  */
-import { formatBlocks, type Result } from "@folijs/agent";
+import { AGENT_TOOLS, formatBlocks } from "@folijs/agent";
 import type { OpenDocument } from "./documents.js";
 import type { ToolResult } from "./protocol.js";
 import { type Host, runScript, SANDBOX_LIMITS, type SandboxLimits, StopRun } from "./sandbox.js";
@@ -12,21 +12,10 @@ import { MAX_GROWTH, weight } from "./weight.js";
 /** @internal What a tool says when its edit would make the document heavier than it may be. */
 export const HEAVY = `That would make the document more than ${MAX_GROWTH / 1_000_000} million characters larger than it was when opened, as it would be saved: a session is held to that. Nothing was changed. Save it, close it and open the saved file to go on.`;
 
-/** The methods of `doc`, by name: what a script may call. */
-const METHODS = [
-  "blocks",
-  "block",
-  "replaceText",
-  "insertAfter",
-  "insertBefore",
-  "deleteBlock",
-  "styles",
-  "setStyle",
-  "comment",
-  "controls",
-  "fillControl",
-  "updateFields",
-] as const;
+/** The methods of `doc`, by name: what a script may call, the tools' own (ADR-0013). */
+const METHODS = new Map(
+  AGENT_TOOLS.flatMap((tool) => tool.methods.map((m) => [m.name, m] as const)),
+);
 
 /**
  * The server's own code in the sandbox, run before the script: `doc` and `console.log` over
@@ -43,7 +32,7 @@ const PRELUDE = `(() => {
     return answer.value;
   };
   const doc = {};
-  for (const name of ${JSON.stringify(METHODS)}) doc[name] = (...args) => ask(name, args);
+  for (const name of ${JSON.stringify([...METHODS.keys()])}) doc[name] = (...args) => ask(name, args);
   const shown = (value) => {
     if (typeof value === "string") return value;
     try { return JSON.stringify(value) ?? String(value); } catch { return String(value); }
@@ -53,18 +42,7 @@ const PRELUDE = `(() => {
 })();`;
 
 /** @internal What a script is told of `doc`: part of the tool's description. */
-export const DOC_TYPES = `doc.blocks(): Block[]            // every block of the body, in order, as it reads now (a copy: call again after edits)
-doc.block(handle): Block
-doc.replaceText(handle, find, replacement, { all? }): { blocks, replaced, refused }   // replaced: places changed; refused: places that could not be (locked)
-doc.insertAfter(handle, paragraphs): { blocks }    // paragraphs: "text" | { text, style? } | a list of them; blocks: the new ones
-doc.insertBefore(handle, paragraphs): { blocks }
-doc.deleteBlock(handle): { text }                  // text: a sentence saying what was done
-doc.styles(): string[]
-doc.setStyle(handle, style): { blocks }
-doc.comment(handle, text, { on? }): { blocks, comment }   // comment: the new comment's id
-doc.controls(): Control[]                          // { id, name, kind, value, empty, items?, readOnly, block }
-doc.fillControl(name, value): { blocks, controls, unfilled }   // unfilled: controls of that name that did not take the value, each with why
-doc.updateFields({ data?, contents? }): { updated, unchanged, rebuilt, text }   // counts, and a sentence
+export const DOC_TYPES = `${[...METHODS.values()].map((m) => m.signature).join("\n")}
 console.log(...values)                             // shown in the answer
 type Block = { handle, kind: "paragraph" | "table" | "other", style?, number?, text, rows?, columns?,
   cell?: { table, row, column, span?, merged?: "down" | "up" }, depth, changed, comments }   // column: the grid column
@@ -123,19 +101,6 @@ export async function runCode(
   const log: string[] = [];
   let logged = 0;
 
-  /** A result of the library for the script: its refusal thrown. */
-  const given = <T>(result: Result<T>) => {
-    if (!result.ok) throw new Error(result.message);
-    return result;
-  };
-  /** An edit's result: the blocks it returns are the blocks the run changed. */
-  const edited = <T extends { blocks: readonly { handle: string }[] }>(result: Result<T>) => {
-    const made = given(result);
-    for (const block of made.blocks) touched.add(block.handle);
-    return made;
-  };
-  // A script's arguments are JSON of any shape: the library refuses what does not fit, as it
-  // does for a tool, so they are passed as they come.
   const size = before.content.size;
   /** Paragraphs the run has inserted, wherever (a table's cells are not the body's blocks). */
   let inserted = 0;
@@ -154,57 +119,25 @@ export async function runCode(
       throw new StopRun(
         `It added more than ${RUN_BLOCKS} paragraphs or ${RUN_GROWTH} characters to the document: a run is held to that. Do the work in several runs.`,
       );
-    const [a, b, c, d] = (Array.isArray(args) ? args : []) as [never, never, never, never];
-    switch (name) {
-      case "log": {
-        const line = oneLine(String(a ?? ""));
-        if (logged < LOG_CHARS) log.push(line.slice(0, LOG_CHARS - logged));
-        logged += line.length;
-        return null;
-      }
-      case "blocks":
-        return given(session.read()).blocks;
-      case "block":
-        return given(session.block(a)).block;
-      case "replaceText": {
-        const { blocks, replaced, refused } = edited(session.replaceText(a, b, c, d));
-        return { blocks, replaced, refused };
-      }
-      case "insertAfter":
-      case "insertBefore": {
-        const { blocks } = edited(
-          name === "insertAfter" ? session.insertAfter(a, b) : session.insertBefore(a, b),
-        );
-        inserted += blocks.length;
-        return { blocks };
-      }
-      case "deleteBlock": {
-        const { text } = given(session.deleteBlock(a));
-        deleted++;
-        return { text };
-      }
-      case "styles":
-        return session.styles();
-      case "setStyle":
-        return { blocks: edited(session.setStyle(a, b)).blocks };
-      case "comment": {
-        const { blocks, comment } = edited(session.comment(a, b, c));
-        return { blocks, comment };
-      }
-      case "controls":
-        return session.controls();
-      case "fillControl": {
-        const { blocks, controls, unfilled } = edited(session.fillControl(a, b));
-        return { blocks, controls, unfilled };
-      }
-      case "updateFields": {
-        const { updated, unchanged, rebuilt, text } = given(session.updateFields(a));
-        fields = true;
-        return { updated, unchanged, rebuilt, text };
-      }
-      default:
-        throw new Error(`doc has no ${oneLine(String(name)).slice(0, 40)}.`);
+    if (name === "log") {
+      const line = oneLine(String((Array.isArray(args) ? args[0] : undefined) ?? ""));
+      if (logged < LOG_CHARS) log.push(line.slice(0, LOG_CHARS - logged));
+      logged += line.length;
+      return null;
     }
+    const method = METHODS.get(name);
+    if (!method) throw new Error(`doc has no ${oneLine(String(name)).slice(0, 40)}.`);
+    const value = method.call(session, Array.isArray(args) ? args : []);
+    // An edit's value names the blocks it changed: the blocks the run changed.
+    const blocks =
+      method.effect === "edit" || method.effect === "insert"
+        ? (value as { blocks: readonly { handle: string }[] }).blocks
+        : [];
+    for (const block of blocks) touched.add(block.handle);
+    if (method.effect === "insert") inserted += blocks.length;
+    if (method.effect === "delete") deleted++;
+    if (method.effect === "fields") fields = true;
+    return value;
   };
 
   const ran = await runScript(code, PRELUDE, host, limits);

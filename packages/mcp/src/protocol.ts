@@ -3,7 +3,8 @@
  * (ADR-0009): JSON-RPC 2.0, one message per line, `initialize`, `ping`, `tools/list` and
  * `tools/call`. Written here and not taken from the SDK, whose client checks it in the tests.
  */
-import { invalid, type JsonSchema, published } from "./schema.js";
+import { invalid } from "@folijs/agent";
+import { type JsonSchema, published } from "./schema.js";
 
 /** The protocol versions answered, newest first. A client asking for another gets the newest. */
 export const PROTOCOL_VERSIONS = ["2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05"] as const;
