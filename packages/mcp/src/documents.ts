@@ -158,6 +158,12 @@ export class Documents {
     const checked = target(this.#rules, wanted);
     if (!checked.ok) return refusal(checked.message);
     const file = checked.file;
+    // Another open document's own file: writing it would lose that document's saved edits.
+    const other = [...this.#open.values()].find((d) => d !== document && same(d.file, file));
+    if (other)
+      return refusal(
+        `${shown(this.#rules, file)} is open as ${other.id}: saving ${document.id} there would write over it. Save with another path, or close ${other.id} first.`,
+      );
     let bytes: Uint8Array;
     try {
       bytes = await exportDocx(document.session.document(), document.package);

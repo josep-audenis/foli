@@ -3014,7 +3014,7 @@ Each task is a PR on `phase-21/hardening`, the build green after each, merged af
 review. 21.1 to 21.6 lose data, hang or leak: they go first, in this order.
 
 - [x] Claim phase, branch `phase-21/hardening`
-- [ ] 21.1 MCP: a save never writes over the file another open document came from
+- [x] 21.1 MCP: a save never writes over the file another open document came from
   (`mcp/src/documents.ts`, `save` and `#mine`). Reproduced: open `a.docx`, save (writes
   `a.agent.docx`), open `a.agent.docx`, edit, save (back to `a.agent.docx`), save the first
   again: the second document's edits are gone. Refuse with a message naming the other document.
