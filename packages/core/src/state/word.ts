@@ -145,7 +145,11 @@ export function applyCommentSteps(
     const rest = at < 0 ? next : [...next.slice(0, at), ...next.slice(at + 1)];
     if (!step.comment) next = rest;
     else {
-      const index = at < 0 ? Math.min(step.index, rest.length) : at;
+      // A new comment goes before the first with a larger id, whatever the list held when it was
+      // made: the same place in every editor of the document (collaboration), the end for a
+      // single editor's (its ids are the largest).
+      const later = rest.findIndex((c) => c.id > (step.comment as CommentJSON).id);
+      const index = at >= 0 ? at : later < 0 ? rest.length : later;
       next = [...rest.slice(0, index), step.comment, ...rest.slice(index)];
     }
   }

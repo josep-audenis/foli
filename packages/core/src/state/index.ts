@@ -1,4 +1,12 @@
 export {
+  type CollabOptions,
+  collab,
+  getVersion,
+  receiveTransaction,
+  type SendableSteps,
+  sendableSteps,
+} from "./collab.js";
+export {
   arrowAcrossLeaf,
   baseKeymap,
   type DeleteUnit,

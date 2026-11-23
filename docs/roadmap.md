@@ -3240,7 +3240,7 @@ lets the agent library return steps); 22.7 onwards build it.
   through (the sender's checks held, and the authority's `authorize` decides), and
   `trackTransaction` leaves it untracked. Test: two editors stay identical after edits that
   trigger each plugin and filter, tracking on.
-- [ ] 22.7 The client plugin (`packages/core`, headless): `collab({ version, clientID })`,
+- [x] 22.7 The client plugin (`packages/core`, headless): `collab({ version, clientID })`,
   `sendableSteps(state)`, `receiveTransaction(state, steps, clientIDs)`, `getVersion(state)`.
   Unconfirmed steps are rebased over received ones through mapping; history takes received
   steps as not undoable and maps its own events over them. The convergence property test of the
