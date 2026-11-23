@@ -948,12 +948,14 @@ export function controlsPlugin(): Plugin {
   return new Plugin({
     filterTransaction: allowed,
     appendTransaction(transactions, before, after) {
-      if (transactions.every(isRemote)) return null;
       const controls = wordContext(after)?.envelope.controls;
       if (!controls) return null;
       const tr = after.tr;
+      // Received steps: what the sender's plugin appended came with them; only the selection settles.
       const held =
-        before.doc !== after.doc && !transactions.some((t) => t.getMeta("historyOp"))
+        before.doc !== after.doc &&
+        !transactions.some((t) => t.getMeta("historyOp")) &&
+        !transactions.every(isRemote)
           ? reconcile(tr, transactions, before, after)
           : controls;
       const selection = settle(

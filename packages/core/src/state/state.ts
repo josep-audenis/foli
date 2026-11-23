@@ -72,8 +72,8 @@ export class Plugin<T = unknown> {
 export const remote = "remote";
 
 /**
- * Whether `tr` is received (`remote`), or appended to a received one.
- * @internal
+ * Whether `tr` is received (`remote`), or appended to a received one: a plugin that appends
+ * transactions appends nothing to these (the sender's plugin already did).
  */
 export const isRemote = (tr: Transaction): boolean =>
   tr.getMeta(remote) === true ||

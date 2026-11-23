@@ -24,15 +24,19 @@ function documentOf(): FoliDocument {
   });
   seed.select(24);
   seed.run(insertControl("text", { tag: "t" }));
+  seed.select(seed.state.doc.content.size - 1);
+  seed.run(insertControl("checkbox", { tag: "c" }));
   return seed.getDocument();
 }
 
-/** Each transaction `editor` makes from now on, its steps as JSON. */
-function record(editor: Editor): unknown[][] {
-  const out: unknown[][] = [];
+/** What `editor` dispatches from now on: each batch's steps (root and appended) as JSON, and the document after it. */
+function record(editor: Editor): { steps: unknown[][]; document: FoliDocument }[] {
+  const out: { steps: unknown[][]; document: FoliDocument }[] = [];
   editor.subscribe((_state, transactions: readonly Transaction[]) => {
-    for (const tr of transactions)
-      if (tr.steps.length) out.push(tr.steps.map((s) => JSON.parse(JSON.stringify(s.toJSON()))));
+    const steps = transactions
+      .map((tr) => tr.steps.map((s) => JSON.parse(JSON.stringify(s.toJSON()))))
+      .filter((list) => list.length);
+    if (steps.length) out.push({ steps, document: editor.getDocument() });
   });
   return out;
 }
@@ -53,17 +57,29 @@ describe("received transactions are applied as they are (22.6)", () => {
     // The notes plugin follows a note's reference, tracked.
     a.select(3);
     a.run(insertNote("footnote"));
-    // A control's value: its placeholder replaced, which the filter lets only its command do.
+    // Deleting the reference, tracked: the notes plugin marks the note deleted with it.
+    a.select(3, 5);
+    a.commands.deleteSelection();
+    // A control's value: its placeholder replaced, which the filter lets only its command do;
+    // a check box's glyph, which no other edit may change.
     expect(a.run(setControlValue("t", "Filled"))).toBe(true);
+    expect(a.run(setControlValue("c", true))).toBe(true);
     a.select(2, 4);
     a.commands.insertText("Z");
     expect(sent.length).toBeGreaterThan(5);
 
     const depth = undoDepth(b.state);
-    for (const steps of sent) {
-      const tr = b.state.tr.setMeta(remote, true);
-      for (const json of steps) tr.step(Step.fromJSON(b.state.schema, json));
-      b.dispatch(tr);
+    for (const { steps: transactions, document: expected } of sent) {
+      // Each of Ann's transactions apart, her plugins' appended ones too: Bob's plugins, had they
+      // appended their own, would make hers no longer apply.
+      for (const steps of transactions) {
+        const before = b.state;
+        const tr = b.state.tr.setMeta(remote, true);
+        for (const json of steps) tr.step(Step.fromJSON(b.state.schema, json));
+        b.dispatch(tr);
+        expect(b.state).not.toBe(before);
+      }
+      expect(b.getDocument()).toEqual(expected);
     }
     expect(b.getDocument()).toEqual(a.getDocument());
     // Nothing of it is Bob's to undo, nor tracked again in his name.
