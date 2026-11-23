@@ -2,7 +2,13 @@ export {
   type CollabOptions,
   collab,
   getVersion,
+  type Presence,
+  type PresenceMessage,
+  presence,
+  presenceMessage,
+  receivePresence,
   receiveTransaction,
+  removePresence,
   type SendableSteps,
   sendableSteps,
 } from "./collab.js";

@@ -7,9 +7,11 @@
  * Headless: the app moves the messages.
  */
 import type { Node } from "../model/index.js";
+import type { Mappable } from "../transform/stepmap.js";
 import { AddMarkStep, RemoveMarkStep, type Step } from "../transform/steps.js";
 import type { CommentJSON } from "../v3/document.js";
 import { collabKey, idSlot } from "./ids.js";
+import type { SelectionJSON } from "./selection.js";
 import { type EditorState, isRemote, Plugin, remote, type Transaction } from "./state.js";
 import {
   afterEnvelopeSteps,
@@ -43,7 +45,29 @@ interface CollabState {
   readonly version: number;
   readonly clientID: string | number;
   readonly unconfirmed: readonly Unconfirmed[];
+  /** The others' presence, their selections mapped through every change since. */
+  readonly peers: ReadonlyMap<string | number, Presence>;
+  /** Presence sent from a version this editor has not reached yet, shown once it does. */
+  readonly early: ReadonlyMap<string | number, PresenceMessage>;
 }
+
+/** Another client as this editor shows it (22.9): who, in what colour, where. */
+export interface Presence {
+  readonly clientID: string | number;
+  readonly name: string;
+  /** `#rgb` or `#rrggbb`. */
+  readonly color: string;
+  /** In this editor's document; null: nowhere (not editing the body). */
+  readonly selection: SelectionJSON | null;
+}
+
+/** What a client sends the others about itself: its selection at the authority's `version`. */
+export interface PresenceMessage extends Presence {
+  readonly version: number;
+}
+
+/** On a transaction: a peer's presence set, or removed (its id). */
+const PRESENCE = "collabPresence";
 
 /** Steps to send: from `version` (the authority's last this editor has), made by `clientID`. */
 export interface SendableSteps {
@@ -114,13 +138,61 @@ export function collab({ version = 0, clientID }: CollabOptions): Plugin<CollabS
   return new Plugin<CollabState>({
     key: collabKey as never,
     state: {
-      init: () => ({ slot: idSlot(clientID), version, clientID, unconfirmed: [] }),
+      init: () => ({
+        slot: idSlot(clientID),
+        version,
+        clientID,
+        unconfirmed: [],
+        peers: new Map(),
+        early: new Map(),
+      }),
       apply(tr, value, before) {
+        let { peers, early } = value;
+        if (tr.docChanged) peers = mapPeers(peers, tr.mapping, tr.doc.content.size);
+        const change = tr.getMeta(PRESENCE) as
+          | Presence
+          | PresenceMessage
+          | string
+          | number
+          | undefined;
+        if (change !== undefined) {
+          const next = new Map(peers);
+          const later = new Map(early);
+          if (typeof change !== "object") {
+            next.delete(change);
+            later.delete(change);
+          } else if ("version" in change) later.set(change.clientID, change);
+          else {
+            next.set(change.clientID, change);
+            later.delete(change.clientID);
+          }
+          peers = next;
+          early = later;
+        }
         const own = tr.getMeta(collabKey) as CollabState | undefined;
-        if (own) return own;
-        if (!tr.docChanged || isRemote(tr)) return value;
+        if (own) {
+          // Presence from the version now reached: shown, over this editor's unconfirmed steps.
+          const ready = [...early.values()].filter((m) => m.version === own.version);
+          if (ready.length) {
+            const next = new Map(peers);
+            const later = new Map(early);
+            for (const m of ready) {
+              next.set(m.clientID, placed(m, own.unconfirmed, tr.doc.content.size));
+              later.delete(m.clientID);
+            }
+            peers = next;
+            early = later;
+          }
+          return { ...own, peers, early };
+        }
+        if (!tr.docChanged || isRemote(tr))
+          return peers === value.peers && early === value.early
+            ? value
+            : { ...value, peers, early };
         return {
           ...value,
+          peers,
+          early,
           unconfirmed: [...value.unconfirmed, ...inversesOf(tr.steps, tr.docs, commentsOf(before))],
         };
       },
@@ -209,4 +281,118 @@ export function receiveTransaction(
   const comments = applyCommentSteps(commentsOf(state), tr.steps.slice(0, start));
   unconfirmed = inversesOf(rebased, tr.docs.slice(start), comments);
   return tr.setMeta(collabKey, { ...current, version, unconfirmed });
+}
+
+/** `peers` with their selections moved through `mapping` (clamped into a document of `size`). */
+function mapPeers(
+  peers: ReadonlyMap<string | number, Presence>,
+  mapping: Mappable,
+  size: number,
+): ReadonlyMap<string | number, Presence> {
+  if (!peers.size) return peers;
+  const out = new Map<string | number, Presence>();
+  for (const [id, peer] of peers) {
+    const s = peer.selection;
+    const at = (pos: number) => Math.max(0, Math.min(size, mapping.map(pos, -1)));
+    out.set(
+      id,
+      s ? { ...peer, selection: { ...s, anchor: at(s.anchor), head: at(s.head) } } : peer,
+    );
+  }
+  return out;
+}
+
+const COLOR = /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i;
+
+/**
+ * What to send the others about this editor: `name`, `color` and its selection, mapped back to
+ * the authority's version (out of this editor's unconfirmed steps). Send it when the selection
+ * changes and after receiving steps.
+ */
+export function presenceMessage(
+  state: EditorState,
+  who: { name: string; color: string },
+): PresenceMessage {
+  const { version, clientID, unconfirmed } = stateOf(state);
+  const json = state.selection.toJSON();
+  // Out of this editor's unconfirmed steps, last first: a position they inserted goes to its edge.
+  let { anchor, head } = json;
+  for (let i = unconfirmed.length - 1; i >= 0; i--) {
+    // Through the step's own map inverted: its inverse may be several mark steps (no positions).
+    const map = (unconfirmed[i] as Unconfirmed).step.getMap().invert();
+    anchor = map.map(anchor, -1);
+    head = map.map(head, -1);
+  }
+  return {
+    clientID,
+    name: who.name,
+    color: who.color,
+    selection: { type: json.type === "node" ? "node" : "text", anchor, head },
+    version,
+  };
+}
+
+/**
+ * The transaction that shows another client's presence (`message`, as untrusted input): dispatch
+ * it. Its selection is moved over this editor's unconfirmed steps; one sent at another version
+ * than this editor's is left out (its next one comes). Nothing in the document or its undo.
+ */
+export function receivePresence(state: EditorState, message: unknown): Transaction {
+  const tr = state.tr.setMeta("addToHistory", false);
+  const { version, clientID, unconfirmed } = stateOf(state);
+  if (typeof message !== "object" || message === null) return tr;
+  const m = message as Partial<PresenceMessage>;
+  const id = m.clientID;
+  const validID =
+    (typeof id === "string" && id.length > 0 && id.length <= 256) ||
+    (typeof id === "number" && Number.isSafeInteger(id));
+  if (!validID || id === clientID || !Number.isSafeInteger(m.version)) return tr;
+  if (typeof m.name !== "string" || typeof m.color !== "string" || !COLOR.test(m.color)) return tr;
+  const s = m.selection as Partial<SelectionJSON> | null | undefined;
+  const valid = s && Number.isSafeInteger(s.anchor) && Number.isSafeInteger(s.head) ? s : null;
+  const read: PresenceMessage = {
+    clientID: id as string | number,
+    name: m.name.slice(0, 100),
+    color: m.color,
+    selection: valid && {
+      type: "text",
+      anchor: valid.anchor as number,
+      head: valid.head as number,
+    },
+    version: m.version as number,
+  };
+  // From an older version: its next one comes. From a later one: kept until this editor is there.
+  if (read.version < version) return tr;
+  return tr.setMeta(
+    PRESENCE,
+    read.version > version ? read : placed(read, unconfirmed, state.doc.content.size),
+  );
+}
+
+/** `message`'s presence in a document with `unconfirmed` on top of its version. */
+function placed(
+  message: PresenceMessage,
+  unconfirmed: readonly Unconfirmed[],
+  size: number,
+): Presence {
+  const { version: _version, selection, ...rest } = message;
+  if (!selection) return { ...rest, selection: null };
+  let { anchor, head } = selection;
+  for (const { step } of unconfirmed) {
+    const map = step.getMap();
+    anchor = map.map(anchor, -1);
+    head = map.map(head, -1);
+  }
+  const clamp = (pos: number) => Math.max(0, Math.min(size, pos));
+  return { ...rest, selection: { type: "text", anchor: clamp(anchor), head: clamp(head) } };
+}
+
+/** The transaction that stops showing client `clientID` (it left): dispatch it. */
+export const removePresence = (state: EditorState, clientID: string | number): Transaction =>
+  state.tr.setMeta("addToHistory", false).setMeta(PRESENCE, clientID);
+
+/** The other clients this editor shows, with their selections in its document. */
+export function presence(state: EditorState): readonly Presence[] {
+  const value = collabKey.getState(state) as CollabState | undefined;
+  return value?.peers ? [...value.peers.values()] : [];
 }
