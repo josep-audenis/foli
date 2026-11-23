@@ -172,7 +172,9 @@ export function collab({ version = 0, clientID }: CollabOptions): Plugin<CollabS
         const own = tr.getMeta(collabKey) as CollabState | undefined;
         if (own) {
           // Presence from the version now reached: shown, over this editor's unconfirmed steps.
-          const ready = [...early.values()].filter((m) => m.version === own.version);
+          // A version reached or passed (a broadcast moves it by its steps); one passed is
+          // from before what this editor now has: shown at its positions, as near as they go.
+          const ready = [...early.values()].filter((m) => m.version <= own.version);
           if (ready.length) {
             const next = new Map(peers);
             const later = new Map(early);
@@ -304,6 +306,19 @@ function mapPeers(
 
 const COLOR = /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i;
 
+/** How many others an editor shows at most. */
+const MAX_PEERS = 100;
+
+/**
+ * A name as shown: without control or bidirectional-override characters (a name that reorders
+ * what is around it), at most 100 characters, whole code points.
+ */
+const cleanName = (name: string): string =>
+  [...name.replace(/[\p{Cc}\u200e\u200f\u202a-\u202e\u2066-\u2069]/gu, "")]
+    .slice(0, 100)
+    .join("")
+    .trim();
+
 /**
  * What to send the others about this editor: `name`, `color` and its selection, mapped back to
  * the authority's version (out of this editor's unconfirmed steps). Send it when the selection
@@ -352,7 +367,7 @@ export function receivePresence(state: EditorState, message: unknown): Transacti
   const valid = s && Number.isSafeInteger(s.anchor) && Number.isSafeInteger(s.head) ? s : null;
   const read: PresenceMessage = {
     clientID: id as string | number,
-    name: m.name.slice(0, 100),
+    name: cleanName(m.name),
     color: m.color,
     selection: valid && {
       type: "text",
@@ -362,7 +377,12 @@ export function receivePresence(state: EditorState, message: unknown): Transacti
     version: m.version as number,
   };
   // From an older version: its next one comes. From a later one: kept until this editor is there.
-  if (read.version < version) return tr;
+  if (read.version < version || !read.name) return tr;
+  // One per client, and not without end: a relay that sends ever new ids is not followed.
+  const known = stateOf(state);
+  const count = new Set([...known.peers.keys(), ...known.early.keys()]).size;
+  if (count >= MAX_PEERS && !known.peers.has(read.clientID) && !known.early.has(read.clientID))
+    return tr;
   return tr.setMeta(
     PRESENCE,
     read.version > version ? read : placed(read, unconfirmed, state.doc.content.size),

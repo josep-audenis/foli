@@ -79,4 +79,34 @@ describe("presence (22.9)", () => {
     );
     expect(presence(a.state)[0]?.selection).toMatchObject({ anchor: 5, head: 5 });
   });
+
+  it("shows one from a version passed at once, cleans names, and follows no more than 100 others", () => {
+    const a = client(1);
+    const b = client(2);
+    b.select(1, 3);
+    const message = presenceMessage(b.state, { name: "Bob", color: "#36c" });
+    // Waiting for version 1; a broadcast of two steps takes the editor to 2.
+    a.dispatch(receivePresence(a.state, { ...message, version: 1 }));
+    b.select(1);
+    b.commands.insertText("X");
+    b.select(1);
+    b.commands.insertText("Y");
+    const sent = sendableSteps(b.state);
+    if (!sent) throw new Error("nothing sent");
+    a.dispatch(
+      receiveTransaction(
+        a.state,
+        sent.steps,
+        sent.steps.map(() => 2),
+      ),
+    );
+    expect(presence(a.state).map((p) => p.name)).toEqual(["Bob"]);
+    a.dispatch(receivePresence(a.state, { ...message, version: 2, name: "‮evil name" }));
+    expect(presence(a.state)[0]?.name).toBe("evil name");
+    a.dispatch(receivePresence(a.state, { ...message, clientID: 3, version: 2, name: "‏" }));
+    expect(presence(a.state)).toHaveLength(1);
+    for (let id = 10; id < 200; id++)
+      a.dispatch(receivePresence(a.state, { ...message, clientID: id, version: 2 }));
+    expect(presence(a.state)).toHaveLength(100);
+  });
 });

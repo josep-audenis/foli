@@ -949,6 +949,7 @@ export class EditorView {
     this.unsubscribe();
     this.peerMarks.clear();
     if (this.peersShown) this.showPeers(false);
+    if (this.peerFrame) this.host.ownerDocument.defaultView?.cancelAnimationFrame(this.peerFrame);
     this.host.ownerDocument.fonts?.removeEventListener("loadingdone", this.onFontsLoaded);
     this.observer.disconnect();
     this.resizeObserver?.disconnect();
@@ -2236,19 +2237,46 @@ export class EditorView {
     this.showPeers(peers.length > 0);
     const size = this.state.doc.content.size;
     const drawings: PeerDrawing[] = [];
+    const near = this.paged ? this.pagesNearView() : null;
+    const box = this.host.getBoundingClientRect();
     for (const { name, color, selection } of peers) {
       if (!selection) continue;
       const from = Math.min(selection.anchor, selection.head, size);
       const to = Math.min(Math.max(selection.anchor, selection.head), size);
-      let ranges: Range[] = [];
+      const ranges: Range[] = [];
       try {
-        ranges = from < to ? this.rangesOf(from, to) : [];
+        // Each paragraph the selection crosses, those on pages near the screen only.
+        if (from < to)
+          this.state.doc.nodesBetween(from, to, (node, pos) => {
+            if (!node.isTextblock) return true;
+            const start = Math.max(from, pos + 1);
+            const end = Math.min(to, pos + node.nodeSize - 1);
+            if (start < end && this.blockNear(pos, near)) ranges.push(...this.rangesOf(start, end));
+            return false;
+          });
       } catch (error) {
         if (!(error instanceof RangeError)) throw error;
       }
-      drawings.push({ name, color, ranges, caret: this.caretAt(selection.head) });
+      const caret = this.caretAt(selection.head);
+      // Not over the rest of the app: only where the editor shows.
+      const shown =
+        caret &&
+        caret.top + caret.height >= box.top &&
+        caret.top <= box.bottom &&
+        caret.left >= box.left &&
+        caret.left <= box.right;
+      drawings.push({ name, color, ranges, caret: shown ? caret : null });
     }
     this.peerMarks.draw(drawings);
+  }
+
+  /** Whether the block at `pos` is on a page in `near` (always, unpaged). */
+  private blockNear(pos: number, near: ReadonlySet<number> | null): boolean {
+    if (!near) return true;
+    const top = this.state.doc.resolve(pos);
+    const item = top.depth ? top.node(1) : this.state.doc.nodeAt(pos);
+    const pages = item && this.itemPages.get(item);
+    return !pages || pages.some((page) => near.has(page));
   }
 
   /** Where the caret at `pos` is drawn, in viewport coordinates; null where none shows. */
