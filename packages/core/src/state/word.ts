@@ -10,6 +10,7 @@ import { deepEqual } from "../model/attrs.js";
 import { fail } from "../model/errors.js";
 import type { Attrs, Mark, MarkType, Node, Schema } from "../model/index.js";
 import { natural, record, Step, type StepJSON, StepResult } from "../transform/steps.js";
+import { text } from "../v3/check.js";
 import type { CommentJSON, FoliDocument, StoryJSON } from "../v3/document.js";
 import {
   checkCommentJSON,
@@ -108,6 +109,7 @@ export class CommentStep extends Step {
   }
 }
 
+// Registered when this module loads, which every editor does (`createEditor`, the word plugin).
 Step.jsonID("comment", (schema, value) => {
   const json = record(value, "$", ["stepType", "id", "comment", "previous", "index"]);
   const id = natural(json, "id");
@@ -450,7 +452,14 @@ Step.jsonID("story", (schema, value) => {
     "selectionBefore",
     "selectionAfter",
   ]);
-  if (typeof json.id !== "string" || !json.id) fail("$.id", "expected a story id");
+  // As `parseDocument` reads the keys of `stories`: an own `__proto__` would be lost.
+  const idError =
+    typeof json.id !== "string"
+      ? "expected a story id"
+      : json.id === "__proto__"
+        ? "is not a story id"
+        : text()(json.id);
+  if (idError) fail("$.id", idError);
   const read = (key: "before" | "after"): Story | null => {
     if (json[key] === null) return null;
     const doc = parseStory(json[key], schema, `$.${key}`);
@@ -461,7 +470,7 @@ Step.jsonID("story", (schema, value) => {
   const after = read("after");
   if (!before && !after) fail("$", "a story step changes a story");
   return new StoryStep(
-    json.id,
+    json.id as string,
     before,
     after,
     selectionJSON(json.selectionBefore ?? null, "$.selectionBefore"),

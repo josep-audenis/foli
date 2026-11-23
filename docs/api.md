@@ -891,7 +891,7 @@ Stable, for plugins and code that edits documents directly:
   `StepMap`, `Mapping`, `Mappable`, `MapResult`; `canJoin`, `canSplit`, `findWrapping`,
   `liftTarget`, `NodeTypeWithAttrs`.
 - Steps as JSON (1.6): `step.toJSON()` (`StepJSON`: `stepType` and the step's fields) and
-  `Step.fromJSON(schema, json)`, for every step of `@folijs/core`, the Word steps
+  `Step.fromJSON(schema, json)` (a value `JSON.parse` gave), for every step of `@folijs/core`, the Word steps
   (`CommentStep`, `EnvelopeStep`, `StoryStep`, from `@folijs/core/internal`) included. `fromJSON` reads untrusted input: an
   unknown step type or key, a position that is not a non-negative integer, or a slice, mark,
   attribute, comment, story or envelope value the schema refuses throws `FoliDocumentError` with

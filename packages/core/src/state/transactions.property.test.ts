@@ -195,7 +195,14 @@ describe("transaction properties (10k runs each)", () => {
           const replay = new Transform(doc);
           for (const step of tr.steps) {
             const json = JSON.parse(JSON.stringify(step.toJSON()));
-            replay.step(Step.fromJSON(testSchema, json));
+            const read = Step.fromJSON(testSchema, json);
+            // The step itself comes back: read again, its JSON is the same.
+            const again = JSON.parse(JSON.stringify(read.toJSON()));
+            ok(
+              JSON.stringify(Step.fromJSON(testSchema, again).toJSON()) === JSON.stringify(again),
+              "a step changed through JSON",
+            );
+            replay.step(read);
           }
           ok(replay.doc.eq(tr.doc), "the replayed steps gave another document");
         }),

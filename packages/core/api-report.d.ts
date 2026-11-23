@@ -2708,7 +2708,8 @@ export declare abstract class Step {
      */
     toJSON(): StepJSON;
     /**
-     * Reads a step from JSON, as untrusted input: an unknown `stepType`, a key the step does not
+     * Reads a step from JSON (a value `JSON.parse` gave), as untrusted input: an unknown
+     * `stepType`, a key the step does not
      * have, a position that is not a non-negative integer or content the schema refuses throws
      * `FoliDocumentError` with the JSON path. Whether the step applies is `apply`'s to say.
      */
