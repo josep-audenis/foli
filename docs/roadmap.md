@@ -34,6 +34,7 @@ place that says what is in progress; check it before starting work.
 | 20 Corpus run             | In progress              | `phase-20/corpus-run` | 20.1–20.7 and 20.8's docs merged; the patch release left                                                                                                                                      |
 | 21 Hardening              | In progress              | `phase-21/hardening`  | Planned 2026-11-22 from an audit of 1.4.0; claimed 2026-11-23, tasks in order: data loss, a hang and a PDF leak first                                                                         |
 | 22 Collaboration          | Blocked by 21            | —                     | Planned 2026-11-23, nothing built: central authority over steps; fixes go before features (Phase 21)                                                                                          |
+| 23 Agent editing parity   | Blocked by 21            | —                     | Planned 2026-11-23, nothing built: the agent edits tables, formatting, lists, pictures, headers and review as a user can                                                                      |
 
 Status values: `Ready` (dependencies met, nobody on it) · `In progress` · `In review` (PR open) ·
 `✅ Done` (merged, acceptance criteria met) · `Blocked by …`.
@@ -115,6 +116,7 @@ Foli's engine is not credible until all five pass in Chromium, Firefox and WebKi
 | 17    | Toolbar for developers    | Tabs an app controls, the built-in dialogs and strings open to it, overflow       | 1.2.0               | M    |
 | 18    | Hint                      | Show a place for a few seconds: an app's, or an agent's change                    | 1.3.0               | S    |
 | 22    | Collaboration             | Real-time editing by several people: steps over the app's transport, an authority | 1.5.0, collab 0.1.0 | L    |
+| 23    | Agent editing parity      | Tables, formatting, lists, pictures, headers: the agent edits as a user does      | agent 0.4, mcp 0.3  | M    |
 
 ```
 P0 ─┬─► P1 spike ────────────────┐
@@ -3233,6 +3235,112 @@ lets the agent library return steps); 22.7 onwards build it.
 - [ ] 22.13 Docs and release: architecture.md (the collab loop), api.md, a site page (how to
   wire a transport and a store), limitations.md (no CRDT, no long offline, what the app must
   do), changesets; 1.5.0 and `@folijs/collab` 0.1.0 published with the owner's approval.
+
+## Phase 23 — Agent editing parity · M → agent 0.4.0, mcp 0.3.0, core patches
+
+The agent does what a person does in the editor, not only text: it inserts tables and edits
+their rows, columns, cells and styles; formats text (bold, italic, font, size, colour,
+highlight, links) and paragraphs (alignment, spacing, indentation, lists); inserts pictures,
+breaks and notes; edits headers and footers; accepts and rejects changes. Asked for by the owner
+on 2026-11-23 after trying the MCP server: the agent could not add a table or a row. Planned the
+same day, nothing built.
+
+Most of the work is wrapping core commands the editor already has in agent operations that take
+handles, and exposing them as a few MCP tools (one per area, an `action` field), not one tool
+per command: every tool's description costs the model context. Code mode (`run`) gets the same
+operations as session methods.
+
+Not in this phase: the agent editing a shared document (Phase 22 leaves it out too); a picture
+from a URL (the MCP server reads files under its root only); comments' own formatting; text
+boxes and other opaque content; Word features the editor itself lacks (the After 1.0 backlog).
+
+**Starts from (agent 0.3.x, mcp 0.2.x), checked 2026-11-23:**
+
+- The session's operations (`agent/src/operations.ts`, `templates.ts`): `replaceText`,
+  `insertAfter`/`insertBefore` (paragraphs only), `deleteBlock` (a paragraph or a whole table),
+  `setStyle` (paragraph style), `comment`, `fillControl`, `updateFields`. limitations.md says
+  so: "No operation inserts a table or a picture, changes a run's formatting (bold, color), or
+  accepts or rejects changes." `session.editor` reaches the rest by positions, but neither the
+  MCP tools nor `run` expose it.
+- Core has the commands: tables (`tablecommands.ts`: `insertTable`, `insertRow`,
+  `insertColumn`, row and column deletion, merge and split, header rows, `setTableStyle`,
+  `setCellShading`, `setColumnWidth`), marks and run formatting (`toggleMark`, `setFontFamily`,
+  `setFontSize`, `setTextColor`, `setHighlight`), paragraphs (`setAlign`, `setLineSpacing`,
+  `setParagraphSpacing`, `changeIndent`), lists (`toggleList`, `sinkListItem`,
+  `liftListItem`), links (`insertLink`, `setLink`, `removeLink`), `insertPicture`,
+  `insertNote`, `insertSectionBreak`, `insertHorizontalRule`, page breaks, and review
+  (`acceptChange`/`rejectChange` and the rest of `review.ts`).
+- Every agent edit is a tracked change, and while tracking core refuses column commands,
+  merging and splitting cells, header rows, table styles, shading and column widths
+  (`tablecommands.ts`; limitations.md, Tables). Rows are tracked; run and paragraph formatting
+  are tracked as formatting changes (`track.ts`).
+- `read` shows a paragraph's style, list number and changes, not its run formatting: the model
+  cannot see what is bold before changing it.
+- Only the body is read and edited; headers, footers and notes' text are not shown.
+
+**Acceptance:**
+
+- Each area below has agent operations by handle, MCP tools, `run` methods, refusals a model
+  can act on (as today's: a code and a sentence saying what to do instead), and tests in
+  `agent` and `mcp` (`scenarios.test.ts` style: an edit, the read after it, export, reject all
+  gives the document back where it can).
+- Tables: insert a table (rows, columns, optional header row and cell text) next to a block;
+  insert and delete rows and columns; merge and split cells; set the table style, a cell's
+  shading, a column's width, header rows. While tracking, each is a tracked change Word shows
+  and round-trips, or is refused with the reason (23.2 decides which, from what Word writes).
+- Text formatting on a block or on text in it (`on`, as `comment` takes it): bold, italic,
+  underline, strikethrough, superscript, subscript, font, size, colour, highlight; links added,
+  changed and removed. Tracked as formatting changes.
+- Paragraph formatting: alignment, spacing before and after, line spacing, indentation; lists
+  (bulleted, numbered, a level in or out, a number removed). Tracked.
+- Insert: pictures (a file under the MCP root, alt text required, size), page and section
+  breaks, horizontal rules, footnotes and endnotes (with their text).
+- Headers and footers: read and edited with the same operations, their blocks' handles marked
+  as theirs in a read.
+- Review: list the document's tracked changes (author, kind, text), accept or reject one, all,
+  or all by an author. In the MCP server behind a flag (`--review`), off by default, as `--code`
+  is: a model accepting a person's changes is not undone by rejecting the agent's.
+- `read` can show run formatting (an option, off by default so reads stay short).
+- READMEs, limitations.md, the MCP server's instructions and tool descriptions updated;
+  `pnpm check` green after each PR; agent 0.4.0, mcp 0.3.0 (and any core patch) published with
+  the owner's approval.
+
+### Tasks
+
+Each task is a PR on `phase-23/agent-parity`, the build green after each, merged after an
+agent's review. Starts after Phase 21 (21.7 and 21.11 change `track.ts` and the agent's read of
+table cells). Independent of Phase 22, but 22.5 and 22.6 also change `track.ts`: whichever
+lands second rebases on the other.
+
+- [ ] Claim phase, branch `phase-23/agent-parity`
+- [ ] 23.1 ADR-0013 Agent tools: one MCP tool per area with an `action` field (the list
+  above), how a handle names a table, row, column or cell (the table's handle and indexes, as
+  `read` prints `r1 c1`), and how `on` names text in a block for formatting. Tool count and
+  description length measured before and after.
+- [ ] 23.2 Core: table structure while tracking. Check what Word 365 writes when tracking for
+  each command (`w:tblPrChange`, `w:tcPrChange`, `w:trPrChange`, `w:tblGridChange`,
+  `w:cellIns`, `w:cellDel`, `w:cellMerge`) with files saved by Word, then track in core what
+  Word records and round-trips, and keep refusing the rest with a reason the agent passes on.
+  Findings and the list of what stays refused in limitations.md.
+- [ ] 23.3 Agent and MCP: tables. `insertTable` next to a block (rows, columns, header row,
+  cell text), rows and columns in and out, merge and split, style, shading, widths, header
+  rows; one MCP tool `edit_table`; `run` methods.
+- [ ] 23.4 Agent and MCP: text formatting and links on a block or on `on` text; `read` option
+  showing run formatting; one MCP tool `format_text`.
+- [ ] 23.5 Agent and MCP: paragraph formatting and lists; one MCP tool `format_paragraph`.
+- [ ] 23.6 Agent and MCP: insert pictures (a path under the root, size limits as `open`'s,
+  alt text), page and section breaks, horizontal rules, footnotes and endnotes; one MCP tool
+  `insert`.
+- [ ] 23.7 Agent and MCP: headers and footers read and edited (the stories), handles marked
+  with their story in a read; the existing tools take them.
+- [ ] 23.8 Agent and MCP: review (`list_changes`, accept or reject), the MCP tools behind
+  `--review`.
+- [ ] 23.9 A scenario per area run through the MCP server with a model's kind of calls (the
+  14.x scenario tests): build a table from data, add a row to an existing one, format a
+  heading, make a list, insert a picture; each exported and opened again.
+- [ ] 23.10 Docs and release: agent and MCP READMEs, limitations.md (Agent editing), the
+  server's instructions, the site's agent page; changesets; agent 0.4.0 and mcp 0.3.0 (and any
+  core patch) published with the owner's approval.
 
 ## After 1.0
 
