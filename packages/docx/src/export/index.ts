@@ -459,6 +459,15 @@ async function intoPackage(
       return existing.name;
     }
     if (!needed) return undefined;
+    if (relationship?.partName) {
+      // Related, but the package lacks the part: made where the relationship points.
+      add.push({
+        name: relationship.partName,
+        data: encoder.encode(write(undefined, namespaces)),
+        contentType,
+      });
+      return relationship.partName;
+    }
     if (pkg.part(defaultName)) {
       // There, but not related to the document: written in place, then related.
       const { o, ns } = originalOf(defaultName);
@@ -738,13 +747,13 @@ async function newPackage(
       );
     }
   }
-  if (options.trackRevisions || doc.settings)
-    add(
-      "/word/settings.xml",
-      REL.settings,
-      CT.settings,
-      newSettingsXml(!!options.trackRevisions, doc.settings),
-    );
+  // Always: it says which Word the package is for (not compatibility mode).
+  add(
+    "/word/settings.xml",
+    REL.settings,
+    CT.settings,
+    newSettingsXml(!!options.trackRevisions, doc.settings, true),
+  );
   parts.push({
     name: "/word/_rels/document.xml.rels",
     text: rels.xml(undefined),

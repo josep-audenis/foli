@@ -476,7 +476,7 @@ describe("paragraph spacing that adds up (w:doNotUseHTMLParagraphAutoSpacing)", 
   it("is written in a new package and read back", async () => {
     const bytes = await exportDocx({ ...createDocument(), settings });
     expect((await readPackage(bytes)).text("/word/settings.xml")).toContain(
-      "<w:compat><w:doNotUseHTMLParagraphAutoSpacing/></w:compat>",
+      "<w:compat><w:doNotUseHTMLParagraphAutoSpacing/><w:compatSetting",
     );
     expect((await importDocx(bytes)).document.settings).toEqual(settings);
   });

@@ -46,6 +46,25 @@ export interface ContentContext extends Context {
   readonly story?: "header" | "footer" | "footnote" | "endnote" | "comment";
   /** The package's notes (`footnote:<id>`, `endnote:<id>`): a reference to another stays verbatim. */
   readonly notes?: ReadonlySet<string>;
+  /** Whether `xml:space="preserve"` applies to an element of the part, from it or an ancestor. */
+  readonly preserved?: (el: XmlElement) => boolean;
+}
+
+/**
+ * The elements of `root` under `xml:space="preserve"`, their own or inherited from an ancestor
+ * (XML 1.0, 2.10), as a `w:r` or `w:p` may say it for its text.
+ * @internal
+ */
+export function preservedIn(root: XmlElement): WeakSet<XmlElement> {
+  const out = new WeakSet<XmlElement>();
+  const walk = (el: XmlElement, inherited: boolean) => {
+    const own = el.attributes.find((a) => a.local === "space" && a.prefix === "xml")?.value;
+    const preserve = own === undefined ? inherited : own === "preserve";
+    if (preserve) out.add(el);
+    for (const c of el.children) if (c.kind === "element") walk(c, preserve);
+  };
+  walk(root, false);
+  return out;
 }
 
 /** Tables nested deeper stay opaque: within the model's depth (three levels per table). */
@@ -627,7 +646,7 @@ function run(
       case "delText":
         // A line end in a `w:t` is white space to Word, not a break (`w:br`, `w:cr`).
         // A tab character in it is a tab, as Word shows it and as the export writes it.
-        spaced(el)
+        spaced(el, context)
           .replace(/\n/g, " ")
           .split("\t")
           .forEach((piece, i) => {
@@ -732,7 +751,7 @@ function run(
           break;
         }
         const bag = attributeBag(el, ["xml:space"], context);
-        const attrs: Record<string, unknown> = { text: spaced(el) };
+        const attrs: Record<string, unknown> = { text: spaced(el, context) };
         if (bag) attrs.attributes = bag;
         const leaf = valid(node("fieldCode", marks, attrs), el, context);
         if (leaf) out.push(leaf);
@@ -801,10 +820,10 @@ function run(
  * A `w:t`'s text as Word reads it: without `xml:space="preserve"`, XML white space at its ends
  * is not part of the text (Word writes `preserve` whenever it is). A no-break space is text.
  */
-function spaced(el: XmlElement): string {
+function spaced(el: XmlElement, context: ContentContext): string {
   const value = textOf(el);
-  const preserve = el.attributes.some(
-    (a) => a.local === "space" && a.prefix === "xml" && a.value === "preserve",
-  );
+  const preserve =
+    context.preserved?.(el) ??
+    el.attributes.some((a) => a.local === "space" && a.prefix === "xml" && a.value === "preserve");
   return preserve ? value : value.replace(/^[ \t\r\n]+|[ \t\r\n]+$/g, "");
 }
