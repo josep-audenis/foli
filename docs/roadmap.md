@@ -3245,10 +3245,13 @@ breaks and notes; edits headers and footers; accepts and rejects changes. Asked 
 on 2026-11-23 after trying the MCP server: the agent could not add a table or a row. Planned the
 same day, nothing built.
 
-Most of the work is wrapping core commands the editor already has in agent operations that take
-handles, and exposing them as a few MCP tools (one per area, an `action` field), not one tool
-per command: every tool's description costs the model context. Code mode (`run`) gets the same
-operations as session methods.
+The work lives in `@folijs/agent`: an app that runs its own model loop, without MCP, gets every
+operation as a session method and the tool definitions to give its model (names, descriptions,
+JSON Schemas, the instructions), so it writes no schema of its own. `@folijs/mcp` and code mode
+(`run`) are built from the same definitions and add nothing an app could not do with the
+package alone. Most operations wrap core commands the editor already has, taking handles
+instead of positions. Tools are few (one per area, an `action` field), not one per command:
+every tool's description costs the model context.
 
 Not in this phase: the agent editing a shared document (Phase 22 leaves it out too); a picture
 from a URL (the MCP server reads files under its root only); comments' own formatting; text
@@ -3262,6 +3265,9 @@ boxes and other opaque content; Word features the editor itself lacks (the After
   so: "No operation inserts a table or a picture, changes a run's formatting (bold, color), or
   accepts or rejects changes." `session.editor` reaches the rest by positions, but neither the
   MCP tools nor `run` expose it.
+- The tool definitions (names, descriptions, JSON Schemas) exist only in `@folijs/mcp`
+  (`mcp/src/tools.ts`), tied to the server; an app using `@folijs/agent` directly writes its
+  own, from the README's suggested system prompt.
 - Core has the commands: tables (`tablecommands.ts`: `insertTable`, `insertRow`,
   `insertColumn`, row and column deletion, merge and split, header rows, `setTableStyle`,
   `setCellShading`, `setColumnWidth`), marks and run formatting (`toggleMark`, `setFontFamily`,
@@ -3280,10 +3286,14 @@ boxes and other opaque content; Word features the editor itself lacks (the After
 
 **Acceptance:**
 
-- Each area below has agent operations by handle, MCP tools, `run` methods, refusals a model
-  can act on (as today's: a code and a sentence saying what to do instead), and tests in
-  `agent` and `mcp` (`scenarios.test.ts` style: an edit, the read after it, export, reject all
-  gives the document back where it can).
+- Each area below is a `@folijs/agent` session method by handle, usable with no MCP server,
+  with refusals a model can act on (as today's: a code and a sentence saying what to do
+  instead) and tests in `agent` alone (`scenarios.test.ts` style: an edit, the read after it,
+  export, reject all gives the document back where it can); then its tool in `agentTools`,
+  the MCP server and `run`.
+- `agentTools(session)` in `@folijs/agent`: each tool's name, description, JSON Schema and a
+  function that runs it on the session, and the instructions text; an app maps them to its
+  model's tool format. `@folijs/mcp` builds its tools from it and adds only its file tools (open, save, close).
 - Tables: insert a table (rows, columns, optional header row and cell text) next to a block;
   insert and delete rows and columns; merge and split cells; set the table style, a cell's
   shading, a column's width, header rows. While tracking, each is a tracked change Word shows
@@ -3293,13 +3303,15 @@ boxes and other opaque content; Word features the editor itself lacks (the After
   changed and removed. Tracked as formatting changes.
 - Paragraph formatting: alignment, spacing before and after, line spacing, indentation; lists
   (bulleted, numbered, a level in or out, a number removed). Tracked.
-- Insert: pictures (a file under the MCP root, alt text required, size), page and section
+- Insert: pictures (bytes and type in the package, a file under the root in the MCP server;
+  alt text required, size), page and section
   breaks, horizontal rules, footnotes and endnotes (with their text).
 - Headers and footers: read and edited with the same operations, their blocks' handles marked
   as theirs in a read.
 - Review: list the document's tracked changes (author, kind, text), accept or reject one, all,
-  or all by an author. In the MCP server behind a flag (`--review`), off by default, as `--code`
-  is: a model accepting a person's changes is not undone by rejecting the agent's.
+  or all by an author. Off unless asked for (a session option in the package, `--review` in the
+  MCP server, as `--code` is): a model accepting a person's changes is not undone by rejecting
+  the agent's.
 - `read` can show run formatting (an option, off by default so reads stay short).
 - READMEs, limitations.md, the MCP server's instructions and tool descriptions updated;
   `pnpm check` green after each PR; agent 0.4.0, mcp 0.3.0 (and any core patch) published with
@@ -3313,30 +3325,33 @@ table cells). Independent of Phase 22, but 22.5 and 22.6 also change `track.ts`:
 lands second rebases on the other.
 
 - [ ] Claim phase, branch `phase-23/agent-parity`
-- [ ] 23.1 ADR-0013 Agent tools: one MCP tool per area with an `action` field (the list
-  above), how a handle names a table, row, column or cell (the table's handle and indexes, as
-  `read` prints `r1 c1`), and how `on` names text in a block for formatting. Tool count and
-  description length measured before and after.
+- [ ] 23.1 ADR-0013 Agent tools: one tool per area with an `action` field (the list above),
+  how a handle names a table, row, column or cell (the table's handle and indexes, as `read`
+  prints `r1 c1`), and how `on` names text in a block for formatting. Then `agentTools(session)`
+  in `@folijs/agent` for today's operations, moved from `mcp/src/tools.ts`, the MCP server
+  built from it with no change a model sees (its tests unchanged). Tool count and description
+  length measured before and after. Each later task adds its operation to the session first,
+  then its tool to `agentTools`, which gives it to MCP and `run` too.
 - [ ] 23.2 Core: table structure while tracking. Check what Word 365 writes when tracking for
   each command (`w:tblPrChange`, `w:tcPrChange`, `w:trPrChange`, `w:tblGridChange`,
   `w:cellIns`, `w:cellDel`, `w:cellMerge`) with files saved by Word, then track in core what
   Word records and round-trips, and keep refusing the rest with a reason the agent passes on.
   Findings and the list of what stays refused in limitations.md.
-- [ ] 23.3 Agent and MCP: tables. `insertTable` next to a block (rows, columns, header row,
+- [ ] 23.3 Agent: tables. `insertTable` next to a block (rows, columns, header row,
   cell text), rows and columns in and out, merge and split, style, shading, widths, header
-  rows; one MCP tool `edit_table`; `run` methods.
-- [ ] 23.4 Agent and MCP: text formatting and links on a block or on `on` text; `read` option
-  showing run formatting; one MCP tool `format_text`.
-- [ ] 23.5 Agent and MCP: paragraph formatting and lists; one MCP tool `format_paragraph`.
-- [ ] 23.6 Agent and MCP: insert pictures (a path under the root, size limits as `open`'s,
-  alt text), page and section breaks, horizontal rules, footnotes and endnotes; one MCP tool
-  `insert`.
-- [ ] 23.7 Agent and MCP: headers and footers read and edited (the stories), handles marked
+  rows; one tool `edit_table`; `run` methods.
+- [ ] 23.4 Agent: text formatting and links on a block or on `on` text; `read` option
+  showing run formatting; one tool `format_text`.
+- [ ] 23.5 Agent: paragraph formatting and lists; one tool `format_paragraph`.
+- [ ] 23.6 Agent: insert pictures (bytes and type in the package; in the MCP server a path
+  under the root, size limits as `open`'s; alt text), page and section breaks, horizontal
+  rules, footnotes and endnotes; one tool `insert`.
+- [ ] 23.7 Agent: headers and footers read and edited (the stories), handles marked
   with their story in a read; the existing tools take them.
-- [ ] 23.8 Agent and MCP: review (`list_changes`, accept or reject), the MCP tools behind
-  `--review`.
-- [ ] 23.9 A scenario per area run through the MCP server with a model's kind of calls (the
-  14.x scenario tests): build a table from data, add a row to an existing one, format a
+- [ ] 23.8 Agent: review (list changes, accept or reject), a session option turning it on;
+  the tools behind `--review` in the MCP server.
+- [ ] 23.9 A scenario per area run twice with a model's kind of calls: through `agentTools`
+  on a session alone (no MCP), and through the MCP server (the 14.x scenario tests): build a table from data, add a row to an existing one, format a
   heading, make a list, insert a picture; each exported and opened again.
 - [ ] 23.10 Docs and release: agent and MCP READMEs, limitations.md (Agent editing), the
   server's instructions, the site's agent page; changesets; agent 0.4.0 and mcp 0.3.0 (and any
