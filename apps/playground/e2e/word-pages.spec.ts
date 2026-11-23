@@ -137,6 +137,10 @@ test("a long paragraph splits at a line, keeping two lines on each side", async 
   await show(page, [lines(LINES_PER_PAGE + 1)]);
   result = await pages(page);
   expect(result.map((r) => r.blocks.map((b) => b.height))).toEqual([[900], [40]]);
+  // `w:widowControl="0"` (21.8): the page fills, one line goes on.
+  await show(page, [lines(LINES_PER_PAGE + 1, { widowControl: false })]);
+  result = await pages(page);
+  expect(result.map((r) => r.blocks.map((b) => b.height))).toEqual([[920], [20]]);
 });
 
 test("a paragraph kept together moves whole to the next page", async ({ page }) => {

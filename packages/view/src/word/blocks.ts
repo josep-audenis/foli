@@ -537,6 +537,8 @@ export interface WordBlock {
   after: number;
   keepNext: boolean;
   keepLines: boolean;
+  /** `w:widowControl`: false splits it at any line, as Word does. */
+  widowControl?: boolean;
   pageBreakBefore: boolean;
   /** The page setup of the section this block ends (null: the section goes on). */
   section: SectionJSON | null;
@@ -954,6 +956,7 @@ function renderBlocksNow(
       after: display.gone ? 0 : pt(spaceAfter),
       keepNext: paragraph.keepNext,
       keepLines: paragraph.keepLines,
+      widowControl: paragraph.widowControl,
       pageBreakBefore: paragraph.pageBreakBefore,
       section: (attrs.section as SectionJSON | null | undefined) ?? null,
     });

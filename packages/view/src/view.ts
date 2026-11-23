@@ -5325,8 +5325,8 @@ function wordBox(
     marginTop: before,
     marginBottom: after,
     keepWithNext: desc.word.keepNext,
-    // A node view's parts are not lines: no widow or orphan control.
-    anyLine: !!desc.parts,
+    // A node view's parts are not lines, and `w:widowControl="0"` turns it off: any line.
+    anyLine: !!desc.parts || desc.word.widowControl === false,
     pageHeight,
     section: section.flow,
     sectionMark: !!desc.node.attrs.section && desc.word.empty,
