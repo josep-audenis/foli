@@ -560,39 +560,84 @@ function monthNames(locale: string): string[][] | null {
   }
 }
 
+/** A date format's parts: text to match, a number (`d`, `MM`, `yyyy`, `h`…), a word. */
+type DatePart =
+  | { literal: string }
+  | { digits: string; width: number }
+  | { word: string; dot: boolean };
+
+const DATE_TOKEN = /'[^']*'|am\/pm|AM\/PM|a\/p|A\/P|d+|M+|y+|[Hhms]+|[AaPp]{2}/y;
+
+/** `format` read once, left to right: what `dateFromText` matches, part by part. */
+function dateParts(format: string): DatePart[] {
+  const parts: DatePart[] = [];
+  for (let i = 0; i < format.length; ) {
+    DATE_TOKEN.lastIndex = i;
+    const token = DATE_TOKEN.exec(format)?.[0];
+    if (!token) {
+      parts.push({ literal: format[i] as string });
+      i++;
+      continue;
+    }
+    i += token.length;
+    const c = token[0] as string;
+    if (c === "'") parts.push({ literal: token.slice(1, -1) });
+    else if ((c === "d" || c === "M") && token.length > 2)
+      parts.push({ word: c === "M" ? token : "", dot: true });
+    else if (c === "d" || c === "M" || c === "y" || /[Hhms]/.test(c))
+      parts.push({ digits: /[dMy]/.test(c) ? token : "", width: Math.max(token.length, 2) });
+    else parts.push({ word: "", dot: false });
+  }
+  return parts;
+}
+
 /**
  * The date `text` says in the control's format and language, as `w:fullDate`; null when it is not
  * one. Word reads a control's text so: a date typed, or brought back by rejecting a change.
+ * Matched part by part in one pass, never through a regular expression built from the format:
+ * one could backtrack for seconds on a hostile format (`hdhdhd…`; `find.ts` avoids them too).
  */
 function dateFromText(control: ControlJSON, text: string): string | null {
   const locale = control.ext && /:lid\b[^>]*:val="([^"]+)"/.exec(control.ext)?.[1];
   const names = monthNames(locale || "en-US") ?? [];
-  const fields: string[] = [];
-  const pattern = (control.dateFormat ?? "d MMMM yyyy").replace(
-    /'[^']*'|am\/pm|AM\/PM|a\/p|A\/P|d+|M+|y+|[Hhms]+|[AaPp]{2}|[.*+?^${}()|[\]\\/]/g,
-    (token) => {
-      if (token[0] === "'") return token.slice(1, -1).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-      if (/^[.*+?^${}()|[\]\\/]$/.test(token)) return `\\${token}`;
-      if (token[0] === "d" && token.length > 2) return "\\p{L}+\\.?";
-      if (token[0] === "d" || token[0] === "y" || token[0] === "M") fields.push(token);
-      if (token[0] === "M" && token.length > 2) return "(\\p{L}+)\\.?";
-      return token[0] === "d" || token[0] === "M" || token[0] === "y" ? "(\\d+)" : "\\S+";
-    },
-  );
-  const found = new RegExp(`^\\s*${pattern}\\s*$`, "iu").exec(text);
-  if (!found) return null;
+  const parts = dateParts(control.dateFormat ?? "d MMMM yyyy");
+  const input = text.trim();
   let [day, month, year] = [0, 0, 0];
-  fields.forEach((field, i) => {
-    const value = found[i + 1] as string;
-    if (field[0] === "d") day = Number(value);
-    else if (field[0] === "y") year = Number(value) + (field.length < 3 ? 2000 : 0);
-    else if (field.length < 3) month = Number(value);
-    else {
-      const name = value.toLowerCase();
-      for (const list of names) if (list.includes(name)) month = list.indexOf(name) + 1;
+  let at = 0;
+  for (const [i, part] of parts.entries()) {
+    if ("literal" in part) {
+      const end = at + part.literal.length;
+      if (input.slice(at, end).toLowerCase() !== part.literal.toLowerCase()) return null;
+      at = end;
+      continue;
     }
-  });
-  return dayFromParts(year, month, day);
+    const start = at;
+    if ("digits" in part) {
+      // Two numbers with nothing between (`ddMMyyyy`): each its format's width.
+      const next = parts[i + 1];
+      const end = next && "digits" in next ? start + part.width : input.length;
+      while (at < end && /[0-9]/.test(input[at] as string)) at++;
+      if (at === start) return null;
+      const value = Number(input.slice(start, at));
+      const field = part.digits;
+      if (field[0] === "d") day = value;
+      else if (field[0] === "y") year = value + (field.length < 3 ? 2000 : 0);
+      else if (field[0] === "M") month = value;
+      continue;
+    }
+    // An am/pm marker as people type it too: `p.m.`.
+    const letter = part.word || part.dot ? /\p{L}/u : /[\p{L}.]/u;
+    while (at < input.length && letter.test(input[at] as string)) at++;
+    if (at === start) return null;
+    const word = input.slice(start, at).toLowerCase();
+    const next = parts[i + 1];
+    // `MMM.` in the text, unless the format's own next text is the dot.
+    if (part.dot && input[at] === "." && !(next && "literal" in next && next.literal[0] === "."))
+      at++;
+    if (part.word)
+      for (const list of names) if (list.includes(word)) month = list.indexOf(word) + 1;
+  }
+  return at === input.length ? dayFromParts(year, month, day) : null;
 }
 
 /** `yyyy-mm-ddT00:00:00Z`, or null for a day the calendar does not have. */
