@@ -13,8 +13,8 @@ import { collab, getVersion, receiveTransaction, sendableSteps } from "./collab.
 import { createEditor, type Editor } from "./editor.js";
 import { insertNote } from "./notes.js";
 import { remote } from "./state.js";
-import { keepTablesApart } from "./tables.js";
 import { insertTable } from "./tablecommands.js";
+import { keepTablesApart } from "./tables.js";
 import { setParagraphStyle } from "./wordformat.js";
 
 const TIMEOUT = 600_000;

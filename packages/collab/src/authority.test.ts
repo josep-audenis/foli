@@ -6,7 +6,9 @@ import {
   type Editor,
   type FoliDocument,
   getVersion,
+  insertTable,
   type NodeJSON,
+  parseDocument,
   receiveTransaction,
   SCHEMA_VERSION,
   Step,
@@ -14,7 +16,13 @@ import {
 } from "@folijs/core";
 import { exportDocx, importDocx, readPackage } from "@folijs/docx";
 import { describe, expect, it } from "vitest";
-import { type Authority, type Broadcast, type CatchUp, createAuthority } from "./index.js";
+import {
+  AUTHORITY,
+  type Authority,
+  type Broadcast,
+  type CatchUp,
+  createAuthority,
+} from "./index.js";
 
 const p = (text: string): NodeJSON => ({
   type: "paragraph",
@@ -256,5 +264,28 @@ describe("authorship (22.10)", () => {
     const xml = (await readPackage(await exportDocx(document))).text("/word/document.xml");
     expect(xml).toContain('w:author="Ann"');
     expect(xml).toContain('w:author="Bob"');
+  });
+});
+
+describe("Word's rules the authority restores (22.8)", () => {
+  it("puts a paragraph between two tables two people inserted at one place", () => {
+    const authority = createAuthority({ document: DOCUMENT });
+    const a = client(DOCUMENT, 1);
+    const b = client(DOCUMENT, 2);
+    for (const editor of [a, b]) {
+      editor.select(1);
+      editor.run(insertTable(2, 2));
+    }
+    const first = authority.receive(message(a));
+    if (!first.ok) throw new Error(first.reason);
+    for (const editor of [a, b]) apply(editor, first.broadcast);
+    const second = authority.receive(message(b));
+    if (!second.ok) throw new Error(second.reason);
+    expect(second.broadcast.clientIDs).toContain(AUTHORITY);
+    for (const editor of [a, b]) apply(editor, second.broadcast);
+    const document = authority.snapshot().document;
+    expect(() => parseDocument(structuredClone(document))).not.toThrow();
+    expect(a.getDocument()).toEqual(document);
+    expect(b.getDocument()).toEqual(document);
   });
 });

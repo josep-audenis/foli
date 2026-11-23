@@ -16,6 +16,14 @@ import {
   Step,
   type StepJSON,
 } from "@folijs/core";
+import { keepTablesApart } from "@folijs/core/internal";
+
+/**
+ * The client id of the steps the authority adds itself: Word's rules that concurrent edits can
+ * break and the schema does not hold (two tables inserted at one place by two people meet; a
+ * table ends the body), restored by a paragraph, broadcast with the client's steps.
+ */
+export const AUTHORITY: ClientID = "@folijs/collab";
 
 /** A client's id: unique among the live clients of one document (a small integer is best). */
 export type ClientID = string | number;
@@ -162,9 +170,19 @@ export function createAuthority<P = unknown>(options: AuthorityOptions<P>): Auth
       if (editor.state === before) return refuse("invalid", "refused by the document's rules");
       // The JSON as read back: what every client gets is what the authority applied.
       const json = parsed.map((step) => step.toJSON());
+      const authors: ClientID[] = json.map(() => clientID);
+      const fix = editor.state.tr.setMeta(remote, true);
+      keepTablesApart(fix);
+      if (fix.docChanged) {
+        editor.dispatch(fix);
+        for (const step of fix.steps) {
+          json.push(step.toJSON());
+          authors.push(AUTHORITY);
+        }
+      }
       const start = version();
       steps.push(...json);
-      for (const _ of json) clientIDs.push(clientID);
+      clientIDs.push(...authors);
       if (steps.length > limits.log) {
         const drop = steps.length - limits.log;
         steps.splice(0, drop);
@@ -174,7 +192,7 @@ export function createAuthority<P = unknown>(options: AuthorityOptions<P>): Auth
       return {
         ok: true,
         version: version(),
-        broadcast: { version: start, steps: json, clientIDs: json.map(() => clientID) },
+        broadcast: { version: start, steps: json, clientIDs: authors },
       };
     },
     stepsSince(since) {
