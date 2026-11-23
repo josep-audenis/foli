@@ -901,7 +901,9 @@ Stable, for plugins and code that edits documents directly:
   (`StepParser`; a type registered twice throws). `Schema.sliceFromJSON(json, path?, gap?)`:
   `gap` is where a `ReplaceAroundStep` inserts, whose holder may lack what it will receive.
 - History: `history(options?)` (`HistoryOptions`: `newGroupDelay`, `depth`), the `closeHistory`
-  and `joinHistory` transaction metadata, `undo`, `redo`, `undoDepth`, `redoDepth`; a
+  and `joinHistory` transaction metadata, the `remote` metadata (1.6: steps another editor made,
+  received as they are: kept out of history and tracking, let through the filters, and the
+  plugins that append transactions add nothing), `undo`, `redo`, `undoDepth`, `redoDepth`; a
   transaction's `addToHistory`. The plugin's state is internal. Of the built-in plugins only
   `history()`, `baseKeymap()` and `listKeymap()` are exported (ADR-0008).
 - The option, result and JSON types of the functions on this page are stable with them:

@@ -3234,7 +3234,7 @@ lets the agent library return steps); 22.7 onwards build it.
   never collide between two editors of one document (an id space per client, from its
   `clientID`). Export unchanged for a single editor. Test: two editors tracking changes at once,
   exported, have unique `w:id`s.
-- [ ] 22.6 Received transactions are applied as they are: this task defines a `remote` meta
+- [x] 22.6 Received transactions are applied as they are: this task defines a `remote` meta
   (22.7 sets it; the tests here set it by hand). With it, the four appending plugins add
   nothing (the sender already sent their steps), the filter of locked controls lets it
   through (the sender's checks held, and the authority's `authorize` decides), and

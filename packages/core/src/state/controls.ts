@@ -29,7 +29,7 @@ import { formatDatePicture } from "./fieldupdate.js";
 import { closeHistory, joinHistory } from "./history.js";
 import { idsOf } from "./ids.js";
 import { marksAt, Selection, TextSelection } from "./selection.js";
-import { type Command, type EditorState, Plugin, type Transaction } from "./state.js";
+import { type Command, type EditorState, isRemote, Plugin, type Transaction } from "./state.js";
 import { trackedDeletes, trackTransaction } from "./track.js";
 import {
   setEnvelopeValue,
@@ -417,7 +417,8 @@ function holdsText(
 
 /** Whether `tr` keeps what the controls of `state` require. */
 function allowed(tr: Transaction, state: EditorState): boolean {
-  if (!tr.docChanged || tr.doc === state.doc || tr.getMeta("historyOp")) return true;
+  if (!tr.docChanged || tr.doc === state.doc || tr.getMeta("historyOp") || isRemote(tr))
+    return true;
   const controls = wordContext(state)?.envelope.controls;
   if (!controls) return true;
   const before = scan(state.doc);
@@ -950,8 +951,11 @@ export function controlsPlugin(): Plugin {
       const controls = wordContext(after)?.envelope.controls;
       if (!controls) return null;
       const tr = after.tr;
+      // Received steps: what the sender's plugin appended came with them; only the selection settles.
       const held =
-        before.doc !== after.doc && !transactions.some((t) => t.getMeta("historyOp"))
+        before.doc !== after.doc &&
+        !transactions.some((t) => t.getMeta("historyOp")) &&
+        !transactions.every(isRemote)
           ? reconcile(tr, transactions, before, after)
           : controls;
       const selection = settle(

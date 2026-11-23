@@ -553,6 +553,12 @@ that way: `withEnvelope` ignores them, and a `CommentStep` (made by `setComments
 or removes one. It leaves the tree as it is, so history records it with the text it belongs to
 and undo and redo take it back.
 
+A received transaction (another editor's steps, 22.6) carries the `remote` meta: `addToHistory`
+is false for it (history maps its events over it), `trackTransaction` leaves it as it is, the
+locked controls' filter lets it through (the authority checked it), and the comments, controls
+and notes plugins append nothing to it or to what is appended to it (`isRemote`): the sender
+already sent the steps they appended. The fields plugin still settles the local selection.
+
 Tracked changes (9.2, `state/track.ts`) do not change the commands. With tracking on (a plugin
 state: on/off and the author), `createEditor`'s dispatch rebuilds each transaction from what
 it changed: the ranges its steps replaced, merged and compared before and after. Each range

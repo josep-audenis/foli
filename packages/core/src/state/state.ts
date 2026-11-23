@@ -63,6 +63,22 @@ export class Plugin<T = unknown> {
   }
 }
 
+/**
+ * Set this meta (true) on a transaction of steps another editor made, received as they are
+ * (collaboration, ADR-0012): it is kept out of history and tracking, the filters let it through
+ * (the sender's checks held; the authority applied it with its own) and the plugins that append
+ * transactions add nothing (the sender already sent what they appended).
+ */
+export const remote = "remote";
+
+/**
+ * Whether `tr` is received (`remote`), or appended to a received one: a plugin that appends
+ * transactions appends nothing to these (the sender's plugin already did).
+ */
+export const isRemote = (tr: Transaction): boolean =>
+  tr.getMeta(remote) === true ||
+  (tr.getMeta("appendedTransaction") as Transaction | undefined)?.getMeta(remote) === true;
+
 /** The state each transaction started from (not a member: the class is public API). */
 const origins = new WeakMap<Transaction, EditorState>();
 /** @internal The state `tr` was made from. */
@@ -138,8 +154,9 @@ export class Transaction extends Transform {
     return this;
   }
 
+  /** False with the `addToHistory: false` meta, and for a received (`remote`) transaction. */
   get addToHistory(): boolean {
-    return this.meta.get("addToHistory") !== false;
+    return this.meta.get("addToHistory") !== false && this.meta.get(remote) !== true;
   }
 
   /** Deletes the selection; deleting everything leaves one empty default textblock. */

@@ -35,7 +35,14 @@ import { PARAGRAPH_PROPERTY_KEYS, RUN_PROPERTY_MARKS } from "../v3/schema.js";
 import { freshId } from "./ids.js";
 import { MARK_ATTRS } from "./mark.js";
 import { NodeSelection, Selection, TextSelection } from "./selection.js";
-import { type Command, type EditorState, Plugin, PluginKey, type Transaction } from "./state.js";
+import {
+  type Command,
+  type EditorState,
+  isRemote,
+  Plugin,
+  PluginKey,
+  type Transaction,
+} from "./state.js";
 import { EnvelopeStep, otherTrees, wordContext } from "./word.js";
 
 /**
@@ -310,6 +317,7 @@ export function trackTransaction(state: EditorState, tr: Transaction): Transacti
     !tr.docChanged ||
     tr.getMeta(untracked) ||
     tr.getMeta("historyOp") ||
+    isRemote(tr) ||
     !tr.addToHistory
   )
     return tr;

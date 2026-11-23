@@ -3,7 +3,14 @@ import { type Mappable, Mapping, type MapResult, type StepMap } from "../transfo
 import { AddMarkStep, RemoveMarkStep, ReplaceStep, type Step } from "../transform/steps.js";
 import { TransformError } from "../transform/transform.js";
 import { Selection, type SelectionJSON } from "./selection.js";
-import { type Command, type EditorState, Plugin, PluginKey, type Transaction } from "./state.js";
+import {
+  type Command,
+  type EditorState,
+  isRemote,
+  Plugin,
+  PluginKey,
+  type Transaction,
+} from "./state.js";
 import {
   StoryEditStep,
   StoryStep,
@@ -102,12 +109,20 @@ export function history({ newGroupDelay = 500, depth = 100 }: HistoryOptions = {
         }
 
         if (!tr.addToHistory || (root && !root.addToHistory)) {
-          return {
-            done: rebase(hist.done, tr.mapping, tr.doc),
-            undone: rebase(hist.undone, tr.mapping, tr.doc),
-            prevTime: 0,
-            prevRanges: null,
-          };
+          const done = rebase(hist.done, tr.mapping, tr.doc);
+          const undone = rebase(hist.undone, tr.mapping, tr.doc);
+          // Another editor's steps between two keys: the typing goes on as one undo step.
+          if (isRemote(tr)) {
+            const story = hist.prevStory ?? null;
+            const mapping = story === null ? tr.mapping : tr.mapping.storyMapping(story);
+            return {
+              ...hist,
+              done,
+              undone,
+              prevRanges: mapRanges(hist.prevRanges, mapping),
+            };
+          }
+          return { done, undone, prevTime: 0, prevRanges: null };
         }
 
         const last = hist.done[hist.done.length - 1];
