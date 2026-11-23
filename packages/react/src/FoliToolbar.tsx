@@ -1479,6 +1479,8 @@ const sameGroups = (a: ToolbarGroups | undefined, b: ToolbarGroups | undefined) 
  * `aria-pressed`; a button whose command cannot run now is `aria-disabled` (still focusable).
  * Clicks leave the focus and selection in the document.
  */
+const IS_APPLE = typeof navigator !== "undefined" && /Mac|iP(hone|[oa]d)/.test(navigator.platform);
+
 /** Keys that step a closed select box through its values. */
 const STEP_KEYS = new Set(["ArrowUp", "ArrowDown", "Home", "End", "PageUp", "PageDown"]);
 
@@ -2271,14 +2273,19 @@ export function FoliToolbar({
                       tabIndex={i === active ? 0 : -1}
                       value={held ?? value}
                       onFocus={() => setActive(i)}
-                      onBlur={apply}
+                      // Leaving it another way than Tab (a click in the document) drops it: the
+                      // selection it was stepped on may be gone.
+                      onBlur={() => setPending(null)}
                       onMouseDown={() => {
                         pointer.current = true;
                         stepped.current = false;
                       }}
                       onKeyDown={(event) => {
                         pointer.current = false;
-                        stepped.current = STEP_KEYS.has(event.key);
+                        // Alt+Down opens the list, and on Apple platforms the arrows do: a pick
+                        // there is a pick, applied at once.
+                        stepped.current = STEP_KEYS.has(event.key) && !event.altKey && !IS_APPLE;
+                        if (event.key === "Tab") apply();
                         if (event.key === "Escape" && held !== null) {
                           event.preventDefault();
                           event.stopPropagation();
@@ -2295,6 +2302,7 @@ export function FoliToolbar({
                           setPending({ key: item.key, value: event.target.value });
                           return;
                         }
+                        setPending(null);
                         editor.run(select.pick(event.target.value));
                         if (pointer.current) onClickCommand?.();
                       }}

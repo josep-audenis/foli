@@ -25,18 +25,18 @@ const doc = (): FoliDocument => ({
 });
 
 describe("21.9", () => {
-  it("FoliCanvas keeps one resolver for an inline resource function", () => {
+  it("FoliCanvas keeps one upload for an inline upload function", () => {
     const editor = createEditor({ document: doc() });
     const given: unknown[] = [];
     const setOptions = vi.spyOn(EditorView.prototype, "setOptions");
     try {
       const view = (n: number) => (
-        <FoliCanvas editor={editor} resource={() => `data:image/png;base64,${n}`} />
+        <FoliCanvas editor={editor} upload={async () => `data:image/png;base64,${n}`} />
       );
       const { rerender } = render(view(1));
       rerender(view(2));
       rerender(view(3));
-      for (const call of setOptions.mock.calls) given.push(call[0].resource);
+      for (const call of setOptions.mock.calls) given.push(call[0].upload);
     } finally {
       setOptions.mockRestore();
     }
@@ -63,6 +63,18 @@ describe("21.9", () => {
     expect(box.value).toBe(after);
     fireEvent.keyUp(box, { key: "Enter" });
     expect(JSON.stringify(editor.getDocument().content)).not.toBe(before);
+    expect(box.value).toBe(after);
+    // A pick with the pointer after a step: the pick, not the step held before it.
+    fireEvent.keyDown(box, { key: "ArrowDown" });
+    fireEvent.change(box, { target: { value: next } });
+    fireEvent.mouseDown(box);
+    fireEvent.change(box, { target: { value: after } });
+    fireEvent.blur(box);
+    expect(box.value).toBe(after);
+    // Escape drops a stepped value.
+    fireEvent.keyDown(box, { key: "ArrowUp" });
+    fireEvent.change(box, { target: { value: next } });
+    fireEvent.keyDown(box, { key: "Escape" });
     expect(box.value).toBe(after);
     // One step to undo, not one per value passed.
     act(() => {

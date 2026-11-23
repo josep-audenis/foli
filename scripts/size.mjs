@@ -119,13 +119,15 @@ writeFileSync(appEntry, `export { FoliEditor } from "${dist("react")}";\n`);
  * Core, view, docx and agent raised in Phase 21 (86.0, 116.3, 60.0 and 75.7 kB; 87.9, 118.2,
  * 61.0 and 76.7 allowed): the audit's fixes (comment ids made distinct, a date control read
  * without a regular expression, part names checked twice, field values checked), about 0.1 kB
- * each on bundles at their limit, with room for the rest of the phase.
+ * each on bundles at their limit, with room for the rest of the phase. React and FoliEditor
+ * raised in 21.9 (170.2 kB, 172.5 allowed): the select boxes held until Enter, the focus given
+ * back after a dialog closed from elsewhere, the comments pane's frame-batched measuring.
  */
 const BUNDLES = [
   { name: "@folijs/core", entry: dist("core"), budget: 90_000 },
   { name: "@folijs/view", entry: dist("view"), budget: 121_000 },
-  { name: "@folijs/react", entry: dist("react"), budget: 174_080 },
-  { name: "FoliEditor only", entry: appEntry, budget: 174_080 },
+  { name: "@folijs/react", entry: dist("react"), budget: 176_640 },
+  { name: "FoliEditor only", entry: appEntry, budget: 176_640 },
   { name: "@folijs/docx", entry: dist("docx"), budget: 62_500 },
   { name: "@folijs/pdf", entry: dist("pdf"), budget: 18_800 },
   { name: "@folijs/agent", entry: dist("agent"), budget: 78_500 },

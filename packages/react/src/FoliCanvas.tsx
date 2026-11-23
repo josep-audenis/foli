@@ -19,8 +19,8 @@ export interface FoliCanvasProps {
   upload?: EditorViewOptions["upload"] | undefined;
   /**
    * The URL to show a picture's image from (`packageImages` for a .docx package's images). A new
-   * function each render is fine: pictures drawn later ask the latest one; ones already drawn
-   * keep their image until the document or the picture changes.
+   * function draws every picture again: keep it the same between renders (`useMemo`,
+   * `useCallback`) and give a new one only with new images.
    */
   resource?: EditorViewOptions["resource"] | undefined;
   className?: string | undefined;
@@ -54,19 +54,16 @@ export const FoliCanvas = forwardRef<FoliCanvasHandle, FoliCanvasProps>(function
 
   useImperativeHandle(ref, () => ({ focus: () => viewRef.current?.focus() }), []);
 
-  // The app's latest functions, called through one function each: an inline one, new each
-  // render, would otherwise draw every picture again (a new resolver) on every render.
-  const latest = useRef({ upload, resource });
-  latest.current = { upload, resource };
-  const stable = useRef({
-    upload: ((file) => latest.current.upload?.(file)) as NonNullable<FoliCanvasProps["upload"]>,
-    resource: ((key, r) => latest.current.resource?.(key, r)) as NonNullable<
-      FoliCanvasProps["resource"]
-    >,
-  }).current;
-  // Only giving one or taking it away changes the view's options.
-  const uploadOption = upload ? stable.upload : null;
-  const resourceOption = resource ? stable.resource : null;
+  // The app's latest upload, called through one function: an inline one, new each render, is
+  // not a change of the view's options. (A new `resource` is: it draws the pictures again, as a
+  // new package's images need even when the document came first.)
+  const latestUpload = useRef(upload);
+  latestUpload.current = upload;
+  const stableUpload = useRef<NonNullable<FoliCanvasProps["upload"]>>(
+    (file) => latestUpload.current?.(file) ?? Promise.reject(new Error("No upload")),
+  ).current;
+  const uploadOption = upload ? stableUpload : null;
+  const resourceOption = resource;
 
   // The options at the moment the view is made: its first render already uses them (no web
   // image fetched before the app's resolver is in place).
