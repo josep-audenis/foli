@@ -264,3 +264,41 @@ describe("a story's view that fails to open (21.8)", () => {
     expect(host.querySelectorAll(".foli-story-mount")).toHaveLength(1);
   });
 });
+
+describe("a drop-down's options (21.8)", () => {
+  it("have ids no other view's list has", () => {
+    const optionIds = () => {
+      const host = document.createElement("div");
+      document.body.append(host);
+      const editor = createEditor({
+        document: parseDocument({
+          ...createDocument({
+            type: "doc",
+            content: [
+              p({ type: "controlStart", attrs: { id: "c" } }, text("one"), {
+                type: "controlEnd",
+                attrs: { id: "c" },
+              }),
+            ],
+          }),
+          controls: { c: { kind: "dropDown", items: [{ value: "one" }, { value: "two" }] } },
+        }),
+      });
+      const view = new EditorView(host, editor);
+      views.push(view);
+      view.focus();
+      editor.select(3);
+      host.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "ArrowDown", altKey: true, bubbles: true }),
+      );
+      const ids = [...document.querySelectorAll('[role="option"]')].map((o) => o.id);
+      view.destroy();
+      return ids;
+    };
+    const first = optionIds();
+    const second = optionIds();
+    expect(first).toHaveLength(2);
+    expect(second).toHaveLength(2);
+    expect(second.filter((id) => first.includes(id))).toEqual([]);
+  });
+});

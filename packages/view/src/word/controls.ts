@@ -104,7 +104,12 @@ function lines(rects: readonly Box[]): Box[] {
 }
 
 /** @internal */
+/** Numbers each view's chrome: its pop-ups' element ids are its own. */
+let chromes = 0;
+
 export class ControlChrome {
+  /** Unique in the page: two views' lists never share an option's id (`aria-activedescendant`). */
+  private readonly idPrefix = `foli-control-${++chromes}`;
   private drawn: HTMLElement[] = [];
   private hovered: ControlRange | null = null;
   private popup: HTMLElement | null = null;
@@ -351,7 +356,7 @@ export class ControlChrome {
     );
     const options = items.map((item, i) => {
       const option = this.doc.createElement("div");
-      option.id = `foli-control-option-${i}`;
+      option.id = `${this.idPrefix}-option-${i}`;
       option.setAttribute("role", "option");
       option.setAttribute("aria-selected", String(item.value === current));
       option.textContent = item.display ?? item.value;
