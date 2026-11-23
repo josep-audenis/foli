@@ -50,6 +50,9 @@ importers:
 
   apps/playground:
     dependencies:
+      '@folijs/collab':
+        specifier: workspace:*
+        version: link:../../packages/collab
       '@folijs/core':
         specifier: workspace:*
         version: link:../../packages/core

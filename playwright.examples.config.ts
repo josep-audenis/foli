@@ -22,6 +22,14 @@ const APPS = [
     command: vite(5183),
     specs: ["success.spec.ts", "vanilla.spec.ts"],
   },
+  // A store of its own per run: the server starts from a new document.
+  {
+    name: "collab",
+    port: 5184,
+    command:
+      "node -e \"require('node:fs').rmSync('.e2e-store.json',{force:true})\" && node server.mjs --port 5184 --store .e2e-store.json",
+    specs: ["collab.spec.ts"],
+  },
 ];
 const BROWSERS = [
   { name: "chromium", device: devices["Desktop Chrome"] },

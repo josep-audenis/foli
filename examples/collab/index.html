@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Foli, edited together</title>
+  </head>
+  <body>
+    <main>
+      <h1>Foli, edited together</h1>
+      <p id="who" role="status">Connecting…</p>
+      <div class="buttons">
+        <button type="button" id="track" aria-pressed="false">Track changes</button>
+        <button type="button" id="connection">Disconnect</button>
+        <button type="button" id="export">Export .docx</button>
+      </div>
+      <ul id="people" aria-label="Also editing"></ul>
+      <div class="canvas"><div id="editor"></div></div>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

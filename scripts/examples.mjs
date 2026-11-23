@@ -25,7 +25,7 @@ const run = (command, cwd = root) => {
 run("pnpm build");
 rmSync(packs, { recursive: true, force: true });
 mkdirSync(packs);
-for (const name of ["core", "view", "react", "docx"]) {
+for (const name of ["core", "view", "react", "docx", "collab"]) {
   run(`pnpm pack --pack-destination "${packs}"`, `${root}packages/${name}`);
 }
 // Stable names, so the examples' package.json files need no version.
@@ -33,7 +33,7 @@ for (const file of readdirSync(packs)) {
   renameSync(`${packs}/${file}`, `${packs}/${file.replace(/-\d+\.\d+\.\d+.*\.tgz$/, ".tgz")}`);
 }
 
-for (const example of ["vite", "next", "extension", "vanilla"]) {
+for (const example of ["vite", "next", "extension", "vanilla", "collab"]) {
   const dir = `${root}examples/${example}`;
   // A fresh install: the tarballs change on every pack, and a lockfile would pin old ones.
   rmSync(`${dir}/node_modules`, { recursive: true, force: true });
