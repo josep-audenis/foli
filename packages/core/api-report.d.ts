@@ -3336,7 +3336,8 @@ export declare function createDocument(content?: NodeJSON, section?: SectionJSON
  * Custom types (ADR-0008) are validated by `options.extensions`; a namespaced type none of them
  * declares is kept as it is, its attributes checked only as plain JSON (a foreign node or mark).
  *
- * What Word opens is accepted: duplicate ids (the first wins), a numbering instance or a reply
+ * What Word opens is accepted: duplicate ids (the first wins; a repeated comment id is given
+ * anew, `distinctComments`), a numbering instance or a reply
  * whose target is missing, references to styles that do not exist. Rejected is only what the
  * engine cannot work with: wrong types, out-of-range values, and cycles (a style based on
  * itself, comments replying to each other) that would never end when followed.

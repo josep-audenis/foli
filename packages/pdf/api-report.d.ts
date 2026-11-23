@@ -58,6 +58,13 @@ export interface ExportPdfOptions {
      * views out without an error; a custom node whose attributes its spec refuses throws in the page.
      */
     extensions?: string | undefined;
+    /** Stops the export: the call rejects with the signal's reason. */
+    signal?: AbortSignal | undefined;
+    /**
+     * Milliseconds after which the export stops, as `signal` does (a `TimeoutError`): counted from
+     * the call, the wait for earlier exports on the page included.
+     */
+    timeout?: number | undefined;
 }
 export interface ExportedPdf {
     /** The PDF file. */
@@ -86,5 +93,8 @@ export interface Rendered {
  * and sections as the editor shows them; each sheet its section's page size; links kept and
  * headings as PDF bookmarks. The page's content is replaced. `document` is validated first
  * (`parseDocument`): an invalid one throws before the page is touched.
+ *
+ * Exports given one page run one after another, never mixed. `signal` and `timeout` reject the
+ * call; the export on the page stops at its next step, and the page is free once it has.
  */
 export declare function exportPdf(document: FoliDocument, options: ExportPdfOptions): Promise<ExportedPdf>;

@@ -494,7 +494,8 @@ export function createDocument(
  * Custom types (ADR-0008) are validated by `options.extensions`; a namespaced type none of them
  * declares is kept as it is, its attributes checked only as plain JSON (a foreign node or mark).
  *
- * What Word opens is accepted: duplicate ids (the first wins), a numbering instance or a reply
+ * What Word opens is accepted: duplicate ids (the first wins; a repeated comment id is given
+ * anew, `distinctComments`), a numbering instance or a reply
  * whose target is missing, references to styles that do not exist. Rejected is only what the
  * engine cannot work with: wrong types, out-of-range values, and cycles (a style based on
  * itself, comments replying to each other) that would never end when followed.
@@ -571,7 +572,8 @@ export function parseDocument(input: unknown, options: ParseOptions = {}): FoliD
   if (input.controls !== undefined) check("controls", input.controls, checkControls);
   if (input.settings !== undefined) check("settings", input.settings, checkSettings);
   const styles = input.styles as StyleJSON[];
-  const comments = input.comments as CommentJSON[];
+  const distinct = distinctComments(input.comments as CommentJSON[], input.content);
+  const comments = distinct.comments;
   noCycles(
     "styles",
     styles,
@@ -588,7 +590,7 @@ export function parseDocument(input: unknown, options: ParseOptions = {}): FoliD
   );
 
   const schema = schemaWith(options.extensions);
-  const content = parseContent(input.content, { schema });
+  const content = parseContent(distinct.content, { schema });
   const stories = Object.entries((input.stories ?? {}) as Record<string, StoryJSON>).map(
     ([id, story]) => {
       const path = `stories[${JSON.stringify(id)}].content`;
@@ -781,6 +783,67 @@ const ENVELOPE_KEYS = [
 
 function fail(path: string, message: string): never {
   throw new FoliDocumentError(`${path}: ${message}`);
+}
+
+const COMMENT_ANCHORS = new Set(["commentStart", "commentEnd", "commentReference"]);
+
+/**
+ * Comments whose ids repeat (`1, 1, 2`: a damaged file, imported so by 1.4) each with an id of
+ * its own, as copies: editing or resolving one by id would change another. The first keeps the
+ * id; each later one gets one above every comment's and anchor's, and so do its anchors: the
+ * n-th start and reference of that id, and the end that closes that start. A reply to a
+ * repeated id stays the first's.
+ */
+function distinctComments(
+  comments: CommentJSON[],
+  content: unknown,
+): { comments: CommentJSON[]; content: unknown } {
+  const seen = new Set<number>();
+  if (comments.every((c) => !seen.has(c.id) && seen.add(c.id))) return { comments, content };
+  const copies = structuredClone(comments);
+  const body = structuredClone(content);
+  const trees = [body, ...copies.map((c) => c.content)];
+  const anchors: { attrs: Record<string, unknown> }[] = [];
+  const walk = (value: unknown): void => {
+    if (Array.isArray(value)) for (const item of value) walk(item);
+    else if (isRecord(value)) {
+      if (COMMENT_ANCHORS.has(value.type as string) && isRecord(value.attrs))
+        anchors.push(value as { attrs: Record<string, unknown> });
+      walk(value.content);
+    }
+  };
+  walk(trees);
+  const idOf = (a: { attrs: Record<string, unknown> }) =>
+    typeof a.attrs.id === "number" ? a.attrs.id : -1;
+  let next = Math.max(-1, ...copies.map((c) => c.id), ...anchors.map(idOf)) + 1;
+  const given = new Map<number, number[]>();
+  for (const c of copies) {
+    const ids = given.get(c.id);
+    if (!ids) given.set(c.id, [c.id]);
+    else {
+      ids.push(next);
+      c.id = next++;
+    }
+  }
+  const counts = new Map<string, number>();
+  const open = new Map<number, number[]>();
+  for (const anchor of anchors) {
+    const was = idOf(anchor);
+    const ids = given.get(was);
+    if (!ids || ids.length < 2) continue;
+    const type = (anchor as { type?: string }).type;
+    let id: number | undefined;
+    if (type === "commentEnd") id = open.get(was)?.pop();
+    else {
+      const n = counts.get(`${type} ${was}`) ?? 0;
+      counts.set(`${type} ${was}`, n + 1);
+      id = ids[n];
+      if (type === "commentStart" && id !== undefined)
+        open.set(was, [...(open.get(was) ?? []), id]);
+    }
+    anchor.attrs = { ...anchor.attrs, id: id ?? was };
+  }
+  return { comments: copies, content: body };
 }
 
 function check(path: string, value: unknown, checker: Check): void {
