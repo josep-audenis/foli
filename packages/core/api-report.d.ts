@@ -2490,6 +2490,8 @@ export declare class StoryStep extends Step {
     readonly selectionAfter: SelectionJSON | null;
     constructor(id: string, before: Story | null, after: Story | null, selectionBefore?: SelectionJSON | null, selectionAfter?: SelectionJSON | null);
     apply(doc: Node): StepResult;
+    /** The story replaced whole: edits of it made before map to deleted. */
+    getMap(): StepMap;
     invert(): Step;
     map(): Step;
     toJSON(): StepJSON;
