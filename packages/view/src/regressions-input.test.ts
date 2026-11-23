@@ -147,3 +147,23 @@ describe("destroy", () => {
     expect(host.getAttributeNames()).toEqual([]);
   });
 });
+
+describe("page translation (21.5)", () => {
+  it("is off on the editing host while the view is on it", () => {
+    const { host, view } = mount("Hello");
+    expect(host.getAttribute("translate")).toBe("no");
+    view.destroy();
+    views.splice(views.indexOf(view), 1);
+    expect(host.hasAttribute("translate")).toBe(false);
+  });
+
+  it("gives the host's own translate back on destroy", () => {
+    const host = document.createElement("div");
+    host.setAttribute("translate", "yes");
+    document.body.append(host);
+    const view = new EditorView(host, createEditor({ document: createDocument() }));
+    expect(host.getAttribute("translate")).toBe("no");
+    view.destroy();
+    expect(host.getAttribute("translate")).toBe("yes");
+  });
+});

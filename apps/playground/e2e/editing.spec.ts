@@ -178,3 +178,21 @@ test("a reload right after typing keeps the edited document", async ({ page }) =
   await page.keyboard.type(" more");
   await expect.poll(() => savedTexts(page)).toEqual(["Kept bold", "second more"]);
 });
+
+test("the browser's page translation does not rewrite the document (21.5)", async ({ page }) => {
+  await openEmpty(page);
+  await page.keyboard.type("Hello world");
+  await expect.poll(() => savedTexts(page)).toEqual(["Hello world"]);
+  // What a page translator does: it rewrites the text of every element it may translate.
+  await page.evaluate(() => {
+    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+    const nodes: Text[] = [];
+    while (walker.nextNode()) nodes.push(walker.currentNode as Text);
+    for (const node of nodes)
+      if (node.parentElement?.translate && node.data.trim()) node.data = `Bonjour ${node.data}`;
+  });
+  await page.keyboard.press("End");
+  await page.keyboard.type("!");
+  await expect.poll(async () => (await savedTexts(page))?.join("")).toContain("!");
+  expect((await savedTexts(page))?.join("")).not.toContain("Bonjour");
+});

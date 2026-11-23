@@ -3041,7 +3041,7 @@ review. 21.1 to 21.6 lose data, hang or leak: they go first, in this order.
   one after another), a `signal` (AbortSignal) and a `timeout` option; README: one export per
   page at a time, keep `@folijs/pdf` external in bundlers (it loads `dist/renderer.js` beside
   itself).
-- [ ] 21.5 View: the browser's page translation cannot rewrite the document. The host has no
+- [x] 21.5 View: the browser's page translation cannot rewrite the document. The host has no
   `translate="no"`: Chrome's Translate changes the text nodes, `readBack` takes the change for
   typing, and the translation is saved (as tracked changes while tracking). `translate="no"` on
   the editing host and on `renderDocument`'s pages; an e2e test changing a text node the way a
