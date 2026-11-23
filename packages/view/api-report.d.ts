@@ -878,48 +878,7 @@ export type { ReviewView } from "@folijs/core";
 export {};
 
 // word/controls.d.ts
-/**
- * What the editable view draws for content controls (ADR-0007, 11.9): the bounding box and title
- * of the control the caret is in or the pointer is over, its list or date button, and the pop-ups
- * those open. Everything here is the view's own: it stands beside the blocks, marked
- * `contenteditable="false"`, so it is neither document text nor a place positions map to.
- */
-import { type ControlRange } from "@folijs/core";
-export declare class ControlChrome {
-    private readonly view;
-    /** Unique in the page: two views' lists never share an option's id (`aria-activedescendant`). */
-    private readonly idPrefix;
-    private drawn;
-    private hovered;
-    private popup;
-    private status;
-    private said;
-    private stopWatching;
-    constructor(view: ControlChromeHost);
-    private get doc();
-    /** Where pop-ups go: out of the editing host. */
-    private get root();
-    /** The control the selection is in, if it is all in one. */
-    active(): ControlRange | null;
-    private properties;
-    /** Draws the frames as the state and the pages now are (`show` false: none). */
-    draw(show?: boolean): void;
-    private frame;
-    private element;
-    private selectWhole;
-    /** The pointer over `target`: the control there gets its frame too. */
-    hover(target: EventTarget | null): void;
-    /** A click on a check box's glyph changes it. Whether it was one. */
-    click(event: MouseEvent): boolean;
-    private announce;
-    /** Opens the list or date picker of the control the selection is in. Whether there is one. */
-    open(): boolean;
-    private choose;
-    private list;
-    private datePicker;
-    close(focus: boolean): void;
-    destroy(): void;
-}
+export {};
 
 // word/edit.d.ts
 export {};
