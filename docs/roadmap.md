@@ -3214,7 +3214,7 @@ lets the agent library return steps); 22.7 onwards build it.
   above); the message protocol (`{ version, steps, clientID }`, confirm, refuse); what Foli
   ships and what the app keeps (transport, auth, storage); how ids, envelope changes and
   stories are handled (22.3–22.5); what a snapshot holds (document, package, resources).
-- [ ] 22.2 Steps as JSON: `toJSON` on every step and `Step.fromJSON(schema, json)`, with a
+- [x] 22.2 Steps as JSON: `toJSON` on every step and `Step.fromJSON(schema, json)`, with a
   registry (`Step.jsonID`) so an extension can add its own; slices keep `ext`, `attributes` and
   opaque nodes. Property test: random transactions → JSON → applied on a second state give the
   same document. `fromJSON` validates its input (a trust boundary: it will read the network).

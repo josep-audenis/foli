@@ -886,6 +886,15 @@ Stable, for plugins and code that edits documents directly:
   `ReplaceAroundStep`, `AddMarkStep`, `RemoveMarkStep`, `NodeMarkupStep`, `NodeMarkupBatchStep`,
   `StepMap`, `Mapping`, `Mappable`, `MapResult`; `canJoin`, `canSplit`, `findWrapping`,
   `liftTarget`, `NodeTypeWithAttrs`.
+- Steps as JSON (1.6): `step.toJSON()` (`StepJSON`: `stepType` and the step's fields) and
+  `Step.fromJSON(schema, json)` (a value `JSON.parse` gave), for every step of `@folijs/core`, the Word steps
+  (`CommentStep`, `EnvelopeStep`, `StoryStep`, from `@folijs/core/internal`) included. `fromJSON` reads untrusted input: an
+  unknown step type or key, a position that is not a non-negative integer, or a slice, mark,
+  attribute, comment, story or envelope value the schema refuses throws `FoliDocumentError` with
+  the JSON path; whether the step applies is `apply`'s to say. An extension's own step class
+  overrides `toJSON` and registers how it is read with `Step.jsonID(stepType, parse)`
+  (`StepParser`; a type registered twice throws). `Schema.sliceFromJSON(json, path?, gap?)`:
+  `gap` is where a `ReplaceAroundStep` inserts, whose holder may lack what it will receive.
 - History: `history(options?)` (`HistoryOptions`: `newGroupDelay`, `depth`), the `closeHistory`
   and `joinHistory` transaction metadata, `undo`, `redo`, `undoDepth`, `redoDepth`; a
   transaction's `addToHistory`. The plugin's state is internal. Of the built-in plugins only

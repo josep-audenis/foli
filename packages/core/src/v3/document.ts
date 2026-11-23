@@ -1132,3 +1132,99 @@ const checkComment: Check = shape(
   },
   ["id", "author", "content"],
 );
+
+const checkDefaults: Check = shape(
+  { paragraph: paragraphProperties, run: runProperties, ext: xml },
+  [],
+  true,
+);
+const checkNumbering: Check = shape(
+  { abstracts: listOf(checkAbstract), instances: listOf(checkInstance) },
+  ["abstracts", "instances"],
+);
+
+/** How each envelope key is checked: whole, and (`entry`) one entry of it, by its path. */
+const ENVELOPE_CHECKS: Record<
+  string,
+  { whole: Check; optional: boolean; entry?: (path: readonly string[]) => Check | undefined }
+> = {
+  section: { whole: checkSection, optional: false },
+  defaults: { whole: checkDefaults, optional: false },
+  theme: { whole: checkTheme, optional: true },
+  styles: {
+    whole: listOf(checkStyle),
+    optional: false,
+    entry: (path) => (path.length === 1 ? checkStyle : undefined),
+  },
+  numbering: {
+    whole: checkNumbering,
+    optional: false,
+    entry: (path) =>
+      path.length !== 2
+        ? undefined
+        : path[0] === "abstracts"
+          ? checkAbstract
+          : path[0] === "instances"
+            ? checkInstance
+            : undefined,
+  },
+  resources: {
+    whole: checkResources,
+    optional: true,
+    entry: (path) => (path.length === 1 ? checkResource : undefined),
+  },
+  controls: {
+    whole: checkControls,
+    optional: true,
+    entry: (path) => (path.length === 1 ? checkControl : undefined),
+  },
+  settings: {
+    whole: checkSettings,
+    optional: true,
+    entry: (path) =>
+      path.length === 1 ? (v) => checkSettings({ [path[0] as string]: v }) : undefined,
+  },
+};
+
+/**
+ * Why `value` cannot be the envelope's `key` (at `path` inside it: one style, one resource…), as
+ * `parseDocument` checks it; undefined when it can. An entry may be undefined (removed).
+ * @internal
+ */
+export function envelopeValueError(
+  key: string,
+  path: readonly string[],
+  value: unknown,
+): string | undefined {
+  const checks = Object.hasOwn(ENVELOPE_CHECKS, key) ? ENVELOPE_CHECKS[key] : undefined;
+  if (!checks) return `unknown envelope key ${JSON.stringify(key)}`;
+  const check = path.length ? checks.entry?.(path) : checks.whole;
+  if (!check) return `no entry ${JSON.stringify(path)} in ${key}`;
+  if (value === undefined) return path.length || checks.optional ? undefined : "is required";
+  return check(value);
+}
+
+/**
+ * A story's JSON (`StoryJSON`) as `parseDocument` reads it: its tree, checked by its kind's rules.
+ * @internal
+ */
+export function parseStory(value: unknown, schema: Schema, path: string): Node {
+  check(path, value, checkStory);
+  const tree = parseContent((value as StoryJSON).content, { path: `${path}.content`, schema });
+  storyRules(tree, (value as StoryJSON).kind, `${path}.content`);
+  return tree;
+}
+
+/**
+ * A comment's JSON (`CommentJSON`) as `parseDocument` reads it; throws `FoliDocumentError`.
+ * @internal
+ */
+export function checkCommentJSON(value: unknown, schema: Schema, path: string): void {
+  check(path, value, checkComment);
+  for (const block of blocks((value as CommentJSON).content, `${path}.content`, schema))
+    block.descendants((node) => {
+      if (node.type.name === "noteReference")
+        fail(`${path}.content`, "a comment cannot hold a note reference");
+      return true;
+    });
+}

@@ -43,7 +43,7 @@ export { DEFAULT_SETTINGS, type DocumentSettings, type FoliDocumentV2, PAGE_SIZE
 export { type AttributeSpec, type AttributeSpecs, type Attrs, ContentMatch, FoliDocumentError, Fragment, Mark, type MarkJSON, type MarkSpec, MarkType, Node, type NodeJSON, NodeRange, type NodeSpec, NodeType, ReplaceError, ResolvedPos, Schema, type SchemaSpec, Slice, type SliceJSON, TextNode, } from "./model/index.js";
 export { ALIGNMENTS, type Alignment, type BlockJSON, type BulletListJSON, type ColorMarkJSON, type DocJSON, type HardBreakJSON, HEADING_LEVELS, type HeadingJSON, type HeadingLevel, type HorizontalRuleJSON, type InlineJSON, isColor, isSafeHref, type LinkMarkJSON, type ListItemJSON, MARK_TYPES, type MarkName, type MarkNameJSON, type OrderedListJSON, type PageBreakJSON, type ParagraphJSON, SAFE_LINK_PROTOCOLS, SIMPLE_MARK_TYPES, type SimpleMarkJSON, type SimpleMarkName, type TextJSON, } from "./schema.js";
 export { AllSelection, acceptAllChanges, acceptChange, addComment, addRepeatingItem, alignAt, arrowAcrossLeaf, autolinkHref, type BookmarkInfo, type BookmarkResult, type BuiltInCommands, baseKeymap, CellSelection, type Change, type ChangeFilter, type ChangeKind, type Command, type CommentContent, type CommentMatch, type CommentOptions, type ControlInsertOptions, type ControlPropertiesPatch, type ControlRange, type ControlValue, type ControlValueInput, type CrossReference, type CrossReferenceTargets, canOutdent, cellsAsTable, changeIndent, closeHistory, colorAt, columnAt, commentAnchors, controlAt, controlIsReadOnly, controlProperties, controlsIn, controlValues, convertNotes, createEditor, crossReferenceTargets, type DeleteUnit, type DocumentTarget, deleteAllComments, deleteBackward, deleteBookmark, deleteColumns, deleteComment, deleteForward, deleteRows, deleteSelection, deleteTable, documentOutline, documentSections, type Editor, type EditorDocument, type EditorListener, type EditorOptions, EditorState, type EditorStateConfig, editComment, ensureStory, extendCellSelection, type Field, type FieldDisplay, type FieldInstruction, type FieldLayout, type FieldPage, type FieldSkip, type FieldSkipReason, type FieldsReport, type FindMatch, type FindOptions, type FoliCommands, type FoundMatches, fieldAround, fieldCodesShown, fieldDisplay, fieldsIn, findAll, findInComments, findInText, fontFamilyAt, fontSizeAt, formatDatePicture, formatNumericPicture, goTo, goToCell, goToCellVertically, HIGHLIGHT_HEX, type HistoryOptions, hint, history, type InsertFieldOptions, type InsertNoteOptions, insertBookmark, insertColumn, insertColumnBreak, insertControl, insertControlText, insertCrossReference, insertDate, insertField, insertHardBreak, insertHorizontalRule, insertLink, insertNote, insertPageBreak, insertPageNumber, insertPicture, insertRow, insertSectionBreak, insertTab, insertTable, insertTableOfContents, insertText, isBookmarkName, isHeaderRow, isMarkActive, joinBackward, joinForward, joinHistory, type ListKind, liftListItem, liftListItemAtStart, lineSpacingAt, linkAt, linkEditorRequest, listBookmarks, listKeymap, listKindAt, marksAt, mergeCells, type NavigationRequest, type NewPicture, NodeSelection, type NoteKind, type NoteNumber, type NoteNumberOptions, nextChange, nextMatch, normalizeHref, noteAtSelection, noteNumbers, noteProperties, noteTexts, type OpenStory, type OutlineEntry, openLinkEditor, type PictureCrop, Plugin, PluginKey, type PluginSpec, pageVariant, paragraphStyleAt, paragraphStyles, parseFieldInstruction, pasteCells, previousChange, type ReplaceRefusal, type ReplaceReport, type ReviewView, redo, redoDepth, rejectAllChanges, rejectChange, removeLink, removeSectionBreak, renameBookmark, replace, replaceAll, replaceInComments, replyToComment, requestsLinkEditor, resolveComment, type SectionAt, type SectionBreakKind, type SectionColumns, type SectionSetup, Selection, type SelectionJSON, type StorySide, type StoryVariant, type StoryView, sectionAt, sectionColumns, sectionSettings, selectAll, selectedPicture, setAlign, setBlockType, setCellShading, setColumnWidth, setControlProperties, setControlValue, setDifferentEvenPages, setDifferentFirstPage, setFontFamily, setFontSize, setHighlight, setLineSpacing, setLink, setNoteProperties, setParagraphSpacing, setParagraphStyle, setPictureAlt, setPictureCrop, setPictureRotation, setPictureSize, setReviewView, setSectionSetup, setStoryLinked, setTableStyle, setTextColor, setTrackChanges, sinkListItem, splitBlock, splitCell, splitListItem, storyOfSection, type TableOfContentsOptions, TextSelection, type TrackState, Transaction, tableStyleAt, tableStyles, toggleFieldCodes, toggleHeaderRow, toggleList, toggleMark, trackedChanges, trackState, trackTransaction, type UpdateFieldsOptions, undo, undoDepth, untracked, updateFields, wrapInList, } from "./state/index.js";
-export { AddMarkStep, canJoin, canSplit, findWrapping, liftTarget, type Mappable, Mapping, type MapResult, NodeMarkupBatchStep, NodeMarkupStep, type NodeTypeWithAttrs, RemoveMarkStep, ReplaceAroundStep, ReplaceStep, Step, StepMap, StepResult, Transform, TransformError, } from "./transform/index.js";
+export { AddMarkStep, canJoin, canSplit, findWrapping, liftTarget, type Mappable, Mapping, type MapResult, NodeMarkupBatchStep, NodeMarkupStep, type NodeTypeWithAttrs, RemoveMarkStep, ReplaceAroundStep, ReplaceStep, Step, type StepJSON, StepMap, type StepParser, StepResult, Transform, TransformError, } from "./transform/index.js";
 export { type AbstractNumberingJSON, type BorderJSON, type CellPropertiesJSON, type CommentJSON, type ContentOptions, type ControlJSON, createDocument, type Extension, type ExtensionNodeSpec, type FoliDocument, type FoliDocumentV3, type FoliDocumentV4, HIGHLIGHT_COLORS, halfPointsToPt, JUSTIFICATIONS, type Justification, type MeasureJSON, migrateToV3, migrateToV4, migrateToV5, mmToTwips, type NotePropertiesJSON, type NumberingInstanceJSON, type NumberingLevelJSON, type ParagraphPropertiesJSON, type ParseOptions, parseContent, parseDocument, ptToTwips, type ResourceJSON, type RowPropertiesJSON, SCHEMA_VERSION, type SectionJSON, type StoryJSON, type StyleJSON, TABLE_CONDITIONS, type TableCondition, type TableConditionJSON, type TablePropertiesJSON, type ThemeJSON, TWIPS_PER_INCH, TWIPS_PER_POINT, twipsToMm, twipsToPt, twipsToPx, type WordSettingsJSON, } from "./v3/index.js";
 
 // internal.d.ts
@@ -547,11 +547,16 @@ export declare class Schema {
      */
     nodeFromJSON(value: unknown, path?: string): Node;
     markFromJSON(value: unknown, path?: string): Mark;
-    /** Parses a slice. Open nodes may hold incomplete content; everything else is strict. */
-    sliceFromJSON(value: unknown, path?: string): Slice;
+    /**
+     * Parses a slice. Open nodes may hold incomplete content; everything else is strict. `gap`: a
+     * position of the slice (`Slice.insertAt`'s) where content will be inserted, a
+     * `ReplaceAroundStep`'s: the node holding it may lack what the inserted content will give.
+     */
+    sliceFromJSON(value: unknown, path?: string, gap?: number): Slice;
     /**
      * `openStart`/`openEnd`: how many levels, starting with this node, are cut open. `depth`: how
      * deep the node is; past `MAX_NODE_DEPTH` the input is refused instead of overflowing the stack.
+     * `gap`: a position in the node's content (`sliceFromJSON`'s), -1 for none.
      */
     private parseNode;
     private marksFromJSON;
@@ -2391,7 +2396,7 @@ export declare function trackTransaction(state: EditorState, tr: Transaction): T
 
 // state/word.d.ts
 import type { Node } from "../model/index.js";
-import { Step, StepResult } from "../transform/steps.js";
+import { Step, type StepJSON, StepResult } from "../transform/steps.js";
 import type { CommentJSON, FoliDocument, StoryJSON } from "../v3/document.js";
 import { Resolver } from "../v3/resolve.js";
 import { type SelectionJSON } from "./selection.js";
@@ -2433,6 +2438,7 @@ export declare class CommentStep extends Step {
     apply(doc: Node): StepResult;
     invert(): Step;
     map(): Step;
+    toJSON(): StepJSON;
 }
 /**
  * Makes `tr` change the comments from `from` (the state's) to `to`, one `CommentStep` per
@@ -2455,6 +2461,7 @@ export declare class EnvelopeStep<K extends EnvelopeKey = EnvelopeKey> extends S
     apply(doc: Node): StepResult;
     invert(): Step;
     map(): Step;
+    toJSON(): StepJSON;
 }
 /**
  * Changes story `id` from `before` to `after` (null: no story), a step of the body's transaction
@@ -2471,6 +2478,7 @@ export declare class StoryStep extends Step {
     apply(doc: Node): StepResult;
     invert(): Step;
     map(): Step;
+    toJSON(): StepJSON;
     /** This step followed by `next`, when `next` starts from what this one leaves. */
     merge(next: StoryStep): StoryStep | null;
 }
@@ -2599,7 +2607,7 @@ export type ListKind = "bulletList" | "orderedList";
 
 // transform/index.d.ts
 export { type Mappable, Mapping, type MapResult, StepMap } from "./stepmap.js";
-export { AddMarkStep, NodeMarkupBatchStep, NodeMarkupStep, RemoveMarkStep, ReplaceAroundStep, ReplaceStep, Step, StepResult, } from "./steps.js";
+export { AddMarkStep, NodeMarkupBatchStep, NodeMarkupStep, RemoveMarkStep, ReplaceAroundStep, ReplaceStep, Step, type StepJSON, type StepParser, StepResult, } from "./steps.js";
 export { canJoin, canSplit, findWrapping, liftTarget, type NodeTypeWithAttrs, } from "./structure.js";
 export { Transform, TransformError } from "./transform.js";
 
@@ -2668,7 +2676,7 @@ export declare class Mapping implements Mappable {
 }
 
 // transform/steps.d.ts
-import { type Attrs, type Mark, type Node, type NodeType, Slice } from "../model/index.js";
+import { type Attrs, type Mark, type Node, type NodeType, type Schema, Slice } from "../model/index.js";
 import { type Mappable, StepMap } from "./stepmap.js";
 /** Either the new document or why the step could not be applied. */
 export declare class StepResult {
@@ -2680,6 +2688,13 @@ export declare class StepResult {
     /** Runs `doc.replace`, turning schema/range violations into a failed result. */
     static fromReplace(doc: Node, from: number, to: number, slice: Slice): StepResult;
 }
+/** A step as JSON: `stepType` names how to read it back (`Step.jsonID`), the rest is the step's. */
+export interface StepJSON {
+    stepType: string;
+    [key: string]: unknown;
+}
+/** Reads a step's JSON (its `stepType` matched) in `schema`; throws `FoliDocumentError`. */
+export type StepParser = (schema: Schema, json: Readonly<Record<string, unknown>>) => Step;
 /**
  * One atomic, invertible document change. Every edit is a sequence of steps; steps report how
  * they move positions (`getMap`), can be inverted against the document they were applied to,
@@ -2687,6 +2702,20 @@ export declare class StepResult {
  */
 export declare abstract class Step {
     abstract apply(doc: Node): StepResult;
+    /**
+     * The step as JSON, for another editor (`Step.fromJSON`). An extension's step class that
+     * travels between editors (collaboration) overrides it and registers its `stepType`.
+     */
+    toJSON(): StepJSON;
+    /**
+     * Reads a step from JSON (a value `JSON.parse` gave), as untrusted input: an unknown
+     * `stepType`, a key the step does not
+     * have, a position that is not a non-negative integer or content the schema refuses throws
+     * `FoliDocumentError` with the JSON path. Whether the step applies is `apply`'s to say.
+     */
+    static fromJSON(schema: Schema, json: unknown): Step;
+    /** Registers how steps of `stepType` are read back. A type registered twice throws. */
+    static jsonID(stepType: string, parse: StepParser): void;
     getMap(): StepMap;
     /** The step that undoes this one. `doc` is the document this step was applied to. */
     abstract invert(doc: Node): Step;
@@ -2708,6 +2737,7 @@ export declare class ReplaceStep extends Step {
     getMap(): StepMap;
     invert(doc: Node): Step;
     map(mapping: Mappable): Step | null;
+    toJSON(): StepJSON;
     /**
      * One step equivalent to applying this step and then `next`, when they touch adjacent ranges
      * (e.g. consecutive keystrokes); null otherwise. Keeps typing history to one step per run.
@@ -2730,6 +2760,7 @@ export declare class ReplaceAroundStep extends Step {
     readonly structure: boolean;
     constructor(from: number, to: number, gapFrom: number, gapTo: number, slice: Slice, insert: number, structure?: boolean);
     apply(doc: Node): StepResult;
+    toJSON(): StepJSON;
     getMap(): StepMap;
     invert(doc: Node): Step;
     map(mapping: Mappable): Step | null;
@@ -2743,6 +2774,7 @@ declare abstract class MarkStep extends Step {
     protected abstract create(from: number, to: number): MarkStep;
     apply(doc: Node): StepResult;
     map(mapping: Mappable): Step | null;
+    toJSON(): StepJSON;
 }
 /** Adds a mark to all inline content in `from..to` whose parent allows it. */
 export declare class AddMarkStep extends MarkStep {
@@ -2770,6 +2802,7 @@ export declare class NodeMarkupStep extends Step {
     constructor(pos: number, type: NodeType, attrs: Attrs | null, marks?: readonly Mark[] | undefined);
     apply(doc: Node): StepResult;
     invert(doc: Node): Step;
+    toJSON(): StepJSON;
     map(mapping: Mappable): Step | null;
 }
 /**
@@ -2782,6 +2815,7 @@ export declare class NodeMarkupBatchStep extends Step {
     apply(doc: Node): StepResult;
     invert(doc: Node): Step;
     map(mapping: Mappable): Step | null;
+    toJSON(): StepJSON;
 }
 export {};
 
