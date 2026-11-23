@@ -1,0 +1,133 @@
+# ADR-0012: Collaboration: a central authority over steps, not a CRDT
+
+- **Status:** Accepted when merged, task 22.1 (2026-11-23), by an agent's review, as the owner
+  asked for Phase 22 (real-time editing by several people, planned in #218).
+- **Context:** several people edit one document at once and each sees the others' changes
+  within a moment. The document stays a lossless Word document (ADR-0005): what the editor
+  holds beside its tree (styles, numbering, comments, stories, controls, resources) changes too,
+  and the schema refuses trees Word would not open. Foli already describes every edit as steps
+  that map positions (`Mapping`) and invert (history); what it lacks is listed under "Starts
+  from" in Phase 22 of the roadmap.
+
+## Decision
+
+**A central authority orders every step.** One process per document (the app's server, a
+worker, a Durable Object) holds the document and a version: the number of steps it has
+accepted. A client sends the steps it made since the version it knows; the authority accepts
+them only if they start from its current version and apply, and broadcasts them with their
+authors' client ids. Each client keeps its own steps not yet confirmed on top of what it
+received: when steps of others arrive, it takes its own back, applies the others' and applies
+its own again, mapped over them (`Mapping` with mirrored maps, as history already does). Google
+Docs works the same way.
+
+**Not a CRDT.** A Yjs binding was weighed and left out:
+
+- It bypasses steps: the server cannot validate a change, only merge it. Foli's authority
+  applies every step with `packages/core` and refuses one that does not apply, or one the app's
+  `authorize` callback refuses (a read-only user).
+- A merge can leave a document the schema refuses: two people adding a cell to one row each
+  make a row with the wrong number of cells; deleting a paragraph while another person splits
+  it leaves content with no block. Steps refuse such a change at the authority instead.
+- Word's envelope and stories would each need their own mapping into Yjs types, and every
+  command that changes them a second implementation.
+- Offline editing over days, a CRDT's strength, is not in this phase (below).
+
+**The protocol.** Plain JSON, over whatever the app uses (WebSocket, SSE, HTTP, a queue):
+
+| Message         | From → to            | Body                                                     |
+| --------------- | -------------------- | -------------------------------------------------------- |
+| steps           | client → authority   | `{ version, clientID, steps: StepJSON[] }`               |
+| accepted        | authority → sender   | `{ version }` (the version after them)                   |
+| refused         | authority → sender   | `{ reason, version }`, nothing changed                   |
+| broadcast       | authority → everyone | `{ version, steps, clientIDs }` (`version`: before them) |
+| catch up        | client → authority   | `stepsSince(version)`: the steps since, or a snapshot    |
+| presence (22.9) | client → everyone    | `{ clientID, name, color, selection, version }`          |
+
+A refusal's reason is `stale` (the version is behind: the client receives what it missed,
+rebases and sends again), `malformed` (not JSON steps of this schema), `invalid` (a step does
+not apply), `too-large` (over a limit) or `unauthorized` (the app's callback said no). The
+sender's own steps come back in the broadcast like everyone's: a client knows its steps are
+confirmed when it receives them with its own client id, and needs no reply to stay correct.
+
+**What Foli ships, what the app keeps.** Foli ships:
+
+- the client plugin in `@folijs/core` (headless, beside history): `collab({ version,
+  clientID })`, `sendableSteps(state)`, `receiveTransaction(state, steps, clientIDs)`,
+  `getVersion(state)`;
+- `@folijs/collab`, the authority, which runs wherever `packages/core` runs (Node, workers,
+  Durable Objects): `createAuthority({ document, package?, limits, authorize? })`, `receive`,
+  `stepsSince`, `snapshot`, compaction of the log;
+- presence (remote carets and selections drawn by the view) and an example over WebSocket.
+
+The app keeps the transport, authentication and permissions (`authorize` is its callback),
+storage (the authority gives what to persist, a snapshot and the log, and persists nothing
+itself), client ids, and any hosted service.
+
+**Envelope changes are steps.** `withEnvelope` keeps its signature and adds an `EnvelopeStep`
+for each part of the envelope it changes, with the value before and after, so the change
+travels, is validated and undone like any other. The parts and the unit a step changes:
+
+| Envelope key | One step changes                                       |
+| ------------ | ------------------------------------------------------ |
+| `section`    | the whole last-section setup                           |
+| `settings`   | one setting (`evenAndOddHeaders`, `trackRevisions`, …) |
+| `defaults`   | the whole document defaults                            |
+| `theme`      | the whole theme                                        |
+| `styles`     | one style, by id                                       |
+| `numbering`  | one abstract definition or one instance, by id         |
+| `resources`  | one resource, by key                                   |
+| `controls`   | one control's properties, by id                        |
+
+Comments keep their `CommentStep` and stories their story steps; `schemaVersion` is computed.
+Changing one entry, not the whole value, keeps messages small (a document's styles can weigh
+hundreds of kilobytes) and lets two people change two styles at once. A step changed from a
+stale value is refused by the authority; a client rebasing its own envelope step over another
+person's change of the same entry merges the two property by property, its own change winning
+where both changed one property. Undo now takes a style or numbering change back with the edit
+it came with (it stayed before): a change of behaviour the changeset and limitations.md state.
+
+**The tracking switch is in the document.** Whether edits are tracked becomes a setting,
+`settings.trackRevisions`, changed by a step: every client and the authority's snapshot have
+it, `exportDocx` writes it when not told otherwise. A document that has it on needs schema 7
+(the settings check refuses keys it does not know, so 1.5 could not read it); one with it off
+stays at 5. Who makes the changes stays each client's own (`author`).
+
+**Stories merge.** A change inside an existing header, footer or note is a `StoryEditStep`: the
+story's id and the story's own steps, mapped through the story's own positions, so two people
+typing in one footer rebase like two people typing in the body. `StoryStep` stays for creating,
+removing or replacing a story whole. Maps of story steps travel inside the body's `Mapping`,
+under the story's id.
+
+**Ids are unique across clients.** Revision, comment, note, control and numbering ids and the
+numbers of generated bookmark names are still the next free number after the largest in the
+document, but with the collab plugin on, only numbers of the client's own class are taken:
+`id ≡ slot (mod 256)`, where the slot is the client id when it is an integer (its remainder),
+or a hash of it. Apps give the live clients of one document distinct small integers; two
+clients in one slot can still collide. Without the plugin nothing changes: a single editor's
+export is the same as before.
+
+**Received transactions are applied as they are.** They carry the meta `remote`: kept out of
+history and of tracking, let through the filters (the sender's checks held, the authority's
+`authorize` decided), and the plugins that append transactions (comments, controls, fields,
+notes) add nothing, since the sender already sent the steps they appended.
+
+**History.** Received steps are not undoable. The user's own events are mapped over them (the
+existing rebase); an event whose envelope or story steps no longer apply after someone else
+changed the same entry or story is dropped whole, never half applied.
+
+**What a snapshot holds.** `{ version, document, package? }`: the document as JSON (content,
+envelope, comments, stories and resources), and the package it was imported from, which the
+authority keeps opaque and the app stores beside it (export needs it for the parts Foli does not
+edit, ADR-0005). A picture's bytes travel in a step only as a `data:` URL, within the message
+limit; an app with large pictures stores the bytes and gives resources a `url`.
+
+## Consequences
+
+- The authority is the bottleneck of one document, by design: one process orders its steps.
+  Scaling is per document, not per step.
+- A client that is offline keeps its steps and sends them when it reconnects, rebased over
+  what it missed; long offline sessions (days) and peer-to-peer are not supported.
+- Two clients editing one style property at once: the last confirmed wins. Two clients in one id
+  slot can produce duplicate ids; the app avoids it by numbering its live clients.
+- The agent library and the MCP server do not edit a shared document in this phase.
+- Undo takes envelope changes back with their edit, a change from 1.5 written in the changeset.
