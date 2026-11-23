@@ -216,7 +216,7 @@ const DEPTH: Readonly<Record<EnvelopeKey, number>> = {
   controls: 1,
 };
 /** Keys the formatting resolver reads: a change rebuilds it. */
-const FORMATTING = new Set<EnvelopeKey>(["defaults", "theme", "styles", "numbering"]);
+const FORMATTING = new Set<EnvelopeKey>(["defaults", "theme", "styles", "numbering", "settings"]);
 
 const isObject = (v: unknown): v is Record<string, unknown> =>
   typeof v === "object" && v !== null && !Array.isArray(v);
@@ -404,6 +404,15 @@ export class StoryStep extends Step {
     return StepResult.ok(doc);
   }
 
+  /** The story replaced whole: edits of it made before map to deleted. */
+  override getMap(): StepMap {
+    const size = (story: Story | null) => story?.doc.content.size ?? 0;
+    return new StepMap([], false, {
+      id: this.id,
+      maps: [new StepMap([0, size(this.before), size(this.after)])],
+    });
+  }
+
   invert(): Step {
     return new StoryStep(
       this.id,
@@ -560,7 +569,8 @@ export class StoryEditStep extends Step {
 
   invert(): Step {
     const base = storyBases.get(this);
-    if (!base) throw new RangeError(`The story edit of ${this.id} has no tree to invert against`);
+    // Its story is gone (removed by another editor): it changed nothing, nor does its inverse.
+    if (!base) return new StoryEditStep(this.id, [], this.selectionAfter, this.selectionBefore);
     const inverted: Step[] = [];
     let doc = base;
     for (const step of this.steps) {
@@ -586,7 +596,11 @@ export class StoryEditStep extends Step {
         m.appendMap(mapped.getMap(), count - 1 - i);
       }
     });
-    return steps.length ? new StoryEditStep(this.id, steps) : null;
+    const map = (s: SelectionJSON | null): SelectionJSON | null =>
+      s && { ...s, anchor: through.map(s.anchor, -1), head: through.map(s.head, -1) };
+    return steps.length
+      ? new StoryEditStep(this.id, steps, map(this.selectionBefore), map(this.selectionAfter))
+      : null;
   }
 
   /** This edit followed by `next`, an edit of the same story. */
@@ -665,8 +679,10 @@ export function storyStepsApply(
       current.set(step.id, step.after);
     } else if (step instanceof StoryEditStep) {
       const story = at(step.id);
-      const doc = story && storyEditResult(step, story.doc);
-      if (!story || !doc) return false;
+      // A story removed since (by another editor): the edit has nothing to change.
+      if (!story) continue;
+      const doc = storyEditResult(step, story.doc);
+      if (!doc) return false;
       current.set(step.id, { ...story, doc });
     }
   }
@@ -694,8 +710,11 @@ function storyJSON({ doc, ...rest }: Story): StoryJSON {
   return { ...rest, content: doc.toJSON() };
 }
 
-/** `envelope` after the envelope steps among `steps`. */
-function afterEnvelopeSteps(envelope: WordEnvelope, steps: readonly Step[]): WordEnvelope {
+/**
+ * `envelope` after the envelope steps among `steps`.
+ * @internal
+ */
+export function afterEnvelopeSteps(envelope: WordEnvelope, steps: readonly Step[]): WordEnvelope {
   let current = envelope;
   for (const step of steps)
     if (step instanceof EnvelopeStep)
@@ -716,9 +735,21 @@ export function setEnvelopeValue<K extends EnvelopeKey>(
   const envelope = wordContext(state)?.envelope;
   if (!envelope) return tr;
   const current = afterEnvelopeSteps(envelope, tr.steps);
-  for (const change of entries(current[key], value, DEPTH[key]))
-    tr.step(new EnvelopeStep(key, change.before, change.after, change.path));
+  for (const step of envelopeChanges(key, current[key], value)) tr.step(step);
   return tr;
+}
+
+/**
+ * The steps that change `key` from `now` to `value`: one per entry, or one for the whole value
+ * when entries would not give it (a list reordered).
+ */
+function envelopeChanges(key: EnvelopeKey, now: unknown, value: unknown): EnvelopeStep[] {
+  if (deepEqual(now, value)) return [];
+  let changes = entries(now, value, DEPTH[key]);
+  let check: unknown = now;
+  for (const c of changes) check = setIn(check, c.path, c.after);
+  if (!deepEqual(check, value)) changes = [{ path: [], before: now, after: value }];
+  return changes.map((c) => new EnvelopeStep(key, c.before, c.after, c.path));
 }
 
 /** Whether every envelope step of `steps` finds its `before`, given the ones before it. */
@@ -905,16 +936,8 @@ export function withEnvelope(tr: Transaction, envelope: WordEnvelope): Transacti
   const current = from && wordContext(from)?.envelope;
   if (!current) return tr;
   const now = afterEnvelopeSteps(current, tr.steps);
-  for (const key of ENVELOPE_KEYS) {
-    if (deepEqual(now[key], envelope[key])) continue;
-    let changes = entries(now[key], envelope[key], DEPTH[key]);
-    // Entries that would not give `envelope`'s value (a list reordered): the whole value.
-    let check: unknown = now[key];
-    for (const c of changes) check = setIn(check, c.path, c.after);
-    if (!deepEqual(check, envelope[key]))
-      changes = [{ path: [], before: now[key], after: envelope[key] }];
-    for (const c of changes) tr.step(new EnvelopeStep(key, c.before, c.after, c.path));
-  }
+  for (const key of ENVELOPE_KEYS)
+    for (const step of envelopeChanges(key, now[key], envelope[key])) tr.step(step);
   return tr;
 }
 

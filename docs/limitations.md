@@ -357,7 +357,7 @@ Custom nodes and marks, plugins and toolbar items ([extensions](guides/extension
   stays: its anchors there cannot be removed.
 - Revisions carry no initials (Word has none); comments do.
 - Since 1.6, undo takes back a style, list definition, resource or control's properties added with
-  an edit, with the edit (before, they stayed as in Word). The tracking switch is the
+  an edit, with the edit (before, they stayed; not checked against what Word does). The tracking switch is the
   document's (`settings.trackRevisions`, schema 7): a document with it set, or an imported
   `.docx` that tracks changes, cannot be read by 1.5 or earlier.
 

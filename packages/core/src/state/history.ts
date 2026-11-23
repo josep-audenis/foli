@@ -209,9 +209,20 @@ class RebaseMapping implements Mappable {
 
   constructor(private readonly base: Mappable) {}
 
-  /** shortcut: a story's positions through the base only, not mirrored over the rebased steps. */
+  /** A story's positions through the same path: the originals taken back, the base, the rebased. */
   storyMapping(id: string): Mapping | undefined {
-    return this.base.storyMapping?.(id);
+    const m = new Mapping();
+    const count = this.inverted.length;
+    for (let i = count - 1; i >= 0; i--) m.appendMap(this.inverted[i] as StepMap);
+    if (this.base instanceof Mapping) m.appendMapping(this.base);
+    else {
+      const story = this.base.storyMapping?.(id);
+      if (story) m.appendMapping(story);
+    }
+    this.rebased.forEach((map, i) => {
+      if (map) m.appendMap(map, count - 1 - i);
+    });
+    return m.storyMapping(id);
   }
 
   push(original: Step, rebased: Step | null): void {

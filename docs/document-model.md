@@ -490,7 +490,7 @@ From 1.4.0 a document is saved with the lowest version its content needs (ADR-00
 picture is rotated or cropped, so 1.0 to 1.3 keep reading what 1.4 saves without those; one that
 needs 6 is refused by them with a message saying so. A document that says 5 holding v6 content
 is refused. From 1.6.0 a document that holds `settings.trackRevisions` (on, or turned off after
-being on) needs 7; 1.4 and 1.5 refuse it, and a document that says 5 or 6 holding it is refused.
+being on) needs 7; every earlier release refuses it, and a document that says 5 or 6 holding it is refused.
 
 0.1.0 reads only version 1: it rejects documents saved by 0.2.0 ("Unsupported schemaVersion: 2").
 0.2.0 reads versions 1 and 2: it rejects documents saved by 0.3.0.
