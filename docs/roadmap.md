@@ -3049,7 +3049,7 @@ review. 21.1 to 21.6 lose data, hang or leak: they go first, in this order.
 - [x] 21.6 Docx: a zip entry cannot stand in for another part. `zip.ts` refuses duplicate names
   by lower case only; `package.ts` keys parts percent-decoded, so `word/%64ocument.xml` replaces
   `word/document.xml` silently (probed). Refuse when the decoded key is already taken.
-- [ ] 21.7 Core, smaller bugs: a new tracked change reuses a table row's revision id
+- [x] 21.7 Core, smaller bugs: a new tracked change reuses a table row's revision id
   (`track.ts`, `maxRevisionIn` reads no row attrs: duplicate `w:id` on export); `MERGEFIELD \@`
   takes any value `Date.parse` accepts (`"12"` becomes 2001-12-01; `fieldupdate.ts`): accept
   ISO dates and the document locale's numeric form only; `SEQ \r` with no number restarts at 0;

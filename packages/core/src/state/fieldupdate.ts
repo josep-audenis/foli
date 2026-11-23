@@ -226,6 +226,14 @@ export function formatNumericPicture(value: number, picture: string): string | n
   return out.join("");
 }
 
+/**
+ * A merge value read as a date by `\@`: ISO 8601 only (`2026-03-05`, with a time and zone or
+ * not), never what `Date.parse` guesses (`"12"` is not 2001-12-01).
+ * shortcut: the document's language is not known here, so its numeric form (`5/3/2026`) shows
+ * as written; read it when a field's language is.
+ */
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:\d{2})?)?$/;
+
 const NUMBER_SWITCH: Record<string, string> = {
   ROMAN: "upperRoman",
   roman: "lowerRoman",
@@ -743,8 +751,9 @@ function sequenceValues(run: Run, fields: readonly Field[]): Map<Field, number> 
     }
     // Of `\c`, `\n` and `\r`, the first written counts.
     const action = [...switches.keys()].find((letter) => "cnr".includes(letter));
-    const restart = Number(switches.get("r")?.[0]);
-    if (action === "r" && Number.isFinite(restart)) value = restart;
+    // A `\r` without a whole number to restart at counts on, as Word does.
+    const restart = switches.get("r")?.[0] ?? "";
+    if (action === "r" && /^\d+$/.test(restart)) value = Number(restart);
     else if (action !== "c") value++;
     counters.set(id, value);
     list.push({ pos: field.from, value });
@@ -874,7 +883,7 @@ function work(run: Run, field: Field, sequence: Map<Field, number>): Worked | nu
       const picture = switches.get("@")?.[0];
       if (value instanceof Date)
         shown = picture ? formatDatePicture(value, picture) : value.toISOString();
-      else if (picture && typeof value === "string" && !Number.isNaN(Date.parse(value)))
+      else if (picture && typeof value === "string" && ISO_DATE.test(value))
         // A bare day is that day here, not UTC's midnight (the day before, west of it).
         shown = formatDatePicture(
           new Date(/^\d{4}-\d{2}-\d{2}$/.test(value) ? `${value}T00:00` : value),

@@ -165,10 +165,11 @@ export function maxRevisionIn(doc: Node): number {
   };
   doc.descendants((node) => {
     for (const mark of node.marks) if (REVIEW_MARKS.has(mark.type.name)) see(mark.attrs);
+    // A paragraph's mark or a table row (`w:trPr/w:ins`, `w:del`) inserted or deleted.
+    const revision = node.attrs.revision as ParagraphRevision | null | undefined;
+    see(revision?.insertion);
+    see(revision?.deletion);
     if (node.isTextblock) {
-      const revision = node.attrs.revision as ParagraphRevision | null | undefined;
-      see(revision?.insertion);
-      see(revision?.deletion);
       see(node.attrs.formatChange);
       see((node.attrs.section as SectionJSON | null | undefined)?.change);
     }

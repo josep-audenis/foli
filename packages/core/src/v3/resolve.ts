@@ -361,9 +361,10 @@ function themeFont(theme: ThemeJSON | undefined, ref: string): string | null {
 
 /** A counter in a number format (ST_NumberFormat); formats Foli does not know show as decimal. */
 export function formatNumber(n: number, format: string | undefined): string {
+  if (format === "none") return "";
+  // A fraction has no roman, letter or ordinal form: its digits.
+  if (!Number.isInteger(n)) return String(n);
   switch (format ?? "decimal") {
-    case "none":
-      return "";
     case "decimalZero":
       return n >= 0 && n < 10 ? `0${n}` : String(n);
     case "upperRoman":
@@ -428,8 +429,10 @@ function letters(n: number): string {
 }
 
 function ordinal(n: number): string {
-  const tens = n % 100;
-  const suffix = tens >= 11 && tens <= 13 ? "th" : (["th", "st", "nd", "rd"][n % 10] ?? "th");
+  // A negative number's suffix is its size's: -1st, -12th.
+  const tens = Math.abs(n) % 100;
+  const suffix =
+    tens >= 11 && tens <= 13 ? "th" : (["th", "st", "nd", "rd"][Math.abs(n) % 10] ?? "th");
   return `${n}${suffix}`;
 }
 
