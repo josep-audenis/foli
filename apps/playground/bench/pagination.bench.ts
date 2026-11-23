@@ -10,8 +10,10 @@ import { benchDocument, loadTestFont, routeTestFont } from "../e2e/fixtures.js";
 const SIZES = [1, 10, 50, 100, 200];
 /** Every size with paragraphs; 100 sections also with each section's paragraphs as a list (7.4). */
 const CASES = [
-  ...SIZES.map((sections) => ({ sections, lists: false })),
-  { sections: 100, lists: true },
+  ...SIZES.map((sections) => ({ sections, lists: false, remote: 0 })),
+  { sections: 100, lists: true, remote: 0 },
+  // Three others typing at once (22.12): four clients, remote steps arriving between the keys.
+  { sections: 50, lists: false, remote: 3 },
 ];
 const MOUNTS = 5;
 const TYPED = "the quick brown fox jumps over the lazy dog ".repeat(2);
@@ -28,8 +30,9 @@ const round = (value: number) => Math.round(value * 10) / 10;
 
 test.describe.configure({ mode: "serial" });
 
-for (const { sections, lists } of CASES) {
-  test(`${sections}-section document${lists ? " with lists" : ""}`, async ({
+for (const { sections, lists, remote } of CASES) {
+  const others = remote ? `, ${remote} others editing` : "";
+  test(`${sections}-section document${lists ? " with lists" : ""}${others}`, async ({
     page,
     browserName,
   }) => {
@@ -41,7 +44,9 @@ for (const { sections, lists } of CASES) {
 
     const mounts: { layoutMs: number; paintMs: number; pages: number }[] = [];
     for (let i = 0; i < MOUNTS; i++) {
-      mounts.push(await page.evaluate((doc) => window.foliBench.mount(doc), json));
+      mounts.push(
+        await page.evaluate(([doc, n]) => window.foliBench.mount(doc, n), [json, remote] as const),
+      );
     }
     const pages = mounts[0]?.pages ?? 0;
     expect(mounts.every((mount) => mount.pages === pages)).toBe(true);
@@ -72,6 +77,8 @@ for (const { sections, lists } of CASES) {
     let typedChars = 0;
     const typed = await keys(() => page.keyboard.type(TYPED[typedChars++] ?? ""), TYPED.length);
     const enters = await keys(() => page.keyboard.press("Enter"), ENTERS);
+    // The others' steps did reach the editor while it typed (else this measured one user).
+    if (remote) expect(await page.evaluate(() => window.foliBench.version())).toBeGreaterThan(100);
 
     const reflows: { ms: number; pages: number; font: string }[] = [];
     for (let i = 0; i < REFLOWS; i++) {
@@ -89,6 +96,7 @@ for (const { sections, lists } of CASES) {
       browser: browserName,
       sections,
       lists,
+      remote,
       pages,
       layoutMs: round(median(mounts.map((mount) => mount.layoutMs))),
       layoutPaintMs: round(median(mounts.map((mount) => mount.paintMs))),

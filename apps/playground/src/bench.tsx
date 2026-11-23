@@ -2,8 +2,19 @@
  * The benchmark page (`/bench.html`, dev server only): mounts the editor on demand and times it
  * from inside the page. Driven by `apps/playground/bench/`; see docs/benchmarks.md.
  */
-import { parseDocument } from "@folijs/core";
-import { type FoliChange, FoliEditor } from "@folijs/react";
+import { createAuthority } from "@folijs/collab";
+import {
+  collab,
+  createEditor,
+  type Editor,
+  type FoliDocument,
+  getVersion,
+  parseDocument,
+  receiveTransaction,
+  Step,
+  sendableSteps,
+} from "@folijs/core";
+import { type FoliChange, FoliEditor, type FoliEditorHandle } from "@folijs/react";
 import { flushSync } from "react-dom";
 import { createRoot, type Root } from "react-dom/client";
 import "@folijs/react/styles.css";
@@ -66,17 +77,96 @@ swap.textContent =
   "html body .foli-canvas .foli-page :is(p, h1, h2, h3, h4, h5, h6, span) " +
   "{ font-family: sans-serif !important; }";
 
+/**
+ * Others editing the document at once (22.12): `count` headless editors, each typing a character
+ * into a paragraph of the document's second half every 50 ms, through an in-page authority; the
+ * mounted editor sends its own steps and receives theirs, as over a network with no delay.
+ */
+let others: ReturnType<typeof setInterval>[] = [];
+let measured: Editor | null = null;
+function collaborate(document: FoliDocument, own: Editor, count: number): void {
+  for (const timer of others) clearInterval(timer);
+  others = [];
+  const authority = createAuthority({ document });
+  const editors = [own];
+  const flush = () => {
+    for (const editor of editors) {
+      const sendable = sendableSteps(editor.state);
+      if (!sendable) continue;
+      const result = authority.receive({
+        version: sendable.version,
+        clientID: sendable.clientID,
+        steps: sendable.steps.map((s) => s.toJSON()),
+      });
+      if (!result.ok) continue;
+      for (const each of editors) {
+        if (getVersion(each.state) !== result.broadcast.version) continue;
+        const steps = result.broadcast.steps.map((json) => Step.fromJSON(each.state.schema, json));
+        each.dispatch(receiveTransaction(each.state, steps, result.broadcast.clientIDs));
+      }
+    }
+  };
+  for (let i = 0; i < count; i++) {
+    const editor = createEditor({ document, plugins: [collab({ clientID: i + 2 })] });
+    editors.push(editor);
+    let at = 0;
+    others.push(
+      setInterval(() => {
+        // A paragraph far from the first page: what they type moves no line of the user's.
+        const size = editor.state.doc.content.size;
+        const pos = Math.floor(size * (0.6 + 0.1 * i)) + (at++ % 5);
+        try {
+          editor.select(pos);
+          editor.commands.insertText("x");
+        } catch {
+          // Not a text position: the next tick tries another.
+        }
+        flush();
+      }, 50),
+    );
+  }
+  own.subscribe(() => queueMicrotask(flush));
+}
+
 const bench = {
-  /** Mounts a stored document: time until it is laid out (synchronous), and until painted. */
-  async mount(json: unknown): Promise<{ layoutMs: number; paintMs: number; pages: number }> {
+  /**
+   * Mounts a stored document: time until it is laid out (synchronous), and until painted. With
+   * `remote`, that many others edit it at once (`collaborate`).
+   */
+  async mount(
+    json: unknown,
+    remote = 0,
+  ): Promise<{ layoutMs: number; paintMs: number; pages: number }> {
     const document = parseDocument(json);
     root?.unmount();
+    for (const timer of others) clearInterval(timer);
+    others = [];
     root = createRoot(container);
     const start = performance.now();
-    flushSync(() => root?.render(<FoliEditor initialContent={document} onChange={readBack} />));
+    let handle: FoliEditorHandle | null = null;
+    flushSync(() =>
+      root?.render(
+        <FoliEditor
+          ref={(value) => {
+            handle = value;
+          }}
+          initialContent={document}
+          onChange={readBack}
+          {...(remote ? { plugins: [collab({ clientID: 1 })] } : {})}
+        />,
+      ),
+    );
+    const mounted = handle as FoliEditorHandle | null;
     const layoutMs = performance.now() - start;
+    // After the layout's time: setting the others up is not the document's layout.
+    if (remote && mounted) collaborate(document, mounted.editor, remote);
+    measured = mounted?.editor ?? null;
     await painted();
     return { layoutMs, paintMs: performance.now() - start, pages: pages() };
+  },
+  /** The authority's version the mounted editor has: how many steps reached it. */
+  version(): number {
+    return measured ? getVersion(measured.state) : -1;
   },
   /** The timing of the last key pressed, once its frame is painted. */
   lastKey(): Promise<KeySample> {

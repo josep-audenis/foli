@@ -106,7 +106,7 @@ export function metricsOf(record) {
     );
     return fields.map((field) => [
       record.browser,
-      `${field.replace(/Ms$/, "")} ${record.sections}`,
+      `${field.replace(/Ms$/, "")} ${record.sections}${record.remote ? ` remote ${record.remote}` : ""}`,
       record[field],
     ]);
   }
@@ -375,7 +375,7 @@ async function main() {
       "--config",
       "playwright.bench.config.ts",
       "--grep",
-      " (100|200)-section document$|find on a hundred pages",
+      " (100|200)-section document$|50-section document, 3 others editing$|find on a hundred pages",
       "--repeat-each",
       String(options.runs),
       ...browsers.map((engine) => `--project=${engine}`),
