@@ -401,15 +401,12 @@ export function theme(root: XmlElement, context: Context): ThemeJSON | undefined
  * `w:comments`, with replies and resolved state from `commentsExtended` (keyed by the
  * `w14:paraId` of each comment's last paragraph). Each comment keeps its start tag verbatim
  * (`ext`): values the model cannot hold (a long author, a date without a time) stay there.
- * An id the file repeats is given to its first comment; each later one gets a fresh id, listed
- * in `renumbered` (an id: the ids its comments have now, in the file's order) for its anchors.
  * @internal
  */
 export function comments(
   root: XmlElement,
   extended: XmlElement | undefined,
   context: ContentContext,
-  renumbered = new Map<number, number[]>(),
 ): CommentJSON[] {
   const byParaId = new Map<string, CommentJSON>();
   const list: CommentJSON[] = [];
@@ -440,18 +437,6 @@ export function comments(
       .at(-1)
       ?.attributes.find((x) => x.ns === W14 && x.local === "paraId")?.value;
     if (paraId && !byParaId.has(paraId)) byParaId.set(paraId, comment);
-  }
-  // Before replies are read: a reply names its parent by paragraph, and takes its id now.
-  let next = list.reduce((max, c) => Math.max(max, c.id), -1) + 1;
-  for (const c of list) {
-    const ids = renumbered.get(c.id);
-    if (!ids) {
-      renumbered.set(c.id, [c.id]);
-      continue;
-    }
-    context.report.unmodeled(`w:comment ${c.id}`, `an id taken by an earlier comment: ${next}`);
-    ids.push(next);
-    c.id = next++;
   }
   if (extended) {
     for (const ex of elements(extended)) {

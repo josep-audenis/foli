@@ -53,7 +53,7 @@ describe("comments made in the editor", () => {
   });
 });
 
-describe("comments whose ids a file repeats (21.3)", () => {
+describe("comments whose ids a file repeats (21.3, renumbered by parseDocument)", () => {
   const W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
   const anchored = (id: number, text: string) =>
     `<w:p><w:commentRangeStart w:id="${id}"/><w:r><w:t>${text}</w:t></w:r><w:commentRangeEnd w:id="${id}"/>` +
@@ -93,5 +93,10 @@ describe("comments whose ids a file repeats (21.3)", () => {
     const by = (id: number) => editor.getDocument().comments.find((c) => c.id === id);
     expect([by(1)?.done, by(3)?.done, by(2)?.done]).toEqual([undefined, true, true]);
     expect(by(1)?.author).toBe("A");
+    const again = await importDocx(await exportDocx(editor.getDocument()));
+    expect(again.document.comments.map((c) => [c.id, c.author, c.done])).toEqual(
+      editor.getDocument().comments.map((c) => [c.id, c.author, c.done]),
+    );
+    expect(again.document.content).toEqual(editor.getDocument().content);
   });
 });

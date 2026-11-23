@@ -1,7 +1,6 @@
 import {
   type ControlJSON,
   type FoliDocument,
-  type NodeJSON,
   parseDocument,
   type ResourceJSON,
   SCHEMA_VERSION,
@@ -126,16 +125,13 @@ export function importPackage(pkg: DocxPackage): DocxImport {
     : undefined;
   const commentsPart = related(REL.comments);
   const extended = related(REL.commentsExtended);
-  const renumbered = new Map<number, number[]>();
   const commented = commentsPart
     ? comments(
         commentsPart.root,
         extended?.root,
         contextFor(commentsPart.name, commentsPart.source),
-        renumbered,
       )
     : [];
-  renumberAnchors(content, renumbered);
   const stories = readStories(pkg, contextFor);
   const usedControls = controlsUsed([content, commented, stories]);
   // A settings part Foli cannot read is kept as it is, and read as saying nothing.
@@ -179,30 +175,6 @@ export function importPackage(pkg: DocxPackage): DocxImport {
     throw new DocxError(`Cannot import: ${(error as Error).message}`, { cause: error });
   }
   return { document, package: pkg, report: report.report(), trackRevisions };
-}
-
-const ANCHORS = new Set(["commentStart", "commentEnd", "commentReference"]);
-
-/**
- * The anchors of comments whose id the file repeats, given the ids `comments` gave them: the
- * n-th anchor of a kind with that id to the n-th comment (an anchor beyond them to the first).
- */
-function renumberAnchors(content: NodeJSON[], renumbered: ReadonlyMap<number, number[]>): void {
-  if (![...renumbered.values()].some((ids) => ids.length > 1)) return;
-  const seen = new Map<string, number>();
-  const walk = (nodes: NodeJSON[] | undefined) => {
-    for (const node of nodes ?? []) {
-      const ids = ANCHORS.has(node.type) ? renumbered.get(node.attrs?.id as number) : undefined;
-      if (ids && ids.length > 1) {
-        const key = `${node.type} ${node.attrs?.id}`;
-        const n = seen.get(key) ?? 0;
-        seen.set(key, n + 1);
-        node.attrs = { ...node.attrs, id: ids[n] ?? ids[0] };
-      }
-      walk(node.content);
-    }
-  };
-  walk(content);
 }
 
 /**

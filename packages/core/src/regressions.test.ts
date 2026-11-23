@@ -434,13 +434,64 @@ describe("several of one's own paragraphs, deleted together at the document's en
 });
 
 describe("duplicate comment ids (21.3)", () => {
-  it("are refused: a command by id would act on the wrong comment", () => {
-    const comment = (id: number) => ({ id, author: "A", content: [{ type: "paragraph" }] });
-    expect(() =>
-      parseDocument({ ...createDocument(), comments: [comment(1), comment(1), comment(2)] }),
-    ).toThrow("comments[1].id: 1 is the id of an earlier comment");
-    expect(() =>
-      parseDocument({ ...createDocument(), comments: [comment(1), comment(2)] }),
-    ).not.toThrow();
+  it("are given anew, anchors with them, so a command by id acts on one comment", () => {
+    const comment = (id: number, author: string) => ({
+      id,
+      author,
+      content: [{ type: "paragraph" }],
+    });
+    const anchored = (id: number, text: string): NodeJSON => ({
+      type: "paragraph",
+      content: [
+        { type: "commentStart", attrs: { id } },
+        { type: "text", text },
+        { type: "commentEnd", attrs: { id } },
+        { type: "commentReference", attrs: { id } },
+      ],
+    });
+    // Nested ranges of one id: each end closes the start opened last.
+    const nested: NodeJSON = {
+      type: "paragraph",
+      content: [
+        { type: "commentStart", attrs: { id: 5 } },
+        { type: "commentStart", attrs: { id: 5 } },
+        { type: "text", text: "x" },
+        { type: "commentEnd", attrs: { id: 5 } },
+        { type: "commentEnd", attrs: { id: 5 } },
+      ],
+    };
+    const input = {
+      ...createDocument(docOf(anchored(1, "a"), anchored(1, "b"), anchored(2, "c"), nested)),
+      comments: [
+        comment(1, "A"),
+        comment(1, "B"),
+        comment(2, "C"),
+        comment(5, "D"),
+        comment(5, "E"),
+      ],
+    };
+    const before = JSON.stringify(input);
+    const doc = parseDocument(input);
+    expect(JSON.stringify(input)).toBe(before);
+    expect(doc.comments.map((c) => [c.id, c.author])).toEqual([
+      [1, "A"],
+      [6, "B"],
+      [2, "C"],
+      [5, "D"],
+      [7, "E"],
+    ]);
+    const ids = doc.content.content?.map((b) =>
+      (b.content ?? []).filter((n) => n.type !== "text").map((n) => n.attrs?.id),
+    );
+    expect(ids).toEqual([
+      [1, 1, 1],
+      [6, 6, 6],
+      [2, 2, 2],
+      [5, 7, 7, 5],
+    ]);
+    const editor = createEditor({ document: input });
+    expect(editor.commands.resolveComment(6)).toBe(true);
+    const by = (id: number) => editor.getDocument().comments.find((c) => c.id === id);
+    expect([by(1)?.done, by(6)?.done]).toEqual([undefined, true]);
   });
 });

@@ -3028,7 +3028,8 @@ review. 21.1 to 21.6 lose data, hang or leak: they go first, in this order.
   `parseDocument` refuses duplicate comment ids; docx import (`import/parts.ts`) renumbers them
   (and their anchors), as paste already renumbers. Same check for bookmark names and control
   ids where a duplicate makes a command act on the wrong one.
-  (Done: comments refused and renumbered as said. Bookmark names and control ids need no
+  (Done: `parseDocument` renumbers them instead of refusing, so a document 1.4 saved with
+  them still opens; a reply to a repeated id stays the first's. Bookmark names and control ids need no
   check: a repeated bookmark name acts as in Word, the first found and every one renamed
   together; `importDocx` gives each control an id of its own and paste renumbers them.)
 - [ ] 21.4 PDF: two `exportPdf` calls on one page cannot mix (`pdf/src/index.ts`). Today the
