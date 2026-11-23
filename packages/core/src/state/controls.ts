@@ -7,6 +7,7 @@
  * ADR-0007): a filter compares what a transaction leaves with what was there, so it holds for
  * typing, paste, deletion, tracked changes and code alike; undo passes.
  */
+
 import {
   FoliDocumentError,
   Fragment,
@@ -26,6 +27,7 @@ import { attempt } from "./attempt.js";
 import { insertHardBreak, insertText } from "./commands.js";
 import { formatDatePicture } from "./fieldupdate.js";
 import { closeHistory, joinHistory } from "./history.js";
+import { idsOf } from "./ids.js";
 import { marksAt, Selection, TextSelection } from "./selection.js";
 import { type Command, type EditorState, Plugin, type Transaction } from "./state.js";
 import { trackedDeletes, trackTransaction } from "./track.js";
@@ -1386,9 +1388,12 @@ export function copiedControl(control: ControlJSON): ControlJSON {
  * An id no control of `controls` has.
  * @internal
  */
-export function freshControlId(controls: Controls | undefined): string {
-  let n = Object.keys(controls ?? {}).length + 1;
-  while (Object.hasOwn(controls ?? {}, `control-${n}`)) n++;
+export function freshControlId(
+  controls: Controls | undefined,
+  fresh: (after: number) => number = (n) => n + 1,
+): string {
+  let n = fresh(Object.keys(controls ?? {}).length);
+  while (Object.hasOwn(controls ?? {}, `control-${n}`)) n = fresh(n);
   return `control-${n}`;
 }
 
@@ -1452,7 +1457,7 @@ export function insertControl(
     const { controlStart, controlEnd } = schema.nodes;
     if (!controlStart || !controlEnd) return false;
     const { envelope } = context;
-    const id = freshControlId(envelope.controls);
+    const id = freshControlId(envelope.controls, idsOf(state));
     const control = newControl(kind, options);
     const add = (extra: Record<string, ControlJSON>) => ({
       ...(envelope.controls ?? {}),
@@ -1609,7 +1614,7 @@ export function addRepeatingItem(target?: string): Command {
         return id;
       let copy = copies.get(id);
       if (!copy) {
-        copy = freshControlId({ ...controls, ...added });
+        copy = freshControlId({ ...controls, ...added }, idsOf(state));
         copies.set(id, copy);
         added[copy] = copiedControl(controls[id] as ControlJSON);
       }

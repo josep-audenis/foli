@@ -689,7 +689,11 @@ A stale `StoryStep` or `EnvelopeStep`, or a `StoryEditStep` that no longer appli
 whole event (`storedStepsApply`); a story edit made outside history is mapped over, as in the
 body. A story editor maps its caret over a story edit that gives no selection (another editor's). Revision and
 bookmark ids are allocated over every tree (`otherTrees`), and accepting or rejecting all changes
-reaches every story.
+reaches every story. New ids (revisions, comments, notes, controls, numbering definitions, generated
+bookmark names and ids) come from `freshId(state, max)` (`state/ids.ts`, 22.5): the next number
+after the largest in use, or, with an id slot (the collab plugin's, from its client id), the next
+of the client's class `id ≡ slot (mod 256)`, so two editors of one document never give two changes
+one id; a single editor's ids are as before.
 
 A note opens the same way (`openNote`: double click on it or its number, Shift+Alt+N, the Notes
 menu), mounted in its piece at the foot of its reference's page, whole. A plugin in core

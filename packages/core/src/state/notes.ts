@@ -17,6 +17,7 @@ import type { NotePropertiesJSON, SectionJSON, StoryJSON } from "../v3/document.
 import { parseContent } from "../v3/document.js";
 import { formatNumber } from "../v3/resolve.js";
 import { closeHistory } from "./history.js";
+import { freshId } from "./ids.js";
 import { resolveStoryChanges } from "./review.js";
 import { documentSections } from "./sections.js";
 import { TextSelection } from "./selection.js";
@@ -210,7 +211,7 @@ function freshNoteId(state: EditorState, kind: NoteKind, taken: ReadonlySet<stri
   };
   for (const id of wordContext(state)?.stories.keys() ?? []) see(id);
   for (const id of taken) see(id);
-  return `${kind}:${max + 1}`;
+  return `${kind}:${freshId(state, max)}`;
 }
 
 /**
@@ -502,8 +503,8 @@ export function notesPlugin(): Plugin {
       const tr: Transaction = after.tr.setMeta(untracked, true);
       let revision = -1;
       const changed = (mark: Mark) => {
-        if (revision < 0) revision = nextRevisionId(after);
-        return mark.type.create({ ...mark.attrs, id: revision++ });
+        revision = revision < 0 ? nextRevisionId(after) : freshId(after, revision);
+        return mark.type.create({ ...mark.attrs, id: revision });
       };
       for (const [id, old] of was) {
         const story = storyAfter(after, tr, id);

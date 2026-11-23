@@ -32,6 +32,7 @@ import {
 import { TransformError } from "../transform/transform.js";
 import type { CommentJSON, SectionJSON } from "../v3/document.js";
 import { PARAGRAPH_PROPERTY_KEYS, RUN_PROPERTY_MARKS } from "../v3/schema.js";
+import { freshId } from "./ids.js";
 import { MARK_ATTRS } from "./mark.js";
 import { NodeSelection, Selection, TextSelection } from "./selection.js";
 import { type Command, type EditorState, Plugin, PluginKey, type Transaction } from "./state.js";
@@ -241,7 +242,7 @@ export function newRevision(state: EditorState): Revision | null {
 
 /** @internal The id after every change of the document, in all its trees. */
 export function nextRevisionId(state: EditorState): number {
-  return maxRevisionId(state) + 1;
+  return freshId(state, maxRevisionId(state));
 }
 
 /** A replaced range: `a..b` before the transaction, `c..d` after it. */
@@ -335,11 +336,13 @@ function rebuild(
       .map((r) => [r.a, r.b]),
   );
   const date = now();
-  let nextId = -1;
+  let lastId: number | null = null;
   const newId = () => {
-    if (nextId < 0)
-      nextId = Math.max(maxRevisionId(state) + 1, (tr.getMeta(revisionFloor) as number) ?? 0);
-    return nextId++;
+    lastId = freshId(
+      state,
+      lastId ?? Math.max(maxRevisionId(state), ((tr.getMeta(revisionFloor) as number) ?? 0) - 1),
+    );
+    return lastId;
   };
   const at = (x: At, assoc: number) => out.mapping.slice(x.step).map(x.pos, assoc);
   const here = (pos: number): At => ({ pos, step: out.steps.length });

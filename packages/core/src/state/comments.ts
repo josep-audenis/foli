@@ -7,9 +7,11 @@
  * them. A comment whose reference mark goes (its range deleted with it) goes too, with its
  * replies.
  */
+
 import type { Node, NodeJSON } from "../model/index.js";
 import type { CommentJSON } from "../v3/document.js";
 import { closeHistory } from "./history.js";
+import { freshId } from "./ids.js";
 import { AllSelection, Selection, TextSelection } from "./selection.js";
 import { type Command, type EditorState, Plugin, PluginKey, type Transaction } from "./state.js";
 import { now, trackState, untracked } from "./track.js";
@@ -56,7 +58,8 @@ function opaqueCommentIds(doc: Node): Set<number> {
 }
 
 /** The next free comment id: above every comment and every comment anchor, verbatim ones too. */
-function nextCommentId(doc: Node, comments: readonly CommentJSON[]): number {
+function nextCommentId(state: EditorState, comments: readonly CommentJSON[]): number {
+  const { doc } = state;
   let max = -1;
   for (const c of comments) max = Math.max(max, c.id);
   doc.descendants((node) => {
@@ -64,7 +67,7 @@ function nextCommentId(doc: Node, comments: readonly CommentJSON[]): number {
     return node.isBlock;
   });
   for (const id of opaqueCommentIds(doc)) max = Math.max(max, id);
-  return max + 1;
+  return freshId(state, max);
 }
 
 /** The comment a thread starts with (`id`'s, following `parent`). */
@@ -130,7 +133,7 @@ export function addComment(content: CommentContent, options: CommentOptions = {}
     if (!$from.parent.inlineContent || !$to.parent.inlineContent) return false;
     if (dispatch) {
       const comments = context.envelope.comments;
-      const id = nextCommentId(state.doc, comments);
+      const id = nextCommentId(state, comments);
       const tr = commentTr(state);
       // From the end, so the start's position stays.
       tr.insert($to.pos, [types.end.create({ id }), types.reference.create({ id })]);
@@ -169,7 +172,7 @@ export function replyToComment(
     if (!context || !root || !anchors || !commentStart || !commentEnd || !commentReference)
       return false;
     if (dispatch) {
-      const id = nextCommentId(state.doc, comments);
+      const id = nextCommentId(state, comments);
       const tr = commentTr(state);
       // As Word writes a thread: the starts together (this one after the thread's last), then
       // each end with its reference (this pair after the thread's last reference).

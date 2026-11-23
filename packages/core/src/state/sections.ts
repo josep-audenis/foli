@@ -16,6 +16,7 @@ import type { SectionJSON, StoryJSON } from "../v3/document.js";
 import { parseContent } from "../v3/document.js";
 import { checkSection } from "../v3/schema.js";
 import { closeHistory } from "./history.js";
+import { freshId } from "./ids.js";
 import { keepLastMark } from "./mark.js";
 import { TextSelection } from "./selection.js";
 import type { Command, EditorState, Transaction } from "./state.js";
@@ -191,7 +192,7 @@ export function insertSectionBreak(kind: SectionBreakKind = "nextPage"): Command
       const type = kind === "nextPage" ? undefined : kind;
       const change = setup.change && {
         ...setup.change,
-        id: nextRevisionId(state) + (revision ? 1 : 0),
+        id: revision ? freshId(state, revision.id) : nextRevisionId(state),
         previous: clean({ ...setup.change.previous, type }),
       };
       writeSection(
