@@ -1,5 +1,23 @@
 # @folijs/docx
 
+## 1.5.0
+
+### Patch Changes
+
+- 0bc8328: A footnote or endnote reference to a note the package does not hold no longer makes the export fail with "A note reference has no note": the import keeps such a reference verbatim (reported as opaque) instead of as a note reference, and the export writes it back as it was.
+- a73c1e6: A run property written twice in one `w:rPr` (two `w:rFonts`, say, as some tools write in styles and numbering levels) no longer makes the import fail with "duplicate mark": the two are read in order as one property, and the import report says so. The original `w:rPr` is still written back on export.
+- 63d7e9a: Export correctness from the audit of 1.4.0: a new package writes `w:compat` with `compatibilityMode` 15, so Word no longer opens it in compatibility mode; `doNotUseHTMLParagraphAutoSpacing` is written into an existing settings part that lacks it; a relationship whose part the package lacks gets that part where it points instead of a second relationship; `xml:space="preserve"` inherited from a paragraph or run is read; a cell or table naming both `left` and `start` (or `right` and `end`) writes one element for the side; drawing ids are found in single quotes and in UTF-16 parts. New export options `asDocument` and `dropped`: a `.docm`, `.dotm` or `.dotx` written as a plain `.docx`, its main part's type changed and its VBA project (its data and signatures with it) left out and reported; keyboard customizations stay. A new package also says Word 2013's other compatibility settings.
+- 5017c9d: A package with two zip entries that name one part once percent-decoded (`word/document.xml` and `word/%64ocument.xml`, or `[Content_Types].xml` encoded) is refused as damaged: before, the later entry silently stood in for the other part. So is a `[Content_Types].xml` giving one part two different types.
+- 1d7ba63: A paragraph with two `w:pPr` (schema-invalid, but written by some tools) no longer loses the second one silently: it is read into the first, property by property and in order, as Word does when it resaves such a file, and the import report says so.
+- bf15217: A tab character inside `w:t` is read as a tab (as the export writes it), so a document reads the same after a round trip. A `w:instrText` holding elements (a `w:br` in it) is kept verbatim instead of read as a field code the export could not place.
+- 4285724: An XML part holding a bare `&` is refused with "A bare & in text" instead of a message that quoted the document up to the next `;`.
+- Updated dependencies [084bac7]
+- Updated dependencies [d05fc3e]
+- Updated dependencies [125371e]
+- Updated dependencies [836abd3]
+- Updated dependencies [7cd3e1e]
+  - @folijs/core@1.5.0
+
 ## 1.4.0
 
 ### Minor Changes
