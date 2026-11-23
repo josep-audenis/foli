@@ -265,11 +265,16 @@ describe("readPackage", () => {
     // Nor two types for one part (the same one twice is only redundant).
     const typed = (...overrides: string[]) =>
       TYPES.replace("</Types>", `${overrides.join("")}</Types>`);
-    const doc = (type: string) =>
-      `<Override PartName="/WORD/%64ocument.xml" ContentType="${type}"/>`;
+    const other = (name: string, type: string) =>
+      `<Override PartName="${name}" ContentType="${type}"/>`;
+    const types = typed(other("/word/a.xml", "text/plain"), other("/WORD/%61.xml", "text/xml"));
     await expect(
-      readPackage(await zip({ ...files, "[Content_Types].xml": typed(doc("text/plain")) })),
+      readPackage(await zip({ ...files, "[Content_Types].xml": types })),
     ).rejects.toThrow(DocxError);
+    const same = typed(other("/word/a.xml", "text/xml"), other("/WORD/%61.xml", "text/xml"));
+    await expect(
+      readPackage(await zip({ ...files, "[Content_Types].xml": same })),
+    ).resolves.toBeDefined();
   });
 
   it("requires the main part to be WordprocessingML", async () => {
