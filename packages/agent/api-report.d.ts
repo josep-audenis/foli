@@ -50,14 +50,20 @@ export interface Block {
      * is.
      */
     text: string;
-    /** A table's size: its rows, and the cells of its longest row. */
+    /** A table's size: its rows, and its grid's columns (a merged cell spans several). */
     rows?: number;
     columns?: number;
-    /** Where a block in a table is: its table's handle, row and cell in the row, from 1. */
+    /**
+     * Where a block in a table is: its table's handle, row and grid column, from 1; `span`, the
+     * grid columns a cell merged across covers; `merged`, a cell merged with the ones below
+     * (`down`) or part of the cell above (`up`, its text shown there).
+     */
     cell?: {
         table: string;
         row: number;
         column: number;
+        span?: number;
+        merged?: "down" | "up";
     };
     /** How many tables it is inside: 0 in the body. */
     depth: number;
