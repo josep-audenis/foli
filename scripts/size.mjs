@@ -138,6 +138,9 @@ writeFileSync(appEntry, `export { FoliEditor } from "${dist("react")}";\n`);
  * Core, view, React and FoliEditor raised in 22.9 (91.6, 123.9, 175.6 and 173.7 kB; 94.7, 127.0,
  * 179.7 and 179.7 allowed): presence (core's peers mapped through every change, the view's
  * marks and carets) on bundles at their limit after the collab plugin.
+ * Agent raised in 23.2 (84.2 kB, 90.0 allowed): the tool definitions moved from the MCP server
+ * (23.1) and core's tracked table formatting, with room for Phase 23's operations (tables,
+ * formatting, pictures, headers, review), which are the session's own code.
  */
 const BUNDLES = [
   { name: "@folijs/core", entry: dist("core"), budget: 97_000 },
@@ -146,7 +149,7 @@ const BUNDLES = [
   { name: "FoliEditor only", entry: appEntry, budget: 184_000 },
   { name: "@folijs/docx", entry: dist("docx"), budget: 65_000 },
   { name: "@folijs/pdf", entry: dist("pdf"), budget: 18_800 },
-  { name: "@folijs/agent", entry: dist("agent"), budget: 86_000 },
+  { name: "@folijs/agent", entry: dist("agent"), budget: 92_160 },
   { name: "@folijs/collab", entry: dist("collab"), budget: 82_000 },
 ];
 /** Bundles built as they ship (minified scripts): their gzipped bytes, with their budget. */

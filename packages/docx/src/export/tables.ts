@@ -21,7 +21,25 @@ interface Spec {
   /** Attribute → the children it is written as. */
   children: Readonly<Record<string, readonly string[]>>;
   read: Reader;
-  write: (prop: string, value: Json | unknown) => string;
+  /** A child from its attribute; `attrs` and `ns` are the element's own (a change's previous). */
+  write: (prop: string, value: Json | unknown, attrs: Json, ns: Namespaces) => string;
+}
+
+/**
+ * A recorded formatting change (`w:tblPrChange`, `w:trPrChange`, `w:tcPrChange`; schema 8), its
+ * previous properties written over the element's own `ext`, so that what Foli does not model is
+ * in them as it is now (Word puts the whole element back on reject).
+ */
+function changeXml(spec: Spec, value: unknown, attrs: Json, ns: Namespaces): string {
+  if (!value) return "";
+  const v = value as Json;
+  const previous = { ...(v.previous as Json), ext: attrs.ext, formatChange: undefined };
+  return el(
+    `w:${spec.name.slice(2)}Change`,
+    { "w:id": s(v.id), "w:author": s(v.author) ?? "", "w:date": s(v.date) },
+    // The previous holds no change: its own is written as none, the element's dropped.
+    propertiesXml(spec, previous, ns, true),
+  );
 }
 
 const s = (x: unknown) => (x === undefined || x === null ? undefined : String(x));
@@ -118,10 +136,13 @@ const TABLE_CHILDREN: Record<string, readonly string[]> = {
   layout: ["tblLayout"],
   cellMargins: ["tblCellMar"],
   look: ["tblLook"],
+  formatChange: ["tblPrChange"],
 };
 
-function tableChild(prop: string, value: unknown): string {
+function tableChild(prop: string, value: unknown, attrs: Json, ns: Namespaces): string {
   switch (prop) {
+    case "formatChange":
+      return changeXml(TABLE, value, attrs, ns);
     case "style":
       return val("tblStyle", s(value));
     case "rowBandSize":
@@ -248,9 +269,10 @@ const ROW: Spec = {
     height: ["trHeight"],
     header: ["tblHeader"],
     revision: ["ins", "del"],
+    formatChange: ["trPrChange"],
   },
   read: (element, context) => rowProperties(element, context, true),
-  write: (prop, value) => {
+  write: (prop, value, attrs, ns) => {
     const v = (value ?? {}) as Json;
     switch (prop) {
       case "gridBefore":
@@ -268,6 +290,8 @@ const ROW: Spec = {
         return onOff("tblHeader", value as boolean | undefined);
       case "revision":
         return revisionXml("ins", v.insertion) + revisionXml("del", v.deletion);
+      case "formatChange":
+        return changeXml(ROW, value, attrs, ns);
       default:
         return "";
     }
@@ -307,9 +331,10 @@ const CELL: Spec = {
     margins: ["tcMar"],
     textDirection: ["textDirection"],
     verticalAlign: ["vAlign"],
+    formatChange: ["tcPrChange"],
   },
   read: (element, context) => cellProperties(element, context, false),
-  write: (prop, value) => {
+  write: (prop, value, attrs, ns) => {
     switch (prop) {
       case "width":
         return measureXml("tcW", value);
@@ -330,6 +355,8 @@ const CELL: Spec = {
         return val("textDirection", s(value));
       case "verticalAlign":
         return val("vAlign", s(value));
+      case "formatChange":
+        return changeXml(CELL, value, attrs, ns);
       default:
         return "";
     }
@@ -349,7 +376,7 @@ function propertiesXml(spec: Spec, attrs: Json, ns: Namespaces, always: boolean)
   const generated = new Map<string, string>();
   for (const [prop, locals] of Object.entries(spec.children)) {
     const text = keptOrFresh(original, same(current[prop], reread[prop]), locals, () =>
-      spec.write(prop, current[prop]),
+      spec.write(prop, current[prop], attrs, ns),
     );
     generated.set(locals[0] as string, text);
     for (const other of locals.slice(1)) generated.set(other, "");

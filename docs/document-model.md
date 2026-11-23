@@ -484,13 +484,17 @@ Migrations never drop content. A published version never changes in place.
 | 4       | 0.5.0       | v4 → v5 (`migrateToV5`): only the version changes (what is opaque stays so until its `.docx` is imported again)      |
 | 5       | 0.6.0       | v5 → v6: only the version changes (v6 only adds attributes)                                                          |
 | 6       | 1.4.0       | v6 → v7: only the version changes (v7 only adds a setting)                                                           |
-| 7       | 1.6.0       | — (the current version: the tracking switch, `settings.trackRevisions`, ADR-0012)                                    |
+| 7       | 1.6.0       | v7 → v8: only the version changes (v8 only adds attributes)                                                          |
+| 8       | 1.7.0       | — (the current version: a table's, row's or cell's recorded formatting, `formatChange`, ADR-0013)                    |
 
 From 1.4.0 a document is saved with the lowest version its content needs (ADR-0008): 5 unless a
 picture is rotated or cropped, so 1.0 to 1.3 keep reading what 1.4 saves without those; one that
 needs 6 is refused by them with a message saying so. A document that says 5 holding v6 content
 is refused. From 1.6.0 a document that holds `settings.trackRevisions` (on, or turned off after
 being on) needs 7; every earlier release refuses it, and a document that says 5 or 6 holding it is refused.
+From 1.7.0 a table, row or cell with a recorded formatting change (`formatChange`: `id`,
+`author`, `date`, `previous`, the properties before; `w:tblPrChange`, `w:trPrChange`,
+`w:tcPrChange`) needs 8, and a document that says 7 or less holding one is refused.
 
 0.1.0 reads only version 1: it rejects documents saved by 0.2.0 ("Unsupported schemaVersion: 2").
 0.2.0 reads versions 1 and 2: it rejects documents saved by 0.3.0.

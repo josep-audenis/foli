@@ -1,11 +1,61 @@
-import type { Mark, MarkType, ResolvedPos } from "../model/index.js";
+import { Mark, type MarkType, type ResolvedPos } from "../model/index.js";
 import { isSafeHref } from "../schema.js";
 import { TransformError } from "../transform/transform.js";
 import { attempt } from "./attempt.js";
 import { AllSelection, marksAt, TextSelection } from "./selection.js";
 import type { Command, EditorState, Transaction } from "./state.js";
 import { CellSelection } from "./tables.js";
+import { trackState } from "./track.js";
 import { styleLink, unstyleLink } from "./wordformat.js";
+
+/**
+ * Links `from..to` as `marks` says, as a tracked change while tracking (23.2): Word records no
+ * change of a link (`w:hyperlink` has no record of its own), so the text is deleted and inserted
+ * again with the link as it is now; rejecting puts the text back as it was. Untracked, the marks
+ * change in place. Text already deleted as a tracked change is left.
+ */
+function relink(
+  state: EditorState,
+  tr: Transaction,
+  from: number,
+  to: number,
+  type: MarkType,
+  marks: (marks: readonly Mark[]) => readonly Mark[],
+  mark: Mark | null,
+): void {
+  if (!trackState(state)?.on) {
+    if (mark) tr.addMark(from, to, mark);
+    else tr.removeMark(from, to, type);
+    return;
+  }
+  const deletion = state.schema.marks.deletion;
+  const pieces: { from: number; to: number; text: string; marks: readonly Mark[] }[] = [];
+  tr.doc.nodesBetween(from, to, (node, pos) => {
+    if (!node.isText) return true;
+    if (deletion?.isInSet(node.marks)) return false;
+    const s = Math.max(pos, from);
+    const e = Math.min(pos + node.nodeSize, to);
+    // Inserted text (anyone's) takes the link in place: it is part of that insertion, and its
+    // author stays its author.
+    if (state.schema.marks.insertion?.isInSet(node.marks)) {
+      if (mark) tr.addMark(s, e, mark);
+      else tr.removeMark(s, e, type);
+      return false;
+    }
+    const next = marks(node.marks);
+    if (!Mark.sameSet(next, node.marks))
+      pieces.push({
+        from: s,
+        to: e,
+        text: (node.text as string).slice(s - pos, e - pos),
+        marks: next,
+      });
+    return false;
+  });
+  // From the end: a replacement keeps the length, but the rebuild's do not, and none is mapped.
+  for (const piece of pieces.reverse())
+    tr.insertText(piece.text, piece.from, piece.to, piece.marks);
+}
 
 const EMAIL = /^[^\s@/:]+@[^\s@/:]+\.\p{L}{2,}$/iu;
 /**
@@ -156,14 +206,16 @@ export function setLink(href: string): Command {
     if (!selection.empty) {
       return attempt(state, dispatch, (tr) => {
         for (const { from, to } of selection.ranges) {
-          tr.addMark(from, to, mark);
+          relink(state, tr, from, to, type, (marks) => mark.addToSet(marks), mark);
           styleLink(tr, state, from, to);
         }
       });
     }
     const around = linkAround(selection.$from, type);
     if (!around) return insertLink(normalized)(state, dispatch);
-    return attempt(state, dispatch, (tr) => tr.addMark(around.from, around.to, mark));
+    return attempt(state, dispatch, (tr) =>
+      relink(state, tr, around.from, around.to, type, (marks) => mark.addToSet(marks), mark),
+    );
   };
 }
 
@@ -177,7 +229,7 @@ export const removeLink: Command = (state, dispatch) => {
   if (!ranges.length) return false;
   return attempt(state, dispatch, (tr) => {
     for (const range of ranges) {
-      tr.removeMark(range.from, range.to, type);
+      relink(state, tr, range.from, range.to, type, (marks) => type.removeFromSet(marks), null);
       unstyleLink(tr, state, range.from, range.to);
     }
   });

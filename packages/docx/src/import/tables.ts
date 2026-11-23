@@ -125,6 +125,21 @@ function look(el: XmlElement | undefined, context: Context): Json | undefined {
   return Object.fromEntries(LOOK_BITS.map(([key, bit]) => [key, (mask & bit) !== 0]));
 }
 
+/**
+ * A recorded formatting change (`w:tblPrChange`, `w:trPrChange`, `w:tcPrChange`; schema 8): who,
+ * when, and the properties it holds as they were. One without an id is left in `ext`.
+ */
+function formatChange(
+  change: XmlElement | undefined,
+  previous: (el: XmlElement | undefined) => Json,
+  local: string,
+): Json | undefined {
+  if (!change) return undefined;
+  const { id, author, date } = revisionOf(change);
+  if (id === undefined) return undefined;
+  return compact({ id, author, date: date ?? undefined, previous: previous(child(change, local)) });
+}
+
 const value = (el: XmlElement | undefined) => attr(el, "val");
 const whole = (el: XmlElement | undefined) => integer(attr(el, "val"));
 const on = (el: XmlElement | undefined) => (el ? toggle(el) : undefined);
@@ -152,6 +167,11 @@ export function tableProperties(el: XmlElement | undefined, context: Context, ex
   keep("look", look(at("tblLook"), context), "tblLook");
   keep("rowBandSize", whole(at("tblStyleRowBandSize")), "tblStyleRowBandSize");
   keep("columnBandSize", whole(at("tblStyleColBandSize")), "tblStyleColBandSize");
+  keep(
+    "formatChange",
+    formatChange(at("tblPrChange"), (p) => tableProperties(p, context, false), "tblPr"),
+    "tblPrChange",
+  );
   if (ext) out.ext = sourceOf(context, el);
   return out;
 }
@@ -205,6 +225,11 @@ export function rowProperties(el: XmlElement | undefined, context: Context, node
     return id === undefined ? undefined : compact({ id, author, date: date ?? undefined });
   };
   keep("revision", compact({ insertion: revision("ins"), deletion: revision("del") }), "ins");
+  keep(
+    "formatChange",
+    formatChange(at("trPrChange"), (p) => rowProperties(p, context, false), "trPr"),
+    "trPrChange",
+  );
   out.ext = sourceOf(context, el);
   return out;
 }
@@ -230,10 +255,16 @@ export function cellProperties(el: XmlElement | undefined, context: Context, nod
   keep("verticalAlign", value(at("vAlign")), "vAlign");
   keep("textDirection", value(at("textDirection")), "textDirection");
   keep("noWrap", on(at("noWrap")), "noWrap");
+  keep(
+    "formatChange",
+    formatChange(at("tcPrChange"), (p) => cellProperties(p, context, false), "tcPr"),
+    "tcPrChange",
+  );
   if (node) out.ext = sourceOf(context, el);
   return out;
 }
 
+const unchanged = ({ formatChange: _, ...json }: Json) => json;
 const nonEmpty = (json: Json) => (Object.keys(json).length ? json : undefined);
 
 /**
@@ -252,9 +283,10 @@ export function tableStyleParts(
     return {
       paragraph: pPr ? nonEmpty(paragraph(pPr)) : undefined,
       run: marks.length ? marks : undefined,
-      table: nonEmpty(tableProperties(child(el, "tblPr"), context, false)),
+      // A style's own recorded change stays in its `ext`: a style's parts hold none.
+      table: nonEmpty(unchanged(tableProperties(child(el, "tblPr"), context, false))),
       row: nonEmpty(rowProperties(child(el, "trPr"), context, false)),
-      cell: nonEmpty(cellProperties(child(el, "tcPr"), context, false)),
+      cell: nonEmpty(unchanged(cellProperties(child(el, "tcPr"), context, false))),
     };
   };
   const own = parts(style);

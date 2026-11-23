@@ -313,6 +313,29 @@ export const checkRowProperties: Check = propertiesCheck(rowProperties);
 /** @internal */
 export const checkCellProperties: Check = propertiesCheck(cellProperties);
 
+/**
+ * Table, row and cell properties a formatting change records (`previous`, schema 8): all but the
+ * verbatim XML.
+ * @internal
+ */
+export const TABLE_PROPERTY_KEYS: readonly string[] = Object.keys(tableProperties).filter(
+  (k) => k !== "ext",
+);
+/** @internal */
+export const ROW_PROPERTY_KEYS: readonly string[] = Object.keys(rowProperties).filter(
+  (k) => k !== "ext",
+);
+/** @internal */
+export const CELL_PROPERTY_KEYS: readonly string[] = Object.keys(cellProperties).filter(
+  (k) => k !== "ext",
+);
+/**
+ * A table's, row's or cell's recorded formatting (`w:tblPrChange`, `w:trPrChange`,
+ * `w:tcPrChange`; schema 8): who, when, and the properties before.
+ */
+const tableFormatChange = (previous: Check) =>
+  nullableAttr(shape({ ...revisionFields, previous }, ["id", "author", "previous"]));
+
 /** EMU (English Metric Units: 914 400 per inch), as DrawingML measures pictures. */
 const emu = int(0, 2_147_483_647);
 const offset = int(-2_147_483_648, 2_147_483_647);
@@ -617,6 +640,7 @@ export const schema = new Schema({
         grid: { default: [], validate: listOf(positiveTwips, MAX_COLUMNS) },
         /** The `w:tblGrid` the grid was read from, verbatim. */
         gridExt: nullableAttr(xml),
+        formatChange: tableFormatChange(checkTableProperties),
       },
     },
     tableRow: {
@@ -628,6 +652,7 @@ export const schema = new Schema({
         revision: nullableAttr(shape({ insertion: revision, deletion: revision })),
         /** The row's table property exceptions (`w:tblPrEx`). */
         exceptions: nullableAttr(checkTableProperties),
+        formatChange: tableFormatChange(checkRowProperties),
         /** `w:tr`'s own unknown attributes (`w14:paraId`, revision save ids…). */
         attributes: nullableAttr(attributes),
       },
@@ -635,7 +660,11 @@ export const schema = new Schema({
     tableCell: {
       // As Word requires, a cell ends with a paragraph.
       content: "block* paragraph",
-      attrs: { ...cellProperties, ...controlsAttr },
+      attrs: {
+        ...cellProperties,
+        ...controlsAttr,
+        formatChange: tableFormatChange(checkCellProperties),
+      },
     },
     /** Block content Foli does not model yet (a table inside a content control…), kept verbatim. */
     opaqueBlock: {

@@ -31,7 +31,13 @@ import {
 } from "../transform/steps.js";
 import { TransformError } from "../transform/transform.js";
 import type { CommentJSON, SectionJSON } from "../v3/document.js";
-import { PARAGRAPH_PROPERTY_KEYS, RUN_PROPERTY_MARKS } from "../v3/schema.js";
+import {
+  CELL_PROPERTY_KEYS,
+  PARAGRAPH_PROPERTY_KEYS,
+  ROW_PROPERTY_KEYS,
+  RUN_PROPERTY_MARKS,
+  TABLE_PROPERTY_KEYS,
+} from "../v3/schema.js";
 import { freshId } from "./ids.js";
 import { MARK_ATTRS } from "./mark.js";
 import { NodeSelection, Selection, TextSelection } from "./selection.js";
@@ -104,6 +110,16 @@ const propertiesOf = (attrs: Attrs) =>
   Object.fromEntries(RECORDED.filter((k) => attrs[k] != null).map((k) => [k, attrs[k]]));
 const sameProperties = (a: Attrs, b: Attrs) =>
   RECORDED.every((k) => deepEqual(a[k] ?? null, b[k] ?? null));
+
+/**
+ * @internal
+ * The properties a table's, row's or cell's formatting change records, by node type (schema 8).
+ */
+export const TABLE_RECORDED: Readonly<Record<string, readonly string[]>> = {
+  table: TABLE_PROPERTY_KEYS,
+  tableRow: ROW_PROPERTY_KEYS,
+  tableCell: CELL_PROPERTY_KEYS,
+};
 
 /** A tracked change's author and date, as the schema keeps them (`w:id`, `w:author`, `w:date`). */
 interface Revision {
@@ -196,10 +212,9 @@ export function maxRevisionIn(doc: Node): number {
     const revision = node.attrs.revision as ParagraphRevision | null | undefined;
     see(revision?.insertion);
     see(revision?.deletion);
-    if (node.isTextblock) {
-      see(node.attrs.formatChange);
-      see((node.attrs.section as SectionJSON | null | undefined)?.change);
-    }
+    // A paragraph's, table's, row's or cell's recorded formatting.
+    if (node.isTextblock || TABLE_RECORDED[node.type.name]) see(node.attrs.formatChange);
+    if (node.isTextblock) see((node.attrs.section as SectionJSON | null | undefined)?.change);
     return true;
   });
   return max;
@@ -650,9 +665,44 @@ function rebuild(
       out.addMark(from, to, formatChange.create(attrs));
     }
   };
+  /**
+   * A table's, row's or cell's properties changed: recorded as Word records them (`w:tblPrChange`,
+   * `w:trPrChange`, `w:tcPrChange`), the record keeping the properties before the first change;
+   * one's own record of what the node is again goes.
+   */
+  const recordTable = (step: NodeMarkupStep, keys: readonly string[]): NodeMarkupStep => {
+    const node = out.doc.nodeAt(step.pos) as Node;
+    const attrs = step.attrs as Attrs;
+    const same = (a: Attrs, b: Attrs) => keys.every((k) => deepEqual(a[k] ?? null, b[k] ?? null));
+    if (same(node.attrs, attrs)) return step;
+    // In one's own inserted rows the change is part of the insertion, as in a paragraph.
+    const own = (row: Node) =>
+      (row.attrs.revision as ParagraphRevision | null)?.insertion?.author === author;
+    const rows =
+      node.type.name === "table"
+        ? Array.from({ length: node.childCount }, (_, i) => node.child(i))
+        : [node.type.name === "tableRow" ? node : out.doc.resolve(step.pos).parent];
+    if (rows.every(own)) return step;
+    const record = node.attrs.formatChange as { author: string; previous: Attrs } | null;
+    const formatChange = record
+      ? same(attrs, record.previous) && record.author === author
+        ? null
+        : record
+      : {
+          id: newId(),
+          author,
+          date,
+          previous: Object.fromEntries(
+            keys.filter((k) => node.attrs[k] != null).map((k) => [k, node.attrs[k]]),
+          ),
+        };
+    return new NodeMarkupStep(step.pos, step.type, { ...attrs, formatChange }, step.marks);
+  };
   const recordParagraph = (step: NodeMarkupStep): NodeMarkupStep => {
     const node = out.doc.nodeAt(step.pos);
     const attrs = step.attrs;
+    const table = node && TABLE_RECORDED[node.type.name];
+    if (table && attrs && node.type === step.type) return recordTable(step, table);
     if (!node?.isTextblock || !attrs || node.type !== step.type) return step;
     // Only the mark's attributes change (a split moves them to the second paragraph): as is.
     if (sameProperties(node.attrs, attrs)) return step;

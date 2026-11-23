@@ -34,7 +34,7 @@ place that says what is in progress; check it before starting work.
 | 20 Corpus run             | ✅ Done                  | —                       | Merged in #206–#222; its five `@folijs/docx` fixes ship with Phase 21's release (owner, 2026-11-23)                                                                                           |
 | 21 Hardening              | ✅ Done                  | —                       | Merged in #220–#237; 1.5.0, `@folijs/agent` 0.3.2 and `@folijs/mcp` 0.2.3 on npm (2026-11-23), with Phase 20's docx fixes; two limits await the owner's word (21.13)                          |
 | 22 Collaboration          | ✅ Done                  | —                       | Merged in #238–#251; released as 1.6.0 (#252; `@folijs/collab` 0.1.0, `@folijs/agent` 0.3.3, `@folijs/mcp` 0.2.4); a rare divergence a heavier property run found is a known limit            |
-| 23 Agent editing parity   | In progress              | `phase-23/agent-parity` | Building 2026-11-23: 23.1 (ADR-0013, the tools in `@folijs/agent`) merged                                                                                                                     |
+| 23 Agent editing parity   | In progress              | `phase-23/agent-parity` | Building: 23.1 (ADR-0013) and 23.2 (tracked table formatting, schema 8) merged                                                                                                                |
 
 Status values: `Ready` (dependencies met, nobody on it) · `In progress` · `In review` (PR open) ·
 `✅ Done` (merged, acceptance criteria met) · `Blocked by …`.
@@ -3393,13 +3393,25 @@ lands second merges the other in (no rebase: force push is blocked).
   its `doc` summary built from them. What a client lists compared as JSON before and after:
   the same bytes, 14 tools and 2,978 description characters (8,273 with schemas), 15 and 5,658
   (11,236) with `--code`; ADR-0013 has the table.
-- [ ] 23.2 Core: table structure and links while tracking. What Word records for each table
+- [x] 23.2 Core: table structure and links while tracking. What Word records for each table
   command (`w:tblPrChange`, `w:tcPrChange`, `w:trPrChange`, `w:tblGridChange`, `w:cellIns`,
   `w:cellDel`, `w:cellMerge`) and for a link, from ECMA-376 and from tracked tables in the
   Phase 20 corpus; files saved by Word 365 only if the owner supplies them (no manual check is
   waited for). Track in core what is recorded that way and round-trips; keep refusing the rest
   while tracking with a reason the agent passes on (the fallback for all of it if the sources
   disagree). Findings and the list of what stays refused in limitations.md.
+  Done. Found in the Phase 20 corpus (3,551 files; no Word 365 files supplied): Word wrote
+  `w:tblPrChange` in 61 files, `w:tcPrChange` in 62, `w:tblGridChange` in 63, `w:trPrChange`
+  in 3, `w:cellIns` and `w:cellDel` in 3 each, `w:cellMerge` in none (Word records a merge as
+  `w:tcPrChange` holding the old `w:gridSpan` or `w:vMerge`); the elements agree with ECMA-376.
+  Tracked now (schema 8, a `formatChange` on tables, rows and cells, `tableFormatting` in
+  `trackedChanges`): table styles, header rows, cell shading, read from and written to `.docx`;
+  the 62 corpus files with them round-trip their 675 records and accept and reject cleanly.
+  Links added, changed or taken off while tracking are the text deleted and inserted again with
+  the link (Word has no record of a link; before, the link itself was not tracked). Still
+  refused while tracking, with the reason in limitations.md: column insertion and deletion,
+  merging and splitting, column widths (each needs cells inserted or deleted, a grid change and
+  cell formatting recorded together).
 - [ ] 23.3 Agent: tables. `insertTable` next to a block (rows, columns, header row,
   cell text), rows and columns in and out, merge and split, style, shading, widths, header
   rows; one tool `edit_table`; `run` methods.

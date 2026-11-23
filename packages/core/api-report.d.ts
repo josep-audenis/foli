@@ -1973,7 +1973,8 @@ export declare function setPictureAlt(pos: number, alt: string, decorative?: boo
 /**
  * Accepting and rejecting tracked changes (9.4), as Word does. A change is a run of content with
  * one `insertion`, `deletion` or `formatChange` mark, a paragraph mark inserted or deleted
- * (`revision`), or a paragraph's recorded formatting (`formatChange`). Accepting an insertion or
+ * (`revision`), or a paragraph's, table's, row's or cell's recorded formatting (`formatChange`).
+ * Accepting an insertion or
  * a formatting change drops its record; accepting a deletion removes the content (a deleted
  * paragraph mark joins the paragraph with the next, keeping the first one's properties, as an
  * untracked join). Rejecting does the reverse: inserted content goes (an inserted paragraph mark
@@ -1984,7 +1985,7 @@ export declare function setPictureAlt(pos: number, alt: string, decorative?: boo
 import type { Node } from "../model/index.js";
 import type { SectionJSON } from "../v3/document.js";
 import { type Command } from "./state.js";
-export type ChangeKind = "insertion" | "deletion" | "formatting" | "paragraphInsertion" | "paragraphDeletion" | "paragraphFormatting" | "sectionFormatting" | "rowInsertion" | "rowDeletion";
+export type ChangeKind = "insertion" | "deletion" | "formatting" | "paragraphInsertion" | "paragraphDeletion" | "paragraphFormatting" | "sectionFormatting" | "rowInsertion" | "rowDeletion" | "tableFormatting";
 /** One tracked change of the document, where it is. */
 export interface Change {
     readonly kind: ChangeKind;
@@ -2362,7 +2363,7 @@ export declare function isHeaderRow(state: EditorState): boolean;
 /**
  * Makes the selection's rows header rows, with every row above them (Word repeats only a run of
  * rows from the table's top), or, when they all are, makes them and the header rows below them
- * ordinary rows. Not while tracking.
+ * ordinary rows. While tracking, a tracked formatting change of each row (`w:trPrChange`).
  */
 export declare const toggleHeaderRow: Command;
 /** The table styles one can pick: the document's, with Word's Table Grid where it lacks it. */
@@ -2371,12 +2372,13 @@ export declare function tableStyles(state: EditorState): string[];
 export declare function tableStyleAt(state: EditorState): string | null;
 /**
  * Gives the table around the selection the table style named `name` (Word's Table Grid is
- * added when missing; any other must exist), or none. Not while tracking.
+ * added when missing; any other must exist), or none. While tracking, a tracked formatting
+ * change of the table (`w:tblPrChange`).
  */
 export declare function setTableStyle(name: string | null): Command;
 /**
- * Shades the selected cells with `fill` (`RRGGBB`), or takes their shading off (null). Not
- * while tracking.
+ * Shades the selected cells with `fill` (`RRGGBB`), or takes their shading off (null). While
+ * tracking, a tracked formatting change of each cell (`w:tcPrChange`).
  */
 export declare function setCellShading(fill: string | null): Command;
 /**
@@ -3150,9 +3152,10 @@ import { type ContentOptions, type ParseOptions } from "./extensions.js";
 /**
  * The schema version of documents in the Word model (ADR-0005; v4 adds tables and pictures,
  * ADR-0006; v5 stories, fields, content controls and notes, ADR-0007; v6 a picture's rotation and
- * crop; v7 the tracking switch in the settings, ADR-0012).
+ * crop; v7 the tracking switch in the settings, ADR-0012; v8 a table's, row's or cell's recorded
+ * formatting, ADR-0013).
  */
-export declare const SCHEMA_VERSION = 7;
+export declare const SCHEMA_VERSION = 8;
 /** Page setup of a section, in twips (1/1440 inch). Missing parts take Word's defaults. */
 export interface SectionJSON {
     pageSize?: {
@@ -3528,7 +3531,7 @@ export interface FoliDocument {
      * The lowest schema its content needs (ADR-0008): 5 (1.0's) unless it holds what a later one
      * added (6: a picture's rotation or crop, 1.4).
      */
-    schemaVersion: 5 | 6 | typeof SCHEMA_VERSION;
+    schemaVersion: 5 | 6 | 7 | typeof SCHEMA_VERSION;
     /** The last section's page setup (`w:body/w:sectPr`); earlier sections end at paragraphs. */
     section: SectionJSON;
     /** Document defaults (`w:docDefaults`). */

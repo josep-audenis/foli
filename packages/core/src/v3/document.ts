@@ -42,9 +42,10 @@ import {
 /**
  * The schema version of documents in the Word model (ADR-0005; v4 adds tables and pictures,
  * ADR-0006; v5 stories, fields, content controls and notes, ADR-0007; v6 a picture's rotation and
- * crop; v7 the tracking switch in the settings, ADR-0012).
+ * crop; v7 the tracking switch in the settings, ADR-0012; v8 a table's, row's or cell's recorded
+ * formatting, ADR-0013).
  */
-export const SCHEMA_VERSION = 7;
+export const SCHEMA_VERSION = 8;
 
 /** Page setup of a section, in twips (1/1440 inch). Missing parts take Word's defaults. */
 export interface SectionJSON {
@@ -396,7 +397,7 @@ export interface FoliDocument {
    * The lowest schema its content needs (ADR-0008): 5 (1.0's) unless it holds what a later one
    * added (6: a picture's rotation or crop, 1.4).
    */
-  schemaVersion: 5 | 6 | typeof SCHEMA_VERSION;
+  schemaVersion: 5 | 6 | 7 | typeof SCHEMA_VERSION;
   /** The last section's page setup (`w:body/w:sectPr`); earlier sections end at paragraphs. */
   section: SectionJSON;
   /** Document defaults (`w:docDefaults`). */
@@ -443,8 +444,8 @@ export function migrateToV5(doc: FoliDocumentV4): FoliDocument {
 
 /**
  * The lowest schema `doc`'s content needs (ADR-0008: a document is saved with it, so an older
- * 1.x reads it when it can): 7 for the tracking switch in the settings, 6 for a picture rotated
- * or cropped, else 5.
+ * 1.x reads it when it can): 8 for a table's, row's or cell's recorded formatting, 7 for the
+ * tracking switch in the settings, 6 for a picture rotated or cropped, else 5.
  * @internal
  */
 export function schemaVersionOf(
@@ -452,12 +453,13 @@ export function schemaVersionOf(
     settings?: WordSettingsJSON | undefined;
   },
 ): FoliDocument["schemaVersion"] {
-  if (doc.settings?.trackRevisions !== undefined) return 7;
   const trees = [
     doc.content,
     ...doc.comments.map((c) => ({ content: c.content })),
     ...Object.values(doc.stories ?? {}).map((s) => s.content),
   ];
+  if (trees.some((tree) => laterNode(tree, 7))) return 8;
+  if (doc.settings?.trackRevisions !== undefined) return 7;
   return trees.some((tree) => laterNode(tree, 5)) ? 6 : 5;
 }
 
@@ -516,7 +518,7 @@ export function parseDocument(input: unknown, options: ParseOptions = {}): FoliD
   if (version === 1 || version === 2) {
     return parseDocument(migrateToV5(migrateToV4(migrateToV3(parseDocumentV2(input)))), options);
   }
-  if (version === 3 || version === 4 || version === 5 || version === 6) {
+  if (version === 3 || version === 4 || version === 5 || version === 6 || version === 7) {
     if (version === 3 && Object.hasOwn(input, "resources"))
       fail("resources", "unknown key (schema 4 and later)");
     if (version < 5)
@@ -526,7 +528,7 @@ export function parseDocument(input: unknown, options: ParseOptions = {}): FoliD
     // What a later schema added is not in a document that says it is of an earlier one.
     const later = version < 5 ? laterSection(doc.section) : undefined;
     if (later) fail("section", `${later} is of schema 5 (the document says schema ${version})`);
-    if (doc.settings?.trackRevisions !== undefined)
+    if (version < 7 && doc.settings?.trackRevisions !== undefined)
       fail("settings.trackRevisions", `is of schema 7 (the document says schema ${version})`);
     for (const [path, content] of [
       ["content", doc.content],
@@ -756,6 +758,8 @@ function laterSection(section: unknown): string | undefined {
   return isRecord(section) ? V5_SECTION_KEYS.find((key) => Object.hasOwn(section, key)) : undefined;
 }
 
+const TABLE_NODES = new Set(["table", "tableRow", "tableCell"]);
+
 /**
  * The first thing in validated content JSON that a schema after `version` added, if any: a node
  * type, a block's `controls`, a part of a section.
@@ -777,6 +781,8 @@ function laterNode(
     if (part) return { name: part, schema: 5 };
     if (version < 6 && name === "picture" && (attrs.rotation != null || attrs.crop != null))
       return { name: "a picture's rotation or crop", schema: 6 };
+    if (version < 8 && TABLE_NODES.has(name) && attrs.formatChange != null)
+      return { name: `a ${name} with a formatChange`, schema: 8 };
     if (Array.isArray(node.content)) for (const child of node.content) stack.push(child);
   }
   return undefined;
